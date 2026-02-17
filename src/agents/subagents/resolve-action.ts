@@ -3,6 +3,7 @@ import { spawnSubagent } from "../subagent.js";
 import type { SubagentResult, SubagentStreamCallback } from "../subagent.js";
 import { rollDice } from "../../tools/dice/index.js";
 import type { RollDiceInput } from "../../types/dice.js";
+import { getModel } from "../../config/models.js";
 
 const SYSTEM_PROMPT = `You are a mechanical resolution engine. You resolve actions by reading character sheets and rules, determining modifiers, calling roll_dice, and evaluating results.
 
@@ -47,7 +48,7 @@ export async function resolveAction(
     client,
     {
       name: "resolve_action",
-      model: "claude-haiku-4-5-20251001",
+      model: getModel("small"),
       visibility: onStream ? "player_facing" : "silent",
       systemPrompt: SYSTEM_PROMPT,
       maxTokens: 256,

@@ -7,6 +7,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { ChoiceFrequency } from "../../types/config.js";
 import { oneShot } from "../subagent.js";
 import type { UsageStats } from "../agent-loop.js";
+import { getModel } from "../../config/models.js";
 
 export interface GeneratedChoices {
   choices: string[];
@@ -50,7 +51,7 @@ export async function generateChoices(
 
   const result = await oneShot(
     client,
-    "claude-haiku-4-5-20251001",
+    getModel("small"),
     SYSTEM_PROMPT,
     userMessage,
     150,

@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
+import { getModel } from "../../config/models.js";
 
 const SYSTEM_PROMPT = `You append terse summaries to a running scene precis.
 
@@ -29,7 +30,7 @@ export async function updatePrecis(
 
   return oneShot(
     client,
-    "claude-haiku-4-5-20251001",
+    getModel("small"),
     SYSTEM_PROMPT,
     prompt,
     128,

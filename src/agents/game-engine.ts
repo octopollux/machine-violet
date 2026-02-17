@@ -8,6 +8,7 @@ import type { DroppedExchange } from "../context/conversation.js";
 import { SceneManager } from "./scene-manager.js";
 import type { SceneState, FileIO } from "./scene-manager.js";
 import type { DMSessionState } from "./dm-prompt.js";
+import { getModel } from "../config/models.js";
 
 // --- Types ---
 
@@ -78,7 +79,7 @@ export class GameEngine {
       params.fileIO,
     );
     this.callbacks = params.callbacks;
-    this.model = params.model ?? "claude-opus-4-6";
+    this.model = params.model ?? getModel("large");
   }
 
   /** Get current engine state */
@@ -89,6 +90,11 @@ export class GameEngine {
   /** Get session usage stats */
   getSessionUsage(): UsageStats {
     return { ...this.sessionUsage };
+  }
+
+  /** Get scene manager (for shutdown transcript flush) */
+  getSceneManager(): SceneManager {
+    return this.sceneManager;
   }
 
   /**
@@ -247,7 +253,6 @@ export class GameEngine {
         this.setState("dm_thinking");
         this.callbacks.onToolEnd(name);
       },
-      onError: (error) => this.callbacks.onError(error),
     };
   }
 

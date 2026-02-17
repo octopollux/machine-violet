@@ -7,6 +7,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { SubagentStreamCallback } from "../subagent.js";
 import { spawnSubagent } from "../subagent.js";
 import type { UsageStats } from "../agent-loop.js";
+import { getModel } from "../../config/models.js";
 
 export interface PromotionInput {
   /** Current character file content (markdown with front matter) */
@@ -65,7 +66,7 @@ ${input.characterSheet}`;
     client,
     {
       name: "promote_character",
-      model: "claude-haiku-4-5-20251001",
+      model: getModel("small"),
       visibility: onStream ? "player_facing" : "silent",
       systemPrompt,
       maxTokens: 1024,

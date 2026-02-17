@@ -2,6 +2,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { UsageStats } from "../agent-loop.js";
 import type { SubagentStreamCallback } from "../subagent.js";
 import { spawnSubagent } from "../subagent.js";
+import { getModel } from "../../config/models.js";
 
 /**
  * Context snapshot for OOC mode — captured when entering, restored when exiting.
@@ -96,7 +97,7 @@ export async function enterOOC(
     client,
     {
       name: "ooc",
-      model: "claude-sonnet-4-5-20250929",
+      model: getModel("medium"),
       visibility: "player_facing",
       systemPrompt,
       maxTokens: 512,

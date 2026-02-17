@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
+import { getModel } from "../../config/models.js";
 
 const SYSTEM_PROMPT = `You write campaign log entries from scene transcripts.
 
@@ -25,7 +26,7 @@ export async function summarizeScene(
 ): Promise<SubagentResult> {
   return oneShot(
     client,
-    "claude-haiku-4-5-20251001",
+    getModel("small"),
     SYSTEM_PROMPT,
     `Write a campaign log entry for this scene:\n\n${transcript}`,
     256,

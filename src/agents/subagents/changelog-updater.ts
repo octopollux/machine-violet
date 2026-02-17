@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
+import { getModel } from "../../config/models.js";
 
 const SYSTEM_PROMPT = `You identify entities meaningfully involved in a scene and write changelog entries.
 
@@ -31,7 +32,7 @@ export async function updateChangelogs(
 
   return oneShot(
     client,
-    "claude-haiku-4-5-20251001",
+    getModel("small"),
     SYSTEM_PROMPT,
     prompt,
     512,

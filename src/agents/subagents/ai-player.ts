@@ -1,7 +1,8 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { PlayerConfig } from "../../types/config.js";
-import type { ModelId, UsageStats } from "../agent-loop.js";
+import type { UsageStats } from "../agent-loop.js";
 import { oneShot } from "../subagent.js";
+import { getModel } from "../../config/models.js";
 
 /**
  * Context provided to the AI player for decision-making.
@@ -27,10 +28,10 @@ export interface AIPlayerResult {
   usage: UsageStats;
 }
 
-const MODEL_MAP: Record<string, ModelId> = {
-  haiku: "claude-haiku-4-5-20251001",
-  sonnet: "claude-sonnet-4-5-20250929",
-};
+const MODEL_MAP = {
+  haiku: () => getModel("small"),
+  sonnet: () => getModel("medium"),
+} as const;
 
 /**
  * Build the system prompt for an AI player.
@@ -67,7 +68,8 @@ export async function aiPlayerTurn(
   client: Anthropic,
   ctx: AIPlayerContext,
 ): Promise<AIPlayerResult> {
-  const model = MODEL_MAP[ctx.player.model ?? "haiku"] ?? MODEL_MAP.haiku;
+  const lookup = MODEL_MAP[ctx.player.model ?? "haiku"] ?? MODEL_MAP.haiku;
+  const model = lookup();
   const systemPrompt = buildAIPlayerPrompt(ctx);
 
   const userMessage = ctx.recentNarration || "It's your turn. What do you do?";
