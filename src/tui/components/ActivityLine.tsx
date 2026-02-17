@@ -1,0 +1,22 @@
+import React from "react";
+import { Text, Box } from "ink";
+import { getActivity } from "../activity.js";
+
+interface ActivityLineProps {
+  engineState: string | null;
+}
+
+/**
+ * Shows what the engine is doing — mapped from in-flight tool calls.
+ * Hidden when idle (null state).
+ */
+export function ActivityLine({ engineState }: ActivityLineProps) {
+  const activity = getActivity(engineState);
+  if (!activity) return null;
+
+  return (
+    <Box>
+      <Text dimColor>{activity.label}</Text>
+    </Box>
+  );
+}

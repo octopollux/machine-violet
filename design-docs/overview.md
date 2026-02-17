@@ -1,55 +1,141 @@
-# tui-rpg: An agentic RPG in your conole
+# tui-rpg: An Agentic RPG in Your Console
 
-TUI-RPG is an agentic DM and game state manager designed to run any RPG. The design relies heavily on tool calls, local state, and non-generative creative tools in addition to the powers of the AI storyteller/DM.
+TUI-RPG is an agentic DM and game state manager designed to run any tabletop RPG in a terminal. The AI is the Dungeon Master — it narrates, adjudicates, manages the world, and manipulates the UI directly. The player never sees game files or internal state. Everything is narrated.
+
+
+## Architecture
+
+tui-rpg is a single Ink (React for CLI) application. The game engine, Claude SDK integration, and TUI are all one process — no abstraction layer between engine and interface. The DM agent has tools that manipulate both game state and the UI directly, so it can do things that weren't anticipated at design time.
+
+Game state lives on the filesystem as markdown and JSON. Automatic git snapshots (via isomorphic-git, no system dependency) provide rollback and recovery. A web API could be exposed later but is not an architectural prerequisite.
 
 Tech stack:
-- Claude SDK
-- Ink (TUI)
-- Tools to unpack game systems/campaigns from source documents, like PDFs
-- TBD
+- **Runtime**: Node.js (18+)
+- **Language**: TypeScript
+- **UI**: Ink (React for CLI)
+- **AI**: Anthropic Claude SDK (Opus for DM, Sonnet for setup/OOC, Haiku for mechanical tasks)
+- **State**: Filesystem (markdown + JSON) with isomorphic-git for snapshots
+- **Document import**: Claude vision for PDF extraction
 
 
-## Harness and setup
-- tui-rpg comes equipped to run as many freely-available or open-source RPGs as possible, as well as a systemless free-play option.
-- Skills are included to build games using unknown (user-supplied) systems
-- For non-free systems, the agent asks the user to provide source materials
-- The agent has a single permission knob which grants access to a variety of external sources of game systems, storytelling resources, etc
-- tui-rpg is highly filesystem-reliant; The game world is built in a filesystem structure optimized for use through tools and agents:
-    - The entire game is logged (Markdown); a base campaign log tersely summarizes the course of the campaign with relative-path links to scene directories, which contain complete gameplay transcripts, DM-only details, and relative links to other resources
-    - Other resource types (in folders): locations, characters, players, etc etc.
-    - Location descriptions represent a wiki-linked structure which comprises the generated game world
-    - Some locations may have a data structure which enables it to be rendered (or at least reasoned about) in tiles; this structure needs to support at least squares and hexes if we do it.
+## Execution Tiers
 
-- There is a game initialization phase:
-    - Sets home directory for the campaign
-    - Accepts additional game materials, like PDF
-    - Agentically sets up any extra tooling which may be needed, like a card-draw routine
-    - Prompts the user to answer questions:
-        - System, setting, difficulty
-        - Mood and style; Is it a silly campaign, a grimdark one, a peaceful exploration?
-    - The DM sets up essential components of the game world, particularly turn timers for important world events, if applicable.
+Work is pushed down to the cheapest tier that can handle it reliably. See [Context Management Design](context-management.md) for cost modeling.
 
-- The game has an automatic turn counter, and a turn-counter alarm tool that the DM can use to make in-game background events happen in simulated "real time". Outside of combat, the "turn counter" increments off of certain events like dice rolls, level-ups, rests, travel, etc. The turn counter alarm drops a notification into the DM's context, invisibly to the player.
+| Tier | Cost | Handles |
+|---|---|---|
+| **Tier 1: Code** | Zero tokens | Dice rolls, spatial math, pathfinding, viewport rendering, clock arithmetic, file I/O |
+| **Tier 2: Haiku/Sonnet** | Cheap tokens | Action resolution, rule lookups, transcript summarization, PDF parsing, OOC mode |
+| **Tier 3: Opus** | Expensive tokens | Narration, NPC personality, creative decisions, rule judgment, dramatic pacing |
+
+A tool is worth building if it saves significant tokens or if the model would be unreliable without it.
 
 
+## The Game World
 
-## UI/UX ideas
-- Entities have text colors when mentioned: Enemies are red, allies are green, neutral parties are gray; any character can have a custom text color (used rarely, for color - think gold dragons). PCs get to pick their colors.
-- Rolls are automatic; if the player says "I hit it with my sword", the DM calls a subagent with information about conditions (like, for example, that the PC is grappled/standing in water/etc) and target, and the subagent uses the character sheet(s) to infer the attack type (if not stated clearly) and roll the attack. The subagent may ask questions - the player can choose from a list or provide their own freeform answer. This applies to any rollable action, not just attacks! NPCs also use this subagent, but silently - only returning results to the DM.
-- Automatic rolls on behalf of PCs show "Rolled 1d10: 3" in grey text, or "Rolled 3d6; crit!", where `crit!` is highlighted in red. 
-- Rolls are implemented in software; if the game system is sufficiently exotic, the game initialization process may need to code-generate the dice roll/card draw routine.
-- The user is always allowed to roll on their own and simply tell the DM; the DM will still call the dice roll tool, but with a parameter that also states the outcome. This is because dice rolls may have hooks, and the dice roll tool needs to protest if the dice roll was impossible (the user rolled a 9 for damage on an attack which cannot exceed 1d4, for example).
-- The game is implemented in a text-mode console, scrolling as normal.
-- Key gameplay mode changes (Entering normal gameplay, leveling up, entering combat, party wipe, OOC mode) cause the TUI to render a pretty ASCII-art horizontal rule/line separator, and the color scheme of the entire TUI changes.
-- The main output-text area has a lower edge rendered in ASCII art with stylistic flourishes; these can change based on the situation. Below this line is the text-input area and a Nethack-style modeline under the DM's control.
+### Filesystem as Database
+The campaign directory is the database. The campaign transcript is the knowledge backbone — dense with wikilinks to entity files, serving as both narrative record and the DM's index into the game world. Entity types: players, characters, locations, factions, lore (grab-bag), rules, and the campaign log. Every entity reference in a transcript is a wikilink. PC character sheets are the one piece of state the player may see. → [Entity Filesystem Design](entity-filesystem.md)
 
+### Tile Maps
+Locations can have tile maps — sparse JSON structures with a tool layer for spatial queries, viewport rendering, and entity management. Supports square and hex grids. The DM sees small rendered viewports, not raw data. → [Map System Design](map-system.md)
 
-
-## Gameplay engine ideas
-- The game has a toggleable Out-Of-Character mode. This makes the UI take on a different color scheme, and the DM agent can talk to the player either as a player or as a user (for example, to answer game system questions, remind the player about previous in-game eents, or to resolve technical issues with the game system or the tui-rpg app itself). The DM can toggle OOC mode at will as the flow of conversation leaves or reenters normal gameplay.
+### Clocks and Alarms
+Two clocks manage time automatically. A **calendar** tracks narrative time and advances via scene transitions. A **round counter** tracks combat turns. Both support alarms that fire notifications into the DM's context invisibly to the player. → [Clocks and Alarms Design](clocks-and-alarms.md)
 
 
-## DM guidance
-- Write agent-facing documents densely, with heavy used of shorthand, cultural/literary references, etc.; calling a character a "Pecksniff" or a "Stacey" does a lot of heavily lifting in providing character personality without filling up the context window.
-- To make storytelling more convincing, a great option is to prepare multiple options (in dense shorthand), then use the dice tool to choose for you; You can use uneven probabilities in the number space of a D100 to make improbable things appropriately improbable, but *possible*.
-- Remember: The in-game universe exists for the player to interact with, but this doesn't mean that the universe *revolves around the player*; charisma is not mind control, you cannot break through a stone wall with a spoon, and ignoring the Big Bad for months probably ends in a loss condition.
+## Game Systems
+
+tui-rpg ships with support for freely available RPG systems (fetched at runtime), a catalog of pre-built options, and the ability to import user-supplied sourcebooks via PDF. A "Just jump in" mode uses a hidden lightweight system (24XX or text-adventure conventions) for zero-friction freeform play. → [Rules Systems Reference](rules-systems.md), [Document Ingestion Design](document-ingestion.md)
+
+
+## Randomization
+
+Dice, cards, and random tables are handled by Tier 1 code (true randomness) combined with a Tier 2 resolution subagent (Haiku reads rules, determines modifiers, interprets results). Tools return mechanistic results (individual die values, not just totals). Resource pools live on character sheets, not in a separate system. Player-claimed rolls are validated but accepted. → [Randomization Tools Design](randomization.md)
+
+
+## Subagents
+
+A subagent is a nested Claude API conversation with its own context window. The DM delegates a task; the subagent works through it and returns a terse result. The DM's context is not polluted by intermediate steps.
+
+**Silent** (DM-only): NPC dice rolls, rule lookups, transcript summarization, PDF parsing.
+
+**Player-facing** (takes over the TUI): Character generation, level-up, OOC mode.
+
+OOC mode is a sandboxed Sonnet subagent. It receives the DM's context on entry, handles rules questions, transcript searches, and configuration changes, and returns only a terse summary to the DM when it ends. The DM controls OOC entry and exit via tools.
+
+
+## Scene and Session Management
+
+Scenes are an engine concept, not a game-system concept. A scene transition is a commit point — the DM signals a structural moment and the engine handles a cascade of housekeeping: transcript finalization, campaign log updates, clock advancement, alarm checks, context window pruning, and state checkpointing.
+
+- **`scene_transition`**: natural narrative boundary. Fires Tier 1 bookkeeping + Tier 2 summarization. Returns alarm notifications and a clean slate.
+- **`session_end`**: saves a session recap for next time.
+- **`session_resume`**: "previously on..." — loads campaign state into the DM's fresh context.
+- **`context_refresh`**: mid-scene reorientation without a full scene break.
+
+→ [Context Management Design](context-management.md)
+
+
+## Game Initialization
+
+After a one-time API key and home directory prompt, the entire setup process is agentic (Sonnet). Structured choices (3-5 options + freeform) at each step. A "Just jump in" fast path gets the player into a random game in under a minute by mashing Enter. Players choose a genre, system, campaign seed, DM personality (swappable prompt fragment, Rimworld-style), and character. → [Game Initialization Design](game-initialization.md)
+
+### Persistent Data Location
+Campaign directories, cached rules, and app configuration live under a platform-specific home directory chosen to land inside cloud-synced folders by default (Documents on Windows/macOS).
+
+
+## Multiplayer and AI Players
+
+Multiplayer is hot-seat — multiple players share one terminal. A player bar at the bottom of the TUI shows who's active. Outside initiative, players switch freely with a hotkey. During initiative, the system controls turn order.
+
+AI players are trivially simple — a Haiku/Sonnet call replacing human input, using the character's personality prompt and sheet. Enables solo-with-party, mixed parties, and demo mode. → [Multiplayer and Initiative Design](multiplayer-and-initiative.md)
+
+
+## TUI
+
+The layout is a bordered narrative window with DM-controlled chrome. Bottom to top: player selector, input line, modeline, styled lower frame (turn indicator), activity line, scrolling DM text, top frame (resource display). Left/right frames complete the border. Frame styles are pre-baked per genre with combat/exploration/OOC/level-up variants — the DM (or engine) swaps variants via tools. The top frame shows the active character's key resources (Tier 1, configurable keys pointing into the character sheet). The activity line shows automatic indicators for in-flight engine operations. The DM can use inline formatting tags (`<b>`, `<i>`, `<u>`, justification, hex colors) sparingly for dramatic effect. Themed modals handle character sheets, player choices, dramatic dice rolls, session recaps, and the ESC game menu. A `present_choices` tool lets the DM (or a Haiku subagent, automatically) offer structured A/B/C options with freeform always available — frequency is configurable per campaign and per player. Responsive design degrades gracefully from full chrome (≥80×40) down to bare DM text + input (20×12). → [TUI Design](tui-design.md)
+
+### Visual conventions
+- **Entity colors**: enemies red, allies green, neutral gray. PCs pick their own color. Custom colors for special entities.
+- **Dice display**: automatic rolls show results in styled text ("Rolled 2d20kh1+5: [18,7] → 23"). Crits are highlighted.
+- **Player rolls**: players can roll physical dice and report results; the engine validates and fires hooks.
+
+
+## Error Recovery
+
+Automatic git snapshots provide point-in-time rollback. API failures retry with backoff; sustained outages save and resume. Multi-step cascades (like scene transitions) are idempotent and resumable. Periodic validation checks catch state drift between files. Players can request rollback, corrections, and consistency checks via OOC mode. → [Error Recovery Design](error-recovery.md)
+
+
+## DM Prompt and Guidance
+
+The DM is not an assistant — it runs a world. The system prompt establishes role (decide things, say no, let bad things happen, have secrets, surprise yourself), voice (personality via swappable DM personality fragments), and tool discipline (call the tool when state changes, delegate mechanical work to subagents).
+
+Agent-facing documents should be written densely, using shorthand and cultural/literary references to maximize information per token. The dice-for-narrative-choices pattern (prepare options, roll to choose) keeps storytelling unpredictable. → [DM Developer Prompt](dm-prompt.md)
+
+
+## Implementation Constraints
+
+**Cross-platform packaging.** The app must be buildable into installation packages for Windows, macOS, and Linux. Not implemented now, but nothing in the codebase should preclude it. Constraints: no native addons that don't cross-compile, no hard-coded path separators, no platform-specific shell assumptions in app code. isomorphic-git (already chosen) avoids the system git dependency. Packaging mechanism (pkg, caxa, Node SEA) is a deferred build-time decision.
+
+**Testability of agentic outputs.** Where AI outputs have testable structure, validate them with static test code in addition to normal unit/integration testing. Tier 1 tools are fully deterministic (use seeded RNG for dice). Tier 2 subagent outputs have defined return schemas — validate shape, bounds, and consistency (damage within weapon range, HP non-negative, wikilinks resolve, etc.). The filesystem wikilink contract, entity file format, JSON validity, and changelog structure are all verifiable by code. The TUI formatting parser is deterministic and fully testable.
+
+
+## Design Documents Index
+
+| Document | Topic |
+|---|---|
+| [Map System](map-system.md) | Sparse JSON maps, spatial tools, viewport rendering |
+| [Entity Filesystem](entity-filesystem.md) | Entity types, folder structure, wikilinks, changelogs |
+| [Randomization Tools](randomization.md) | Dice, cards, action resolution, hooks |
+| [Rules Systems Reference](rules-systems.md) | Free game system catalog, licensing, freeform play |
+| [DM Developer Prompt](dm-prompt.md) | DM system prompt draft and engineering notes |
+| [Document Ingestion](document-ingestion.md) | PDF import pipeline, batch API |
+| [Context Management](context-management.md) | Token economics, retention policy, cost modeling |
+| [Clocks and Alarms](clocks-and-alarms.md) | Calendar, combat rounds, alarm system |
+| [Game Initialization](game-initialization.md) | Setup flow, campaign seeds, DM personalities |
+| [Multiplayer and Initiative](multiplayer-and-initiative.md) | Hot-seat, AI players, turn order |
+| [Error Recovery](error-recovery.md) | Git snapshots, rollback, validation |
+| [TUI Design](tui-design.md) | Layout, frames, styles, responsive design, DM formatting |
+| [Tools Catalog](tools-catalog.md) | All 37 tools by domain, signatures, tiers |
+| [Subagents Catalog](subagents-catalog.md) | All 14 subagent patterns, models, visibility |
+| [Development Plan](development-plan.md) | 10-phase implementation roadmap, dependency graph, testing strategy |
