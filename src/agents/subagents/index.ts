@@ -7,3 +7,7 @@ export { aiPlayerTurn, buildAIPlayerPrompt } from "./ai-player.js";
 export type { AIPlayerContext, AIPlayerResult } from "./ai-player.js";
 export { enterOOC, buildOOCPrompt } from "./ooc-mode.js";
 export type { OOCSnapshot, OOCResult } from "./ooc-mode.js";
+export { generateChoices, shouldGenerateChoices } from "./choice-generator.js";
+export type { GeneratedChoices } from "./choice-generator.js";
+export { promoteCharacter } from "./character-promotion.js";
+export type { PromotionInput, PromotionResult } from "./character-promotion.js";
