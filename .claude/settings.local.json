@@ -20,7 +20,9 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(node_modules/.bin/vitest run:*)",
-      "Bash(npm info:*)"
+      "Bash(npm info:*)",
+      "Bash(grep:*)",
+      "Bash(node -e:*)"
     ]
   }
 }

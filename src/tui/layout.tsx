@@ -9,6 +9,7 @@ import {
   ActivityLine,
   NarrativeArea,
   HorizontalBorder,
+  SideFrame,
 } from "./components/index.js";
 import {
   getViewportTier,
@@ -47,7 +48,6 @@ export interface LayoutProps {
   engineState: string | null;
 
   // Display options
-  dmBackground?: string;
   quoteColor?: string;
 }
 
@@ -69,7 +69,6 @@ export function Layout(props: LayoutProps) {
     resources,
     turnHolder,
     engineState,
-    dmBackground,
     quoteColor,
   } = props;
 
@@ -80,12 +79,19 @@ export function Layout(props: LayoutProps) {
   const width = dimensions.columns;
   const narRows = narrativeRows(dimensions.rows, elements);
 
+  // Side frame width (1 for now, designed to support 2 later)
+  const sideFrameWidth: 1 | 2 = 1;
+
   // Activity glyph for modeline (when activity line dropped)
   const activity = getActivity(engineState);
   const actGlyph = elements.activityGlyphInModeline ? activity?.glyph : undefined;
 
   // Turn info for modeline (when lower frame dropped)
   const turnForModeline = elements.turnInfoInModeline ? turnHolder : undefined;
+
+  // Height and inner width of the middle section (narrative + activity) for side frames
+  const middleHeight = narRows + (elements.activityLine ? 1 : 0);
+  const innerWidth = elements.sideFrames ? width - 2 * sideFrameWidth : width;
 
   return (
     <Box flexDirection="column" width={width} height={dimensions.rows}>
@@ -100,11 +106,36 @@ export function Layout(props: LayoutProps) {
         />
       )}
 
-      {/* Narrative Area */}
-      <NarrativeArea lines={narrativeLines} maxRows={narRows} columns={width} dmBackground={dmBackground} quoteColor={quoteColor} />
+      {/* Middle section: optional side frames + narrative + activity */}
+      <Box flexDirection="row">
+        {elements.sideFrames && (
+          <SideFrame
+            variant={frameVariant}
+            side="left"
+            height={middleHeight}
+            frameWidth={sideFrameWidth}
+            ascii={ascii}
+          />
+        )}
 
-      {/* Activity Line */}
-      {elements.activityLine && <ActivityLine engineState={engineState} />}
+        <Box flexDirection="column" width={innerWidth}>
+          {/* Narrative Area */}
+          <NarrativeArea lines={narrativeLines} maxRows={narRows} quoteColor={quoteColor} />
+
+          {/* Activity Line */}
+          {elements.activityLine && <ActivityLine engineState={engineState} />}
+        </Box>
+
+        {elements.sideFrames && (
+          <SideFrame
+            variant={frameVariant}
+            side="right"
+            height={middleHeight}
+            frameWidth={sideFrameWidth}
+            ascii={ascii}
+          />
+        )}
+      </Box>
 
       {/* Lower Frame (turn indicator) */}
       {elements.lowerFrame && (

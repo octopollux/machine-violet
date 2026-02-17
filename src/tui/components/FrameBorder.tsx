@@ -1,7 +1,7 @@
 import React from "react";
 import { Text, Box } from "ink";
 import type { FrameStyleVariant } from "../../types/tui.js";
-import { renderHorizontalFrame, renderContentLine } from "../frames/index.js";
+import { renderHorizontalFrame, renderVerticalFrame, renderContentLine } from "../frames/index.js";
 
 interface HorizontalBorderProps {
   variant: FrameStyleVariant;
@@ -23,6 +23,33 @@ export function HorizontalBorder({
   return (
     <Box>
       <Text color={variant.color}>{line}</Text>
+    </Box>
+  );
+}
+
+interface SideFrameProps {
+  variant: FrameStyleVariant;
+  side: "left" | "right";
+  height: number;
+  /** Width of the frame column in characters (1 or 2). Default 1. */
+  frameWidth?: 1 | 2;
+  ascii?: boolean;
+}
+
+/** Renders a vertical side frame (left or right) as a column of border characters. */
+export function SideFrame({
+  variant,
+  side,
+  height,
+  frameWidth = 1,
+  ascii,
+}: SideFrameProps) {
+  const ch = renderVerticalFrame(variant, side, frameWidth, ascii);
+  return (
+    <Box flexDirection="column" width={frameWidth}>
+      {Array.from({ length: height }, (_, i) => (
+        <Text key={i} color={variant.color}>{ch}</Text>
+      ))}
     </Box>
   );
 }

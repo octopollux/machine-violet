@@ -128,6 +128,27 @@ export function renderTopFrame(
 }
 
 /**
+ * Render a vertical frame string for one row of a side border.
+ * @param variant - The style variant to use
+ * @param side - "left" or "right"
+ * @param frameWidth - Width of the side frame in columns (1 or 2)
+ * @param ascii - Force ASCII fallback
+ */
+export function renderVerticalFrame(
+  variant: FrameStyleVariant,
+  side: "left" | "right",
+  frameWidth: 1 | 2 = 1,
+  ascii = false,
+): string {
+  const v = ascii ? ASCII_VARIANT : variant;
+  if (frameWidth === 1) {
+    return v.vertical;
+  }
+  // Width 2: border char + padding space (inside edge)
+  return side === "left" ? `${v.vertical} ` : ` ${v.vertical}`;
+}
+
+/**
  * Approximate string width (handles most common cases).
  * Does not handle full Unicode width detection — just counts characters.
  */

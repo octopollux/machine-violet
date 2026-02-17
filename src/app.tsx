@@ -1129,7 +1129,6 @@ export default function App({ shutdownRef }: AppProps) {
         resources={resources}
         turnHolder={activeChar}
         engineState={engineState}
-        dmBackground="#1a0033"
         quoteColor="#ffffff"
       />
       {menuOpen && (

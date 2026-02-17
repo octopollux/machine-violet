@@ -4,6 +4,7 @@ import {
   getStyle,
   styleForGenre,
   renderHorizontalFrame,
+  renderVerticalFrame,
   renderContentLine,
   renderTopFrame,
   stringWidth,
@@ -171,6 +172,51 @@ describe("renderTopFrame", () => {
     const lines = renderTopFrame(gothic, 60, "Campaign", []);
     expect(lines).toHaveLength(2);
     expect(lines[1]).toContain("Campaign");
+  });
+});
+
+describe("renderVerticalFrame", () => {
+  const gothic = getStyle("gothic")!.variants.exploration;
+
+  it("renders a single vertical char at width 1", () => {
+    const result = renderVerticalFrame(gothic, "left", 1);
+    expect(result).toBe("║");
+    expect(result).toHaveLength(1);
+  });
+
+  it("returns same char for left and right at width 1", () => {
+    const left = renderVerticalFrame(gothic, "left", 1);
+    const right = renderVerticalFrame(gothic, "right", 1);
+    expect(left).toBe(right);
+  });
+
+  it("renders left frame at width 2 with trailing space", () => {
+    const result = renderVerticalFrame(gothic, "left", 2);
+    expect(result).toBe("║ ");
+    expect(result).toHaveLength(2);
+  });
+
+  it("renders right frame at width 2 with leading space", () => {
+    const result = renderVerticalFrame(gothic, "right", 2);
+    expect(result).toBe(" ║");
+    expect(result).toHaveLength(2);
+  });
+
+  it("uses ASCII fallback", () => {
+    const result = renderVerticalFrame(gothic, "left", 1, true);
+    expect(result).toBe("|");
+  });
+
+  it("uses ASCII fallback at width 2", () => {
+    const left = renderVerticalFrame(gothic, "left", 2, true);
+    const right = renderVerticalFrame(gothic, "right", 2, true);
+    expect(left).toBe("| ");
+    expect(right).toBe(" |");
+  });
+
+  it("works with combat variant", () => {
+    const combat = getStyle("gothic")!.variants.combat;
+    expect(renderVerticalFrame(combat, "left", 1)).toBe("┃");
   });
 });
 

@@ -6,7 +6,7 @@ import { InputLine } from "./InputLine.js";
 import { PlayerSelector } from "./PlayerSelector.js";
 import { ActivityLine } from "./ActivityLine.js";
 import { NarrativeArea } from "./NarrativeArea.js";
-import { HorizontalBorder, FramedContent } from "./FrameBorder.js";
+import { HorizontalBorder, SideFrame, FramedContent } from "./FrameBorder.js";
 import { getStyle } from "../frames/index.js";
 
 const gothic = getStyle("gothic")!.variants.exploration;
@@ -134,6 +134,48 @@ describe("NarrativeArea", () => {
     expect(frame).toContain("King");
     expect(frame).toContain("has fallen");
     // Bold styling is applied via ANSI codes (tested by presence of content)
+  });
+});
+
+describe("SideFrame", () => {
+  it("renders vertical chars for given height", () => {
+    const { lastFrame } = render(
+      <SideFrame variant={gothic} side="left" height={3} />,
+    );
+    const frame = lastFrame();
+    const lines = frame.split("\n");
+    expect(lines).toHaveLength(3);
+    for (const line of lines) {
+      expect(line).toContain("║");
+    }
+  });
+
+  it("renders right side identically at width 1", () => {
+    const { lastFrame } = render(
+      <SideFrame variant={gothic} side="right" height={2} />,
+    );
+    const frame = lastFrame();
+    const lines = frame.split("\n");
+    expect(lines).toHaveLength(2);
+    for (const line of lines) {
+      expect(line).toContain("║");
+    }
+  });
+
+  it("renders width 2 with padding", () => {
+    const { lastFrame } = render(
+      <SideFrame variant={gothic} side="left" height={2} frameWidth={2} />,
+    );
+    const frame = lastFrame();
+    expect(frame).toContain("║");
+  });
+
+  it("renders ASCII fallback", () => {
+    const { lastFrame } = render(
+      <SideFrame variant={gothic} side="left" height={2} ascii />,
+    );
+    const frame = lastFrame();
+    expect(frame).toContain("|");
   });
 });
 
