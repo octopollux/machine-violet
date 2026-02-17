@@ -19,18 +19,18 @@ describe("model config", () => {
   it("returns defaults when no dev-config.json", () => {
     const config = loadModelConfig({ cwd: testDir, reset: true });
     expect(config.large).toBe("claude-opus-4-6");
-    expect(config.medium).toBe("claude-sonnet-4-5-20250929");
+    expect(config.medium).toBe("claude-sonnet-4-6");
     expect(config.small).toBe("claude-haiku-4-5-20251001");
   });
 
   it("applies partial override", () => {
     writeFileSync(
       join(testDir, "dev-config.json"),
-      JSON.stringify({ models: { large: "claude-sonnet-4-5-20250929" } }),
+      JSON.stringify({ models: { large: "claude-sonnet-4-6" } }),
     );
     const config = loadModelConfig({ cwd: testDir, reset: true });
-    expect(config.large).toBe("claude-sonnet-4-5-20250929");
-    expect(config.medium).toBe("claude-sonnet-4-5-20250929");
+    expect(config.large).toBe("claude-sonnet-4-6");
+    expect(config.medium).toBe("claude-sonnet-4-6");
     expect(config.small).toBe("claude-haiku-4-5-20251001");
   });
 
@@ -39,14 +39,14 @@ describe("model config", () => {
       join(testDir, "dev-config.json"),
       JSON.stringify({
         models: {
-          large: "claude-sonnet-4-5-20250929",
+          large: "claude-sonnet-4-6",
           medium: "claude-haiku-4-5-20251001",
           small: "claude-haiku-4-5-20251001",
         },
       }),
     );
     const config = loadModelConfig({ cwd: testDir, reset: true });
-    expect(config.large).toBe("claude-sonnet-4-5-20250929");
+    expect(config.large).toBe("claude-sonnet-4-6");
     expect(config.medium).toBe("claude-haiku-4-5-20251001");
     expect(config.small).toBe("claude-haiku-4-5-20251001");
   });
@@ -71,7 +71,7 @@ describe("model config", () => {
     // Write file after first load — should be ignored due to cache
     writeFileSync(
       join(testDir, "dev-config.json"),
-      JSON.stringify({ models: { large: "claude-sonnet-4-5-20250929" } }),
+      JSON.stringify({ models: { large: "claude-sonnet-4-6" } }),
     );
     const b = loadModelConfig({ cwd: testDir });
     expect(b.large).toBe(a.large);
@@ -80,7 +80,7 @@ describe("model config", () => {
   it("getModel returns tier value", () => {
     loadModelConfig({ cwd: testDir, reset: true });
     expect(getModel("large")).toBe("claude-opus-4-6");
-    expect(getModel("medium")).toBe("claude-sonnet-4-5-20250929");
+    expect(getModel("medium")).toBe("claude-sonnet-4-6");
     expect(getModel("small")).toBe("claude-haiku-4-5-20251001");
   });
 });

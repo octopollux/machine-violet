@@ -1,3 +1,5 @@
+import { join } from "node:path";
+
 /**
  * Main menu options and campaign listing.
  */
@@ -28,9 +30,10 @@ export async function listCampaigns(
   }
 
   for (const dir of dirs) {
-    const configPath = `${campaignsDir}/${dir}/config.json`;
+    const campaignPath = join(campaignsDir, dir);
+    const configPath = join(campaignPath, "config.json");
     if (await exists(configPath)) {
-      entries.push({ name: dir, path: `${campaignsDir}/${dir}` });
+      entries.push({ name: dir, path: campaignPath });
     }
   }
 

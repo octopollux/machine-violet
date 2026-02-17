@@ -12,12 +12,13 @@ export interface ModelConfig {
 
 const DEFAULTS: ModelConfig = {
   large: "claude-opus-4-6",
-  medium: "claude-sonnet-4-5-20250929",
+  medium: "claude-sonnet-4-6",
   small: "claude-haiku-4-5-20251001",
 };
 
 const VALID_MODELS = new Set<string>([
   "claude-opus-4-6",
+  "claude-sonnet-4-6",
   "claude-sonnet-4-5-20250929",
   "claude-haiku-4-5-20251001",
 ]);

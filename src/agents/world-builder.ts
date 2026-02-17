@@ -13,8 +13,14 @@ export async function buildCampaignWorld(
   result: SetupResult,
   fileIO: FileIO,
 ): Promise<string> {
-  // Generate campaign directory name (slug)
-  const slug = slugify(result.campaignName);
+  // Generate campaign directory name (slug), ensuring uniqueness
+  const baseSlug = slugify(result.campaignName);
+  let slug = baseSlug;
+  let suffix = 2;
+  while (await fileIO.exists(`${campaignsDir}/${slug}`)) {
+    slug = `${baseSlug}-${suffix}`;
+    suffix++;
+  }
   const root = `${campaignsDir}/${slug}`;
 
   // 1. Create campaign directory structure
@@ -39,6 +45,7 @@ export async function buildCampaignWorld(
       type: "PC",
       player: result.playerName,
       display_resources: ["HP"],
+      theme_color: result.themeColor,
     },
     result.characterDescription || "A character awaiting their story.",
     [],

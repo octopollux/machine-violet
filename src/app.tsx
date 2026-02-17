@@ -6,8 +6,8 @@ import { readFile, writeFile, appendFile, mkdir, readdir, stat } from "node:fs/p
 import { join, dirname } from "node:path";
 
 import { Layout } from "./tui/layout.js";
-import { STYLES } from "./tui/frames/index.js";
-import { GameMenu, MENU_ITEMS } from "./tui/modals/index.js";
+import { STYLES, getStyle } from "./tui/frames/index.js";
+import { GameMenu, MENU_ITEMS, ChoiceModal, DiceRollModal, CharacterSheetModal, SessionRecapModal } from "./tui/modals/index.js";
 import type { FrameStyle, StyleVariant } from "./types/tui.js";
 import type { FileIO, SceneState } from "./agents/scene-manager.js";
 import type { EngineState, EngineCallbacks } from "./agents/game-engine.js";
@@ -16,11 +16,13 @@ import type { TuiCommand, UsageStats } from "./agents/agent-loop.js";
 import type { GameState } from "./agents/game-state.js";
 import type { DMSessionState } from "./agents/dm-prompt.js";
 import type { CampaignConfig } from "./types/config.js";
-import { isConfigured, validateApiKeyFormat, buildEnvContent, buildAppConfig, getDefaultHomeDir } from "./config/first-launch.js";
+import { validateApiKeyFormat, buildEnvContent, buildAppConfig, getDefaultHomeDir } from "./config/first-launch.js";
 import { listCampaigns } from "./config/main-menu.js";
 import type { CampaignEntry } from "./config/main-menu.js";
-import { fastPathSetup, fullSetup, buildCampaignConfig } from "./agents/setup-agent.js";
+import { fastPathSetup, buildCampaignConfig } from "./agents/setup-agent.js";
 import type { SetupStep, SetupResult } from "./agents/setup-agent.js";
+import { createSetupConversation } from "./agents/subagents/setup-conversation.js";
+import type { SetupConversation } from "./agents/subagents/setup-conversation.js";
 import { buildCampaignWorld } from "./agents/world-builder.js";
 import { getActivePlayer, switchToNextPlayer, getPlayerEntries } from "./agents/player-manager.js";
 import { createClocksState } from "./tools/clocks/index.js";
@@ -30,8 +32,19 @@ import { CostTracker } from "./context/cost-tracker.js";
 import type { ShutdownContext } from "./shutdown.js";
 import { gracefulShutdown } from "./shutdown.js";
 import { getModel } from "./config/models.js";
+import { campaignPaths } from "./tools/filesystem/index.js";
+import { createGitIO } from "./tools/git/isogit-adapter.js";
+import { shouldGenerateChoices, generateChoices } from "./agents/subagents/choice-generator.js";
+import { enterOOC } from "./agents/subagents/ooc-mode.js";
 
 // --- Types ---
+
+export type ActiveModal =
+  | { kind: "choice"; prompt: string; choices: string[] }
+  | { kind: "dice"; expression: string; rolls: number[]; kept?: number[]; total: number; reason?: string }
+  | { kind: "character_sheet"; content: string }
+  | { kind: "recap"; lines: string[] }
+  | null;
 
 export type AppPhase =
   | "loading"
@@ -90,7 +103,7 @@ export default function App({ shutdownRef }: AppProps) {
   const [phase, setPhase] = useState<AppPhase>("loading");
   const [narrativeLines, setNarrativeLines] = useState<string[]>([]);
   const [inputValue, setInputValue] = useState("");
-  const [engineState, setEngineState] = useState<EngineState | null>(null);
+  const [engineState, setEngineState] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // --- Game state refs (stable across renders) ---
@@ -103,11 +116,32 @@ export default function App({ shutdownRef }: AppProps) {
   const [menuIndex, setMenuIndex] = useState(0);
   const [campaigns, setCampaigns] = useState<CampaignEntry[]>([]);
   const [campaignSelectIndex, setCampaignSelectIndex] = useState(0);
+  const [mainMenuIndex, setMainMenuIndex] = useState(0);
+
+  // --- Modal state ---
+  const [activeModal, _setActiveModal] = useState<ActiveModal>(null);
+  const activeModalRef = useRef<ActiveModal>(null);
+  const setActiveModal = useCallback((modal: ActiveModal) => {
+    _setActiveModal(modal);
+    activeModalRef.current = modal;
+  }, []);
+
+  // --- Additional display state ---
+  const [resources, setResources] = useState<string[]>([]);
+  const [modelineOverride, setModelineOverride] = useState<string | null>(null);
+  const [oocActive, setOocActive] = useState(false);
+  const [choiceIndex, setChoiceIndex] = useState(0);
+  const clientRef = useRef<Anthropic | null>(null);
 
   // --- Setup state ---
   const [setupPrompt, setSetupPrompt] = useState<SetupStep | null>(null);
   const setupResolveRef = useRef<((idx: number | string) => void) | null>(null);
   const [setupChoiceIndex, setSetupChoiceIndex] = useState(0);
+  // Conversational setup (full path)
+  const setupConvoRef = useRef<SetupConversation | null>(null);
+  const [setupConvoLines, setSetupConvoLines] = useState<string[]>([]);
+  const [setupConvoInput, setSetupConvoInput] = useState("");
+  const [setupConvoBusy, setSetupConvoBusy] = useState(false);
 
   // --- First-launch state ---
   const [apiKeyInput, setApiKeyInput] = useState("");
@@ -116,7 +150,7 @@ export default function App({ shutdownRef }: AppProps) {
   // --- Display state ---
   const [campaignName, setCampaignName] = useState("");
   const [activePlayerIndex, setActivePlayerIndex] = useState(0);
-  const [style] = useState<FrameStyle>(STYLES[0]);
+  const [style, setStyle] = useState<FrameStyle>(STYLES[0]);
   const [variant, setVariant] = useState<StyleVariant>("exploration");
 
   // --- Config paths ---
@@ -125,7 +159,6 @@ export default function App({ shutdownRef }: AppProps) {
     return process.cwd();
   }, []);
 
-  const getEnvPath = useCallback(() => join(getAppDir(), ".env"), [getAppDir]);
   const getConfigPath = useCallback(() => join(getAppDir(), "config.json"), [getAppDir]);
 
   // --- Load campaigns ---
@@ -152,18 +185,20 @@ export default function App({ shutdownRef }: AppProps) {
   useEffect(() => {
     if (phase !== "loading") return;
 
-    const envPath = getEnvPath();
+    // If config.json exists, skip to main menu (returning user)
+    const configPath = getConfigPath();
     try {
-      if (isConfigured(envPath, (p) => readFileSync(p, "utf-8"))) {
-        setPhase("main_menu");
-        loadCampaigns();
-      } else {
-        setPhase("first_launch");
-      }
-    } catch {
-      setPhase("first_launch");
-    }
-  }, [phase, getEnvPath, loadCampaigns]);
+      readFileSync(configPath, "utf-8");
+      setPhase("main_menu");
+      loadCampaigns();
+      return;
+    } catch { /* config.json doesn't exist — first launch */ }
+
+    // Prefill API key from .env / environment if available
+    const envKey = process.env.ANTHROPIC_API_KEY;
+    if (envKey) setApiKeyInput(envKey);
+    setPhase("first_launch");
+  }, [phase, getConfigPath, loadCampaigns]);
 
   // --- Build game state from config ---
   const buildGameState = useCallback((config: CampaignConfig, campaignRoot: string): GameState => {
@@ -179,6 +214,59 @@ export default function App({ shutdownRef }: AppProps) {
     };
   }, []);
 
+  // --- TUI command dispatch ---
+  const dispatchTuiCommand = useCallback((cmd: TuiCommand) => {
+    switch (cmd.type) {
+      case "update_modeline":
+        setModelineOverride(cmd.text as string);
+        break;
+      case "set_ui_style": {
+        setVariant(cmd.variant as StyleVariant);
+        const found = getStyle(cmd.style as string);
+        if (found) setStyle(found);
+        break;
+      }
+      case "set_display_resources":
+        setResources(cmd.resources as string[]);
+        break;
+      case "present_choices": {
+        const choices = cmd.choices as string[];
+        if (choices && choices.length > 0) {
+          setChoiceIndex(0);
+          setActiveModal({ kind: "choice", prompt: (cmd.prompt as string) || "What do you do?", choices });
+        }
+        break;
+      }
+      case "present_roll":
+        setActiveModal({
+          kind: "dice",
+          expression: cmd.expression as string,
+          rolls: cmd.rolls as number[],
+          kept: cmd.kept as number[] | undefined,
+          total: cmd.total as number,
+          reason: cmd.reason as string | undefined,
+        });
+        break;
+      case "show_character_sheet": {
+        const charName = cmd.character as string;
+        const gs = gameStateRef.current;
+        if (gs) {
+          const path = campaignPaths(gs.campaignRoot).character(charName);
+          fileIO.current.readFile(path).then((content) => {
+            setActiveModal({ kind: "character_sheet", content });
+          }).catch(() => {
+            setActiveModal({ kind: "character_sheet", content: `[Could not load character sheet for ${charName}]` });
+          });
+        }
+        break;
+      }
+      case "enter_ooc":
+        setOocActive(true);
+        setVariant("ooc");
+        break;
+    }
+  }, [setActiveModal]);
+
   // --- Engine callbacks ---
   const buildCallbacks = useCallback((): EngineCallbacks => ({
     onNarrativeDelta(delta: string) {
@@ -192,8 +280,25 @@ export default function App({ shutdownRef }: AppProps) {
         return lines;
       });
     },
-    onNarrativeComplete(_text: string) {
+    onNarrativeComplete(text: string) {
       setNarrativeLines((prev) => [...prev, ""]);
+
+      // Auto-generate choices if configured
+      const gs = gameStateRef.current;
+      if (gs && clientRef.current) {
+        const dmProvided = activeModalRef.current?.kind === "choice";
+        if (shouldGenerateChoices(gs.config.choices.campaign_default, dmProvided)) {
+          const activePlayer = getActivePlayer(gs);
+          generateChoices(clientRef.current, text, activePlayer.characterName).then((result) => {
+            // Only show if no other modal is active
+            if (!activeModalRef.current && result.choices.length > 0) {
+              setChoiceIndex(0);
+              setActiveModal({ kind: "choice", prompt: "What do you do?", choices: result.choices });
+            }
+            costTracker.current.record(result.usage, getModel("small"));
+          }).catch(() => { /* best-effort */ });
+        }
+      }
     },
     onStateChange(state: EngineState) {
       setEngineState(state);
@@ -203,9 +308,8 @@ export default function App({ shutdownRef }: AppProps) {
         setVariant("combat");
       }
     },
-    onTuiCommand(_cmd: TuiCommand) {
-      // TUI commands from tools (choice modals, dice rolls, etc.)
-      // Future: dispatch to modal system
+    onTuiCommand(cmd: TuiCommand) {
+      dispatchTuiCommand(cmd);
     },
     onToolStart(_name: string) { /* activity shown via engineState */ },
     onToolEnd(_name: string) { /* activity shown via engineState */ },
@@ -217,23 +321,81 @@ export default function App({ shutdownRef }: AppProps) {
       setErrorMsg(error.message);
       setNarrativeLines((prev) => [...prev, `[Error: ${error.message}]`]);
     },
-  }), []);
+    onRetry(status: number, delayMs: number) {
+      setEngineState(`retry:${status}:${Math.ceil(delayMs / 1000)}`);
+    },
+  }), [dispatchTuiCommand, setActiveModal]);
+
+  // --- Detect latest scene/session numbers from campaign directory ---
+  const detectSceneState = useCallback(async (campaignRoot: string): Promise<SceneState> => {
+    const paths = campaignPaths(campaignRoot);
+    const scenesDir = join(campaignRoot, "campaign", "scenes");
+    const recapsDir = join(campaignRoot, "campaign", "session-recaps");
+
+    let maxScene = 0;
+    let lastSlug = "opening";
+    try {
+      const entries = await readdir(scenesDir);
+      for (const entry of entries) {
+        // Scene dirs look like "001-opening", "002-tavern"
+        const match = entry.match(/^(\d+)-(.+)$/);
+        if (match) {
+          const n = parseInt(match[1], 10);
+          if (n > maxScene) {
+            maxScene = n;
+            lastSlug = match[2];
+          }
+        }
+      }
+    } catch { /* no scenes dir yet */ }
+
+    let maxSession = 0;
+    try {
+      const entries = await readdir(recapsDir);
+      for (const entry of entries) {
+        // Recap files look like "session-001.md"
+        const match = entry.match(/^session-(\d+)\.md$/);
+        if (match) {
+          const n = parseInt(match[1], 10);
+          if (n > maxSession) maxSession = n;
+        }
+      }
+    } catch { /* no recaps dir yet */ }
+
+    // Load the last scene's transcript back for context
+    let transcript: string[] = [];
+    if (maxScene > 0) {
+      try {
+        const tPath = paths.sceneTranscript(maxScene, lastSlug);
+        const raw = await readFile(tPath, "utf-8");
+        // Parse transcript: each entry is separated by double newlines, skip the "# Scene N" header
+        const blocks = raw.split("\n\n").filter((b) => b.trim().length > 0);
+        transcript = blocks.filter((b) => !b.startsWith("# Scene"));
+      } catch { /* no transcript yet */ }
+    }
+
+    return {
+      sceneNumber: Math.max(1, maxScene),
+      slug: maxScene > 0 ? lastSlug : "opening",
+      transcript,
+      precis: "",
+      sessionNumber: maxSession + 1, // next session
+    };
+  }, []);
 
   // --- Start engine for a campaign ---
-  const startEngine = useCallback(async (config: CampaignConfig, campaignRoot: string) => {
+  const startEngine = useCallback(async (config: CampaignConfig, campaignRoot: string, isResume = false) => {
     const gs = buildGameState(config, campaignRoot);
     gameStateRef.current = gs;
 
-    const scene: SceneState = {
-      sceneNumber: 1,
-      slug: "opening",
-      transcript: [],
-      precis: "",
-      sessionNumber: 1,
-    };
+    // On resume, detect scene/session state from disk; otherwise start fresh
+    const scene: SceneState = isResume
+      ? await detectSceneState(campaignRoot)
+      : { sceneNumber: 1, slug: "opening", transcript: [], precis: "", sessionNumber: 1 };
 
     const sessionState: DMSessionState = {};
     const client = new Anthropic();
+    clientRef.current = client;
 
     const engine = new GameEngine({
       client,
@@ -248,6 +410,9 @@ export default function App({ shutdownRef }: AppProps) {
     setCampaignName(config.name);
     setActivePlayerIndex(0);
 
+    // Create gitIO if git recovery is enabled
+    const gitIO = config.recovery.enable_git ? createGitIO() : undefined;
+
     // Update shutdown context
     if (shutdownRef) {
       shutdownRef.current = {
@@ -255,16 +420,42 @@ export default function App({ shutdownRef }: AppProps) {
         campaignRoot,
         fileIO: fileIO.current,
         gitEnabled: config.recovery.enable_git,
+        gitIO,
       };
     }
 
-    setNarrativeLines([`Welcome to ${config.name}.`, "", "The story begins..."]);
-    setPhase("playing");
+    if (isResume) {
+      // Load session recap + campaign log into DM's prefix context
+      const recap = await engine.resumeSession();
 
-    // Send opening prompt to DM
-    const activePlayer = getActivePlayer(gs);
-    await engine.processInput(activePlayer.characterName, "[Session begins. Set the scene.]");
-  }, [buildGameState, buildCallbacks, shutdownRef]);
+      setNarrativeLines([`Welcome back to ${config.name}.`, ""]);
+      if (recap) {
+        setNarrativeLines((prev) => [...prev, "Previously...", "", recap, ""]);
+      }
+      setPhase("playing");
+
+      // Send a resume-specific prompt to the DM
+      const activePlayer = getActivePlayer(gs);
+      const resumeParts = ["[Session resumes. Continue the narrative where we left off."];
+      if (config.premise) resumeParts.push(`Campaign premise: ${config.premise}`);
+      const pc = config.players[0];
+      if (pc) resumeParts.push(`The player character is ${pc.character}.`);
+      if (recap) resumeParts.push(`Last session recap: ${recap}`);
+      resumeParts.push("Pick up naturally from the last scene — do NOT restart or re-introduce the setting.");
+      await engine.processInput(activePlayer.characterName, resumeParts.join(" ") + "]");
+    } else {
+      setNarrativeLines([`Welcome to ${config.name}.`, "", "The story begins..."]);
+      setPhase("playing");
+
+      // Send opening prompt to DM with campaign context
+      const activePlayer = getActivePlayer(gs);
+      const openingParts = ["[Session begins. Set the scene."];
+      if (config.premise) openingParts.push(`Campaign premise: ${config.premise}`);
+      const pc = config.players[0];
+      if (pc) openingParts.push(`The player character is ${pc.character}.`);
+      await engine.processInput(activePlayer.characterName, openingParts.join(" ") + "]");
+    }
+  }, [buildGameState, buildCallbacks, shutdownRef, detectSceneState]);
 
   // --- Setup callback: presents choices to user via modal ---
   const setupCallback = useCallback(async (step: SetupStep): Promise<number | string> => {
@@ -275,19 +466,11 @@ export default function App({ shutdownRef }: AppProps) {
     });
   }, []);
 
-  // --- Run setup flow ---
-  const runSetup = useCallback(async (mode: "fast" | "full") => {
-    setPhase("setup");
-
-    const result: SetupResult = mode === "fast"
-      ? await fastPathSetup(setupCallback)
-      : await fullSetup(setupCallback);
-
-    setSetupPrompt(null);
+  // --- Finalize setup result into a running campaign ---
+  const finalizeSetup = useCallback(async (result: SetupResult) => {
     setPhase("building");
     setNarrativeLines(["Building your world..."]);
 
-    // Build campaign on disk
     try {
       const configPath = getConfigPath();
       let campaignsDir: string;
@@ -306,7 +489,114 @@ export default function App({ shutdownRef }: AppProps) {
       setErrorMsg(e instanceof Error ? e.message : String(e));
       setPhase("main_menu");
     }
-  }, [setupCallback, getConfigPath, startEngine]);
+  }, [getConfigPath, startEngine]);
+
+  // --- Shared helpers for conversational setup ---
+  const setupStreamDelta = useCallback((delta: string) => {
+    setSetupConvoLines((prev) => {
+      const lines = [...prev];
+      if (lines.length === 0) lines.push(delta);
+      else lines[lines.length - 1] += delta;
+      const last = lines[lines.length - 1];
+      if (last.includes("\n")) {
+        const parts = last.split("\n");
+        lines[lines.length - 1] = parts[0];
+        for (let i = 1; i < parts.length; i++) {
+          lines.push(parts[i]);
+        }
+      }
+      return lines;
+    });
+  }, []);
+
+  const handleSetupTurnResult = useCallback(async (result: { finalized?: SetupResult; pendingChoices?: { prompt: string; choices: string[] }; usage: UsageStats }) => {
+    setSetupConvoBusy(false);
+    setSetupConvoLines((prev) => [...prev, ""]);
+
+    if (result.pendingChoices) {
+      // Show choice modal for the player
+      setChoiceIndex(0);
+      setActiveModal({
+        kind: "choice",
+        prompt: result.pendingChoices.prompt,
+        choices: result.pendingChoices.choices,
+      });
+      return;
+    }
+
+    if (result.finalized) {
+      costTracker.current.record(result.usage, getModel("medium"));
+      setupConvoRef.current = null;
+      await finalizeSetup(result.finalized);
+    }
+  }, [finalizeSetup, setActiveModal]);
+
+  // --- Run setup flow ---
+  const runSetup = useCallback(async (mode: "fast" | "full") => {
+    setPhase("setup");
+
+    if (mode === "full") {
+      const client = new Anthropic();
+      const convo = createSetupConversation(client);
+      setupConvoRef.current = convo;
+      setSetupConvoLines([]);
+      setSetupConvoInput("");
+      setSetupConvoBusy(true);
+
+      try {
+        const result = await convo.start(setupStreamDelta);
+        await handleSetupTurnResult(result);
+      } catch (e) {
+        setSetupConvoBusy(false);
+        setErrorMsg(e instanceof Error ? e.message : String(e));
+        setPhase("main_menu");
+      }
+      return;
+    }
+
+    // Fast path: step-by-step choices
+    const result = await fastPathSetup(setupCallback);
+    setSetupPrompt(null);
+    await finalizeSetup(result);
+  }, [setupCallback, finalizeSetup, setupStreamDelta, handleSetupTurnResult]);
+
+  // --- Send a message in conversational setup ---
+  const sendSetupMessage = useCallback(async (text: string) => {
+    const convo = setupConvoRef.current;
+    if (!convo) return;
+
+    setSetupConvoLines((prev) => [...prev, `> ${text}`, ""]);
+    setSetupConvoBusy(true);
+
+    try {
+      const result = await convo.send(text, setupStreamDelta);
+      await handleSetupTurnResult(result);
+    } catch (e) {
+      setSetupConvoBusy(false);
+      setErrorMsg(e instanceof Error ? e.message : String(e));
+      setPhase("main_menu");
+    }
+  }, [setupStreamDelta, handleSetupTurnResult]);
+
+  // --- Resolve a choice modal during conversational setup ---
+  const resolveSetupChoice = useCallback(async (selectedText: string) => {
+    const convo = setupConvoRef.current;
+    if (!convo) return;
+
+    setActiveModal(null);
+    setChoiceIndex(0);
+    setSetupConvoLines((prev) => [...prev, `> ${selectedText}`, ""]);
+    setSetupConvoBusy(true);
+
+    try {
+      const result = await convo.resolveChoice(selectedText, setupStreamDelta);
+      await handleSetupTurnResult(result);
+    } catch (e) {
+      setSetupConvoBusy(false);
+      setErrorMsg(e instanceof Error ? e.message : String(e));
+      setPhase("main_menu");
+    }
+  }, [setActiveModal, setupStreamDelta, handleSetupTurnResult]);
 
   // --- Resume a campaign ---
   const resumeCampaign = useCallback(async (entry: CampaignEntry) => {
@@ -316,7 +606,7 @@ export default function App({ shutdownRef }: AppProps) {
     try {
       const configRaw = await readFile(join(entry.path, "config.json"), "utf-8");
       const config: CampaignConfig = JSON.parse(configRaw);
-      await startEngine(config, entry.path);
+      await startEngine(config, entry.path, true);
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : String(e));
       setPhase("main_menu");
@@ -361,8 +651,8 @@ export default function App({ shutdownRef }: AppProps) {
 
     // --- Main Menu ---
     if (phase === "main_menu") {
-      // Check if we're in campaign select sub-menu
-      if (campaigns.length > 0 && campaignSelectIndex >= 0 && menuOpen) {
+      // Campaign select sub-menu
+      if (menuOpen && campaigns.length > 0) {
         if (key.upArrow) {
           setCampaignSelectIndex((i) => Math.max(0, i - 1));
           return;
@@ -383,17 +673,30 @@ export default function App({ shutdownRef }: AppProps) {
         return;
       }
 
-      if (input === "1") {
-        runSetup("full");
+      const mainMenuItems = campaigns.length > 0
+        ? ["New Campaign", "Continue Campaign", "Just Jump In", "Quit"]
+        : ["New Campaign", "Just Jump In", "Quit"];
+
+      if (key.upArrow) {
+        setMainMenuIndex((i) => Math.max(0, i - 1));
         return;
       }
-      if (input === "2" && campaigns.length > 0) {
-        setMenuOpen(true);
-        setCampaignSelectIndex(0);
+      if (key.downArrow) {
+        setMainMenuIndex((i) => Math.min(mainMenuItems.length - 1, i + 1));
         return;
       }
-      if (input === "3") {
-        runSetup("fast");
+      if (key.return) {
+        const selected = mainMenuItems[mainMenuIndex];
+        if (selected === "New Campaign") {
+          runSetup("full");
+        } else if (selected === "Continue Campaign") {
+          setMenuOpen(true);
+          setCampaignSelectIndex(0);
+        } else if (selected === "Just Jump In") {
+          runSetup("fast");
+        } else if (selected === "Quit") {
+          process.exit(0);
+        }
         return;
       }
       if (input === "q" || input === "Q") {
@@ -402,7 +705,61 @@ export default function App({ shutdownRef }: AppProps) {
       return;
     }
 
-    // --- Setup: choosing ---
+    // --- Setup: conversational mode ---
+    if (phase === "setup" && setupConvoRef.current) {
+      // Choice modal active during setup
+      const modal = activeModalRef.current;
+      if (modal && modal.kind === "choice") {
+        if (key.upArrow) {
+          setChoiceIndex((i) => Math.max(0, i - 1));
+          return;
+        }
+        if (key.downArrow) {
+          setChoiceIndex((i) => Math.min(modal.choices.length - 1, i + 1));
+          return;
+        }
+        if (key.return) {
+          const chosen = modal.choices[choiceIndex];
+          resolveSetupChoice(chosen);
+          return;
+        }
+        if (key.escape) {
+          // Dismiss modal — treat as if they want to type instead
+          setActiveModal(null);
+          setChoiceIndex(0);
+          return;
+        }
+        return;
+      }
+
+      if (setupConvoBusy) return; // Block input while agent is responding
+
+      if (key.return && setupConvoInput.trim()) {
+        const text = setupConvoInput.trim();
+        setSetupConvoInput("");
+        sendSetupMessage(text);
+        return;
+      }
+      if (key.escape) {
+        // Cancel setup, return to main menu
+        setupConvoRef.current = null;
+        setSetupConvoLines([]);
+        setSetupConvoInput("");
+        setActiveModal(null);
+        setPhase("main_menu");
+        return;
+      }
+      if (key.backspace || key.delete) {
+        setSetupConvoInput((v) => v.slice(0, -1));
+        return;
+      }
+      if (input && !key.ctrl && !key.meta && !key.return) {
+        setSetupConvoInput((v) => v + input);
+      }
+      return;
+    }
+
+    // --- Setup: step-by-step choosing (fast path) ---
     if (phase === "setup" && setupPrompt && setupResolveRef.current) {
       if (key.upArrow) {
         setSetupChoiceIndex((i) => Math.max(0, i - 1));
@@ -423,6 +780,53 @@ export default function App({ shutdownRef }: AppProps) {
 
     // --- Playing ---
     if (phase === "playing") {
+      // Modal input takes priority over everything except ESC for menu
+      const modal = activeModalRef.current;
+
+      // Non-choice modals: any key dismisses
+      if (modal && (modal.kind === "dice" || modal.kind === "character_sheet" || modal.kind === "recap")) {
+        setActiveModal(null);
+        return;
+      }
+
+      // Choice modal: arrow keys to navigate, Enter to select, ESC dismisses
+      if (modal && modal.kind === "choice") {
+        if (key.escape) {
+          setActiveModal(null);
+          setChoiceIndex(0);
+          return;
+        }
+        if (key.upArrow) {
+          setChoiceIndex((i) => Math.max(0, i - 1));
+          return;
+        }
+        if (key.downArrow) {
+          setChoiceIndex((i) => Math.min(modal.choices.length - 1, i + 1));
+          return;
+        }
+        if (key.return) {
+          const chosen = modal.choices[choiceIndex];
+          setActiveModal(null);
+          setChoiceIndex(0);
+          // Send chosen text as player input
+          if (engineRef.current && gameStateRef.current) {
+            const active = getActivePlayer(gameStateRef.current);
+            setNarrativeLines((prev) => [...prev, "", `> ${active.characterName}: ${chosen}`, ""]);
+            engineRef.current.processInput(active.characterName, chosen);
+          }
+        }
+        return;
+      }
+
+      // OOC active: block game input, ESC cancels
+      if (oocActive) {
+        if (key.escape) {
+          setOocActive(false);
+          setVariant("exploration");
+        }
+        return;
+      }
+
       // ESC toggles game menu
       if (key.escape) {
         setMenuOpen((v) => !v);
@@ -447,8 +851,47 @@ export default function App({ shutdownRef }: AppProps) {
           } else if (item === "Save & Quit") {
             setMenuOpen(false);
             doShutdown();
+          } else if (item === "Character Sheet") {
+            setMenuOpen(false);
+            const gs = gameStateRef.current;
+            if (gs) {
+              const active = getActivePlayer(gs);
+              const path = campaignPaths(gs.campaignRoot).character(active.characterName);
+              fileIO.current.readFile(path).then((content) => {
+                setActiveModal({ kind: "character_sheet", content });
+              }).catch(() => {
+                setActiveModal({ kind: "character_sheet", content: `[Could not load character sheet for ${active.characterName}]` });
+              });
+            }
+          } else if (item === "OOC Mode") {
+            setMenuOpen(false);
+            setOocActive(true);
+            setVariant("ooc");
+            setNarrativeLines((prev) => [...prev, "[OOC Mode]"]);
+            // Single-shot OOC: run subagent then return
+            if (clientRef.current && gameStateRef.current) {
+              const gs = gameStateRef.current;
+              enterOOC(clientRef.current, "", {
+                campaignName: gs.config.name,
+                previousVariant: variant,
+              }, (delta) => {
+                setNarrativeLines((prev) => {
+                  const lines = [...prev];
+                  if (lines.length === 0) lines.push(delta);
+                  else lines[lines.length - 1] += delta;
+                  return lines;
+                });
+              }).then((result) => {
+                setOocActive(false);
+                setVariant(result.snapshot.previousVariant as StyleVariant);
+                setNarrativeLines((prev) => [...prev, ""]);
+                costTracker.current.record(result.usage, getModel("medium"));
+              }).catch(() => {
+                setOocActive(false);
+                setVariant("exploration");
+              });
+            }
           }
-          // Other menu items: future
           return;
         }
         return;
@@ -496,10 +939,11 @@ export default function App({ shutdownRef }: AppProps) {
       campaignRoot: gameStateRef.current?.campaignRoot,
       fileIO: fileIO.current,
       gitEnabled: gameStateRef.current?.config.recovery.enable_git,
+      gitIO: shutdownRef?.current?.gitIO,
     });
 
     process.exit(0);
-  }, []);
+  }, [shutdownRef]);
 
   // --- Render ---
 
@@ -538,23 +982,70 @@ export default function App({ shutdownRef }: AppProps) {
       );
     }
 
+    const mainMenuItems = campaigns.length > 0
+      ? ["New Campaign", "Continue Campaign", "Just Jump In", "Quit"]
+      : ["New Campaign", "Just Jump In", "Quit"];
+    const mainMenuDescriptions: Record<string, string> = {
+      "New Campaign": "Full guided setup",
+      "Continue Campaign": `${campaigns.length} saved`,
+      "Just Jump In": "Quick start with defaults",
+      "Quit": "",
+    };
+
     return (
       <Box flexDirection="column" padding={1}>
         <Text bold>TUI-RPG</Text>
         <Text> </Text>
-        <Text>1) New Campaign</Text>
-        <Text color={campaigns.length > 0 ? undefined : "gray"}>
-          2) Continue Campaign {campaigns.length === 0 ? "(none found)" : `(${campaigns.length})`}
-        </Text>
-        <Text>3) Just Jump In</Text>
+        {mainMenuItems.map((item, i) => (
+          <Text key={item}>
+            {i === mainMenuIndex ? ">" : " "} {item}
+            {mainMenuDescriptions[item] ? <Text dimColor> — {mainMenuDescriptions[item]}</Text> : null}
+          </Text>
+        ))}
         <Text> </Text>
-        <Text dimColor>Q to quit.</Text>
+        <Text dimColor>Arrow keys to select, Enter to confirm.</Text>
         {errorMsg && <Text color="red">{errorMsg}</Text>}
       </Box>
     );
   }
 
-  // Setup flow
+  // Setup flow: conversational
+  if (phase === "setup" && setupConvoRef.current) {
+    const setupHasModal = activeModal?.kind === "choice";
+    const setupModalHeight = setupHasModal && activeModal
+      ? activeModal.choices.length + 5 + 2  // choices + prompt/blanks/instructions + borders
+      : 0;
+    return (
+      <Box flexDirection="column" width={cols} height={rows}>
+        <Layout
+          dimensions={{ columns: cols, rows: rows - setupModalHeight }}
+          style={style}
+          variant="exploration"
+          narrativeLines={setupConvoLines}
+          modelineText="Campaign Setup"
+          inputValue={setupConvoInput}
+          activeCharacterName="You"
+          players={[{ name: "Player", isAI: false }]}
+          activePlayerIndex={0}
+          campaignName="New Campaign"
+          resources={[]}
+          turnHolder="You"
+          engineState={setupConvoBusy ? "dm_thinking" : null}
+        />
+        {setupHasModal && activeModal && (
+          <ChoiceModal
+            variant={style.variants["exploration"]}
+            width={cols}
+            prompt={activeModal.prompt}
+            choices={activeModal.choices}
+            selectedIndex={choiceIndex}
+          />
+        )}
+      </Box>
+    );
+  }
+
+  // Setup flow: step-by-step (fast path)
   if (phase === "setup" && setupPrompt) {
     return (
       <Box flexDirection="column" padding={1}>
@@ -603,29 +1094,83 @@ export default function App({ shutdownRef }: AppProps) {
   const gs = gameStateRef.current;
   const players = gs ? getPlayerEntries(gs) : [{ name: "Player", isAI: false }];
   const activeChar = gs ? getActivePlayer(gs).characterName : "Player";
+  // Compute actual modal height (content lines + 2 border rows)
+  const modalHeight = (() => {
+    if (!activeModal) return 0;
+    switch (activeModal.kind) {
+      case "choice":
+        // prompt + empty + N choices + empty + instructions + 2 borders
+        return activeModal.choices.length + 5 + 2;
+      case "dice":
+        // reason? + expression + dice + kept? + total + blanks + 2 borders
+        return 8 + 2;
+      case "character_sheet":
+        // content lines + 2 borders, capped at half the screen
+        return Math.min(activeModal.content.split("\n").length + 2, Math.floor(rows / 2));
+      case "recap":
+        return Math.min(activeModal.lines.length + 2, Math.floor(rows / 2));
+    }
+  })();
+  const layoutRows = menuOpen ? rows - MENU_ITEMS.length - 4 : rows - modalHeight;
 
   return (
     <Box flexDirection="column" width={cols} height={rows}>
       <Layout
-        dimensions={{ columns: cols, rows: menuOpen ? rows - MENU_ITEMS.length - 4 : rows }}
+        dimensions={{ columns: cols, rows: layoutRows }}
         style={style}
         variant={variant}
         narrativeLines={narrativeLines}
-        modelineText={`${costTracker.current.formatTerse()} | ${campaignName}`}
+        modelineText={modelineOverride ?? `${costTracker.current.formatTerse()} | ${campaignName}`}
         inputValue={inputValue}
         activeCharacterName={activeChar}
         players={players}
         activePlayerIndex={activePlayerIndex}
         campaignName={campaignName}
-        resources={[]}
+        resources={resources}
         turnHolder={activeChar}
         engineState={engineState}
+        dmBackground="#1a0033"
+        quoteColor="#ffffff"
       />
       {menuOpen && (
         <GameMenu
           variant={style.variants[variant]}
           width={cols}
           selectedIndex={menuIndex}
+        />
+      )}
+      {!menuOpen && activeModal?.kind === "choice" && (
+        <ChoiceModal
+          variant={style.variants[variant]}
+          width={cols}
+          prompt={activeModal.prompt}
+          choices={activeModal.choices}
+          selectedIndex={choiceIndex}
+        />
+      )}
+      {!menuOpen && activeModal?.kind === "dice" && (
+        <DiceRollModal
+          variant={style.variants[variant]}
+          width={cols}
+          expression={activeModal.expression}
+          rolls={activeModal.rolls}
+          kept={activeModal.kept}
+          total={activeModal.total}
+          reason={activeModal.reason}
+        />
+      )}
+      {!menuOpen && activeModal?.kind === "character_sheet" && (
+        <CharacterSheetModal
+          variant={style.variants[variant]}
+          width={cols}
+          content={activeModal.content}
+        />
+      )}
+      {!menuOpen && activeModal?.kind === "recap" && (
+        <SessionRecapModal
+          variant={style.variants[variant]}
+          width={cols}
+          lines={activeModal.lines}
         />
       )}
     </Box>

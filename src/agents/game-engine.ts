@@ -39,6 +39,8 @@ export interface EngineCallbacks {
   onUsageUpdate: (session: UsageStats) => void;
   /** Error occurred */
   onError: (error: Error) => void;
+  /** API call is being retried after a retryable error */
+  onRetry: (status: number, delayMs: number) => void;
 }
 
 /**
@@ -252,6 +254,9 @@ export class GameEngine {
       onToolEnd: (name) => {
         this.setState("dm_thinking");
         this.callbacks.onToolEnd(name);
+      },
+      onRetry: (status, delayMs) => {
+        this.callbacks.onRetry(status, delayMs);
       },
     };
   }

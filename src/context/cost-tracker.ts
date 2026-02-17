@@ -1,12 +1,12 @@
 /**
  * Cost tracking for Claude API usage.
  *
- * Pricing (per million tokens):
- *   Opus:   $15 input, $75 output, cache write $18.75, cache read $1.50
- *   Sonnet: $3 input, $15 output, cache write $3.75, cache read $0.30
- *   Haiku:  $0.80 input, $4 output, cache write $1, cache read $0.08
+ * Pricing (per million tokens, prompts ≤ 200K tokens):
+ *   Opus 4.6:   $5 input, $25 output, cache write $6.25, cache read $0.50
+ *   Sonnet 4.6: $3 input, $15 output, cache write $3.75, cache read $0.30
+ *   Haiku 4.5:  $1 input, $5 output, cache write $1.25, cache read $0.10
  *
- * All costs in USD.
+ * All costs in USD. Using ≤200K tier (our prompts stay well under).
  */
 import type { UsageStats, ModelId } from "../agents/agent-loop.js";
 
@@ -20,9 +20,10 @@ interface ModelPricing {
 }
 
 const PRICING: Record<string, ModelPricing> = {
-  "claude-opus-4-6":             { input: 15,   output: 75,  cacheWrite: 18.75, cacheRead: 1.50 },
+  "claude-opus-4-6":             { input: 5,    output: 25,  cacheWrite: 6.25,  cacheRead: 0.50 },
+  "claude-sonnet-4-6":           { input: 3,    output: 15,  cacheWrite: 3.75,  cacheRead: 0.30 },
   "claude-sonnet-4-5-20250929":  { input: 3,    output: 15,  cacheWrite: 3.75,  cacheRead: 0.30 },
-  "claude-haiku-4-5-20251001":   { input: 0.80, output: 4,   cacheWrite: 1.00,  cacheRead: 0.08 },
+  "claude-haiku-4-5-20251001":   { input: 1,    output: 5,   cacheWrite: 1.25,  cacheRead: 0.10 },
 };
 
 // Fallback to Opus pricing if model unknown

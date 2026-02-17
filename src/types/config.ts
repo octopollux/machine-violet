@@ -43,6 +43,7 @@ export interface CampaignConfig {
   genre?: string;
   mood?: string;
   difficulty?: string;
+  premise?: string;
   dm_personality: DMPersonality;
   players: PlayerConfig[];
   combat: CombatConfig;

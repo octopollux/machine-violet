@@ -1,8 +1,10 @@
+import Anthropic from "@anthropic-ai/sdk";
 import type { CampaignConfig, PlayerConfig } from "../types/config.js";
 import type { DMPersonality } from "../types/config.js";
 import { PERSONALITIES, randomPersonality } from "../config/personalities.js";
 import { randomSeeds } from "../config/seeds.js";
 import { createDefaultConfig as defaultCombatConfig } from "../tools/combat/index.js";
+import { getModel } from "../config/models.js";
 
 // --- Types ---
 
@@ -28,6 +30,7 @@ export interface SetupResult {
   playerName: string;
   characterName: string;
   characterDescription: string;
+  themeColor: string;
 }
 
 export type SetupCallback = (step: SetupStep) => Promise<number | string>;
@@ -157,17 +160,111 @@ export async function fastPathSetup(
     playerName: "Player",
     characterName,
     characterDescription,
+    themeColor: generateThemeColor(characterName),
   };
 }
 
-// --- Full Setup (Sonnet-powered) ---
+// --- AI generation for full setup ---
+
+const SETUP_GEN_SYSTEM = `You are a creative tabletop RPG game designer. Generate options for new campaigns.
+Respond ONLY with valid JSON, no markdown fences, no commentary.`;
+
+interface GeneratedCampaigns {
+  campaigns: { name: string; premise: string }[];
+}
+
+interface GeneratedCharacters {
+  characters: { name: string; description: string }[];
+}
+
+async function generateCampaignOptions(
+  client: Anthropic,
+  genre: string,
+  mood: string,
+): Promise<SetupStep> {
+  // Static fallback
+  const fallback = campaignStep(genre.toLowerCase().split(" ")[0]);
+
+  try {
+    const response = await client.messages.create({
+      model: getModel("small"),
+      max_tokens: 300,
+      system: SETUP_GEN_SYSTEM,
+      messages: [{
+        role: "user",
+        content: `Generate 3 unique campaign premises for a ${mood} ${genre} tabletop RPG.
+Return JSON: {"campaigns":[{"name":"Short Title","premise":"One sentence hook"},...]}`,
+      }],
+    });
+
+    const text = response.content[0]?.type === "text" ? response.content[0].text : "";
+    const parsed: GeneratedCampaigns = JSON.parse(text);
+    if (parsed.campaigns?.length >= 2) {
+      return {
+        prompt: "What kind of adventure?",
+        choices: [
+          { label: "Surprise me", description: "Let the DM build a world from scratch" },
+          ...parsed.campaigns.slice(0, 3).map((c) => ({ label: c.name, description: c.premise })),
+        ],
+        defaultIndex: 0,
+      };
+    }
+  } catch { /* fall through to static */ }
+
+  return fallback;
+}
+
+async function generateCharacterOptions(
+  client: Anthropic,
+  genre: string,
+  mood: string,
+  campaignPremise: string,
+): Promise<SetupStep> {
+  try {
+    const response = await client.messages.create({
+      model: getModel("small"),
+      max_tokens: 300,
+      system: SETUP_GEN_SYSTEM,
+      messages: [{
+        role: "user",
+        content: `Generate 3 unique player characters for a ${mood} ${genre} RPG campaign: "${campaignPremise}"
+Each character should have a short evocative name and a one-sentence hook.
+Return JSON: {"characters":[{"name":"Name","description":"One sentence hook"},...]}`,
+      }],
+    });
+
+    const text = response.content[0]?.type === "text" ? response.content[0].text : "";
+    const parsed: GeneratedCharacters = JSON.parse(text);
+    if (parsed.characters?.length >= 2) {
+      return {
+        prompt: "Who are you?",
+        choices: parsed.characters.slice(0, 3).map((c) => ({ label: c.name, description: c.description })),
+        defaultIndex: 0,
+      };
+    }
+  } catch { /* fall through to static */ }
+
+  return {
+    prompt: "Describe your character, or pick one.",
+    choices: [
+      { label: "Kael", description: "A wandering sellsword" },
+      { label: "Sister Venn", description: "Excommunicated healer" },
+      { label: "Rook", description: "A thief with a stolen secret" },
+    ],
+    defaultIndex: 0,
+  };
+}
+
+// --- Full Setup (AI-powered) ---
 
 /**
- * Full setup flow — driven by the setup agent (Sonnet).
- * Each step presents choices via the callback.
+ * Full setup flow — uses AI (Haiku) to generate campaign and character options
+ * tailored to the player's genre/mood selections.
+ * Falls back to static options if no client is provided or AI fails.
  */
 export async function fullSetup(
   getChoice: SetupCallback,
+  client?: Anthropic,
 ): Promise<SetupResult> {
   // Genre
   const genreIdx = await resolveChoice(getChoice, GENRE_STEP);
@@ -179,8 +276,18 @@ export async function fullSetup(
   const systemChoice = typeof systemIdx === "string" ? systemIdx : SYSTEM_STEP.choices[systemIdx].label;
   const system = systemChoice.includes("No system") ? null : systemChoice;
 
-  // Campaign
-  const campStep = campaignStep(genreKey);
+  // Mood
+  const moodIdx = await resolveChoice(getChoice, MOOD_STEP);
+  const mood = typeof moodIdx === "string" ? moodIdx : MOOD_STEP.choices[moodIdx].label;
+
+  // Difficulty
+  const diffIdx = await resolveChoice(getChoice, DIFFICULTY_STEP);
+  const difficulty = typeof diffIdx === "string" ? diffIdx : DIFFICULTY_STEP.choices[diffIdx].label;
+
+  // Campaign — AI-generated if client available, static fallback otherwise
+  const campStep = client
+    ? await generateCampaignOptions(client, genre, mood)
+    : campaignStep(genreKey);
   const campIdx = await resolveChoice(getChoice, campStep);
   let campaignName: string;
   let campaignPremise: string;
@@ -196,14 +303,6 @@ export async function fullSetup(
     campaignName = seed.label;
     campaignPremise = seed.description ?? "";
   }
-
-  // Mood
-  const moodIdx = await resolveChoice(getChoice, MOOD_STEP);
-  const mood = typeof moodIdx === "string" ? moodIdx : MOOD_STEP.choices[moodIdx].label;
-
-  // Difficulty
-  const diffIdx = await resolveChoice(getChoice, DIFFICULTY_STEP);
-  const difficulty = typeof diffIdx === "string" ? diffIdx : DIFFICULTY_STEP.choices[diffIdx].label;
 
   // Personality
   const persStep = personalityStep();
@@ -221,16 +320,18 @@ export async function fullSetup(
   const playerChoice = await resolveChoice(getChoice, playerStep);
   const playerName = typeof playerChoice === "string" ? playerChoice : "Player";
 
-  // Character
-  const charStep: SetupStep = {
-    prompt: "Describe your character, or pick one.",
-    choices: [
-      { label: "Kael", description: "A wandering sellsword" },
-      { label: "Sister Venn", description: "Excommunicated healer" },
-      { label: "Rook", description: "A thief with a stolen secret" },
-    ],
-    defaultIndex: 0,
-  };
+  // Character — AI-generated if client available
+  const charStep = client
+    ? await generateCharacterOptions(client, genre, mood, campaignPremise)
+    : {
+        prompt: "Describe your character, or pick one.",
+        choices: [
+          { label: "Kael", description: "A wandering sellsword" } as SetupChoice,
+          { label: "Sister Venn", description: "Excommunicated healer" } as SetupChoice,
+          { label: "Rook", description: "A thief with a stolen secret" } as SetupChoice,
+        ],
+        defaultIndex: 0,
+      };
   const charIdx = await resolveChoice(getChoice, charStep);
   const charChoice = typeof charIdx === "string" ? charIdx : charStep.choices[charIdx];
   const characterName = typeof charChoice === "string" ? charChoice : charChoice.label;
@@ -249,6 +350,7 @@ export async function fullSetup(
     playerName,
     characterName,
     characterDescription,
+    themeColor: generateThemeColor(characterName),
   };
 }
 
@@ -268,6 +370,7 @@ export function buildCampaignConfig(result: SetupResult): CampaignConfig {
     genre: result.genre,
     mood: result.mood,
     difficulty: result.difficulty,
+    premise: result.campaignPremise,
     dm_personality: result.personality,
     players: [player],
     combat: defaultCombatConfig(),
@@ -289,6 +392,38 @@ export function buildCampaignConfig(result: SetupResult): CampaignConfig {
 }
 
 // --- Helpers ---
+
+/**
+ * Generate a theme color for a character, suitable for dark TUI backgrounds.
+ * Uses a simple hash of the name to pick a hue, with guaranteed minimum brightness.
+ */
+export function generateThemeColor(name: string): string {
+  // Simple hash
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
+  }
+
+  // Convert to HSL with high saturation and lightness for dark backgrounds
+  const hue = Math.abs(hash) % 360;
+  const saturation = 60 + (Math.abs(hash >> 8) % 30);   // 60-90%
+  const lightness = 55 + (Math.abs(hash >> 16) % 20);    // 55-75%
+
+  // Convert HSL to hex
+  return hslToHex(hue, saturation, lightness);
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  const sN = s / 100;
+  const lN = l / 100;
+  const a = sN * Math.min(lN, 1 - lN);
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const color = lN - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color).toString(16).padStart(2, "0");
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
 
 async function resolveChoice(
   getChoice: SetupCallback,

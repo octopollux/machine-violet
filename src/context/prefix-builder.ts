@@ -56,6 +56,21 @@ export function buildCachedPrefix(
     });
   }
 
+  // Campaign setting (genre, mood, difficulty, premise)
+  {
+    const settingLines: string[] = [];
+    if (config.genre) settingLines.push(`Genre: ${config.genre}`);
+    if (config.mood) settingLines.push(`Mood: ${config.mood}`);
+    if (config.difficulty) settingLines.push(`Difficulty: ${config.difficulty}`);
+    if (config.premise) settingLines.push(`Premise: ${config.premise}`);
+    if (settingLines.length > 0) {
+      blocks.push({
+        type: "text",
+        text: `\n\n## Campaign Setting\n${settingLines.join("\n")}`,
+      });
+    }
+  }
+
   // Rules appendix (cached — stable within a session)
   if (sections.rulesAppendix) {
     blocks.push({

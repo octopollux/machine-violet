@@ -31,20 +31,21 @@ describe("Modal", () => {
 });
 
 describe("ChoiceModal", () => {
-  it("renders prompt and labeled choices", () => {
+  it("renders prompt and labeled choices with selection cursor", () => {
     const { lastFrame } = render(
       <ChoiceModal
         variant={gothic}
         width={50}
         prompt="What do you do?"
         choices={["Attack", "Flee", "Negotiate"]}
+        selectedIndex={0}
       />,
     );
     const frame = lastFrame();
     expect(frame).toContain("What do you do?");
-    expect(frame).toContain("A) Attack");
-    expect(frame).toContain("B) Flee");
-    expect(frame).toContain("C) Negotiate");
+    expect(frame).toContain("> Attack");
+    expect(frame).toContain("  Flee");
+    expect(frame).toContain("  Negotiate");
   });
 });
 

@@ -76,6 +76,53 @@ export function toPlainText(nodes: FormattingNode[]): string {
     .join("");
 }
 
+/**
+ * Highlight quoted text ("...") in a formatting tree.
+ * Wraps matched quotes in a color node. Uses the given color,
+ * or defaults to bright white.
+ */
+export function highlightQuotes(
+  nodes: FormattingNode[],
+  color = "#ffffff",
+): FormattingNode[] {
+  return nodes.map((node) => {
+    if (typeof node === "string") {
+      return splitQuotes(node, color);
+    }
+    // Recurse into tag children
+    return { ...node, content: highlightQuotes(node.content, color) } as FormattingTag;
+  }).flat();
+}
+
+function splitQuotes(text: string, color: string): FormattingNode[] {
+  const result: FormattingNode[] = [];
+  const regex = /"([^"]+)"/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(text)) !== null) {
+    // Text before the quote
+    if (match.index > lastIndex) {
+      result.push(text.slice(lastIndex, match.index));
+    }
+    // The quoted text (including quotes) as a color node
+    const quoteNode: FormattingTag = {
+      type: "color",
+      color,
+      content: [match[0]],
+    };
+    result.push(quoteNode);
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Remaining text
+  if (lastIndex < text.length) {
+    result.push(text.slice(lastIndex));
+  }
+
+  return result.length > 0 ? result : [text];
+}
+
 // --- Internal ---
 
 interface ParsedTag {

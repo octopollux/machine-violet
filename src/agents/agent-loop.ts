@@ -4,7 +4,7 @@ import type { GameState } from "./game-state.js";
 
 // --- Types ---
 
-export type ModelId = "claude-opus-4-6" | "claude-sonnet-4-5-20250929" | "claude-haiku-4-5-20251001";
+export type ModelId = "claude-opus-4-6" | "claude-sonnet-4-6" | "claude-sonnet-4-5-20250929" | "claude-haiku-4-5-20251001";
 
 export interface AgentLoopConfig {
   model: ModelId;
@@ -20,6 +20,8 @@ export interface AgentLoopConfig {
   onComplete?: (usage: UsageStats) => void;
   /** Called on error */
   onError?: (error: Error) => void;
+  /** Called when a retryable error triggers a backoff wait */
+  onRetry?: (status: number, delayMs: number) => void;
 }
 
 export interface UsageStats {
@@ -256,6 +258,7 @@ const TUI_TOOLS = new Set([
   "present_choices",
   "present_roll",
   "show_character_sheet",
+  "enter_ooc",
 ]);
 
 function isTuiCommand(toolName: string): boolean {
@@ -291,12 +294,15 @@ async function callWithRetry(
         stream: false,
       });
     } catch (e) {
-      if (!isRetryable(e) || attempt === RETRY_DELAYS.length) {
+      const status = extractStatus(e);
+      if (!status || !RETRYABLE_STATUS.has(status) || attempt === RETRY_DELAYS.length) {
         const error = e instanceof Error ? e : new Error(String(e));
         config.onError?.(error);
         throw error;
       }
-      await sleep(RETRY_DELAYS[attempt]);
+      const delay = RETRY_DELAYS[attempt];
+      config.onRetry?.(status, delay);
+      await sleep(delay);
     }
   }
   throw new Error("Unreachable");
@@ -321,22 +327,30 @@ async function streamWithRetry(
       const message = await stream.finalMessage();
       return { message, usage: message.usage };
     } catch (e) {
-      if (!isRetryable(e) || attempt === RETRY_DELAYS.length) {
+      const status = extractStatus(e);
+      if (!status || !RETRYABLE_STATUS.has(status) || attempt === RETRY_DELAYS.length) {
         const error = e instanceof Error ? e : new Error(String(e));
         config.onError?.(error);
         throw error;
       }
-      await sleep(RETRY_DELAYS[attempt]);
+      const delay = RETRY_DELAYS[attempt];
+      config.onRetry?.(status, delay);
+      await sleep(delay);
     }
   }
   throw new Error("Unreachable");
 }
 
-function isRetryable(e: unknown): boolean {
+function extractStatus(e: unknown): number | null {
   if (e && typeof e === "object" && "status" in e) {
-    return RETRYABLE_STATUS.has(e.status as number);
+    const status = (e as { status: number }).status;
+    if (typeof status === "number") return status;
   }
-  return false;
+  // Detect overloaded errors that may lack a numeric status
+  // (e.g. streamed error events with type "overloaded_error")
+  const msg = e instanceof Error ? e.message : String(e);
+  if (msg.includes("overloaded")) return 529;
+  return null;
 }
 
 function sleep(ms: number): Promise<void> {

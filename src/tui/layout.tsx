@@ -45,6 +45,10 @@ export interface LayoutProps {
   // Turn/activity
   turnHolder?: string;
   engineState: string | null;
+
+  // Display options
+  dmBackground?: string;
+  quoteColor?: string;
 }
 
 /**
@@ -65,6 +69,8 @@ export function Layout(props: LayoutProps) {
     resources,
     turnHolder,
     engineState,
+    dmBackground,
+    quoteColor,
   } = props;
 
   const tier = getViewportTier(dimensions);
@@ -95,7 +101,7 @@ export function Layout(props: LayoutProps) {
       )}
 
       {/* Narrative Area */}
-      <NarrativeArea lines={narrativeLines} maxRows={narRows} />
+      <NarrativeArea lines={narrativeLines} maxRows={narRows} columns={width} dmBackground={dmBackground} quoteColor={quoteColor} />
 
       {/* Activity Line */}
       {elements.activityLine && <ActivityLine engineState={engineState} />}

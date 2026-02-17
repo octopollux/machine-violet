@@ -11,10 +11,10 @@ describe("calculateCost", () => {
       cacheCreationTokens: 0,
     };
     const cost = calculateCost(usage, "claude-opus-4-6");
-    // 1000 * 15/1M + 500 * 75/1M + 2000 * 1.50/1M
-    // = 0.015 + 0.0375 + 0.003
-    // = 0.0555
-    expect(cost).toBeCloseTo(0.0555, 4);
+    // 1000 * 5/1M + 500 * 25/1M + 2000 * 0.50/1M
+    // = 0.005 + 0.0125 + 0.001
+    // = 0.0185
+    expect(cost).toBeCloseTo(0.0185, 4);
   });
 
   it("calculates Haiku cost correctly", () => {
@@ -25,10 +25,10 @@ describe("calculateCost", () => {
       cacheCreationTokens: 0,
     };
     const cost = calculateCost(usage, "claude-haiku-4-5-20251001");
-    // 5000 * 0.80/1M + 200 * 4/1M
-    // = 0.004 + 0.0008
-    // = 0.0048
-    expect(cost).toBeCloseTo(0.0048, 4);
+    // 5000 * 1/1M + 200 * 5/1M
+    // = 0.005 + 0.001
+    // = 0.006
+    expect(cost).toBeCloseTo(0.006, 4);
   });
 
   it("includes cache creation cost", () => {
@@ -39,8 +39,8 @@ describe("calculateCost", () => {
       cacheCreationTokens: 10000,
     };
     const cost = calculateCost(usage, "claude-opus-4-6");
-    // 10000 * 18.75/1M = 0.1875
-    expect(cost).toBeCloseTo(0.1875, 4);
+    // 10000 * 6.25/1M = 0.0625
+    expect(cost).toBeCloseTo(0.0625, 4);
   });
 });
 

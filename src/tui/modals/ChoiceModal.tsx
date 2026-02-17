@@ -7,24 +7,25 @@ interface ChoiceModalProps {
   width: number;
   prompt: string;
   choices: string[];
+  selectedIndex: number;
 }
 
 /**
- * Player choice modal. Shows prompt + labeled options (A/B/C).
+ * Player choice modal. Shows prompt + selectable options with arrow cursor.
  */
 export function ChoiceModal({
   variant,
   width,
   prompt,
   choices,
+  selectedIndex,
 }: ChoiceModalProps) {
-  const labels = "ABCDEFGHIJ";
   const lines: string[] = [
     prompt,
     "",
-    ...choices.map((c, i) => `${labels[i]}) ${c}`),
+    ...choices.map((c, i) => `${i === selectedIndex ? ">" : " "} ${c}`),
     "",
-    "> _",
+    "Arrow keys to select, Enter to confirm, ESC to dismiss.",
   ];
 
   return <Modal variant={variant} width={width} title="Choose" children={lines} />;

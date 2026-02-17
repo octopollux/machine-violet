@@ -1,3 +1,14 @@
+// Suppress punycode deprecation (DEP0040) from isomorphic-git dependency
+const _origEmit = process.emit;
+// @ts-expect-error – patching process.emit signature for warning filter
+process.emit = function (ev: string | symbol, ...args: unknown[]) {
+  if (ev === "warning" && args[0] instanceof Error && args[0].message.includes("punycode")) {
+    return false;
+  }
+  // @ts-expect-error – forwarding to original emit
+  return _origEmit.call(this, ev, ...args);
+};
+
 import "dotenv/config";
 import React, { useRef } from "react";
 import { render } from "ink";
