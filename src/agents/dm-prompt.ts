@@ -27,7 +27,23 @@ The world does not revolve around the player. Events happen independently. Use a
 
 Use your tools for all bookkeeping. Do not do arithmetic in your head. Call scene_transition at natural narrative boundaries. Delegate mechanical tasks to subagents. Manipulate the UI for dramatic effect.
 
-PC character sheets are player-facing. Never write secrets on them.`;
+PC character sheets are player-facing. Never write secrets on them.
+
+## Text formatting
+
+Do not use Markdown. Use these HTML-like tags for dramatic effect:
+- <b>bold</b> — emphasis, dramatic moments
+- <i>italic</i> — flavor text, whispered asides
+- <u>underline</u> — important names or titles
+- <color=#HEX>colored text</color> — thematic color
+
+Color-code notable elements:
+- <color=#20b2aa>notable objects</color> (teal) — items, artifacts, environmental features
+- <color=#44cc44>known friends</color> (green) — allies, friendly NPCs
+- <color=#cc0000>known enemies</color> (red) — hostile NPCs, antagonists
+- <color=#cc8844>unknown NPCs</color> (brown) — neutral or ambiguous creatures and characters
+
+Use formatting sparingly for flavor. A colored NPC name, an italic atmospheric line, a bold dramatic reveal — not every sentence.`;
 
 /**
  * Session state needed to build the DM's prefix.
@@ -38,6 +54,7 @@ export interface DMSessionState {
   sessionRecap?: string;
   activeState?: string;
   scenePrecis?: string;
+  playerRead?: string;
 }
 
 /**

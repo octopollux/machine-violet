@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
 import { summarizeScene } from "./scene-summarizer.js";
-import { updatePrecis } from "./precis-updater.js";
+import { updatePrecis, parsePrecisResult } from "./precis-updater.js";
 import { updateChangelogs } from "./changelog-updater.js";
 import { resolveAction } from "./resolve-action.js";
 
@@ -84,6 +84,79 @@ describe("updatePrecis", () => {
     );
 
     expect(result.text).toContain("G1");
+  });
+
+  it("extracts player read from response with PLAYER_READ block", async () => {
+    const client = mockClient([
+      textResponse('R4: Aldric hit G1 for 9 slash. G1: 3/12 HP.\nPLAYER_READ: {"engagement":"high","focus":["combat"],"tone":"aggressive","pacing":"pushing_forward","offScript":false}'),
+    ]);
+
+    const result = await updatePrecis(
+      client,
+      "Scene 14: Combat in throne room. R1-R3: ...",
+      "[Aldric] I swing my longsword at the goblin.\nDM: The blade bites deep...",
+    );
+
+    expect(result.text).toContain("G1");
+    expect(result.text).not.toContain("PLAYER_READ");
+    expect(result.playerRead).toBeDefined();
+    expect(result.playerRead!.engagement).toBe("high");
+    expect(result.playerRead!.focus).toEqual(["combat"]);
+    expect(result.playerRead!.tone).toBe("aggressive");
+    expect(result.playerRead!.pacing).toBe("pushing_forward");
+    expect(result.playerRead!.offScript).toBe(false);
+  });
+
+  it("returns undefined playerRead when PLAYER_READ block is missing", async () => {
+    const client = mockClient([
+      textResponse("R4: Aldric hit G1 for 9 slash. G1: 3/12 HP."),
+    ]);
+
+    const result = await updatePrecis(
+      client,
+      "Scene 14: Combat in throne room. R1-R3: ...",
+      "[Aldric] I swing my longsword at the goblin.\nDM: The blade bites deep...",
+    );
+
+    expect(result.playerRead).toBeUndefined();
+  });
+});
+
+describe("parsePrecisResult", () => {
+  it("parses well-formed PLAYER_READ block", () => {
+    const result = parsePrecisResult({
+      text: 'Aldric entered the cave.\nPLAYER_READ: {"engagement":"moderate","focus":["exploration","puzzle"],"tone":"cautious","pacing":"exploratory","offScript":true}',
+      usage: { inputTokens: 50, outputTokens: 20, cacheReadTokens: 0, cacheCreationTokens: 0 },
+    });
+
+    expect(result.text).toBe("Aldric entered the cave.");
+    expect(result.playerRead).toEqual({
+      engagement: "moderate",
+      focus: ["exploration", "puzzle"],
+      tone: "cautious",
+      pacing: "exploratory",
+      offScript: true,
+    });
+  });
+
+  it("returns undefined playerRead for malformed JSON", () => {
+    const result = parsePrecisResult({
+      text: "Aldric entered the cave.\nPLAYER_READ: {not valid json}",
+      usage: { inputTokens: 50, outputTokens: 20, cacheReadTokens: 0, cacheCreationTokens: 0 },
+    });
+
+    expect(result.text).toBe("Aldric entered the cave.");
+    expect(result.playerRead).toBeUndefined();
+  });
+
+  it("returns full text when no PLAYER_READ line", () => {
+    const result = parsePrecisResult({
+      text: "Aldric entered the cave. Found a torch.",
+      usage: { inputTokens: 50, outputTokens: 20, cacheReadTokens: 0, cacheCreationTokens: 0 },
+    });
+
+    expect(result.text).toBe("Aldric entered the cave. Found a torch.");
+    expect(result.playerRead).toBeUndefined();
   });
 });
 

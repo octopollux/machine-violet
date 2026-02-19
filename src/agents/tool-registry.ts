@@ -795,10 +795,38 @@ const TOOL_DEFS: RegisteredTool[] = [
   },
 ];
 
+// --- State change mapping ---
+
+import type { StateSlice } from "../context/state-persistence.js";
+
+/** Maps tool names to which state slices they mutate */
+export const TOOL_STATE_MAP: Record<string, StateSlice[]> = {
+  start_combat: ["combat", "clocks"],
+  end_combat: ["combat", "clocks"],
+  advance_turn: ["combat"],
+  modify_initiative: ["combat"],
+  set_alarm: ["clocks"],
+  clear_alarm: ["clocks"],
+  advance_calendar: ["clocks"],
+  next_round: ["clocks"],
+  create_map: ["maps"],
+  place_entity: ["maps"],
+  move_entity: ["maps"],
+  remove_entity: ["maps"],
+  set_terrain: ["maps"],
+  annotate: ["maps"],
+  import_entities: ["maps"],
+  deck: ["decks"],
+  switch_player: [],
+};
+
+export type OnStateChanged = (toolName: string, state: GameState, slices: StateSlice[]) => void;
+
 // --- Registry ---
 
 export class ToolRegistry {
   private tools = new Map<string, RegisteredTool>();
+  onStateChanged?: OnStateChanged;
 
   constructor() {
     for (const tool of TOOL_DEFS) {
@@ -818,7 +846,14 @@ export class ToolRegistry {
       return err(`Unknown tool: ${name}`);
     }
     try {
-      return tool.handler(state, input);
+      const result = tool.handler(state, input);
+      if (!result.is_error && this.onStateChanged) {
+        const slices = TOOL_STATE_MAP[name];
+        if (slices && slices.length > 0) {
+          this.onStateChanged(name, state, slices);
+        }
+      }
+      return result;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       return err(`Tool error (${name}): ${msg}`);

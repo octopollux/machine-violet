@@ -1,4 +1,5 @@
 import React from "react";
+import { Box } from "ink";
 import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
 import { Modal } from "./Modal.js";
@@ -52,7 +53,9 @@ describe("ChoiceModal", () => {
 describe("GameMenu", () => {
   it("renders all menu items", () => {
     const { lastFrame } = render(
-      <GameMenu variant={gothic} width={40} selectedIndex={0} />,
+      <Box width={40} height={24}>
+        <GameMenu variant={gothic} width={40} height={24} selectedIndex={0} />
+      </Box>,
     );
     const frame = lastFrame();
     for (const item of MENU_ITEMS) {
@@ -62,7 +65,9 @@ describe("GameMenu", () => {
 
   it("highlights selected item", () => {
     const { lastFrame } = render(
-      <GameMenu variant={gothic} width={40} selectedIndex={2} />,
+      <Box width={40} height={24}>
+        <GameMenu variant={gothic} width={40} height={24} selectedIndex={2} />
+      </Box>,
     );
     const frame = lastFrame();
     // Selected item gets ◆, others get ○
@@ -82,7 +87,9 @@ describe("CharacterSheetModal", () => {
     ].join("\n");
 
     const { lastFrame } = render(
-      <CharacterSheetModal variant={gothic} width={50} content={content} />,
+      <Box width={50} height={24}>
+        <CharacterSheetModal variant={gothic} width={50} height={24} content={content} />
+      </Box>,
     );
     const frame = lastFrame();
     expect(frame).toContain("Aldric the Bold");
@@ -92,11 +99,14 @@ describe("CharacterSheetModal", () => {
 
   it("uses default title when no H1 present", () => {
     const { lastFrame } = render(
-      <CharacterSheetModal
-        variant={gothic}
-        width={50}
-        content="Just some text"
-      />,
+      <Box width={50} height={24}>
+        <CharacterSheetModal
+          variant={gothic}
+          width={50}
+          height={24}
+          content="Just some text"
+        />
+      </Box>,
     );
     expect(lastFrame()).toContain("Character Sheet");
   });
@@ -166,6 +176,6 @@ describe("SessionRecapModal", () => {
     expect(frame).toContain("Session Recap");
     expect(frame).toContain("Previously on...");
     expect(frame).toContain("The party entered the Shattered Hall.");
-    expect(frame).toContain("Press any key to continue");
+    expect(frame).toContain("Press ESC or Enter to continue");
   });
 });

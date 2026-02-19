@@ -68,7 +68,7 @@ Key docs: `tools-catalog.md` (37 tools), `subagents-catalog.md` (14 patterns), `
 
 ## Cost Awareness
 
-Live API key in `.env` with limited credit. Opus is $15/$75 per MTok. Default dev override uses Sonnet for DM to save money. Don't make unnecessary API calls in manual testing.
+Live API key in `.env` with limited credit. Opus is $5/$25 per MTok. Default dev override uses Sonnet for DM to save money. Don't make unnecessary API calls in manual testing.
 
 ## TypeScript Config
 

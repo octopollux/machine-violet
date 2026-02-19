@@ -6,8 +6,11 @@ import { readFile, writeFile, appendFile, mkdir, readdir, stat } from "node:fs/p
 import { join, dirname } from "node:path";
 
 import { Layout } from "./tui/layout.js";
+import type { NarrativeAreaHandle } from "./tui/components/index.js";
+import { scrollAmount } from "./tui/components/index.js";
 import { STYLES, getStyle } from "./tui/frames/index.js";
-import { GameMenu, MENU_ITEMS, ChoiceModal, DiceRollModal, CharacterSheetModal, SessionRecapModal } from "./tui/modals/index.js";
+import { MENU_ITEMS, ChoiceModal, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal } from "./tui/modals/index.js";
+import type { CenteredModalHandle } from "./tui/modals/index.js";
 import type { FrameStyle, StyleVariant } from "./types/tui.js";
 import type { FileIO, SceneState } from "./agents/scene-manager.js";
 import type { EngineState, EngineCallbacks } from "./agents/game-engine.js";
@@ -28,6 +31,7 @@ import { getActivePlayer, switchToNextPlayer, getPlayerEntries } from "./agents/
 import { createClocksState } from "./tools/clocks/index.js";
 import { createCombatState, createDefaultConfig } from "./tools/combat/index.js";
 import { createDecksState } from "./tools/cards/index.js";
+import { StatePersister } from "./context/state-persistence.js";
 import { CostTracker } from "./context/cost-tracker.js";
 import type { ShutdownContext } from "./shutdown.js";
 import { gracefulShutdown } from "./shutdown.js";
@@ -130,8 +134,12 @@ export default function App({ shutdownRef }: AppProps) {
   const [resources, setResources] = useState<string[]>([]);
   const [modelineOverride, setModelineOverride] = useState<string | null>(null);
   const [oocActive, setOocActive] = useState(false);
+  const [oocBusy, setOocBusy] = useState(false);
+  const previousVariantRef = useRef<StyleVariant>("exploration");
   const [choiceIndex, setChoiceIndex] = useState(0);
   const clientRef = useRef<Anthropic | null>(null);
+  const narrativeRef = useRef<NarrativeAreaHandle>(null);
+  const modalScrollRef = useRef<CenteredModalHandle>(null);
 
   // --- Setup state ---
   const [setupPrompt, setSetupPrompt] = useState<SetupStep | null>(null);
@@ -150,8 +158,23 @@ export default function App({ shutdownRef }: AppProps) {
   // --- Display state ---
   const [campaignName, setCampaignName] = useState("");
   const [activePlayerIndex, setActivePlayerIndex] = useState(0);
-  const [style, setStyle] = useState<FrameStyle>(STYLES[0]);
-  const [variant, setVariant] = useState<StyleVariant>("exploration");
+  const [style, _setStyle] = useState<FrameStyle>(STYLES[0]);
+  const [variant, _setVariant] = useState<StyleVariant>("exploration");
+  const persisterRef = useRef<StatePersister | null>(null);
+  const styleRef = useRef<FrameStyle>(STYLES[0]);
+  const variantRef = useRef<StyleVariant>("exploration");
+
+  const setStyle = useCallback((s: FrameStyle) => {
+    _setStyle(s);
+    styleRef.current = s;
+    persisterRef.current?.persistUI({ styleName: s.name, variant: variantRef.current });
+  }, []);
+
+  const setVariant = useCallback((v: StyleVariant) => {
+    _setVariant(v);
+    variantRef.current = v;
+    persisterRef.current?.persistUI({ styleName: styleRef.current.name, variant: v });
+  }, []);
 
   // --- Config paths ---
   const getAppDir = useCallback(() => {
@@ -261,8 +284,10 @@ export default function App({ shutdownRef }: AppProps) {
         break;
       }
       case "enter_ooc":
+        previousVariantRef.current = variantRef.current;
         setOocActive(true);
         setVariant("ooc");
+        setNarrativeLines((prev) => [...prev, "[OOC Mode \u2014 type to chat, ESC to exit]", ""]);
         break;
     }
   }, [setActiveModal]);
@@ -272,10 +297,15 @@ export default function App({ shutdownRef }: AppProps) {
     onNarrativeDelta(delta: string) {
       setNarrativeLines((prev) => {
         const lines = [...prev];
-        if (lines.length === 0) {
-          lines.push(delta);
-        } else {
-          lines[lines.length - 1] += delta;
+        if (lines.length === 0) lines.push(delta);
+        else lines[lines.length - 1] += delta;
+        const last = lines[lines.length - 1];
+        if (last.includes("\n")) {
+          const parts = last.split("\n");
+          lines[lines.length - 1] = parts[0];
+          for (let i = 1; i < parts.length; i++) {
+            lines.push(parts[i]);
+          }
         }
         return lines;
       });
@@ -379,6 +409,7 @@ export default function App({ shutdownRef }: AppProps) {
       slug: maxScene > 0 ? lastSlug : "opening",
       transcript,
       precis: "",
+      playerReads: [],
       sessionNumber: maxSession + 1, // next session
     };
   }, []);
@@ -391,7 +422,7 @@ export default function App({ shutdownRef }: AppProps) {
     // On resume, detect scene/session state from disk; otherwise start fresh
     const scene: SceneState = isResume
       ? await detectSceneState(campaignRoot)
-      : { sceneNumber: 1, slug: "opening", transcript: [], precis: "", sessionNumber: 1 };
+      : { sceneNumber: 1, slug: "opening", transcript: [], precis: "", playerReads: [], sessionNumber: 1 };
 
     const sessionState: DMSessionState = {};
     const client = new Anthropic();
@@ -407,6 +438,7 @@ export default function App({ shutdownRef }: AppProps) {
     });
 
     engineRef.current = engine;
+    persisterRef.current = new StatePersister(campaignRoot, fileIO.current);
     setCampaignName(config.name);
     setActivePlayerIndex(0);
 
@@ -425,24 +457,75 @@ export default function App({ shutdownRef }: AppProps) {
     }
 
     if (isResume) {
+      // Load persisted state
+      const persister = new StatePersister(campaignRoot, fileIO.current);
+      const loaded = await persister.loadAll();
+
+      // Hydrate game state from persisted files
+      if (loaded.combat) gs.combat = loaded.combat;
+      if (loaded.clocks) gs.clocks = loaded.clocks;
+      if (loaded.maps) gs.maps = loaded.maps;
+      if (loaded.decks) gs.decks = loaded.decks;
+      if (loaded.scene) {
+        gs.activePlayerIndex = loaded.scene.activePlayerIndex;
+        scene.precis = loaded.scene.precis;
+        scene.playerReads = loaded.scene.playerReads;
+        setActivePlayerIndex(loaded.scene.activePlayerIndex);
+      }
+
+      // Restore UI theme state
+      if (loaded.ui) {
+        const restoredStyle = getStyle(loaded.ui.styleName);
+        if (restoredStyle) {
+          _setStyle(restoredStyle);
+          styleRef.current = restoredStyle;
+        }
+        _setVariant(loaded.ui.variant);
+        variantRef.current = loaded.ui.variant;
+      }
+
       // Load session recap + campaign log into DM's prefix context
       const recap = await engine.resumeSession();
 
-      setNarrativeLines([`Welcome back to ${config.name}.`, ""]);
-      if (recap) {
-        setNarrativeLines((prev) => [...prev, "Previously...", "", recap, ""]);
+      // Restore scene transcript into scrollback
+      const transcriptLines: string[] = [];
+      for (const block of scene.transcript) {
+        for (const line of block.split("\n")) {
+          transcriptLines.push(line);
+        }
+        transcriptLines.push("");
       }
-      setPhase("playing");
 
-      // Send a resume-specific prompt to the DM
-      const activePlayer = getActivePlayer(gs);
-      const resumeParts = ["[Session resumes. Continue the narrative where we left off."];
-      if (config.premise) resumeParts.push(`Campaign premise: ${config.premise}`);
-      const pc = config.players[0];
-      if (pc) resumeParts.push(`The player character is ${pc.character}.`);
-      if (recap) resumeParts.push(`Last session recap: ${recap}`);
-      resumeParts.push("Pick up naturally from the last scene — do NOT restart or re-introduce the setting.");
-      await engine.processInput(activePlayer.characterName, resumeParts.join(" ") + "]");
+      // If we have a saved conversation, hydrate and skip the resume prompt
+      if (loaded.conversation && loaded.conversation.length > 0) {
+        engine.hydrateConversation(loaded.conversation);
+
+        // Extract last DM response for display
+        const lastExchange = loaded.conversation[loaded.conversation.length - 1];
+        const lastDMText = typeof lastExchange.assistant.content === "string"
+          ? lastExchange.assistant.content
+          : "[Resuming session...]";
+
+        setNarrativeLines([...transcriptLines, `Welcome back to ${config.name}.`, "", lastDMText, ""]);
+        setPhase("playing");
+      } else {
+        // No saved conversation — fall back to recap-based resume
+        setNarrativeLines([...transcriptLines, `Welcome back to ${config.name}.`, ""]);
+        if (recap) {
+          setNarrativeLines((prev) => [...prev, "Previously...", "", recap, ""]);
+        }
+        setPhase("playing");
+
+        // Send a resume-specific prompt to the DM
+        const activePlayer = getActivePlayer(gs);
+        const resumeParts = ["[Session resumes. Continue the narrative where we left off."];
+        if (config.premise) resumeParts.push(`Campaign premise: ${config.premise}`);
+        const pc = config.players[0];
+        if (pc) resumeParts.push(`The player character is ${pc.character}.`);
+        if (recap) resumeParts.push(`Last session recap: ${recap}`);
+        resumeParts.push("Pick up naturally from the last scene — do NOT restart or re-introduce the setting.");
+        await engine.processInput(activePlayer.characterName, resumeParts.join(" ") + "]");
+      }
     } else {
       setNarrativeLines([`Welcome to ${config.name}.`, "", "The story begins..."]);
       setPhase("playing");
@@ -565,7 +648,7 @@ export default function App({ shutdownRef }: AppProps) {
     const convo = setupConvoRef.current;
     if (!convo) return;
 
-    setSetupConvoLines((prev) => [...prev, `> ${text}`, ""]);
+    setSetupConvoLines((prev) => [...prev, `> ${text}`, "", ""]);
     setSetupConvoBusy(true);
 
     try {
@@ -585,7 +668,7 @@ export default function App({ shutdownRef }: AppProps) {
 
     setActiveModal(null);
     setChoiceIndex(0);
-    setSetupConvoLines((prev) => [...prev, `> ${selectedText}`, ""]);
+    setSetupConvoLines((prev) => [...prev, `> ${selectedText}`, "", ""]);
     setSetupConvoBusy(true);
 
     try {
@@ -783,9 +866,36 @@ export default function App({ shutdownRef }: AppProps) {
       // Modal input takes priority over everything except ESC for menu
       const modal = activeModalRef.current;
 
-      // Non-choice modals: any key dismisses
-      if (modal && (modal.kind === "dice" || modal.kind === "character_sheet" || modal.kind === "recap")) {
+      // Dice modal: any key dismisses
+      if (modal && modal.kind === "dice") {
         setActiveModal(null);
+        return;
+      }
+
+      // Scrollable modals (character sheet, recap): scroll keys navigate, ESC/Enter dismisses
+      if (modal && (modal.kind === "character_sheet" || modal.kind === "recap")) {
+        if (key.escape || key.return) {
+          setActiveModal(null);
+          return;
+        }
+        if (key.pageUp || key.pageDown) {
+          const step = scrollAmount(rows);
+          modalScrollRef.current?.scrollBy(key.pageUp ? -step : step);
+          return;
+        }
+        if (input === "+" || input === "-") {
+          const step = scrollAmount(rows);
+          modalScrollRef.current?.scrollBy(input === "-" ? -step : step);
+          return;
+        }
+        if (key.upArrow) {
+          modalScrollRef.current?.scrollBy(-1);
+          return;
+        }
+        if (key.downArrow) {
+          modalScrollRef.current?.scrollBy(1);
+          return;
+        }
         return;
       }
 
@@ -818,11 +928,51 @@ export default function App({ shutdownRef }: AppProps) {
         return;
       }
 
-      // OOC active: block game input, ESC cancels
+      // OOC active: interactive mode — type messages, ESC exits
       if (oocActive) {
         if (key.escape) {
           setOocActive(false);
-          setVariant("exploration");
+          setVariant(previousVariantRef.current);
+          setNarrativeLines((prev) => [...prev, "[Exiting OOC Mode]", ""]);
+          return;
+        }
+        if (oocBusy) return; // Block input while OOC agent is responding
+
+        if (key.return && inputValue.trim()) {
+          const text = inputValue.trim();
+          setInputValue("");
+          setNarrativeLines((prev) => [...prev, `> ${text}`, ""]);
+          // Fire OOC subagent with the player's message
+          if (clientRef.current && gameStateRef.current) {
+            const gs = gameStateRef.current;
+            setOocBusy(true);
+            enterOOC(clientRef.current, text, {
+              campaignName: gs.config.name,
+              previousVariant: previousVariantRef.current,
+            }, (delta) => {
+              setNarrativeLines((prev) => {
+                const lines = [...prev];
+                if (lines.length === 0) lines.push(delta);
+                else lines[lines.length - 1] += delta;
+                return lines;
+              });
+            }).then((result) => {
+              setOocBusy(false);
+              setNarrativeLines((prev) => [...prev, ""]);
+              costTracker.current.record(result.usage, getModel("medium"));
+            }).catch(() => {
+              setOocBusy(false);
+              setNarrativeLines((prev) => [...prev, "[OOC error]", ""]);
+            });
+          }
+          return;
+        }
+        if (key.backspace || key.delete) {
+          setInputValue((v) => v.slice(0, -1));
+          return;
+        }
+        if (input && !key.ctrl && !key.meta && !key.return) {
+          setInputValue((v) => v + input);
         }
         return;
       }
@@ -865,31 +1015,17 @@ export default function App({ shutdownRef }: AppProps) {
             }
           } else if (item === "OOC Mode") {
             setMenuOpen(false);
-            setOocActive(true);
-            setVariant("ooc");
-            setNarrativeLines((prev) => [...prev, "[OOC Mode]"]);
-            // Single-shot OOC: run subagent then return
-            if (clientRef.current && gameStateRef.current) {
-              const gs = gameStateRef.current;
-              enterOOC(clientRef.current, "", {
-                campaignName: gs.config.name,
-                previousVariant: variant,
-              }, (delta) => {
-                setNarrativeLines((prev) => {
-                  const lines = [...prev];
-                  if (lines.length === 0) lines.push(delta);
-                  else lines[lines.length - 1] += delta;
-                  return lines;
-                });
-              }).then((result) => {
-                setOocActive(false);
-                setVariant(result.snapshot.previousVariant as StyleVariant);
-                setNarrativeLines((prev) => [...prev, ""]);
-                costTracker.current.record(result.usage, getModel("medium"));
-              }).catch(() => {
-                setOocActive(false);
-                setVariant("exploration");
-              });
+            if (oocActive) {
+              // Exit OOC mode
+              setOocActive(false);
+              setVariant(previousVariantRef.current);
+              setNarrativeLines((prev) => [...prev, "[Exiting OOC Mode]", ""]);
+            } else {
+              // Enter OOC mode — interactive, stay until user exits
+              previousVariantRef.current = variantRef.current;
+              setOocActive(true);
+              setVariant("ooc");
+              setNarrativeLines((prev) => [...prev, "[OOC Mode \u2014 type to chat, ESC to exit]", ""]);
             }
           }
           return;
@@ -901,6 +1037,18 @@ export default function App({ shutdownRef }: AppProps) {
       if (key.tab && gameStateRef.current) {
         const next = switchToNextPlayer(gameStateRef.current);
         setActivePlayerIndex(next.index);
+        return;
+      }
+
+      // Scroll keys: +/- (when input empty) and PgUp/PgDn
+      if (key.pageUp || key.pageDown) {
+        const step = scrollAmount(rows);
+        narrativeRef.current?.scrollBy(key.pageUp ? -step : step);
+        return;
+      }
+      if (!inputValue && (input === "+" || input === "-")) {
+        const step = scrollAmount(rows);
+        narrativeRef.current?.scrollBy(input === "-" ? -step : step);
         return;
       }
 
@@ -1094,7 +1242,9 @@ export default function App({ shutdownRef }: AppProps) {
   const gs = gameStateRef.current;
   const players = gs ? getPlayerEntries(gs) : [{ name: "Player", isAI: false }];
   const activeChar = gs ? getActivePlayer(gs).characterName : "Player";
-  // Compute actual modal height (content lines + 2 border rows)
+
+  // Compute actual modal height for bottom-stacked modals only.
+  // CenteredModal types (menu, character_sheet) overlay the layout and don't need height subtraction.
   const modalHeight = (() => {
     if (!activeModal) return 0;
     switch (activeModal.kind) {
@@ -1104,14 +1254,13 @@ export default function App({ shutdownRef }: AppProps) {
       case "dice":
         // reason? + expression + dice + kept? + total + blanks + 2 borders
         return 8 + 2;
-      case "character_sheet":
-        // content lines + 2 borders, capped at half the screen
-        return Math.min(activeModal.content.split("\n").length + 2, Math.floor(rows / 2));
       case "recap":
         return Math.min(activeModal.lines.length + 2, Math.floor(rows / 2));
+      default:
+        return 0;
     }
   })();
-  const layoutRows = menuOpen ? rows - MENU_ITEMS.length - 4 : rows - modalHeight;
+  const layoutRows = rows - modalHeight;
 
   return (
     <Box flexDirection="column" width={cols} height={rows}>
@@ -1130,15 +1279,9 @@ export default function App({ shutdownRef }: AppProps) {
         turnHolder={activeChar}
         engineState={engineState}
         quoteColor="#ffffff"
+        narrativeRef={narrativeRef}
       />
-      {menuOpen && (
-        <GameMenu
-          variant={style.variants[variant]}
-          width={cols}
-          selectedIndex={menuIndex}
-        />
-      )}
-      {!menuOpen && activeModal?.kind === "choice" && (
+      {activeModal?.kind === "choice" && (
         <ChoiceModal
           variant={style.variants[variant]}
           width={cols}
@@ -1147,7 +1290,7 @@ export default function App({ shutdownRef }: AppProps) {
           selectedIndex={choiceIndex}
         />
       )}
-      {!menuOpen && activeModal?.kind === "dice" && (
+      {activeModal?.kind === "dice" && (
         <DiceRollModal
           variant={style.variants[variant]}
           width={cols}
@@ -1158,18 +1301,29 @@ export default function App({ shutdownRef }: AppProps) {
           reason={activeModal.reason}
         />
       )}
-      {!menuOpen && activeModal?.kind === "character_sheet" && (
-        <CharacterSheetModal
-          variant={style.variants[variant]}
-          width={cols}
-          content={activeModal.content}
-        />
-      )}
-      {!menuOpen && activeModal?.kind === "recap" && (
+      {activeModal?.kind === "recap" && (
         <SessionRecapModal
           variant={style.variants[variant]}
           width={cols}
           lines={activeModal.lines}
+        />
+      )}
+      {activeModal?.kind === "character_sheet" && (
+        <CharacterSheetModal
+          variant={style.variants[variant]}
+          width={cols}
+          height={rows}
+          content={activeModal.content}
+          scrollRef={modalScrollRef}
+        />
+      )}
+      {menuOpen && (
+        <GameMenu
+          variant={style.variants[variant]}
+          width={cols}
+          height={rows}
+          selectedIndex={menuIndex}
+          oocActive={oocActive}
         />
       )}
     </Box>

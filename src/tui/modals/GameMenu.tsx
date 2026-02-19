@@ -1,11 +1,13 @@
 import React from "react";
 import type { FrameStyleVariant } from "../../types/tui.js";
-import { Modal } from "./Modal.js";
+import { CenteredModal } from "./CenteredModal.js";
 
 interface GameMenuProps {
   variant: FrameStyleVariant;
   width: number;
+  height: number;
   selectedIndex: number;
+  oocActive?: boolean;
 }
 
 const MENU_ITEMS = [
@@ -22,14 +24,17 @@ const MENU_ITEMS = [
 export function GameMenu({
   variant,
   width,
+  height,
   selectedIndex,
+  oocActive,
 }: GameMenuProps) {
   const lines = MENU_ITEMS.map((item, i) => {
     const marker = i === selectedIndex ? "◆" : "○";
-    return `  ${marker} ${item}`;
+    const label = item === "OOC Mode" && oocActive ? "Exit OOC Mode" : item;
+    return `  ${marker} ${label}`;
   });
 
-  return <Modal variant={variant} width={width} children={lines} />;
+  return <CenteredModal variant={variant} width={width} height={height} title="Menu" children={lines} />;
 }
 
 export { MENU_ITEMS };

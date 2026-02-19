@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseFormatting, toPlainText } from "./formatting.js";
+import { parseFormatting, toPlainText, highlightQuotesWithState, computeQuoteState, healTagBoundaries, scanTagChanges } from "./formatting.js";
 import type { FormattingTag } from "../types/tui.js";
 
 describe("parseFormatting", () => {
@@ -134,5 +134,156 @@ describe("toPlainText", () => {
 
   it("handles empty input", () => {
     expect(toPlainText([])).toBe("");
+  });
+});
+
+describe("highlightQuotesWithState", () => {
+  const color = "#ffffff";
+
+  it("highlights a single-line quote", () => {
+    const nodes = parseFormatting('He said "hello" quietly.');
+    const result = highlightQuotesWithState(nodes, color, false);
+    // Should produce: 'He said ', color('"hello"'), ' quietly.'
+    expect(result).toHaveLength(3);
+    expect(result[0]).toBe("He said ");
+    const quoted = result[1] as FormattingTag;
+    expect(quoted.type).toBe("color");
+    expect(quoted.color).toBe(color);
+    expect(quoted.content).toEqual(['"hello"']);
+    expect(result[2]).toBe(" quietly.");
+  });
+
+  it("threads quote state across multiple nodes (multiline)", () => {
+    // Simulate 3 lines where a quote spans from line 1 into line 3
+    const lines = [
+      'The wizard said "Beware',
+      "the darkness that",
+      'lurks within." Then silence.',
+    ];
+    const states = computeQuoteState(lines);
+    // After line 0: inQuote=true (one open quote)
+    expect(states[0]).toBe(true);
+    // After line 1: still true (no quotes)
+    expect(states[1]).toBe(true);
+    // After line 2: false (closing quote)
+    expect(states[2]).toBe(false);
+
+    // Now highlight line 1 (middle line, entirely inside quote)
+    const nodes1 = parseFormatting(lines[1]);
+    const result1 = highlightQuotesWithState(nodes1, color, true);
+    // Entire text should be wrapped in a color node (mid-quote)
+    expect(result1).toHaveLength(1);
+    const tag = result1[0] as FormattingTag;
+    expect(tag.type).toBe("color");
+    expect(tag.color).toBe(color);
+  });
+
+  it("threads state across formatting tags", () => {
+    // Quote starts before bold tag and ends after it: "hello <b>world</b> end"
+    const nodes = parseFormatting('"hello <b>world</b> end"');
+    const result = highlightQuotesWithState(nodes, color, false);
+    // The open " starts a quote; the bold tag content is inside it; the closing " ends it
+    const plain = toPlainText(result);
+    expect(plain).toBe('"hello world end"');
+    // First node should be a color node for the opening part
+    const first = result[0] as FormattingTag;
+    expect(first.type).toBe("color");
+  });
+});
+
+describe("scanTagChanges", () => {
+  it("detects open and close tags", () => {
+    const changes = scanTagChanges("<b>hello</b>");
+    expect(changes).toEqual([
+      { kind: "open", name: "b", raw: "<b>" },
+      { kind: "close", name: "b", raw: "</b>" },
+    ]);
+  });
+
+  it("detects color tags", () => {
+    const changes = scanTagChanges("<color=#ff0000>red</color>");
+    expect(changes).toEqual([
+      { kind: "open", name: "color", raw: "<color=#ff0000>" },
+      { kind: "close", name: "color", raw: "</color>" },
+    ]);
+  });
+
+  it("returns empty for plain text", () => {
+    expect(scanTagChanges("no tags here")).toEqual([]);
+  });
+
+  it("handles unclosed tags", () => {
+    const changes = scanTagChanges("<i>hello");
+    expect(changes).toEqual([{ kind: "open", name: "i", raw: "<i>" }]);
+  });
+});
+
+describe("healTagBoundaries", () => {
+  it("heals italic spanning two lines", () => {
+    const result = healTagBoundaries(["<i>hello", "world</i>"]);
+    expect(result).toEqual(["<i>hello</i>", "<i>world</i>"]);
+  });
+
+  it("heals italic spanning three lines", () => {
+    const result = healTagBoundaries([
+      "<i>The door creaked open,",
+      "revealing ancient horrors.",
+      "She screamed.</i> The end.",
+    ]);
+    expect(result).toEqual([
+      "<i>The door creaked open,</i>",
+      "<i>revealing ancient horrors.</i>",
+      "<i>She screamed.</i> The end.",
+    ]);
+  });
+
+  it("heals nested bold+italic spanning two lines", () => {
+    const result = healTagBoundaries(["<b><i>hello", "world</i></b>"]);
+    expect(result).toEqual(["<b><i>hello</i></b>", "<b><i>world</i></b>"]);
+  });
+
+  it("passes through lines with no tags unchanged", () => {
+    const input = ["plain line one", "plain line two"];
+    expect(healTagBoundaries(input)).toEqual(input);
+  });
+
+  it("passes through lines with self-contained tags unchanged", () => {
+    const input = ["<b>bold</b> text", "normal"];
+    expect(healTagBoundaries(input)).toEqual(input);
+  });
+
+  it("handles mixed tagged and plain lines", () => {
+    const result = healTagBoundaries([
+      "<i>start italic",
+      "still italic</i>",
+      "plain text",
+      "<b>bold text</b>",
+    ]);
+    expect(result).toEqual([
+      "<i>start italic</i>",
+      "<i>still italic</i>",
+      "plain text",
+      "<b>bold text</b>",
+    ]);
+  });
+
+  it("heals color tags spanning lines", () => {
+    const result = healTagBoundaries([
+      "<color=#ff0000>red text",
+      "more red</color>",
+    ]);
+    expect(result).toEqual([
+      "<color=#ff0000>red text</color>",
+      "<color=#ff0000>more red</color>",
+    ]);
+  });
+
+  it("handles empty lines array", () => {
+    expect(healTagBoundaries([])).toEqual([]);
+  });
+
+  it("handles empty string lines within open tags", () => {
+    const result = healTagBoundaries(["<i>start", "", "end</i>"]);
+    expect(result).toEqual(["<i>start</i>", "<i></i>", "<i>end</i>"]);
   });
 });

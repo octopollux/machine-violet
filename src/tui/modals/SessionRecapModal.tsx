@@ -17,7 +17,7 @@ export function SessionRecapModal({
   width,
   lines,
 }: SessionRecapModalProps) {
-  const body = ["Previously on...", "", ...lines, "", "[Press any key to continue]"];
+  const body = ["Previously on...", "", ...lines, "", "[Press ESC or Enter to continue]"];
 
   return <Modal variant={variant} width={width} title="Session Recap" children={body} />;
 }

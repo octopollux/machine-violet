@@ -4,7 +4,9 @@ import type { GameState } from "./game-state.js";
 import { agentLoopStreaming } from "./agent-loop.js";
 import type { AgentLoopConfig, TuiCommand, UsageStats } from "./agent-loop.js";
 import { ConversationManager } from "../context/conversation.js";
-import type { DroppedExchange } from "../context/conversation.js";
+import type { DroppedExchange, SerializedExchange } from "../context/conversation.js";
+import { StatePersister } from "../context/state-persistence.js";
+import type { StateSlice } from "../context/state-persistence.js";
 import { SceneManager } from "./scene-manager.js";
 import type { SceneState, FileIO } from "./scene-manager.js";
 import type { DMSessionState } from "./dm-prompt.js";
@@ -59,6 +61,7 @@ export class GameEngine {
     inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0,
   };
   private model: AgentLoopConfig["model"];
+  private persister: StatePersister | null;
 
   constructor(params: {
     client: Anthropic;
@@ -82,6 +85,25 @@ export class GameEngine {
     );
     this.callbacks = params.callbacks;
     this.model = params.model ?? getModel("large");
+
+    // Wire up state persistence
+    this.persister = new StatePersister(params.gameState.campaignRoot, params.fileIO);
+    this.registry.onStateChanged = (_toolName, state, slices) => {
+      this.persistSlices(state, slices);
+    };
+  }
+
+  /** Persist specific state slices after mutations */
+  private persistSlices(state: GameState, slices: StateSlice[]): void {
+    if (!this.persister) return;
+    for (const slice of slices) {
+      switch (slice) {
+        case "combat": this.persister.persistCombat(state.combat); break;
+        case "clocks": this.persister.persistClocks(state.clocks); break;
+        case "maps": this.persister.persistMaps(state.maps); break;
+        case "decks": this.persister.persistDecks(state.decks); break;
+      }
+    }
   }
 
   /** Get current engine state */
@@ -97,6 +119,29 @@ export class GameEngine {
   /** Get scene manager (for shutdown transcript flush) */
   getSceneManager(): SceneManager {
     return this.sceneManager;
+  }
+
+  /** Get conversation manager (for shutdown serialization) */
+  getConversation(): ConversationManager {
+    return this.conversation;
+  }
+
+  /** Get persister (for shutdown and resume) */
+  getPersister(): StatePersister | null {
+    return this.persister;
+  }
+
+  /** Hydrate conversation from saved exchanges */
+  hydrateConversation(exchanges: SerializedExchange[]): void {
+    this.conversation = ConversationManager.hydrate(exchanges, this.gameState.config.context);
+    // Re-link scene manager to the new conversation instance
+    this.sceneManager = new SceneManager(
+      this.gameState,
+      this.sceneManager.getScene(),
+      this.conversation,
+      this.sceneManager.getSessionState(),
+      this.sceneManager.getFileIO(),
+    );
   }
 
   /**
@@ -151,10 +196,25 @@ export class GameEngine {
       };
       const dropped = this.conversation.addExchange(userMessage, assistantMessage);
 
+      // Persist conversation after each exchange (crash resilience)
+      if (this.persister) {
+        this.persister.persistConversation(this.conversation.serialize());
+      }
+
       // Handle dropped exchange
       if (dropped) {
         this.callbacks.onExchangeDropped();
         await this.handleDroppedExchange(dropped);
+      }
+
+      // Persist scene state (precis, playerReads, activePlayerIndex)
+      if (this.persister) {
+        const scene = this.sceneManager.getScene();
+        this.persister.persistScene({
+          precis: scene.precis,
+          playerReads: scene.playerReads,
+          activePlayerIndex: this.gameState.activePlayerIndex,
+        });
       }
 
       // Process TUI commands
@@ -244,7 +304,7 @@ export class GameEngine {
   private buildAgentConfig(): AgentLoopConfig {
     return {
       model: this.model,
-      maxTokens: 1024,
+      maxTokens: 8192,
       maxToolRounds: 10,
       onTextDelta: (delta) => this.callbacks.onNarrativeDelta(delta),
       onToolStart: (name) => {

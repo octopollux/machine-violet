@@ -215,7 +215,8 @@ describe("campaignDirs", () => {
     expect(dirs).toContain("/root/factions");
     expect(dirs).toContain("/root/lore");
     expect(dirs).toContain("/root/rules");
-    expect(dirs).toHaveLength(10);
+    expect(dirs).toContain("/root/state");
+    expect(dirs).toHaveLength(11);
   });
 });
 

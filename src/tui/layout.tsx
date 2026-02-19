@@ -2,6 +2,7 @@ import React from "react";
 import { Box } from "ink";
 import type { FrameStyle, StyleVariant, ViewportDimensions } from "../types/tui.js";
 import type { PlayerEntry } from "./components/index.js";
+import type { NarrativeAreaHandle } from "./components/index.js";
 import {
   Modeline,
   InputLine,
@@ -49,6 +50,9 @@ export interface LayoutProps {
 
   // Display options
   quoteColor?: string;
+
+  /** Ref to NarrativeArea scroll handle */
+  narrativeRef?: React.Ref<NarrativeAreaHandle>;
 }
 
 /**
@@ -70,6 +74,7 @@ export function Layout(props: LayoutProps) {
     turnHolder,
     engineState,
     quoteColor,
+    narrativeRef,
   } = props;
 
   const tier = getViewportTier(dimensions);
@@ -120,7 +125,7 @@ export function Layout(props: LayoutProps) {
 
         <Box flexDirection="column" width={innerWidth}>
           {/* Narrative Area */}
-          <NarrativeArea lines={narrativeLines} maxRows={narRows} quoteColor={quoteColor} />
+          <NarrativeArea ref={narrativeRef} lines={narrativeLines} maxRows={narRows} quoteColor={quoteColor} />
 
           {/* Activity Line */}
           {elements.activityLine && <ActivityLine engineState={engineState} />}

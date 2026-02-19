@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Text, Box } from "ink";
 
 interface InputLineProps {
@@ -18,6 +18,15 @@ export function InputLine({
   showPlayerName,
   playerName,
 }: InputLineProps) {
+  const [cursorVisible, setCursorVisible] = useState(true);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCursorVisible((v) => !v);
+    }, 530);
+    return () => clearInterval(timer);
+  }, []);
+
   const prefix = showPlayerName && playerName
     ? `${playerName}/${characterName}`
     : characterName;
@@ -28,7 +37,7 @@ export function InputLine({
         <Text bold>{prefix}</Text>
         <Text> &gt; </Text>
         <Text>{value}</Text>
-        <Text dimColor>_</Text>
+        <Text dimColor>{cursorVisible ? "_" : " "}</Text>
       </Text>
     </Box>
   );

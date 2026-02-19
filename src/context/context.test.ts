@@ -196,4 +196,28 @@ describe("buildCachedPrefix", () => {
     const dmBlock = blocks[0] as Record<string, unknown>;
     expect(dmBlock["cache_control"]).toEqual({ type: "ephemeral" });
   });
+
+  it("includes Player Read block when provided", () => {
+    const blocks = buildCachedPrefix(mockConfig, {
+      dmPrompt: "You are the DM.",
+      personality: "Terse.",
+      scenePrecis: "Round 1 of combat.",
+      playerRead: "Engagement: high | Focus: combat | Tone: aggressive | Pacing: pushing_forward | Off-script: no",
+    });
+
+    const allText = blocks.map((b) => b.text).join("\n");
+    expect(allText).toContain("## Player Read");
+    expect(allText).toContain("Engagement: high");
+    expect(allText).toContain("Tone: aggressive");
+  });
+
+  it("omits Player Read block when not provided", () => {
+    const blocks = buildCachedPrefix(mockConfig, {
+      dmPrompt: "You are the DM.",
+      personality: "Terse.",
+    });
+
+    const allText = blocks.map((b) => b.text).join("\n");
+    expect(allText).not.toContain("Player Read");
+  });
 });

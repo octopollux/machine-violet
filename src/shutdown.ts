@@ -19,7 +19,7 @@ export interface ShutdownContext {
  * Caller is responsible for process.exit after this resolves.
  */
 export async function gracefulShutdown(ctx: ShutdownContext): Promise<void> {
-  // 1. If engine exists, finalize transcript to disk
+  // 1. If engine exists, finalize transcript and persist conversation to disk
   if (ctx.engine && ctx.campaignRoot) {
     try {
       const sm = ctx.engine.getSceneManager();
@@ -36,6 +36,17 @@ export async function gracefulShutdown(ctx: ShutdownContext): Promise<void> {
       }
     } catch {
       // Best-effort — don't crash on shutdown
+    }
+
+    // Persist conversation window for seamless resume
+    try {
+      const persister = ctx.engine.getPersister();
+      if (persister) {
+        const serialized = ctx.engine.getConversation().serialize();
+        persister.persistConversation(serialized);
+      }
+    } catch {
+      // Best-effort
     }
   }
 

@@ -94,33 +94,181 @@ export function highlightQuotes(
   }).flat();
 }
 
-function splitQuotes(text: string, color: string): FormattingNode[] {
-  const result: FormattingNode[] = [];
-  const regex = /"([^"]+)"/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
+/**
+ * Track quote state across multiple lines for multiline quote highlighting.
+ * Returns an array of booleans indicating whether each line ends inside an open quote.
+ */
+export function computeQuoteState(lines: string[]): boolean[] {
+  const states: boolean[] = [];
+  let inQuote = false;
 
-  while ((match = regex.exec(text)) !== null) {
-    // Text before the quote
-    if (match.index > lastIndex) {
-      result.push(text.slice(lastIndex, match.index));
+  for (const line of lines) {
+    for (const ch of line) {
+      if (ch === '"') {
+        inQuote = !inQuote;
+      }
     }
-    // The quoted text (including quotes) as a color node
-    const quoteNode: FormattingTag = {
-      type: "color",
-      color,
-      content: [match[0]],
-    };
-    result.push(quoteNode);
-    lastIndex = match.index + match[0].length;
+    states.push(inQuote);
   }
 
-  // Remaining text
-  if (lastIndex < text.length) {
-    result.push(text.slice(lastIndex));
+  return states;
+}
+
+function splitQuotesWithState(
+  text: string,
+  color: string,
+  startInQuote: boolean,
+): FormattingNode[] {
+  const result: FormattingNode[] = [];
+  let inQuote = startInQuote;
+  let current = "";
+
+  for (const ch of text) {
+    if (ch === '"') {
+      if (inQuote) {
+        // Closing quote — include the closing " in the quoted span
+        current += ch;
+        const quoteNode: FormattingTag = { type: "color", color, content: [current] };
+        result.push(quoteNode);
+        current = "";
+        inQuote = false;
+      } else {
+        // Opening quote — flush plain text, start quote
+        if (current) result.push(current);
+        current = ch;
+        inQuote = true;
+      }
+    } else {
+      current += ch;
+    }
+  }
+
+  // Flush remaining
+  if (current) {
+    if (inQuote) {
+      // Line ends mid-quote — highlight the rest
+      const quoteNode: FormattingTag = { type: "color", color, content: [current] };
+      result.push(quoteNode);
+    } else {
+      result.push(current);
+    }
   }
 
   return result.length > 0 ? result : [text];
+}
+
+function splitQuotes(text: string, color: string): FormattingNode[] {
+  return splitQuotesWithState(text, color, false);
+}
+
+export function highlightQuotesWithState(
+  nodes: FormattingNode[],
+  color: string,
+  startInQuote: boolean,
+): FormattingNode[] {
+  const result: FormattingNode[] = [];
+  let inQuote = startInQuote;
+  for (const node of nodes) {
+    if (typeof node === "string") {
+      const expanded = splitQuotesWithState(node, color, inQuote);
+      result.push(...expanded);
+      // Update state: count quotes in this text
+      for (const ch of node) if (ch === '"') inQuote = !inQuote;
+    } else {
+      const newContent = highlightQuotesWithState(node.content, color, inQuote);
+      result.push({ ...node, content: newContent } as FormattingTag);
+      // Update state from tag's text content
+      const plain = toPlainText(node.content);
+      for (const ch of plain) if (ch === '"') inQuote = !inQuote;
+    }
+  }
+  return result;
+}
+
+/**
+ * Heal formatting tags that span line boundaries.
+ *
+ * When a tag like `<i>` is opened on one line and closed on a later line,
+ * per-line parsing sees unclosed/orphaned tags. This function prepends
+ * inherited open tags and appends close tags so each line is well-formed.
+ */
+export function healTagBoundaries(lines: string[]): string[] {
+  const openStack: { raw: string; name: string }[] = [];
+  const healed: string[] = [];
+
+  for (const line of lines) {
+    // Compute tag changes from the *original* line
+    const changes = scanTagChanges(line);
+
+    // Build prefix from currently open tags
+    const prefix = openStack.map((t) => t.raw).join("");
+
+    // Apply changes to the stack
+    for (const change of changes) {
+      if (change.kind === "open") {
+        openStack.push({ raw: change.raw, name: change.name });
+      } else {
+        // Close: pop the most recent matching open tag
+        for (let j = openStack.length - 1; j >= 0; j--) {
+          if (openStack[j].name === change.name) {
+            openStack.splice(j, 1);
+            break;
+          }
+        }
+      }
+    }
+
+    // Suffix: close anything still open (reversed for proper nesting)
+    const suffix = [...openStack]
+      .reverse()
+      .map((t) => `</${t.name}>`)
+      .join("");
+
+    healed.push(prefix + line + suffix);
+  }
+
+  return healed;
+}
+
+interface TagChange {
+  kind: "open" | "close";
+  name: string;
+  raw: string; // full tag text, e.g. "<color=#ff0000>" or "</i>"
+}
+
+/**
+ * Scan a line for open/close formatting tags, returning them in order.
+ * Does not parse content — just finds tag boundaries for stack tracking.
+ */
+export function scanTagChanges(line: string): TagChange[] {
+  const changes: TagChange[] = [];
+  let i = 0;
+
+  while (i < line.length) {
+    const tagStart = line.indexOf("<", i);
+    if (tagStart === -1) break;
+
+    // Try close tag first: </tagname>
+    const closeMatch = line.slice(tagStart).match(/^<\/(b|i|u|center|right|color)>/);
+    if (closeMatch) {
+      changes.push({ kind: "close", name: closeMatch[1], raw: closeMatch[0] });
+      i = tagStart + closeMatch[0].length;
+      continue;
+    }
+
+    // Try open tag via parseOpenTag (reuses existing logic)
+    const parsed = parseOpenTag(line, tagStart);
+    if (parsed) {
+      changes.push({ kind: "open", name: parsed.tagName, raw: line.slice(tagStart, parsed.end) });
+      i = parsed.end;
+      continue;
+    }
+
+    // Not a recognized tag, skip past <
+    i = tagStart + 1;
+  }
+
+  return changes;
 }
 
 // --- Internal ---

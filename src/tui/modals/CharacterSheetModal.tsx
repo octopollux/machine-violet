@@ -1,22 +1,29 @@
 import React from "react";
 import type { FrameStyleVariant } from "../../types/tui.js";
-import { Modal } from "./Modal.js";
+import { CenteredModal } from "./CenteredModal.js";
+import type { CenteredModalHandle } from "./CenteredModal.js";
 
 interface CharacterSheetModalProps {
   variant: FrameStyleVariant;
   width: number;
+  height: number;
   /** Entity markdown content — front matter lines rendered as-is */
   content: string;
+  /** Ref for scroll control */
+  scrollRef?: React.Ref<CenteredModalHandle>;
 }
 
 /**
  * Character sheet modal. Renders entity markdown as styled modal.
  * Extracts title from first H1 line, shows front matter and body.
+ * Width: min 30, 70% of screen, no max cap.
  */
 export function CharacterSheetModal({
   variant,
   width,
+  height,
   content,
+  scrollRef,
 }: CharacterSheetModalProps) {
   const rawLines = content.split("\n");
 
@@ -31,5 +38,17 @@ export function CharacterSheetModal({
     }
   }
 
-  return <Modal variant={variant} width={width} title={title} children={bodyLines} />;
+  return (
+    <CenteredModal
+      ref={scrollRef}
+      variant={variant}
+      width={width}
+      height={height}
+      title={title}
+      children={bodyLines}
+      minWidth={30}
+      maxWidth={999}
+      widthFraction={0.7}
+    />
+  );
 }

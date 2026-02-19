@@ -5,6 +5,7 @@ import { buildDMPrefix, buildActiveState } from "./dm-prompt.js";
 import type { DMSessionState } from "./dm-prompt.js";
 import { summarizeScene } from "./subagents/scene-summarizer.js";
 import { updatePrecis } from "./subagents/precis-updater.js";
+import type { PlayerRead } from "./subagents/precis-updater.js";
 import { updateChangelogs } from "./subagents/changelog-updater.js";
 import { advanceCalendar, checkClocks } from "../tools/clocks/index.js";
 import { sceneDir, campaignPaths } from "../tools/filesystem/index.js";
@@ -18,6 +19,7 @@ export interface SceneState {
   slug: string;
   transcript: string[];
   precis: string;
+  playerReads: PlayerRead[];
   sessionNumber: number;
 }
 
@@ -92,6 +94,7 @@ export class SceneManager {
       turnHolder: undefined,
     });
     this.sessionState.scenePrecis = this.scene.precis;
+    this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);
     return buildDMPrefix(this.state.config, this.sessionState);
   }
 
@@ -131,6 +134,9 @@ export class SceneManager {
 
     const result = await updatePrecis(client, this.scene.precis, exchangeText);
     this.scene.precis += "\n" + result.text;
+    if (result.playerRead) {
+      this.scene.playerReads.push(result.playerRead);
+    }
     return result.usage;
   }
 
@@ -222,9 +228,10 @@ export class SceneManager {
     await this.savePendingOp();
     checkClocks(this.state.clocks);
 
-    // Step 6: Reset precis
+    // Step 6: Reset precis and player reads
     this.pendingOp.step = "reset_precis";
     this.scene.precis = "";
+    this.scene.playerReads = [];
 
     // Step 7: Prune context
     this.pendingOp.step = "prune_context";
@@ -308,6 +315,16 @@ export class SceneManager {
     return this.scene;
   }
 
+  /** Get session state (for re-linking after conversation hydration) */
+  getSessionState(): DMSessionState {
+    return this.sessionState;
+  }
+
+  /** Get file IO (for re-linking after conversation hydration) */
+  getFileIO(): FileIO {
+    return this.fileIO;
+  }
+
   // --- Internal ---
 
   private async finalizeTranscript(): Promise<void> {
@@ -377,4 +394,14 @@ function accUsage(total: UsageStats, add: UsageStats): void {
 
 function parseChangelogEntries(text: string): string[] {
   return text.split("\n").filter((line) => line.includes(":")).map((line) => line.trim());
+}
+
+/**
+ * Synthesize accumulated player reads into a concise text block for the DM prompt.
+ * Uses only the most recent read (it supersedes earlier ones).
+ */
+function synthesizePlayerRead(reads: PlayerRead[]): string | undefined {
+  if (reads.length === 0) return undefined;
+  const latest = reads[reads.length - 1];
+  return `Engagement: ${latest.engagement} | Focus: ${latest.focus.join(", ")} | Tone: ${latest.tone} | Pacing: ${latest.pacing} | Off-script: ${latest.offScript ? "yes" : "no"}`;
 }

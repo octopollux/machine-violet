@@ -16,6 +16,7 @@ export function campaignDirs(root: string): string[] {
     join(root, "factions"),
     join(root, "lore"),
     join(root, "rules"),
+    join(root, "state"),
   ];
 }
 

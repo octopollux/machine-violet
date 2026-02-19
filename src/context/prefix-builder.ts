@@ -20,6 +20,7 @@ export interface PrefixSections {
   sessionRecap?: string;
   activeState?: string;
   scenePrecis?: string;
+  playerRead?: string;
 }
 
 /**
@@ -110,6 +111,14 @@ export function buildCachedPrefix(
     blocks.push({
       type: "text",
       text: `\n\n## Scene So Far\n${sections.scenePrecis}`,
+    });
+  }
+
+  // Player read (sentiment signals from dropped exchanges)
+  if (sections.playerRead) {
+    blocks.push({
+      type: "text",
+      text: `\n\n## Player Read\n${sections.playerRead}`,
     });
   }
 

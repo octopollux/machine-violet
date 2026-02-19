@@ -65,6 +65,7 @@ function mockScene(): SceneState {
       "**DM:** The tavern is warm and dimly lit.",
     ],
     precis: "",
+    playerReads: [],
     sessionNumber: 1,
   };
 }
@@ -161,6 +162,58 @@ describe("SceneManager", () => {
 
     expect(usage.inputTokens).toBe(50);
     expect(mgr.getScene().precis).toContain("Aldric entered the tavern");
+  });
+
+  it("accumulates player reads from dropped exchanges", async () => {
+    const client = mockClient([
+      textResponse('Aldric entered the tavern.\nPLAYER_READ: {"engagement":"high","focus":["exploration"],"tone":"curious","pacing":"exploratory","offScript":true}'),
+    ]);
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      mockFileIO(),
+    );
+
+    await mgr.handleDroppedExchange(client, {
+      exchange: {
+        user: { role: "user", content: "I enter the tavern." },
+        assistant: { role: "assistant", content: "The tavern is warm." },
+        toolResults: [],
+        estimatedTokens: 20,
+        stubbed: false,
+      },
+      reason: "exchange_count",
+    });
+
+    expect(mgr.getScene().playerReads).toHaveLength(1);
+    expect(mgr.getScene().playerReads[0].engagement).toBe("high");
+    expect(mgr.getScene().playerReads[0].tone).toBe("curious");
+  });
+
+  it("clears player reads on scene transition", async () => {
+    const client = mockClient([
+      textResponse("Summary"),
+      textResponse(""),
+    ]);
+
+    const scene = mockScene();
+    scene.playerReads = [
+      { engagement: "high", focus: ["combat"], tone: "aggressive", pacing: "pushing_forward", offScript: false },
+    ];
+
+    const mgr = new SceneManager(
+      mockState(),
+      scene,
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      mockFileIO(),
+    );
+
+    await mgr.sceneTransition(client, "End of fight");
+    expect(mgr.getScene().playerReads).toHaveLength(0);
   });
 
   it("executes scene_transition cascade", async () => {

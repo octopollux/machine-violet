@@ -23,6 +23,7 @@ function mockScene(transcript: string[] = []): SceneState {
     slug: "opening",
     transcript,
     precis: "",
+    playerReads: [],
     sessionNumber: 1,
   };
 }
