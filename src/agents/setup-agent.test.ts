@@ -86,7 +86,7 @@ describe("buildCampaignWorld", () => {
   it("creates campaign directory structure and files", async () => {
     const files: Record<string, string> = {};
     const dirs: Set<string> = new Set();
-    const norm = (p: string) => p.replace(/\\/g, "/");
+    const { norm } = await import("../utils/paths.js");
 
     const fileIO: FileIO = {
       readFile: vi.fn(async (path) => files[norm(path)] ?? ""),
@@ -122,6 +122,12 @@ describe("buildCampaignWorld", () => {
     // Location was created
     const locationFile = Object.keys(files).find((p) => p.includes("/locations/"));
     expect(locationFile).toBeTruthy();
+
+    // Party file was written with PC as member
+    const partyFile = Object.keys(files).find((p) => p.endsWith("/party.md"));
+    expect(partyFile).toBeTruthy();
+    expect(files[partyFile!]).toContain("The Party");
+    expect(files[partyFile!]).toContain("[[");
 
     // Player file was written
     const playerFile = Object.keys(files).find((p) => p.includes("/players/"));

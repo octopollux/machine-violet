@@ -8,6 +8,7 @@ export interface PlayerConfig {
   type: "human" | "ai";
   model?: "haiku" | "sonnet";
   personality?: string;
+  color?: string;
 }
 
 export interface DMPersonality {

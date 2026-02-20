@@ -1,7 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { PlayerConfig } from "../../types/config.js";
-import type { UsageStats } from "../agent-loop.js";
 import { oneShot } from "../subagent.js";
+import type { SubagentResult } from "../subagent.js";
 import { getModel } from "../../config/models.js";
 
 /**
@@ -21,11 +21,9 @@ export interface AIPlayerContext {
 /**
  * Result from an AI player turn.
  */
-export interface AIPlayerResult {
+export interface AIPlayerResult extends SubagentResult {
   /** The in-character action text */
   action: string;
-  /** Usage stats for this call */
-  usage: UsageStats;
 }
 
 const MODEL_MAP = {
@@ -83,7 +81,7 @@ export async function aiPlayerTurn(
   );
 
   return {
+    ...result,
     action: result.text.trim(),
-    usage: result.usage,
   };
 }

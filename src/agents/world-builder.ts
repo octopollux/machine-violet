@@ -3,6 +3,7 @@ import type { SetupResult } from "./setup-agent.js";
 import { buildCampaignConfig } from "./setup-agent.js";
 import { campaignDirs, campaignPaths } from "../tools/filesystem/index.js";
 import { serializeEntity } from "../tools/filesystem/index.js";
+import { norm } from "../utils/paths.js";
 
 /**
  * Build the entire campaign directory from setup results.
@@ -26,19 +27,19 @@ export async function buildCampaignWorld(
   // 1. Create campaign directory structure
   const dirs = campaignDirs(root);
   for (const dir of dirs) {
-    await fileIO.mkdir(dir.replace(/\\/g, "/"));
+    await fileIO.mkdir(norm(dir));
   }
 
   // 2. Write config.json
   const config = buildCampaignConfig(result);
   const paths = campaignPaths(root);
   await fileIO.writeFile(
-    paths.config.replace(/\\/g, "/"),
+    norm(paths.config),
     JSON.stringify(config, null, 2) + "\n",
   );
 
   // 3. Write character file
-  const charPath = paths.character(slugify(result.characterName)).replace(/\\/g, "/");
+  const charPath = norm(paths.character(slugify(result.characterName)));
   const charContent = serializeEntity(
     result.characterName,
     {
@@ -52,8 +53,18 @@ export async function buildCampaignWorld(
   );
   await fileIO.writeFile(charPath, charContent);
 
-  // 4. Write player file
-  const playerPath = paths.player(slugify(result.playerName)).replace(/\\/g, "/");
+  // 4. Write party file
+  const charSlug = slugify(result.characterName);
+  const partyContent = serializeEntity(
+    "The Party",
+    { type: "Party" },
+    `## Members\n- [[${charSlug}]]\n\n## Shared Resources\n(None yet)`,
+    [],
+  );
+  await fileIO.writeFile(norm(paths.party), partyContent);
+
+  // 5. Write player file
+  const playerPath = norm(paths.player(slugify(result.playerName)));
   const playerContent = serializeEntity(
     result.playerName,
     { type: "Player" },
@@ -62,14 +73,14 @@ export async function buildCampaignWorld(
   );
   await fileIO.writeFile(playerPath, playerContent);
 
-  // 5. Write campaign log (first entry)
-  const logPath = paths.log.replace(/\\/g, "/");
+  // 6. Write campaign log (first entry)
+  const logPath = norm(paths.log);
   const logContent = `# Campaign Log: ${result.campaignName}\n\n${result.campaignPremise}\n`;
   await fileIO.writeFile(logPath, logContent);
 
-  // 6. Write starting location (minimal)
+  // 7. Write starting location (minimal)
   const locationSlug = "starting-location";
-  const locationPath = paths.location(locationSlug).replace(/\\/g, "/");
+  const locationPath = norm(paths.location(locationSlug));
   const locationDir = locationPath.replace(/\/index\.md$/, "");
   await fileIO.mkdir(locationDir);
   const locationContent = serializeEntity(

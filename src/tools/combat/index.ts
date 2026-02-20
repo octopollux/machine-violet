@@ -171,10 +171,7 @@ function rollD20Initiative(
   });
 
   // Sort descending by initiative (ties broken by type: pc > ai_pc > npc)
-  return entries.sort((a, b) => {
-    if (b.initiative !== a.initiative) return b.initiative - a.initiative;
-    return typePriority(a.type) - typePriority(b.type);
-  });
+  return sortByInitiative(entries);
 }
 
 function cardDrawInitiative(
@@ -192,10 +189,7 @@ function cardDrawInitiative(
     };
   });
 
-  return entries.sort((a, b) => {
-    if (b.initiative !== a.initiative) return b.initiative - a.initiative;
-    return typePriority(a.type) - typePriority(b.type);
-  });
+  return sortByInitiative(entries);
 }
 
 function fictionFirstInitiative(
@@ -219,16 +213,20 @@ function customInitiative(
     type: c.type,
   }));
 
-  return entries.sort((a, b) => {
-    if (b.initiative !== a.initiative) return b.initiative - a.initiative;
-    return typePriority(a.type) - typePriority(b.type);
-  });
+  return sortByInitiative(entries);
 }
 
 function typePriority(type: string): number {
   if (type === "pc") return 0;
   if (type === "ai_pc") return 1;
   return 2;
+}
+
+function sortByInitiative(entries: InitiativeEntry[]): InitiativeEntry[] {
+  return entries.sort((a, b) => {
+    if (b.initiative !== a.initiative) return b.initiative - a.initiative;
+    return typePriority(a.type) - typePriority(b.type);
+  });
 }
 
 // --- Modify Helpers ---

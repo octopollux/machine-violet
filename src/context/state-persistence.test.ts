@@ -9,8 +9,7 @@ import type { ContextConfig } from "../types/config.js";
 import { createClocksState } from "../tools/clocks/index.js";
 import { createCombatState } from "../tools/combat/index.js";
 import { createDecksState } from "../tools/cards/index.js";
-
-const norm = (p: string) => p.replace(/\\/g, "/");
+import { norm } from "../utils/paths.js";
 let files: Record<string, string>;
 
 function mockFileIO(): FileIO {

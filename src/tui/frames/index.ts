@@ -3,6 +3,7 @@ export {
   renderHorizontalFrame,
   renderVerticalFrame,
   renderContentLine,
+  renderStyledContentLine,
   renderTopFrame,
   stringWidth,
   truncateToWidth,

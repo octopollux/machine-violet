@@ -200,7 +200,7 @@ describe("uniqueTargets", () => {
 // --- Scaffold ---
 
 // Normalize path separators for cross-platform assertions
-const norm = (p: string) => p.replace(/\\/g, "/");
+import { norm } from "../../utils/paths.js";
 
 describe("campaignDirs", () => {
   it("returns all expected directories", () => {

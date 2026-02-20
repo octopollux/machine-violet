@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { ToolRegistry, ToolResult } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
+import { accumulateUsage } from "../context/usage-helpers.js";
 
 // --- Types ---
 
@@ -263,15 +264,6 @@ const TUI_TOOLS = new Set([
 
 function isTuiCommand(toolName: string): boolean {
   return TUI_TOOLS.has(toolName);
-}
-
-function accumulateUsage(total: UsageStats, usage: Anthropic.Usage): void {
-  total.inputTokens += usage.input_tokens;
-  total.outputTokens += usage.output_tokens;
-  // Cache tokens may not be present in all responses
-  const u = usage as Record<string, number>;
-  total.cacheReadTokens += u["cache_read_input_tokens"] ?? 0;
-  total.cacheCreationTokens += u["cache_creation_input_tokens"] ?? 0;
 }
 
 interface CreateParams {

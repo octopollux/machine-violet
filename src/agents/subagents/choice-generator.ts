@@ -6,12 +6,11 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { ChoiceFrequency } from "../../types/config.js";
 import { oneShot } from "../subagent.js";
-import type { UsageStats } from "../agent-loop.js";
+import type { SubagentResult } from "../subagent.js";
 import { getModel } from "../../config/models.js";
 
-export interface GeneratedChoices {
+export interface GeneratedChoices extends SubagentResult {
   choices: string[];
-  usage: UsageStats;
 }
 
 const SYSTEM_PROMPT = `You generate 3-4 short action choices for a tabletop RPG player.
@@ -63,5 +62,5 @@ export async function generateChoices(
     .filter((line) => line.length > 0)
     .slice(0, 4);
 
-  return { choices, usage: result.usage };
+  return { ...result, choices };
 }

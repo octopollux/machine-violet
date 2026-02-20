@@ -5,6 +5,7 @@ import { PERSONALITIES, randomPersonality } from "../config/personalities.js";
 import { randomSeeds } from "../config/seeds.js";
 import { createDefaultConfig as defaultCombatConfig } from "../tools/combat/index.js";
 import { getModel } from "../config/models.js";
+import { TOKEN_LIMITS } from "../config/tokens.js";
 
 // --- Types ---
 
@@ -188,7 +189,7 @@ async function generateCampaignOptions(
   try {
     const response = await client.messages.create({
       model: getModel("small"),
-      max_tokens: 300,
+      max_tokens: TOKEN_LIMITS.SETUP_STEP,
       system: SETUP_GEN_SYSTEM,
       messages: [{
         role: "user",
@@ -223,7 +224,7 @@ async function generateCharacterOptions(
   try {
     const response = await client.messages.create({
       model: getModel("small"),
-      max_tokens: 300,
+      max_tokens: TOKEN_LIMITS.SETUP_STEP,
       system: SETUP_GEN_SYSTEM,
       messages: [{
         role: "user",
@@ -362,6 +363,7 @@ export function buildCampaignConfig(result: SetupResult): CampaignConfig {
     name: result.playerName,
     character: result.characterName,
     type: "human",
+    color: result.themeColor,
   };
 
   return {

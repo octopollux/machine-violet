@@ -2,6 +2,7 @@ import type { MapData } from "../../types/maps.js";
 import type { ClocksState } from "../../types/clocks.js";
 import { extractWikilinks } from "./wikilinks.js";
 import { parseFrontMatter } from "./frontmatter.js";
+import { norm } from "../../utils/paths.js";
 
 export interface ValidationError {
   file: string;
@@ -202,11 +203,11 @@ export function resolveRelativePath(
   fromFile: string,
   relativePath: string,
 ): string {
-  const normalized = fromFile.replace(/\\/g, "/");
+  const normalized = norm(fromFile);
   const parts = normalized.split("/");
   parts.pop(); // Remove filename, keep directory
 
-  const relParts = relativePath.replace(/\\/g, "/").split("/");
+  const relParts = norm(relativePath).split("/");
   for (const part of relParts) {
     if (part === "..") {
       parts.pop();

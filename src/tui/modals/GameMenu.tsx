@@ -8,15 +8,31 @@ interface GameMenuProps {
   height: number;
   selectedIndex: number;
   oocActive?: boolean;
+  devModeEnabled?: boolean;
+  devActive?: boolean;
 }
 
-const MENU_ITEMS = [
+const BASE_MENU_ITEMS = [
   "Resume",
   "Character Sheet",
   "OOC Mode",
   "Settings",
   "Save & Quit",
 ];
+
+/**
+ * Build the effective menu items list, conditionally including Dev Mode.
+ */
+export function getMenuItems(devModeEnabled?: boolean): string[] {
+  if (!devModeEnabled) return BASE_MENU_ITEMS;
+  const items = [...BASE_MENU_ITEMS];
+  const oocIndex = items.indexOf("OOC Mode");
+  items.splice(oocIndex + 1, 0, "Dev Mode");
+  return items;
+}
+
+/** @deprecated Use getMenuItems() instead */
+const MENU_ITEMS = BASE_MENU_ITEMS;
 
 /**
  * ESC menu modal. Standard navigation options.
@@ -27,10 +43,15 @@ export function GameMenu({
   height,
   selectedIndex,
   oocActive,
+  devModeEnabled,
+  devActive,
 }: GameMenuProps) {
-  const lines = MENU_ITEMS.map((item, i) => {
+  const items = getMenuItems(devModeEnabled);
+  const lines = items.map((item, i) => {
     const marker = i === selectedIndex ? "◆" : "○";
-    const label = item === "OOC Mode" && oocActive ? "Exit OOC Mode" : item;
+    let label = item;
+    if (item === "OOC Mode" && oocActive) label = "Exit OOC Mode";
+    if (item === "Dev Mode" && devActive) label = "Exit Dev Mode";
     return `  ${marker} ${label}`;
   });
 

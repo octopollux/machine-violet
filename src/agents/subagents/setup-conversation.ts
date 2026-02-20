@@ -1,17 +1,16 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { UsageStats } from "../agent-loop.js";
+import type { SubagentResult } from "../subagent.js";
 import type { SetupResult } from "../setup-agent.js";
 import { generateThemeColor } from "../setup-agent.js";
 import { PERSONALITIES } from "../../config/personalities.js";
 import { getModel } from "../../config/models.js";
+import { accumulateUsage as accRawUsage } from "../../context/usage-helpers.js";
+import { TOKEN_LIMITS } from "../../config/tokens.js";
 
 // --- Types ---
 
-export interface SetupTurnResult {
-  /** Text response from the assistant */
-  text: string;
-  /** Usage for this turn */
-  usage: UsageStats;
+export interface SetupTurnResult extends SubagentResult {
   /** Non-null when the agent called finalize_setup */
   finalized?: SetupResult;
   /** Non-null when the agent called present_choices — must be resolved before continuing */
@@ -116,6 +115,8 @@ You can use these HTML-like tags in your messages for dramatic effect and visual
 
 Use formatting to create visual rhythm and break up walls of text. A strategically-placed newline, a bold campaign title, a colored genre tag, an italic atmospheric line — these make the experience feel polished rather than like reading a paragraph.
 
+Do not use markdown syntax (e.g. **bold**, *italics*, \`code\`) — it won't render properly in the app. Use the HTML-like tags described above instead.
+
 ## Output structure
 
 CRITICAL: Use blank lines between paragraphs and sections. Never write more than 2-3 sentences in a row without a blank line. Short paragraphs (1-2 sentences each) separated by blank lines are far easier to read than a dense block. When in doubt, add a blank line.
@@ -150,11 +151,7 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
   let pendingToolUseId: string | null = null;
 
   function accumulateUsage(response: Anthropic.Message): void {
-    totalUsage.inputTokens += response.usage.input_tokens;
-    totalUsage.outputTokens += response.usage.output_tokens;
-    const u = response.usage as Record<string, number>;
-    totalUsage.cacheReadTokens += u["cache_read_input_tokens"] ?? 0;
-    totalUsage.cacheCreationTokens += u["cache_creation_input_tokens"] ?? 0;
+    accRawUsage(totalUsage, response.usage);
   }
 
   function handleFinalize(input: Record<string, unknown>): void {
@@ -190,7 +187,7 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
 
     const stream = client.messages.stream({
       model: getModel("medium"),
-      max_tokens: 1024,
+      max_tokens: TOKEN_LIMITS.SUBAGENT_LARGE,
       system: SYSTEM_PROMPT,
       messages,
       tools: TOOLS,
@@ -214,8 +211,10 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
       } else if (block.type === "tool_use") {
         if (block.name === "present_choices") {
           // Don't resolve immediately — pause and return to the app for player input
-          const input = block.input as { prompt: string; choices: string[] };
-          pendingChoices = { prompt: input.prompt, choices: input.choices };
+          const input = block.input as { prompt?: string; choices?: unknown };
+          const rawChoices = Array.isArray(input.choices) ? input.choices : [];
+          const choices = rawChoices.map((c: unknown) => typeof c === "string" ? c : String(c));
+          pendingChoices = { prompt: input.prompt ?? "Choose:", choices };
           pendingToolUseId = block.id;
         } else if (block.name === "finalize_setup") {
           handleFinalize(block.input as Record<string, unknown>);
@@ -245,7 +244,7 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
 
       const followUp = client.messages.stream({
         model: getModel("medium"),
-        max_tokens: 512,
+        max_tokens: TOKEN_LIMITS.SUBAGENT_MEDIUM,
         system: SYSTEM_PROMPT,
         messages,
         tools: TOOLS,

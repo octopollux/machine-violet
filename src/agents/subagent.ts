@@ -18,8 +18,8 @@ export interface SubagentConfig {
   maxTokens: number;
   /** Tool definitions available to this subagent (optional) */
   tools?: Anthropic.Tool[];
-  /** Tool handler for subagent tool calls */
-  toolHandler?: (name: string, input: Record<string, unknown>) => { content: string; is_error?: boolean };
+  /** Tool handler for subagent tool calls (may be async for I/O-bound tools) */
+  toolHandler?: (name: string, input: Record<string, unknown>) => { content: string; is_error?: boolean } | Promise<{ content: string; is_error?: boolean }>;
   /** Max tool-use rounds before cutting off */
   maxToolRounds?: number;
 }
@@ -109,7 +109,7 @@ export async function spawnSubagent(
         text += block.text;
       } else if (block.type === "tool_use" && config.toolHandler) {
         hasToolUse = true;
-        const result = config.toolHandler(block.name, block.input as Record<string, unknown>);
+        const result = await config.toolHandler(block.name, block.input as Record<string, unknown>);
         toolResults.push({
           type: "tool_result",
           tool_use_id: block.id,

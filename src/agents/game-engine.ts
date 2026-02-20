@@ -11,6 +11,9 @@ import { SceneManager } from "./scene-manager.js";
 import type { SceneState, FileIO } from "./scene-manager.js";
 import type { DMSessionState } from "./dm-prompt.js";
 import { getModel } from "../config/models.js";
+import { accUsage } from "../context/usage-helpers.js";
+import { TOKEN_LIMITS } from "../config/tokens.js";
+import type { ToolResult } from "./tool-registry.js";
 
 // --- Types ---
 
@@ -34,7 +37,9 @@ export interface EngineCallbacks {
   /** Tool started executing */
   onToolStart: (name: string) => void;
   /** Tool finished executing */
-  onToolEnd: (name: string) => void;
+  onToolEnd: (name: string, result?: ToolResult) => void;
+  /** Dev mode log message */
+  onDevLog?: (msg: string) => void;
   /** Exchange dropped from conversation (precis will update) */
   onExchangeDropped: () => void;
   /** Usage stats updated */
@@ -85,6 +90,11 @@ export class GameEngine {
     );
     this.callbacks = params.callbacks;
     this.model = params.model ?? getModel("large");
+
+    // Wire dev logging to scene manager when available
+    if (params.callbacks.onDevLog) {
+      this.sceneManager.devLog = params.callbacks.onDevLog;
+    }
 
     // Wire up state persistence
     this.persister = new StatePersister(params.gameState.campaignRoot, params.fileIO);
@@ -304,16 +314,16 @@ export class GameEngine {
   private buildAgentConfig(): AgentLoopConfig {
     return {
       model: this.model,
-      maxTokens: 8192,
+      maxTokens: TOKEN_LIMITS.DM_RESPONSE,
       maxToolRounds: 10,
       onTextDelta: (delta) => this.callbacks.onNarrativeDelta(delta),
       onToolStart: (name) => {
         this.setState("tool_running");
         this.callbacks.onToolStart(name);
       },
-      onToolEnd: (name) => {
+      onToolEnd: (name, result) => {
         this.setState("dm_thinking");
-        this.callbacks.onToolEnd(name);
+        this.callbacks.onToolEnd(name, result);
       },
       onRetry: (status, delayMs) => {
         this.callbacks.onRetry(status, delayMs);
@@ -334,9 +344,3 @@ export class GameEngine {
   }
 }
 
-function accUsage(total: UsageStats, add: UsageStats): void {
-  total.inputTokens += add.inputTokens;
-  total.outputTokens += add.outputTokens;
-  total.cacheReadTokens += add.cacheReadTokens;
-  total.cacheCreationTokens += add.cacheCreationTokens;
-}

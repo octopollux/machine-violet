@@ -8,6 +8,7 @@ import type { DMSessionState } from "./dm-prompt.js";
 import { createClocksState } from "../tools/clocks/index.js";
 import { createCombatState, createDefaultConfig } from "../tools/combat/index.js";
 import { createDecksState } from "../tools/cards/index.js";
+import { norm } from "../utils/paths.js";
 
 function mockUsage(): Anthropic.Usage {
   return { input_tokens: 50, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
@@ -82,8 +83,6 @@ function mockSessionState(): DMSessionState {
 
 let files: Record<string, string>;
 let dirs: Set<string>;
-
-const norm = (p: string) => p.replace(/\\/g, "/");
 
 function mockFileIO(): FileIO {
   return {

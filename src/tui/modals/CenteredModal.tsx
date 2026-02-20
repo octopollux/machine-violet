@@ -1,13 +1,13 @@
-import React, { useRef, useState, useCallback, useEffect, useImperativeHandle, forwardRef } from "react";
+import React, { useRef, useState, useCallback, useEffect, forwardRef } from "react";
 import { Box, Text } from "ink";
 import { ScrollView } from "ink-scroll-view";
 import type { ScrollViewRef } from "ink-scroll-view";
-import type { FrameStyleVariant } from "../../types/tui.js";
-import { renderHorizontalFrame, renderContentLine } from "../frames/index.js";
+import type { FormattingNode, FrameStyleVariant } from "../../types/tui.js";
+import { renderHorizontalFrame, renderContentLine, renderStyledContentLine } from "../frames/index.js";
+import { useScrollHandle } from "../hooks/useScrollHandle.js";
+import type { ScrollHandle } from "../hooks/useScrollHandle.js";
 
-export interface CenteredModalHandle {
-  scrollBy(delta: number): void;
-}
+export type CenteredModalHandle = ScrollHandle;
 
 interface CenteredModalProps {
   variant: FrameStyleVariant;
@@ -15,6 +15,8 @@ interface CenteredModalProps {
   height: number;
   title?: string;
   children: string[];
+  /** Pre-parsed styled content lines (overrides children when present) */
+  styledChildren?: FormattingNode[][];
   /** Min width of modal content (default 40) */
   minWidth?: number;
   /** Max width cap (default 60) */
@@ -35,16 +37,18 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
     height,
     title,
     children,
+    styledChildren,
     minWidth = 40,
     maxWidth = 60,
     widthFraction = 0.5,
   }, ref) {
     const modalWidth = Math.max(minWidth, Math.min(Math.floor(width * widthFraction), maxWidth));
+    const lineCount = styledChildren ? styledChildren.length : children.length;
 
     // Max content rows = screen height minus borders (2) minus some padding (4 top+bottom)
     const maxContentRows = Math.max(3, height - 6);
-    const needsScroll = children.length > maxContentRows;
-    const visibleRows = needsScroll ? maxContentRows : children.length;
+    const needsScroll = lineCount > maxContentRows;
+    const visibleRows = needsScroll ? maxContentRows : lineCount;
 
     // Total modal height = borders (2) + visible content rows
     const modalHeight = visibleRows + 2;
@@ -70,21 +74,9 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
     useEffect(() => {
       const timer = setTimeout(() => updateScrollState(), 0);
       return () => clearTimeout(timer);
-    }, [children.length, updateScrollState]);
+    }, [lineCount, updateScrollState]);
 
-    useImperativeHandle(ref, () => ({
-      scrollBy(delta: number) {
-        const sv = scrollRef.current;
-        if (!sv) return;
-        if (delta > 0) {
-          const room = sv.getBottomOffset() - sv.getScrollOffset();
-          if (room <= 0) return;
-          sv.scrollBy(Math.min(delta, room));
-        } else {
-          sv.scrollBy(delta);
-        }
-      },
-    }), []);
+    useScrollHandle(ref, scrollRef);
 
     const top = renderHorizontalFrame(variant, modalWidth, "top", title);
     const bottom = renderHorizontalFrame(variant, modalWidth, "bottom");
@@ -96,13 +88,19 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
         </Box>
         <Box height={visibleRows} flexDirection="column">
           <ScrollView ref={scrollRef} onScroll={handleScroll}>
-            {children.map((line, i) => (
-              <Box key={i}>
-                <Text color={variant.color}>
-                  {renderContentLine(variant, line, modalWidth)}
-                </Text>
-              </Box>
-            ))}
+            {styledChildren
+              ? styledChildren.map((nodes, i) => (
+                <Box key={i}>
+                  {renderStyledContentLine(variant, nodes, modalWidth)}
+                </Box>
+              ))
+              : children.map((line, i) => (
+                <Box key={i}>
+                  <Text color={variant.color}>
+                    {renderContentLine(variant, line, modalWidth)}
+                  </Text>
+                </Box>
+              ))}
           </ScrollView>
           {linesBelow > 0 && (
             <Box position="absolute" width={modalWidth} marginTop={visibleRows - 1} justifyContent="flex-end">

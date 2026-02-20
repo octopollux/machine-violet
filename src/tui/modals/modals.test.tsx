@@ -77,7 +77,7 @@ describe("GameMenu", () => {
 });
 
 describe("CharacterSheetModal", () => {
-  it("extracts title from H1 and renders body", () => {
+  it("extracts title from H1 and renders styled body", () => {
     const content = [
       "# Aldric the Bold",
       "**Type:** PC",
@@ -93,8 +93,27 @@ describe("CharacterSheetModal", () => {
     );
     const frame = lastFrame();
     expect(frame).toContain("Aldric the Bold");
-    expect(frame).toContain("**Type:** PC");
+    // **Type:** is now rendered as styled bold — check the plain text content
+    expect(frame).toContain("Type:");
+    expect(frame).toContain("PC");
     expect(frame).toContain("A stalwart warrior.");
+  });
+
+  it("renders list items with visual bullets", () => {
+    const content = [
+      "# Inventory",
+      "- Sword of Light",
+      "- Shield of Dawn",
+    ].join("\n");
+
+    const { lastFrame } = render(
+      <Box width={50} height={24}>
+        <CharacterSheetModal variant={gothic} width={50} height={24} content={content} />
+      </Box>,
+    );
+    const frame = lastFrame();
+    expect(frame).toContain("·");
+    expect(frame).toContain("Sword of Light");
   });
 
   it("uses default title when no H1 present", () => {

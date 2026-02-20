@@ -101,7 +101,7 @@ function mockSessionState(): DMSessionState {
   return {};
 }
 
-const norm = (p: string) => p.replace(/\\/g, "/");
+import { norm } from "../utils/paths.js";
 let files: Record<string, string>;
 let dirs: Set<string>;
 

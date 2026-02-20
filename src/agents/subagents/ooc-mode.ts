@@ -1,8 +1,9 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import type { UsageStats } from "../agent-loop.js";
 import type { SubagentStreamCallback } from "../subagent.js";
 import { spawnSubagent } from "../subagent.js";
+import type { SubagentResult } from "../subagent.js";
 import { getModel } from "../../config/models.js";
+import { TOKEN_LIMITS } from "../../config/tokens.js";
 
 /**
  * Context snapshot for OOC mode — captured when entering, restored when exiting.
@@ -17,11 +18,9 @@ export interface OOCSnapshot {
 /**
  * Result from an OOC session.
  */
-export interface OOCResult {
+export interface OOCResult extends SubagentResult {
   /** Terse summary of what happened in OOC (for DM context) */
   summary: string;
-  /** Usage stats */
-  usage: UsageStats;
   /** The snapshot to restore */
   snapshot: OOCSnapshot;
 }
@@ -100,7 +99,7 @@ export async function enterOOC(
       model: getModel("medium"),
       visibility: "player_facing",
       systemPrompt,
-      maxTokens: 512,
+      maxTokens: TOKEN_LIMITS.SUBAGENT_MEDIUM,
     },
     playerMessage,
     onStream,
@@ -114,8 +113,8 @@ export async function enterOOC(
   const summary = extractSummary(result.text);
 
   return {
+    ...result,
     summary,
-    usage: result.usage,
     snapshot,
   };
 }

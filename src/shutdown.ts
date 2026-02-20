@@ -1,5 +1,6 @@
 import type { GameEngine } from "./agents/game-engine.js";
 import type { FileIO } from "./agents/scene-manager.js";
+import { norm } from "./utils/paths.js";
 import { CampaignRepo } from "./tools/git/campaign-repo.js";
 import type { GitIO } from "./tools/git/campaign-repo.js";
 
@@ -30,7 +31,7 @@ export async function gracefulShutdown(ctx: ShutdownContext): Promise<void> {
         const { sceneDir } = await import("./tools/filesystem/index.js");
         const dir = sceneDir(ctx.campaignRoot, scene.sceneNumber, scene.slug || "untitled");
         await ctx.fileIO.mkdir(dir);
-        const transcriptPath = dir.replace(/\\/g, "/") + "/transcript.md";
+        const transcriptPath = norm(dir) + "/transcript.md";
         const content = `# Scene ${scene.sceneNumber}\n\n${scene.transcript.join("\n\n")}\n`;
         await ctx.fileIO.writeFile(transcriptPath, content);
       }

@@ -23,7 +23,13 @@
       "Bash(npm info:*)",
       "Bash(grep:*)",
       "Bash(node -e:*)",
-      "WebFetch(domain:www.npmjs.com)"
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(dir:*)",
+      "Bash(wc:*)",
+      "Bash(echo:*)",
+      "Bash(awk:*)",
+      "Bash(node --trace-deprecation -e:*)"
     ]
   }
 }

@@ -17,9 +17,13 @@ export function ChoiceModal({
   variant,
   width,
   prompt,
-  choices,
+  choices: rawChoices,
   selectedIndex,
 }: ChoiceModalProps) {
+  // Defensive: ensure choices is always a string array (LLM may send unexpected shapes)
+  const choices = Array.isArray(rawChoices)
+    ? rawChoices.map((c) => typeof c === "string" ? c : String(c))
+    : [];
   const lines: string[] = [
     prompt,
     "",

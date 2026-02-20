@@ -1,5 +1,6 @@
 import React from "react";
-import type { FrameStyleVariant } from "../../types/tui.js";
+import type { FormattingNode, FrameStyleVariant } from "../../types/tui.js";
+import { markdownToTags, parseFormatting } from "../formatting.js";
 import { CenteredModal } from "./CenteredModal.js";
 import type { CenteredModalHandle } from "./CenteredModal.js";
 
@@ -38,6 +39,11 @@ export function CharacterSheetModal({
     }
   }
 
+  // Parse markdown → tags → FormattingNode[] for styled rendering
+  const styledLines: FormattingNode[][] = bodyLines.map(
+    (line) => parseFormatting(markdownToTags(line)),
+  );
+
   return (
     <CenteredModal
       ref={scrollRef}
@@ -46,6 +52,7 @@ export function CharacterSheetModal({
       height={height}
       title={title}
       children={bodyLines}
+      styledChildren={styledLines}
       minWidth={30}
       maxWidth={999}
       widthFraction={0.7}

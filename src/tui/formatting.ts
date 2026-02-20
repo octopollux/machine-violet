@@ -271,6 +271,44 @@ export function scanTagChanges(line: string): TagChange[] {
   return changes;
 }
 
+/**
+ * Convert a single markdown line into our <b>/<i>/<color> tag format.
+ * This lets markdown content flow through the existing parseFormatting pipeline.
+ *
+ * Conversions:
+ *  - ## Header → <b>Header</b>  (any heading level)
+ *  - **bold** → <b>bold</b>
+ *  - *italic* → <i>italic</i>  (but not **)
+ *  - [text](url) → text  (strip to display text)
+ *  - - list item → ·  list item  (visual bullet)
+ *  - Everything else → pass through
+ */
+export function markdownToTags(line: string): string {
+  // Heading lines: ## Header Text → <b>Header Text</b>
+  const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+  if (headingMatch) {
+    return `<b>${headingMatch[2]}</b>`;
+  }
+
+  // List items: - item → ·  item (with indent)
+  const listMatch = line.match(/^(\s*)-\s+(.+)$/);
+  if (listMatch) {
+    const indent = listMatch[1];
+    line = `${indent}  · ${listMatch[2]}`;
+  }
+
+  // Links: [text](url) → text
+  line = line.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+
+  // Bold: **text** → <b>text</b> (must come before italic)
+  line = line.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+
+  // Italic: *text* → <i>text</i> (single *, not preceded/followed by *)
+  line = line.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, "<i>$1</i>");
+
+  return line;
+}
+
 // --- Internal ---
 
 interface ParsedTag {

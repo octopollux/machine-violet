@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { norm } from "../utils/paths.js";
 import type { FileIO } from "../agents/scene-manager.js";
 import type { CombatState } from "../types/combat.js";
 import type { ClocksState } from "../types/clocks.js";
@@ -59,12 +60,12 @@ export class StatePersister {
   }
 
   private path(file: string): string {
-    return join(this.root, file).replace(/\\/g, "/");
+    return norm(join(this.root, file));
   }
 
   private async writeJSON(file: string, data: unknown): Promise<void> {
     try {
-      await this.fileIO.writeFile(this.path(file), JSON.stringify(data));
+      await this.fileIO.writeFile(this.path(file), JSON.stringify(data, null, 2));
     } catch {
       // Fire-and-forget: best-effort persistence
     }

@@ -45,6 +45,7 @@ export function campaignPaths(root: string) {
     location: (name: string) => join(root, "locations", name, "index.md"),
     locationMap: (name: string, mapId: string) =>
       join(root, "locations", name, `${mapId}.json`),
+    party: join(root, "characters", "party.md"),
     faction: (name: string) => join(root, "factions", `${name}.md`),
     lore: (name: string) => join(root, "lore", `${name}.md`),
     rule: (name: string) => join(root, "rules", `${name}.md`),

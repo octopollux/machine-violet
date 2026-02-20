@@ -8,9 +8,12 @@ import { updatePrecis } from "./subagents/precis-updater.js";
 import type { PlayerRead } from "./subagents/precis-updater.js";
 import { updateChangelogs } from "./subagents/changelog-updater.js";
 import { advanceCalendar, checkClocks } from "../tools/clocks/index.js";
+import { join } from "node:path";
 import { sceneDir, campaignPaths } from "../tools/filesystem/index.js";
 import { formatChangelogEntry, appendChangelog } from "../tools/filesystem/index.js";
 import type { UsageStats } from "./agent-loop.js";
+import { accUsage } from "../context/usage-helpers.js";
+import { norm } from "../utils/paths.js";
 
 // --- Types ---
 
@@ -72,6 +75,9 @@ export class SceneManager {
   private fileIO: FileIO;
   private pendingOp: PendingOperation | null = null;
 
+  /** Optional dev mode log callback. */
+  devLog?: (msg: string) => void;
+
   constructor(
     state: GameState,
     scene: SceneState,
@@ -132,7 +138,9 @@ export class SceneManager {
       : "[complex content]";
     const exchangeText = `Player: ${userContent}\nDM: ${assistantContent}`;
 
+    this.devLog?.("[dev] subagent:precis-updater starting");
     const result = await updatePrecis(client, this.scene.precis, exchangeText);
+    this.devLog?.("[dev] subagent:precis-updater done");
     this.scene.precis += "\n" + result.text;
     if (result.playerRead) {
       this.scene.playerReads.push(result.playerRead);
@@ -166,80 +174,44 @@ export class SceneManager {
       title,
       timeAdvance,
     };
-
-    // Save pending operation marker
     await this.savePendingOp();
 
     // Step 1: Finalize transcript to disk
     this.pendingOp.step = "finalize_transcript";
-    await this.finalizeTranscript();
+    await this.stepFinalizeTranscript();
 
     // Step 2: Campaign log entry (Haiku)
     this.pendingOp.step = "campaign_log";
     await this.savePendingOp();
-    const transcript = this.scene.transcript.join("\n");
-    const summaryResult = await summarizeScene(client, transcript);
-    result.campaignLogEntry = summaryResult.text;
-    accUsage(totalUsage, summaryResult.usage);
-
-    // Append to campaign log file
-    const paths = campaignPaths(this.state.campaignRoot);
-    const logEntry = `\n## Scene ${this.scene.sceneNumber}: ${title}\n${result.campaignLogEntry}\n`;
-    await this.fileIO.appendFile(paths.log, logEntry);
+    await this.stepCampaignLog(client, title, result);
 
     // Step 3: Entity changelog updates (Haiku)
     this.pendingOp.step = "changelog_updates";
     await this.savePendingOp();
-    const entityFiles = await this.listEntityFiles();
-    if (entityFiles.length > 0) {
-      const changelogResult = await updateChangelogs(
-        client,
-        transcript,
-        this.scene.sceneNumber,
-        entityFiles,
-      );
-      accUsage(totalUsage, changelogResult.usage);
-      result.changelogEntries = parseChangelogEntries(changelogResult.text);
-
-      // Write changelog entries to entity files
-      for (const entry of result.changelogEntries) {
-        const [filename, ...rest] = entry.split(": ");
-        const entryText = rest.join(": ");
-        if (filename && entryText) {
-          await this.appendEntityChangelog(
-            filename.trim(),
-            this.scene.sceneNumber,
-            entryText.trim(),
-          );
-        }
-      }
-    }
+    await this.stepChangelogUpdates(client, result);
 
     // Step 4: Advance calendar
     this.pendingOp.step = "advance_calendar";
     await this.savePendingOp();
-    if (timeAdvance && timeAdvance > 0) {
-      const fired = advanceCalendar(this.state.clocks, timeAdvance);
-      result.alarmsFired = fired.map((a) => a.message);
-    }
+    this.stepAdvanceCalendar(timeAdvance, result);
 
     // Step 5: Check alarms
     this.pendingOp.step = "check_alarms";
     await this.savePendingOp();
-    checkClocks(this.state.clocks);
+    this.stepCheckAlarms();
 
     // Step 6: Reset precis and player reads
     this.pendingOp.step = "reset_precis";
-    this.scene.precis = "";
-    this.scene.playerReads = [];
+    this.stepResetPrecis();
 
     // Step 7: Prune context
     this.pendingOp.step = "prune_context";
-    this.conversation.clear();
+    this.stepPruneContext();
 
     // Step 8: Checkpoint (git commit would go here)
     this.pendingOp.step = "checkpoint";
     await this.savePendingOp();
+    await this.stepCheckpoint();
 
     // Done
     this.pendingOp.step = "done";
@@ -325,6 +297,88 @@ export class SceneManager {
     return this.fileIO;
   }
 
+  // --- Transition step methods ---
+
+  private async stepFinalizeTranscript(): Promise<void> {
+    await this.finalizeTranscript();
+  }
+
+  private async stepCampaignLog(
+    client: Anthropic,
+    title: string,
+    result: TransitionResult,
+  ): Promise<void> {
+    const transcript = this.scene.transcript.join("\n");
+    this.devLog?.("[dev] subagent:summarizer starting");
+    const summaryResult = await summarizeScene(client, transcript);
+    this.devLog?.("[dev] subagent:summarizer done");
+    result.campaignLogEntry = summaryResult.text;
+    accUsage(result.usage, summaryResult.usage);
+
+    const paths = campaignPaths(this.state.campaignRoot);
+    const logEntry = `\n## Scene ${this.scene.sceneNumber}: ${title}\n${result.campaignLogEntry}\n`;
+    await this.fileIO.appendFile(paths.log, logEntry);
+  }
+
+  private async stepChangelogUpdates(
+    client: Anthropic,
+    result: TransitionResult,
+  ): Promise<void> {
+    const entityFiles = await this.listEntityFiles();
+    if (entityFiles.length === 0) return;
+
+    const transcript = this.scene.transcript.join("\n");
+    this.devLog?.(`[dev] subagent:changelog starting (${entityFiles.length} entities)`);
+    const changelogResult = await updateChangelogs(
+      client,
+      transcript,
+      this.scene.sceneNumber,
+      entityFiles,
+    );
+    accUsage(result.usage, changelogResult.usage);
+    this.devLog?.("[dev] subagent:changelog done");
+    result.changelogEntries = parseChangelogEntries(changelogResult.text);
+
+    for (const entry of result.changelogEntries) {
+      const [filename, ...rest] = entry.split(": ");
+      const entryText = rest.join(": ");
+      if (filename && entryText) {
+        await this.appendEntityChangelog(
+          filename.trim(),
+          this.scene.sceneNumber,
+          entryText.trim(),
+        );
+      }
+    }
+  }
+
+  private stepAdvanceCalendar(
+    timeAdvance: number | undefined,
+    result: TransitionResult,
+  ): void {
+    if (timeAdvance && timeAdvance > 0) {
+      const fired = advanceCalendar(this.state.clocks, timeAdvance);
+      result.alarmsFired = fired.map((a) => a.message);
+    }
+  }
+
+  private stepCheckAlarms(): void {
+    checkClocks(this.state.clocks);
+  }
+
+  private stepResetPrecis(): void {
+    this.scene.precis = "";
+    this.scene.playerReads = [];
+  }
+
+  private stepPruneContext(): void {
+    this.conversation.clear();
+  }
+
+  private async stepCheckpoint(): Promise<void> {
+    // Git commit would go here
+  }
+
   // --- Internal ---
 
   private async finalizeTranscript(): Promise<void> {
@@ -334,19 +388,19 @@ export class SceneManager {
       this.scene.slug || "untitled",
     );
     await this.fileIO.mkdir(dir);
-    const transcriptPath = dir.replace(/\\/g, "/") + "/transcript.md";
+    const transcriptPath = norm(dir) + "/transcript.md";
     const content = `# Scene ${this.scene.sceneNumber}\n\n${this.scene.transcript.join("\n\n")}\n`;
     await this.fileIO.writeFile(transcriptPath, content);
   }
 
   private async savePendingOp(): Promise<void> {
-    const path = this.state.campaignRoot.replace(/\\/g, "/") + "/pending-operation.json";
-    await this.fileIO.writeFile(path, JSON.stringify(this.pendingOp));
+    const path = norm(this.state.campaignRoot) + "/pending-operation.json";
+    await this.fileIO.writeFile(path, JSON.stringify(this.pendingOp, null, 2));
   }
 
   private async clearPendingOp(): Promise<void> {
     this.pendingOp = null;
-    const path = this.state.campaignRoot.replace(/\\/g, "/") + "/pending-operation.json";
+    const path = norm(this.state.campaignRoot) + "/pending-operation.json";
     await this.fileIO.writeFile(path, "");
   }
 
@@ -383,14 +437,66 @@ export class SceneManager {
   }
 }
 
-// --- Helpers ---
+// --- Standalone detection (runs before SceneManager exists) ---
 
-function accUsage(total: UsageStats, add: UsageStats): void {
-  total.inputTokens += add.inputTokens;
-  total.outputTokens += add.outputTokens;
-  total.cacheReadTokens += add.cacheReadTokens;
-  total.cacheCreationTokens += add.cacheCreationTokens;
+/**
+ * Detect the latest scene/session numbers from a campaign directory.
+ * Used during resume to reconstruct SceneState without an active SceneManager.
+ */
+export async function detectSceneState(campaignRoot: string, io: FileIO): Promise<SceneState> {
+  const paths = campaignPaths(campaignRoot);
+  const scenesDir = join(campaignRoot, "campaign", "scenes");
+  const recapsDir = join(campaignRoot, "campaign", "session-recaps");
+
+  let maxScene = 0;
+  let lastSlug = "opening";
+  try {
+    const entries = await io.listDir(scenesDir);
+    for (const entry of entries) {
+      const match = entry.match(/^(\d+)-(.+)$/);
+      if (match) {
+        const n = parseInt(match[1], 10);
+        if (n > maxScene) {
+          maxScene = n;
+          lastSlug = match[2];
+        }
+      }
+    }
+  } catch { /* no scenes dir yet */ }
+
+  let maxSession = 0;
+  try {
+    const entries = await io.listDir(recapsDir);
+    for (const entry of entries) {
+      const match = entry.match(/^session-(\d+)\.md$/);
+      if (match) {
+        const n = parseInt(match[1], 10);
+        if (n > maxSession) maxSession = n;
+      }
+    }
+  } catch { /* no recaps dir yet */ }
+
+  let transcript: string[] = [];
+  if (maxScene > 0) {
+    try {
+      const tPath = paths.sceneTranscript(maxScene, lastSlug);
+      const raw = await io.readFile(tPath);
+      const blocks = raw.split("\n\n").filter((b) => b.trim().length > 0);
+      transcript = blocks.filter((b) => !b.startsWith("# Scene"));
+    } catch { /* no transcript yet */ }
+  }
+
+  return {
+    sceneNumber: Math.max(1, maxScene),
+    slug: maxScene > 0 ? lastSlug : "opening",
+    transcript,
+    precis: "",
+    playerReads: [],
+    sessionNumber: maxSession + 1,
+  };
 }
+
+// --- Helpers ---
 
 function parseChangelogEntries(text: string): string[] {
   return text.split("\n").filter((line) => line.includes(":")).map((line) => line.trim());

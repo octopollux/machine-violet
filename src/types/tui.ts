@@ -17,10 +17,11 @@ export interface FrameStyle {
     combat: FrameStyleVariant;
     ooc: FrameStyleVariant;
     levelup: FrameStyleVariant;
+    dev: FrameStyleVariant;
   };
 }
 
-export type StyleVariant = "exploration" | "combat" | "ooc" | "levelup";
+export type StyleVariant = "exploration" | "combat" | "ooc" | "levelup" | "dev";
 
 export type ViewportTier =
   | "full"

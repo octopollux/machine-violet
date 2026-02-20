@@ -6,8 +6,9 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { SubagentStreamCallback } from "../subagent.js";
 import { spawnSubagent } from "../subagent.js";
-import type { UsageStats } from "../agent-loop.js";
+import type { SubagentResult } from "../subagent.js";
 import { getModel } from "../../config/models.js";
+import { TOKEN_LIMITS } from "../../config/tokens.js";
 
 export interface PromotionInput {
   /** Current character file content (markdown with front matter) */
@@ -20,13 +21,11 @@ export interface PromotionInput {
   characterName: string;
 }
 
-export interface PromotionResult {
+export interface PromotionResult extends SubagentResult {
   /** Updated character file content */
   updatedSheet: string;
   /** Changelog entry for this promotion */
   changelogEntry: string;
-  /** Usage stats */
-  usage: UsageStats;
 }
 
 const SYSTEM_PROMPT = `You are a character sheet manager for a tabletop RPG.
@@ -69,7 +68,7 @@ ${input.characterSheet}`;
       model: getModel("small"),
       visibility: onStream ? "player_facing" : "silent",
       systemPrompt,
-      maxTokens: 1024,
+      maxTokens: TOKEN_LIMITS.SUBAGENT_LARGE,
     },
     userMessage,
     onStream,
@@ -81,8 +80,8 @@ ${input.characterSheet}`;
   const changelogEntry = (parts[1] ?? "Character promoted.").trim();
 
   return {
+    ...result,
     updatedSheet,
     changelogEntry,
-    usage: result.usage,
   };
 }

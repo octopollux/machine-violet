@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseFormatting, toPlainText, highlightQuotesWithState, computeQuoteState, healTagBoundaries, scanTagChanges } from "./formatting.js";
+import { parseFormatting, toPlainText, highlightQuotesWithState, computeQuoteState, healTagBoundaries, scanTagChanges, markdownToTags } from "./formatting.js";
 import type { FormattingTag } from "../types/tui.js";
 
 describe("parseFormatting", () => {
@@ -215,6 +215,61 @@ describe("scanTagChanges", () => {
   it("handles unclosed tags", () => {
     const changes = scanTagChanges("<i>hello");
     expect(changes).toEqual([{ kind: "open", name: "i", raw: "<i>" }]);
+  });
+});
+
+describe("markdownToTags", () => {
+  it("converts H1 heading to bold", () => {
+    expect(markdownToTags("# Title")).toBe("<b>Title</b>");
+  });
+
+  it("converts H2 heading to bold", () => {
+    expect(markdownToTags("## Section")).toBe("<b>Section</b>");
+  });
+
+  it("converts H3 heading to bold", () => {
+    expect(markdownToTags("### Subsection")).toBe("<b>Subsection</b>");
+  });
+
+  it("converts **bold** to <b> tags", () => {
+    expect(markdownToTags("**Type:** PC")).toBe("<b>Type:</b> PC");
+  });
+
+  it("converts *italic* to <i> tags", () => {
+    expect(markdownToTags("*whispers softly*")).toBe("<i>whispers softly</i>");
+  });
+
+  it("does not confuse ** with *", () => {
+    expect(markdownToTags("**bold** and *italic*")).toBe("<b>bold</b> and <i>italic</i>");
+  });
+
+  it("strips links to display text", () => {
+    expect(markdownToTags("[Aldric](entities/aldric.md)")).toBe("Aldric");
+  });
+
+  it("converts list items to visual bullets", () => {
+    expect(markdownToTags("- Sword of Light")).toBe("  · Sword of Light");
+  });
+
+  it("preserves indented list items", () => {
+    expect(markdownToTags("  - Sub item")).toBe("    · Sub item");
+  });
+
+  it("passes plain text through unchanged", () => {
+    expect(markdownToTags("Just plain text.")).toBe("Just plain text.");
+  });
+
+  it("passes empty string through unchanged", () => {
+    expect(markdownToTags("")).toBe("");
+  });
+
+  it("handles multiple bold spans on one line", () => {
+    expect(markdownToTags("**HP:** 42 **AC:** 16")).toBe("<b>HP:</b> 42 <b>AC:</b> 16");
+  });
+
+  it("handles links within other content", () => {
+    expect(markdownToTags("Allies: [Bran](bran.md) and [Cara](cara.md)"))
+      .toBe("Allies: Bran and Cara");
   });
 });
 

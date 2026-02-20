@@ -4,6 +4,7 @@ import type { SubagentResult, SubagentStreamCallback } from "../subagent.js";
 import { rollDice } from "../../tools/dice/index.js";
 import type { RollDiceInput } from "../../types/dice.js";
 import { getModel } from "../../config/models.js";
+import { TOKEN_LIMITS } from "../../config/tokens.js";
 
 const SYSTEM_PROMPT = `You are a mechanical resolution engine. You resolve actions by reading character sheets and rules, determining modifiers, calling roll_dice, and evaluating results.
 
@@ -51,7 +52,7 @@ export async function resolveAction(
       model: getModel("small"),
       visibility: onStream ? "player_facing" : "silent",
       systemPrompt: SYSTEM_PROMPT,
-      maxTokens: 256,
+      maxTokens: TOKEN_LIMITS.SUBAGENT_SMALL,
       maxToolRounds: 3,
       tools: [ROLL_DICE_TOOL],
       toolHandler: (name, toolInput) => {

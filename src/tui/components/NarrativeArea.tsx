@@ -1,13 +1,13 @@
-import React, { useRef, useEffect, useState, useCallback, useImperativeHandle, forwardRef } from "react";
+import React, { useRef, useEffect, useState, useCallback, forwardRef } from "react";
 import { Text, Box } from "ink";
 import { ScrollView } from "ink-scroll-view";
 import type { ScrollViewRef } from "ink-scroll-view";
-import type { FormattingNode, FormattingTag } from "../../types/tui.js";
 import { parseFormatting, highlightQuotes, computeQuoteState, highlightQuotesWithState, healTagBoundaries } from "../formatting.js";
+import { renderNodes } from "../render-nodes.js";
+import { useScrollHandle } from "../hooks/useScrollHandle.js";
+import type { ScrollHandle } from "../hooks/useScrollHandle.js";
 
-export interface NarrativeAreaHandle {
-  scrollBy(delta: number): void;
-}
+export type NarrativeAreaHandle = ScrollHandle;
 
 interface NarrativeAreaProps {
   /** Raw DM text (may contain formatting tags) */
@@ -37,19 +37,7 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
   const atBottomRef = useRef(true);
 
   // Expose scrollBy to parent (clamped so forward scroll stops at bottom)
-  useImperativeHandle(ref, () => ({
-    scrollBy(delta: number) {
-      const sv = scrollRef.current;
-      if (!sv) return;
-      if (delta > 0) {
-        const room = sv.getBottomOffset() - sv.getScrollOffset();
-        if (room <= 0) return;
-        sv.scrollBy(Math.min(delta, room));
-      } else {
-        sv.scrollBy(delta);
-      }
-    },
-  }), []);
+  useScrollHandle(ref, scrollRef);
 
   // Track scroll position
   const updateScrollState = useCallback(() => {
@@ -120,6 +108,11 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
 
 /** A single narrative line with formatting and optional quote highlighting. */
 function NarrativeLine({ text, quoteColor, quoteOpen }: { text: string; quoteColor?: string; quoteOpen: boolean }) {
+  // Dev mode lines: render with dim grey styling
+  if (text.startsWith("[dev]")) {
+    return <Text dimColor color="gray">{text}</Text>;
+  }
+
   let nodes = parseFormatting(text);
   if (quoteColor) {
     if (quoteOpen) {
@@ -132,29 +125,3 @@ function NarrativeLine({ text, quoteColor, quoteOpen }: { text: string; quoteCol
   return <Text>{renderNodes(nodes)}</Text>;
 }
 
-function renderNodes(nodes: FormattingNode[]): React.ReactNode[] {
-  return nodes.map((node, i) => {
-    if (typeof node === "string") {
-      return <React.Fragment key={i}>{node}</React.Fragment>;
-    }
-    return <React.Fragment key={i}>{renderTag(node)}</React.Fragment>;
-  });
-}
-
-function renderTag(tag: FormattingTag): React.ReactNode {
-  const children = renderNodes(tag.content);
-
-  switch (tag.type) {
-    case "bold":
-      return <Text bold>{children}</Text>;
-    case "italic":
-      return <Text italic>{children}</Text>;
-    case "underline":
-      return <Text underline>{children}</Text>;
-    case "color":
-      return <Text color={tag.color}>{children}</Text>;
-    case "center":
-    case "right":
-      return <Text>{children}</Text>;
-  }
-}
