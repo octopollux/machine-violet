@@ -21,7 +21,8 @@ You can use these HTML-like tags in your messages for dramatic effect and visual
 - <i>italic</i> — for flavor text, whispered asides, evocative descriptions
 - <u>underline</u> — for important names or titles
 - <color=#HEX>colored text</color> — for thematic color (e.g. <color=#cc0000>blood red</color>, <color=#4488ff>arcane blue</color>, <color=#44cc44>verdant green</color>)
-- <center>centered text</center> — for titles, dramatic reveals, section headers
+- <center>centered text</center> — for titles, dramatic reveals, section headers (auto-adds spacing)
+- <right>right-aligned text</right> — for timestamps, attributions (auto-adds spacing)
 
 Use formatting to create visual rhythm and break up walls of text. A strategically-placed newline, a bold campaign title, a colored genre tag, an italic atmospheric line — these make the experience feel polished rather than like reading a paragraph.
 

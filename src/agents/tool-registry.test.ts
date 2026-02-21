@@ -201,6 +201,106 @@ describe("ToolRegistry", () => {
     expect(state.maps["m"].regions[0].terrain).toBe("forest");
   });
 
+  // ====== WORLDBUILDING ======
+
+  it("create_entity returns TUI command with serialized content (character type)", () => {
+    const reg = new ToolRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "create_entity", {
+      entity_type: "character",
+      name: "Grimjaw the Bold",
+      front_matter: { disposition: "hostile", class: "warrior" },
+      body: "A scarred orc chieftain.",
+    });
+    expect(result.is_error).toBeUndefined();
+    const parsed = JSON.parse(result.content);
+    expect(parsed.type).toBe("create_entity");
+    expect(parsed.entity_type).toBe("character");
+    expect(parsed.name).toBe("Grimjaw the Bold");
+    expect(parsed.slug).toBe("grimjaw-the-bold");
+    expect(parsed.file_path).toContain("characters");
+    expect(parsed.content).toContain("# Grimjaw the Bold");
+    expect(parsed.content).toContain("hostile");
+    expect(parsed.content).toContain("scarred orc");
+  });
+
+  it("create_entity for location uses subdirectory path", () => {
+    const reg = new ToolRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "create_entity", {
+      entity_type: "location",
+      name: "Iron Forge",
+    });
+    const parsed = JSON.parse(result.content);
+    expect(parsed.file_path).toContain("locations");
+    expect(parsed.file_path).toContain("index.md");
+  });
+
+  it("create_entity rejects invalid entity_type", () => {
+    const reg = new ToolRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "create_entity", {
+      entity_type: "weapon",
+      name: "Sword",
+    });
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("Invalid entity_type");
+  });
+
+  it("create_entity rejects empty name", () => {
+    const reg = new ToolRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "create_entity", {
+      entity_type: "character",
+      name: "  ",
+    });
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("required");
+  });
+
+  it("create_entity with minimal input (no body/front_matter)", () => {
+    const reg = new ToolRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "create_entity", {
+      entity_type: "faction",
+      name: "The Red Hand",
+    });
+    expect(result.is_error).toBeUndefined();
+    const parsed = JSON.parse(result.content);
+    expect(parsed.entity_type).toBe("faction");
+    expect(parsed.content).toContain("# The Red Hand");
+    expect(parsed.content).toContain("**Type:** faction");
+  });
+
+  it("update_entity returns TUI command with update instructions", () => {
+    const reg = new ToolRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "update_entity", {
+      entity_type: "character",
+      name: "Grimjaw",
+      front_matter_updates: { disposition: "friendly" },
+      body_append: "Has joined the party.",
+      changelog_entry: "Befriended by Aldric",
+    });
+    expect(result.is_error).toBeUndefined();
+    const parsed = JSON.parse(result.content);
+    expect(parsed.type).toBe("update_entity");
+    expect(parsed.front_matter_updates).toEqual({ disposition: "friendly" });
+    expect(parsed.body_append).toBe("Has joined the party.");
+    expect(parsed.changelog_entry).toBe("Befriended by Aldric");
+  });
+
+  it("update_entity rejects when no updates provided", () => {
+    const reg = new ToolRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "update_entity", {
+      entity_type: "character",
+      name: "Grimjaw",
+    });
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("At least one");
+  });
+
   it("dispatches context_refresh and returns TUI command JSON", () => {
     const reg = new ToolRegistry();
     const state = mockState();
@@ -218,6 +318,25 @@ describe("ToolRegistry", () => {
     expect(parsed.type).toBe("scene_transition");
     expect(parsed.title).toBe("The Dark Forest");
     expect(parsed.time_advance).toBe(60);
+  });
+
+  it("dispatches pause_for_effect and returns TuiCommand JSON", () => {
+    const reg = new ToolRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "pause_for_effect", { message: "The journey begins..." });
+    expect(result.is_error).toBeUndefined();
+    const parsed = JSON.parse(result.content);
+    expect(parsed.type).toBe("pause_for_effect");
+    expect(parsed.message).toBe("The journey begins...");
+  });
+
+  it("dispatches pause_for_effect without message", () => {
+    const reg = new ToolRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "pause_for_effect", {});
+    expect(result.is_error).toBeUndefined();
+    const parsed = JSON.parse(result.content);
+    expect(parsed.type).toBe("pause_for_effect");
   });
 
   it("dispatches session_end and returns TuiCommand JSON", () => {

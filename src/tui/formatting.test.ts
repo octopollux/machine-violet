@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseFormatting, toPlainText, highlightQuotesWithState, computeQuoteState, healTagBoundaries, scanTagChanges, markdownToTags } from "./formatting.js";
+import { parseFormatting, toPlainText, highlightQuotesWithState, computeQuoteState, healTagBoundaries, scanTagChanges, markdownToTags, padAlignmentLines } from "./formatting.js";
 import type { FormattingTag } from "../types/tui.js";
 
 describe("parseFormatting", () => {
@@ -340,5 +340,79 @@ describe("healTagBoundaries", () => {
   it("handles empty string lines within open tags", () => {
     const result = healTagBoundaries(["<i>start", "", "end</i>"]);
     expect(result).toEqual(["<i>start</i>", "<i></i>", "<i>end</i>"]);
+  });
+});
+
+describe("padAlignmentLines", () => {
+  it("inserts blank line before centered line when preceded by non-empty", () => {
+    const result = padAlignmentLines(["Some text", "<center>Title</center>"]);
+    expect(result).toEqual(["Some text", "", "<center>Title</center>"]);
+  });
+
+  it("inserts blank line after centered line when followed by non-empty", () => {
+    const result = padAlignmentLines(["<center>Title</center>", "Some text"]);
+    expect(result).toEqual(["<center>Title</center>", "", "Some text"]);
+  });
+
+  it("inserts blank lines both before and after", () => {
+    const result = padAlignmentLines(["Before", "<center>Title</center>", "After"]);
+    expect(result).toEqual(["Before", "", "<center>Title</center>", "", "After"]);
+  });
+
+  it("works for <right> tags", () => {
+    const result = padAlignmentLines(["Before", "<right>— Author</right>", "After"]);
+    expect(result).toEqual(["Before", "", "<right>— Author</right>", "", "After"]);
+  });
+
+  it("does not double-pad when blank line already present before", () => {
+    const result = padAlignmentLines(["Some text", "", "<center>Title</center>"]);
+    expect(result).toEqual(["Some text", "", "<center>Title</center>"]);
+  });
+
+  it("does not double-pad when blank line already present after", () => {
+    const result = padAlignmentLines(["<center>Title</center>", "", "Some text"]);
+    expect(result).toEqual(["<center>Title</center>", "", "Some text"]);
+  });
+
+  it("handles center line at start of array", () => {
+    const result = padAlignmentLines(["<center>Title</center>", "After"]);
+    expect(result).toEqual(["<center>Title</center>", "", "After"]);
+  });
+
+  it("handles center line at end of array", () => {
+    const result = padAlignmentLines(["Before", "<center>Title</center>"]);
+    expect(result).toEqual(["Before", "", "<center>Title</center>"]);
+  });
+
+  it("handles consecutive center lines", () => {
+    const result = padAlignmentLines([
+      "Before",
+      "<center>Title</center>",
+      "<center>Subtitle</center>",
+      "After",
+    ]);
+    expect(result).toEqual([
+      "Before",
+      "",
+      "<center>Title</center>",
+      "",
+      "<center>Subtitle</center>",
+      "",
+      "After",
+    ]);
+  });
+
+  it("passes through lines with no alignment tags unchanged", () => {
+    const input = ["Hello", "World", ""];
+    expect(padAlignmentLines(input)).toEqual(input);
+  });
+
+  it("handles empty array", () => {
+    expect(padAlignmentLines([])).toEqual([]);
+  });
+
+  it("handles center with leading/trailing whitespace", () => {
+    const result = padAlignmentLines(["Before", "  <center>Title</center>  ", "After"]);
+    expect(result).toEqual(["Before", "", "  <center>Title</center>  ", "", "After"]);
   });
 });

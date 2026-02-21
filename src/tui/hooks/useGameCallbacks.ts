@@ -100,6 +100,12 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
         }
         break;
       }
+      case "pause_for_effect":
+        setActiveModal({
+          kind: "pause",
+          message: cmd.message as string | undefined,
+        });
+        break;
       case "enter_ooc":
         previousVariantRef.current = variantRef.current;
         setOocActive(true);
@@ -116,6 +122,7 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
       setNarrativeLines((prev) => {
         const lines = [...prev];
         if (lines.length === 0) lines.push(delta);
+        else if (lines[lines.length - 1] === "" && delta !== "") lines.push(delta);
         else lines[lines.length - 1] += delta;
         const last = lines[lines.length - 1];
         if (last.includes("\n")) {

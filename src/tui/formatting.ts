@@ -309,6 +309,37 @@ export function markdownToTags(line: string): string {
   return line;
 }
 
+/**
+ * Insert blank lines before/after alignment lines (<center>, <right>)
+ * so they have breathing room. Skips if a blank line is already present.
+ */
+export function padAlignmentLines(lines: string[]): string[] {
+  const alignRe = /^\s*<(center|right)>.*<\/\1>\s*$/;
+  const result: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const isAlign = alignRe.test(lines[i]);
+
+    if (isAlign) {
+      // Insert blank line before if previous line is non-empty
+      const prev = result[result.length - 1];
+      if (prev !== undefined && prev !== "") {
+        result.push("");
+      }
+      result.push(lines[i]);
+      // Insert blank line after if next line is non-empty
+      const next = lines[i + 1];
+      if (next !== undefined && next !== "") {
+        result.push("");
+      }
+    } else {
+      result.push(lines[i]);
+    }
+  }
+
+  return result;
+}
+
 // --- Internal ---
 
 interface ParsedTag {

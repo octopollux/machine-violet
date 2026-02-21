@@ -170,6 +170,30 @@ describe("NarrativeArea", () => {
     const frame = lastFrame();
     expect(frame).toContain("No width");
   });
+
+  it("renders player input lines with colored carat and text", () => {
+    const { lastFrame } = render(
+      <NarrativeArea
+        lines={["> Aldric: I attack the goblin!"]}
+        maxRows={5}
+        quoteColor="#5a9cff"
+      />,
+    );
+    const frame = lastFrame();
+    expect(frame).toContain(">");
+    expect(frame).toContain("Aldric: I attack the goblin!");
+  });
+
+  it("renders player input as plain text without quoteColor", () => {
+    const { lastFrame } = render(
+      <NarrativeArea
+        lines={["> Aldric: I attack the goblin!"]}
+        maxRows={5}
+      />,
+    );
+    const frame = lastFrame();
+    expect(frame).toContain("> Aldric: I attack the goblin!");
+  });
 });
 
 describe("SideFrame", () => {

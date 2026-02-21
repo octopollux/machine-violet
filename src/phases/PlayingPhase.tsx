@@ -6,7 +6,7 @@ import type { ActiveModal } from "../app.js";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
 import { scrollAmount } from "../tui/components/index.js";
 import { Layout } from "../tui/layout.js";
-import { ChoiceModal, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, getMenuItems } from "../tui/modals/index.js";
+import { Modal, ChoiceModal, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, getMenuItems } from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import type { GameEngine } from "../agents/game-engine.js";
 import type { GameState } from "../agents/game-state.js";
@@ -130,6 +130,14 @@ export function PlayingPhase({
     // Dice modal: any key dismisses
     if (activeModal && activeModal.kind === "dice") {
       setActiveModal(null);
+      return;
+    }
+
+    // Pause modal: ENTER or ESC dismisses
+    if (activeModal && activeModal.kind === "pause") {
+      if (key.return || key.escape) {
+        setActiveModal(null);
+      }
       return;
     }
 
@@ -384,6 +392,8 @@ export function PlayingPhase({
         return 8 + 2;
       case "recap":
         return Math.min(activeModal.lines.length + 2, Math.floor(rows / 2));
+      case "pause":
+        return 3 + 2; // message + blank + prompt + top/bottom borders
       default:
         return 0;
     }
@@ -434,6 +444,13 @@ export function PlayingPhase({
           variant={style.variants[variant]}
           width={cols}
           lines={activeModal.lines}
+        />
+      )}
+      {activeModal?.kind === "pause" && (
+        <Modal
+          variant={style.variants[variant]}
+          width={cols}
+          children={[activeModal.message || "", "", "[Press ENTER to continue]"]}
         />
       )}
       {activeModal?.kind === "character_sheet" && (

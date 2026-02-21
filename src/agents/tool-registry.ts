@@ -52,6 +52,9 @@ import {
   getCurrentTurn,
   modifyInitiative,
 } from "../tools/combat/index.js";
+import { campaignPaths, serializeEntity } from "../tools/filesystem/index.js";
+import type { EntityFrontMatter } from "../types/entities.js";
+import { slugify } from "./world-builder.js";
 
 // --- Helpers ---
 
@@ -748,6 +751,26 @@ const TOOL_DEFS: RegisteredTool[] = [
     },
   },
 
+  // ====== PACING ======
+  {
+    definition: {
+      name: "pause_for_effect",
+      description: "Pause and show a brief message until the player presses ENTER. Use at dramatic moments, after world-building reveals, or before handing off control. The player's current narrative view is preserved — the message appears as a small overlay.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          message: { type: "string", description: "Short message to display (e.g. 'The journey begins...'). Defaults to a simple pause prompt." },
+        },
+      },
+    },
+    handler: (_state, input) => {
+      return ok(JSON.stringify({
+        type: "pause_for_effect",
+        message: input.message,
+      }));
+    },
+  },
+
   // ====== OOC ======
   {
     definition: {
@@ -863,6 +886,114 @@ const TOOL_DEFS: RegisteredTool[] = [
     },
     handler: (_state) => {
       return ok(JSON.stringify({ type: "validate" }));
+    },
+  },
+
+  // ====== WORLDBUILDING ======
+  {
+    definition: {
+      name: "create_entity",
+      description: "Create a new entity file (NPC, location, faction, or lore). Silent DM note — not narrated to players.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          entity_type: { type: "string", enum: ["character", "location", "faction", "lore"], description: "Entity type" },
+          name: { type: "string", description: "Entity name" },
+          front_matter: { type: "object", description: "Front matter key-value pairs (e.g. disposition, class)" },
+          body: { type: "string", description: "Markdown body content" },
+        },
+        required: ["entity_type", "name"],
+      },
+    },
+    handler: (state, input) => {
+      const entityType = input.entity_type as string;
+      const name = input.name as string;
+
+      if (!["character", "location", "faction", "lore"].includes(entityType)) {
+        return err(`Invalid entity_type: ${entityType}`);
+      }
+      if (!name || !name.trim()) {
+        return err("Entity name is required.");
+      }
+
+      const slug = slugify(name);
+      const paths = campaignPaths(state.campaignRoot);
+      const pathFn = entityType === "character" ? paths.character
+        : entityType === "location" ? paths.location
+        : entityType === "faction" ? paths.faction
+        : paths.lore;
+      const filePath = pathFn(slug);
+
+      const fm: EntityFrontMatter = {
+        type: entityType,
+        ...(input.front_matter as Record<string, unknown> ?? {}),
+      };
+      const body = (input.body as string) ?? "";
+      const content = serializeEntity(name, fm, body, []);
+
+      return ok(JSON.stringify({
+        type: "create_entity",
+        entity_type: entityType,
+        name,
+        slug,
+        file_path: filePath,
+        content,
+      }));
+    },
+  },
+  {
+    definition: {
+      name: "update_entity",
+      description: "Update an existing entity file (NPC, PC, location, faction, lore): merge front matter, append body text, add changelog. Silent DM note — use for PC sheets when the player reveals character information.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          entity_type: { type: "string", enum: ["character", "location", "faction", "lore"], description: "Entity type" },
+          name: { type: "string", description: "Entity name" },
+          front_matter_updates: { type: "object", description: "Front matter keys to merge (null value deletes key)" },
+          body_append: { type: "string", description: "Text to append to the body" },
+          changelog_entry: { type: "string", description: "Changelog entry to add" },
+        },
+        required: ["entity_type", "name"],
+      },
+    },
+    handler: (state, input) => {
+      const entityType = input.entity_type as string;
+      const name = input.name as string;
+
+      if (!["character", "location", "faction", "lore"].includes(entityType)) {
+        return err(`Invalid entity_type: ${entityType}`);
+      }
+      if (!name || !name.trim()) {
+        return err("Entity name is required.");
+      }
+
+      const fmUpdates = input.front_matter_updates as Record<string, unknown> | undefined;
+      const bodyAppend = input.body_append as string | undefined;
+      const changelogEntry = input.changelog_entry as string | undefined;
+
+      if (!fmUpdates && !bodyAppend && !changelogEntry) {
+        return err("At least one of front_matter_updates, body_append, or changelog_entry is required.");
+      }
+
+      const slug = slugify(name);
+      const paths = campaignPaths(state.campaignRoot);
+      const pathFn = entityType === "character" ? paths.character
+        : entityType === "location" ? paths.location
+        : entityType === "faction" ? paths.faction
+        : paths.lore;
+      const filePath = pathFn(slug);
+
+      return ok(JSON.stringify({
+        type: "update_entity",
+        entity_type: entityType,
+        name,
+        slug,
+        file_path: filePath,
+        front_matter_updates: fmUpdates,
+        body_append: bodyAppend,
+        changelog_entry: changelogEntry,
+      }));
     },
   },
 ];

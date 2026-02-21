@@ -16,7 +16,8 @@ import { TOKEN_LIMITS } from "../config/tokens.js";
 import type { ToolResult } from "./tool-registry.js";
 import { isAITurn, getActivePlayer } from "./player-manager.js";
 import { aiPlayerTurn } from "./subagents/ai-player.js";
-import { campaignPaths } from "../tools/filesystem/index.js";
+import { campaignPaths, parseFrontMatter, serializeEntity, formatChangelogEntry } from "../tools/filesystem/index.js";
+import { norm } from "../utils/paths.js";
 import { validateCampaign } from "../tools/validation/index.js";
 import { CampaignRepo } from "../tools/git/index.js";
 import type { GitIO } from "../tools/git/index.js";
@@ -286,6 +287,10 @@ export class GameEngine {
           await this.refreshContext();
         } else if (cmd.type === "validate") {
           await this.runValidation();
+        } else if (cmd.type === "create_entity") {
+          await this.createEntity(cmd);
+        } else if (cmd.type === "update_entity") {
+          await this.updateEntity(cmd);
         } else {
           this.callbacks.onTuiCommand(cmd);
         }
@@ -425,6 +430,92 @@ export class GameEngine {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       this.callbacks.onDevLog?.(`[dev] validate: failed — ${msg}`);
+    }
+  }
+
+  // --- Worldbuilding Entity I/O ---
+
+  /** Write a new entity file (from create_entity tool) */
+  private async createEntity(cmd: TuiCommand): Promise<void> {
+    const { entity_type, name, file_path, content } = cmd as {
+      entity_type: string; name: string; file_path: string; content: string;
+    };
+    const filePath = norm(file_path);
+
+    try {
+      // Locations use subdirectories — ensure parent dir exists
+      if (entity_type === "location") {
+        const parentDir = filePath.replace(/\/index\.md$/, "");
+        await this.fileIO.mkdir(parentDir);
+      }
+
+      if (await this.fileIO.exists(filePath)) {
+        this.callbacks.onDevLog?.(`[dev] create_entity: "${name}" already exists at ${filePath}, skipping`);
+        return;
+      }
+
+      await this.fileIO.writeFile(filePath, content);
+      this.callbacks.onDevLog?.(`[dev] create_entity: wrote ${entity_type} "${name}" → ${filePath}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.callbacks.onDevLog?.(`[dev] create_entity: failed for "${name}" — ${msg}`);
+    }
+  }
+
+  /** Update an existing entity file (from update_entity tool) */
+  private async updateEntity(cmd: TuiCommand): Promise<void> {
+    const { name, file_path, front_matter_updates, body_append, changelog_entry } = cmd as {
+      name: string; file_path: string;
+      front_matter_updates?: Record<string, unknown>;
+      body_append?: string;
+      changelog_entry?: string;
+    };
+    const filePath = norm(file_path);
+
+    try {
+      if (!(await this.fileIO.exists(filePath))) {
+        this.callbacks.onDevLog?.(`[dev] update_entity: "${name}" not found at ${filePath}`);
+        return;
+      }
+
+      const raw = await this.fileIO.readFile(filePath);
+      const { frontMatter, body, changelog } = parseFrontMatter(raw);
+      const title = frontMatter._title ?? name;
+      const parts: string[] = [];
+
+      // Merge front matter updates (null deletes keys)
+      if (front_matter_updates) {
+        for (const [key, value] of Object.entries(front_matter_updates)) {
+          if (value === null) {
+            delete frontMatter[key];
+          } else {
+            frontMatter[key] = value;
+          }
+        }
+        parts.push(`fm:${Object.keys(front_matter_updates).length} keys`);
+      }
+
+      // Append body text
+      let newBody = body;
+      if (body_append) {
+        newBody = body ? `${body}\n\n${body_append}` : body_append;
+        parts.push("+body");
+      }
+
+      // Add changelog entry
+      const newChangelog = [...changelog];
+      if (changelog_entry) {
+        const sceneNumber = this.sceneManager.getScene().sceneNumber;
+        newChangelog.push(formatChangelogEntry(sceneNumber, changelog_entry));
+        parts.push("+changelog");
+      }
+
+      const updated = serializeEntity(title as string, frontMatter, newBody, newChangelog);
+      await this.fileIO.writeFile(filePath, updated);
+      this.callbacks.onDevLog?.(`[dev] update_entity: updated "${name}" — ${parts.join(", ")}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.callbacks.onDevLog?.(`[dev] update_entity: failed for "${name}" — ${msg}`);
     }
   }
 

@@ -128,3 +128,49 @@ describe("dispatchTuiCommand logic", () => {
     expect(deps.setVariant).toHaveBeenCalledWith("ooc");
   });
 });
+
+/**
+ * Simulates the onNarrativeDelta logic from useGameCallbacks.
+ * Mirrors the setNarrativeLines updater function.
+ */
+function applyDelta(prev: string[], delta: string): string[] {
+  const lines = [...prev];
+  if (lines.length === 0) lines.push(delta);
+  else if (lines[lines.length - 1] === "" && delta !== "") lines.push(delta);
+  else lines[lines.length - 1] += delta;
+  const last = lines[lines.length - 1];
+  if (last.includes("\n")) {
+    const parts = last.split("\n");
+    lines[lines.length - 1] = parts[0];
+    for (let i = 1; i < parts.length; i++) {
+      lines.push(parts[i]);
+    }
+  }
+  return lines;
+}
+
+describe("onNarrativeDelta logic", () => {
+  it("preserves blank line separator when DM delta arrives", () => {
+    // Player input leaves trailing blank line
+    const after_player = ["", "> Player: Attack!", ""];
+    // First DM delta should NOT overwrite the blank separator
+    const result = applyDelta(after_player, "The dragon");
+    expect(result).toEqual(["", "> Player: Attack!", "", "The dragon"]);
+  });
+
+  it("appends subsequent deltas to the current line", () => {
+    const lines = ["", "> Player: Attack!", "", "The dragon"];
+    const result = applyDelta(lines, " roars!");
+    expect(result).toEqual(["", "> Player: Attack!", "", "The dragon roars!"]);
+  });
+
+  it("splits on newlines within a delta", () => {
+    const lines = ["", "> Player: Attack!", "", "First line"];
+    const result = applyDelta(lines, ".\nSecond line");
+    expect(result).toEqual(["", "> Player: Attack!", "", "First line.", "Second line"]);
+  });
+
+  it("pushes to empty array", () => {
+    expect(applyDelta([], "Hello")).toEqual(["Hello"]);
+  });
+});

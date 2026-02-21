@@ -48,7 +48,7 @@ export async function buildCampaignWorld(
       display_resources: ["HP"],
       theme_color: result.themeColor,
     },
-    result.characterDescription || "A character awaiting their story.",
+    result.characterDescription || "A newly created character. Their story unfolds through play.",
     [],
   );
   await fileIO.writeFile(charPath, charContent);

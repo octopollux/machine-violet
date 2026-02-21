@@ -162,7 +162,7 @@ export function buildDevToolHandler(
             return { content: `Unknown slice: ${slice}. Valid: ${VALID_SLICES.join(", ")}`, is_error: true };
           }
           if (slice === "all") {
-            const { campaignRoot: _cr, activePlayerIndex: _api, ...rest } = gameState;
+            const { campaignRoot: _cr, activePlayerIndex: _api, ...rest } = gameState; // eslint-disable-line @typescript-eslint/no-unused-vars
             return { content: JSON.stringify(rest, null, 2) };
           }
           const data = gameState[slice as Exclude<GameStateSlice, "all">];

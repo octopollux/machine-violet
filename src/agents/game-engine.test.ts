@@ -454,6 +454,166 @@ describe("GameEngine", () => {
   });
 });
 
+describe("GameEngine Worldbuilding Entity I/O", () => {
+  it("create_entity writes file and does NOT forward to TUI", async () => {
+    const client = mockClient([
+      ...toolAndTextMessages("create_entity", {
+        entity_type: "character",
+        name: "Grimjaw",
+      }, "You see a scarred orc."),
+    ]);
+    const { callbacks, log } = mockCallbacks();
+    const fio = mockFileIO();
+    const devLogs: string[] = [];
+    callbacks.onDevLog = (msg) => devLogs.push(msg);
+
+    const engine = new GameEngine({
+      client,
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: fio,
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "I look at the orc.");
+
+    // Should NOT be forwarded to TUI
+    expect(log.tuiCommands.filter((c) => c.type === "create_entity")).toHaveLength(0);
+    // File should have been written
+    expect(fio.writeFile).toHaveBeenCalled();
+    // Dev log should confirm write
+    expect(devLogs.some((d) => d.includes("create_entity") && d.includes("wrote"))).toBe(true);
+  });
+
+  it("create_entity skips existing files", async () => {
+    // Pre-populate the file
+    files[norm("/tmp/test-campaign/characters/grimjaw.md")] = "# Grimjaw\n";
+
+    const client = mockClient([
+      ...toolAndTextMessages("create_entity", {
+        entity_type: "character",
+        name: "Grimjaw",
+      }, "The orc is here."),
+    ]);
+    const { callbacks } = mockCallbacks();
+    const fio = mockFileIO();
+    const devLogs: string[] = [];
+    callbacks.onDevLog = (msg) => devLogs.push(msg);
+
+    const engine = new GameEngine({
+      client,
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: fio,
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "Look again.");
+
+    expect(devLogs.some((d) => d.includes("already exists"))).toBe(true);
+  });
+
+  it("create_entity for location creates parent directory", async () => {
+    const client = mockClient([
+      ...toolAndTextMessages("create_entity", {
+        entity_type: "location",
+        name: "Iron Forge",
+      }, "You arrive."),
+    ]);
+    const { callbacks } = mockCallbacks();
+    const fio = mockFileIO();
+
+    const engine = new GameEngine({
+      client,
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: fio,
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "Travel there.");
+
+    expect(fio.mkdir).toHaveBeenCalled();
+    const mkdirCalls = vi.mocked(fio.mkdir).mock.calls.map((c) => c[0]);
+    expect(mkdirCalls.some((p) => p.includes("locations") && p.includes("iron-forge"))).toBe(true);
+  });
+
+  it("update_entity reads, merges front matter, appends body, adds changelog, writes back", async () => {
+    // Pre-populate entity file
+    files[norm("/tmp/test-campaign/characters/grimjaw.md")] =
+      "# Grimjaw\n\n**Type:** character\n**Disposition:** hostile\n\nA scarred orc.\n";
+
+    const client = mockClient([
+      ...toolAndTextMessages("update_entity", {
+        entity_type: "character",
+        name: "Grimjaw",
+        front_matter_updates: { disposition: "friendly" },
+        body_append: "Now an ally.",
+        changelog_entry: "Befriended",
+      }, "The orc nods."),
+    ]);
+    const { callbacks } = mockCallbacks();
+    const fio = mockFileIO();
+    const devLogs: string[] = [];
+    callbacks.onDevLog = (msg) => devLogs.push(msg);
+
+    const engine = new GameEngine({
+      client,
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: fio,
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "I befriend the orc.");
+
+    // Check updated content
+    const written = files[norm("/tmp/test-campaign/characters/grimjaw.md")];
+    expect(written).toContain("friendly");
+    expect(written).toContain("Now an ally.");
+    expect(written).toContain("Changelog");
+    expect(written).toContain("Befriended");
+    expect(devLogs.some((d) => d.includes("update_entity") && d.includes("updated"))).toBe(true);
+  });
+
+  it("update_entity silently handles missing files", async () => {
+    const client = mockClient([
+      ...toolAndTextMessages("update_entity", {
+        entity_type: "character",
+        name: "Nobody",
+        body_append: "Some text",
+      }, "Nothing happens."),
+    ]);
+    const { callbacks, log } = mockCallbacks();
+    const fio = mockFileIO();
+    const devLogs: string[] = [];
+    callbacks.onDevLog = (msg) => devLogs.push(msg);
+
+    const engine = new GameEngine({
+      client,
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: fio,
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "Update nobody.");
+
+    expect(devLogs.some((d) => d.includes("not found"))).toBe(true);
+    expect(log.errors).toHaveLength(0);
+  });
+});
+
 describe("GameEngine Git Auto-Commit", () => {
   function mockGitIO() {
     return {

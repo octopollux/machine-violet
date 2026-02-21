@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback, useMemo, forwardRef } 
 import { Text, Box } from "ink";
 import { ScrollView } from "ink-scroll-view";
 import type { ScrollViewRef } from "ink-scroll-view";
-import { parseFormatting, highlightQuotes, computeQuoteState, highlightQuotesWithState, healTagBoundaries } from "../formatting.js";
+import { parseFormatting, highlightQuotes, computeQuoteState, highlightQuotesWithState, healTagBoundaries, padAlignmentLines } from "../formatting.js";
 import { renderNodes } from "../render-nodes.js";
 import { useScrollHandle } from "../hooks/useScrollHandle.js";
 import type { ScrollHandle } from "../hooks/useScrollHandle.js";
@@ -87,13 +87,14 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
     [quoteColor, lines],
   );
 
-  // Heal formatting tags that span line boundaries
+  // Heal formatting tags that span line boundaries, then pad alignment lines
   const healedLines = healTagBoundaries(lines);
+  const paddedLines = padAlignmentLines(healedLines);
 
   return (
     <Box height={maxRows} flexDirection="column">
       <ScrollView ref={scrollRef} onScroll={handleScroll}>
-        {healedLines.map((line, i) => (
+        {paddedLines.map((line, i) => (
           <NarrativeLine
             key={i}
             text={line}
@@ -122,6 +123,11 @@ function NarrativeLine({ text, quoteColor, quoteOpen, width }: {
   // Dev mode lines: render with dim grey styling
   if (text.startsWith("[dev]")) {
     return <Text dimColor color="gray">{text}</Text>;
+  }
+
+  // Player input lines: "> CharacterName: text" — green carat, theme-colored text
+  if (text.startsWith("> ") && quoteColor) {
+    return <Text><Text color="greenBright">&gt;</Text><Text color={quoteColor}>{text.slice(1)}</Text></Text>;
   }
 
   let nodes = parseFormatting(text);
