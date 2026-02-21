@@ -3,6 +3,7 @@ import type { PlayerConfig } from "../../types/config.js";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import { getModel } from "../../config/models.js";
+import { loadTemplate } from "../../prompts/load-prompt.js";
 
 /**
  * Context provided to the AI player for decision-making.
@@ -45,17 +46,12 @@ export function buildAIPlayerPrompt(ctx: AIPlayerContext): string {
     ? `\n\nCurrent situation: ${situation}`
     : "";
 
-  return `You are ${player.character}, a character in a tabletop RPG.${personality}
-
-Character sheet:
-${characterSheet}${situationBlock}
-
-Rules:
-- Respond in character. Say what you do, concisely (1-2 sentences).
-- You may include brief dialogue.
-- Do NOT narrate outcomes — the DM handles that. Say "I try to pick the lock", not "I pick the lock and it opens."
-- Do NOT use action tags like *asterisks* — just state your action plainly.
-- Stay in character. Your personality drives your decisions.`;
+  return loadTemplate("ai-player", {
+    characterName: player.character,
+    personality,
+    characterSheet,
+    situation: situationBlock,
+  });
 }
 
 /**

@@ -6,6 +6,7 @@ import { randomSeeds } from "../config/seeds.js";
 import { createDefaultConfig as defaultCombatConfig } from "../tools/combat/index.js";
 import { getModel } from "../config/models.js";
 import { TOKEN_LIMITS } from "../config/tokens.js";
+import { loadPrompt } from "../prompts/load-prompt.js";
 
 // --- Types ---
 
@@ -167,8 +168,7 @@ export async function fastPathSetup(
 
 // --- AI generation for full setup ---
 
-const SETUP_GEN_SYSTEM = `You are a creative tabletop RPG game designer. Generate options for new campaigns.
-Respond ONLY with valid JSON, no markdown fences, no commentary.`;
+const SETUP_GEN_SYSTEM = loadPrompt("setup-gen");
 
 interface GeneratedCampaigns {
   campaigns: { name: string; premise: string }[];

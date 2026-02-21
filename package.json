@@ -8,6 +8,7 @@
     "start": "node dist/index.js",
     "dev": "tsx src/index.tsx",
     "build": "tsc",
+    "postbuild": "node -e \"const fs=require('fs'),p=require('path'),s='src/prompts',d='dist/prompts';fs.mkdirSync(d,{recursive:true});fs.readdirSync(s).filter(f=>f.endsWith('.md')).forEach(f=>fs.copyFileSync(p.join(s,f),p.join(d,f)))\"",
     "watch": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",

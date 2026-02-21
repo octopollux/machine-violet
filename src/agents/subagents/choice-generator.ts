@@ -8,17 +8,13 @@ import type { ChoiceFrequency } from "../../types/config.js";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import { getModel } from "../../config/models.js";
+import { loadPrompt } from "../../prompts/load-prompt.js";
 
 export interface GeneratedChoices extends SubagentResult {
   choices: string[];
 }
 
-const SYSTEM_PROMPT = `You generate 3-4 short action choices for a tabletop RPG player.
-
-Given the DM's latest narration, suggest what the player might do next.
-Each choice should be a brief action statement (5-10 words).
-Include a mix of: cautious/bold, social/physical, creative/direct.
-Output ONLY the choices, one per line. No numbering, no explanation.`;
+const SYSTEM_PROMPT = loadPrompt("choice-generator");
 
 /**
  * Should we auto-generate choices for this turn?

@@ -9,6 +9,7 @@ import { spawnSubagent } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import { getModel } from "../../config/models.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
+import { loadPrompt } from "../../prompts/load-prompt.js";
 
 export interface PromotionInput {
   /** Current character file content (markdown with front matter) */
@@ -28,17 +29,7 @@ export interface PromotionResult extends SubagentResult {
   changelogEntry: string;
 }
 
-const SYSTEM_PROMPT = `You are a character sheet manager for a tabletop RPG.
-
-Given a character sheet, game rules, and promotion context, update the character sheet.
-Apply level-up changes: new abilities, stat increases, HP changes, spell slots, etc.
-Follow the game system's rules precisely. If no system rules are provided, make reasonable narrative-appropriate changes.
-
-Output format:
-1. First, output the COMPLETE updated character sheet (preserve the full markdown format including title and front matter).
-2. Then, after a line containing only "---CHANGELOG---", output a single terse changelog line describing what changed.
-
-Example changelog: "Level 5: +1 STR (16), Extra Attack, +5 HP (max 42)"`;
+const SYSTEM_PROMPT = loadPrompt("character-promotion");
 
 /**
  * Run the character promotion subagent.

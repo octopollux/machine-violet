@@ -3,15 +3,9 @@ import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import { getModel } from "../../config/models.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
+import { loadPrompt } from "../../prompts/load-prompt.js";
 
-const SYSTEM_PROMPT = `You write campaign log entries from scene transcripts.
-
-Rules:
-- One line per significant event. Dense, terse.
-- PRESERVE ALL wikilinks from the transcript exactly as written.
-- Include mechanical outcomes (HP changes, items gained/lost, alarms set).
-- Do not editorialize or add narrative color. Just the facts.
-- Format: bullet list, each bullet is one event.`;
+const SYSTEM_PROMPT = loadPrompt("scene-summarizer");
 
 /**
  * Scene summarizer subagent.

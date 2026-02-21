@@ -2,15 +2,9 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import { getModel } from "../../config/models.js";
+import { loadPrompt } from "../../prompts/load-prompt.js";
 
-const SYSTEM_PROMPT = `You identify entities meaningfully involved in a scene and write changelog entries.
-
-Rules:
-- Only include entities that were MEANINGFULLY involved (not just mentioned in passing).
-- One line per entity, format: "entity_filename: changelog entry text"
-- Changelog entries are terse: what happened to this entity in this scene.
-- Include scene number reference.
-- Do not include entities that were only mentioned in passing or as background.`;
+const SYSTEM_PROMPT = loadPrompt("changelog-updater");
 
 /**
  * Changelog updater subagent.
