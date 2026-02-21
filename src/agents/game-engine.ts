@@ -14,6 +14,12 @@ import { getModel } from "../config/models.js";
 import { accUsage } from "../context/usage-helpers.js";
 import { TOKEN_LIMITS } from "../config/tokens.js";
 import type { ToolResult } from "./tool-registry.js";
+import { isAITurn, getActivePlayer } from "./player-manager.js";
+import { aiPlayerTurn } from "./subagents/ai-player.js";
+import { campaignPaths } from "../tools/filesystem/index.js";
+import { validateCampaign } from "../tools/validation/index.js";
+import { CampaignRepo } from "../tools/git/index.js";
+import type { GitIO } from "../tools/git/index.js";
 
 // --- Types ---
 
@@ -67,6 +73,10 @@ export class GameEngine {
   };
   private model: AgentLoopConfig["model"];
   private persister: StatePersister | null;
+  private fileIO: FileIO;
+  private repo: CampaignRepo | null = null;
+  private aiTurnDepth = 0;
+  private static MAX_AI_CHAIN = 10;
 
   constructor(params: {
     client: Anthropic;
@@ -76,10 +86,24 @@ export class GameEngine {
     fileIO: FileIO;
     callbacks: EngineCallbacks;
     model?: AgentLoopConfig["model"];
+    gitIO?: GitIO;
   }) {
     this.client = params.client;
     this.registry = new ToolRegistry();
     this.gameState = params.gameState;
+    this.fileIO = params.fileIO;
+
+    // Create CampaignRepo if gitIO provided
+    if (params.gitIO) {
+      this.repo = new CampaignRepo({
+        dir: params.gameState.campaignRoot,
+        git: params.gitIO,
+        enabled: true,
+        autoCommitInterval: params.gameState.config.recovery.auto_commit_interval,
+        maxCommits: params.gameState.config.recovery.max_commits,
+      });
+    }
+
     this.conversation = new ConversationManager(params.gameState.config.context);
     this.sceneManager = new SceneManager(
       params.gameState,
@@ -87,6 +111,7 @@ export class GameEngine {
       this.conversation,
       params.sessionState,
       params.fileIO,
+      this.repo ?? undefined,
     );
     this.callbacks = params.callbacks;
     this.model = params.model ?? getModel("large");
@@ -97,7 +122,11 @@ export class GameEngine {
     }
 
     // Wire up state persistence
-    this.persister = new StatePersister(params.gameState.campaignRoot, params.fileIO);
+    this.persister = new StatePersister(
+      params.gameState.campaignRoot,
+      params.fileIO,
+      (error) => this.callbacks.onError(error),
+    );
     this.registry.onStateChanged = (_toolName, state, slices) => {
       this.persistSlices(state, slices);
     };
@@ -141,6 +170,11 @@ export class GameEngine {
     return this.persister;
   }
 
+  /** Get campaign repo (for shutdown use) */
+  getRepo(): CampaignRepo | null {
+    return this.repo;
+  }
+
   /** Hydrate conversation from saved exchanges */
   hydrateConversation(exchanges: SerializedExchange[]): void {
     this.conversation = ConversationManager.hydrate(exchanges, this.gameState.config.context);
@@ -151,6 +185,7 @@ export class GameEngine {
       this.conversation,
       this.sceneManager.getSessionState(),
       this.sceneManager.getFileIO(),
+      this.repo ?? undefined,
     );
   }
 
@@ -158,9 +193,14 @@ export class GameEngine {
    * Process player input: send to DM, stream response, handle tools.
    * This is the main game loop entry point.
    */
-  async processInput(characterName: string, text: string): Promise<void> {
+  async processInput(characterName: string, text: string, opts?: { fromAI?: boolean }): Promise<void> {
     if (this.engineState !== "idle" && this.engineState !== "waiting_input") {
       return; // Already processing
+    }
+
+    // Reset AI chain depth on human-initiated input
+    if (!opts?.fromAI) {
+      this.aiTurnDepth = 0;
     }
 
     this.setState("dm_thinking");
@@ -211,6 +251,9 @@ export class GameEngine {
         this.persister.persistConversation(this.conversation.serialize());
       }
 
+      // Track exchange for git auto-commit
+      await this.repo?.trackExchange();
+
       // Handle dropped exchange
       if (dropped) {
         this.callbacks.onExchangeDropped();
@@ -227,9 +270,25 @@ export class GameEngine {
         });
       }
 
-      // Process TUI commands
+      // Process TUI commands — intercept engine commands
       for (const cmd of result.tuiCommands) {
-        this.callbacks.onTuiCommand(cmd);
+        if (cmd.type === "scene_transition") {
+          await this.transitionScene(
+            cmd.title as string,
+            cmd.time_advance as number | undefined,
+          );
+        } else if (cmd.type === "session_end") {
+          await this.endSession(
+            cmd.title as string,
+            cmd.time_advance as number | undefined,
+          );
+        } else if (cmd.type === "context_refresh") {
+          await this.refreshContext();
+        } else if (cmd.type === "validate") {
+          await this.runValidation();
+        } else {
+          this.callbacks.onTuiCommand(cmd);
+        }
       }
 
       // Accumulate usage
@@ -245,6 +304,9 @@ export class GameEngine {
     }
 
     this.setState("waiting_input");
+
+    // Check if an AI player should auto-act next
+    this.processAITurnIfNeeded();
   }
 
   /**
@@ -302,6 +364,140 @@ export class GameEngine {
     const recap = await this.sceneManager.sessionResume();
     this.setState("waiting_input");
     return recap;
+  }
+
+  /**
+   * Resume an interrupted scene-transition cascade from a pending operation.
+   */
+  async resumePendingTransition(pendingOp: import("./scene-manager.js").PendingOperation): Promise<void> {
+    this.setState("scene_transition");
+
+    try {
+      const result = await this.sceneManager.resumePendingTransition(
+        this.client,
+        pendingOp,
+      );
+
+      if (result) {
+        accUsage(this.sessionUsage, result.usage);
+        this.callbacks.onUsageUpdate(this.sessionUsage);
+      }
+    } catch (e) {
+      const error = e instanceof Error ? e : new Error(String(e));
+      this.callbacks.onError(error);
+    }
+
+    this.setState("waiting_input");
+  }
+
+  // --- Context Refresh ---
+
+  /** Refresh the DM's context from disk */
+  private async refreshContext(): Promise<void> {
+    this.callbacks.onDevLog?.("[dev] context_refresh: refreshing context from disk");
+    await this.sceneManager.contextRefresh();
+    this.callbacks.onDevLog?.("[dev] context_refresh: done");
+  }
+
+  // --- Validation ---
+
+  /** Run campaign validation and surface results */
+  private async runValidation(): Promise<void> {
+    this.callbacks.onDevLog?.("[dev] validate: running campaign validation");
+    try {
+      const result = await validateCampaign(
+        this.gameState.campaignRoot,
+        this.gameState.maps,
+        this.gameState.clocks,
+        this.fileIO,
+      );
+      if (result.errorCount === 0 && result.warningCount === 0) {
+        this.callbacks.onNarrativeDelta("[Validation: no issues found]\n");
+      } else {
+        const summary = result.issues
+          .map((i) => `  ${i.severity}: ${i.file} — ${i.message}`)
+          .join("\n");
+        this.callbacks.onNarrativeDelta(
+          `[Validation: ${result.errorCount} errors, ${result.warningCount} warnings]\n${summary}\n`,
+        );
+      }
+      this.callbacks.onDevLog?.(`[dev] validate: ${result.errorCount} errors, ${result.warningCount} warnings, ${result.filesChecked} files checked`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.callbacks.onDevLog?.(`[dev] validate: failed — ${msg}`);
+    }
+  }
+
+  // --- AI Auto-Turn ---
+
+  /**
+   * Check if the current turn belongs to an AI player.
+   * If so, schedule executeAITurn via setTimeout(0) to keep the call stack flat.
+   */
+  processAITurnIfNeeded(): void {
+    if (isAITurn(this.gameState)) {
+      setTimeout(() => void this.executeAITurn(), 0);
+    }
+  }
+
+  /**
+   * Execute an AI player's turn: load character sheet, call AI subagent,
+   * display the action, then feed it into processInput() as if the AI typed it.
+   */
+  async executeAITurn(): Promise<void> {
+    // Safety valve — prevent infinite AI chains
+    if (this.aiTurnDepth >= GameEngine.MAX_AI_CHAIN) {
+      this.aiTurnDepth = 0;
+      this.callbacks.onNarrativeDelta("\n[AI turn limit reached]\n");
+      return;
+    }
+
+    this.aiTurnDepth++;
+
+    const active = getActivePlayer(this.gameState);
+    const characterName = active.characterName;
+
+    this.setState("dm_thinking");
+
+    // Load character sheet (best-effort)
+    let characterSheet = `Character: ${characterName}`;
+    try {
+      const sheetPath = campaignPaths(this.gameState.campaignRoot).character(characterName);
+      const content = await this.fileIO.readFile(sheetPath);
+      if (content) characterSheet = content;
+    } catch {
+      // Fallback to name-only — fine for systemless play
+    }
+
+    // Gather recent narration from conversation
+    const messages = this.conversation.getMessages();
+    const recentAssistant = messages
+      .filter((m) => m.role === "assistant")
+      .slice(-3)
+      .map((m) => (typeof m.content === "string" ? m.content : ""))
+      .join("\n");
+
+    try {
+      const result = await aiPlayerTurn(this.client, {
+        player: active.player,
+        characterSheet,
+        recentNarration: recentAssistant || "It's your turn. What do you do?",
+      });
+
+      // Display AI action in narrative
+      this.callbacks.onNarrativeDelta(`\n> ${characterName} (AI): ${result.action}\n`);
+
+      // Accumulate usage from subagent
+      accUsage(this.sessionUsage, result.usage);
+      this.callbacks.onUsageUpdate(this.sessionUsage);
+
+      // Feed the action into the game loop as player input
+      await this.processInput(characterName, result.action, { fromAI: true });
+    } catch (e) {
+      const error = e instanceof Error ? e : new Error(String(e));
+      this.callbacks.onError(error);
+      this.setState("waiting_input");
+    }
   }
 
   // --- Internal ---

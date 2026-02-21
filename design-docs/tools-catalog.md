@@ -82,6 +82,7 @@ All T1 (initiative rolling may delegate to T2 for complex systems). Called by DM
 | Tool | Signature | Effect |
 |---|---|---|
 | `start_combat` | `({ combatants[] })` | Roll initiative, set turn order, activate combat clock and UI variant. Returns sorted order + round 1. |
+| `advance_turn` | `({})` | Advance to the next combatant's turn. Tracks individual turns within a round and auto-detects round boundaries. More granular than `next_round` (which advances the round-level combat clock). |
 | `modify_initiative` | `({ action, combatant, position? })` | Mid-combat changes: add, remove, move, delay a combatant. |
 | `end_combat` | `({})` | Clear initiative, reset combat clock, clear combat alarms, return to free player switching. |
 
@@ -111,11 +112,19 @@ All T1 (initiative rolling may delegate to T2 for complex systems). Called by DM
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
 | `update_modeline` | T1 | DM | `({ text })` | Set modeline content. Freeform text string. |
-| `set_ui_style` | T1 | DM, Engine | `({ style?, variant? })` | Switch frame style variant (combat/exploration/ooc/levelup) or change base style. |
+| `set_ui_style` | T1 | DM, Engine | `({ style?, variant? })` | Switch frame style variant (combat/exploration/ooc/levelup/dev) or change base style. |
 | `set_display_resources` | T1 | DM, Setup | `({ character, resources[] })` | Update which resource keys appear in the top frame for a character. |
 | `present_choices` | T1 + T2 | DM, Engine | `({ prompt?, choices[]? })` | Show choice modal. No params = Haiku subagent generates options. Explicit params = DM's choices. |
 | `present_roll` | T1 | DM | `({ result, label })` | Display a dice roll as a dramatic modal. |
 | `show_character_sheet` | T1 | DM, Player | `({ character })` | Open character sheet modal. |
+
+---
+
+## Player Management Tools → [multiplayer-and-initiative.md](multiplayer-and-initiative.md)
+
+| Tool | Tier | Caller | Signature | Effect |
+|---|---|---|---|---|
+| `switch_player` | T1 | DM | `({ player })` | Switch the active player character during free play (outside combat). During combat, initiative controls turn order automatically. |
 
 ---
 
@@ -132,6 +141,7 @@ All T1 (initiative rolling may delegate to T2 for complex systems). Called by DM
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
 | `rollback` | T1 | OOC agent | `({ target })` | Restore campaign state to a git commit. Target can be a commit hash, scene label, "last", or "exchanges_ago:N". Triggers `session_resume` after. |
+| `validate` | T1 | DM, OOC agent | `({})` | Run the full validation suite on demand. Checks entity files, wikilinks, maps, clocks, and config integrity. Returns a list of issues with severity levels. Also runs automatically at scene transitions and session start. |
 
 ---
 
@@ -144,13 +154,14 @@ All T1 (initiative rolling may delegate to T2 for complex systems). Called by DM
 | Map bulk setup | 3 | T1 |
 | Randomization | 3 | T1, T2 |
 | Clocks | 4 | T1 |
-| Combat | 3 | T1 |
+| Combat | 4 | T1 |
 | Scene/Session | 4 | T1+T2 |
 | Entity | 1 | T2 |
 | TUI | 6 | T1, T1+T2 |
+| Player Management | 1 | T1 |
 | OOC/Mode | 1 | T1 |
-| Error recovery | 1 | T1 |
-| **Total** | **37** | |
+| Error recovery | 2 | T1 |
+| **Total** | **40** | |
 
 ### Not tools (engine-managed, no DM call needed)
 

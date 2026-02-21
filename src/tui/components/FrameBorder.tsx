@@ -1,7 +1,7 @@
 import React from "react";
 import { Text, Box } from "ink";
 import type { FrameStyleVariant } from "../../types/tui.js";
-import { renderHorizontalFrame, renderVerticalFrame, renderContentLine } from "../frames/index.js";
+import { renderHorizontalFrame, renderVerticalFrame } from "../frames/index.js";
 
 interface HorizontalBorderProps {
   variant: FrameStyleVariant;
@@ -54,24 +54,3 @@ export function SideFrame({
   );
 }
 
-interface FramedContentProps {
-  variant: FrameStyleVariant;
-  width: number;
-  content: string;
-  ascii?: boolean;
-}
-
-/** Renders a content line with left/right vertical borders */
-export function FramedContent({
-  variant,
-  width,
-  content,
-  ascii,
-}: FramedContentProps) {
-  const line = renderContentLine(variant, content, width, ascii);
-  return (
-    <Box>
-      <Text color={variant.color}>{line}</Text>
-    </Box>
-  );
-}

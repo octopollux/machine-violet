@@ -44,9 +44,44 @@
 - [ ] Update child components to pull from context
 
 ## 7. Clean up dead features & minor issues
-- [ ] Implement or remove `center`/`right` formatting tags (render-nodes.tsx)
-- [ ] Remove unused `FramedContent` component (FrameBorder.tsx)
-- [ ] Fix inconsistent `.js` extensions on imports
-- [ ] Add error logging to `StatePersister.writeJSON()` (currently silent)
-- [ ] Memoize `computeQuoteState()` in NarrativeArea
-- [ ] Externalize model IDs / pricing to config
+- [x] Implement `center`/`right` formatting tags (NarrativeArea alignment via Box justifyContent)
+- [x] Remove unused `FramedContent` component (FrameBorder.tsx)
+- [x] Fix inconsistent `.js` extensions on imports (already consistent — verified all 148 files)
+- [x] Add error logging to `StatePersister.writeJSON()` (optional onError callback)
+- [x] Memoize `computeQuoteState()` in NarrativeArea (useMemo)
+- [x] Externalize model IDs / pricing to config (loadPricingConfig in models.ts, dev-config.json override)
+
+**Above are tech debt cleanup; bugs and features follow**
+~~~
+Prompts should be external files, not embedded in the TypeScript; this is because the human developer will be using VSCode, and text files wrap and are easily editable, while TS files do not.
+~~~
+We need to embed enough knowledge for certain agents to be able to manually inspect and modify game state. Maybe a skill?
+~~~
+Is anything preventing agents from making unsafe tool calls - especially file access outside of the game state filesystem area? If not, could be implemented using hooks, for example
+~~~
+Dev Mode needs an ergonomic way to really inspect agent context (both for debugging and for cache optimization). Open to suggestions!
+~~~
+The DM needs to update character and player as new information arrives; unlike everything else in game state, the user themselves can progressively reveal information about their own character that the DM does not know; this needs to be recorded.
+~~~
+Cost display should be moved to Esc menu, at the bottom right.
+~~~
+Costs should use the SDK's cost API features to calculate accurate costs against token counts; we will want to be sure to actually get costs for the model we are using without any hardcoded assumptions; this needs to take caching into account. Bear in mind that a year from now, both model selection and costs will be wildly different, so hardcoding anything related to this will not hold up well.
+~~~
+We have code which should print a newline to the conversation view after every turn; this does not seem to work. Frankly I am not sure that newlines work at all in the conversation view.
+~~~
+Using HTML-ish formatting to center text should also add a newline before and after the text segment; otherwise it has no space in which to center.
+~~~
+Initial DM instructions at the start of the campaign are written to the transcript in game state; this makes them appear in the user-visible conversation view when the game loaded from disk.
+~~~
+We need to implement a prompt which is periodically re-inserted into the DM's context; at this time it eventually forgets to use formatting.
+~~~
+Quote-matching coloring needs to also color the quotes.
+~~~
+Local state folder should be named `.tui-rpg`, not `tui-rpg`, because the *code repo* is typically named tui-rpg and this gets confusing for the developer!
+~~~
+Modeline and theme state should persist to disk immediately and load with the session; modeline should be per-character.
+~~~
+We need to implement a "prompt user to press ENTER to continue" tool, and the game init agent needs to use it immediately before ending its final turn and handing over control to the DM; otherwise the player never gets to see the final paragraph of the world init conversation. The tool is available to the DM without further guidance.
+~~~
+I'd like to know what options the DM has for worldbuilding for later; ideally they should be able to create new locations/characters/factions/etc whenever they want to, link them together with wikilinks, and just silently stash them; otherwise the world can only be a tunnel-vision side effect of the immediate narrative.
+~~~

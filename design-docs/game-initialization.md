@@ -7,8 +7,9 @@ Game initialization takes the player from first launch to gameplay. After a one-
 - **Every prompt has a default.** Repeatedly hitting Enter takes the player to a random, systemless game with a random character. Zero friction to start.
 - **Options, not interrogation.** Each decision point offers 3-5 choices plus freeform input (the Claude Code pattern). The player picks one or types something else.
 - **"More Choices" is always available.** If the suggestions don't inspire, the player can ask the agent to generate more.
-- **Setup is dramatic.** The Sonnet setup agent has personality — it's not a form wizard, it's the opening act. It sets the tone before the DM (Opus) takes over.
-- **Mechanical work is delegated.** The conversational flow runs on Sonnet. PDF imports, file creation, rule parsing, and chargen mechanics run on Haiku or in code (Tier 1/2).
+- **Setup is dramatic.** The setup agent has personality — it's not a form wizard, it's the opening act. It sets the tone before the DM (Opus) takes over.
+- **Two-tier architecture.** The Setup Agent (Sonnet) orchestrates the flow and handles finalization. The actual multi-turn conversation is delegated to a Setup Conversation subagent (Haiku) for cost efficiency. The player doesn't see the boundary — it's a seamless experience. See [subagents-catalog.md](subagents-catalog.md) §9-10.
+- **Mechanical work is delegated.** PDF imports, file creation, rule parsing, and chargen mechanics run on Haiku or in code (Tier 1/2).
 
 ## Flow
 
@@ -312,7 +313,8 @@ The selected personality fragment is stored in `config.json` and loaded into the
 | Phase | Model | Rationale |
 |---|---|---|
 | API key validation | Haiku | Cheapest model for a test call |
-| Conversational setup | Sonnet | Good quality, dramatic personality, moderate cost |
+| Setup orchestration | Sonnet | Handles finalization and campaign directory creation |
+| Conversational setup | Haiku | Multi-turn player conversation delegated to Haiku for cost efficiency |
 | PDF import (extraction) | Haiku (vision) | Cheap, handles complex layouts |
 | PDF import (organization) | Haiku | Mechanical sorting into filesystem |
 | Rule card distillation | Haiku | Compression task, no creativity needed |

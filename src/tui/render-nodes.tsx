@@ -26,6 +26,8 @@ function renderTag(tag: FormattingTag): React.ReactNode {
       return <Text color={tag.color}>{children}</Text>;
     case "center":
     case "right":
+      // Alignment is handled at the NarrativeLine level when this is a
+      // top-level tag. Nested inside other formatting, render children inline.
       return <Text>{children}</Text>;
   }
 }

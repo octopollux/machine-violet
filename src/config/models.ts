@@ -23,7 +23,22 @@ const VALID_MODELS = new Set<string>([
   "claude-haiku-4-5-20251001",
 ]);
 
+export interface ModelPricing {
+  input: number;
+  output: number;
+  cacheWrite: number;
+  cacheRead: number;
+}
+
+const DEFAULT_PRICING: Record<string, ModelPricing> = {
+  "claude-opus-4-6":             { input: 5,    output: 25,  cacheWrite: 6.25,  cacheRead: 0.50 },
+  "claude-sonnet-4-6":           { input: 3,    output: 15,  cacheWrite: 3.75,  cacheRead: 0.30 },
+  "claude-sonnet-4-5-20250929":  { input: 3,    output: 15,  cacheWrite: 3.75,  cacheRead: 0.30 },
+  "claude-haiku-4-5-20251001":   { input: 1,    output: 5,   cacheWrite: 1.25,  cacheRead: 0.10 },
+};
+
 let cached: ModelConfig | null = null;
+let cachedPricing: Record<string, ModelPricing> | null = null;
 
 /**
  * Load model config: defaults merged with optional dev-config.json overrides.
@@ -61,4 +76,40 @@ export function loadModelConfig(opts?: { cwd?: string; reset?: boolean }): Model
  */
 export function getModel(tier: ModelTier): ModelId {
   return loadModelConfig()[tier];
+}
+
+/**
+ * Load pricing config: defaults merged with optional dev-config.json overrides.
+ * Pricing overrides are keyed by model ID string.
+ * Pass `reset: true` in tests to clear cache.
+ */
+export function loadPricingConfig(opts?: { cwd?: string; reset?: boolean }): Record<string, ModelPricing> {
+  if (opts?.reset) cachedPricing = null;
+  if (cachedPricing) return cachedPricing;
+
+  const pricing: Record<string, ModelPricing> = { ...DEFAULT_PRICING };
+  const dir = opts?.cwd ?? process.cwd();
+
+  try {
+    const raw = readFileSync(join(dir, "dev-config.json"), "utf-8");
+    const parsed = JSON.parse(raw);
+    const overrides = parsed?.pricing;
+    if (overrides && typeof overrides === "object") {
+      for (const [modelId, values] of Object.entries(overrides)) {
+        const v = values as Record<string, unknown>;
+        if (v && typeof v === "object"
+            && typeof v.input === "number"
+            && typeof v.output === "number"
+            && typeof v.cacheWrite === "number"
+            && typeof v.cacheRead === "number") {
+          pricing[modelId] = v as unknown as ModelPricing;
+        }
+      }
+    }
+  } catch {
+    // No dev-config.json or invalid — use defaults
+  }
+
+  cachedPricing = pricing;
+  return pricing;
 }

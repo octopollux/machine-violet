@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadModelConfig, getModel } from "./models.js";
+import { loadModelConfig, getModel, loadPricingConfig } from "./models.js";
 
 describe("model config", () => {
   let testDir: string;
@@ -82,5 +82,82 @@ describe("model config", () => {
     expect(getModel("large")).toBe("claude-opus-4-6");
     expect(getModel("medium")).toBe("claude-sonnet-4-6");
     expect(getModel("small")).toBe("claude-haiku-4-5-20251001");
+  });
+});
+
+describe("pricing config", () => {
+  let testDir: string;
+
+  beforeEach(() => {
+    testDir = join(tmpdir(), `tui-rpg-pricing-test-${Date.now()}`);
+    mkdirSync(testDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
+  it("returns defaults when no dev-config.json", () => {
+    const pricing = loadPricingConfig({ cwd: testDir, reset: true });
+    expect(pricing["claude-opus-4-6"].input).toBe(5);
+    expect(pricing["claude-opus-4-6"].output).toBe(25);
+    expect(pricing["claude-haiku-4-5-20251001"].input).toBe(1);
+  });
+
+  it("overrides specific model pricing", () => {
+    writeFileSync(
+      join(testDir, "dev-config.json"),
+      JSON.stringify({
+        pricing: {
+          "claude-opus-4-6": { input: 10, output: 50, cacheWrite: 12.5, cacheRead: 1.0 },
+        },
+      }),
+    );
+    const pricing = loadPricingConfig({ cwd: testDir, reset: true });
+    expect(pricing["claude-opus-4-6"].input).toBe(10);
+    expect(pricing["claude-opus-4-6"].output).toBe(50);
+    // Other models unchanged
+    expect(pricing["claude-haiku-4-5-20251001"].input).toBe(1);
+  });
+
+  it("adds pricing for unknown models", () => {
+    writeFileSync(
+      join(testDir, "dev-config.json"),
+      JSON.stringify({
+        pricing: {
+          "claude-next-gen": { input: 8, output: 40, cacheWrite: 10, cacheRead: 0.8 },
+        },
+      }),
+    );
+    const pricing = loadPricingConfig({ cwd: testDir, reset: true });
+    expect(pricing["claude-next-gen"].input).toBe(8);
+  });
+
+  it("ignores malformed pricing entries", () => {
+    writeFileSync(
+      join(testDir, "dev-config.json"),
+      JSON.stringify({
+        pricing: {
+          "claude-opus-4-6": { input: "not a number" },
+        },
+      }),
+    );
+    const pricing = loadPricingConfig({ cwd: testDir, reset: true });
+    // Should still have defaults
+    expect(pricing["claude-opus-4-6"].input).toBe(5);
+  });
+
+  it("caches after first load", () => {
+    const a = loadPricingConfig({ cwd: testDir, reset: true });
+    writeFileSync(
+      join(testDir, "dev-config.json"),
+      JSON.stringify({
+        pricing: {
+          "claude-opus-4-6": { input: 99, output: 99, cacheWrite: 99, cacheRead: 99 },
+        },
+      }),
+    );
+    const b = loadPricingConfig({ cwd: testDir });
+    expect(b["claude-opus-4-6"].input).toBe(a["claude-opus-4-6"].input);
   });
 });

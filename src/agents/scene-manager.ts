@@ -8,12 +8,15 @@ import { updatePrecis } from "./subagents/precis-updater.js";
 import type { PlayerRead } from "./subagents/precis-updater.js";
 import { updateChangelogs } from "./subagents/changelog-updater.js";
 import { advanceCalendar, checkClocks } from "../tools/clocks/index.js";
+import { validateCampaign } from "../tools/validation/index.js";
+import type { ValidationResult } from "../tools/validation/index.js";
 import { join } from "node:path";
 import { sceneDir, campaignPaths } from "../tools/filesystem/index.js";
 import { formatChangelogEntry, appendChangelog } from "../tools/filesystem/index.js";
 import type { UsageStats } from "./agent-loop.js";
 import { accUsage } from "../context/usage-helpers.js";
 import { norm } from "../utils/paths.js";
+import type { CampaignRepo } from "../tools/git/index.js";
 
 // --- Types ---
 
@@ -32,6 +35,7 @@ export type PendingStep =
   | "changelog_updates"
   | "advance_calendar"
   | "check_alarms"
+  | "validate"
   | "reset_precis"
   | "prune_context"
   | "checkpoint"
@@ -49,6 +53,7 @@ export interface TransitionResult {
   campaignLogEntry: string;
   changelogEntries: string[];
   alarmsFired: string[];
+  validationIssues?: ValidationResult;
   usage: UsageStats;
 }
 
@@ -65,6 +70,13 @@ export interface FileIO {
   listDir(path: string): Promise<string[]>;
 }
 
+/** Ordered cascade steps for scene transitions. Used for resume logic. */
+const STEP_ORDER: PendingStep[] = [
+  "finalize_transcript", "campaign_log", "changelog_updates",
+  "advance_calendar", "check_alarms", "validate",
+  "reset_precis", "prune_context", "checkpoint", "done",
+];
+
 // --- Scene Manager ---
 
 export class SceneManager {
@@ -73,6 +85,7 @@ export class SceneManager {
   private conversation: ConversationManager;
   private sessionState: DMSessionState;
   private fileIO: FileIO;
+  private repo: CampaignRepo | null;
   private pendingOp: PendingOperation | null = null;
 
   /** Optional dev mode log callback. */
@@ -84,12 +97,14 @@ export class SceneManager {
     conversation: ConversationManager,
     sessionState: DMSessionState,
     fileIO: FileIO,
+    repo?: CampaignRepo,
   ) {
     this.state = state;
     this.scene = scene;
     this.conversation = conversation;
     this.sessionState = sessionState;
     this.fileIO = fileIO;
+    this.repo = repo ?? null;
   }
 
   /** Get the current system prompt (cached prefix) */
@@ -200,6 +215,11 @@ export class SceneManager {
     await this.savePendingOp();
     this.stepCheckAlarms();
 
+    // Step 5b: Validation
+    this.pendingOp.step = "validate";
+    await this.savePendingOp();
+    result.validationIssues = await this.stepValidate();
+
     // Step 6: Reset precis and player reads
     this.pendingOp.step = "reset_precis";
     this.stepResetPrecis();
@@ -238,6 +258,67 @@ export class SceneManager {
     const recapPath = paths.sessionRecap(this.scene.sessionNumber);
     await this.fileIO.writeFile(recapPath, `# Session ${this.scene.sessionNumber} Recap\n\n${result.campaignLogEntry}\n`);
 
+    // Git session commit
+    await this.repo?.sessionCommit(this.scene.sessionNumber);
+
+    return result;
+  }
+
+  /**
+   * Resume an interrupted scene-transition cascade.
+   * Picks up from the step recorded in pendingOp and runs through to checkpoint.
+   * Returns null if the pending op is already done or has an unknown step.
+   */
+  async resumePendingTransition(
+    client: Anthropic,
+    pendingOp: PendingOperation,
+  ): Promise<TransitionResult | null> {
+    // Already done or unknown step — clear and bail
+    const startIdx = STEP_ORDER.indexOf(pendingOp.step);
+    if (pendingOp.step === "done" || startIdx === -1) {
+      await this.clearPendingOp();
+      return null;
+    }
+
+    this.pendingOp = { ...pendingOp };
+
+    const totalUsage: UsageStats = {
+      inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0,
+    };
+    const result: TransitionResult = {
+      campaignLogEntry: "",
+      changelogEntries: [],
+      alarmsFired: [],
+      usage: totalUsage,
+    };
+
+    // Run from startIdx through checkpoint (skip "done")
+    const endIdx = STEP_ORDER.indexOf("done");
+    for (let i = startIdx; i < endIdx; i++) {
+      const step = STEP_ORDER[i];
+      this.pendingOp.step = step;
+      await this.savePendingOp();
+
+      switch (step) {
+        case "finalize_transcript": await this.stepFinalizeTranscript(); break;
+        case "campaign_log": await this.stepCampaignLog(client, pendingOp.title, result); break;
+        case "changelog_updates": await this.stepChangelogUpdates(client, result); break;
+        case "advance_calendar": this.stepAdvanceCalendar(pendingOp.timeAdvance, result); break;
+        case "check_alarms": this.stepCheckAlarms(); break;
+        case "validate": result.validationIssues = await this.stepValidate(); break;
+        case "reset_precis": this.stepResetPrecis(); break;
+        case "prune_context": this.stepPruneContext(); break;
+        case "checkpoint": await this.stepCheckpoint(); break;
+      }
+    }
+
+    await this.clearPendingOp();
+
+    // Advance scene for next scene
+    this.scene.sceneNumber++;
+    this.scene.slug = "";
+    this.scene.transcript = [];
+
     return result;
   }
 
@@ -264,17 +345,60 @@ export class SceneManager {
       this.sessionState.sessionRecap = recap;
     }
 
+    // Run validation after loading state
+    try {
+      const validation = await validateCampaign(
+        this.state.campaignRoot,
+        this.state.maps,
+        this.state.clocks,
+        this.fileIO,
+      );
+      this.devLog?.(`[dev] session resume validation: ${validation.errorCount} errors, ${validation.warningCount} warnings, ${validation.filesChecked} files`);
+    } catch (e) {
+      this.devLog?.(`[dev] session resume validation failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
     return recap;
   }
 
-  /** Context refresh: regenerate precis from transcript, re-read active state */
+  /** Context refresh: re-read campaign log, session recap, rebuild active state */
   async contextRefresh(): Promise<void> {
-    // Precis will be regenerated from transcript on disk if needed
-    // For now, just refresh the prefix
+    const root = this.state.campaignRoot;
+    const paths = campaignPaths(root);
+
+    // Re-read campaign log
+    try {
+      if (await this.fileIO.exists(paths.log)) {
+        this.sessionState.campaignSummary = await this.fileIO.readFile(paths.log);
+      }
+    } catch { /* non-critical */ }
+
+    // Re-read previous session recap
+    try {
+      const recapPath = paths.sessionRecap(this.scene.sessionNumber - 1);
+      if (await this.fileIO.exists(recapPath)) {
+        this.sessionState.sessionRecap = await this.fileIO.readFile(recapPath);
+      }
+    } catch { /* non-critical */ }
+
+    // Rebuild active state with pending alarms
+    const clockStatus = checkClocks(this.state.clocks);
+    const pendingAlarms: string[] = [];
+    if (clockStatus.calendar.next_alarm) {
+      pendingAlarms.push(clockStatus.calendar.next_alarm.message);
+    }
+    if (clockStatus.combat.next_alarm) {
+      pendingAlarms.push(clockStatus.combat.next_alarm.message);
+    }
+
     this.sessionState.activeState = buildActiveState({
       pcSummaries: this.state.config.players.map((p) => p.character),
-      pendingAlarms: [],
+      pendingAlarms,
     });
+
+    // Sync precis and player read
+    this.sessionState.scenePrecis = this.scene.precis;
+    this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);
   }
 
   /** Get current pending operation (for recovery) */
@@ -295,6 +419,11 @@ export class SceneManager {
   /** Get file IO (for re-linking after conversation hydration) */
   getFileIO(): FileIO {
     return this.fileIO;
+  }
+
+  /** Get campaign repo (for shutdown use) */
+  getRepo(): CampaignRepo | null {
+    return this.repo;
   }
 
   // --- Transition step methods ---
@@ -366,6 +495,24 @@ export class SceneManager {
     checkClocks(this.state.clocks);
   }
 
+  private async stepValidate(): Promise<ValidationResult | undefined> {
+    try {
+      const result = await validateCampaign(
+        this.state.campaignRoot,
+        this.state.maps,
+        this.state.clocks,
+        this.fileIO,
+      );
+      if (result.errorCount > 0 || result.warningCount > 0) {
+        this.devLog?.(`[dev] validation: ${result.errorCount} errors, ${result.warningCount} warnings`);
+      }
+      return result;
+    } catch (e) {
+      this.devLog?.(`[dev] validation failed: ${e instanceof Error ? e.message : String(e)}`);
+      return undefined;
+    }
+  }
+
   private stepResetPrecis(): void {
     this.scene.precis = "";
     this.scene.playerReads = [];
@@ -376,7 +523,7 @@ export class SceneManager {
   }
 
   private async stepCheckpoint(): Promise<void> {
-    // Git commit would go here
+    await this.repo?.sceneCommit(this.pendingOp?.title ?? "untitled");
   }
 
   // --- Internal ---

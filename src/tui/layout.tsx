@@ -125,7 +125,7 @@ export function Layout(props: LayoutProps) {
 
         <Box flexDirection="column" width={innerWidth}>
           {/* Narrative Area */}
-          <NarrativeArea ref={narrativeRef} lines={narrativeLines} maxRows={narRows} quoteColor={quoteColor} />
+          <NarrativeArea ref={narrativeRef} lines={narrativeLines} maxRows={narRows} quoteColor={quoteColor} width={innerWidth} />
 
           {/* Activity Line */}
           {elements.activityLine && <ActivityLine engineState={engineState} />}

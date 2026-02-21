@@ -1,6 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { CostTracker, calculateCost } from "./cost-tracker.js";
+import { loadPricingConfig } from "../config/models.js";
 import type { UsageStats } from "../agents/agent-loop.js";
+
+// Reset pricing cache before each test to ensure defaults are used
+beforeEach(() => {
+  loadPricingConfig({ reset: true });
+});
 
 describe("calculateCost", () => {
   it("calculates Opus cost correctly", () => {

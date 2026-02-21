@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
 import { SceneManager } from "./scene-manager.js";
 import type { SceneState, FileIO } from "./scene-manager.js";
+import type { CampaignRepo } from "../tools/git/index.js";
 import type { GameState } from "./game-state.js";
 import { ConversationManager } from "../context/conversation.js";
 import type { DMSessionState } from "./dm-prompt.js";
@@ -343,5 +344,331 @@ describe("SceneManager", () => {
     const recap = await mgr.sessionResume();
     expect(recap).toContain("adventure began");
     expect(sessionState.campaignSummary).toContain("Campaign Log");
+  });
+
+  it("contextRefresh populates sessionState fields from disk", async () => {
+    const fileIO = mockFileIO();
+    files["/tmp/test-campaign/campaign/log.md"] = "# Campaign Log\nScene 1 happened.";
+    files["/tmp/test-campaign/campaign/session-recaps/session-000.md"] = "# Session 0\nRecap here.";
+
+    const scene = mockScene();
+    scene.sessionNumber = 1;
+    scene.precis = "Current precis text";
+    scene.playerReads = [
+      { engagement: "high", focus: ["exploration"], tone: "curious", pacing: "exploratory", offScript: false },
+    ];
+
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      scene,
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      fileIO,
+    );
+
+    await mgr.contextRefresh();
+
+    expect(sessionState.campaignSummary).toContain("Campaign Log");
+    expect(sessionState.sessionRecap).toContain("Recap here");
+    expect(sessionState.activeState).toContain("Aldric");
+    expect(sessionState.scenePrecis).toBe("Current precis text");
+    expect(sessionState.playerRead).toContain("high");
+  });
+
+  it("contextRefresh handles missing files gracefully", async () => {
+    const fileIO = mockFileIO();
+    // No files pre-populated — everything missing
+
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      fileIO,
+    );
+
+    // Should not throw
+    await mgr.contextRefresh();
+    expect(sessionState.activeState).toContain("Aldric");
+  });
+
+  it("sceneTransition populates validationIssues in result", async () => {
+    const client = mockClient([
+      textResponse("Summary"),
+      textResponse(""),
+    ]);
+
+    const fileIO = mockFileIO();
+    // Create config.json so validation runs
+    files["/tmp/test-campaign/config.json"] = '{"name":"Test"}';
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    const result = await mgr.sceneTransition(client, "Test Scene");
+    expect(result.validationIssues).toBeDefined();
+    expect(result.validationIssues!.filesChecked).toBeGreaterThanOrEqual(1);
+  });
+
+  it("validation failure does not block scene transition", async () => {
+    const client = mockClient([
+      textResponse("Summary"),
+      textResponse(""),
+    ]);
+
+    const fileIO = mockFileIO();
+    // Validation will try to read config.json — it won't exist, which is a validation error,
+    // but the transition should still complete successfully.
+    const devLogs: string[] = [];
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+    mgr.devLog = (msg: string) => devLogs.push(msg);
+
+    // Should complete without throwing — missing config.json is a validation error but non-blocking
+    const result = await mgr.sceneTransition(client, "Test Scene");
+    expect(result.campaignLogEntry).toBeTruthy();
+    expect(mgr.getScene().sceneNumber).toBe(2);
+    // Validation ran and found issues (missing config.json)
+    expect(result.validationIssues).toBeDefined();
+    expect(result.validationIssues!.errorCount).toBeGreaterThan(0);
+  });
+
+  it("stepCheckpoint commits via CampaignRepo during scene transition", async () => {
+    const client = mockClient([
+      textResponse("Summary"),
+      textResponse(""),
+    ]);
+
+    const fileIO = mockFileIO();
+    const mockRepo = {
+      sceneCommit: vi.fn(async () => "abc123"),
+      sessionCommit: vi.fn(async () => "def456"),
+      trackExchange: vi.fn(async () => null),
+      isEnabled: vi.fn(() => true),
+    };
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+      mockRepo as unknown as CampaignRepo,
+    );
+
+    await mgr.sceneTransition(client, "Tavern Meeting");
+
+    expect(mockRepo.sceneCommit).toHaveBeenCalledWith("Tavern Meeting");
+  });
+
+  it("sessionEnd calls sessionCommit on CampaignRepo", async () => {
+    const client = mockClient([
+      textResponse("Summary"),
+      textResponse(""),
+    ]);
+
+    const fileIO = mockFileIO();
+    const mockRepo = {
+      sceneCommit: vi.fn(async () => "abc123"),
+      sessionCommit: vi.fn(async () => "def456"),
+      trackExchange: vi.fn(async () => null),
+      isEnabled: vi.fn(() => true),
+    };
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+      mockRepo as unknown as CampaignRepo,
+    );
+
+    await mgr.sessionEnd(client, "End of session");
+
+    // sceneCommit from the transition cascade, sessionCommit from sessionEnd
+    expect(mockRepo.sceneCommit).toHaveBeenCalled();
+    expect(mockRepo.sessionCommit).toHaveBeenCalledWith(1);
+  });
+
+  it("sessionResume runs validation (check devLog)", async () => {
+    const fileIO = mockFileIO();
+    files["/tmp/test-campaign/config.json"] = '{"name":"Test"}';
+
+    const devLogs: string[] = [];
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+    mgr.devLog = (msg: string) => devLogs.push(msg);
+
+    await mgr.sessionResume();
+    expect(devLogs.some((m) => m.includes("validation"))).toBe(true);
+  });
+
+  // --- resumePendingTransition tests ---
+
+  it("resumePendingTransition resumes from campaign_log step", async () => {
+    // Mock client: first call = scene summary, second call = changelog
+    const client = mockClient([
+      textResponse("- Resumed summary"),
+      textResponse(""),
+    ]);
+
+    const fileIO = mockFileIO();
+    (fileIO.listDir as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    const result = await mgr.resumePendingTransition(client, {
+      type: "scene_transition",
+      step: "campaign_log",
+      sceneNumber: 1,
+      title: "Resume Test",
+    });
+
+    expect(result).not.toBeNull();
+    // transcript finalize should NOT be called (we skip finalize_transcript)
+    const mkdirCalls = (fileIO.mkdir as ReturnType<typeof vi.fn>).mock.calls;
+    expect(mkdirCalls.length).toBe(0);
+
+    // campaign log was appended
+    expect(fileIO.appendFile).toHaveBeenCalled();
+    expect(result!.campaignLogEntry).toContain("Resumed summary");
+  });
+
+  it("resumePendingTransition clears pending-operation.json after success", async () => {
+    const client = mockClient([
+      textResponse("Summary"),
+      textResponse(""),
+    ]);
+
+    const fileIO = mockFileIO();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    await mgr.resumePendingTransition(client, {
+      type: "scene_transition",
+      step: "validate",
+      sceneNumber: 1,
+      title: "Test",
+    });
+
+    // Pending op file should be cleared (written as empty string)
+    const pendingOpCalls = (fileIO.writeFile as ReturnType<typeof vi.fn>).mock.calls
+      .filter(([path]: [string]) => path.includes("pending-operation"));
+    const lastCall = pendingOpCalls[pendingOpCalls.length - 1];
+    expect(lastCall[1]).toBe("");
+  });
+
+  it("resumePendingTransition no-ops when step is done", async () => {
+    const client = mockClient([]);
+    const fileIO = mockFileIO();
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    const result = await mgr.resumePendingTransition(client, {
+      type: "scene_transition",
+      step: "done",
+      sceneNumber: 1,
+      title: "Already Done",
+    });
+
+    expect(result).toBeNull();
+    // Scene number should NOT have advanced
+    expect(mgr.getScene().sceneNumber).toBe(1);
+  });
+
+  it("resumePendingTransition advances scene number", async () => {
+    const client = mockClient([]);
+    const fileIO = mockFileIO();
+
+    const scene = mockScene();
+    expect(scene.sceneNumber).toBe(1);
+
+    const mgr = new SceneManager(
+      mockState(),
+      scene,
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    // Resume from checkpoint (last real step — quick, no API calls)
+    await mgr.resumePendingTransition(client, {
+      type: "scene_transition",
+      step: "checkpoint",
+      sceneNumber: 1,
+      title: "Advance Test",
+    });
+
+    expect(mgr.getScene().sceneNumber).toBe(2);
+    expect(mgr.getScene().slug).toBe("");
+    expect(mgr.getScene().transcript).toHaveLength(0);
+  });
+
+  it("resumePendingTransition preserves pending-op on error", async () => {
+    // Mock client that throws on first call (campaign_log step)
+    const client = {
+      messages: {
+        create: vi.fn(async () => { throw new Error("API down"); }),
+      },
+    } as unknown as Anthropic;
+
+    const fileIO = mockFileIO();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    await expect(mgr.resumePendingTransition(client, {
+      type: "scene_transition",
+      step: "campaign_log",
+      sceneNumber: 1,
+      title: "Error Test",
+    })).rejects.toThrow("API down");
+
+    // pending-operation.json should NOT be cleared — still has the failed step
+    const pendingOpCalls = (fileIO.writeFile as ReturnType<typeof vi.fn>).mock.calls
+      .filter(([path]: [string]) => path.includes("pending-operation"));
+    // The last write should have the step, not be empty
+    const lastCall = pendingOpCalls[pendingOpCalls.length - 1];
+    expect(lastCall[1]).not.toBe("");
+    expect(lastCall[1]).toContain("campaign_log");
   });
 });

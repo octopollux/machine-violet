@@ -260,6 +260,10 @@ const TUI_TOOLS = new Set([
   "present_roll",
   "show_character_sheet",
   "enter_ooc",
+  "scene_transition",
+  "session_end",
+  "context_refresh",
+  "validate",
 ]);
 
 function isTuiCommand(toolName: string): boolean {

@@ -89,11 +89,23 @@ Writes the campaign log entry for a completed scene. Dense, wikilinked, one line
 | **Trigger** | When an exchange drops from the DM's conversation window |
 | **Source doc** | [context-management.md](context-management.md) |
 
-Appends a terse summary of the dropped exchange to the running scene precis. Keeps the DM oriented despite the short conversation window.
+Appends a terse summary of the dropped exchange to the running scene precis. Keeps the DM oriented despite the short conversation window. Also extracts structured player engagement signals (see **PlayerRead** below).
 
 **Context**: The dropped exchange + current precis. ~500-1K tokens.
 
-**Returns**: Updated precis append. ~20-50 tokens.
+**Returns**: Updated precis append (~20-50 tokens) + a `PlayerRead` JSON object with engagement signals.
+
+**PlayerRead interface**: Extracted from every dropped exchange, providing lightweight sentiment/engagement tracking without a dedicated subagent call:
+
+| Field | Type | Description |
+|---|---|---|
+| `engagement` | `"high" \| "moderate" \| "low"` | How invested the player seems (high = detailed/creative input) |
+| `focus` | `string[]` | 1-3 tags for player focus (e.g. `"npc_interaction"`, `"combat"`, `"puzzle"`) |
+| `tone` | `string` | Single word for the player's tone (e.g. `"playful"`, `"cautious"`) |
+| `pacing` | `"exploratory" \| "pushing_forward" \| "hesitant"` | Whether the player is exploring, driving forward, or hesitant |
+| `offScript` | `boolean` | `true` if the player typed a custom action rather than picking from offered choices |
+
+The engine can use PlayerRead signals to adjust choice frequency, pacing hints in the DM prompt, or DM personality modulation.
 
 ---
 
@@ -148,6 +160,25 @@ Replaces human input for an AI-controlled character. Responds in character, conc
 
 ---
 
+### 16. Dev Mode Subagent
+
+| Property | Value |
+|---|---|
+| **Model** | Sonnet |
+| **Visibility** | Player-facing |
+| **Trigger** | Toggled from game menu |
+| **Source doc** | Implementation-only (`src/agents/subagents/dev-mode.ts`) |
+
+Developer console for inspecting and manipulating the running game. Has its own tool suite: `read_file`, `write_file`, `inspect_state`, `mutate_state`, `summarize_state`. Uses the dedicated "dev" frame variant.
+
+**Context**: Campaign name + game state summary + dev system prompt. ~2-4K tokens.
+
+**Returns**: Terse summary to the DM when dev mode ends — what was inspected or changed.
+
+**Tools available**: File read/write within the campaign directory, state inspection (combat, clocks, maps, decks, config), state mutation. Cannot call DM-only tools.
+
+---
+
 ## Initialization Subagents (during setup)
 
 ### 9. Setup Agent
@@ -165,7 +196,24 @@ Drives the entire game initialization conversation. Personality: dramatic, the o
 
 ---
 
-### 10. Character Creation Subagent (Crunchy)
+### 10. Setup Conversation Subagent
+
+| Property | Value |
+|---|---|
+| **Model** | Haiku |
+| **Visibility** | Player-facing |
+| **Trigger** | Setup agent delegates interactive campaign generation |
+| **Source doc** | [game-initialization.md](game-initialization.md) |
+
+Multi-turn conversational subagent for interactive campaign setup. The setup agent (Sonnet) orchestrates the flow and delegates the actual conversation to this Haiku subagent for cost efficiency. Supports `present_choices` and `finalize_setup` tool calls.
+
+**Context**: System prompt with personality instructions + conversation history with player. Variable size.
+
+**Returns**: Either a `finalize_setup` call with all campaign parameters, or a `present_choices` call for structured player input.
+
+---
+
+### 11. Character Creation Subagent (Crunchy)
 
 | Property | Value |
 |---|---|
@@ -182,7 +230,7 @@ Walks the player through mechanical character creation — race, class, stats, b
 
 ---
 
-### 11. PDF Extraction Subagent
+### 12. PDF Extraction Subagent
 
 | Property | Value |
 |---|---|
@@ -199,7 +247,7 @@ Extracts structured text from PDF pages. Uses vision for complex layouts (multi-
 
 ---
 
-### 12. PDF Organization Subagent
+### 13. PDF Organization Subagent
 
 | Property | Value |
 |---|---|
@@ -216,7 +264,7 @@ Reads extracted content from Phase 1 and sorts it into the entity filesystem: ru
 
 ---
 
-### 13. Rule Card Distiller
+### 14. Rule Card Distiller
 
 | Property | Value |
 |---|---|
@@ -233,7 +281,7 @@ Reads full game rules and produces dense reference cards — compressed cheat sh
 
 ---
 
-### 14. DM Cheat Sheet Generator
+### 15. DM Cheat Sheet Generator
 
 | Property | Value |
 |---|---|
@@ -258,25 +306,27 @@ Summarizes campaign book structure into a dense cheat sheet: act/chapter breakdo
 | 2 | OOC | Sonnet | Player-facing | Runtime — out-of-character mode |
 | 3 | Choice Generation | Haiku | Silent | Runtime — player choice options |
 | 4 | Scene Summarizer | Haiku | Silent | Runtime — scene transition |
-| 5 | Precis Updater | Haiku | Silent | Runtime — context pruning |
+| 5 | Precis Updater + PlayerRead | Haiku | Silent | Runtime — context pruning + engagement tracking |
 | 6 | Changelog Updater | Haiku | Silent | Runtime — scene transition |
 | 7 | Character Promotion | Haiku | Silent | Runtime — on demand |
 | 8 | AI Player | Haiku/Sonnet | Silent | Runtime — AI player turns |
-| 9 | Setup Agent | Sonnet | Player-facing | Init — game setup |
-| 10 | Character Creation | Haiku | Player-facing | Init — crunchy chargen |
-| 11 | PDF Extraction | Haiku (vision) | Silent | Init — document import |
-| 12 | PDF Organization | Haiku | Silent | Init — document import |
-| 13 | Rule Card Distiller | Haiku | Silent | Init — rules compression |
-| 14 | DM Cheat Sheet | Haiku | Silent | Init — campaign book summary |
+| 9 | Setup Agent | Sonnet | Player-facing | Init — game setup (orchestrator) |
+| 10 | Setup Conversation | Haiku | Player-facing | Init — interactive campaign generation |
+| 11 | Character Creation | Haiku | Player-facing | Init — crunchy chargen |
+| 12 | PDF Extraction | Haiku (vision) | Silent | Init — document import |
+| 13 | PDF Organization | Haiku | Silent | Init — document import |
+| 14 | Rule Card Distiller | Haiku | Silent | Init — rules compression |
+| 15 | DM Cheat Sheet | Haiku | Silent | Init — campaign book summary |
+| 16 | Dev Mode | Sonnet | Player-facing | Runtime — developer console |
 
 ### Model distribution
 
-- **Haiku**: 11 subagents (cheap mechanical work)
-- **Sonnet**: 2 subagents (OOC, setup — need personality/quality)
+- **Haiku**: 12 subagents (cheap mechanical work)
+- **Sonnet**: 3 subagents (OOC, setup orchestrator, dev mode — need personality/quality)
 - **Haiku/Sonnet configurable**: 1 (AI player)
 - **Opus**: 0 subagents (Opus IS the DM, never delegated to)
 
 ### Visibility distribution
 
 - **Silent**: 10 (DM-only, player never sees)
-- **Player-facing**: 4 (OOC, setup, crunchy chargen, resolution when input needed)
+- **Player-facing**: 6 (OOC, setup, setup conversation, crunchy chargen, resolution when input needed, dev mode)

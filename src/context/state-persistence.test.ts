@@ -198,6 +198,32 @@ describe("StatePersister", () => {
     // Give fire-and-forget promises time to settle
     await new Promise((r) => setTimeout(r, 10));
   });
+
+  it("calls onError callback when write fails", async () => {
+    const fio = mockFileIO();
+    (fio.writeFile as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("disk full"));
+    const onError = vi.fn();
+    const persister = new StatePersister("/tmp/campaign", fio, onError);
+
+    persister.persistCombat(createCombatState());
+
+    // Give fire-and-forget promise time to settle
+    await new Promise((r) => setTimeout(r, 10));
+    expect(onError).toHaveBeenCalledWith(expect.any(Error));
+    expect(onError.mock.calls[0][0].message).toBe("disk full");
+  });
+
+  it("calls onError callback when read fails", async () => {
+    const fio = mockFileIO();
+    (fio.readFile as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("permission denied"));
+    const onError = vi.fn();
+    const persister = new StatePersister("/tmp/campaign", fio, onError);
+
+    const loaded = await persister.loadAll();
+    expect(loaded.combat).toBeUndefined();
+    expect(onError).toHaveBeenCalled();
+    expect(onError.mock.calls[0][0].message).toBe("permission denied");
+  });
 });
 
 describe("ConversationManager serialize/hydrate", () => {

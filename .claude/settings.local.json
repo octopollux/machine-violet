@@ -29,7 +29,9 @@
       "Bash(wc:*)",
       "Bash(echo:*)",
       "Bash(awk:*)",
-      "Bash(node --trace-deprecation -e:*)"
+      "Bash(node --trace-deprecation -e:*)",
+      "Bash(find:*)",
+      "Bash(R:/tui-rpg/node_modules/.bin/tsc:*)"
     ]
   }
 }

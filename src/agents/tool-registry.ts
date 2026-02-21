@@ -370,7 +370,7 @@ const TOOL_DEFS: RegisteredTool[] = [
       if ("is_error" in r) return r as ToolResult;
       if (input.region) {
         const reg = input.region as { x1: number; y1: number; x2: number; y2: number };
-        defineRegion(r.map, reg, input.terrain as string);
+        setTerrain(r.map, reg, input.terrain as string);
         return ok(`Region set to ${input.terrain}`);
       }
       setTerrain(r.map, input.coord as string, input.terrain as string);
@@ -396,6 +396,31 @@ const TOOL_DEFS: RegisteredTool[] = [
       if ("is_error" in r) return r as ToolResult;
       annotate(r.map, input.coord as string, input.text as string);
       return ok(`Annotated ${input.coord}`);
+    },
+  },
+
+  {
+    definition: {
+      name: "define_region",
+      description: "Define a rectangular terrain region on a map.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          map: { type: "string" },
+          x1: { type: "number", description: "Left column" },
+          y1: { type: "number", description: "Top row" },
+          x2: { type: "number", description: "Right column" },
+          y2: { type: "number", description: "Bottom row" },
+          terrain: { type: "string", description: "Terrain type for the region" },
+        },
+        required: ["map", "x1", "y1", "x2", "y2", "terrain"],
+      },
+    },
+    handler: (state, input) => {
+      const r = requireMap(state, input);
+      if ("is_error" in r) return r as ToolResult;
+      defineRegion(r.map, input.x1 as number, input.y1 as number, input.x2 as number, input.y2 as number, input.terrain as string);
+      return ok(`Region (${input.x1},${input.y1})-(${input.x2},${input.y2}) → ${input.terrain}`);
     },
   },
 
@@ -766,6 +791,53 @@ const TOOL_DEFS: RegisteredTool[] = [
     },
   },
 
+  // ====== SCENE/SESSION ======
+  {
+    definition: {
+      name: "scene_transition",
+      description: "Transition to a new scene. Finalizes transcript, writes campaign log, updates changelogs, advances calendar, checks alarms, resets context. Call at natural narrative boundaries.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          title: { type: "string", description: "Title for the new scene" },
+          time_advance: { type: "number", description: "Minutes of in-game time to advance" },
+        },
+        required: ["title"],
+      },
+    },
+    handler: (_state, input) => {
+      return ok(JSON.stringify({ type: "scene_transition", title: input.title, time_advance: input.time_advance }));
+    },
+  },
+  {
+    definition: {
+      name: "session_end",
+      description: "End the current session. Runs scene transition + writes session recap.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          title: { type: "string", description: "Title for the session ending" },
+          time_advance: { type: "number", description: "Minutes of in-game time to advance" },
+        },
+        required: ["title"],
+      },
+    },
+    handler: (_state, input) => {
+      return ok(JSON.stringify({ type: "session_end", title: input.title, time_advance: input.time_advance }));
+    },
+  },
+
+  {
+    definition: {
+      name: "context_refresh",
+      description: "Refresh the DM's context: re-read campaign log, session recap, rebuild active state. Use when context feels stale.",
+      input_schema: { type: "object" as const, properties: {} },
+    },
+    handler: (_state) => {
+      return ok(JSON.stringify({ type: "context_refresh" }));
+    },
+  },
+
   // ====== RECOVERY ======
   {
     definition: {
@@ -816,6 +888,7 @@ export const TOOL_STATE_MAP: Record<string, StateSlice[]> = {
   set_terrain: ["maps"],
   annotate: ["maps"],
   import_entities: ["maps"],
+  define_region: ["maps"],
   deck: ["decks"],
   switch_player: [],
 };

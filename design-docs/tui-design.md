@@ -34,13 +34,13 @@ Full layout at ≥80 columns, ≥40 rows. Elements listed bottom to top:
 
 **Input line** — Text input for the active player. Tagged with the active character name before being sent to the DM: `[Aldric] I approach the figure cautiously`.
 
-**Modeline** — Nethack-style status line. DM-controlled via tools. Typically shows HP, location, active conditions. Content is freeform text — the DM writes whatever's relevant.
+**Modeline** — Nethack-style status line. DM-controlled via tools. Typically shows HP, location, active conditions. Content is freeform text — the DM writes whatever's relevant. The modeline also displays a running session cost in USD (e.g. `<1¢`, `37¢`, `$1.24`), updated after each exchange via the cost tracker.
 
 **Lower frame** — Styled horizontal separator with the current turn holder centered: `═══╡ Aldric's Turn ╞═══`. Shows `DM` when it's the DM's turn to narrate. Part of the frame style system (see below).
 
 **Activity line** — Automatic indicators for in-flight engine operations. Not DM-controlled. See [Activity Indicators](#activity-indicators).
 
-**DM narrative text** — Scrolling text area. The main content region. The DM's narration renders here. Supports inline formatting (see [DM Text Formatting](#dm-text-formatting)).
+**DM narrative text** — Scrolling text area. The main content region. The DM's narration renders here. Supports inline formatting (see [DM Text Formatting](#dm-text-formatting)). Shows a scroll indicator when content overflows (e.g. `scroll (12) more`) and supports PageUp/PageDown keyboard scrolling. Auto-scrolls to the bottom when new content arrives, unless the user has scrolled up.
 
 **Top frame** — Styled border with resource display. Shows the active character's key resources (HP + 1-2 others). See [Resource Display](#resource-display).
 
@@ -102,6 +102,10 @@ The DM prompt includes one line: *"You can use `<b>`, `<i>`, `<u>`, `<center>`, 
 
 Unrecognized tags are stripped. Malformed tags render as plain text. This is cosmetic — no tag changes game state.
 
+### Quote Highlighting
+
+In addition to explicit tags, the narrative area automatically detects quoted dialogue (`"..."`) and applies color highlighting (default: bright white). This makes NPC speech visually distinct without the DM needing to use `<color>` tags. Quote state is tracked across line boundaries so multi-line dialogue renders correctly.
+
 
 ## Frame Style System
 
@@ -109,7 +113,7 @@ Frames (top, bottom, left, right) are rendered from pre-baked style definitions.
 
 ### Style selection
 
-The campaign genre sets a default style during game init. The style has four **variants**:
+The campaign genre sets a default style during game init. The style has five **variants**:
 
 | Variant | When active |
 |---|---|
@@ -117,6 +121,7 @@ The campaign genre sets a default style during game init. The style has four **v
 | `combat` | During initiative (between `start_combat` and `end_combat`) |
 | `ooc` | During OOC mode |
 | `levelup` | During character advancement subagent |
+| `dev` | During dev mode (developer console) |
 
 The DM switches variants via a `set_ui_style` tool call, or the engine switches automatically on mode changes (combat start, OOC entry, etc.).
 
@@ -159,6 +164,14 @@ Styles are shipped with the app as data. Each defines the box-drawing characters
       "vertical": "║",
       "flourish": "╡ ✦ %s ✦ ╞",
       "color": "#ccaa44"
+    },
+    "dev": {
+      "horizontal": "─",
+      "vertical": "│",
+      "corner_tl": "┌", "corner_tr": "┐",
+      "corner_bl": "└", "corner_br": "┘",
+      "flourish": "┤ %s ├",
+      "color": "#44cc88"
     }
   }
 }
@@ -321,6 +334,7 @@ Standard navigation (arrow keys + Enter). Settings covers choice frequency, disp
 - Modals overlay the narrative area, not the full screen. The modeline and player selector remain visible underneath.
 - Modals inherit the active frame style variant (a combat choice modal uses the combat border style).
 - Modals are dismissed with ESC (back to game), Enter (confirm selection), or the relevant hotkey.
+- When modal content exceeds available height, it scrolls with a scroll indicator (e.g. `scroll (5) more`) and supports PageUp/PageDown navigation.
 - At minimal viewport sizes, modals take the full screen.
 
 
@@ -333,7 +347,7 @@ The DM controls the UI through these tools:
 update_modeline({ text: "HP: 42/42 | Loc: The Shattered Hall | Conditions: Poisoned" })
 ```
 
-**`set_ui_style`** — Switch frame style variant, or change the base style entirely.
+**`set_ui_style`** — Switch frame style variant, or change the base style entirely. Variants: `exploration`, `combat`, `ooc`, `levelup`, `dev`.
 ```
 set_ui_style({ variant: "combat" })
 set_ui_style({ style: "gothic", variant: "exploration" })

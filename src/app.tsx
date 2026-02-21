@@ -30,6 +30,7 @@ import type { ShutdownContext } from "./shutdown.js";
 import { gracefulShutdown } from "./shutdown.js";
 import { createGitIO } from "./tools/git/isogit-adapter.js";
 import { useGameCallbacks } from "./tui/hooks/useGameCallbacks.js";
+import { useRawModeGuardian } from "./tui/hooks/useRawModeGuardian.js";
 import { isDevMode, wrapFileIOWithDevLog } from "./config/dev-mode.js";
 
 import { FirstLaunchPhase } from "./phases/FirstLaunchPhase.js";
@@ -207,6 +208,9 @@ export default function App({ shutdownRef }: AppProps) {
     };
   }, []);
 
+  // --- Raw mode guardian: re-enable raw mode if OS/terminal disabled it (e.g. window blur) ---
+  useRawModeGuardian({ enabled: phase !== "loading" && phase !== "shutting_down" });
+
   // --- Engine callbacks (extracted hook) ---
   const { buildCallbacks, dispatchTuiCommand } = useGameCallbacks({
     setNarrativeLines, setEngineState, setErrorMsg, setModelineOverride,
@@ -234,6 +238,8 @@ export default function App({ shutdownRef }: AppProps) {
       ? wrapFileIOWithDevLog(fileIO.current, (msg) => setNarrativeLines((prev) => [...prev, msg]))
       : fileIO.current;
 
+    const gitIO = config.recovery.enable_git ? createGitIO() : undefined;
+
     const engine = new GameEngine({
       client,
       gameState: gs,
@@ -241,14 +247,17 @@ export default function App({ shutdownRef }: AppProps) {
       sessionState,
       fileIO: engineFileIO,
       callbacks: buildCallbacks(),
+      gitIO,
     });
 
     engineRef.current = engine;
-    persisterRef.current = new StatePersister(campaignRoot, fileIO.current);
+    persisterRef.current = new StatePersister(
+      campaignRoot,
+      fileIO.current,
+      (error) => console.error("[state-persist]", error.message),
+    );
     setCampaignName(config.name);
     setActivePlayerIndex(0);
-
-    const gitIO = config.recovery.enable_git ? createGitIO() : undefined;
 
     if (shutdownRef) {
       shutdownRef.current = {
@@ -261,7 +270,11 @@ export default function App({ shutdownRef }: AppProps) {
     }
 
     if (isResume) {
-      const persister = new StatePersister(campaignRoot, fileIO.current);
+      const persister = new StatePersister(
+        campaignRoot,
+        fileIO.current,
+        (error) => console.error("[state-persist]", error.message),
+      );
       const loaded = await persister.loadAll();
 
       if (loaded.combat) gs.combat = loaded.combat;
@@ -281,6 +294,12 @@ export default function App({ shutdownRef }: AppProps) {
         setVariant(loaded.ui.variant);
       }
       hydratedRef.current = true;
+
+      // Resume interrupted cascade if present
+      const pendingOp = await persister.loadPendingOp();
+      if (pendingOp && pendingOp.step && pendingOp.step !== "done") {
+        await engine.resumePendingTransition(pendingOp);
+      }
 
       const recap = await engine.resumeSession();
 
@@ -305,7 +324,7 @@ export default function App({ shutdownRef }: AppProps) {
       } else {
         setNarrativeLines([...transcriptLines, `Welcome back to ${config.name}.`, ""]);
         if (recap) {
-          setNarrativeLines((prev) => [...prev, "Previously...", "", recap, ""]);
+          setActiveModal({ kind: "recap", lines: recap.split("\n") });
         }
         setPhase("playing");
 

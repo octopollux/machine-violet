@@ -74,7 +74,7 @@ The conversation history keeps only the last N exchanges. An "exchange" is one p
 The cached prefix includes a "current scene summary" — a running precis of the current scene so far. This compensates for the short conversation window by giving the DM a compressed record of everything that's happened in this scene, not just the last few exchanges.
 
 This precis is updated periodically:
-- Every time an exchange is dropped from the conversation window, a Haiku subagent appends a terse summary of that exchange to the precis
+- Every time an exchange is dropped from the conversation window, a Haiku subagent appends a terse summary of that exchange to the precis and extracts a **PlayerRead** — structured engagement signals (engagement level, focus tags, tone, pacing, off-script detection). See [subagents-catalog.md](subagents-catalog.md) §5 for the full PlayerRead interface.
 - On `context_refresh`, the full precis is regenerated from the scene transcript on disk
 
 This is the key mechanism that lets the DM feel like it has a handle on the scene despite only seeing the last few exchanges verbatim. The precis is in the cached prefix, so it costs ~10% of the conversation rate.

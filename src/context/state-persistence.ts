@@ -53,10 +53,12 @@ export interface LoadedState {
 export class StatePersister {
   private root: string;
   private fileIO: FileIO;
+  private onError?: (error: Error) => void;
 
-  constructor(campaignRoot: string, fileIO: FileIO) {
+  constructor(campaignRoot: string, fileIO: FileIO, onError?: (error: Error) => void) {
     this.root = campaignRoot;
     this.fileIO = fileIO;
+    this.onError = onError;
   }
 
   private path(file: string): string {
@@ -66,8 +68,9 @@ export class StatePersister {
   private async writeJSON(file: string, data: unknown): Promise<void> {
     try {
       await this.fileIO.writeFile(this.path(file), JSON.stringify(data, null, 2));
-    } catch {
+    } catch (e) {
       // Fire-and-forget: best-effort persistence
+      this.onError?.(e instanceof Error ? e : new Error(String(e)));
     }
   }
 
@@ -76,7 +79,8 @@ export class StatePersister {
       const raw = await this.fileIO.readFile(this.path(file));
       if (!raw) return undefined;
       return JSON.parse(raw) as T;
-    } catch {
+    } catch (e) {
+      this.onError?.(e instanceof Error ? e : new Error(String(e)));
       return undefined;
     }
   }
@@ -109,12 +113,18 @@ export class StatePersister {
     void this.writeJSON(STATE_FILES.ui, state);
   }
 
+  /** Load pending operation file (for crash recovery) */
+  async loadPendingOp(): Promise<import("../agents/scene-manager.js").PendingOperation | undefined> {
+    return this.readJSON<import("../agents/scene-manager.js").PendingOperation>("pending-operation.json");
+  }
+
   /** Delete conversation state (called on clean session boundary) */
   async clearConversation(): Promise<void> {
     try {
       await this.fileIO.writeFile(this.path(STATE_FILES.conversation), "");
-    } catch {
+    } catch (e) {
       // best-effort
+      this.onError?.(e instanceof Error ? e : new Error(String(e)));
     }
   }
 

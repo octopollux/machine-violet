@@ -170,4 +170,64 @@ describe("ToolRegistry", () => {
     expect(reg.has("roll_dice")).toBe(true);
     expect(reg.has("fake_tool")).toBe(false);
   });
+
+  it("dispatches define_region and creates region on map", () => {
+    const reg = new ToolRegistry();
+    const state = mockState();
+    state.maps["m"] = createMap("m", "square", { width: 10, height: 10 }, "stone");
+
+    const result = reg.dispatch(state, "define_region", {
+      map: "m", x1: 1, y1: 1, x2: 3, y2: 3, terrain: "water",
+    });
+    expect(result.is_error).toBeUndefined();
+    expect(result.content).toContain("water");
+    expect(state.maps["m"].regions).toHaveLength(1);
+    expect(state.maps["m"].regions[0].terrain).toBe("water");
+  });
+
+  it("dispatches set_terrain with region input (regression)", () => {
+    const reg = new ToolRegistry();
+    const state = mockState();
+    state.maps["m"] = createMap("m", "square", { width: 10, height: 10 }, "stone");
+
+    const result = reg.dispatch(state, "set_terrain", {
+      map: "m",
+      region: { x1: 0, y1: 0, x2: 2, y2: 2 },
+      terrain: "forest",
+    });
+    expect(result.is_error).toBeUndefined();
+    expect(result.content).toContain("forest");
+    expect(state.maps["m"].regions).toHaveLength(1);
+    expect(state.maps["m"].regions[0].terrain).toBe("forest");
+  });
+
+  it("dispatches context_refresh and returns TUI command JSON", () => {
+    const reg = new ToolRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "context_refresh", {});
+    const parsed = JSON.parse(result.content);
+    expect(parsed.type).toBe("context_refresh");
+  });
+
+  it("dispatches scene_transition and returns TuiCommand JSON", () => {
+    const reg = new ToolRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "scene_transition", { title: "The Dark Forest", time_advance: 60 });
+    expect(result.is_error).toBeUndefined();
+    const parsed = JSON.parse(result.content);
+    expect(parsed.type).toBe("scene_transition");
+    expect(parsed.title).toBe("The Dark Forest");
+    expect(parsed.time_advance).toBe(60);
+  });
+
+  it("dispatches session_end and returns TuiCommand JSON", () => {
+    const reg = new ToolRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "session_end", { title: "End of Session 1" });
+    expect(result.is_error).toBeUndefined();
+    const parsed = JSON.parse(result.content);
+    expect(parsed.type).toBe("session_end");
+    expect(parsed.title).toBe("End of Session 1");
+    expect(parsed.time_advance).toBeUndefined();
+  });
 });

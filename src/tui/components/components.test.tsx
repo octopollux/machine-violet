@@ -6,7 +6,7 @@ import { InputLine } from "./InputLine.js";
 import { PlayerSelector } from "./PlayerSelector.js";
 import { ActivityLine } from "./ActivityLine.js";
 import { NarrativeArea } from "./NarrativeArea.js";
-import { HorizontalBorder, SideFrame, FramedContent } from "./FrameBorder.js";
+import { HorizontalBorder, SideFrame } from "./FrameBorder.js";
 import { getStyle } from "../frames/index.js";
 
 const gothic = getStyle("gothic")!.variants.exploration;
@@ -135,6 +135,41 @@ describe("NarrativeArea", () => {
     expect(frame).toContain("has fallen");
     // Bold styling is applied via ANSI codes (tested by presence of content)
   });
+
+  it("renders centered text when width is provided", () => {
+    const { lastFrame } = render(
+      <NarrativeArea
+        lines={["<center>Chapter 1</center>"]}
+        maxRows={5}
+        width={40}
+      />,
+    );
+    const frame = lastFrame();
+    expect(frame).toContain("Chapter 1");
+  });
+
+  it("renders right-aligned text when width is provided", () => {
+    const { lastFrame } = render(
+      <NarrativeArea
+        lines={["<right>Page 42</right>"]}
+        maxRows={5}
+        width={40}
+      />,
+    );
+    const frame = lastFrame();
+    expect(frame).toContain("Page 42");
+  });
+
+  it("renders center tag as plain text without width", () => {
+    const { lastFrame } = render(
+      <NarrativeArea
+        lines={["<center>No width</center>"]}
+        maxRows={5}
+      />,
+    );
+    const frame = lastFrame();
+    expect(frame).toContain("No width");
+  });
 });
 
 describe("SideFrame", () => {
@@ -201,12 +236,4 @@ describe("FrameBorder components", () => {
     expect(lastFrame()).toContain("Aldric's Turn");
   });
 
-  it("renders framed content", () => {
-    const { lastFrame } = render(
-      <FramedContent variant={gothic} width={40} content="Hello" />,
-    );
-    const frame = lastFrame();
-    expect(frame).toContain("║");
-    expect(frame).toContain("Hello");
-  });
 });

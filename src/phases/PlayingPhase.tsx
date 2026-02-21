@@ -98,11 +98,35 @@ export function PlayingPhase({
 
   const narrativeRef = useRef<NarrativeAreaHandle>(null);
   const modalScrollRef = useRef<CenteredModalHandle>(null);
+  const escTimestamps = useRef<number[]>([]);
 
   const menuItems = useMemo(() => getMenuItems(devModeEnabled), [devModeEnabled]);
 
   // --- Input handling ---
   useInput((input, key) => {
+    // Triple-ESC reset: 3 ESC presses within 1.5s clears all overlay state
+    if (key.escape) {
+      const now = Date.now();
+      escTimestamps.current.push(now);
+      escTimestamps.current = escTimestamps.current.filter((t) => now - t <= 1500);
+      if (escTimestamps.current.length >= 3) {
+        escTimestamps.current = [];
+        setActiveModal(null);
+        setChoiceIndex(0);
+        setMenuOpen(false);
+        setMenuIndex(0);
+        if (oocActive) {
+          setOocActive(false);
+          setVariant(previousVariantRef.current);
+        }
+        if (devActive) {
+          setDevActive(false);
+          setVariant(previousVariantRef.current);
+        }
+        return;
+      }
+    }
+
     // Dice modal: any key dismisses
     if (activeModal && activeModal.kind === "dice") {
       setActiveModal(null);

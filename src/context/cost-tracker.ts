@@ -1,34 +1,17 @@
 /**
  * Cost tracking for Claude API usage.
  *
- * Pricing (per million tokens, prompts ≤ 200K tokens):
- *   Opus 4.6:   $5 input, $25 output, cache write $6.25, cache read $0.50
- *   Sonnet 4.6: $3 input, $15 output, cache write $3.75, cache read $0.30
- *   Haiku 4.5:  $1 input, $5 output, cache write $1.25, cache read $0.10
- *
- * All costs in USD. Using ≤200K tier (our prompts stay well under).
+ * Default pricing in src/config/models.ts; overridable via dev-config.json.
+ * All costs in USD per million tokens. Using ≤200K tier (our prompts stay well under).
  */
 import type { UsageStats, ModelId } from "../agents/agent-loop.js";
-
-// --- Pricing tables (per million tokens) ---
-
-interface ModelPricing {
-  input: number;
-  output: number;
-  cacheWrite: number;
-  cacheRead: number;
-}
-
-const PRICING: Record<string, ModelPricing> = {
-  "claude-opus-4-6":             { input: 5,    output: 25,  cacheWrite: 6.25,  cacheRead: 0.50 },
-  "claude-sonnet-4-6":           { input: 3,    output: 15,  cacheWrite: 3.75,  cacheRead: 0.30 },
-  "claude-sonnet-4-5-20250929":  { input: 3,    output: 15,  cacheWrite: 3.75,  cacheRead: 0.30 },
-  "claude-haiku-4-5-20251001":   { input: 1,    output: 5,   cacheWrite: 1.25,  cacheRead: 0.10 },
-};
+import type { ModelPricing } from "../config/models.js";
+import { loadPricingConfig } from "../config/models.js";
 
 // Fallback to Opus pricing if model unknown
 function getPricing(model: string): ModelPricing {
-  return PRICING[model] ?? PRICING["claude-opus-4-6"];
+  const pricing = loadPricingConfig();
+  return pricing[model] ?? pricing["claude-opus-4-6"];
 }
 
 // --- Cost calculation ---
