@@ -195,6 +195,37 @@ describe("NarrativeArea", () => {
     const frame = lastFrame();
     expect(frame).toContain("> Aldric: I attack the goblin!");
   });
+
+  it("renders blank lines as visible empty lines", () => {
+    const { lastFrame } = render(
+      <NarrativeArea
+        lines={[dm("Line A"), dm(""), dm("Line B")]}
+        maxRows={10}
+      />,
+    );
+    const frame = lastFrame();
+    const lines = frame.split("\n");
+    // Find the indices of content lines
+    const lineA = lines.findIndex((l) => l.includes("Line A"));
+    const lineB = lines.findIndex((l) => l.includes("Line B"));
+    // There should be a gap (blank line) between them
+    expect(lineB - lineA).toBeGreaterThanOrEqual(2);
+  });
+
+  it("renders turn separator between DM and player lines", () => {
+    const { lastFrame } = render(
+      <NarrativeArea
+        lines={[dm("DM speaks."), player("> I respond.")]}
+        maxRows={10}
+      />,
+    );
+    const frame = lastFrame();
+    const lines = frame.split("\n");
+    const dmLine = lines.findIndex((l) => l.includes("DM speaks."));
+    const playerLine = lines.findIndex((l) => l.includes("I respond."));
+    // Turn separator should create a gap
+    expect(playerLine - dmLine).toBeGreaterThanOrEqual(2);
+  });
 });
 
 describe("SideFrame", () => {

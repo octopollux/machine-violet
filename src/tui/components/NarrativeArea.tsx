@@ -117,6 +117,14 @@ function NarrativeLineComponent({ line, playerColor, width }: {
   playerColor?: string;
   width?: number;
 }) {
+  // Empty nodes (paragraph breaks, turn separators) need a space to
+  // occupy one terminal line — Ink collapses truly-empty <Text/>.
+  const isEmpty = line.nodes.length === 0
+    || (line.nodes.length === 1 && line.nodes[0] === "");
+  if (isEmpty) {
+    return <Text>{" "}</Text>;
+  }
+
   switch (line.kind) {
     case "dev": {
       const text = typeof line.nodes[0] === "string" ? line.nodes[0] : "";
