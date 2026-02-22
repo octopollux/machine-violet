@@ -33,8 +33,13 @@ export interface LayoutProps {
   // Content
   narrativeLines: NarrativeLine[];
   modelineText: string;
-  inputValue: string;
   activeCharacterName: string;
+
+  // Text input
+  inputIsDisabled?: boolean;
+  inputResetKey?: number;
+  onInputChange?: (value: string) => void;
+  onInputSubmit?: (value: string) => void;
 
   // Player state
   players: PlayerEntry[];
@@ -68,8 +73,11 @@ export function Layout(props: LayoutProps) {
     variant,
     narrativeLines,
     modelineText,
-    inputValue,
     activeCharacterName,
+    inputIsDisabled,
+    inputResetKey,
+    onInputChange,
+    onInputSubmit,
     players,
     activePlayerIndex,
     campaignName,
@@ -172,9 +180,12 @@ export function Layout(props: LayoutProps) {
       {/* Input Line */}
       <InputLine
         characterName={activeCharacterName}
-        value={inputValue}
         showPlayerName={elements.playerInPrompt}
         playerName={players[activePlayerIndex]?.name}
+        isDisabled={inputIsDisabled}
+        onChange={onInputChange}
+        onSubmit={onInputSubmit}
+        resetKey={inputResetKey}
       />
 
       {/* Player Selector */}

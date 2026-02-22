@@ -15,7 +15,6 @@ const baseProps = {
     { kind: "dm" as const, text: "A figure sits motionless in a high-backed chair." },
   ],
   modelineText: "HP: 42/42 | Loc: The Shattered Hall",
-  inputValue: "",
   activeCharacterName: "Aldric",
   players: [
     { name: "Aldric", isAI: false },

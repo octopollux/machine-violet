@@ -34,21 +34,19 @@ describe("Modeline", () => {
 });
 
 describe("InputLine", () => {
-  it("renders character name and cursor", () => {
+  it("renders character name and prompt", () => {
     const { lastFrame } = render(
-      <InputLine characterName="Aldric" value="I swing my sword" />,
+      <InputLine characterName="Aldric" />,
     );
     const frame = lastFrame();
     expect(frame).toContain("Aldric");
     expect(frame).toContain(">");
-    expect(frame).toContain("I swing my sword");
   });
 
   it("shows player name when playerSelector dropped", () => {
     const { lastFrame } = render(
       <InputLine
         characterName="Aldric"
-        value=""
         showPlayerName
         playerName="Alex"
       />,

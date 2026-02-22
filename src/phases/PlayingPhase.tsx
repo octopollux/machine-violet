@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo, useCallback } from "react";
 import { useInput, useStdout, Box } from "ink";
 import { appendDelta } from "../tui/narrative-helpers.js";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
@@ -10,7 +10,6 @@ import { getActivePlayer, switchToNextPlayer, getPlayerEntries } from "../agents
 import { enterOOC } from "../agents/subagents/ooc-mode.js";
 import { enterDevMode, summarizeGameState } from "../agents/subagents/dev-mode.js";
 import { getModel } from "../config/models.js";
-import { useTextInput } from "../tui/hooks/useTextInput.js";
 import { useGameContext } from "../tui/game-context.js";
 
 export function PlayingPhase() {
@@ -31,12 +30,15 @@ export function PlayingPhase() {
   const rows = stdout?.rows ?? 40;
 
   // Local state — only used within playing phase input/render
-  const [inputValue, setInputValue] = useState("");
+  const [resetKey, setResetKey] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuIndex, setMenuIndex] = useState(0);
   const [oocBusy, setOocBusy] = useState(false);
   const [devBusy, setDevBusy] = useState(false);
-  const { handleKey: handleTextKey } = useTextInput({ value: inputValue, onChange: setInputValue });
+
+  const clearInput = useCallback(() => {
+    setResetKey((k) => k + 1);
+  }, []);
 
   const narrativeRef = useRef<NarrativeAreaHandle>(null);
   const modalScrollRef = useRef<CenteredModalHandle>(null);
@@ -44,7 +46,72 @@ export function PlayingPhase() {
 
   const menuItems = useMemo(() => getMenuItems(devModeEnabled), [devModeEnabled]);
 
-  // --- Input handling ---
+  // Whether TextInput should be disabled
+  const textInputDisabled =
+    !!(activeModal && activeModal.kind === "dice") ||
+    !!activeModal ||
+    menuOpen ||
+    (devActive && devBusy) ||
+    (oocActive && oocBusy);
+
+  // --- Submit handler for TextInput ---
+  const handleSubmit = useCallback((value: string) => {
+    if (!value.trim()) return;
+    const text = value.trim();
+
+    if (devActive) {
+      setNarrativeLines((prev) => [...prev, { kind: "player", text: `> ${text}` }, { kind: "dm", text: "" }]);
+      if (clientRef.current && gameStateRef.current) {
+        const gs = gameStateRef.current;
+        const fileIO = engineRef.current?.getSceneManager().getFileIO();
+        setDevBusy(true);
+        enterDevMode(clientRef.current, text, {
+          campaignName: gs.config.name,
+          gameStateSummary: summarizeGameState(gs),
+          gameState: gs,
+          fileIO,
+        }, (delta) => {
+          setNarrativeLines((prev) => appendDelta(prev, delta, "dm"));
+        }).then((result) => {
+          setDevBusy(false);
+          setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }]);
+          costTracker.current.record(result.usage, getModel("medium"));
+        }).catch(() => {
+          setDevBusy(false);
+          setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Dev mode error]" }, { kind: "dm", text: "" }]);
+        });
+      }
+    } else if (oocActive) {
+      setNarrativeLines((prev) => [...prev, { kind: "player", text: `> ${text}` }, { kind: "dm", text: "" }]);
+      if (clientRef.current && gameStateRef.current) {
+        const gs = gameStateRef.current;
+        setOocBusy(true);
+        enterOOC(clientRef.current, text, {
+          campaignName: gs.config.name,
+          previousVariant: previousVariantRef.current,
+        }, (delta) => {
+          setNarrativeLines((prev) => appendDelta(prev, delta, "dm"));
+        }).then((result) => {
+          setOocBusy(false);
+          setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }]);
+          costTracker.current.record(result.usage, getModel("medium"));
+        }).catch(() => {
+          setOocBusy(false);
+          setNarrativeLines((prev) => [...prev, { kind: "system", text: "[OOC error]" }, { kind: "dm", text: "" }]);
+        });
+      }
+    } else {
+      if (engineRef.current && gameStateRef.current) {
+        const active = getActivePlayer(gameStateRef.current);
+        setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }, { kind: "player", text: `> ${active.characterName}: ${text}` }, { kind: "dm", text: "" }]);
+        engineRef.current.processInput(active.characterName, text);
+      }
+    }
+
+    clearInput();
+  }, [devActive, oocActive, clearInput]);
+
+  // --- Input handling (modals, menus, scroll — TextInput handles text editing) ---
   useInput((input, key) => {
     // Triple-ESC reset: 3 ESC presses within 1.5s clears all overlay state
     if (key.escape) {
@@ -130,7 +197,7 @@ export function PlayingPhase() {
       return;
     }
 
-    // Dev mode input
+    // Dev mode: ESC exits, busy blocks all keys
     if (devActive) {
       if (key.escape) {
         setDevActive(false);
@@ -138,39 +205,10 @@ export function PlayingPhase() {
         setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Exiting Dev Mode]" }, { kind: "dm", text: "" }]);
         return;
       }
-      if (devBusy) return;
-
-      if (key.return && inputValue.trim()) {
-        const text = inputValue.trim();
-        setInputValue("");
-        setNarrativeLines((prev) => [...prev, { kind: "player", text: `> ${text}` }, { kind: "dm", text: "" }]);
-        if (clientRef.current && gameStateRef.current) {
-          const gs = gameStateRef.current;
-          const fileIO = engineRef.current?.getSceneManager().getFileIO();
-          setDevBusy(true);
-          enterDevMode(clientRef.current, text, {
-            campaignName: gs.config.name,
-            gameStateSummary: summarizeGameState(gs),
-            gameState: gs,
-            fileIO,
-          }, (delta) => {
-            setNarrativeLines((prev) => appendDelta(prev, delta, "dm"));
-          }).then((result) => {
-            setDevBusy(false);
-            setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }]);
-            costTracker.current.record(result.usage, getModel("medium"));
-          }).catch(() => {
-            setDevBusy(false);
-            setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Dev mode error]" }, { kind: "dm", text: "" }]);
-          });
-        }
-        return;
-      }
-      handleTextKey(input, key);
       return;
     }
 
-    // OOC mode
+    // OOC mode: ESC exits, busy blocks all keys
     if (oocActive) {
       if (key.escape) {
         setOocActive(false);
@@ -178,32 +216,6 @@ export function PlayingPhase() {
         setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Exiting OOC Mode]" }, { kind: "dm", text: "" }]);
         return;
       }
-      if (oocBusy) return;
-
-      if (key.return && inputValue.trim()) {
-        const text = inputValue.trim();
-        setInputValue("");
-        setNarrativeLines((prev) => [...prev, { kind: "player", text: `> ${text}` }, { kind: "dm", text: "" }]);
-        if (clientRef.current && gameStateRef.current) {
-          const gs = gameStateRef.current;
-          setOocBusy(true);
-          enterOOC(clientRef.current, text, {
-            campaignName: gs.config.name,
-            previousVariant: previousVariantRef.current,
-          }, (delta) => {
-            setNarrativeLines((prev) => appendDelta(prev, delta, "dm"));
-          }).then((result) => {
-            setOocBusy(false);
-            setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }]);
-            costTracker.current.record(result.usage, getModel("medium"));
-          }).catch(() => {
-            setOocBusy(false);
-            setNarrativeLines((prev) => [...prev, { kind: "system", text: "[OOC error]" }, { kind: "dm", text: "" }]);
-          });
-        }
-        return;
-      }
-      handleTextKey(input, key);
       return;
     }
 
@@ -284,25 +296,6 @@ export function PlayingPhase() {
       narrativeRef.current?.scrollBy(key.pageUp ? -step : step);
       return;
     }
-    if (!inputValue && (input === "+" || input === "-")) {
-      const step = scrollAmount(rows);
-      narrativeRef.current?.scrollBy(input === "-" ? -step : step);
-      return;
-    }
-
-    // Text input
-    if (key.return && inputValue.trim()) {
-      const text = inputValue.trim();
-      setInputValue("");
-      if (engineRef.current && gameStateRef.current) {
-        const active = getActivePlayer(gameStateRef.current);
-        setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }, { kind: "player", text: `> ${active.characterName}: ${text}` }, { kind: "dm", text: "" }]);
-        engineRef.current.processInput(active.characterName, text);
-      }
-      return;
-    }
-
-    handleTextKey(input, key);
   });
 
   // --- Render ---
@@ -333,8 +326,10 @@ export function PlayingPhase() {
         variant={variant}
         narrativeLines={narrativeLines}
         modelineText={modelines[activeChar] ?? `${costTracker.current.formatTerse()} | ${campaignName}`}
-        inputValue={inputValue}
         activeCharacterName={activeChar}
+        inputIsDisabled={textInputDisabled}
+        inputResetKey={resetKey}
+        onInputSubmit={handleSubmit}
         players={players}
         activePlayerIndex={activePlayerIndex}
         campaignName={campaignName}

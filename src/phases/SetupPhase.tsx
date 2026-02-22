@@ -3,7 +3,6 @@ import { useInput, useStdout, Text, Box } from "ink";
 import Anthropic from "@anthropic-ai/sdk";
 import type { FrameStyle, NarrativeLine } from "../types/tui.js";
 import { appendDelta } from "../tui/narrative-helpers.js";
-import { useTextInput } from "../tui/hooks/useTextInput.js";
 import { Layout } from "../tui/layout.js";
 import { ChoiceModal } from "../tui/modals/index.js";
 import type { SetupStep, SetupResult } from "../agents/setup-agent.js";
@@ -33,9 +32,12 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
   // Conversational setup state
   const setupConvoRef = useRef<SetupConversation | null>(null);
   const [setupConvoLines, setSetupConvoLines] = useState<NarrativeLine[]>([]);
-  const [setupConvoInput, setSetupConvoInput] = useState("");
   const [setupConvoBusy, setSetupConvoBusy] = useState(false);
-  const { handleKey: handleTextKey } = useTextInput({ value: setupConvoInput, onChange: setSetupConvoInput, disabled: setupConvoBusy });
+  const [resetKey, setResetKey] = useState(0);
+
+  const clearInput = useCallback(() => {
+    setResetKey((k) => k + 1);
+  }, []);
 
   // Choice modal state (shared by both modes)
   const [activeModal, setActiveModal] = useState<ActiveChoiceModal | null>(null);
@@ -128,7 +130,7 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
       const convo = createSetupConversation(client);
       setupConvoRef.current = convo;
       setSetupConvoLines([]);
-      setSetupConvoInput("");
+      clearInput();
       setSetupConvoBusy(true);
 
       try {
@@ -152,15 +154,26 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
       setSetupPrompt(null);
       onComplete(result);
     }
-  }, [mode, setupStreamDelta, handleSetupTurnResult, onComplete, onError, onCancel]);
+  }, [mode, clearInput, setupStreamDelta, handleSetupTurnResult, onComplete, onError, onCancel]);
 
   // Start on first render
   React.useEffect(() => {
     startSetup();
   }, [startSetup]);
 
-  // --- Input handling ---
-  useInput((input, key) => {
+  // Whether TextInput should be disabled
+  const textInputDisabled = !!pendingResult || !!activeModal || setupConvoBusy || !setupConvoRef.current;
+
+  // --- Submit handler for TextInput ---
+  const handleSetupSubmit = useCallback((value: string) => {
+    if (!value.trim()) return;
+    const text = value.trim();
+    clearInput();
+    sendSetupMessage(text);
+  }, [clearInput, sendSetupMessage]);
+
+  // --- Input handling (modals, menus — TextInput handles text editing) ---
+  useInput((_input, key) => {
     // Waiting for ENTER after setup farewell
     if (pendingResult) {
       if (key.return) {
@@ -194,23 +207,14 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
         return;
       }
 
-      if (setupConvoBusy) return;
-
-      if (key.return && setupConvoInput.trim()) {
-        const text = setupConvoInput.trim();
-        setSetupConvoInput("");
-        sendSetupMessage(text);
-        return;
-      }
       if (key.escape) {
         setupConvoRef.current = null;
         setSetupConvoLines([]);
-        setSetupConvoInput("");
+        clearInput();
         setActiveModal(null);
         onCancel();
         return;
       }
-      handleTextKey(input, key);
       return;
     }
 
@@ -243,8 +247,8 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
           variant="exploration"
           narrativeLines={setupConvoLines}
           modelineText="Campaign Setup"
-          inputValue=""
           activeCharacterName="You"
+          inputIsDisabled
           players={[{ name: "Player", isAI: false }]}
           activePlayerIndex={0}
           campaignName="New Campaign"
@@ -270,8 +274,10 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
           variant="exploration"
           narrativeLines={setupConvoLines}
           modelineText="Campaign Setup"
-          inputValue={setupConvoInput}
           activeCharacterName="You"
+          inputIsDisabled={textInputDisabled}
+          inputResetKey={resetKey}
+          onInputSubmit={handleSetupSubmit}
           players={[{ name: "Player", isAI: false }]}
           activePlayerIndex={0}
           campaignName="New Campaign"
