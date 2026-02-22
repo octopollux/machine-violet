@@ -716,4 +716,26 @@ describe("parseTranscriptEntries", () => {
   it("handles empty transcript", () => {
     expect(parseTranscriptEntries("# Scene 1\n\n")).toEqual([]);
   });
+
+  it("detects entry prefixes after extra newlines (triple \\n)", () => {
+    // DM responses may end with trailing \n, which produces \n\n\n
+    // when joined by finalizeTranscript. The parser must still detect
+    // the next entry's prefix despite the leading whitespace.
+    const raw = [
+      "# Scene 1",
+      "",
+      "**DM:** Previous DM response.",
+      "",
+      "",
+      "**[Anderson]** Player input here.",
+      "",
+      "**DM:** Next DM response.",
+    ].join("\n");
+
+    const entries = parseTranscriptEntries(raw);
+    expect(entries).toHaveLength(3);
+    expect(entries[0]).toMatch(/^\*\*DM:\*\*/);
+    expect(entries[1]).toMatch(/^\*\*\[Anderson\]\*\*/);
+    expect(entries[2]).toMatch(/^\*\*DM:\*\*/);
+  });
 });

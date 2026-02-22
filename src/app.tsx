@@ -357,7 +357,17 @@ export default function App({ shutdownRef }: AppProps) {
           ? lastExchange.assistant.content
           : "[Resuming session...]";
 
-        setNarrativeLines([...transcriptLines, { kind: "system", text: `Welcome back to ${config.name}.` }, { kind: "dm", text: "" }, { kind: "dm", text: lastDMText }, { kind: "dm", text: "" }]);
+        // Process lastDMText the same way as transcript entries:
+        // split on \n\n for paragraph breaks, join \n with space
+        // so word-wrapping uses the terminal width, not LLM line breaks.
+        const lastDMLines: NarrativeLine[] = [];
+        for (const para of lastDMText.split("\n\n")) {
+          const joined = para.replace(/\n/g, " ");
+          lastDMLines.push({ kind: "dm", text: joined });
+          lastDMLines.push({ kind: "dm", text: "" });
+        }
+
+        setNarrativeLines([...transcriptLines, { kind: "system", text: `Welcome back to ${config.name}.` }, { kind: "dm", text: "" }, ...lastDMLines]);
         setPhase("playing");
       } else {
         setNarrativeLines([...transcriptLines, { kind: "system", text: `Welcome back to ${config.name}.` }, { kind: "dm", text: "" }]);

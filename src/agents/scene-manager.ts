@@ -657,12 +657,15 @@ export function parseTranscriptEntries(raw: string): string[] {
   const entries: string[] = [];
 
   for (const para of paragraphs) {
-    if (para.startsWith("# Scene")) continue;
-    if (entryPrefix.test(para) || entries.length === 0) {
-      entries.push(para);
+    // Trim leading whitespace so that extra \n from DM responses
+    // (which produce \n\n\n when joined) don't hide entry prefixes.
+    const trimmed = para.trimStart();
+    if (trimmed.startsWith("# Scene")) continue;
+    if (entryPrefix.test(trimmed) || entries.length === 0) {
+      entries.push(trimmed);
     } else {
       // Continuation paragraph — merge back into previous entry
-      entries[entries.length - 1] += "\n\n" + para;
+      entries[entries.length - 1] += "\n\n" + trimmed;
     }
   }
 
