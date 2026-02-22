@@ -652,13 +652,16 @@ describe("GameEngine Git Auto-Commit", () => {
       gitIO,
     });
 
-    // First exchange — should not trigger commit (1 < 2)
+    // First exchange — triggers lazy init commit only (1 < 2 interval)
     await engine.processInput("Aldric", "First action.");
-    expect(gitIO.commit).not.toHaveBeenCalled();
+    expect(gitIO.commit).toHaveBeenCalledTimes(1); // init commit
+    expect(gitIO.commit).toHaveBeenCalledWith(
+      expect.anything(), "auto: initial state", expect.anything(),
+    );
 
     // Second exchange — should trigger auto-commit (2 >= 2)
     await engine.processInput("Aldric", "Second action.");
-    expect(gitIO.commit).toHaveBeenCalled();
+    expect(gitIO.commit).toHaveBeenCalledTimes(2); // init + auto
   });
 
   it("no git errors when gitIO not provided", async () => {

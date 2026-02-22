@@ -160,12 +160,13 @@ describe("CampaignRepo", () => {
     await repo.characterCommit("Aldric", "level 3");
 
     const log = await repo.getLog();
-    expect(log).toHaveLength(5);
+    expect(log).toHaveLength(6); // 5 explicit + 1 auto-init
     expect(log[0].type).toBe("character");
     expect(log[1].type).toBe("checkpoint");
     expect(log[2].type).toBe("session");
     expect(log[3].type).toBe("scene");
     expect(log[4].type).toBe("auto");
+    expect(log[5].type).toBe("auto"); // auto: initial state
   });
 });
 

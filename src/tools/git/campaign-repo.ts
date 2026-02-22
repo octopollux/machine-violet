@@ -49,6 +49,8 @@ export class CampaignRepo {
   private exchangeCount = 0;
   private autoCommitInterval: number;
   private maxCommits: number;
+  private initialized = false;
+  private initPromise: Promise<void> | null = null;
 
   constructor(params: {
     dir: string;
@@ -71,6 +73,18 @@ export class CampaignRepo {
     // Initial commit with all existing files
     await this.stageAll();
     await this.commitIfDirty("auto: initial state");
+    this.initialized = true;
+  }
+
+  /** Ensure init() has been called. Safe to call multiple times. */
+  private async ensureInit(): Promise<void> {
+    if (this.initialized) return;
+    if (!this.initPromise) {
+      this.initPromise = this.init().finally(() => {
+        this.initPromise = null;
+      });
+    }
+    await this.initPromise;
   }
 
   /**
@@ -79,6 +93,7 @@ export class CampaignRepo {
    */
   async trackExchange(): Promise<string | null> {
     if (!this.enabled) return null;
+    await this.ensureInit();
     this.exchangeCount++;
     if (this.exchangeCount >= this.autoCommitInterval) {
       this.exchangeCount = 0;
@@ -90,6 +105,7 @@ export class CampaignRepo {
   /** Auto-commit with a standard message. */
   async autoCommit(message: string): Promise<string | null> {
     if (!this.enabled) return null;
+    await this.ensureInit();
     await this.stageAll();
     return this.commitIfDirty(message);
   }
@@ -97,6 +113,7 @@ export class CampaignRepo {
   /** Scene transition commit. */
   async sceneCommit(sceneTitle: string): Promise<string | null> {
     if (!this.enabled) return null;
+    await this.ensureInit();
     await this.stageAll();
     return this.commitIfDirty(`scene: ${sceneTitle}`);
   }
@@ -104,6 +121,7 @@ export class CampaignRepo {
   /** Session end commit. */
   async sessionCommit(sessionNum: number): Promise<string | null> {
     if (!this.enabled) return null;
+    await this.ensureInit();
     await this.stageAll();
     return this.commitIfDirty(`session: end session ${sessionNum}`);
   }
@@ -111,6 +129,7 @@ export class CampaignRepo {
   /** Pre-destructive operation checkpoint. */
   async checkpoint(label: string): Promise<string | null> {
     if (!this.enabled) return null;
+    await this.ensureInit();
     await this.stageAll();
     return this.commitIfDirty(`checkpoint: before ${label}`);
   }
@@ -118,6 +137,7 @@ export class CampaignRepo {
   /** Character change commit. */
   async characterCommit(characterName: string, change: string): Promise<string | null> {
     if (!this.enabled) return null;
+    await this.ensureInit();
     await this.stageAll();
     return this.commitIfDirty(`character: ${characterName} ${change}`);
   }
@@ -125,6 +145,7 @@ export class CampaignRepo {
   /** Get commit log with parsed types. */
   async getLog(depth = 50): Promise<CommitInfo[]> {
     if (!this.enabled) return [];
+    await this.ensureInit();
     const entries = await this.git.log(this.dir, depth);
     return entries.map((e) => ({
       oid: e.oid,
@@ -140,6 +161,7 @@ export class CampaignRepo {
    */
   async rollback(target: string): Promise<RollbackResult> {
     if (!this.enabled) throw new Error("Git is disabled.");
+    await this.ensureInit();
 
     // Safety checkpoint before rollback
     await this.stageAll();
@@ -167,6 +189,7 @@ export class CampaignRepo {
    */
   async pruneIfNeeded(): Promise<number> {
     if (!this.enabled) return 0;
+    await this.ensureInit();
     const log = await this.getLog(this.maxCommits + 100);
     if (log.length <= this.maxCommits) return 0;
 

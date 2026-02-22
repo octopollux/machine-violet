@@ -34,7 +34,9 @@
       "Bash(R:/tui-rpg/node_modules/.bin/tsc:*)",
       "Bash(cat:*)",
       "Bash(xargs:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(npm uninstall:*)"
     ]
   }
 }
