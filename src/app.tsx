@@ -336,8 +336,15 @@ export default function App({ shutdownRef }: AppProps) {
 
       const transcriptLines: NarrativeLine[] = [];
       for (const block of scene.transcript) {
-        for (const line of block.split("\n")) {
-          transcriptLines.push({ kind: "dm", text: markdownToTags(line) });
+        const blockLines = block.split("\n");
+        for (let bi = 0; bi < blockLines.length; bi++) {
+          // Match appendDelta behavior: insert blank between consecutive
+          // non-empty lines so restored text has the same paragraph spacing
+          // as streamed text.
+          if (bi > 0 && blockLines[bi - 1] !== "" && blockLines[bi] !== "") {
+            transcriptLines.push({ kind: "dm", text: "" });
+          }
+          transcriptLines.push({ kind: "dm", text: markdownToTags(blockLines[bi]) });
         }
         transcriptLines.push({ kind: "dm", text: "" });
       }

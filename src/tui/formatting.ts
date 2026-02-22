@@ -145,26 +145,31 @@ export function wrapNodes(nodes: FormattingNode[], width: number): FormattingNod
 /**
  * Flatten a FormattingNode[] into word tokens, splitting text at spaces.
  * Each word token carries structurally well-formed node fragments.
+ * Returns true if the last text ended with a space (trailing word break).
  */
 function flattenToWords(
   nodes: FormattingNode[],
   words: { nodes: FormattingNode[]; visible: number }[],
-): void {
+): boolean {
+  let wordBreak = false;
+
   for (const node of nodes) {
     if (typeof node === "string") {
       // Split text node at spaces into words
       const parts = node.split(/ /);
+      wordBreak = false;
       for (let i = 0; i < parts.length; i++) {
         const part = parts[i];
         if (i > 0) {
-          // Space boundary — we've consumed a space, so this starts a new word
-          // If part is empty (multiple spaces), just skip
+          // Space boundary — we've consumed a space
+          wordBreak = true;
           if (part === "") continue;
           words.push({ nodes: [part], visible: part.length });
+          wordBreak = false;
         } else {
           // First part — append to current word-in-progress or start new
-          if (part === "") continue;
-          if (words.length > 0) {
+          if (part === "") { wordBreak = true; continue; }
+          if (words.length > 0 && !wordBreak) {
             // Append to previous word (continuation across tag boundaries)
             const prev = words[words.length - 1];
             prev.nodes.push(part);
@@ -172,32 +177,34 @@ function flattenToWords(
           } else {
             words.push({ nodes: [part], visible: part.length });
           }
+          wordBreak = false;
         }
       }
     } else {
       // Tag node — recurse into children, wrapping fragments in the same tag type
       const childWords: { nodes: FormattingNode[]; visible: number }[] = [];
-      flattenToWords(node.content, childWords);
+      const childBreak = flattenToWords(node.content, childWords);
 
       for (let i = 0; i < childWords.length; i++) {
         const cw = childWords[i];
         // Wrap each child word fragment in a copy of this tag
         const wrapped: FormattingTag = { ...node, content: cw.nodes } as FormattingTag;
 
-        if (i === 0 && words.length > 0) {
+        if (i === 0 && words.length > 0 && !wordBreak) {
           // First fragment continues the previous word
           const prev = words[words.length - 1];
           prev.nodes.push(wrapped);
           prev.visible += cw.visible;
-        } else if (i === 0) {
-          words.push({ nodes: [wrapped], visible: cw.visible });
         } else {
-          // Subsequent fragments are new words (they were separated by spaces)
           words.push({ nodes: [wrapped], visible: cw.visible });
         }
       }
+      // Propagate trailing word break from child content
+      wordBreak = childBreak;
     }
   }
+
+  return wordBreak;
 }
 
 /**

@@ -380,6 +380,30 @@ describe("wrapNodes", () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual([]);
   });
+
+  it("preserves space before tag node", () => {
+    // "text <i>d</i> more" — space between "text" and italic must not be eaten
+    const nodes = parseFormatting("text <i>d</i> more");
+    const result = wrapNodes(nodes, 80);
+    expect(result).toHaveLength(1);
+    expect(toPlainText(result[0])).toBe("text d more");
+  });
+
+  it("preserves space after tag node with trailing space in content", () => {
+    // {italic: ["hello "]} followed by "world" — space inside tag before sibling
+    const nodes = parseFormatting("<i>hello </i>world");
+    const result = wrapNodes(nodes, 80);
+    expect(result).toHaveLength(1);
+    expect(toPlainText(result[0])).toBe("hello world");
+  });
+
+  it("does not insert space where none exists at tag boundary", () => {
+    // "c<i>d</i> e" — no space between c and italic d
+    const nodes = parseFormatting("c<i>d</i> e");
+    const result = wrapNodes(nodes, 80);
+    expect(result).toHaveLength(1);
+    expect(toPlainText(result[0])).toBe("cd e");
+  });
 });
 
 describe("processNarrativeLines", () => {
