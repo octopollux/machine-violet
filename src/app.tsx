@@ -335,18 +335,18 @@ export default function App({ shutdownRef }: AppProps) {
       const recap = await engine.resumeSession();
 
       const transcriptLines: NarrativeLine[] = [];
-      for (const block of scene.transcript) {
-        const blockLines = block.split("\n");
-        for (let bi = 0; bi < blockLines.length; bi++) {
-          // Match appendDelta behavior: insert blank between consecutive
-          // non-empty lines so restored text has the same paragraph spacing
-          // as streamed text.
-          if (bi > 0 && blockLines[bi - 1] !== "" && blockLines[bi] !== "") {
-            transcriptLines.push({ kind: "dm", text: "" });
-          }
-          transcriptLines.push({ kind: "dm", text: markdownToTags(blockLines[bi]) });
+      for (const entry of scene.transcript) {
+        // Each entry is a complete transcript record (DM response, player
+        // input, or tool result). DM responses may contain \n\n paragraph
+        // breaks — split on those for visual separation. Within each
+        // paragraph, \n is a soft wrap from the LLM and gets joined with
+        // a space so word-wrapping uses the actual terminal width.
+        const paragraphs = entry.split("\n\n");
+        for (const para of paragraphs) {
+          const joined = para.replace(/\n/g, " ");
+          transcriptLines.push({ kind: "dm", text: markdownToTags(joined) });
+          transcriptLines.push({ kind: "dm", text: "" });
         }
-        transcriptLines.push({ kind: "dm", text: "" });
       }
 
       if (loaded.conversation && loaded.conversation.length > 0) {

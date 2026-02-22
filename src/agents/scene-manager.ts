@@ -628,8 +628,7 @@ export async function detectSceneState(campaignRoot: string, io: FileIO): Promis
     try {
       const tPath = paths.sceneTranscript(maxScene, lastSlug);
       const raw = await io.readFile(tPath);
-      const blocks = raw.split("\n\n").filter((b) => b.trim().length > 0);
-      transcript = blocks.filter((b) => !b.startsWith("# Scene"));
+      transcript = parseTranscriptEntries(raw);
     } catch { /* no transcript yet */ }
   }
 
@@ -644,6 +643,31 @@ export async function detectSceneState(campaignRoot: string, io: FileIO): Promis
 }
 
 // --- Helpers ---
+
+/**
+ * Parse a transcript.md file into the original entry array.
+ * Entries start with known prefixes (**[, **DM:**, > `). Paragraphs
+ * without a prefix are continuation of the previous entry (DM responses
+ * can contain \n\n paragraph breaks). This is the inverse of the
+ * join("\n\n") used in finalizeTranscript.
+ */
+export function parseTranscriptEntries(raw: string): string[] {
+  const entryPrefix = /^(\*\*\[|\*\*DM:\*\*|> `)/;
+  const paragraphs = raw.split("\n\n").filter((b) => b.trim().length > 0);
+  const entries: string[] = [];
+
+  for (const para of paragraphs) {
+    if (para.startsWith("# Scene")) continue;
+    if (entryPrefix.test(para) || entries.length === 0) {
+      entries.push(para);
+    } else {
+      // Continuation paragraph — merge back into previous entry
+      entries[entries.length - 1] += "\n\n" + para;
+    }
+  }
+
+  return entries;
+}
 
 function parseChangelogEntries(text: string): string[] {
   return text.split("\n").filter((line) => line.includes(":")).map((line) => line.trim());

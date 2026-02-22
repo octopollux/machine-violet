@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
-import { SceneManager } from "./scene-manager.js";
+import { SceneManager, parseTranscriptEntries } from "./scene-manager.js";
 import type { SceneState, FileIO } from "./scene-manager.js";
 import type { CampaignRepo } from "../tools/git/index.js";
 import type { GameState } from "./game-state.js";
@@ -670,5 +670,50 @@ describe("SceneManager", () => {
     const lastCall = pendingOpCalls[pendingOpCalls.length - 1];
     expect(lastCall[1]).not.toBe("");
     expect(lastCall[1]).toContain("campaign_log");
+  });
+});
+
+describe("parseTranscriptEntries", () => {
+  it("parses simple transcript entries", () => {
+    const raw = `# Scene 1\n\n**[Aldric]** I enter the tavern.\n\n**DM:** The tavern is warm.`;
+    const entries = parseTranscriptEntries(raw);
+    expect(entries).toEqual([
+      "**[Aldric]** I enter the tavern.",
+      "**DM:** The tavern is warm.",
+    ]);
+  });
+
+  it("merges multi-paragraph DM responses", () => {
+    const raw = [
+      "# Scene 1",
+      "**DM:** Paragraph one.",
+      "Paragraph two.",
+      "Paragraph three.",
+      "**[Aldric]** I attack.",
+    ].join("\n\n");
+    const entries = parseTranscriptEntries(raw);
+    expect(entries).toEqual([
+      "**DM:** Paragraph one.\n\nParagraph two.\n\nParagraph three.",
+      "**[Aldric]** I attack.",
+    ]);
+  });
+
+  it("handles tool results", () => {
+    const raw = [
+      "# Scene 1",
+      "**DM:** The blade gleams.",
+      "> `roll_dice`: 1d20+5: [18]→23",
+      "**DM:** You strike true!",
+    ].join("\n\n");
+    const entries = parseTranscriptEntries(raw);
+    expect(entries).toEqual([
+      "**DM:** The blade gleams.",
+      "> `roll_dice`: 1d20+5: [18]→23",
+      "**DM:** You strike true!",
+    ]);
+  });
+
+  it("handles empty transcript", () => {
+    expect(parseTranscriptEntries("# Scene 1\n\n")).toEqual([]);
   });
 });
