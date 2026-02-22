@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Text, Box } from "ink";
+import { Text, Box, useInput } from "ink";
 import Anthropic from "@anthropic-ai/sdk";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { readFile, writeFile, appendFile, mkdir, readdir, stat } from "node:fs/promises";
@@ -7,12 +7,13 @@ import { join, dirname } from "node:path";
 
 import { STYLES, getStyle } from "./tui/frames/index.js";
 import { markdownToTags } from "./tui/formatting.js";
-import type { FrameStyle, StyleVariant } from "./types/tui.js";
+import type { FrameStyle, StyleVariant, NarrativeLine, ActiveModal } from "./types/tui.js";
 import type { FileIO, SceneState } from "./agents/scene-manager.js";
 import { detectSceneState } from "./agents/scene-manager.js";
 import { GameEngine } from "./agents/game-engine.js";
 import type { GameState } from "./agents/game-state.js";
 import type { DMSessionState } from "./agents/dm-prompt.js";
+import { buildUIState } from "./agents/dm-prompt.js";
 import type { CampaignConfig } from "./types/config.js";
 import { buildEnvContent, buildAppConfig, getDefaultHomeDir } from "./config/first-launch.js";
 import { listCampaigns } from "./config/main-menu.js";
@@ -32,21 +33,16 @@ import { createGitIO } from "./tools/git/isogit-adapter.js";
 import { useGameCallbacks } from "./tui/hooks/useGameCallbacks.js";
 import { useRawModeGuardian } from "./tui/hooks/useRawModeGuardian.js";
 import { isDevMode, wrapFileIOWithDevLog } from "./config/dev-mode.js";
+import { setContextDumpDir } from "./config/context-dump.js";
 
 import { FirstLaunchPhase } from "./phases/FirstLaunchPhase.js";
 import { MainMenuPhase } from "./phases/MainMenuPhase.js";
 import { SetupPhase } from "./phases/SetupPhase.js";
 import { PlayingPhase } from "./phases/PlayingPhase.js";
+import { GameProvider } from "./tui/game-context.js";
+import type { GameContextValue } from "./tui/game-context.js";
 
 // --- Types ---
-
-export type ActiveModal =
-  | { kind: "choice"; prompt: string; choices: string[] }
-  | { kind: "dice"; expression: string; rolls: number[]; kept?: number[]; total: number; reason?: string }
-  | { kind: "character_sheet"; content: string }
-  | { kind: "recap"; lines: string[] }
-  | { kind: "pause"; message?: string }
-  | null;
 
 export type AppPhase =
   | "loading"
@@ -99,7 +95,7 @@ export interface AppProps {
 export default function App({ shutdownRef }: AppProps) {
   // --- Core state ---
   const [phase, setPhase] = useState<AppPhase>("loading");
-  const [narrativeLines, setNarrativeLines] = useState<string[]>([]);
+  const [narrativeLines, setNarrativeLines] = useState<NarrativeLine[]>([]);
   const [engineState, setEngineState] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -131,7 +127,7 @@ export default function App({ shutdownRef }: AppProps) {
 
   // --- Display state ---
   const [resources, setResources] = useState<string[]>([]);
-  const [modelineOverride, setModelineOverride] = useState<string | null>(null);
+  const [modelines, setModelines] = useState<Record<string, string>>({});
   const [campaignName, setCampaignName] = useState("");
   const [activePlayerIndex, setActivePlayerIndex] = useState(0);
   const [style, setStyle] = useState<FrameStyle>(STYLES[0]);
@@ -142,11 +138,23 @@ export default function App({ shutdownRef }: AppProps) {
   // Auto-sync variantRef (needed by dispatchTuiCommand's enter_ooc to save previous variant)
   useEffect(() => { variantRef.current = variant; }, [variant]);
 
-  // Persist UI when style/variant change (skip during resume hydration)
+  // Persist UI when style/variant/modelines change (skip during resume hydration)
   useEffect(() => {
     if (!hydratedRef.current) return;
-    persisterRef.current?.persistUI({ styleName: style.name, variant });
-  }, [style, variant]);
+    persisterRef.current?.persistUI({
+      styleName: style.name,
+      variant,
+      modelines: Object.keys(modelines).length > 0 ? modelines : undefined,
+    });
+  }, [style, variant, modelines]);
+
+  // Sync UI state to engine for DM prefix
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.setUIState(buildUIState({ modelines, styleName: style.name, variant }));
+  }, [modelines, style, variant]);
 
   // --- Setup mode tracking ---
   const [setupMode, setSetupMode] = useState<"fast" | "full">("full");
@@ -209,12 +217,19 @@ export default function App({ shutdownRef }: AppProps) {
     };
   }, []);
 
+  // --- Raw mode: keep Ink's stdin listener alive across phase transitions ---
+  // Without this, Ink removes its `readable` listener and calls `stdin.unref()`
+  // whenever rawModeEnabledCount drops to 0 (i.e. between SetupPhase unmounting
+  // and PlayingPhase mounting). This permanent hook keeps the count >= 1.
+  const stableNoOp = useCallback(() => {}, []);
+  useInput(stableNoOp, { isActive: phase !== "loading" && phase !== "shutting_down" });
+
   // --- Raw mode guardian: re-enable raw mode if OS/terminal disabled it (e.g. window blur) ---
   useRawModeGuardian({ enabled: phase !== "loading" && phase !== "shutting_down" });
 
   // --- Engine callbacks (extracted hook) ---
   const { buildCallbacks, dispatchTuiCommand } = useGameCallbacks({
-    setNarrativeLines, setEngineState, setErrorMsg, setModelineOverride,
+    setNarrativeLines, setEngineState, setErrorMsg, setModelines,
     setResources, setStyle, setVariant, setActiveModal, setChoiceIndex,
     setOocActive,
     gameStateRef, clientRef, activeModalRef, variantRef, previousVariantRef,
@@ -236,8 +251,22 @@ export default function App({ shutdownRef }: AppProps) {
 
     // Wrap FileIO with dev logging when dev mode is active
     const engineFileIO = isDevMode()
-      ? wrapFileIOWithDevLog(fileIO.current, (msg) => setNarrativeLines((prev) => [...prev, msg]))
+      ? wrapFileIOWithDevLog(fileIO.current, (msg) => setNarrativeLines((prev) => [...prev, { kind: "dev", text: msg }]))
       : fileIO.current;
+
+    // Set up context dump directory when dev mode is active
+    if (isDevMode()) {
+      setContextDumpDir(join(campaignRoot, ".dev-mode", "campaigns", "context"));
+      // Ensure .dev-mode is excluded from isomorphic-git snapshots
+      const gitignorePath = join(campaignRoot, ".gitignore");
+      void readFile(gitignorePath, "utf-8")
+        .then((content) => {
+          if (!content.includes(".dev-mode")) {
+            return appendFile(gitignorePath, "\n.dev-mode/\n", "utf-8");
+          }
+        })
+        .catch(() => writeFile(gitignorePath, ".dev-mode/\n", "utf-8"));
+    }
 
     const gitIO = config.recovery.enable_git ? createGitIO() : undefined;
 
@@ -293,6 +322,7 @@ export default function App({ shutdownRef }: AppProps) {
         const restoredStyle = getStyle(loaded.ui.styleName);
         if (restoredStyle) setStyle(restoredStyle);
         setVariant(loaded.ui.variant);
+        if (loaded.ui.modelines) setModelines(loaded.ui.modelines);
       }
       hydratedRef.current = true;
 
@@ -304,12 +334,12 @@ export default function App({ shutdownRef }: AppProps) {
 
       const recap = await engine.resumeSession();
 
-      const transcriptLines: string[] = [];
+      const transcriptLines: NarrativeLine[] = [];
       for (const block of scene.transcript) {
         for (const line of block.split("\n")) {
-          transcriptLines.push(markdownToTags(line));
+          transcriptLines.push({ kind: "dm", text: markdownToTags(line) });
         }
-        transcriptLines.push("");
+        transcriptLines.push({ kind: "dm", text: "" });
       }
 
       if (loaded.conversation && loaded.conversation.length > 0) {
@@ -320,10 +350,10 @@ export default function App({ shutdownRef }: AppProps) {
           ? lastExchange.assistant.content
           : "[Resuming session...]";
 
-        setNarrativeLines([...transcriptLines, `Welcome back to ${config.name}.`, "", lastDMText, ""]);
+        setNarrativeLines([...transcriptLines, { kind: "system", text: `Welcome back to ${config.name}.` }, { kind: "dm", text: "" }, { kind: "dm", text: lastDMText }, { kind: "dm", text: "" }]);
         setPhase("playing");
       } else {
-        setNarrativeLines([...transcriptLines, `Welcome back to ${config.name}.`, ""]);
+        setNarrativeLines([...transcriptLines, { kind: "system", text: `Welcome back to ${config.name}.` }, { kind: "dm", text: "" }]);
         if (recap) {
           setActiveModal({ kind: "recap", lines: recap.split("\n") });
         }
@@ -336,11 +366,11 @@ export default function App({ shutdownRef }: AppProps) {
         if (pc) resumeParts.push(`The player character is ${pc.character}.`);
         if (recap) resumeParts.push(`Last session recap: ${recap}`);
         resumeParts.push("Pick up naturally from the last scene — do NOT restart or re-introduce the setting.");
-        await engine.processInput(activePlayer.characterName, resumeParts.join(" ") + "]");
+        await engine.processInput(activePlayer.characterName, resumeParts.join(" ") + "]", { skipTranscript: true });
       }
     } else {
       hydratedRef.current = true;
-      setNarrativeLines([`Welcome to ${config.name}.`, "", "The story begins..."]);
+      setNarrativeLines([{ kind: "system", text: `Welcome to ${config.name}.` }, { kind: "dm", text: "" }, { kind: "system", text: "The story begins..." }]);
       setPhase("playing");
 
       const activePlayer = getActivePlayer(gs);
@@ -348,14 +378,14 @@ export default function App({ shutdownRef }: AppProps) {
       if (config.premise) openingParts.push(`Campaign premise: ${config.premise}`);
       const pc = config.players[0];
       if (pc) openingParts.push(`The player character is ${pc.character}.`);
-      await engine.processInput(activePlayer.characterName, openingParts.join(" ") + "]");
+      await engine.processInput(activePlayer.characterName, openingParts.join(" ") + "]", { skipTranscript: true });
     }
   }, [buildGameState, buildCallbacks, shutdownRef]);
 
   // --- Finalize setup result into a running campaign ---
   const finalizeSetup = useCallback(async (result: SetupResult) => {
     setPhase("building");
-    setNarrativeLines(["Building your world..."]);
+    setNarrativeLines([{ kind: "system", text: "Building your world..." }]);
 
     try {
       const configPath = getConfigPath();
@@ -380,7 +410,7 @@ export default function App({ shutdownRef }: AppProps) {
   // --- Resume a campaign ---
   const resumeCampaign = useCallback(async (entry: CampaignEntry) => {
     setPhase("building");
-    setNarrativeLines(["Loading campaign..."]);
+    setNarrativeLines([{ kind: "system", text: "Loading campaign..." }]);
 
     try {
       const configRaw = await readFile(join(entry.path, "config.json"), "utf-8");
@@ -392,10 +422,26 @@ export default function App({ shutdownRef }: AppProps) {
     }
   }, [startEngine]);
 
-  // --- Shutdown ---
-  const doShutdown = useCallback(async () => {
+  // --- Save & Exit: persist state without session-end housekeeping ---
+  const doSaveAndExit = useCallback(async () => {
     setPhase("shutting_down");
-    setNarrativeLines(["Saving and shutting down..."]);
+    setNarrativeLines([{ kind: "system", text: "Saving and exiting..." }]);
+
+    await gracefulShutdown({
+      engine: engineRef.current ?? undefined,
+      campaignRoot: gameStateRef.current?.campaignRoot,
+      fileIO: fileIO.current,
+      gitEnabled: gameStateRef.current?.config.recovery.enable_git,
+      gitIO: shutdownRef?.current?.gitIO,
+    });
+
+    process.exit(0);
+  }, [shutdownRef]);
+
+  // --- End Session: full session-end housekeeping then exit ---
+  const doEndSession = useCallback(async () => {
+    setPhase("shutting_down");
+    setNarrativeLines([{ kind: "system", text: "Ending session..." }]);
 
     // Run session-end housekeeping (precis, campaign log, changelog, calendar)
     if (engineRef.current) {
@@ -490,35 +536,25 @@ export default function App({ shutdownRef }: AppProps) {
   }
 
   // --- Playing ---
+  const gameContext: GameContextValue = {
+    engineRef, gameStateRef, clientRef, costTracker,
+    narrativeLines, setNarrativeLines,
+    style, variant, setVariant,
+    campaignName, activePlayerIndex, setActivePlayerIndex,
+    engineState, resources, modelines,
+    activeModal, setActiveModal,
+    choiceIndex, setChoiceIndex,
+    oocActive, setOocActive, previousVariantRef,
+    devModeEnabled: isDevMode(),
+    devActive, setDevActive,
+    dispatchTuiCommand,
+    onShutdown: doSaveAndExit,
+    onEndSession: doEndSession,
+  };
+
   return (
-    <PlayingPhase
-      engineRef={engineRef}
-      gameStateRef={gameStateRef}
-      clientRef={clientRef}
-      costTracker={costTracker}
-      narrativeLines={narrativeLines}
-      setNarrativeLines={setNarrativeLines}
-      style={style}
-      variant={variant}
-      setVariant={setVariant}
-      campaignName={campaignName}
-      activePlayerIndex={activePlayerIndex}
-      setActivePlayerIndex={setActivePlayerIndex}
-      engineState={engineState}
-      resources={resources}
-      modelineOverride={modelineOverride}
-      activeModal={activeModal}
-      setActiveModal={setActiveModal}
-      choiceIndex={choiceIndex}
-      setChoiceIndex={setChoiceIndex}
-      oocActive={oocActive}
-      setOocActive={setOocActive}
-      previousVariantRef={previousVariantRef}
-      devModeEnabled={isDevMode()}
-      devActive={devActive}
-      setDevActive={setDevActive}
-      dispatchTuiCommand={dispatchTuiCommand}
-      onShutdown={doShutdown}
-    />
+    <GameProvider value={gameContext}>
+      <PlayingPhase />
+    </GameProvider>
   );
 }

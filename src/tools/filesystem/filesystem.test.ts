@@ -310,18 +310,18 @@ describe("defaultCampaignRoot", () => {
   it("returns Documents path for Windows", () => {
     const root = defaultCampaignRoot("win32");
     expect(root).toContain("Documents");
-    expect(root).toContain("tui-rpg");
+    expect(root).toContain(".tui-rpg");
   });
 
   it("returns Documents path for macOS", () => {
     const root = defaultCampaignRoot("darwin");
     expect(root).toContain("Documents");
-    expect(root).toContain("tui-rpg");
+    expect(root).toContain(".tui-rpg");
   });
 
   it("returns XDG or .local/share for Linux", () => {
     const root = norm(defaultCampaignRoot("linux"));
-    expect(root).toContain("tui-rpg");
+    expect(root).toContain(".tui-rpg");
     // Should be either XDG_DATA_HOME or .local/share
     const xdg = process.env["XDG_DATA_HOME"];
     const hasXdg = xdg ? root.includes(norm(xdg)) : false;

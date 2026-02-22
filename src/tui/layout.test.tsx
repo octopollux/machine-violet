@@ -11,8 +11,8 @@ const baseProps = {
   style,
   variant: "exploration" as const,
   narrativeLines: [
-    "The door groans open onto a long hall.",
-    "A figure sits motionless in a high-backed chair.",
+    { kind: "dm" as const, text: "The door groans open onto a long hall." },
+    { kind: "dm" as const, text: "A figure sits motionless in a high-backed chair." },
   ],
   modelineText: "HP: 42/42 | Loc: The Shattered Hall",
   inputValue: "",

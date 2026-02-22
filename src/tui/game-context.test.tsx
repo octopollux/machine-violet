@@ -1,0 +1,83 @@
+import React from "react";
+import { Text } from "ink";
+import { describe, it, expect, vi } from "vitest";
+import { render } from "ink-testing-library";
+import { GameProvider, useGameContext } from "./game-context.js";
+import type { GameContextValue } from "./game-context.js";
+
+/** Builds a minimal GameContextValue for tests. Override any field via `overrides`. */
+export function makeTestContext(overrides: Partial<GameContextValue> = {}): GameContextValue {
+  return {
+    engineRef: { current: null },
+    gameStateRef: { current: null },
+    clientRef: { current: null },
+    costTracker: { current: { formatTerse: () => "$0.00", record: vi.fn() } as never },
+    narrativeLines: [],
+    setNarrativeLines: vi.fn(),
+    style: { name: "default", genre_tags: [], variants: {} } as never,
+    variant: "exploration",
+    setVariant: vi.fn(),
+    campaignName: "Test Campaign",
+    activePlayerIndex: 0,
+    setActivePlayerIndex: vi.fn(),
+    engineState: null,
+    resources: [],
+    modelines: {},
+    activeModal: null,
+    setActiveModal: vi.fn(),
+    choiceIndex: 0,
+    setChoiceIndex: vi.fn(),
+    oocActive: false,
+    setOocActive: vi.fn(),
+    previousVariantRef: { current: "exploration" },
+    devModeEnabled: false,
+    devActive: false,
+    setDevActive: vi.fn(),
+    dispatchTuiCommand: vi.fn(),
+    onShutdown: vi.fn(),
+    onEndSession: vi.fn(),
+    ...overrides,
+  };
+}
+
+/** Test component that renders a field from context. */
+function ShowCampaign() {
+  const { campaignName } = useGameContext();
+  return <Text>{campaignName}</Text>;
+}
+
+describe("GameContext", () => {
+  it("returns context value when inside provider", () => {
+    const ctx = makeTestContext({ campaignName: "My Quest" });
+    const { lastFrame } = render(
+      <GameProvider value={ctx}>
+        <ShowCampaign />
+      </GameProvider>,
+    );
+    expect(lastFrame()).toContain("My Quest");
+  });
+
+  it("throws when used outside provider", () => {
+    // Ink's render catches the throw internally, so we capture via an error boundary
+    let caught: Error | null = null;
+
+    function Bomb() {
+      useGameContext(); // should throw
+      return <Text>should not render</Text>;
+    }
+
+    class Catcher extends React.Component<{ children: React.ReactNode }, { error: boolean }> {
+      state = { error: false };
+      static getDerivedStateFromError() { return { error: true }; }
+      componentDidCatch(err: Error) { caught = err; }
+      render() { return this.state.error ? null : this.props.children; }
+    }
+
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(<Catcher><Bomb /></Catcher>);
+    spy.mockRestore();
+
+    expect(caught).not.toBeNull();
+    expect(caught!.message).toContain("useGameContext must be used within a <GameProvider>");
+  });
+});

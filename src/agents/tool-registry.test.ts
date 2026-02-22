@@ -131,13 +131,24 @@ describe("ToolRegistry", () => {
     expect(state.combat.active).toBe(false);
   });
 
-  it("returns TUI commands as JSON", () => {
+  it("returns TUI commands as JSON (update_modeline defaults character)", () => {
     const reg = new ToolRegistry();
     const state = mockState();
     const result = reg.dispatch(state, "update_modeline", { text: "HP: 42/42" });
     const parsed = JSON.parse(result.content);
     expect(parsed.type).toBe("update_modeline");
     expect(parsed.text).toBe("HP: 42/42");
+    expect(parsed.character).toBe("Aldric");
+  });
+
+  it("update_modeline uses explicit character param", () => {
+    const reg = new ToolRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "update_modeline", { text: "HP: 30/30", character: "Rook" });
+    const parsed = JSON.parse(result.content);
+    expect(parsed.type).toBe("update_modeline");
+    expect(parsed.text).toBe("HP: 30/30");
+    expect(parsed.character).toBe("Rook");
   });
 
   it("returns error for unknown tool", () => {
@@ -318,25 +329,6 @@ describe("ToolRegistry", () => {
     expect(parsed.type).toBe("scene_transition");
     expect(parsed.title).toBe("The Dark Forest");
     expect(parsed.time_advance).toBe(60);
-  });
-
-  it("dispatches pause_for_effect and returns TuiCommand JSON", () => {
-    const reg = new ToolRegistry();
-    const state = mockState();
-    const result = reg.dispatch(state, "pause_for_effect", { message: "The journey begins..." });
-    expect(result.is_error).toBeUndefined();
-    const parsed = JSON.parse(result.content);
-    expect(parsed.type).toBe("pause_for_effect");
-    expect(parsed.message).toBe("The journey begins...");
-  });
-
-  it("dispatches pause_for_effect without message", () => {
-    const reg = new ToolRegistry();
-    const state = mockState();
-    const result = reg.dispatch(state, "pause_for_effect", {});
-    expect(result.is_error).toBeUndefined();
-    const parsed = JSON.parse(result.content);
-    expect(parsed.type).toBe("pause_for_effect");
   });
 
   it("dispatches session_end and returns TuiCommand JSON", () => {

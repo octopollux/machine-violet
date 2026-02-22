@@ -7,7 +7,7 @@ Ink (React for CLI) + Anthropic Claude SDK + TypeScript.
 
 ```bash
 npm install
-npx vitest run          # 491 tests
+npx vitest run          # tests
 npx eslint src/         # lint
 npx tsx src/index.tsx    # launch (needs ANTHROPIC_API_KEY in .env)
 ```
@@ -15,63 +15,82 @@ npx tsx src/index.tsx    # launch (needs ANTHROPIC_API_KEY in .env)
 ## Architecture
 
 - **Single Ink process** — no frontend/backend split. DM tools manipulate UI directly.
-- **Filesystem IS the database** — markdown + JSON entities, wikilinked, campaign transcript is the knowledge backbone.
-- **isomorphic-git** for state snapshots (no system git dependency).
-- **Context window is aggressively managed**: small conversation window (3-5 exchanges), cached prefix for stable knowledge, scene precis for continuity.
+- **Filesystem IS the database** — markdown + JSON entities, wikilinked. The campaign transcript is the knowledge backbone; the DM rediscovers things by following wikilinks, not by re-reading its own context.
+- **Conversation is ephemeral** — kept to 3-5 exchanges, then dropped and compressed into a scene precis in the cached prefix. Tools return minimum viable information. Delegation to cheap subagents is how you avoid bloating DM context.
+- **isomorphic-git** for state snapshots (no system git dependency). Auto-commits happen every N exchanges and at scene/session boundaries.
+- **Scene transitions** are idempotent cascades (transcript → summarize → changelog → alarms → context refresh → clear conversation). Each step is safe to re-run; pending operations tracked in `state/pending-operation.json`.
 
 ### Execution Tiers
 
 | Tier | Production Model | Used For |
 |------|-----------------|----------|
 | `large` | Opus | DM narration |
-| `medium` | Sonnet | OOC mode, AI players (sonnet tier) |
-| `small` | Haiku | Summarizer, precis, changelog, choices, resolve, promotion |
+| `medium` | Sonnet | OOC mode, AI players |
+| `small` | Haiku | All mechanical subagents (summarizer, precis, changelog, choices, resolve, promotion) |
 
 Configured in `src/config/models.ts`. Override with `dev-config.json` (gitignored):
 ```json
 { "models": { "large": "claude-sonnet-4-5-20250929" } }
 ```
-
-## Source Layout
-
-```
-src/
-  agents/           # Agent loop, game engine, DM prompt, scene manager, setup, player manager
-    subagents/      # 8 subagent patterns: summarizer, precis, changelog, choices, resolve, promotion, ooc, ai-player
-  config/           # First launch, main menu, model tiers, personalities, seeds
-  context/          # Conversation manager, cost tracker
-  tools/            # T1 tool implementations (dice, cards, maps, clocks, combat, filesystem, git, validation)
-  tui/              # Ink components: layout, frames, formatting, modals, responsive, activity
-  types/            # Shared type definitions (config, tui, dice, etc.)
-  app.tsx            # Root Ink component — app state machine (7 phases)
-  index.tsx          # Entry point — signal handlers, Ink render
-  shutdown.ts        # Graceful shutdown (flush transcript, git commit)
-```
+Model config is cached after first load; tests must call `loadModelConfig({ reset: true })`.
 
 ## Design Docs
 
 All in `design-docs/`. Start with `overview.md` — it links to everything else.
-
-Key docs: `tools-catalog.md` (37 tools), `subagents-catalog.md` (14 patterns), `development-plan.md` (10-phase roadmap), `tui-design.md` (layout/frames/modals), `dm-prompt.md` (system prompt engineering).
+Key docs: `tools-catalog.md`, `subagents-catalog.md`, `development-plan.md`, `tui-design.md`, `dm-prompt.md`, `context-management.md`, `entity-filesystem.md`.
 
 ## Conventions
 
-- **No globals.** All T1 tools take explicit state objects (DecksState, ClocksState, CombatState, MapData).
+### TypeScript & Modules
+- `target: ES2022`, `module: nodenext`, `jsx: react-jsx`, `strict: true`. No path aliases.
+- **All imports end with `.js`** (ES module resolution requires it).
+- Barrel `index.ts` files exist in many directories — check before reaching into subdirectories.
+- ESLint flat config (`eslint.config.js`); unused params prefixed with `_` are allowed.
+
+### State & I/O
+- **No globals.** All tool handlers take explicit state objects (`GameState`, `DecksState`, `ClocksState`, `CombatState`, `MapData`).
+- **FileIO/GitIO interfaces** abstract all I/O. Production uses real `fs`; tests inject mocks. Never call `fs` directly in game logic.
+- **GameState** (defined in `src/agents/game-state.ts`) is the single mutable source of truth, passed to every tool handler.
+- Tool results use `ok(data)` / `err(message)` helpers. `err` sets `is_error: true`.
+
+### Entity Filesystem
+- **Front matter format:** `**Key:** Value` lines (not YAML). Parsed by `parseFrontMatter()` in `src/tools/filesystem/frontmatter.ts`.
+- **Wikilinks are mandatory** — every entity mention in transcripts/logs is a wikilink. Dead links are valid (entity exists in fiction but not yet detailed). Scene summarizer must preserve all wikilinks.
+- **Changelogs** are append-only `## Changelog` sections with `- ` entries, updated automatically by Haiku subagent at scene transitions.
+- Characters exist on a spectrum: minimal NPCs can be promoted to full character sheets via `promote_character` tool.
+
+### Prompts
+- All prompts live in `src/prompts/*.md`, loaded by `loadPrompt(name)` (sync, cached, CRLF→LF normalized).
+- Templates use `{{placeholder}}` interpolation via `loadTemplate(name, vars)`.
+- `postbuild` script copies `.md` files to `dist/prompts/` for runtime access.
+- **Tests must call `resetPromptCache()` in `beforeEach`** to avoid cross-test pollution.
+
+### Subagents
+- `spawnSubagent()` creates an isolated Claude conversation with its own context window — DM context is never polluted.
+- System prompts automatically get a suffix enforcing terse responses.
+- Subagents have own `maxToolRounds` (default 3) and return usage stats.
+- **Delegation is not optional** — never have the DM do mechanical work a Haiku subagent can do.
+
+### Testing
+- Tests are **co-located** with source (e.g., `foo.ts` + `foo.test.ts`).
+- **Seeded RNG** via `src/tools/dice/rng.ts` — `seededRng(seed)` for determinism, `cryptoRng` for prod.
+- **Anthropic client mocked** via `vi.fn()` on `messages.create`. Tests use factory helpers (`textMessage()`, `toolUseMessage()`, etc.) to build fake responses. No real API calls.
+- **FileIO mocked** with in-memory `Record<string, string>`.
+- **Cross-platform paths:** Tests use `norm()` helper (backslash → forward slash) for all path assertions. Required on Windows.
+- **Ink components** tested via `ink-testing-library`: `render(<C />)` → `lastFrame().toContain(...)` (string inspection, no DOM).
+- Vitest `globals: true` — `describe`/`it`/`expect` available without import.
+
+### DM Identity (not an assistant)
+- The DM decides things, says no, lets bad things happen, has secrets, surprises itself.
+- Dice for narrative choices — roll when the story could go several ways, commit to the result.
+- Never explain reasoning during narration. NPCs lie, withhold, change their minds.
+- The world doesn't revolve around the player. Ticking clocks and alarms drive offscreen events.
 - **System-agnostic.** No D&D-specific hardcoding. Initiative, round structure, dice notation are all configurable.
-- **Tests use seeded RNG** via `src/tools/dice/rng.ts` (LCG for tests, crypto for prod).
-- **Cross-platform paths.** Tests use `norm()` helper (backslash → forward slash) for assertions.
-- **Front matter format:** `**Key:** Value` lines (not YAML).
-- **Agent loop mocked in tests** via fake Anthropic client (`vi.fn` on `messages.create`/`stream`). No real API calls in tests.
-- **Subagents** enforce "respond in minimum tokens" via system prompt suffix.
-- **GitIO/FileIO interfaces** abstract I/O for testable mocking.
-- **Validation errors** use severity levels: `"error"` vs `"warning"`.
 
 ## Cost Awareness
 
 Live API key in `.env` with limited credit. Opus is $5/$25 per MTok. Default dev override uses Sonnet for DM to save money. Don't make unnecessary API calls in manual testing.
 
-## TypeScript Config
+## Commit Hygeine
 
-`target: ES2022`, `module: nodenext`, `jsx: react-jsx`, `strict: true`.
-
-ESLint uses flat config (`eslint.config.js`) with `typescript-eslint`.
+After completing a coding task, make a detailed commit; you'll need this history later!

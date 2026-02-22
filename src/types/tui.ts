@@ -46,7 +46,21 @@ export type FormattingTag =
 
 export type FormattingNode = string | FormattingTag;
 
+/** Typed narrative line — only "dm" lines enter the formatting/heal/quote pipeline. */
+export type NarrativeLine =
+  | { kind: "dm"; text: string }
+  | { kind: "player"; text: string }
+  | { kind: "dev"; text: string }
+  | { kind: "system"; text: string };
+
 export interface ActivityIndicator {
   label: string;
   glyph: string;
 }
+
+export type ActiveModal =
+  | { kind: "choice"; prompt: string; choices: string[] }
+  | { kind: "dice"; expression: string; rolls: number[]; kept?: number[]; total: number; reason?: string }
+  | { kind: "character_sheet"; content: string }
+  | { kind: "recap"; lines: string[] }
+  | null;

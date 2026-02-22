@@ -61,6 +61,54 @@ export function renderHorizontalFrame(
 }
 
 /**
+ * Like renderHorizontalFrame, but returns the border split into three parts
+ * so the center text can be colored independently.
+ */
+export function renderHorizontalFrameParts(
+  variant: FrameStyleVariant,
+  width: number,
+  position: "top" | "bottom",
+  centerText: string,
+  ascii = false,
+): { left: string; center: string; right: string } {
+  const v = ascii ? ASCII_VARIANT : variant;
+  const leftCorner = position === "top" ? v.corner_tl : v.corner_bl;
+  const rightCorner = position === "top" ? v.corner_tr : v.corner_br;
+
+  if (width < 4) return { left: v.horizontal.repeat(width), center: "", right: "" };
+
+  const innerWidth = width - 2; // minus corners
+
+  const flourished = v.flourish.replace("%s", centerText);
+  const flourishLen = stringWidth(flourished);
+
+  if (flourishLen >= innerWidth) {
+    // Flourish too wide — just center the text
+    const textLen = stringWidth(centerText);
+    const padTotal = Math.max(0, innerWidth - textLen);
+    const padLeft = Math.floor(padTotal / 2);
+    const padRight = padTotal - padLeft;
+    return {
+      left: leftCorner + v.horizontal.repeat(padLeft),
+      center: centerText,
+      right: v.horizontal.repeat(padRight) + rightCorner,
+    };
+  }
+
+  const padTotal = innerWidth - flourishLen;
+  const padLeft = Math.floor(padTotal / 2);
+  const padRight = padTotal - padLeft;
+
+  // Split the flourish template around the center text
+  const flourishParts = v.flourish.split("%s");
+  return {
+    left: leftCorner + v.horizontal.repeat(padLeft) + flourishParts[0],
+    center: centerText,
+    right: flourishParts[1] + v.horizontal.repeat(padRight) + rightCorner,
+  };
+}
+
+/**
  * Render a content line with left/right vertical borders.
  * @param variant - The style variant to use
  * @param content - The text content to display

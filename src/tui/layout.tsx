@@ -1,6 +1,6 @@
 import React from "react";
 import { Box } from "ink";
-import type { FrameStyle, StyleVariant, ViewportDimensions } from "../types/tui.js";
+import type { FrameStyle, StyleVariant, ViewportDimensions, NarrativeLine } from "../types/tui.js";
 import type { PlayerEntry } from "./components/index.js";
 import type { NarrativeAreaHandle } from "./components/index.js";
 import {
@@ -31,7 +31,7 @@ export interface LayoutProps {
   variant: StyleVariant;
 
   // Content
-  narrativeLines: string[];
+  narrativeLines: NarrativeLine[];
   modelineText: string;
   inputValue: string;
   activeCharacterName: string;
@@ -50,6 +50,9 @@ export interface LayoutProps {
 
   // Display options
   quoteColor?: string;
+  playerColor?: string;
+  /** Color for the turn indicator text (player color on their turn, theme color on DM turn). */
+  turnIndicatorColor?: string;
 
   /** Ref to NarrativeArea scroll handle */
   narrativeRef?: React.Ref<NarrativeAreaHandle>;
@@ -74,6 +77,8 @@ export function Layout(props: LayoutProps) {
     turnHolder,
     engineState,
     quoteColor,
+    playerColor,
+    turnIndicatorColor,
     narrativeRef,
   } = props;
 
@@ -125,7 +130,7 @@ export function Layout(props: LayoutProps) {
 
         <Box flexDirection="column" width={innerWidth}>
           {/* Narrative Area */}
-          <NarrativeArea ref={narrativeRef} lines={narrativeLines} maxRows={narRows} quoteColor={quoteColor} width={innerWidth} />
+          <NarrativeArea ref={narrativeRef} lines={narrativeLines} maxRows={narRows} quoteColor={quoteColor} playerColor={playerColor} width={innerWidth} />
 
           {/* Activity Line */}
           {elements.activityLine && <ActivityLine engineState={engineState} />}
@@ -149,6 +154,7 @@ export function Layout(props: LayoutProps) {
           width={width}
           position="bottom"
           centerText={turnHolder ? `${turnHolder}'s Turn` : undefined}
+          centerTextColor={turnIndicatorColor}
           ascii={ascii}
         />
       )}

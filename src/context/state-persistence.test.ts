@@ -161,6 +161,37 @@ describe("StatePersister", () => {
     expect(loaded.ui).toEqual(ui);
   });
 
+  it("round-trips UI state with modelines", async () => {
+    const fio = mockFileIO();
+    const persister = new StatePersister("/tmp/campaign", fio);
+    const ui = {
+      styleName: "gothic",
+      variant: "exploration" as const,
+      modelines: { Aldric: "HP 45/50 | Blessed", Rook: "HP 28/30 | Poisoned" },
+    };
+
+    persister.persistUI(ui);
+    await vi.waitFor(() => expect(fio.writeFile).toHaveBeenCalled());
+
+    const loaded = await persister.loadAll();
+    expect(loaded.ui).toEqual(ui);
+    expect(loaded.ui!.modelines).toEqual({ Aldric: "HP 45/50 | Blessed", Rook: "HP 28/30 | Poisoned" });
+  });
+
+  it("loads old UI state without modelines (backward compat)", async () => {
+    const fio = mockFileIO();
+    const persister = new StatePersister("/tmp/campaign", fio);
+    // Simulate old-format UI state (no modelines field)
+    const oldUI = { styleName: "arcane", variant: "exploration" };
+    files[norm("/tmp/campaign/state/ui.json")] = JSON.stringify(oldUI);
+
+    const loaded = await persister.loadAll();
+    expect(loaded.ui).toBeDefined();
+    expect(loaded.ui!.styleName).toBe("arcane");
+    expect(loaded.ui!.variant).toBe("exploration");
+    expect(loaded.ui!.modelines).toBeUndefined();
+  });
+
   it("clearConversation removes conversation file", async () => {
     const fio = mockFileIO();
     const persister = new StatePersister("/tmp/campaign", fio);

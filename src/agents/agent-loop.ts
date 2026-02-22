@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { ToolRegistry, ToolResult } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
 import { accumulateUsage } from "../context/usage-helpers.js";
+import { dumpContext } from "../config/context-dump.js";
 
 // --- Types ---
 
@@ -259,7 +260,6 @@ const TUI_TOOLS = new Set([
   "present_choices",
   "present_roll",
   "show_character_sheet",
-  "pause_for_effect",
   "enter_ooc",
   "scene_transition",
   "session_end",
@@ -288,6 +288,7 @@ async function callWithRetry(
 ): Promise<Anthropic.Message> {
   for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
     try {
+      dumpContext("dm", params);
       return await client.messages.create({
         ...params,
         stream: false,
@@ -314,6 +315,7 @@ async function streamWithRetry(
 ): Promise<{ message: Anthropic.Message; usage: Anthropic.Usage }> {
   for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
     try {
+      dumpContext("dm", params);
       const stream = client.messages.stream({
         ...params,
       });

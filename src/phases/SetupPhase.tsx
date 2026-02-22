@@ -1,7 +1,8 @@
 import React, { useState, useRef, useCallback } from "react";
 import { useInput, useStdout, Text, Box } from "ink";
 import Anthropic from "@anthropic-ai/sdk";
-import type { FrameStyle } from "../types/tui.js";
+import type { FrameStyle, NarrativeLine } from "../types/tui.js";
+import { appendDelta } from "../tui/narrative-helpers.js";
 import { useTextInput } from "../tui/hooks/useTextInput.js";
 import { Layout } from "../tui/layout.js";
 import { ChoiceModal } from "../tui/modals/index.js";
@@ -31,7 +32,7 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
 
   // Conversational setup state
   const setupConvoRef = useRef<SetupConversation | null>(null);
-  const [setupConvoLines, setSetupConvoLines] = useState<string[]>([]);
+  const [setupConvoLines, setSetupConvoLines] = useState<NarrativeLine[]>([]);
   const [setupConvoInput, setSetupConvoInput] = useState("");
   const [setupConvoBusy, setSetupConvoBusy] = useState(false);
   const { handleKey: handleTextKey } = useTextInput({ value: setupConvoInput, onChange: setSetupConvoInput, disabled: setupConvoBusy });
@@ -39,6 +40,9 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
   // Choice modal state (shared by both modes)
   const [activeModal, setActiveModal] = useState<ActiveChoiceModal | null>(null);
   const [choiceIndex, setChoiceIndex] = useState(0);
+
+  // Gate: hold finalized result until player presses ENTER
+  const [pendingResult, setPendingResult] = useState<SetupResult | null>(null);
 
   // Fast-path setup state
   const [setupPrompt, setSetupPrompt] = useState<SetupStep | null>(null);
@@ -50,26 +54,13 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
 
   // --- Streaming delta handler ---
   const setupStreamDelta = useCallback((delta: string) => {
-    setSetupConvoLines((prev) => {
-      const lines = [...prev];
-      if (lines.length === 0) lines.push(delta);
-      else lines[lines.length - 1] += delta;
-      const last = lines[lines.length - 1];
-      if (last.includes("\n")) {
-        const parts = last.split("\n");
-        lines[lines.length - 1] = parts[0];
-        for (let i = 1; i < parts.length; i++) {
-          lines.push(parts[i]);
-        }
-      }
-      return lines;
-    });
+    setSetupConvoLines((prev) => appendDelta(prev, delta, "dm"));
   }, []);
 
   // --- Handle turn result from conversation ---
   const handleSetupTurnResult = useCallback(async (result: { finalized?: SetupResult; pendingChoices?: { prompt: string; choices: string[] }; usage: UsageStats }) => {
     setSetupConvoBusy(false);
-    setSetupConvoLines((prev) => [...prev, ""]);
+    setSetupConvoLines((prev) => [...prev, { kind: "dm", text: "" }]);
 
     if (result.pendingChoices) {
       setChoiceIndex(0);
@@ -84,7 +75,8 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
     if (result.finalized) {
       costTracker.current.record(result.usage, getModel("medium"));
       setupConvoRef.current = null;
-      onComplete(result.finalized);
+      setPendingResult(result.finalized);
+      setSetupConvoLines((prev) => [...prev, { kind: "dm", text: "" }, { kind: "dm", text: "<center><b>[Press ENTER to begin your adventure]</b></center>" }]);
     }
   }, [costTracker, onComplete, setActiveModal]);
 
@@ -93,7 +85,7 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
     const convo = setupConvoRef.current;
     if (!convo) return;
 
-    setSetupConvoLines((prev) => [...prev, `> ${text}`, "", ""]);
+    setSetupConvoLines((prev) => [...prev, { kind: "player", text: `> ${text}` }, { kind: "dm", text: "" }, { kind: "dm", text: "" }]);
     setSetupConvoBusy(true);
 
     try {
@@ -113,7 +105,7 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
 
     setActiveModal(null);
     setChoiceIndex(0);
-    setSetupConvoLines((prev) => [...prev, `> ${selectedText}`, "", ""]);
+    setSetupConvoLines((prev) => [...prev, { kind: "player", text: `> ${selectedText}` }, { kind: "dm", text: "" }, { kind: "dm", text: "" }]);
     setSetupConvoBusy(true);
 
     try {
@@ -169,6 +161,14 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
 
   // --- Input handling ---
   useInput((input, key) => {
+    // Waiting for ENTER after setup farewell
+    if (pendingResult) {
+      if (key.return) {
+        onComplete(pendingResult);
+      }
+      return;
+    }
+
     // Conversational mode
     if (setupConvoRef.current) {
       // Choice modal active during setup
@@ -232,6 +232,29 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
       }
     }
   });
+
+  // --- Render: awaiting ENTER after setup farewell ---
+  if (pendingResult) {
+    return (
+      <Box flexDirection="column" width={cols} height={rows}>
+        <Layout
+          dimensions={{ columns: cols, rows }}
+          style={style}
+          variant="exploration"
+          narrativeLines={setupConvoLines}
+          modelineText="Campaign Setup"
+          inputValue=""
+          activeCharacterName="You"
+          players={[{ name: "Player", isAI: false }]}
+          activePlayerIndex={0}
+          campaignName="New Campaign"
+          resources={[]}
+          turnHolder="You"
+          engineState={null}
+        />
+      </Box>
+    );
+  }
 
   // --- Render: conversational mode ---
   if (setupConvoRef.current) {

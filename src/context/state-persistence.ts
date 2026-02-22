@@ -33,6 +33,7 @@ export interface PersistedSceneState {
 export interface PersistedUIState {
   styleName: string;
   variant: StyleVariant;
+  modelines?: Record<string, string>;
 }
 
 /** Full loaded state from disk */

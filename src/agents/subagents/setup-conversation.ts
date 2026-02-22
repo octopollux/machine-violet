@@ -236,7 +236,21 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
     },
 
     async send(text, onDelta) {
-      messages.push({ role: "user", content: text });
+      if (pendingToolUseId) {
+        // User dismissed the choice modal and typed a free-form response.
+        // Still must send a tool_result to satisfy the API contract.
+        messages.push({
+          role: "user",
+          content: [{
+            type: "tool_result",
+            tool_use_id: pendingToolUseId,
+            content: `The player dismissed the choices and instead wrote: "${text}"`,
+          }],
+        });
+        pendingToolUseId = null;
+      } else {
+        messages.push({ role: "user", content: text });
+      }
       return runTurn(onDelta);
     },
 

@@ -6,12 +6,12 @@ import { describe, it, expect, vi } from "vitest";
  */
 
 import type { TuiCommand } from "../../agents/agent-loop.js";
-import type { StyleVariant } from "../../types/tui.js";
-import type { ActiveModal } from "../../app.js";
+import type { StyleVariant, NarrativeLine, ActiveModal } from "../../types/tui.js";
+import { appendDelta } from "../narrative-helpers.js";
 
 /** Simulates the dispatch logic from useGameCallbacks */
 function createDispatch(deps: {
-  setModelineOverride: ReturnType<typeof vi.fn>;
+  setModelines: ReturnType<typeof vi.fn>;
   setVariant: ReturnType<typeof vi.fn>;
   setStyle: ReturnType<typeof vi.fn>;
   setResources: ReturnType<typeof vi.fn>;
@@ -26,9 +26,12 @@ function createDispatch(deps: {
 }) {
   return (cmd: TuiCommand) => {
     switch (cmd.type) {
-      case "update_modeline":
-        deps.setModelineOverride(cmd.text as string);
+      case "update_modeline": {
+        const char = cmd.character as string;
+        const text = cmd.text as string;
+        deps.setModelines((prev: Record<string, string>) => ({ ...prev, [char]: text }));
         break;
+      }
       case "set_display_resources":
         deps.setResources(cmd.resources as string[]);
         break;
@@ -62,7 +65,7 @@ function createDispatch(deps: {
 
 function makeDeps() {
   return {
-    setModelineOverride: vi.fn(),
+    setModelines: vi.fn(),
     setVariant: vi.fn(),
     setStyle: vi.fn(),
     setResources: vi.fn(),
@@ -78,11 +81,21 @@ function makeDeps() {
 }
 
 describe("dispatchTuiCommand logic", () => {
-  it("handles update_modeline", () => {
+  it("handles update_modeline with character", () => {
     const deps = makeDeps();
     const dispatch = createDispatch(deps);
-    dispatch({ type: "update_modeline", text: "hello" });
-    expect(deps.setModelineOverride).toHaveBeenCalledWith("hello");
+    dispatch({ type: "update_modeline", text: "HP 45/50", character: "Aldric" });
+    expect(deps.setModelines).toHaveBeenCalledWith(expect.any(Function));
+    const updater = deps.setModelines.mock.calls[0][0];
+    expect(updater({})).toEqual({ Aldric: "HP 45/50" });
+  });
+
+  it("update_modeline merges with existing modelines", () => {
+    const deps = makeDeps();
+    const dispatch = createDispatch(deps);
+    dispatch({ type: "update_modeline", text: "HP 45/50", character: "Aldric" });
+    const updater = deps.setModelines.mock.calls[0][0];
+    expect(updater({ Kira: "HP 30/30" })).toEqual({ Kira: "HP 30/30", Aldric: "HP 45/50" });
   });
 
   it("handles set_display_resources", () => {
@@ -129,48 +142,35 @@ describe("dispatchTuiCommand logic", () => {
   });
 });
 
-/**
- * Simulates the onNarrativeDelta logic from useGameCallbacks.
- * Mirrors the setNarrativeLines updater function.
- */
-function applyDelta(prev: string[], delta: string): string[] {
-  const lines = [...prev];
-  if (lines.length === 0) lines.push(delta);
-  else if (lines[lines.length - 1] === "" && delta !== "") lines.push(delta);
-  else lines[lines.length - 1] += delta;
-  const last = lines[lines.length - 1];
-  if (last.includes("\n")) {
-    const parts = last.split("\n");
-    lines[lines.length - 1] = parts[0];
-    for (let i = 1; i < parts.length; i++) {
-      lines.push(parts[i]);
-    }
-  }
-  return lines;
-}
+const dm = (text: string): NarrativeLine => ({ kind: "dm", text });
+const player = (text: string): NarrativeLine => ({ kind: "player", text });
 
-describe("onNarrativeDelta logic", () => {
+describe("appendDelta (typed NarrativeLine)", () => {
   it("preserves blank line separator when DM delta arrives", () => {
-    // Player input leaves trailing blank line
-    const after_player = ["", "> Player: Attack!", ""];
-    // First DM delta should NOT overwrite the blank separator
-    const result = applyDelta(after_player, "The dragon");
-    expect(result).toEqual(["", "> Player: Attack!", "", "The dragon"]);
+    const after_player: NarrativeLine[] = [dm(""), player("> Player: Attack!"), dm("")];
+    const result = appendDelta(after_player, "The dragon", "dm");
+    expect(result).toEqual([dm(""), player("> Player: Attack!"), dm(""), dm("The dragon")]);
   });
 
   it("appends subsequent deltas to the current line", () => {
-    const lines = ["", "> Player: Attack!", "", "The dragon"];
-    const result = applyDelta(lines, " roars!");
-    expect(result).toEqual(["", "> Player: Attack!", "", "The dragon roars!"]);
+    const lines: NarrativeLine[] = [dm(""), player("> Player: Attack!"), dm(""), dm("The dragon")];
+    const result = appendDelta(lines, " roars!", "dm");
+    expect(result).toEqual([dm(""), player("> Player: Attack!"), dm(""), dm("The dragon roars!")]);
   });
 
-  it("splits on newlines within a delta", () => {
-    const lines = ["", "> Player: Attack!", "", "First line"];
-    const result = applyDelta(lines, ".\nSecond line");
-    expect(result).toEqual(["", "> Player: Attack!", "", "First line.", "Second line"]);
+  it("splits on newlines within a delta (double-spaced)", () => {
+    const lines: NarrativeLine[] = [dm(""), player("> Player: Attack!"), dm(""), dm("First line")];
+    const result = appendDelta(lines, ".\nSecond line", "dm");
+    expect(result).toEqual([dm(""), player("> Player: Attack!"), dm(""), dm("First line."), dm(""), dm("Second line")]);
+  });
+
+  it("preserves single blank line for \\n\\n (no extra doubling)", () => {
+    const lines: NarrativeLine[] = [dm("First")];
+    const result = appendDelta(lines, "\n\nSecond", "dm");
+    expect(result).toEqual([dm("First"), dm(""), dm("Second")]);
   });
 
   it("pushes to empty array", () => {
-    expect(applyDelta([], "Hello")).toEqual(["Hello"]);
+    expect(appendDelta([], "Hello", "dm")).toEqual([dm("Hello")]);
   });
 });

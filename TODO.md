@@ -5,32 +5,26 @@ When creating a plan to do any of these items, include a step to update this TOD
 ## Refactoring
 
 ### Replace prop drilling with context in TUI layer
-- [ ] Create `GameContext` provider (or `useGameState()` hook)
+- [x] Create `GameContext` provider with `useGameContext()` hook
+- [x] Refactor PlayingPhase from 28 props to context consumer
 - [ ] Refactor Layout from 15 props to context consumer
 - [ ] Update child components to pull from context
 
 ## Bugs
-
-- [x] ~~Newlines between turns don't appear in the conversation view.~~ (`onNarrativeDelta` now preserves blank-line separators instead of appending to them)
-- [x] ~~Text justification formatting instructions missing from the agents that use formatting (DM and setup-conversation).~~ (Added `<center>`, `<right>` with spacing notes to dm-identity and setup-conversation prompts)
-- [x] ~~`<center>` formatting should add a newline before and after the text segment so it has space to center in.~~ (`padAlignmentLines()` preprocessor in formatting.ts; prompts note `(auto-adds spacing)`)
-- [x] ~~Quote-matching coloring needs to also color the quote marks themselves.~~ (Already implemented — `splitQuotesWithState` includes quotes in color nodes)
-- [ ] Initial DM instructions at campaign start are written to the transcript, making them appear in the user-visible conversation view when the game is loaded from disk.
+- [ ] When restoring state from disk, the transcript doesn't get processed for formatting based on who is speaking; player turns look like DM turns.
 
 ## Features
 
 - [ ] **Cost display**: Move to Esc menu (bottom right).
 - [ ] **Cost calculation**: Use the SDK's cost API to calculate accurate costs from token counts. Must handle caching and not hardcode model-specific pricing — models and prices will change.
 - [ ] **Periodic formatting reminder**: Re-insert a prompt into the DM's context periodically so it doesn't forget to use formatting.
-- [ ] **State folder rename**: Local state folder should be `.tui-rpg`, not `tui-rpg` — the code repo is typically named `tui-rpg` and this gets confusing.
-- [ ] **Modeline/theme persistence**: Should persist to disk immediately and load with the session; modeline should be per-character.
-- [x] ~~**"Press ENTER to continue" tool**~~: Implemented as `pause_for_effect` TUI tool. Shows overlay modal; ENTER/ESC dismisses.
-- [x] ~~**DM worldbuilding tools**~~: `create_entity` and `update_entity` tools. Engine-intercepted for async file I/O. DM prompt guidance for proactive worldbuilding.
-- [ ] **Game state agent knowledge**: Embed enough knowledge for certain agents to manually inspect and modify game state. Maybe a skill?
+- [x] **State folder rename**: Local state folder should be `.tui-rpg`, not `tui-rpg` — the code repo is typically named `tui-rpg` and this gets confusing.
+- [ ] **Modeline/theme state and persistence**: These pieces of state should also persist to disk, and should be brought into DM context on load so it can update them consistently; in fact, we need persistence of state for these in general so that modeline isn't effectively random from scene to scene/session to session.
+- [ ] **Game state agent knowledge**: Embed enough knowledge for certain agents to manually inspect and modify game state. Maybe a skill? Ideally designed in such a way that we get the contents of this information "for free" without haing to update it any time we add features/changes to state funtionality - but not absolutely essential.
 - [ ] **Filesystem sandboxing**: Prevent agents from making unsafe tool calls — especially file access outside the game state area. Could use hooks.
-- [ ] **Dev Mode context inspector**: Ergonomic way to inspect agent context for debugging and cache optimization.
-- [x] ~~**Progressive character updates**~~: DM prompt guidance to record player-revealed character info via `update_entity`. Sparse initial template signals progressive enrichment.
-- [x] ~~**Character Color in conversation view**~~: Player input lines render `>` in bright green and text in the character's theme color, via NarrativeLine detection.
+- [ ] **Hex colors in character sheets**: In the charater sheet modal, match on hex color strings (`#\d{6}`) and render the string itself to the specified color. This is so that users can see their color.
+- [ ] Claude API connection errors should gracefully force a center-screen modal; this modal should poll a cheap Claude API endpoint (is there a health check endpoint?) and close automatically.
+- Choice modal should always have a final "Enter your own: > _" option that accepts text input in-place; with this addition, the choice modal can sit on top of the normal user input line, saving some space.
 
 
 

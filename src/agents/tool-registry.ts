@@ -651,18 +651,21 @@ const TOOL_DEFS: RegisteredTool[] = [
   {
     definition: {
       name: "update_modeline",
-      description: "Set the modeline status text.",
+      description: "Set the modeline status text for a character. Defaults to the active character.",
       input_schema: {
         type: "object" as const,
         properties: {
-          text: { type: "string" },
+          text: { type: "string", description: "Status line content" },
+          character: { type: "string", description: "Character name. Defaults to active character." },
         },
         required: ["text"],
       },
     },
-    handler: (_state, input) => {
+    handler: (state, input) => {
+      const character = (input.character as string)
+        || state.config.players[state.activePlayerIndex].character;
       // TUI tools return commands — the agent loop applies them
-      return ok(JSON.stringify({ type: "update_modeline", text: input.text }));
+      return ok(JSON.stringify({ type: "update_modeline", text: input.text, character }));
     },
   },
   {
@@ -748,26 +751,6 @@ const TOOL_DEFS: RegisteredTool[] = [
     },
     handler: (_state, input) => {
       return ok(JSON.stringify({ type: "show_character_sheet", ...input }));
-    },
-  },
-
-  // ====== PACING ======
-  {
-    definition: {
-      name: "pause_for_effect",
-      description: "Pause and show a brief message until the player presses ENTER. Use at dramatic moments, after world-building reveals, or before handing off control. The player's current narrative view is preserved — the message appears as a small overlay.",
-      input_schema: {
-        type: "object" as const,
-        properties: {
-          message: { type: "string", description: "Short message to display (e.g. 'The journey begins...'). Defaults to a simple pause prompt." },
-        },
-      },
-    },
-    handler: (_state, input) => {
-      return ok(JSON.stringify({
-        type: "pause_for_effect",
-        message: input.message,
-      }));
     },
   },
 

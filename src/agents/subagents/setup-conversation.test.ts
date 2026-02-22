@@ -180,6 +180,30 @@ describe("createSetupConversation", () => {
     expect(result.text).toContain("May your blade stay sharp!");
   });
 
+  it("send() after dismissed choice includes tool_result", async () => {
+    const client = mockClient([
+      presentChoicesResponse("Pick one:", "Genre:", ["Fantasy", "Sci-Fi"]),
+      textResponse("Interesting! Tell me more about that."),
+    ]);
+    const conv = createSetupConversation(client);
+    await conv.start(noop);
+
+    // User dismisses the choice modal and types free-form text instead
+    const result = await conv.send("I want a pirate adventure", noop);
+    expect(result.text).toBe("Interesting! Tell me more about that.");
+
+    // Verify the message sent to the API included a tool_result (not plain text)
+    const streamCalls = (client.messages.stream as ReturnType<typeof vi.fn>).mock.calls;
+    const secondCall = streamCalls[1][0];
+    const userMsg = secondCall.messages.find(
+      (m: { role: string }) => m.role === "user" && Array.isArray(m.content),
+    );
+    expect(userMsg).toBeDefined();
+    expect(userMsg.content[0].type).toBe("tool_result");
+    expect(userMsg.content[0].tool_use_id).toBe("toolu_choices_1");
+    expect(userMsg.content[0].content).toContain("I want a pirate adventure");
+  });
+
   it("usage accumulates across turns", async () => {
     const client = mockClient([
       textResponse("Welcome!", mockUsage(100, 30)),

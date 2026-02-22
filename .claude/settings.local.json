@@ -33,7 +33,8 @@
       "Bash(find:*)",
       "Bash(R:/tui-rpg/node_modules/.bin/tsc:*)",
       "Bash(cat:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(test:*)"
     ]
   }
 }

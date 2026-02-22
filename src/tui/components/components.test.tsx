@@ -99,10 +99,13 @@ describe("ActivityLine", () => {
 });
 
 describe("NarrativeArea", () => {
+  const dm = (text: string) => ({ kind: "dm" as const, text });
+  const player = (text: string) => ({ kind: "player" as const, text });
+
   it("renders text lines", () => {
     const { lastFrame } = render(
       <NarrativeArea
-        lines={["The door creaks open.", "A cold wind blows."]}
+        lines={[dm("The door creaks open."), dm("A cold wind blows.")]}
         maxRows={5}
       />,
     );
@@ -112,7 +115,7 @@ describe("NarrativeArea", () => {
   });
 
   it("renders with many lines without crashing", () => {
-    const lines = Array.from({ length: 200 }, (_, i) => `Line ${i + 1}`);
+    const lines = Array.from({ length: 200 }, (_, i) => dm(`Line ${i + 1}`));
     const { lastFrame } = render(
       <NarrativeArea lines={lines} maxRows={10} />,
     );
@@ -126,7 +129,7 @@ describe("NarrativeArea", () => {
   it("renders DM formatting tags", () => {
     const { lastFrame } = render(
       <NarrativeArea
-        lines={["The <b>King</b> has fallen."]}
+        lines={[dm("The <b>King</b> has fallen.")]}
         maxRows={5}
       />,
     );
@@ -139,7 +142,7 @@ describe("NarrativeArea", () => {
   it("renders centered text when width is provided", () => {
     const { lastFrame } = render(
       <NarrativeArea
-        lines={["<center>Chapter 1</center>"]}
+        lines={[dm("<center>Chapter 1</center>")]}
         maxRows={5}
         width={40}
       />,
@@ -151,7 +154,7 @@ describe("NarrativeArea", () => {
   it("renders right-aligned text when width is provided", () => {
     const { lastFrame } = render(
       <NarrativeArea
-        lines={["<right>Page 42</right>"]}
+        lines={[dm("<right>Page 42</right>")]}
         maxRows={5}
         width={40}
       />,
@@ -163,7 +166,7 @@ describe("NarrativeArea", () => {
   it("renders center tag as plain text without width", () => {
     const { lastFrame } = render(
       <NarrativeArea
-        lines={["<center>No width</center>"]}
+        lines={[dm("<center>No width</center>")]}
         maxRows={5}
       />,
     );
@@ -174,9 +177,9 @@ describe("NarrativeArea", () => {
   it("renders player input lines with colored carat and text", () => {
     const { lastFrame } = render(
       <NarrativeArea
-        lines={["> Aldric: I attack the goblin!"]}
+        lines={[player("> Aldric: I attack the goblin!")]}
         maxRows={5}
-        quoteColor="#5a9cff"
+        playerColor="#5a9cff"
       />,
     );
     const frame = lastFrame();
@@ -184,10 +187,10 @@ describe("NarrativeArea", () => {
     expect(frame).toContain("Aldric: I attack the goblin!");
   });
 
-  it("renders player input as plain text without quoteColor", () => {
+  it("renders player input as plain text without playerColor", () => {
     const { lastFrame } = render(
       <NarrativeArea
-        lines={["> Aldric: I attack the goblin!"]}
+        lines={[player("> Aldric: I attack the goblin!")]}
         maxRows={5}
       />,
     );

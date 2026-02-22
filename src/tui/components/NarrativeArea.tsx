@@ -2,7 +2,8 @@ import React, { useRef, useEffect, useState, useCallback, useMemo, forwardRef } 
 import { Text, Box } from "ink";
 import { ScrollView } from "ink-scroll-view";
 import type { ScrollViewRef } from "ink-scroll-view";
-import { parseFormatting, highlightQuotes, computeQuoteState, highlightQuotesWithState, healTagBoundaries, padAlignmentLines } from "../formatting.js";
+import type { NarrativeLine } from "../../types/tui.js";
+import { parseFormatting, computeQuoteState, highlightQuotesWithState, wrapAndHealLines, padAlignmentLines } from "../formatting.js";
 import { renderNodes } from "../render-nodes.js";
 import { useScrollHandle } from "../hooks/useScrollHandle.js";
 import type { ScrollHandle } from "../hooks/useScrollHandle.js";
@@ -10,12 +11,14 @@ import type { ScrollHandle } from "../hooks/useScrollHandle.js";
 export type NarrativeAreaHandle = ScrollHandle;
 
 interface NarrativeAreaProps {
-  /** Raw DM text (may contain formatting tags) */
-  lines: string[];
+  /** Typed narrative lines */
+  lines: NarrativeLine[];
   /** Maximum rows to display */
   maxRows: number;
-  /** Color for quoted dialogue text */
+  /** Color for quoted dialogue text in DM narration */
   quoteColor?: string;
+  /** Color for player speech text */
+  playerColor?: string;
   /** Available width in columns (enables center/right alignment) */
   width?: number;
 }
@@ -33,7 +36,7 @@ export function scrollAmount(viewportRows: number): number {
  * Exposes scrollBy via ref for keyboard scrolling.
  */
 export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>(
-  function NarrativeArea({ lines, maxRows, quoteColor, width }, ref) {
+  function NarrativeArea({ lines, maxRows, quoteColor, playerColor, width }, ref) {
   const scrollRef = useRef<ScrollViewRef>(null);
   const [linesBelow, setLinesBelow] = useState(0);
   const atBottomRef = useRef(true);
@@ -57,7 +60,7 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
   }, [updateScrollState]);
 
   // Auto-scroll to bottom when new content arrives (only if user was at bottom)
-  const lastLine = lines[lines.length - 1] ?? "";
+  const lastLine = lines[lines.length - 1]?.text ?? "";
   useEffect(() => {
     if (!atBottomRef.current) {
       // User scrolled up — don't auto-scroll, but update indicator
@@ -81,24 +84,25 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
     return () => { process.stdout.off("resize", onResize); };
   }, [updateScrollState]);
 
-  // Pre-compute quote state across all lines (from original text, not healed)
-  const quoteStates = useMemo(
-    () => quoteColor ? computeQuoteState(lines) : undefined,
-    [quoteColor, lines],
-  );
+  // Pre-wrap + heal formatting tags (resets color at source boundaries), then pad
+  const healedLines = useMemo(() => wrapAndHealLines(lines, width ?? 0), [lines, width]);
+  const paddedLines = useMemo(() => padAlignmentLines(healedLines), [healedLines]);
 
-  // Heal formatting tags that span line boundaries, then pad alignment lines
-  const healedLines = healTagBoundaries(lines);
-  const paddedLines = padAlignmentLines(healedLines);
+  // Pre-compute quote state across padded lines (must match paddedLines indices)
+  const quoteStates = useMemo(
+    () => quoteColor ? computeQuoteState(paddedLines) : undefined,
+    [quoteColor, paddedLines],
+  );
 
   return (
     <Box height={maxRows} flexDirection="column">
       <ScrollView ref={scrollRef} onScroll={handleScroll}>
         {paddedLines.map((line, i) => (
-          <NarrativeLine
+          <NarrativeLineComponent
             key={i}
-            text={line}
+            line={line}
             quoteColor={quoteColor}
+            playerColor={playerColor}
             quoteOpen={quoteStates ? (i > 0 && quoteStates[i - 1]) : false}
             width={width}
           />
@@ -113,44 +117,50 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
   );
 });
 
-/** A single narrative line with formatting and optional quote highlighting. */
-function NarrativeLine({ text, quoteColor, quoteOpen, width }: {
-  text: string;
+/** A single narrative line rendered based on its kind. */
+function NarrativeLineComponent({ line, quoteColor, playerColor, quoteOpen, width }: {
+  line: NarrativeLine;
   quoteColor?: string;
+  playerColor?: string;
   quoteOpen: boolean;
   width?: number;
 }) {
-  // Dev mode lines: render with dim grey styling
-  if (text.startsWith("[dev]")) {
-    return <Text dimColor color="gray">{text}</Text>;
-  }
+  switch (line.kind) {
+    case "dev":
+      return <Text wrap="truncate" dimColor color="gray">{line.text}</Text>;
 
-  // Player input lines: "> CharacterName: text" — green carat, theme-colored text
-  if (text.startsWith("> ") && quoteColor) {
-    return <Text><Text color="greenBright">&gt;</Text><Text color={quoteColor}>{text.slice(1)}</Text></Text>;
-  }
+    case "player":
+      if (playerColor && line.text.startsWith("> ")) {
+        return (
+          <Text wrap="truncate">
+            <Text color="greenBright">&gt;</Text>
+            <Text color={playerColor}>{line.text.slice(1)}</Text>
+          </Text>
+        );
+      }
+      return <Text wrap="truncate">{line.text}</Text>;
 
-  let nodes = parseFormatting(text);
-  if (quoteColor) {
-    if (quoteOpen) {
-      // This line starts mid-quote — use state-aware highlighting
-      nodes = highlightQuotesWithState(nodes, quoteColor, true);
-    } else {
-      nodes = highlightQuotes(nodes, quoteColor);
+    case "system":
+      return <Text wrap="truncate">{line.text}</Text>;
+
+    case "dm": {
+      let nodes = parseFormatting(line.text);
+      if (quoteColor) {
+        nodes = highlightQuotesWithState(nodes, quoteColor, quoteOpen);
+      }
+
+      // Check if the entire line is a single center/right alignment tag
+      if (width && nodes.length === 1 && typeof nodes[0] !== "string"
+          && (nodes[0].type === "center" || nodes[0].type === "right")) {
+        const justify = nodes[0].type === "center" ? "center" : "flex-end";
+        return (
+          <Box width={width} justifyContent={justify}>
+            <Text wrap="truncate">{renderNodes(nodes[0].content)}</Text>
+          </Box>
+        );
+      }
+
+      return <Text wrap="truncate">{renderNodes(nodes)}</Text>;
     }
   }
-
-  // Check if the entire line is a single center/right alignment tag
-  if (width && nodes.length === 1 && typeof nodes[0] !== "string"
-      && (nodes[0].type === "center" || nodes[0].type === "right")) {
-    const justify = nodes[0].type === "center" ? "center" : "flex-end";
-    return (
-      <Box width={width} justifyContent={justify}>
-        <Text>{renderNodes(nodes[0].content)}</Text>
-      </Box>
-    );
-  }
-
-  return <Text>{renderNodes(nodes)}</Text>;
 }
-

@@ -1,13 +1,15 @@
 import React from "react";
 import { Text, Box } from "ink";
 import type { FrameStyleVariant } from "../../types/tui.js";
-import { renderHorizontalFrame, renderVerticalFrame } from "../frames/index.js";
+import { renderHorizontalFrame, renderHorizontalFrameParts, renderVerticalFrame } from "../frames/index.js";
 
 interface HorizontalBorderProps {
   variant: FrameStyleVariant;
   width: number;
   position: "top" | "bottom";
   centerText?: string;
+  /** When set, the center text is rendered in this color instead of the variant color. */
+  centerTextColor?: string;
   ascii?: boolean;
 }
 
@@ -17,8 +19,19 @@ export function HorizontalBorder({
   width,
   position,
   centerText,
+  centerTextColor,
   ascii,
 }: HorizontalBorderProps) {
+  if (centerText && centerTextColor) {
+    const parts = renderHorizontalFrameParts(variant, width, position, centerText, ascii);
+    return (
+      <Box>
+        <Text color={variant.color}>{parts.left}</Text>
+        <Text color={centerTextColor}>{parts.center}</Text>
+        <Text color={variant.color}>{parts.right}</Text>
+      </Box>
+    );
+  }
   const line = renderHorizontalFrame(variant, width, position, centerText, ascii);
   return (
     <Box>

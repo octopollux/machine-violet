@@ -25,7 +25,7 @@ describe("first-launch", () => {
 
   it("returns platform default home dir", () => {
     const dir = getDefaultHomeDir();
-    expect(dir).toContain("tui-rpg");
+    expect(dir).toContain(".tui-rpg");
   });
 
   it("builds .env content", () => {

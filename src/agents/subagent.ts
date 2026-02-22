@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { ModelId, UsageStats } from "./agent-loop.js";
+import { dumpContext } from "../config/context-dump.js";
 
 // --- Types ---
 
@@ -73,6 +74,8 @@ export async function spawnSubagent(
       stream: false,
       ...(config.tools?.length ? { tools: config.tools } : {}),
     };
+
+    dumpContext(config.name, params);
 
     let response: Anthropic.Message;
 

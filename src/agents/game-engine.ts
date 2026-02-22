@@ -21,6 +21,7 @@ import { norm } from "../utils/paths.js";
 import { validateCampaign } from "../tools/validation/index.js";
 import { CampaignRepo } from "../tools/git/index.js";
 import type { GitIO } from "../tools/git/index.js";
+import { writeDebugDump } from "../tools/filesystem/debug-dump.js";
 
 // --- Types ---
 
@@ -176,6 +177,11 @@ export class GameEngine {
     return this.repo;
   }
 
+  /** Update the UI state section of the DM's prefix (called from TUI layer). */
+  setUIState(uiState: string | undefined): void {
+    this.sceneManager.getSessionState().uiState = uiState;
+  }
+
   /** Hydrate conversation from saved exchanges */
   hydrateConversation(exchanges: SerializedExchange[]): void {
     this.conversation = ConversationManager.hydrate(exchanges, this.gameState.config.context);
@@ -194,7 +200,7 @@ export class GameEngine {
    * Process player input: send to DM, stream response, handle tools.
    * This is the main game loop entry point.
    */
-  async processInput(characterName: string, text: string, opts?: { fromAI?: boolean }): Promise<void> {
+  async processInput(characterName: string, text: string, opts?: { fromAI?: boolean; skipTranscript?: boolean }): Promise<void> {
     if (this.engineState !== "idle" && this.engineState !== "waiting_input") {
       return; // Already processing
     }
@@ -209,8 +215,10 @@ export class GameEngine {
     // Tag the input with character name
     const taggedInput = `[${characterName}] ${text}`;
 
-    // Append to transcript
-    this.sceneManager.appendPlayerInput(characterName, text);
+    // Append to transcript (skip for system instructions like session open/resume)
+    if (!opts?.skipTranscript) {
+      this.sceneManager.appendPlayerInput(characterName, text);
+    }
 
     // Build the user message
     const userMessage: Anthropic.MessageParam = {
@@ -305,6 +313,7 @@ export class GameEngine {
 
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
+      await this.dumpDebugInfo(error);
       this.callbacks.onError(error);
     }
 
@@ -332,6 +341,7 @@ export class GameEngine {
 
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
+      await this.dumpDebugInfo(error);
       this.callbacks.onError(error);
     }
 
@@ -356,6 +366,7 @@ export class GameEngine {
 
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
+      await this.dumpDebugInfo(error);
       this.callbacks.onError(error);
     }
 
@@ -389,6 +400,7 @@ export class GameEngine {
       }
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
+      await this.dumpDebugInfo(error);
       this.callbacks.onError(error);
     }
 
@@ -586,6 +598,7 @@ export class GameEngine {
       await this.processInput(characterName, result.action, { fromAI: true });
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
+      await this.dumpDebugInfo(error);
       this.callbacks.onError(error);
       this.setState("waiting_input");
     }
@@ -596,6 +609,28 @@ export class GameEngine {
   private setState(state: EngineState): void {
     this.engineState = state;
     this.callbacks.onStateChange(state);
+  }
+
+  /** Write a debug dump with full context for post-mortem analysis. */
+  private async dumpDebugInfo(error: Error): Promise<void> {
+    try {
+      const scene = this.sceneManager.getScene();
+      const path = await writeDebugDump(this.gameState.campaignRoot, this.fileIO, {
+        error,
+        engineState: this.engineState,
+        sceneNumber: scene.sceneNumber,
+        sceneSlug: scene.slug,
+        sessionNumber: scene.sessionNumber,
+        precis: scene.precis,
+        transcript: scene.transcript,
+        conversation: this.conversation.serialize(),
+      });
+      if (path) {
+        this.callbacks.onDevLog?.(`[dev] debug dump saved: ${path}`);
+      }
+    } catch {
+      // Debug dump itself failed — don't mask the original error
+    }
   }
 
   private buildAgentConfig(): AgentLoopConfig {

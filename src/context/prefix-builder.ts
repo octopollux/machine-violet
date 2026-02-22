@@ -21,6 +21,7 @@ export interface PrefixSections {
   activeState?: string;
   scenePrecis?: string;
   playerRead?: string;
+  uiState?: string;
 }
 
 /**
@@ -119,6 +120,14 @@ export function buildCachedPrefix(
     blocks.push({
       type: "text",
       text: `\n\n## Player Read\n${sections.playerRead}`,
+    });
+  }
+
+  // UI state (modelines, style — changes frequently, no cache_control)
+  if (sections.uiState) {
+    blocks.push({
+      type: "text",
+      text: `\n\n## UI State\n${sections.uiState}`,
     });
   }
 

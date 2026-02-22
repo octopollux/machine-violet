@@ -1,11 +1,10 @@
 import { useCallback } from "react";
 import type Anthropic from "@anthropic-ai/sdk";
-import type { FrameStyle, StyleVariant } from "../../types/tui.js";
+import type { FrameStyle, StyleVariant, NarrativeLine, ActiveModal } from "../../types/tui.js";
 import type { EngineState, EngineCallbacks } from "../../agents/game-engine.js";
 import type { TuiCommand, UsageStats } from "../../agents/agent-loop.js";
 import type { GameState } from "../../agents/game-state.js";
 import type { FileIO } from "../../agents/scene-manager.js";
-import type { ActiveModal } from "../../app.js";
 import { getStyle } from "../frames/index.js";
 import { campaignPaths } from "../../tools/filesystem/index.js";
 import { getActivePlayer } from "../../agents/player-manager.js";
@@ -14,14 +13,15 @@ import { getModel } from "../../config/models.js";
 import { CostTracker } from "../../context/cost-tracker.js";
 import { isDevMode } from "../../config/dev-mode.js";
 import type { ToolResult } from "../../agents/tool-registry.js";
+import { appendDelta } from "../narrative-helpers.js";
 
 /** All external state/setters the hook needs, passed as a single deps object. */
 export interface GameCallbackDeps {
   // Setters
-  setNarrativeLines: React.Dispatch<React.SetStateAction<string[]>>;
+  setNarrativeLines: React.Dispatch<React.SetStateAction<NarrativeLine[]>>;
   setEngineState: (s: string | null) => void;
   setErrorMsg: (s: string | null) => void;
-  setModelineOverride: (s: string | null) => void;
+  setModelines: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   setResources: (r: string[]) => void;
   setStyle: (s: FrameStyle) => void;
   setVariant: (v: StyleVariant) => void;
@@ -45,7 +45,7 @@ export interface GameCallbackResult {
 
 export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
   const {
-    setNarrativeLines, setEngineState, setErrorMsg, setModelineOverride,
+    setNarrativeLines, setEngineState, setErrorMsg, setModelines,
     setResources, setStyle, setVariant, setActiveModal, setChoiceIndex,
     setOocActive,
     gameStateRef, clientRef, activeModalRef, variantRef, previousVariantRef,
@@ -54,9 +54,12 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
 
   const dispatchTuiCommand = useCallback((cmd: TuiCommand) => {
     switch (cmd.type) {
-      case "update_modeline":
-        setModelineOverride(cmd.text as string);
+      case "update_modeline": {
+        const char = cmd.character as string;
+        const text = cmd.text as string;
+        setModelines((prev) => ({ ...prev, [char]: text }));
         break;
+      }
       case "set_ui_style": {
         setVariant(cmd.variant as StyleVariant);
         const found = getStyle(cmd.style as string);
@@ -100,43 +103,23 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
         }
         break;
       }
-      case "pause_for_effect":
-        setActiveModal({
-          kind: "pause",
-          message: cmd.message as string | undefined,
-        });
-        break;
       case "enter_ooc":
         previousVariantRef.current = variantRef.current;
         setOocActive(true);
         setVariant("ooc");
-        setNarrativeLines((prev) => [...prev, "[OOC Mode \u2014 type to chat, ESC to exit]", ""]);
+        setNarrativeLines((prev) => [...prev, { kind: "system", text: "[OOC Mode \u2014 type to chat, ESC to exit]" }, { kind: "dm", text: "" }]);
         break;
     }
-  }, [setModelineOverride, setVariant, setStyle, setResources, setChoiceIndex,
+  }, [setModelines, setVariant, setStyle, setResources, setChoiceIndex,
       setActiveModal, setOocActive, setNarrativeLines, gameStateRef, fileIO,
       previousVariantRef, variantRef]);
 
   const buildCallbacks = useCallback((): EngineCallbacks => ({
     onNarrativeDelta(delta: string) {
-      setNarrativeLines((prev) => {
-        const lines = [...prev];
-        if (lines.length === 0) lines.push(delta);
-        else if (lines[lines.length - 1] === "" && delta !== "") lines.push(delta);
-        else lines[lines.length - 1] += delta;
-        const last = lines[lines.length - 1];
-        if (last.includes("\n")) {
-          const parts = last.split("\n");
-          lines[lines.length - 1] = parts[0];
-          for (let i = 1; i < parts.length; i++) {
-            lines.push(parts[i]);
-          }
-        }
-        return lines;
-      });
+      setNarrativeLines((prev) => appendDelta(prev, delta, "dm"));
     },
     onNarrativeComplete(text: string) {
-      setNarrativeLines((prev) => [...prev, ""]);
+      setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }]);
 
       const gs = gameStateRef.current;
       if (gs && clientRef.current) {
@@ -144,11 +127,11 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
         if (shouldGenerateChoices(gs.config.choices.campaign_default, dmProvided)) {
           const activePlayer = getActivePlayer(gs);
           if (isDevMode()) {
-            setNarrativeLines((prev) => [...prev, "[dev] subagent:choices starting"]);
+            setNarrativeLines((prev) => [...prev, { kind: "dev", text: "[dev] subagent:choices starting" }]);
           }
           generateChoices(clientRef.current, text, activePlayer.characterName).then((result) => {
             if (isDevMode()) {
-              setNarrativeLines((prev) => [...prev, `[dev] subagent:choices → ${result.choices.length} options generated`]);
+              setNarrativeLines((prev) => [...prev, { kind: "dev", text: `[dev] subagent:choices \u2192 ${result.choices.length} options generated` }]);
             }
             if (!activeModalRef.current && result.choices.length > 0) {
               setChoiceIndex(0);
@@ -161,18 +144,13 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
     },
     onStateChange(state: EngineState) {
       setEngineState(state);
-      if (state === "waiting_input") {
-        setVariant("exploration");
-      } else if (state === "tool_running") {
-        setVariant("combat");
-      }
     },
     onTuiCommand(cmd: TuiCommand) {
       dispatchTuiCommand(cmd);
     },
     onToolStart(name: string) {
       if (isDevMode()) {
-        setNarrativeLines((prev) => [...prev, `[dev] tool:${name} ...`]);
+        setNarrativeLines((prev) => [...prev, { kind: "dev", text: `[dev] tool:${name} ...` }]);
       }
     },
     onToolEnd(name: string, result?: ToolResult) {
@@ -181,11 +159,11 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
           ? result.content.slice(0, 77) + "..."
           : result.content;
         const status = result.is_error ? " ERROR" : "";
-        setNarrativeLines((prev) => [...prev, `[dev] tool:${name}${status} → ${preview}`]);
+        setNarrativeLines((prev) => [...prev, { kind: "dev", text: `[dev] tool:${name}${status} \u2192 ${preview}` }]);
       }
     },
     onDevLog(msg: string) {
-      setNarrativeLines((prev) => [...prev, msg]);
+      setNarrativeLines((prev) => [...prev, { kind: "dev", text: msg }]);
     },
     onExchangeDropped() { /* precis update handled internally */ },
     onUsageUpdate(usage: UsageStats) {
@@ -193,12 +171,16 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
     },
     onError(error: Error) {
       setErrorMsg(error.message);
-      setNarrativeLines((prev) => [...prev, `[Error: ${error.message}]`]);
+      setNarrativeLines((prev) => [
+        ...prev,
+        { kind: "system", text: `[Error: ${error.message}]` },
+        { kind: "system", text: "[Debug info saved to .debug/ folder]" },
+      ]);
     },
     onRetry(status: number, delayMs: number) {
       setEngineState(`retry:${status}:${Math.ceil(delayMs / 1000)}`);
     },
-  }), [dispatchTuiCommand, setNarrativeLines, setEngineState, setVariant,
+  }), [dispatchTuiCommand, setNarrativeLines, setEngineState,
        setErrorMsg, setActiveModal, setChoiceIndex,
        gameStateRef, clientRef, activeModalRef, costTracker]);
 

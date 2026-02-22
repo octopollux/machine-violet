@@ -1,89 +1,31 @@
 import React, { useState, useRef, useMemo } from "react";
 import { useInput, useStdout, Box } from "ink";
-import type Anthropic from "@anthropic-ai/sdk";
-import type { FrameStyle, StyleVariant } from "../types/tui.js";
-import type { ActiveModal } from "../app.js";
+import { appendDelta } from "../tui/narrative-helpers.js";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
 import { scrollAmount } from "../tui/components/index.js";
 import { Layout } from "../tui/layout.js";
-import { Modal, ChoiceModal, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, getMenuItems } from "../tui/modals/index.js";
+import { ChoiceModal, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, getMenuItems } from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
-import type { GameEngine } from "../agents/game-engine.js";
-import type { GameState } from "../agents/game-state.js";
 import { getActivePlayer, switchToNextPlayer, getPlayerEntries } from "../agents/player-manager.js";
-import { CostTracker } from "../context/cost-tracker.js";
 import { enterOOC } from "../agents/subagents/ooc-mode.js";
 import { enterDevMode, summarizeGameState } from "../agents/subagents/dev-mode.js";
 import { getModel } from "../config/models.js";
 import { useTextInput } from "../tui/hooks/useTextInput.js";
+import { useGameContext } from "../tui/game-context.js";
 
-export interface PlayingPhaseProps {
-  // Refs
-  engineRef: React.RefObject<GameEngine | null>;
-  gameStateRef: React.RefObject<GameState | null>;
-  clientRef: React.RefObject<Anthropic | null>;
-  costTracker: React.RefObject<CostTracker>;
-  // Narrative
-  narrativeLines: string[];
-  setNarrativeLines: React.Dispatch<React.SetStateAction<string[]>>;
-  // Style
-  style: FrameStyle;
-  variant: StyleVariant;
-  setVariant: (v: StyleVariant) => void;
-  // Display
-  campaignName: string;
-  activePlayerIndex: number;
-  setActivePlayerIndex: (i: number) => void;
-  engineState: string | null;
-  resources: string[];
-  modelineOverride: string | null;
-  // Modal state (owned by App, since buildCallbacks/dispatchTuiCommand sets it)
-  activeModal: ActiveModal;
-  setActiveModal: (m: ActiveModal) => void;
-  choiceIndex: number;
-  setChoiceIndex: React.Dispatch<React.SetStateAction<number>>;
-  // OOC state (owned by App, since dispatchTuiCommand sets it)
-  oocActive: boolean;
-  setOocActive: (v: boolean) => void;
-  previousVariantRef: React.MutableRefObject<StyleVariant>;
-  // Dev mode state (owned by App)
-  devModeEnabled?: boolean;
-  devActive: boolean;
-  setDevActive: (v: boolean) => void;
-  // Actions
-  dispatchTuiCommand: (cmd: import("../agents/agent-loop.js").TuiCommand) => void;
-  onShutdown: () => void;
-}
-
-export function PlayingPhase({
-  engineRef,
-  gameStateRef,
-  clientRef,
-  costTracker,
-  narrativeLines,
-  setNarrativeLines,
-  style,
-  variant,
-  setVariant,
-  campaignName,
-  activePlayerIndex,
-  setActivePlayerIndex,
-  engineState,
-  resources,
-  modelineOverride,
-  activeModal,
-  setActiveModal,
-  choiceIndex,
-  setChoiceIndex,
-  oocActive,
-  setOocActive,
-  previousVariantRef,
-  devModeEnabled,
-  devActive,
-  setDevActive,
-  dispatchTuiCommand,
-  onShutdown,
-}: PlayingPhaseProps) {
+export function PlayingPhase() {
+  const {
+    engineRef, gameStateRef, clientRef, costTracker,
+    narrativeLines, setNarrativeLines,
+    style, variant, setVariant,
+    campaignName, activePlayerIndex, setActivePlayerIndex,
+    engineState, resources, modelines,
+    activeModal, setActiveModal,
+    choiceIndex, setChoiceIndex,
+    oocActive, setOocActive, previousVariantRef,
+    devModeEnabled, devActive, setDevActive,
+    dispatchTuiCommand, onShutdown, onEndSession,
+  } = useGameContext();
   const { stdout } = useStdout();
   const cols = stdout?.columns ?? 80;
   const rows = stdout?.rows ?? 40;
@@ -130,14 +72,6 @@ export function PlayingPhase({
     // Dice modal: any key dismisses
     if (activeModal && activeModal.kind === "dice") {
       setActiveModal(null);
-      return;
-    }
-
-    // Pause modal: ENTER or ESC dismisses
-    if (activeModal && activeModal.kind === "pause") {
-      if (key.return || key.escape) {
-        setActiveModal(null);
-      }
       return;
     }
 
@@ -189,7 +123,7 @@ export function PlayingPhase({
         setChoiceIndex(0);
         if (engineRef.current && gameStateRef.current) {
           const active = getActivePlayer(gameStateRef.current);
-          setNarrativeLines((prev) => [...prev, "", `> ${active.characterName}: ${chosen}`, ""]);
+          setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }, { kind: "player", text: `> ${active.characterName}: ${chosen}` }, { kind: "dm", text: "" }]);
           engineRef.current.processInput(active.characterName, chosen);
         }
       }
@@ -201,7 +135,7 @@ export function PlayingPhase({
       if (key.escape) {
         setDevActive(false);
         setVariant(previousVariantRef.current);
-        setNarrativeLines((prev) => [...prev, "[Exiting Dev Mode]", ""]);
+        setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Exiting Dev Mode]" }, { kind: "dm", text: "" }]);
         return;
       }
       if (devBusy) return;
@@ -209,7 +143,7 @@ export function PlayingPhase({
       if (key.return && inputValue.trim()) {
         const text = inputValue.trim();
         setInputValue("");
-        setNarrativeLines((prev) => [...prev, `> ${text}`, ""]);
+        setNarrativeLines((prev) => [...prev, { kind: "player", text: `> ${text}` }, { kind: "dm", text: "" }]);
         if (clientRef.current && gameStateRef.current) {
           const gs = gameStateRef.current;
           const fileIO = engineRef.current?.getSceneManager().getFileIO();
@@ -220,19 +154,14 @@ export function PlayingPhase({
             gameState: gs,
             fileIO,
           }, (delta) => {
-            setNarrativeLines((prev) => {
-              const lines = [...prev];
-              if (lines.length === 0) lines.push(delta);
-              else lines[lines.length - 1] += delta;
-              return lines;
-            });
+            setNarrativeLines((prev) => appendDelta(prev, delta, "dm"));
           }).then((result) => {
             setDevBusy(false);
-            setNarrativeLines((prev) => [...prev, ""]);
+            setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }]);
             costTracker.current.record(result.usage, getModel("medium"));
           }).catch(() => {
             setDevBusy(false);
-            setNarrativeLines((prev) => [...prev, "[Dev mode error]", ""]);
+            setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Dev mode error]" }, { kind: "dm", text: "" }]);
           });
         }
         return;
@@ -246,7 +175,7 @@ export function PlayingPhase({
       if (key.escape) {
         setOocActive(false);
         setVariant(previousVariantRef.current);
-        setNarrativeLines((prev) => [...prev, "[Exiting OOC Mode]", ""]);
+        setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Exiting OOC Mode]" }, { kind: "dm", text: "" }]);
         return;
       }
       if (oocBusy) return;
@@ -254,7 +183,7 @@ export function PlayingPhase({
       if (key.return && inputValue.trim()) {
         const text = inputValue.trim();
         setInputValue("");
-        setNarrativeLines((prev) => [...prev, `> ${text}`, ""]);
+        setNarrativeLines((prev) => [...prev, { kind: "player", text: `> ${text}` }, { kind: "dm", text: "" }]);
         if (clientRef.current && gameStateRef.current) {
           const gs = gameStateRef.current;
           setOocBusy(true);
@@ -262,19 +191,14 @@ export function PlayingPhase({
             campaignName: gs.config.name,
             previousVariant: previousVariantRef.current,
           }, (delta) => {
-            setNarrativeLines((prev) => {
-              const lines = [...prev];
-              if (lines.length === 0) lines.push(delta);
-              else lines[lines.length - 1] += delta;
-              return lines;
-            });
+            setNarrativeLines((prev) => appendDelta(prev, delta, "dm"));
           }).then((result) => {
             setOocBusy(false);
-            setNarrativeLines((prev) => [...prev, ""]);
+            setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }]);
             costTracker.current.record(result.usage, getModel("medium"));
           }).catch(() => {
             setOocBusy(false);
-            setNarrativeLines((prev) => [...prev, "[OOC error]", ""]);
+            setNarrativeLines((prev) => [...prev, { kind: "system", text: "[OOC error]" }, { kind: "dm", text: "" }]);
           });
         }
         return;
@@ -304,9 +228,12 @@ export function PlayingPhase({
         const item = menuItems[menuIndex];
         if (item === "Resume") {
           setMenuOpen(false);
-        } else if (item === "Save & Quit") {
+        } else if (item === "Save & Exit") {
           setMenuOpen(false);
           onShutdown();
+        } else if (item === "End Session") {
+          setMenuOpen(false);
+          onEndSession();
         } else if (item === "Character Sheet") {
           setMenuOpen(false);
           const gs = gameStateRef.current;
@@ -319,24 +246,24 @@ export function PlayingPhase({
           if (oocActive) {
             setOocActive(false);
             setVariant(previousVariantRef.current);
-            setNarrativeLines((prev) => [...prev, "[Exiting OOC Mode]", ""]);
+            setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Exiting OOC Mode]" }, { kind: "dm", text: "" }]);
           } else {
             previousVariantRef.current = variant;
             setOocActive(true);
             setVariant("ooc");
-            setNarrativeLines((prev) => [...prev, "[OOC Mode \u2014 type to chat, ESC to exit]", ""]);
+            setNarrativeLines((prev) => [...prev, { kind: "system", text: "[OOC Mode \u2014 type to chat, ESC to exit]" }, { kind: "dm", text: "" }]);
           }
         } else if (item === "Dev Mode") {
           setMenuOpen(false);
           if (devActive) {
             setDevActive(false);
             setVariant(previousVariantRef.current);
-            setNarrativeLines((prev) => [...prev, "[Exiting Dev Mode]", ""]);
+            setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Exiting Dev Mode]" }, { kind: "dm", text: "" }]);
           } else {
             previousVariantRef.current = variant;
             setDevActive(true);
             setVariant("dev");
-            setNarrativeLines((prev) => [...prev, "[Dev Mode \u2014 type to inspect, ESC to exit]", ""]);
+            setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Dev Mode \u2014 type to inspect, ESC to exit]" }, { kind: "dm", text: "" }]);
           }
         }
         return;
@@ -369,7 +296,7 @@ export function PlayingPhase({
       setInputValue("");
       if (engineRef.current && gameStateRef.current) {
         const active = getActivePlayer(gameStateRef.current);
-        setNarrativeLines((prev) => [...prev, "", `> ${active.characterName}: ${text}`, ""]);
+        setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }, { kind: "player", text: `> ${active.characterName}: ${text}` }, { kind: "dm", text: "" }]);
         engineRef.current.processInput(active.characterName, text);
       }
       return;
@@ -392,8 +319,6 @@ export function PlayingPhase({
         return 8 + 2;
       case "recap":
         return Math.min(activeModal.lines.length + 2, Math.floor(rows / 2));
-      case "pause":
-        return 3 + 2; // message + blank + prompt + top/bottom borders
       default:
         return 0;
     }
@@ -407,7 +332,7 @@ export function PlayingPhase({
         style={style}
         variant={variant}
         narrativeLines={narrativeLines}
-        modelineText={modelineOverride ?? `${costTracker.current.formatTerse()} | ${campaignName}`}
+        modelineText={modelines[activeChar] ?? `${costTracker.current.formatTerse()} | ${campaignName}`}
         inputValue={inputValue}
         activeCharacterName={activeChar}
         players={players}
@@ -416,7 +341,9 @@ export function PlayingPhase({
         resources={resources}
         turnHolder={activeChar}
         engineState={engineState}
-        quoteColor={gameStateRef.current?.config.players[activePlayerIndex]?.color ?? "#ffffff"}
+        quoteColor="#ffffff"
+        playerColor={gameStateRef.current?.config.players[activePlayerIndex]?.color}
+        turnIndicatorColor={engineState === "waiting_input" ? gameStateRef.current?.config.players[activePlayerIndex]?.color : undefined}
         narrativeRef={narrativeRef}
       />
       {activeModal?.kind === "choice" && (
@@ -444,13 +371,6 @@ export function PlayingPhase({
           variant={style.variants[variant]}
           width={cols}
           lines={activeModal.lines}
-        />
-      )}
-      {activeModal?.kind === "pause" && (
-        <Modal
-          variant={style.variants[variant]}
-          width={cols}
-          children={[activeModal.message || "", "", "[Press ENTER to continue]"]}
         />
       )}
       {activeModal?.kind === "character_sheet" && (

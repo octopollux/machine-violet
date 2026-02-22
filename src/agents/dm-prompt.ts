@@ -20,6 +20,7 @@ export interface DMSessionState {
   activeState?: string;
   scenePrecis?: string;
   playerRead?: string;
+  uiState?: string;
 }
 
 /**
@@ -75,6 +76,27 @@ export function buildActiveState(params: {
   }
 
   return lines.join("\n");
+}
+
+/**
+ * Build the UI state section for the DM's prefix.
+ * Shows current modelines and style info so the DM can maintain consistency.
+ */
+export function buildUIState(params: {
+  modelines: Record<string, string>;
+  styleName: string;
+  variant: string;
+}): string | undefined {
+  const lines: string[] = [];
+  const entries = Object.entries(params.modelines);
+  if (entries.length > 0) {
+    lines.push("Modelines (as last set by you):");
+    for (const [char, text] of entries) {
+      lines.push(`  ${char}: ${text}`);
+    }
+  }
+  lines.push(`UI: style=${params.styleName}, variant=${params.variant}`);
+  return lines.length > 0 ? lines.join("\n") : undefined;
 }
 
 /** Exported for testing */
