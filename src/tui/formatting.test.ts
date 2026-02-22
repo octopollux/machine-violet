@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseFormatting, toPlainText, highlightQuotesWithState, computeQuoteState, healTagBoundaries, scanTagChanges, markdownToTags, padAlignmentLines, visibleLength, wrapLine, wrapAndHealLines } from "./formatting.js";
+import { parseFormatting, toPlainText, highlightQuotesWithState, markdownToTags, nodeVisibleLength, wrapNodes, processNarrativeLines } from "./formatting.js";
 import type { FormattingTag, NarrativeLine } from "../types/tui.js";
 
 describe("parseFormatting", () => {
@@ -153,27 +153,13 @@ describe("highlightQuotesWithState", () => {
     expect(result[2]).toBe(" quietly.");
   });
 
-  it("threads quote state across multiple nodes (multiline)", () => {
-    // Simulate 3 lines where a quote spans from line 1 into line 3
-    const lines: NarrativeLine[] = [
-      { kind: "dm", text: 'The wizard said "Beware' },
-      { kind: "dm", text: "the darkness that" },
-      { kind: "dm", text: 'lurks within." Then silence.' },
-    ];
-    const states = computeQuoteState(lines);
-    // After line 0: inQuote=true (one open quote)
-    expect(states[0]).toBe(true);
-    // After line 1: still true (no quotes)
-    expect(states[1]).toBe(true);
-    // After line 2: false (closing quote)
-    expect(states[2]).toBe(false);
-
-    // Now highlight line 1 (middle line, entirely inside quote)
-    const nodes1 = parseFormatting(lines[1].text);
-    const result1 = highlightQuotesWithState(nodes1, color, true);
+  it("highlights mid-quote line when startInQuote is true", () => {
+    // Line entirely inside a quote
+    const nodes = parseFormatting("the darkness that");
+    const result = highlightQuotesWithState(nodes, color, true);
     // Entire text should be wrapped in a color node (mid-quote)
-    expect(result1).toHaveLength(1);
-    const tag = result1[0] as FormattingTag;
+    expect(result).toHaveLength(1);
+    const tag = result[0] as FormattingTag;
     expect(tag.type).toBe("color");
     expect(tag.color).toBe(color);
   });
@@ -226,33 +212,6 @@ describe("highlightQuotesWithState", () => {
       (n) => typeof n !== "string" && n.type === "color" && toPlainText(n.content).includes(" world"),
     );
     expect(worldNode).toBeDefined();
-  });
-});
-
-describe("scanTagChanges", () => {
-  it("detects open and close tags", () => {
-    const changes = scanTagChanges("<b>hello</b>");
-    expect(changes).toEqual([
-      { kind: "open", name: "b", raw: "<b>" },
-      { kind: "close", name: "b", raw: "</b>" },
-    ]);
-  });
-
-  it("detects color tags", () => {
-    const changes = scanTagChanges("<color=#ff0000>red</color>");
-    expect(changes).toEqual([
-      { kind: "open", name: "color", raw: "<color=#ff0000>" },
-      { kind: "close", name: "color", raw: "</color>" },
-    ]);
-  });
-
-  it("returns empty for plain text", () => {
-    expect(scanTagChanges("no tags here")).toEqual([]);
-  });
-
-  it("handles unclosed tags", () => {
-    const changes = scanTagChanges("<i>hello");
-    expect(changes).toEqual([{ kind: "open", name: "i", raw: "<i>" }]);
   });
 });
 
@@ -311,353 +270,358 @@ describe("markdownToTags", () => {
   });
 });
 
-describe("healTagBoundaries", () => {
-  it("heals italic spanning two lines", () => {
-    const result = healTagBoundaries(["<i>hello", "world</i>"]);
-    expect(result).toEqual(["<i>hello</i>", "<i>world</i>"]);
-  });
-
-  it("heals italic spanning three lines", () => {
-    const result = healTagBoundaries([
-      "<i>The door creaked open,",
-      "revealing ancient horrors.",
-      "She screamed.</i> The end.",
-    ]);
-    expect(result).toEqual([
-      "<i>The door creaked open,</i>",
-      "<i>revealing ancient horrors.</i>",
-      "<i>She screamed.</i> The end.",
-    ]);
-  });
-
-  it("heals nested bold+italic spanning two lines", () => {
-    const result = healTagBoundaries(["<b><i>hello", "world</i></b>"]);
-    expect(result).toEqual(["<b><i>hello</i></b>", "<b><i>world</i></b>"]);
-  });
-
-  it("passes through lines with no tags unchanged", () => {
-    const input = ["plain line one", "plain line two"];
-    expect(healTagBoundaries(input)).toEqual(input);
-  });
-
-  it("passes through lines with self-contained tags unchanged", () => {
-    const input = ["<b>bold</b> text", "normal"];
-    expect(healTagBoundaries(input)).toEqual(input);
-  });
-
-  it("handles mixed tagged and plain lines", () => {
-    const result = healTagBoundaries([
-      "<i>start italic",
-      "still italic</i>",
-      "plain text",
-      "<b>bold text</b>",
-    ]);
-    expect(result).toEqual([
-      "<i>start italic</i>",
-      "<i>still italic</i>",
-      "plain text",
-      "<b>bold text</b>",
-    ]);
-  });
-
-  it("heals color tags spanning lines", () => {
-    const result = healTagBoundaries([
-      "<color=#ff0000>red text",
-      "more red</color>",
-    ]);
-    expect(result).toEqual([
-      "<color=#ff0000>red text</color>",
-      "<color=#ff0000>more red</color>",
-    ]);
-  });
-
-  it("handles empty lines array", () => {
-    expect(healTagBoundaries([])).toEqual([]);
-  });
-
-  it("handles empty string lines within open tags", () => {
-    const result = healTagBoundaries(["<i>start", "", "end</i>"]);
-    expect(result).toEqual(["<i>start</i>", "<i></i>", "<i>end</i>"]);
-  });
-});
-
-describe("padAlignmentLines", () => {
-  const dm = (text: string): NarrativeLine => ({ kind: "dm", text });
-
-  it("inserts blank line before centered line when preceded by non-empty", () => {
-    const result = padAlignmentLines([dm("Some text"), dm("<center>Title</center>")]);
-    expect(result).toEqual([dm("Some text"), dm(""), dm("<center>Title</center>")]);
-  });
-
-  it("inserts blank line after centered line when followed by non-empty", () => {
-    const result = padAlignmentLines([dm("<center>Title</center>"), dm("Some text")]);
-    expect(result).toEqual([dm("<center>Title</center>"), dm(""), dm("Some text")]);
-  });
-
-  it("inserts blank lines both before and after", () => {
-    const result = padAlignmentLines([dm("Before"), dm("<center>Title</center>"), dm("After")]);
-    expect(result).toEqual([dm("Before"), dm(""), dm("<center>Title</center>"), dm(""), dm("After")]);
-  });
-
-  it("works for <right> tags", () => {
-    const result = padAlignmentLines([dm("Before"), dm("<right>— Author</right>"), dm("After")]);
-    expect(result).toEqual([dm("Before"), dm(""), dm("<right>— Author</right>"), dm(""), dm("After")]);
-  });
-
-  it("does not double-pad when blank line already present before", () => {
-    const result = padAlignmentLines([dm("Some text"), dm(""), dm("<center>Title</center>")]);
-    expect(result).toEqual([dm("Some text"), dm(""), dm("<center>Title</center>")]);
-  });
-
-  it("does not double-pad when blank line already present after", () => {
-    const result = padAlignmentLines([dm("<center>Title</center>"), dm(""), dm("Some text")]);
-    expect(result).toEqual([dm("<center>Title</center>"), dm(""), dm("Some text")]);
-  });
-
-  it("handles center line at start of array", () => {
-    const result = padAlignmentLines([dm("<center>Title</center>"), dm("After")]);
-    expect(result).toEqual([dm("<center>Title</center>"), dm(""), dm("After")]);
-  });
-
-  it("handles center line at end of array", () => {
-    const result = padAlignmentLines([dm("Before"), dm("<center>Title</center>")]);
-    expect(result).toEqual([dm("Before"), dm(""), dm("<center>Title</center>")]);
-  });
-
-  it("handles consecutive center lines", () => {
-    const result = padAlignmentLines([
-      dm("Before"),
-      dm("<center>Title</center>"),
-      dm("<center>Subtitle</center>"),
-      dm("After"),
-    ]);
-    expect(result).toEqual([
-      dm("Before"),
-      dm(""),
-      dm("<center>Title</center>"),
-      dm(""),
-      dm("<center>Subtitle</center>"),
-      dm(""),
-      dm("After"),
-    ]);
-  });
-
-  it("passes through lines with no alignment tags unchanged", () => {
-    const input: NarrativeLine[] = [dm("Hello"), dm("World"), dm("")];
-    expect(padAlignmentLines(input)).toEqual(input);
-  });
-
-  it("handles empty array", () => {
-    expect(padAlignmentLines([])).toEqual([]);
-  });
-
-  it("handles center with leading/trailing whitespace", () => {
-    const result = padAlignmentLines([dm("Before"), dm("  <center>Title</center>  "), dm("After")]);
-    expect(result).toEqual([dm("Before"), dm(""), dm("  <center>Title</center>  "), dm(""), dm("After")]);
-  });
-});
-
-describe("visibleLength", () => {
+describe("nodeVisibleLength", () => {
   it("counts plain text characters", () => {
-    expect(visibleLength("hello world")).toBe(11);
+    expect(nodeVisibleLength(["hello world"])).toBe(11);
   });
 
   it("skips bold tags", () => {
-    expect(visibleLength("<b>bold</b>")).toBe(4);
+    expect(nodeVisibleLength(parseFormatting("<b>bold</b>"))).toBe(4);
   });
 
   it("skips italic tags", () => {
-    expect(visibleLength("<i>italic</i>")).toBe(6);
+    expect(nodeVisibleLength(parseFormatting("<i>italic</i>"))).toBe(6);
   });
 
   it("skips color tags", () => {
-    expect(visibleLength("<color=#ff0000>red text</color>")).toBe(8);
+    expect(nodeVisibleLength(parseFormatting("<color=#ff0000>red text</color>"))).toBe(8);
   });
 
   it("skips nested tags", () => {
-    expect(visibleLength("<b><i>nested</i></b>")).toBe(6);
+    expect(nodeVisibleLength(parseFormatting("<b><i>nested</i></b>"))).toBe(6);
   });
 
-  it("treats unrecognized < as visible", () => {
-    expect(visibleLength("3 < 5")).toBe(5);
-  });
-
-  it("returns 0 for empty string", () => {
-    expect(visibleLength("")).toBe(0);
+  it("returns 0 for empty array", () => {
+    expect(nodeVisibleLength([])).toBe(0);
   });
 
   it("handles mixed tags and text", () => {
-    expect(visibleLength("Hello <b>world</b>!")).toBe(12);
+    expect(nodeVisibleLength(parseFormatting("Hello <b>world</b>!"))).toBe(12);
   });
 });
 
-describe("wrapLine", () => {
+describe("wrapNodes", () => {
   it("returns short line unchanged", () => {
-    expect(wrapLine("hello", 80)).toEqual(["hello"]);
+    const nodes = parseFormatting("hello");
+    const result = wrapNodes(nodes, 80);
+    expect(result).toHaveLength(1);
+    expect(toPlainText(result[0])).toBe("hello");
   });
 
   it("wraps at word boundary", () => {
-    const result = wrapLine("hello world", 6);
-    expect(result).toEqual(["hello", "world"]);
+    const nodes = parseFormatting("hello world");
+    const result = wrapNodes(nodes, 6);
+    expect(result).toHaveLength(2);
+    expect(toPlainText(result[0])).toBe("hello");
+    expect(toPlainText(result[1])).toBe("world");
   });
 
   it("wraps long text into multiple lines", () => {
-    const result = wrapLine("aaa bbb ccc ddd", 8);
-    expect(result).toEqual(["aaa bbb", "ccc ddd"]);
+    const nodes = parseFormatting("aaa bbb ccc ddd");
+    const result = wrapNodes(nodes, 8);
+    expect(result).toHaveLength(2);
+    expect(toPlainText(result[0])).toBe("aaa bbb");
+    expect(toPlainText(result[1])).toBe("ccc ddd");
   });
 
   it("handles hard break (single word exceeds width)", () => {
-    const result = wrapLine("abcdefghij", 5);
-    // Word exceeds width but can't split cleanly — goes through as-is
-    expect(result).toEqual(["abcdefghij"]);
+    const nodes = parseFormatting("abcdefghij");
+    const result = wrapNodes(nodes, 5);
+    // Word exceeds width but can't split — goes through on its own line
+    expect(result).toHaveLength(1);
+    expect(toPlainText(result[0])).toBe("abcdefghij");
   });
 
   it("skips tags when counting width", () => {
     // "<b>hello</b> world" = 11 visible chars; with width=12 it fits
-    expect(wrapLine("<b>hello</b> world", 12)).toEqual(["<b>hello</b> world"]);
+    const nodes = parseFormatting("<b>hello</b> world");
+    const result = wrapNodes(nodes, 12);
+    expect(result).toHaveLength(1);
+    expect(toPlainText(result[0])).toBe("hello world");
   });
 
   it("wraps tag-containing text correctly", () => {
     // "<b>hello</b> world foo" = 15 visible; width=10 should wrap
-    // "hello " = 6 vis, "world " = 6 vis → 12 > 10, so "world" goes to next line
-    const result = wrapLine("<b>hello</b> world foo", 10);
-    expect(result).toEqual(["<b>hello</b>", "world foo"]);
+    const nodes = parseFormatting("<b>hello</b> world foo");
+    const result = wrapNodes(nodes, 10);
+    expect(result).toHaveLength(2);
+    expect(toPlainText(result[0])).toBe("hello");
+    expect(toPlainText(result[1])).toBe("world foo");
+  });
+
+  it("preserves tag structure across wrapping", () => {
+    // Bold tag wraps — each line should have valid bold nodes
+    const nodes = parseFormatting("<b>hello world</b>");
+    const result = wrapNodes(nodes, 6);
+    expect(result).toHaveLength(2);
+    // First line should contain a bold node
+    const first = result[0].find((n) => typeof n !== "string" && n.type === "bold");
+    expect(first).toBeDefined();
+    // Second line should also contain a bold node
+    const second = result[1].find((n) => typeof n !== "string" && n.type === "bold");
+    expect(second).toBeDefined();
   });
 
   it("does not wrap alignment lines", () => {
-    const line = "<center>This is a very long centered title that exceeds width</center>";
-    expect(wrapLine(line, 20)).toEqual([line]);
+    const nodes = parseFormatting("<center>This is a very long centered title that exceeds width</center>");
+    const result = wrapNodes(nodes, 20);
+    expect(result).toHaveLength(1);
   });
 
-  it("returns line unchanged when width is 0", () => {
-    expect(wrapLine("hello world", 0)).toEqual(["hello world"]);
+  it("returns nodes unchanged when width is 0", () => {
+    const nodes = parseFormatting("hello world");
+    const result = wrapNodes(nodes, 0);
+    expect(result).toHaveLength(1);
+    expect(toPlainText(result[0])).toBe("hello world");
   });
 
-  it("handles empty string", () => {
-    expect(wrapLine("", 80)).toEqual([""]);
+  it("handles empty nodes", () => {
+    const result = wrapNodes([], 80);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual([]);
   });
 });
 
-describe("wrapAndHealLines", () => {
+describe("processNarrativeLines", () => {
   const dm = (text: string): NarrativeLine => ({ kind: "dm", text });
 
-  it("resets color at source line boundary", () => {
-    const result = wrapAndHealLines([
-      dm("<color=#ff0000>red text"),
-      dm("next line"),
-    ], 80);
-    // First line gets closed; second line should NOT inherit color
-    expect(result).toEqual([
-      dm("<color=#ff0000>red text</color>"),
-      dm("next line"),
-    ]);
-  });
-
-  it("carries color across wrap boundary within same source line", () => {
-    // Source line with color that wraps — color should persist across the wrap
-    const result = wrapAndHealLines([
-      dm("<color=#ff0000>aaa bbb ccc</color>"),
-    ], 8);
-    // Wraps into visual lines; color heals across wrap boundaries
-    expect(result).toEqual([
-      dm("<color=#ff0000>aaa bbb</color>"),
-      dm("<color=#ff0000>ccc</color>"),
-    ]);
-  });
-
   it("b/i/u persist across source boundaries", () => {
-    const result = wrapAndHealLines([
+    const result = processNarrativeLines([
       dm("<i>italic start"),
       dm("still italic</i>"),
     ], 80);
-    expect(result).toEqual([
-      dm("<i>italic start</i>"),
-      dm("<i>still italic</i>"),
-    ]);
+    // Second line should have italic content
+    const plain1 = toPlainText(result[1].nodes);
+    expect(plain1).toBe("still italic");
+    // Check that it's wrapped in italic
+    const hasItalic = result[1].nodes.some(
+      (n) => typeof n !== "string" && n.type === "italic",
+    );
+    expect(hasItalic).toBe(true);
+  });
+
+  it("color resets at source line boundary", () => {
+    const result = processNarrativeLines([
+      dm("<color=#ff0000>red text"),
+      dm("next line"),
+    ], 80);
+    // Second line should NOT have color
+    const plain1 = toPlainText(result[1].nodes);
+    expect(plain1).toBe("next line");
+    // Should be plain text, no color tag
+    expect(result[1].nodes).toEqual(["next line"]);
   });
 
   it("b persists but color resets at source boundary", () => {
-    const result = wrapAndHealLines([
+    const result = processNarrativeLines([
       dm("<b><color=#ff0000>bold red"),
       dm("next line</b>"),
     ], 80);
-    // b should persist, color should reset
-    expect(result).toEqual([
-      dm("<b><color=#ff0000>bold red</color></b>"),
-      dm("<b>next line</b>"),
-    ]);
+    // Second line should be bold but not colored
+    const plain1 = toPlainText(result[1].nodes);
+    expect(plain1).toBe("next line");
+    const hasBold = result[1].nodes.some(
+      (n) => typeof n !== "string" && n.type === "bold",
+    );
+    expect(hasBold).toBe(true);
+    // Should NOT have a color tag at the top level
+    const hasColor = result[1].nodes.some(
+      (n) => typeof n !== "string" && n.type === "color",
+    );
+    expect(hasColor).toBe(false);
   });
 
   it("handles lines with no tags", () => {
-    const result = wrapAndHealLines([dm("plain line"), dm("another line")], 80);
-    expect(result).toEqual([dm("plain line"), dm("another line")]);
+    const result = processNarrativeLines([dm("plain line"), dm("another line")], 80);
+    expect(toPlainText(result[0].nodes)).toBe("plain line");
+    expect(toPlainText(result[1].nodes)).toBe("another line");
   });
 
   it("handles empty lines array", () => {
-    expect(wrapAndHealLines([], 80)).toEqual([]);
+    expect(processNarrativeLines([], 80)).toEqual([]);
   });
 
   it("handles width 0 (no wrapping, still heals)", () => {
-    const result = wrapAndHealLines([
+    const result = processNarrativeLines([
       dm("<i>italic"),
       dm("continued</i>"),
     ], 0);
-    expect(result).toEqual([
-      dm("<i>italic</i>"),
-      dm("<i>continued</i>"),
-    ]);
+    // Both lines should have italic content
+    const hasItalic0 = result[0].nodes.some(
+      (n) => typeof n !== "string" && n.type === "italic",
+    );
+    const hasItalic1 = result[1].nodes.some(
+      (n) => typeof n !== "string" && n.type === "italic",
+    );
+    expect(hasItalic0).toBe(true);
+    expect(hasItalic1).toBe(true);
   });
 
   it("color does not leak across multiple source lines", () => {
-    const result = wrapAndHealLines([
+    const result = processNarrativeLines([
       dm("<color=#ff0000>red</color>"),
       dm("normal"),
       dm("<color=#00ff00>green"),
       dm("should not be green"),
     ], 80);
-    expect(result).toEqual([
-      dm("<color=#ff0000>red</color>"),
-      dm("normal"),
-      dm("<color=#00ff00>green</color>"),
-      dm("should not be green"),
-    ]);
-  });
-});
-
-describe("typed NarrativeLine pipeline", () => {
-  it("dev lines with JSON quotes do not corrupt quote state", () => {
-    const lines: NarrativeLine[] = [
-      { kind: "dm", text: 'He said "hello' },
-      { kind: "dev", text: '[dev] tool:read → {"name":"value"}' },
-      { kind: "dm", text: 'world"' },
-    ];
-    const states = computeQuoteState(lines);
-    expect(states[0]).toBe(true);
-    expect(states[1]).toBe(true);  // dev line ignored, state unchanged
-    expect(states[2]).toBe(false); // dm line closes quote
+    expect(toPlainText(result[1].nodes)).toBe("normal");
+    expect(result[1].nodes).toEqual(["normal"]);
+    expect(toPlainText(result[3].nodes)).toBe("should not be green");
+    expect(result[3].nodes).toEqual(["should not be green"]);
   });
 
-  it("dev lines with formatting tags do not corrupt heal state", () => {
-    const lines: NarrativeLine[] = [
-      { kind: "dm", text: "<i>italic start" },
-      { kind: "dev", text: "[dev] tool:read → <b>unclosed" },
-      { kind: "dm", text: "still italic</i>" },
-    ];
-    const result = wrapAndHealLines(lines, 80);
-    expect(result[0]).toEqual({ kind: "dm", text: "<i>italic start</i>" });
-    expect(result[1]).toEqual({ kind: "dev", text: "[dev] tool:read → <b>unclosed" });
-    expect(result[2]).toEqual({ kind: "dm", text: "<i>still italic</i>" });
+  it("pads alignment lines with blank lines", () => {
+    const result = processNarrativeLines([
+      dm("Before"),
+      dm("<center>Title</center>"),
+      dm("After"),
+    ], 80);
+    // Should be: Before, blank, center, blank, After
+    expect(result).toHaveLength(5);
+    expect(toPlainText(result[0].nodes)).toBe("Before");
+    expect(toPlainText(result[1].nodes)).toBe(""); // blank
+    expect(result[2].alignment).toBe("center");
+    expect(toPlainText(result[3].nodes)).toBe(""); // blank
+    expect(toPlainText(result[4].nodes)).toBe("After");
   });
 
-  it("non-dm lines preserve their kind through wrapping", () => {
-    const lines: NarrativeLine[] = [
+  it("pads right alignment lines", () => {
+    const result = processNarrativeLines([
+      dm("Before"),
+      dm("<right>— Author</right>"),
+      dm("After"),
+    ], 80);
+    expect(result).toHaveLength(5);
+    expect(result[2].alignment).toBe("right");
+  });
+
+  it("does not double-pad when blank line already present", () => {
+    const result = processNarrativeLines([
+      dm("Some text"),
+      dm(""),
+      dm("<center>Title</center>"),
+    ], 80);
+    // blank line already before center, should not add another
+    expect(result).toHaveLength(3);
+  });
+
+  it("quote highlighting works within processNarrativeLines", () => {
+    const quoteColor = "#ffffff";
+    const result = processNarrativeLines([
+      dm('He said "hello" quietly.'),
+    ], 80, quoteColor);
+    // Should have quote-highlighted nodes
+    const hasQuoteColor = result[0].nodes.some(
+      (n) => typeof n !== "string" && n.type === "color" && n.color === quoteColor,
+    );
+    expect(hasQuoteColor).toBe(true);
+  });
+
+  it("multiline quotes highlight correctly across lines", () => {
+    const quoteColor = "#ffffff";
+    const result = processNarrativeLines([
+      dm('The wizard said "Beware'),
+      dm("the darkness that"),
+      dm('lurks within." Then silence.'),
+    ], 80, quoteColor);
+    // Middle line should be entirely highlighted (mid-quote)
+    const midLineNodes = result[1].nodes;
+    const hasColor = midLineNodes.some(
+      (n) => typeof n !== "string" && n.type === "color" && n.color === quoteColor,
+    );
+    expect(hasColor).toBe(true);
+  });
+
+  it("unbalanced quote in paragraph 1 does NOT affect paragraph 2", () => {
+    const quoteColor = "#ffffff";
+    const result = processNarrativeLines([
+      dm('He said "hello'),      // unbalanced open quote
+      dm(""),                     // blank line = paragraph boundary
+      dm("Normal text here."),    // should NOT be highlighted
+    ], 80, quoteColor);
+    // The blank line resets quote state — paragraph 2 should be plain
+    const para2Nodes = result[2].nodes;
+    const hasColor = para2Nodes.some(
+      (n) => typeof n !== "string" && n.type === "color" && n.color === quoteColor,
+    );
+    expect(hasColor).toBe(false);
+  });
+
+  it("multi-line quotes within a paragraph still highlight correctly", () => {
+    const quoteColor = "#ffffff";
+    const result = processNarrativeLines([
+      dm('"Hello'),
+      dm('world"'),
+    ], 80, quoteColor);
+    // Both lines should have quote highlighting
+    const line0HasColor = result[0].nodes.some(
+      (n) => typeof n !== "string" && n.type === "color" && n.color === quoteColor,
+    );
+    const line1HasColor = result[1].nodes.some(
+      (n) => typeof n !== "string" && n.type === "color" && n.color === quoteColor,
+    );
+    expect(line0HasColor).toBe(true);
+    expect(line1HasColor).toBe(true);
+  });
+
+  it("non-dm lines pass through without affecting DM formatting state", () => {
+    const result = processNarrativeLines([
       { kind: "system", text: "Welcome to the game." },
-      { kind: "dm", text: "<b>bold</b> text" },
+      dm("<b>bold</b> text"),
       { kind: "player", text: "> Alice: attack" },
-    ];
-    const result = wrapAndHealLines(lines, 80);
+    ], 80);
     expect(result[0].kind).toBe("system");
     expect(result[1].kind).toBe("dm");
     expect(result[2].kind).toBe("player");
+  });
+
+  it("dev lines with JSON quotes do not corrupt quote state", () => {
+    const quoteColor = "#ffffff";
+    const result = processNarrativeLines([
+      dm('He said "hello'),
+      { kind: "dev", text: '[dev] tool:read → {"name":"value"}' },
+      dm('world"'),
+    ], 80, quoteColor);
+    // The dev line should not affect DM quote state
+    // Line 2 (dm: 'world"') should have quote highlighting (closing quote)
+    const dmLine = result[2]; // dm line after dev
+    const hasColor = dmLine.nodes.some(
+      (n) => typeof n !== "string" && n.type === "color" && n.color === quoteColor,
+    );
+    expect(hasColor).toBe(true);
+  });
+
+  it("dev lines with formatting tags do not corrupt heal state", () => {
+    const result = processNarrativeLines([
+      dm("<i>italic start"),
+      { kind: "dev", text: "[dev] tool:read → <b>unclosed" },
+      dm("still italic</i>"),
+    ], 80);
+    // First DM line should have italic
+    const hasItalic0 = result[0].nodes.some(
+      (n) => typeof n !== "string" && n.type === "italic",
+    );
+    expect(hasItalic0).toBe(true);
+    // Dev line passes through as plain text
+    expect(result[1].kind).toBe("dev");
+    // Third line (second DM line) should still have italic from cross-line healing
+    const hasItalic2 = result[2].nodes.some(
+      (n) => typeof n !== "string" && n.type === "italic",
+    );
+    expect(hasItalic2).toBe(true);
+  });
+
+  it("wrapping preserves tag structure (no broken tags)", () => {
+    const result = processNarrativeLines([
+      dm("<b>hello world</b>"),
+    ], 6);
+    // Should wrap into 2 lines, each with valid bold structure
+    expect(result.length).toBeGreaterThanOrEqual(2);
+    for (const line of result) {
+      const hasBold = line.nodes.some(
+        (n) => typeof n !== "string" && n.type === "bold",
+      );
+      expect(hasBold).toBe(true);
+    }
   });
 });

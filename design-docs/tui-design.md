@@ -91,7 +91,7 @@ The modeline glyph column is used when the activity line has been dropped due to
 
 ## DM Text Formatting
 
-The DM can use a small set of inline tags in narration for dramatic effect. These are parsed from the DM's text output and rendered as Ink components.
+The DM can use a small set of inline tags in narration for dramatic effect. These are processed through a single AST-based pipeline (`processNarrativeLines`) and rendered as Ink components.
 
 Available tags:
 - `<b>`, `<i>`, `<u>` — bold, italic, underline
@@ -102,9 +102,21 @@ The DM prompt includes one line: *"You can use `<b>`, `<i>`, `<u>`, `<center>`, 
 
 Unrecognized tags are stripped. Malformed tags render as plain text. This is cosmetic — no tag changes game state.
 
+### Formatting Pipeline
+
+All DM text processing flows through `processNarrativeLines(lines, width, quoteColor?) → ProcessedLine[]`:
+
+1. **Heal** cross-line tags on raw strings (`b`/`i`/`u` persist across source lines; `color` resets at source boundaries)
+2. **Parse** healed text into `FormattingNode[]` AST via `parseFormatting`
+3. **Wrap** each AST at terminal width via `wrapNodes` (tags never break across lines)
+4. **Pad** alignment lines (`<center>`, `<right>`) with blank lines for breathing room
+5. **Quote highlight** with paragraph-scoped reset (blank DM lines reset quote state)
+
+Non-DM lines (player, dev, system) pass through without entering the formatting pipeline.
+
 ### Quote Highlighting
 
-In addition to explicit tags, the narrative area automatically detects quoted dialogue (`"..."`) and applies color highlighting (default: bright white). This makes NPC speech visually distinct without the DM needing to use `<color>` tags. Quote state is tracked across line boundaries so multi-line dialogue renders correctly.
+The narrative area automatically detects quoted dialogue (`"..."`) and applies color highlighting (default: bright white). This makes NPC speech visually distinct without the DM needing to use `<color>` tags. Quote state is tracked across line boundaries so multi-line dialogue renders correctly. Quote state resets at paragraph boundaries (blank DM lines) to prevent an unbalanced quote from inverting all subsequent highlighting.
 
 
 ## Frame Style System

@@ -80,6 +80,11 @@ Key docs: `tools-catalog.md`, `subagents-catalog.md`, `development-plan.md`, `tu
 - **Ink components** tested via `ink-testing-library`: `render(<C />)` → `lastFrame().toContain(...)` (string inspection, no DOM).
 - Vitest `globals: true` — `describe`/`it`/`expect` available without import.
 
+### DM Text Formatting Pipeline
+- `processNarrativeLines()` in `src/tui/formatting.ts` is the single entry point for the rendering pipeline.
+- Pipeline: heal raw strings → parse to `FormattingNode[]` AST → wrap (`wrapNodes`) → pad alignment → quote highlight.
+- Quote state resets at paragraph boundaries (blank DM lines). `b`/`i`/`u` persist across source lines; `color` resets.
+
 ### DM Identity (not an assistant)
 - The DM decides things, says no, lets bad things happen, has secrets, surprises itself.
 - Dice for narrative choices — roll when the story could go several ways, commit to the result.

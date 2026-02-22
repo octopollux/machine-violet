@@ -152,12 +152,14 @@ The visual application. No game logic yet — just the layout rendering with moc
 - [ ] `TurnIndicator` — lower frame centered text with flourish
 
 ### 3.4 DM text formatting parser (`src/tui/formatting.ts`)
-- [ ] Parse tags from DM text output: `<b>`, `<i>`, `<u>`, `<center>`, `<right>`, `<color=#hex>`
-- [ ] Convert parsed tags to Ink components (`<Text bold>`, `<Text color="#hex">`, `<Box justifyContent>`)
-- [ ] Strip unrecognized tags. Render malformed tags as plain text.
-- [ ] Nested tags
+- [x] Parse tags from DM text output: `<b>`, `<i>`, `<u>`, `<center>`, `<right>`, `<color=#hex>`
+- [x] Convert parsed tags to Ink components (`<Text bold>`, `<Text color="#hex">`, `<Box justifyContent>`)
+- [x] Strip unrecognized tags. Render malformed tags as plain text.
+- [x] Nested tags
+- [x] AST-based pipeline: `processNarrativeLines` (heal → parse → wrap → pad → quote highlight)
+- [x] Paragraph-scoped quote reset (blank DM lines reset quote state)
 
-**Tests**: Every tag type. Nesting. Malformed input. Unrecognized tags. Empty content.
+**Tests**: Every tag type. Nesting. Malformed input. Unrecognized tags. Empty content. AST wrapping. Cross-line healing. Quote paragraph reset.
 
 ### 3.5 Modal system (`src/tui/modals/`)
 - [ ] Base modal component: themed border (inherits active style variant), overlay behavior, dismiss handling

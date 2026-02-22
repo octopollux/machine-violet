@@ -2,8 +2,8 @@ import React, { useRef, useEffect, useState, useCallback, useMemo, forwardRef } 
 import { Text, Box } from "ink";
 import { ScrollView } from "ink-scroll-view";
 import type { ScrollViewRef } from "ink-scroll-view";
-import type { NarrativeLine } from "../../types/tui.js";
-import { parseFormatting, computeQuoteState, highlightQuotesWithState, wrapAndHealLines, padAlignmentLines } from "../formatting.js";
+import type { NarrativeLine, ProcessedLine } from "../../types/tui.js";
+import { processNarrativeLines } from "../formatting.js";
 import { renderNodes } from "../render-nodes.js";
 import { useScrollHandle } from "../hooks/useScrollHandle.js";
 import type { ScrollHandle } from "../hooks/useScrollHandle.js";
@@ -84,26 +84,20 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
     return () => { process.stdout.off("resize", onResize); };
   }, [updateScrollState]);
 
-  // Pre-wrap + heal formatting tags (resets color at source boundaries), then pad
-  const healedLines = useMemo(() => wrapAndHealLines(lines, width ?? 0), [lines, width]);
-  const paddedLines = useMemo(() => padAlignmentLines(healedLines), [healedLines]);
-
-  // Pre-compute quote state across padded lines (must match paddedLines indices)
-  const quoteStates = useMemo(
-    () => quoteColor ? computeQuoteState(paddedLines) : undefined,
-    [quoteColor, paddedLines],
+  // Single-pass AST pipeline: parse → heal → wrap → pad → quote highlight
+  const processedLines = useMemo(
+    () => processNarrativeLines(lines, width ?? 0, quoteColor),
+    [lines, width, quoteColor],
   );
 
   return (
     <Box height={maxRows} flexDirection="column">
       <ScrollView ref={scrollRef} onScroll={handleScroll}>
-        {paddedLines.map((line, i) => (
+        {processedLines.map((line, i) => (
           <NarrativeLineComponent
             key={i}
             line={line}
-            quoteColor={quoteColor}
             playerColor={playerColor}
-            quoteOpen={quoteStates ? (i > 0 && quoteStates[i - 1]) : false}
             width={width}
           />
         ))}
@@ -118,49 +112,51 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
 });
 
 /** A single narrative line rendered based on its kind. */
-function NarrativeLineComponent({ line, quoteColor, playerColor, quoteOpen, width }: {
-  line: NarrativeLine;
-  quoteColor?: string;
+function NarrativeLineComponent({ line, playerColor, width }: {
+  line: ProcessedLine;
   playerColor?: string;
-  quoteOpen: boolean;
   width?: number;
 }) {
   switch (line.kind) {
-    case "dev":
-      return <Text wrap="truncate" dimColor color="gray">{line.text}</Text>;
+    case "dev": {
+      const text = typeof line.nodes[0] === "string" ? line.nodes[0] : "";
+      return <Text wrap="truncate" dimColor color="gray">{text}</Text>;
+    }
 
-    case "player":
-      if (playerColor && line.text.startsWith("> ")) {
+    case "player": {
+      const text = typeof line.nodes[0] === "string" ? line.nodes[0] : "";
+      if (playerColor && text.startsWith("> ")) {
         return (
           <Text wrap="truncate">
             <Text color="greenBright">&gt;</Text>
-            <Text color={playerColor}>{line.text.slice(1)}</Text>
+            <Text color={playerColor}>{text.slice(1)}</Text>
           </Text>
         );
       }
-      return <Text wrap="truncate">{line.text}</Text>;
+      return <Text wrap="truncate">{text}</Text>;
+    }
 
-    case "system":
-      return <Text wrap="truncate">{line.text}</Text>;
+    case "system": {
+      const text = typeof line.nodes[0] === "string" ? line.nodes[0] : "";
+      return <Text wrap="truncate">{text}</Text>;
+    }
 
     case "dm": {
-      let nodes = parseFormatting(line.text);
-      if (quoteColor) {
-        nodes = highlightQuotesWithState(nodes, quoteColor, quoteOpen);
-      }
-
-      // Check if the entire line is a single center/right alignment tag
-      if (width && nodes.length === 1 && typeof nodes[0] !== "string"
-          && (nodes[0].type === "center" || nodes[0].type === "right")) {
-        const justify = nodes[0].type === "center" ? "center" : "flex-end";
+      // Alignment lines get Box layout
+      if (width && line.alignment) {
+        const justify = line.alignment === "center" ? "center" : "flex-end";
+        // Unwrap the outer alignment tag to get inner content
+        const inner = line.nodes.length === 1 && typeof line.nodes[0] !== "string"
+          ? line.nodes[0].content
+          : line.nodes;
         return (
           <Box width={width} justifyContent={justify}>
-            <Text wrap="truncate">{renderNodes(nodes[0].content)}</Text>
+            <Text wrap="truncate">{renderNodes(inner)}</Text>
           </Box>
         );
       }
 
-      return <Text wrap="truncate">{renderNodes(nodes)}</Text>;
+      return <Text wrap="truncate">{renderNodes(line.nodes)}</Text>;
     }
   }
 }

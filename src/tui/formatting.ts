@@ -1,4 +1,4 @@
-import type { FormattingNode, FormattingTag, NarrativeLine } from "../types/tui.js";
+import type { FormattingNode, FormattingTag, NarrativeLine, ProcessedLine } from "../types/tui.js";
 
 /**
  * Parse DM text with inline formatting tags into a tree of FormattingNodes.
@@ -77,26 +77,276 @@ export function toPlainText(nodes: FormattingNode[]): string {
 }
 
 /**
- * Track quote state across multiple lines for multiline quote highlighting.
- * Returns an array of booleans indicating whether each line ends inside an open quote.
+ * Compute the visible length of a FormattingNode array (strip all tags).
  */
-export function computeQuoteState(lines: NarrativeLine[]): boolean[] {
-  const states: boolean[] = [];
-  let inQuote = false;
+export function nodeVisibleLength(nodes: FormattingNode[]): number {
+  return toPlainText(nodes).length;
+}
 
-  for (const line of lines) {
-    if (line.kind === "dm") {
-      for (const ch of line.text) {
-        if (ch === '"') {
-          inQuote = !inQuote;
+/**
+ * Word-wrap an AST node array at the given width.
+ * Returns an array of lines, each a well-formed FormattingNode[].
+ * Tags never break across lines — this eliminates the need for healTagBoundaries.
+ */
+export function wrapNodes(nodes: FormattingNode[], width: number): FormattingNode[][] {
+  if (width <= 0) return [nodes];
+
+  // Single top-level alignment tag → never wrap
+  if (nodes.length === 1 && typeof nodes[0] !== "string"
+      && (nodes[0].type === "center" || nodes[0].type === "right")) {
+    return [nodes];
+  }
+
+  // Fast path: fits already
+  if (nodeVisibleLength(nodes) <= width) return [nodes];
+
+  // Flatten the node tree into word tokens. Each word carries a well-formed
+  // node fragment so reconstructed lines are structurally valid.
+  interface WordToken { nodes: FormattingNode[]; visible: number; }
+  const words: WordToken[] = [];
+
+  // Collect all words by depth-first walk
+  flattenToWords(nodes, words);
+
+  if (words.length === 0) return [nodes];
+
+  // Greedily assemble words into lines
+  const lines: FormattingNode[][] = [];
+  let curLine: FormattingNode[] = [];
+  let curVis = 0;
+
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+
+    if (curVis > 0 && curVis + 1 + word.visible > width) {
+      // Start a new line
+      lines.push(curLine);
+      curLine = [];
+      curVis = 0;
+    }
+
+    // Add space between words on the same line
+    if (curVis > 0) {
+      curLine.push(" ");
+      curVis += 1;
+    }
+
+    curLine.push(...word.nodes);
+    curVis += word.visible;
+  }
+
+  if (curLine.length > 0) {
+    lines.push(curLine);
+  }
+
+  return lines.length > 0 ? lines : [nodes];
+}
+
+/**
+ * Flatten a FormattingNode[] into word tokens, splitting text at spaces.
+ * Each word token carries structurally well-formed node fragments.
+ */
+function flattenToWords(
+  nodes: FormattingNode[],
+  words: { nodes: FormattingNode[]; visible: number }[],
+): void {
+  for (const node of nodes) {
+    if (typeof node === "string") {
+      // Split text node at spaces into words
+      const parts = node.split(/ /);
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        if (i > 0) {
+          // Space boundary — we've consumed a space, so this starts a new word
+          // If part is empty (multiple spaces), just skip
+          if (part === "") continue;
+          words.push({ nodes: [part], visible: part.length });
+        } else {
+          // First part — append to current word-in-progress or start new
+          if (part === "") continue;
+          if (words.length > 0) {
+            // Append to previous word (continuation across tag boundaries)
+            const prev = words[words.length - 1];
+            prev.nodes.push(part);
+            prev.visible += part.length;
+          } else {
+            words.push({ nodes: [part], visible: part.length });
+          }
+        }
+      }
+    } else {
+      // Tag node — recurse into children, wrapping fragments in the same tag type
+      const childWords: { nodes: FormattingNode[]; visible: number }[] = [];
+      flattenToWords(node.content, childWords);
+
+      for (let i = 0; i < childWords.length; i++) {
+        const cw = childWords[i];
+        // Wrap each child word fragment in a copy of this tag
+        const wrapped: FormattingTag = { ...node, content: cw.nodes } as FormattingTag;
+
+        if (i === 0 && words.length > 0) {
+          // First fragment continues the previous word
+          const prev = words[words.length - 1];
+          prev.nodes.push(wrapped);
+          prev.visible += cw.visible;
+        } else if (i === 0) {
+          words.push({ nodes: [wrapped], visible: cw.visible });
+        } else {
+          // Subsequent fragments are new words (they were separated by spaces)
+          words.push({ nodes: [wrapped], visible: cw.visible });
         }
       }
     }
-    states.push(inQuote);
+  }
+}
+
+/**
+ * Unified processing pipeline for NarrativeLines.
+ * Heal → parse → wrap → pad alignment → quote highlight.
+ * Returns ProcessedLine[] ready for direct rendering.
+ */
+export function processNarrativeLines(
+  lines: NarrativeLine[],
+  width: number,
+  quoteColor?: string,
+): ProcessedLine[] {
+  // Phase 1: Heal cross-line tags on raw strings, then parse into AST.
+  // Healing must happen before parsing because parseFormatting treats
+  // unclosed tags as plain text.
+  const parsed: { kind: NarrativeLine["kind"]; nodes: FormattingNode[]; isSourceBoundary: boolean }[] = [];
+
+  // Track open tags across DM source lines for cross-line healing
+  const openStack: { raw: string; name: string }[] = [];
+
+  for (const srcLine of lines) {
+    if (srcLine.kind !== "dm") {
+      parsed.push({ kind: srcLine.kind, nodes: [srcLine.text], isSourceBoundary: true });
+      continue;
+    }
+
+    // At source boundaries, remove color entries from the stack
+    for (let j = openStack.length - 1; j >= 0; j--) {
+      if (openStack[j].name === "color") {
+        openStack.splice(j, 1);
+      }
+    }
+
+    // Scan the original text for tag changes
+    const changes = scanTagChanges(srcLine.text);
+
+    // Build prefix from currently open tags
+    const prefix = openStack.map((t) => t.raw).join("");
+
+    // Apply changes to the stack
+    for (const change of changes) {
+      if (change.kind === "open") {
+        openStack.push({ raw: change.raw, name: change.name });
+      } else {
+        for (let j = openStack.length - 1; j >= 0; j--) {
+          if (openStack[j].name === change.name) {
+            openStack.splice(j, 1);
+            break;
+          }
+        }
+      }
+    }
+
+    // Build suffix: close anything still open
+    const suffix = [...openStack]
+      .reverse()
+      .map((t) => `</${t.name}>`)
+      .join("");
+
+    // Heal the raw text, then parse into AST
+    const healedText = prefix + srcLine.text + suffix;
+    const nodes = parseFormatting(healedText);
+
+    parsed.push({ kind: "dm", nodes, isSourceBoundary: true });
   }
 
-  return states;
+  // Phase 2: Wrap each line
+  const wrapped: { kind: NarrativeLine["kind"]; nodes: FormattingNode[]; isSourceBoundary: boolean }[] = [];
+  for (const line of parsed) {
+    if (line.kind === "dm") {
+      const wLines = wrapNodes(line.nodes, width);
+      for (let j = 0; j < wLines.length; j++) {
+        wrapped.push({ kind: "dm", nodes: wLines[j], isSourceBoundary: j === 0 });
+      }
+    } else {
+      wrapped.push(line);
+    }
+  }
+
+  // Phase 3: Pad alignment lines
+  const padded: { kind: NarrativeLine["kind"]; nodes: FormattingNode[]; isSourceBoundary: boolean }[] = [];
+  for (let i = 0; i < wrapped.length; i++) {
+    const line = wrapped[i];
+    const isAlign = line.kind === "dm" && isAlignmentNode(line.nodes);
+
+    if (isAlign) {
+      // Blank line before if previous is non-empty
+      const prev = padded[padded.length - 1];
+      if (prev !== undefined && !isEmptyNodes(prev.nodes)) {
+        padded.push({ kind: "dm", nodes: [], isSourceBoundary: false });
+      }
+      padded.push(line);
+      // Blank line after if next is non-empty
+      const next = wrapped[i + 1];
+      if (next !== undefined && !isEmptyNodes(next.nodes)) {
+        padded.push({ kind: "dm", nodes: [], isSourceBoundary: false });
+      }
+    } else {
+      padded.push(line);
+    }
+  }
+
+  // Phase 4: Quote highlighting with paragraph-scoped reset
+  const result: ProcessedLine[] = [];
+  let inQuote = false;
+
+  for (const line of padded) {
+    if (line.kind === "dm") {
+      // Reset quote state at blank DM lines (paragraph boundary)
+      if (isEmptyNodes(line.nodes)) {
+        inQuote = false;
+      }
+
+      let nodes = line.nodes;
+      if (quoteColor) {
+        nodes = highlightQuotesWithState(nodes, quoteColor, inQuote);
+        // Update quote state
+        const plain = toPlainText(line.nodes);
+        for (const ch of plain) {
+          if (ch === '"') inQuote = !inQuote;
+        }
+      }
+
+      // Detect alignment
+      let alignment: "center" | "right" | undefined;
+      if (line.nodes.length === 1 && typeof line.nodes[0] !== "string"
+          && (line.nodes[0].type === "center" || line.nodes[0].type === "right")) {
+        alignment = line.nodes[0].type;
+      }
+
+      result.push({ kind: "dm", nodes, alignment });
+    } else {
+      result.push({ kind: line.kind, nodes: line.nodes });
+    }
+  }
+
+  return result;
 }
+
+function isAlignmentNode(nodes: FormattingNode[]): boolean {
+  return nodes.length === 1 && typeof nodes[0] !== "string"
+    && (nodes[0].type === "center" || nodes[0].type === "right");
+}
+
+function isEmptyNodes(nodes: FormattingNode[]): boolean {
+  return nodes.length === 0 || (nodes.length === 1 && nodes[0] === "");
+}
+
+
 
 function splitQuotesWithState(
   text: string,
@@ -165,50 +415,7 @@ export function highlightQuotesWithState(
   return result;
 }
 
-/**
- * Heal formatting tags that span line boundaries.
- *
- * When a tag like `<i>` is opened on one line and closed on a later line,
- * per-line parsing sees unclosed/orphaned tags. This function prepends
- * inherited open tags and appends close tags so each line is well-formed.
- */
-export function healTagBoundaries(lines: string[]): string[] {
-  const openStack: { raw: string; name: string }[] = [];
-  const healed: string[] = [];
 
-  for (const line of lines) {
-    // Compute tag changes from the *original* line
-    const changes = scanTagChanges(line);
-
-    // Build prefix from currently open tags
-    const prefix = openStack.map((t) => t.raw).join("");
-
-    // Apply changes to the stack
-    for (const change of changes) {
-      if (change.kind === "open") {
-        openStack.push({ raw: change.raw, name: change.name });
-      } else {
-        // Close: pop the most recent matching open tag
-        for (let j = openStack.length - 1; j >= 0; j--) {
-          if (openStack[j].name === change.name) {
-            openStack.splice(j, 1);
-            break;
-          }
-        }
-      }
-    }
-
-    // Suffix: close anything still open (reversed for proper nesting)
-    const suffix = [...openStack]
-      .reverse()
-      .map((t) => `</${t.name}>`)
-      .join("");
-
-    healed.push(prefix + line + suffix);
-  }
-
-  return healed;
-}
 
 interface TagChange {
   kind: "open" | "close";
@@ -220,7 +427,7 @@ interface TagChange {
  * Scan a line for open/close formatting tags, returning them in order.
  * Does not parse content — just finds tag boundaries for stack tracking.
  */
-export function scanTagChanges(line: string): TagChange[] {
+function scanTagChanges(line: string): TagChange[] {
   const changes: TagChange[] = [];
   let i = 0;
 
@@ -289,230 +496,13 @@ export function markdownToTags(line: string): string {
   return line;
 }
 
-/**
- * Insert blank lines before/after alignment lines (<center>, <right>)
- * so they have breathing room. Skips if a blank line is already present.
- */
-export function padAlignmentLines(lines: NarrativeLine[]): NarrativeLine[] {
-  const alignRe = /^\s*<(center|right)>.*<\/\1>\s*$/;
-  const result: NarrativeLine[] = [];
 
-  for (let i = 0; i < lines.length; i++) {
-    const isAlign = lines[i].kind === "dm" && alignRe.test(lines[i].text);
 
-    if (isAlign) {
-      // Insert blank line before if previous line is non-empty
-      const prev = result[result.length - 1];
-      if (prev !== undefined && prev.text !== "") {
-        result.push({ kind: "dm", text: "" });
-      }
-      result.push(lines[i]);
-      // Insert blank line after if next line is non-empty
-      const next = lines[i + 1];
-      if (next !== undefined && next.text !== "") {
-        result.push({ kind: "dm", text: "" });
-      }
-    } else {
-      result.push(lines[i]);
-    }
-  }
 
-  return result;
-}
 
-/**
- * Count visible characters in a string, skipping recognized formatting tags.
- * Tags like <b>, </b>, <color=#hex>, </color>, <i>, </i>, <u>, </u>,
- * <center>, </center>, <right>, </right> are zero-width.
- */
-export function visibleLength(text: string): number {
-  let len = 0;
-  let i = 0;
 
-  while (i < text.length) {
-    if (text[i] === "<") {
-      // Try close tag
-      const closeMatch = text.slice(i).match(/^<\/(b|i|u|center|right|color)>/);
-      if (closeMatch) {
-        i += closeMatch[0].length;
-        continue;
-      }
-      // Try open tag
-      const parsed = parseOpenTag(text, i);
-      if (parsed) {
-        i = parsed.end;
-        continue;
-      }
-    }
-    len++;
-    i++;
-  }
 
-  return len;
-}
 
-/**
- * Tag-aware word wrap for a single source line.
- * Splits at word boundaries (spaces) when visible length exceeds width.
- * Tags are zero-width and never split. Alignment lines are never wrapped.
- * Returns the line unchanged (in a single-element array) if it fits.
- */
-export function wrapLine(text: string, width: number): string[] {
-  if (width <= 0) return [text];
-
-  // Skip alignment lines — never wrap those
-  if (/^\s*<(center|right)>.*<\/\1>\s*$/.test(text)) return [text];
-
-  // Fast path: fits already
-  if (visibleLength(text) <= width) return [text];
-
-  // Tokenize into segments: each is either a tag (zero-width) or a single visible char
-  interface Segment { text: string; visible: number; isSpace: boolean; }
-  const segments: Segment[] = [];
-  let i = 0;
-  while (i < text.length) {
-    if (text[i] === "<") {
-      const closeMatch = text.slice(i).match(/^<\/(b|i|u|center|right|color)>/);
-      if (closeMatch) {
-        segments.push({ text: closeMatch[0], visible: 0, isSpace: false });
-        i += closeMatch[0].length;
-        continue;
-      }
-      const parsed = parseOpenTag(text, i);
-      if (parsed) {
-        segments.push({ text: text.slice(i, parsed.end), visible: 0, isSpace: false });
-        i = parsed.end;
-        continue;
-      }
-    }
-    const ch = text[i];
-    segments.push({ text: ch, visible: 1, isSpace: ch === " " });
-    i++;
-  }
-
-  // Group segments into words (split at spaces; spaces attach to preceding word)
-  interface Word { text: string; visible: number; }
-  const words: Word[] = [];
-  let cur: Word = { text: "", visible: 0 };
-
-  for (const seg of segments) {
-    cur.text += seg.text;
-    cur.visible += seg.visible;
-    if (seg.isSpace) {
-      words.push(cur);
-      cur = { text: "", visible: 0 };
-    }
-  }
-  if (cur.text !== "") words.push(cur);
-
-  // Build lines from words
-  const result: string[] = [];
-  let line = "";
-  let lineVis = 0;
-
-  for (const word of words) {
-    if (lineVis > 0 && lineVis + word.visible > width) {
-      // Trim trailing space from line before pushing
-      result.push(line.replace(/ $/, ""));
-      line = "";
-      lineVis = 0;
-    }
-
-    // Hard break: word alone exceeds width and line is empty
-    if (lineVis === 0 && word.visible > width) {
-      // Just let it through — it'll exceed width but we can't split mid-word cleanly with tags
-      line += word.text;
-      lineVis += word.visible;
-      continue;
-    }
-
-    line += word.text;
-    lineVis += word.visible;
-  }
-
-  if (line !== "") {
-    result.push(line.replace(/ $/, ""));
-  }
-
-  return result.length > 0 ? result : [text];
-}
-
-/**
- * Combined wrap + heal pipeline.
- * 1. Pre-wraps each source line at terminal width (tag-aware)
- * 2. Heals tag boundaries across all visual lines
- * 3. Resets `color` from the propagation stack at source-line boundaries
- * 4. `b`/`i`/`u` persist across all boundaries; `color` only across wrap boundaries
- */
-export function wrapAndHealLines(lines: NarrativeLine[], width: number): NarrativeLine[] {
-  // Phase 1: wrap each source line into visual lines, tracking source boundaries and kinds
-  const visualLines: NarrativeLine[] = [];
-  const isSourceBoundary: boolean[] = [];
-
-  for (const srcLine of lines) {
-    if (srcLine.kind === "dm" || srcLine.kind === "dev") {
-      const wrapped = width > 0 ? wrapLine(srcLine.text, width) : [srcLine.text];
-      for (let j = 0; j < wrapped.length; j++) {
-        visualLines.push({ kind: srcLine.kind, text: wrapped[j] });
-        isSourceBoundary.push(j === 0);
-      }
-    } else {
-      // player/system lines pass through without tag-aware wrapping
-      visualLines.push(srcLine);
-      isSourceBoundary.push(true);
-    }
-  }
-
-  // Phase 2: heal only dm lines; non-dm lines pass through without touching the stack
-  const openStack: { raw: string; name: string }[] = [];
-  const healed: NarrativeLine[] = [];
-
-  for (let i = 0; i < visualLines.length; i++) {
-    if (visualLines[i].kind !== "dm") {
-      healed.push(visualLines[i]);
-      continue;
-    }
-
-    // At source boundaries, remove color entries from the stack
-    if (isSourceBoundary[i]) {
-      for (let j = openStack.length - 1; j >= 0; j--) {
-        if (openStack[j].name === "color") {
-          openStack.splice(j, 1);
-        }
-      }
-    }
-
-    const line = visualLines[i].text;
-    const changes = scanTagChanges(line);
-
-    // Build prefix from currently open tags
-    const prefix = openStack.map((t) => t.raw).join("");
-
-    // Apply changes to the stack
-    for (const change of changes) {
-      if (change.kind === "open") {
-        openStack.push({ raw: change.raw, name: change.name });
-      } else {
-        for (let j = openStack.length - 1; j >= 0; j--) {
-          if (openStack[j].name === change.name) {
-            openStack.splice(j, 1);
-            break;
-          }
-        }
-      }
-    }
-
-    // Suffix: close anything still open
-    const suffix = [...openStack]
-      .reverse()
-      .map((t) => `</${t.name}>`)
-      .join("");
-
-    healed.push({ kind: "dm", text: prefix + line + suffix });
-  }
-
-  return healed;
-}
 
 // --- Internal ---
 

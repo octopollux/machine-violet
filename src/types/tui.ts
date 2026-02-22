@@ -53,6 +53,13 @@ export type NarrativeLine =
   | { kind: "dev"; text: string }
   | { kind: "system"; text: string };
 
+/** A fully processed line ready for rendering — nodes are pre-parsed, healed, wrapped, and quote-highlighted. */
+export interface ProcessedLine {
+  kind: NarrativeLine["kind"];
+  nodes: FormattingNode[];
+  alignment?: "center" | "right";
+}
+
 export interface ActivityIndicator {
   label: string;
   glyph: string;
