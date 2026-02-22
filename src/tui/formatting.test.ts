@@ -594,9 +594,14 @@ describe("processNarrativeLines", () => {
       dm("<b>bold</b> text"),
       { kind: "player", text: "> Alice: attack" },
     ], 80);
+    // Phase 5 inserts blank separators at kind transitions:
+    // system, [sep], dm, [sep], player
+    const kinds = result.map((l) => l.kind);
+    expect(kinds.filter((k) => k === "system")).toHaveLength(1);
+    expect(kinds.filter((k) => k === "dm")).toHaveLength(2); // separator + content
+    expect(kinds.filter((k) => k === "player")).toHaveLength(2); // separator + content
     expect(result[0].kind).toBe("system");
-    expect(result[1].kind).toBe("dm");
-    expect(result[2].kind).toBe("player");
+    expect(result[result.length - 1].kind).toBe("player");
   });
 
   it("dev lines with JSON quotes do not corrupt quote state", () => {
@@ -607,9 +612,10 @@ describe("processNarrativeLines", () => {
       dm('world"'),
     ], 80, quoteColor);
     // The dev line should not affect DM quote state
-    // Line 2 (dm: 'world"') should have quote highlighting (closing quote)
-    const dmLine = result[2]; // dm line after dev
-    const hasColor = dmLine.nodes.some(
+    // Find the last dm line (after separators inserted by Phase 5)
+    const dmLines = result.filter((l) => l.kind === "dm");
+    const lastDM = dmLines[dmLines.length - 1];
+    const hasColor = lastDM.nodes.some(
       (n) => typeof n !== "string" && n.type === "color" && n.color === quoteColor,
     );
     expect(hasColor).toBe(true);
@@ -626,13 +632,54 @@ describe("processNarrativeLines", () => {
       (n) => typeof n !== "string" && n.type === "italic",
     );
     expect(hasItalic0).toBe(true);
-    // Dev line passes through as plain text
-    expect(result[1].kind).toBe("dev");
-    // Third line (second DM line) should still have italic from cross-line healing
-    const hasItalic2 = result[2].nodes.some(
+    // Dev line passes through as plain text (separators may also have kind "dev")
+    const devContent = result.filter((l) => l.kind === "dev" && toPlainText(l.nodes) !== "");
+    expect(devContent).toHaveLength(1);
+    // Last DM line should still have italic from cross-line healing
+    const dmLines = result.filter((l) => l.kind === "dm");
+    const lastDM = dmLines[dmLines.length - 1];
+    const hasItalic = lastDM.nodes.some(
       (n) => typeof n !== "string" && n.type === "italic",
     );
-    expect(hasItalic2).toBe(true);
+    expect(hasItalic).toBe(true);
+  });
+
+  it("inserts blank line at kind transitions (turn separator)", () => {
+    const result = processNarrativeLines([
+      dm("DM narration."),
+      { kind: "player", text: "> I attack." },
+      dm("The blow lands."),
+    ], 80);
+    // dm, [sep], player, [sep], dm
+    expect(result).toHaveLength(5);
+    expect(toPlainText(result[0].nodes)).toBe("DM narration.");
+    expect(toPlainText(result[1].nodes)).toBe(""); // separator
+    expect(toPlainText(result[2].nodes)).toBe("> I attack.");
+    expect(toPlainText(result[3].nodes)).toBe(""); // separator
+    expect(toPlainText(result[4].nodes)).toBe("The blow lands.");
+  });
+
+  it("does not double-up separator when blank DM line precedes kind change", () => {
+    const result = processNarrativeLines([
+      dm("End of DM paragraph."),
+      dm(""),  // existing blank line
+      { kind: "player", text: "> I look around." },
+    ], 80);
+    // dm, blank(already there), [sep], player
+    // The blank dm line is already present, but it's a different kind from player,
+    // so Phase 5 checks the last *output* line — the blank dm line IS empty,
+    // so no extra separator is inserted.
+    expect(result).toHaveLength(3);
+  });
+
+  it("no separator between consecutive lines of same kind", () => {
+    const result = processNarrativeLines([
+      dm("First paragraph."),
+      dm("Second paragraph."),
+    ], 80);
+    expect(result).toHaveLength(2);
+    expect(toPlainText(result[0].nodes)).toBe("First paragraph.");
+    expect(toPlainText(result[1].nodes)).toBe("Second paragraph.");
   });
 
   it("wrapping preserves tag structure (no broken tags)", () => {
