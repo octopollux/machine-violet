@@ -357,22 +357,7 @@ export default function App({ shutdownRef }: AppProps) {
       if (loaded.conversation && loaded.conversation.length > 0) {
         engine.hydrateConversation(loaded.conversation);
 
-        const lastExchange = loaded.conversation[loaded.conversation.length - 1];
-        const lastDMText = typeof lastExchange.assistant.content === "string"
-          ? lastExchange.assistant.content
-          : "[Resuming session...]";
-
-        // Process lastDMText the same way as transcript entries:
-        // split on \n\n for paragraph breaks, join \n with space
-        // so word-wrapping uses the terminal width, not LLM line breaks.
-        const lastDMLines: NarrativeLine[] = [];
-        for (const para of lastDMText.split("\n\n")) {
-          const joined = para.replace(/\n/g, " ");
-          lastDMLines.push({ kind: "dm", text: joined });
-          lastDMLines.push({ kind: "dm", text: "" });
-        }
-
-        setNarrativeLines([...transcriptLines, { kind: "system", text: `Welcome back to ${config.name}.` }, { kind: "dm", text: "" }, ...lastDMLines]);
+        setNarrativeLines([...transcriptLines, { kind: "system", text: `Welcome back to ${config.name}.` }, { kind: "dm", text: "" }]);
         setPhase("playing");
       } else {
         setNarrativeLines([...transcriptLines, { kind: "system", text: `Welcome back to ${config.name}.` }, { kind: "dm", text: "" }]);
@@ -386,8 +371,7 @@ export default function App({ shutdownRef }: AppProps) {
         if (config.premise) resumeParts.push(`Campaign premise: ${config.premise}`);
         const pc = config.players[0];
         if (pc) resumeParts.push(`The player character is ${pc.character}.`);
-        if (recap) resumeParts.push(`Last session recap: ${recap}`);
-        resumeParts.push("Pick up naturally from the last scene — do NOT restart or re-introduce the setting.");
+        resumeParts.push("Pick up naturally from the last scene — do NOT restart, re-introduce the setting, or recap what has already happened.");
         await engine.processInput(activePlayer.characterName, resumeParts.join(" ") + "]", { skipTranscript: true });
       }
     } else {

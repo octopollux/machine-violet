@@ -6,10 +6,7 @@ When creating a plan to do any of these items, include a step to update this TOD
 
 
 ## Bugs
-- [x] User input has a limit; at some point the main conversation view does not shrink any more to accomodate the expansion of the input box. Entering additional text still works, but the user cannot see it.
-- [x] Player text shown in the conversation view truncates instead of wrapping
-- [x] Dev mode text shown in the conversation view truncates instead of wrapping; this should eventually truncate - let's set it at 250 characters and try that out.
-- [ ] Upon state load/resume from disk, the conversation view shows the end of the game transcript, a newline, `Welcome back to <campaign name>`, another newline, and then the final several lines of the transcript again - presumably intended as a recap. Since theis same text is already on the screen three lines above, we should drop the recap - and also format the welcome-back announcement in bright yellow for style.
+- [x] Upon state load/resume from disk, the conversation view shows the end of the game transcript, a newline, `Welcome back to <campaign name>`, another newline, and then the final several lines of the transcript again - presumably intended as a recap. Since theis same text is already on the screen three lines above, we should drop the recap - and also format the welcome-back announcement in bright yellow for style.
 - [ ] Text formatting can still get "stuck" if there is a dangling <i>, <b>, etc in the transcript. Need to limit the scope of these.
 
 ## Features

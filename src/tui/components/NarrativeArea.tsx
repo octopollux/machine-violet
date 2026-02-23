@@ -148,7 +148,7 @@ function NarrativeLineComponent({ line, playerColor, width }: {
 
     case "system": {
       const text = typeof line.nodes[0] === "string" ? line.nodes[0] : "";
-      return <Text wrap="truncate">{text}</Text>;
+      return <Text wrap="truncate" color="yellowBright">{text}</Text>;
     }
 
     case "dm": {
