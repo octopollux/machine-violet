@@ -25,6 +25,7 @@ export type StateSlice = "combat" | "clocks" | "maps" | "decks";
 /** Scene state subset that gets persisted */
 export interface PersistedSceneState {
   precis: string;
+  openThreads?: string;
   playerReads: SceneState["playerReads"];
   activePlayerIndex: number;
 }

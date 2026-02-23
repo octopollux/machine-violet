@@ -67,6 +67,7 @@ function mockScene(): SceneState {
       "**DM:** The tavern is warm and dimly lit.",
     ],
     precis: "",
+    openThreads: "",
     playerReads: [],
     sessionNumber: 1,
   };

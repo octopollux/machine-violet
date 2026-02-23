@@ -158,6 +158,70 @@ describe("parsePrecisResult", () => {
     expect(result.text).toBe("Aldric entered the cave. Found a torch.");
     expect(result.playerRead).toBeUndefined();
   });
+
+  it("parses OPEN: line and strips it from precis text", () => {
+    const result = parsePrecisResult({
+      text: '[[Mira]] served drinks, seemed nervous.\nOPEN: [[Mira]]\'s nervousness, [[Corvin]]\'s offer\nPLAYER_READ: {"engagement":"high","focus":["npc_interaction"],"tone":"curious","pacing":"exploratory","offScript":false}',
+      usage: { inputTokens: 50, outputTokens: 20, cacheReadTokens: 0, cacheCreationTokens: 0 },
+    });
+
+    expect(result.text).toBe("[[Mira]] served drinks, seemed nervous.");
+    expect(result.openThreads).toBe("[[Mira]]'s nervousness, [[Corvin]]'s offer");
+    expect(result.playerRead?.engagement).toBe("high");
+  });
+
+  it("returns undefined openThreads when OPEN: line is absent", () => {
+    const result = parsePrecisResult({
+      text: 'Corvin paid and left.\nPLAYER_READ: {"engagement":"moderate","focus":["npc_interaction"],"tone":"cautious","pacing":"pushing_forward","offScript":false}',
+      usage: { inputTokens: 50, outputTokens: 20, cacheReadTokens: 0, cacheCreationTokens: 0 },
+    });
+
+    expect(result.openThreads).toBeUndefined();
+    expect(result.text).toBe("Corvin paid and left.");
+  });
+
+  it("handles OPEN: without PLAYER_READ", () => {
+    const result = parsePrecisResult({
+      text: "Aldric searched the room.\nOPEN: hidden compartment",
+      usage: { inputTokens: 50, outputTokens: 20, cacheReadTokens: 0, cacheCreationTokens: 0 },
+    });
+
+    expect(result.text).toBe("Aldric searched the room.");
+    expect(result.openThreads).toBe("hidden compartment");
+    expect(result.playerRead).toBeUndefined();
+  });
+});
+
+describe("updatePrecis open threads", () => {
+  it("passes currentOpenThreads into the prompt", async () => {
+    const client = mockClient([
+      textResponse("Aldric questioned [[Mira]].\nOPEN: [[Mira]]'s fear\nPLAYER_READ: {\"engagement\":\"high\",\"focus\":[\"npc_interaction\"],\"tone\":\"curious\",\"pacing\":\"exploratory\",\"offScript\":false}"),
+    ]);
+
+    await updatePrecis(
+      client,
+      "Scene 1: Aldric entered the tavern.",
+      "Player: I ask Mira what's wrong.\nDM: She shakes her head.",
+      "[[Mira]]'s nervousness",
+    );
+
+    const call = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(call.messages[0].content).toContain("[[Mira]]'s nervousness");
+  });
+
+  it("returns openThreads from OPEN: line", async () => {
+    const client = mockClient([
+      textResponse("Aldric questioned [[Mira]].\nOPEN: [[Mira]]'s fear, [[stranger]]'s identity\nPLAYER_READ: {\"engagement\":\"high\",\"focus\":[\"npc_interaction\"],\"tone\":\"cautious\",\"pacing\":\"exploratory\",\"offScript\":false}"),
+    ]);
+
+    const result = await updatePrecis(
+      client,
+      "Scene 1: Tavern.",
+      "Player: I press Mira.\nDM: She glances at the door.",
+    );
+
+    expect(result.openThreads).toBe("[[Mira]]'s fear, [[stranger]]'s identity");
+  });
 });
 
 describe("updateChangelogs", () => {

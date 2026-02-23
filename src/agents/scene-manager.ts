@@ -25,6 +25,8 @@ export interface SceneState {
   slug: string;
   transcript: string[];
   precis: string;
+  /** Unresolved narrative threads for the current scene, maintained by the precis updater. */
+  openThreads: string;
   playerReads: PlayerRead[];
   sessionNumber: number;
 }
@@ -114,7 +116,9 @@ export class SceneManager {
       pendingAlarms: [],
       turnHolder: undefined,
     });
-    this.sessionState.scenePrecis = this.scene.precis;
+    this.sessionState.scenePrecis = this.scene.openThreads
+      ? `${this.scene.precis}\nOpen: ${this.scene.openThreads}`
+      : this.scene.precis;
     this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);
     return buildDMPrefix(this.state.config, this.sessionState);
   }
@@ -154,9 +158,12 @@ export class SceneManager {
     const exchangeText = `Player: ${userContent}\nDM: ${assistantContent}`;
 
     this.devLog?.("[dev] subagent:precis-updater starting");
-    const result = await updatePrecis(client, this.scene.precis, exchangeText);
+    const result = await updatePrecis(client, this.scene.precis, exchangeText, this.scene.openThreads || undefined);
     this.devLog?.("[dev] subagent:precis-updater done");
     this.scene.precis += "\n" + result.text;
+    if (result.openThreads !== undefined) {
+      this.scene.openThreads = result.openThreads;
+    }
     if (result.playerRead) {
       this.scene.playerReads.push(result.playerRead);
     }
@@ -397,7 +404,9 @@ export class SceneManager {
     });
 
     // Sync precis and player read
-    this.sessionState.scenePrecis = this.scene.precis;
+    this.sessionState.scenePrecis = this.scene.openThreads
+      ? `${this.scene.precis}\nOpen: ${this.scene.openThreads}`
+      : this.scene.precis;
     this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);
   }
 
@@ -515,6 +524,7 @@ export class SceneManager {
 
   private stepResetPrecis(): void {
     this.scene.precis = "";
+    this.scene.openThreads = "";
     this.scene.playerReads = [];
   }
 
@@ -637,6 +647,7 @@ export async function detectSceneState(campaignRoot: string, io: FileIO): Promis
     slug: maxScene > 0 ? lastSlug : "opening",
     transcript,
     precis: "",
+    openThreads: "",
     playerReads: [],
     sessionNumber: maxSession + 1,
   };

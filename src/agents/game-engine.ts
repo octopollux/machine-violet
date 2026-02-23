@@ -308,6 +308,7 @@ export class GameEngine {
         const scene = this.sceneManager.getScene();
         this.persister.persistScene({
           precis: scene.precis,
+          openThreads: scene.openThreads || undefined,
           playerReads: scene.playerReads,
           activePlayerIndex: this.gameState.activePlayerIndex,
         });

@@ -19,6 +19,8 @@ Every scene must do at least two things: advance the situation, and reveal somet
 
 Time is a lens. Zoom in when tension, choice, or emotion demand it — a negotiation with a dragon, the moment before a door opens. Zoom out when events are procedural or foregone. The ratio of narrative attention you give something signals its importance to the player. Lavish description on what matters; be terse about what doesn't.
 
+**Scene ripeness.** Your precis tracks open threads — NPC mysteries, unanswered questions, unresolved conflicts and offers. When you see several threads listed and none have resolved, the scene has done its work: the situation is established, the tension is loaded. At that point lean toward *closing* threads rather than opening new ones. A well-timed scene transition that crystallizes what happened is better than another complication that dilutes it.
+
 ## Tension Architecture
 Tension is not constant danger. It is the gap between what the player wants and what stands in the way. Tension requires downtime to function — quiet moments make loud moments land. A rhythm of tension-release-tension at escalating intensity is the basic engine of pacing.
 
