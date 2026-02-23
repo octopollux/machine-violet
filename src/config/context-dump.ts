@@ -88,7 +88,8 @@ export function renderDump(agentName: string, params: DumpableParams): string {
   } else if (Array.isArray(params.system)) {
     for (let i = 0; i < params.system.length; i++) {
       const block = params.system[i];
-      const cached = block.cache_control ? " [cached]" : "";
+      const cc = block.cache_control as { type: string; ttl?: string } | undefined;
+      const cached = cc ? (cc.ttl ? ` [cached:${cc.ttl}]` : " [cached]") : "";
       lines.push(`--- block ${i + 1}${cached} ---`);
       lines.push(block.text);
     }
@@ -102,7 +103,9 @@ export function renderDump(agentName: string, params: DumpableParams): string {
     for (let i = 0; i < tools.length; i++) {
       const tool = tools[i];
       const desc = (tool.description ?? "").split("\n")[0];
-      lines.push(`${i + 1}. ${tool.name} - ${desc}`);
+      const cc = (tool as Record<string, unknown>)["cache_control"] as { type: string; ttl?: string } | undefined;
+      const cached = cc ? (cc.ttl ? ` [cached:${cc.ttl}]` : " [cached]") : "";
+      lines.push(`${i + 1}. ${tool.name} - ${desc}${cached}`);
     }
     lines.push("");
   }

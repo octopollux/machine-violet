@@ -63,6 +63,37 @@ describe("renderDump", () => {
     expect(result).toContain("Personality block");
   });
 
+  it("renders TTL in cache marker when present", () => {
+    const result = renderDump("dm", {
+      model: "claude-sonnet-4-5-20250929",
+      max_tokens: 2000,
+      system: [
+        { type: "text", text: "Identity block", cache_control: { type: "ephemeral", ttl: "1h" } },
+        { type: "text", text: "Personality block" },
+      ],
+      messages: [],
+    });
+
+    expect(result).toContain("--- block 1 [cached:1h] ---");
+    expect(result).toContain("--- block 2 ---");
+  });
+
+  it("renders cached marker on last tool when cache_control is present", () => {
+    const result = renderDump("dm", {
+      model: "claude-opus-4-6",
+      max_tokens: 4096,
+      system: "system",
+      messages: [],
+      tools: [
+        { name: "roll_dice", description: "Roll dice." },
+        { name: "draw_card", description: "Draw a card.", cache_control: { type: "ephemeral", ttl: "1h" } },
+      ],
+    });
+
+    expect(result).toContain("1. roll_dice - Roll dice.");
+    expect(result).toContain("2. draw_card - Draw a card. [cached:1h]");
+  });
+
   it("renders messages with role headers", () => {
     const result = renderDump("dm", {
       model: "claude-opus-4-6",

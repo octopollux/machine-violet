@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
-import { agentLoop } from "./agent-loop.js";
+import { agentLoop, stampToolsCacheControl } from "./agent-loop.js";
 import type { AgentLoopConfig } from "./agent-loop.js";
 import { ToolRegistry } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
@@ -274,5 +274,40 @@ describe("agentLoop", () => {
       expect.objectContaining({ is_error: true }),
     );
     expect(result.text).toBe("I couldn't find that map.");
+  });
+});
+
+describe("stampToolsCacheControl", () => {
+  it("stamps cache_control on the last tool", () => {
+    const tools: Anthropic.Tool[] = [
+      { name: "roll_dice", description: "Roll dice.", input_schema: { type: "object", properties: {} } },
+      { name: "draw_card", description: "Draw a card.", input_schema: { type: "object", properties: {} } },
+    ];
+
+    const result = stampToolsCacheControl(tools);
+    const last = result[result.length - 1] as Record<string, unknown>;
+    expect(last["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
+    // First tool should NOT have cache_control
+    const first = result[0] as Record<string, unknown>;
+    expect(first["cache_control"]).toBeUndefined();
+  });
+
+  it("does not mutate the input array or tools", () => {
+    const tools: Anthropic.Tool[] = [
+      { name: "roll_dice", description: "Roll dice.", input_schema: { type: "object", properties: {} } },
+    ];
+
+    const result = stampToolsCacheControl(tools);
+    // Input array not mutated
+    expect(tools).not.toBe(result);
+    // Input tool object not mutated
+    expect((tools[0] as Record<string, unknown>)["cache_control"]).toBeUndefined();
+    // Output has cache_control
+    expect((result[0] as Record<string, unknown>)["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
+  });
+
+  it("returns empty array unchanged", () => {
+    const result = stampToolsCacheControl([]);
+    expect(result).toEqual([]);
   });
 });

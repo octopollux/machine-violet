@@ -39,7 +39,7 @@ export function buildCachedPrefix(
   blocks.push({
     type: "text",
     text: sections.dmPrompt,
-    cache_control: { type: "ephemeral" },
+    cache_control: { type: "ephemeral", ttl: "1h" },
   } as Anthropic.TextBlockParam);
 
   // DM personality fragment
@@ -78,7 +78,7 @@ export function buildCachedPrefix(
     blocks.push({
       type: "text",
       text: `\n\n## Rules Reference\n${sections.rulesAppendix}`,
-      cache_control: { type: "ephemeral" },
+      cache_control: { type: "ephemeral", ttl: "1h" },
     } as Anthropic.TextBlockParam);
   }
 
@@ -87,7 +87,7 @@ export function buildCachedPrefix(
     blocks.push({
       type: "text",
       text: `\n\n## Campaign Log\n${sections.campaignSummary}`,
-      cache_control: { type: "ephemeral" },
+      cache_control: { type: "ephemeral", ttl: "1h" },
     } as Anthropic.TextBlockParam);
   }
 

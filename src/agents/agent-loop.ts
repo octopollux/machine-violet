@@ -60,6 +60,25 @@ export interface AgentLoopResult {
 const RETRY_DELAYS = [1000, 2000, 4000, 8000, 16000]; // ms
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 529]);
 
+// --- Cache helpers ---
+
+/**
+ * Stamp cache_control on the last tool definition so the entire tools block
+ * is cached with a 1-hour TTL. Per the API spec, a breakpoint on the last
+ * tool caches everything before it in the tools array.
+ *
+ * This uses 1 of the 4 available explicit cache breakpoints (the other 3
+ * are on system prompt blocks in prefix-builder.ts).
+ */
+export function stampToolsCacheControl(tools: Anthropic.Tool[]): Anthropic.Tool[] {
+  if (tools.length === 0) return tools;
+  const result = [...tools];
+  const last = { ...result[result.length - 1] };
+  (last as Record<string, unknown>)["cache_control"] = { type: "ephemeral", ttl: "1h" };
+  result[result.length - 1] = last;
+  return result;
+}
+
 // --- Agent Loop ---
 
 /**
@@ -74,7 +93,7 @@ export async function agentLoop(
   gameState: GameState,
   config: AgentLoopConfig,
 ): Promise<AgentLoopResult> {
-  const tools = registry.getDefinitions();
+  const tools = stampToolsCacheControl(registry.getDefinitions());
   const totalUsage: UsageStats = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 };
   const tuiCommands: TuiCommand[] = [];
   let fullText = "";
@@ -177,7 +196,7 @@ export async function agentLoopStreaming(
   gameState: GameState,
   config: AgentLoopConfig,
 ): Promise<AgentLoopResult> {
-  const tools = registry.getDefinitions();
+  const tools = stampToolsCacheControl(registry.getDefinitions());
   const totalUsage: UsageStats = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 };
   const tuiCommands: TuiCommand[] = [];
   let fullText = "";
