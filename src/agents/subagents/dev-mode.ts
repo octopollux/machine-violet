@@ -11,6 +11,8 @@ import { validateCampaign } from "../../tools/validation/index.js";
 import { repairState } from "./repair-state.js";
 import { norm } from "../../utils/paths.js";
 import * as path from "node:path";
+import type { CampaignRepo } from "../../tools/git/index.js";
+import { queryCommitLog } from "../../tools/git/index.js";
 
 /**
  * Result from a Dev Mode exchange.
@@ -164,6 +166,19 @@ export function buildDevTools(): Anthropic.Tool[] {
         required: ["path"],
       },
     },
+    {
+      name: "get_commit_log",
+      description: "List git snapshot commits for this campaign. Shows commit hash, type, message, and timestamp. Filter by type or search term.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          depth: { type: "number", description: "Number of commits to retrieve (default 20, max 100)" },
+          type: { type: "string", enum: ["auto", "scene", "session", "checkpoint", "character"], description: "Filter by commit type" },
+          search: { type: "string", description: "Filter by message content (case-insensitive)" },
+        },
+        required: [],
+      },
+    },
   ];
 }
 
@@ -188,6 +203,7 @@ export function buildDevToolHandler(
   fileIO: FileIO,
   client?: Anthropic,
   sceneManager?: SceneManager,
+  repo?: CampaignRepo,
 ): (name: string, input: Record<string, unknown>) => Promise<{ content: string; is_error?: boolean }> {
   const root = gameState.campaignRoot;
 
@@ -287,6 +303,18 @@ export function buildDevToolHandler(
           return { content: `Deleted ${input.path}` };
         }
 
+        case "get_commit_log": {
+          if (!repo) {
+            return { content: "Git is not available", is_error: true };
+          }
+          const result = await queryCommitLog(repo, {
+            depth: input.depth as number | undefined,
+            type: input.type as string | undefined,
+            search: input.search as string | undefined,
+          });
+          return { content: result };
+        }
+
         default:
           return { content: `Unknown tool: ${name}`, is_error: true };
       }
@@ -361,6 +389,7 @@ export async function enterDevMode(
     gameState?: GameState;
     fileIO?: FileIO;
     sceneManager?: SceneManager;
+    repo?: CampaignRepo;
   },
   onStream?: SubagentStreamCallback,
 ): Promise<DevModeResult> {
@@ -372,7 +401,7 @@ export async function enterDevMode(
   const hasTools = !!(options.gameState && options.fileIO);
   const tools = hasTools ? buildDevTools() : undefined;
   const toolHandler = hasTools
-    ? buildDevToolHandler(options.gameState!, options.fileIO!, client, options.sceneManager)
+    ? buildDevToolHandler(options.gameState!, options.fileIO!, client, options.sceneManager, options.repo)
     : undefined;
 
   const result = await spawnSubagent(

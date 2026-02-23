@@ -26,6 +26,10 @@ Returns scene number, slug, precis, open threads, exchange count.
 `validate_campaign` checks broken wikilinks, malformed entities, clock/map issues.
 `repair_state` scans transcripts for wikilinked entities missing files. **Always dry-run first** (`dry_run: true`), show the report, then offer to write.
 
+**Git history:** `get_commit_log`
+Browse campaign snapshot history. Optional params: `depth` (default 20, max 100), `type` (auto|scene|session|checkpoint|character), `search` (case-insensitive message filter).
+Commit types: `auto` = periodic saves, `scene` = scene transitions, `session` = session boundaries, `checkpoint` = pre-destructive ops, `character` = character changes.
+
 ## Game State Structure
 
 **combat** — `{ active, order: [{ id, initiative, type }], round, currentTurn }`

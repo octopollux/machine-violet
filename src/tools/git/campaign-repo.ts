@@ -238,6 +238,43 @@ function parseCommitType(message: string): CommitType {
   return "auto";
 }
 
+/**
+ * Query the commit log with optional filtering — shared helper for agent tools.
+ * Returns a terse formatted string suitable for tool results.
+ */
+export async function queryCommitLog(
+  repo: CampaignRepo,
+  options: { depth?: number; type?: string; search?: string },
+): Promise<string> {
+  if (!repo.isEnabled()) return "Git is disabled for this campaign.";
+
+  const depth = Math.min(Math.max(options.depth ?? 20, 1), 100);
+  const log = await repo.getLog(depth);
+
+  let filtered = log;
+  if (options.type) {
+    const t = options.type as CommitType;
+    filtered = filtered.filter((c) => c.type === t);
+  }
+  if (options.search) {
+    const term = options.search.toLowerCase();
+    filtered = filtered.filter((c) => c.message.toLowerCase().includes(term));
+  }
+
+  if (filtered.length === 0) return "No matching commits found.";
+
+  const lines = filtered.map((c) => {
+    const short = c.oid.slice(0, 7);
+    const date = new Date(c.timestamp * 1000).toISOString().slice(0, 16).replace("T", " ");
+    return `${short} [${c.type}] ${c.message} (${date})`;
+  });
+
+  const header = filtered.length < log.length
+    ? `${filtered.length} of ${log.length} commits (filtered):`
+    : `${log.length} commits:`;
+  return header + "\n" + lines.join("\n");
+}
+
 function resolveTarget(log: CommitInfo[], target: string): CommitInfo | null {
   if (target === "last") {
     return log[0] ?? null;

@@ -5,6 +5,8 @@ import type { SubagentResult } from "../subagent.js";
 import { getModel } from "../../config/models.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
+import type { CampaignRepo } from "../../tools/git/index.js";
+import { queryCommitLog } from "../../tools/git/index.js";
 
 /**
  * Context snapshot for OOC mode — captured when entering, restored when exiting.
@@ -51,6 +53,50 @@ export function buildOOCPrompt(
   return prompt;
 }
 
+/** Build OOC tool definitions (available when repo is provided). */
+export function buildOOCTools(): Anthropic.Tool[] {
+  return [
+    {
+      name: "get_commit_log",
+      description: "List git snapshot commits for this campaign. Shows commit hash, type, message, and timestamp. Use to review game history for rollback or debugging.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          depth: { type: "number", description: "Number of commits to retrieve (default 20, max 100)" },
+          type: { type: "string", enum: ["auto", "scene", "session", "checkpoint", "character"], description: "Filter by commit type" },
+          search: { type: "string", description: "Filter by message content (case-insensitive)" },
+        },
+        required: [],
+      },
+    },
+  ];
+}
+
+/** Build OOC tool handler. */
+export function buildOOCToolHandler(
+  repo: CampaignRepo,
+): (name: string, input: Record<string, unknown>) => Promise<{ content: string; is_error?: boolean }> {
+  return async (name: string, input: Record<string, unknown>) => {
+    try {
+      switch (name) {
+        case "get_commit_log": {
+          const result = await queryCommitLog(repo, {
+            depth: input.depth as number | undefined,
+            type: input.type as string | undefined,
+            search: input.search as string | undefined,
+          });
+          return { content: result };
+        }
+        default:
+          return { content: `Unknown tool: ${name}`, is_error: true };
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { content: msg, is_error: true };
+    }
+  };
+}
+
 /**
  * Enter OOC mode — spawn a Sonnet subagent that handles OOC conversation.
  * The subagent is player-facing (streams to TUI).
@@ -66,6 +112,7 @@ export async function enterOOC(
     characterSheet?: string;
     previousVariant: string;
     wasMidNarration?: boolean;
+    repo?: CampaignRepo;
   },
   onStream?: SubagentStreamCallback,
 ): Promise<OOCResult> {
@@ -80,6 +127,10 @@ export async function enterOOC(
     wasMidNarration: options.wasMidNarration ?? false,
   };
 
+  const hasTools = !!options.repo;
+  const tools = hasTools ? buildOOCTools() : undefined;
+  const toolHandler = hasTools ? buildOOCToolHandler(options.repo!) : undefined;
+
   const result = await spawnSubagent(
     client,
     {
@@ -87,7 +138,10 @@ export async function enterOOC(
       model: getModel("medium"),
       visibility: "player_facing",
       systemPrompt,
-      maxTokens: TOKEN_LIMITS.SUBAGENT_MEDIUM,
+      maxTokens: hasTools ? TOKEN_LIMITS.SUBAGENT_LARGE : TOKEN_LIMITS.SUBAGENT_MEDIUM,
+      ...(tools ? { tools } : {}),
+      ...(toolHandler ? { toolHandler } : {}),
+      maxToolRounds: hasTools ? 5 : undefined,
     },
     playerMessage,
     onStream,

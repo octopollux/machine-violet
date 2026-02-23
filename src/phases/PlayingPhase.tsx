@@ -73,6 +73,7 @@ export function PlayingPhase() {
           gameState: gs,
           fileIO,
           sceneManager: engineRef.current?.getSceneManager(),
+          repo: engineRef.current?.getRepo() ?? undefined,
         }, (delta) => {
           setNarrativeLines((prev) => appendDelta(prev, delta, "dm"));
         }).then((result) => {
@@ -92,6 +93,7 @@ export function PlayingPhase() {
         enterOOC(clientRef.current, text, {
           campaignName: gs.config.name,
           previousVariant: previousVariantRef.current,
+          repo: engineRef.current?.getRepo() ?? undefined,
         }, (delta) => {
           setNarrativeLines((prev) => appendDelta(prev, delta, "dm"));
         }).then((result) => {

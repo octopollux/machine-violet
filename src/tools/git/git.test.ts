@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { CampaignRepo } from "./campaign-repo.js";
+import { CampaignRepo, queryCommitLog } from "./campaign-repo.js";
 import type { GitIO } from "./campaign-repo.js";
 
 // --- Mock GitIO ---
@@ -236,5 +236,73 @@ describe("CampaignRepo rollback", () => {
     // Should have created a checkpoint commit before the rollback
     const checkpointExists = git.commits.some((c) => c.message.includes("before rollback"));
     expect(checkpointExists).toBe(true);
+  });
+});
+
+describe("queryCommitLog", () => {
+  async function repoWithHistory() {
+    const git = mockGitIO();
+    const repo = new CampaignRepo({ dir: "/tmp/campaign", git });
+    await repo.autoCommit("auto: exchanges 1-3");
+    await repo.sceneCommit("The Goblin Caves");
+    await repo.autoCommit("auto: exchanges 4-6");
+    await repo.sessionCommit(1);
+    await repo.characterCommit("Aldric", "level 3");
+    return repo;
+  }
+
+  it("returns all commits when no filters", async () => {
+    const repo = await repoWithHistory();
+    const result = await queryCommitLog(repo, {});
+    expect(result).toContain("commits:");
+    expect(result).toContain("[scene]");
+    expect(result).toContain("[session]");
+    expect(result).toContain("[auto]");
+    expect(result).toContain("[character]");
+    expect(result).toContain("Goblin Caves");
+  });
+
+  it("filters by type", async () => {
+    const repo = await repoWithHistory();
+    const result = await queryCommitLog(repo, { type: "scene" });
+    expect(result).toContain("filtered");
+    expect(result).toContain("[scene]");
+    expect(result).not.toContain("[session]");
+    expect(result).not.toContain("[character]");
+  });
+
+  it("filters by search term", async () => {
+    const repo = await repoWithHistory();
+    const result = await queryCommitLog(repo, { search: "goblin" });
+    expect(result).toContain("Goblin Caves");
+    expect(result).toContain("filtered");
+  });
+
+  it("returns no-match message when nothing found", async () => {
+    const repo = await repoWithHistory();
+    const result = await queryCommitLog(repo, { search: "zzzzz" });
+    expect(result).toBe("No matching commits found.");
+  });
+
+  it("respects depth limit", async () => {
+    const repo = await repoWithHistory();
+    const result = await queryCommitLog(repo, { depth: 2 });
+    // Only 2 commits fetched from log
+    const lines = result.split("\n").filter((l) => l.match(/^\w{7} /));
+    expect(lines.length).toBeLessThanOrEqual(2);
+  });
+
+  it("clamps depth to max 100", async () => {
+    const repo = await repoWithHistory();
+    // Should not throw with absurd depth
+    const result = await queryCommitLog(repo, { depth: 9999 });
+    expect(result).toContain("commits:");
+  });
+
+  it("reports disabled git", async () => {
+    const git = mockGitIO();
+    const repo = new CampaignRepo({ dir: "/tmp/campaign", git, enabled: false });
+    const result = await queryCommitLog(repo, {});
+    expect(result).toContain("disabled");
   });
 });

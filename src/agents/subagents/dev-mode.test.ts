@@ -5,6 +5,8 @@ import type { GameState } from "../game-state.js";
 import type { FileIO, SceneState, SceneManager } from "../scene-manager.js";
 import { loadModelConfig } from "../../config/models.js";
 import { resetPromptCache } from "../../prompts/load-prompt.js";
+import { CampaignRepo } from "../../tools/git/index.js";
+import type { GitIO } from "../../tools/git/index.js";
 
 beforeEach(() => {
   loadModelConfig({ reset: true });
@@ -194,9 +196,9 @@ describe("summarizeGameState", () => {
 // --- Tool definitions ---
 
 describe("buildDevTools", () => {
-  it("returns 10 tool definitions", () => {
+  it("returns 11 tool definitions", () => {
     const tools = buildDevTools();
-    expect(tools).toHaveLength(10);
+    expect(tools).toHaveLength(11);
   });
 
   it("has expected tool names", () => {
@@ -204,6 +206,7 @@ describe("buildDevTools", () => {
     expect(names).toEqual([
       "read_file", "write_file", "list_dir", "get_game_state", "set_game_state",
       "repair_state", "get_scene_state", "validate_campaign", "search_files", "delete_file",
+      "get_commit_log",
     ]);
   });
 
@@ -482,6 +485,77 @@ describe("buildDevToolHandler", () => {
   });
 });
 
+// --- Git mock for commit log tests ---
+
+function mockGitIO(): GitIO {
+  const commits: Array<{ message: string; oid: string; timestamp: number }> = [];
+  const staged = new Set<string>();
+  let oidCounter = 0;
+
+  return {
+    init: vi.fn(async () => {}),
+    add: vi.fn(async (_dir, filepath) => { staged.add(filepath); }),
+    commit: vi.fn(async (_dir, message) => {
+      const oid = `commit_${++oidCounter}`;
+      commits.unshift({ message, oid, timestamp: Math.floor(Date.now() / 1000) + oidCounter });
+      staged.clear();
+      return oid;
+    }),
+    log: vi.fn(async (_dir, depth = 50) =>
+      commits.slice(0, depth).map((c) => ({
+        oid: c.oid,
+        commit: { message: c.message, author: { timestamp: c.timestamp } },
+      })),
+    ),
+    checkout: vi.fn(async () => {}),
+    statusMatrix: vi.fn(async () =>
+      staged.size > 0
+        ? [...staged].map((f) => [f, 1, 2, 2] as [string, number, number, number])
+        : [["config.json", 1, 2, 1] as [string, number, number, number]],
+    ),
+    listFiles: vi.fn(async () => ["config.json"]),
+  };
+}
+
+async function repoWithHistory(): Promise<CampaignRepo> {
+  const git = mockGitIO();
+  const repo = new CampaignRepo({ dir: "/campaigns/test-campaign", git });
+  await repo.sceneCommit("The Tavern Brawl");
+  await repo.autoCommit("auto: exchanges");
+  return repo;
+}
+
+describe("buildDevToolHandler — get_commit_log", () => {
+  it("returns commit log via repo", async () => {
+    const gs = makeGameState();
+    const fio = mockFileIO();
+    const repo = await repoWithHistory();
+    const handler = buildDevToolHandler(gs, fio, undefined, undefined, repo);
+
+    const result = await handler("get_commit_log", {});
+    expect(result.is_error).toBeUndefined();
+    expect(result.content).toContain("[scene]");
+    expect(result.content).toContain("Tavern Brawl");
+  });
+
+  it("filters by type", async () => {
+    const gs = makeGameState();
+    const repo = await repoWithHistory();
+    const handler = buildDevToolHandler(gs, mockFileIO(), undefined, undefined, repo);
+
+    const result = await handler("get_commit_log", { type: "scene" });
+    expect(result.content).toContain("[scene]");
+    expect(result.content).not.toContain("[auto]");
+  });
+
+  it("errors when repo not available", async () => {
+    const handler = buildDevToolHandler(makeGameState(), mockFileIO());
+    const result = await handler("get_commit_log", {});
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("not available");
+  });
+});
+
 // --- enterDevMode ---
 
 describe("enterDevMode", () => {
@@ -543,7 +617,7 @@ describe("enterDevMode", () => {
     // When tools are provided, the create call should include tools
     const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     if (createCall) {
-      expect(createCall.tools).toHaveLength(10);
+      expect(createCall.tools).toHaveLength(11);
       expect(createCall.max_tokens).toBe(1024); // SUBAGENT_LARGE
     }
   });
