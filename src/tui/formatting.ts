@@ -274,10 +274,16 @@ export function processNarrativeLines(
   // Phase 2: Wrap each line
   const wrapped: { kind: NarrativeLine["kind"]; nodes: FormattingNode[]; isSourceBoundary: boolean }[] = [];
   for (const line of parsed) {
-    if (line.kind === "dm") {
+    if (line.kind === "dm" || line.kind === "player") {
       const wLines = wrapNodes(line.nodes, width);
       for (let j = 0; j < wLines.length; j++) {
-        wrapped.push({ kind: "dm", nodes: wLines[j], isSourceBoundary: j === 0 });
+        if (line.kind === "player") {
+          // Player nodes are always plain strings — re-join after wrapping
+          // so the renderer can still read nodes[0] as the full line text.
+          wrapped.push({ kind: "player", nodes: [toPlainText(wLines[j])], isSourceBoundary: j === 0 });
+        } else {
+          wrapped.push({ kind: "dm", nodes: wLines[j], isSourceBoundary: j === 0 });
+        }
       }
     } else {
       wrapped.push(line);

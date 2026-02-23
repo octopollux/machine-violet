@@ -127,7 +127,8 @@ function NarrativeLineComponent({ line, playerColor, width }: {
 
   switch (line.kind) {
     case "dev": {
-      const text = typeof line.nodes[0] === "string" ? line.nodes[0] : "";
+      const raw = typeof line.nodes[0] === "string" ? line.nodes[0] : "";
+      const text = raw.length > 250 ? raw.slice(0, 250) + "…" : raw;
       return <Text wrap="truncate" dimColor color="gray">{text}</Text>;
     }
 
@@ -141,7 +142,8 @@ function NarrativeLineComponent({ line, playerColor, width }: {
           </Text>
         );
       }
-      return <Text wrap="truncate">{text}</Text>;
+      // Continuation lines from wrapped player text
+      return <Text wrap="truncate" color={playerColor}>{text}</Text>;
     }
 
     case "system": {
