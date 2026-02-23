@@ -16,3 +16,4 @@ export {
 export type { ValidationError } from "./validation.js";
 export { writeDebugDump } from "./debug-dump.js";
 export type { DebugDumpData } from "./debug-dump.js";
+export { sandboxFileIO } from "./sandbox.js";

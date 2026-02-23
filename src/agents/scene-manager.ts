@@ -70,6 +70,7 @@ export interface FileIO {
   mkdir(path: string): Promise<void>;
   exists(path: string): Promise<boolean>;
   listDir(path: string): Promise<string[]>;
+  deleteFile?(path: string): Promise<void>;
 }
 
 /** Ordered cascade steps for scene transitions. Used for resume logic. */

@@ -70,6 +70,7 @@ export function PlayingPhase() {
           gameStateSummary: summarizeGameState(gs),
           gameState: gs,
           fileIO,
+          sceneManager: engineRef.current?.getSceneManager(),
         }, (delta) => {
           setNarrativeLines((prev) => appendDelta(prev, delta, "dm"));
         }).then((result) => {

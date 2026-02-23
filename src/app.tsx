@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Text, Box, useInput } from "ink";
 import Anthropic from "@anthropic-ai/sdk";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { readFile, writeFile, appendFile, mkdir, readdir, stat } from "node:fs/promises";
+import { readFile, writeFile, appendFile, mkdir, readdir, stat, unlink } from "node:fs/promises";
 import { join, dirname } from "node:path";
 
 import { STYLES, getStyle } from "./tui/frames/index.js";
@@ -34,6 +34,7 @@ import { useGameCallbacks } from "./tui/hooks/useGameCallbacks.js";
 import { useRawModeGuardian } from "./tui/hooks/useRawModeGuardian.js";
 import { isDevMode, wrapFileIOWithDevLog } from "./config/dev-mode.js";
 import { setContextDumpDir } from "./config/context-dump.js";
+import { sandboxFileIO } from "./tools/filesystem/index.js";
 
 import { FirstLaunchPhase } from "./phases/FirstLaunchPhase.js";
 import { MainMenuPhase } from "./phases/MainMenuPhase.js";
@@ -81,6 +82,9 @@ function createFileIO(): FileIO {
     },
     async listDir(path: string) {
       return readdir(path);
+    },
+    async deleteFile(path: string) {
+      await unlink(path);
     },
   };
 }
@@ -249,10 +253,14 @@ export default function App({ shutdownRef }: AppProps) {
     const client = new Anthropic();
     clientRef.current = client;
 
+    // Sandbox FileIO to campaign root (and future content roots)
+    const campaignsDir = dirname(campaignRoot);
+    const sandboxed = sandboxFileIO(fileIO.current, [campaignRoot, campaignsDir]);
+
     // Wrap FileIO with dev logging when dev mode is active
     const engineFileIO = isDevMode()
-      ? wrapFileIOWithDevLog(fileIO.current, (msg) => setNarrativeLines((prev) => [...prev, { kind: "dev", text: msg }]))
-      : fileIO.current;
+      ? wrapFileIOWithDevLog(sandboxed, (msg) => setNarrativeLines((prev) => [...prev, { kind: "dev", text: msg }]))
+      : sandboxed;
 
     // Set up context dump directory when dev mode is active
     if (isDevMode()) {

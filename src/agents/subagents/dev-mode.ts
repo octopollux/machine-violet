@@ -3,10 +3,13 @@ import type { SubagentStreamCallback } from "../subagent.js";
 import { spawnSubagent } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import type { GameState } from "../game-state.js";
-import type { FileIO } from "../scene-manager.js";
+import type { FileIO, SceneManager } from "../scene-manager.js";
 import { getModel } from "../../config/models.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
+import { validateCampaign } from "../../tools/validation/index.js";
+import { repairState } from "./repair-state.js";
+import { norm } from "../../utils/paths.js";
 import * as path from "node:path";
 
 /**
@@ -42,7 +45,7 @@ export function buildDevPrompt(
 type GameStateSlice = "combat" | "clocks" | "maps" | "decks" | "config" | "all";
 const VALID_SLICES: GameStateSlice[] = ["combat", "clocks", "maps", "decks", "config", "all"];
 
-/** Build the 5 dev mode tool definitions. */
+/** Build the 10 dev mode tool definitions. */
 export function buildDevTools(): Anthropic.Tool[] {
   return [
     {
@@ -109,6 +112,58 @@ export function buildDevTools(): Anthropic.Tool[] {
         required: ["slice", "patch"],
       },
     },
+    {
+      name: "repair_state",
+      description: "Scan transcripts for wikilinked entities and generate missing entity files. Use dry_run=true to preview without writing.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          dry_run: { type: "boolean", description: "If true, report what would be generated without writing files. Default: true." },
+        },
+        required: [],
+      },
+    },
+    {
+      name: "get_scene_state",
+      description: "Get live scene state: scene number, slug, precis, open threads, exchange count.",
+      input_schema: {
+        type: "object" as const,
+        properties: {},
+        required: [],
+      },
+    },
+    {
+      name: "validate_campaign",
+      description: "Run the full campaign validation suite: broken links, malformed entities, clock/map issues.",
+      input_schema: {
+        type: "object" as const,
+        properties: {},
+        required: [],
+      },
+    },
+    {
+      name: "search_files",
+      description: "Search campaign files by regex pattern. Returns matching lines in 'file:line: content' format.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          pattern: { type: "string", description: "Regex pattern to search for" },
+          path: { type: "string", description: "Optional subdirectory to limit search (e.g. 'characters')" },
+        },
+        required: ["pattern"],
+      },
+    },
+    {
+      name: "delete_file",
+      description: "Delete a campaign file by relative path.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          path: { type: "string", description: "Relative path within the campaign directory" },
+        },
+        required: ["path"],
+      },
+    },
   ];
 }
 
@@ -131,6 +186,8 @@ export function resolveDevPath(campaignRoot: string, relative: string): string {
 export function buildDevToolHandler(
   gameState: GameState,
   fileIO: FileIO,
+  client?: Anthropic,
+  sceneManager?: SceneManager,
 ): (name: string, input: Record<string, unknown>) => Promise<{ content: string; is_error?: boolean }> {
   const root = gameState.campaignRoot;
 
@@ -184,6 +241,52 @@ export function buildDevToolHandler(
           return { content: `Patched ${slice}. New value:\n${JSON.stringify(gameState[key], null, 2)}` };
         }
 
+        case "repair_state": {
+          if (!client) {
+            return { content: "No API client available for repair", is_error: true };
+          }
+          const dryRun = input.dry_run !== false; // default true
+          const repairResult = await repairState(client, gameState, fileIO, dryRun);
+          return { content: JSON.stringify(repairResult, null, 2) };
+        }
+
+        case "get_scene_state": {
+          if (!sceneManager) {
+            return { content: "No scene manager available", is_error: true };
+          }
+          const scene = sceneManager.getScene();
+          return {
+            content: JSON.stringify({
+              sceneNumber: scene.sceneNumber,
+              slug: scene.slug,
+              precis: scene.precis,
+              openThreads: scene.openThreads,
+              exchangeCount: scene.transcript.length,
+            }, null, 2),
+          };
+        }
+
+        case "validate_campaign": {
+          const validationResult = await validateCampaign(root, gameState.maps, gameState.clocks, fileIO);
+          return { content: JSON.stringify(validationResult, null, 2) };
+        }
+
+        case "search_files": {
+          const pattern = new RegExp(input.pattern as string, "gi");
+          const searchPath = input.path ? resolveDevPath(root, input.path as string) : root;
+          const matches = await searchCampaignFiles(searchPath, fileIO, pattern);
+          return { content: matches.length > 0 ? matches.join("\n") : "(no matches)" };
+        }
+
+        case "delete_file": {
+          const abs = resolveDevPath(root, input.path as string);
+          if (!fileIO.deleteFile) {
+            return { content: "Delete not supported", is_error: true };
+          }
+          await fileIO.deleteFile(abs);
+          return { content: `Deleted ${input.path}` };
+        }
+
         default:
           return { content: `Unknown tool: ${name}`, is_error: true };
       }
@@ -192,6 +295,57 @@ export function buildDevToolHandler(
       return { content: msg, is_error: true };
     }
   };
+}
+
+/**
+ * Walk campaign directories and search for pattern matches in .md and .json files.
+ */
+async function searchCampaignFiles(
+  searchRoot: string,
+  fileIO: FileIO,
+  pattern: RegExp,
+): Promise<string[]> {
+  const matches: string[] = [];
+  const maxResults = 100;
+
+  async function walkDir(dirPath: string, prefix: string): Promise<void> {
+    if (matches.length >= maxResults) return;
+    let entries: string[];
+    try {
+      entries = await fileIO.listDir(dirPath);
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      if (matches.length >= maxResults) break;
+      const fullPath = norm(dirPath) + "/" + entry;
+      const relPath = prefix ? prefix + "/" + entry : entry;
+
+      if (entry.endsWith(".md") || entry.endsWith(".json")) {
+        try {
+          const content = await fileIO.readFile(fullPath);
+          const lines = content.split("\n");
+          for (let i = 0; i < lines.length; i++) {
+            if (matches.length >= maxResults) break;
+            // Reset lastIndex for global regex
+            pattern.lastIndex = 0;
+            if (pattern.test(lines[i])) {
+              matches.push(`${relPath}:${i + 1}: ${lines[i]}`);
+            }
+          }
+        } catch {
+          // Skip unreadable files
+        }
+      } else if (!entry.includes(".")) {
+        // Likely a directory — recurse
+        await walkDir(fullPath, relPath);
+      }
+    }
+  }
+
+  await walkDir(searchRoot, "");
+  return matches;
 }
 
 /**
@@ -206,6 +360,7 @@ export async function enterDevMode(
     gameStateSummary?: string;
     gameState?: GameState;
     fileIO?: FileIO;
+    sceneManager?: SceneManager;
   },
   onStream?: SubagentStreamCallback,
 ): Promise<DevModeResult> {
@@ -217,7 +372,7 @@ export async function enterDevMode(
   const hasTools = !!(options.gameState && options.fileIO);
   const tools = hasTools ? buildDevTools() : undefined;
   const toolHandler = hasTools
-    ? buildDevToolHandler(options.gameState!, options.fileIO!)
+    ? buildDevToolHandler(options.gameState!, options.fileIO!, client, options.sceneManager)
     : undefined;
 
   const result = await spawnSubagent(

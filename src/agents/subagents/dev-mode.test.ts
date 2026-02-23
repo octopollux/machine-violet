@@ -1,8 +1,15 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
 import { buildDevPrompt, buildDevTools, buildDevToolHandler, resolveDevPath, enterDevMode, summarizeGameState } from "./dev-mode.js";
 import type { GameState } from "../game-state.js";
-import type { FileIO } from "../scene-manager.js";
+import type { FileIO, SceneState, SceneManager } from "../scene-manager.js";
+import { loadModelConfig } from "../../config/models.js";
+import { resetPromptCache } from "../../prompts/load-prompt.js";
+
+beforeEach(() => {
+  loadModelConfig({ reset: true });
+  resetPromptCache();
+});
 
 function mockUsage(): Anthropic.Usage {
   return { input_tokens: 50, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
@@ -102,7 +109,23 @@ function mockFileIO(files: Record<string, string> = {}, dirs: Record<string, str
       if (p in dirs) return dirs[p];
       return [];
     }),
+    deleteFile: vi.fn(async () => {}),
   };
+}
+
+function mockSceneManager(scene?: Partial<SceneState>): SceneManager {
+  return {
+    getScene: vi.fn(() => ({
+      sceneNumber: 3,
+      slug: "tavern-brawl",
+      transcript: ["**DM:** You enter.", "**[Kael]** I look around."],
+      precis: "A brawl broke out in the tavern.",
+      openThreads: "Who started the fight?",
+      playerReads: [],
+      sessionNumber: 1,
+      ...scene,
+    })),
+  } as unknown as SceneManager;
 }
 
 describe("summarizeGameState", () => {
@@ -171,14 +194,17 @@ describe("summarizeGameState", () => {
 // --- Tool definitions ---
 
 describe("buildDevTools", () => {
-  it("returns 5 tool definitions", () => {
+  it("returns 10 tool definitions", () => {
     const tools = buildDevTools();
-    expect(tools).toHaveLength(5);
+    expect(tools).toHaveLength(10);
   });
 
   it("has expected tool names", () => {
     const names = buildDevTools().map((t) => t.name);
-    expect(names).toEqual(["read_file", "write_file", "list_dir", "get_game_state", "set_game_state"]);
+    expect(names).toEqual([
+      "read_file", "write_file", "list_dir", "get_game_state", "set_game_state",
+      "repair_state", "get_scene_state", "validate_campaign", "search_files", "delete_file",
+    ]);
   });
 
   it("each tool has name, description, and input_schema", () => {
@@ -346,6 +372,114 @@ describe("buildDevToolHandler", () => {
     expect(result.is_error).toBe(true);
     expect(result.content).toContain("Unknown tool");
   });
+
+  // --- New tool handler tests ---
+
+  it("get_scene_state returns scene data", async () => {
+    const sm = mockSceneManager();
+    const handler = buildDevToolHandler(makeGameState(), mockFileIO(), undefined, sm);
+
+    const result = await handler("get_scene_state", {});
+    const parsed = JSON.parse(result.content);
+    expect(parsed.sceneNumber).toBe(3);
+    expect(parsed.slug).toBe("tavern-brawl");
+    expect(parsed.precis).toContain("brawl");
+    expect(parsed.openThreads).toContain("fight");
+    expect(parsed.exchangeCount).toBe(2);
+  });
+
+  it("get_scene_state errors without scene manager", async () => {
+    const handler = buildDevToolHandler(makeGameState(), mockFileIO());
+    const result = await handler("get_scene_state", {});
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("No scene manager");
+  });
+
+  it("validate_campaign returns validation report", async () => {
+    const gs = makeGameState();
+    const fio = mockFileIO(
+      { "/campaigns/test-campaign/config.json": '{"name":"Test"}' },
+      {
+        "/campaigns/test-campaign/characters": [],
+        "/campaigns/test-campaign/locations": [],
+        "/campaigns/test-campaign/factions": [],
+        "/campaigns/test-campaign/items": [],
+        "/campaigns/test-campaign/lore": [],
+      },
+    );
+    const handler = buildDevToolHandler(gs, fio);
+
+    const result = await handler("validate_campaign", {});
+    expect(result.is_error).toBeUndefined();
+    const parsed = JSON.parse(result.content);
+    expect(parsed).toHaveProperty("issues");
+    expect(parsed).toHaveProperty("errorCount");
+    expect(parsed).toHaveProperty("warningCount");
+    expect(parsed).toHaveProperty("filesChecked");
+  });
+
+  it("search_files finds matching lines", async () => {
+    const gs = makeGameState();
+    const fio = mockFileIO(
+      {
+        "/campaigns/test-campaign/characters/kael.md": "# Kael\n**Race:** Half-elf\nHP: 20",
+        "/campaigns/test-campaign/characters/goblin.md": "# Goblin\nHP: 5",
+      },
+      {
+        "/campaigns/test-campaign": ["characters"],
+        "/campaigns/test-campaign/characters": ["kael.md", "goblin.md"],
+      },
+    );
+    const handler = buildDevToolHandler(gs, fio);
+
+    const result = await handler("search_files", { pattern: "HP:", path: "characters" });
+    expect(result.content).toContain("kael.md");
+    expect(result.content).toContain("HP: 20");
+    expect(result.content).toContain("goblin.md");
+    expect(result.content).toContain("HP: 5");
+  });
+
+  it("search_files returns no matches message", async () => {
+    const gs = makeGameState();
+    const fio = mockFileIO(
+      { "/campaigns/test-campaign/notes.md": "nothing here" },
+      {
+        "/campaigns/test-campaign": ["notes.md"],
+      },
+    );
+    const handler = buildDevToolHandler(gs, fio);
+
+    const result = await handler("search_files", { pattern: "ZZZZZ" });
+    expect(result.content).toBe("(no matches)");
+  });
+
+  it("delete_file calls fileIO.deleteFile", async () => {
+    const gs = makeGameState();
+    const fio = mockFileIO();
+    const handler = buildDevToolHandler(gs, fio);
+
+    const result = await handler("delete_file", { path: "characters/old.md" });
+    expect(result.content).toContain("Deleted characters/old.md");
+    expect(fio.deleteFile).toHaveBeenCalledWith("/campaigns/test-campaign/characters/old.md");
+  });
+
+  it("delete_file errors when deleteFile not supported", async () => {
+    const gs = makeGameState();
+    const fio = mockFileIO();
+    delete fio.deleteFile;
+    const handler = buildDevToolHandler(gs, fio);
+
+    const result = await handler("delete_file", { path: "characters/old.md" });
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("Delete not supported");
+  });
+
+  it("repair_state errors without client", async () => {
+    const handler = buildDevToolHandler(makeGameState(), mockFileIO());
+    const result = await handler("repair_state", { dry_run: true });
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("No API client");
+  });
 });
 
 // --- enterDevMode ---
@@ -409,7 +543,7 @@ describe("enterDevMode", () => {
     // When tools are provided, the create call should include tools
     const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     if (createCall) {
-      expect(createCall.tools).toHaveLength(5);
+      expect(createCall.tools).toHaveLength(10);
       expect(createCall.max_tokens).toBe(1024); // SUBAGENT_LARGE
     }
   });
