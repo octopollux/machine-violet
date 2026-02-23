@@ -164,6 +164,8 @@ describe("enterOOC", () => {
 
 // --- Git mock ---
 
+const MOCK_BASE_TS = Math.floor(new Date("2025-03-15T12:00:00Z").getTime() / 1000);
+
 function mockGitIO(): GitIO {
   const commits: Array<{ message: string; oid: string; timestamp: number }> = [];
   const staged = new Set<string>();
@@ -174,7 +176,7 @@ function mockGitIO(): GitIO {
     add: vi.fn(async (_dir, filepath) => { staged.add(filepath); }),
     commit: vi.fn(async (_dir, message) => {
       const oid = `commit_${++oidCounter}`;
-      commits.unshift({ message, oid, timestamp: Math.floor(Date.now() / 1000) + oidCounter });
+      commits.unshift({ message, oid, timestamp: MOCK_BASE_TS + oidCounter * 86400 });
       staged.clear();
       return oid;
     }),
@@ -205,7 +207,7 @@ describe("buildOOCTools", () => {
 });
 
 describe("buildOOCToolHandler", () => {
-  it("returns commit log from repo", async () => {
+  it("returns commit log with distinct dates", async () => {
     const git = mockGitIO();
     const repo = new CampaignRepo({ dir: "/tmp/campaign", git });
     await repo.sceneCommit("The Dragon's Lair");
@@ -216,6 +218,10 @@ describe("buildOOCToolHandler", () => {
     expect(result.is_error).toBeUndefined();
     expect(result.content).toContain("[scene]");
     expect(result.content).toContain("Dragon's Lair");
+    expect(result.content).toContain("2025-03-");
+    const dateMatches = result.content.match(/\((\d{4}-\d{2}-\d{2})/g) ?? [];
+    const uniqueDates = new Set(dateMatches);
+    expect(uniqueDates.size).toBeGreaterThan(1);
   });
 
   it("filters by type", async () => {

@@ -4,6 +4,10 @@ import type { GitIO } from "./campaign-repo.js";
 
 // --- Mock GitIO ---
 
+// Fixed base: 2025-03-15T12:00:00Z — each commit offsets by 1 day backward
+const MOCK_BASE_TS = Math.floor(new Date("2025-03-15T12:00:00Z").getTime() / 1000);
+const ONE_DAY = 86400;
+
 function mockGitIO(): GitIO & {
   commits: Array<{ message: string; oid: string; timestamp: number }>;
   staged: Set<string>;
@@ -26,7 +30,8 @@ function mockGitIO(): GitIO & {
 
     commit: vi.fn(async (_dir, message) => {
       const oid = `commit_${++oidCounter}`;
-      const timestamp = Math.floor(Date.now() / 1000) + oidCounter;
+      // Each commit is 1 day after the previous, so dates are distinguishable
+      const timestamp = MOCK_BASE_TS + oidCounter * ONE_DAY;
       commits.unshift({ message, oid, timestamp }); // Most recent first
       staged.clear();
       return oid;
@@ -251,7 +256,7 @@ describe("queryCommitLog", () => {
     return repo;
   }
 
-  it("returns all commits when no filters", async () => {
+  it("returns all commits with distinct dates", async () => {
     const repo = await repoWithHistory();
     const result = await queryCommitLog(repo, {});
     expect(result).toContain("commits:");
@@ -260,6 +265,13 @@ describe("queryCommitLog", () => {
     expect(result).toContain("[auto]");
     expect(result).toContain("[character]");
     expect(result).toContain("Goblin Caves");
+    // Commits should show different dates (mock spaces them 1 day apart)
+    // The initial auto-init is day 1 (2025-03-16), then each explicit commit adds a day
+    expect(result).toContain("2025-03-");
+    // Verify at least two different dates appear
+    const dateMatches = result.match(/\((\d{4}-\d{2}-\d{2})/g) ?? [];
+    const uniqueDates = new Set(dateMatches);
+    expect(uniqueDates.size).toBeGreaterThan(1);
   });
 
   it("filters by type", async () => {

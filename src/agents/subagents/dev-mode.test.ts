@@ -487,6 +487,8 @@ describe("buildDevToolHandler", () => {
 
 // --- Git mock for commit log tests ---
 
+const MOCK_BASE_TS = Math.floor(new Date("2025-03-15T12:00:00Z").getTime() / 1000);
+
 function mockGitIO(): GitIO {
   const commits: Array<{ message: string; oid: string; timestamp: number }> = [];
   const staged = new Set<string>();
@@ -497,7 +499,7 @@ function mockGitIO(): GitIO {
     add: vi.fn(async (_dir, filepath) => { staged.add(filepath); }),
     commit: vi.fn(async (_dir, message) => {
       const oid = `commit_${++oidCounter}`;
-      commits.unshift({ message, oid, timestamp: Math.floor(Date.now() / 1000) + oidCounter });
+      commits.unshift({ message, oid, timestamp: MOCK_BASE_TS + oidCounter * 86400 });
       staged.clear();
       return oid;
     }),
@@ -526,7 +528,7 @@ async function repoWithHistory(): Promise<CampaignRepo> {
 }
 
 describe("buildDevToolHandler — get_commit_log", () => {
-  it("returns commit log via repo", async () => {
+  it("returns commit log with distinct dates", async () => {
     const gs = makeGameState();
     const fio = mockFileIO();
     const repo = await repoWithHistory();
@@ -536,6 +538,11 @@ describe("buildDevToolHandler — get_commit_log", () => {
     expect(result.is_error).toBeUndefined();
     expect(result.content).toContain("[scene]");
     expect(result.content).toContain("Tavern Brawl");
+    expect(result.content).toContain("2025-03-");
+    // Commits are 1 day apart — verify multiple dates appear
+    const dateMatches = result.content.match(/\((\d{4}-\d{2}-\d{2})/g) ?? [];
+    const uniqueDates = new Set(dateMatches);
+    expect(uniqueDates.size).toBeGreaterThan(1);
   });
 
   it("filters by type", async () => {
