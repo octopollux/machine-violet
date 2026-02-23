@@ -265,7 +265,7 @@ export async function queryCommitLog(
 
   const lines = filtered.map((c) => {
     const short = c.oid.slice(0, 7);
-    const date = new Date(c.timestamp * 1000).toISOString().slice(0, 16).replace("T", " ");
+    const date = formatLocalTime(c.timestamp);
     return `${short} [${c.type}] ${c.message} (${date})`;
   });
 
@@ -273,6 +273,13 @@ export async function queryCommitLog(
     ? `${filtered.length} of ${log.length} commits (filtered):`
     : `${log.length} commits:`;
   return header + "\n" + lines.join("\n");
+}
+
+/** Format epoch seconds as local time: "YYYY-MM-DD HH:MM" */
+function formatLocalTime(epochSeconds: number): string {
+  const d = new Date(epochSeconds * 1000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function resolveTarget(log: CommitInfo[], target: string): CommitInfo | null {
