@@ -98,4 +98,4 @@ Live API key in `.env` with limited credit. Opus is $5/$25 per MTok. Default dev
 
 ## Commit Hygeine
 
-After completing a coding task, make a detailed commit; you'll need this history later!
+After completing a coding task, make a detailed commit; you'll need this history later! In your final summary, mention that you have made a commit.
