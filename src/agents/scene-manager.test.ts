@@ -165,6 +165,43 @@ describe("SceneManager", () => {
     expect(mgr.getScene().precis).toContain("Aldric entered the tavern");
   });
 
+  it("passes PC identification to precis updater", async () => {
+    const client = mockClient([
+      textResponse("Aldric entered the tavern."),
+    ]);
+
+    const state = mockState();
+    state.config.players = [
+      { name: "Alice", character: "Aldric", type: "human" },
+      { name: "Bob", character: "Brin", type: "human" },
+    ];
+
+    const mgr = new SceneManager(
+      state,
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      mockFileIO(),
+    );
+
+    await mgr.handleDroppedExchange(client, {
+      exchange: {
+        user: { role: "user", content: "I enter the tavern." },
+        assistant: { role: "assistant", content: "The tavern is warm." },
+        toolResults: [],
+        estimatedTokens: 20,
+        stubbed: false,
+      },
+      reason: "exchange_count",
+    });
+
+    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const userMessage = createCall.messages[0].content;
+    expect(userMessage).toContain("[[Aldric]] (Alice)");
+    expect(userMessage).toContain("[[Brin]] (Bob)");
+    expect(userMessage).toContain("Player characters:");
+  });
+
   it("accumulates player reads from dropped exchanges", async () => {
     const client = mockClient([
       textResponse('Aldric entered the tavern.\nPLAYER_READ: {"engagement":"high","focus":["exploration"],"tone":"curious","pacing":"exploratory","offScript":true}'),

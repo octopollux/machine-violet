@@ -5,6 +5,7 @@ Rules:
 - Preserve wikilinks.
 - Include mechanical state changes (HP, position, items).
 - Do not repeat information already in the precis.
+- Always name PCs by character name in summaries (never write "the player" — use [[CharacterName]]).
 
 Output order (all on separate lines):
 1. The precis summary line(s).

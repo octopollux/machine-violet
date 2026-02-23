@@ -158,8 +158,16 @@ export class SceneManager {
       : "[complex content]";
     const exchangeText = `Player: ${userContent}\nDM: ${assistantContent}`;
 
+    const pcIdent = this.state.config.players
+      .map((p) => `[[${p.character}]] (${p.name})`)
+      .join(", ");
+
     this.devLog?.("[dev] subagent:precis-updater starting");
-    const result = await updatePrecis(client, this.scene.precis, exchangeText, this.scene.openThreads || undefined);
+    const result = await updatePrecis(
+      client, this.scene.precis, exchangeText,
+      this.scene.openThreads || undefined,
+      pcIdent,
+    );
     this.devLog?.("[dev] subagent:precis-updater done");
     this.scene.precis += "\n" + result.text;
     if (result.openThreads !== undefined) {

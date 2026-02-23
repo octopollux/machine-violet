@@ -39,12 +39,17 @@ export async function updatePrecis(
   currentPrecis: string,
   droppedExchange: string,
   currentOpenThreads?: string,
+  pcIdentification?: string,
 ): Promise<PrecisUpdateResult> {
   const openThreadsLine = currentOpenThreads
     ? `Current open threads: ${currentOpenThreads}`
     : "Current open threads: (none)";
 
-  const prompt = `Current precis:\n${currentPrecis}\n\n${openThreadsLine}\n\nDropped exchange:\n${droppedExchange}\n\nAppend a terse summary of the dropped exchange to the precis, then add the OPEN: line (if any threads are open), then the PLAYER_READ: JSON line.`;
+  const pcLine = pcIdentification
+    ? `\n\nPlayer characters: ${pcIdentification}`
+    : "";
+
+  const prompt = `Current precis:\n${currentPrecis}\n\n${openThreadsLine}${pcLine}\n\nDropped exchange:\n${droppedExchange}\n\nAppend a terse summary of the dropped exchange to the precis, then add the OPEN: line (if any threads are open), then the PLAYER_READ: JSON line.`;
 
   const result = await oneShot(
     client,
