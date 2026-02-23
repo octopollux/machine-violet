@@ -16,7 +16,7 @@ type Action =
   | { type: "insert"; text: string }
   | { type: "delete" };
 
-function reducer(state: State, action: Action): State {
+export function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "move-cursor-left":
       return { ...state, cursorOffset: Math.max(0, state.cursorOffset - 1) };
@@ -34,7 +34,8 @@ function reducer(state: State, action: Action): State {
         cursorOffset: state.cursorOffset + action.text.length,
       };
     case "delete": {
-      const newOffset = Math.max(0, state.cursorOffset - 1);
+      if (state.cursorOffset === 0) return state;
+      const newOffset = state.cursorOffset - 1;
       return {
         ...state,
         previousValue: state.value,
@@ -183,8 +184,16 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", availab
     }
   }, { isActive: !isDisabled });
 
-  // Reset viewport when input is cleared
-  if (state.value.length === 0) {
+  // +1 accounts for the cursor block at the end of text
+  const needsViewport = availableWidth != null
+    && Number.isFinite(availableWidth)
+    && availableWidth > 0
+    && state.value.length + 1 > availableWidth;
+
+  // Reset viewport whenever the text fits without scrolling — this prevents
+  // a stale offset from causing the window to jump when text grows back past
+  // the threshold after deletion.
+  if (!needsViewport) {
     viewStartRef.current = 0;
   }
 
@@ -195,12 +204,6 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", availab
     if (state.value.length === 0) {
       return cursorChar;
     }
-
-    // +1 accounts for the cursor block at the end of text
-    const needsViewport = availableWidth != null
-      && Number.isFinite(availableWidth)
-      && availableWidth > 0
-      && state.value.length + 1 > availableWidth;
 
     if (needsViewport) {
       const viewStart = computeViewStart(viewStartRef.current, state.cursorOffset, availableWidth, state.value.length);
@@ -234,7 +237,7 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", availab
       result += cursorChar;
     }
     return result;
-  }, [isDisabled, state.value, state.cursorOffset, availableWidth]);
+  }, [isDisabled, state.value, state.cursorOffset, availableWidth, needsViewport]);
 
   return <Text>{rendered}</Text>;
 }

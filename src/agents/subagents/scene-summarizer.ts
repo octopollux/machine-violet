@@ -24,6 +24,6 @@ export async function summarizeScene(
     getModel("small"),
     SYSTEM_PROMPT,
     `Write a campaign log entry for this scene:\n\n${transcript}`,
-    TOKEN_LIMITS.SUBAGENT_MEDIUM,
+    TOKEN_LIMITS.DM_RESPONSE,
   );
 }

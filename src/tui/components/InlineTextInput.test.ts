@@ -1,4 +1,4 @@
-import { computeViewStart } from "./InlineTextInput.js";
+import { computeViewStart, reducer } from "./InlineTextInput.js";
 
 describe("computeViewStart", () => {
   it("returns 0 when text fits in view", () => {
@@ -68,5 +68,42 @@ describe("computeViewStart", () => {
     // Text is 25 chars, viewWidth=20, cursor at 15, prevViewStart=10.
     // maxVs = 25 + 1 - 20 = 6. prevViewStart 10 > 6, so clamps to 6.
     expect(computeViewStart(10, 15, 20, 25)).toBe(6);
+  });
+});
+
+describe("reducer", () => {
+  const make = (value: string, cursorOffset: number) => ({
+    previousValue: value,
+    value,
+    cursorOffset,
+  });
+
+  describe("delete (backspace)", () => {
+    it("is a no-op when cursor is at position 0", () => {
+      const state = make("hello", 0);
+      const next = reducer(state, { type: "delete" });
+      expect(next).toBe(state); // same reference → no mutation
+    });
+
+    it("deletes the character before the cursor", () => {
+      const state = make("hello", 3);
+      const next = reducer(state, { type: "delete" });
+      expect(next.value).toBe("helo");
+      expect(next.cursorOffset).toBe(2);
+    });
+
+    it("deletes the last character when cursor is at end", () => {
+      const state = make("hi", 2);
+      const next = reducer(state, { type: "delete" });
+      expect(next.value).toBe("h");
+      expect(next.cursorOffset).toBe(1);
+    });
+
+    it("empties the string when one character remains and cursor is at end", () => {
+      const state = make("x", 1);
+      const next = reducer(state, { type: "delete" });
+      expect(next.value).toBe("");
+      expect(next.cursorOffset).toBe(0);
+    });
   });
 });
