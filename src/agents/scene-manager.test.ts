@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
-import { SceneManager, parseTranscriptEntries } from "./scene-manager.js";
+import { SceneManager, parseTranscriptEntries, classifyTranscriptEntry } from "./scene-manager.js";
 import type { SceneState, FileIO } from "./scene-manager.js";
 import type { CampaignRepo } from "../tools/git/index.js";
 import type { GameState } from "./game-state.js";
@@ -737,5 +737,43 @@ describe("parseTranscriptEntries", () => {
     expect(entries[0]).toMatch(/^\*\*DM:\*\*/);
     expect(entries[1]).toMatch(/^\*\*\[Anderson\]\*\*/);
     expect(entries[2]).toMatch(/^\*\*DM:\*\*/);
+  });
+});
+
+describe("classifyTranscriptEntry", () => {
+  it("classifies DM entries and strips prefix", () => {
+    const result = classifyTranscriptEntry("**DM:** The door opens.");
+    expect(result).toEqual({ kind: "dm", text: "The door opens." });
+  });
+
+  it("handles DM prefix with no trailing space", () => {
+    const result = classifyTranscriptEntry("**DM:**The door opens.");
+    expect(result).toEqual({ kind: "dm", text: "The door opens." });
+  });
+
+  it("classifies player entries and formats as player line", () => {
+    const result = classifyTranscriptEntry("**[Anderson]** I attack the goblin.");
+    expect(result).toEqual({ kind: "player", text: "> Anderson: I attack the goblin." });
+  });
+
+  it("handles player names with spaces", () => {
+    const result = classifyTranscriptEntry("**[Dr. Voss]** I examine the patient.");
+    expect(result).toEqual({ kind: "player", text: "> Dr. Voss: I examine the patient." });
+  });
+
+  it("classifies tool results as dev", () => {
+    const result = classifyTranscriptEntry("> `roll_dice`: 2d6 → 7");
+    expect(result).toEqual({ kind: "dev", text: "> `roll_dice`: 2d6 → 7" });
+  });
+
+  it("classifies unrecognized entries as DM", () => {
+    const result = classifyTranscriptEntry("Some continuation text.");
+    expect(result).toEqual({ kind: "dm", text: "Some continuation text." });
+  });
+
+  it("handles multi-paragraph DM entry", () => {
+    const result = classifyTranscriptEntry("**DM:** First paragraph.\n\nSecond paragraph.");
+    expect(result.kind).toBe("dm");
+    expect(result.text).toBe("First paragraph.\n\nSecond paragraph.");
   });
 });

@@ -9,7 +9,7 @@ import { STYLES, getStyle } from "./tui/frames/index.js";
 import { markdownToTags } from "./tui/formatting.js";
 import type { FrameStyle, StyleVariant, NarrativeLine, ActiveModal } from "./types/tui.js";
 import type { FileIO, SceneState } from "./agents/scene-manager.js";
-import { detectSceneState } from "./agents/scene-manager.js";
+import { detectSceneState, classifyTranscriptEntry } from "./agents/scene-manager.js";
 import { GameEngine } from "./agents/game-engine.js";
 import type { GameState } from "./agents/game-state.js";
 import type { DMSessionState } from "./agents/dm-prompt.js";
@@ -336,16 +336,21 @@ export default function App({ shutdownRef }: AppProps) {
 
       const transcriptLines: NarrativeLine[] = [];
       for (const entry of scene.transcript) {
-        // Each entry is a complete transcript record (DM response, player
-        // input, or tool result). DM responses may contain \n\n paragraph
-        // breaks — split on those for visual separation. Within each
-        // paragraph, \n is a soft wrap from the LLM and gets joined with
-        // a space so word-wrapping uses the actual terminal width.
-        const paragraphs = entry.split("\n\n");
-        for (const para of paragraphs) {
-          const joined = para.replace(/\n/g, " ");
-          transcriptLines.push({ kind: "dm", text: markdownToTags(joined) });
-          transcriptLines.push({ kind: "dm", text: "" });
+        const { kind, text } = classifyTranscriptEntry(entry);
+        if (kind === "dm") {
+          // DM responses may contain \n\n paragraph breaks — split on
+          // those for visual separation. Within each paragraph, \n is a
+          // soft wrap from the LLM and gets joined with a space so
+          // word-wrapping uses the actual terminal width.
+          const paragraphs = text.split("\n\n");
+          for (const para of paragraphs) {
+            const joined = para.replace(/\n/g, " ");
+            transcriptLines.push({ kind: "dm", text: markdownToTags(joined) });
+            transcriptLines.push({ kind: "dm", text: "" });
+          }
+        } else {
+          // Player input and tool results are single-line entries.
+          transcriptLines.push({ kind, text });
         }
       }
 

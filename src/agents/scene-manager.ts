@@ -672,6 +672,33 @@ export function parseTranscriptEntries(raw: string): string[] {
   return entries;
 }
 
+/**
+ * Classify a transcript entry by its prefix and return the appropriate
+ * NarrativeLine kind plus cleaned text.
+ *
+ * - `**DM:** ...`     → kind "dm", prefix stripped
+ * - `**[Name]** ...`  → kind "player", formatted as "> Name: ..."
+ * - `` > `tool`: ...``→ kind "dev", kept as-is
+ * - anything else     → kind "dm", kept as-is (continuation text)
+ */
+export function classifyTranscriptEntry(entry: string): { kind: "dm" | "player" | "dev"; text: string } {
+  if (entry.startsWith("**DM:** ")) {
+    return { kind: "dm", text: entry.slice("**DM:** ".length) };
+  }
+  // Also handle **DM:** with no space after (edge case)
+  if (entry.startsWith("**DM:**")) {
+    return { kind: "dm", text: entry.slice("**DM:**".length) };
+  }
+  const playerMatch = entry.match(/^\*\*\[(.+?)\]\*\*\s*/);
+  if (playerMatch) {
+    return { kind: "player", text: `> ${playerMatch[1]}: ${entry.slice(playerMatch[0].length)}` };
+  }
+  if (entry.startsWith("> `")) {
+    return { kind: "dev", text: entry };
+  }
+  return { kind: "dm", text: entry };
+}
+
 function parseChangelogEntries(text: string): string[] {
   return text.split("\n").filter((line) => line.includes(":")).map((line) => line.trim());
 }
