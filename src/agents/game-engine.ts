@@ -79,6 +79,9 @@ export class GameEngine {
   private repo: CampaignRepo | null = null;
   private aiTurnDepth = 0;
   private static MAX_AI_CHAIN = 10;
+  private turnsWithoutTools = 0;
+  private turnsWithoutEntities = 0;
+  private static readonly BEHAVIOR_THRESHOLD = 3;
 
   constructor(params: {
     client: Anthropic;
@@ -229,8 +232,26 @@ export class GameEngine {
     // Get system prompt
     const systemPrompt = this.sceneManager.getSystemPrompt();
 
-    // Get conversation messages + new user message
-    const messages = [...this.conversation.getMessages(), userMessage];
+    // Build message list; inject behavioral reminder before player input if needed
+    const messages = [...this.conversation.getMessages()];
+    if (!opts?.skipTranscript) {
+      const reminder = this.buildBehaviorReminder();
+      if (reminder) {
+        messages.push({ role: "user", content: reminder });
+      }
+    }
+    messages.push(userMessage);
+
+    // Wrap config to track whether any tool was called this turn
+    let toolUsedThisTurn = false;
+    const baseConfig = this.buildAgentConfig();
+    const config: AgentLoopConfig = {
+      ...baseConfig,
+      onToolEnd: (name, result) => {
+        toolUsedThisTurn = true;
+        baseConfig.onToolEnd?.(name, result);
+      },
+    };
 
     try {
       // Run the agent loop with streaming
@@ -240,8 +261,21 @@ export class GameEngine {
         messages,
         this.registry,
         this.gameState,
-        this.buildAgentConfig(),
+        config,
       );
+
+      // Update behavioral drift counters
+      if (toolUsedThisTurn) {
+        this.turnsWithoutTools = 0;
+      } else {
+        this.turnsWithoutTools++;
+      }
+      const hasEntityLinks = /\[[^\]]+\]\([^)]+\.md[^)]*\)|\[\[[^\]]+\]\]/.test(result.text);
+      if (hasEntityLinks) {
+        this.turnsWithoutEntities = 0;
+      } else {
+        this.turnsWithoutEntities++;
+      }
 
       // Append to transcript
       if (result.text) {
@@ -327,6 +361,8 @@ export class GameEngine {
    * Execute a scene transition.
    */
   async transitionScene(title: string, timeAdvance?: number): Promise<void> {
+    this.turnsWithoutTools = 0;
+    this.turnsWithoutEntities = 0;
     this.setState("scene_transition");
 
     try {
@@ -352,6 +388,8 @@ export class GameEngine {
    * End the session.
    */
   async endSession(title: string, timeAdvance?: number): Promise<void> {
+    this.turnsWithoutTools = 0;
+    this.turnsWithoutEntities = 0;
     this.setState("session_ending");
 
     try {
@@ -631,6 +669,20 @@ export class GameEngine {
     } catch {
       // Debug dump itself failed — don't mask the original error
     }
+  }
+
+  /**
+   * Returns a terse behavioral reminder if the DM has gone BEHAVIOR_THRESHOLD
+   * turns without using tools or wikilinks, otherwise null.
+   * Injected ephemerally before the player message — not stored in conversation.
+   */
+  private buildBehaviorReminder(): string | null {
+    if (this.conversation.size < GameEngine.BEHAVIOR_THRESHOLD) return null;
+    const cues: string[] = [];
+    if (this.turnsWithoutTools >= GameEngine.BEHAVIOR_THRESHOLD) cues.push("use your tools");
+    if (this.turnsWithoutEntities >= GameEngine.BEHAVIOR_THRESHOLD) cues.push("wikilink entity names");
+    if (cues.length === 0) return null;
+    return `[dm-note] ${cues.join("; ")}.`;
   }
 
   private buildAgentConfig(): AgentLoopConfig {

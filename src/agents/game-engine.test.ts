@@ -926,3 +926,167 @@ describe("GameEngine AI Auto-Turn", () => {
     vi.useRealTimers();
   });
 });
+
+describe("GameEngine Behavioral Reminder", () => {
+  /** Extract the messages array from the Nth stream() call (0-indexed). */
+  function sentMessages(client: Anthropic, callIdx: number): Anthropic.MessageParam[] {
+    const streamFn = client.messages.stream as ReturnType<typeof vi.fn>;
+    return (streamFn.mock.calls[callIdx][0] as { messages: Anthropic.MessageParam[] }).messages;
+  }
+
+  it("no reminder injected during first 3 turns even without tools or entity links", async () => {
+    const client = mockClient([
+      textMessage("Turn 1."),
+      textMessage("Turn 2."),
+      textMessage("Turn 3."),
+    ]);
+    const { callbacks } = mockCallbacks();
+    const engine = new GameEngine({
+      client, gameState: mockState(), scene: mockScene(),
+      sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "One.");
+    await engine.processInput("Aldric", "Two.");
+    await engine.processInput("Aldric", "Three.");
+
+    for (let i = 0; i < 3; i++) {
+      const msgs = sentMessages(client, i);
+      expect(msgs.every((m) => typeof m.content !== "string" || !m.content.includes("[dm-note]"))).toBe(true);
+    }
+  });
+
+  it("injects tool reminder on 4th turn after 3 turns without tools", async () => {
+    const client = mockClient([
+      textMessage("One."),
+      textMessage("Two."),
+      textMessage("Three."),
+      textMessage("Four."),
+    ]);
+    const { callbacks } = mockCallbacks();
+    const engine = new GameEngine({
+      client, gameState: mockState(), scene: mockScene(),
+      sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "One.");
+    await engine.processInput("Aldric", "Two.");
+    await engine.processInput("Aldric", "Three.");
+    await engine.processInput("Aldric", "Four.");
+
+    const msgs = sentMessages(client, 3);
+    const dmNote = msgs.find((m) => typeof m.content === "string" && m.content.includes("[dm-note]"));
+    expect(dmNote).toBeDefined();
+    expect(dmNote!.content).toContain("use your tools");
+  });
+
+  it("tool use resets the tool counter and suppresses the tool reminder", async () => {
+    // Turn 4 uses a tool → 2 stream calls (one per agent loop round).
+    // So turn 5 lands at stream-call index 5, not 4.
+    const client = mockClient([
+      textMessage("One."),            // turn 1 → stream[0]
+      textMessage("Two."),            // turn 2 → stream[1]
+      textMessage("Three."),          // turn 3 → stream[2]
+      ...toolAndTextMessages("set_ui_style", { variant: "default" }, "You roll a 14."), // turn 4 → stream[3,4]
+      textMessage("Five."),           // turn 5 → stream[5]
+    ]);
+    const { callbacks } = mockCallbacks();
+    const engine = new GameEngine({
+      client, gameState: mockState(), scene: mockScene(),
+      sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "One.");
+    await engine.processInput("Aldric", "Two.");
+    await engine.processInput("Aldric", "Three.");
+    await engine.processInput("Aldric", "Four."); // tool used here → turnsWithoutTools resets to 0
+    await engine.processInput("Aldric", "Five.");
+
+    // After the tool turn (counter reset to 0), only 1 turn has passed without tools.
+    // Tool reminder should be absent; entity reminder may appear independently.
+    const msgs = sentMessages(client, 5);
+    const dmNote = msgs.find((m) => typeof m.content === "string" && m.content.includes("[dm-note]"));
+    expect(dmNote?.content ?? "").not.toContain("use your tools");
+  });
+
+  it("injects entity reminder after 3 turns without wikilinks", async () => {
+    const client = mockClient([
+      textMessage("One."),
+      textMessage("Two."),
+      textMessage("Three."),
+      textMessage("Four."),
+    ]);
+    const { callbacks } = mockCallbacks();
+    const engine = new GameEngine({
+      client, gameState: mockState(), scene: mockScene(),
+      sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "One.");
+    await engine.processInput("Aldric", "Two.");
+    await engine.processInput("Aldric", "Three.");
+    await engine.processInput("Aldric", "Four.");
+
+    const msgs = sentMessages(client, 3);
+    const dmNote = msgs.find((m) => typeof m.content === "string" && m.content.includes("[dm-note]"));
+    expect(dmNote).toBeDefined();
+    expect(dmNote!.content).toContain("wikilink entity names");
+  });
+
+  it("entity link in DM response resets the entity counter", async () => {
+    const client = mockClient([
+      textMessage("One."),
+      textMessage("Two."),
+      // Turn 3 — response contains an entity link
+      textMessage("You see [Grimjaw](../characters/grimjaw.md) approach."),
+      textMessage("Four."),
+      textMessage("Five."),
+    ]);
+    const { callbacks } = mockCallbacks();
+    const engine = new GameEngine({
+      client, gameState: mockState(), scene: mockScene(),
+      sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "One.");
+    await engine.processInput("Aldric", "Two.");
+    await engine.processInput("Aldric", "Three."); // entity link in response
+    await engine.processInput("Aldric", "Four.");
+    await engine.processInput("Aldric", "Five.");
+
+    // After the entity link on turn 3, the counter resets.
+    // Turn 4 is only 1 turn after the reset, so no entity reminder on turn 5 (index 4).
+    const msgs = sentMessages(client, 4);
+    const dmNote = msgs.find((m) => typeof m.content === "string" && m.content.includes("[dm-note]"));
+    expect(dmNote?.content ?? "").not.toContain("wikilink entity names");
+  });
+
+  it("reminder is skipped for skipTranscript turns (session open/resume)", async () => {
+    const client = mockClient([
+      textMessage("One."),
+      textMessage("Two."),
+      textMessage("Three."),
+      // skipTranscript turn on what would be turn 4
+      textMessage("Session resumed."),
+    ]);
+    const { callbacks } = mockCallbacks();
+    const engine = new GameEngine({
+      client, gameState: mockState(), scene: mockScene(),
+      sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "One.");
+    await engine.processInput("Aldric", "Two.");
+    await engine.processInput("Aldric", "Three.");
+    await engine.processInput("Aldric", "[session-open]", { skipTranscript: true });
+
+    const msgs = sentMessages(client, 3);
+    expect(msgs.every((m) => typeof m.content !== "string" || !m.content.includes("[dm-note]"))).toBe(true);
+  });
+});
