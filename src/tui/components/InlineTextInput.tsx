@@ -1,4 +1,4 @@
-import React, { useReducer, useCallback, useEffect, useMemo } from "react";
+import React, { useReducer, useCallback, useEffect, useMemo, useRef } from "react";
 import { Text, useInput, useStdin } from "ink";
 import chalk from "chalk";
 
@@ -63,9 +63,44 @@ const END_SEQUENCES = new Set([
   "\x1b[8~",  // rxvt
 ]);
 
+/**
+ * Compute the horizontal scroll offset so the cursor stays visible
+ * within a fixed-width viewport window. The window always fills the
+ * available width — it won't leave empty space on the right when text
+ * is shorter than viewStart + viewWidth (e.g. after deletion).
+ */
+export function computeViewStart(
+  prevViewStart: number,
+  cursorOffset: number,
+  viewWidth: number,
+  textLength: number,
+): number {
+  if (!Number.isFinite(viewWidth) || viewWidth <= 0) return 0;
+  // Cursor fits without scrolling
+  if (cursorOffset < viewWidth) {
+    // If previous view was already at 0 or cursor is in the current window, stay put
+    if (prevViewStart === 0) return 0;
+  }
+  let vs = prevViewStart;
+  // Cursor moved left of window → snap left edge to cursor
+  if (cursorOffset < vs) {
+    vs = cursorOffset;
+  }
+  // Cursor moved right of window → snap so cursor is at right edge
+  if (cursorOffset >= vs + viewWidth) {
+    vs = cursorOffset - viewWidth + 1;
+  }
+  // Don't leave empty space on the right — clamp so the viewport is full.
+  // +1 accounts for the cursor block column at end-of-text.
+  const maxVs = Math.max(0, textLength + 1 - viewWidth);
+  vs = Math.min(vs, maxVs);
+  return Math.max(0, vs);
+}
+
 export interface InlineTextInputProps {
   isDisabled?: boolean;
   defaultValue?: string;
+  availableWidth?: number;
   onChange?: (value: string) => void;
   onSubmit?: (value: string) => void;
 }
@@ -75,12 +110,14 @@ export interface InlineTextInputProps {
  * Supports: left/right arrows, Home/End, Ctrl+A/E, backspace, delete.
  * Clear by changing the React `key` prop.
  */
-export function InlineTextInput({ isDisabled = false, defaultValue = "", onChange, onSubmit }: InlineTextInputProps) {
+export function InlineTextInput({ isDisabled = false, defaultValue = "", availableWidth, onChange, onSubmit }: InlineTextInputProps) {
   const [state, dispatch] = useReducer(reducer, {
     previousValue: defaultValue,
     value: defaultValue,
     cursorOffset: defaultValue.length,
   });
+
+  const viewStartRef = useRef(0);
 
   // Access Ink's internal event emitter to detect Home/End keys.
   // Ink's useInput doesn't expose these — its parser recognizes them but
@@ -146,6 +183,11 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", onChang
     }
   }, { isActive: !isDisabled });
 
+  // Reset viewport when input is cleared
+  if (state.value.length === 0) {
+    viewStartRef.current = 0;
+  }
+
   const rendered = useMemo(() => {
     if (isDisabled) {
       return state.value;
@@ -153,6 +195,35 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", onChang
     if (state.value.length === 0) {
       return cursorChar;
     }
+
+    // +1 accounts for the cursor block at the end of text
+    const needsViewport = availableWidth != null
+      && Number.isFinite(availableWidth)
+      && availableWidth > 0
+      && state.value.length + 1 > availableWidth;
+
+    if (needsViewport) {
+      const viewStart = computeViewStart(viewStartRef.current, state.cursorOffset, availableWidth, state.value.length);
+      viewStartRef.current = viewStart;
+
+      const viewEnd = viewStart + availableWidth;
+      // If cursor is at end of text, we need room for the cursor block
+      const atEnd = state.cursorOffset === state.value.length;
+      const sliceEnd = atEnd ? Math.min(viewEnd - 1, state.value.length) : Math.min(viewEnd, state.value.length);
+      const visible = state.value.slice(viewStart, sliceEnd);
+
+      let result = "";
+      for (let i = 0; i < visible.length; i++) {
+        const globalIndex = viewStart + i;
+        result += globalIndex === state.cursorOffset ? chalk.inverse(visible[i]) : visible[i];
+      }
+      if (atEnd && state.cursorOffset >= viewStart && state.cursorOffset < viewEnd) {
+        result += cursorChar;
+      }
+      return result;
+    }
+
+    // No viewport needed — render full text
     let result = "";
     let index = 0;
     for (const char of state.value) {
@@ -163,7 +234,7 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", onChang
       result += cursorChar;
     }
     return result;
-  }, [isDisabled, state.value, state.cursorOffset]);
+  }, [isDisabled, state.value, state.cursorOffset, availableWidth]);
 
   return <Text>{rendered}</Text>;
 }

@@ -4,21 +4,20 @@ When creating a plan to do any of these items, include a step to update this TOD
 
 ## Refactoring
 
-### Replace prop drilling with context in TUI layer
-- [x] Create `GameContext` provider with `useGameContext()` hook
-- [x] Refactor PlayingPhase from 28 props to context consumer
-- [ ] Refactor Layout from 15 props to context consumer
-- [ ] Update child components to pull from context
 
 ## Bugs
-- [ ] When restoring state from disk, the transcript doesn't get processed for formatting based on who is speaking; player turns look like DM turns.
+- [x] User input has a limit; at some point the main conversation view does not shrink any more to accomodate the expansion of the input box. Entering additional text still works, but the user cannot see it.
+- [ ] Player text shown in the conversation view truncates instead of wrapping
+- [ ] Dev mode text shown in the conversation view truncates instead of wrapping; this should eventually truncate - let's set it at 250 characters and try that out.
+- [ ] Upon state load/resume from disk, the conversation view shows the end of the game transcript, a newline, `Welcome back to <campaign name>`, another newline, and then the final several lines of the transcript again - presumably intended as a recap. Since theis same text is already on the screen three lines above, we should drop the recap - and also format the welcome-back announcement in bright yellow for style.
+- [ ] Text formatting can still get "stuck" if there is a dangling <i>, <b>, etc in the transcript. Need to limit the scope of these.
 
 ## Features
 
+- [ ] PgUp/PgDown/+/- should work to scroll the main conversation view when the choice modal is active.
 - [ ] **Cost display**: Move to Esc menu (bottom right).
 - [ ] **Cost calculation**: Use the SDK's cost API to calculate accurate costs from token counts. Must handle caching and not hardcode model-specific pricing — models and prices will change.
 - [ ] **Periodic formatting reminder**: Re-insert a prompt into the DM's context periodically so it doesn't forget to use formatting.
-- [x] **State folder rename**: Local state folder should be `.tui-rpg`, not `tui-rpg` — the code repo is typically named `tui-rpg` and this gets confusing.
 - [ ] **Modeline/theme state and persistence**: These pieces of state should also persist to disk, and should be brought into DM context on load so it can update them consistently; in fact, we need persistence of state for these in general so that modeline isn't effectively random from scene to scene/session to session.
 - [ ] **Game state agent knowledge**: Embed enough knowledge for certain agents to manually inspect and modify game state. Maybe a skill? Ideally designed in such a way that we get the contents of this information "for free" without haing to update it any time we add features/changes to state funtionality - but not absolutely essential.
 - [ ] **Filesystem sandboxing**: Prevent agents from making unsafe tool calls — especially file access outside the game state area. Could use hooks.

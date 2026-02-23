@@ -182,6 +182,7 @@ export function Layout(props: LayoutProps) {
         characterName={activeCharacterName}
         showPlayerName={elements.playerInPrompt}
         playerName={players[activePlayerIndex]?.name}
+        width={width}
         isDisabled={inputIsDisabled}
         onChange={onInputChange}
         onSubmit={onInputSubmit}

@@ -36,7 +36,9 @@
       "Bash(xargs:*)",
       "Bash(test:*)",
       "WebFetch(domain:github.com)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(xxd:*)",
+      "Bash(node:*)"
     ]
   }
 }

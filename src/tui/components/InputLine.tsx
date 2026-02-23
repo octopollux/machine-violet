@@ -6,6 +6,7 @@ interface InputLineProps {
   characterName: string;
   showPlayerName?: boolean;
   playerName?: string;
+  width?: number;
   isDisabled?: boolean;
   onChange?: (value: string) => void;
   onSubmit?: (value: string) => void;
@@ -20,6 +21,7 @@ export function InputLine({
   characterName,
   showPlayerName,
   playerName,
+  width,
   isDisabled,
   onChange,
   onSubmit,
@@ -29,13 +31,18 @@ export function InputLine({
     ? `${playerName}/${characterName}`
     : characterName;
 
+  // prefix text + " > " separator
+  const prefixWidth = prefix.length + 3;
+  const inputWidth = width != null ? width - prefixWidth : undefined;
+
   return (
-    <Box>
+    <Box height={1}>
       <Text bold>{prefix}</Text>
       <Text> &gt; </Text>
       <InlineTextInput
         key={resetKey}
         isDisabled={isDisabled}
+        availableWidth={inputWidth}
         onChange={onChange}
         onSubmit={onSubmit}
       />
