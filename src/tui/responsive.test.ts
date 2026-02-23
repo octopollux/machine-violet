@@ -137,4 +137,18 @@ describe("narrativeRows", () => {
     const elements = getVisibleElements("full");
     expect(narrativeRows(3, elements)).toBe(1);
   });
+
+  it("returns 1 extra row when hideInputLine is true", () => {
+    const elements = getVisibleElements("full");
+    const normal = narrativeRows(40, elements);
+    const hidden = narrativeRows(40, elements, true);
+    expect(hidden).toBe(normal + 1);
+  });
+
+  it("hideInputLine works for minimal layout", () => {
+    const elements = getVisibleElements("minimal");
+    const normal = narrativeRows(12, elements);
+    const hidden = narrativeRows(12, elements, true);
+    expect(hidden).toBe(normal + 1);
+  });
 });

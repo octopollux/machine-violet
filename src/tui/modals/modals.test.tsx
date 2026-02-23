@@ -48,6 +48,69 @@ describe("ChoiceModal", () => {
     expect(frame).toContain("  Flee");
     expect(frame).toContain("  Negotiate");
   });
+
+  it("renders without custom input row when showCustomInput is omitted", () => {
+    const { lastFrame } = render(
+      <ChoiceModal
+        variant={gothic}
+        width={50}
+        prompt="Pick one"
+        choices={["A", "B"]}
+        selectedIndex={0}
+      />,
+    );
+    expect(lastFrame()).not.toContain("Enter your own");
+  });
+
+  it("renders Enter your own text when showCustomInput is true", () => {
+    const { lastFrame } = render(
+      <ChoiceModal
+        variant={gothic}
+        width={60}
+        prompt="What do you do?"
+        choices={["Attack", "Flee"]}
+        selectedIndex={0}
+        showCustomInput
+      />,
+    );
+    const frame = lastFrame();
+    expect(frame).toContain("Enter your own...");
+    expect(frame).toContain("  Enter your own...");
+  });
+
+  it("highlights custom input row when selected", () => {
+    const { lastFrame } = render(
+      <ChoiceModal
+        variant={gothic}
+        width={60}
+        prompt="What do you do?"
+        choices={["Attack", "Flee"]}
+        selectedIndex={2}
+        showCustomInput
+      />,
+    );
+    const frame = lastFrame();
+    expect(frame).toContain("> Enter your own...");
+  });
+
+  it("renders inline text input when customInputActive is true", () => {
+    const { lastFrame } = render(
+      <ChoiceModal
+        variant={gothic}
+        width={60}
+        prompt="What do you do?"
+        choices={["Attack", "Flee"]}
+        selectedIndex={2}
+        showCustomInput
+        customInputActive
+        customInputResetKey={0}
+        onCustomInputSubmit={() => {}}
+      />,
+    );
+    const frame = lastFrame();
+    expect(frame).toContain("> Enter your own:");
+    expect(frame).toContain("Type your action");
+  });
 });
 
 describe("GameMenu", () => {

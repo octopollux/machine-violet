@@ -5,6 +5,8 @@ import type { FrameStyle, NarrativeLine } from "../types/tui.js";
 import { appendDelta } from "../tui/narrative-helpers.js";
 import { Layout } from "../tui/layout.js";
 import { ChoiceModal } from "../tui/modals/index.js";
+import type { NarrativeAreaHandle } from "../tui/components/index.js";
+import { scrollAmount } from "../tui/components/index.js";
 import type { SetupStep, SetupResult } from "../agents/setup-agent.js";
 import { fastPathSetup } from "../agents/setup-agent.js";
 import { createSetupConversation } from "../agents/subagents/setup-conversation.js";
@@ -28,6 +30,8 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
   const { stdout } = useStdout();
   const cols = stdout?.columns ?? 80;
   const rows = stdout?.rows ?? 40;
+
+  const narrativeRef = useRef<NarrativeAreaHandle>(null);
 
   // Conversational setup state
   const setupConvoRef = useRef<SetupConversation | null>(null);
@@ -204,6 +208,14 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
           setChoiceIndex(0);
           return;
         }
+        if (key.pageUp || key.pageDown) {
+          const step = scrollAmount(rows);
+          narrativeRef.current?.scrollBy(key.pageUp ? -step : step);
+        }
+        if (_input === "+" || _input === "-") {
+          const step = scrollAmount(rows);
+          narrativeRef.current?.scrollBy(_input === "-" ? -step : step);
+        }
         return;
       }
 
@@ -284,6 +296,7 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
           resources={[]}
           turnHolder="You"
           engineState={setupConvoBusy ? "dm_thinking" : null}
+          narrativeRef={narrativeRef}
         />
         {setupHasModal && activeModal && (
           <ChoiceModal

@@ -61,6 +61,9 @@ export interface LayoutProps {
 
   /** Ref to NarrativeArea scroll handle */
   narrativeRef?: React.Ref<NarrativeAreaHandle>;
+
+  /** When true, skip rendering the InputLine (e.g. choice modal provides its own input) */
+  hideInputLine?: boolean;
 }
 
 /**
@@ -88,6 +91,7 @@ export function Layout(props: LayoutProps) {
     playerColor,
     turnIndicatorColor,
     narrativeRef,
+    hideInputLine,
   } = props;
 
   const tier = getViewportTier(dimensions);
@@ -95,7 +99,7 @@ export function Layout(props: LayoutProps) {
   const ascii = useAsciiFallback(dimensions.columns);
   const frameVariant = style.variants[variant];
   const width = dimensions.columns;
-  const narRows = narrativeRows(dimensions.rows, elements);
+  const narRows = narrativeRows(dimensions.rows, elements, hideInputLine);
 
   // Side frame width (1 for now, designed to support 2 later)
   const sideFrameWidth: 1 | 2 = 1;
@@ -178,16 +182,18 @@ export function Layout(props: LayoutProps) {
       )}
 
       {/* Input Line */}
-      <InputLine
-        characterName={activeCharacterName}
-        showPlayerName={elements.playerInPrompt}
-        playerName={players[activePlayerIndex]?.name}
-        width={width}
-        isDisabled={inputIsDisabled}
-        onChange={onInputChange}
-        onSubmit={onInputSubmit}
-        resetKey={inputResetKey}
-      />
+      {!hideInputLine && (
+        <InputLine
+          characterName={activeCharacterName}
+          showPlayerName={elements.playerInPrompt}
+          playerName={players[activePlayerIndex]?.name}
+          width={width}
+          isDisabled={inputIsDisabled}
+          onChange={onInputChange}
+          onSubmit={onInputSubmit}
+          resetKey={inputResetKey}
+        />
+      )}
 
       {/* Player Selector */}
       {elements.playerSelector && (

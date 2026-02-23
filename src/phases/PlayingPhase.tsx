@@ -35,6 +35,8 @@ export function PlayingPhase() {
   const [menuIndex, setMenuIndex] = useState(0);
   const [oocBusy, setOocBusy] = useState(false);
   const [devBusy, setDevBusy] = useState(false);
+  const [customInputMode, setCustomInputMode] = useState(false);
+  const [customInputResetKey, setCustomInputResetKey] = useState(0);
 
   const clearInput = useCallback(() => {
     setResetKey((k) => k + 1);
@@ -112,6 +114,20 @@ export function PlayingPhase() {
     clearInput();
   }, [devActive, oocActive, clearInput]);
 
+  const handleCustomChoiceSubmit = useCallback((value: string) => {
+    if (!value.trim()) return;
+    const text = value.trim();
+    setActiveModal(null);
+    setChoiceIndex(0);
+    setCustomInputMode(false);
+    setCustomInputResetKey((k) => k + 1);
+    if (engineRef.current && gameStateRef.current) {
+      const active = getActivePlayer(gameStateRef.current);
+      setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }, { kind: "player", text: `> ${active.characterName}: ${text}` }, { kind: "dm", text: "" }]);
+      engineRef.current.processInput(active.characterName, text);
+    }
+  }, []);
+
   // --- Input handling (modals, menus, scroll — TextInput handles text editing) ---
   useInput((input, key) => {
     // Triple-ESC reset: 3 ESC presses within 1.5s clears all overlay state
@@ -123,6 +139,8 @@ export function PlayingPhase() {
         escTimestamps.current = [];
         setActiveModal(null);
         setChoiceIndex(0);
+        setCustomInputMode(false);
+        setCustomInputResetKey((k) => k + 1);
         setMenuOpen(false);
         setMenuIndex(0);
         if (oocActive) {
@@ -172,9 +190,33 @@ export function PlayingPhase() {
 
     // Choice modal
     if (activeModal && activeModal.kind === "choice") {
+      const step = scrollAmount(rows);
+
+      if (customInputMode) {
+        // Custom input active — only intercept navigation/scroll, let InlineTextInput handle the rest
+        if (key.escape) {
+          setCustomInputMode(false);
+          return;
+        }
+        if (key.upArrow) {
+          setCustomInputMode(false);
+          setCustomInputResetKey((k) => k + 1);
+          setChoiceIndex(activeModal.choices.length - 1);
+          return;
+        }
+        if (key.pageUp || key.pageDown) {
+          narrativeRef.current?.scrollBy(key.pageUp ? -step : step);
+          return;
+        }
+        // All other keys (including +/-) fall through to InlineTextInput
+        return;
+      }
+
+      // Normal choice navigation
       if (key.escape) {
         setActiveModal(null);
         setChoiceIndex(0);
+        setCustomInputMode(false);
         return;
       }
       if (key.upArrow) {
@@ -182,18 +224,37 @@ export function PlayingPhase() {
         return;
       }
       if (key.downArrow) {
-        setChoiceIndex((i) => Math.min(activeModal.choices.length - 1, i + 1));
+        const totalOptions = activeModal.choices.length + 1;
+        setChoiceIndex((i) => {
+          const next = Math.min(totalOptions - 1, i + 1);
+          if (next === activeModal.choices.length) {
+            setCustomInputMode(true);
+          }
+          return next;
+        });
         return;
       }
       if (key.return) {
+        if (choiceIndex === activeModal.choices.length) {
+          // Enter on the custom input row — activate it
+          setCustomInputMode(true);
+          return;
+        }
         const chosen = activeModal.choices[choiceIndex];
         setActiveModal(null);
         setChoiceIndex(0);
+        setCustomInputMode(false);
         if (engineRef.current && gameStateRef.current) {
           const active = getActivePlayer(gameStateRef.current);
           setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }, { kind: "player", text: `> ${active.characterName}: ${chosen}` }, { kind: "dm", text: "" }]);
           engineRef.current.processInput(active.characterName, chosen);
         }
+      }
+      if (key.pageUp || key.pageDown) {
+        narrativeRef.current?.scrollBy(key.pageUp ? -step : step);
+      }
+      if (input === "+" || input === "-") {
+        narrativeRef.current?.scrollBy(input === "-" ? -step : step);
       }
       return;
     }
@@ -308,7 +369,7 @@ export function PlayingPhase() {
     if (!activeModal) return 0;
     switch (activeModal.kind) {
       case "choice":
-        return activeModal.choices.length + 5 + 2;
+        return activeModal.choices.length + 1 + 5 + 2; // +1 for "Enter your own" row
       case "dice":
         return 8 + 2;
       case "recap":
@@ -341,6 +402,7 @@ export function PlayingPhase() {
         playerColor={gameStateRef.current?.config.players[activePlayerIndex]?.color}
         turnIndicatorColor={engineState === "waiting_input" ? gameStateRef.current?.config.players[activePlayerIndex]?.color : undefined}
         narrativeRef={narrativeRef}
+        hideInputLine={activeModal?.kind === "choice"}
       />
       {activeModal?.kind === "choice" && (
         <ChoiceModal
@@ -349,6 +411,10 @@ export function PlayingPhase() {
           prompt={activeModal.prompt}
           choices={activeModal.choices}
           selectedIndex={choiceIndex}
+          showCustomInput
+          customInputActive={customInputMode}
+          customInputResetKey={customInputResetKey}
+          onCustomInputSubmit={handleCustomChoiceSubmit}
         />
       )}
       {activeModal?.kind === "dice" && (

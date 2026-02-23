@@ -109,11 +109,12 @@ export function useAsciiFallback(columns: number): boolean {
 export function narrativeRows(
   totalRows: number,
   elements: VisibleElements,
+  hideInputLine = false,
 ): number {
   let used = 0;
 
-  // Input line: always present (1 row)
-  used += 1;
+  // Input line: present unless explicitly hidden (1 row)
+  if (!hideInputLine) used += 1;
 
   if (elements.topFrame) used += 2;    // border + resource line
   if (elements.lowerFrame) used += 1;  // separator with turn indicator
