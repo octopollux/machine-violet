@@ -231,10 +231,15 @@ export function processNarrativeLines(
       continue;
     }
 
-    // At source boundaries, remove color entries from the stack
-    for (let j = openStack.length - 1; j >= 0; j--) {
-      if (openStack[j].name === "color") {
-        openStack.splice(j, 1);
+    // At paragraph boundaries (blank DM lines), reset all open tags.
+    // At other source boundaries, reset only color tags (b/i/u persist within a paragraph).
+    if (srcLine.text.trim() === "") {
+      openStack.length = 0;
+    } else {
+      for (let j = openStack.length - 1; j >= 0; j--) {
+        if (openStack[j].name === "color") {
+          openStack.splice(j, 1);
+        }
       }
     }
 

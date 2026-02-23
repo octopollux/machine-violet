@@ -672,6 +672,51 @@ describe("processNarrativeLines", () => {
     expect(result).toHaveLength(3);
   });
 
+  it("dangling b/i/u does not bleed past paragraph boundary (blank DM line)", () => {
+    const result = processNarrativeLines([
+      dm("<i>italic start — never closed"),
+      dm(""),                               // blank line = paragraph boundary
+      dm("Normal text in new paragraph."),
+    ], 80);
+    // Third line should be plain text — NOT wrapped in italic
+    const thirdDM = result.filter((l) => l.kind === "dm").find(
+      (l) => toPlainText(l.nodes) === "Normal text in new paragraph.",
+    );
+    expect(thirdDM).toBeDefined();
+    const hasItalic = thirdDM!.nodes.some(
+      (n) => typeof n !== "string" && n.type === "italic",
+    );
+    expect(hasItalic).toBe(false);
+  });
+
+  it("dangling b does not bleed past paragraph boundary", () => {
+    const result = processNarrativeLines([
+      dm("<b>bold — never closed"),
+      dm("still in first paragraph, still bold"),
+      dm(""),                               // paragraph boundary
+      dm("Fresh paragraph, not bold."),
+    ], 80);
+    const dmLines = result.filter((l) => l.kind === "dm");
+    const lastDM = dmLines[dmLines.length - 1];
+    expect(toPlainText(lastDM.nodes)).toBe("Fresh paragraph, not bold.");
+    const hasBold = lastDM.nodes.some(
+      (n) => typeof n !== "string" && n.type === "bold",
+    );
+    expect(hasBold).toBe(false);
+  });
+
+  it("b/i/u still persist within a paragraph (no blank line between)", () => {
+    // Existing cross-line behaviour must be preserved
+    const result = processNarrativeLines([
+      dm("<i>italic start"),
+      dm("still italic</i>"),
+    ], 80);
+    const hasItalic = result[1].nodes.some(
+      (n) => typeof n !== "string" && n.type === "italic",
+    );
+    expect(hasItalic).toBe(true);
+  });
+
   it("no separator between consecutive lines of same kind", () => {
     const result = processNarrativeLines([
       dm("First paragraph."),

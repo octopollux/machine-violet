@@ -6,8 +6,6 @@ When creating a plan to do any of these items, include a step to update this TOD
 
 
 ## Bugs
-- [x] Upon state load/resume from disk, the conversation view shows the end of the game transcript, a newline, `Welcome back to <campaign name>`, another newline, and then the final several lines of the transcript again - presumably intended as a recap. Since theis same text is already on the screen three lines above, we should drop the recap - and also format the welcome-back announcement in bright yellow for style.
-- [ ] Text formatting can still get "stuck" if there is a dangling <i>, <b>, etc in the transcript. Need to limit the scope of these.
 
 ## Features
 
