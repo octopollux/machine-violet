@@ -63,16 +63,26 @@ export async function validateCampaign(
 
   // 2. Gather all entity files and validate format
   const entityFiles: Array<{ path: string; content: string }> = [];
-  const entityDirs = ["characters", "locations", "factions", "items", "lore"];
+  const entityDirs = ["characters", "locations", "factions", "lore"];
 
   for (const dir of entityDirs) {
     const dirPath = `${campaignRoot}/${dir}`;
     if (!(await io.exists(dirPath))) continue;
 
-    const files = await io.listDir(dirPath);
-    for (const file of files) {
-      if (!file.endsWith(".md")) continue;
-      const filePath = `${dirPath}/${file}`;
+    const entries = await io.listDir(dirPath);
+    for (const entry of entries) {
+      let filePath: string;
+      if (entry.endsWith(".md")) {
+        filePath = `${dirPath}/${entry}`;
+      } else {
+        // Could be a subdirectory (locations use slug/index.md)
+        const indexPath = `${dirPath}/${entry}/index.md`;
+        if (await io.exists(indexPath)) {
+          filePath = indexPath;
+        } else {
+          continue;
+        }
+      }
       const content = await io.readFile(filePath);
       entityFiles.push({ path: filePath, content });
       const entityErrors = validateEntityFile(filePath, content);

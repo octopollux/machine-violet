@@ -557,6 +557,36 @@ export class SceneManager {
 
   // --- Internal ---
 
+  /**
+   * Collect all entity file paths across entity directories.
+   * Handles both flat files (characters/, factions/, lore/) and
+   * subdirectory entries (locations/<slug>/index.md).
+   * Returns entries as `{ dir, file, fullPath }`.
+   */
+  private async collectEntityFiles(): Promise<Array<{ dir: string; file: string; fullPath: string }>> {
+    const dirs = ["characters", "locations", "factions", "lore"];
+    const results: Array<{ dir: string; file: string; fullPath: string }> = [];
+    for (const dir of dirs) {
+      const dirPath = `${this.state.campaignRoot}/${dir}`;
+      try {
+        if (!(await this.fileIO.exists(dirPath))) continue;
+        const entries = await this.fileIO.listDir(dirPath);
+        for (const entry of entries) {
+          if (entry.endsWith(".md")) {
+            results.push({ dir, file: entry, fullPath: `${dirPath}/${entry}` });
+          } else {
+            // Could be a subdirectory (locations use slug/index.md)
+            const indexPath = `${dirPath}/${entry}/index.md`;
+            if (await this.fileIO.exists(indexPath)) {
+              results.push({ dir, file: `${entry}/index.md`, fullPath: indexPath });
+            }
+          }
+        }
+      } catch { /* non-critical — skip dir */ }
+    }
+    return results;
+  }
+
   private async loadPCSummaries(): Promise<string[]> {
     const root = this.state.campaignRoot;
     const paths = campaignPaths(root);
@@ -581,23 +611,17 @@ export class SceneManager {
   }
 
   private async buildAliasContext(): Promise<string> {
-    const dirs = ["characters", "locations", "factions", "lore"];
+    const entityFiles = await this.collectEntityFiles();
     const lines: string[] = [];
-    for (const dir of dirs) {
-      const dirPath = `${this.state.campaignRoot}/${dir}`;
+    for (const { file, fullPath } of entityFiles) {
       try {
-        if (!(await this.fileIO.exists(dirPath))) continue;
-        const files = await this.fileIO.listDir(dirPath);
-        for (const file of files) {
-          if (!file.endsWith(".md")) continue;
-          const raw = await this.fileIO.readFile(`${dirPath}/${file}`);
-          const { frontMatter } = parseFrontMatter(raw);
-          const aliases = frontMatter.additional_names as string | undefined;
-          if (aliases?.trim()) {
-            lines.push(`${file}: also known as ${aliases.trim()}`);
-          }
+        const raw = await this.fileIO.readFile(fullPath);
+        const { frontMatter } = parseFrontMatter(raw);
+        const aliases = frontMatter.additional_names as string | undefined;
+        if (aliases?.trim()) {
+          lines.push(`${file}: also known as ${aliases.trim()}`);
         }
-      } catch { /* non-critical — skip dir */ }
+      } catch { /* non-critical */ }
     }
     return lines.length > 0
       ? `\n\nEntity aliases (use canonical filename in wikilinks, not the alias):\n${lines.join("\n")}`
@@ -628,16 +652,8 @@ export class SceneManager {
   }
 
   private async listEntityFiles(): Promise<string[]> {
-    const dirs = ["characters", "locations", "factions", "lore"];
-    const files: string[] = [];
-    for (const dir of dirs) {
-      const dirPath = `${this.state.campaignRoot}/${dir}`;
-      if (await this.fileIO.exists(dirPath)) {
-        const entries = await this.fileIO.listDir(dirPath);
-        files.push(...entries.filter((f) => f.endsWith(".md")));
-      }
-    }
-    return files;
+    const entityFiles = await this.collectEntityFiles();
+    return entityFiles.map((e) => e.file);
   }
 
   private async appendEntityChangelog(
@@ -645,15 +661,25 @@ export class SceneManager {
     sceneNumber: number,
     description: string,
   ): Promise<void> {
-    // Find the entity file in common directories
+    // Find the entity file — check both flat path and subdirectory index.md
     const dirs = ["characters", "locations", "factions", "lore"];
     for (const dir of dirs) {
-      const path = `${this.state.campaignRoot}/${dir}/${filename}`;
-      if (await this.fileIO.exists(path)) {
-        const content = await this.fileIO.readFile(path);
+      const flatPath = `${this.state.campaignRoot}/${dir}/${filename}`;
+      if (await this.fileIO.exists(flatPath)) {
+        const content = await this.fileIO.readFile(flatPath);
         const entry = formatChangelogEntry(sceneNumber, description);
         const updated = appendChangelog(content, entry);
-        await this.fileIO.writeFile(path, updated);
+        await this.fileIO.writeFile(flatPath, updated);
+        return;
+      }
+      // Try subdirectory pattern (e.g. locations/slug/index.md)
+      const slug = filename.replace(/\.md$/, "");
+      const indexPath = `${this.state.campaignRoot}/${dir}/${slug}/index.md`;
+      if (await this.fileIO.exists(indexPath)) {
+        const content = await this.fileIO.readFile(indexPath);
+        const entry = formatChangelogEntry(sceneNumber, description);
+        const updated = appendChangelog(content, entry);
+        await this.fileIO.writeFile(indexPath, updated);
         return;
       }
     }

@@ -140,6 +140,25 @@ describe("validateCampaign", () => {
     expect(result.issues.some((i) => i.message.includes("Past alarm"))).toBe(true);
   });
 
+  it("validates location entity files in subdirectories", async () => {
+    const io = mockIO(
+      {
+        "/camp/config.json": "{}",
+        "/camp/locations/tavern/index.md": "# The Rusty Nail\n\n**Type:** Location\n\nA seedy tavern.",
+      },
+      {
+        "/camp/locations": ["tavern"],  // subdirectory, not .md file
+        "/camp/locations/tavern": ["index.md"],
+      },
+    );
+
+    const result = await validateCampaign("/camp", {}, cleanClocks(), io);
+
+    // Should find and validate the location file (config + location = 2 files checked)
+    expect(result.filesChecked).toBe(2);
+    expect(result.issues.filter((i) => i.file.includes("tavern")).length).toBe(0);
+  });
+
   it("counts errors and warnings separately", async () => {
     const io = mockIO(
       {

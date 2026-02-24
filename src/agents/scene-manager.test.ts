@@ -456,16 +456,17 @@ describe("SceneManager", () => {
     const fileIO = mockFileIO();
     files["/tmp/test-campaign/characters/mysterious-stranger.md"] =
       "# Mysterious Stranger\n\n**Type:** NPC\n**Additional Names:** Grimjaw, Captain Grimjaw\n\nA cloaked figure.\n";
-    files["/tmp/test-campaign/factions/shadow-organization.md"] =
-      "# The Shadow Organization\n\n**Type:** Faction\n**Additional Names:** Iron Crown Guild\n\nA secret cabal.\n";
+    files["/tmp/test-campaign/locations/old-tower/index.md"] =
+      "# The Old Tower\n\n**Type:** Location\n**Additional Names:** Malachar's Prison\n\nA crumbling ruin.\n";
     dirs.add("/tmp/test-campaign/characters");
-    dirs.add("/tmp/test-campaign/factions");
+    dirs.add("/tmp/test-campaign/locations");
+    dirs.add("/tmp/test-campaign/locations/old-tower");
     (fileIO.listDir as ReturnType<typeof vi.fn>).mockImplementation(async (path: string) => {
       if (norm(path) === "/tmp/test-campaign/characters") {
         return ["mysterious-stranger.md"];
       }
-      if (norm(path) === "/tmp/test-campaign/factions") {
-        return ["shadow-organization.md"];
+      if (norm(path) === "/tmp/test-campaign/locations") {
+        return ["old-tower"];  // subdirectory, not a .md file
       }
       return [];
     });
@@ -490,7 +491,7 @@ describe("SceneManager", () => {
     const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(createCall.messages[0].content).toContain("Entity aliases");
     expect(createCall.messages[0].content).toContain("mysterious-stranger.md: also known as Grimjaw, Captain Grimjaw");
-    expect(createCall.messages[0].content).toContain("shadow-organization.md: also known as Iron Crown Guild");
+    expect(createCall.messages[0].content).toContain("old-tower/index.md: also known as Malachar's Prison");
   });
 
   it("buildAliasContext returns empty when no aliases exist", async () => {
@@ -523,6 +524,45 @@ describe("SceneManager", () => {
     await mgr.sceneTransition(client, "Test");
     const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(createCall.messages[0].content).not.toContain("Entity aliases");
+  });
+
+  it("scene transition updates changelogs for location subdirectories", async () => {
+    const fileIO = mockFileIO();
+    // Location entity in subdirectory
+    files["/tmp/test-campaign/locations/tavern/index.md"] =
+      "# The Rusty Nail\n\n**Type:** Location\n\nA seedy tavern.\n";
+    dirs.add("/tmp/test-campaign/characters");
+    dirs.add("/tmp/test-campaign/locations");
+    dirs.add("/tmp/test-campaign/locations/tavern");
+
+    (fileIO.listDir as ReturnType<typeof vi.fn>).mockImplementation(async (path: string) => {
+      if (norm(path) === "/tmp/test-campaign/locations") {
+        return ["tavern"];  // subdirectory
+      }
+      return [];
+    });
+
+    // Mock client: summarizer + changelog updater returns location entry
+    const client = mockClient([
+      textResponse("- Scene summary"),
+      textResponse("tavern/index.md: Party entered and caused a brawl"),
+    ]);
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    const result = await mgr.sceneTransition(client, "Tavern Brawl");
+    expect(result.changelogEntries).toHaveLength(1);
+
+    // Verify changelog was written to the location's index.md
+    const locationContent = files["/tmp/test-campaign/locations/tavern/index.md"];
+    expect(locationContent).toContain("## Changelog");
+    expect(locationContent).toContain("Party entered and caused a brawl");
   });
 
   it("contextRefresh handles missing files gracefully", async () => {
