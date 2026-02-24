@@ -1,0 +1,9 @@
+export { computeRelativePath } from "./relative-path.js";
+export { walkCampaignFiles } from "./walk-campaign.js";
+export type { CampaignFile } from "./walk-campaign.js";
+export { findReferences } from "./find-references.js";
+export type { EntityReference, FindReferencesResult } from "./find-references.js";
+export { renameEntity, rewriteLinks } from "./rename-entity.js";
+export type { RenameResult } from "./rename-entity.js";
+export { mergeEntities } from "./merge-entities.js";
+export type { MergeResult } from "./merge-entities.js";

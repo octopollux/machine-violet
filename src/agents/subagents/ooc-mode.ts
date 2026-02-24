@@ -2,11 +2,17 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { SubagentStreamCallback } from "../subagent.js";
 import { spawnSubagent } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
+import type { FileIO } from "../scene-manager.js";
 import { getModel } from "../../config/models.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import type { CampaignRepo } from "../../tools/git/index.js";
 import { queryCommitLog } from "../../tools/git/index.js";
+import type { MapData } from "../../types/maps.js";
+import type { ClocksState } from "../../types/clocks.js";
+import { findReferences } from "../../tools/campaign-ops/index.js";
+import { validateCampaign } from "../../tools/validation/index.js";
+import { norm } from "../../utils/paths.js";
 
 /**
  * Context snapshot for OOC mode — captured when entering, restored when exiting.
@@ -53,9 +59,9 @@ export function buildOOCPrompt(
   return prompt;
 }
 
-/** Build OOC tool definitions (available when repo is provided). */
-export function buildOOCTools(): Anthropic.Tool[] {
-  return [
+/** Build OOC tool definitions (available when repo or fileIO is provided). */
+export function buildOOCTools(hasFileIO: boolean): Anthropic.Tool[] {
+  const tools: Anthropic.Tool[] = [
     {
       name: "get_commit_log",
       description: "List git snapshot commits for this campaign. Shows commit hash, type, message, and timestamp. Use to review game history for rollback or debugging.",
@@ -70,16 +76,61 @@ export function buildOOCTools(): Anthropic.Tool[] {
       },
     },
   ];
+
+  if (hasFileIO) {
+    tools.push(
+      {
+        name: "read_file",
+        description: "Read a campaign file by relative path (e.g. 'characters/kael.md').",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            path: { type: "string", description: "Relative path within the campaign directory" },
+          },
+          required: ["path"],
+        },
+      },
+      {
+        name: "find_references",
+        description: "Find all wikilinks pointing to an entity. Returns file, display text, and line number for each reference.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            path: { type: "string", description: "Entity path relative to campaign root (e.g. 'characters/kael.md')" },
+          },
+          required: ["path"],
+        },
+      },
+      {
+        name: "validate_campaign",
+        description: "Run the full campaign validation suite: broken links, malformed entities, clock/map issues.",
+        input_schema: {
+          type: "object" as const,
+          properties: {},
+          required: [],
+        },
+      },
+    );
+  }
+
+  return tools;
 }
 
 /** Build OOC tool handler. */
 export function buildOOCToolHandler(
-  repo: CampaignRepo,
+  repo?: CampaignRepo,
+  campaignRoot?: string,
+  fileIO?: FileIO,
+  maps?: Record<string, MapData>,
+  clocks?: ClocksState,
 ): (name: string, input: Record<string, unknown>) => Promise<{ content: string; is_error?: boolean }> {
   return async (name: string, input: Record<string, unknown>) => {
     try {
       switch (name) {
         case "get_commit_log": {
+          if (!repo) {
+            return { content: "Git is not available", is_error: true };
+          }
           const result = await queryCommitLog(repo, {
             depth: input.depth as number | undefined,
             type: input.type as string | undefined,
@@ -87,6 +138,39 @@ export function buildOOCToolHandler(
           });
           return { content: result };
         }
+
+        case "read_file": {
+          if (!fileIO || !campaignRoot) {
+            return { content: "File I/O not available", is_error: true };
+          }
+          const relPath = (input.path as string).replace(/\\/g, "/").replace(/^\/+/, "");
+          if (relPath.split("/").some((p) => p === "..")) {
+            return { content: "Path traversal not allowed", is_error: true };
+          }
+          const abs = norm(campaignRoot) + "/" + relPath;
+          const content = await fileIO.readFile(abs);
+          return { content };
+        }
+
+        case "find_references": {
+          if (!fileIO || !campaignRoot) {
+            return { content: "File I/O not available", is_error: true };
+          }
+          const refResult = await findReferences(campaignRoot, fileIO, input.path as string);
+          return { content: JSON.stringify(refResult, null, 2) };
+        }
+
+        case "validate_campaign": {
+          if (!fileIO || !campaignRoot) {
+            return { content: "File I/O not available", is_error: true };
+          }
+          const validationResult = await validateCampaign(
+            campaignRoot, maps ?? {}, clocks ?? { calendar: { current: 0, epoch: "", display_format: "", alarms: [] }, combat: { current: 0, active: false, alarms: [] } },
+            fileIO,
+          );
+          return { content: JSON.stringify(validationResult, null, 2) };
+        }
+
         default:
           return { content: `Unknown tool: ${name}`, is_error: true };
       }
@@ -113,6 +197,10 @@ export async function enterOOC(
     previousVariant: string;
     wasMidNarration?: boolean;
     repo?: CampaignRepo;
+    fileIO?: FileIO;
+    campaignRoot?: string;
+    maps?: Record<string, MapData>;
+    clocks?: ClocksState;
   },
   onStream?: SubagentStreamCallback,
 ): Promise<OOCResult> {
@@ -127,9 +215,12 @@ export async function enterOOC(
     wasMidNarration: options.wasMidNarration ?? false,
   };
 
-  const hasTools = !!options.repo;
-  const tools = hasTools ? buildOOCTools() : undefined;
-  const toolHandler = hasTools ? buildOOCToolHandler(options.repo!) : undefined;
+  const hasFileIO = !!(options.fileIO && options.campaignRoot);
+  const hasTools = !!options.repo || hasFileIO;
+  const tools = hasTools ? buildOOCTools(hasFileIO) : undefined;
+  const toolHandler = hasTools
+    ? buildOOCToolHandler(options.repo, options.campaignRoot, options.fileIO, options.maps, options.clocks)
+    : undefined;
 
   const result = await spawnSubagent(
     client,

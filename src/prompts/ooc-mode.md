@@ -13,6 +13,11 @@ Do NOT narrate game events or play the DM role.
 
 ## Tools
 
+**Campaign files:** `read_file`, `find_references`, `validate_campaign`
+`read_file` reads any campaign file by relative path (e.g. `characters/kael.md`).
+`find_references` shows all wikilinks pointing at a given entity.
+`validate_campaign` checks for broken links, malformed entities, and state issues.
+
 **Git history:** `get_commit_log`
 Browse campaign snapshot history. Optional params: `depth` (default 20, max 100), `type` (auto|scene|session|checkpoint|character), `search` (case-insensitive message filter).
 Use this to help the player review what happened (scene/session commits), check save points, or investigate issues.

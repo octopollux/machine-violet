@@ -13,6 +13,7 @@ import { norm } from "../../utils/paths.js";
 import * as path from "node:path";
 import type { CampaignRepo } from "../../tools/git/index.js";
 import { queryCommitLog } from "../../tools/git/index.js";
+import { findReferences, renameEntity, mergeEntities } from "../../tools/campaign-ops/index.js";
 
 /**
  * Result from a Dev Mode exchange.
@@ -179,6 +180,43 @@ export function buildDevTools(): Anthropic.Tool[] {
         required: [],
       },
     },
+    {
+      name: "find_references",
+      description: "Find all wikilinks pointing to an entity. Returns file, display text, and line number for each reference.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          path: { type: "string", description: "Entity path relative to campaign root (e.g. 'characters/kael.md')" },
+        },
+        required: ["path"],
+      },
+    },
+    {
+      name: "rename_entity",
+      description: "Rename an entity file and update all wikilinks across the campaign. Always dry-run first.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          old_path: { type: "string", description: "Current entity path relative to campaign root" },
+          new_path: { type: "string", description: "New entity path relative to campaign root" },
+          dry_run: { type: "boolean", description: "If true, report changes without writing. Default: true." },
+        },
+        required: ["old_path", "new_path"],
+      },
+    },
+    {
+      name: "merge_entities",
+      description: "Merge two entity files into the winner, repoint all loser wikilinks. Always dry-run first.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          winner_path: { type: "string", description: "Entity to keep (receives merged content)" },
+          loser_path: { type: "string", description: "Entity to merge in and delete" },
+          dry_run: { type: "boolean", description: "If true, report changes without writing. Default: true." },
+        },
+        required: ["winner_path", "loser_path"],
+      },
+    },
   ];
 }
 
@@ -313,6 +351,27 @@ export function buildDevToolHandler(
             search: input.search as string | undefined,
           });
           return { content: result };
+        }
+
+        case "find_references": {
+          const refResult = await findReferences(root, fileIO, input.path as string);
+          return { content: JSON.stringify(refResult, null, 2) };
+        }
+
+        case "rename_entity": {
+          const dryRun = input.dry_run !== false; // default true
+          const renameResult = await renameEntity(
+            root, fileIO, input.old_path as string, input.new_path as string, dryRun,
+          );
+          return { content: JSON.stringify(renameResult, null, 2) };
+        }
+
+        case "merge_entities": {
+          const dryRun = input.dry_run !== false; // default true
+          const mergeResult = await mergeEntities(
+            root, fileIO, input.winner_path as string, input.loser_path as string, dryRun,
+          );
+          return { content: JSON.stringify(mergeResult, null, 2) };
         }
 
         default:

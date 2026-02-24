@@ -196,9 +196,9 @@ describe("summarizeGameState", () => {
 // --- Tool definitions ---
 
 describe("buildDevTools", () => {
-  it("returns 11 tool definitions", () => {
+  it("returns 14 tool definitions", () => {
     const tools = buildDevTools();
-    expect(tools).toHaveLength(11);
+    expect(tools).toHaveLength(14);
   });
 
   it("has expected tool names", () => {
@@ -206,7 +206,7 @@ describe("buildDevTools", () => {
     expect(names).toEqual([
       "read_file", "write_file", "list_dir", "get_game_state", "set_game_state",
       "repair_state", "get_scene_state", "validate_campaign", "search_files", "delete_file",
-      "get_commit_log",
+      "get_commit_log", "find_references", "rename_entity", "merge_entities",
     ]);
   });
 
@@ -483,6 +483,80 @@ describe("buildDevToolHandler", () => {
     expect(result.is_error).toBe(true);
     expect(result.content).toContain("No API client");
   });
+
+  it("find_references returns references for a target entity", async () => {
+    const gs = makeGameState();
+    const fio = mockFileIO(
+      {
+        "/campaigns/test-campaign/characters/kael.md": "# Kael\n**Type:** PC",
+        "/campaigns/test-campaign/campaign/log.md": "Met [Kael](../characters/kael.md) at the tavern.",
+      },
+      {
+        "/campaigns/test-campaign/characters": ["kael.md"],
+      },
+    );
+    const handler = buildDevToolHandler(gs, fio);
+
+    const result = await handler("find_references", { path: "characters/kael.md" });
+    expect(result.is_error).toBeUndefined();
+    const parsed = JSON.parse(result.content);
+    expect(parsed.target).toBe("characters/kael.md");
+    expect(parsed.references).toHaveLength(1);
+    expect(parsed.references[0].file).toBe("campaign/log.md");
+    expect(parsed.references[0].display).toBe("Kael");
+  });
+
+  it("rename_entity delegates to operation and returns result", async () => {
+    const gs = makeGameState();
+    const fio = mockFileIO(
+      {
+        "/campaigns/test-campaign/characters/kael.md": "# Kael\n**Type:** PC",
+        "/campaigns/test-campaign/campaign/log.md": "Met [Kael](../characters/kael.md).",
+      },
+      {
+        "/campaigns/test-campaign/characters": ["kael.md"],
+      },
+    );
+    const handler = buildDevToolHandler(gs, fio);
+
+    const result = await handler("rename_entity", {
+      old_path: "characters/kael.md",
+      new_path: "characters/kael-ranger.md",
+      dry_run: true,
+    });
+    expect(result.is_error).toBeUndefined();
+    const parsed = JSON.parse(result.content);
+    expect(parsed.oldPath).toBe("characters/kael.md");
+    expect(parsed.newPath).toBe("characters/kael-ranger.md");
+    expect(parsed.dryRun).toBe(true);
+    expect(parsed.linksUpdated).toBe(1);
+  });
+
+  it("merge_entities delegates to operation and returns result", async () => {
+    const gs = makeGameState();
+    const fio = mockFileIO(
+      {
+        "/campaigns/test-campaign/characters/kael.md": "# Kael\n**Type:** PC",
+        "/campaigns/test-campaign/characters/kael-dupe.md": "# Kael\n**Type:** PC\n**Class:** Ranger",
+      },
+      {
+        "/campaigns/test-campaign/characters": ["kael.md", "kael-dupe.md"],
+      },
+    );
+    const handler = buildDevToolHandler(gs, fio);
+
+    const result = await handler("merge_entities", {
+      winner_path: "characters/kael.md",
+      loser_path: "characters/kael-dupe.md",
+      dry_run: true,
+    });
+    expect(result.is_error).toBeUndefined();
+    const parsed = JSON.parse(result.content);
+    expect(parsed.winnerPath).toBe("characters/kael.md");
+    expect(parsed.loserPath).toBe("characters/kael-dupe.md");
+    expect(parsed.dryRun).toBe(true);
+    expect(parsed.keysAdded).toContain("class");
+  });
 });
 
 // --- Git mock for commit log tests ---
@@ -624,7 +698,7 @@ describe("enterDevMode", () => {
     // When tools are provided, the create call should include tools
     const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     if (createCall) {
-      expect(createCall.tools).toHaveLength(11);
+      expect(createCall.tools).toHaveLength(14);
       expect(createCall.max_tokens).toBe(16384); // DEV_MODE
     }
   });
