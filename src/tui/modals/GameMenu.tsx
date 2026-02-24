@@ -10,6 +10,7 @@ interface GameMenuProps {
   oocActive?: boolean;
   devModeEnabled?: boolean;
   devActive?: boolean;
+  tokenSummary?: string;
 }
 
 const BASE_MENU_ITEMS = [
@@ -46,6 +47,7 @@ export function GameMenu({
   oocActive,
   devModeEnabled,
   devActive,
+  tokenSummary,
 }: GameMenuProps) {
   const items = getMenuItems(devModeEnabled);
   const lines = items.map((item, i) => {
@@ -56,7 +58,7 @@ export function GameMenu({
     return `  ${marker} ${label}`;
   });
 
-  return <CenteredModal variant={variant} width={width} height={height} title="Menu" children={lines} />;
+  return <CenteredModal variant={variant} width={width} height={height} title="Menu" footer={tokenSummary} children={lines} />;
 }
 
 export { MENU_ITEMS };

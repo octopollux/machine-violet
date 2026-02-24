@@ -11,7 +11,7 @@ export function makeTestContext(overrides: Partial<GameContextValue> = {}): Game
     engineRef: { current: null },
     gameStateRef: { current: null },
     clientRef: { current: null },
-    costTracker: { current: { formatTerse: () => "$0.00", record: vi.fn() } as never },
+    costTracker: { current: { formatTokens: () => "", record: vi.fn() } as never },
     narrativeLines: [],
     setNarrativeLines: vi.fn(),
     style: { name: "default", genre_tags: [], variants: {} } as never,

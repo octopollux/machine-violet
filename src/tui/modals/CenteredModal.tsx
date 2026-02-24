@@ -3,7 +3,7 @@ import { Box, Text } from "ink";
 import { ScrollView } from "ink-scroll-view";
 import type { ScrollViewRef } from "ink-scroll-view";
 import type { FormattingNode, FrameStyleVariant } from "../../types/tui.js";
-import { renderHorizontalFrame, renderContentLine, renderStyledContentLine } from "../frames/index.js";
+import { renderHorizontalFrame, renderHorizontalFrameParts, renderContentLine, renderStyledContentLine } from "../frames/index.js";
 import { useScrollHandle } from "../hooks/useScrollHandle.js";
 import type { ScrollHandle } from "../hooks/useScrollHandle.js";
 
@@ -23,6 +23,10 @@ interface CenteredModalProps {
   maxWidth?: number;
   /** Width as fraction of screen (default 0.5) */
   widthFraction?: number;
+  /** Text to display in the bottom frame border */
+  footer?: string;
+  /** Color for the footer text (default "yellow") */
+  footerColor?: string;
 }
 
 /**
@@ -41,6 +45,8 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
     minWidth = 40,
     maxWidth = 60,
     widthFraction = 0.5,
+    footer,
+    footerColor = "yellow",
   }, ref) {
     const modalWidth = Math.max(minWidth, Math.min(Math.floor(width * widthFraction), maxWidth));
     const lineCount = styledChildren ? styledChildren.length : children.length;
@@ -79,7 +85,12 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
     useScrollHandle(ref, scrollRef);
 
     const top = renderHorizontalFrame(variant, modalWidth, "top", title);
-    const bottom = renderHorizontalFrame(variant, modalWidth, "bottom");
+
+    // Bottom frame: use parts when footer is present so center can be colored differently
+    const bottomFrame = footer
+      ? renderHorizontalFrameParts(variant, modalWidth, "bottom", footer)
+      : null;
+    const bottom = footer ? null : renderHorizontalFrame(variant, modalWidth, "bottom");
 
     return (
       <Box position="absolute" flexDirection="column" marginTop={topMargin} marginLeft={leftPad}>
@@ -109,7 +120,15 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
           )}
         </Box>
         <Box>
-          <Text color={variant.color}>{bottom}</Text>
+          {bottomFrame ? (
+            <Text>
+              <Text color={variant.color}>{bottomFrame.left}</Text>
+              <Text color={footerColor}>{bottomFrame.center}</Text>
+              <Text color={variant.color}>{bottomFrame.right}</Text>
+            </Text>
+          ) : (
+            <Text color={variant.color}>{bottom}</Text>
+          )}
         </Box>
       </Box>
     );

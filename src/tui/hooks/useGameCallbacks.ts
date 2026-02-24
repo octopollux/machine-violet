@@ -9,7 +9,6 @@ import { getStyle } from "../frames/index.js";
 import { campaignPaths } from "../../tools/filesystem/index.js";
 import { getActivePlayer } from "../../agents/player-manager.js";
 import { shouldGenerateChoices, generateChoices } from "../../agents/subagents/choice-generator.js";
-import { getModel } from "../../config/models.js";
 import { CostTracker } from "../../context/cost-tracker.js";
 import { isDevMode } from "../../config/dev-mode.js";
 import type { ToolResult } from "../../agents/tool-registry.js";
@@ -137,7 +136,7 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
               setChoiceIndex(0);
               setActiveModal({ kind: "choice", prompt: "What do you do?", choices: result.choices });
             }
-            costTracker.current.record(result.usage, getModel("small"));
+            costTracker.current.record(result.usage, "small");
           }).catch(() => { /* best-effort */ });
         }
       }
@@ -167,7 +166,7 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
     },
     onExchangeDropped() { /* precis update handled internally */ },
     onUsageUpdate(usage: UsageStats) {
-      costTracker.current.record(usage, getModel("large"));
+      costTracker.current.record(usage, "large");
     },
     onError(error: Error) {
       setErrorMsg(error.message);

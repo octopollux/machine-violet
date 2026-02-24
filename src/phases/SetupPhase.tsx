@@ -13,7 +13,6 @@ import { createSetupConversation } from "../agents/subagents/setup-conversation.
 import type { SetupConversation } from "../agents/subagents/setup-conversation.js";
 import type { UsageStats } from "../agents/agent-loop.js";
 import { CostTracker } from "../context/cost-tracker.js";
-import { getModel } from "../config/models.js";
 
 type ActiveChoiceModal = { kind: "choice"; prompt: string; choices: string[] };
 
@@ -79,7 +78,7 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
     }
 
     if (result.finalized) {
-      costTracker.current.record(result.usage, getModel("medium"));
+      costTracker.current.record(result.usage, "medium");
       setupConvoRef.current = null;
       setPendingResult(result.finalized);
       setSetupConvoLines((prev) => [...prev, { kind: "dm", text: "" }, { kind: "dm", text: "<center><b>[Press ENTER to begin your adventure]</b></center>" }]);

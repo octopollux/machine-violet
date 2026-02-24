@@ -126,6 +126,22 @@ describe("GameMenu", () => {
     }
   });
 
+  it("renders token summary in footer", () => {
+    const { lastFrame } = render(
+      <Box width={60} height={24}>
+        <GameMenu
+          variant={gothic}
+          width={60}
+          height={24}
+          selectedIndex={0}
+          tokenSummary="L 5.2k/40k | M 2k/15k"
+        />
+      </Box>,
+    );
+    const frame = lastFrame();
+    expect(frame).toContain("L 5.2k/40k | M 2k/15k");
+  });
+
   it("highlights selected item", () => {
     const { lastFrame } = render(
       <Box width={40} height={24}>

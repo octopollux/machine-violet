@@ -9,7 +9,6 @@ import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { getActivePlayer, switchToNextPlayer, getPlayerEntries } from "../agents/player-manager.js";
 import { enterOOC } from "../agents/subagents/ooc-mode.js";
 import { enterDevMode, summarizeGameState } from "../agents/subagents/dev-mode.js";
-import { getModel } from "../config/models.js";
 import { useGameContext } from "../tui/game-context.js";
 
 export function PlayingPhase() {
@@ -79,7 +78,7 @@ export function PlayingPhase() {
         }).then((result) => {
           setDevBusy(false);
           setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }]);
-          costTracker.current.record(result.usage, getModel("medium"));
+          costTracker.current.record(result.usage, "medium");
         }).catch(() => {
           setDevBusy(false);
           setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Dev mode error]" }, { kind: "dm", text: "" }]);
@@ -99,7 +98,7 @@ export function PlayingPhase() {
         }).then((result) => {
           setOocBusy(false);
           setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }]);
-          costTracker.current.record(result.usage, getModel("medium"));
+          costTracker.current.record(result.usage, "medium");
         }).catch(() => {
           setOocBusy(false);
           setNarrativeLines((prev) => [...prev, { kind: "system", text: "[OOC error]" }, { kind: "dm", text: "" }]);
@@ -399,7 +398,7 @@ export function PlayingPhase() {
         style={style}
         variant={variant}
         narrativeLines={narrativeLines}
-        modelineText={modelines[activeChar] ?? `${costTracker.current.formatTerse()} | ${campaignName}`}
+        modelineText={modelines[activeChar] ?? campaignName}
         activeCharacterName={activeChar}
         inputIsDisabled={textInputDisabled}
         inputResetKey={resetKey}
@@ -465,6 +464,7 @@ export function PlayingPhase() {
           oocActive={oocActive}
           devModeEnabled={devModeEnabled}
           devActive={devActive}
+          tokenSummary={costTracker.current.formatTokens()}
         />
       )}
     </Box>
