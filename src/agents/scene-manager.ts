@@ -124,6 +124,7 @@ export class SceneManager {
     this.sessionState.scenePrecis = this.scene.openThreads
       ? `${this.scene.precis}\nOpen: ${this.scene.openThreads}`
       : this.scene.precis;
+    this.sessionState.scenePacing = buildScenePacing(this.scene);
     this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);
     return buildDMPrefix(this.state.config, this.sessionState);
   }
@@ -800,6 +801,38 @@ export function classifyTranscriptEntry(entry: string): { kind: "dm" | "player" 
     return { kind: "dev", text: entry };
   }
   return { kind: "dm", text: entry };
+}
+
+/**
+ * Build a terse scene-pacing signal for the DM prefix.
+ * Gives the DM concrete data to evaluate scene ripeness:
+ * exchange count, open thread count, and whether any threads
+ * have been resolved (precis updates happened but thread count stayed or dropped).
+ */
+export function buildScenePacing(scene: SceneState): string | undefined {
+  // Count player exchanges (lines starting with **[)
+  const exchangeCount = scene.transcript.filter((t) => t.startsWith("**[")).length;
+  if (exchangeCount === 0) return undefined;
+
+  // Count open threads from the comma-separated list
+  const threadList = scene.openThreads
+    ? scene.openThreads.split(",").map((t) => t.trim()).filter(Boolean)
+    : [];
+  const threadCount = threadList.length;
+
+  const parts: string[] = [`Exchanges: ${exchangeCount}`];
+  parts.push(`Open threads: ${threadCount}`);
+
+  // Advisory nudge when the scene is running long or overloaded
+  if (exchangeCount >= 8 && threadCount >= 3) {
+    parts.push("→ Scene is long and thread-heavy. Consider ending it — unresolved threads carry forward, and your alarms and clocks need a transition to fire.");
+  } else if (exchangeCount >= 10) {
+    parts.push("→ Scene is running long. Look for a cut point.");
+  } else if (threadCount >= 4) {
+    parts.push("→ Many open threads. Resolve or cut — don't open more.");
+  }
+
+  return parts.join(" | ");
 }
 
 function parseChangelogEntries(text: string): string[] {

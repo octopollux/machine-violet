@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
-import { SceneManager, parseTranscriptEntries, classifyTranscriptEntry } from "./scene-manager.js";
+import { SceneManager, parseTranscriptEntries, classifyTranscriptEntry, buildScenePacing } from "./scene-manager.js";
 import type { SceneState, FileIO } from "./scene-manager.js";
 import type { CampaignRepo } from "../tools/git/index.js";
 import type { GameState } from "./game-state.js";
@@ -964,5 +964,85 @@ describe("classifyTranscriptEntry", () => {
     const result = classifyTranscriptEntry("**DM:** First paragraph.\n\nSecond paragraph.");
     expect(result.kind).toBe("dm");
     expect(result.text).toBe("First paragraph.\n\nSecond paragraph.");
+  });
+});
+
+describe("buildScenePacing", () => {
+  it("returns undefined for empty transcript", () => {
+    const scene = mockScene();
+    scene.transcript = [];
+    expect(buildScenePacing(scene)).toBeUndefined();
+  });
+
+  it("returns undefined when no player exchanges exist", () => {
+    const scene = mockScene();
+    scene.transcript = ["**DM:** The world is dark."];
+    expect(buildScenePacing(scene)).toBeUndefined();
+  });
+
+  it("shows exchange and thread counts", () => {
+    const scene = mockScene();
+    scene.transcript = [
+      "**[Aldric]** I enter the tavern.",
+      "**DM:** The tavern is warm.",
+      "**[Aldric]** I talk to the innkeeper.",
+      "**DM:** He eyes you warily.",
+    ];
+    scene.openThreads = "[[innkeeper-secret]], [[missing-merchant]]";
+    const result = buildScenePacing(scene)!;
+    expect(result).toContain("Exchanges: 2");
+    expect(result).toContain("Open threads: 2");
+    expect(result).not.toContain("→");
+  });
+
+  it("nudges when scene is long and thread-heavy", () => {
+    const scene = mockScene();
+    // 8 player exchanges
+    scene.transcript = [];
+    for (let i = 0; i < 8; i++) {
+      scene.transcript.push(`**[Aldric]** Action ${i}.`);
+      scene.transcript.push(`**DM:** Response ${i}.`);
+    }
+    scene.openThreads = "[[a]], [[b]], [[c]]";
+    const result = buildScenePacing(scene)!;
+    expect(result).toContain("Exchanges: 8");
+    expect(result).toContain("Open threads: 3");
+    expect(result).toContain("Scene is long and thread-heavy");
+  });
+
+  it("nudges when scene is long even with few threads", () => {
+    const scene = mockScene();
+    scene.transcript = [];
+    for (let i = 0; i < 10; i++) {
+      scene.transcript.push(`**[Aldric]** Action ${i}.`);
+      scene.transcript.push(`**DM:** Response ${i}.`);
+    }
+    scene.openThreads = "[[a]]";
+    const result = buildScenePacing(scene)!;
+    expect(result).toContain("Exchanges: 10");
+    expect(result).toContain("running long");
+  });
+
+  it("nudges when many threads are open even in short scene", () => {
+    const scene = mockScene();
+    scene.transcript = [
+      "**[Aldric]** I look around.",
+      "**DM:** You see many things.",
+    ];
+    scene.openThreads = "[[a]], [[b]], [[c]], [[d]]";
+    const result = buildScenePacing(scene)!;
+    expect(result).toContain("Open threads: 4");
+    expect(result).toContain("Many open threads");
+  });
+
+  it("handles empty openThreads string", () => {
+    const scene = mockScene();
+    scene.transcript = [
+      "**[Aldric]** I enter.",
+      "**DM:** Welcome.",
+    ];
+    scene.openThreads = "";
+    const result = buildScenePacing(scene)!;
+    expect(result).toContain("Open threads: 0");
   });
 });

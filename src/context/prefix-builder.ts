@@ -20,6 +20,7 @@ export interface PrefixSections {
   sessionRecap?: string;
   activeState?: string;
   scenePrecis?: string;
+  scenePacing?: string;
   playerRead?: string;
   uiState?: string;
 }
@@ -112,6 +113,14 @@ export function buildCachedPrefix(
     blocks.push({
       type: "text",
       text: `\n\n## Scene So Far\n${sections.scenePrecis}`,
+    });
+  }
+
+  // Scene pacing (exchange count, thread metrics — helps DM gauge scene ripeness)
+  if (sections.scenePacing) {
+    blocks.push({
+      type: "text",
+      text: `\n\n## Scene Pacing\n${sections.scenePacing}`,
     });
   }
 

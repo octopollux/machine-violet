@@ -220,4 +220,27 @@ describe("buildCachedPrefix", () => {
     const allText = blocks.map((b) => b.text).join("\n");
     expect(allText).not.toContain("Player Read");
   });
+
+  it("includes Scene Pacing block when provided", () => {
+    const blocks = buildCachedPrefix(mockConfig, {
+      dmPrompt: "You are the DM.",
+      personality: "Terse.",
+      scenePacing: "Exchanges: 6 | Open threads: 3",
+    });
+
+    const allText = blocks.map((b) => b.text).join("\n");
+    expect(allText).toContain("## Scene Pacing");
+    expect(allText).toContain("Exchanges: 6");
+    expect(allText).toContain("Open threads: 3");
+  });
+
+  it("omits Scene Pacing block when not provided", () => {
+    const blocks = buildCachedPrefix(mockConfig, {
+      dmPrompt: "You are the DM.",
+      personality: "Terse.",
+    });
+
+    const allText = blocks.map((b) => b.text).join("\n");
+    expect(allText).not.toContain("Scene Pacing");
+  });
 });
