@@ -84,9 +84,9 @@ describe("model config", () => {
     expect(getModel("small")).toBe("claude-haiku-4-5-20251001");
   });
 
-  it("defaults thinking to { default: 0 }", () => {
+  it("defaults thinking with dev-mode adaptive", () => {
     const config = loadModelConfig({ cwd: testDir, reset: true });
-    expect(config.thinking).toEqual({ default: 0 });
+    expect(config.thinking).toEqual({ "default": 0, "dev-mode": "adaptive" });
   });
 
   it("loads per-agent thinking map from dev-config.json", () => {
@@ -145,7 +145,7 @@ describe("model config", () => {
       JSON.stringify({ thinking: 2048 }),
     );
     const config = loadModelConfig({ cwd: testDir, reset: true });
-    expect(config.thinking).toEqual({ default: 0 });
+    expect(config.thinking).toEqual({ "default": 0, "dev-mode": "adaptive" });
   });
 
   describe("getThinkingConfig", () => {
@@ -153,6 +153,13 @@ describe("model config", () => {
       loadModelConfig({ cwd: testDir, reset: true });
       const tc = getThinkingConfig("unknown-agent");
       expect(tc.param).toEqual({ type: "disabled" });
+      expect(tc.budgetTokens).toBe(0);
+    });
+
+    it("returns adaptive for dev-mode by default", () => {
+      loadModelConfig({ cwd: testDir, reset: true });
+      const tc = getThinkingConfig("dev-mode");
+      expect(tc.param).toEqual({ type: "adaptive" });
       expect(tc.budgetTokens).toBe(0);
     });
 

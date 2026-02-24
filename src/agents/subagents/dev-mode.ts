@@ -411,7 +411,7 @@ export async function enterDevMode(
       model: getModel("medium"),
       visibility: "player_facing",
       systemPrompt,
-      maxTokens: hasTools ? TOKEN_LIMITS.SUBAGENT_LARGE : TOKEN_LIMITS.SUBAGENT_MEDIUM,
+      maxTokens: TOKEN_LIMITS.DEV_MODE,
       ...(tools ? { tools } : {}),
       ...(toolHandler ? { toolHandler } : {}),
       maxToolRounds: hasTools ? 10 : undefined,

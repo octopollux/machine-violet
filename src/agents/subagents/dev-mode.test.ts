@@ -625,7 +625,7 @@ describe("enterDevMode", () => {
     const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     if (createCall) {
       expect(createCall.tools).toHaveLength(11);
-      expect(createCall.max_tokens).toBe(1024); // SUBAGENT_LARGE
+      expect(createCall.max_tokens).toBe(16384); // DEV_MODE
     }
   });
 
@@ -638,7 +638,7 @@ describe("enterDevMode", () => {
     const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     if (createCall) {
       expect(createCall.tools).toBeUndefined();
-      expect(createCall.max_tokens).toBe(512); // SUBAGENT_MEDIUM
+      expect(createCall.max_tokens).toBe(16384); // DEV_MODE
     }
   });
 });
