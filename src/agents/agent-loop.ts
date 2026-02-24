@@ -239,6 +239,9 @@ export async function agentLoopStreaming(
     const toolResults: Anthropic.ToolResultBlockParam[] = [];
 
     for (const block of message.content) {
+      // Skip thinking blocks — they must not be sent back in conversation history
+      if (block.type === "thinking") continue;
+
       assistantContent.push(block);
 
       if (block.type === "text") {

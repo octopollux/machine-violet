@@ -277,6 +277,52 @@ describe("agentLoop", () => {
   });
 });
 
+describe("thinking block filtering", () => {
+  it("strips thinking blocks from conversation history", async () => {
+    // First response has a thinking block + tool_use, second is text-only
+    const thinkingPlusToolMsg: Anthropic.Message = {
+      id: "msg_test",
+      type: "message",
+      role: "assistant",
+      model: "claude-haiku-4-5-20251001",
+      content: [
+        { type: "thinking", thinking: "Let me consider...", signature: "sig" } as unknown as Anthropic.ContentBlock,
+        { type: "tool_use", id: "toolu_1", name: "roll_dice", input: { notation: "1d20" } },
+      ] as Anthropic.ContentBlock[],
+      stop_reason: "tool_use",
+      stop_sequence: null,
+      usage: mockUsage(),
+    } as Anthropic.Message;
+
+    const createFn = vi.fn()
+      .mockResolvedValueOnce(thinkingPlusToolMsg)
+      .mockResolvedValueOnce(textMessage("You rolled a 15!"));
+
+    const client = { messages: { create: createFn } } as unknown as Anthropic;
+
+    await agentLoop(
+      client,
+      "System",
+      [{ role: "user", content: "Roll a d20" }],
+      new ToolRegistry(),
+      mockState(),
+      mockConfig(),
+    );
+
+    // Second call should have the assistant message WITHOUT the thinking block
+    const secondCallArgs = createFn.mock.calls[1][0] as { messages: Anthropic.MessageParam[] };
+    const assistantMsg = secondCallArgs.messages.find(
+      (m: Anthropic.MessageParam) => m.role === "assistant",
+    );
+    expect(assistantMsg).toBeDefined();
+    const blockTypes = (assistantMsg!.content as Anthropic.ContentBlock[]).map(
+      (b: Anthropic.ContentBlock) => b.type,
+    );
+    expect(blockTypes).not.toContain("thinking");
+    expect(blockTypes).toContain("tool_use");
+  });
+});
+
 describe("stampToolsCacheControl", () => {
   it("stamps cache_control on the last tool", () => {
     const tools: Anthropic.Tool[] = [
