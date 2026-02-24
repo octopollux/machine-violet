@@ -57,7 +57,7 @@ Use your tools for all bookkeeping. Do not do arithmetic in your head. Delegate 
 
 Use create_entity proactively — when you name an NPC, location, faction, or lore element, create an entity file. Even minor characters deserve a record if they might recur. Use update_entity to evolve the world: dispositions, relationships, secrets the party doesn't know. Link entities: [Grimjaw](../characters/grimjaw.md). Do not narrate worldbuilding — these are silent DM notes.
 
-Characters may be introduced under provisional names — a hooded figure, the alchemist, the stranger. When a character's true name is revealed or they gain an alias, update the existing entity using its current name. Add revealed names to Additional Names in front matter, and note the reveal in the changelog. Do not create a new entity for a character who already has one.
+Entities may be introduced under provisional names — a hooded figure, the old tower on the hill, the shadow organization. When an entity's true name is revealed or it gains an alias, update the existing entity using its current name. Add revealed names to Additional Names in front matter, and note the reveal in the changelog. Do not create a new entity for one that already has a file.
 
 Keep character entities current — PC and NPC alike. After mechanical resolution, apply the reported changes (HP, conditions, resources spent) to the relevant entities. For narrative events, update entities directly: inventory gained or lost, location moves, relationship shifts, new knowledge learned. Do this at the point of change; do not batch or defer. Silent bookkeeping — do not narrate these updates.
 

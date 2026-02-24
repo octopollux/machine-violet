@@ -581,24 +581,27 @@ export class SceneManager {
   }
 
   private async buildAliasContext(): Promise<string> {
-    const charDir = `${this.state.campaignRoot}/characters`;
-    try {
-      if (!(await this.fileIO.exists(charDir))) return "";
-      const files = await this.fileIO.listDir(charDir);
-      const lines: string[] = [];
-      for (const file of files) {
-        if (!file.endsWith(".md")) continue;
-        const raw = await this.fileIO.readFile(`${charDir}/${file}`);
-        const { frontMatter } = parseFrontMatter(raw);
-        const aliases = frontMatter.additional_names as string | undefined;
-        if (aliases?.trim()) {
-          lines.push(`${file}: also known as ${aliases.trim()}`);
+    const dirs = ["characters", "locations", "factions", "lore"];
+    const lines: string[] = [];
+    for (const dir of dirs) {
+      const dirPath = `${this.state.campaignRoot}/${dir}`;
+      try {
+        if (!(await this.fileIO.exists(dirPath))) continue;
+        const files = await this.fileIO.listDir(dirPath);
+        for (const file of files) {
+          if (!file.endsWith(".md")) continue;
+          const raw = await this.fileIO.readFile(`${dirPath}/${file}`);
+          const { frontMatter } = parseFrontMatter(raw);
+          const aliases = frontMatter.additional_names as string | undefined;
+          if (aliases?.trim()) {
+            lines.push(`${file}: also known as ${aliases.trim()}`);
+          }
         }
-      }
-      return lines.length > 0
-        ? `\n\nEntity aliases (use canonical filename in wikilinks, not the alias):\n${lines.join("\n")}`
-        : "";
-    } catch { return ""; }
+      } catch { /* non-critical — skip dir */ }
+    }
+    return lines.length > 0
+      ? `\n\nEntity aliases (use canonical filename in wikilinks, not the alias):\n${lines.join("\n")}`
+      : "";
   }
 
   private async finalizeTranscript(): Promise<void> {

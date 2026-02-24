@@ -452,14 +452,20 @@ describe("SceneManager", () => {
     expect(sessionState.activeState).not.toContain("(also:");
   });
 
-  it("buildAliasContext returns formatted alias lines", async () => {
+  it("buildAliasContext returns formatted alias lines across entity types", async () => {
     const fileIO = mockFileIO();
     files["/tmp/test-campaign/characters/mysterious-stranger.md"] =
       "# Mysterious Stranger\n\n**Type:** NPC\n**Additional Names:** Grimjaw, Captain Grimjaw\n\nA cloaked figure.\n";
+    files["/tmp/test-campaign/factions/shadow-organization.md"] =
+      "# The Shadow Organization\n\n**Type:** Faction\n**Additional Names:** Iron Crown Guild\n\nA secret cabal.\n";
     dirs.add("/tmp/test-campaign/characters");
+    dirs.add("/tmp/test-campaign/factions");
     (fileIO.listDir as ReturnType<typeof vi.fn>).mockImplementation(async (path: string) => {
       if (norm(path) === "/tmp/test-campaign/characters") {
         return ["mysterious-stranger.md"];
+      }
+      if (norm(path) === "/tmp/test-campaign/factions") {
+        return ["shadow-organization.md"];
       }
       return [];
     });
@@ -484,6 +490,7 @@ describe("SceneManager", () => {
     const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(createCall.messages[0].content).toContain("Entity aliases");
     expect(createCall.messages[0].content).toContain("mysterious-stranger.md: also known as Grimjaw, Captain Grimjaw");
+    expect(createCall.messages[0].content).toContain("shadow-organization.md: also known as Iron Crown Guild");
   });
 
   it("buildAliasContext returns empty when no aliases exist", async () => {
