@@ -271,7 +271,7 @@ export class GameEngine {
       } else {
         this.turnsWithoutTools++;
       }
-      const hasEntityLinks = /\[[^\]]+\]\([^)]+\.md[^)]*\)|\[\[[^\]]+\]\]/.test(result.text);
+      const hasEntityLinks = /<color=[^>]+>[^<]+<\/color>/.test(result.text);
       if (hasEntityLinks) {
         this.turnsWithoutEntities = 0;
       } else {
@@ -675,14 +675,14 @@ export class GameEngine {
 
   /**
    * Returns a terse behavioral reminder if the DM has gone BEHAVIOR_THRESHOLD
-   * turns without using tools or wikilinks, otherwise null.
+   * turns without using tools or formatting entities, otherwise null.
    * Injected ephemerally before the player message — not stored in conversation.
    */
   private buildBehaviorReminder(): string | null {
     if (this.conversation.size < GameEngine.BEHAVIOR_THRESHOLD) return null;
     const cues: string[] = [];
     if (this.turnsWithoutTools >= GameEngine.BEHAVIOR_THRESHOLD) cues.push("use your tools");
-    if (this.turnsWithoutEntities >= GameEngine.BEHAVIOR_THRESHOLD) cues.push("wikilink entity names");
+    if (this.turnsWithoutEntities >= GameEngine.BEHAVIOR_THRESHOLD) cues.push("color-code entity names");
     if (cues.length === 0) return null;
     return `[dm-note] ${cues.join("; ")}.`;
   }

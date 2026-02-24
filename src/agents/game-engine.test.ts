@@ -938,7 +938,7 @@ describe("GameEngine Behavioral Reminder", () => {
     return (streamFn.mock.calls[callIdx][0] as { messages: Anthropic.MessageParam[] }).messages;
   }
 
-  it("no reminder injected during first 3 turns even without tools or entity links", async () => {
+  it("no reminder injected during first 3 turns even without tools or entity formatting", async () => {
     const client = mockClient([
       textMessage("Turn 1."),
       textMessage("Turn 2."),
@@ -1016,7 +1016,7 @@ describe("GameEngine Behavioral Reminder", () => {
     expect(dmNote?.content ?? "").not.toContain("use your tools");
   });
 
-  it("injects entity reminder after 3 turns without wikilinks", async () => {
+  it("injects entity reminder after 3 turns without color-coded entities", async () => {
     const client = mockClient([
       textMessage("One."),
       textMessage("Two."),
@@ -1038,15 +1038,15 @@ describe("GameEngine Behavioral Reminder", () => {
     const msgs = sentMessages(client, 3);
     const dmNote = msgs.find((m) => typeof m.content === "string" && m.content.includes("[dm-note]"));
     expect(dmNote).toBeDefined();
-    expect(dmNote!.content).toContain("wikilink entity names");
+    expect(dmNote!.content).toContain("color-code entity names");
   });
 
-  it("entity link in DM response resets the entity counter", async () => {
+  it("color-coded entity in DM response resets the entity counter", async () => {
     const client = mockClient([
       textMessage("One."),
       textMessage("Two."),
-      // Turn 3 — response contains an entity link
-      textMessage("You see [Grimjaw](../characters/grimjaw.md) approach."),
+      // Turn 3 — response contains a color-coded entity
+      textMessage('You see <color=#cc8844>Grimjaw</color> approach.'),
       textMessage("Four."),
       textMessage("Five."),
     ]);
@@ -1059,15 +1059,15 @@ describe("GameEngine Behavioral Reminder", () => {
 
     await engine.processInput("Aldric", "One.");
     await engine.processInput("Aldric", "Two.");
-    await engine.processInput("Aldric", "Three."); // entity link in response
+    await engine.processInput("Aldric", "Three."); // color-coded entity in response
     await engine.processInput("Aldric", "Four.");
     await engine.processInput("Aldric", "Five.");
 
-    // After the entity link on turn 3, the counter resets.
+    // After the color-coded entity on turn 3, the counter resets.
     // Turn 4 is only 1 turn after the reset, so no entity reminder on turn 5 (index 4).
     const msgs = sentMessages(client, 4);
     const dmNote = msgs.find((m) => typeof m.content === "string" && m.content.includes("[dm-note]"));
-    expect(dmNote?.content ?? "").not.toContain("wikilink entity names");
+    expect(dmNote?.content ?? "").not.toContain("color-code entity names");
   });
 
   it("reminder is skipped for skipTranscript turns (session open/resume)", async () => {
