@@ -186,7 +186,9 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
       }
     }
 
-    messages.push({ role: "assistant", content: response.content });
+    // Strip thinking blocks — they must not be sent back in conversation history
+    const filtered = response.content.filter((b) => b.type !== "thinking");
+    messages.push({ role: "assistant", content: filtered });
 
     // If we have pending choices, return now — app will call resolveChoice later
     if (pendingChoices) {
@@ -223,7 +225,8 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
         }
       }
 
-      messages.push({ role: "assistant", content: followUpMsg.content });
+      const filteredFollowUp = followUpMsg.content.filter((b) => b.type !== "thinking");
+      messages.push({ role: "assistant", content: filteredFollowUp });
     }
 
     return {

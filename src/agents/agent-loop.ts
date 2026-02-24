@@ -134,6 +134,9 @@ export async function agentLoop(
     const toolResults: Anthropic.ToolResultBlockParam[] = [];
 
     for (const block of response.content) {
+      // Skip thinking blocks — they must not be sent back in conversation history
+      if (block.type === "thinking") continue;
+
       assistantContent.push(block);
 
       if (block.type === "text") {

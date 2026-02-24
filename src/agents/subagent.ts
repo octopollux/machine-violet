@@ -126,7 +126,9 @@ export async function spawnSubagent(
       }
     }
 
-    messages.push({ role: "assistant", content: response.content });
+    // Strip thinking blocks — they must not be sent back in conversation history
+    const assistantContent = response.content.filter((b) => b.type !== "thinking");
+    messages.push({ role: "assistant", content: assistantContent });
 
     if (!hasToolUse || response.stop_reason === "end_turn") {
       return { text, usage: totalUsage };
