@@ -195,6 +195,23 @@ describe("CharacterSheetModal", () => {
     expect(frame).toContain("Sword of Light");
   });
 
+  it("renders hex color strings in their own color", () => {
+    const content = [
+      "# Aldric the Bold",
+      "**Color:** #cc0000",
+      "**Type:** PC",
+    ].join("\n");
+
+    const { lastFrame } = render(
+      <Box width={50} height={24}>
+        <CharacterSheetModal variant={gothic} width={50} height={24} content={content} />
+      </Box>,
+    );
+    const frame = lastFrame();
+    // The hex string should still appear in the output (rendered in color)
+    expect(frame).toContain("#cc0000");
+  });
+
   it("uses default title when no H1 present", () => {
     const { lastFrame } = render(
       <Box width={50} height={24}>

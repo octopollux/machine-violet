@@ -14,6 +14,11 @@ interface CharacterSheetModalProps {
   scrollRef?: React.Ref<CenteredModalHandle>;
 }
 
+/** Wrap bare hex color strings (#rrggbb) in color tags so they render in their own color. */
+function colorizeHexStrings(line: string): string {
+  return line.replace(/#([0-9a-fA-F]{6})\b/g, (match) => `<color=${match}>${match}</color>`);
+}
+
 /**
  * Character sheet modal. Renders entity markdown as styled modal.
  * Extracts title from first H1 line, shows front matter and body.
@@ -40,8 +45,9 @@ export function CharacterSheetModal({
   }
 
   // Parse markdown → tags → FormattingNode[] for styled rendering
+  // colorizeHexStrings wraps #rrggbb strings in <color> tags so they preview in their own color
   const styledLines: FormattingNode[][] = bodyLines.map(
-    (line) => parseFormatting(markdownToTags(line)),
+    (line) => parseFormatting(colorizeHexStrings(markdownToTags(line))),
   );
 
   return (
