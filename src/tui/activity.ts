@@ -33,18 +33,12 @@ export function retryLabel(status: number): string {
   return `API error (${status})`;
 }
 
-/** Get the activity indicator for an engine state, or undefined if idle */
+/** Get the activity indicator for an engine state, or undefined if idle.
+ *  Retry states (e.g. "retry:429:10") are handled by ApiErrorModal
+ *  and intentionally return undefined here. */
 export function getActivity(
   state: string | null,
 ): ActivityIndicator | undefined {
   if (!state) return undefined;
-  // Check for retry state
-  const retry = parseRetryState(state);
-  if (retry) {
-    return {
-      label: `${retryLabel(retry.status)} — retrying (${retry.delaySec}s)`,
-      glyph: "⏳",
-    };
-  }
   return ACTIVITY_MAP[state];
 }

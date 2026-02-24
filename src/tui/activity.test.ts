@@ -65,20 +65,10 @@ describe("retryLabel", () => {
   });
 });
 
-describe("getActivity with retry states", () => {
-  it("shows human-friendly label for HTTP 429", () => {
-    const activity = getActivity("retry:429:10");
-    expect(activity!.label).toBe("Rate limited — retrying (10s)");
-    expect(activity!.glyph).toBe("⏳");
-  });
-
-  it("shows connection lost for status 0", () => {
-    const activity = getActivity("retry:0:5");
-    expect(activity!.label).toBe("Connection lost — retrying (5s)");
-  });
-
-  it("shows API overloaded for 529", () => {
-    const activity = getActivity("retry:529:12");
-    expect(activity!.label).toBe("API overloaded — retrying (12s)");
+describe("getActivity ignores retry states (handled by ApiErrorModal)", () => {
+  it("returns undefined for retry states", () => {
+    expect(getActivity("retry:429:10")).toBeUndefined();
+    expect(getActivity("retry:0:5")).toBeUndefined();
+    expect(getActivity("retry:529:12")).toBeUndefined();
   });
 });
