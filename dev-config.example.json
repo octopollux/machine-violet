@@ -1,0 +1,21 @@
+{
+  "models": {
+    "large": "claude-sonnet-4-6"
+  },
+  "thinking": {
+    "default": 0,
+    "dm": 0,
+    "ooc": 0,
+    "dev-mode": 0,
+    "ai-player": 0,
+    "setup": 0,
+    "setup-gen": 0,
+    "scene-summarizer": 0,
+    "precis-updater": 0,
+    "changelog-updater": 0,
+    "choice-generator": 0,
+    "resolve_action": 0,
+    "promote_character": 0,
+    "repair-state": 0
+  }
+}
