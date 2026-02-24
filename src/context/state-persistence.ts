@@ -26,6 +26,7 @@ export type StateSlice = "combat" | "clocks" | "maps" | "decks";
 export interface PersistedSceneState {
   precis: string;
   openThreads?: string;
+  npcIntents?: string;
   playerReads: SceneState["playerReads"];
   activePlayerIndex: number;
 }

@@ -18,6 +18,8 @@ export interface PrecisUpdateResult extends SubagentResult {
   playerRead?: PlayerRead;
   /** Current open narrative threads for this scene, or undefined if none. */
   openThreads?: string;
+  /** Active NPC intentions/plans, or undefined if none. */
+  npcIntents?: string;
 }
 
 const SYSTEM_PROMPT = loadPrompt("precis-updater");
@@ -41,16 +43,21 @@ export async function updatePrecis(
   currentOpenThreads?: string,
   pcIdentification?: string,
   aliasContext?: string,
+  currentNpcIntents?: string,
 ): Promise<PrecisUpdateResult> {
   const openThreadsLine = currentOpenThreads
     ? `Current open threads: ${currentOpenThreads}`
     : "Current open threads: (none)";
 
+  const npcIntentsLine = currentNpcIntents
+    ? `\nCurrent NPC intents: ${currentNpcIntents}`
+    : "";
+
   const pcLine = pcIdentification
     ? `\n\nPlayer characters: ${pcIdentification}`
     : "";
 
-  const prompt = `Current precis:\n${currentPrecis}\n\n${openThreadsLine}${pcLine}${aliasContext ?? ""}\n\nDropped exchange:\n${droppedExchange}\n\nAppend a terse summary of the dropped exchange to the precis, then add the OPEN: line (if any threads are open), then the PLAYER_READ: JSON line.`;
+  const prompt = `Current precis:\n${currentPrecis}\n\n${openThreadsLine}${npcIntentsLine}${pcLine}${aliasContext ?? ""}\n\nDropped exchange:\n${droppedExchange}\n\nAppend a terse summary of the dropped exchange to the precis, then add NPC_NEXT: lines (if any NPCs have active intentions), then the OPEN: line (if any threads are open), then the PLAYER_READ: JSON line.`;
 
   const result = await oneShot(
     client,
@@ -68,25 +75,39 @@ export async function updatePrecis(
  * Parse the subagent response into precis text, open threads, and optional PlayerRead.
  * The model is expected to output:
  *   <precis text>
- *   OPEN: [[thread1]], [[thread2]]      ← optional, omitted when no threads
+ *   NPC_NEXT: [[Name]] intends to [action]  ← optional, one per NPC
+ *   OPEN: [[thread1]], [[thread2]]           ← optional, omitted when no threads
  *   PLAYER_READ: {"engagement":"high",...}
  *
- * If either special line is missing or malformed, that field returns undefined.
+ * If any special line is missing or malformed, that field returns undefined.
  */
 export function parsePrecisResult(result: SubagentResult): PrecisUpdateResult {
   const lines = result.text.split("\n");
 
+  const npcNextIndices = lines
+    .map((l, i) => l.trim().startsWith("NPC_NEXT:") ? i : -1)
+    .filter((i) => i !== -1);
   const openIdx = lines.findIndex((l) => l.trim().startsWith("OPEN:"));
   const playerReadIdx = lines.findIndex((l) => l.trim().startsWith("PLAYER_READ:"));
 
   // Precis text is everything before the first special line
   const firstSpecial = Math.min(
+    npcNextIndices.length > 0 ? npcNextIndices[0] : Infinity,
     openIdx === -1 ? Infinity : openIdx,
     playerReadIdx === -1 ? Infinity : playerReadIdx,
   );
   const precisText = firstSpecial === Infinity
     ? result.text.trim()
     : lines.slice(0, firstSpecial).join("\n").trim();
+
+  // Parse NPC_NEXT: lines (may be multiple)
+  let npcIntents: string | undefined;
+  if (npcNextIndices.length > 0) {
+    const intents = npcNextIndices
+      .map((i) => lines[i].replace(/^.*?NPC_NEXT:\s*/, "").trim())
+      .filter(Boolean);
+    npcIntents = intents.length > 0 ? intents.join("; ") : undefined;
+  }
 
   // Parse OPEN:
   let openThreads: string | undefined;
@@ -121,5 +142,6 @@ export function parsePrecisResult(result: SubagentResult): PrecisUpdateResult {
     usage: result.usage,
     playerRead,
     openThreads,
+    npcIntents,
   };
 }

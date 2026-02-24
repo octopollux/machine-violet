@@ -28,6 +28,8 @@ export interface SceneState {
   precis: string;
   /** Unresolved narrative threads for the current scene, maintained by the precis updater. */
   openThreads: string;
+  /** Active NPC intentions/plans, maintained by the precis updater. */
+  npcIntents: string;
   playerReads: PlayerRead[];
   sessionNumber: number;
 }
@@ -121,9 +123,7 @@ export class SceneManager {
       pendingAlarms: [],
       turnHolder: undefined,
     });
-    this.sessionState.scenePrecis = this.scene.openThreads
-      ? `${this.scene.precis}\nOpen: ${this.scene.openThreads}`
-      : this.scene.precis;
+    this.sessionState.scenePrecis = buildScenePrecis(this.scene);
     this.sessionState.scenePacing = buildScenePacing(this.scene);
     this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);
     return buildDMPrefix(this.state.config, this.sessionState);
@@ -173,11 +173,15 @@ export class SceneManager {
       this.scene.openThreads || undefined,
       pcIdent,
       this.aliasContext || undefined,
+      this.scene.npcIntents || undefined,
     );
     this.devLog?.("[dev] subagent:precis-updater done");
     this.scene.precis += "\n" + result.text;
     if (result.openThreads !== undefined) {
       this.scene.openThreads = result.openThreads;
+    }
+    if (result.npcIntents !== undefined) {
+      this.scene.npcIntents = result.npcIntents;
     }
     if (result.playerRead) {
       this.scene.playerReads.push(result.playerRead);
@@ -423,9 +427,7 @@ export class SceneManager {
     });
 
     // Sync precis and player read
-    this.sessionState.scenePrecis = this.scene.openThreads
-      ? `${this.scene.precis}\nOpen: ${this.scene.openThreads}`
-      : this.scene.precis;
+    this.sessionState.scenePrecis = buildScenePrecis(this.scene);
     this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);
   }
 
@@ -545,6 +547,7 @@ export class SceneManager {
   private stepResetPrecis(): void {
     this.scene.precis = "";
     this.scene.openThreads = "";
+    this.scene.npcIntents = "";
     this.scene.playerReads = [];
   }
 
@@ -741,6 +744,7 @@ export async function detectSceneState(campaignRoot: string, io: FileIO): Promis
     transcript,
     precis: "",
     openThreads: "",
+    npcIntents: "",
     playerReads: [],
     sessionNumber: maxSession + 1,
   };
@@ -809,6 +813,14 @@ export function classifyTranscriptEntry(entry: string): { kind: "dm" | "player" 
  * exchange count, open thread count, and whether any threads
  * have been resolved (precis updates happened but thread count stayed or dropped).
  */
+/** Assemble the scene precis string from precis text, NPC intents, and open threads. */
+export function buildScenePrecis(scene: SceneState): string {
+  let result = scene.precis;
+  if (scene.npcIntents) result += `\nNPC intents: ${scene.npcIntents}`;
+  if (scene.openThreads) result += `\nOpen: ${scene.openThreads}`;
+  return result;
+}
+
 export function buildScenePacing(scene: SceneState): string | undefined {
   // Count player exchanges (lines starting with **[)
   const exchangeCount = scene.transcript.filter((t) => t.startsWith("**[")).length;

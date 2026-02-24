@@ -310,6 +310,7 @@ export class GameEngine {
         this.persister.persistScene({
           precis: scene.precis,
           openThreads: scene.openThreads || undefined,
+          npcIntents: scene.npcIntents || undefined,
           playerReads: scene.playerReads,
           activePlayerIndex: this.gameState.activePlayerIndex,
         });

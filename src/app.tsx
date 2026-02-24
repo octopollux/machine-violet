@@ -324,6 +324,7 @@ export default function App({ shutdownRef }: AppProps) {
         gs.activePlayerIndex = loaded.scene.activePlayerIndex;
         scene.precis = loaded.scene.precis;
         scene.openThreads = loaded.scene.openThreads ?? "";
+        scene.npcIntents = loaded.scene.npcIntents ?? "";
         scene.playerReads = loaded.scene.playerReads;
         setActivePlayerIndex(loaded.scene.activePlayerIndex);
       }
