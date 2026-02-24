@@ -238,6 +238,7 @@ export class GameEngine {
       const reminder = this.buildBehaviorReminder();
       if (reminder) {
         messages.push({ role: "user", content: reminder });
+        this.callbacks.onDevLog?.(`[dev] injection: ${reminder}`);
       }
     }
     messages.push(userMessage);

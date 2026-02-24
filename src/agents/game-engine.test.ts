@@ -137,6 +137,7 @@ interface CallbackLog {
   errors: Error[];
   usageUpdates: UsageStats[];
   exchangeDrops: number;
+  devLogs: string[];
 }
 
 function mockCallbacks(): { callbacks: EngineCallbacks; log: CallbackLog } {
@@ -150,6 +151,7 @@ function mockCallbacks(): { callbacks: EngineCallbacks; log: CallbackLog } {
     errors: [],
     usageUpdates: [],
     exchangeDrops: 0,
+    devLogs: [],
   };
 
   return {
@@ -164,6 +166,7 @@ function mockCallbacks(): { callbacks: EngineCallbacks; log: CallbackLog } {
       onExchangeDropped: () => log.exchangeDrops++,
       onUsageUpdate: (usage) => log.usageUpdates.push({ ...usage }),
       onError: (error) => log.errors.push(error),
+      onDevLog: (msg) => log.devLogs.push(msg),
     },
   };
 }
@@ -1089,5 +1092,27 @@ describe("GameEngine Behavioral Reminder", () => {
 
     const msgs = sentMessages(client, 3);
     expect(msgs.every((m) => typeof m.content !== "string" || !m.content.includes("[dm-note]"))).toBe(true);
+  });
+
+  it("emits devLog when behavioral reminder is injected", async () => {
+    const client = mockClient([
+      textMessage("One."),
+      textMessage("Two."),
+      textMessage("Three."),
+      textMessage("Four."),
+    ]);
+    const { callbacks, log } = mockCallbacks();
+    const engine = new GameEngine({
+      client, gameState: mockState(), scene: mockScene(),
+      sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "One.");
+    await engine.processInput("Aldric", "Two.");
+    await engine.processInput("Aldric", "Three.");
+    await engine.processInput("Aldric", "Four.");
+
+    expect(log.devLogs.some((m) => m.includes("[dm-note]"))).toBe(true);
   });
 });
