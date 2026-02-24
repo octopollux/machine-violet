@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Text, Box } from "ink";
-import { getActivity, parseRetryState } from "../activity.js";
+import { getActivity, parseRetryState, retryLabel } from "../activity.js";
 
 interface ActivityLineProps {
   engineState: string | null;
@@ -44,7 +44,7 @@ export function ActivityLine({ engineState }: ActivityLineProps) {
   if (countdown !== null && retryStatus !== null) {
     return (
       <Box>
-        <Text dimColor>⏳ The DM is busy ({retryStatus}) ({countdown}s)</Text>
+        <Text dimColor>⏳ {retryLabel(retryStatus)} — retrying ({countdown}s)</Text>
       </Box>
     );
   }

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
-import { agentLoop, stampToolsCacheControl } from "./agent-loop.js";
+import { agentLoop, stampToolsCacheControl, _internal } from "./agent-loop.js";
 import type { AgentLoopConfig } from "./agent-loop.js";
 import { ToolRegistry } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
@@ -309,5 +309,142 @@ describe("stampToolsCacheControl", () => {
   it("returns empty array unchanged", () => {
     const result = stampToolsCacheControl([]);
     expect(result).toEqual([]);
+  });
+});
+
+describe("extractStatus", () => {
+  const { extractStatus } = _internal;
+
+  it("extracts numeric .status from error objects", () => {
+    expect(extractStatus({ status: 429, message: "rate limit" })).toBe(429);
+    expect(extractStatus({ status: 529 })).toBe(529);
+  });
+
+  it("detects overloaded errors by message string", () => {
+    expect(extractStatus(new Error("server overloaded"))).toBe(529);
+  });
+
+  it("detects network errors and maps to status 0", () => {
+    expect(extractStatus(new Error("fetch failed"))).toBe(0);
+    expect(extractStatus(new Error("connect ECONNRESET"))).toBe(0);
+    expect(extractStatus(new Error("getaddrinfo ENOTFOUND api.anthropic.com"))).toBe(0);
+    expect(extractStatus(new Error("connect ETIMEDOUT 1.2.3.4:443"))).toBe(0);
+    expect(extractStatus(new Error("connect ECONNREFUSED 127.0.0.1:443"))).toBe(0);
+    expect(extractStatus(new Error("socket hang up"))).toBe(0);
+    expect(extractStatus(new Error("network error"))).toBe(0);
+    expect(extractStatus(new Error("write EPIPE"))).toBe(0);
+    expect(extractStatus(new Error("getaddrinfo EAI_AGAIN api.anthropic.com"))).toBe(0);
+  });
+
+  it("returns null for unknown errors", () => {
+    expect(extractStatus(new Error("something unexpected"))).toBeNull();
+    expect(extractStatus("just a string")).toBeNull();
+  });
+});
+
+describe("retryDelay", () => {
+  const { retryDelay } = _internal;
+
+  it("uses exponential backoff", () => {
+    expect(retryDelay(0)).toBe(1000);
+    expect(retryDelay(1)).toBe(2000);
+    expect(retryDelay(2)).toBe(4000);
+    expect(retryDelay(3)).toBe(8000);
+  });
+
+  it("caps at 12s", () => {
+    expect(retryDelay(4)).toBe(12000);
+    expect(retryDelay(5)).toBe(12000);
+    expect(retryDelay(100)).toBe(12000);
+  });
+});
+
+describe("retry behavior via agentLoop", () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("retries on 529 and eventually succeeds", async () => {
+    const overloadedError = Object.assign(new Error("overloaded"), { status: 529 });
+    let callCount = 0;
+    const client = {
+      messages: {
+        create: vi.fn(async () => {
+          callCount++;
+          if (callCount <= 2) throw overloadedError;
+          return textMessage("Success after retries");
+        }),
+      },
+    } as unknown as Anthropic;
+
+    const onRetry = vi.fn();
+    const promise = agentLoop(
+      client,
+      "System",
+      [{ role: "user", content: "Hi" }],
+      new ToolRegistry(),
+      mockState(),
+      mockConfig({ onRetry }),
+    );
+
+    // Advance through both retry delays
+    await vi.advanceTimersByTimeAsync(1000); // attempt 0 backoff
+    await vi.advanceTimersByTimeAsync(2000); // attempt 1 backoff
+
+    const result = await promise;
+    expect(result.text).toBe("Success after retries");
+    expect(onRetry).toHaveBeenCalledTimes(2);
+    expect(onRetry).toHaveBeenCalledWith(529, expect.any(Number));
+  });
+
+  it("retries on network errors (ECONNRESET)", async () => {
+    let callCount = 0;
+    const client = {
+      messages: {
+        create: vi.fn(async () => {
+          callCount++;
+          if (callCount === 1) throw new Error("connect ECONNRESET");
+          return textMessage("Reconnected");
+        }),
+      },
+    } as unknown as Anthropic;
+
+    const onRetry = vi.fn();
+    const promise = agentLoop(
+      client,
+      "System",
+      [{ role: "user", content: "Hi" }],
+      new ToolRegistry(),
+      mockState(),
+      mockConfig({ onRetry }),
+    );
+
+    await vi.advanceTimersByTimeAsync(1000);
+
+    const result = await promise;
+    expect(result.text).toBe("Reconnected");
+    expect(onRetry).toHaveBeenCalledWith(0, 1000);
+  });
+
+  it("throws immediately on non-retryable errors", async () => {
+    const client = {
+      messages: {
+        create: vi.fn(async () => {
+          throw Object.assign(new Error("bad request"), { status: 400 });
+        }),
+      },
+    } as unknown as Anthropic;
+
+    const onError = vi.fn();
+    await expect(
+      agentLoop(
+        client,
+        "System",
+        [{ role: "user", content: "Hi" }],
+        new ToolRegistry(),
+        mockState(),
+        mockConfig({ onError }),
+      ),
+    ).rejects.toThrow("bad request");
+    expect(onError).toHaveBeenCalled();
   });
 });

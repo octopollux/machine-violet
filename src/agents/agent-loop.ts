@@ -57,8 +57,19 @@ export interface AgentLoopResult {
 
 // --- Constants ---
 
-const RETRY_DELAYS = [1000, 2000, 4000, 8000, 16000]; // ms
-const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 529]);
+/**
+ * Exponential backoff: 1s, 2s, 4s, 8s, 12s, then 12s forever.
+ * We never give up — the player's game is worth waiting for.
+ */
+const BACKOFF_BASE_MS = 1000;
+const BACKOFF_CAP_MS = 12_000;
+
+function retryDelay(attempt: number): number {
+  return Math.min(BACKOFF_BASE_MS * 2 ** attempt, BACKOFF_CAP_MS);
+}
+
+/** Status 0 is synthetic — used for network-level errors (no HTTP status). */
+const RETRYABLE_STATUS = new Set([0, 429, 500, 502, 503, 529]);
 
 // --- Cache helpers ---
 
@@ -305,7 +316,7 @@ async function callWithRetry(
   params: CreateParams,
   config: AgentLoopConfig,
 ): Promise<Anthropic.Message> {
-  for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
+  for (let attempt = 0; ; attempt++) {
     try {
       dumpContext("dm", params);
       return await client.messages.create({
@@ -314,17 +325,16 @@ async function callWithRetry(
       });
     } catch (e) {
       const status = extractStatus(e);
-      if (!status || !RETRYABLE_STATUS.has(status) || attempt === RETRY_DELAYS.length) {
+      if (status === null || !RETRYABLE_STATUS.has(status)) {
         const error = e instanceof Error ? e : new Error(String(e));
         config.onError?.(error);
         throw error;
       }
-      const delay = RETRY_DELAYS[attempt];
+      const delay = retryDelay(attempt);
       config.onRetry?.(status, delay);
       await sleep(delay);
     }
   }
-  throw new Error("Unreachable");
 }
 
 async function streamWithRetry(
@@ -332,7 +342,7 @@ async function streamWithRetry(
   params: CreateParams,
   config: AgentLoopConfig,
 ): Promise<{ message: Anthropic.Message; usage: Anthropic.Usage }> {
-  for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
+  for (let attempt = 0; ; attempt++) {
     try {
       dumpContext("dm", params);
       const stream = client.messages.stream({
@@ -348,31 +358,52 @@ async function streamWithRetry(
       return { message, usage: message.usage };
     } catch (e) {
       const status = extractStatus(e);
-      if (!status || !RETRYABLE_STATUS.has(status) || attempt === RETRY_DELAYS.length) {
+      if (status === null || !RETRYABLE_STATUS.has(status)) {
         const error = e instanceof Error ? e : new Error(String(e));
         config.onError?.(error);
         throw error;
       }
-      const delay = RETRY_DELAYS[attempt];
+      const delay = retryDelay(attempt);
       config.onRetry?.(status, delay);
       await sleep(delay);
     }
   }
-  throw new Error("Unreachable");
 }
+
+/** Patterns that indicate a network-level (not application-level) failure. */
+const NETWORK_ERROR_PATTERNS = [
+  "ECONNRESET",
+  "ECONNREFUSED",
+  "ETIMEDOUT",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "fetch failed",
+  "socket hang up",
+  "network error",
+  "Failed to fetch",
+  "EPIPE",
+];
 
 function extractStatus(e: unknown): number | null {
   if (e && typeof e === "object" && "status" in e) {
     const status = (e as { status: number }).status;
     if (typeof status === "number") return status;
   }
+  const msg = e instanceof Error ? e.message : String(e);
   // Detect overloaded errors that may lack a numeric status
   // (e.g. streamed error events with type "overloaded_error")
-  const msg = e instanceof Error ? e.message : String(e);
   if (msg.includes("overloaded")) return 529;
+  // Detect network-level errors (no HTTP status at all)
+  const lower = msg.toLowerCase();
+  for (const pat of NETWORK_ERROR_PATTERNS) {
+    if (lower.includes(pat.toLowerCase())) return 0;
+  }
   return null;
 }
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+/** @internal — exported for tests only */
+export const _internal = { extractStatus, retryDelay };

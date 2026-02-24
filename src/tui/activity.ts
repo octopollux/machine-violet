@@ -25,6 +25,14 @@ export function parseRetryState(state: string): RetryInfo | null {
   return { status: Number(match[1]), delaySec: Number(match[2]) };
 }
 
+/** Human-friendly label for a retry HTTP status (or 0 for network errors). */
+export function retryLabel(status: number): string {
+  if (status === 0) return "Connection lost";
+  if (status === 429) return "Rate limited";
+  if (status === 529) return "API overloaded";
+  return `API error (${status})`;
+}
+
 /** Get the activity indicator for an engine state, or undefined if idle */
 export function getActivity(
   state: string | null,
@@ -34,7 +42,7 @@ export function getActivity(
   const retry = parseRetryState(state);
   if (retry) {
     return {
-      label: `The DM is busy (${retry.status}) (${retry.delaySec}s)`,
+      label: `${retryLabel(retry.status)} — retrying (${retry.delaySec}s)`,
       glyph: "⏳",
     };
   }

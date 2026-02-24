@@ -51,16 +51,15 @@ After rollback, the DM receives a fresh `session_resume` with context rebuilt fr
 
 ## API Failures
 
-### Transient failures (timeout, rate limit, 500)
+### Transient failures (timeout, rate limit, 500, network errors)
 
-Retry with exponential backoff. The TUI shows a subtle "reconnecting..." indicator. No state has changed — the API call didn't complete — so there's nothing to roll back.
+Retry with exponential backoff (1s, 2s, 4s, 8s, capped at 12s) **indefinitely** — we never give up. The TUI shows a human-friendly activity label with a live countdown:
+- `Connection lost — retrying (12s)` for network errors (ECONNRESET, ETIMEDOUT, etc.)
+- `Rate limited — retrying (4s)` for HTTP 429
+- `API overloaded — retrying (8s)` for HTTP 529
+- `API error (500) — retrying (2s)` for other server errors
 
-### Sustained outages
-
-After N retries (configurable, default 5), the engine:
-1. Auto-commits current state
-2. Notifies the player: "API is unavailable. Your game is saved."
-3. On next launch, `session_resume` picks up where things left off
+Retryable statuses: 429, 500, 502, 503, 529, plus synthetic status 0 for connection-level errors. No state has changed — the API call didn't complete — so there's nothing to roll back.
 
 ### Subagent failures
 
