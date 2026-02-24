@@ -13,7 +13,7 @@ import { norm } from "../../utils/paths.js";
 import * as path from "node:path";
 import type { CampaignRepo } from "../../tools/git/index.js";
 import { queryCommitLog } from "../../tools/git/index.js";
-import { findReferences, renameEntity, mergeEntities } from "../../tools/campaign-ops/index.js";
+import { findReferences, renameEntity, mergeEntities, resolveDeadLinks } from "../../tools/campaign-ops/index.js";
 
 /**
  * Result from a Dev Mode exchange.
@@ -217,6 +217,18 @@ export function buildDevTools(): Anthropic.Tool[] {
         required: ["winner_path", "loser_path"],
       },
     },
+    {
+      name: "resolve_dead_links",
+      description: "Triage dead wikilinks: classify as intentional stubs, broken refs to repoint, or missing entities to generate. Accepts freeform context. Dry-run by default.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          context: { type: "string", description: "Freeform description of the problem (e.g. 'I renamed kael.md to kael-ranger.md')" },
+          dry_run: { type: "boolean", description: "If true (default), report without writing. If false, apply repoints and generate stubs." },
+        },
+        required: ["context"],
+      },
+    },
   ];
 }
 
@@ -372,6 +384,15 @@ export function buildDevToolHandler(
             root, fileIO, input.winner_path as string, input.loser_path as string, dryRun,
           );
           return { content: JSON.stringify(mergeResult, null, 2) };
+        }
+
+        case "resolve_dead_links": {
+          if (!client) {
+            return { content: "No API client available for dead link resolution", is_error: true };
+          }
+          const dryRun = input.dry_run !== false;
+          const resolveResult = await resolveDeadLinks(root, fileIO, client, input.context as string, dryRun);
+          return { content: JSON.stringify(resolveResult, null, 2) };
         }
 
         default:

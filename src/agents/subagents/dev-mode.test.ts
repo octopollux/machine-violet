@@ -196,9 +196,9 @@ describe("summarizeGameState", () => {
 // --- Tool definitions ---
 
 describe("buildDevTools", () => {
-  it("returns 14 tool definitions", () => {
+  it("returns 15 tool definitions", () => {
     const tools = buildDevTools();
-    expect(tools).toHaveLength(14);
+    expect(tools).toHaveLength(15);
   });
 
   it("has expected tool names", () => {
@@ -206,7 +206,7 @@ describe("buildDevTools", () => {
     expect(names).toEqual([
       "read_file", "write_file", "list_dir", "get_game_state", "set_game_state",
       "repair_state", "get_scene_state", "validate_campaign", "search_files", "delete_file",
-      "get_commit_log", "find_references", "rename_entity", "merge_entities",
+      "get_commit_log", "find_references", "rename_entity", "merge_entities", "resolve_dead_links",
     ]);
   });
 
@@ -484,6 +484,13 @@ describe("buildDevToolHandler", () => {
     expect(result.content).toContain("No API client");
   });
 
+  it("resolve_dead_links errors without client", async () => {
+    const handler = buildDevToolHandler(makeGameState(), mockFileIO());
+    const result = await handler("resolve_dead_links", { context: "test" });
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("No API client");
+  });
+
   it("find_references returns references for a target entity", async () => {
     const gs = makeGameState();
     const fio = mockFileIO(
@@ -698,7 +705,7 @@ describe("enterDevMode", () => {
     // When tools are provided, the create call should include tools
     const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     if (createCall) {
-      expect(createCall.tools).toHaveLength(14);
+      expect(createCall.tools).toHaveLength(15);
       expect(createCall.max_tokens).toBe(16384); // DEV_MODE
     }
   });

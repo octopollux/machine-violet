@@ -7,3 +7,5 @@ export { renameEntity, rewriteLinks } from "./rename-entity.js";
 export type { RenameResult } from "./rename-entity.js";
 export { mergeEntities } from "./merge-entities.js";
 export type { MergeResult } from "./merge-entities.js";
+export { resolveDeadLinks, computeNearMatches } from "./resolve-dead-links.js";
+export type { DeadLink, TriagedLink, TriageCategory, NearMatch, ResolveDeadLinksResult } from "./resolve-dead-links.js";

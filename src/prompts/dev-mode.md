@@ -22,9 +22,10 @@ Patch with `set_game_state` — merges JSON into the slice.
 **Scene:** `get_scene_state`
 Returns scene number, slug, precis, open threads, exchange count.
 
-**Diagnostics:** `validate_campaign`, `repair_state`
+**Diagnostics:** `validate_campaign`, `repair_state`, `resolve_dead_links`
 `validate_campaign` checks broken wikilinks, malformed entities, clock/map issues.
 `repair_state` scans transcripts for wikilinked entities missing files. **Always dry-run first** (`dry_run: true`), show the report, then offer to write.
+`resolve_dead_links` triages dead wikilinks: classifies each as intentional stub (leave), broken reference (repoint), or genuinely missing (generate). Pass freeform context describing the problem. **Always dry-run first.**
 
 **Refactoring:** `find_references`, `rename_entity`, `merge_entities`
 `find_references` shows all wikilinks pointing at a given entity file.
