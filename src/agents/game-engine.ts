@@ -10,7 +10,7 @@ import type { StateSlice } from "../context/state-persistence.js";
 import { SceneManager } from "./scene-manager.js";
 import type { SceneState, FileIO } from "./scene-manager.js";
 import type { DMSessionState } from "./dm-prompt.js";
-import { getModel, loadModelConfig } from "../config/models.js";
+import { getModel, getThinkingConfig } from "../config/models.js";
 import { accUsage } from "../context/usage-helpers.js";
 import { TOKEN_LIMITS } from "../config/tokens.js";
 import type { ToolResult } from "./tool-registry.js";
@@ -688,18 +688,12 @@ export class GameEngine {
   }
 
   private buildAgentConfig(): AgentLoopConfig {
-    const budget = loadModelConfig().thinkingBudget;
-    const thinking: AgentLoopConfig["thinking"] =
-      budget === "adaptive" ? { type: "adaptive" }
-      : budget > 0 ? { type: "enabled", budget_tokens: budget }
-      : { type: "disabled" };
+    const tc = getThinkingConfig("dm");
     return {
       model: this.model,
-      maxTokens: typeof budget === "number" && budget > 0
-        ? TOKEN_LIMITS.DM_RESPONSE + budget
-        : TOKEN_LIMITS.DM_RESPONSE,
+      maxTokens: TOKEN_LIMITS.DM_RESPONSE + tc.budgetTokens,
       maxToolRounds: 10,
-      thinking,
+      thinking: tc.param,
       onTextDelta: (delta) => this.callbacks.onNarrativeDelta(delta),
       onToolStart: (name) => {
         this.setState("tool_running");

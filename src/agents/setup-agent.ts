@@ -4,7 +4,7 @@ import type { DMPersonality } from "../types/config.js";
 import { PERSONALITIES, randomPersonality } from "../config/personalities.js";
 import { randomSeeds } from "../config/seeds.js";
 import { createDefaultConfig as defaultCombatConfig } from "../tools/combat/index.js";
-import { getModel } from "../config/models.js";
+import { getModel, getThinkingConfig } from "../config/models.js";
 import { TOKEN_LIMITS } from "../config/tokens.js";
 import { loadPrompt } from "../prompts/load-prompt.js";
 
@@ -185,12 +185,13 @@ async function generateCampaignOptions(
 ): Promise<SetupStep> {
   // Static fallback
   const fallback = campaignStep(genre.toLowerCase().split(" ")[0]);
+  const tc = getThinkingConfig("setup-gen");
 
   try {
     const response = await client.messages.create({
       model: getModel("small"),
-      max_tokens: TOKEN_LIMITS.SETUP_STEP,
-      thinking: { type: "disabled" },
+      max_tokens: TOKEN_LIMITS.SETUP_STEP + tc.budgetTokens,
+      thinking: tc.param,
       system: SETUP_GEN_SYSTEM,
       messages: [{
         role: "user",
@@ -222,11 +223,13 @@ async function generateCharacterOptions(
   mood: string,
   campaignPremise: string,
 ): Promise<SetupStep> {
+  const tc = getThinkingConfig("setup-gen");
+
   try {
     const response = await client.messages.create({
       model: getModel("small"),
-      max_tokens: TOKEN_LIMITS.SETUP_STEP,
-      thinking: { type: "disabled" },
+      max_tokens: TOKEN_LIMITS.SETUP_STEP + tc.budgetTokens,
+      thinking: tc.param,
       system: SETUP_GEN_SYSTEM,
       messages: [{
         role: "user",

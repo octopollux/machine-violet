@@ -234,6 +234,7 @@ export async function repairState(
         systemPrompt,
         lines.join("\n"),
         1024,
+        "repair-state",
       );
       accUsage(totalUsage, genResult.usage);
 

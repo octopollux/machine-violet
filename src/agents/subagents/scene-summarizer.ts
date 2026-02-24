@@ -25,5 +25,6 @@ export async function summarizeScene(
     SYSTEM_PROMPT,
     `Write a campaign log entry for this scene:\n\n${transcript}`,
     TOKEN_LIMITS.DM_RESPONSE,
+    "scene-summarizer",
   );
 }

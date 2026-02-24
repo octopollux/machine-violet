@@ -57,6 +57,7 @@ export async function updatePrecis(
     SYSTEM_PROMPT,
     prompt,
     256,
+    "precis-updater",
   );
 
   return parsePrecisResult(result);

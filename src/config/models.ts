@@ -1,3 +1,4 @@
+import type Anthropic from "@anthropic-ai/sdk";
 import type { ModelId } from "../agents/agent-loop.js";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -9,19 +10,26 @@ export interface ModelConfig {
   medium: ModelId;
   small: ModelId;
   /**
-   * Extended thinking for the DM (large tier).
-   * - 0 = disabled (default)
-   * - number >= 1024 = enabled with explicit budget
-   * - "adaptive" = model decides its own thinking budget
+   * Per-agent thinking configuration.
+   * Keys are agent names (e.g. "dm", "ooc", "scene-summarizer").
+   * Values: 0 = disabled, >= 1024 = explicit budget, "adaptive" = model decides.
+   * The "default" key serves as fallback for unconfigured agents.
    */
-  thinkingBudget: number | "adaptive";
+  thinking: Record<string, number | "adaptive">;
+}
+
+export type ThinkingParam = Anthropic.Messages.ThinkingConfigParam;
+
+export interface ThinkingConfig {
+  param: ThinkingParam;
+  budgetTokens: number;
 }
 
 const DEFAULTS: ModelConfig = {
   large: "claude-opus-4-6",
   medium: "claude-sonnet-4-6",
   small: "claude-haiku-4-5-20251001",
-  thinkingBudget: 0,
+  thinking: { default: 0 },
 };
 
 const VALID_MODELS = new Set<string>([
@@ -71,11 +79,20 @@ export function loadModelConfig(opts?: { cwd?: string; reset?: boolean }): Model
         }
       }
     }
-    const tb = parsed?.thinking_budget;
-    if (tb === "adaptive") {
-      config.thinkingBudget = "adaptive";
-    } else if (typeof tb === "number" && Number.isInteger(tb) && (tb === 0 || tb >= 1024)) {
-      config.thinkingBudget = tb;
+    const thinking = parsed?.thinking;
+    if (thinking && typeof thinking === "object" && !Array.isArray(thinking)) {
+      const map: Record<string, number | "adaptive"> = {};
+      for (const [key, val] of Object.entries(thinking)) {
+        if (val === "adaptive") {
+          map[key] = "adaptive";
+        } else if (typeof val === "number" && Number.isInteger(val) && (val === 0 || val >= 1024)) {
+          map[key] = val;
+        }
+        // Skip invalid entries silently
+      }
+      if (Object.keys(map).length > 0) {
+        config.thinking = { ...DEFAULTS.thinking, ...map };
+      }
     }
   } catch {
     // No dev-config.json or invalid — use defaults
@@ -90,6 +107,18 @@ export function loadModelConfig(opts?: { cwd?: string; reset?: boolean }): Model
  */
 export function getModel(tier: ModelTier): ModelId {
   return loadModelConfig()[tier];
+}
+
+/**
+ * Look up thinking configuration for a named agent.
+ * Falls back to the "default" key, then disabled.
+ */
+export function getThinkingConfig(agentName: string): ThinkingConfig {
+  const map = loadModelConfig().thinking;
+  const value = map[agentName] ?? map["default"] ?? 0;
+  if (value === "adaptive") return { param: { type: "adaptive" }, budgetTokens: 0 };
+  if (typeof value === "number" && value >= 1024) return { param: { type: "enabled", budget_tokens: value }, budgetTokens: value };
+  return { param: { type: "disabled" }, budgetTokens: 0 };
 }
 
 /**

@@ -82,6 +82,8 @@ export function renderDump(agentName: string, params: DumpableParams): string {
   lines.push(`Max Tokens: ${params.max_tokens}`);
   if (params.thinking?.type === "enabled" && params.thinking.budget_tokens) {
     lines.push(`Thinking: ${params.thinking.budget_tokens} tokens`);
+  } else if (params.thinking?.type === "adaptive") {
+    lines.push(`Thinking: adaptive`);
   }
   lines.push("");
 

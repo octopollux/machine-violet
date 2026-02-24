@@ -4,7 +4,7 @@ import type { SubagentResult } from "../subagent.js";
 import type { SetupResult } from "../setup-agent.js";
 import { generateThemeColor } from "../setup-agent.js";
 import { PERSONALITIES } from "../../config/personalities.js";
-import { getModel } from "../../config/models.js";
+import { getModel, getThinkingConfig } from "../../config/models.js";
 import { accumulateUsage as accRawUsage } from "../../context/usage-helpers.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
@@ -141,13 +141,15 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
     finalized = undefined;
     pendingToolUseId = null;
 
+    const tc = getThinkingConfig("setup");
+
     const stream = client.messages.stream({
       model: getModel("medium"),
-      max_tokens: TOKEN_LIMITS.SUBAGENT_LARGE,
+      max_tokens: TOKEN_LIMITS.SUBAGENT_LARGE + tc.budgetTokens,
       system: SYSTEM_PROMPT,
       messages,
       tools: TOOLS,
-      thinking: { type: "disabled" },
+      thinking: tc.param,
     });
 
     stream.on("text", (delta) => {
@@ -201,11 +203,11 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
 
       const followUp = client.messages.stream({
         model: getModel("medium"),
-        max_tokens: TOKEN_LIMITS.SUBAGENT_MEDIUM,
+        max_tokens: TOKEN_LIMITS.SUBAGENT_MEDIUM + tc.budgetTokens,
         system: SYSTEM_PROMPT,
         messages,
         tools: TOOLS,
-        thinking: { type: "disabled" },
+        thinking: tc.param,
       });
 
       followUp.on("text", (delta) => {

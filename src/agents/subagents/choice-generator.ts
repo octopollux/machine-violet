@@ -50,6 +50,7 @@ export async function generateChoices(
     SYSTEM_PROMPT,
     userMessage,
     150,
+    "choice-generator",
   );
 
   const choices = result.text

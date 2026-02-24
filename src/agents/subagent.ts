@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { ModelId, UsageStats } from "./agent-loop.js";
 import { dumpContext } from "../config/context-dump.js";
+import { getThinkingConfig } from "../config/models.js";
 
 // --- Types ---
 
@@ -65,14 +66,16 @@ export async function spawnSubagent(
 
   const maxRounds = config.maxToolRounds ?? 3;
 
+  const tc = getThinkingConfig(config.name);
+
   for (let round = 0; round < maxRounds; round++) {
     const params: Anthropic.MessageCreateParamsNonStreaming = {
       model: config.model,
-      max_tokens: config.maxTokens,
+      max_tokens: config.maxTokens + tc.budgetTokens,
       system: config.systemPrompt + "\n\nIMPORTANT: Respond in the minimum tokens necessary. Be terse.",
       messages,
       stream: false,
-      thinking: { type: "disabled" },
+      thinking: tc.param,
       ...(config.tools?.length ? { tools: config.tools } : {}),
     };
 
@@ -156,9 +159,10 @@ export async function oneShot(
   systemPrompt: string,
   userMessage: string,
   maxTokens = 256,
+  name = "one_shot",
 ): Promise<SubagentResult> {
   return spawnSubagent(client, {
-    name: "one_shot",
+    name,
     model,
     visibility: "silent",
     systemPrompt,

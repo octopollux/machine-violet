@@ -30,5 +30,6 @@ export async function updateChangelogs(
     SYSTEM_PROMPT,
     prompt,
     512,
+    "changelog-updater",
   );
 }

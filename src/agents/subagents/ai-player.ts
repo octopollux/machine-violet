@@ -74,6 +74,7 @@ export async function aiPlayerTurn(
     systemPrompt,
     userMessage,
     150, // AI players should be brief
+    "ai-player",
   );
 
   return {
