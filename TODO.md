@@ -7,13 +7,14 @@ When creating a plan to do any of these items, include a step to update this TOD
 
 ## Bugs
 
+- [x] Scroll hotkeys do not work to scroll the main conversation view in OOC/Dev modes
+
 ## Features
-- [ ] PgUp/PgDown/+/- should work to scroll the main conversation view when the choice modal is active.
+- [ ] PgUp/PgDown/+/- should work to scroll the main conversation view when any bottom (as opposed to center) modal is active.
 - [ ] **Cost display**: Move to Esc menu (bottom right).
 - [ ] **Cost calculation**: Use the SDK's cost API to calculate accurate costs from token counts. Must handle caching and not hardcode model-specific pricing — models and prices will change.
 - [ ] **Hex colors in character sheets**: In the character sheet modal, match on hex color strings (`#\d{6}`) and render the string itself to the specified color. This is so that users can see their color.
 - [ ] Claude API connection errors should gracefully force a center-screen modal; this modal should poll a cheap Claude API endpoint (is there a health check endpoint?) and close automatically.
-- Choice modal should always have a final "Enter your own: > _" option that accepts text input in-place; with this addition, the choice modal can sit on top of the normal user input line, saving some space.
 - Session recap should use a center modal, and the DM's turn should not begin until the user has cleared it.
 
 

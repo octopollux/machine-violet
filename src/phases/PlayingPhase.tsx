@@ -269,6 +269,11 @@ export function PlayingPhase() {
         setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Exiting Dev Mode]" }, { kind: "dm", text: "" }]);
         return;
       }
+      if (key.pageUp || key.pageDown) {
+        const step = scrollAmount(rows);
+        narrativeRef.current?.scrollBy(key.pageUp ? -step : step);
+        return;
+      }
       return;
     }
 
@@ -278,6 +283,11 @@ export function PlayingPhase() {
         setOocActive(false);
         setVariant(previousVariantRef.current);
         setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Exiting OOC Mode]" }, { kind: "dm", text: "" }]);
+        return;
+      }
+      if (key.pageUp || key.pageDown) {
+        const step = scrollAmount(rows);
+        narrativeRef.current?.scrollBy(key.pageUp ? -step : step);
         return;
       }
       return;
