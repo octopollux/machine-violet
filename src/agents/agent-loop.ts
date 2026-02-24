@@ -391,6 +391,7 @@ const NETWORK_ERROR_PATTERNS = [
   "fetch failed",
   "socket hang up",
   "network error",
+  "connection error",
   "Failed to fetch",
   "EPIPE",
 ];

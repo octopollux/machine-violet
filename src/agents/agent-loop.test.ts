@@ -380,6 +380,8 @@ describe("extractStatus", () => {
     expect(extractStatus(new Error("network error"))).toBe(0);
     expect(extractStatus(new Error("write EPIPE"))).toBe(0);
     expect(extractStatus(new Error("getaddrinfo EAI_AGAIN api.anthropic.com"))).toBe(0);
+    // Anthropic SDK APIConnectionError uses this generic message
+    expect(extractStatus(new Error("Connection error."))).toBe(0);
   });
 
   it("returns null for unknown errors", () => {
