@@ -83,6 +83,47 @@ describe("model config", () => {
     expect(getModel("medium")).toBe("claude-sonnet-4-6");
     expect(getModel("small")).toBe("claude-haiku-4-5-20251001");
   });
+
+  it("defaults thinkingBudget to 0", () => {
+    const config = loadModelConfig({ cwd: testDir, reset: true });
+    expect(config.thinkingBudget).toBe(0);
+  });
+
+  it("loads thinking_budget from dev-config.json", () => {
+    writeFileSync(
+      join(testDir, "dev-config.json"),
+      JSON.stringify({ thinking_budget: 2048 }),
+    );
+    const config = loadModelConfig({ cwd: testDir, reset: true });
+    expect(config.thinkingBudget).toBe(2048);
+  });
+
+  it("rejects thinking_budget below 1024", () => {
+    writeFileSync(
+      join(testDir, "dev-config.json"),
+      JSON.stringify({ thinking_budget: 512 }),
+    );
+    const config = loadModelConfig({ cwd: testDir, reset: true });
+    expect(config.thinkingBudget).toBe(0);
+  });
+
+  it("rejects non-integer thinking_budget", () => {
+    writeFileSync(
+      join(testDir, "dev-config.json"),
+      JSON.stringify({ thinking_budget: 1024.5 }),
+    );
+    const config = loadModelConfig({ cwd: testDir, reset: true });
+    expect(config.thinkingBudget).toBe(0);
+  });
+
+  it("accepts thinking_budget of 0 (disabled)", () => {
+    writeFileSync(
+      join(testDir, "dev-config.json"),
+      JSON.stringify({ thinking_budget: 0 }),
+    );
+    const config = loadModelConfig({ cwd: testDir, reset: true });
+    expect(config.thinkingBudget).toBe(0);
+  });
 });
 
 describe("pricing config", () => {

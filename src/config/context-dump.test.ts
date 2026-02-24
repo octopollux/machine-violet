@@ -153,6 +153,29 @@ describe("renderDump", () => {
 
     expect(result).toMatch(/Timestamp: \d{4}-\d{2}-\d{2}T/);
   });
+
+  it("shows thinking budget when enabled", () => {
+    const result = renderDump("dm", {
+      model: "claude-opus-4-6",
+      max_tokens: 10240,
+      system: "sys",
+      messages: [],
+      thinking: { type: "enabled", budget_tokens: 2048 },
+    });
+
+    expect(result).toContain("Thinking: 2048 tokens");
+  });
+
+  it("omits thinking line when disabled", () => {
+    const result = renderDump("dm", {
+      model: "claude-opus-4-6",
+      max_tokens: 4096,
+      system: "sys",
+      messages: [],
+    });
+
+    expect(result).not.toContain("Thinking:");
+  });
 });
 
 // --- renderContent ---

@@ -10,7 +10,7 @@ import type { StateSlice } from "../context/state-persistence.js";
 import { SceneManager } from "./scene-manager.js";
 import type { SceneState, FileIO } from "./scene-manager.js";
 import type { DMSessionState } from "./dm-prompt.js";
-import { getModel } from "../config/models.js";
+import { getModel, loadModelConfig } from "../config/models.js";
 import { accUsage } from "../context/usage-helpers.js";
 import { TOKEN_LIMITS } from "../config/tokens.js";
 import type { ToolResult } from "./tool-registry.js";
@@ -688,9 +688,10 @@ export class GameEngine {
   }
 
   private buildAgentConfig(): AgentLoopConfig {
-    return {
+    const budget = loadModelConfig().thinkingBudget;
+    const config: AgentLoopConfig = {
       model: this.model,
-      maxTokens: TOKEN_LIMITS.DM_RESPONSE,
+      maxTokens: budget > 0 ? TOKEN_LIMITS.DM_RESPONSE + budget : TOKEN_LIMITS.DM_RESPONSE,
       maxToolRounds: 10,
       onTextDelta: (delta) => this.callbacks.onNarrativeDelta(delta),
       onToolStart: (name) => {
@@ -705,6 +706,10 @@ export class GameEngine {
         this.callbacks.onRetry(status, delayMs);
       },
     };
+    if (budget > 0) {
+      config.thinking = { type: "enabled", budget_tokens: budget };
+    }
+    return config;
   }
 
   private async handleDroppedExchange(dropped: DroppedExchange): Promise<void> {

@@ -8,12 +8,15 @@ export interface ModelConfig {
   large: ModelId;
   medium: ModelId;
   small: ModelId;
+  /** Extended thinking budget (tokens) for the DM (large tier). 0 = disabled. Must be >= 1024 when enabled. */
+  thinkingBudget: number;
 }
 
 const DEFAULTS: ModelConfig = {
   large: "claude-opus-4-6",
   medium: "claude-sonnet-4-6",
   small: "claude-haiku-4-5-20251001",
+  thinkingBudget: 0,
 };
 
 const VALID_MODELS = new Set<string>([
@@ -62,6 +65,10 @@ export function loadModelConfig(opts?: { cwd?: string; reset?: boolean }): Model
           config[tier] = models[tier] as ModelId;
         }
       }
+    }
+    const tb = parsed?.thinking_budget;
+    if (typeof tb === "number" && Number.isInteger(tb) && (tb === 0 || tb >= 1024)) {
+      config.thinkingBudget = tb;
     }
   } catch {
     // No dev-config.json or invalid — use defaults

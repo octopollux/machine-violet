@@ -34,6 +34,7 @@ export interface DumpableParams {
   system: string | readonly SystemBlock[];
   messages: readonly MessageParam[];
   tools?: readonly ToolDef[];
+  thinking?: { type: string; budget_tokens?: number };
 }
 
 interface SystemBlock {
@@ -79,6 +80,9 @@ export function renderDump(agentName: string, params: DumpableParams): string {
   lines.push(`Timestamp: ${new Date().toISOString()}`);
   lines.push(`Model: ${params.model}`);
   lines.push(`Max Tokens: ${params.max_tokens}`);
+  if (params.thinking?.type === "enabled" && params.thinking.budget_tokens) {
+    lines.push(`Thinking: ${params.thinking.budget_tokens} tokens`);
+  }
   lines.push("");
 
   // System prompt

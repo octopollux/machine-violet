@@ -12,6 +12,8 @@ export interface AgentLoopConfig {
   model: ModelId;
   maxTokens: number;
   maxToolRounds: number;
+  /** Extended thinking config. Omit or undefined to disable. */
+  thinking?: Anthropic.Messages.ThinkingConfigParam;
   /** Called when DM text streams in */
   onTextDelta?: (delta: string) => void;
   /** Called when a tool call starts */
@@ -120,6 +122,7 @@ export async function agentLoop(
       system: systemPrompt,
       messages: workingMessages,
       tools,
+      ...(config.thinking ? { thinking: config.thinking } : {}),
     }, config);
 
     // Accumulate usage
@@ -222,6 +225,7 @@ export async function agentLoopStreaming(
       system: systemPrompt,
       messages: workingMessages,
       tools,
+      ...(config.thinking ? { thinking: config.thinking } : {}),
     }, config);
 
     accumulateUsage(totalUsage, usage);
@@ -309,6 +313,7 @@ interface CreateParams {
   system: string | Anthropic.TextBlockParam[];
   messages: Anthropic.MessageParam[];
   tools: Anthropic.Tool[];
+  thinking?: Anthropic.Messages.ThinkingConfigParam;
 }
 
 async function callWithRetry(
