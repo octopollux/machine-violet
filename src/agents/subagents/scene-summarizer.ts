@@ -18,12 +18,13 @@ const SYSTEM_PROMPT = loadPrompt("scene-summarizer");
 export async function summarizeScene(
   client: Anthropic,
   transcript: string,
+  aliasContext?: string,
 ): Promise<SubagentResult> {
   return oneShot(
     client,
     getModel("small"),
     SYSTEM_PROMPT,
-    `Write a campaign log entry for this scene:\n\n${transcript}`,
+    `Write a campaign log entry for this scene:\n\n${transcript}${aliasContext ?? ""}`,
     TOKEN_LIMITS.DM_RESPONSE,
     "scene-summarizer",
   );

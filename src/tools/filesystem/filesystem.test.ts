@@ -66,6 +66,18 @@ Just a description.
     expect(changelog).toEqual([]);
   });
 
+  it("extracts additional_names field", () => {
+    const entity = `# Mysterious Stranger
+
+**Type:** NPC
+**Additional Names:** Grimjaw, Captain Grimjaw
+
+A cloaked figure with a scarred face.
+`;
+    const { frontMatter } = parseFrontMatter(entity);
+    expect(frontMatter.additional_names).toBe("Grimjaw, Captain Grimjaw");
+  });
+
   it("handles multiple changelog entries", () => {
     const multi = `# Mayor Graves
 
@@ -133,6 +145,18 @@ describe("serializeEntity", () => {
     const md = serializeEntity("Test", { _title: "Test", type: "NPC" }, "", []);
     expect(md).not.toContain("_title");
     expect(md).toContain("**Type:** NPC");
+  });
+
+  it("round-trips additional_names", () => {
+    const md = serializeEntity(
+      "Mysterious Stranger",
+      { type: "NPC", additional_names: "Grimjaw, Captain Grimjaw" },
+      "A cloaked figure.",
+      [],
+    );
+    expect(md).toContain("**Additional Names:** Grimjaw, Captain Grimjaw");
+    const { frontMatter } = parseFrontMatter(md);
+    expect(frontMatter.additional_names).toBe("Grimjaw, Captain Grimjaw");
   });
 
   it("handles empty body and changelog", () => {

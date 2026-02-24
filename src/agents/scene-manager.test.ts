@@ -414,6 +414,110 @@ describe("SceneManager", () => {
     expect(sessionState.playerRead).toContain("high");
   });
 
+  it("contextRefresh produces enriched PC summaries with aliases", async () => {
+    const fileIO = mockFileIO();
+    files["/tmp/test-campaign/campaign/log.md"] = "# Log";
+    files["/tmp/test-campaign/characters/aldric.md"] =
+      "# Aldric\n\n**Type:** PC\n**Additional Names:** The Hooded Figure\n\nA paladin.\n";
+
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      fileIO,
+    );
+
+    await mgr.contextRefresh();
+    expect(sessionState.activeState).toContain("Aldric (also: The Hooded Figure)");
+  });
+
+  it("contextRefresh produces bare name when no aliases exist", async () => {
+    const fileIO = mockFileIO();
+    files["/tmp/test-campaign/characters/aldric.md"] =
+      "# Aldric\n\n**Type:** PC\n\nA paladin.\n";
+
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      fileIO,
+    );
+
+    await mgr.contextRefresh();
+    expect(sessionState.activeState).toContain("Aldric");
+    expect(sessionState.activeState).not.toContain("(also:");
+  });
+
+  it("buildAliasContext returns formatted alias lines", async () => {
+    const fileIO = mockFileIO();
+    files["/tmp/test-campaign/characters/mysterious-stranger.md"] =
+      "# Mysterious Stranger\n\n**Type:** NPC\n**Additional Names:** Grimjaw, Captain Grimjaw\n\nA cloaked figure.\n";
+    dirs.add("/tmp/test-campaign/characters");
+    (fileIO.listDir as ReturnType<typeof vi.fn>).mockImplementation(async (path: string) => {
+      if (norm(path) === "/tmp/test-campaign/characters") {
+        return ["mysterious-stranger.md"];
+      }
+      return [];
+    });
+
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      fileIO,
+    );
+
+    await mgr.contextRefresh();
+    // The alias context is private, but we can verify it's passed to subagents
+    // by checking the summarizer call in a transition
+    const client = mockClient([
+      textResponse("- Summary"),
+      textResponse(""),
+    ]);
+    await mgr.sceneTransition(client, "Test");
+    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(createCall.messages[0].content).toContain("Entity aliases");
+    expect(createCall.messages[0].content).toContain("mysterious-stranger.md: also known as Grimjaw, Captain Grimjaw");
+  });
+
+  it("buildAliasContext returns empty when no aliases exist", async () => {
+    const fileIO = mockFileIO();
+    files["/tmp/test-campaign/characters/aldric.md"] =
+      "# Aldric\n\n**Type:** PC\n\nA paladin.\n";
+    dirs.add("/tmp/test-campaign/characters");
+    (fileIO.listDir as ReturnType<typeof vi.fn>).mockImplementation(async (path: string) => {
+      if (norm(path) === "/tmp/test-campaign/characters") {
+        return ["aldric.md"];
+      }
+      return [];
+    });
+
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      fileIO,
+    );
+
+    await mgr.contextRefresh();
+    // Verify no alias context in subagent calls
+    const client = mockClient([
+      textResponse("- Summary"),
+      textResponse(""),
+    ]);
+    await mgr.sceneTransition(client, "Test");
+    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(createCall.messages[0].content).not.toContain("Entity aliases");
+  });
+
   it("contextRefresh handles missing files gracefully", async () => {
     const fileIO = mockFileIO();
     // No files pre-populated — everything missing

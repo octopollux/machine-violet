@@ -11,8 +11,9 @@ import { advanceCalendar, checkClocks } from "../tools/clocks/index.js";
 import { validateCampaign } from "../tools/validation/index.js";
 import type { ValidationResult } from "../tools/validation/index.js";
 import { join } from "node:path";
-import { sceneDir, campaignPaths } from "../tools/filesystem/index.js";
+import { sceneDir, campaignPaths, parseFrontMatter } from "../tools/filesystem/index.js";
 import { formatChangelogEntry, appendChangelog } from "../tools/filesystem/index.js";
+import { slugify } from "./world-builder.js";
 import type { UsageStats } from "./agent-loop.js";
 import { accUsage } from "../context/usage-helpers.js";
 import { norm } from "../utils/paths.js";
@@ -90,6 +91,8 @@ export class SceneManager {
   private fileIO: FileIO;
   private repo: CampaignRepo | null;
   private pendingOp: PendingOperation | null = null;
+  private pcSummaries: string[];
+  private aliasContext: string = "";
 
   /** Optional dev mode log callback. */
   devLog?: (msg: string) => void;
@@ -108,12 +111,13 @@ export class SceneManager {
     this.sessionState = sessionState;
     this.fileIO = fileIO;
     this.repo = repo ?? null;
+    this.pcSummaries = state.config.players.map((p) => p.character);
   }
 
   /** Get the current system prompt (cached prefix) */
   getSystemPrompt(): Anthropic.TextBlockParam[] {
     this.sessionState.activeState = buildActiveState({
-      pcSummaries: this.state.config.players.map((p) => p.character),
+      pcSummaries: this.pcSummaries,
       pendingAlarms: [],
       turnHolder: undefined,
     });
@@ -167,6 +171,7 @@ export class SceneManager {
       client, this.scene.precis, exchangeText,
       this.scene.openThreads || undefined,
       pcIdent,
+      this.aliasContext || undefined,
     );
     this.devLog?.("[dev] subagent:precis-updater done");
     this.scene.precis += "\n" + result.text;
@@ -397,6 +402,10 @@ export class SceneManager {
       }
     } catch { /* non-critical */ }
 
+    // Refresh PC summaries with alias info and build alias context for subagents
+    this.pcSummaries = await this.loadPCSummaries();
+    this.aliasContext = await this.buildAliasContext();
+
     // Rebuild active state with pending alarms
     const clockStatus = checkClocks(this.state.clocks);
     const pendingAlarms: string[] = [];
@@ -408,7 +417,7 @@ export class SceneManager {
     }
 
     this.sessionState.activeState = buildActiveState({
-      pcSummaries: this.state.config.players.map((p) => p.character),
+      pcSummaries: this.pcSummaries,
       pendingAlarms,
     });
 
@@ -457,7 +466,7 @@ export class SceneManager {
   ): Promise<void> {
     const transcript = this.scene.transcript.join("\n");
     this.devLog?.("[dev] subagent:summarizer starting");
-    const summaryResult = await summarizeScene(client, transcript);
+    const summaryResult = await summarizeScene(client, transcript, this.aliasContext || undefined);
     this.devLog?.("[dev] subagent:summarizer done");
     result.campaignLogEntry = summaryResult.text;
     accUsage(result.usage, summaryResult.usage);
@@ -481,6 +490,7 @@ export class SceneManager {
       transcript,
       this.scene.sceneNumber,
       entityFiles,
+      this.aliasContext || undefined,
     );
     accUsage(result.usage, changelogResult.usage);
     this.devLog?.("[dev] subagent:changelog done");
@@ -546,6 +556,50 @@ export class SceneManager {
   }
 
   // --- Internal ---
+
+  private async loadPCSummaries(): Promise<string[]> {
+    const root = this.state.campaignRoot;
+    const paths = campaignPaths(root);
+    const summaries: string[] = [];
+    for (const player of this.state.config.players) {
+      const slug = slugify(player.character);
+      const filePath = paths.character(slug);
+      let line = player.character;
+      try {
+        if (await this.fileIO.exists(filePath)) {
+          const raw = await this.fileIO.readFile(filePath);
+          const { frontMatter } = parseFrontMatter(raw);
+          const aliases = frontMatter.additional_names as string | undefined;
+          if (aliases?.trim()) {
+            line += ` (also: ${aliases.trim()})`;
+          }
+        }
+      } catch { /* non-critical — fall back to bare name */ }
+      summaries.push(line);
+    }
+    return summaries;
+  }
+
+  private async buildAliasContext(): Promise<string> {
+    const charDir = `${this.state.campaignRoot}/characters`;
+    try {
+      if (!(await this.fileIO.exists(charDir))) return "";
+      const files = await this.fileIO.listDir(charDir);
+      const lines: string[] = [];
+      for (const file of files) {
+        if (!file.endsWith(".md")) continue;
+        const raw = await this.fileIO.readFile(`${charDir}/${file}`);
+        const { frontMatter } = parseFrontMatter(raw);
+        const aliases = frontMatter.additional_names as string | undefined;
+        if (aliases?.trim()) {
+          lines.push(`${file}: also known as ${aliases.trim()}`);
+        }
+      }
+      return lines.length > 0
+        ? `\n\nEntity aliases (use canonical filename in wikilinks, not the alias):\n${lines.join("\n")}`
+        : "";
+    } catch { return ""; }
+  }
 
   private async finalizeTranscript(): Promise<void> {
     const dir = sceneDir(

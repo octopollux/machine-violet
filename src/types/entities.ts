@@ -15,6 +15,7 @@ export interface EntityFrontMatter {
   location?: string;
   color?: string;
   disposition?: string;
+  additional_names?: string;
   display_resources?: string[];
   [key: string]: unknown;
 }

@@ -6,3 +6,4 @@ Rules:
 - Include mechanical outcomes (HP changes, items gained/lost, alarms set).
 - Do not editorialize or add narrative color. Just the facts.
 - Format: bullet list, each bullet is one event.
+- When a character has aliases (listed under "Entity aliases"), use their canonical filename in wikilinks.

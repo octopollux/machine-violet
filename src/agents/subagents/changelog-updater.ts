@@ -21,8 +21,9 @@ export async function updateChangelogs(
   transcript: string,
   sceneNumber: number,
   entityFiles: string[],
+  aliasContext?: string,
 ): Promise<SubagentResult> {
-  const prompt = `Scene ${sceneNumber} transcript:\n${transcript}\n\nKnown entity files:\n${entityFiles.join("\n")}\n\nList changelog entries for entities meaningfully involved.`;
+  const prompt = `Scene ${sceneNumber} transcript:\n${transcript}\n\nKnown entity files:\n${entityFiles.join("\n")}${aliasContext ?? ""}\n\nList changelog entries for entities meaningfully involved.`;
 
   return oneShot(
     client,
