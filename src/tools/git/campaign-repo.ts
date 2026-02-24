@@ -30,6 +30,7 @@ export interface RollbackResult {
 export interface GitIO {
   init(dir: string): Promise<void>;
   add(dir: string, filepath: string): Promise<void>;
+  remove(dir: string, filepath: string): Promise<void>;
   commit(dir: string, message: string, author: { name: string; email: string }): Promise<string>;
   log(dir: string, depth?: number): Promise<Array<{ oid: string; commit: { message: string; author: { timestamp: number } } }>>;
   checkout(dir: string, oid: string): Promise<void>;
@@ -211,8 +212,11 @@ export class CampaignRepo {
   private async stageAll(): Promise<void> {
     const matrix = await this.git.statusMatrix(this.dir);
     for (const [filepath, head, workdir, stage] of matrix) {
-      // Stage any file that differs between workdir and staging
-      if (workdir !== stage || head !== workdir) {
+      if (workdir === 0 && head !== 0) {
+        // File deleted from workdir — stage the removal
+        await this.git.remove(this.dir, filepath);
+      } else if (workdir !== stage || head !== workdir) {
+        // File added or modified — stage it
         await this.git.add(this.dir, filepath);
       }
     }

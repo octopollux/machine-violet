@@ -15,6 +15,10 @@ export function createGitIO(): GitIO {
       await git.add({ fs, dir, filepath });
     },
 
+    async remove(dir, filepath) {
+      await git.remove({ fs, dir, filepath });
+    },
+
     async commit(dir, message, author) {
       return git.commit({ fs, dir, message, author });
     },

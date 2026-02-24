@@ -11,21 +11,28 @@ const ONE_DAY = 86400;
 function mockGitIO(): GitIO & {
   commits: Array<{ message: string; oid: string; timestamp: number }>;
   staged: Set<string>;
+  removed: Set<string>;
   initCalled: boolean;
 } {
   const commits: Array<{ message: string; oid: string; timestamp: number }> = [];
   const staged = new Set<string>();
+  const removed = new Set<string>();
   let oidCounter = 0;
 
   const io: ReturnType<typeof mockGitIO> = {
     commits,
     staged,
+    removed,
     initCalled: false,
 
     init: vi.fn(async () => { io.initCalled = true; }),
 
     add: vi.fn(async (_dir, filepath) => {
       staged.add(filepath);
+    }),
+
+    remove: vi.fn(async (_dir, filepath) => {
+      removed.add(filepath);
     }),
 
     commit: vi.fn(async (_dir, message) => {
@@ -139,6 +146,24 @@ describe("CampaignRepo", () => {
     const repo = new CampaignRepo({ dir: "/tmp/campaign", git });
     const oid = await repo.sceneCommit("Clean State");
     expect(oid).toBeNull();
+  });
+
+  it("stages deleted files with remove instead of add", async () => {
+    const git = mockGitIO();
+    // statusMatrix: alice-wunderlich.md deleted (head=1, workdir=0, stage=1)
+    //               alice.md modified (head=1, workdir=2, stage=1)
+    git.statusMatrix = vi.fn(async () => [
+      ["characters/alice-wunderlich.md", 1, 0, 1] as [string, number, number, number],
+      ["characters/alice.md", 1, 2, 1] as [string, number, number, number],
+    ]);
+
+    const repo = new CampaignRepo({ dir: "/tmp/campaign", git });
+    await repo.autoCommit("auto: after merge");
+
+    expect(git.remove).toHaveBeenCalledWith("/tmp/campaign", "characters/alice-wunderlich.md");
+    expect(git.add).toHaveBeenCalledWith("/tmp/campaign", "characters/alice.md");
+    // Should NOT have tried to add the deleted file
+    expect(git.add).not.toHaveBeenCalledWith("/tmp/campaign", "characters/alice-wunderlich.md");
   });
 
   it("does nothing when disabled", async () => {
