@@ -689,10 +689,17 @@ export class GameEngine {
 
   private buildAgentConfig(): AgentLoopConfig {
     const budget = loadModelConfig().thinkingBudget;
-    const config: AgentLoopConfig = {
+    const thinking: AgentLoopConfig["thinking"] =
+      budget === "adaptive" ? { type: "adaptive" }
+      : budget > 0 ? { type: "enabled", budget_tokens: budget }
+      : { type: "disabled" };
+    return {
       model: this.model,
-      maxTokens: budget > 0 ? TOKEN_LIMITS.DM_RESPONSE + budget : TOKEN_LIMITS.DM_RESPONSE,
+      maxTokens: typeof budget === "number" && budget > 0
+        ? TOKEN_LIMITS.DM_RESPONSE + budget
+        : TOKEN_LIMITS.DM_RESPONSE,
       maxToolRounds: 10,
+      thinking,
       onTextDelta: (delta) => this.callbacks.onNarrativeDelta(delta),
       onToolStart: (name) => {
         this.setState("tool_running");
@@ -706,10 +713,6 @@ export class GameEngine {
         this.callbacks.onRetry(status, delayMs);
       },
     };
-    if (budget > 0) {
-      config.thinking = { type: "enabled", budget_tokens: budget };
-    }
-    return config;
   }
 
   private async handleDroppedExchange(dropped: DroppedExchange): Promise<void> {

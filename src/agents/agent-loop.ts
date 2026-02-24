@@ -122,7 +122,7 @@ export async function agentLoop(
       system: systemPrompt,
       messages: workingMessages,
       tools,
-      ...(config.thinking ? { thinking: config.thinking } : {}),
+      thinking: config.thinking,
     }, config);
 
     // Accumulate usage
@@ -225,7 +225,7 @@ export async function agentLoopStreaming(
       system: systemPrompt,
       messages: workingMessages,
       tools,
-      ...(config.thinking ? { thinking: config.thinking } : {}),
+      thinking: config.thinking,
     }, config);
 
     accumulateUsage(totalUsage, usage);

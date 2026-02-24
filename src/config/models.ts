@@ -8,8 +8,13 @@ export interface ModelConfig {
   large: ModelId;
   medium: ModelId;
   small: ModelId;
-  /** Extended thinking budget (tokens) for the DM (large tier). 0 = disabled. Must be >= 1024 when enabled. */
-  thinkingBudget: number;
+  /**
+   * Extended thinking for the DM (large tier).
+   * - 0 = disabled (default)
+   * - number >= 1024 = enabled with explicit budget
+   * - "adaptive" = model decides its own thinking budget
+   */
+  thinkingBudget: number | "adaptive";
 }
 
 const DEFAULTS: ModelConfig = {
@@ -67,7 +72,9 @@ export function loadModelConfig(opts?: { cwd?: string; reset?: boolean }): Model
       }
     }
     const tb = parsed?.thinking_budget;
-    if (typeof tb === "number" && Number.isInteger(tb) && (tb === 0 || tb >= 1024)) {
+    if (tb === "adaptive") {
+      config.thinkingBudget = "adaptive";
+    } else if (typeof tb === "number" && Number.isInteger(tb) && (tb === 0 || tb >= 1024)) {
       config.thinkingBudget = tb;
     }
   } catch {

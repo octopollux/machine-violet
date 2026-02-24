@@ -124,6 +124,15 @@ describe("model config", () => {
     const config = loadModelConfig({ cwd: testDir, reset: true });
     expect(config.thinkingBudget).toBe(0);
   });
+
+  it("accepts thinking_budget 'adaptive'", () => {
+    writeFileSync(
+      join(testDir, "dev-config.json"),
+      JSON.stringify({ thinking_budget: "adaptive" }),
+    );
+    const config = loadModelConfig({ cwd: testDir, reset: true });
+    expect(config.thinkingBudget).toBe("adaptive");
+  });
 });
 
 describe("pricing config", () => {

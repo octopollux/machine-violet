@@ -147,6 +147,7 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
       system: SYSTEM_PROMPT,
       messages,
       tools: TOOLS,
+      thinking: { type: "disabled" },
     });
 
     stream.on("text", (delta) => {
@@ -204,6 +205,7 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
         system: SYSTEM_PROMPT,
         messages,
         tools: TOOLS,
+        thinking: { type: "disabled" },
       });
 
       followUp.on("text", (delta) => {

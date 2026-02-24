@@ -72,6 +72,7 @@ export async function spawnSubagent(
       system: config.systemPrompt + "\n\nIMPORTANT: Respond in the minimum tokens necessary. Be terse.",
       messages,
       stream: false,
+      thinking: { type: "disabled" },
       ...(config.tools?.length ? { tools: config.tools } : {}),
     };
 

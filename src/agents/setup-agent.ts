@@ -190,6 +190,7 @@ async function generateCampaignOptions(
     const response = await client.messages.create({
       model: getModel("small"),
       max_tokens: TOKEN_LIMITS.SETUP_STEP,
+      thinking: { type: "disabled" },
       system: SETUP_GEN_SYSTEM,
       messages: [{
         role: "user",
@@ -225,6 +226,7 @@ async function generateCharacterOptions(
     const response = await client.messages.create({
       model: getModel("small"),
       max_tokens: TOKEN_LIMITS.SETUP_STEP,
+      thinking: { type: "disabled" },
       system: SETUP_GEN_SYSTEM,
       messages: [{
         role: "user",
