@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import type Anthropic from "@anthropic-ai/sdk";
-import type { FrameStyle, StyleVariant, NarrativeLine, ActiveModal } from "../../types/tui.js";
+import type { FrameStyle, StyleVariant, NarrativeLine, ActiveModal, RetryOverlay } from "../../types/tui.js";
 import type { EngineState, EngineCallbacks } from "../../agents/game-engine.js";
 import type { TuiCommand, UsageStats } from "../../agents/agent-loop.js";
 import type { GameState } from "../../agents/game-state.js";
@@ -27,6 +27,7 @@ export interface GameCallbackDeps {
   setActiveModal: (m: ActiveModal) => void;
   setChoiceIndex: React.Dispatch<React.SetStateAction<number>>;
   setOocActive: (v: boolean) => void;
+  setRetryOverlay: (o: RetryOverlay | null) => void;
   // Refs
   gameStateRef: React.RefObject<GameState | null>;
   clientRef: React.RefObject<Anthropic | null>;
@@ -46,7 +47,7 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
   const {
     setNarrativeLines, setEngineState, setErrorMsg, setModelines,
     setResources, setStyle, setVariant, setActiveModal, setChoiceIndex,
-    setOocActive,
+    setOocActive, setRetryOverlay,
     gameStateRef, clientRef, activeModalRef, variantRef, previousVariantRef,
     costTracker, fileIO,
   } = deps;
@@ -143,6 +144,7 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
     },
     onStateChange(state: EngineState) {
       setEngineState(state);
+      setRetryOverlay(null);
     },
     onTuiCommand(cmd: TuiCommand) {
       dispatchTuiCommand(cmd);
@@ -177,10 +179,12 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
       ]);
     },
     onRetry(status: number, delayMs: number) {
-      setEngineState(`retry:${status}:${Math.ceil(delayMs / 1000)}`);
+      const delaySec = Math.ceil(delayMs / 1000);
+      setEngineState(`retry:${status}:${delaySec}`);
+      setRetryOverlay({ status, delaySec });
     },
   }), [dispatchTuiCommand, setNarrativeLines, setEngineState,
-       setErrorMsg, setActiveModal, setChoiceIndex,
+       setErrorMsg, setActiveModal, setChoiceIndex, setRetryOverlay,
        gameStateRef, clientRef, activeModalRef, costTracker]);
 
   return { buildCallbacks, dispatchTuiCommand };

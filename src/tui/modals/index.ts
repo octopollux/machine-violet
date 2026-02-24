@@ -6,3 +6,4 @@ export { GameMenu, MENU_ITEMS, getMenuItems } from "./GameMenu.js";
 export { CharacterSheetModal } from "./CharacterSheetModal.js";
 export { DiceRollModal } from "./DiceRollModal.js";
 export { SessionRecapModal } from "./SessionRecapModal.js";
+export { ApiErrorModal } from "./ApiErrorModal.js";

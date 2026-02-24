@@ -65,6 +65,11 @@ export interface ActivityIndicator {
   glyph: string;
 }
 
+export interface RetryOverlay {
+  status: number;
+  delaySec: number;
+}
+
 export type ActiveModal =
   | { kind: "choice"; prompt: string; choices: string[] }
   | { kind: "dice"; expression: string; rolls: number[]; kept?: number[]; total: number; reason?: string }

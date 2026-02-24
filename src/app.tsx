@@ -7,7 +7,7 @@ import { join, dirname } from "node:path";
 
 import { STYLES, getStyle } from "./tui/frames/index.js";
 import { markdownToTags } from "./tui/formatting.js";
-import type { FrameStyle, StyleVariant, NarrativeLine, ActiveModal } from "./types/tui.js";
+import type { FrameStyle, StyleVariant, NarrativeLine, ActiveModal, RetryOverlay } from "./types/tui.js";
 import type { FileIO, SceneState } from "./agents/scene-manager.js";
 import { detectSceneState, classifyTranscriptEntry } from "./agents/scene-manager.js";
 import { GameEngine } from "./agents/game-engine.js";
@@ -116,6 +116,7 @@ export default function App({ shutdownRef }: AppProps) {
 
   // --- Modal state (shared with PlayingPhase via props, set by buildCallbacks/dispatchTuiCommand) ---
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
+  const [retryOverlay, setRetryOverlay] = useState<RetryOverlay | null>(null);
   const activeModalRef = useRef<ActiveModal>(null);
   const [choiceIndex, setChoiceIndex] = useState(0);
 
@@ -235,7 +236,7 @@ export default function App({ shutdownRef }: AppProps) {
   const { buildCallbacks, dispatchTuiCommand } = useGameCallbacks({
     setNarrativeLines, setEngineState, setErrorMsg, setModelines,
     setResources, setStyle, setVariant, setActiveModal, setChoiceIndex,
-    setOocActive,
+    setOocActive, setRetryOverlay,
     gameStateRef, clientRef, activeModalRef, variantRef, previousVariantRef,
     costTracker, fileIO,
   });
@@ -559,6 +560,7 @@ export default function App({ shutdownRef }: AppProps) {
     engineState, resources, modelines,
     activeModal, setActiveModal,
     choiceIndex, setChoiceIndex,
+    retryOverlay,
     oocActive, setOocActive, previousVariantRef,
     devModeEnabled: isDevMode(),
     devActive, setDevActive,

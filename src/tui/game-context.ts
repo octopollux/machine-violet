@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 import type Anthropic from "@anthropic-ai/sdk";
-import type { FrameStyle, StyleVariant, NarrativeLine, ActiveModal } from "../types/tui.js";
+import type { FrameStyle, StyleVariant, NarrativeLine, ActiveModal, RetryOverlay } from "../types/tui.js";
 import type { GameEngine } from "../agents/game-engine.js";
 import type { GameState } from "../agents/game-state.js";
 import type { TuiCommand } from "../agents/agent-loop.js";
@@ -32,6 +32,8 @@ export interface GameContextValue {
   setActiveModal: (m: ActiveModal) => void;
   choiceIndex: number;
   setChoiceIndex: React.Dispatch<React.SetStateAction<number>>;
+  // Retry overlay (system-driven, separate from activeModal)
+  retryOverlay: RetryOverlay | null;
   // OOC state
   oocActive: boolean;
   setOocActive: (v: boolean) => void;

@@ -4,7 +4,7 @@ import { appendDelta } from "../tui/narrative-helpers.js";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
 import { scrollAmount } from "../tui/components/index.js";
 import { Layout } from "../tui/layout.js";
-import { ChoiceModal, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, getMenuItems } from "../tui/modals/index.js";
+import { ChoiceModal, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, ApiErrorModal, getMenuItems } from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { getActivePlayer, switchToNextPlayer, getPlayerEntries } from "../agents/player-manager.js";
 import { enterOOC } from "../agents/subagents/ooc-mode.js";
@@ -22,6 +22,7 @@ export function PlayingPhase() {
     choiceIndex, setChoiceIndex,
     oocActive, setOocActive, previousVariantRef,
     devModeEnabled, devActive, setDevActive,
+    retryOverlay,
     dispatchTuiCommand, onShutdown, onEndSession,
   } = useGameContext();
   const { stdout } = useStdout();
@@ -51,6 +52,7 @@ export function PlayingPhase() {
   const textInputDisabled =
     !!(activeModal && activeModal.kind === "dice") ||
     !!activeModal ||
+    !!retryOverlay ||
     menuOpen ||
     (devActive && devBusy) ||
     (oocActive && oocBusy);
@@ -155,6 +157,9 @@ export function PlayingPhase() {
         return;
       }
     }
+
+    // Retry overlay: block all input (triple-ESC above still works)
+    if (retryOverlay) return;
 
     // Dice modal: any key dismisses
     if (activeModal && activeModal.kind === "dice") {
@@ -453,6 +458,14 @@ export function PlayingPhase() {
           height={rows}
           content={activeModal.content}
           scrollRef={modalScrollRef}
+        />
+      )}
+      {retryOverlay && (
+        <ApiErrorModal
+          variant={style.variants[variant]}
+          width={cols}
+          height={rows}
+          overlay={retryOverlay}
         />
       )}
       {menuOpen && (
