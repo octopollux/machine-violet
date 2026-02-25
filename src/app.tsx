@@ -296,6 +296,7 @@ export default function App({ shutdownRef }: AppProps) {
       (error) => console.error("[state-persist]", error.message),
     );
     setCampaignName(config.name);
+    process.stdout.write(`\x1b]0;${config.name}\x07`);
     setActivePlayerIndex(0);
 
     if (shutdownRef) {
