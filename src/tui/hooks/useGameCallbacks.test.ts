@@ -173,4 +173,15 @@ describe("appendDelta (typed NarrativeLine)", () => {
   it("pushes to empty array", () => {
     expect(appendDelta([], "Hello", "dm")).toEqual([dm("Hello")]);
   });
+
+  it("does not concatenate dm delta onto a dev line", () => {
+    const dev = (text: string): NarrativeLine => ({ kind: "dev", text });
+    const lines: NarrativeLine[] = [dm("Start"), dev("[dev] file:write decks.json (100 chars)")];
+    const result = appendDelta(lines, "The Nine of Wands.", "dm");
+    expect(result).toEqual([
+      dm("Start"),
+      dev("[dev] file:write decks.json (100 chars)"),
+      dm("The Nine of Wands."),
+    ]);
+  });
 });

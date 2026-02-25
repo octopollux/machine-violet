@@ -15,7 +15,7 @@ export function appendDelta(
     lines.push({ kind, text: delta });
   } else {
     const last = lines[lines.length - 1];
-    if (last.text === "" && delta !== "") {
+    if (last.kind !== kind || (last.text === "" && delta !== "")) {
       lines.push({ kind, text: delta });
     } else {
       lines[lines.length - 1] = { kind: last.kind, text: last.text + delta };

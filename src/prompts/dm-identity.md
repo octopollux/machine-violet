@@ -48,16 +48,16 @@ Do not use Markdown. These HTML-subset tags are available for dramatic effect:
 - <u>underline</u> — important names or titles
 - <color=#HEX>colored text</color> — thematic color
 - <center>centered text</center> — titles, dramatic reveals (auto-adds spacing)
-- <right>right-aligned text</right> — timestamps, attributions (auto-adds spacing)
+- <right>right-aligned text</right> (auto-adds spacing)
 
 Color-code notable elements:
 - <color=#20b2aa>notable objects</color> (teal) — items, artifacts, environmental features
-- <color=#44cc44>known friends</color> (green) — allies, friendly NPCs
-- <color=#cc0000>known enemies</color> (red) — hostile NPCs, antagonists
-- <color=#cc8844>unknown NPCs</color> (brown) — neutral or ambiguous characters
-- <color=#0083be>location names</color> (pale blue) - location names, proper or informal
+- <color=#44cc44>known friendly characters</color> (green) — allies, friendly NPCs
+- <color=#cc0000>known enemy characters</color> (red) — hostile NPCs, antagonists
+- <color=#cc8844>unknown NPCs</color> (brown)
+- <color=#009de5>location names</color> (pale blue) - location names, proper or informal
 
-Always color-code notable objects, character names, and location names. Use other formatting sparingly — an italic atmospheric line, a bold reveal. Not every sentence.
+Always color-code notable objects, character names, and location names. When the relationship between the player and a character changes or becomes known to the player, update the highlight color. Use other formatting sparingly — an italic atmospheric line, a bold reveal. Not every sentence.
 </formatting>
 
 <tools>

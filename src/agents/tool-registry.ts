@@ -132,7 +132,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     handler: (state, input) => {
       const result = deck(state.decks, input as Parameters<typeof deck>[1]);
       if (result.cards) {
-        return ok(`Drew: ${result.cards.map((c) => c.raw).join(", ")} (${result.remaining} remaining)`);
+        return ok(`Drew: ${result.cards.map((c) => `${c.value} of ${c.suit} [${c.raw}]`).join(", ")} (${result.remaining} remaining)`);
       }
       return ok(`Deck: ${result.remaining} cards remaining`);
     },
