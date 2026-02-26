@@ -1,12 +1,10 @@
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 import type { ToolRegistry, ToolResult } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
 import {
   runAgentLoop,
   TUI_TOOLS,
   stampToolsCacheControl,
-  extractStatus,
-  retryDelay,
 } from "./agent-session.js";
 
 // --- Types (canonical definitions, re-exported for backward compatibility) ---
@@ -38,11 +36,6 @@ export interface UsageStats {
   outputTokens: number;
   cacheReadTokens: number;
   cacheCreationTokens: number;
-}
-
-export interface Exchange {
-  role: "user" | "assistant";
-  content: Anthropic.MessageParam["content"];
 }
 
 /** TUI command emitted by TUI tools (update_modeline, set_ui_style, etc.) */
@@ -135,5 +128,3 @@ export async function agentLoopStreaming(
   });
 }
 
-/** @internal — exported for tests only */
-export const _internal = { extractStatus, retryDelay };

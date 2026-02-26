@@ -33,9 +33,6 @@ export function getMenuItems(devModeEnabled?: boolean): string[] {
   return items;
 }
 
-/** @deprecated Use getMenuItems() instead */
-const MENU_ITEMS = BASE_MENU_ITEMS;
-
 /**
  * ESC menu modal. Standard navigation options.
  */
@@ -61,4 +58,3 @@ export function GameMenu({
   return <CenteredModal variant={variant} width={width} height={height} title="Menu" footer={tokenSummary} children={lines} />;
 }
 
-export { MENU_ITEMS };

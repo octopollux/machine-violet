@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
-import { agentLoop, stampToolsCacheControl, _internal } from "./agent-loop.js";
+import { agentLoop, stampToolsCacheControl } from "./agent-loop.js";
+import { extractStatus, retryDelay } from "./agent-session.js";
 import type { AgentLoopConfig } from "./agent-loop.js";
 import { ToolRegistry } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
@@ -359,8 +360,6 @@ describe("stampToolsCacheControl", () => {
 });
 
 describe("extractStatus", () => {
-  const { extractStatus } = _internal;
-
   it("extracts numeric .status from error objects", () => {
     expect(extractStatus({ status: 429, message: "rate limit" })).toBe(429);
     expect(extractStatus({ status: 529 })).toBe(529);
@@ -391,8 +390,6 @@ describe("extractStatus", () => {
 });
 
 describe("retryDelay", () => {
-  const { retryDelay } = _internal;
-
   it("uses exponential backoff", () => {
     expect(retryDelay(0)).toBe(1000);
     expect(retryDelay(1)).toBe(2000);

@@ -4,7 +4,7 @@ import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
 import { Modal } from "./Modal.js";
 import { ChoiceModal } from "./ChoiceModal.js";
-import { GameMenu, MENU_ITEMS } from "./GameMenu.js";
+import { GameMenu, getMenuItems } from "./GameMenu.js";
 import { CharacterSheetModal } from "./CharacterSheetModal.js";
 import { DiceRollModal } from "./DiceRollModal.js";
 import { SessionRecapModal } from "./SessionRecapModal.js";
@@ -121,7 +121,7 @@ describe("GameMenu", () => {
       </Box>,
     );
     const frame = lastFrame();
-    for (const item of MENU_ITEMS) {
+    for (const item of getMenuItems()) {
       expect(frame).toContain(item);
     }
   });
