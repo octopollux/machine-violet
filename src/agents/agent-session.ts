@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { ToolResult } from "./tool-registry.js";
 import type { UsageStats, TuiCommand, ModelId } from "./agent-loop.js";
 import { accumulateUsage } from "../context/usage-helpers.js";
-import { dumpContext } from "../config/context-dump.js";
+import { dumpContext, dumpThinking } from "../config/context-dump.js";
 import { getThinkingConfig } from "../config/models.js";
 
 // --- Types ---
@@ -226,10 +226,14 @@ export async function runAgentLoop(
     let hasToolUse = false;
     const assistantContent: Anthropic.ContentBlock[] = [];
     const toolResults: Anthropic.ToolResultBlockParam[] = [];
+    let thinkingText = "";
 
     for (const block of response.content) {
       // Skip thinking blocks — they must not be sent back in conversation history
-      if (block.type === "thinking") continue;
+      if (block.type === "thinking") {
+        thinkingText += block.thinking;
+        continue;
+      }
 
       assistantContent.push(block);
 
@@ -267,6 +271,11 @@ export async function runAgentLoop(
           is_error: result.is_error,
         });
       }
+    }
+
+    // Dump thinking blocks (dev mode only)
+    if (thinkingText) {
+      dumpThinking(config.name, round, thinkingText);
     }
 
     // Append assistant message

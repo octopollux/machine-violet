@@ -8,7 +8,7 @@ import { getModel, getThinkingConfig } from "../../config/models.js";
 import { accumulateUsage as accRawUsage } from "../../context/usage-helpers.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
-import { dumpContext } from "../../config/context-dump.js";
+import { dumpContext, dumpThinking } from "../../config/context-dump.js";
 import {
   extractStatus,
   RETRYABLE_STATUS,
@@ -215,7 +215,12 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
       }
     }
 
-    // Strip thinking blocks — they must not be sent back in conversation history
+    // Dump + strip thinking blocks — they must not be sent back in conversation history
+    const thinkingText = response.content
+      .filter((b): b is Anthropic.ThinkingBlock => b.type === "thinking")
+      .map((b) => b.thinking)
+      .join("\n");
+    if (thinkingText) dumpThinking("setup", 0, thinkingText);
     const filtered = response.content.filter((b) => b.type !== "thinking");
     messages.push({ role: "assistant", content: filtered });
 
@@ -250,6 +255,11 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
         }
       }
 
+      const followUpThinking = followUpMsg.content
+        .filter((b): b is Anthropic.ThinkingBlock => b.type === "thinking")
+        .map((b) => b.thinking)
+        .join("\n");
+      if (followUpThinking) dumpThinking("setup", 1, followUpThinking);
       const filteredFollowUp = followUpMsg.content.filter((b) => b.type !== "thinking");
       messages.push({ role: "assistant", content: filteredFollowUp });
     }

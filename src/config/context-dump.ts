@@ -46,3 +46,22 @@ export function dumpContext(agentName: string, params: DumpableParams): void {
 
   void writeFile(filePath, json, "utf-8").catch(() => {});
 }
+
+/**
+ * Dump response thinking blocks to a separate file.
+ * Writes to `{agentName}-thinking.json`. Fire-and-forget, errors swallowed.
+ * Only runs when DEV_MODE is active and dumpDir has been set.
+ */
+export function dumpThinking(
+  agentName: string,
+  round: number,
+  thinkingText: string,
+): void {
+  if (!isDevMode() || !dumpDir) return;
+
+  const envelope = { agent: agentName, round, timestamp: new Date().toISOString(), thinking: thinkingText };
+  const json = JSON.stringify(envelope, null, 2);
+  const filePath = join(dumpDir, `${agentName}-thinking.json`);
+
+  void writeFile(filePath, json, "utf-8").catch(() => {});
+}
