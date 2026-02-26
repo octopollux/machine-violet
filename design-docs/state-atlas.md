@@ -60,6 +60,8 @@ GameState
 │           └── template: string           const
 │
 ├── config: CampaignConfig                 const → config.json            Campaign init
+│   ├── version?: number                   const (CAMPAIGN_FORMAT_VERSION at creation)
+│   ├── createdAt?: string                 const (ISO 8601 timestamp at creation)
 │   ├── name, system, genre, mood, difficulty, premise
 │   ├── dm_personality: DMPersonality
 │   ├── players: PlayerConfig[]
@@ -147,6 +149,7 @@ All state files live under `<campaignRoot>/state/`.
 | `state/scene.json` | `PersistedSceneState` | `StatePersister.persistScene` | After precis update, scene transition |
 | `state/conversation.json` | `SerializedExchange[]` | `StatePersister.persistConversation` | After each exchange |
 | `state/ui.json` | `PersistedUIState` | `StatePersister.persistUI` | After style/modeline changes |
+| `config.json` | `CampaignConfig` | `buildCampaignConfig` / `createDefaultCampaignConfig` | Campaign creation only. Read-only during play. Includes `version` (`CAMPAIGN_FORMAT_VERSION`) and `createdAt` (ISO 8601) manifest fields. |
 | `pending-operation.json` | `PendingOperation` | `SceneManager` | During scene transition cascade steps |
 
 `StatePersister` uses write-through: each `persist*` call is fire-and-forget with error swallowing. Recovery on next session load reads `loadAll()` and hydrates `GameState`.
@@ -379,10 +382,12 @@ Key isolation properties:
 | Rule | Guard | Severity |
 |------|-------|----------|
 | config.json must be valid JSON | `validateJson()` | Soft (validation error) |
+| `version` set to `CAMPAIGN_FORMAT_VERSION` at creation | `buildCampaignConfig()`, `createDefaultCampaignConfig()` | Informational (no runtime guard yet) |
+| `createdAt` set to ISO 8601 timestamp at creation | `buildCampaignConfig()`, `createDefaultCampaignConfig()` | Informational (no runtime guard yet) |
 | Entity files must have H1 title | `validateEntityFile()` | Soft (validation error) |
 | Entity files should have Type field | `validateEntityFile()` | Soft (validation warning) |
 
-*Source: `src/tools/filesystem/validation.ts`*
+*Source: `src/tools/filesystem/validation.ts`, `src/types/config.ts`, `src/tools/filesystem/config.ts`, `src/agents/setup-agent.ts`*
 
 ### Cross-Slice
 
@@ -528,6 +533,7 @@ Canonical directory tree for a campaign. Machine-managed files are marked with t
 ```
 <campaignRoot>/
 ├── config.json                            [machine] CampaignConfig. Written at init, read-only during play.
+│                                          Manifest fields: version (CAMPAIGN_FORMAT_VERSION), createdAt (ISO 8601).
 │
 ├── pending-operation.json                 [machine] PendingOperation. Crash recovery breadcrumb.
 │
