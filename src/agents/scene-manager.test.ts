@@ -1,0 +1,1138 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import type Anthropic from "@anthropic-ai/sdk";
+import { SceneManager, parseTranscriptEntries, classifyTranscriptEntry, buildScenePacing } from "./scene-manager.js";
+import type { SceneState, FileIO } from "./scene-manager.js";
+import type { CampaignRepo } from "../tools/git/index.js";
+import type { GameState } from "./game-state.js";
+import { ConversationManager } from "../context/conversation.js";
+import type { DMSessionState } from "./dm-prompt.js";
+import { createClocksState } from "../tools/clocks/index.js";
+import { createCombatState, createDefaultConfig } from "../tools/combat/index.js";
+import { createDecksState } from "../tools/cards/index.js";
+import { norm } from "../utils/paths.js";
+
+function mockUsage(): Anthropic.Usage {
+  return { input_tokens: 50, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
+}
+
+function textResponse(text: string): Anthropic.Message {
+  return {
+    id: "msg_test",
+    type: "message",
+    role: "assistant",
+    model: "claude-haiku-4-5-20251001",
+    content: [{ type: "text", text }],
+    stop_reason: "end_turn",
+    stop_sequence: null,
+    usage: mockUsage(),
+  } as Anthropic.Message;
+}
+
+function mockClient(responses: Anthropic.Message[]): Anthropic {
+  let callIdx = 0;
+  return {
+    messages: {
+      create: vi.fn(async () => responses[callIdx++]),
+    },
+  } as unknown as Anthropic;
+}
+
+function mockState(): GameState {
+  return {
+    maps: {},
+    clocks: createClocksState(),
+    combat: createCombatState(),
+    combatConfig: createDefaultConfig(),
+    decks: createDecksState(),
+    config: {
+      name: "Test Campaign",
+      dm_personality: { name: "grim", prompt_fragment: "Be terse." },
+      players: [{ name: "Alice", character: "Aldric", type: "human" }],
+      combat: createDefaultConfig(),
+      context: { retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 },
+      recovery: { auto_commit_interval: 300, max_commits: 100, enable_git: false },
+      choices: { campaign_default: "often", player_overrides: {} },
+    },
+    campaignRoot: "/tmp/test-campaign",
+    activePlayerIndex: 0,
+  };
+}
+
+function mockScene(): SceneState {
+  return {
+    sceneNumber: 1,
+    slug: "tavern-meeting",
+    transcript: [
+      "**[Aldric]** I enter the tavern.",
+      "**DM:** The tavern is warm and dimly lit.",
+    ],
+    precis: "",
+    openThreads: "",
+    playerReads: [],
+    sessionNumber: 1,
+  };
+}
+
+function mockSessionState(): DMSessionState {
+  return {
+    rulesAppendix: undefined,
+    campaignSummary: undefined,
+    sessionRecap: undefined,
+    activeState: undefined,
+    scenePrecis: undefined,
+  };
+}
+
+let files: Record<string, string>;
+let dirs: Set<string>;
+
+function mockFileIO(): FileIO {
+  return {
+    readFile: vi.fn(async (path: string) => files[norm(path)] ?? ""),
+    writeFile: vi.fn(async (path: string, content: string) => { files[norm(path)] = content; }),
+    appendFile: vi.fn(async (path: string, content: string) => { files[norm(path)] = (files[norm(path)] ?? "") + content; }),
+    mkdir: vi.fn(async (path: string) => { dirs.add(norm(path)); }),
+    exists: vi.fn(async (path: string) => norm(path) in files || dirs.has(norm(path))),
+    listDir: vi.fn(async () => []),
+  };
+}
+
+beforeEach(() => {
+  files = {};
+  dirs = new Set();
+});
+
+describe("SceneManager", () => {
+  it("appends player input and DM response to transcript", () => {
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      mockFileIO(),
+    );
+
+    mgr.appendPlayerInput("Aldric", "I draw my sword.");
+    mgr.appendDMResponse("The blade gleams in the candlelight.");
+    mgr.appendToolResult("roll_dice", "1d20+5: [18]→23");
+
+    const scene = mgr.getScene();
+    expect(scene.transcript).toHaveLength(5); // 2 existing + 3 new
+    expect(scene.transcript[2]).toContain("[Aldric]");
+    expect(scene.transcript[3]).toContain("DM:");
+    expect(scene.transcript[4]).toContain("roll_dice");
+  });
+
+  it("generates system prompt", () => {
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      mockFileIO(),
+    );
+
+    const prompt = mgr.getSystemPrompt();
+    expect(prompt.length).toBeGreaterThan(0);
+    expect(prompt[0].text).toContain("Dungeon Master");
+  });
+
+  it("handles dropped exchange by updating precis", async () => {
+    const client = mockClient([
+      textResponse("Aldric entered the tavern. Warm, dimly lit."),
+    ]);
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      mockFileIO(),
+    );
+
+    const usage = await mgr.handleDroppedExchange(client, {
+      exchange: {
+        user: { role: "user", content: "I enter the tavern." },
+        assistant: { role: "assistant", content: "The tavern is warm." },
+        toolResults: [],
+        estimatedTokens: 20,
+        stubbed: false,
+      },
+      reason: "exchange_count",
+    });
+
+    expect(usage.inputTokens).toBe(50);
+    expect(mgr.getScene().precis).toContain("Aldric entered the tavern");
+  });
+
+  it("passes PC identification to precis updater", async () => {
+    const client = mockClient([
+      textResponse("Aldric entered the tavern."),
+    ]);
+
+    const state = mockState();
+    state.config.players = [
+      { name: "Alice", character: "Aldric", type: "human" },
+      { name: "Bob", character: "Brin", type: "human" },
+    ];
+
+    const mgr = new SceneManager(
+      state,
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      mockFileIO(),
+    );
+
+    await mgr.handleDroppedExchange(client, {
+      exchange: {
+        user: { role: "user", content: "I enter the tavern." },
+        assistant: { role: "assistant", content: "The tavern is warm." },
+        toolResults: [],
+        estimatedTokens: 20,
+        stubbed: false,
+      },
+      reason: "exchange_count",
+    });
+
+    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const userMessage = createCall.messages[0].content;
+    expect(userMessage).toContain("[[Aldric]] (Alice)");
+    expect(userMessage).toContain("[[Brin]] (Bob)");
+    expect(userMessage).toContain("Player characters:");
+  });
+
+  it("accumulates player reads from dropped exchanges", async () => {
+    const client = mockClient([
+      textResponse('Aldric entered the tavern.\nPLAYER_READ: {"engagement":"high","focus":["exploration"],"tone":"curious","pacing":"exploratory","offScript":true}'),
+    ]);
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      mockFileIO(),
+    );
+
+    await mgr.handleDroppedExchange(client, {
+      exchange: {
+        user: { role: "user", content: "I enter the tavern." },
+        assistant: { role: "assistant", content: "The tavern is warm." },
+        toolResults: [],
+        estimatedTokens: 20,
+        stubbed: false,
+      },
+      reason: "exchange_count",
+    });
+
+    expect(mgr.getScene().playerReads).toHaveLength(1);
+    expect(mgr.getScene().playerReads[0].engagement).toBe("high");
+    expect(mgr.getScene().playerReads[0].tone).toBe("curious");
+  });
+
+  it("clears player reads on scene transition", async () => {
+    const client = mockClient([
+      textResponse("Summary"),
+      textResponse(""),
+    ]);
+
+    const scene = mockScene();
+    scene.playerReads = [
+      { engagement: "high", focus: ["combat"], tone: "aggressive", pacing: "pushing_forward", offScript: false },
+    ];
+
+    const mgr = new SceneManager(
+      mockState(),
+      scene,
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      mockFileIO(),
+    );
+
+    await mgr.sceneTransition(client, "End of fight");
+    expect(mgr.getScene().playerReads).toHaveLength(0);
+  });
+
+  it("executes scene_transition cascade", async () => {
+    // Mock client: first call = scene summary, second call = changelog
+    const client = mockClient([
+      textResponse("- Aldric entered tavern\n- Met innkeeper"),
+      textResponse("aldric.md: Entered tavern in Scene 1"),
+    ]);
+
+    const fileIO = mockFileIO();
+    (fileIO.listDir as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    const result = await mgr.sceneTransition(client, "Tavern Meeting");
+
+    // Transcript was written
+    expect(fileIO.writeFile).toHaveBeenCalled();
+    expect(fileIO.mkdir).toHaveBeenCalled();
+
+    // Campaign log was appended
+    expect(fileIO.appendFile).toHaveBeenCalled();
+    expect(result.campaignLogEntry).toContain("Aldric entered tavern");
+
+    // Scene advanced
+    expect(mgr.getScene().sceneNumber).toBe(2);
+    expect(mgr.getScene().transcript).toHaveLength(0);
+    expect(mgr.getScene().precis).toBe("");
+
+    // Pending op cleared
+    expect(mgr.getPendingOp()).toBeNull();
+
+    // Usage accumulated (1 Haiku call — no entity files to update changelogs)
+    expect(result.usage.inputTokens).toBe(50);
+  });
+
+  it("writes pending-operation.json during cascade", async () => {
+    const client = mockClient([
+      textResponse("Summary"),
+      textResponse(""),
+    ]);
+
+    const fileIO = mockFileIO();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    await mgr.sceneTransition(client, "Test");
+
+    // pending-operation.json was written multiple times during cascade
+    const pendingOpCalls = (fileIO.writeFile as ReturnType<typeof vi.fn>).mock.calls
+      .filter(([path]: [string]) => path.includes("pending-operation"));
+    expect(pendingOpCalls.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("advances calendar during scene transition", async () => {
+    const client = mockClient([
+      textResponse("Summary"),
+      textResponse(""),
+    ]);
+
+    const state = mockState();
+    const initialCalendar = state.clocks.calendar.current;
+
+    const mgr = new SceneManager(
+      state,
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      mockFileIO(),
+    );
+
+    await mgr.sceneTransition(client, "Test", 120); // 120 minutes
+
+    expect(state.clocks.calendar.current).toBe(initialCalendar + 120);
+  });
+
+  it("sessionEnd writes recap file", async () => {
+    const client = mockClient([
+      textResponse("- Session summary"),
+      textResponse(""),
+    ]);
+
+    const fileIO = mockFileIO();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    await mgr.sessionEnd(client, "End of session");
+
+    // Session recap file was written
+    const recapCalls = (fileIO.writeFile as ReturnType<typeof vi.fn>).mock.calls
+      .filter(([path]: [string]) => path.includes("session-"));
+    expect(recapCalls.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("sessionResume loads recap and campaign log", async () => {
+    const fileIO = mockFileIO();
+    files["/tmp/test-campaign/campaign/session-recaps/session-000.md"] = "# Session 0 Recap\nThe adventure began.";
+    files["/tmp/test-campaign/campaign/log.md"] = "# Campaign Log\n- Scene 1: Tavern";
+
+    const sessionState = mockSessionState();
+    const scene = mockScene();
+    scene.sessionNumber = 1; // resuming session 1, so loads recap of session 0
+
+    const mgr = new SceneManager(
+      mockState(),
+      scene,
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      fileIO,
+    );
+
+    const recap = await mgr.sessionResume();
+    expect(recap).toContain("adventure began");
+    expect(sessionState.campaignSummary).toContain("Campaign Log");
+  });
+
+  it("contextRefresh populates sessionState fields from disk", async () => {
+    const fileIO = mockFileIO();
+    files["/tmp/test-campaign/campaign/log.md"] = "# Campaign Log\nScene 1 happened.";
+    files["/tmp/test-campaign/campaign/session-recaps/session-000.md"] = "# Session 0\nRecap here.";
+
+    const scene = mockScene();
+    scene.sessionNumber = 1;
+    scene.precis = "Current precis text";
+    scene.playerReads = [
+      { engagement: "high", focus: ["exploration"], tone: "curious", pacing: "exploratory", offScript: false },
+    ];
+
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      scene,
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      fileIO,
+    );
+
+    await mgr.contextRefresh();
+
+    expect(sessionState.campaignSummary).toContain("Campaign Log");
+    expect(sessionState.sessionRecap).toContain("Recap here");
+    expect(sessionState.activeState).toContain("Aldric");
+    expect(sessionState.scenePrecis).toBe("Current precis text");
+    expect(sessionState.playerRead).toContain("high");
+  });
+
+  it("contextRefresh produces enriched PC summaries with aliases", async () => {
+    const fileIO = mockFileIO();
+    files["/tmp/test-campaign/campaign/log.md"] = "# Log";
+    files["/tmp/test-campaign/characters/aldric.md"] =
+      "# Aldric\n\n**Type:** PC\n**Additional Names:** The Hooded Figure\n\nA paladin.\n";
+
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      fileIO,
+    );
+
+    await mgr.contextRefresh();
+    expect(sessionState.activeState).toContain("Aldric (also: The Hooded Figure)");
+  });
+
+  it("contextRefresh produces bare name when no aliases exist", async () => {
+    const fileIO = mockFileIO();
+    files["/tmp/test-campaign/characters/aldric.md"] =
+      "# Aldric\n\n**Type:** PC\n\nA paladin.\n";
+
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      fileIO,
+    );
+
+    await mgr.contextRefresh();
+    expect(sessionState.activeState).toContain("Aldric");
+    expect(sessionState.activeState).not.toContain("(also:");
+  });
+
+  it("buildAliasContext returns formatted alias lines across entity types", async () => {
+    const fileIO = mockFileIO();
+    files["/tmp/test-campaign/characters/mysterious-stranger.md"] =
+      "# Mysterious Stranger\n\n**Type:** NPC\n**Additional Names:** Grimjaw, Captain Grimjaw\n\nA cloaked figure.\n";
+    files["/tmp/test-campaign/locations/old-tower/index.md"] =
+      "# The Old Tower\n\n**Type:** Location\n**Additional Names:** Malachar's Prison\n\nA crumbling ruin.\n";
+    dirs.add("/tmp/test-campaign/characters");
+    dirs.add("/tmp/test-campaign/locations");
+    dirs.add("/tmp/test-campaign/locations/old-tower");
+    (fileIO.listDir as ReturnType<typeof vi.fn>).mockImplementation(async (path: string) => {
+      if (norm(path) === "/tmp/test-campaign/characters") {
+        return ["mysterious-stranger.md"];
+      }
+      if (norm(path) === "/tmp/test-campaign/locations") {
+        return ["old-tower"];  // subdirectory, not a .md file
+      }
+      return [];
+    });
+
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      fileIO,
+    );
+
+    await mgr.contextRefresh();
+    // The alias context is private, but we can verify it's passed to subagents
+    // by checking the summarizer call in a transition
+    const client = mockClient([
+      textResponse("- Summary"),
+      textResponse(""),
+    ]);
+    await mgr.sceneTransition(client, "Test");
+    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(createCall.messages[0].content).toContain("Entity aliases");
+    expect(createCall.messages[0].content).toContain("mysterious-stranger.md: also known as Grimjaw, Captain Grimjaw");
+    expect(createCall.messages[0].content).toContain("old-tower/index.md: also known as Malachar's Prison");
+  });
+
+  it("buildAliasContext returns empty when no aliases exist", async () => {
+    const fileIO = mockFileIO();
+    files["/tmp/test-campaign/characters/aldric.md"] =
+      "# Aldric\n\n**Type:** PC\n\nA paladin.\n";
+    dirs.add("/tmp/test-campaign/characters");
+    (fileIO.listDir as ReturnType<typeof vi.fn>).mockImplementation(async (path: string) => {
+      if (norm(path) === "/tmp/test-campaign/characters") {
+        return ["aldric.md"];
+      }
+      return [];
+    });
+
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      fileIO,
+    );
+
+    await mgr.contextRefresh();
+    // Verify no alias context in subagent calls
+    const client = mockClient([
+      textResponse("- Summary"),
+      textResponse(""),
+    ]);
+    await mgr.sceneTransition(client, "Test");
+    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(createCall.messages[0].content).not.toContain("Entity aliases");
+  });
+
+  it("scene transition updates changelogs for location subdirectories", async () => {
+    const fileIO = mockFileIO();
+    // Location entity in subdirectory
+    files["/tmp/test-campaign/locations/tavern/index.md"] =
+      "# The Rusty Nail\n\n**Type:** Location\n\nA seedy tavern.\n";
+    dirs.add("/tmp/test-campaign/characters");
+    dirs.add("/tmp/test-campaign/locations");
+    dirs.add("/tmp/test-campaign/locations/tavern");
+
+    (fileIO.listDir as ReturnType<typeof vi.fn>).mockImplementation(async (path: string) => {
+      if (norm(path) === "/tmp/test-campaign/locations") {
+        return ["tavern"];  // subdirectory
+      }
+      return [];
+    });
+
+    // Mock client: summarizer + changelog updater returns location entry
+    const client = mockClient([
+      textResponse("- Scene summary"),
+      textResponse("tavern/index.md: Party entered and caused a brawl"),
+    ]);
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    const result = await mgr.sceneTransition(client, "Tavern Brawl");
+    expect(result.changelogEntries).toHaveLength(1);
+
+    // Verify changelog was written to the location's index.md
+    const locationContent = files["/tmp/test-campaign/locations/tavern/index.md"];
+    expect(locationContent).toContain("## Changelog");
+    expect(locationContent).toContain("Party entered and caused a brawl");
+  });
+
+  it("contextRefresh handles missing files gracefully", async () => {
+    const fileIO = mockFileIO();
+    // No files pre-populated — everything missing
+
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      fileIO,
+    );
+
+    // Should not throw
+    await mgr.contextRefresh();
+    expect(sessionState.activeState).toContain("Aldric");
+  });
+
+  it("sceneTransition populates validationIssues in result", async () => {
+    const client = mockClient([
+      textResponse("Summary"),
+      textResponse(""),
+    ]);
+
+    const fileIO = mockFileIO();
+    // Create config.json so validation runs
+    files["/tmp/test-campaign/config.json"] = '{"name":"Test"}';
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    const result = await mgr.sceneTransition(client, "Test Scene");
+    expect(result.validationIssues).toBeDefined();
+    expect(result.validationIssues!.filesChecked).toBeGreaterThanOrEqual(1);
+  });
+
+  it("validation failure does not block scene transition", async () => {
+    const client = mockClient([
+      textResponse("Summary"),
+      textResponse(""),
+    ]);
+
+    const fileIO = mockFileIO();
+    // Validation will try to read config.json — it won't exist, which is a validation error,
+    // but the transition should still complete successfully.
+    const devLogs: string[] = [];
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+    mgr.devLog = (msg: string) => devLogs.push(msg);
+
+    // Should complete without throwing — missing config.json is a validation error but non-blocking
+    const result = await mgr.sceneTransition(client, "Test Scene");
+    expect(result.campaignLogEntry).toBeTruthy();
+    expect(mgr.getScene().sceneNumber).toBe(2);
+    // Validation ran and found issues (missing config.json)
+    expect(result.validationIssues).toBeDefined();
+    expect(result.validationIssues!.errorCount).toBeGreaterThan(0);
+  });
+
+  it("stepCheckpoint commits via CampaignRepo during scene transition", async () => {
+    const client = mockClient([
+      textResponse("Summary"),
+      textResponse(""),
+    ]);
+
+    const fileIO = mockFileIO();
+    const mockRepo = {
+      sceneCommit: vi.fn(async () => "abc123"),
+      sessionCommit: vi.fn(async () => "def456"),
+      trackExchange: vi.fn(async () => null),
+      isEnabled: vi.fn(() => true),
+    };
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+      mockRepo as unknown as CampaignRepo,
+    );
+
+    await mgr.sceneTransition(client, "Tavern Meeting");
+
+    expect(mockRepo.sceneCommit).toHaveBeenCalledWith("Tavern Meeting");
+  });
+
+  it("sessionEnd calls sessionCommit on CampaignRepo", async () => {
+    const client = mockClient([
+      textResponse("Summary"),
+      textResponse(""),
+    ]);
+
+    const fileIO = mockFileIO();
+    const mockRepo = {
+      sceneCommit: vi.fn(async () => "abc123"),
+      sessionCommit: vi.fn(async () => "def456"),
+      trackExchange: vi.fn(async () => null),
+      isEnabled: vi.fn(() => true),
+    };
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+      mockRepo as unknown as CampaignRepo,
+    );
+
+    await mgr.sessionEnd(client, "End of session");
+
+    // sceneCommit from the transition cascade, sessionCommit from sessionEnd
+    expect(mockRepo.sceneCommit).toHaveBeenCalled();
+    expect(mockRepo.sessionCommit).toHaveBeenCalledWith(1);
+  });
+
+  it("sessionResume runs validation (check devLog)", async () => {
+    const fileIO = mockFileIO();
+    files["/tmp/test-campaign/config.json"] = '{"name":"Test"}';
+
+    const devLogs: string[] = [];
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+    mgr.devLog = (msg: string) => devLogs.push(msg);
+
+    await mgr.sessionResume();
+    expect(devLogs.some((m) => m.includes("validation"))).toBe(true);
+  });
+
+  // --- resumePendingTransition tests ---
+
+  it("resumePendingTransition resumes from subagent_updates step", async () => {
+    // Mock client: first call = scene summary, second call = changelog
+    const client = mockClient([
+      textResponse("- Resumed summary"),
+      textResponse(""),
+    ]);
+
+    const fileIO = mockFileIO();
+    (fileIO.listDir as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    const result = await mgr.resumePendingTransition(client, {
+      type: "scene_transition",
+      step: "subagent_updates" as import("./scene-manager.js").PendingStep,
+      sceneNumber: 1,
+      title: "Resume Test",
+    });
+
+    expect(result).not.toBeNull();
+    // transcript finalize should NOT be called (we skip finalize_transcript)
+    const mkdirCalls = (fileIO.mkdir as ReturnType<typeof vi.fn>).mock.calls;
+    expect(mkdirCalls.length).toBe(0);
+
+    // campaign log was appended
+    expect(fileIO.appendFile).toHaveBeenCalled();
+    expect(result!.campaignLogEntry).toContain("Resumed summary");
+  });
+
+  it("resumePendingTransition clears pending-operation.json after success", async () => {
+    const client = mockClient([
+      textResponse("Summary"),
+      textResponse(""),
+    ]);
+
+    const fileIO = mockFileIO();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    await mgr.resumePendingTransition(client, {
+      type: "scene_transition",
+      step: "validate",
+      sceneNumber: 1,
+      title: "Test",
+    });
+
+    // Pending op file should be cleared (written as empty string)
+    const pendingOpCalls = (fileIO.writeFile as ReturnType<typeof vi.fn>).mock.calls
+      .filter(([path]: [string]) => path.includes("pending-operation"));
+    const lastCall = pendingOpCalls[pendingOpCalls.length - 1];
+    expect(lastCall[1]).toBe("");
+  });
+
+  it("resumePendingTransition no-ops when step is done", async () => {
+    const client = mockClient([]);
+    const fileIO = mockFileIO();
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    const result = await mgr.resumePendingTransition(client, {
+      type: "scene_transition",
+      step: "done",
+      sceneNumber: 1,
+      title: "Already Done",
+    });
+
+    expect(result).toBeNull();
+    // Scene number should NOT have advanced
+    expect(mgr.getScene().sceneNumber).toBe(1);
+  });
+
+  it("resumePendingTransition advances scene number", async () => {
+    const client = mockClient([]);
+    const fileIO = mockFileIO();
+
+    const scene = mockScene();
+    expect(scene.sceneNumber).toBe(1);
+
+    const mgr = new SceneManager(
+      mockState(),
+      scene,
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    // Resume from checkpoint (last real step — quick, no API calls)
+    await mgr.resumePendingTransition(client, {
+      type: "scene_transition",
+      step: "checkpoint",
+      sceneNumber: 1,
+      title: "Advance Test",
+    });
+
+    expect(mgr.getScene().sceneNumber).toBe(2);
+    expect(mgr.getScene().slug).toBe("");
+    expect(mgr.getScene().transcript).toHaveLength(0);
+  });
+
+  it("resumePendingTransition preserves pending-op on error", async () => {
+    // Mock client that throws on first call (subagent_updates step)
+    const client = {
+      messages: {
+        create: vi.fn(async () => { throw new Error("API down"); }),
+      },
+    } as unknown as Anthropic;
+
+    const fileIO = mockFileIO();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    await expect(mgr.resumePendingTransition(client, {
+      type: "scene_transition",
+      step: "subagent_updates" as import("./scene-manager.js").PendingStep,
+      sceneNumber: 1,
+      title: "Error Test",
+    })).rejects.toThrow("API down");
+
+    // pending-operation.json should NOT be cleared — still has the failed step
+    const pendingOpCalls = (fileIO.writeFile as ReturnType<typeof vi.fn>).mock.calls
+      .filter(([path]: [string]) => path.includes("pending-operation"));
+    // The last write should have the step, not be empty
+    const lastCall = pendingOpCalls[pendingOpCalls.length - 1];
+    expect(lastCall[1]).not.toBe("");
+    expect(lastCall[1]).toContain("subagent_updates");
+  });
+
+  it("legacy pending-op step 'campaign_log' normalizes to subagent_updates", async () => {
+    const client = mockClient([
+      textResponse("- Resumed summary"),
+      textResponse(""),
+    ]);
+
+    const fileIO = mockFileIO();
+    (fileIO.listDir as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    // Pass legacy step name — should normalize and resume from subagent_updates
+    const result = await mgr.resumePendingTransition(client, {
+      type: "scene_transition",
+      step: "campaign_log" as import("./scene-manager.js").PendingStep,
+      sceneNumber: 1,
+      title: "Legacy Test",
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.campaignLogEntry).toContain("Resumed summary");
+  });
+
+  it("legacy pending-op step 'changelog_updates' normalizes to subagent_updates", async () => {
+    const client = mockClient([
+      textResponse("- Summary"),
+      textResponse(""),
+    ]);
+
+    const fileIO = mockFileIO();
+    (fileIO.listDir as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    const result = await mgr.resumePendingTransition(client, {
+      type: "scene_transition",
+      step: "changelog_updates" as import("./scene-manager.js").PendingStep,
+      sceneNumber: 1,
+      title: "Legacy Test",
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.campaignLogEntry).toContain("Summary");
+  });
+
+  it("appendEntityChangelog is idempotent", async () => {
+    const fileIO = mockFileIO();
+    // Character already has a Scene 001 entry
+    files["/tmp/test-campaign/characters/aldric.md"] =
+      "# Aldric\n\n**Type:** PC\n\n## Changelog\n- **Scene 001**: Already entered.\n";
+    dirs.add("/tmp/test-campaign/characters");
+    (fileIO.listDir as ReturnType<typeof vi.fn>).mockImplementation(async (path: string) => {
+      if (norm(path) === "/tmp/test-campaign/characters") return ["aldric.md"];
+      return [];
+    });
+
+    // Mock client: summarizer + changelog that returns an entry for aldric scene 1
+    const client = mockClient([
+      textResponse("- Summary"),
+      textResponse("aldric.md: Entered tavern in Scene 1"),
+    ]);
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    await mgr.sceneTransition(client, "Tavern Meeting");
+
+    // File should NOT have a duplicate entry
+    const content = files["/tmp/test-campaign/characters/aldric.md"];
+    const sceneEntries = (content.match(/Scene 001/g) || []).length;
+    expect(sceneEntries).toBe(1);
+  });
+});
+
+describe("parseTranscriptEntries", () => {
+  it("parses simple transcript entries", () => {
+    const raw = `# Scene 1\n\n**[Aldric]** I enter the tavern.\n\n**DM:** The tavern is warm.`;
+    const entries = parseTranscriptEntries(raw);
+    expect(entries).toEqual([
+      "**[Aldric]** I enter the tavern.",
+      "**DM:** The tavern is warm.",
+    ]);
+  });
+
+  it("merges multi-paragraph DM responses", () => {
+    const raw = [
+      "# Scene 1",
+      "**DM:** Paragraph one.",
+      "Paragraph two.",
+      "Paragraph three.",
+      "**[Aldric]** I attack.",
+    ].join("\n\n");
+    const entries = parseTranscriptEntries(raw);
+    expect(entries).toEqual([
+      "**DM:** Paragraph one.\n\nParagraph two.\n\nParagraph three.",
+      "**[Aldric]** I attack.",
+    ]);
+  });
+
+  it("handles tool results", () => {
+    const raw = [
+      "# Scene 1",
+      "**DM:** The blade gleams.",
+      "> `roll_dice`: 1d20+5: [18]→23",
+      "**DM:** You strike true!",
+    ].join("\n\n");
+    const entries = parseTranscriptEntries(raw);
+    expect(entries).toEqual([
+      "**DM:** The blade gleams.",
+      "> `roll_dice`: 1d20+5: [18]→23",
+      "**DM:** You strike true!",
+    ]);
+  });
+
+  it("handles empty transcript", () => {
+    expect(parseTranscriptEntries("# Scene 1\n\n")).toEqual([]);
+  });
+
+  it("detects entry prefixes after extra newlines (triple \\n)", () => {
+    // DM responses may end with trailing \n, which produces \n\n\n
+    // when joined by finalizeTranscript. The parser must still detect
+    // the next entry's prefix despite the leading whitespace.
+    const raw = [
+      "# Scene 1",
+      "",
+      "**DM:** Previous DM response.",
+      "",
+      "",
+      "**[Anderson]** Player input here.",
+      "",
+      "**DM:** Next DM response.",
+    ].join("\n");
+
+    const entries = parseTranscriptEntries(raw);
+    expect(entries).toHaveLength(3);
+    expect(entries[0]).toMatch(/^\*\*DM:\*\*/);
+    expect(entries[1]).toMatch(/^\*\*\[Anderson\]\*\*/);
+    expect(entries[2]).toMatch(/^\*\*DM:\*\*/);
+  });
+});
+
+describe("classifyTranscriptEntry", () => {
+  it("classifies DM entries and strips prefix", () => {
+    const result = classifyTranscriptEntry("**DM:** The door opens.");
+    expect(result).toEqual({ kind: "dm", text: "The door opens." });
+  });
+
+  it("handles DM prefix with no trailing space", () => {
+    const result = classifyTranscriptEntry("**DM:**The door opens.");
+    expect(result).toEqual({ kind: "dm", text: "The door opens." });
+  });
+
+  it("classifies player entries and formats as player line", () => {
+    const result = classifyTranscriptEntry("**[Anderson]** I attack the goblin.");
+    expect(result).toEqual({ kind: "player", text: "> Anderson: I attack the goblin." });
+  });
+
+  it("handles player names with spaces", () => {
+    const result = classifyTranscriptEntry("**[Dr. Voss]** I examine the patient.");
+    expect(result).toEqual({ kind: "player", text: "> Dr. Voss: I examine the patient." });
+  });
+
+  it("classifies tool results as dev", () => {
+    const result = classifyTranscriptEntry("> `roll_dice`: 2d6 → 7");
+    expect(result).toEqual({ kind: "dev", text: "> `roll_dice`: 2d6 → 7" });
+  });
+
+  it("classifies unrecognized entries as DM", () => {
+    const result = classifyTranscriptEntry("Some continuation text.");
+    expect(result).toEqual({ kind: "dm", text: "Some continuation text." });
+  });
+
+  it("handles multi-paragraph DM entry", () => {
+    const result = classifyTranscriptEntry("**DM:** First paragraph.\n\nSecond paragraph.");
+    expect(result.kind).toBe("dm");
+    expect(result.text).toBe("First paragraph.\n\nSecond paragraph.");
+  });
+});
+
+describe("buildScenePacing", () => {
+  it("returns undefined for empty transcript", () => {
+    const scene = mockScene();
+    scene.transcript = [];
+    expect(buildScenePacing(scene)).toBeUndefined();
+  });
+
+  it("returns undefined when no player exchanges exist", () => {
+    const scene = mockScene();
+    scene.transcript = ["**DM:** The world is dark."];
+    expect(buildScenePacing(scene)).toBeUndefined();
+  });
+
+  it("shows exchange and thread counts", () => {
+    const scene = mockScene();
+    scene.transcript = [
+      "**[Aldric]** I enter the tavern.",
+      "**DM:** The tavern is warm.",
+      "**[Aldric]** I talk to the innkeeper.",
+      "**DM:** He eyes you warily.",
+    ];
+    scene.openThreads = "[[innkeeper-secret]], [[missing-merchant]]";
+    const result = buildScenePacing(scene)!;
+    expect(result).toContain("Exchanges: 2");
+    expect(result).toContain("Open threads: 2");
+    expect(result).not.toContain("→");
+  });
+
+  it("nudges when scene is long and thread-heavy", () => {
+    const scene = mockScene();
+    // 8 player exchanges
+    scene.transcript = [];
+    for (let i = 0; i < 8; i++) {
+      scene.transcript.push(`**[Aldric]** Action ${i}.`);
+      scene.transcript.push(`**DM:** Response ${i}.`);
+    }
+    scene.openThreads = "[[a]], [[b]], [[c]]";
+    const result = buildScenePacing(scene)!;
+    expect(result).toContain("Exchanges: 8");
+    expect(result).toContain("Open threads: 3");
+    expect(result).toContain("Scene is long and thread-heavy");
+  });
+
+  it("nudges when scene is long even with few threads", () => {
+    const scene = mockScene();
+    scene.transcript = [];
+    for (let i = 0; i < 10; i++) {
+      scene.transcript.push(`**[Aldric]** Action ${i}.`);
+      scene.transcript.push(`**DM:** Response ${i}.`);
+    }
+    scene.openThreads = "[[a]]";
+    const result = buildScenePacing(scene)!;
+    expect(result).toContain("Exchanges: 10");
+    expect(result).toContain("running long");
+  });
+
+  it("nudges when many threads are open even in short scene", () => {
+    const scene = mockScene();
+    scene.transcript = [
+      "**[Aldric]** I look around.",
+      "**DM:** You see many things.",
+    ];
+    scene.openThreads = "[[a]], [[b]], [[c]], [[d]]";
+    const result = buildScenePacing(scene)!;
+    expect(result).toContain("Open threads: 4");
+    expect(result).toContain("Many open threads");
+  });
+
+  it("handles empty openThreads string", () => {
+    const scene = mockScene();
+    scene.transcript = [
+      "**[Aldric]** I enter.",
+      "**DM:** Welcome.",
+    ];
+    scene.openThreads = "";
+    const result = buildScenePacing(scene)!;
+    expect(result).toContain("Open threads: 0");
+  });
+});
