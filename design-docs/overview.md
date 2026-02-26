@@ -139,3 +139,4 @@ Agent-facing documents should be written densely, using shorthand and cultural/l
 | [Tools Catalog](tools-catalog.md) | All 37 tools by domain, signatures, tiers |
 | [Subagents Catalog](subagents-catalog.md) | All 14 subagent patterns, models, visibility |
 | [Development Plan](development-plan.md) | 10-phase implementation roadmap, dependency graph, testing strategy |
+| [State Atlas](state-atlas.md) | Runtime state schema, tool×state matrix, invariants, lifecycle |
