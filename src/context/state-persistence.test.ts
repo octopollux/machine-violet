@@ -205,9 +205,10 @@ describe("StatePersister", () => {
     ];
 
     persister.persistConversation(exchanges);
-    await vi.waitFor(() => expect(fio.writeFile).toHaveBeenCalled());
+    await persister.flush();
 
-    await persister.clearConversation();
+    persister.clearConversation();
+    await persister.flush();
 
     const loaded = await persister.loadAll();
     expect(loaded.conversation).toBeUndefined();
@@ -254,6 +255,121 @@ describe("StatePersister", () => {
     expect(loaded.combat).toBeUndefined();
     expect(onError).toHaveBeenCalled();
     expect(onError.mock.calls[0][0].message).toBe("permission denied");
+  });
+});
+
+describe("write serialization", () => {
+  it("serializes writes to the same file", async () => {
+    const writeOrder: string[] = [];
+    const fio = mockFileIO();
+    (fio.writeFile as ReturnType<typeof vi.fn>).mockImplementation(
+      async (_path: string, content: string) => {
+        writeOrder.push(content);
+        // Simulate slow I/O
+        await new Promise((r) => setTimeout(r, 10));
+        files[norm(_path)] = content;
+      },
+    );
+
+    const persister = new StatePersister("/tmp/campaign", fio);
+    persister.persistScene({ precis: "first", playerReads: [], activePlayerIndex: 0 });
+    persister.persistScene({ precis: "second", playerReads: [], activePlayerIndex: 0 });
+
+    await persister.flush();
+    expect(writeOrder).toHaveLength(2);
+    expect(writeOrder[0]).toContain("first");
+    expect(writeOrder[1]).toContain("second");
+  });
+
+  it("concurrent writes to different files proceed independently", async () => {
+    const callTimes: Record<string, number[]> = {};
+    const fio = mockFileIO();
+    (fio.writeFile as ReturnType<typeof vi.fn>).mockImplementation(
+      async (path: string, content: string) => {
+        const key = norm(path);
+        if (!callTimes[key]) callTimes[key] = [];
+        callTimes[key].push(Date.now());
+        await new Promise((r) => setTimeout(r, 20));
+        files[key] = content;
+      },
+    );
+
+    const persister = new StatePersister("/tmp/campaign", fio);
+    persister.persistCombat({ active: false, order: [], round: 0, currentTurn: 0 });
+    persister.persistClocks(createClocksState());
+
+    await persister.flush();
+    // Both files were written
+    const combatKey = norm("/tmp/campaign/state/combat.json");
+    const clocksKey = norm("/tmp/campaign/state/clocks.json");
+    expect(callTimes[combatKey]).toHaveLength(1);
+    expect(callTimes[clocksKey]).toHaveLength(1);
+    // They started concurrently (within 5ms of each other)
+    expect(Math.abs(callTimes[combatKey][0] - callTimes[clocksKey][0])).toBeLessThan(15);
+  });
+
+  it("error in one write does not block subsequent writes", async () => {
+    let callCount = 0;
+    const fio = mockFileIO();
+    (fio.writeFile as ReturnType<typeof vi.fn>).mockImplementation(
+      async (path: string, content: string) => {
+        callCount++;
+        if (callCount === 1) throw new Error("disk full");
+        files[norm(path)] = content;
+      },
+    );
+
+    const persister = new StatePersister("/tmp/campaign", fio);
+    persister.persistScene({ precis: "first", playerReads: [], activePlayerIndex: 0 });
+    persister.persistScene({ precis: "second", playerReads: [], activePlayerIndex: 0 });
+
+    await persister.flush();
+    expect(callCount).toBe(2);
+    // Second write succeeded
+    const loaded = await persister.loadAll();
+    expect(loaded.scene?.precis).toBe("second");
+  });
+
+  it("flush() resolves after all pending writes complete", async () => {
+    const fio = mockFileIO();
+    const persister = new StatePersister("/tmp/campaign", fio);
+
+    persister.persistCombat({ active: false, order: [], round: 0, currentTurn: 0 });
+    persister.persistClocks(createClocksState());
+    persister.persistScene({ precis: "test", playerReads: [], activePlayerIndex: 0 });
+
+    await persister.flush();
+    const loaded = await persister.loadAll();
+    expect(loaded.combat).toBeDefined();
+    expect(loaded.clocks).toBeDefined();
+    expect(loaded.scene).toBeDefined();
+  });
+
+  it("clearConversation serialized with persistConversation", async () => {
+    const writeOrder: string[] = [];
+    const fio = mockFileIO();
+    (fio.writeFile as ReturnType<typeof vi.fn>).mockImplementation(
+      async (path: string, content: string) => {
+        if (norm(path).includes("conversation")) {
+          writeOrder.push(content || "<empty>");
+        }
+        await new Promise((r) => setTimeout(r, 5));
+        files[norm(path)] = content;
+      },
+    );
+
+    const persister = new StatePersister("/tmp/campaign", fio);
+    persister.persistConversation([{
+      user: { role: "user", content: "Hello" },
+      assistant: { role: "assistant", content: "Hi" },
+      toolResults: [],
+      stubbed: false,
+    }]);
+    persister.clearConversation();
+
+    await persister.flush();
+    expect(writeOrder).toHaveLength(2);
+    expect(writeOrder[1]).toBe("<empty>");
   });
 });
 

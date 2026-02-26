@@ -45,6 +45,7 @@ export async function gracefulShutdown(ctx: ShutdownContext): Promise<void> {
       if (persister) {
         const serialized = ctx.engine.getConversation().serialize();
         persister.persistConversation(serialized);
+        await persister.flush();
       }
     } catch {
       // Best-effort

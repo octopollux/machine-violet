@@ -36,8 +36,7 @@ export interface SceneState {
 
 export type PendingStep =
   | "finalize_transcript"
-  | "campaign_log"
-  | "changelog_updates"
+  | "subagent_updates"
   | "advance_calendar"
   | "check_alarms"
   | "validate"
@@ -78,7 +77,7 @@ export interface FileIO {
 
 /** Ordered cascade steps for scene transitions. Used for resume logic. */
 const STEP_ORDER: PendingStep[] = [
-  "finalize_transcript", "campaign_log", "changelog_updates",
+  "finalize_transcript", "subagent_updates",
   "advance_calendar", "check_alarms", "validate",
   "reset_precis", "prune_context", "checkpoint", "done",
 ];
@@ -221,15 +220,10 @@ export class SceneManager {
     this.pendingOp.step = "finalize_transcript";
     await this.stepFinalizeTranscript();
 
-    // Step 2: Campaign log entry (Haiku)
-    this.pendingOp.step = "campaign_log";
+    // Step 2: Parallel subagent updates (campaign log + entity changelogs)
+    this.pendingOp.step = "subagent_updates";
     await this.savePendingOp();
-    await this.stepCampaignLog(client, title, result);
-
-    // Step 3: Entity changelog updates (Haiku)
-    this.pendingOp.step = "changelog_updates";
-    await this.savePendingOp();
-    await this.stepChangelogUpdates(client, result);
+    await this.stepSubagentUpdates(client, title, result);
 
     // Step 4: Advance calendar
     this.pendingOp.step = "advance_calendar";
@@ -299,9 +293,15 @@ export class SceneManager {
     client: Anthropic,
     pendingOp: PendingOperation,
   ): Promise<TransitionResult | null> {
+    // Normalize legacy step names from before subagent parallelization
+    let effectiveStep = pendingOp.step as string;
+    if (effectiveStep === "campaign_log" || effectiveStep === "changelog_updates") {
+      effectiveStep = "subagent_updates";
+    }
+
     // Already done or unknown step — clear and bail
-    const startIdx = STEP_ORDER.indexOf(pendingOp.step);
-    if (pendingOp.step === "done" || startIdx === -1) {
+    const startIdx = STEP_ORDER.indexOf(effectiveStep as PendingStep);
+    if (effectiveStep === "done" || startIdx === -1) {
       await this.clearPendingOp();
       return null;
     }
@@ -327,8 +327,7 @@ export class SceneManager {
 
       switch (step) {
         case "finalize_transcript": await this.stepFinalizeTranscript(); break;
-        case "campaign_log": await this.stepCampaignLog(client, pendingOp.title, result); break;
-        case "changelog_updates": await this.stepChangelogUpdates(client, result); break;
+        case "subagent_updates": await this.stepSubagentUpdates(client, pendingOp.title, result); break;
         case "advance_calendar": this.stepAdvanceCalendar(pendingOp.timeAdvance, result); break;
         case "check_alarms": this.stepCheckAlarms(); break;
         case "validate": result.validationIssues = await this.stepValidate(); break;
@@ -460,6 +459,17 @@ export class SceneManager {
 
   private async stepFinalizeTranscript(): Promise<void> {
     await this.finalizeTranscript();
+  }
+
+  private async stepSubagentUpdates(
+    client: Anthropic,
+    title: string,
+    result: TransitionResult,
+  ): Promise<void> {
+    await Promise.all([
+      this.stepCampaignLog(client, title, result),
+      this.stepChangelogUpdates(client, result),
+    ]);
   }
 
   private async stepCampaignLog(
@@ -668,9 +678,11 @@ export class SceneManager {
     // Find the entity file — check both flat path and subdirectory index.md
     const dirs = ["characters", "locations", "factions", "lore"];
     for (const dir of dirs) {
+      const sceneTag = `Scene ${String(sceneNumber).padStart(3, "0")}`;
       const flatPath = `${this.state.campaignRoot}/${dir}/${filename}`;
       if (await this.fileIO.exists(flatPath)) {
         const content = await this.fileIO.readFile(flatPath);
+        if (content.includes(sceneTag)) return; // idempotency guard
         const entry = formatChangelogEntry(sceneNumber, description);
         const updated = appendChangelog(content, entry);
         await this.fileIO.writeFile(flatPath, updated);
@@ -681,6 +693,7 @@ export class SceneManager {
       const indexPath = `${this.state.campaignRoot}/${dir}/${slug}/index.md`;
       if (await this.fileIO.exists(indexPath)) {
         const content = await this.fileIO.readFile(indexPath);
+        if (content.includes(sceneTag)) return; // idempotency guard
         const entry = formatChangelogEntry(sceneNumber, description);
         const updated = appendChangelog(content, entry);
         await this.fileIO.writeFile(indexPath, updated);

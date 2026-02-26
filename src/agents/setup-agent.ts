@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { CampaignConfig, PlayerConfig } from "../types/config.js";
+import { CAMPAIGN_FORMAT_VERSION } from "../types/config.js";
 import type { DMPersonality } from "../types/config.js";
 import { PERSONALITIES, randomPersonality } from "../config/personalities.js";
 import { randomSeeds } from "../config/seeds.js";
@@ -372,6 +373,8 @@ export function buildCampaignConfig(result: SetupResult): CampaignConfig {
   };
 
   return {
+    version: CAMPAIGN_FORMAT_VERSION,
+    createdAt: new Date().toISOString(),
     name: result.campaignName,
     system: result.system ?? undefined,
     genre: result.genre,

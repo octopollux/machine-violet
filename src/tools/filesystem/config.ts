@@ -1,4 +1,5 @@
 import type { CampaignConfig } from "../../types/config.js";
+import { CAMPAIGN_FORMAT_VERSION } from "../../types/config.js";
 
 /**
  * Validate a campaign config object.
@@ -89,6 +90,8 @@ export function createDefaultCampaignConfig(
   characterName: string,
 ): CampaignConfig {
   return {
+    version: CAMPAIGN_FORMAT_VERSION,
+    createdAt: new Date().toISOString(),
     name,
     dm_personality: {
       name: "Classic DM",

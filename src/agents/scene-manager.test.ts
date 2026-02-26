@@ -712,7 +712,7 @@ describe("SceneManager", () => {
 
   // --- resumePendingTransition tests ---
 
-  it("resumePendingTransition resumes from campaign_log step", async () => {
+  it("resumePendingTransition resumes from subagent_updates step", async () => {
     // Mock client: first call = scene summary, second call = changelog
     const client = mockClient([
       textResponse("- Resumed summary"),
@@ -732,7 +732,7 @@ describe("SceneManager", () => {
 
     const result = await mgr.resumePendingTransition(client, {
       type: "scene_transition",
-      step: "campaign_log",
+      step: "subagent_updates" as import("./scene-manager.js").PendingStep,
       sceneNumber: 1,
       title: "Resume Test",
     });
@@ -829,7 +829,7 @@ describe("SceneManager", () => {
   });
 
   it("resumePendingTransition preserves pending-op on error", async () => {
-    // Mock client that throws on first call (campaign_log step)
+    // Mock client that throws on first call (subagent_updates step)
     const client = {
       messages: {
         create: vi.fn(async () => { throw new Error("API down"); }),
@@ -847,7 +847,7 @@ describe("SceneManager", () => {
 
     await expect(mgr.resumePendingTransition(client, {
       type: "scene_transition",
-      step: "campaign_log",
+      step: "subagent_updates" as import("./scene-manager.js").PendingStep,
       sceneNumber: 1,
       title: "Error Test",
     })).rejects.toThrow("API down");
@@ -858,7 +858,97 @@ describe("SceneManager", () => {
     // The last write should have the step, not be empty
     const lastCall = pendingOpCalls[pendingOpCalls.length - 1];
     expect(lastCall[1]).not.toBe("");
-    expect(lastCall[1]).toContain("campaign_log");
+    expect(lastCall[1]).toContain("subagent_updates");
+  });
+
+  it("legacy pending-op step 'campaign_log' normalizes to subagent_updates", async () => {
+    const client = mockClient([
+      textResponse("- Resumed summary"),
+      textResponse(""),
+    ]);
+
+    const fileIO = mockFileIO();
+    (fileIO.listDir as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    // Pass legacy step name — should normalize and resume from subagent_updates
+    const result = await mgr.resumePendingTransition(client, {
+      type: "scene_transition",
+      step: "campaign_log" as import("./scene-manager.js").PendingStep,
+      sceneNumber: 1,
+      title: "Legacy Test",
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.campaignLogEntry).toContain("Resumed summary");
+  });
+
+  it("legacy pending-op step 'changelog_updates' normalizes to subagent_updates", async () => {
+    const client = mockClient([
+      textResponse("- Summary"),
+      textResponse(""),
+    ]);
+
+    const fileIO = mockFileIO();
+    (fileIO.listDir as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    const result = await mgr.resumePendingTransition(client, {
+      type: "scene_transition",
+      step: "changelog_updates" as import("./scene-manager.js").PendingStep,
+      sceneNumber: 1,
+      title: "Legacy Test",
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.campaignLogEntry).toContain("Summary");
+  });
+
+  it("appendEntityChangelog is idempotent", async () => {
+    const fileIO = mockFileIO();
+    // Character already has a Scene 001 entry
+    files["/tmp/test-campaign/characters/aldric.md"] =
+      "# Aldric\n\n**Type:** PC\n\n## Changelog\n- **Scene 001**: Already entered.\n";
+    dirs.add("/tmp/test-campaign/characters");
+    (fileIO.listDir as ReturnType<typeof vi.fn>).mockImplementation(async (path: string) => {
+      if (norm(path) === "/tmp/test-campaign/characters") return ["aldric.md"];
+      return [];
+    });
+
+    // Mock client: summarizer + changelog that returns an entry for aldric scene 1
+    const client = mockClient([
+      textResponse("- Summary"),
+      textResponse("aldric.md: Entered tavern in Scene 1"),
+    ]);
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    await mgr.sceneTransition(client, "Tavern Meeting");
+
+    // File should NOT have a duplicate entry
+    const content = files["/tmp/test-campaign/characters/aldric.md"];
+    const sceneEntries = (content.match(/Scene 001/g) || []).length;
+    expect(sceneEntries).toBe(1);
   });
 });
 

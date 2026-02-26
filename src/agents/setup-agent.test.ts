@@ -71,6 +71,14 @@ describe("buildCampaignConfig", () => {
     expect(config.context.retention_exchanges).toBe(5);
     expect(config.recovery.enable_git).toBe(true);
   });
+
+  it("includes version and createdAt", async () => {
+    const result = await fastPathSetup(defaultChoice);
+    const config = buildCampaignConfig(result);
+
+    expect(config.version).toBe(1);
+    expect(config.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
 });
 
 describe("slugify", () => {

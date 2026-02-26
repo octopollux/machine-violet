@@ -1,5 +1,8 @@
 import type { CombatConfig } from "./combat.js";
 
+/** Bump when CampaignConfig schema changes in a breaking way. */
+export const CAMPAIGN_FORMAT_VERSION = 1;
+
 export type ChoiceFrequency = "none" | "rarely" | "often" | "always";
 
 export interface PlayerConfig {
@@ -39,6 +42,8 @@ export interface AppConfig {
 }
 
 export interface CampaignConfig {
+  version?: number;
+  createdAt?: string;  // ISO 8601
   name: string;
   system?: string;
   genre?: string;

@@ -52,11 +52,14 @@ export interface LoadedState {
 /**
  * Write-through state persister.
  * Each persist call is fire-and-forget with error swallowing.
+ * Writes to the same file are serialized via per-file promise chains;
+ * writes to different files proceed concurrently.
  */
 export class StatePersister {
   private root: string;
   private fileIO: FileIO;
   private onError?: (error: Error) => void;
+  private writeQueues = new Map<string, Promise<void>>();
 
   constructor(campaignRoot: string, fileIO: FileIO, onError?: (error: Error) => void) {
     this.root = campaignRoot;
@@ -68,13 +71,24 @@ export class StatePersister {
     return norm(join(this.root, file));
   }
 
-  private async writeJSON(file: string, data: unknown): Promise<void> {
+  private async doWrite(file: string, content: string): Promise<void> {
     try {
-      await this.fileIO.writeFile(this.path(file), JSON.stringify(data, null, 2));
+      await this.fileIO.writeFile(this.path(file), content);
     } catch (e) {
       // Fire-and-forget: best-effort persistence
       this.onError?.(e instanceof Error ? e : new Error(String(e)));
     }
+  }
+
+  private enqueueWrite(file: string, content: string): void {
+    const prev = this.writeQueues.get(file) ?? Promise.resolve();
+    const next = prev.then(() => this.doWrite(file, content)).catch(() => {});
+    this.writeQueues.set(file, next);
+  }
+
+  /** Wait for all pending writes to complete. */
+  async flush(): Promise<void> {
+    await Promise.all(this.writeQueues.values());
   }
 
   private async readJSON<T>(file: string): Promise<T | undefined> {
@@ -89,31 +103,31 @@ export class StatePersister {
   }
 
   persistCombat(state: CombatState): void {
-    void this.writeJSON(STATE_FILES.combat, state);
+    this.enqueueWrite(STATE_FILES.combat, JSON.stringify(state, null, 2));
   }
 
   persistClocks(state: ClocksState): void {
-    void this.writeJSON(STATE_FILES.clocks, state);
+    this.enqueueWrite(STATE_FILES.clocks, JSON.stringify(state, null, 2));
   }
 
   persistMaps(state: Record<string, MapData>): void {
-    void this.writeJSON(STATE_FILES.maps, state);
+    this.enqueueWrite(STATE_FILES.maps, JSON.stringify(state, null, 2));
   }
 
   persistDecks(state: DecksState): void {
-    void this.writeJSON(STATE_FILES.decks, state);
+    this.enqueueWrite(STATE_FILES.decks, JSON.stringify(state, null, 2));
   }
 
   persistScene(scene: PersistedSceneState): void {
-    void this.writeJSON(STATE_FILES.scene, scene);
+    this.enqueueWrite(STATE_FILES.scene, JSON.stringify(scene, null, 2));
   }
 
   persistConversation(exchanges: SerializedExchange[]): void {
-    void this.writeJSON(STATE_FILES.conversation, exchanges);
+    this.enqueueWrite(STATE_FILES.conversation, JSON.stringify(exchanges, null, 2));
   }
 
   persistUI(state: PersistedUIState): void {
-    void this.writeJSON(STATE_FILES.ui, state);
+    this.enqueueWrite(STATE_FILES.ui, JSON.stringify(state, null, 2));
   }
 
   /** Load pending operation file (for crash recovery) */
@@ -122,13 +136,8 @@ export class StatePersister {
   }
 
   /** Delete conversation state (called on clean session boundary) */
-  async clearConversation(): Promise<void> {
-    try {
-      await this.fileIO.writeFile(this.path(STATE_FILES.conversation), "");
-    } catch (e) {
-      // best-effort
-      this.onError?.(e instanceof Error ? e : new Error(String(e)));
-    }
+  clearConversation(): void {
+    this.enqueueWrite(STATE_FILES.conversation, "");
   }
 
   /** Load all persisted state files. Missing files return undefined per key. */

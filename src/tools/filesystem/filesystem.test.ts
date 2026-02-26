@@ -420,4 +420,10 @@ describe("createDefaultCampaignConfig", () => {
     expect(config.combat.initiative_method).toBe("d20_dex");
     expect(validateConfig(config)).toEqual([]);
   });
+
+  it("includes version and createdAt", () => {
+    const config = createDefaultCampaignConfig("Test", "Alex", "aldric");
+    expect(config.version).toBe(1);
+    expect(config.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
 });
