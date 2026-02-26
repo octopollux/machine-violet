@@ -82,7 +82,7 @@ describe("ToolRegistry", () => {
   it("dispatches place_entity and move_entity", () => {
     const reg = new ToolRegistry();
     const state = mockState();
-    state.maps["m"] = createMap("m", "square", { width: 10, height: 10 }, "stone");
+    state.maps["m"] = createMap("m", "square", 10, 10, "stone");
 
     reg.dispatch(state, "place_entity", {
       map: "m",
@@ -185,7 +185,7 @@ describe("ToolRegistry", () => {
   it("dispatches define_region and creates region on map", () => {
     const reg = new ToolRegistry();
     const state = mockState();
-    state.maps["m"] = createMap("m", "square", { width: 10, height: 10 }, "stone");
+    state.maps["m"] = createMap("m", "square", 10, 10, "stone");
 
     const result = reg.dispatch(state, "define_region", {
       map: "m", x1: 1, y1: 1, x2: 3, y2: 3, terrain: "water",
@@ -199,7 +199,7 @@ describe("ToolRegistry", () => {
   it("dispatches set_terrain with region input (regression)", () => {
     const reg = new ToolRegistry();
     const state = mockState();
-    state.maps["m"] = createMap("m", "square", { width: 10, height: 10 }, "stone");
+    state.maps["m"] = createMap("m", "square", 10, 10, "stone");
 
     const result = reg.dispatch(state, "set_terrain", {
       map: "m",

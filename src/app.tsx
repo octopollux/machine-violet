@@ -23,7 +23,7 @@ import type { SetupResult } from "./agents/setup-agent.js";
 import { buildCampaignWorld } from "./agents/world-builder.js";
 import { getActivePlayer } from "./agents/player-manager.js";
 import { createClocksState } from "./tools/clocks/index.js";
-import { createCombatState, createDefaultConfig } from "./tools/combat/index.js";
+import { createCombatState } from "./tools/combat/index.js";
 import { createDecksState } from "./tools/cards/index.js";
 import { StatePersister } from "./context/state-persistence.js";
 import { CostTracker } from "./context/cost-tracker.js";
@@ -141,6 +141,10 @@ export default function App({ shutdownRef }: AppProps) {
   useEffect(() => { variantRef.current = variant; }, [variant]);
 
   // Persist UI when style/variant/modelines change (skip during resume hydration)
+  // NOTE: UI state is persisted via useEffect, which fires synchronously after
+  // React state updates in event handlers (React 18). The only data-loss window
+  // is a process crash between dispatch and effect — an extremely narrow gap.
+  // Scene-transition persistence (in game-engine.ts) covers the most critical case.
   useEffect(() => {
     if (!hydratedRef.current) return;
     persisterRef.current?.persistUI({
@@ -211,7 +215,7 @@ export default function App({ shutdownRef }: AppProps) {
       maps: {},
       clocks: createClocksState(),
       combat: createCombatState(),
-      combatConfig: createDefaultConfig(),
+      combatConfig: config.combat,
       decks: createDecksState(),
       config,
       campaignRoot,

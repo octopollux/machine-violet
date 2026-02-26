@@ -132,8 +132,13 @@ export class GameEngine {
       params.fileIO,
       (error) => this.callbacks.onError(error),
     );
-    this.registry.onStateChanged = (_toolName, state, slices) => {
+    this.registry.onStateChanged = (toolName, state, slices) => {
       this.persistSlices(state, slices);
+      // switch_player mutates activePlayerIndex but has no state slice —
+      // persist it via scene state immediately
+      if (toolName === "switch_player") {
+        this.persistCurrentScene();
+      }
     };
   }
 
@@ -148,6 +153,19 @@ export class GameEngine {
         case "decks": this.persister.persistDecks(state.decks); break;
       }
     }
+  }
+
+  /** Persist current scene state (precis, threads, player index, etc.) */
+  private persistCurrentScene(): void {
+    if (!this.persister) return;
+    const scene = this.sceneManager.getScene();
+    this.persister.persistScene({
+      precis: scene.precis,
+      openThreads: scene.openThreads || undefined,
+      npcIntents: scene.npcIntents || undefined,
+      playerReads: scene.playerReads,
+      activePlayerIndex: this.gameState.activePlayerIndex,
+    });
   }
 
   /** Get current engine state */
@@ -378,6 +396,9 @@ export class GameEngine {
       accUsage(this.sessionUsage, result.usage);
       this.callbacks.onUsageUpdate(this.sessionUsage);
 
+      // Persist the reset scene state (new sceneNumber, cleared precis/transcript)
+      this.persistCurrentScene();
+
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
       await this.dumpDebugInfo(error);
@@ -404,6 +425,9 @@ export class GameEngine {
 
       accUsage(this.sessionUsage, result.usage);
       this.callbacks.onUsageUpdate(this.sessionUsage);
+
+      // Persist scene state after session end
+      this.persistCurrentScene();
 
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));

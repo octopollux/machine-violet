@@ -448,7 +448,8 @@ const TOOL_DEFS: RegisteredTool[] = [
       const map = createMap(
         input.id as string,
         input.grid_type as "square" | "hex",
-        { width: input.width as number, height: input.height as number },
+        input.width as number,
+        input.height as number,
         input.default_terrain as string,
       );
       state.maps[map.id] = map;
