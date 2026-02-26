@@ -1,4 +1,4 @@
-export { Modeline } from "./Modeline.js";
+export { Modeline, buildModelineDisplay, splitModeline } from "./Modeline.js";
 export { InputLine } from "./InputLine.js";
 export { PlayerSelector } from "./PlayerSelector.js";
 export type { PlayerEntry } from "./PlayerSelector.js";

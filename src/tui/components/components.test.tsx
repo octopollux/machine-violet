@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
-import { Modeline } from "./Modeline.js";
+import { Modeline, buildModelineDisplay, splitModeline } from "./Modeline.js";
 import { InputLine } from "./InputLine.js";
 import { PlayerSelector } from "./PlayerSelector.js";
 import { ActivityLine } from "./ActivityLine.js";
@@ -11,25 +11,77 @@ import { getStyle } from "../frames/index.js";
 
 const gothic = getStyle("gothic")!.variants.exploration;
 
+describe("buildModelineDisplay", () => {
+  it("returns text when no extras", () => {
+    expect(buildModelineDisplay("HP: 42/42")).toBe("HP: 42/42");
+  });
+
+  it("prefixes activity glyph", () => {
+    expect(buildModelineDisplay("HP: 42/42", "⚔")).toBe("⚔ HP: 42/42");
+  });
+
+  it("prefixes turn info", () => {
+    expect(buildModelineDisplay("HP: 42/42", undefined, "Aldric")).toBe("[Aldric] HP: 42/42");
+  });
+
+  it("prefixes both glyph and turn info", () => {
+    expect(buildModelineDisplay("HP: 42/42", "⚔", "Aldric")).toBe("⚔ [Aldric] HP: 42/42");
+  });
+});
+
+describe("splitModeline", () => {
+  it("returns single line when text fits", () => {
+    expect(splitModeline("HP: 42/42 | Loc: Hall", 80)).toEqual(["HP: 42/42 | Loc: Hall"]);
+  });
+
+  it("splits at pipe when text exceeds width", () => {
+    const text = "HP: 42/42 | Mana: 7/12 | Loc: The Hall";
+    const lines = splitModeline(text, 30);
+    expect(lines.length).toBeGreaterThan(1);
+    // Each line should fit within width
+    for (const line of lines) {
+      expect(line.length).toBeLessThanOrEqual(30);
+    }
+    // No line should contain a leading or trailing " | " from the split
+    for (const line of lines) {
+      expect(line).not.toMatch(/^ \| /);
+      expect(line).not.toMatch(/ \| $/);
+    }
+  });
+
+  it("greedily packs segments", () => {
+    // "A | B" is 5 chars, fits in 8; adding " | C" makes 10 → wraps
+    expect(splitModeline("A | B | C", 8)).toEqual(["A | B", "C"]);
+  });
+
+  it("returns one line when no pipes present", () => {
+    expect(splitModeline("A very long modeline with no pipes", 10)).toEqual(
+      ["A very long modeline with no pipes"],
+    );
+  });
+
+  it("handles empty string", () => {
+    expect(splitModeline("", 80)).toEqual([""]);
+  });
+
+  it("each segment too wide gets own line", () => {
+    expect(splitModeline("AAAA | BBBB | CCCC", 4)).toEqual(["AAAA", "BBBB", "CCCC"]);
+  });
+});
+
 describe("Modeline", () => {
-  it("renders text", () => {
-    const { lastFrame } = render(<Modeline text="HP: 42/42 | Loc: Hall" />);
+  it("renders single line", () => {
+    const { lastFrame } = render(<Modeline lines={["HP: 42/42 | Loc: Hall"]} />);
     expect(lastFrame()).toContain("HP: 42/42");
     expect(lastFrame()).toContain("Loc: Hall");
   });
 
-  it("prefixes activity glyph", () => {
+  it("renders multiple lines", () => {
     const { lastFrame } = render(
-      <Modeline text="HP: 42/42" activityGlyph="⚔" />,
+      <Modeline lines={["HP: 42/42 | Mana: 7/12", "Loc: The Shattered Hall"]} />,
     );
-    expect(lastFrame()).toContain("⚔");
-  });
-
-  it("prefixes turn info", () => {
-    const { lastFrame } = render(
-      <Modeline text="HP: 42/42" turnInfo="Aldric" />,
-    );
-    expect(lastFrame()).toContain("[Aldric]");
+    expect(lastFrame()).toContain("HP: 42/42");
+    expect(lastFrame()).toContain("Loc: The Shattered Hall");
   });
 });
 

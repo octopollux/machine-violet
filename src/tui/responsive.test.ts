@@ -151,4 +151,18 @@ describe("narrativeRows", () => {
     const hidden = narrativeRows(12, elements, true);
     expect(hidden).toBe(normal + 1);
   });
+
+  it("accounts for multi-line modeline", () => {
+    const elements = getVisibleElements("full");
+    const oneRow = narrativeRows(40, elements, false, 1);
+    const twoRows = narrativeRows(40, elements, false, 2);
+    expect(twoRows).toBe(oneRow - 1);
+  });
+
+  it("accounts for three-line modeline", () => {
+    const elements = getVisibleElements("full");
+    const oneRow = narrativeRows(40, elements, false, 1);
+    const threeRows = narrativeRows(40, elements, false, 3);
+    expect(threeRows).toBe(oneRow - 2);
+  });
 });

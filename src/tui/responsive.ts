@@ -105,11 +105,13 @@ export function useAsciiFallback(columns: number): boolean {
 
 /**
  * Calculate the number of rows available for the narrative area.
+ * @param modelineHeight — actual line count of the wrapped modeline (default 1).
  */
 export function narrativeRows(
   totalRows: number,
   elements: VisibleElements,
   hideInputLine = false,
+  modelineHeight = 1,
 ): number {
   let used = 0;
 
@@ -119,7 +121,7 @@ export function narrativeRows(
   if (elements.topFrame) used += 2;    // border + resource line
   if (elements.lowerFrame) used += 1;  // separator with turn indicator
   if (elements.activityLine) used += 1;
-  if (elements.modeline) used += 1;
+  if (elements.modeline) used += modelineHeight;
   if (elements.playerSelector) used += 1;
 
   return Math.max(1, totalRows - used);

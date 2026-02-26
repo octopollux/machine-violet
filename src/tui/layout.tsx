@@ -5,6 +5,8 @@ import type { PlayerEntry } from "./components/index.js";
 import type { NarrativeAreaHandle } from "./components/index.js";
 import {
   Modeline,
+  buildModelineDisplay,
+  splitModeline,
   InputLine,
   PlayerSelector,
   ActivityLine,
@@ -99,7 +101,6 @@ export function Layout(props: LayoutProps) {
   const ascii = useAsciiFallback(dimensions.columns);
   const frameVariant = style.variants[variant];
   const width = dimensions.columns;
-  const narRows = narrativeRows(dimensions.rows, elements, hideInputLine);
 
   // Side frame width (1 for now, designed to support 2 later)
   const sideFrameWidth: 1 | 2 = 1;
@@ -110,6 +111,11 @@ export function Layout(props: LayoutProps) {
 
   // Turn info for modeline (when lower frame dropped)
   const turnForModeline = elements.turnInfoInModeline ? turnHolder : undefined;
+
+  // Pre-split modeline so we know its height before sizing the narrative area
+  const modelineDisplay = buildModelineDisplay(modelineText, actGlyph, turnForModeline);
+  const modelineLines = splitModeline(modelineDisplay, width);
+  const narRows = narrativeRows(dimensions.rows, elements, hideInputLine, modelineLines.length);
 
   // Height and inner width of the middle section (narrative + activity) for side frames
   const middleHeight = narRows + (elements.activityLine ? 1 : 0);
@@ -174,9 +180,7 @@ export function Layout(props: LayoutProps) {
       {/* Modeline */}
       {elements.modeline && (
         <Modeline
-          text={modelineText}
-          activityGlyph={actGlyph}
-          turnInfo={turnForModeline}
+          lines={modelineLines}
           width={width}
         />
       )}
