@@ -3,8 +3,16 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { FrameStyle, StyleVariant, NarrativeLine, ActiveModal, RetryOverlay } from "../types/tui.js";
 import type { GameEngine } from "../agents/game-engine.js";
 import type { GameState } from "../agents/game-state.js";
-import type { TuiCommand } from "../agents/agent-loop.js";
+import type { TuiCommand, UsageStats } from "../agents/agent-loop.js";
 import type { CostTracker } from "../context/cost-tracker.js";
+import type { ModelTier } from "../config/models.js";
+
+/** A non-DM mode session (OOC, Dev, or future modes). */
+export interface ModeSession {
+  send(text: string, onDelta: (delta: string) => void): Promise<{ usage: UsageStats }>;
+  label: string;    // "OOC" | "Dev"
+  tier: ModelTier;  // for cost tracking
+}
 
 /** Every piece of shared state that App provides to PlayingPhase. */
 export interface GameContextValue {
@@ -34,14 +42,12 @@ export interface GameContextValue {
   setChoiceIndex: React.Dispatch<React.SetStateAction<number>>;
   // Retry overlay (system-driven, separate from activeModal)
   retryOverlay: RetryOverlay | null;
-  // OOC state
-  oocActive: boolean;
-  setOocActive: (v: boolean) => void;
+  // Mode session (replaces oocActive/devActive booleans)
+  activeSession: ModeSession | null;
+  setActiveSession: (s: ModeSession | null) => void;
   previousVariantRef: React.MutableRefObject<StyleVariant>;
   // Dev mode
   devModeEnabled?: boolean;
-  devActive: boolean;
-  setDevActive: (v: boolean) => void;
   // Actions
   dispatchTuiCommand: (cmd: TuiCommand) => void;
   onShutdown: () => void;

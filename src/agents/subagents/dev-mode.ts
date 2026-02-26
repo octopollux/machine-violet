@@ -14,6 +14,7 @@ import * as path from "node:path";
 import type { CampaignRepo } from "../../tools/git/index.js";
 import { queryCommitLog } from "../../tools/git/index.js";
 import { findReferences, renameEntity, mergeEntities, resolveDeadLinks } from "../../tools/campaign-ops/index.js";
+import type { ModeSession } from "../../tui/game-context.js";
 
 /**
  * Result from a Dev Mode exchange.
@@ -577,4 +578,26 @@ function extractSummary(text: string): string {
   const trimmed = firstSentence.trim();
   if (trimmed.length > 100) return trimmed.slice(0, 97) + "...";
   return trimmed + ".";
+}
+
+/**
+ * Create a ModeSession for Dev mode.
+ * Used by PlayingPhase to unify non-DM mode handling.
+ */
+export function createDevSession(
+  client: Anthropic,
+  options: {
+    campaignName: string;
+    gameStateSummary?: string;
+    gameState?: GameState;
+    fileIO?: FileIO;
+    sceneManager?: SceneManager;
+    repo?: CampaignRepo;
+  },
+): ModeSession {
+  return {
+    label: "Dev",
+    tier: "medium",
+    send: (text, onDelta) => enterDevMode(client, text, options, onDelta),
+  };
 }

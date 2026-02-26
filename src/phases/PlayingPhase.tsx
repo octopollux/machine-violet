@@ -7,8 +7,8 @@ import { Layout } from "../tui/layout.js";
 import { ChoiceModal, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, ApiErrorModal, getMenuItems } from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { getActivePlayer, switchToNextPlayer, getPlayerEntries } from "../agents/player-manager.js";
-import { enterOOC } from "../agents/subagents/ooc-mode.js";
-import { enterDevMode, summarizeGameState } from "../agents/subagents/dev-mode.js";
+import { createOOCSession } from "../agents/subagents/ooc-mode.js";
+import { createDevSession, summarizeGameState } from "../agents/subagents/dev-mode.js";
 import { useGameContext } from "../tui/game-context.js";
 
 export function PlayingPhase() {
@@ -20,8 +20,8 @@ export function PlayingPhase() {
     engineState, resources, modelines,
     activeModal, setActiveModal,
     choiceIndex, setChoiceIndex,
-    oocActive, setOocActive, previousVariantRef,
-    devModeEnabled, devActive, setDevActive,
+    activeSession, setActiveSession, previousVariantRef,
+    devModeEnabled,
     retryOverlay,
     dispatchTuiCommand, onShutdown, onEndSession,
   } = useGameContext();
@@ -33,8 +33,7 @@ export function PlayingPhase() {
   const [resetKey, setResetKey] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuIndex, setMenuIndex] = useState(0);
-  const [oocBusy, setOocBusy] = useState(false);
-  const [devBusy, setDevBusy] = useState(false);
+  const [modeBusy, setModeBusy] = useState(false);
   const [customInputMode, setCustomInputMode] = useState(false);
   const [customInputResetKey, setCustomInputResetKey] = useState(0);
 
@@ -54,59 +53,29 @@ export function PlayingPhase() {
     !!activeModal ||
     !!retryOverlay ||
     menuOpen ||
-    (devActive && devBusy) ||
-    (oocActive && oocBusy);
+    (!!activeSession && modeBusy);
 
   // --- Submit handler for TextInput ---
   const handleSubmit = useCallback((value: string) => {
     if (!value.trim()) return;
     const text = value.trim();
 
-    if (devActive) {
+    if (activeSession) {
+      // Any non-DM mode (OOC, Dev, future modes)
       setNarrativeLines((prev) => [...prev, { kind: "player", text: `> ${text}` }, { kind: "dm", text: "" }]);
-      if (clientRef.current && gameStateRef.current) {
-        const gs = gameStateRef.current;
-        const fileIO = engineRef.current?.getSceneManager().getFileIO();
-        setDevBusy(true);
-        enterDevMode(clientRef.current, text, {
-          campaignName: gs.config.name,
-          gameStateSummary: summarizeGameState(gs),
-          gameState: gs,
-          fileIO,
-          sceneManager: engineRef.current?.getSceneManager(),
-          repo: engineRef.current?.getRepo() ?? undefined,
-        }, (delta) => {
-          setNarrativeLines((prev) => appendDelta(prev, delta, "dm"));
-        }).then((result) => {
-          setDevBusy(false);
-          setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }]);
-          costTracker.current.record(result.usage, "medium");
-        }).catch(() => {
-          setDevBusy(false);
-          setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Dev mode error]" }, { kind: "dm", text: "" }]);
-        });
-      }
-    } else if (oocActive) {
-      setNarrativeLines((prev) => [...prev, { kind: "player", text: `> ${text}` }, { kind: "dm", text: "" }]);
-      if (clientRef.current && gameStateRef.current) {
-        const gs = gameStateRef.current;
-        setOocBusy(true);
-        enterOOC(clientRef.current, text, {
-          campaignName: gs.config.name,
-          previousVariant: previousVariantRef.current,
-          repo: engineRef.current?.getRepo() ?? undefined,
-        }, (delta) => {
-          setNarrativeLines((prev) => appendDelta(prev, delta, "dm"));
-        }).then((result) => {
-          setOocBusy(false);
-          setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }]);
-          costTracker.current.record(result.usage, "medium");
-        }).catch(() => {
-          setOocBusy(false);
-          setNarrativeLines((prev) => [...prev, { kind: "system", text: "[OOC error]" }, { kind: "dm", text: "" }]);
-        });
-      }
+      setModeBusy(true);
+      activeSession.send(text, (delta) => {
+        setNarrativeLines((prev) => appendDelta(prev, delta, "dm"));
+      }).then((result) => {
+        setModeBusy(false);
+        setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }]);
+        costTracker.current.record(result.usage, activeSession.tier);
+      }).catch(() => {
+        setModeBusy(false);
+        setNarrativeLines((prev) => [...prev, { kind: "system", text: `[${activeSession.label} error]` }, { kind: "dm", text: "" }]);
+      });
     } else {
+      // DM mode
       if (engineRef.current && gameStateRef.current) {
         const active = getActivePlayer(gameStateRef.current);
         setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }, { kind: "player", text: `> ${active.characterName}: ${text}` }, { kind: "dm", text: "" }]);
@@ -115,7 +84,7 @@ export function PlayingPhase() {
     }
 
     clearInput();
-  }, [devActive, oocActive, clearInput]);
+  }, [activeSession, clearInput]);
 
   const handleCustomChoiceSubmit = useCallback((value: string) => {
     if (!value.trim()) return;
@@ -130,6 +99,15 @@ export function PlayingPhase() {
       engineRef.current.processInput(active.characterName, text);
     }
   }, []);
+
+  // Helper to exit active session mode
+  const exitActiveSession = useCallback(() => {
+    if (!activeSession) return;
+    const label = activeSession.label;
+    setActiveSession(null);
+    setVariant(previousVariantRef.current);
+    setNarrativeLines((prev) => [...prev, { kind: "system", text: `[Exiting ${label} Mode]` }, { kind: "dm", text: "" }]);
+  }, [activeSession, setActiveSession, setVariant, previousVariantRef, setNarrativeLines]);
 
   // --- Input handling (modals, menus, scroll — TextInput handles text editing) ---
   useInput((input, key) => {
@@ -146,13 +124,8 @@ export function PlayingPhase() {
         setCustomInputResetKey((k) => k + 1);
         setMenuOpen(false);
         setMenuIndex(0);
-        if (oocActive) {
-          setOocActive(false);
-          setVariant(previousVariantRef.current);
-        }
-        if (devActive) {
-          setDevActive(false);
-          setVariant(previousVariantRef.current);
+        if (activeSession) {
+          exitActiveSession();
         }
         return;
       }
@@ -265,28 +238,10 @@ export function PlayingPhase() {
       return;
     }
 
-    // Dev mode: ESC exits, busy blocks all keys
-    if (devActive) {
+    // Active session mode (OOC/Dev): ESC exits, busy blocks all keys
+    if (activeSession) {
       if (key.escape) {
-        setDevActive(false);
-        setVariant(previousVariantRef.current);
-        setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Exiting Dev Mode]" }, { kind: "dm", text: "" }]);
-        return;
-      }
-      if (key.pageUp || key.pageDown) {
-        const step = scrollAmount(rows);
-        narrativeRef.current?.scrollBy(key.pageUp ? -step : step);
-        return;
-      }
-      return;
-    }
-
-    // OOC mode: ESC exits, busy blocks all keys
-    if (oocActive) {
-      if (key.escape) {
-        setOocActive(false);
-        setVariant(previousVariantRef.current);
-        setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Exiting OOC Mode]" }, { kind: "dm", text: "" }]);
+        exitActiveSession();
         return;
       }
       if (key.pageUp || key.pageDown) {
@@ -333,27 +288,40 @@ export function PlayingPhase() {
           }
         } else if (item === "OOC Mode") {
           setMenuOpen(false);
-          if (oocActive) {
-            setOocActive(false);
-            setVariant(previousVariantRef.current);
-            setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Exiting OOC Mode]" }, { kind: "dm", text: "" }]);
+          if (activeSession?.label === "OOC") {
+            exitActiveSession();
           } else {
-            previousVariantRef.current = variant;
-            setOocActive(true);
-            setVariant("ooc");
-            setNarrativeLines((prev) => [...prev, { kind: "system", text: "[OOC Mode \u2014 type to chat, ESC to exit]" }, { kind: "dm", text: "" }]);
+            if (clientRef.current && gameStateRef.current) {
+              previousVariantRef.current = variant;
+              const gs = gameStateRef.current;
+              setActiveSession(createOOCSession(clientRef.current, {
+                campaignName: gs.config.name,
+                previousVariant: variant,
+                repo: engineRef.current?.getRepo() ?? undefined,
+              }));
+              setVariant("ooc");
+              setNarrativeLines((prev) => [...prev, { kind: "system", text: "[OOC Mode \u2014 type to chat, ESC to exit]" }, { kind: "dm", text: "" }]);
+            }
           }
         } else if (item === "Dev Mode") {
           setMenuOpen(false);
-          if (devActive) {
-            setDevActive(false);
-            setVariant(previousVariantRef.current);
-            setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Exiting Dev Mode]" }, { kind: "dm", text: "" }]);
+          if (activeSession?.label === "Dev") {
+            exitActiveSession();
           } else {
-            previousVariantRef.current = variant;
-            setDevActive(true);
-            setVariant("dev");
-            setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Dev Mode \u2014 type to inspect, ESC to exit]" }, { kind: "dm", text: "" }]);
+            if (clientRef.current && gameStateRef.current) {
+              previousVariantRef.current = variant;
+              const gs = gameStateRef.current;
+              setActiveSession(createDevSession(clientRef.current, {
+                campaignName: gs.config.name,
+                gameStateSummary: summarizeGameState(gs),
+                gameState: gs,
+                fileIO: engineRef.current?.getSceneManager().getFileIO(),
+                sceneManager: engineRef.current?.getSceneManager(),
+                repo: engineRef.current?.getRepo() ?? undefined,
+              }));
+              setVariant("dev");
+              setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Dev Mode \u2014 type to inspect, ESC to exit]" }, { kind: "dm", text: "" }]);
+            }
           }
         }
         return;
@@ -474,9 +442,9 @@ export function PlayingPhase() {
           width={cols}
           height={rows}
           selectedIndex={menuIndex}
-          oocActive={oocActive}
+          oocActive={activeSession?.label === "OOC"}
           devModeEnabled={devModeEnabled}
-          devActive={devActive}
+          devActive={activeSession?.label === "Dev"}
           tokenSummary={costTracker.current.formatTokens()}
         />
       )}

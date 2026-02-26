@@ -13,6 +13,7 @@ import type { ClocksState } from "../../types/clocks.js";
 import { findReferences } from "../../tools/campaign-ops/index.js";
 import { validateCampaign } from "../../tools/validation/index.js";
 import { norm } from "../../utils/paths.js";
+import type { ModeSession } from "../../tui/game-context.js";
 
 /**
  * Context snapshot for OOC mode — captured when entering, restored when exiting.
@@ -261,4 +262,23 @@ function extractSummary(text: string): string {
   const trimmed = firstSentence.trim();
   if (trimmed.length > 100) return trimmed.slice(0, 97) + "...";
   return trimmed + ".";
+}
+
+/**
+ * Create a ModeSession for OOC mode.
+ * Used by PlayingPhase to unify non-DM mode handling.
+ */
+export function createOOCSession(
+  client: Anthropic,
+  options: {
+    campaignName: string;
+    previousVariant: string;
+    repo?: CampaignRepo;
+  },
+): ModeSession {
+  return {
+    label: "OOC",
+    tier: "medium",
+    send: (text, onDelta) => enterOOC(client, text, options, onDelta),
+  };
 }

@@ -1,7 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { ModelId, UsageStats } from "./agent-loop.js";
-import { dumpContext } from "../config/context-dump.js";
-import { getThinkingConfig } from "../config/models.js";
+import { runAgentLoop } from "./agent-session.js";
 
 // --- Types ---
 
@@ -53,102 +52,24 @@ export async function spawnSubagent(
   userMessage: string,
   onStream?: SubagentStreamCallback,
 ): Promise<SubagentResult> {
-  const totalUsage: UsageStats = {
-    inputTokens: 0,
-    outputTokens: 0,
-    cacheReadTokens: 0,
-    cacheCreationTokens: 0,
-  };
+  const isStreaming = config.visibility === "player_facing" && !!onStream;
 
-  const messages: Anthropic.MessageParam[] = [
+  const result = await runAgentLoop(client, config.systemPrompt, [
     { role: "user", content: userMessage },
-  ];
+  ], {
+    name: config.name,
+    model: config.model,
+    maxTokens: config.maxTokens,
+    maxToolRounds: config.maxToolRounds ?? 3,
+    stream: isStreaming,
+    tools: config.tools,
+    toolHandler: config.toolHandler,
+    terseSuffix: true,
+    retry: config.visibility === "player_facing",
+    onTextDelta: onStream,
+  });
 
-  const maxRounds = config.maxToolRounds ?? 3;
-
-  const tc = getThinkingConfig(config.name);
-
-  for (let round = 0; round < maxRounds; round++) {
-    const params: Anthropic.MessageCreateParamsNonStreaming = {
-      model: config.model,
-      max_tokens: config.maxTokens + tc.budgetTokens,
-      system: config.systemPrompt + "\n\nIMPORTANT: Respond in the minimum tokens necessary. Be terse.",
-      messages,
-      stream: false,
-      thinking: tc.param,
-      ...(config.tools?.length ? { tools: config.tools } : {}),
-    };
-
-    dumpContext(config.name, params);
-
-    let response: Anthropic.Message;
-
-    if (config.visibility === "player_facing" && onStream) {
-      // Stream for player-facing subagents
-      const stream = client.messages.stream({
-        ...params,
-      });
-
-      stream.on("text", (delta) => {
-        onStream(delta);
-      });
-
-      response = await stream.finalMessage();
-    } else {
-      // Non-streaming for silent subagents
-      response = await client.messages.create(params);
-    }
-
-    // Accumulate usage
-    totalUsage.inputTokens += response.usage.input_tokens;
-    totalUsage.outputTokens += response.usage.output_tokens;
-    const u = response.usage as Record<string, number>;
-    totalUsage.cacheReadTokens += u["cache_read_input_tokens"] ?? 0;
-    totalUsage.cacheCreationTokens += u["cache_creation_input_tokens"] ?? 0;
-
-    // Check for tool use
-    let hasToolUse = false;
-    const toolResults: Anthropic.ToolResultBlockParam[] = [];
-    let text = "";
-
-    for (const block of response.content) {
-      if (block.type === "text") {
-        text += block.text;
-      } else if (block.type === "tool_use" && config.toolHandler) {
-        hasToolUse = true;
-        const result = await config.toolHandler(block.name, block.input as Record<string, unknown>);
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: block.id,
-          content: result.content,
-          is_error: result.is_error,
-        });
-      }
-    }
-
-    // Strip thinking blocks — they must not be sent back in conversation history
-    const assistantContent = response.content.filter((b) => b.type !== "thinking");
-    messages.push({ role: "assistant", content: assistantContent });
-
-    if (!hasToolUse || response.stop_reason === "end_turn") {
-      return { text, usage: totalUsage };
-    }
-
-    messages.push({ role: "user", content: toolResults });
-  }
-
-  // Maxed out tool rounds — return whatever text we accumulated
-  const lastAssistant = messages[messages.length - 1];
-  let finalText = "";
-  if (lastAssistant.role === "assistant" && Array.isArray(lastAssistant.content)) {
-    for (const block of lastAssistant.content) {
-      if (typeof block === "object" && "type" in block && block.type === "text") {
-        finalText += (block as Anthropic.TextBlock).text;
-      }
-    }
-  }
-
-  return { text: finalText, usage: totalUsage };
+  return { text: result.text, usage: result.usage };
 }
 
 /**

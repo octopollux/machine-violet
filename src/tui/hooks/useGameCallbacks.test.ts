@@ -17,11 +17,13 @@ function createDispatch(deps: {
   setResources: ReturnType<typeof vi.fn>;
   setChoiceIndex: ReturnType<typeof vi.fn>;
   setActiveModal: ReturnType<typeof vi.fn>;
-  setOocActive: ReturnType<typeof vi.fn>;
+  setActiveSession: ReturnType<typeof vi.fn>;
   setNarrativeLines: ReturnType<typeof vi.fn>;
   variantRef: { current: StyleVariant };
   previousVariantRef: { current: StyleVariant };
   gameStateRef: { current: unknown };
+  clientRef: { current: unknown };
+  engineRef: { current: unknown };
   fileIO: { current: { readFile: ReturnType<typeof vi.fn> } };
 }) {
   return (cmd: TuiCommand) => {
@@ -55,7 +57,7 @@ function createDispatch(deps: {
         break;
       case "enter_ooc":
         deps.previousVariantRef.current = deps.variantRef.current;
-        deps.setOocActive(true);
+        deps.setActiveSession(expect.anything());
         deps.setVariant("ooc");
         deps.setNarrativeLines(vi.fn());
         break;
@@ -71,11 +73,13 @@ function makeDeps() {
     setResources: vi.fn(),
     setChoiceIndex: vi.fn(),
     setActiveModal: vi.fn() as ReturnType<typeof vi.fn> & ((m: ActiveModal) => void),
-    setOocActive: vi.fn(),
+    setActiveSession: vi.fn(),
     setNarrativeLines: vi.fn(),
     variantRef: { current: "exploration" as StyleVariant },
     previousVariantRef: { current: "exploration" as StyleVariant },
     gameStateRef: { current: null },
+    clientRef: { current: null },
+    engineRef: { current: null },
     fileIO: { current: { readFile: vi.fn() } },
   };
 }
@@ -137,7 +141,7 @@ describe("dispatchTuiCommand logic", () => {
     const dispatch = createDispatch(deps);
     dispatch({ type: "enter_ooc" });
     expect(deps.previousVariantRef.current).toBe("combat");
-    expect(deps.setOocActive).toHaveBeenCalledWith(true);
+    expect(deps.setActiveSession).toHaveBeenCalled();
     expect(deps.setVariant).toHaveBeenCalledWith("ooc");
   });
 });

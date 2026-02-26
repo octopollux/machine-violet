@@ -8,6 +8,13 @@ import { getModel, getThinkingConfig } from "../../config/models.js";
 import { accumulateUsage as accRawUsage } from "../../context/usage-helpers.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
+import { dumpContext } from "../../config/context-dump.js";
+import {
+  extractStatus,
+  RETRYABLE_STATUS,
+  retryDelay,
+  sleep,
+} from "../agent-session.js";
 
 // --- Types ---
 
@@ -91,6 +98,32 @@ const TOOLS = [FINALIZE_TOOL, PRESENT_CHOICES_TOOL];
 
 const SYSTEM_PROMPT = loadPrompt("setup-conversation");
 
+// --- Streaming with retry ---
+
+/**
+ * Stream an API call with exponential backoff retry on transient errors.
+ */
+async function streamWithRetry(
+  client: Anthropic,
+  params: Anthropic.MessageCreateParamsNonStreaming,
+  onDelta: (delta: string) => void,
+): Promise<Anthropic.Message> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      dumpContext("setup", params);
+      const stream = client.messages.stream({ ...params });
+      stream.on("text", (delta) => { onDelta(delta); });
+      return await stream.finalMessage();
+    } catch (e) {
+      const status = extractStatus(e);
+      if (status === null || !RETRYABLE_STATUS.has(status)) {
+        throw e instanceof Error ? e : new Error(String(e));
+      }
+      await sleep(retryDelay(attempt));
+    }
+  }
+}
+
 // --- Implementation ---
 
 export function createSetupConversation(client: Anthropic): SetupConversation {
@@ -105,10 +138,6 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
   let finalized: SetupResult | undefined;
   // Pending state when present_choices is called — stores tool_use_id so we can send the result back
   let pendingToolUseId: string | null = null;
-
-  function accumulateUsage(response: Anthropic.Message): void {
-    accRawUsage(totalUsage, response.usage);
-  }
 
   function handleFinalize(input: Record<string, unknown>): void {
     const personalityName = (input.dm_personality as string) || "The Chronicler";
@@ -136,6 +165,10 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
    * Run one API call, stream text, process tool calls.
    * Returns the result, which may include pendingChoices (needs resolveChoice)
    * or finalized (setup complete).
+   *
+   * Uses deferred tool handling: present_choices pauses the loop and returns
+   * to the app for player input. This pattern doesn't fit runAgentLoop's
+   * immediate-tool-result model, so we handle it manually with retry.
    */
   async function runTurn(onDelta: (delta: string) => void): Promise<SetupTurnResult> {
     finalized = undefined;
@@ -143,21 +176,17 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
 
     const tc = getThinkingConfig("setup");
 
-    const stream = client.messages.stream({
+    const response = await streamWithRetry(client, {
       model: getModel("medium"),
       max_tokens: TOKEN_LIMITS.SUBAGENT_LARGE + tc.budgetTokens,
       system: SYSTEM_PROMPT,
       messages,
+      stream: false,
       tools: TOOLS,
       thinking: tc.param,
-    });
+    }, onDelta);
 
-    stream.on("text", (delta) => {
-      onDelta(delta);
-    });
-
-    const response = await stream.finalMessage();
-    accumulateUsage(response);
+    accRawUsage(totalUsage, response.usage);
 
     // Process content blocks
     let text = "";
@@ -203,21 +232,17 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
     if (toolResults.length > 0) {
       messages.push({ role: "user", content: toolResults });
 
-      const followUp = client.messages.stream({
+      const followUpMsg = await streamWithRetry(client, {
         model: getModel("medium"),
         max_tokens: TOKEN_LIMITS.SUBAGENT_MEDIUM + tc.budgetTokens,
         system: SYSTEM_PROMPT,
         messages,
+        stream: false,
         tools: TOOLS,
         thinking: tc.param,
-      });
+      }, onDelta);
 
-      followUp.on("text", (delta) => {
-        onDelta(delta);
-      });
-
-      const followUpMsg = await followUp.finalMessage();
-      accumulateUsage(followUpMsg);
+      accRawUsage(totalUsage, followUpMsg.usage);
 
       for (const block of followUpMsg.content) {
         if (block.type === "text") {

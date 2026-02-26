@@ -4,11 +4,14 @@ import type { FrameStyle, StyleVariant, NarrativeLine, ActiveModal, RetryOverlay
 import type { EngineState, EngineCallbacks } from "../../agents/game-engine.js";
 import type { TuiCommand, UsageStats } from "../../agents/agent-loop.js";
 import type { GameState } from "../../agents/game-state.js";
+import type { GameEngine } from "../../agents/game-engine.js";
 import type { FileIO } from "../../agents/scene-manager.js";
+import type { ModeSession } from "../game-context.js";
 import { getStyle } from "../frames/index.js";
 import { campaignPaths } from "../../tools/filesystem/index.js";
 import { getActivePlayer } from "../../agents/player-manager.js";
 import { shouldGenerateChoices, generateChoices } from "../../agents/subagents/choice-generator.js";
+import { createOOCSession } from "../../agents/subagents/ooc-mode.js";
 import { CostTracker } from "../../context/cost-tracker.js";
 import { isDevMode } from "../../config/dev-mode.js";
 import type { ToolResult } from "../../agents/tool-registry.js";
@@ -26,11 +29,12 @@ export interface GameCallbackDeps {
   setVariant: (v: StyleVariant) => void;
   setActiveModal: (m: ActiveModal) => void;
   setChoiceIndex: React.Dispatch<React.SetStateAction<number>>;
-  setOocActive: (v: boolean) => void;
+  setActiveSession: (s: ModeSession | null) => void;
   setRetryOverlay: (o: RetryOverlay | null) => void;
   // Refs
   gameStateRef: React.RefObject<GameState | null>;
   clientRef: React.RefObject<Anthropic | null>;
+  engineRef: React.RefObject<GameEngine | null>;
   activeModalRef: React.RefObject<ActiveModal>;
   variantRef: React.RefObject<StyleVariant>;
   previousVariantRef: React.MutableRefObject<StyleVariant>;
@@ -47,8 +51,8 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
   const {
     setNarrativeLines, setEngineState, setErrorMsg, setModelines,
     setResources, setStyle, setVariant, setActiveModal, setChoiceIndex,
-    setOocActive, setRetryOverlay,
-    gameStateRef, clientRef, activeModalRef, variantRef, previousVariantRef,
+    setActiveSession, setRetryOverlay,
+    gameStateRef, clientRef, engineRef, activeModalRef, variantRef, previousVariantRef,
     costTracker, fileIO,
   } = deps;
 
@@ -103,15 +107,24 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
         }
         break;
       }
-      case "enter_ooc":
+      case "enter_ooc": {
         previousVariantRef.current = variantRef.current;
-        setOocActive(true);
+        const gs = gameStateRef.current;
+        const client = clientRef.current;
+        if (gs && client) {
+          setActiveSession(createOOCSession(client, {
+            campaignName: gs.config.name,
+            previousVariant: variantRef.current,
+            repo: engineRef.current?.getRepo() ?? undefined,
+          }));
+        }
         setVariant("ooc");
         setNarrativeLines((prev) => [...prev, { kind: "system", text: "[OOC Mode \u2014 type to chat, ESC to exit]" }, { kind: "dm", text: "" }]);
         break;
+      }
     }
   }, [setModelines, setVariant, setStyle, setResources, setChoiceIndex,
-      setActiveModal, setOocActive, setNarrativeLines, gameStateRef, fileIO,
+      setActiveModal, setActiveSession, setNarrativeLines, gameStateRef, clientRef, engineRef, fileIO,
       previousVariantRef, variantRef]);
 
   const buildCallbacks = useCallback((): EngineCallbacks => ({

@@ -123,12 +123,9 @@ export default function App({ shutdownRef }: AppProps) {
   // Auto-sync activeModalRef from state (engine callbacks need ref for synchronous reads)
   useEffect(() => { activeModalRef.current = activeModal; }, [activeModal]);
 
-  // --- OOC state (shared with PlayingPhase, set by dispatchTuiCommand) ---
-  const [oocActive, setOocActive] = useState(false);
+  // --- Mode session state (replaces separate oocActive/devActive booleans) ---
+  const [activeSession, setActiveSession] = useState<import("./tui/game-context.js").ModeSession | null>(null);
   const previousVariantRef = useRef<StyleVariant>("exploration");
-
-  // --- Dev mode state ---
-  const [devActive, setDevActive] = useState(false);
 
   // --- Display state ---
   const [resources, setResources] = useState<string[]>([]);
@@ -236,8 +233,8 @@ export default function App({ shutdownRef }: AppProps) {
   const { buildCallbacks, dispatchTuiCommand } = useGameCallbacks({
     setNarrativeLines, setEngineState, setErrorMsg, setModelines,
     setResources, setStyle, setVariant, setActiveModal, setChoiceIndex,
-    setOocActive, setRetryOverlay,
-    gameStateRef, clientRef, activeModalRef, variantRef, previousVariantRef,
+    setActiveSession, setRetryOverlay,
+    gameStateRef, clientRef, engineRef, activeModalRef, variantRef, previousVariantRef,
     costTracker, fileIO,
   });
 
@@ -563,9 +560,8 @@ export default function App({ shutdownRef }: AppProps) {
     activeModal, setActiveModal,
     choiceIndex, setChoiceIndex,
     retryOverlay,
-    oocActive, setOocActive, previousVariantRef,
+    activeSession, setActiveSession, previousVariantRef,
     devModeEnabled: isDevMode(),
-    devActive, setDevActive,
     dispatchTuiCommand,
     onShutdown: doSaveAndExit,
     onEndSession: doEndSession,
