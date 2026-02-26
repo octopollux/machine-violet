@@ -82,7 +82,7 @@ export class StatePersister {
 
   private enqueueWrite(file: string, content: string): void {
     const prev = this.writeQueues.get(file) ?? Promise.resolve();
-    const next = prev.then(() => this.doWrite(file, content)).catch(() => {});
+    const next = prev.then(() => this.doWrite(file, content)).catch(() => { /* fire-and-forget */ });
     this.writeQueues.set(file, next);
   }
 

@@ -50,6 +50,7 @@ export function renderViewport(
           : "?";
       terrainChars.set(terrain, ch);
     }
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- just set above
     return terrainChars.get(terrain)!;
   }
 

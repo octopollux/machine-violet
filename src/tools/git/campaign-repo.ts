@@ -32,9 +32,9 @@ export interface GitIO {
   add(dir: string, filepath: string): Promise<void>;
   remove(dir: string, filepath: string): Promise<void>;
   commit(dir: string, message: string, author: { name: string; email: string }): Promise<string>;
-  log(dir: string, depth?: number): Promise<Array<{ oid: string; commit: { message: string; author: { timestamp: number } } }>>;
+  log(dir: string, depth?: number): Promise<{ oid: string; commit: { message: string; author: { timestamp: number } } }[]>;
   checkout(dir: string, oid: string): Promise<void>;
-  statusMatrix(dir: string): Promise<Array<[string, number, number, number]>>;
+  statusMatrix(dir: string): Promise<[string, number, number, number][]>;
   listFiles(dir: string): Promise<string[]>;
 }
 

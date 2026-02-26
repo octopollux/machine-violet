@@ -7,8 +7,7 @@ Ink (React for CLI) + Anthropic Claude SDK + TypeScript.
 
 ```bash
 npm install
-npx vitest run          # tests
-npx eslint src/         # lint
+npm run check           # lint + tests + coverage threshold (run before every PR)
 npx tsx src/index.tsx    # launch (needs ANTHROPIC_API_KEY in .env)
 ```
 

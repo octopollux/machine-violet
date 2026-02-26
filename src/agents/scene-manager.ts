@@ -94,7 +94,7 @@ export class SceneManager {
   private repo: CampaignRepo | null;
   private pendingOp: PendingOperation | null = null;
   private pcSummaries: string[];
-  private aliasContext: string = "";
+  private aliasContext = "";
 
   /** Optional dev mode log callback. */
   devLog?: (msg: string) => void;
@@ -602,9 +602,9 @@ export class SceneManager {
    * subdirectory entries (locations/<slug>/index.md).
    * Returns entries as `{ dir, file, fullPath }`.
    */
-  private async collectEntityFiles(): Promise<Array<{ dir: string; file: string; fullPath: string }>> {
+  private async collectEntityFiles(): Promise<{ dir: string; file: string; fullPath: string }[]> {
     const dirs = ["characters", "locations", "factions", "lore"];
-    const results: Array<{ dir: string; file: string; fullPath: string }> = [];
+    const results: { dir: string; file: string; fullPath: string }[] = [];
     for (const dir of dirs) {
       const dirPath = `${this.state.campaignRoot}/${dir}`;
       try {

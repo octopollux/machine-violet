@@ -2,13 +2,13 @@ import { describe, it, expect, vi } from "vitest";
 import { checkAndRestoreRawMode } from "./useRawModeGuardian.js";
 import type { RawModeStdin } from "./useRawModeGuardian.js";
 
-function makeStdin(overrides: Partial<RawModeStdin> = {}): RawModeStdin & { setRawMode: ReturnType<typeof vi.fn> } {
+function makeStdin(overrides: Partial<RawModeStdin> = {}) {
   return {
     isTTY: true,
     isRaw: true,
     setRawMode: vi.fn(),
     ...overrides,
-  };
+  } as RawModeStdin & { setRawMode: ReturnType<typeof vi.fn> };
 }
 
 describe("checkAndRestoreRawMode", () => {

@@ -2,6 +2,8 @@ import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { isDevMode } from "./dev-mode.js";
 
+const noop = () => { /* fire-and-forget */ };
+
 // --- Module-level state (same pattern as dev-mode.ts) ---
 
 let dumpDir: string | null = null;
@@ -12,7 +14,7 @@ let dumpDir: string | null = null;
  */
 export function setContextDumpDir(dir: string): void {
   dumpDir = dir;
-  void mkdir(dir, { recursive: true }).catch(() => {});
+  void mkdir(dir, { recursive: true }).catch(noop);
 }
 
 /** Get the current dump directory (for testing). */
@@ -44,7 +46,7 @@ export function dumpContext(agentName: string, params: DumpableParams): void {
   const json = JSON.stringify(envelope, null, 2);
   const filePath = join(dumpDir, `${agentName}.json`);
 
-  void writeFile(filePath, json, "utf-8").catch(() => {});
+  void writeFile(filePath, json, "utf-8").catch(noop);
 }
 
 /**
@@ -63,5 +65,5 @@ export function dumpThinking(
   const json = JSON.stringify(envelope, null, 2);
   const filePath = join(dumpDir, `${agentName}-thinking.json`);
 
-  void writeFile(filePath, json, "utf-8").catch(() => {});
+  void writeFile(filePath, json, "utf-8").catch(noop);
 }

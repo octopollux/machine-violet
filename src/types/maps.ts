@@ -60,12 +60,12 @@ export interface PathResult {
 }
 
 export interface LineOfSightResult {
-  tiles: Array<{
+  tiles: {
     coord: CoordKey;
     terrain: string;
     entities: MapEntity[];
     annotation?: string;
-  }>;
+  }[];
 }
 
 export interface TilesInRangeInput {

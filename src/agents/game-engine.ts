@@ -564,6 +564,7 @@ export class GameEngine {
       if (front_matter_updates) {
         for (const [key, value] of Object.entries(front_matter_updates)) {
           if (value === null) {
+            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
             delete frontMatter[key];
           } else {
             frontMatter[key] = value;

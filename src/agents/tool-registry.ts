@@ -481,7 +481,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     handler: (state, input) => {
       const r = requireMap(state, input);
       if ("is_error" in r) return r as ToolResult;
-      const ents = input.entities as Array<{ coord: string; entity: Parameters<typeof placeEntity>[2] }>;
+      const ents = input.entities as { coord: string; entity: Parameters<typeof placeEntity>[2] }[];
       importEntities(r.map, ents);
       return ok(`Placed ${ents.length} entities`);
     },

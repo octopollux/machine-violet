@@ -17,7 +17,7 @@ export interface ValidationError {
  * Returns errors for dead links (links pointing to non-existent files).
  */
 export function validateWikilinks(
-  files: Array<{ path: string; content: string }>,
+  files: { path: string; content: string }[],
   existingPaths: Set<string>,
 ): ValidationError[] {
   const errors: ValidationError[] = [];

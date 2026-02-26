@@ -38,7 +38,8 @@ export function rollDice(
  */
 function validateClaim(input: RollDiceInput): RollDiceOutput {
   const expressions = parseMulti(input.expression);
-  const claim = input.claimed_result!;
+  const claim = input.claimed_result;
+  if (!claim) throw new Error("validateClaim requires claimed_result");
 
   if (expressions.length !== 1) {
     throw new Error("Claimed results only supported for single expressions");

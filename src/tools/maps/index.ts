@@ -56,7 +56,7 @@ export function defineRegion(
 /** Batch-place multiple entities */
 export function importEntities(
   map: MapData,
-  entities: Array<{ coord: CoordKey; entity: MapEntity }>,
+  entities: { coord: CoordKey; entity: MapEntity }[],
 ): void {
   for (const { coord, entity } of entities) {
     placeEntity(map, coord, entity);
@@ -120,21 +120,22 @@ export function tilesInRange(
   center: CoordKey,
   range: number,
   filter?: "entities" | string,
-): Array<{ coord: CoordKey; terrain: string; entities: MapEntity[] }> {
-  const results: Array<{
+): { coord: CoordKey; terrain: string; entities: MapEntity[] }[] {
+  const results: {
     coord: CoordKey;
     terrain: string;
     entities: MapEntity[];
-  }> = [];
+  }[] = [];
 
   // BFS to find all tiles within range
   const visited = new Set<CoordKey>();
-  const queue: Array<{ coord: CoordKey; dist: number }> = [
+  const queue: { coord: CoordKey; dist: number }[] = [
     { coord: center, dist: 0 },
   ];
   visited.add(center);
 
   while (queue.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- while-loop guarantees non-empty
     const { coord, dist } = queue.shift()!;
 
     if (dist > range) continue;
@@ -176,12 +177,13 @@ export function findNearest(
 ): { coord: CoordKey; distance: number } | null {
   // BFS from the starting point
   const visited = new Set<CoordKey>();
-  const queue: Array<{ coord: CoordKey; dist: number }> = [
+  const queue: { coord: CoordKey; dist: number }[] = [
     { coord: from, dist: 0 },
   ];
   visited.add(from);
 
   while (queue.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- while-loop guarantees non-empty
     const { coord, dist } = queue.shift()!;
 
     // Check entities at this coordinate
@@ -237,6 +239,7 @@ export function moveEntity(
     if (idx !== -1) {
       const entity = entities.splice(idx, 1)[0];
       if (entities.length === 0) {
+        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- cleaning up coord-keyed record
         delete map.entities[coord];
       }
       // Place at new position
@@ -257,6 +260,7 @@ export function removeEntity(map: MapData, entityId: string): void {
     if (idx !== -1) {
       entities.splice(idx, 1);
       if (entities.length === 0) {
+        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- cleaning up coord-keyed record
         delete map.entities[coord];
       }
       return;

@@ -228,6 +228,7 @@ export default function App({ shutdownRef }: AppProps) {
   // Without this, Ink removes its `readable` listener and calls `stdin.unref()`
   // whenever rawModeEnabledCount drops to 0 (i.e. between SetupPhase unmounting
   // and PlayingPhase mounting). This permanent hook keeps the count >= 1.
+  // eslint-disable-next-line @typescript-eslint/no-empty-function -- intentional no-op to keep raw mode alive
   const stableNoOp = useCallback(() => {}, []);
   useInput(stableNoOp, { isActive: phase !== "loading" && phase !== "shutting_down" });
 

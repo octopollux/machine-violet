@@ -121,7 +121,7 @@ export function isAITurn(state: GameState): boolean {
 /**
  * Build player entries for TUI display.
  */
-export function getPlayerEntries(state: GameState): Array<{ name: string; isAI: boolean }> {
+export function getPlayerEntries(state: GameState): { name: string; isAI: boolean }[] {
   return state.config.players.map((p) => ({
     name: p.character,
     isAI: p.type === "ai",

@@ -39,10 +39,12 @@ export function findPath(
     }
 
     if (current === to) {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- current always in gScore
       return reconstructPath(cameFrom, current, gScore.get(current)!);
     }
 
     openSet.delete(current);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- current always in gScore
     const currentG = gScore.get(current)!;
 
     for (const neighbor of gridNeighbors(map.gridType, current)) {
@@ -73,6 +75,7 @@ function reconstructPath(
 ): PathResult {
   const path: CoordKey[] = [current];
   while (cameFrom.has(current)) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- while-loop guarantees presence
     current = cameFrom.get(current)!;
     path.unshift(current);
   }
