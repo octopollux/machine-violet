@@ -278,19 +278,21 @@ describe("DiceRollModal", () => {
 describe("SessionRecapModal", () => {
   it("renders recap with header and continue prompt", () => {
     const { lastFrame } = render(
-      <SessionRecapModal
-        variant={gothic}
-        width={60}
-        lines={[
-          "The party entered the Shattered Hall.",
-          "Aldric confronted the shadow king.",
-        ]}
-      />,
+      <Box width={100} height={30}>
+        <SessionRecapModal
+          variant={gothic}
+          width={100}
+          height={30}
+          lines={[
+            "The party entered the Shattered Hall.",
+            "Aldric confronted the shadow king.",
+          ]}
+        />
+      </Box>,
     );
     const frame = lastFrame();
-    expect(frame).toContain("Session Recap");
     expect(frame).toContain("Previously on...");
     expect(frame).toContain("The party entered the Shattered Hall.");
-    expect(frame).toContain("Press ESC or Enter to continue");
+    expect(frame).toContain("ESC or Enter to continue");
   });
 });

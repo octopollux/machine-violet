@@ -4,6 +4,7 @@ import type { ConversationManager, DroppedExchange } from "../context/index.js";
 import { buildDMPrefix, buildActiveState } from "./dm-prompt.js";
 import type { DMSessionState } from "./dm-prompt.js";
 import { summarizeScene } from "./subagents/scene-summarizer.js";
+import { generateNarrativeRecap } from "./subagents/narrative-recap.js";
 import { updatePrecis } from "./subagents/precis-updater.js";
 import type { PlayerRead } from "./subagents/precis-updater.js";
 import { updateChangelogs } from "./subagents/changelog-updater.js";
@@ -278,6 +279,22 @@ export class SceneManager {
     const recapPath = paths.sessionRecap(this.scene.sessionNumber);
     await this.fileIO.writeFile(recapPath, `# Session ${this.scene.sessionNumber} Recap\n\n${result.campaignLogEntry}\n`);
 
+    // Generate narrative recap for the "Previously on..." modal
+    try {
+      const narrativeResult = await generateNarrativeRecap(
+        client,
+        result.campaignLogEntry,
+        this.state.config.name,
+      );
+      await this.fileIO.writeFile(
+        paths.sessionRecapNarrative(this.scene.sessionNumber),
+        narrativeResult.text,
+      );
+      accUsage(result.usage, narrativeResult.usage);
+    } catch {
+      // Non-critical — bullet recap still exists for fallback
+    }
+
     // Git session commit
     await this.repo?.sessionCommit(this.scene.sessionNumber);
 
@@ -354,11 +371,18 @@ export class SceneManager {
   async sessionResume(): Promise<string> {
     const paths = campaignPaths(this.state.campaignRoot);
 
-    // Try to load session recap
+    // Try to load session recap (bullet version — always used for DM prefix)
     const recapPath = paths.sessionRecap(this.scene.sessionNumber - 1);
     let recap = "";
     if (await this.fileIO.exists(recapPath)) {
       recap = await this.fileIO.readFile(recapPath);
+    }
+
+    // Load narrative recap for player display (falls back to bullet recap)
+    let narrativeRecap = "";
+    const narrativePath = paths.sessionRecapNarrative(this.scene.sessionNumber - 1);
+    if (await this.fileIO.exists(narrativePath)) {
+      narrativeRecap = await this.fileIO.readFile(narrativePath);
     }
 
     // Load campaign log for summary
@@ -383,7 +407,8 @@ export class SceneManager {
       this.devLog?.(`[dev] session resume validation failed: ${e instanceof Error ? e.message : String(e)}`);
     }
 
-    return recap;
+    // Return narrative recap for player display, fall back to bullet recap
+    return narrativeRecap || recap;
   }
 
   /** Context refresh: re-read campaign log, session recap, rebuild active state */

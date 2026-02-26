@@ -23,7 +23,7 @@ export function PlayingPhase() {
     activeSession, setActiveSession, previousVariantRef,
     devModeEnabled,
     retryOverlay,
-    dispatchTuiCommand, onShutdown, onEndSession,
+    dispatchTuiCommand, onShutdown, onEndSession, onRecapDismissed,
   } = useGameContext();
   const { stdout } = useStdout();
   const cols = stdout?.columns ?? 80;
@@ -143,7 +143,9 @@ export function PlayingPhase() {
     // Scrollable modals (character sheet, recap)
     if (activeModal && (activeModal.kind === "character_sheet" || activeModal.kind === "recap")) {
       if (key.escape || key.return) {
+        const wasRecap = activeModal.kind === "recap";
         setActiveModal(null);
+        if (wasRecap) onRecapDismissed();
         return;
       }
       if (key.pageUp || key.pageDown) {
@@ -357,7 +359,7 @@ export function PlayingPhase() {
       case "dice":
         return 8 + 2;
       case "recap":
-        return Math.min(activeModal.lines.length + 2, Math.floor(rows / 2));
+        return 0; // CenteredModal uses absolute positioning
       default:
         return 0;
     }
@@ -416,7 +418,9 @@ export function PlayingPhase() {
         <SessionRecapModal
           variant={style.variants[variant]}
           width={cols}
+          height={rows}
           lines={activeModal.lines}
+          scrollRef={modalScrollRef}
         />
       )}
       {activeModal?.kind === "character_sheet" && (

@@ -110,6 +110,7 @@ export default function App({ shutdownRef }: AppProps) {
   const fileIO = useRef(createFileIO());
   const clientRef = useRef<Anthropic | null>(null);
   const persisterRef = useRef<StatePersister | null>(null);
+  const pendingResumeRef = useRef<{ characterName: string; text: string } | null>(null);
 
   // --- Campaigns ---
   const [campaigns, setCampaigns] = useState<CampaignEntry[]>([]);
@@ -374,10 +375,6 @@ export default function App({ shutdownRef }: AppProps) {
         setPhase("playing");
       } else {
         setNarrativeLines([...transcriptLines, { kind: "system", text: `Welcome back to ${config.name}.` }, { kind: "dm", text: "" }]);
-        if (recap) {
-          setActiveModal({ kind: "recap", lines: recap.split("\n") });
-        }
-        setPhase("playing");
 
         const activePlayer = getActivePlayer(gs);
         const resumeParts = ["[Session resumes. Continue the narrative where we left off."];
@@ -385,7 +382,14 @@ export default function App({ shutdownRef }: AppProps) {
         const pc = config.players[0];
         if (pc) resumeParts.push(`The player character is ${pc.character}.`);
         resumeParts.push("Pick up naturally from the last scene — do NOT restart, re-introduce the setting, or recap what has already happened.");
-        await engine.processInput(activePlayer.characterName, resumeParts.join(" ") + "]", { skipTranscript: true });
+
+        if (recap) {
+          setActiveModal({ kind: "recap", lines: recap.split("\n") });
+          pendingResumeRef.current = { characterName: activePlayer.characterName, text: resumeParts.join(" ") + "]" };
+        } else {
+          await engine.processInput(activePlayer.characterName, resumeParts.join(" ") + "]", { skipTranscript: true });
+        }
+        setPhase("playing");
       }
     } else {
       hydratedRef.current = true;
@@ -456,6 +460,14 @@ export default function App({ shutdownRef }: AppProps) {
 
     process.exit(0);
   }, [shutdownRef]);
+
+  // --- Recap dismissed: fire the deferred DM resume turn ---
+  const handleRecapDismissed = useCallback(() => {
+    const pending = pendingResumeRef.current;
+    if (!pending) return;
+    pendingResumeRef.current = null;
+    engineRef.current?.processInput(pending.characterName, pending.text, { skipTranscript: true });
+  }, []);
 
   // --- End Session: full session-end housekeeping then exit ---
   const doEndSession = useCallback(async () => {
@@ -569,6 +581,7 @@ export default function App({ shutdownRef }: AppProps) {
     dispatchTuiCommand,
     onShutdown: doSaveAndExit,
     onEndSession: doEndSession,
+    onRecapDismissed: handleRecapDismissed,
   };
 
   return (

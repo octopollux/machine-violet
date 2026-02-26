@@ -51,6 +51,8 @@ export function campaignPaths(root: string) {
     rule: (name: string) => join(root, "rules", `${name}.md`),
     sessionRecap: (n: number) =>
       join(root, "campaign", "session-recaps", `session-${String(n).padStart(3, "0")}.md`),
+    sessionRecapNarrative: (n: number) =>
+      join(root, "campaign", "session-recaps", `session-${String(n).padStart(3, "0")}-narrative.md`),
     sceneTranscript: (n: number, slug: string) =>
       join(sceneDir(root, n, slug), "transcript.md"),
     sceneDmNotes: (n: number, slug: string) =>
