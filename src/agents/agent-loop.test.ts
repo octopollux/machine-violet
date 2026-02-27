@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
 import { agentLoop, stampToolsCacheControl } from "./agent-loop.js";
 import { extractStatus, retryDelay } from "./agent-session.js";
@@ -40,7 +40,7 @@ function mockConfig(overrides?: Partial<AgentLoopConfig>): AgentLoopConfig {
 }
 
 function mockUsage(): Anthropic.Usage {
-  return { input_tokens: 100, output_tokens: 50, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
+  return { input_tokens: 100, output_tokens: 50, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: null, inference_geo: null, server_tool_use: null, service_tier: null };
 }
 
 function textMessage(text: string): Anthropic.Message {
@@ -332,10 +332,10 @@ describe("stampToolsCacheControl", () => {
     ];
 
     const result = stampToolsCacheControl(tools);
-    const last = result[result.length - 1] as Record<string, unknown>;
+    const last = result[result.length - 1] as unknown as Record<string, unknown>;
     expect(last["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
     // First tool should NOT have cache_control
-    const first = result[0] as Record<string, unknown>;
+    const first = result[0] as unknown as Record<string, unknown>;
     expect(first["cache_control"]).toBeUndefined();
   });
 
@@ -348,9 +348,9 @@ describe("stampToolsCacheControl", () => {
     // Input array not mutated
     expect(tools).not.toBe(result);
     // Input tool object not mutated
-    expect((tools[0] as Record<string, unknown>)["cache_control"]).toBeUndefined();
+    expect((tools[0] as unknown as Record<string, unknown>)["cache_control"]).toBeUndefined();
     // Output has cache_control
-    expect((result[0] as Record<string, unknown>)["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
+    expect((result[0] as unknown as Record<string, unknown>)["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
   });
 
   it("returns empty array unchanged", () => {

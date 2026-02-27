@@ -1,3 +1,4 @@
+import { describe, it, expect } from "vitest";
 import { writeDebugDump } from "./debug-dump.js";
 import type { FileIO } from "../../agents/scene-manager.js";
 import { norm } from "../../utils/paths.js";

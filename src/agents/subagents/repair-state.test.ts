@@ -20,7 +20,7 @@ function makeGameState(root = "/campaigns/test"): GameState {
     },
     combat: { active: false, order: [], round: 0, currentTurn: 0 },
     combatConfig: { initiative_method: "d20_dex", round_structure: "individual", surprise_rules: false },
-    decks: {},
+    decks: { decks: {} },
     config: {
       name: "Test Campaign",
       dm_personality: { name: "Classic", prompt_fragment: "" },

@@ -563,7 +563,7 @@ export function summarizeGameState(gs: GameState): string {
   lines.push(`\nMaps loaded: ${mapIds.length > 0 ? mapIds.join(", ") : "none"}`);
 
   // Decks
-  const deckIds = Object.keys(gs.decks);
+  const deckIds = Object.keys(gs.decks.decks);
   lines.push(`Decks loaded: ${deckIds.length > 0 ? deckIds.join(", ") : "none"}`);
 
   return lines.join("\n");

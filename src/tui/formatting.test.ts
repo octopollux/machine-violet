@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseFormatting, toPlainText, highlightQuotesWithState, markdownToTags, nodeVisibleLength, wrapNodes, processNarrativeLines } from "./formatting.js";
-import type { FormattingTag, NarrativeLine } from "../types/tui.js";
+import type { FormattingTag, FormattingNode, NarrativeLine } from "../types/tui.js";
 
 describe("parseFormatting", () => {
   it("returns plain text as-is", () => {

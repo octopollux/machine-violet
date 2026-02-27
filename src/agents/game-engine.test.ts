@@ -21,7 +21,7 @@ vi.mock("./subagents/ai-player.js", () => ({
 import { aiPlayerTurn } from "./subagents/ai-player.js";
 
 function mockUsage(): Anthropic.Usage {
-  return { input_tokens: 100, output_tokens: 50, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
+  return { input_tokens: 100, output_tokens: 50, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: null, inference_geo: null, server_tool_use: null, service_tier: null };
 }
 
 function textMessage(text: string): Anthropic.Message {
@@ -103,6 +103,7 @@ function mockScene(): SceneState {
     transcript: [],
     precis: "",
     openThreads: "",
+    npcIntents: "",
     playerReads: [],
     sessionNumber: 1,
   };
@@ -167,6 +168,7 @@ function mockCallbacks(): { callbacks: EngineCallbacks; log: CallbackLog } {
       onUsageUpdate: (usage) => log.usageUpdates.push({ ...usage }),
       onError: (error) => log.errors.push(error),
       onDevLog: (msg) => log.devLogs.push(msg),
+      onRetry: () => {},
     },
   };
 }
@@ -629,6 +631,7 @@ describe("GameEngine Git Auto-Commit", () => {
       // head=1, workdir=2, stage=2: file is staged and differs from HEAD → commit will fire
       statusMatrix: vi.fn(async () => [["file.md", 1, 2, 2] as [string, number, number, number]]),
       listFiles: vi.fn(async () => []),
+      remove: vi.fn(async () => {}),
     };
   }
 

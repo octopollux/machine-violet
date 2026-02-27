@@ -8,4 +8,3 @@ export { SetupPhase } from "./SetupPhase.js";
 export type { SetupPhaseProps } from "./SetupPhase.js";
 
 export { PlayingPhase } from "./PlayingPhase.js";
-export type { PlayingPhaseProps } from "./PlayingPhase.js";

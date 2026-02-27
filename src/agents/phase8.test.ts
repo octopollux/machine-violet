@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import type { GameState } from "./game-state.js";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { CampaignConfig, PlayerConfig } from "../types/config.js";
 import {
@@ -16,7 +17,7 @@ import { ToolRegistry } from "./tool-registry.js";
 // --- Test Helpers ---
 
 function mockUsage(): Anthropic.Usage {
-  return { input_tokens: 50, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
+  return { input_tokens: 50, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: null, inference_geo: null, server_tool_use: null, service_tier: null };
 }
 
 function textResponse(text: string): Anthropic.Message {
@@ -84,10 +85,10 @@ function makeConfig(players: PlayerConfig[]): CampaignConfig {
 function makeState(players: PlayerConfig[], activeIndex = 0): GameState {
   return {
     maps: {},
-    clocks: { calendar: { epoch: "0", current: 0, display_format: "d/m/y", alarms: [] }, combat: { round: 0, active: false, current: 0, alarms: [] } },
+    clocks: { calendar: { epoch: "0", current: 0, display_format: "d/m/y", alarms: [] }, combat: { active: false, current: 0, alarms: [] } },
     combat: { active: false, order: [], round: 0, currentTurn: 0 },
     combatConfig: { initiative_method: "d20_dex", round_structure: "individual", surprise_rules: false },
-    decks: { decks: new Map() },
+    decks: { decks: {} },
     config: makeConfig(players),
     campaignRoot: "/tmp/test",
     activePlayerIndex: activeIndex,

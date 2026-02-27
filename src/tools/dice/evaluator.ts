@@ -76,7 +76,8 @@ function applyKeep(rolls: number[], expr: DiceExpression): number[] {
 function computeTotal(kept: number[], expr: DiceExpression): number {
   if (expr.successThreshold !== undefined) {
     // Success counting — total is count of successes, no modifier
-    return kept.filter((r) => r >= expr.successThreshold).length;
+    const threshold = expr.successThreshold;
+    return kept.filter((r) => r >= threshold).length;
   }
 
   const sum = kept.reduce((acc, val) => acc + val, 0);

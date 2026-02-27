@@ -6,7 +6,7 @@ import { updateChangelogs } from "./changelog-updater.js";
 import { resolveAction } from "./resolve-action.js";
 
 function mockUsage(): Anthropic.Usage {
-  return { input_tokens: 50, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
+  return { input_tokens: 50, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: null, inference_geo: null, server_tool_use: null, service_tier: null };
 }
 
 function textResponse(text: string): Anthropic.Message {

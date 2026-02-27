@@ -12,7 +12,7 @@ import { createDecksState } from "../tools/cards/index.js";
 import { norm } from "../utils/paths.js";
 
 function mockUsage(): Anthropic.Usage {
-  return { input_tokens: 50, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
+  return { input_tokens: 50, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: null, inference_geo: null, server_tool_use: null, service_tier: null };
 }
 
 function textResponse(text: string): Anthropic.Message {
@@ -68,6 +68,7 @@ function mockScene(): SceneState {
     ],
     precis: "",
     openThreads: "",
+    npcIntents: "",
     playerReads: [],
     sessionNumber: 1,
   };
@@ -313,7 +314,7 @@ describe("SceneManager", () => {
 
     // pending-operation.json was written multiple times during cascade
     const pendingOpCalls = (fileIO.writeFile as ReturnType<typeof vi.fn>).mock.calls
-      .filter(([path]: [string]) => path.includes("pending-operation"));
+      .filter(([path]: unknown[]) => (path as string).includes("pending-operation"));
     expect(pendingOpCalls.length).toBeGreaterThanOrEqual(4);
   });
 
@@ -358,7 +359,7 @@ describe("SceneManager", () => {
 
     // Session recap file was written
     const recapCalls = (fileIO.writeFile as ReturnType<typeof vi.fn>).mock.calls
-      .filter(([path]: [string]) => path.includes("session-"));
+      .filter(([path]: unknown[]) => (path as string).includes("session-"));
     expect(recapCalls.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -771,7 +772,7 @@ describe("SceneManager", () => {
 
     // Pending op file should be cleared (written as empty string)
     const pendingOpCalls = (fileIO.writeFile as ReturnType<typeof vi.fn>).mock.calls
-      .filter(([path]: [string]) => path.includes("pending-operation"));
+      .filter(([path]: unknown[]) => (path as string).includes("pending-operation"));
     const lastCall = pendingOpCalls[pendingOpCalls.length - 1];
     expect(lastCall[1]).toBe("");
   });
@@ -854,7 +855,7 @@ describe("SceneManager", () => {
 
     // pending-operation.json should NOT be cleared — still has the failed step
     const pendingOpCalls = (fileIO.writeFile as ReturnType<typeof vi.fn>).mock.calls
-      .filter(([path]: [string]) => path.includes("pending-operation"));
+      .filter(([path]: unknown[]) => (path as string).includes("pending-operation"));
     // The last write should have the step, not be empty
     const lastCall = pendingOpCalls[pendingOpCalls.length - 1];
     expect(lastCall[1]).not.toBe("");
