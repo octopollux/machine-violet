@@ -8,10 +8,14 @@ export function classifyPath(relPath: string): FileCategory {
 
   if (normalized === "config.json") return "config";
   if (normalized.startsWith("state/")) return "state";
-  if (normalized.endsWith("-thinking.json") && normalized.includes("context-dump"))
+  // Context dumps: .dev-mode/**/context/* or context-dump/*
+  const isContextPath = normalized.includes(".dev-mode/") && normalized.includes("/context/");
+  const isLegacyContextPath = normalized.includes("context-dump/");
+  if (normalized.endsWith("-thinking.json") && (isContextPath || isLegacyContextPath))
     return "thinking";
-  if (normalized.includes("context-dump") && normalized.endsWith(".json"))
-    return "context-dump";
+  if (isContextPath || isLegacyContextPath) return "context-dump";
+  // Crash logs
+  if (normalized.startsWith(".debug/")) return "other";
   if (normalized.includes("/scenes/") && normalized.endsWith("transcript.md"))
     return "transcript";
   if (normalized.includes("/session-recaps/")) return "transcript";
@@ -50,9 +54,9 @@ export function watchCampaign(
     interval: 500,
     ignored: (path: string) => {
       const basename = path.split(/[/\\]/).pop() ?? "";
-      // Ignore dotfiles/dirs (but not the watched root which may be under .tui-rpg)
-      if (basename.startsWith(".")) return true;
       if (basename === "node_modules") return true;
+      // Allow .dev-mode and .debug through; block all other dotfiles/dirs
+      if (basename.startsWith(".") && basename !== ".dev-mode" && basename !== ".debug") return true;
       return false;
     },
   });
