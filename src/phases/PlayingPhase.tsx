@@ -70,9 +70,10 @@ export function PlayingPhase() {
         setModeBusy(false);
         setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }]);
         costTracker.current?.record(result.usage, activeSession.tier);
-      }).catch(() => {
+      }).catch((err: unknown) => {
         setModeBusy(false);
-        setNarrativeLines((prev) => [...prev, { kind: "system", text: `[${activeSession.label} error]` }, { kind: "dm", text: "" }]);
+        const msg = err instanceof Error ? err.message : String(err);
+        setNarrativeLines((prev) => [...prev, { kind: "system", text: `[${activeSession.label} error: ${msg}]` }, { kind: "dm", text: "" }]);
       });
     } else {
       // DM mode
