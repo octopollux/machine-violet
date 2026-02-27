@@ -14,7 +14,7 @@ export interface SubagentConfig {
   /** Silent (DM-only) or player-facing (takes over TUI) */
   visibility: SubagentVisibility;
   /** System prompt for the subagent */
-  systemPrompt: string;
+  systemPrompt: string | Anthropic.TextBlockParam[];
   /** Max output tokens */
   maxTokens: number;
   /** Tool definitions available to this subagent (optional) */

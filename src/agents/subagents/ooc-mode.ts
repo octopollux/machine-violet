@@ -2,10 +2,12 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { SubagentStreamCallback } from "../subagent.js";
 import { spawnSubagent } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
+import type { DMSessionState } from "../dm-prompt.js";
 import type { FileIO } from "../scene-manager.js";
 import { getModel } from "../../config/models.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
+import type { CampaignConfig } from "../../types/config.js";
 import type { CampaignRepo } from "../../tools/git/index.js";
 import { queryCommitLog } from "../../tools/git/index.js";
 import type { MapData } from "../../types/maps.js";
@@ -36,9 +38,57 @@ export interface OOCResult extends SubagentResult {
 }
 
 /**
- * Build the OOC system prompt with campaign-specific context.
+ * Options for building the OOC system prompt.
  */
+export interface OOCPromptOptions {
+  campaignName: string;
+  config?: CampaignConfig;
+  sessionState?: DMSessionState;
+  characterSheet?: string;
+  systemRules?: string;
+}
+
+/**
+ * Build the OOC system prompt with campaign-specific context.
+ *
+ * When `config` + `sessionState` are provided, returns `TextBlockParam[]`
+ * with cache_control on stable sections (identity, rules, campaign log).
+ *
+ * When only `campaignName` is provided (pre-game-start / backward compat),
+ * returns a flat string.
+ */
+export function buildOOCPrompt(options: OOCPromptOptions): string | Anthropic.TextBlockParam[];
+
+/** @deprecated Legacy overload — use options object form. */
 export function buildOOCPrompt(
+  campaignName: string,
+  systemRules?: string,
+  characterSheet?: string,
+): string;
+
+export function buildOOCPrompt(
+  optionsOrName: OOCPromptOptions | string,
+  systemRules?: string,
+  characterSheet?: string,
+): string | Anthropic.TextBlockParam[] {
+  // Legacy call: buildOOCPrompt("name", rules?, sheet?)
+  if (typeof optionsOrName === "string") {
+    return buildOOCPromptLegacy(optionsOrName, systemRules, characterSheet);
+  }
+
+  const opts = optionsOrName;
+
+  // If no session state, fall back to flat string
+  if (!opts.sessionState || !opts.config) {
+    return buildOOCPromptLegacy(opts.campaignName, opts.systemRules, opts.characterSheet);
+  }
+
+  // Build structured TextBlockParam[] with caching
+  return buildOOCPromptCached(opts);
+}
+
+/** Legacy flat-string builder (backward compat / pre-game-start). */
+function buildOOCPromptLegacy(
   campaignName: string,
   systemRules?: string,
   characterSheet?: string,
@@ -58,6 +108,86 @@ export function buildOOCPrompt(
   }
 
   return prompt;
+}
+
+/** Structured cached-prefix builder — mirrors DM prefix layout minus DM-internal sections. */
+function buildOOCPromptCached(opts: Required<Pick<OOCPromptOptions, "config" | "sessionState">> & OOCPromptOptions): Anthropic.TextBlockParam[] {
+  const blocks: Anthropic.TextBlockParam[] = [];
+  const config = opts.config;
+  const ss = opts.sessionState;
+
+  // OOC identity prompt (stable — cached)
+  blocks.push({
+    type: "text",
+    text: loadPrompt("ooc-mode"),
+    cache_control: { type: "ephemeral", ttl: "1h" },
+  } as Anthropic.TextBlockParam);
+
+  // Campaign setting
+  {
+    const settingLines: string[] = [`Campaign: ${opts.campaignName}`];
+    if (config.system) settingLines.push(`Game System: ${config.system}`);
+    if (config.genre) settingLines.push(`Genre: ${config.genre}`);
+    if (config.mood) settingLines.push(`Mood: ${config.mood}`);
+    if (config.difficulty) settingLines.push(`Difficulty: ${config.difficulty}`);
+    if (config.premise) settingLines.push(`Premise: ${config.premise}`);
+    blocks.push({
+      type: "text",
+      text: `\n\n## Campaign Setting\n${settingLines.join("\n")}`,
+    });
+  }
+
+  // Rules appendix (stable — cached)
+  if (ss.rulesAppendix || opts.systemRules) {
+    blocks.push({
+      type: "text",
+      text: `\n\n## Rules Reference\n${ss.rulesAppendix ?? opts.systemRules}`,
+      cache_control: { type: "ephemeral", ttl: "1h" },
+    } as Anthropic.TextBlockParam);
+  }
+
+  // Campaign log (stable within a scene — cached)
+  if (ss.campaignSummary) {
+    blocks.push({
+      type: "text",
+      text: `\n\n## Campaign Log\n${ss.campaignSummary}`,
+      cache_control: { type: "ephemeral", ttl: "1h" },
+    } as Anthropic.TextBlockParam);
+  }
+
+  // Session recap (changes once at session start)
+  if (ss.sessionRecap) {
+    blocks.push({
+      type: "text",
+      text: `\n\n## Last Session\n${ss.sessionRecap}`,
+    });
+  }
+
+  // Active state (location, PCs, alarms — changes during play)
+  if (ss.activeState) {
+    blocks.push({
+      type: "text",
+      text: `\n\n## Current State\n${ss.activeState}`,
+    });
+  }
+
+  // Scene precis (changes as exchanges are pruned)
+  if (ss.scenePrecis) {
+    blocks.push({
+      type: "text",
+      text: `\n\n## Scene So Far\n${ss.scenePrecis}`,
+    });
+  }
+
+  // Active character sheet (player-specific, uncached)
+  if (opts.characterSheet) {
+    blocks.push({
+      type: "text",
+      text: `\n\n## Active Character\n${opts.characterSheet}`,
+    });
+  }
+
+  return blocks;
 }
 
 /** Build OOC tool definitions (available when repo or fileIO is provided). */
@@ -193,6 +323,8 @@ export async function enterOOC(
   playerMessage: string,
   options: {
     campaignName: string;
+    config?: CampaignConfig;
+    sessionState?: DMSessionState;
     systemRules?: string;
     characterSheet?: string;
     previousVariant: string;
@@ -205,11 +337,13 @@ export async function enterOOC(
   },
   onStream?: SubagentStreamCallback,
 ): Promise<OOCResult> {
-  const systemPrompt = buildOOCPrompt(
-    options.campaignName,
-    options.systemRules,
-    options.characterSheet,
-  );
+  const systemPrompt = buildOOCPrompt({
+    campaignName: options.campaignName,
+    config: options.config,
+    sessionState: options.sessionState,
+    characterSheet: options.characterSheet,
+    systemRules: options.systemRules,
+  });
 
   const snapshot: OOCSnapshot = {
     previousVariant: options.previousVariant,
@@ -273,7 +407,14 @@ export function createOOCSession(
   options: {
     campaignName: string;
     previousVariant: string;
+    config?: CampaignConfig;
+    sessionState?: DMSessionState;
+    characterSheet?: string;
     repo?: CampaignRepo;
+    fileIO?: FileIO;
+    campaignRoot?: string;
+    maps?: Record<string, MapData>;
+    clocks?: ClocksState;
   },
 ): ModeSession {
   return {

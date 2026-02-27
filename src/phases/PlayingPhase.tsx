@@ -70,9 +70,10 @@ export function PlayingPhase() {
         setModeBusy(false);
         setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }]);
         costTracker.current?.record(result.usage, activeSession.tier);
-      }).catch(() => {
+      }).catch((err: unknown) => {
         setModeBusy(false);
-        setNarrativeLines((prev) => [...prev, { kind: "system", text: `[${activeSession.label} error]` }, { kind: "dm", text: "" }]);
+        const msg = err instanceof Error ? err.message : String(err);
+        setNarrativeLines((prev) => [...prev, { kind: "system", text: `[${activeSession.label} error: ${msg}]` }, { kind: "dm", text: "" }]);
       });
     } else {
       // DM mode
@@ -296,10 +297,16 @@ export function PlayingPhase() {
             if (clientRef.current && gameStateRef.current) {
               previousVariantRef.current = variant;
               const gs = gameStateRef.current;
+              const engine = engineRef.current;
+              const sm = engine?.getSceneManager();
               setActiveSession(createOOCSession(clientRef.current, {
                 campaignName: gs.config.name,
                 previousVariant: variant,
-                repo: engineRef.current?.getRepo() ?? undefined,
+                config: gs.config,
+                sessionState: sm?.getSessionState(),
+                repo: engine?.getRepo() ?? undefined,
+                fileIO: sm?.getFileIO(),
+                campaignRoot: gs.campaignRoot,
               }));
               setVariant("ooc");
               setNarrativeLines((prev) => [...prev, { kind: "system", text: "[OOC Mode \u2014 type to chat, ESC to exit]" }, { kind: "dm", text: "" }]);
