@@ -22,6 +22,7 @@ export interface PrefixSections {
   scenePrecis?: string;
   scenePacing?: string;
   playerRead?: string;
+  entityIndex?: string;
   uiState?: string;
 }
 
@@ -129,6 +130,14 @@ export function buildCachedPrefix(
     blocks.push({
       type: "text",
       text: `\n\n## Player Read\n${sections.playerRead}`,
+    });
+  }
+
+  // Scene entity index (prevents duplicate entity creation)
+  if (sections.entityIndex) {
+    blocks.push({
+      type: "text",
+      text: `\n\n## Scene Entities\n${sections.entityIndex}`,
     });
   }
 

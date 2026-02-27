@@ -590,6 +590,73 @@ describe("GameEngine Worldbuilding Entity I/O", () => {
     expect(devLogs.some((d) => d.includes("update_entity") && d.includes("updated"))).toBe(true);
   });
 
+  it("create_entity notifies sceneManager entity index", async () => {
+    const client = mockClient([
+      ...toolAndTextMessages("create_entity", {
+        entity_type: "character",
+        name: "Grimjaw",
+        file_path: "/tmp/test-campaign/characters/grimjaw.md",
+        content: "# Grimjaw\n\n**Type:** character\n\nA scarred orc.\n",
+      }, "You see a scarred orc."),
+    ]);
+    const { callbacks } = mockCallbacks();
+    const fio = mockFileIO();
+
+    const engine = new GameEngine({
+      client,
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: fio,
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "I look at the orc.");
+
+    // The scene manager's entity index should now contain Grimjaw
+    // We can verify by inspecting the system prompt
+    const sm = engine.getSceneManager();
+    const prompt = sm.getSystemPrompt();
+    const combined = prompt.map((b) => b.text).join("");
+    expect(combined).toContain("Scene Entities");
+    expect(combined).toContain("Grimjaw");
+  });
+
+  it("update_entity notifies sceneManager with aliases", async () => {
+    files[norm("/tmp/test-campaign/characters/grimjaw.md")] =
+      "# Grimjaw\n\n**Type:** character\n**Additional Names:** Captain Grimjaw\n\nA scarred orc.\n";
+
+    const client = mockClient([
+      ...toolAndTextMessages("update_entity", {
+        entity_type: "character",
+        name: "Grimjaw",
+        file_path: "/tmp/test-campaign/characters/grimjaw.md",
+        body_append: "Now an ally.",
+      }, "The orc nods."),
+    ]);
+    const { callbacks } = mockCallbacks();
+    const fio = mockFileIO();
+
+    const engine = new GameEngine({
+      client,
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: fio,
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "I befriend the orc.");
+
+    const sm = engine.getSceneManager();
+    const prompt = sm.getSystemPrompt();
+    const combined = prompt.map((b) => b.text).join("");
+    expect(combined).toContain("Scene Entities");
+    expect(combined).toContain("Grimjaw (also: Captain Grimjaw)");
+  });
+
   it("update_entity silently handles missing files", async () => {
     const client = mockClient([
       ...toolAndTextMessages("update_entity", {
