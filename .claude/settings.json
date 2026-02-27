@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(src/**)",
+      "Read(design-docs/**)",
+      "Read(dist/**)",
+      "Read(package.json)",
+      "Read(tsconfig.json)",
+      "Read(eslint.config.js)",
+      "Read(vitest.config.ts)",
+      "Read(CLAUDE.md)",
+      "Read(.claude/**)",
+      "Edit(src/**)",
+      "Edit(design-docs/**)",
+      "Write(src/**)",
+      "Read(~/Documents/.tui-rpg/**)",
+      "Edit(~/Documents/.tui-rpg/**)",
+      "Write(~/Documents/.tui-rpg/**)",
+      "Read(~/.local/share/.tui-rpg/**)",
+      "Edit(~/.local/share/.tui-rpg/**)",
+      "Write(~/.local/share/.tui-rpg/**)"
+    ]
+  }
+}

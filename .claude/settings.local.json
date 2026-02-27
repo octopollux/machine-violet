@@ -43,7 +43,10 @@
       "Bash(npm run:*)",
       "Bash(gh pr:*)",
       "Bash(gh run:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(mkdir:*)",
+      "Bash(git worktree:*)",
+      "Bash(git:*)"
     ]
   }
 }
