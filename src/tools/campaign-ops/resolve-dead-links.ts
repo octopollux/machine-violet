@@ -17,7 +17,7 @@ import { norm } from "../../utils/paths.js";
 export interface DeadLink {
   rawTarget: string;       // as it appears in source (e.g. "../characters/kael.md")
   resolvedPath: string;    // relative to root (e.g. "characters/kael.md")
-  references: Array<{ file: string; line: number; display: string }>;
+  references: { file: string; line: number; display: string }[];
 }
 
 export interface NearMatch {

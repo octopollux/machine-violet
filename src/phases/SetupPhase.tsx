@@ -14,7 +14,7 @@ import type { SetupConversation } from "../agents/subagents/setup-conversation.j
 import type { UsageStats } from "../agents/agent-loop.js";
 import { CostTracker } from "../context/cost-tracker.js";
 
-type ActiveChoiceModal = { kind: "choice"; prompt: string; choices: string[] };
+interface ActiveChoiceModal { kind: "choice"; prompt: string; choices: string[] }
 
 export interface SetupPhaseProps {
   mode: "fast" | "full";
@@ -194,7 +194,8 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
           return;
         }
         if (key.downArrow) {
-          setChoiceIndex((i) => Math.min(activeModal!.choices.length - 1, i + 1));
+          const choices = activeModal.choices;
+          setChoiceIndex((i) => Math.min(choices.length - 1, i + 1));
           return;
         }
         if (key.return) {

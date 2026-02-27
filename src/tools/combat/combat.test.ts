@@ -166,9 +166,8 @@ describe("turn management", () => {
 
   it("advanceTurn wraps around and increments round", () => {
     // Advance through all combatants
-    for (let i = 0; i < party.length; i++) {
-      advanceTurn(state);
-    }
+    // Advance through all combatants to wrap around
+    party.forEach(() => advanceTurn(state));
     // We should be back at the start, round 2
     expect(state.currentTurn).toBe(0);
     expect(state.round).toBe(2);

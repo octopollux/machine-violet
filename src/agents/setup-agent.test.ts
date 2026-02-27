@@ -93,7 +93,7 @@ describe("slugify", () => {
 describe("buildCampaignWorld", () => {
   it("creates campaign directory structure and files", async () => {
     const files: Record<string, string> = {};
-    const dirs: Set<string> = new Set();
+    const dirs = new Set<string>();
     const { norm } = await import("../utils/paths.js");
 
     const fileIO: FileIO = {

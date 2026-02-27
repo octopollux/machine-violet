@@ -348,5 +348,6 @@ export function getStyle(name: string): FrameStyle | undefined {
 export function styleForGenre(genre: string): FrameStyle {
   const tag = genre.toLowerCase().replace(/\s+/g, "_");
   const match = STYLES.find((s) => s.genre_tags.includes(tag));
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- "clean" always exists in STYLES
   return match ?? STYLES.find((s) => s.name === "clean")!;
 }

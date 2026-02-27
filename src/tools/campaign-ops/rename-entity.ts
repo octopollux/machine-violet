@@ -88,7 +88,7 @@ export async function renameEntity(
 
   const filesUpdated: string[] = [];
   let totalLinksUpdated = 0;
-  const fileWrites: Array<{ absPath: string; content: string }> = [];
+  const fileWrites: { absPath: string; content: string }[] = [];
 
   // Rewrite links in each file
   for (const file of campaignFiles) {

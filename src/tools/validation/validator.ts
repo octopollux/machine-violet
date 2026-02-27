@@ -62,7 +62,7 @@ export async function validateCampaign(
   }
 
   // 2. Gather all entity files and validate format
-  const entityFiles: Array<{ path: string; content: string }> = [];
+  const entityFiles: { path: string; content: string }[] = [];
   const entityDirs = ["characters", "locations", "factions", "lore"];
 
   for (const dir of entityDirs) {

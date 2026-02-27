@@ -9,12 +9,12 @@ const MOCK_BASE_TS = Math.floor(new Date("2025-03-15T12:00:00Z").getTime() / 100
 const ONE_DAY = 86400;
 
 function mockGitIO(): GitIO & {
-  commits: Array<{ message: string; oid: string; timestamp: number }>;
+  commits: { message: string; oid: string; timestamp: number }[];
   staged: Set<string>;
   removed: Set<string>;
   initCalled: boolean;
 } {
-  const commits: Array<{ message: string; oid: string; timestamp: number }> = [];
+  const commits: { message: string; oid: string; timestamp: number }[] = [];
   const staged = new Set<string>();
   const removed = new Set<string>();
   let oidCounter = 0;

@@ -9,22 +9,25 @@ import type { TuiCommand } from "../../agents/agent-loop.js";
 import type { StyleVariant, NarrativeLine, ActiveModal } from "../../types/tui.js";
 import { appendDelta } from "../narrative-helpers.js";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type MockFn = ReturnType<typeof vi.fn> & ((...args: any[]) => any);
+
 /** Simulates the dispatch logic from useGameCallbacks */
 function createDispatch(deps: {
-  setModelines: ReturnType<typeof vi.fn>;
-  setVariant: ReturnType<typeof vi.fn>;
-  setStyle: ReturnType<typeof vi.fn>;
-  setResources: ReturnType<typeof vi.fn>;
-  setChoiceIndex: ReturnType<typeof vi.fn>;
-  setActiveModal: ReturnType<typeof vi.fn>;
-  setActiveSession: ReturnType<typeof vi.fn>;
-  setNarrativeLines: ReturnType<typeof vi.fn>;
+  setModelines: MockFn;
+  setVariant: MockFn;
+  setStyle: MockFn;
+  setResources: MockFn;
+  setChoiceIndex: MockFn;
+  setActiveModal: MockFn;
+  setActiveSession: MockFn;
+  setNarrativeLines: MockFn;
   variantRef: { current: StyleVariant };
   previousVariantRef: { current: StyleVariant };
   gameStateRef: { current: unknown };
   clientRef: { current: unknown };
   engineRef: { current: unknown };
-  fileIO: { current: { readFile: ReturnType<typeof vi.fn> } };
+  fileIO: { current: { readFile: MockFn } };
 }) {
   return (cmd: TuiCommand) => {
     switch (cmd.type) {

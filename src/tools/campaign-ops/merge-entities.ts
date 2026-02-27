@@ -74,7 +74,7 @@ export async function mergeEntities(
   const campaignFiles = await walkCampaignFiles(root, fileIO);
   const filesUpdated: string[] = [];
   let totalLinksUpdated = 0;
-  const fileWrites: Array<{ absPath: string; content: string }> = [];
+  const fileWrites: { absPath: string; content: string }[] = [];
 
   for (const file of campaignFiles) {
     const { content: updatedContent, count } = rewriteLinks(

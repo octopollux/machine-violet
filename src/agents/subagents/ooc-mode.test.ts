@@ -189,7 +189,7 @@ describe("enterOOC", () => {
 const MOCK_BASE_TS = Math.floor(new Date("2025-03-15T12:00:00Z").getTime() / 1000);
 
 function mockGitIO(): GitIO {
-  const commits: Array<{ message: string; oid: string; timestamp: number }> = [];
+  const commits: { message: string; oid: string; timestamp: number }[] = [];
   const staged = new Set<string>();
   let oidCounter = 0;
 

@@ -482,7 +482,7 @@ export async function enterDevMode(
   const hasTools = !!(options.gameState && options.fileIO);
   const tools = hasTools ? buildDevTools() : undefined;
   const toolHandler = hasTools
-    ? buildDevToolHandler(options.gameState!, options.fileIO!, client, options.sceneManager, options.repo)
+    ? buildDevToolHandler(options.gameState as NonNullable<typeof options.gameState>, options.fileIO as NonNullable<typeof options.fileIO>, client, options.sceneManager, options.repo)
     : undefined;
 
   const result = await spawnSubagent(

@@ -115,8 +115,7 @@ export function wrapNodes(nodes: FormattingNode[], width: number): FormattingNod
   let curLine: FormattingNode[] = [];
   let curVis = 0;
 
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i];
+  for (const word of words) {
 
     if (curVis > 0 && curVis + 1 + word.visible > width) {
       // Start a new line
@@ -637,6 +636,7 @@ function buildNode(
     case "right":
       return { type: "right", content: children };
     case "color":
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- color is set when tag === "color"
       return { type: "color", color: color!, content: children };
     default:
       return null;

@@ -91,7 +91,8 @@ async function scanTranscripts(
       const start = Math.max(0, lineIdx - 1);
       const end = Math.min(lines.length, lineIdx + 2);
       const snippet = lines.slice(start, end).join("\n");
-      const arr = excerpts.get(key)!;
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- just set above
+    const arr = excerpts.get(key)!;
       if (arr.length < 5) arr.push(snippet);
     }
   }
@@ -137,8 +138,8 @@ async function inventoryEntities(
 /**
  * Parse the ===filename=== delimited output from the generation prompt.
  */
-export function parseGeneratedEntities(output: string): Array<{ filePath: string; content: string }> {
-  const results: Array<{ filePath: string; content: string }> = [];
+export function parseGeneratedEntities(output: string): { filePath: string; content: string }[] {
+  const results: { filePath: string; content: string }[] = [];
   const parts = output.split(/^===(.+?)===$/m);
 
   // parts[0] is preamble (before first delimiter), then alternating: filename, content

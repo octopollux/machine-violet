@@ -99,9 +99,11 @@ function drawCards(state: DecksState, input: DeckInput, rng: RNG): DeckOutput {
     let card: Card;
     switch (from) {
       case "top":
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- count guard above
         card = deckState.drawPile.shift()!;
         break;
       case "bottom":
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- count guard above
         card = deckState.drawPile.pop()!;
         break;
       case "random": {

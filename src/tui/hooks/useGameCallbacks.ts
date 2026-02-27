@@ -99,7 +99,7 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
         const gs = gameStateRef.current;
         if (gs) {
           const path = campaignPaths(gs.campaignRoot).character(charName);
-          fileIO.current.readFile(path).then((content) => {
+          fileIO.current?.readFile(path).then((content) => {
             setActiveModal({ kind: "character_sheet", content });
           }).catch(() => {
             setActiveModal({ kind: "character_sheet", content: `[Could not load character sheet for ${charName}]` });
@@ -108,13 +108,13 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
         break;
       }
       case "enter_ooc": {
-        previousVariantRef.current = variantRef.current;
+        previousVariantRef.current = variantRef.current ?? "exploration";
         const gs = gameStateRef.current;
         const client = clientRef.current;
         if (gs && client) {
           setActiveSession(createOOCSession(client, {
             campaignName: gs.config.name,
-            previousVariant: variantRef.current,
+            previousVariant: variantRef.current ?? "exploration",
             repo: engineRef.current?.getRepo() ?? undefined,
           }));
         }
@@ -150,7 +150,7 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
               setChoiceIndex(0);
               setActiveModal({ kind: "choice", prompt: "What do you do?", choices: result.choices });
             }
-            costTracker.current.record(result.usage, "small");
+            costTracker.current?.record(result.usage, "small");
           }).catch(() => { /* best-effort */ });
         }
       }
@@ -181,7 +181,7 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
     },
     onExchangeDropped() { /* precis update handled internally */ },
     onUsageUpdate(usage: UsageStats) {
-      costTracker.current.record(usage, "large");
+      costTracker.current?.record(usage, "large");
     },
     onError(error: Error) {
       setErrorMsg(error.message);

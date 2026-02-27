@@ -35,6 +35,7 @@ export function sandboxFileIO(inner: FileIO, allowedRoots: string[]): FileIO {
     mkdir: async (p) => inner.mkdir(guard(p)),
     exists: async (p) => inner.exists(guard(p)),
     listDir: async (p) => inner.listDir(guard(p)),
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by ternary
     ...(inner.deleteFile ? { deleteFile: async (p: string) => inner.deleteFile!(guard(p)) } : {}),
   };
 }

@@ -132,6 +132,7 @@ export class ConversationManager {
 
     // Drop by exchange count
     while (this.exchanges.length > this.config.retention_exchanges) {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- while-loop guarantees non-empty
       const removed = this.exchanges.shift()!;
       dropped = { exchange: removed, reason: "exchange_count" };
     }
@@ -141,6 +142,7 @@ export class ConversationManager {
       this.exchanges.length > 1 &&
       this.getEstimatedTokens() > this.config.max_conversation_tokens
     ) {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- while-loop guarantees non-empty
       const removed = this.exchanges.shift()!;
       dropped = { exchange: removed, reason: "token_limit" };
     }

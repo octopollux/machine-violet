@@ -23,7 +23,8 @@ export function evaluate(expr: DiceExpression, rng: RNG): DiceRollResult {
   }
 
   if (expr.successThreshold !== undefined) {
-    result.successes = kept.filter((r) => r >= expr.successThreshold!).length;
+    const threshold = expr.successThreshold;
+    result.successes = kept.filter((r) => r >= threshold).length;
     // For success counting, total is the success count, not the sum
     result.total = result.successes;
   }
@@ -75,7 +76,7 @@ function applyKeep(rolls: number[], expr: DiceExpression): number[] {
 function computeTotal(kept: number[], expr: DiceExpression): number {
   if (expr.successThreshold !== undefined) {
     // Success counting — total is count of successes, no modifier
-    return kept.filter((r) => r >= expr.successThreshold!).length;
+    return kept.filter((r) => r >= expr.successThreshold).length;
   }
 
   const sum = kept.reduce((acc, val) => acc + val, 0);
