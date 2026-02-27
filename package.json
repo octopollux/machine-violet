@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node dist/index.js",
-    "dev": "tsx src/index.tsx",
+    "dev": "cross-env DEV_MODE=true tsx src/index.tsx",
     "build": "tsc",
     "postbuild": "node -e \"const fs=require('fs'),p=require('path'),s='src/prompts',d='dist/prompts';fs.mkdirSync(d,{recursive:true});fs.readdirSync(s).filter(f=>f.endsWith('.md')).forEach(f=>fs.copyFileSync(p.join(s,f),p.join(d,f)))\"",
     "watch": "tsc --watch",
@@ -40,6 +40,7 @@
     "@types/node": "^20.11.0",
     "@types/react": "^18.3.0",
     "@vitest/coverage-v8": "^4.0.18",
+    "cross-env": "^10.1.0",
     "eslint": "^10.0.0",
     "ink-testing-library": "^4.0.0",
     "tsx": "^4.7.0",
