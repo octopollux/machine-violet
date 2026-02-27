@@ -369,14 +369,14 @@ describe("validateConfig", () => {
 
   it("requires name", () => {
     const config = createDefaultCampaignConfig("Test", "Alex", "aldric");
-    (config as Record<string, unknown>).name = "";
+    (config as unknown as Record<string, unknown>).name = "";
     const errors = validateConfig(config);
     expect(errors.some((e) => e.includes("name"))).toBe(true);
   });
 
   it("requires dm_personality", () => {
     const config = createDefaultCampaignConfig("Test", "Alex", "aldric");
-    (config as Record<string, unknown>).dm_personality = undefined;
+    (config as unknown as Record<string, unknown>).dm_personality = undefined;
     const errors = validateConfig(config);
     expect(errors.some((e) => e.includes("dm_personality"))).toBe(true);
   });
@@ -397,14 +397,14 @@ describe("validateConfig", () => {
 
   it("validates combat config", () => {
     const config = createDefaultCampaignConfig("Test", "Alex", "aldric");
-    (config.combat as Record<string, unknown>).initiative_method = "invalid";
+    (config.combat as unknown as Record<string, unknown>).initiative_method = "invalid";
     const errors = validateConfig(config);
     expect(errors.some((e) => e.includes("initiative_method"))).toBe(true);
   });
 
   it("validates choices config", () => {
     const config = createDefaultCampaignConfig("Test", "Alex", "aldric");
-    (config.choices as Record<string, unknown>).campaign_default = "sometimes";
+    (config.choices as unknown as Record<string, unknown>).campaign_default = "sometimes";
     const errors = validateConfig(config);
     expect(errors.some((e) => e.includes("campaign_default"))).toBe(true);
   });

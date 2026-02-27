@@ -32,6 +32,8 @@ export function makeTestContext(overrides: Partial<GameContextValue> = {}): Game
     previousVariantRef: { current: "exploration" },
     devModeEnabled: false,
     dispatchTuiCommand: vi.fn(),
+    retryOverlay: null,
+    onRecapDismissed: vi.fn(),
     onShutdown: vi.fn(),
     onEndSession: vi.fn(),
     ...overrides,

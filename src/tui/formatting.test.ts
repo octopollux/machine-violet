@@ -146,7 +146,7 @@ describe("highlightQuotesWithState", () => {
     // Should produce: 'He said ', color('"hello"'), ' quietly.'
     expect(result).toHaveLength(3);
     expect(result[0]).toBe("He said ");
-    const quoted = result[1] as FormattingTag;
+    const quoted = result[1] as { type: "color"; color: string; content: FormattingNode[] };
     expect(quoted.type).toBe("color");
     expect(quoted.color).toBe(color);
     expect(quoted.content).toEqual(['"hello"']);
@@ -159,7 +159,7 @@ describe("highlightQuotesWithState", () => {
     const result = highlightQuotesWithState(nodes, color, true);
     // Entire text should be wrapped in a color node (mid-quote)
     expect(result).toHaveLength(1);
-    const tag = result[0] as FormattingTag;
+    const tag = result[0] as { type: "color"; color: string; content: FormattingNode[] };
     expect(tag.type).toBe("color");
     expect(tag.color).toBe(color);
   });
@@ -189,7 +189,7 @@ describe("highlightQuotesWithState", () => {
     expect(result[0]).toBe("He said ");
 
     // The opening quote segment should be highlighted
-    const openQuote = result[1] as FormattingTag;
+    const openQuote = result[1] as { type: "color"; color: string; content: FormattingNode[] };
     expect(openQuote.type).toBe("color");
     expect(openQuote.color).toBe(color);
 

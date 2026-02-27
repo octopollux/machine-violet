@@ -17,7 +17,7 @@ function mockIO(files: Record<string, string>, dirs: Record<string, string[]>): 
 function cleanClocks(): ClocksState {
   return {
     calendar: { epoch: "0", current: 100, display_format: "d/m/y", alarms: [] },
-    combat: { round: 0, active: false, current: 0, alarms: [] },
+    combat: { active: false, current: 0, alarms: [] },
   };
 }
 
@@ -98,13 +98,17 @@ describe("validateCampaign", () => {
   it("validates map entity bounds", async () => {
     const map: MapData = {
       id: "test",
-      grid_type: "square",
+      gridType: "square",
       bounds: { width: 10, height: 10 },
+      defaultTerrain: "floor",
+      regions: [],
       terrain: {},
       entities: {
         "15,15": [{ id: "oob", type: "npc" }], // out of bounds
       },
       annotations: {},
+      links: [],
+      meta: {},
     };
 
     const io = mockIO(
@@ -127,7 +131,7 @@ describe("validateCampaign", () => {
           { id: "a1", fires_at: 50, message: "Past alarm" }, // fires_at < current
         ],
       },
-      combat: { round: 0, active: false, current: 0, alarms: [] },
+      combat: { active: false, current: 0, alarms: [] },
     };
 
     const io = mockIO(
