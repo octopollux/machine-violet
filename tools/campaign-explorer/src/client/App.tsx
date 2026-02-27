@@ -15,7 +15,7 @@ export function App() {
   const lastFileChangeRef = useRef<FileChangeEvent | null>(null);
 
   const { groups, loading: treeLoading, updatedItems, markRead, handleFileChange } =
-    useFileTree(selectedCampaign);
+    useFileTree(selectedCampaign, selectedFile);
 
   const handleSSE = useCallback(
     (event: SSEEvent) => {

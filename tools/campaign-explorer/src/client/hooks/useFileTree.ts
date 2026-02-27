@@ -8,7 +8,7 @@ export interface GroupedTree {
 }
 
 /** Fetch and manage the file tree for a campaign. */
-export function useFileTree(campaignSlug: string | null): {
+export function useFileTree(campaignSlug: string | null, selectedFile: string | null): {
   groups: GroupedTree[];
   loading: boolean;
   updatedItems: Set<string>;
@@ -56,7 +56,9 @@ export function useFileTree(campaignSlug: string | null): {
         });
       }
 
-      // Track updated items: file, category, and campaign level
+      // Track updated items — but skip if the file is already selected (auto-acknowledge)
+      if (event.relativePath === selectedFile) return;
+
       setUpdatedItems((prev) => {
         const next = new Set(prev);
         next.add(`${event.campaignSlug}:${event.relativePath}`);
@@ -65,7 +67,7 @@ export function useFileTree(campaignSlug: string | null): {
         return next;
       });
     },
-    [campaignSlug],
+    [campaignSlug, selectedFile],
   );
 
   const markRead = useCallback(
@@ -73,17 +75,26 @@ export function useFileTree(campaignSlug: string | null): {
       if (!campaignSlug) return;
       setUpdatedItems((prev) => {
         const next = new Set(prev);
-        next.delete(`${campaignSlug}:${relativePath}`);
+        const fileKey = `${campaignSlug}:${relativePath}`;
+        next.delete(fileKey);
 
-        // Check if category still has updated items
+        // Check if this category still has any updated files
         const entry = entries.find((e) => e.relativePath === relativePath);
         if (entry) {
           const categoryKey = `${campaignSlug}:${entry.category}`;
-          const hasOthers = [...next].some(
-            (k) => k.startsWith(`${campaignSlug}:`) && k !== categoryKey && k !== campaignSlug,
-          );
-          if (!hasOthers) {
+          const categoryFileKeys = entries
+            .filter((e) => e.category === entry.category)
+            .map((e) => `${campaignSlug}:${e.relativePath}`);
+          const categoryHasUpdates = categoryFileKeys.some((k) => next.has(k));
+          if (!categoryHasUpdates) {
             next.delete(categoryKey);
+          }
+
+          // Check if any category still has updates
+          const anyUpdates = [...next].some(
+            (k) => k.startsWith(`${campaignSlug}:`) && k !== campaignSlug,
+          );
+          if (!anyUpdates) {
             next.delete(campaignSlug);
           }
         }

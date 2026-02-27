@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { scanCampaigns } from "./campaign-scanner.js";
 import { watchCampaign } from "./watcher.js";
-import { sseHandler, broadcast } from "./sse.js";
+import { sseHandler, broadcast, clientCount } from "./sse.js";
 import { createApiRouter } from "./api.js";
 import type { CampaignInfo } from "../shared/protocol.js";
 import type { FSWatcher } from "chokidar";
@@ -83,6 +83,27 @@ async function main(): Promise<void> {
     }
 
     res.json({ campaigns: campaigns.length });
+  });
+
+  // --- Debug endpoints (remove later) ---
+  app.get("/api/debug/status", (_req, res) => {
+    res.json({
+      sseClients: clientCount(),
+      campaigns: campaigns.length,
+      watchers: watchers.length,
+    });
+  });
+
+  app.get("/api/debug/ping", (_req, res) => {
+    const event = {
+      type: "file-change" as const,
+      campaignSlug: campaigns[0]?.slug ?? "test",
+      relativePath: "_debug_ping",
+      category: "other" as const,
+      changeType: "change" as const,
+    };
+    broadcast(event);
+    res.json({ sent: true, clients: clientCount() });
   });
 
   app.listen(PORT, () => {
