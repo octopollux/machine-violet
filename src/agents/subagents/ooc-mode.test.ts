@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
 import { buildOOCPrompt, buildOOCTools, buildOOCToolHandler, enterOOC } from "./ooc-mode.js";
+import type { DMSessionState } from "../dm-prompt.js";
 import type { FileIO } from "../scene-manager.js";
 import { CampaignRepo } from "../../tools/git/index.js";
 import type { GitIO } from "../../tools/git/index.js";
+import type { CampaignConfig } from "../../types/config.js";
 import { loadModelConfig } from "../../config/models.js";
 import { resetPromptCache } from "../../prompts/load-prompt.js";
 
@@ -42,7 +44,36 @@ function mockClient(responses: Anthropic.Message[]): Anthropic {
   } as unknown as Anthropic;
 }
 
-describe("buildOOCPrompt", () => {
+function mockConfig(overrides?: Partial<CampaignConfig>): CampaignConfig {
+  return {
+    name: "TestCampaign",
+    system: "FATE",
+    genre: "fantasy",
+    mood: "dark",
+    difficulty: "hard",
+    premise: "A world in shadow",
+    dm_personality: { name: "The Narrator", prompt_fragment: "You are mysterious." },
+    players: [{ name: "Player1", character: "Kael", type: "human" }],
+    combat: { initiative_method: "roll", round_structure: "individual", surprise_rules: false },
+    context: { retention_exchanges: 5, max_conversation_tokens: 4000, tool_result_stub_after: 200 },
+    recovery: { auto_commit_interval: 3, max_commits: 100, enable_git: true },
+    choices: { campaign_default: "often", player_overrides: {} },
+    ...overrides,
+  };
+}
+
+function mockSessionState(overrides?: Partial<DMSessionState>): DMSessionState {
+  return {
+    rulesAppendix: "## FATE Core\nAspects, Fate Points, etc.",
+    campaignSummary: "Session 1: The party met at the tavern...",
+    sessionRecap: "Last time: you defeated the goblins.",
+    activeState: "Location: Tavern\nPCs:\n  Kael (HP 10/10)",
+    scenePrecis: "The party is resting after the battle. [[Merchant Giles]] offered a quest.",
+    ...overrides,
+  };
+}
+
+describe("buildOOCPrompt (legacy)", () => {
   it("includes campaign name", () => {
     const prompt = buildOOCPrompt("Shadow of the Dragon");
     expect(prompt).toContain("Campaign: Shadow of the Dragon");
@@ -59,6 +90,132 @@ describe("buildOOCPrompt", () => {
     expect(prompt).not.toContain("Game system rules:");
     expect(prompt).not.toContain("Active character:");
     expect(prompt).not.toContain("undefined");
+  });
+});
+
+describe("buildOOCPrompt (structured)", () => {
+  it("returns TextBlockParam[] when config and sessionState provided", () => {
+    const result = buildOOCPrompt({
+      campaignName: "TestCampaign",
+      config: mockConfig(),
+      sessionState: mockSessionState(),
+    });
+    expect(Array.isArray(result)).toBe(true);
+    const blocks = result as Anthropic.TextBlockParam[];
+    expect(blocks.length).toBeGreaterThan(1);
+    expect(blocks.every((b) => b.type === "text")).toBe(true);
+  });
+
+  it("falls back to string when no sessionState", () => {
+    const result = buildOOCPrompt({ campaignName: "TestCampaign" });
+    expect(typeof result).toBe("string");
+    expect(result).toContain("Campaign: TestCampaign");
+  });
+
+  it("falls back to string when no config", () => {
+    const result = buildOOCPrompt({
+      campaignName: "TestCampaign",
+      sessionState: mockSessionState(),
+    });
+    expect(typeof result).toBe("string");
+  });
+
+  it("has cache_control on stable blocks (identity, rules, campaign log)", () => {
+    const result = buildOOCPrompt({
+      campaignName: "TestCampaign",
+      config: mockConfig(),
+      sessionState: mockSessionState(),
+    }) as Anthropic.TextBlockParam[];
+
+    const cached = result.filter((b) => "cache_control" in b && b.cache_control);
+    expect(cached.length).toBe(3); // identity, rules, campaign log
+
+    // Identity is first cached block
+    expect(cached[0].text).toContain("Out-of-Character");
+
+    // Rules block
+    expect(cached[1].text).toContain("Rules Reference");
+    expect(cached[1].text).toContain("FATE Core");
+
+    // Campaign log block
+    expect(cached[2].text).toContain("Campaign Log");
+    expect(cached[2].text).toContain("party met at the tavern");
+  });
+
+  it("includes campaign setting from config", () => {
+    const result = buildOOCPrompt({
+      campaignName: "TestCampaign",
+      config: mockConfig(),
+      sessionState: mockSessionState(),
+    }) as Anthropic.TextBlockParam[];
+
+    const allText = result.map((b) => b.text).join("\n");
+    expect(allText).toContain("Campaign Setting");
+    expect(allText).toContain("Game System: FATE");
+    expect(allText).toContain("Genre: fantasy");
+    expect(allText).toContain("A world in shadow");
+  });
+
+  it("includes session recap and active state (uncached)", () => {
+    const result = buildOOCPrompt({
+      campaignName: "TestCampaign",
+      config: mockConfig(),
+      sessionState: mockSessionState(),
+    }) as Anthropic.TextBlockParam[];
+
+    const allText = result.map((b) => b.text).join("\n");
+    expect(allText).toContain("Last Session");
+    expect(allText).toContain("defeated the goblins");
+    expect(allText).toContain("Current State");
+    expect(allText).toContain("Tavern");
+    expect(allText).toContain("Scene So Far");
+    expect(allText).toContain("Merchant Giles");
+  });
+
+  it("includes character sheet when provided", () => {
+    const result = buildOOCPrompt({
+      campaignName: "TestCampaign",
+      config: mockConfig(),
+      sessionState: mockSessionState(),
+      characterSheet: "# Kael\n**HP:** 10",
+    }) as Anthropic.TextBlockParam[];
+
+    const allText = result.map((b) => b.text).join("\n");
+    expect(allText).toContain("Active Character");
+    expect(allText).toContain("Kael");
+  });
+
+  it("omits empty session state sections", () => {
+    const result = buildOOCPrompt({
+      campaignName: "TestCampaign",
+      config: mockConfig(),
+      sessionState: { rulesAppendix: "Some rules" },
+    }) as Anthropic.TextBlockParam[];
+
+    const allText = result.map((b) => b.text).join("\n");
+    // Check for section headings (not inline mentions in the identity prompt)
+    expect(allText).not.toContain("## Campaign Log");
+    expect(allText).not.toContain("## Last Session");
+    expect(allText).not.toContain("## Current State");
+    expect(allText).not.toContain("## Scene So Far");
+  });
+
+  it("does not include DM-internal sections (scenePacing, playerRead, uiState)", () => {
+    const result = buildOOCPrompt({
+      campaignName: "TestCampaign",
+      config: mockConfig(),
+      sessionState: {
+        ...mockSessionState(),
+        scenePacing: "5 exchanges, threads ripe",
+        playerRead: "Player seems engaged",
+        uiState: "style=classic, variant=exploration",
+      },
+    }) as Anthropic.TextBlockParam[];
+
+    const allText = result.map((b) => b.text).join("\n");
+    expect(allText).not.toContain("Scene Pacing");
+    expect(allText).not.toContain("Player Read");
+    expect(allText).not.toContain("UI State");
   });
 });
 
@@ -180,6 +337,41 @@ describe("enterOOC", () => {
       expect(names).toContain("find_references");
       expect(names).toContain("validate_campaign");
       expect(names).toContain("get_commit_log");
+    }
+  });
+
+  it("sends structured system prompt when sessionState and config provided", async () => {
+    const client = mockClient([textResponse("The merchant offered you a quest.")]);
+    await enterOOC(client, "What did the merchant say?", {
+      campaignName: "TestCampaign",
+      previousVariant: "playing",
+      config: mockConfig(),
+      sessionState: mockSessionState(),
+    });
+
+    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    if (createCall) {
+      // System prompt should be an array of TextBlockParam
+      expect(Array.isArray(createCall.system)).toBe(true);
+      const blocks = createCall.system as Anthropic.TextBlockParam[];
+      expect(blocks.length).toBeGreaterThan(1);
+      const allText = blocks.map((b: Anthropic.TextBlockParam) => b.text).join("\n");
+      expect(allText).toContain("Scene So Far");
+      expect(allText).toContain("Merchant Giles");
+    }
+  });
+
+  it("sends flat string system prompt without sessionState", async () => {
+    const client = mockClient([textResponse("Done.")]);
+    await enterOOC(client, "test", {
+      campaignName: "Test",
+      previousVariant: "playing",
+    });
+
+    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    if (createCall) {
+      // System prompt should be a plain string (with terse suffix)
+      expect(typeof createCall.system).toBe("string");
     }
   });
 });

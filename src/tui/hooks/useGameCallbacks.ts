@@ -112,10 +112,16 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
         const gs = gameStateRef.current;
         const client = clientRef.current;
         if (gs && client) {
+          const engine = engineRef.current;
+          const sm = engine?.getSceneManager();
           setActiveSession(createOOCSession(client, {
             campaignName: gs.config.name,
             previousVariant: variantRef.current ?? "exploration",
-            repo: engineRef.current?.getRepo() ?? undefined,
+            config: gs.config,
+            sessionState: sm?.getSessionState(),
+            repo: engine?.getRepo() ?? undefined,
+            fileIO: sm?.getFileIO(),
+            campaignRoot: gs.campaignRoot,
           }));
         }
         setVariant("ooc");
