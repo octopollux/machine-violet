@@ -11,17 +11,25 @@ const clients: SSEClient[] = [];
 
 /** Express handler for GET /api/events (SSE endpoint). */
 export function sseHandler(_req: Request, res: Response): void {
-  res.writeHead(200, {
+  res.set({
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache",
-    Connection: "keep-alive",
+    "Connection": "keep-alive",
   });
-  res.write("\n");
+  res.status(200);
+  res.flushHeaders();
+
+  // Keep-alive comment every 30s to prevent proxy/browser timeout
+  const keepAlive = setInterval(() => {
+    res.write(":keepalive\n\n");
+  }, 30_000);
 
   const client: SSEClient = { res, id: nextId++ };
   clients.push(client);
+  console.log(`SSE client ${client.id} connected (${clients.length} total)`);
 
   _req.on("close", () => {
+    clearInterval(keepAlive);
     const idx = clients.indexOf(client);
     if (idx !== -1) clients.splice(idx, 1);
   });
@@ -29,7 +37,9 @@ export function sseHandler(_req: Request, res: Response): void {
 
 /** Broadcast an SSE event to all connected clients. */
 export function broadcast(event: SSEEvent): void {
+  if (clients.length === 0) return;
   const data = JSON.stringify(event);
+  console.log(`SSE → ${clients.length} client(s): ${event.type} ${event.type === "file-change" ? event.relativePath : ""}`);
   for (const client of clients) {
     client.res.write(`event: ${event.type}\ndata: ${data}\n\n`);
   }

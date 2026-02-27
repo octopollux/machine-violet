@@ -6,7 +6,19 @@ export default defineConfig({
   server: {
     port: 5199,
     proxy: {
-      "/api": "http://localhost:3999",
+      "/api/events": {
+        target: "http://localhost:3999",
+        // Disable response buffering so SSE events stream through immediately
+        configure: (proxy) => {
+          proxy.on("proxyRes", (proxyRes) => {
+            proxyRes.headers["cache-control"] = "no-cache";
+            proxyRes.headers["x-accel-buffering"] = "no";
+          });
+        },
+      },
+      "/api": {
+        target: "http://localhost:3999",
+      },
     },
   },
 });

@@ -83,6 +83,8 @@ export function watchCampaign(
   watcher.on("add", (path) => emit("add", path));
   watcher.on("change", (path) => emit("change", path));
   watcher.on("unlink", (path) => emit("unlink", path));
+  watcher.on("ready", () => console.log(`Watcher ready: ${campaignSlug}`));
+  watcher.on("error", (err) => console.error(`Watcher error (${campaignSlug}):`, err));
 
   return watcher;
 }
