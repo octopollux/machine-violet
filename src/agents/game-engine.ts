@@ -514,7 +514,7 @@ export class GameEngine {
 
   /** Write a new entity file (from create_entity tool) */
   private async createEntity(cmd: TuiCommand): Promise<void> {
-    const { entity_type, name, file_path, content } = cmd as {
+    const { entity_type, name, file_path, content } = cmd as unknown as {
       entity_type: string; name: string; file_path: string; content: string;
     };
     const filePath = norm(file_path);
@@ -541,7 +541,7 @@ export class GameEngine {
 
   /** Update an existing entity file (from update_entity tool) */
   private async updateEntity(cmd: TuiCommand): Promise<void> {
-    const { name, file_path, front_matter_updates, body_append, changelog_entry } = cmd as {
+    const { name, file_path, front_matter_updates, body_append, changelog_entry } = cmd as unknown as {
       name: string; file_path: string;
       front_matter_updates?: Record<string, unknown>;
       body_append?: string;

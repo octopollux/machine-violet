@@ -48,7 +48,7 @@ export async function resolveAction(
       tools: [ROLL_DICE_TOOL],
       toolHandler: (name, toolInput) => {
         if (name === "roll_dice") {
-          const result = rollDice(toolInput as RollDiceInput);
+          const result = rollDice(toolInput as unknown as RollDiceInput);
           const lines = result.results.map((r) => {
             const kept = r.kept ? r.kept.join(",") : r.rolls.join(",");
             return `${r.expression}: [${kept}]→${r.total}`;

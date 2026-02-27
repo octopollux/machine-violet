@@ -193,7 +193,7 @@ describe("buildCachedPrefix", () => {
     });
 
     // First block (DM prompt) should have cache_control
-    const dmBlock = blocks[0] as Record<string, unknown>;
+    const dmBlock = blocks[0] as unknown as Record<string, unknown>;
     expect(dmBlock["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
   });
 

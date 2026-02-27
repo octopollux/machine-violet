@@ -12,7 +12,7 @@ import type { AgentSessionConfig } from "./agent-session.js";
 // --- Test helpers ---
 
 function mockUsage(input = 100, output = 50): Anthropic.Usage {
-  return { input_tokens: input, output_tokens: output, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
+  return { input_tokens: input, output_tokens: output, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: null, inference_geo: null, server_tool_use: null, service_tier: null };
 }
 
 function textMessage(text: string, usage?: Anthropic.Usage): Anthropic.Message {
@@ -435,9 +435,9 @@ describe("stampToolsCacheControl", () => {
     ];
 
     const result = stampToolsCacheControl(tools);
-    const last = result[result.length - 1] as Record<string, unknown>;
+    const last = result[result.length - 1] as unknown as Record<string, unknown>;
     expect(last["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
-    const first = result[0] as Record<string, unknown>;
+    const first = result[0] as unknown as Record<string, unknown>;
     expect(first["cache_control"]).toBeUndefined();
   });
 
@@ -448,8 +448,8 @@ describe("stampToolsCacheControl", () => {
 
     const result = stampToolsCacheControl(tools);
     expect(tools).not.toBe(result);
-    expect((tools[0] as Record<string, unknown>)["cache_control"]).toBeUndefined();
-    expect((result[0] as Record<string, unknown>)["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
+    expect((tools[0] as unknown as Record<string, unknown>)["cache_control"]).toBeUndefined();
+    expect((result[0] as unknown as Record<string, unknown>)["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
   });
 
   it("returns empty array unchanged", () => {

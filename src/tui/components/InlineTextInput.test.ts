@@ -1,3 +1,4 @@
+import { describe, it, expect } from "vitest";
 import { computeViewStart, reducer } from "./InlineTextInput.js";
 
 describe("computeViewStart", () => {

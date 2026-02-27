@@ -90,7 +90,7 @@ describe("InputLine", () => {
     const { lastFrame } = render(
       <InputLine characterName="Aldric" />,
     );
-    const frame = lastFrame();
+    const frame = lastFrame()!;
     expect(frame).toContain("Aldric");
     expect(frame).toContain(">");
   });
@@ -129,7 +129,7 @@ describe("PlayerSelector", () => {
         activeIndex={0}
       />,
     );
-    const frame = lastFrame();
+    const frame = lastFrame()!;
     expect(frame).toContain("Aldric");
     expect(frame).toContain("Sable");
     expect(frame).toContain("Rook(AI)");
@@ -159,7 +159,7 @@ describe("NarrativeArea", () => {
         maxRows={5}
       />,
     );
-    const frame = lastFrame();
+    const frame = lastFrame()!;
     expect(frame).toContain("The door creaks open.");
     expect(frame).toContain("A cold wind blows.");
   });
@@ -169,7 +169,7 @@ describe("NarrativeArea", () => {
     const { lastFrame } = render(
       <NarrativeArea lines={lines} maxRows={10} />,
     );
-    const frame = lastFrame();
+    const frame = lastFrame()!;
     // ScrollView manages viewport — renders without error
     expect(frame.length).toBeGreaterThan(0);
     // Content is present (viewport shows some subset)
@@ -183,7 +183,7 @@ describe("NarrativeArea", () => {
         maxRows={5}
       />,
     );
-    const frame = lastFrame();
+    const frame = lastFrame()!;
     expect(frame).toContain("King");
     expect(frame).toContain("has fallen");
     // Bold styling is applied via ANSI codes (tested by presence of content)
@@ -197,7 +197,7 @@ describe("NarrativeArea", () => {
         width={40}
       />,
     );
-    const frame = lastFrame();
+    const frame = lastFrame()!;
     expect(frame).toContain("Chapter 1");
   });
 
@@ -209,7 +209,7 @@ describe("NarrativeArea", () => {
         width={40}
       />,
     );
-    const frame = lastFrame();
+    const frame = lastFrame()!;
     expect(frame).toContain("Page 42");
   });
 
@@ -220,7 +220,7 @@ describe("NarrativeArea", () => {
         maxRows={5}
       />,
     );
-    const frame = lastFrame();
+    const frame = lastFrame()!;
     expect(frame).toContain("No width");
   });
 
@@ -232,7 +232,7 @@ describe("NarrativeArea", () => {
         playerColor="#5a9cff"
       />,
     );
-    const frame = lastFrame();
+    const frame = lastFrame()!;
     expect(frame).toContain(">");
     expect(frame).toContain("Aldric: I attack the goblin!");
   });
@@ -244,7 +244,7 @@ describe("NarrativeArea", () => {
         maxRows={5}
       />,
     );
-    const frame = lastFrame();
+    const frame = lastFrame()!;
     expect(frame).toContain("> Aldric: I attack the goblin!");
   });
 
@@ -255,7 +255,7 @@ describe("NarrativeArea", () => {
         maxRows={10}
       />,
     );
-    const frame = lastFrame();
+    const frame = lastFrame()!;
     const lines = frame.split("\n");
     // Find the indices of content lines
     const lineA = lines.findIndex((l) => l.includes("Line A"));
@@ -271,7 +271,7 @@ describe("NarrativeArea", () => {
         maxRows={10}
       />,
     );
-    const frame = lastFrame();
+    const frame = lastFrame()!;
     const lines = frame.split("\n");
     const dmLine = lines.findIndex((l) => l.includes("DM speaks."));
     const playerLine = lines.findIndex((l) => l.includes("I respond."));
@@ -285,7 +285,7 @@ describe("SideFrame", () => {
     const { lastFrame } = render(
       <SideFrame variant={gothic} side="left" height={3} />,
     );
-    const frame = lastFrame();
+    const frame = lastFrame()!;
     const lines = frame.split("\n");
     expect(lines).toHaveLength(3);
     for (const line of lines) {
@@ -297,7 +297,7 @@ describe("SideFrame", () => {
     const { lastFrame } = render(
       <SideFrame variant={gothic} side="right" height={2} />,
     );
-    const frame = lastFrame();
+    const frame = lastFrame()!;
     const lines = frame.split("\n");
     expect(lines).toHaveLength(2);
     for (const line of lines) {
@@ -309,7 +309,7 @@ describe("SideFrame", () => {
     const { lastFrame } = render(
       <SideFrame variant={gothic} side="left" height={2} frameWidth={2} />,
     );
-    const frame = lastFrame();
+    const frame = lastFrame()!;
     expect(frame).toContain("║");
   });
 
@@ -317,7 +317,7 @@ describe("SideFrame", () => {
     const { lastFrame } = render(
       <SideFrame variant={gothic} side="left" height={2} ascii />,
     );
-    const frame = lastFrame();
+    const frame = lastFrame()!;
     expect(frame).toContain("|");
   });
 });
@@ -327,7 +327,7 @@ describe("FrameBorder components", () => {
     const { lastFrame } = render(
       <HorizontalBorder variant={gothic} width={40} position="top" />,
     );
-    const frame = lastFrame();
+    const frame = lastFrame()!;
     expect(frame).toContain("╔");
     expect(frame).toContain("═");
   });

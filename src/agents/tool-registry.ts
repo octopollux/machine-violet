@@ -100,7 +100,7 @@ const TOOL_DEFS: RegisteredTool[] = [
       },
     },
     handler: (_state, input) => {
-      const result = rollDice(input as Parameters<typeof rollDice>[0]);
+      const result = rollDice(input as unknown as Parameters<typeof rollDice>[0]);
       // Terse format: "2d20kh1+5: [18,7]→23"
       const lines = result.results.map((r) => {
         const kept = r.kept ? r.kept.join(",") : r.rolls.join(",");
@@ -130,7 +130,7 @@ const TOOL_DEFS: RegisteredTool[] = [
       },
     },
     handler: (state, input) => {
-      const result = deck(state.decks, input as Parameters<typeof deck>[1]);
+      const result = deck(state.decks, input as unknown as Parameters<typeof deck>[1]);
       if (result.cards) {
         return ok(`Drew: ${result.cards.map((c) => `${c.value} of ${c.suit} [${c.raw}]`).join(", ")} (${result.remaining} remaining)`);
       }
@@ -155,7 +155,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     },
     handler: (state, input) => {
       const r = requireMap(state, input);
-      if ("is_error" in r) return r as ToolResult;
+      if ("content" in r) return r;
       const result = viewArea(r.map, input.center as string, input.radius as number);
       return ok(`${result.grid}\n${result.legend.join("\n")}`);
     },
@@ -176,7 +176,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     },
     handler: (state, input) => {
       const r = requireMap(state, input);
-      if ("is_error" in r) return r as ToolResult;
+      if ("content" in r) return r;
       const d = distance(r.map, input.from as string, input.to as string);
       return ok(`${d} tiles`);
     },
@@ -199,7 +199,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     },
     handler: (state, input) => {
       const r = requireMap(state, input);
-      if ("is_error" in r) return r as ToolResult;
+      if ("content" in r) return r;
       const result = pathBetween(r.map, input.from as string, input.to as string, {
         terrainCosts: input.terrain_costs as Record<string, number> | undefined,
         impassable: input.impassable as string[] | undefined,
@@ -224,7 +224,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     },
     handler: (state, input) => {
       const r = requireMap(state, input);
-      if ("is_error" in r) return r as ToolResult;
+      if ("content" in r) return r;
       const result = lineOfSight(r.map, input.from as string, input.to as string);
       const tiles = result.tiles.map((t) => {
         const ents = t.entities.length ? ` [${t.entities.map((e) => e.id).join(",")}]` : "";
@@ -250,7 +250,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     },
     handler: (state, input) => {
       const r = requireMap(state, input);
-      if ("is_error" in r) return r as ToolResult;
+      if ("content" in r) return r;
       const results = tilesInRange(r.map, input.center as string, input.range as number, input.filter as string | undefined);
       return ok(JSON.stringify(results));
     },
@@ -271,10 +271,10 @@ const TOOL_DEFS: RegisteredTool[] = [
     },
     handler: (state, input) => {
       const r = requireMap(state, input);
-      if ("is_error" in r) return r as ToolResult;
+      if ("content" in r) return r;
       const result = findNearest(r.map, input.from as string, input.type as string);
       if (!result) return ok("Nothing found.");
-      return ok(`${result.id} at ${result.coord} (${result.distance} tiles)`);
+      return ok(`'${input.type as string}' at ${result.coord} (${result.distance} tiles)`);
     },
   },
 
@@ -303,7 +303,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     },
     handler: (state, input) => {
       const r = requireMap(state, input);
-      if ("is_error" in r) return r as ToolResult;
+      if ("content" in r) return r;
       placeEntity(r.map, input.coord as string, input.entity as Parameters<typeof placeEntity>[2]);
       return ok(`Placed ${(input.entity as { id: string }).id} at ${input.coord}`);
     },
@@ -324,7 +324,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     },
     handler: (state, input) => {
       const r = requireMap(state, input);
-      if ("is_error" in r) return r as ToolResult;
+      if ("content" in r) return r;
       moveEntity(r.map, input.entity_id as string, input.to as string);
       return ok(`Moved ${input.entity_id} → ${input.to}`);
     },
@@ -344,7 +344,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     },
     handler: (state, input) => {
       const r = requireMap(state, input);
-      if ("is_error" in r) return r as ToolResult;
+      if ("content" in r) return r;
       removeEntity(r.map, input.entity_id as string);
       return ok(`Removed ${input.entity_id}`);
     },
@@ -370,7 +370,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     },
     handler: (state, input) => {
       const r = requireMap(state, input);
-      if ("is_error" in r) return r as ToolResult;
+      if ("content" in r) return r;
       if (input.region) {
         const reg = input.region as { x1: number; y1: number; x2: number; y2: number };
         setTerrain(r.map, reg, input.terrain as string);
@@ -396,7 +396,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     },
     handler: (state, input) => {
       const r = requireMap(state, input);
-      if ("is_error" in r) return r as ToolResult;
+      if ("content" in r) return r;
       annotate(r.map, input.coord as string, input.text as string);
       return ok(`Annotated ${input.coord}`);
     },
@@ -421,7 +421,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     },
     handler: (state, input) => {
       const r = requireMap(state, input);
-      if ("is_error" in r) return r as ToolResult;
+      if ("content" in r) return r;
       defineRegion(r.map, input.x1 as number, input.y1 as number, input.x2 as number, input.y2 as number, input.terrain as string);
       return ok(`Region (${input.x1},${input.y1})-(${input.x2},${input.y2}) → ${input.terrain}`);
     },
@@ -480,7 +480,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     },
     handler: (state, input) => {
       const r = requireMap(state, input);
-      if ("is_error" in r) return r as ToolResult;
+      if ("content" in r) return r;
       const ents = input.entities as { coord: string; entity: Parameters<typeof placeEntity>[2] }[];
       importEntities(r.map, ents);
       return ok(`Placed ${ents.length} entities`);
@@ -504,7 +504,7 @@ const TOOL_DEFS: RegisteredTool[] = [
       },
     },
     handler: (state, input) => {
-      const result = setAlarm(state.clocks, input as Parameters<typeof setAlarm>[1]);
+      const result = setAlarm(state.clocks, input as unknown as Parameters<typeof setAlarm>[1]);
       return ok(`Alarm ${result.id}: fires at ${result.fires_at}${result.display ? ` (${result.display})` : ""}`);
     },
   },
@@ -642,7 +642,7 @@ const TOOL_DEFS: RegisteredTool[] = [
       },
     },
     handler: (state, input) => {
-      modifyInitiative(state.combat, input as Parameters<typeof modifyInitiative>[1], state.combatConfig);
+      modifyInitiative(state.combat, input as unknown as Parameters<typeof modifyInitiative>[1], state.combatConfig);
       const current = getCurrentTurn(state.combat);
       return ok(`Initiative modified. Current turn: ${current.id}`);
     },

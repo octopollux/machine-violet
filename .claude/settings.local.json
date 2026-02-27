@@ -38,7 +38,12 @@
       "WebFetch(domain:github.com)",
       "Bash(npm uninstall:*)",
       "Bash(xxd:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(git stash:*)",
+      "Bash(npm run:*)",
+      "Bash(gh pr:*)",
+      "Bash(gh run:*)",
+      "Bash(git push:*)"
     ]
   }
 }

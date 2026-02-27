@@ -3,7 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { createSetupConversation } from "./setup-conversation.js";
 
 function mockUsage(input = 50, output = 20): Anthropic.Usage {
-  return { input_tokens: input, output_tokens: output, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
+  return { input_tokens: input, output_tokens: output, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: null, inference_geo: null, server_tool_use: null, service_tier: null };
 }
 
 function textResponse(text: string, usage?: Anthropic.Usage): Anthropic.Message {
@@ -196,7 +196,7 @@ describe("createSetupConversation", () => {
     const streamCalls = (client.messages.stream as ReturnType<typeof vi.fn>).mock.calls;
     const secondCall = streamCalls[1][0];
     const userMsg = secondCall.messages.find(
-      (m: { role: string }) => m.role === "user" && Array.isArray(m.content),
+      (m: { role: string; content?: unknown }) => m.role === "user" && Array.isArray(m.content),
     );
     expect(userMsg).toBeDefined();
     expect(userMsg.content[0].type).toBe("tool_result");

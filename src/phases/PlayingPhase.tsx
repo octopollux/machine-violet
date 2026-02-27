@@ -69,7 +69,7 @@ export function PlayingPhase() {
       }).then((result) => {
         setModeBusy(false);
         setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }]);
-        costTracker.current.record(result.usage, activeSession.tier);
+        costTracker.current?.record(result.usage, activeSession.tier);
       }).catch(() => {
         setModeBusy(false);
         setNarrativeLines((prev) => [...prev, { kind: "system", text: `[${activeSession.label} error]` }, { kind: "dm", text: "" }]);
@@ -290,7 +290,7 @@ export function PlayingPhase() {
           }
         } else if (item === "OOC Mode") {
           setMenuOpen(false);
-          if (activeSession?.label === "OOC") {
+          if ((activeSession as null | { label: string })?.label === "OOC") {
             exitActiveSession();
           } else {
             if (clientRef.current && gameStateRef.current) {
@@ -307,7 +307,7 @@ export function PlayingPhase() {
           }
         } else if (item === "Dev Mode") {
           setMenuOpen(false);
-          if (activeSession?.label === "Dev") {
+          if ((activeSession as null | { label: string })?.label === "Dev") {
             exitActiveSession();
           } else {
             if (clientRef.current && gameStateRef.current) {
@@ -449,7 +449,7 @@ export function PlayingPhase() {
           oocActive={activeSession?.label === "OOC"}
           devModeEnabled={devModeEnabled}
           devActive={activeSession?.label === "Dev"}
-          tokenSummary={costTracker.current.formatTokens()}
+          tokenSummary={costTracker.current?.formatTokens() ?? ""}
         />
       )}
     </Box>

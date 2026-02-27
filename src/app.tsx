@@ -251,7 +251,7 @@ export default function App({ shutdownRef }: AppProps) {
 
     const scene: SceneState = isResume
       ? await detectSceneState(campaignRoot, fileIO.current)
-      : { sceneNumber: 1, slug: "opening", transcript: [], precis: "", playerReads: [], sessionNumber: 1 };
+      : { sceneNumber: 1, slug: "opening", transcript: [], precis: "", openThreads: "", npcIntents: "", playerReads: [], sessionNumber: 1 };
 
     const sessionState: DMSessionState = {};
     const client = new Anthropic();

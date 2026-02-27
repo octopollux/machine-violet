@@ -23,6 +23,8 @@ function mockScene(transcript: string[] = []): SceneState {
     slug: "opening",
     transcript,
     precis: "",
+    openThreads: "",
+    npcIntents: "",
     playerReads: [],
     sessionNumber: 1,
   };
@@ -106,6 +108,7 @@ describe("gracefulShutdown", () => {
     const gitIO = {
       init: vi.fn().mockResolvedValue(undefined),
       add: vi.fn().mockResolvedValue(undefined),
+      remove: vi.fn().mockResolvedValue(undefined),
       commit: commitFn,
       log: vi.fn().mockResolvedValue([]),
       checkout: vi.fn().mockResolvedValue(undefined),

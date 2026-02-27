@@ -78,7 +78,7 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
     }
 
     if (result.finalized) {
-      costTracker.current.record(result.usage, "medium");
+      costTracker.current?.record(result.usage, "medium");
       setupConvoRef.current = null;
       setPendingResult(result.finalized);
       setSetupConvoLines((prev) => [...prev, { kind: "dm", text: "" }, { kind: "dm", text: "<center><b>[Press ENTER to begin your adventure]</b></center>" }]);
