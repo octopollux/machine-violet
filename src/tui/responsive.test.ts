@@ -122,8 +122,8 @@ describe("narrativeRows", () => {
   it("calculates rows for full layout", () => {
     const elements = getVisibleElements("full");
     const rows = narrativeRows(40, elements);
-    // Full: topFrame(2) + activity(1) + lowerFrame(1) + modeline(1) + playerSelector(1) + input(1) = 7
-    expect(rows).toBe(33);
+    // Full: topFrame(2) + activity(1) + lowerFrame(2) + modeline(1) + playerSelector(1) + input(1) = 8
+    expect(rows).toBe(32);
   });
 
   it("calculates rows for minimal layout", () => {

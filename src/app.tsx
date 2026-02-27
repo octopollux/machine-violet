@@ -5,9 +5,11 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { readFile, writeFile, appendFile, mkdir, readdir, stat, unlink } from "node:fs/promises";
 import { join, dirname } from "node:path";
 
-import { STYLES, getStyle } from "./tui/frames/index.js";
+import { getStyle } from "./tui/frames/index.js";
 import { markdownToTags } from "./tui/formatting.js";
-import type { FrameStyle, StyleVariant, NarrativeLine, ActiveModal, RetryOverlay } from "./types/tui.js";
+import type { NarrativeLine, ActiveModal, RetryOverlay } from "./types/tui.js";
+import type { StyleVariant, ResolvedTheme } from "./tui/themes/types.js";
+import { BUILTIN_DEFINITIONS, resolveTheme, resetThemeCache } from "./tui/themes/index.js";
 import type { FileIO, SceneState } from "./agents/scene-manager.js";
 import { detectSceneState, classifyTranscriptEntry } from "./agents/scene-manager.js";
 import { GameEngine } from "./agents/game-engine.js";
@@ -53,6 +55,22 @@ export type AppPhase =
   | "building"
   | "playing"
   | "shutting_down";
+
+// --- Theme helpers ---
+
+const DEFAULT_THEME_NAME = "gothic";
+const DEFAULT_KEY_COLOR = "#8888aa";
+
+function resolveDefaultTheme(variant: StyleVariant = "exploration", keyColor = DEFAULT_KEY_COLOR): ResolvedTheme {
+  const def = BUILTIN_DEFINITIONS[DEFAULT_THEME_NAME] ?? Object.values(BUILTIN_DEFINITIONS)[0];
+  return resolveTheme(def, variant, keyColor);
+}
+
+function resolveNamedTheme(name: string, variant: StyleVariant, keyColor: string): ResolvedTheme {
+  const def = BUILTIN_DEFINITIONS[name];
+  if (def) return resolveTheme(def, variant, keyColor);
+  return resolveDefaultTheme(variant, keyColor);
+}
 
 // --- Production FileIO ---
 
@@ -133,35 +151,50 @@ export default function App({ shutdownRef }: AppProps) {
   const [modelines, setModelines] = useState<Record<string, string>>({});
   const [campaignName, setCampaignName] = useState("");
   const [activePlayerIndex, setActivePlayerIndex] = useState(0);
-  const [style, setStyle] = useState<FrameStyle>(STYLES[0]);
+
+  // --- Theme state (replaces old style/variant) ---
+  const [themeName, setThemeName] = useState(DEFAULT_THEME_NAME);
+  const [keyColor, setKeyColor] = useState(DEFAULT_KEY_COLOR);
   const [variant, setVariant] = useState<StyleVariant>("exploration");
+  const [theme, setTheme] = useState<ResolvedTheme>(() => resolveDefaultTheme());
   const variantRef = useRef<StyleVariant>("exploration");
   const hydratedRef = useRef(false);
+
+  // Re-resolve theme when variant, themeName, or keyColor changes
+  useEffect(() => {
+    resetThemeCache();
+    setTheme(resolveNamedTheme(themeName, variant, keyColor));
+  }, [themeName, variant, keyColor]);
 
   // Auto-sync variantRef (needed by dispatchTuiCommand's enter_ooc to save previous variant)
   useEffect(() => { variantRef.current = variant; }, [variant]);
 
-  // Persist UI when style/variant/modelines change (skip during resume hydration)
-  // NOTE: UI state is persisted via useEffect, which fires synchronously after
-  // React state updates in event handlers (React 18). The only data-loss window
-  // is a process crash between dispatch and effect — an extremely narrow gap.
-  // Scene-transition persistence (in game-engine.ts) covers the most critical case.
+  // Legacy setStyle bridge — useGameCallbacks dispatches set_ui_style with style name.
+  // Map old style names to new theme names and update themeName.
+  const setStyle = useCallback((s: { name: string }) => {
+    // Old style names map directly to theme names
+    if (BUILTIN_DEFINITIONS[s.name]) {
+      setThemeName(s.name);
+    }
+  }, []);
+
+  // Persist UI when theme/variant/modelines change (skip during resume hydration)
   useEffect(() => {
     if (!hydratedRef.current) return;
     persisterRef.current?.persistUI({
-      styleName: style.name,
+      styleName: themeName,
       variant,
       modelines: Object.keys(modelines).length > 0 ? modelines : undefined,
     });
-  }, [style, variant, modelines]);
+  }, [themeName, variant, modelines]);
 
   // Sync UI state to engine for DM prefix
   useEffect(() => {
     if (!hydratedRef.current) return;
     const engine = engineRef.current;
     if (!engine) return;
-    engine.setUIState(buildUIState({ modelines, styleName: style.name, variant }));
-  }, [modelines, style, variant]);
+    engine.setUIState(buildUIState({ modelines, styleName: themeName, variant }));
+  }, [modelines, themeName, variant]);
 
   // --- Setup mode tracking ---
   const [setupMode, setSetupMode] = useState<"fast" | "full">("full");
@@ -225,9 +258,6 @@ export default function App({ shutdownRef }: AppProps) {
   }, []);
 
   // --- Raw mode: keep Ink's stdin listener alive across phase transitions ---
-  // Without this, Ink removes its `readable` listener and calls `stdin.unref()`
-  // whenever rawModeEnabledCount drops to 0 (i.e. between SetupPhase unmounting
-  // and PlayingPhase mounting). This permanent hook keeps the count >= 1.
   // eslint-disable-next-line @typescript-eslint/no-empty-function -- intentional no-op to keep raw mode alive
   const stableNoOp = useCallback(() => {}, []);
   useInput(stableNoOp, { isActive: phase !== "loading" && phase !== "shutting_down" });
@@ -238,7 +268,8 @@ export default function App({ shutdownRef }: AppProps) {
   // --- Engine callbacks (extracted hook) ---
   const { buildCallbacks, dispatchTuiCommand } = useGameCallbacks({
     setNarrativeLines, setEngineState, setErrorMsg, setModelines,
-    setResources, setStyle, setVariant, setActiveModal, setChoiceIndex,
+    setResources, setStyle, setVariant, setThemeName, setKeyColor,
+    setActiveModal, setChoiceIndex,
     setActiveSession, setRetryOverlay,
     gameStateRef, clientRef, engineRef, activeModalRef, variantRef, previousVariantRef,
     costTracker, fileIO,
@@ -269,7 +300,6 @@ export default function App({ shutdownRef }: AppProps) {
     // Set up context dump directory when dev mode is active
     if (isDevMode()) {
       setContextDumpDir(join(campaignRoot, ".dev-mode", "campaigns", "context"));
-      // Ensure .dev-mode is excluded from isomorphic-git snapshots
       const gitignorePath = join(campaignRoot, ".gitignore");
       void readFile(gitignorePath, "utf-8")
         .then((content) => {
@@ -334,8 +364,16 @@ export default function App({ shutdownRef }: AppProps) {
       }
 
       if (loaded.ui) {
-        const restoredStyle = getStyle(loaded.ui.styleName);
-        if (restoredStyle) setStyle(restoredStyle);
+        // Restore theme from persisted style name
+        if (BUILTIN_DEFINITIONS[loaded.ui.styleName]) {
+          setThemeName(loaded.ui.styleName);
+        } else {
+          // Legacy: try old getStyle for backwards compat
+          const legacy = getStyle(loaded.ui.styleName);
+          if (legacy && BUILTIN_DEFINITIONS[legacy.name]) {
+            setThemeName(legacy.name);
+          }
+        }
         setVariant(loaded.ui.variant);
         if (loaded.ui.modelines) setModelines(loaded.ui.modelines);
       }
@@ -353,10 +391,6 @@ export default function App({ shutdownRef }: AppProps) {
       for (const entry of scene.transcript) {
         const { kind, text } = classifyTranscriptEntry(entry);
         if (kind === "dm") {
-          // DM responses may contain \n\n paragraph breaks — split on
-          // those for visual separation. Within each paragraph, \n is a
-          // soft wrap from the LLM and gets joined with a space so
-          // word-wrapping uses the actual terminal width.
           const paragraphs = text.split("\n\n");
           for (const para of paragraphs) {
             const joined = para.replace(/\n/g, " ");
@@ -364,7 +398,6 @@ export default function App({ shutdownRef }: AppProps) {
             transcriptLines.push({ kind: "dm", text: "" });
           }
         } else {
-          // Player input and tool results are single-line entries.
           transcriptLines.push({ kind, text });
         }
       }
@@ -475,7 +508,6 @@ export default function App({ shutdownRef }: AppProps) {
     setPhase("shutting_down");
     setNarrativeLines([{ kind: "system", text: "Ending session..." }]);
 
-    // Run session-end housekeeping (precis, campaign log, changelog, calendar)
     if (engineRef.current) {
       try {
         const sm = engineRef.current.getSceneManager();
@@ -534,7 +566,7 @@ export default function App({ shutdownRef }: AppProps) {
     return (
       <SetupPhase
         mode={setupMode}
-        style={style}
+        theme={theme}
         costTracker={costTracker}
         onComplete={finalizeSetup}
         onCancel={() => setPhase("main_menu")}
@@ -571,7 +603,7 @@ export default function App({ shutdownRef }: AppProps) {
   const gameContext: GameContextValue = {
     engineRef, gameStateRef, clientRef, costTracker,
     narrativeLines, setNarrativeLines,
-    style, variant, setVariant,
+    theme, variant, setVariant, setTheme, keyColor, setKeyColor,
     campaignName, activePlayerIndex, setActivePlayerIndex,
     engineState, resources, modelines,
     activeModal, setActiveModal,

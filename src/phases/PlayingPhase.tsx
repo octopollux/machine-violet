@@ -10,12 +10,13 @@ import { getActivePlayer, switchToNextPlayer, getPlayerEntries } from "../agents
 import { createOOCSession } from "../agents/subagents/ooc-mode.js";
 import { createDevSession, summarizeGameState } from "../agents/subagents/dev-mode.js";
 import { useGameContext } from "../tui/game-context.js";
+import { themeToVariant } from "../tui/themes/index.js";
 
 export function PlayingPhase() {
   const {
     engineRef, gameStateRef, clientRef, costTracker,
     narrativeLines, setNarrativeLines,
-    style, variant, setVariant,
+    theme, variant, setVariant,
     campaignName, activePlayerIndex, setActivePlayerIndex,
     engineState, resources, modelines,
     activeModal, setActiveModal,
@@ -47,6 +48,9 @@ export function PlayingPhase() {
 
   const menuItems = useMemo(() => getMenuItems(devModeEnabled), [devModeEnabled]);
 
+  // Compatibility: extract FrameStyleVariant for modals that still use old interface
+  const modalVariant = useMemo(() => themeToVariant(theme), [theme]);
+
   // Whether TextInput should be disabled
   const textInputDisabled =
     !!(activeModal && activeModal.kind === "dice") ||
@@ -61,8 +65,7 @@ export function PlayingPhase() {
     const text = value.trim();
 
     if (activeSession) {
-      // Any non-DM mode (OOC, Dev, future modes)
-      setNarrativeLines((prev) => [...prev, { kind: "player", text: `> ${text}` }, { kind: "dm", text: "" }]);
+      setNarrativeLines((prev) => [...prev, { kind: "separator", text: "" }, { kind: "player", text: `> ${text}` }, { kind: "dm", text: "" }]);
       setModeBusy(true);
       activeSession.send(text, (delta) => {
         setNarrativeLines((prev) => appendDelta(prev, delta, "dm"));
@@ -76,10 +79,9 @@ export function PlayingPhase() {
         setNarrativeLines((prev) => [...prev, { kind: "system", text: `[${activeSession.label} error: ${msg}]` }, { kind: "dm", text: "" }]);
       });
     } else {
-      // DM mode
       if (engineRef.current && gameStateRef.current) {
         const active = getActivePlayer(gameStateRef.current);
-        setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }, { kind: "player", text: `> ${active.characterName}: ${text}` }, { kind: "dm", text: "" }]);
+        setNarrativeLines((prev) => [...prev, { kind: "separator", text: "" }, { kind: "player", text: `> ${active.characterName}: ${text}` }, { kind: "dm", text: "" }]);
         engineRef.current.processInput(active.characterName, text);
       }
     }
@@ -96,7 +98,7 @@ export function PlayingPhase() {
     setCustomInputResetKey((k) => k + 1);
     if (engineRef.current && gameStateRef.current) {
       const active = getActivePlayer(gameStateRef.current);
-      setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }, { kind: "player", text: `> ${active.characterName}: ${text}` }, { kind: "dm", text: "" }]);
+      setNarrativeLines((prev) => [...prev, { kind: "separator", text: "" }, { kind: "player", text: `> ${active.characterName}: ${text}` }, { kind: "dm", text: "" }]);
       engineRef.current.processInput(active.characterName, text);
     }
   }, []);
@@ -175,7 +177,6 @@ export function PlayingPhase() {
       const step = scrollAmount(rows);
 
       if (customInputMode) {
-        // Custom input active — only intercept navigation/scroll, let InlineTextInput handle the rest
         if (key.escape) {
           setCustomInputMode(false);
           return;
@@ -190,11 +191,9 @@ export function PlayingPhase() {
           narrativeRef.current?.scrollBy(key.pageUp ? -step : step);
           return;
         }
-        // All other keys (including +/-) fall through to InlineTextInput
         return;
       }
 
-      // Normal choice navigation
       if (key.escape) {
         setActiveModal(null);
         setChoiceIndex(0);
@@ -218,7 +217,6 @@ export function PlayingPhase() {
       }
       if (key.return) {
         if (choiceIndex === activeModal.choices.length) {
-          // Enter on the custom input row — activate it
           setCustomInputMode(true);
           return;
         }
@@ -228,7 +226,7 @@ export function PlayingPhase() {
         setCustomInputMode(false);
         if (engineRef.current && gameStateRef.current) {
           const active = getActivePlayer(gameStateRef.current);
-          setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }, { kind: "player", text: `> ${active.characterName}: ${chosen}` }, { kind: "dm", text: "" }]);
+          setNarrativeLines((prev) => [...prev, { kind: "separator", text: "" }, { kind: "player", text: `> ${active.characterName}: ${chosen}` }, { kind: "dm", text: "" }]);
           engineRef.current.processInput(active.characterName, chosen);
         }
       }
@@ -362,11 +360,11 @@ export function PlayingPhase() {
     if (!activeModal) return 0;
     switch (activeModal.kind) {
       case "choice":
-        return activeModal.choices.length + 1 + 5 + 2; // +1 for "Enter your own" row
+        return activeModal.choices.length + 1 + 5 + 2;
       case "dice":
         return 8 + 2;
       case "recap":
-        return 0; // CenteredModal uses absolute positioning
+        return 0;
       default:
         return 0;
     }
@@ -377,8 +375,7 @@ export function PlayingPhase() {
     <Box flexDirection="column" width={cols} height={rows}>
       <Layout
         dimensions={{ columns: cols, rows: layoutRows }}
-        style={style}
-        variant={variant}
+        theme={theme}
         narrativeLines={narrativeLines}
         modelineText={modelines[activeChar] ?? campaignName}
         activeCharacterName={activeChar}
@@ -399,7 +396,7 @@ export function PlayingPhase() {
       />
       {activeModal?.kind === "choice" && (
         <ChoiceModal
-          variant={style.variants[variant]}
+          variant={modalVariant}
           width={cols}
           prompt={activeModal.prompt}
           choices={activeModal.choices}
@@ -412,7 +409,7 @@ export function PlayingPhase() {
       )}
       {activeModal?.kind === "dice" && (
         <DiceRollModal
-          variant={style.variants[variant]}
+          variant={modalVariant}
           width={cols}
           expression={activeModal.expression}
           rolls={activeModal.rolls}
@@ -423,7 +420,7 @@ export function PlayingPhase() {
       )}
       {activeModal?.kind === "recap" && (
         <SessionRecapModal
-          variant={style.variants[variant]}
+          variant={modalVariant}
           width={cols}
           height={rows}
           lines={activeModal.lines}
@@ -432,7 +429,7 @@ export function PlayingPhase() {
       )}
       {activeModal?.kind === "character_sheet" && (
         <CharacterSheetModal
-          variant={style.variants[variant]}
+          variant={modalVariant}
           width={cols}
           height={rows}
           content={activeModal.content}
@@ -441,7 +438,7 @@ export function PlayingPhase() {
       )}
       {retryOverlay && (
         <ApiErrorModal
-          variant={style.variants[variant]}
+          variant={modalVariant}
           width={cols}
           height={rows}
           overlay={retryOverlay}
@@ -449,7 +446,7 @@ export function PlayingPhase() {
       )}
       {menuOpen && (
         <GameMenu
-          variant={style.variants[variant]}
+          variant={modalVariant}
           width={cols}
           height={rows}
           selectedIndex={menuIndex}

@@ -354,6 +354,12 @@ export class GameEngine {
           await this.createEntity(cmd);
         } else if (cmd.type === "update_entity") {
           await this.updateEntity(cmd);
+        } else if (cmd.type === "set_theme") {
+          // Persist to location entity if requested, then forward to TUI
+          if (cmd.save_to_location) {
+            await this.saveThemeToLocation(cmd);
+          }
+          this.callbacks.onTuiCommand(cmd);
         } else {
           this.callbacks.onTuiCommand(cmd);
         }
@@ -398,6 +404,9 @@ export class GameEngine {
 
       // Persist the reset scene state (new sceneNumber, cleared precis/transcript)
       this.persistCurrentScene();
+
+      // Auto-apply theme from location entity if it has theme metadata
+      await this.applyLocationTheme(title);
 
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
@@ -598,6 +607,81 @@ export class GameEngine {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       this.callbacks.onDevLog?.(`[dev] update_entity: failed for "${name}" — ${msg}`);
+    }
+  }
+
+  // --- Theme <-> Location persistence ---
+
+  /** Save theme + key_color to a location entity's front matter. */
+  private async saveThemeToLocation(cmd: TuiCommand): Promise<void> {
+    const location = cmd.location as string | undefined;
+    const themeName = cmd.theme as string | undefined;
+    const keyColor = cmd.key_color as string | undefined;
+
+    if (!location) {
+      this.callbacks.onDevLog?.("[dev] set_theme: save_to_location requires a location name");
+      return;
+    }
+
+    const slugified = location.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    const paths = campaignPaths(this.gameState.campaignRoot);
+    const filePath = norm(paths.location(slugified));
+
+    try {
+      if (!(await this.fileIO.exists(filePath))) {
+        this.callbacks.onDevLog?.(`[dev] set_theme: location "${location}" not found at ${filePath}`);
+        return;
+      }
+
+      const raw = await this.fileIO.readFile(filePath);
+      const { frontMatter, body, changelog } = parseFrontMatter(raw);
+      const title = frontMatter._title ?? location;
+
+      if (themeName) frontMatter.theme = themeName;
+      if (keyColor) frontMatter.key_color = keyColor;
+
+      const sceneNumber = this.sceneManager.getScene().sceneNumber;
+      const newChangelog = [...changelog];
+      const parts: string[] = [];
+      if (themeName) parts.push(`theme=${themeName}`);
+      if (keyColor) parts.push(`key_color=${keyColor}`);
+      newChangelog.push(formatChangelogEntry(sceneNumber, `Theme updated: ${parts.join(", ")}`));
+
+      const updated = serializeEntity(title as string, frontMatter, body, newChangelog);
+      await this.fileIO.writeFile(filePath, updated);
+      this.callbacks.onDevLog?.(`[dev] set_theme: saved ${parts.join(", ")} to location "${location}"`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.callbacks.onDevLog?.(`[dev] set_theme: failed to save to location "${location}" — ${msg}`);
+    }
+  }
+
+  /**
+   * Check if a location entity has theme metadata and auto-apply it.
+   * Called after scene transitions with the scene title as a location hint.
+   */
+  async applyLocationTheme(locationHint: string): Promise<void> {
+    const slugified = locationHint.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    const paths = campaignPaths(this.gameState.campaignRoot);
+    const filePath = norm(paths.location(slugified));
+
+    try {
+      if (!(await this.fileIO.exists(filePath))) return;
+
+      const raw = await this.fileIO.readFile(filePath);
+      const { frontMatter } = parseFrontMatter(raw);
+      const themeName = frontMatter.theme as string | undefined;
+      const keyColor = frontMatter.key_color as string | undefined;
+
+      if (themeName || keyColor) {
+        const cmd: TuiCommand = { type: "set_theme" };
+        if (themeName) cmd.theme = themeName;
+        if (keyColor) cmd.key_color = keyColor;
+        this.callbacks.onTuiCommand(cmd);
+        this.callbacks.onDevLog?.(`[dev] auto-theme: applied ${themeName ?? ""}${keyColor ? ` ${keyColor}` : ""} from location "${locationHint}"`);
+      }
+    } catch {
+      // Best-effort — don't break scene transitions for theme lookup failures
     }
   }
 
