@@ -566,6 +566,109 @@ describe("SceneManager", () => {
     expect(locationContent).toContain("Party entered and caused a brawl");
   });
 
+  it("notifyEntityTouched adds entry and getSystemPrompt includes entity index", () => {
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      mockFileIO(),
+    );
+
+    mgr.notifyEntityTouched("/tmp/test-campaign/characters/phone-booth-man.md", "Phone Booth Man");
+    const prompt = mgr.getSystemPrompt();
+    const combined = prompt.map((b) => b.text).join("");
+    expect(combined).toContain("Scene Entities");
+    expect(combined).toContain("characters/phone-booth-man.md");
+    expect(combined).toContain("Phone Booth Man");
+    expect(combined).toContain("do not create duplicates");
+  });
+
+  it("notifyEntityTouched includes aliases when provided", () => {
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      mockFileIO(),
+    );
+
+    mgr.notifyEntityTouched(
+      "/tmp/test-campaign/characters/flood-street-watcher.md",
+      "Flood Street Watcher",
+      "The Watcher",
+    );
+    const prompt = mgr.getSystemPrompt();
+    const combined = prompt.map((b) => b.text).join("");
+    expect(combined).toContain("Flood Street Watcher (also: The Watcher)");
+  });
+
+  it("getSystemPrompt omits entity index when no entities touched", () => {
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      mockFileIO(),
+    );
+
+    const prompt = mgr.getSystemPrompt();
+    const combined = prompt.map((b) => b.text).join("");
+    expect(combined).not.toContain("Scene Entities");
+  });
+
+  it("sceneEntityIndex is cleared on scene transition", async () => {
+    const client = mockClient([
+      textResponse("Summary"),
+      textResponse(""),
+    ]);
+
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      mockFileIO(),
+    );
+
+    mgr.notifyEntityTouched("/tmp/test-campaign/characters/grimjaw.md", "Grimjaw");
+    // Verify it was added
+    let prompt = mgr.getSystemPrompt();
+    expect(prompt.map((b) => b.text).join("")).toContain("Grimjaw");
+
+    await mgr.sceneTransition(client, "End of scene");
+
+    // After transition, entity index should be cleared
+    prompt = mgr.getSystemPrompt();
+    expect(prompt.map((b) => b.text).join("")).not.toContain("Scene Entities");
+  });
+
+  it("notifyEntityTouched upserts — second call updates entry", () => {
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      mockFileIO(),
+    );
+
+    mgr.notifyEntityTouched("/tmp/test-campaign/characters/grimjaw.md", "Grimjaw");
+    mgr.notifyEntityTouched("/tmp/test-campaign/characters/grimjaw.md", "Grimjaw", "Captain Grimjaw");
+
+    mgr.getSystemPrompt();
+    // Check the entityIndex on sessionState directly — one entry, with aliases
+    expect(sessionState.entityIndex).toBeDefined();
+    expect(sessionState.entityIndex).toContain("Grimjaw (also: Captain Grimjaw)");
+    // Map upsert: path should appear exactly once in the entity index
+    const matches = sessionState.entityIndex!.match(/characters\/grimjaw\.md/g);
+    expect(matches).toHaveLength(1);
+  });
+
   it("contextRefresh handles missing files gracefully", async () => {
     const fileIO = mockFileIO();
     // No files pre-populated — everything missing

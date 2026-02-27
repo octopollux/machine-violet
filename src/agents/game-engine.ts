@@ -532,6 +532,7 @@ export class GameEngine {
       }
 
       await this.fileIO.writeFile(filePath, content);
+      this.sceneManager.notifyEntityTouched(filePath, name);
       this.callbacks.onDevLog?.(`[dev] create_entity: wrote ${entity_type} "${name}" → ${filePath}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -590,6 +591,9 @@ export class GameEngine {
 
       const updated = serializeEntity(title as string, frontMatter, newBody, newChangelog);
       await this.fileIO.writeFile(filePath, updated);
+
+      const aliases = (frontMatter.additional_names as string | undefined)?.trim() || undefined;
+      this.sceneManager.notifyEntityTouched(filePath, title as string, aliases);
       this.callbacks.onDevLog?.(`[dev] update_entity: updated "${name}" — ${parts.join(", ")}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

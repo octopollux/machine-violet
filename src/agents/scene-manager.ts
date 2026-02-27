@@ -95,6 +95,7 @@ export class SceneManager {
   private pendingOp: PendingOperation | null = null;
   private pcSummaries: string[];
   private aliasContext = "";
+  private sceneEntityIndex = new Map<string, { name: string; aliases?: string }>();
 
   /** Optional dev mode log callback. */
   devLog?: (msg: string) => void;
@@ -126,6 +127,7 @@ export class SceneManager {
     this.sessionState.scenePrecis = buildScenePrecis(this.scene);
     this.sessionState.scenePacing = buildScenePacing(this.scene);
     this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);
+    this.sessionState.entityIndex = this.buildSceneEntityIndex();
     return buildDMPrefix(this.state.config, this.sessionState);
   }
 
@@ -480,6 +482,21 @@ export class SceneManager {
     return this.repo;
   }
 
+  /**
+   * Record that an entity was created or updated this scene.
+   * Called by GameEngine after successful entity file writes.
+   */
+  notifyEntityTouched(filePath: string, name: string, aliases?: string): void {
+    // Compute relative path from campaignRoot
+    const normalizedPath = norm(filePath);
+    const normalizedRoot = norm(this.state.campaignRoot);
+    const prefix = normalizedRoot.endsWith("/") ? normalizedRoot : normalizedRoot + "/";
+    const relativePath = normalizedPath.startsWith(prefix)
+      ? normalizedPath.slice(prefix.length)
+      : normalizedPath;
+    this.sceneEntityIndex.set(relativePath, { name, aliases: aliases || undefined });
+  }
+
   // --- Transition step methods ---
 
   private async stepFinalizeTranscript(): Promise<void> {
@@ -584,6 +601,7 @@ export class SceneManager {
     this.scene.openThreads = "";
     this.scene.npcIntents = "";
     this.scene.playerReads = [];
+    this.sceneEntityIndex.clear();
   }
 
   private stepPruneContext(): void {
@@ -693,6 +711,20 @@ export class SceneManager {
   private async listEntityFiles(): Promise<string[]> {
     const entityFiles = await this.collectEntityFiles();
     return entityFiles.map((e) => e.file);
+  }
+
+  /**
+   * Build a compact entity index string for the DM prefix.
+   * Returns undefined if no entities have been touched this scene.
+   */
+  private buildSceneEntityIndex(): string | undefined {
+    if (this.sceneEntityIndex.size === 0) return undefined;
+    const lines: string[] = ["Entities created/updated this scene — update these, do not create duplicates:"];
+    for (const [path, { name, aliases }] of this.sceneEntityIndex) {
+      const suffix = aliases ? ` (also: ${aliases})` : "";
+      lines.push(`  ${path} — ${name}${suffix}`);
+    }
+    return lines.join("\n");
   }
 
   private async appendEntityChangelog(
