@@ -8,6 +8,9 @@ const noop = () => { /* fire-and-forget */ };
 
 let dumpDir: string | null = null;
 
+/** Accumulates thinking blocks between dumpContext() calls, keyed by agent. */
+const thinkingAccumulator = new Map<string, { round: number; thinking: string; timestamp: string }[]>();
+
 /**
  * Set the context dump output directory. Called once at campaign start.
  * Creates the directory tree (fire-and-forget).
@@ -25,6 +28,7 @@ export function getContextDumpDir(): string | null {
 /** Reset state (for tests). */
 export function resetContextDump(): void {
   dumpDir = null;
+  thinkingAccumulator.clear();
 }
 
 // --- Types ---
@@ -38,11 +42,23 @@ export type DumpableParams = Record<string, any>;
 /**
  * Dump context to a file as raw JSON. Fire-and-forget, errors swallowed.
  * Only runs when DEV_MODE is active and dumpDir has been set.
+ *
+ * Drains any accumulated thinking blocks for this agent and includes them
+ * as `_thinking_trace` in the JSON envelope.
  */
 export function dumpContext(agentName: string, params: DumpableParams): void {
   if (!isDevMode() || !dumpDir) return;
 
-  const envelope = { agent: agentName, timestamp: new Date().toISOString(), ...params };
+  // Drain accumulated thinking for this agent
+  const traces = thinkingAccumulator.get(agentName) ?? [];
+  thinkingAccumulator.delete(agentName);
+
+  const envelope = {
+    agent: agentName,
+    timestamp: new Date().toISOString(),
+    ...params,
+    ...(traces.length > 0 ? { _thinking_trace: traces } : {}),
+  };
   const json = JSON.stringify(envelope, null, 2);
   const filePath = join(dumpDir, `${agentName}.json`);
 
@@ -53,6 +69,9 @@ export function dumpContext(agentName: string, params: DumpableParams): void {
  * Dump response thinking blocks to a separate file.
  * Writes to `{agentName}-thinking.json`. Fire-and-forget, errors swallowed.
  * Only runs when DEV_MODE is active and dumpDir has been set.
+ *
+ * Also accumulates the thinking block so the next dumpContext() call
+ * for this agent will include it in `_thinking_trace`.
  */
 export function dumpThinking(
   agentName: string,
@@ -61,7 +80,16 @@ export function dumpThinking(
 ): void {
   if (!isDevMode() || !dumpDir) return;
 
-  const envelope = { agent: agentName, round, timestamp: new Date().toISOString(), thinking: thinkingText };
+  const timestamp = new Date().toISOString();
+
+  // Accumulate for next dumpContext() call
+  if (!thinkingAccumulator.has(agentName)) {
+    thinkingAccumulator.set(agentName, []);
+  }
+  thinkingAccumulator.get(agentName)?.push({ round, thinking: thinkingText, timestamp });
+
+  // Still write the separate file for backward compat
+  const envelope = { agent: agentName, round, timestamp, thinking: thinkingText };
   const json = JSON.stringify(envelope, null, 2);
   const filePath = join(dumpDir, `${agentName}-thinking.json`);
 
