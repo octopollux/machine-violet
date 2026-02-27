@@ -29,5 +29,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Test + coverage threshold
+      - name: Test
+        run: npm test
+
+      - name: Coverage threshold
+        if: matrix.node-version == 22
         run: npm run test:coverage
