@@ -17,15 +17,12 @@ export function classifyPath(relPath: string): FileCategory {
   if (normalized.includes("/session-recaps/")) return "transcript";
   if (normalized.startsWith("campaign/")) return "transcript";
   if (normalized.endsWith(".json") && normalized.includes("map")) return "map";
-  if (
-    normalized.startsWith("characters/") ||
-    normalized.startsWith("locations/") ||
-    normalized.startsWith("factions/") ||
-    normalized.startsWith("lore/") ||
-    normalized.startsWith("rules/") ||
-    normalized.startsWith("players/")
-  )
-    return "entity";
+  if (normalized.startsWith("characters/")) return "characters";
+  if (normalized.startsWith("players/")) return "players";
+  if (normalized.startsWith("locations/")) return "locations";
+  if (normalized.startsWith("factions/")) return "factions";
+  if (normalized.startsWith("lore/")) return "lore";
+  if (normalized.startsWith("rules/")) return "rules";
 
   return "other";
 }

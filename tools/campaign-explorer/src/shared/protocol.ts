@@ -1,7 +1,12 @@
 /** File categories for the tree sidebar. */
 export type FileCategory =
   | "state"
-  | "entity"
+  | "characters"
+  | "players"
+  | "locations"
+  | "factions"
+  | "lore"
+  | "rules"
   | "transcript"
   | "context-dump"
   | "thinking"
