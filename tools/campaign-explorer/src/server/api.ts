@@ -87,8 +87,9 @@ async function walkDir(root: string, dir: string): Promise<TreeEntry[]> {
   }
 
   for (const item of items) {
-    // Skip dotfiles/dirs and node_modules
-    if (item.startsWith(".") || item === "node_modules") continue;
+    // Skip dotfiles/dirs (except .dev-mode and .debug) and node_modules
+    if (item === "node_modules") continue;
+    if (item.startsWith(".") && item !== ".dev-mode" && item !== ".debug") continue;
 
     const absPath = join(dir, item);
     try {
