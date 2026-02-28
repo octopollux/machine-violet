@@ -8,7 +8,7 @@
     "start": "node dist/index.js",
     "dev": "tsx src/index.tsx",
     "build": "tsc",
-    "postbuild": "node -e \"const fs=require('fs'),p=require('path');[['src/prompts','dist/prompts','.md'],['src/tui/themes/assets','dist/tui/themes/assets','.theme']].forEach(([s,d,ext])=>{fs.mkdirSync(d,{recursive:true});fs.readdirSync(s).filter(f=>f.endsWith(ext)).forEach(f=>fs.copyFileSync(p.join(s,f),p.join(d,f)))})\"",
+    "postbuild": "node -e \"const fs=require('fs'),p=require('path');[['src/prompts','dist/prompts','.md'],['src/tui/themes/assets','dist/tui/themes/assets','.theme'],['src/tui/themes/assets','dist/tui/themes/assets','.player-frame']].forEach(([s,d,ext])=>{fs.mkdirSync(d,{recursive:true});fs.readdirSync(s).filter(f=>f.endsWith(ext)).forEach(f=>fs.copyFileSync(p.join(s,f),p.join(d,f)))})\"",
     "watch": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",

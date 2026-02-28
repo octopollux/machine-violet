@@ -51,13 +51,20 @@ export function resolveTheme(
   };
 
   // Generate swatch
+  const SAFE_DEFAULT_HEX = "#8888aa";
   let swatch: Color[];
   try {
     swatch = fromPreset(swatchConfig.preset, keyColor);
   } catch {
-    // Fallback to simple arc if preset not found
-    const params = simpleArc(keyColor);
-    swatch = generateArc(params);
+    try {
+      // Fallback to simple arc if preset not found
+      const params = simpleArc(keyColor);
+      swatch = generateArc(params);
+    } catch {
+      // Fallback to safe default if keyColor is invalid hex
+      const params = simpleArc(SAFE_DEFAULT_HEX);
+      swatch = generateArc(params);
+    }
   }
 
   return {

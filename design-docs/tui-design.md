@@ -143,7 +143,7 @@ Theme assets are `.theme` files stored in `src/tui/themes/assets/`. The format i
 
 ```ini
 @name gothic
-@height 2
+@height: 2
 
 [corner_tl]
 ╔═
@@ -187,7 +187,7 @@ Theme assets are `.theme` files stored in `src/tui/themes/assets/`. The format i
 ═╣
 
 [turn_separator]
-╡ %s ╞
+───── † ─────
 ```
 
 The parser (`parseThemeAsset()`) validates that all 13 required components are present: `corner_tl`, `corner_tr`, `corner_bl`, `corner_br`, `edge_top`, `edge_bottom`, `edge_left`, `edge_right`, `separator_left_top`, `separator_right_top`, `separator_left_bottom`, `separator_right_bottom`, `turn_separator`.

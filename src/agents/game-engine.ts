@@ -623,6 +623,11 @@ export class GameEngine {
       return;
     }
 
+    if (!themeName && !keyColor) {
+      this.callbacks.onDevLog?.("[dev] set_theme: nothing to save (no theme or key_color provided)");
+      return;
+    }
+
     const slugified = location.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
     const paths = campaignPaths(this.gameState.campaignRoot);
     const filePath = norm(paths.location(slugified));

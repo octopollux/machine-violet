@@ -129,11 +129,10 @@ ConversationManager
 
 ```
 PersistedUIState                                  → state/ui.json
-├── themeName: string                             Theme asset name (e.g. "gothic")
-├── keyColor?: string                             Optional hex key color for swatch hue shift
-├── styleName: string                             Legacy, for set_ui_style compat
+├── styleName: string                             Theme/style name (e.g. "gothic")
 ├── variant: StyleVariant
 └── modelines?: Record<string, string>
+<!-- TODO: migrate to themeName + keyColor fields when theme system is fully wired -->
 ```
 
 ---
@@ -547,7 +546,7 @@ Canonical directory tree for a campaign. Machine-managed files are marked with t
 │   ├── decks.json                         DecksState
 │   ├── scene.json                         PersistedSceneState (precis, threads, intents, playerReads, activePlayerIndex)
 │   ├── conversation.json                  SerializedExchange[]
-│   └── ui.json                            PersistedUIState (themeName, keyColor, styleName, variant, modelines)
+│   └── ui.json                            PersistedUIState (styleName, variant, modelines)
 │
 ├── campaign/                              [machine + DM] The knowledge backbone.
 │   ├── log.md                             [machine] Append-only campaign log. Dense, wikilinked.
