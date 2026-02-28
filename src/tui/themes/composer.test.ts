@@ -204,19 +204,21 @@ describe("composeBottomFrame", () => {
 });
 
 describe("composeSimpleBorder", () => {
-  it("creates a 1-row top border", () => {
+  it("creates a 1-row top border with corners", () => {
     const asset = parseThemeAsset(H1_THEME);
     const frame = composeSimpleBorder(asset, 15, "top");
     expect(frame.height).toBe(1);
     expect(frame.rows[0].length).toBe(15);
-    expect(frame.rows[0]).toBe("---------------");
+    // Corners from corner_tl/corner_tr + tiled edge
+    expect(frame.rows[0]).toBe("+-------------+");
   });
 
-  it("creates a 1-row bottom border", () => {
+  it("creates a 1-row bottom border with corners", () => {
     const asset = parseThemeAsset(H1_THEME);
     const frame = composeSimpleBorder(asset, 10, "bottom");
     expect(frame.height).toBe(1);
     expect(frame.rows[0].length).toBe(10);
+    expect(frame.rows[0]).toBe("+--------+");
   });
 });
 

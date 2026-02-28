@@ -21,6 +21,7 @@ export {
   composeSimpleBorder,
   composeSideColumn,
   composeTurnSeparator,
+  playerPaneSideChar,
 } from "./composer.js";
 
 export {

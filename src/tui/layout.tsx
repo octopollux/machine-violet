@@ -17,6 +17,7 @@ import {
   ThemedHorizontalBorder,
   ThemedSideFrame,
   SimpleBorder,
+  PlayerPaneSide,
 } from "./components/ThemedFrame.js";
 import {
   getViewportTier,
@@ -186,18 +187,36 @@ export function Layout(props: LayoutProps) {
 
       {/* === PLAYER PANE === */}
 
-      {/* Player Pane top border (simple 1-row) */}
+      {/* Player Pane top border (simple 1-row with corners) */}
       {elements.modeline && (
         <SimpleBorder theme={theme} width={width} position="top" color={playerColor} />
       )}
 
-      {/* Modeline */}
+      {/* Player Pane content: side edges + modeline + input */}
       {elements.modeline && (
-        <Modeline lines={modelineLines} width={width} />
+        <Box flexDirection="row">
+          <PlayerPaneSide theme={theme} side="left" color={playerColor} />
+          <Box flexDirection="column" width={width - 2}>
+            <Modeline lines={modelineLines} width={width - 2} />
+            {!hideInputLine && (
+              <InputLine
+                characterName={activeCharacterName}
+                showPlayerName={elements.playerInPrompt}
+                playerName={players[activePlayerIndex]?.name}
+                width={width - 2}
+                isDisabled={inputIsDisabled}
+                onChange={onInputChange}
+                onSubmit={onInputSubmit}
+                resetKey={inputResetKey}
+              />
+            )}
+          </Box>
+          <PlayerPaneSide theme={theme} side="right" color={playerColor} />
+        </Box>
       )}
 
-      {/* Input Line */}
-      {!hideInputLine && (
+      {/* Input Line when modeline is hidden (minimal tier) */}
+      {!elements.modeline && !hideInputLine && (
         <InputLine
           characterName={activeCharacterName}
           showPlayerName={elements.playerInPrompt}

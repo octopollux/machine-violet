@@ -161,13 +161,38 @@ export function composeSimpleBorder(
   width: number,
   position: "top" | "bottom",
 ): ComposedFrame {
+  // Use first character of each corner for single-row borders
+  const cornerL = position === "top"
+    ? (asset.components.corner_tl.rows[0]?.[0] ?? "┌")
+    : (asset.components.corner_bl.rows[0]?.[0] ?? "└");
+  const cornerR = position === "top"
+    ? (asset.components.corner_tr.rows[0]?.slice(-1) ?? "┐")
+    : (asset.components.corner_br.rows[0]?.slice(-1) ?? "┘");
+
   const edge =
     position === "top"
       ? asset.components.edge_top.rows[0]
       : asset.components.edge_bottom.rows[0];
 
-  const row = tileToWidth(edge ?? "─", width);
+  const fillWidth = width - 2; // corners take 1 char each
+  if (fillWidth <= 0) {
+    return { rows: [tileToWidth(edge ?? "─", width)], height: 1 };
+  }
+
+  const row = cornerL + tileToWidth(edge ?? "─", fillWidth) + cornerR;
   return { rows: [row], height: 1 };
+}
+
+/**
+ * Get the single-character side edge for the Player Pane.
+ * Uses the first character of edge_left / last character of edge_right.
+ */
+export function playerPaneSideChar(asset: ThemeAsset, side: "left" | "right"): string {
+  if (side === "left") {
+    return asset.components.edge_left.rows[0]?.[0] ?? "│";
+  }
+  const rightRow = asset.components.edge_right.rows[0] ?? "│";
+  return rightRow.slice(-1) || "│";
 }
 
 /**

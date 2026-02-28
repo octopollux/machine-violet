@@ -11,6 +11,7 @@ import {
   composeBottomFrame,
   composeSimpleBorder,
   composeSideColumn,
+  playerPaneSideChar,
 } from "../themes/composer.js";
 
 /** Get hex color for a frame part from the resolved theme's swatch + color map. */
@@ -125,4 +126,21 @@ export function SimpleBorder({ theme, width, position, color }: SimpleBorderProp
       <Text color={borderColor}>{frame.rows[0]}</Text>
     </Box>
   );
+}
+
+// --- Player Pane Side Edges ---
+
+interface PlayerPaneSideProps {
+  theme: ResolvedTheme;
+  side: "left" | "right";
+  color?: string;
+}
+
+/**
+ * Single-character side edge for Player Pane content rows.
+ */
+export function PlayerPaneSide({ theme, side, color }: PlayerPaneSideProps) {
+  const ch = playerPaneSideChar(theme.asset, side);
+  const borderColor = color ?? themeColor(theme, "border");
+  return <Text color={borderColor}>{ch}</Text>;
 }
