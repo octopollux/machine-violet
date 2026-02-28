@@ -154,26 +154,33 @@ export function composeBottomFrame(
 /**
  * Compose a simple 1-row border for the Player Pane.
  * Uses the dedicated PlayerPaneFrame components.
- * position "top" uses edge_top + corner_tl/tr; "bottom" uses edge_bottom + corner_bl/br.
+ * position "top" uses edge_top + corner_tl/tr row 0;
+ * "bottom" uses edge_bottom + corner_bl/br last row.
+ * Multi-char corner rows are supported — fillWidth adjusts accordingly.
  */
 export function composeSimpleBorder(
   frame: PlayerPaneFrame,
   width: number,
   position: "top" | "bottom",
 ): ComposedFrame {
-  const cornerL = position === "top"
-    ? (frame.components.corner_tl.rows[0]?.[0] ?? "┌")
-    : (frame.components.corner_bl.rows[0]?.[0] ?? "└");
-  const cornerR = position === "top"
-    ? (frame.components.corner_tr.rows[0]?.slice(-1) ?? "┐")
-    : (frame.components.corner_br.rows[0]?.slice(-1) ?? "┘");
+  let cornerL: string;
+  let cornerR: string;
+  if (position === "top") {
+    cornerL = frame.components.corner_tl.rows[0] ?? "┌";
+    cornerR = frame.components.corner_tr.rows[0] ?? "┐";
+  } else {
+    const blLast = frame.components.corner_bl.height - 1;
+    const brLast = frame.components.corner_br.height - 1;
+    cornerL = frame.components.corner_bl.rows[blLast] ?? "└";
+    cornerR = frame.components.corner_br.rows[brLast] ?? "┘";
+  }
 
   const edge =
     position === "top"
       ? frame.components.edge_top.rows[0]
       : frame.components.edge_bottom.rows[0];
 
-  const fillWidth = width - 2; // corners take 1 char each
+  const fillWidth = width - cornerL.length - cornerR.length;
   if (fillWidth <= 0) {
     return { rows: [tileToWidth(edge ?? "─", width)], height: 1 };
   }
@@ -192,6 +199,48 @@ export function playerPaneSideChar(frame: PlayerPaneFrame, side: "left" | "right
   }
   const rightRow = frame.components.edge_right.rows[0] ?? "│";
   return rightRow.slice(-1) || "│";
+}
+
+/**
+ * Build a side column for the Player Pane, composited from multi-row corners + edge.
+ * Returns one character per content row:
+ *  - Rows 0..topCorner.height-2:  chars from top corner rows 1..N-1
+ *  - Middle rows:                  edge char (from edge_left / edge_right)
+ *  - Last bottomCorner.height-1 rows: chars from bottom corner rows 0..N-2
+ * For the left side, the first character of each row is used.
+ * For the right side, the last character of each row is used.
+ */
+export function playerPaneSideColumn(
+  frame: PlayerPaneFrame,
+  side: "left" | "right",
+  contentHeight: number,
+): string[] {
+  const topCorner = side === "left" ? frame.components.corner_tl : frame.components.corner_tr;
+  const bottomCorner = side === "left" ? frame.components.corner_bl : frame.components.corner_br;
+  const edgeComp = side === "left" ? frame.components.edge_left : frame.components.edge_right;
+
+  const pickChar = (row: string | undefined): string => {
+    if (!row) return " ";
+    return side === "left" ? (row[0] ?? " ") : (row.slice(-1) || " ");
+  };
+
+  const edgeChar = pickChar(edgeComp.rows[0]);
+  const topRows = topCorner.height - 1; // corner rows 1..N-1
+  const bottomRows = bottomCorner.height - 1; // corner rows 0..N-2
+
+  const result: string[] = [];
+  for (let i = 0; i < contentHeight; i++) {
+    if (i < topRows) {
+      result.push(pickChar(topCorner.rows[i + 1]));
+    } else if (i >= contentHeight - bottomRows) {
+      const bottomIdx = i - (contentHeight - bottomRows);
+      result.push(pickChar(bottomCorner.rows[bottomIdx]));
+    } else {
+      result.push(edgeChar);
+    }
+  }
+
+  return result;
 }
 
 /**

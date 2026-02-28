@@ -11,7 +11,7 @@ import {
   composeBottomFrame,
   composeSimpleBorder,
   composeSideColumn,
-  playerPaneSideChar,
+  playerPaneSideColumn,
 } from "../themes/composer.js";
 
 /** Get hex color for a frame part from the resolved theme's swatch + color map. */
@@ -140,19 +140,20 @@ interface PlayerPaneSideProps {
 
 /**
  * Side edge for Player Pane content rows.
- * When height > 1, renders a vertical column of repeated edge characters.
+ * Renders a vertical column of characters composited from multi-row corners + edge.
  */
 export function PlayerPaneSide({ theme, side, color, height }: PlayerPaneSideProps) {
-  const ch = playerPaneSideChar(theme.playerPaneFrame, side);
   const borderColor = color ?? themeColor(theme, "border");
-  if (height && height > 1) {
+  const h = height ?? 1;
+  const chars = playerPaneSideColumn(theme.playerPaneFrame, side, h);
+  if (h > 1) {
     return (
       <Box flexDirection="column">
-        {Array.from({ length: height }, (_, i) => (
+        {chars.map((ch, i) => (
           <Text key={i} color={borderColor}>{ch}</Text>
         ))}
       </Box>
     );
   }
-  return <Text color={borderColor}>{ch}</Text>;
+  return <Text color={borderColor}>{chars[0] ?? " "}</Text>;
 }

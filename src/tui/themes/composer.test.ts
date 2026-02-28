@@ -7,6 +7,7 @@ import {
   composeSideColumn,
   composeTurnSeparator,
   playerPaneSideChar,
+  playerPaneSideColumn,
 } from "./composer.js";
 import { parseThemeAsset, parsePlayerPaneFrame } from "./parser.js";
 
@@ -336,5 +337,116 @@ describe("composeTurnSeparator", () => {
     const asset = parseThemeAsset(H1_THEME);
     const sep = composeTurnSeparator(asset, 7);
     expect(sep).toBe("-- * --");
+  });
+});
+
+// Multi-row corner player-pane frame (3-row corners, like default.player-frame)
+const MULTI_ROW_FRAME = `@name: multi-row
+[corner_tl]
+┌
+│
+(
+
+[corner_tr]
+┐
+|
+)
+
+[corner_bl]
+(
+|
+└
+
+[corner_br]
+)
+|
+┘
+
+[edge_top]
+─
+
+[edge_bottom]
+─
+
+[edge_left]
+│
+
+[edge_right]
+│
+`;
+
+describe("composeSimpleBorder (multi-row corners)", () => {
+  it("top border uses corner row 0", () => {
+    const frame = parsePlayerPaneFrame(MULTI_ROW_FRAME);
+    const composed = composeSimpleBorder(frame, 12, "top");
+    expect(composed.rows[0]).toBe("┌──────────┐");
+    expect(composed.rows[0].length).toBe(12);
+  });
+
+  it("bottom border uses corner last row", () => {
+    const frame = parsePlayerPaneFrame(MULTI_ROW_FRAME);
+    const composed = composeSimpleBorder(frame, 12, "bottom");
+    // corner_bl last row = "└", corner_br last row = "┘"
+    expect(composed.rows[0]).toBe("└──────────┘");
+    expect(composed.rows[0].length).toBe(12);
+  });
+});
+
+describe("playerPaneSideColumn (multi-row corners)", () => {
+  it("composites top corner, edge, bottom corner for left side", () => {
+    const frame = parsePlayerPaneFrame(MULTI_ROW_FRAME);
+    // 3-row corners → topRows=2, bottomRows=2, contentHeight=7 → 3 middle rows
+    const col = playerPaneSideColumn(frame, "left", 7);
+    expect(col).toHaveLength(7);
+    // Top corner rows 1,2 (first char)
+    expect(col[0]).toBe("│"); // corner_tl row 1
+    expect(col[1]).toBe("("); // corner_tl row 2
+    // Middle rows: edge_left
+    expect(col[2]).toBe("│");
+    expect(col[3]).toBe("│");
+    expect(col[4]).toBe("│");
+    // Bottom corner rows 0,1 (first char)
+    expect(col[5]).toBe("("); // corner_bl row 0
+    expect(col[6]).toBe("|"); // corner_bl row 1
+  });
+
+  it("composites top corner, edge, bottom corner for right side", () => {
+    const frame = parsePlayerPaneFrame(MULTI_ROW_FRAME);
+    const col = playerPaneSideColumn(frame, "right", 7);
+    expect(col).toHaveLength(7);
+    // Top corner rows 1,2 (last char)
+    expect(col[0]).toBe("|"); // corner_tr row 1
+    expect(col[1]).toBe(")"); // corner_tr row 2
+    // Middle rows: edge_right
+    expect(col[2]).toBe("│");
+    expect(col[3]).toBe("│");
+    expect(col[4]).toBe("│");
+    // Bottom corner rows 0,1 (last char)
+    expect(col[5]).toBe(")"); // corner_br row 0
+    expect(col[6]).toBe("|"); // corner_br row 1
+  });
+
+  it("handles single-row corners (no underlap)", () => {
+    const frame = parsePlayerPaneFrame(SIMPLE_FRAME);
+    // 1-row corners → topRows=0, bottomRows=0, all middle
+    const col = playerPaneSideColumn(frame, "left", 5);
+    expect(col).toHaveLength(5);
+    expect(col.every((ch) => ch === "|")).toBe(true);
+  });
+
+  it("handles 0 content height", () => {
+    const frame = parsePlayerPaneFrame(MULTI_ROW_FRAME);
+    const col = playerPaneSideColumn(frame, "left", 0);
+    expect(col).toHaveLength(0);
+  });
+});
+
+describe("playerPaneSideColumn (corners-only frame)", () => {
+  it("returns spaces when edges are absent", () => {
+    const frame = parsePlayerPaneFrame(CORNERS_ONLY_FRAME);
+    const col = playerPaneSideColumn(frame, "left", 5);
+    expect(col).toHaveLength(5);
+    // 1-row corners → all edge chars → space (from default edge)
+    expect(col.every((ch) => ch === " ")).toBe(true);
   });
 });
