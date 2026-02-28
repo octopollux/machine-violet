@@ -123,7 +123,7 @@ export function narrativeRows(
   if (elements.topFrame) used += borderHeight;
   if (elements.lowerFrame) used += borderHeight;
   if (elements.activityLine) used += 1;
-  if (elements.modeline) used += modelineHeight;
+  if (elements.modeline) used += modelineHeight + 2; // +2 for Player Pane top+bottom borders
   if (elements.playerSelector) used += 1;
 
   return Math.max(1, totalRows - used);

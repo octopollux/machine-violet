@@ -187,7 +187,7 @@ export function Layout(props: LayoutProps) {
       {/* === PLAYER PANE === */}
 
       {/* Player Pane top border (simple 1-row) */}
-      {elements.modeline && !elements.lowerFrame && (
+      {elements.modeline && (
         <SimpleBorder theme={theme} width={width} position="top" color={playerColor} />
       )}
 
@@ -208,6 +208,11 @@ export function Layout(props: LayoutProps) {
           onSubmit={onInputSubmit}
           resetKey={inputResetKey}
         />
+      )}
+
+      {/* Player Pane bottom border */}
+      {elements.modeline && (
+        <SimpleBorder theme={theme} width={width} position="bottom" color={playerColor} />
       )}
 
       {/* Player Selector */}
