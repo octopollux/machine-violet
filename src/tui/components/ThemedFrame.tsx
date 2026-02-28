@@ -134,13 +134,25 @@ interface PlayerPaneSideProps {
   theme: ResolvedTheme;
   side: "left" | "right";
   color?: string;
+  /** When set, renders a column of side characters spanning this many rows. */
+  height?: number;
 }
 
 /**
- * Single-character side edge for Player Pane content rows.
+ * Side edge for Player Pane content rows.
+ * When height > 1, renders a vertical column of repeated edge characters.
  */
-export function PlayerPaneSide({ theme, side, color }: PlayerPaneSideProps) {
+export function PlayerPaneSide({ theme, side, color, height }: PlayerPaneSideProps) {
   const ch = playerPaneSideChar(theme.playerPaneFrame, side);
   const borderColor = color ?? themeColor(theme, "border");
+  if (height && height > 1) {
+    return (
+      <Box flexDirection="column">
+        {Array.from({ length: height }, (_, i) => (
+          <Text key={i} color={borderColor}>{ch}</Text>
+        ))}
+      </Box>
+    );
+  }
   return <Text color={borderColor}>{ch}</Text>;
 }

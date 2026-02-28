@@ -23,6 +23,7 @@ import {
   getViewportTier,
   getVisibleElements,
   narrativeRows,
+  PLAYER_PANE_HEIGHT,
 } from "./responsive.js";
 import { getActivity } from "./activity.js";
 
@@ -124,9 +125,12 @@ export function Layout(props: LayoutProps) {
     dimensions.rows,
     elements,
     hideInputLine,
-    modelineLines.length,
     theme.asset.height,
+    players.length,
   );
+
+  // Fixed content height inside the Player Pane (between top/bottom borders)
+  const playerPaneContentHeight = PLAYER_PANE_HEIGHT - 2;
 
   // Height of the middle section (narrative + activity) for side frames
   const middleHeight = narRows + (elements.activityLine ? 1 : 0);
@@ -192,11 +196,11 @@ export function Layout(props: LayoutProps) {
         <SimpleBorder theme={theme} width={width} position="top" color={playerColor} />
       )}
 
-      {/* Player Pane content: side edges + modeline + input */}
+      {/* Player Pane content: side edges + modeline + input (fixed height) */}
       {elements.modeline && (
-        <Box flexDirection="row">
-          <PlayerPaneSide theme={theme} side="left" color={playerColor} />
-          <Box flexDirection="column" width={width - 2}>
+        <Box flexDirection="row" height={playerPaneContentHeight}>
+          <PlayerPaneSide theme={theme} side="left" color={playerColor} height={playerPaneContentHeight} />
+          <Box flexDirection="column" width={width - 2} justifyContent="flex-end">
             <Modeline lines={modelineLines} width={width - 2} />
             {!hideInputLine && (
               <InputLine
@@ -211,7 +215,7 @@ export function Layout(props: LayoutProps) {
               />
             )}
           </Box>
-          <PlayerPaneSide theme={theme} side="right" color={playerColor} />
+          <PlayerPaneSide theme={theme} side="right" color={playerColor} height={playerPaneContentHeight} />
         </Box>
       )}
 
