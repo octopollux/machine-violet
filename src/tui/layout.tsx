@@ -200,8 +200,9 @@ export function Layout(props: LayoutProps) {
       {elements.modeline && (
         <Box flexDirection="row" height={playerPaneContentHeight}>
           <PlayerPaneSide theme={theme} side="left" color={playerColor} height={playerPaneContentHeight} />
-          <Box flexDirection="column" width={width - 2} justifyContent="flex-end">
+          <Box flexDirection="column" width={width - 2}>
             <Modeline lines={modelineLines} width={width - 2} />
+            <Box flexGrow={1} />
             {!hideInputLine && (
               <InputLine
                 characterName={activeCharacterName}
@@ -214,6 +215,7 @@ export function Layout(props: LayoutProps) {
                 resetKey={inputResetKey}
               />
             )}
+            <Box height={1} />
           </Box>
           <PlayerPaneSide theme={theme} side="right" color={playerColor} height={playerPaneContentHeight} />
         </Box>
