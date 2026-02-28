@@ -81,7 +81,7 @@ export function PlayingPhase() {
     } else {
       if (engineRef.current && gameStateRef.current) {
         const active = getActivePlayer(gameStateRef.current);
-        setNarrativeLines((prev) => [...prev, { kind: "separator", text: "" }, { kind: "player", text: `> ${active.characterName}: ${text}` }, { kind: "dm", text: "" }]);
+        setNarrativeLines((prev) => [...prev, { kind: "separator", text: "" }, { kind: "player", text: `> ${active.characterName}: ${text}` }, { kind: "separator", text: "" }]);
         engineRef.current.processInput(active.characterName, text);
       }
     }
@@ -98,7 +98,7 @@ export function PlayingPhase() {
     setCustomInputResetKey((k) => k + 1);
     if (engineRef.current && gameStateRef.current) {
       const active = getActivePlayer(gameStateRef.current);
-      setNarrativeLines((prev) => [...prev, { kind: "separator", text: "" }, { kind: "player", text: `> ${active.characterName}: ${text}` }, { kind: "dm", text: "" }]);
+      setNarrativeLines((prev) => [...prev, { kind: "separator", text: "" }, { kind: "player", text: `> ${active.characterName}: ${text}` }, { kind: "separator", text: "" }]);
       engineRef.current.processInput(active.characterName, text);
     }
   }, []);
@@ -226,7 +226,7 @@ export function PlayingPhase() {
         setCustomInputMode(false);
         if (engineRef.current && gameStateRef.current) {
           const active = getActivePlayer(gameStateRef.current);
-          setNarrativeLines((prev) => [...prev, { kind: "separator", text: "" }, { kind: "player", text: `> ${active.characterName}: ${chosen}` }, { kind: "dm", text: "" }]);
+          setNarrativeLines((prev) => [...prev, { kind: "separator", text: "" }, { kind: "player", text: `> ${active.characterName}: ${chosen}` }, { kind: "separator", text: "" }]);
           engineRef.current.processInput(active.characterName, chosen);
         }
       }
