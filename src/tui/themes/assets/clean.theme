@@ -1,0 +1,42 @@
+@name: clean
+@genre_tags: modern, freeform, minimal
+@height: 1
+
+[corner_tl]
+┌
+
+[corner_tr]
+┐
+
+[corner_bl]
+└
+
+[corner_br]
+┘
+
+[edge_top]
+─
+
+[edge_bottom]
+─
+
+[edge_left]
+│
+
+[edge_right]
+│
+
+[separator_left_top]
+─
+
+[separator_right_top]
+─
+
+[separator_left_bottom]
+─
+
+[separator_right_bottom]
+─
+
+[turn_separator]
+── · ──

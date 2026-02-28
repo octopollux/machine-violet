@@ -1,6 +1,7 @@
 import React from "react";
 import { Box } from "ink";
-import type { FrameStyle, StyleVariant, ViewportDimensions, NarrativeLine } from "../types/tui.js";
+import type { ViewportDimensions, NarrativeLine } from "../types/tui.js";
+import type { ResolvedTheme } from "./themes/types.js";
 import type { PlayerEntry } from "./components/index.js";
 import type { NarrativeAreaHandle } from "./components/index.js";
 import {
@@ -11,26 +12,26 @@ import {
   PlayerSelector,
   ActivityLine,
   NarrativeArea,
-  HorizontalBorder,
-  SideFrame,
 } from "./components/index.js";
+import {
+  ThemedHorizontalBorder,
+  ThemedSideFrame,
+  SimpleBorder,
+  PlayerPaneSide,
+} from "./components/ThemedFrame.js";
 import {
   getViewportTier,
   getVisibleElements,
-  useAsciiFallback,
   narrativeRows,
+  PLAYER_PANE_HEIGHT,
 } from "./responsive.js";
-import { renderTopFrame } from "./frames/index.js";
 import { getActivity } from "./activity.js";
-import { Text } from "ink";
 
 export interface LayoutProps {
   /** Terminal dimensions */
   dimensions: ViewportDimensions;
-  /** Active frame style */
-  style: FrameStyle;
-  /** Active style variant */
-  variant: StyleVariant;
+  /** Resolved theme for rendering */
+  theme: ResolvedTheme;
 
   // Content
   narrativeLines: NarrativeLine[];
@@ -66,16 +67,19 @@ export interface LayoutProps {
 
   /** When true, skip rendering the InputLine (e.g. choice modal provides its own input) */
   hideInputLine?: boolean;
+
+  /** When set, replaces the Player Pane interior (Modeline + InputLine) with this element */
+  playerPaneOverlay?: React.ReactNode;
 }
 
 /**
- * Main TUI layout. Composes all elements with responsive breakpoints.
+ * Main TUI layout — two-pane structure (Conversation Pane + Player Pane).
+ * Composes all elements with responsive breakpoints.
  */
 export function Layout(props: LayoutProps) {
   const {
     dimensions,
-    style,
-    variant,
+    theme,
     narrativeLines,
     modelineText,
     activeCharacterName,
@@ -94,16 +98,15 @@ export function Layout(props: LayoutProps) {
     turnIndicatorColor,
     narrativeRef,
     hideInputLine,
+    playerPaneOverlay,
   } = props;
 
   const tier = getViewportTier(dimensions);
   const elements = getVisibleElements(tier);
-  const ascii = useAsciiFallback(dimensions.columns);
-  const frameVariant = style.variants[variant];
   const width = dimensions.columns;
 
-  // Side frame width (1 for now, designed to support 2 later)
-  const sideFrameWidth: 1 | 2 = 1;
+  // Side frame width from theme asset
+  const sideFrameWidth = elements.sideFrames ? theme.asset.components.edge_left.width : 0;
 
   // Activity glyph for modeline (when activity line dropped)
   const activity = getActivity(engineState);
@@ -115,78 +118,119 @@ export function Layout(props: LayoutProps) {
   // Pre-split modeline so we know its height before sizing the narrative area
   const modelineDisplay = buildModelineDisplay(modelineText, actGlyph, turnForModeline);
   const modelineLines = splitModeline(modelineDisplay, width);
-  const narRows = narrativeRows(dimensions.rows, elements, hideInputLine, modelineLines.length);
 
-  // Height and inner width of the middle section (narrative + activity) for side frames
+  // Build resource string for top frame title
+  const titleText = resources.length > 0
+    ? `${campaignName} | ${resources.join(" | ")}`
+    : campaignName;
+
+  // Calculate narrative rows (accounting for themed border heights)
+  const narRows = narrativeRows(
+    dimensions.rows,
+    elements,
+    hideInputLine,
+    theme.asset.height,
+    players.length,
+  );
+
+  // Fixed content height inside the Player Pane (between top/bottom borders)
+  const playerPaneContentHeight = PLAYER_PANE_HEIGHT - 2;
+
+  // Height of the middle section (narrative + activity) for side frames
   const middleHeight = narRows + (elements.activityLine ? 1 : 0);
   const innerWidth = elements.sideFrames ? width - 2 * sideFrameWidth : width;
 
   return (
     <Box flexDirection="column" width={width} height={dimensions.rows}>
-      {/* Top Frame (resource display) */}
+      {/* === CONVERSATION PANE === */}
+
+      {/* Top Frame (themed multi-line border + campaign title) */}
       {elements.topFrame && (
-        <TopFrameBlock
-          variant={frameVariant}
+        <ThemedHorizontalBorder
+          theme={theme}
           width={width}
-          campaignName={campaignName}
-          resources={resources}
-          ascii={ascii}
+          position="top"
+          centerText={titleText}
         />
       )}
 
       {/* Middle section: optional side frames + narrative + activity */}
       <Box flexDirection="row">
         {elements.sideFrames && (
-          <SideFrame
-            variant={frameVariant}
-            side="left"
-            height={middleHeight}
-            frameWidth={sideFrameWidth}
-            ascii={ascii}
-          />
+          <ThemedSideFrame theme={theme} side="left" height={middleHeight} />
         )}
 
         <Box flexDirection="column" width={innerWidth}>
           {/* Narrative Area */}
-          <NarrativeArea ref={narrativeRef} lines={narrativeLines} maxRows={narRows} quoteColor={quoteColor} playerColor={playerColor} width={innerWidth} />
+          <NarrativeArea
+            ref={narrativeRef}
+            lines={narrativeLines}
+            maxRows={narRows}
+            quoteColor={quoteColor}
+            playerColor={playerColor}
+            width={innerWidth}
+            themeAsset={theme.asset}
+            separatorColor={theme.swatch[theme.colorMap.separator]?.hex}
+          />
 
           {/* Activity Line */}
           {elements.activityLine && <ActivityLine engineState={engineState} />}
         </Box>
 
         {elements.sideFrames && (
-          <SideFrame
-            variant={frameVariant}
-            side="right"
-            height={middleHeight}
-            frameWidth={sideFrameWidth}
-            ascii={ascii}
-          />
+          <ThemedSideFrame theme={theme} side="right" height={middleHeight} />
         )}
       </Box>
 
-      {/* Lower Frame (turn indicator) */}
+      {/* Bottom Frame (themed multi-line border + turn indicator) */}
       {elements.lowerFrame && (
-        <HorizontalBorder
-          variant={frameVariant}
+        <ThemedHorizontalBorder
+          theme={theme}
           width={width}
           position="bottom"
           centerText={turnHolder ? `${turnHolder}'s Turn` : undefined}
           centerTextColor={turnIndicatorColor}
-          ascii={ascii}
         />
       )}
 
-      {/* Modeline */}
+      {/* === PLAYER PANE === */}
+
+      {/* Player Pane top border (simple 1-row with corners) */}
       {elements.modeline && (
-        <Modeline
-          lines={modelineLines}
-          width={width}
-        />
+        <SimpleBorder theme={theme} width={width} position="top" color={playerColor} />
       )}
 
-      {/* Input Line */}
-      {!hideInputLine && (
+      {/* Player Pane content: side edges + modeline + input (fixed height) */}
+      {elements.modeline && (
+        <Box flexDirection="row" height={playerPaneContentHeight}>
+          <PlayerPaneSide theme={theme} side="left" color={playerColor} height={playerPaneContentHeight} />
+          <Box flexDirection="column" width={width - 2} paddingLeft={1} paddingRight={1}>
+            {playerPaneOverlay ? playerPaneOverlay : (
+              <>
+                <Modeline lines={modelineLines} width={width - 4} />
+                <Box flexGrow={1} />
+                {!hideInputLine && (
+                  <InputLine
+                    characterName={activeCharacterName}
+                    showPlayerName={elements.playerInPrompt}
+                    playerName={players[activePlayerIndex]?.name}
+                    width={width - 4}
+                    isDisabled={inputIsDisabled}
+                    onChange={onInputChange}
+                    onSubmit={onInputSubmit}
+                    resetKey={inputResetKey}
+                  />
+                )}
+                <Box height={1} />
+              </>
+            )}
+          </Box>
+          <PlayerPaneSide theme={theme} side="right" color={playerColor} height={playerPaneContentHeight} />
+        </Box>
+      )}
+
+      {/* Input Line when modeline is hidden (minimal tier) */}
+      {!elements.modeline && !hideInputLine && (
         <InputLine
           characterName={activeCharacterName}
           showPlayerName={elements.playerInPrompt}
@@ -199,40 +243,15 @@ export function Layout(props: LayoutProps) {
         />
       )}
 
+      {/* Player Pane bottom border */}
+      {elements.modeline && (
+        <SimpleBorder theme={theme} width={width} position="bottom" color={playerColor} />
+      )}
+
       {/* Player Selector */}
       {elements.playerSelector && (
-        <PlayerSelector
-          players={players}
-          activeIndex={activePlayerIndex}
-        />
+        <PlayerSelector players={players} activeIndex={activePlayerIndex} />
       )}
-    </Box>
-  );
-}
-
-/** Renders the top frame (border + resource line) */
-function TopFrameBlock({
-  variant,
-  width,
-  campaignName,
-  resources,
-  ascii,
-}: {
-  variant: LayoutProps["style"]["variants"]["exploration"];
-  width: number;
-  campaignName: string;
-  resources: string[];
-  ascii: boolean;
-}) {
-  const lines = renderTopFrame(variant, width, campaignName, resources, ascii);
-
-  return (
-    <Box flexDirection="column">
-      {lines.map((line, i) => (
-        <Box key={i}>
-          <Text color={variant.color}>{line}</Text>
-        </Box>
-      ))}
     </Box>
   );
 }

@@ -4,6 +4,7 @@ import {
   getVisibleElements,
   useAsciiFallback,
   narrativeRows,
+  PLAYER_PANE_HEIGHT,
 } from "./responsive.js";
 
 describe("getViewportTier", () => {
@@ -119,11 +120,11 @@ describe("useAsciiFallback", () => {
 });
 
 describe("narrativeRows", () => {
-  it("calculates rows for full layout", () => {
+  it("calculates rows for full layout with fixed player pane", () => {
     const elements = getVisibleElements("full");
     const rows = narrativeRows(40, elements);
-    // Full: topFrame(2) + activity(1) + lowerFrame(1) + modeline(1) + playerSelector(1) + input(1) = 7
-    expect(rows).toBe(33);
+    // Full: playerPane(9) + topFrame(2) + activity(1) + lowerFrame(2) + playerSelector(1) = 15
+    expect(rows).toBe(25);
   });
 
   it("calculates rows for minimal layout", () => {
@@ -138,11 +139,12 @@ describe("narrativeRows", () => {
     expect(narrativeRows(3, elements)).toBe(1);
   });
 
-  it("returns 1 extra row when hideInputLine is true", () => {
+  it("hideInputLine does not affect rows when Player Pane is visible", () => {
     const elements = getVisibleElements("full");
     const normal = narrativeRows(40, elements);
     const hidden = narrativeRows(40, elements, true);
-    expect(hidden).toBe(normal + 1);
+    // Player Pane is fixed-height; hiding input doesn't change pane size
+    expect(hidden).toBe(normal);
   });
 
   it("hideInputLine works for minimal layout", () => {
@@ -152,17 +154,24 @@ describe("narrativeRows", () => {
     expect(hidden).toBe(normal + 1);
   });
 
-  it("accounts for multi-line modeline", () => {
+  it("player pane height is fixed regardless of modeline content", () => {
     const elements = getVisibleElements("full");
-    const oneRow = narrativeRows(40, elements, false, 1);
-    const twoRows = narrativeRows(40, elements, false, 2);
-    expect(twoRows).toBe(oneRow - 1);
+    const rows = narrativeRows(40, elements);
+    // Player Pane height doesn't vary — it's always PLAYER_PANE_HEIGHT
+    expect(rows).toBe(40 - (PLAYER_PANE_HEIGHT + 2 + 1 + 2 + 1));
   });
 
-  it("accounts for three-line modeline", () => {
+  it("does not reserve playerSelector row when only 1 PC", () => {
     const elements = getVisibleElements("full");
-    const oneRow = narrativeRows(40, elements, false, 1);
-    const threeRows = narrativeRows(40, elements, false, 3);
-    expect(threeRows).toBe(oneRow - 2);
+    const multi = narrativeRows(40, elements, false, 2, 2);
+    const single = narrativeRows(40, elements, false, 2, 1);
+    expect(single).toBe(multi + 1);
+  });
+
+  it("reserves playerSelector row when 2+ PCs", () => {
+    const elements = getVisibleElements("full");
+    const two = narrativeRows(40, elements, false, 2, 2);
+    const three = narrativeRows(40, elements, false, 2, 3);
+    expect(three).toBe(two);
   });
 });

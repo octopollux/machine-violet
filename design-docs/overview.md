@@ -93,7 +93,7 @@ AI players are trivially simple — a Haiku/Sonnet call replacing human input, u
 
 ## TUI
 
-The layout is a bordered narrative window with DM-controlled chrome. Bottom to top: player selector, input line, modeline, styled lower frame (turn indicator), activity line, scrolling DM text, top frame (resource display). Left/right frames complete the border. Frame styles are pre-baked per genre with combat/exploration/OOC/level-up variants — the DM (or engine) swaps variants via tools. The top frame shows the active character's key resources (Tier 1, configurable keys pointing into the character sheet). The activity line shows automatic indicators for in-flight engine operations. The DM can use inline formatting tags (`<b>`, `<i>`, `<u>`, justification, hex colors) sparingly for dramatic effect. Themed modals handle character sheets, player choices, dramatic dice rolls, session recaps, and the ESC game menu. A `present_choices` tool lets the DM (or a Haiku subagent, automatically) offer structured A/B/C options with freeform always available — frequency is configurable per campaign and per player. Responsive design degrades gracefully from full chrome (≥80×40) down to bare DM text + input (20×12). → [TUI Design](tui-design.md)
+The layout is a bordered narrative window with DM-controlled chrome. Bottom to top: player selector, input line, modeline, styled lower frame (turn indicator), activity line, scrolling DM text, top frame (resource display). Left/right frames complete the border. Themes are human-editable ASCII art asset files (`.theme` format) paired with OKLCH-generated color swatches. The DM (or engine) switches themes via tools, and themes can be persisted to location entities for automatic application on scene transitions. Variants (combat/exploration/OOC/level-up) override swatch colors. The top frame shows the active character's key resources (Tier 1, configurable keys pointing into the character sheet). The activity line shows automatic indicators for in-flight engine operations. The DM can use inline formatting tags (`<b>`, `<i>`, `<u>`, justification, hex colors) sparingly for dramatic effect. Themed modals handle character sheets, player choices, dramatic dice rolls, session recaps, and the ESC game menu. A `present_choices` tool lets the DM (or a Haiku subagent, automatically) offer structured A/B/C options with freeform always available — frequency is configurable per campaign and per player. Responsive design degrades gracefully from full chrome (≥80×40) down to bare DM text + input (20×12). → [TUI Design](tui-design.md)
 
 ### Visual conventions
 - **Entity colors**: enemies red, allies green, neutral gray. PCs pick their own color. Custom colors for special entities.
@@ -135,8 +135,8 @@ Agent-facing documents should be written densely, using shorthand and cultural/l
 | [Game Initialization](game-initialization.md) | Setup flow, campaign seeds, DM personalities |
 | [Multiplayer and Initiative](multiplayer-and-initiative.md) | Hot-seat, AI players, turn order |
 | [Error Recovery](error-recovery.md) | Git snapshots, rollback, validation |
-| [TUI Design](tui-design.md) | Layout, frames, styles, responsive design, DM formatting |
-| [Tools Catalog](tools-catalog.md) | All 37 tools by domain, signatures, tiers |
+| [TUI Design](tui-design.md) | Layout, themes, responsive design, DM formatting |
+| [Tools Catalog](tools-catalog.md) | All 41 tools by domain, signatures, tiers |
 | [Subagents Catalog](subagents-catalog.md) | All 14 subagent patterns, models, visibility |
 | [Development Plan](development-plan.md) | 10-phase implementation roadmap, dependency graph, testing strategy |
 | [State Atlas](state-atlas.md) | Runtime state schema, tool×state matrix, invariants, lifecycle |

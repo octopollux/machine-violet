@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 import type Anthropic from "@anthropic-ai/sdk";
-import type { FrameStyle, StyleVariant, NarrativeLine, ActiveModal, RetryOverlay } from "../types/tui.js";
+import type { NarrativeLine, ActiveModal, RetryOverlay } from "../types/tui.js";
+import type { ResolvedTheme, StyleVariant } from "./themes/types.js";
 import type { GameEngine } from "../agents/game-engine.js";
 import type { GameState } from "../agents/game-state.js";
 import type { TuiCommand, UsageStats } from "../agents/agent-loop.js";
@@ -24,10 +25,13 @@ export interface GameContextValue {
   // Narrative
   narrativeLines: NarrativeLine[];
   setNarrativeLines: React.Dispatch<React.SetStateAction<NarrativeLine[]>>;
-  // Style
-  style: FrameStyle;
+  // Theme
+  theme: ResolvedTheme;
   variant: StyleVariant;
   setVariant: (v: StyleVariant) => void;
+  setTheme: (t: ResolvedTheme) => void;
+  keyColor: string;
+  setKeyColor: (hex: string) => void;
   // Display
   campaignName: string;
   activePlayerIndex: number;

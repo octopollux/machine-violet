@@ -1,7 +1,9 @@
 import React, { useState, useRef, useCallback } from "react";
 import { useInput, useStdout, Text, Box } from "ink";
 import Anthropic from "@anthropic-ai/sdk";
-import type { FrameStyle, NarrativeLine } from "../types/tui.js";
+import type { NarrativeLine } from "../types/tui.js";
+import type { ResolvedTheme } from "../tui/themes/types.js";
+import { themeToVariant } from "../tui/themes/index.js";
 import { appendDelta } from "../tui/narrative-helpers.js";
 import { Layout } from "../tui/layout.js";
 import { ChoiceModal } from "../tui/modals/index.js";
@@ -18,14 +20,14 @@ interface ActiveChoiceModal { kind: "choice"; prompt: string; choices: string[] 
 
 export interface SetupPhaseProps {
   mode: "fast" | "full";
-  style: FrameStyle;
+  theme: ResolvedTheme;
   costTracker: React.RefObject<CostTracker>;
   onComplete: (result: SetupResult) => void;
   onCancel: () => void;
   onError: (msg: string) => void;
 }
 
-export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onError }: SetupPhaseProps) {
+export function SetupPhase({ mode, theme, costTracker, onComplete, onCancel, onError }: SetupPhaseProps) {
   const { stdout } = useStdout();
   const cols = stdout?.columns ?? 80;
   const rows = stdout?.rows ?? 40;
@@ -255,8 +257,7 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
       <Box flexDirection="column" width={cols} height={rows}>
         <Layout
           dimensions={{ columns: cols, rows }}
-          style={style}
-          variant="exploration"
+          theme={theme}
           narrativeLines={setupConvoLines}
           modelineText="Campaign Setup"
           activeCharacterName="You"
@@ -282,8 +283,7 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
       <Box flexDirection="column" width={cols} height={rows}>
         <Layout
           dimensions={{ columns: cols, rows: rows - setupModalHeight }}
-          style={style}
-          variant="exploration"
+          theme={theme}
           narrativeLines={setupConvoLines}
           modelineText="Campaign Setup"
           activeCharacterName="You"
@@ -300,7 +300,7 @@ export function SetupPhase({ mode, style, costTracker, onComplete, onCancel, onE
         />
         {setupHasModal && activeModal && (
           <ChoiceModal
-            variant={style.variants["exploration"]}
+            variant={themeToVariant(theme)}
             width={cols}
             prompt={activeModal.prompt}
             choices={activeModal.choices}

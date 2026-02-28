@@ -129,9 +129,10 @@ ConversationManager
 
 ```
 PersistedUIState                                  → state/ui.json
-├── styleName: string
+├── styleName: string                             Theme/style name (e.g. "gothic")
 ├── variant: StyleVariant
 └── modelines?: Record<string, string>
+<!-- TODO: migrate to themeName + keyColor fields when theme system is fully wired -->
 ```
 
 ---
@@ -148,7 +149,7 @@ All state files live under `<campaignRoot>/state/`.
 | `state/decks.json` | `DecksState` | `StatePersister.persistDecks` | After any tool with `"decks"` |
 | `state/scene.json` | `PersistedSceneState` | `StatePersister.persistScene` | After precis update, scene transition |
 | `state/conversation.json` | `SerializedExchange[]` | `StatePersister.persistConversation` | After each exchange |
-| `state/ui.json` | `PersistedUIState` | `StatePersister.persistUI` | After style/modeline changes |
+| `state/ui.json` | `PersistedUIState` | `StatePersister.persistUI` | After theme/style/modeline changes |
 | `config.json` | `CampaignConfig` | `buildCampaignConfig` / `createDefaultCampaignConfig` | Campaign creation only. Read-only during play. Includes `version` (`CAMPAIGN_FORMAT_VERSION`) and `createdAt` (ISO 8601) manifest fields. |
 | `pending-operation.json` | `PendingOperation` | `SceneManager` | During scene transition cascade steps |
 
@@ -220,6 +221,7 @@ Legend: **R** = reads, **W** = writes (triggers persistence), **UI** = returns T
 | Tool | maps | clocks | combat | decks | config | activePlayerIndex | Notes |
 |------|------|--------|--------|-------|--------|-------------------|-------|
 | `update_modeline` | | | | | R | R | Reads config.players + activePlayerIndex for default character. Returns **UI**. |
+| `set_theme` | | | | | | | Returns **UI**. |
 | `set_ui_style` | | | | | | | Returns **UI**. |
 | `set_display_resources` | | | | | | | Returns **UI**. |
 | `present_choices` | | | | | | | Returns **UI**. |

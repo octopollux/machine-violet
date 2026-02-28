@@ -103,26 +103,35 @@ export function useAsciiFallback(columns: number): boolean {
   return columns < 40;
 }
 
+/** Fixed height of the Player Pane including top/bottom borders. */
+export const PLAYER_PANE_HEIGHT = 9;
+
 /**
  * Calculate the number of rows available for the narrative area.
- * @param modelineHeight — actual line count of the wrapped modeline (default 1).
+ * @param borderHeight — theme border height in rows (1 or 2, default 2).
+ * @param playerCount — number of PCs; player selector row only counted when > 1.
  */
 export function narrativeRows(
   totalRows: number,
   elements: VisibleElements,
   hideInputLine = false,
-  modelineHeight = 1,
+  borderHeight = 2,
+  playerCount = 2,
 ): number {
   let used = 0;
 
-  // Input line: present unless explicitly hidden (1 row)
-  if (!hideInputLine) used += 1;
+  if (elements.modeline) {
+    // Player Pane is fixed-height (includes borders, modeline, and input line)
+    used += PLAYER_PANE_HEIGHT;
+  } else {
+    // Minimal tier: standalone InputLine (no Player Pane)
+    if (!hideInputLine) used += 1;
+  }
 
-  if (elements.topFrame) used += 2;    // border + resource line
-  if (elements.lowerFrame) used += 1;  // separator with turn indicator
+  if (elements.topFrame) used += borderHeight;
+  if (elements.lowerFrame) used += borderHeight;
   if (elements.activityLine) used += 1;
-  if (elements.modeline) used += modelineHeight;
-  if (elements.playerSelector) used += 1;
+  if (elements.playerSelector && playerCount > 1) used += 1;
 
   return Math.max(1, totalRows - used);
 }

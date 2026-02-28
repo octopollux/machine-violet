@@ -1,13 +1,14 @@
 import { useCallback } from "react";
 import type Anthropic from "@anthropic-ai/sdk";
-import type { FrameStyle, StyleVariant, NarrativeLine, ActiveModal, RetryOverlay } from "../../types/tui.js";
+import type { NarrativeLine, ActiveModal, RetryOverlay } from "../../types/tui.js";
+import type { StyleVariant } from "../themes/types.js";
 import type { EngineState, EngineCallbacks } from "../../agents/game-engine.js";
 import type { TuiCommand, UsageStats } from "../../agents/agent-loop.js";
 import type { GameState } from "../../agents/game-state.js";
 import type { GameEngine } from "../../agents/game-engine.js";
 import type { FileIO } from "../../agents/scene-manager.js";
 import type { ModeSession } from "../game-context.js";
-import { getStyle } from "../frames/index.js";
+
 import { campaignPaths } from "../../tools/filesystem/index.js";
 import { getActivePlayer } from "../../agents/player-manager.js";
 import { shouldGenerateChoices, generateChoices } from "../../agents/subagents/choice-generator.js";
@@ -25,8 +26,10 @@ export interface GameCallbackDeps {
   setErrorMsg: (s: string | null) => void;
   setModelines: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   setResources: (r: string[]) => void;
-  setStyle: (s: FrameStyle) => void;
+  setStyle: (s: { name: string }) => void;
   setVariant: (v: StyleVariant) => void;
+  setThemeName: (name: string) => void;
+  setKeyColor: (color: string) => void;
   setActiveModal: (m: ActiveModal) => void;
   setChoiceIndex: React.Dispatch<React.SetStateAction<number>>;
   setActiveSession: (s: ModeSession | null) => void;
@@ -50,7 +53,8 @@ export interface GameCallbackResult {
 export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
   const {
     setNarrativeLines, setEngineState, setErrorMsg, setModelines,
-    setResources, setStyle, setVariant, setActiveModal, setChoiceIndex,
+    setResources, setStyle, setVariant, setThemeName, setKeyColor,
+    setActiveModal, setChoiceIndex,
     setActiveSession, setRetryOverlay,
     gameStateRef, clientRef, engineRef, activeModalRef, variantRef, previousVariantRef,
     costTracker, fileIO,
@@ -66,8 +70,13 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
       }
       case "set_ui_style": {
         setVariant(cmd.variant as StyleVariant);
-        const found = getStyle(cmd.style as string);
-        if (found) setStyle(found);
+        if (cmd.style) setStyle({ name: cmd.style as string });
+        break;
+      }
+      case "set_theme": {
+        if (cmd.theme) setThemeName(cmd.theme as string);
+        if (cmd.key_color) setKeyColor(cmd.key_color as string);
+        if (cmd.variant) setVariant(cmd.variant as StyleVariant);
         break;
       }
       case "set_display_resources":
@@ -129,7 +138,7 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
         break;
       }
     }
-  }, [setModelines, setVariant, setStyle, setResources, setChoiceIndex,
+  }, [setModelines, setVariant, setStyle, setThemeName, setKeyColor, setResources, setChoiceIndex,
       setActiveModal, setActiveSession, setNarrativeLines, gameStateRef, clientRef, engineRef, fileIO,
       previousVariantRef, variantRef]);
 

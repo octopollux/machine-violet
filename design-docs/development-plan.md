@@ -34,7 +34,7 @@ src/
 ├── agents/                   # agent loop, subagent framework
 ├── tui/                      # Ink components
 │   ├── components/           # reusable UI components
-│   ├── frames/               # frame styles and rendering
+│   ├── themes/               # theme assets, parser, color, resolution
 │   ├── modals/               # modal system
 │   └── layout.tsx            # main layout composition
 ├── context/                  # context window management
@@ -43,7 +43,7 @@ src/
 ```
 
 ### 1.3 Core types
-- [ ] Define shared types in `src/types/`: `Entity`, `Character`, `MapData`, `Clock`, `Alarm`, `DiceResult`, `DeckState`, `CombatState`, `Config`, `FrameStyle`
+- [ ] Define shared types in `src/types/`: `Entity`, `Character`, `MapData`, `Clock`, `Alarm`, `DiceResult`, `DeckState`, `CombatState`, `Config`, `ThemeAsset`, `ThemeDefinition`, `ResolvedTheme`
 - [ ] Define tool input/output schemas as TypeScript types — these become the contract for agentic output validation
 
 **Tests**: Build compiles, lint passes, test runner works.
@@ -121,7 +121,7 @@ All deterministic, zero AI. The foundation everything else builds on. Each tool 
 
 **Tests**: Each validation check with valid and invalid fixtures.
 
-**Phase 2 deliverable**: A library of 37 tool implementations, all independently tested, zero AI dependency. This is the largest phase by code volume.
+**Phase 2 deliverable**: A library of 37 tool implementations (41 total after TUI additions in later phases), all independently tested, zero AI dependency. This is the largest phase by code volume.
 
 ---
 
@@ -129,11 +129,13 @@ All deterministic, zero AI. The foundation everything else builds on. Each tool 
 
 The visual application. No game logic yet — just the layout rendering with mock data.
 
-### 3.1 Frame style system (`src/tui/frames/`)
-- [ ] Style definition data model (box-drawing chars, colors, flourishes per variant)
-- [ ] Ship 6 pre-baked styles: gothic, arcane, terminal, rustic, clean, ornate
-- [ ] Frame renderer: given style + variant + dimensions → border characters
-- [ ] Genre-to-style mapping
+### 3.1 Theme system (`src/tui/themes/`)
+- [x] Theme asset file format (`.theme`) — INI-like with `[section]` headers and literal ASCII art rows
+- [x] Parser: `parseThemeAsset(content) → ThemeAsset`. Validates required components.
+- [x] Composition engine: `composeTopFrame`, `composeBottomFrame`, `composeSideColumn`, etc.
+- [x] OKLCH color arc generator with built-in presets (`src/tui/color/`)
+- [x] Theme resolution: `resolveTheme(definition, variant, keyColor?) → ResolvedTheme`
+- [x] Ship 4 built-in themes: gothic, arcane, terminal, clean
 
 ### 3.2 Main layout (`src/tui/layout.tsx`)
 - [ ] Compose all layout elements: top frame, narrative area, activity line, lower frame, modeline, input, player selector
@@ -172,7 +174,7 @@ The visual application. No game logic yet — just the layout rendering with moc
 
 ### 3.6 Demo mode
 - [ ] Wire layout with hardcoded mock data (mock narrative, mock modeline, mock resources)
-- [ ] Hotkeys for cycling frame styles and variants
+- [ ] Hotkeys for cycling themes and variants
 - [ ] Resize handler demonstrating responsive breakpoints
 
 **Tests**: Formatting parser (unit). Frame renderer output (unit). Responsive breakpoint logic (unit). Component rendering with ink-testing-library.

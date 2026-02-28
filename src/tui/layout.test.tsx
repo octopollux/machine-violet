@@ -1,15 +1,19 @@
 import React from "react";
-import { describe, it, expect } from "vitest";
+import { Text } from "ink";
+import { describe, it, expect, beforeEach } from "vitest";
 import { render } from "ink-testing-library";
 import { Layout } from "./layout.js";
-import { getStyle } from "./frames/index.js";
+import { resolveTheme, resetThemeCache, BUILTIN_DEFINITIONS } from "./themes/index.js";
 
-const style = getStyle("gothic")!;
+beforeEach(() => {
+  resetThemeCache();
+});
+
+const theme = resolveTheme(BUILTIN_DEFINITIONS["gothic"], "exploration", "#888888");
 
 const baseProps = {
   dimensions: { columns: 80, rows: 40 },
-  style,
-  variant: "exploration" as const,
+  theme,
   narrativeLines: [
     { kind: "dm" as const, text: "The door groans open onto a long hall." },
     { kind: "dm" as const, text: "A figure sits motionless in a high-backed chair." },
@@ -51,7 +55,6 @@ describe("Layout", () => {
       <Layout {...baseProps} dimensions={{ columns: 60, rows: 40 }} />,
     );
     const frame = lastFrame();
-    // Still shows narrative and player selector
     expect(frame).toContain("The door groans open");
     expect(frame).toContain("Aldric");
   });
@@ -73,16 +76,27 @@ describe("Layout", () => {
       <Layout {...baseProps} dimensions={{ columns: 30, rows: 12 }} />,
     );
     const frame = lastFrame();
-    // Just narrative + input
     expect(frame).toContain("Aldric");
     expect(frame).toContain(">");
   });
 
-  it("renders with combat variant", () => {
+  it("renders with combat theme variant", () => {
+    const combatTheme = resolveTheme(BUILTIN_DEFINITIONS["gothic"], "combat", "#888888");
     const { lastFrame } = render(
-      <Layout {...baseProps} variant="combat" />,
+      <Layout {...baseProps} theme={combatTheme} />,
     );
     const frame = lastFrame();
     expect(frame).toContain("Aldric's Turn");
+  });
+
+  it("playerPaneOverlay replaces Modeline content", () => {
+    const overlay = <Text>OVERLAY CONTENT</Text>;
+    const { lastFrame } = render(
+      <Layout {...baseProps} playerPaneOverlay={overlay} />,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("OVERLAY CONTENT");
+    // Modeline text should NOT appear when overlay is active
+    expect(frame).not.toContain("Loc: The Shattered Hall");
   });
 });

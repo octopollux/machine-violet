@@ -7,6 +7,8 @@ import { processNarrativeLines } from "../formatting.js";
 import { renderNodes } from "../render-nodes.js";
 import { useScrollHandle } from "../hooks/useScrollHandle.js";
 import type { ScrollHandle } from "../hooks/useScrollHandle.js";
+import { composeTurnSeparator } from "../themes/composer.js";
+import type { ThemeAsset } from "../themes/types.js";
 
 export type NarrativeAreaHandle = ScrollHandle;
 
@@ -21,6 +23,10 @@ interface NarrativeAreaProps {
   playerColor?: string;
   /** Available width in columns (enables center/right alignment) */
   width?: number;
+  /** Theme asset for rendering turn separators */
+  themeAsset?: ThemeAsset;
+  /** Color for turn separator lines */
+  separatorColor?: string;
 }
 
 /** Compute scroll step: 25% of viewport, min 2 if <25, min 1 if <12 */
@@ -36,7 +42,7 @@ export function scrollAmount(viewportRows: number): number {
  * Exposes scrollBy via ref for keyboard scrolling.
  */
 export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>(
-  function NarrativeArea({ lines, maxRows, quoteColor, playerColor, width }, ref) {
+  function NarrativeArea({ lines, maxRows, quoteColor, playerColor, width, themeAsset, separatorColor }, ref) {
   const scrollRef = useRef<ScrollViewRef>(null);
   const [linesBelow, setLinesBelow] = useState(0);
   const atBottomRef = useRef(true);
@@ -99,6 +105,8 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
             line={line}
             playerColor={playerColor}
             width={width}
+            themeAsset={themeAsset}
+            separatorColor={separatorColor}
           />
         ))}
       </ScrollView>
@@ -112,12 +120,27 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
 });
 
 /** A single narrative line rendered based on its kind. */
-function NarrativeLineComponent({ line, playerColor, width }: {
+function NarrativeLineComponent({ line, playerColor, width, themeAsset, separatorColor }: {
   line: ProcessedLine;
   playerColor?: string;
   width?: number;
+  themeAsset?: ThemeAsset;
+  separatorColor?: string;
 }) {
-  // Empty nodes (paragraph breaks, turn separators) need a space to
+  // Separator lines always render the turn separator pattern
+  if (line.kind === "separator") {
+    if (themeAsset && width && width > 0) {
+      const text = composeTurnSeparator(themeAsset, width);
+      return <Text wrap="truncate" color={separatorColor} dimColor>{text}</Text>;
+    }
+    // Fallback: simple dashes
+    const fallback = width && width > 4
+      ? "─".repeat(width)
+      : "────";
+    return <Text wrap="truncate" dimColor>{fallback}</Text>;
+  }
+
+  // Empty nodes (paragraph breaks) need a space to
   // occupy one terminal line — Ink collapses truly-empty <Text/>.
   const isEmpty = line.nodes.length === 0
     || (line.nodes.length === 1 && line.nodes[0] === "");

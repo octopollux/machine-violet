@@ -687,6 +687,25 @@ const TOOL_DEFS: RegisteredTool[] = [
   },
   {
     definition: {
+      name: "set_theme",
+      description: "Switch the UI theme, key color, and/or variant. Optionally persist the theme to a location entity.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          theme: { type: "string", description: "Theme name (gothic, arcane, terminal, clean)" },
+          key_color: { type: "string", description: "Hex color for swatch generation (e.g. #8844aa)" },
+          variant: { type: "string", enum: ["exploration", "combat", "ooc", "levelup"] },
+          save_to_location: { type: "boolean", description: "If true, persist theme + key_color to the named location entity's front matter" },
+          location: { type: "string", description: "Location slug/name to save theme to (required when save_to_location is true)" },
+        },
+      },
+    },
+    handler: (_state, input) => {
+      return ok(JSON.stringify({ type: "set_theme", ...input }));
+    },
+  },
+  {
+    definition: {
       name: "set_display_resources",
       description: "Update which resource keys appear in the top frame for a character.",
       input_schema: {
