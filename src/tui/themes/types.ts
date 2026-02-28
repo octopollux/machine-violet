@@ -33,6 +33,26 @@ export const REQUIRED_COMPONENTS = [
 
 export type ComponentName = (typeof REQUIRED_COMPONENTS)[number];
 
+/** All required component names for a player pane frame. */
+export const PLAYER_PANE_COMPONENTS = [
+  "corner_tl",
+  "corner_tr",
+  "corner_bl",
+  "corner_br",
+  "edge_top",
+  "edge_bottom",
+  "edge_left",
+  "edge_right",
+] as const;
+
+export type PlayerPaneComponentName = (typeof PLAYER_PANE_COMPONENTS)[number];
+
+/** Parsed player pane frame — 8 border components, always height 1. */
+export interface PlayerPaneFrame {
+  name: string;
+  components: Record<PlayerPaneComponentName, ThemeComponent>;
+}
+
 /** Parsed theme asset — all border components + metadata. */
 export interface ThemeAsset {
   name: string;
@@ -78,6 +98,8 @@ export interface VariantOverride {
 export interface ThemeDefinition {
   /** Name of the theme asset file (without .theme extension). */
   assetName: string;
+  /** Name of the player-frame asset file (without .player-frame extension). Defaults to "default". */
+  playerFrameName?: string;
   /** Default swatch configuration. */
   swatchConfig: SwatchConfig;
   /** Default color map. */
@@ -89,6 +111,7 @@ export interface ThemeDefinition {
 /** Fully resolved theme ready for rendering. */
 export interface ResolvedTheme {
   asset: ThemeAsset;
+  playerPaneFrame: PlayerPaneFrame;
   swatch: Color[];
   colorMap: ThemeColorMap;
   variant: StyleVariant;

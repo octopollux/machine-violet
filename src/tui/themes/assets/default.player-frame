@@ -1,0 +1,25 @@
+@name: default
+
+[corner_tl]
+┌
+
+[corner_tr]
+┐
+
+[corner_bl]
+└
+
+[corner_br]
+┘
+
+[edge_top]
+─
+
+[edge_bottom]
+─
+
+[edge_left]
+│
+
+[edge_right]
+│

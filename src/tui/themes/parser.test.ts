@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseThemeAsset } from "./parser.js";
+import { parseThemeAsset, parsePlayerPaneFrame } from "./parser.js";
 
 const MINIMAL_THEME = `@name: test
 @genre_tags: fantasy, horror
@@ -186,5 +186,82 @@ describe("parseThemeAsset", () => {
     const asset = parseThemeAsset(TWO_ROW_THEME);
     expect(asset.components.corner_tl.width).toBe(2);
     expect(asset.components.turn_separator.width).toBe(7);
+  });
+});
+
+const MINIMAL_PLAYER_FRAME = `@name: test-frame
+
+[corner_tl]
+┌
+
+[corner_tr]
+┐
+
+[corner_bl]
+└
+
+[corner_br]
+┘
+
+[edge_top]
+─
+
+[edge_bottom]
+─
+
+[edge_left]
+│
+
+[edge_right]
+│
+`;
+
+describe("parsePlayerPaneFrame", () => {
+  it("parses a minimal player frame", () => {
+    const frame = parsePlayerPaneFrame(MINIMAL_PLAYER_FRAME);
+    expect(frame.name).toBe("test-frame");
+    expect(Object.keys(frame.components)).toHaveLength(8);
+  });
+
+  it("all components are height 1", () => {
+    const frame = parsePlayerPaneFrame(MINIMAL_PLAYER_FRAME);
+    for (const comp of Object.values(frame.components)) {
+      expect(comp.height).toBe(1);
+    }
+  });
+
+  it("reads component rows correctly", () => {
+    const frame = parsePlayerPaneFrame(MINIMAL_PLAYER_FRAME);
+    expect(frame.components.corner_tl.rows).toEqual(["┌"]);
+    expect(frame.components.edge_top.rows).toEqual(["─"]);
+    expect(frame.components.edge_left.rows).toEqual(["│"]);
+  });
+
+  it("throws on missing @name", () => {
+    expect(() => parsePlayerPaneFrame("[corner_tl]\n+")).toThrow("missing @name");
+  });
+
+  it("throws on missing required component", () => {
+    const partial = `@name: broken
+
+[corner_tl]
++
+`;
+    expect(() => parsePlayerPaneFrame(partial)).toThrow("missing required component");
+  });
+
+  it("throws on multi-row component (height must be 1)", () => {
+    const bad = MINIMAL_PLAYER_FRAME.replace(
+      "[corner_tl]\n┌",
+      "[corner_tl]\n┌\n║",
+    );
+    expect(() => parsePlayerPaneFrame(bad)).toThrow("row(s), expected 1");
+  });
+
+  it("handles CRLF line endings", () => {
+    const crlf = MINIMAL_PLAYER_FRAME.replace(/\n/g, "\r\n");
+    const frame = parsePlayerPaneFrame(crlf);
+    expect(frame.name).toBe("test-frame");
+    expect(frame.components.corner_tl.rows).toEqual(["┌"]);
   });
 });

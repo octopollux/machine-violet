@@ -118,7 +118,7 @@ interface SimpleBorderProps {
  * Simple 1-row border for the Player Pane.
  */
 export function SimpleBorder({ theme, width, position, color }: SimpleBorderProps) {
-  const frame = composeSimpleBorder(theme.asset, width, position);
+  const frame = composeSimpleBorder(theme.playerPaneFrame, width, position);
   const borderColor = color ?? themeColor(theme, "border");
 
   return (
@@ -140,7 +140,7 @@ interface PlayerPaneSideProps {
  * Single-character side edge for Player Pane content rows.
  */
 export function PlayerPaneSide({ theme, side, color }: PlayerPaneSideProps) {
-  const ch = playerPaneSideChar(theme.asset, side);
+  const ch = playerPaneSideChar(theme.playerPaneFrame, side);
   const borderColor = color ?? themeColor(theme, "border");
   return <Text color={borderColor}>{ch}</Text>;
 }

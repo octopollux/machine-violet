@@ -6,10 +6,11 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
-import type { ThemeAsset } from "./types.js";
-import { parseThemeAsset } from "./parser.js";
+import type { ThemeAsset, PlayerPaneFrame } from "./types.js";
+import { parseThemeAsset, parsePlayerPaneFrame } from "./parser.js";
 
 const cache = new Map<string, ThemeAsset>();
+const playerFrameCache = new Map<string, PlayerPaneFrame>();
 
 /** Directory containing built-in .theme files. */
 function assetsDir(): string {
@@ -45,6 +46,21 @@ export function loadCustomTheme(path: string): ThemeAsset {
   return asset;
 }
 
+/**
+ * Load a built-in player pane frame by name.
+ * @param name - Frame name without .player-frame extension (e.g. "default")
+ */
+export function loadBuiltinPlayerFrame(name: string): PlayerPaneFrame {
+  const cached = playerFrameCache.get(name);
+  if (cached) return cached;
+
+  const filePath = join(assetsDir(), `${name}.player-frame`);
+  const content = readFileSync(filePath, "utf-8");
+  const frame = parsePlayerPaneFrame(content);
+  playerFrameCache.set(name, frame);
+  return frame;
+}
+
 /** List available built-in theme names. */
 export function listBuiltinThemes(): string[] {
   const dir = assetsDir();
@@ -53,7 +69,8 @@ export function listBuiltinThemes(): string[] {
     .map((f) => f.replace(/\.theme$/, ""));
 }
 
-/** Clear the theme cache. For testing only. */
+/** Clear all theme caches. For testing only. */
 export function resetThemeCache(): void {
   cache.clear();
+  playerFrameCache.clear();
 }

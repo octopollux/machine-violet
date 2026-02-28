@@ -2,6 +2,8 @@ export type {
   ThemeComponent,
   ComponentName,
   ThemeAsset,
+  PlayerPaneComponentName,
+  PlayerPaneFrame,
   ThemeColorMap,
   SwatchConfig,
   StyleVariant,
@@ -9,9 +11,9 @@ export type {
   ThemeDefinition,
   ResolvedTheme,
 } from "./types.js";
-export { REQUIRED_COMPONENTS } from "./types.js";
+export { REQUIRED_COMPONENTS, PLAYER_PANE_COMPONENTS } from "./types.js";
 
-export { parseThemeAsset } from "./parser.js";
+export { parseThemeAsset, parsePlayerPaneFrame } from "./parser.js";
 
 export type { ComposedFrame } from "./composer.js";
 export {
@@ -28,6 +30,7 @@ export {
   loadBuiltinTheme,
   loadCustomTheme,
   listBuiltinThemes,
+  loadBuiltinPlayerFrame,
   resetThemeCache,
 } from "./loader.js";
 

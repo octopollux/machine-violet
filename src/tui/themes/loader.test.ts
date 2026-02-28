@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   loadBuiltinTheme,
   listBuiltinThemes,
+  loadBuiltinPlayerFrame,
   resetThemeCache,
 } from "./loader.js";
 
@@ -60,5 +61,42 @@ describe("loader", () => {
     const b = loadBuiltinTheme("gothic");
     expect(a).not.toBe(b); // Different references after cache clear
     expect(a.name).toBe(b.name); // But same content
+  });
+});
+
+describe("loadBuiltinPlayerFrame", () => {
+  beforeEach(() => {
+    resetThemeCache();
+  });
+
+  it("loads default player frame", () => {
+    const frame = loadBuiltinPlayerFrame("default");
+    expect(frame.name).toBe("default");
+    expect(Object.keys(frame.components)).toHaveLength(8);
+  });
+
+  it("all components are height 1", () => {
+    const frame = loadBuiltinPlayerFrame("default");
+    for (const comp of Object.values(frame.components)) {
+      expect(comp.height).toBe(1);
+    }
+  });
+
+  it("caches on repeated loads", () => {
+    const a = loadBuiltinPlayerFrame("default");
+    const b = loadBuiltinPlayerFrame("default");
+    expect(a).toBe(b);
+  });
+
+  it("throws on unknown player frame", () => {
+    expect(() => loadBuiltinPlayerFrame("nonexistent")).toThrow();
+  });
+
+  it("resetThemeCache clears player frame cache", () => {
+    const a = loadBuiltinPlayerFrame("default");
+    resetThemeCache();
+    const b = loadBuiltinPlayerFrame("default");
+    expect(a).not.toBe(b);
+    expect(a.name).toBe(b.name);
   });
 });

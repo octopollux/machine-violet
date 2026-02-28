@@ -15,8 +15,9 @@ import type {
   ThemeColorMap,
   SwatchConfig,
   ThemeAsset,
+  PlayerPaneFrame,
 } from "./types.js";
-import { loadBuiltinTheme } from "./loader.js";
+import { loadBuiltinTheme, loadBuiltinPlayerFrame } from "./loader.js";
 
 /**
  * Resolve a ThemeDefinition into a fully renderable ResolvedTheme.
@@ -32,8 +33,11 @@ export function resolveTheme(
 ): ResolvedTheme {
   const keyColor = keyColorHex ?? "#8888aa";
 
-  // Load the asset
+  // Load the assets
   const asset: ThemeAsset = loadBuiltinTheme(definition.assetName);
+  const playerPaneFrame: PlayerPaneFrame = loadBuiltinPlayerFrame(
+    definition.playerFrameName ?? "default",
+  );
 
   // Merge variant overrides
   const variantOverride = definition.variants?.[variant];
@@ -58,6 +62,7 @@ export function resolveTheme(
 
   return {
     asset,
+    playerPaneFrame,
     swatch,
     colorMap,
     variant,

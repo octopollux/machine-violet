@@ -7,7 +7,7 @@ import {
   composeSideColumn,
   composeTurnSeparator,
 } from "./composer.js";
-import { parseThemeAsset } from "./parser.js";
+import { parseThemeAsset, parsePlayerPaneFrame } from "./parser.js";
 
 // Height-1 theme for simple tests
 const H1_THEME = `@name: simple
@@ -203,22 +203,50 @@ describe("composeBottomFrame", () => {
   });
 });
 
+// Player pane frame for composeSimpleBorder tests
+const SIMPLE_FRAME = `@name: simple-frame
+
+[corner_tl]
++
+
+[corner_tr]
++
+
+[corner_bl]
++
+
+[corner_br]
++
+
+[edge_top]
+-
+
+[edge_bottom]
+-
+
+[edge_left]
+|
+
+[edge_right]
+|
+`;
+
 describe("composeSimpleBorder", () => {
   it("creates a 1-row top border with corners", () => {
-    const asset = parseThemeAsset(H1_THEME);
-    const frame = composeSimpleBorder(asset, 15, "top");
-    expect(frame.height).toBe(1);
-    expect(frame.rows[0].length).toBe(15);
+    const frame = parsePlayerPaneFrame(SIMPLE_FRAME);
+    const composed = composeSimpleBorder(frame, 15, "top");
+    expect(composed.height).toBe(1);
+    expect(composed.rows[0].length).toBe(15);
     // Corners from corner_tl/corner_tr + tiled edge
-    expect(frame.rows[0]).toBe("+-------------+");
+    expect(composed.rows[0]).toBe("+-------------+");
   });
 
   it("creates a 1-row bottom border with corners", () => {
-    const asset = parseThemeAsset(H1_THEME);
-    const frame = composeSimpleBorder(asset, 10, "bottom");
-    expect(frame.height).toBe(1);
-    expect(frame.rows[0].length).toBe(10);
-    expect(frame.rows[0]).toBe("+--------+");
+    const frame = parsePlayerPaneFrame(SIMPLE_FRAME);
+    const composed = composeSimpleBorder(frame, 10, "bottom");
+    expect(composed.height).toBe(1);
+    expect(composed.rows[0].length).toBe(10);
+    expect(composed.rows[0]).toBe("+--------+");
   });
 });
 

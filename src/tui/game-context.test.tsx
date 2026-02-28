@@ -16,6 +16,7 @@ export function makeTestContext(overrides: Partial<GameContextValue> = {}): Game
     setNarrativeLines: vi.fn(),
     theme: {
       asset: { name: "test", genreTags: [], height: 1, components: {} },
+      playerPaneFrame: { name: "test", components: {} },
       swatch: [],
       colorMap: { border: 0, corner: 0, separator: 0, title: 0, turnIndicator: 0, sideFrame: 0 },
       variant: "exploration",

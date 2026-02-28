@@ -18,6 +18,14 @@ describe("resolveTheme", () => {
     expect(resolved.colorMap.border).toBe(2);
   });
 
+  it("includes playerPaneFrame on resolved theme", () => {
+    const def = BUILTIN_DEFINITIONS["gothic"];
+    const resolved = resolveTheme(def, "exploration", "#cc4444");
+    expect(resolved.playerPaneFrame).toBeDefined();
+    expect(resolved.playerPaneFrame.name).toBe("default");
+    expect(Object.keys(resolved.playerPaneFrame.components)).toHaveLength(8);
+  });
+
   it("applies variant overrides for combat", () => {
     const def = BUILTIN_DEFINITIONS["gothic"];
     const resolved = resolveTheme(def, "combat", "#cc4444");

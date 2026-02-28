@@ -3,7 +3,7 @@
  * Assembles multi-line ASCII art borders from ThemeAsset components.
  */
 
-import type { ThemeAsset } from "./types.js";
+import type { ThemeAsset, PlayerPaneFrame } from "./types.js";
 
 /** A composed frame: an array of string rows ready for rendering. */
 export interface ComposedFrame {
@@ -153,26 +153,25 @@ export function composeBottomFrame(
 
 /**
  * Compose a simple 1-row border for the Player Pane.
- * Uses row 0 from top/bottom edge components.
- * position "top" uses edge_top + separator corners; "bottom" uses edge_bottom.
+ * Uses the dedicated PlayerPaneFrame components.
+ * position "top" uses edge_top + corner_tl/tr; "bottom" uses edge_bottom + corner_bl/br.
  */
 export function composeSimpleBorder(
-  asset: ThemeAsset,
+  frame: PlayerPaneFrame,
   width: number,
   position: "top" | "bottom",
 ): ComposedFrame {
-  // Use first character of each corner for single-row borders
   const cornerL = position === "top"
-    ? (asset.components.corner_tl.rows[0]?.[0] ?? "┌")
-    : (asset.components.corner_bl.rows[0]?.[0] ?? "└");
+    ? (frame.components.corner_tl.rows[0]?.[0] ?? "┌")
+    : (frame.components.corner_bl.rows[0]?.[0] ?? "└");
   const cornerR = position === "top"
-    ? (asset.components.corner_tr.rows[0]?.slice(-1) ?? "┐")
-    : (asset.components.corner_br.rows[0]?.slice(-1) ?? "┘");
+    ? (frame.components.corner_tr.rows[0]?.slice(-1) ?? "┐")
+    : (frame.components.corner_br.rows[0]?.slice(-1) ?? "┘");
 
   const edge =
     position === "top"
-      ? asset.components.edge_top.rows[0]
-      : asset.components.edge_bottom.rows[0];
+      ? frame.components.edge_top.rows[0]
+      : frame.components.edge_bottom.rows[0];
 
   const fillWidth = width - 2; // corners take 1 char each
   if (fillWidth <= 0) {
@@ -185,13 +184,13 @@ export function composeSimpleBorder(
 
 /**
  * Get the single-character side edge for the Player Pane.
- * Uses the first character of edge_left / last character of edge_right.
+ * Uses the first character of edge_left / last character of edge_right from the PlayerPaneFrame.
  */
-export function playerPaneSideChar(asset: ThemeAsset, side: "left" | "right"): string {
+export function playerPaneSideChar(frame: PlayerPaneFrame, side: "left" | "right"): string {
   if (side === "left") {
-    return asset.components.edge_left.rows[0]?.[0] ?? "│";
+    return frame.components.edge_left.rows[0]?.[0] ?? "│";
   }
-  const rightRow = asset.components.edge_right.rows[0] ?? "│";
+  const rightRow = frame.components.edge_right.rows[0] ?? "│";
   return rightRow.slice(-1) || "│";
 }
 
