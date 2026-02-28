@@ -112,7 +112,8 @@ All T1 (initiative rolling may delegate to T2 for complex systems). Called by DM
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
 | `update_modeline` | T1 | DM | `({ text })` | Set modeline content. Freeform text string. |
-| `set_ui_style` | T1 | DM, Engine | `({ style?, variant? })` | Switch frame style variant (combat/exploration/ooc/levelup/dev) or change base style. |
+| `set_theme` | T1 | DM, Engine | `({ theme?, key_color?, variant?, save_to_location?, location? })` | Switch theme, key color, and/or variant. Optionally persist to location entity front matter. |
+| `set_ui_style` | T1 | DM, Engine | `({ style?, variant? })` | Switch variant (combat/exploration/ooc/levelup/dev). Still works for variant-only changes; `set_theme` preferred for full theme changes. |
 | `set_display_resources` | T1 | DM, Setup | `({ character, resources[] })` | Update which resource keys appear in the top frame for a character. |
 | `present_choices` | T1 + T2 | DM, Engine | `({ prompt?, choices[]? })` | Show choice modal. No params = Haiku subagent generates options. Explicit params = DM's choices. |
 | `present_roll` | T1 | DM | `({ result, label })` | Display a dice roll as a dramatic modal. |
@@ -157,11 +158,11 @@ All T1 (initiative rolling may delegate to T2 for complex systems). Called by DM
 | Combat | 4 | T1 |
 | Scene/Session | 4 | T1+T2 |
 | Entity | 1 | T2 |
-| TUI | 6 | T1, T1+T2 |
+| TUI | 7 | T1, T1+T2 |
 | Player Management | 1 | T1 |
 | OOC/Mode | 1 | T1 |
 | Error recovery | 2 | T1 |
-| **Total** | **40** | |
+| **Total** | **41** | |
 
 ### Not tools (engine-managed, no DM call needed)
 

@@ -7,44 +7,58 @@ The TUI is a single Ink (React for CLI) application. The aesthetic target is "pr
 Full layout at ≥80 columns, ≥40 rows. Elements listed bottom to top:
 
 ```
-┌═══════════════════════════════════════════════════════════════╗
-║  HP: 42/42          The Shattered Crown         Mana: 7/12  ║ ← top frame (resource display)
-╠═══════════════════════════════════════════════════════════════╣
-║                                                              ║
-║  The door groans open onto a long hall lit by guttering      ║
-║  candles, the air thick with dust and something sweeter      ║ ← DM narrative text (scrolling)
-║  underneath. At the far end, a figure sits motionless        ║
-║  in a high-backed chair.                                     ║
-║                                                              ║
-║                                                              ║
-╟──────────────────────────────────────────────────────────────╢
-║  Checking rules...                                           ║ ← activity line
-╠══════════════════╡ Aldric's Turn ╞═══════════════════════════╣ ← lower frame (turn indicator)
-║  HP: 42/42 | Loc: The Shattered Hall | Conditions: none     ║ ← modeline
-╠══════════════════════════════════════════════════════════════ ╣
-║  > I approach the figure cautiously, hand on my sword        ║ ← input line
-╠══════════════════════════════════════════════════════════════ ╣
-║  [Aldric]  Sable  Rook(AI)                                  ║ ← player selector
-╚══════════════════════════════════════════════════════════════ ╝
+┌═══════════════════════════════════════════════════════════════════════════════┐
+│                         ┌─ Conversation Pane ─┐                              │
+│  ╔══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══╗     │
+│  ║  HP: 42/42       The Shattered Crown        Mana: 7/12  ║     │
+│  ║  ≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈  ║     │
+│  ╠══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══╣     │
+│  ║ ┃                                                          ┃ ║     │
+│  ║ ┃  The door groans open onto a long hall lit by guttering  ┃ ║     │
+│  ║ ┃  candles, the air thick with dust and something sweeter  ┃ ║  ← Conversation Pane
+│  ║ ┃  underneath. At the far end, a figure sits motionless    ┃ ║  (multi-line themed frames,
+│  ║ ┃  in a high-backed chair.                                 ┃ ║   DM narrative, activity line)
+│  ║ ┃                                                          ┃ ║     │
+│  ║ ┃──────────────────────────────────────────────────────────┃ ║     │
+│  ║ ┃  Checking rules...                                       ┃ ║  ← activity line
+│  ╠══ ═══ ═══ ═══ ══╡ Aldric's Turn ╞═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══╣  ← themed bottom frame
+│  ║  ≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈  ║     │
+│  ╚══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══ ═══╝     │
+│                                                                              │
+│                         ┌─── Player Pane ────┐                               │
+│  ┌────────────────────────────────────────────────────────────┐              │
+│  │  HP: 42/42 | Loc: The Shattered Hall | Conditions: none   │  ← modeline  │
+│  │  > I approach the figure cautiously, hand on my sword      │  ← input     │
+│  └────────────────────────────────────────────────────────────┘              │
+│                                                                              │
+│  [Aldric]  Sable  Rook(AI)                                      ← player selector
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
+
+The layout is split into two panes:
+- **Conversation Pane** — multi-line themed top/bottom frames (from `.theme` asset), themed side columns, resource display in top frame, narrative area, activity line, turn indicator in bottom frame.
+- **Player Pane** — simple 1-char bordered box containing modeline + input line. Uses `SimpleBorder` (not the multi-line theme).
+- **Player Selector** — sits below the Player Pane, outside both bordered sections.
 
 ### Elements
 
-**Player selector** — Bottom row. Shows all players. Active player is highlighted. AI players marked with `(AI)`. Outside initiative, players switch with a hotkey (Tab). During initiative, the system controls who's active. Hidden in single-player.
+**Player selector** — Bottom row, below the Player Pane. Shows all players. Active player is highlighted. AI players marked with `(AI)`. Outside initiative, players switch with a hotkey (Tab). During initiative, the system controls who's active. Hidden in single-player.
 
-**Input line** — Text input for the active player. Tagged with the active character name before being sent to the DM: `[Aldric] I approach the figure cautiously`.
+**Player Pane** — A simple bordered box (1-char `SimpleBorder` with corners, not the multi-line theme) containing the modeline and input line. Sits between the Conversation Pane and the player selector.
 
-**Modeline** — Nethack-style status line. DM-controlled via tools. Typically shows HP, location, active conditions. Content is freeform text — the DM writes whatever's relevant. The modeline also displays a running session cost in USD (e.g. `<1¢`, `37¢`, `$1.24`), updated after each exchange via the cost tracker.
+**Input line** — Text input for the active player (inside the Player Pane). Tagged with the active character name before being sent to the DM: `[Aldric] I approach the figure cautiously`.
 
-**Lower frame** — Styled horizontal separator with the current turn holder centered: `═══╡ Aldric's Turn ╞═══`. Shows `DM` when it's the DM's turn to narrate. Part of the frame style system (see below).
+**Modeline** — Nethack-style status line (inside the Player Pane). DM-controlled via tools. Typically shows HP, location, active conditions. Content is freeform text — the DM writes whatever's relevant. The modeline also displays a running session cost in USD (e.g. `<1¢`, `37¢`, `$1.24`), updated after each exchange via the cost tracker.
 
-**Activity line** — Automatic indicators for in-flight engine operations. Not DM-controlled. See [Activity Indicators](#activity-indicators).
+**Bottom frame** — Multi-line themed border (from the active `.theme` asset). Contains the turn indicator centered in the top row: `═══╡ Aldric's Turn ╞═══`. Shows `DM` when it's the DM's turn to narrate. Height and art determined by the theme asset's `edge_bottom`, `corner_bl/br`, and `separator` components.
 
-**DM narrative text** — Scrolling text area. The main content region. The DM's narration renders here. Supports inline formatting (see [DM Text Formatting](#dm-text-formatting)). Shows a scroll indicator when content overflows (e.g. `scroll (12) more`) and supports PageUp/PageDown keyboard scrolling. Auto-scrolls to the bottom when new content arrives, unless the user has scrolled up.
+**Activity line** — Automatic indicators for in-flight engine operations (inside the Conversation Pane). Not DM-controlled. See [Activity Indicators](#activity-indicators).
 
-**Top frame** — Styled border with resource display. Shows the active character's key resources (HP + 1-2 others). See [Resource Display](#resource-display).
+**DM narrative text** — Scrolling text area (inside the Conversation Pane). The main content region. The DM's narration renders here. Supports inline formatting (see [DM Text Formatting](#dm-text-formatting)). Shows a scroll indicator when content overflows (e.g. `scroll (12) more`) and supports PageUp/PageDown keyboard scrolling. Auto-scrolls to the bottom when new content arrives, unless the user has scrolled up.
 
-**Left and right frames** — Styled vertical borders. Same style system as top/bottom. Decorative — no information content. Dropped at ≤40 columns.
+**Top frame** — Multi-line themed border (from the active `.theme` asset) with resource display. Shows the active character's key resources (HP + 1-2 others). See [Resource Display](#resource-display). Height and art determined by the theme asset's `edge_top`, `corner_tl/tr`, and `separator` components.
+
+**Left and right side columns** — Multi-line themed vertical borders (width determined by the theme asset's `edge_left`/`edge_right` components). Decorative — no information content. Part of the Conversation Pane. Dropped at ≤40 columns.
 
 
 ## Resource Display
@@ -119,13 +133,90 @@ Non-DM lines (player, dev, system) pass through without entering the formatting 
 The narrative area automatically detects quoted dialogue (`"..."`) and applies color highlighting (default: bright white). This makes NPC speech visually distinct without the DM needing to use `<color>` tags. Quote state is tracked across line boundaries so multi-line dialogue renders correctly. Quote state resets at paragraph boundaries (blank DM lines) to prevent an unbalanced quote from inverting all subsequent highlighting.
 
 
-## Frame Style System
+## Theme System
 
-Frames (top, bottom, left, right) are rendered from pre-baked style definitions. Each style specifies box-drawing characters, flourishes, and optional color.
+Themes control the visual frame art and colors of the Conversation Pane. A theme pairs a human-editable `.theme` asset file (defining the ASCII/Unicode art) with an OKLCH-generated color swatch (defining the palette). The Player Pane uses a simple `SimpleBorder` and is not affected by the theme.
 
-### Style selection
+### Theme asset format
 
-The campaign genre sets a default style during game init. The style has five **variants**:
+Theme assets are `.theme` files stored in `src/tui/themes/assets/`. The format is INI-like with `@metadata` lines and `[section]` headers containing literal ASCII art rows:
+
+```ini
+@name gothic
+@height 2
+
+[corner_tl]
+╔═
+║
+
+[edge_top]
+══
+══
+
+[corner_tr]
+═╗
+ ║
+
+[edge_left]
+║
+║
+
+[edge_right]
+║
+║
+
+[edge_bottom]
+══
+
+[corner_bl]
+╚═
+
+[corner_br]
+═╝
+
+[separator_left_top]
+╠═
+
+[separator_right_top]
+═╣
+
+[separator_left_bottom]
+╠═
+
+[separator_right_bottom]
+═╣
+
+[turn_separator]
+╡ %s ╞
+```
+
+The parser (`parseThemeAsset()`) validates that all 13 required components are present: `corner_tl`, `corner_tr`, `corner_bl`, `corner_br`, `edge_top`, `edge_bottom`, `edge_left`, `edge_right`, `separator_left_top`, `separator_right_top`, `separator_left_bottom`, `separator_right_bottom`, `turn_separator`.
+
+The composition engine (`composeTopFrame`, `composeBottomFrame`, `composeSideColumn`, etc.) assembles these components into full-width frame rows, filling horizontal edges to the available width and repeating vertical edges to the available height.
+
+### OKLCH color system
+
+Colors are generated at runtime from an OKLCH arc generator (`src/tui/color/`). A **swatch** is an array of hex color strings produced by walking a parametric curve through OKLCH color space:
+
+- **Hue arc**: start hue → end hue (degrees)
+- **Chroma curve**: min/max chroma envelope
+- **Lightness curve**: min/max lightness envelope
+- **Steps**: number of colors to generate
+
+Built-in swatch presets: `foliage`, `cyberpunk`, `ember`, `ethereal`. Each preset defines hue/chroma/lightness parameters tuned for a genre feel.
+
+A `ThemeColorMap` assigns swatch indices to frame parts:
+
+| Color map key | Applied to |
+|---|---|
+| `border` | Top/bottom frame edges |
+| `title` | Resource display text, turn indicator text |
+| `sideFrame` | Left/right side columns |
+| `separator` | Activity line separator, turn separator flourish |
+
+### Variants
+
+The campaign genre sets a default theme during game init. Each theme has **variants** that override swatch parameters and/or color map entries:
 
 | Variant | When active |
 |---|---|
@@ -135,72 +226,36 @@ The campaign genre sets a default style during game init. The style has five **v
 | `levelup` | During character advancement subagent |
 | `dev` | During dev mode (developer console) |
 
-The DM switches variants via a `set_ui_style` tool call, or the engine switches automatically on mode changes (combat start, OOC entry, etc.).
+The DM switches variants via `set_theme` or `set_ui_style` tool calls, or the engine switches automatically on mode changes (combat start, OOC entry, etc.).
 
-### Style definitions
+### Theme resolution
 
-Styles are shipped with the app as data. Each defines the box-drawing characters and optional ANSI colors for all four frame edges plus corners and flourishes.
+A `ThemeDefinition` specifies the theme asset name, base swatch configuration, and per-variant overrides. `resolveTheme(definition, variant, keyColor?)` produces a `ResolvedTheme` containing:
+- The parsed `ThemeAsset` (art components)
+- A generated swatch (hex color array) for the active variant
+- A `ThemeColorMap` mapping frame parts to swatch colors
 
-```jsonc
-// Example style definition (simplified)
-{
-  "name": "gothic",
-  "genre_tags": ["grimdark", "horror", "dark_fantasy"],
-  "variants": {
-    "exploration": {
-      "horizontal": "═",
-      "vertical": "║",
-      "corner_tl": "╔", "corner_tr": "╗",
-      "corner_bl": "╚", "corner_br": "╝",
-      "flourish": "╡ %s ╞",        // %s = centered text (turn indicator, etc.)
-      "color": "#888888"
-    },
-    "combat": {
-      "horizontal": "━",
-      "vertical": "┃",
-      "corner_tl": "┏", "corner_tr": "┓",
-      "corner_bl": "┗", "corner_br": "┛",
-      "flourish": "┫ %s ┣",
-      "color": "#cc4444"
-    },
-    "ooc": {
-      "horizontal": "─",
-      "vertical": "│",
-      "corner_tl": "┌", "corner_tr": "┐",
-      "corner_bl": "└", "corner_br": "┘",
-      "flourish": "┤ %s ├",
-      "color": "#6688cc"
-    },
-    "levelup": {
-      "horizontal": "═",
-      "vertical": "║",
-      "flourish": "╡ ✦ %s ✦ ╞",
-      "color": "#ccaa44"
-    },
-    "dev": {
-      "horizontal": "─",
-      "vertical": "│",
-      "corner_tl": "┌", "corner_tr": "┐",
-      "corner_bl": "└", "corner_br": "┘",
-      "flourish": "┤ %s ├",
-      "color": "#44cc88"
-    }
-  }
-}
+An optional `keyColor` (hex) shifts the swatch hue to center on that color, allowing location-specific tinting without changing the theme art.
+
+### Built-in themes
+
+| Theme | Genre tags | Height | Feel |
+|---|---|---|---|
+| `gothic` | grimdark, horror, dark_fantasy | 2 | Double-line box-drawing, muted colors |
+| `arcane` | high_fantasy, epic | 2 | Ornate Unicode flourishes |
+| `terminal` | sci-fi, cyberpunk | 1 | Single-line ASCII |
+| `clean` | modern, freeform | 1 | Minimal borders |
+
+### Location-scoped themes
+
+The DM can persist a theme + key color to a location entity's front matter via the `set_theme` tool with `save_to_location: true`. On scene transition to that location, the theme auto-applies. Front matter fields:
+
+```
+**Theme:** gothic
+**Key Color:** #8844aa
 ```
 
-### Shipped styles (examples)
-
-| Style | Genre tags | Feel |
-|---|---|---|
-| `gothic` | grimdark, horror, dark_fantasy | Heavy double-line borders, muted colors |
-| `arcane` | high_fantasy, epic | Ornate Unicode flourishes, gold accents |
-| `terminal` | sci-fi, cyberpunk | Thin single-line, green/amber monochrome |
-| `rustic` | pastoral, western, low_fantasy | Simple box-drawing, warm earth tones |
-| `clean` | modern, freeform | Minimal borders, no color |
-| `ornate` | courtly, mystery, intrigue | Decorative corners, rich colors |
-
-The DM can also request a custom style during gameplay (via OOC), and the setup agent can generate one during init if the genre doesn't match any shipped style.
+This creates atmospheric consistency — a haunted crypt always feels dark purple, a sunlit market always feels warm gold — without the DM needing to manually switch themes on every scene transition.
 
 
 ## Responsive Design
@@ -234,12 +289,12 @@ Within a given row tier, elements also adapt horizontally:
 - Modeline truncates less-important fields first (conditions → location → resources)
 - Top frame drops campaign name, then right-side resources, then left-side resources
 - Lower frame simplifies flourishes to plain separators
-- Frame styles fall back to simple ASCII (`-`, `|`, `+`) below 40 columns
+- Themes fall back to simple ASCII (`-`, `|`, `+`) below 40 columns
 
 
 ## Modals
 
-The app is not productivity software — immersion matters. Modals use the same frame style system as the main TUI, appearing as themed bordered windows over the narrative area. They feel like part of the game world, not like dialogs.
+The app is not productivity software — immersion matters. Modals use the same theme system as the main TUI, appearing as themed bordered windows over the narrative area. They feel like part of the game world, not like dialogs.
 
 ### Character Sheet
 
@@ -344,7 +399,7 @@ Standard navigation (arrow keys + Enter). Settings covers choice frequency, disp
 ### Modal behavior
 
 - Modals overlay the narrative area, not the full screen. The modeline and player selector remain visible underneath.
-- Modals inherit the active frame style variant (a combat choice modal uses the combat border style).
+- Modals inherit the active theme variant (a combat choice modal uses the combat theme variant).
 - Modals are dismissed with ESC (back to game), Enter (confirm selection), or the relevant hotkey.
 - When modal content exceeds available height, it scrolls with a scroll indicator (e.g. `scroll (5) more`) and supports PageUp/PageDown navigation.
 - At minimal viewport sizes, modals take the full screen.
@@ -359,10 +414,15 @@ The DM controls the UI through these tools:
 update_modeline({ text: "HP: 42/42 | Loc: The Shattered Hall | Conditions: Poisoned" })
 ```
 
-**`set_ui_style`** — Switch frame style variant, or change the base style entirely. Variants: `exploration`, `combat`, `ooc`, `levelup`, `dev`.
+**`set_theme`** — Switch the UI theme, key color, and/or variant. Optionally persist to a location entity. Preferred over `set_ui_style` for full theme changes.
+```
+set_theme({ theme: "gothic", key_color: "#8844aa" })
+set_theme({ theme: "arcane", variant: "combat", save_to_location: true, location: "the-shattered-hall" })
+```
+
+**`set_ui_style`** — Switch variant only (combat/exploration/ooc/levelup/dev). Still works for quick variant-only changes, but `set_theme` is preferred for full theme changes.
 ```
 set_ui_style({ variant: "combat" })
-set_ui_style({ style: "gothic", variant: "exploration" })
 ```
 
 **`set_display_resources`** — Update which resources appear in the top frame for a character.
