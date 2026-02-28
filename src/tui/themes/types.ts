@@ -47,6 +47,15 @@ export const PLAYER_PANE_COMPONENTS = [
 
 export type PlayerPaneComponentName = (typeof PLAYER_PANE_COMPONENTS)[number];
 
+/** Edge components that are optional in .player-frame files.
+ *  When absent or empty, they default to a single space (renders as blank). */
+export const PLAYER_PANE_EDGE_COMPONENTS: ReadonlySet<PlayerPaneComponentName> = new Set([
+  "edge_top",
+  "edge_bottom",
+  "edge_left",
+  "edge_right",
+]);
+
 /** Parsed player pane frame — 8 border components, always height 1. */
 export interface PlayerPaneFrame {
   name: string;

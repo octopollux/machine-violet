@@ -216,18 +216,48 @@ const MINIMAL_PLAYER_FRAME = `@name: test-frame
 │
 `;
 
+const CORNERS_ONLY_FRAME = `@name: corners-only
+
+[corner_tl]
+┌
+
+[corner_tr]
+┐
+
+[corner_bl]
+└
+
+[corner_br]
+┘
+`;
+
+const MULTI_ROW_CORNERS_FRAME = `@name: multi-row
+[corner_tl]
+┌
+│
+(
+
+[corner_tr]
+┐
+|
+)
+
+[corner_bl]
+(
+|
+└
+
+[corner_br]
+)
+|
+┘
+`;
+
 describe("parsePlayerPaneFrame", () => {
-  it("parses a minimal player frame", () => {
+  it("parses a full player frame (corners + edges)", () => {
     const frame = parsePlayerPaneFrame(MINIMAL_PLAYER_FRAME);
     expect(frame.name).toBe("test-frame");
     expect(Object.keys(frame.components)).toHaveLength(8);
-  });
-
-  it("all components are height 1", () => {
-    const frame = parsePlayerPaneFrame(MINIMAL_PLAYER_FRAME);
-    for (const comp of Object.values(frame.components)) {
-      expect(comp.height).toBe(1);
-    }
   });
 
   it("reads component rows correctly", () => {
@@ -237,25 +267,59 @@ describe("parsePlayerPaneFrame", () => {
     expect(frame.components.edge_left.rows).toEqual(["│"]);
   });
 
+  it("parses a corners-only frame (edges default to space)", () => {
+    const frame = parsePlayerPaneFrame(CORNERS_ONLY_FRAME);
+    expect(frame.name).toBe("corners-only");
+    expect(Object.keys(frame.components)).toHaveLength(8);
+    expect(frame.components.edge_top).toEqual({ rows: [" "], width: 1, height: 1 });
+    expect(frame.components.edge_bottom).toEqual({ rows: [" "], width: 1, height: 1 });
+    expect(frame.components.edge_left).toEqual({ rows: [" "], width: 1, height: 1 });
+    expect(frame.components.edge_right).toEqual({ rows: [" "], width: 1, height: 1 });
+  });
+
+  it("empty edge sections also default to space", () => {
+    const frameText = `@name: empty-edges
+
+[corner_tl]
++
+[corner_tr]
++
+[corner_bl]
++
+[corner_br]
++
+
+[edge_top]
+
+[edge_bottom]
+
+[edge_left]
+
+[edge_right]
+`;
+    const frame = parsePlayerPaneFrame(frameText);
+    expect(frame.components.edge_top).toEqual({ rows: [" "], width: 1, height: 1 });
+    expect(frame.components.edge_left).toEqual({ rows: [" "], width: 1, height: 1 });
+  });
+
+  it("allows multi-row corners", () => {
+    const frame = parsePlayerPaneFrame(MULTI_ROW_CORNERS_FRAME);
+    expect(frame.components.corner_tl.height).toBe(3);
+    expect(frame.components.corner_tl.rows).toEqual(["┌", "│", "("]);
+    expect(frame.components.corner_br.height).toBe(3);
+  });
+
   it("throws on missing @name", () => {
     expect(() => parsePlayerPaneFrame("[corner_tl]\n+")).toThrow("missing @name");
   });
 
-  it("throws on missing required component", () => {
+  it("throws on missing required corner component", () => {
     const partial = `@name: broken
 
 [corner_tl]
 +
 `;
     expect(() => parsePlayerPaneFrame(partial)).toThrow("missing required component");
-  });
-
-  it("throws on multi-row component (height must be 1)", () => {
-    const bad = MINIMAL_PLAYER_FRAME.replace(
-      "[corner_tl]\n┌",
-      "[corner_tl]\n┌\n║",
-    );
-    expect(() => parsePlayerPaneFrame(bad)).toThrow("row(s), expected 1");
   });
 
   it("handles CRLF line endings", () => {

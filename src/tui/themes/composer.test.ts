@@ -6,6 +6,7 @@ import {
   composeSimpleBorder,
   composeSideColumn,
   composeTurnSeparator,
+  playerPaneSideChar,
 } from "./composer.js";
 import { parseThemeAsset, parsePlayerPaneFrame } from "./parser.js";
 
@@ -247,6 +248,50 @@ describe("composeSimpleBorder", () => {
     expect(composed.height).toBe(1);
     expect(composed.rows[0].length).toBe(10);
     expect(composed.rows[0]).toBe("+--------+");
+  });
+});
+
+// Corners-only player frame (edges default to space)
+const CORNERS_ONLY_FRAME = `@name: corners-only
+
+[corner_tl]
++
+
+[corner_tr]
++
+
+[corner_bl]
++
+
+[corner_br]
++
+`;
+
+describe("composeSimpleBorder (corners-only frame)", () => {
+  it("fills edge area with spaces when edges are absent", () => {
+    const frame = parsePlayerPaneFrame(CORNERS_ONLY_FRAME);
+    const composed = composeSimpleBorder(frame, 10, "top");
+    // Corners + spaces between
+    expect(composed.rows[0]).toBe("+        +");
+    expect(composed.rows[0].length).toBe(10);
+  });
+
+  it("bottom border also fills with spaces", () => {
+    const frame = parsePlayerPaneFrame(CORNERS_ONLY_FRAME);
+    const composed = composeSimpleBorder(frame, 10, "bottom");
+    expect(composed.rows[0]).toBe("+        +");
+  });
+});
+
+describe("playerPaneSideChar (corners-only frame)", () => {
+  it("returns space for left side when edge_left is absent", () => {
+    const frame = parsePlayerPaneFrame(CORNERS_ONLY_FRAME);
+    expect(playerPaneSideChar(frame, "left")).toBe(" ");
+  });
+
+  it("returns space for right side when edge_right is absent", () => {
+    const frame = parsePlayerPaneFrame(CORNERS_ONLY_FRAME);
+    expect(playerPaneSideChar(frame, "right")).toBe(" ");
   });
 });
 

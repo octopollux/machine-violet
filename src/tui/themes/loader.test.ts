@@ -75,11 +75,10 @@ describe("loadBuiltinPlayerFrame", () => {
     expect(Object.keys(frame.components)).toHaveLength(8);
   });
 
-  it("all components are height 1", () => {
+  it("edge components are height 1 (defaulted to space)", () => {
     const frame = loadBuiltinPlayerFrame("default");
-    for (const comp of Object.values(frame.components)) {
-      expect(comp.height).toBe(1);
-    }
+    expect(frame.components.edge_left.height).toBe(1);
+    expect(frame.components.edge_right.height).toBe(1);
   });
 
   it("caches on repeated loads", () => {

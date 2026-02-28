@@ -11,6 +11,7 @@ import {
   type PlayerPaneComponentName,
   REQUIRED_COMPONENTS,
   PLAYER_PANE_COMPONENTS,
+  PLAYER_PANE_EDGE_COMPONENTS,
 } from "./types.js";
 
 /** Compute display width of a string (approximate — counts chars, skips ANSI). */
@@ -158,7 +159,8 @@ export function parseThemeAsset(content: string): ThemeAsset {
 
 /**
  * Parse a .player-frame file content into a PlayerPaneFrame.
- * All components are enforced to be height 1.
+ * Corner components are required (any height). Edge components are optional —
+ * when absent or empty they default to a single space (renders as blank).
  */
 export function parsePlayerPaneFrame(content: string): PlayerPaneFrame {
   const { metadata, sections } = parseSections(content);
@@ -172,11 +174,23 @@ export function parsePlayerPaneFrame(content: string): PlayerPaneFrame {
 
   for (const compName of PLAYER_PANE_COMPONENTS) {
     const rows = sections.get(compName);
+    const isEdge = PLAYER_PANE_EDGE_COMPONENTS.has(compName);
+
+    // Check if section is absent or effectively empty
+    const isEmpty = !rows || rows.every((r) => r.trim() === "");
+
+    if (isEmpty && isEdge) {
+      // Optional edge defaults to a single space (renders as blank)
+      result[compName] = { rows: [" "], width: 1, height: 1 };
+      continue;
+    }
+
     if (!rows) {
       throw new Error(`Player frame "${name}" missing required component: [${compName}]`);
     }
 
-    result[compName] = buildComponent(name, compName, rows, 1);
+    // No height constraint — corners can be multi-row, edges are not size-checked
+    result[compName] = buildComponent(name, compName, rows, null);
   }
 
   return {
