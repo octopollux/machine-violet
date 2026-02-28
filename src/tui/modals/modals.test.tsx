@@ -3,7 +3,7 @@ import { Box } from "ink";
 import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
 import { Modal } from "./Modal.js";
-import { ChoiceModal } from "./ChoiceModal.js";
+import { ChoiceModal, ChoiceOverlay } from "./ChoiceModal.js";
 import { GameMenu, getMenuItems } from "./GameMenu.js";
 import { CharacterSheetModal } from "./CharacterSheetModal.js";
 import { DiceRollModal } from "./DiceRollModal.js";
@@ -110,6 +110,98 @@ describe("ChoiceModal", () => {
     const frame = lastFrame();
     expect(frame).toContain("> Enter your own:");
     expect(frame).toContain("Type your action");
+  });
+});
+
+describe("ChoiceOverlay", () => {
+  it("renders prompt and choices without frame borders", () => {
+    const { lastFrame } = render(
+      <ChoiceOverlay
+        width={60}
+        prompt="What do you do?"
+        choices={["Attack", "Flee", "Negotiate"]}
+        selectedIndex={0}
+      />,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("What do you do?");
+    expect(frame).toContain("> Attack");
+    expect(frame).toContain("  Flee");
+    expect(frame).toContain("  Negotiate");
+    // No frame borders
+    expect(frame).not.toContain("╔");
+    expect(frame).not.toContain("╚");
+  });
+
+  it("shows scroll arrows", () => {
+    const { lastFrame } = render(
+      <ChoiceOverlay
+        width={60}
+        prompt="Pick one"
+        choices={["A", "B"]}
+        selectedIndex={0}
+      />,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("▲");
+    expect(frame).toContain("▼");
+  });
+
+  it("shows ESC dismiss help text", () => {
+    const { lastFrame } = render(
+      <ChoiceOverlay
+        width={60}
+        prompt="Pick one"
+        choices={["A", "B"]}
+        selectedIndex={0}
+      />,
+    );
+    expect(lastFrame()!).toContain("ESC dismiss");
+  });
+
+  it("shows custom input row when showCustomInput is true", () => {
+    const { lastFrame } = render(
+      <ChoiceOverlay
+        width={60}
+        prompt="What do you do?"
+        choices={["Attack", "Flee"]}
+        selectedIndex={0}
+        showCustomInput
+      />,
+    );
+    expect(lastFrame()!).toContain("Enter your own...");
+  });
+
+  it("shows submit/back help text when custom input is active", () => {
+    const { lastFrame } = render(
+      <ChoiceOverlay
+        width={60}
+        prompt="What do you do?"
+        choices={["Attack"]}
+        selectedIndex={1}
+        showCustomInput
+        customInputActive
+        customInputResetKey={0}
+        onCustomInputSubmit={() => {}}
+      />,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("submit");
+    expect(frame).toContain("ESC back");
+  });
+
+  it("renders within 7 rows", () => {
+    const { lastFrame } = render(
+      <ChoiceOverlay
+        width={60}
+        prompt="Pick"
+        choices={["A", "B", "C"]}
+        selectedIndex={0}
+        showCustomInput
+      />,
+    );
+    const lines = lastFrame()!.split("\n");
+    expect(lines.length).toBeLessThanOrEqual(7);
   });
 });
 

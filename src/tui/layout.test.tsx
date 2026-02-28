@@ -1,4 +1,5 @@
 import React from "react";
+import { Text } from "ink";
 import { describe, it, expect, beforeEach } from "vitest";
 import { render } from "ink-testing-library";
 import { Layout } from "./layout.js";
@@ -86,5 +87,16 @@ describe("Layout", () => {
     );
     const frame = lastFrame();
     expect(frame).toContain("Aldric's Turn");
+  });
+
+  it("playerPaneOverlay replaces Modeline content", () => {
+    const overlay = <Text>OVERLAY CONTENT</Text>;
+    const { lastFrame } = render(
+      <Layout {...baseProps} playerPaneOverlay={overlay} />,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("OVERLAY CONTENT");
+    // Modeline text should NOT appear when overlay is active
+    expect(frame).not.toContain("Loc: The Shattered Hall");
   });
 });

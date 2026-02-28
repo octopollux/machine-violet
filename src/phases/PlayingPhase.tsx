@@ -4,7 +4,7 @@ import { appendDelta } from "../tui/narrative-helpers.js";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
 import { scrollAmount } from "../tui/components/index.js";
 import { Layout } from "../tui/layout.js";
-import { ChoiceModal, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, ApiErrorModal, getMenuItems } from "../tui/modals/index.js";
+import { ChoiceOverlay, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, ApiErrorModal, getMenuItems } from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { getActivePlayer, switchToNextPlayer, getPlayerEntries } from "../agents/player-manager.js";
 import { createOOCSession } from "../agents/subagents/ooc-mode.js";
@@ -360,7 +360,7 @@ export function PlayingPhase() {
     if (!activeModal) return 0;
     switch (activeModal.kind) {
       case "choice":
-        return activeModal.choices.length + 1 + 5 + 2;
+        return 0; // choice overlay lives inside the Player Pane
       case "dice":
         return 8 + 2;
       case "recap":
@@ -370,6 +370,20 @@ export function PlayingPhase() {
     }
   })();
   const layoutRows = rows - modalHeight;
+
+  // Build overlay for choice modal (replaces Player Pane content)
+  const choiceOverlay = activeModal?.kind === "choice" ? (
+    <ChoiceOverlay
+      width={cols - 2}
+      prompt={activeModal.prompt}
+      choices={activeModal.choices}
+      selectedIndex={choiceIndex}
+      showCustomInput
+      customInputActive={customInputMode}
+      customInputResetKey={customInputResetKey}
+      onCustomInputSubmit={handleCustomChoiceSubmit}
+    />
+  ) : undefined;
 
   return (
     <Box flexDirection="column" width={cols} height={rows}>
@@ -393,20 +407,8 @@ export function PlayingPhase() {
         turnIndicatorColor={engineState === "waiting_input" ? gameStateRef.current?.config.players[activePlayerIndex]?.color : undefined}
         narrativeRef={narrativeRef}
         hideInputLine={activeModal?.kind === "choice"}
+        playerPaneOverlay={choiceOverlay}
       />
-      {activeModal?.kind === "choice" && (
-        <ChoiceModal
-          variant={modalVariant}
-          width={cols}
-          prompt={activeModal.prompt}
-          choices={activeModal.choices}
-          selectedIndex={choiceIndex}
-          showCustomInput
-          customInputActive={customInputMode}
-          customInputResetKey={customInputResetKey}
-          onCustomInputSubmit={handleCustomChoiceSubmit}
-        />
-      )}
       {activeModal?.kind === "dice" && (
         <DiceRollModal
           variant={modalVariant}

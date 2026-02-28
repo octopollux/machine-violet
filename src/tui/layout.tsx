@@ -67,6 +67,9 @@ export interface LayoutProps {
 
   /** When true, skip rendering the InputLine (e.g. choice modal provides its own input) */
   hideInputLine?: boolean;
+
+  /** When set, replaces the Player Pane interior (Modeline + InputLine) with this element */
+  playerPaneOverlay?: React.ReactNode;
 }
 
 /**
@@ -95,6 +98,7 @@ export function Layout(props: LayoutProps) {
     turnIndicatorColor,
     narrativeRef,
     hideInputLine,
+    playerPaneOverlay,
   } = props;
 
   const tier = getViewportTier(dimensions);
@@ -201,21 +205,25 @@ export function Layout(props: LayoutProps) {
         <Box flexDirection="row" height={playerPaneContentHeight}>
           <PlayerPaneSide theme={theme} side="left" color={playerColor} height={playerPaneContentHeight} />
           <Box flexDirection="column" width={width - 2}>
-            <Modeline lines={modelineLines} width={width - 2} />
-            <Box flexGrow={1} />
-            {!hideInputLine && (
-              <InputLine
-                characterName={activeCharacterName}
-                showPlayerName={elements.playerInPrompt}
-                playerName={players[activePlayerIndex]?.name}
-                width={width - 2}
-                isDisabled={inputIsDisabled}
-                onChange={onInputChange}
-                onSubmit={onInputSubmit}
-                resetKey={inputResetKey}
-              />
+            {playerPaneOverlay ? playerPaneOverlay : (
+              <>
+                <Modeline lines={modelineLines} width={width - 2} />
+                <Box flexGrow={1} />
+                {!hideInputLine && (
+                  <InputLine
+                    characterName={activeCharacterName}
+                    showPlayerName={elements.playerInPrompt}
+                    playerName={players[activePlayerIndex]?.name}
+                    width={width - 2}
+                    isDisabled={inputIsDisabled}
+                    onChange={onInputChange}
+                    onSubmit={onInputSubmit}
+                    resetKey={inputResetKey}
+                  />
+                )}
+                <Box height={1} />
+              </>
             )}
-            <Box height={1} />
           </Box>
           <PlayerPaneSide theme={theme} side="right" color={playerColor} height={playerPaneContentHeight} />
         </Box>
