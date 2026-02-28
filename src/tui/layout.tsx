@@ -204,17 +204,17 @@ export function Layout(props: LayoutProps) {
       {elements.modeline && (
         <Box flexDirection="row" height={playerPaneContentHeight}>
           <PlayerPaneSide theme={theme} side="left" color={playerColor} height={playerPaneContentHeight} />
-          <Box flexDirection="column" width={width - 2}>
+          <Box flexDirection="column" width={width - 2} paddingLeft={1} paddingRight={1}>
             {playerPaneOverlay ? playerPaneOverlay : (
               <>
-                <Modeline lines={modelineLines} width={width - 2} />
+                <Modeline lines={modelineLines} width={width - 4} />
                 <Box flexGrow={1} />
                 {!hideInputLine && (
                   <InputLine
                     characterName={activeCharacterName}
                     showPlayerName={elements.playerInPrompt}
                     playerName={players[activePlayerIndex]?.name}
-                    width={width - 2}
+                    width={width - 4}
                     isDisabled={inputIsDisabled}
                     onChange={onInputChange}
                     onSubmit={onInputSubmit}

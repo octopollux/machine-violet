@@ -374,7 +374,7 @@ export function PlayingPhase() {
   // Build overlay for choice modal (replaces Player Pane content)
   const choiceOverlay = activeModal?.kind === "choice" ? (
     <ChoiceOverlay
-      width={cols - 2}
+      width={cols - 4}
       prompt={activeModal.prompt}
       choices={activeModal.choices}
       selectedIndex={choiceIndex}
