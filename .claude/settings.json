@@ -1,4 +1,17 @@
 {
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if [ ! -d node_modules ]; then echo \"Installing dependencies...\" >&2; npm install >&2; fi'",
+            "statusMessage": "Checking dependencies..."
+          }
+        ]
+      }
+    ]
+  },
   "permissions": {
     "allow": [
       "Read(src/**)",
