@@ -8,7 +8,8 @@ import { appendDelta } from "../tui/narrative-helpers.js";
 import { Layout } from "../tui/layout.js";
 import { ChoiceModal } from "../tui/modals/index.js";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
-import { scrollAmount } from "../tui/components/index.js";
+import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
+import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
 import type { SetupStep, SetupResult } from "../agents/setup-agent.js";
 import { fastPathSetup } from "../agents/setup-agent.js";
 import { createSetupConversation } from "../agents/subagents/setup-conversation.js";
@@ -31,6 +32,7 @@ export function SetupPhase({ mode, theme, costTracker, onComplete, onCancel, onE
   const { stdout } = useStdout();
   const cols = stdout?.columns ?? 80;
   const rows = stdout?.rows ?? 40;
+  const tooSmall = cols < MIN_COLUMNS || rows < MIN_ROWS;
 
   const narrativeRef = useRef<NarrativeAreaHandle>(null);
 
@@ -250,6 +252,11 @@ export function SetupPhase({ mode, theme, costTracker, onComplete, onCancel, onE
       }
     }
   });
+
+  // --- Render: terminal too small ---
+  if (tooSmall) {
+    return <TerminalTooSmall columns={cols} rows={rows} />;
+  }
 
   // --- Render: awaiting ENTER after setup farewell ---
   if (pendingResult) {

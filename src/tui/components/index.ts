@@ -7,3 +7,4 @@ export { NarrativeArea, scrollAmount } from "./NarrativeArea.js";
 export type { NarrativeAreaHandle } from "./NarrativeArea.js";
 export { HorizontalBorder, SideFrame } from "./FrameBorder.js";
 export { ThemedHorizontalBorder, ThemedSideFrame, SimpleBorder, PlayerPaneSide } from "./ThemedFrame.js";
+export { TerminalTooSmall } from "./TerminalTooSmall.js";
