@@ -12,7 +12,7 @@ export interface ScrollHandle {
  */
 export function useScrollHandle(
   ref: React.ForwardedRef<ScrollHandle>,
-  scrollRef: React.RefObject<ScrollViewRef>,
+  scrollRef: React.RefObject<ScrollViewRef | null>,
 ): void {
   useImperativeHandle(ref, () => ({
     scrollBy(delta: number) {
