@@ -4,6 +4,9 @@ import { spawnSubagent } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import type { DMSessionState } from "../dm-prompt.js";
 import type { FileIO } from "../scene-manager.js";
+import type { GameState } from "../game-state.js";
+import type { TuiCommand } from "../agent-loop.js";
+import { registry } from "../tool-registry.js";
 import { getModel } from "../../config/models.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
@@ -14,8 +17,31 @@ import type { MapData } from "../../types/maps.js";
 import type { ClocksState } from "../../types/clocks.js";
 import { findReferences } from "../../tools/campaign-ops/index.js";
 import { validateCampaign } from "../../tools/validation/index.js";
+import { parseFrontMatter, serializeEntity } from "../../tools/filesystem/index.js";
 import { norm } from "../../utils/paths.js";
 import type { ModeSession } from "../../tui/game-context.js";
+
+// --- DM tool categories available in OOC mode ---
+
+const OOC_READONLY_TOOLS = [
+  "roll_dice", "view_area", "distance", "path_between",
+  "line_of_sight", "tiles_in_range", "find_nearest", "check_clocks",
+];
+
+const OOC_ENTITY_TOOLS = ["create_entity", "update_entity"];
+
+const OOC_TUI_TOOLS = ["set_theme", "set_display_resources", "show_character_sheet"];
+
+const OOC_RECOVERY_TOOLS = ["rollback"];
+
+const OOC_DM_TOOL_NAMES = [
+  ...OOC_READONLY_TOOLS,
+  ...OOC_ENTITY_TOOLS,
+  ...OOC_TUI_TOOLS,
+  ...OOC_RECOVERY_TOOLS,
+];
+
+const OOC_DM_TOOL_SET = new Set(OOC_DM_TOOL_NAMES);
 
 /**
  * Context snapshot for OOC mode — captured when entering, restored when exiting.
@@ -191,7 +217,7 @@ function buildOOCPromptCached(opts: Required<Pick<OOCPromptOptions, "config" | "
 }
 
 /** Build OOC tool definitions (available when repo or fileIO is provided). */
-export function buildOOCTools(hasFileIO: boolean): Anthropic.Tool[] {
+export function buildOOCTools(hasFileIO: boolean, hasGameState: boolean): Anthropic.Tool[] {
   const tools: Anthropic.Tool[] = [
     {
       name: "get_commit_log",
@@ -244,6 +270,11 @@ export function buildOOCTools(hasFileIO: boolean): Anthropic.Tool[] {
     );
   }
 
+  // Append DM tool definitions when game state is available
+  if (hasGameState) {
+    tools.push(...registry.getDefinitionsFor(OOC_DM_TOOL_NAMES));
+  }
+
   return tools;
 }
 
@@ -254,6 +285,8 @@ export function buildOOCToolHandler(
   fileIO?: FileIO,
   maps?: Record<string, MapData>,
   clocks?: ClocksState,
+  gameState?: GameState,
+  onTuiCommand?: (cmd: TuiCommand) => void,
 ): (name: string, input: Record<string, unknown>) => Promise<{ content: string; is_error?: boolean }> {
   return async (name: string, input: Record<string, unknown>) => {
     try {
@@ -303,6 +336,10 @@ export function buildOOCToolHandler(
         }
 
         default:
+          // DM tool dispatch
+          if (OOC_DM_TOOL_SET.has(name) && gameState) {
+            return await dispatchDMTool(name, input, gameState, repo, fileIO, campaignRoot, onTuiCommand);
+          }
           return { content: `Unknown tool: ${name}`, is_error: true };
       }
     } catch (err) {
@@ -310,6 +347,125 @@ export function buildOOCToolHandler(
       return { content: msg, is_error: true };
     }
   };
+}
+
+/** Dispatch a DM tool from OOC context, post-processing based on category. */
+async function dispatchDMTool(
+  name: string,
+  input: Record<string, unknown>,
+  gameState: GameState,
+  repo?: CampaignRepo,
+  fileIO?: FileIO,
+  campaignRoot?: string,
+  onTuiCommand?: (cmd: TuiCommand) => void,
+): Promise<{ content: string; is_error?: boolean }> {
+  // Read-only tools — dispatch directly and return result
+  if (OOC_READONLY_TOOLS.includes(name)) {
+    const result = registry.dispatch(gameState, name, input);
+    return result;
+  }
+
+  // TUI tools — dispatch to get the command JSON, then forward via callback
+  if (OOC_TUI_TOOLS.includes(name)) {
+    const result = registry.dispatch(gameState, name, input);
+    if (result.is_error) return result;
+    if (onTuiCommand) {
+      const cmd = JSON.parse(result.content) as TuiCommand;
+      onTuiCommand(cmd);
+    }
+    return { content: `Applied: ${name}` };
+  }
+
+  // Entity tools — execute file I/O directly
+  if (OOC_ENTITY_TOOLS.includes(name)) {
+    if (!fileIO || !campaignRoot) {
+      return { content: "File I/O not available for entity operations", is_error: true };
+    }
+    return await executeEntityCommand(name, input, gameState, fileIO, campaignRoot);
+  }
+
+  // Rollback — execute via repo
+  if (OOC_RECOVERY_TOOLS.includes(name)) {
+    return await executeRollback(input, repo);
+  }
+
+  return { content: `Unknown OOC tool: ${name}`, is_error: true };
+}
+
+/** Execute entity create/update via FileIO. */
+async function executeEntityCommand(
+  name: string,
+  input: Record<string, unknown>,
+  gameState: GameState,
+  fileIO: FileIO,
+  _campaignRoot: string,
+): Promise<{ content: string; is_error?: boolean }> {
+  // Use registry.dispatch to get the validated command structure
+  const result = registry.dispatch(gameState, name, input);
+  if (result.is_error) return result;
+
+  const cmd = JSON.parse(result.content);
+
+  if (name === "create_entity") {
+    const dirPath = cmd.file_path.substring(0, cmd.file_path.lastIndexOf("/"));
+    await fileIO.mkdir(dirPath);
+    await fileIO.writeFile(cmd.file_path, cmd.content);
+    return { content: `Created ${cmd.entity_type} "${cmd.name}" at ${cmd.file_path}` };
+  }
+
+  if (name === "update_entity") {
+    // Read existing file
+    let existing: string;
+    try {
+      existing = await fileIO.readFile(cmd.file_path);
+    } catch {
+      return { content: `Entity file not found: ${cmd.file_path}`, is_error: true };
+    }
+
+    // Parse, merge, re-serialize
+    const { frontMatter, body, changelog } = parseFrontMatter(existing);
+    const title = frontMatter._title ?? cmd.name;
+
+    // Merge front matter updates (null = remove key)
+    if (cmd.front_matter_updates) {
+      for (const [key, value] of Object.entries(cmd.front_matter_updates)) {
+        if (value === null) {
+          frontMatter[key] = undefined;
+        } else {
+          frontMatter[key] = value;
+        }
+      }
+    }
+
+    // Append body text
+    const newBody = cmd.body_append ? (body ? body + "\n\n" + cmd.body_append : cmd.body_append) : body;
+
+    // Add changelog entry (no scene prefix in OOC)
+    const newChangelog = [...changelog];
+    if (cmd.changelog_entry) {
+      newChangelog.push(cmd.changelog_entry);
+    }
+
+    const updated = serializeEntity(title, frontMatter, newBody, newChangelog);
+    await fileIO.writeFile(cmd.file_path, updated);
+    return { content: `Updated ${cmd.entity_type} "${cmd.name}"` };
+  }
+
+  return { content: `Unknown entity command: ${name}`, is_error: true };
+}
+
+/** Execute rollback via CampaignRepo. */
+async function executeRollback(
+  input: Record<string, unknown>,
+  repo?: CampaignRepo,
+): Promise<{ content: string; is_error?: boolean }> {
+  if (!repo) {
+    return { content: "Git is not available for rollback", is_error: true };
+  }
+  const target = input.target as string;
+  const result = await repo.rollback(target);
+  const shortHash = result.restoredTo.slice(0, 8);
+  return { content: `Rolled back to ${shortHash}: ${result.summary}` };
 }
 
 /**
@@ -334,6 +490,8 @@ export async function enterOOC(
     campaignRoot?: string;
     maps?: Record<string, MapData>;
     clocks?: ClocksState;
+    gameState?: GameState;
+    onTuiCommand?: (cmd: TuiCommand) => void;
   },
   onStream?: SubagentStreamCallback,
 ): Promise<OOCResult> {
@@ -351,10 +509,11 @@ export async function enterOOC(
   };
 
   const hasFileIO = !!(options.fileIO && options.campaignRoot);
-  const hasTools = !!options.repo || hasFileIO;
-  const tools = hasTools ? buildOOCTools(hasFileIO) : undefined;
+  const hasGameState = !!options.gameState;
+  const hasTools = !!options.repo || hasFileIO || hasGameState;
+  const tools = hasTools ? buildOOCTools(hasFileIO, hasGameState) : undefined;
   const toolHandler = hasTools
-    ? buildOOCToolHandler(options.repo, options.campaignRoot, options.fileIO, options.maps, options.clocks)
+    ? buildOOCToolHandler(options.repo, options.campaignRoot, options.fileIO, options.maps, options.clocks, options.gameState, options.onTuiCommand)
     : undefined;
 
   const result = await spawnSubagent(
@@ -367,7 +526,7 @@ export async function enterOOC(
       maxTokens: hasTools ? TOKEN_LIMITS.SUBAGENT_LARGE : TOKEN_LIMITS.SUBAGENT_MEDIUM,
       ...(tools ? { tools } : {}),
       ...(toolHandler ? { toolHandler } : {}),
-      maxToolRounds: hasTools ? 5 : undefined,
+      maxToolRounds: hasTools ? 8 : undefined,
     },
     playerMessage,
     onStream,
@@ -415,6 +574,8 @@ export function createOOCSession(
     campaignRoot?: string;
     maps?: Record<string, MapData>;
     clocks?: ClocksState;
+    gameState?: GameState;
+    onTuiCommand?: (cmd: TuiCommand) => void;
   },
 ): ModeSession {
   return {
