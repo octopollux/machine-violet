@@ -346,6 +346,8 @@ export class GameEngine {
             cmd.title as string,
             cmd.time_advance as number | undefined,
           );
+        } else if (cmd.type === "rollback") {
+          await this.rollbackAndExit(cmd.target as string);
         } else if (cmd.type === "context_refresh") {
           await this.refreshContext();
         } else if (cmd.type === "validate") {
@@ -488,6 +490,20 @@ export class GameEngine {
     this.callbacks.onDevLog?.("[dev] context_refresh: refreshing context from disk");
     await this.sceneManager.contextRefresh();
     this.callbacks.onDevLog?.("[dev] context_refresh: done");
+  }
+
+  // --- Rollback ---
+
+  /** Roll back to a previous git checkpoint and exit. */
+  private async rollbackAndExit(target: string): Promise<void> {
+    if (!this.repo) {
+      this.callbacks.onError(new Error("Rollback unavailable: git is disabled for this campaign."));
+      return;
+    }
+    this.callbacks.onDevLog?.(`[dev] rollback: rolling back to "${target}"`);
+    const result = await this.repo.rollback(target);
+    console.log(`\nRolled back to: ${result.summary}\nRelaunch the game to resume from this point.\n`);
+    process.exit(0);
   }
 
   // --- Validation ---
