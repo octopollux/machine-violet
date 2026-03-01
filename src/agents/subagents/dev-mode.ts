@@ -12,7 +12,7 @@ import { repairState } from "./repair-state.js";
 import { norm } from "../../utils/paths.js";
 import * as path from "node:path";
 import type { CampaignRepo } from "../../tools/git/index.js";
-import { queryCommitLog } from "../../tools/git/index.js";
+import { queryCommitLog, performRollback } from "../../tools/git/index.js";
 import { ToolRegistry } from "../tool-registry.js";
 import { findReferences, renameEntity, mergeEntities, resolveDeadLinks } from "../../tools/campaign-ops/index.js";
 import type { ModeSession } from "../../tui/game-context.js";
@@ -424,7 +424,7 @@ export function buildDevToolHandler(
                 if (!repo) {
                   return { content: "Rollback unavailable: git is disabled.", is_error: true };
                 }
-                const rb = await repo.rollback(parsed.target as string);
+                const rb = await performRollback(repo, parsed.target as string, root, fileIO);
                 console.log(`\nRolled back to: ${rb.summary}\nRelaunch the game to resume from this point.\n`);
                 process.exit(0);
               }

@@ -711,26 +711,44 @@ describe("buildOOCToolHandler (DM tools)", () => {
     expect(result.content).toContain("not found");
   });
 
-  it("rollback calls repo.rollback()", async () => {
+  it("rollback calls performRollback and exits", async () => {
     const git = mockGitIO();
     const repo = new CampaignRepo({ dir: "/tmp/campaign", git });
     await repo.sceneCommit("The Dragon's Lair");
     await repo.autoCommit("auto: exchanges");
 
+    const fio = mockFileIO({ "/camp/config.json": "{}" });
     const gs = mockGameState();
-    const handler = buildOOCToolHandler(repo, "/camp", undefined, undefined, undefined, gs);
-    const result = await handler("rollback", { target: "last" });
-    expect(result.is_error).toBeUndefined();
-    expect(result.content).toContain("Rolled back to");
-    expect(git.checkout).toHaveBeenCalled();
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+    try {
+      const handler = buildOOCToolHandler(repo, "/camp", fio, undefined, undefined, gs);
+      await handler("rollback", { target: "last" });
+      expect(git.checkout).toHaveBeenCalled();
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    } finally {
+      exitSpy.mockRestore();
+    }
   });
 
   it("rollback without repo returns error", async () => {
     const gs = mockGameState();
-    const handler = buildOOCToolHandler(undefined, "/camp", undefined, undefined, undefined, gs);
+    const fio = mockFileIO();
+    const handler = buildOOCToolHandler(undefined, "/camp", fio, undefined, undefined, gs);
     const result = await handler("rollback", { target: "last" });
     expect(result.is_error).toBe(true);
     expect(result.content).toContain("not available");
+  });
+
+  it("rollback without fileIO returns error", async () => {
+    const git = mockGitIO();
+    const repo = new CampaignRepo({ dir: "/tmp/campaign", git });
+    await repo.sceneCommit("The Dragon's Lair");
+
+    const gs = mockGameState();
+    const handler = buildOOCToolHandler(repo, "/camp", undefined, undefined, undefined, gs);
+    const result = await handler("rollback", { target: "last" });
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("File I/O not available");
   });
 
   it("entity tools without fileIO return error", async () => {
