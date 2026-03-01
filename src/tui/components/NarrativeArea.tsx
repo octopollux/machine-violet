@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback, useMemo, forwardRef } from "react";
+import React, { useRef, useEffect, useState, useCallback, forwardRef } from "react";
 import { Text, Box } from "ink";
 import { ScrollView } from "ink-scroll-view";
 import type { ScrollViewRef } from "ink-scroll-view";
@@ -9,6 +9,91 @@ import { useScrollHandle } from "../hooks/useScrollHandle.js";
 import type { ScrollHandle } from "../hooks/useScrollHandle.js";
 import { composeTurnSeparator } from "../themes/composer.js";
 import type { ThemeAsset } from "../themes/types.js";
+
+// ---------------------------------------------------------------------------
+// Incremental narrative processing hook
+// ---------------------------------------------------------------------------
+
+/** Scan backward for last blank DM line; returns index or -1. */
+function findLastBlankDm(lines: NarrativeLine[]): number {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (lines[i].kind === "dm" && lines[i].text.trim() === "") return i;
+  }
+  return -1;
+}
+
+/** Check that the first `count` elements are reference-equal. */
+function prefixStable(a: NarrativeLine[], b: NarrativeLine[], count: number): boolean {
+  if (a.length < count || b.length < count) return false;
+  for (let i = 0; i < count; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+/**
+ * Incrementally process narrative lines by caching the "frozen" prefix
+ * (everything before the last blank DM line) and only reprocessing
+ * the current paragraph tail on each call.
+ */
+export function useProcessedLines(
+  lines: NarrativeLine[],
+  width: number,
+  quoteColor?: string,
+): ProcessedLine[] {
+  const cacheRef = useRef<{
+    lines: NarrativeLine[];
+    width: number;
+    quoteColor: string | undefined;
+    splitIdx: number;            // index of blank DM line where we split
+    frozenResult: ProcessedLine[];
+    fullResult: ProcessedLine[];
+  } | null>(null);
+
+  const splitIdx = findLastBlankDm(lines);
+  const cache = cacheRef.current;
+
+  // Can we reuse the frozen prefix?
+  if (
+    cache !== null &&
+    cache.width === width &&
+    cache.quoteColor === quoteColor &&
+    cache.splitIdx === splitIdx &&
+    splitIdx >= 0 &&
+    cache.lines.length <= lines.length &&
+    prefixStable(cache.lines, lines, splitIdx + 1)
+  ) {
+    // Frozen prefix is still valid — only reprocess the tail
+    const tail = lines.slice(splitIdx + 1);
+    const tailResult = processNarrativeLines(tail, width, quoteColor);
+    const fullResult = [...cache.frozenResult, ...tailResult];
+    cacheRef.current = {
+      lines,
+      width,
+      quoteColor,
+      splitIdx,
+      frozenResult: cache.frozenResult,
+      fullResult,
+    };
+    return fullResult;
+  }
+
+  // Full recompute
+  if (splitIdx >= 0) {
+    const prefix = lines.slice(0, splitIdx + 1);
+    const tail = lines.slice(splitIdx + 1);
+    const frozenResult = processNarrativeLines(prefix, width, quoteColor);
+    const tailResult = processNarrativeLines(tail, width, quoteColor);
+    const fullResult = [...frozenResult, ...tailResult];
+    cacheRef.current = { lines, width, quoteColor, splitIdx, frozenResult, fullResult };
+    return fullResult;
+  }
+
+  // No blank DM line — no split possible, process everything
+  const fullResult = processNarrativeLines(lines, width, quoteColor);
+  cacheRef.current = { lines, width, quoteColor, splitIdx, frozenResult: [], fullResult };
+  return fullResult;
+}
 
 export type NarrativeAreaHandle = ScrollHandle;
 
@@ -90,11 +175,8 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
     return () => { process.stdout.off("resize", onResize); };
   }, [updateScrollState]);
 
-  // Single-pass AST pipeline: parse → heal → wrap → pad → quote highlight
-  const processedLines = useMemo(
-    () => processNarrativeLines(lines, width ?? 0, quoteColor),
-    [lines, width, quoteColor],
-  );
+  // Incremental pipeline: frozen prefix cached, only tail reprocessed
+  const processedLines = useProcessedLines(lines, width ?? 0, quoteColor);
 
   return (
     <Box height={maxRows} flexDirection="column">
@@ -119,14 +201,18 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
   );
 });
 
-/** A single narrative line rendered based on its kind. */
-function NarrativeLineComponent({ line, playerColor, width, themeAsset, separatorColor }: {
+interface NarrativeLineProps {
   line: ProcessedLine;
   playerColor?: string;
   width?: number;
   themeAsset?: ThemeAsset;
   separatorColor?: string;
-}) {
+}
+
+/** A single narrative line rendered based on its kind. */
+const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
+  line, playerColor, width, themeAsset, separatorColor,
+}: NarrativeLineProps) {
   // Separator lines always render the turn separator pattern
   if (line.kind === "separator") {
     if (themeAsset && width && width > 0) {
@@ -192,4 +278,4 @@ function NarrativeLineComponent({ line, playerColor, width, themeAsset, separato
       return <Text wrap="truncate">{renderNodes(line.nodes)}</Text>;
     }
   }
-}
+});

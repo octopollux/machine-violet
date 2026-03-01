@@ -725,3 +725,111 @@ describe("processNarrativeLines", () => {
     }
   });
 });
+
+describe("paragraph boundary split", () => {
+  // Proves that processing [prefix .. blank] ++ [tail] separately matches
+  // processing everything together — the invariant that makes incremental
+  // caching correct.
+  const dm = (text: string): NarrativeLine => ({ kind: "dm", text });
+  const WIDTH = 80;
+
+  function splitAndProcess(lines: NarrativeLine[], splitIdx: number, width: number, quoteColor?: string) {
+    const prefix = lines.slice(0, splitIdx + 1);
+    const tail = lines.slice(splitIdx + 1);
+    return [
+      ...processNarrativeLines(prefix, width, quoteColor),
+      ...processNarrativeLines(tail, width, quoteColor),
+    ];
+  }
+
+  it("basic split matches full process", () => {
+    const lines = [dm("Hello."), dm(""), dm("World.")];
+    const full = processNarrativeLines(lines, WIDTH);
+    const split = splitAndProcess(lines, 1, WIDTH);
+    expect(split).toEqual(full);
+  });
+
+  it("cross-line bold/italic within a paragraph", () => {
+    const lines = [
+      dm("<b>bold start"),
+      dm("still bold</b>"),
+      dm(""),
+      dm("clean paragraph"),
+    ];
+    const full = processNarrativeLines(lines, WIDTH);
+    const split = splitAndProcess(lines, 2, WIDTH);
+    expect(split).toEqual(full);
+  });
+
+  it("quote highlighting across paragraphs resets at boundary", () => {
+    const quoteColor = "#aabbcc";
+    const lines = [
+      dm('She said "hello" softly.'),
+      dm(""),
+      dm("Normal text."),
+    ];
+    const full = processNarrativeLines(lines, WIDTH, quoteColor);
+    const split = splitAndProcess(lines, 1, WIDTH, quoteColor);
+    expect(split).toEqual(full);
+  });
+
+  it("unbalanced quote does not leak past boundary when split", () => {
+    const quoteColor = "#aabbcc";
+    const lines = [
+      dm('He said "hello'),
+      dm(""),
+      dm("Not quoted."),
+    ];
+    const full = processNarrativeLines(lines, WIDTH, quoteColor);
+    const split = splitAndProcess(lines, 1, WIDTH, quoteColor);
+    expect(split).toEqual(full);
+  });
+
+  it("mixed line kinds (player, separator, system) around boundary", () => {
+    const lines: NarrativeLine[] = [
+      dm("DM text."),
+      { kind: "player", text: "> I attack." },
+      dm(""),
+      { kind: "system", text: "Combat started." },
+      dm("The blow lands."),
+    ];
+    const full = processNarrativeLines(lines, WIDTH);
+    const split = splitAndProcess(lines, 2, WIDTH);
+    expect(split).toEqual(full);
+  });
+
+  it("no blank DM lines — no split possible, full process required", () => {
+    const lines = [dm("Line one."), dm("Line two."), dm("Line three.")];
+    const full = processNarrativeLines(lines, WIDTH);
+    // With no blank DM line, splitIdx would be -1; there's nothing to split.
+    // This just verifies full process is coherent.
+    expect(full).toHaveLength(3);
+    expect(toPlainText(full[0].nodes)).toBe("Line one.");
+  });
+
+  it("multiple paragraph boundaries — split at last one", () => {
+    const lines = [
+      dm("Para 1."),
+      dm(""),
+      dm("Para 2."),
+      dm(""),
+      dm("Para 3."),
+    ];
+    const full = processNarrativeLines(lines, WIDTH);
+    // Split at the last blank (index 3)
+    const split = splitAndProcess(lines, 3, WIDTH);
+    expect(split).toEqual(full);
+  });
+
+  it("alignment padding at boundary", () => {
+    const lines = [
+      dm("Before."),
+      dm("<center>Title</center>"),
+      dm(""),
+      dm("After."),
+    ];
+    const full = processNarrativeLines(lines, WIDTH);
+    const split = splitAndProcess(lines, 2, WIDTH);
+    expect(split).toEqual(full);
+  });
+});
