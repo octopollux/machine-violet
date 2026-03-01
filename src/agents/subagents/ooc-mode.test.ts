@@ -59,7 +59,7 @@ function mockConfig(overrides?: Partial<CampaignConfig>): CampaignConfig {
     premise: "A world in shadow",
     dm_personality: { name: "The Narrator", prompt_fragment: "You are mysterious." },
     players: [{ name: "Player1", character: "Kael", type: "human" }],
-    combat: { initiative_method: "roll", round_structure: "individual", surprise_rules: false },
+    combat: { initiative_method: "d20_dex", round_structure: "individual", surprise_rules: false },
     context: { retention_exchanges: 5, max_conversation_tokens: 4000, tool_result_stub_after: 200 },
     recovery: { auto_commit_interval: 3, max_commits: 100, enable_git: true },
     choices: { campaign_default: "often", player_overrides: {} },

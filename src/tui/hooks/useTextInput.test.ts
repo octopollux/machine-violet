@@ -8,6 +8,7 @@ const baseKey: InkKey = {
   upArrow: false, downArrow: false, leftArrow: false, rightArrow: false,
   return: false, escape: false, ctrl: false, meta: false, shift: false, tab: false,
   backspace: false, delete: false, pageDown: false, pageUp: false,
+  home: false, end: false, super: false, hyper: false, capsLock: false, numLock: false,
 };
 
 function key(overrides: Partial<InkKey> = {}): InkKey {

@@ -110,7 +110,7 @@ export function buildOOCPrompt(
   }
 
   // Build structured TextBlockParam[] with caching
-  return buildOOCPromptCached(opts);
+  return buildOOCPromptCached({ ...opts, config: opts.config, sessionState: opts.sessionState });
 }
 
 /** Legacy flat-string builder (backward compat / pre-game-start). */
