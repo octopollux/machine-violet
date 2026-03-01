@@ -12,7 +12,7 @@ import { TOKEN_LIMITS } from "../../config/tokens.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import type { CampaignConfig } from "../../types/config.js";
 import type { CampaignRepo } from "../../tools/git/index.js";
-import { queryCommitLog } from "../../tools/git/index.js";
+import { queryCommitLog, performRollback } from "../../tools/git/index.js";
 import type { MapData } from "../../types/maps.js";
 import type { ClocksState } from "../../types/clocks.js";
 import { findReferences } from "../../tools/campaign-ops/index.js";
@@ -384,9 +384,9 @@ async function dispatchDMTool(
     return await executeEntityCommand(name, input, gameState, fileIO, campaignRoot);
   }
 
-  // Rollback — execute via repo
+  // Rollback — execute via repo (prunes ghost dirs + exits)
   if (OOC_RECOVERY_TOOLS.includes(name)) {
-    return await executeRollback(input, repo);
+    return await executeRollback(input, repo, campaignRoot, fileIO);
   }
 
   return { content: `Unknown OOC tool: ${name}`, is_error: true };
@@ -454,18 +454,23 @@ async function executeEntityCommand(
   return { content: `Unknown entity command: ${name}`, is_error: true };
 }
 
-/** Execute rollback via CampaignRepo. */
+/** Execute rollback via performRollback — prunes ghost dirs then exits. */
 async function executeRollback(
   input: Record<string, unknown>,
   repo?: CampaignRepo,
+  campaignRoot?: string,
+  fileIO?: FileIO,
 ): Promise<{ content: string; is_error?: boolean }> {
   if (!repo) {
     return { content: "Git is not available for rollback", is_error: true };
   }
+  if (!campaignRoot || !fileIO) {
+    return { content: "File I/O not available for rollback cleanup", is_error: true };
+  }
   const target = input.target as string;
-  const result = await repo.rollback(target);
-  const shortHash = result.restoredTo.slice(0, 8);
-  return { content: `Rolled back to ${shortHash}: ${result.summary}` };
+  const result = await performRollback(repo, target, campaignRoot, fileIO);
+  console.log(`\nRolled back to: ${result.summary}\nRelaunch the game to resume from this point.\n`);
+  process.exit(0);
 }
 
 /**

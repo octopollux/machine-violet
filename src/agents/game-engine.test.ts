@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
-import { GameEngine, pruneEmptyDirs } from "./game-engine.js";
+import { GameEngine } from "./game-engine.js";
+import { pruneEmptyDirs } from "../tools/git/index.js";
 import type { EngineCallbacks, EngineState } from "./game-engine.js";
 import type { GameState } from "./game-state.js";
 import type { SceneState, FileIO } from "./scene-manager.js";
