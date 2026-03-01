@@ -7,8 +7,8 @@ import type { CampaignConfig } from "../types/config.js";
  *   1. DM identity prompt
  *   2. DM personality fragment
  *   3. Rules appendix (distilled rule cards)
- *   4. Campaign summary (log with wikilinks)
- *   5. Session recap
+ *   4. Session recap
+ *   5. Campaign summary (log with wikilinks)
  *   6. Active state (location, PC summaries, alarms)
  *   7. Current scene summary (running precis)
  */
@@ -84,6 +84,14 @@ export function buildCachedPrefix(
     } as Anthropic.TextBlockParam);
   }
 
+  // Session recap (session-stable — benefits from BP3 cache below)
+  if (sections.sessionRecap) {
+    blocks.push({
+      type: "text",
+      text: `\n\n## Last Session\n${sections.sessionRecap}`,
+    });
+  }
+
   // Campaign summary (cached — stable within a scene)
   if (sections.campaignSummary) {
     blocks.push({
@@ -91,14 +99,6 @@ export function buildCachedPrefix(
       text: `\n\n## Campaign Log\n${sections.campaignSummary}`,
       cache_control: { type: "ephemeral", ttl: "1h" },
     } as Anthropic.TextBlockParam);
-  }
-
-  // Session recap (changes once at session start)
-  if (sections.sessionRecap) {
-    blocks.push({
-      type: "text",
-      text: `\n\n## Last Session\n${sections.sessionRecap}`,
-    });
   }
 
   // Active state (changes during play)
