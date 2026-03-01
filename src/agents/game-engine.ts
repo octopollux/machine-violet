@@ -601,7 +601,8 @@ export class GameEngine {
       const updated = serializeEntity(title as string, frontMatter, newBody, newChangelog);
       await this.fileIO.writeFile(filePath, updated);
 
-      const aliases = (frontMatter.additional_names as string | undefined)?.trim() || undefined;
+      const rawAliases = frontMatter.additional_names;
+      const aliases = (Array.isArray(rawAliases) ? rawAliases.join(", ") : typeof rawAliases === "string" ? rawAliases : undefined)?.trim() || undefined;
       this.sceneManager.notifyEntityTouched(filePath, title as string, aliases);
       this.callbacks.onDevLog?.(`[dev] update_entity: updated "${name}" — ${parts.join(", ")}`);
     } catch (e) {
