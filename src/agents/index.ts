@@ -12,7 +12,7 @@ export type { DMSessionState } from "./dm-prompt.js";
 export { SceneManager } from "./scene-manager.js";
 export type { SceneState, FileIO, PendingOperation, TransitionResult } from "./scene-manager.js";
 export { GameEngine } from "./game-engine.js";
-export type { EngineState, EngineCallbacks } from "./game-engine.js";
+export type { EngineState, EngineCallbacks, TurnInfo } from "./game-engine.js";
 export { summarizeScene } from "./subagents/index.js";
 export { updatePrecis } from "./subagents/index.js";
 export { updateChangelogs } from "./subagents/index.js";

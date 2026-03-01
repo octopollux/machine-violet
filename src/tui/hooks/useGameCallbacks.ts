@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { NarrativeLine, ActiveModal, RetryOverlay } from "../../types/tui.js";
 import type { StyleVariant } from "../themes/types.js";
-import type { EngineState, EngineCallbacks } from "../../agents/game-engine.js";
+import type { EngineState, EngineCallbacks, TurnInfo } from "../../agents/game-engine.js";
 import type { TuiCommand, UsageStats } from "../../agents/agent-loop.js";
 import type { GameState } from "../../agents/game-state.js";
 import type { GameEngine } from "../../agents/game-engine.js";
@@ -212,6 +212,23 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
       const delaySec = Math.ceil(delayMs / 1000);
       setEngineState(`retry:${status}:${delaySec}`);
       setRetryOverlay({ status, delaySec });
+    },
+    onTurnStart(turn: TurnInfo) {
+      if (turn.role === "player") {
+        setNarrativeLines((prev) => [
+          ...prev,
+          { kind: "player", text: `> ${turn.participant}: ${turn.text}` },
+        ]);
+      } else if (turn.role === "ai") {
+        setNarrativeLines((prev) => [
+          ...prev,
+          { kind: "player", text: `> ${turn.participant} (AI): ${turn.text}` },
+        ]);
+      }
+      // role === "dm" → no-op (onNarrativeDelta handles DM text rendering)
+    },
+    onTurnEnd(_turn: TurnInfo) {
+      setNarrativeLines((prev) => [...prev, { kind: "separator", text: "" }]);
     },
   }), [dispatchTuiCommand, setNarrativeLines, setEngineState,
        setErrorMsg, setActiveModal, setChoiceIndex, setRetryOverlay,

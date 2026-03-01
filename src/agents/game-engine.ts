@@ -33,6 +33,13 @@ export type EngineState =
   | "scene_transition"
   | "session_ending";
 
+export interface TurnInfo {
+  turnNumber: number;
+  role: "player" | "dm" | "ai";
+  participant: string;   // character name, or "DM"
+  text: string;          // player/AI input text; empty string for DM turns
+}
+
 export interface EngineCallbacks {
   /** DM text streams in as it generates */
   onNarrativeDelta: (delta: string) => void;
@@ -56,6 +63,10 @@ export interface EngineCallbacks {
   onError: (error: Error) => void;
   /** API call is being retried after a retryable error */
   onRetry: (status: number, delayMs: number) => void;
+  /** A player turn is starting (before any API work) */
+  onTurnStart: (turn: TurnInfo) => void;
+  /** A participant turn has ended */
+  onTurnEnd: (turn: TurnInfo) => void;
 }
 
 /**
@@ -78,6 +89,7 @@ export class GameEngine {
   private fileIO: FileIO;
   private repo: CampaignRepo | null = null;
   private aiTurnDepth = 0;
+  private turnCounter = 0;
   private static MAX_AI_CHAIN = 10;
   private turnsWithoutTools = 0;
   private turnsWithoutEntities = 0;
@@ -231,6 +243,29 @@ export class GameEngine {
       this.aiTurnDepth = 0;
     }
 
+    // Fire player turn lifecycle (skipped for AI — executeAITurn already fired it)
+    if (!opts?.fromAI) {
+      this.turnCounter++;
+      const playerTurn: TurnInfo = {
+        turnNumber: this.turnCounter,
+        role: "player",
+        participant: characterName,
+        text,
+      };
+      this.callbacks.onTurnStart(playerTurn);
+      this.callbacks.onTurnEnd(playerTurn);
+    }
+
+    // Fire DM turn lifecycle
+    this.turnCounter++;
+    const dmTurn: TurnInfo = {
+      turnNumber: this.turnCounter,
+      role: "dm",
+      participant: "DM",
+      text: "",
+    };
+    this.callbacks.onTurnStart(dmTurn);
+
     this.setState("dm_thinking");
 
     // Tag the input with character name
@@ -283,17 +318,19 @@ export class GameEngine {
         config,
       );
 
-      // Update behavioral drift counters
-      if (toolUsedThisTurn) {
-        this.turnsWithoutTools = 0;
-      } else {
-        this.turnsWithoutTools++;
-      }
-      const hasEntityLinks = /<color=[^>]+>[^<]+<\/color>/.test(result.text);
-      if (hasEntityLinks) {
-        this.turnsWithoutEntities = 0;
-      } else {
-        this.turnsWithoutEntities++;
+      // Update behavioral drift counters (only on human-initiated turns)
+      if (!opts?.fromAI) {
+        if (toolUsedThisTurn) {
+          this.turnsWithoutTools = 0;
+        } else {
+          this.turnsWithoutTools++;
+        }
+        const hasEntityLinks = /<color=[^>]+>[^<]+<\/color>/.test(result.text);
+        if (hasEntityLinks) {
+          this.turnsWithoutEntities = 0;
+        } else {
+          this.turnsWithoutEntities++;
+        }
       }
 
       // Append to transcript
@@ -373,6 +410,7 @@ export class GameEngine {
 
       // Notify completion
       this.callbacks.onNarrativeComplete(result.text);
+      this.callbacks.onTurnEnd(dmTurn);
 
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
@@ -763,8 +801,16 @@ export class GameEngine {
         recentNarration: recentAssistant || "It's your turn. What do you do?",
       });
 
-      // Display AI action in narrative
-      this.callbacks.onNarrativeDelta(`\n> ${characterName} (AI): ${result.action}\n`);
+      // Fire AI player turn lifecycle
+      this.turnCounter++;
+      const aiTurn: TurnInfo = {
+        turnNumber: this.turnCounter,
+        role: "ai",
+        participant: characterName,
+        text: result.action,
+      };
+      this.callbacks.onTurnStart(aiTurn);
+      this.callbacks.onTurnEnd(aiTurn);
 
       // Accumulate usage from subagent
       accUsage(this.sessionUsage, result.usage);

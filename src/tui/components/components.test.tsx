@@ -265,9 +265,11 @@ describe("NarrativeArea", () => {
   });
 
   it("renders turn separator between DM and player lines", () => {
+    // Separators are now inserted by engine callbacks, not by the formatting pipeline.
+    // NarrativeArea just renders pre-separated lines.
     const { lastFrame } = render(
       <NarrativeArea
-        lines={[dm("DM speaks."), player("> I respond.")]}
+        lines={[dm("DM speaks."), { kind: "separator", text: "" }, player("> I respond.")]}
         maxRows={10}
       />,
     );
