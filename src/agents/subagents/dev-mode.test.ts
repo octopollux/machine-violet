@@ -196,18 +196,27 @@ describe("summarizeGameState", () => {
 // --- Tool definitions ---
 
 describe("buildDevTools", () => {
-  it("returns 15 tool definitions", () => {
-    const tools = buildDevTools();
-    expect(tools).toHaveLength(15);
-  });
-
-  it("has expected tool names", () => {
+  it("includes all dev-specific tools", () => {
     const names = buildDevTools().map((t) => t.name);
-    expect(names).toEqual([
+    const devTools = [
       "read_file", "write_file", "list_dir", "get_game_state", "set_game_state",
       "repair_state", "get_scene_state", "validate_campaign", "search_files", "delete_file",
       "get_commit_log", "find_references", "rename_entity", "merge_entities", "resolve_dead_links",
-    ]);
+    ];
+    for (const name of devTools) {
+      expect(names).toContain(name);
+    }
+  });
+
+  it("includes DM tools from the tool registry", () => {
+    const names = buildDevTools().map((t) => t.name);
+    // Spot-check key DM tools are present
+    expect(names).toContain("roll_dice");
+    expect(names).toContain("rollback");
+    expect(names).toContain("create_entity");
+    expect(names).toContain("start_combat");
+    expect(names).toContain("set_alarm");
+    expect(names).toContain("create_map");
   });
 
   it("each tool has name, description, and input_schema", () => {
@@ -706,7 +715,7 @@ describe("enterDevMode", () => {
     // When tools are provided, the create call should include tools
     const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     if (createCall) {
-      expect(createCall.tools).toHaveLength(15);
+      expect(createCall.tools.length).toBeGreaterThanOrEqual(15);
       expect(createCall.max_tokens).toBe(16384); // DEV_MODE
     }
   });
