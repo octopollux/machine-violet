@@ -15,8 +15,8 @@ The entity filesystem, campaign log, and scene transcripts are the DM's long-ter
 │ System prompt: DM identity                     ~800t  │
 │ Tool definitions: all available tools         ~2000t  │
 │ Rules appendix: distilled rule cards          ~1500t  │
-│ Campaign summary: log with wikilinks           ~800t  │
 │ Session recap: "last time..."                  ~300t  │
+│ Campaign summary: log with wikilinks           ~800t  │
 │ Active state: location, PC summaries, alarms  ~1500t  │
 │ Current scene summary: running precis          ~500t  │
 │                                        Total: ~7500t  │

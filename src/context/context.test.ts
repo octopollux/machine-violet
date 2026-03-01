@@ -243,4 +243,24 @@ describe("buildCachedPrefix", () => {
     const allText = blocks.map((b) => b.text).join("\n");
     expect(allText).not.toContain("Scene Pacing");
   });
+
+  it("places session recap before campaign summary so it falls inside BP3 cache", () => {
+    const blocks = buildCachedPrefix(mockConfig, {
+      dmPrompt: "You are the DM.",
+      personality: "Terse.",
+      rulesAppendix: "Some rules.",
+      campaignSummary: "Scene 1: Party entered dungeon.",
+      sessionRecap: "Last time, the party fought goblins.",
+    });
+
+    const recapIndex = blocks.findIndex((b) => b.text.includes("Last Session"));
+    const summaryIndex = blocks.findIndex((b) => b.text.includes("Campaign Log"));
+    expect(recapIndex).toBeGreaterThan(-1);
+    expect(summaryIndex).toBeGreaterThan(-1);
+    expect(recapIndex).toBeLessThan(summaryIndex);
+
+    // Campaign summary (BP3) should have cache_control, covering the recap
+    const summaryBlock = blocks[summaryIndex] as unknown as Record<string, unknown>;
+    expect(summaryBlock["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
+  });
 });
