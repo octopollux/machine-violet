@@ -164,16 +164,18 @@ export class CampaignRepo {
     if (!this.enabled) throw new Error("Git is disabled.");
     await this.ensureInit();
 
-    // Safety checkpoint before rollback
-    await this.stageAll();
-    await this.commitIfDirty("checkpoint: before rollback");
-
+    // Resolve target BEFORE the safety checkpoint so "last" etc.
+    // refer to the pre-rollback history, not the checkpoint itself.
     const log = await this.getLog(this.maxCommits);
     const targetCommit = resolveTarget(log, target);
 
     if (!targetCommit) {
       throw new Error(`Rollback target not found: ${target}`);
     }
+
+    // Safety checkpoint — preserves current state for recovery
+    await this.stageAll();
+    await this.commitIfDirty("checkpoint: before rollback");
 
     await this.git.checkout(this.dir, targetCommit.oid);
 

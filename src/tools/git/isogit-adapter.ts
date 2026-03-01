@@ -35,7 +35,7 @@ export function createGitIO(): GitIO {
     },
 
     async checkout(dir, oid) {
-      await git.checkout({ fs, dir, ref: oid, force: true });
+      await git.checkout({ fs, dir, oid, force: true });
     },
 
     async statusMatrix(dir) {
