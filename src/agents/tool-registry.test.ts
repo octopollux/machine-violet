@@ -312,6 +312,20 @@ describe("ToolRegistry", () => {
     expect(result.content).toContain("At least one");
   });
 
+  it("getDefinitionsFor returns only requested tools, skips unknown", () => {
+    const reg = new ToolRegistry();
+    const defs = reg.getDefinitionsFor(["roll_dice", "nonexistent", "check_clocks"]);
+    expect(defs).toHaveLength(2);
+    expect(defs[0].name).toBe("roll_dice");
+    expect(defs[1].name).toBe("check_clocks");
+  });
+
+  it("getDefinitionsFor returns empty array for all-unknown names", () => {
+    const reg = new ToolRegistry();
+    const defs = reg.getDefinitionsFor(["fake1", "fake2"]);
+    expect(defs).toHaveLength(0);
+  });
+
   it("dispatches context_refresh and returns TUI command JSON", () => {
     const reg = new ToolRegistry();
     const state = mockState();

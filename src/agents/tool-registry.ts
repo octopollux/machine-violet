@@ -1046,6 +1046,14 @@ export class ToolRegistry {
     return [...this.tools.values()].map((t) => t.definition);
   }
 
+  /** Get tool definitions for a specific subset of tool names (skips unknown names) */
+  getDefinitionsFor(names: string[]): Tool[] {
+    return names
+      .map((name) => this.tools.get(name))
+      .filter((t): t is RegisteredTool => !!t)
+      .map((t) => t.definition);
+  }
+
   /** Dispatch a tool_use block to the appropriate handler */
   dispatch(state: GameState, name: string, input: Record<string, unknown>): ToolResult {
     const tool = this.tools.get(name);

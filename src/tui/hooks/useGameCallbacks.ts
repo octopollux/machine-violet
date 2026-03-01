@@ -131,6 +131,8 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
             repo: engine?.getRepo() ?? undefined,
             fileIO: sm?.getFileIO(),
             campaignRoot: gs.campaignRoot,
+            gameState: gs,
+            onTuiCommand: (cmd) => dispatchTuiCommand(cmd),
           }));
         }
         setVariant("ooc");

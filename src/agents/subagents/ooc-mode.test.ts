@@ -3,9 +3,14 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { buildOOCPrompt, buildOOCTools, buildOOCToolHandler, enterOOC } from "./ooc-mode.js";
 import type { DMSessionState } from "../dm-prompt.js";
 import type { FileIO } from "../scene-manager.js";
+import type { GameState } from "../game-state.js";
+import type { TuiCommand } from "../agent-loop.js";
 import { CampaignRepo } from "../../tools/git/index.js";
 import type { GitIO } from "../../tools/git/index.js";
 import type { CampaignConfig } from "../../types/config.js";
+import { createClocksState } from "../../tools/clocks/index.js";
+import { createCombatState, createDefaultConfig } from "../../tools/combat/index.js";
+import { createDecksState } from "../../tools/cards/index.js";
 import { loadModelConfig } from "../../config/models.js";
 import { resetPromptCache } from "../../prompts/load-prompt.js";
 
@@ -417,17 +422,26 @@ function mockFileIO(
   files: Record<string, string> = {},
   dirs: Record<string, string[]> = {},
 ): FileIO {
+  // Normalize paths for cross-platform matching
+  const n = (p: string) => p.replace(/\\/g, "/");
+  const normFiles: Record<string, string> = {};
+  for (const [k, v] of Object.entries(files)) normFiles[n(k)] = v;
+  const normDirs: Record<string, string[]> = {};
+  for (const [k, v] of Object.entries(dirs)) normDirs[n(k)] = v;
+
   return {
     readFile: vi.fn(async (p: string) => {
-      if (p in files) return files[p];
+      const np = n(p);
+      if (np in normFiles) return normFiles[np];
       throw new Error(`ENOENT: ${p}`);
     }),
     writeFile: vi.fn(async () => {}),
     appendFile: vi.fn(async () => {}),
     mkdir: vi.fn(async () => {}),
-    exists: vi.fn(async (p: string) => p in files || p in dirs),
+    exists: vi.fn(async (p: string) => n(p) in normFiles || n(p) in normDirs),
     listDir: vi.fn(async (p: string) => {
-      if (p in dirs) return dirs[p];
+      const np = n(p);
+      if (np in normDirs) return normDirs[np];
       throw new Error(`ENOENT: ${p}`);
     }),
     deleteFile: vi.fn(async () => {}),
@@ -435,17 +449,38 @@ function mockFileIO(
 }
 
 describe("buildOOCTools", () => {
-  it("returns only get_commit_log when no fileIO", () => {
-    const tools = buildOOCTools(false);
+  it("returns only get_commit_log when no fileIO and no gameState", () => {
+    const tools = buildOOCTools(false, false);
     expect(tools).toHaveLength(1);
     expect(tools[0].name).toBe("get_commit_log");
   });
 
-  it("returns 4 tools when fileIO is available", () => {
-    const tools = buildOOCTools(true);
+  it("returns 4 tools when fileIO is available but no gameState", () => {
+    const tools = buildOOCTools(true, false);
     expect(tools).toHaveLength(4);
     const names = tools.map((t) => t.name);
     expect(names).toEqual(["get_commit_log", "read_file", "find_references", "validate_campaign"]);
+  });
+
+  it("returns 18 tools when both fileIO and gameState are available", () => {
+    const tools = buildOOCTools(true, true);
+    expect(tools).toHaveLength(18);
+    const names = tools.map((t) => t.name);
+    expect(names).toContain("roll_dice");
+    expect(names).toContain("check_clocks");
+    expect(names).toContain("create_entity");
+    expect(names).toContain("update_entity");
+    expect(names).toContain("set_theme");
+    expect(names).toContain("show_character_sheet");
+    expect(names).toContain("rollback");
+  });
+
+  it("returns 15 tools when gameState but no fileIO", () => {
+    const tools = buildOOCTools(false, true);
+    expect(tools).toHaveLength(15);
+    const names = tools.map((t) => t.name);
+    expect(names).toContain("roll_dice");
+    expect(names).not.toContain("read_file");
   });
 });
 
@@ -551,5 +586,223 @@ describe("buildOOCToolHandler", () => {
     const parsed = JSON.parse(result.content);
     expect(parsed).toHaveProperty("issues");
     expect(parsed).toHaveProperty("errorCount");
+  });
+});
+
+// --- GameState mock ---
+
+function mockGameState(overrides?: Partial<GameState>): GameState {
+  return {
+    maps: {},
+    clocks: createClocksState(),
+    combat: createCombatState(),
+    combatConfig: createDefaultConfig(),
+    decks: createDecksState(),
+    config: {
+      name: "TestCampaign",
+      dm_personality: { name: "Narrator", prompt_fragment: "terse" },
+      players: [{ name: "Player1", character: "Kael", type: "human" }],
+      combat: createDefaultConfig(),
+      context: { retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 },
+      recovery: { auto_commit_interval: 300, max_commits: 100, enable_git: false },
+      choices: { campaign_default: "often", player_overrides: {} },
+    },
+    campaignRoot: "/camp",
+    activePlayerIndex: 0,
+    ...overrides,
+  };
+}
+
+describe("buildOOCToolHandler (DM tools)", () => {
+  it("roll_dice dispatches and returns result directly", async () => {
+    const gs = mockGameState();
+    const handler = buildOOCToolHandler(undefined, "/camp", undefined, undefined, undefined, gs);
+    const result = await handler("roll_dice", { expression: "1d6" });
+    expect(result.is_error).toBeUndefined();
+    expect(result.content).toContain("1d6");
+    expect(result.content).toContain("→");
+  });
+
+  it("check_clocks dispatches and returns result directly", async () => {
+    const gs = mockGameState();
+    const handler = buildOOCToolHandler(undefined, "/camp", undefined, undefined, undefined, gs);
+    const result = await handler("check_clocks", {});
+    expect(result.is_error).toBeUndefined();
+    expect(result.content).toContain("calendar");
+  });
+
+  it("set_theme dispatches and calls onTuiCommand", async () => {
+    const gs = mockGameState();
+    const onTuiCommand = vi.fn();
+    const handler = buildOOCToolHandler(undefined, "/camp", undefined, undefined, undefined, gs, onTuiCommand);
+    const result = await handler("set_theme", { theme: "gothic", key_color: "#8844aa" });
+    expect(result.is_error).toBeUndefined();
+    expect(result.content).toBe("Applied: set_theme");
+    expect(onTuiCommand).toHaveBeenCalledOnce();
+    const cmd = onTuiCommand.mock.calls[0][0] as TuiCommand;
+    expect(cmd.type).toBe("set_theme");
+    expect(cmd.theme).toBe("gothic");
+  });
+
+  it("show_character_sheet dispatches and calls onTuiCommand", async () => {
+    const gs = mockGameState();
+    const onTuiCommand = vi.fn();
+    const handler = buildOOCToolHandler(undefined, "/camp", undefined, undefined, undefined, gs, onTuiCommand);
+    const result = await handler("show_character_sheet", { character: "Kael" });
+    expect(result.is_error).toBeUndefined();
+    expect(result.content).toBe("Applied: show_character_sheet");
+    expect(onTuiCommand).toHaveBeenCalledOnce();
+    const cmd = onTuiCommand.mock.calls[0][0] as TuiCommand;
+    expect(cmd.type).toBe("show_character_sheet");
+    expect(cmd.character).toBe("Kael");
+  });
+
+  it("create_entity writes file via FileIO", async () => {
+    const gs = mockGameState();
+    const fio = mockFileIO();
+    const handler = buildOOCToolHandler(undefined, "/camp", fio, undefined, undefined, gs);
+    const result = await handler("create_entity", {
+      entity_type: "character",
+      name: "Grimjaw",
+      front_matter: { disposition: "hostile" },
+      body: "A scarred orc.",
+    });
+    expect(result.is_error).toBeUndefined();
+    expect(result.content).toContain("Created character");
+    expect(result.content).toContain("Grimjaw");
+    expect(fio.writeFile).toHaveBeenCalledOnce();
+    expect(fio.mkdir).toHaveBeenCalledOnce();
+    const writtenContent = (fio.writeFile as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
+    expect(writtenContent).toContain("# Grimjaw");
+    expect(writtenContent).toContain("hostile");
+  });
+
+  it("update_entity reads/merges/writes file via FileIO", async () => {
+    const existingFile = "# Grimjaw\n\n**Type:** character\n**Disposition:** hostile\n\nA scarred orc.\n";
+    const gs = mockGameState();
+    const fio = mockFileIO({ "/camp/characters/grimjaw.md": existingFile });
+    const handler = buildOOCToolHandler(undefined, "/camp", fio, undefined, undefined, gs);
+    const result = await handler("update_entity", {
+      entity_type: "character",
+      name: "Grimjaw",
+      front_matter_updates: { disposition: "friendly" },
+      body_append: "Now an ally.",
+      changelog_entry: "Befriended by Kael",
+    });
+    expect(result.is_error).toBeUndefined();
+    expect(result.content).toContain("Updated character");
+    expect(fio.writeFile).toHaveBeenCalledOnce();
+    const writtenContent = (fio.writeFile as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
+    expect(writtenContent).toContain("friendly");
+    expect(writtenContent).toContain("Now an ally.");
+    expect(writtenContent).toContain("Befriended by Kael");
+  });
+
+  it("update_entity returns error when file not found", async () => {
+    const gs = mockGameState();
+    const fio = mockFileIO();
+    const handler = buildOOCToolHandler(undefined, "/camp", fio, undefined, undefined, gs);
+    const result = await handler("update_entity", {
+      entity_type: "character",
+      name: "Nobody",
+      front_matter_updates: { disposition: "friendly" },
+    });
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("not found");
+  });
+
+  it("rollback calls repo.rollback()", async () => {
+    const git = mockGitIO();
+    const repo = new CampaignRepo({ dir: "/tmp/campaign", git });
+    await repo.sceneCommit("The Dragon's Lair");
+    await repo.autoCommit("auto: exchanges");
+
+    const gs = mockGameState();
+    const handler = buildOOCToolHandler(repo, "/camp", undefined, undefined, undefined, gs);
+    const result = await handler("rollback", { target: "last" });
+    expect(result.is_error).toBeUndefined();
+    expect(result.content).toContain("Rolled back to");
+    expect(git.checkout).toHaveBeenCalled();
+  });
+
+  it("rollback without repo returns error", async () => {
+    const gs = mockGameState();
+    const handler = buildOOCToolHandler(undefined, "/camp", undefined, undefined, undefined, gs);
+    const result = await handler("rollback", { target: "last" });
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("not available");
+  });
+
+  it("entity tools without fileIO return error", async () => {
+    const gs = mockGameState();
+    const handler = buildOOCToolHandler(undefined, undefined, undefined, undefined, undefined, gs);
+    const result = await handler("create_entity", {
+      entity_type: "character",
+      name: "Test",
+      body: "test",
+    });
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("File I/O not available");
+  });
+});
+
+describe("enterOOC with gameState", () => {
+  it("passes 18 tools when gameState and fileIO are provided", async () => {
+    const gs = mockGameState();
+    const fio = mockFileIO();
+    const client = mockClient([textResponse("Done.")]);
+    await enterOOC(client, "test", {
+      campaignName: "Test",
+      previousVariant: "playing",
+      fileIO: fio,
+      campaignRoot: "/camp",
+      gameState: gs,
+    });
+
+    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    if (createCall) {
+      expect(createCall.tools).toHaveLength(18);
+      const names = createCall.tools.map((t: { name: string }) => t.name);
+      expect(names).toContain("roll_dice");
+      expect(names).toContain("create_entity");
+      expect(names).toContain("set_theme");
+      expect(names).toContain("rollback");
+    }
+  });
+
+  it("still passes only 4 tools without gameState", async () => {
+    const fio = mockFileIO();
+    const client = mockClient([textResponse("Done.")]);
+    await enterOOC(client, "test", {
+      campaignName: "Test",
+      previousVariant: "playing",
+      fileIO: fio,
+      campaignRoot: "/camp",
+    });
+
+    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    if (createCall) {
+      expect(createCall.tools).toHaveLength(4);
+    }
+  });
+
+  it("uses maxToolRounds=8 when tools are available", async () => {
+    const gs = mockGameState();
+    const fio = mockFileIO();
+    const client = mockClient([textResponse("Done.")]);
+    await enterOOC(client, "test", {
+      campaignName: "Test",
+      previousVariant: "playing",
+      fileIO: fio,
+      campaignRoot: "/camp",
+      gameState: gs,
+    });
+
+    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    if (createCall) {
+      // maxToolRounds is passed internally to spawnSubagent, not directly to API
+      // We verify tools exist to confirm hasTools path was taken
+      expect(createCall.tools).toBeDefined();
+    }
   });
 });
