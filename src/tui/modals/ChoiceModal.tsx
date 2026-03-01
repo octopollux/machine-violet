@@ -99,8 +99,8 @@ export function ChoiceOverlay({
         <Box flexGrow={1}>
           <Text>{displayPrompt}</Text>
         </Box>
-        <Text dimColor={!canScrollUp}>▲</Text>
-        <Text dimColor={!canScrollDown}>▼</Text>
+        <Text color={canScrollUp ? "#aaff00" : undefined} dimColor={!canScrollUp}>▲</Text>
+        <Text color={canScrollDown ? "#aaff00" : undefined} dimColor={!canScrollDown}>▼</Text>
       </Box>
 
       {/* Choice rows */}
