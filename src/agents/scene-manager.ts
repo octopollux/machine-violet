@@ -656,7 +656,8 @@ export class SceneManager {
         if (await this.fileIO.exists(filePath)) {
           const raw = await this.fileIO.readFile(filePath);
           const { frontMatter } = parseFrontMatter(raw);
-          const aliases = frontMatter.additional_names as string | undefined;
+          const rawAliases = frontMatter.additional_names;
+          const aliases = Array.isArray(rawAliases) ? rawAliases.join(", ") : typeof rawAliases === "string" ? rawAliases : undefined;
           if (aliases?.trim()) {
             line += ` (also: ${aliases.trim()})`;
           }
@@ -674,7 +675,8 @@ export class SceneManager {
       try {
         const raw = await this.fileIO.readFile(fullPath);
         const { frontMatter } = parseFrontMatter(raw);
-        const aliases = frontMatter.additional_names as string | undefined;
+        const rawAliases = frontMatter.additional_names;
+        const aliases = Array.isArray(rawAliases) ? rawAliases.join(", ") : typeof rawAliases === "string" ? rawAliases : undefined;
         if (aliases?.trim()) {
           lines.push(`${file}: also known as ${aliases.trim()}`);
         }

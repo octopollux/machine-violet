@@ -657,6 +657,40 @@ describe("GameEngine Worldbuilding Entity I/O", () => {
     expect(combined).toContain("Grimjaw (also: Captain Grimjaw)");
   });
 
+  it("update_entity handles additional_names passed as array (#15)", async () => {
+    files[norm("/tmp/test-campaign/characters/grimjaw.md")] =
+      "# Grimjaw\n\n**Type:** character\n\nA scarred orc.\n";
+
+    const client = mockClient([
+      ...toolAndTextMessages("update_entity", {
+        entity_type: "character",
+        name: "Grimjaw",
+        file_path: "/tmp/test-campaign/characters/grimjaw.md",
+        front_matter_updates: { additional_names: ["Captain Grimjaw", "The Scarred"] },
+        body_append: "Now an ally.",
+      }, "The orc nods."),
+    ]);
+    const { callbacks } = mockCallbacks();
+    const fio = mockFileIO();
+
+    const engine = new GameEngine({
+      client,
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: fio,
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "I befriend the orc.");
+
+    const sm = engine.getSceneManager();
+    const prompt = sm.getSystemPrompt();
+    const combined = prompt.map((b) => b.text).join("");
+    expect(combined).toContain("Grimjaw (also: Captain Grimjaw, The Scarred)");
+  });
+
   it("update_entity silently handles missing files", async () => {
     const client = mockClient([
       ...toolAndTextMessages("update_entity", {
