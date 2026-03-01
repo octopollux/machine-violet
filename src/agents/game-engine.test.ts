@@ -326,6 +326,71 @@ describe("GameEngine", () => {
     expect(engine.getState()).toBe("waiting_input");
   });
 
+  it("refreshes context after scene transition", async () => {
+    const client = mockClient([textMessage("- Party met in tavern")]);
+    const { callbacks } = mockCallbacks();
+    const fileIO = mockFileIO();
+    const state = mockState();
+
+    // Pre-populate a campaign log file so contextRefresh can read it
+    files[norm("/tmp/test-campaign/campaign/log.md")] = "# Campaign Log\n\n## Scene 1\nOld entry";
+
+    const sessionState = mockSessionState();
+    const engine = new GameEngine({
+      client,
+      gameState: state,
+      scene: mockScene(),
+      sessionState,
+      fileIO,
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.transitionScene("Tavern Meeting", 60);
+
+    // After transition, campaign log should have been re-read by contextRefresh
+    // The appendFile from the transition adds the new entry, then contextRefresh re-reads it
+    expect(fileIO.readFile).toHaveBeenCalled();
+    const readCalls = (fileIO.readFile as ReturnType<typeof vi.fn>).mock.calls
+      .map(([p]: unknown[]) => norm(p as string));
+    expect(readCalls.some((p: string) => p.includes("log.md"))).toBe(true);
+
+    // The session state should have the updated campaign summary
+    expect(sessionState.campaignSummary).toContain("Party met in tavern");
+  });
+
+  it("refreshes context after resumePendingTransition", async () => {
+    const client = mockClient([textMessage("- Resumed summary")]);
+    const { callbacks } = mockCallbacks();
+    const fileIO = mockFileIO();
+    const state = mockState();
+
+    files[norm("/tmp/test-campaign/campaign/log.md")] = "# Campaign Log\nOld data";
+
+    const sessionState = mockSessionState();
+    const engine = new GameEngine({
+      client,
+      gameState: state,
+      scene: mockScene(),
+      sessionState,
+      fileIO,
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.resumePendingTransition({
+      type: "scene_transition",
+      step: "subagent_updates" as import("./scene-manager.js").PendingStep,
+      sceneNumber: 1,
+      title: "Resume Test",
+    });
+
+    // contextRefresh should have re-read the campaign log
+    const readCalls = (fileIO.readFile as ReturnType<typeof vi.fn>).mock.calls
+      .map(([p]: unknown[]) => norm(p as string));
+    expect(readCalls.some((p: string) => p.includes("log.md"))).toBe(true);
+  });
+
   it("ends session", async () => {
     const client = mockClient([textMessage("- Session summary")]);
     const { callbacks, log } = mockCallbacks();

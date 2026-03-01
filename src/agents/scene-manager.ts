@@ -267,6 +267,9 @@ export class SceneManager {
     this.scene.slug = "";
     this.scene.transcript = [];
 
+    // Seed precis with an anchor so the DM has context before any exchanges drop
+    this.scene.precis = buildSceneAnchor(title, result.campaignLogEntry, result.alarmsFired);
+
     return result;
   }
 
@@ -364,6 +367,13 @@ export class SceneManager {
     this.scene.sceneNumber++;
     this.scene.slug = "";
     this.scene.transcript = [];
+
+    // Seed precis with an anchor so the DM has context before any exchanges drop
+    this.scene.precis = buildSceneAnchor(
+      pendingOp.title,
+      result.campaignLogEntry,
+      result.alarmsFired,
+    );
 
     return result;
   }
@@ -827,6 +837,37 @@ export async function detectSceneState(campaignRoot: string, io: FileIO): Promis
 }
 
 // --- Helpers ---
+
+/**
+ * Build a brief scene-opening anchor from the previous scene's campaign log entry.
+ * Seeded into precis after a transition so the DM has compact context for where
+ * the story left off, even before any exchanges are dropped.
+ */
+export function buildSceneAnchor(
+  title: string,
+  campaignLogEntry: string,
+  alarmsFired: string[],
+): string {
+  const lines: string[] = [];
+  if (campaignLogEntry) {
+    const bullets = campaignLogEntry
+      .split("\n")
+      .filter((l) => l.trim().startsWith("- "));
+    // Last 3 bullets describe where the previous scene ended = where we are now
+    const tail = bullets.slice(-3);
+    if (tail.length > 0) {
+      lines.push(`Previous scene (${title}):`);
+      lines.push(...tail);
+    }
+  }
+  if (alarmsFired.length > 0) {
+    lines.push("Alarms fired during transition:");
+    for (const alarm of alarmsFired) {
+      lines.push(`- ${alarm}`);
+    }
+  }
+  return lines.join("\n");
+}
 
 /**
  * Parse a transcript.md file into the original entry array.
