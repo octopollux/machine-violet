@@ -13,6 +13,7 @@ import { norm } from "../../utils/paths.js";
 import * as path from "node:path";
 import type { CampaignRepo } from "../../tools/git/index.js";
 import { queryCommitLog } from "../../tools/git/index.js";
+import { ToolRegistry } from "../tool-registry.js";
 import { findReferences, renameEntity, mergeEntities, resolveDeadLinks } from "../../tools/campaign-ops/index.js";
 import type { ModeSession } from "../../tui/game-context.js";
 
@@ -49,9 +50,9 @@ export function buildDevPrompt(
 type GameStateSlice = "combat" | "clocks" | "maps" | "decks" | "config" | "all";
 const VALID_SLICES: GameStateSlice[] = ["combat", "clocks", "maps", "decks", "config", "all"];
 
-/** Build the 10 dev mode tool definitions. */
+/** Build dev mode tool definitions: dev-specific tools + all DM tools. */
 export function buildDevTools(): Anthropic.Tool[] {
-  return [
+  const devTools: Anthropic.Tool[] = [
     {
       name: "read_file",
       description: "Read a campaign file by relative path (from campaign root).",
@@ -231,6 +232,17 @@ export function buildDevTools(): Anthropic.Tool[] {
       },
     },
   ];
+
+  // Append all DM tools, skipping any names already defined above
+  const devNames = new Set(devTools.map((t) => t.name));
+  const registry = new ToolRegistry();
+  for (const def of registry.getDefinitions()) {
+    if (!devNames.has(def.name)) {
+      devTools.push(def);
+    }
+  }
+
+  return devTools;
 }
 
 /**
@@ -257,6 +269,7 @@ export function buildDevToolHandler(
   repo?: CampaignRepo,
 ): (name: string, input: Record<string, unknown>) => Promise<{ content: string; is_error?: boolean }> {
   const root = gameState.campaignRoot;
+  const dmRegistry = new ToolRegistry();
 
   return async (name: string, input: Record<string, unknown>) => {
     try {
@@ -396,8 +409,30 @@ export function buildDevToolHandler(
           return { content: JSON.stringify(resolveResult, null, 2) };
         }
 
-        default:
-          return { content: `Unknown tool: ${name}`, is_error: true };
+        default: {
+          // Fall through to DM tool registry
+          if (!dmRegistry.has(name)) {
+            return { content: `Unknown tool: ${name}`, is_error: true };
+          }
+          const result = dmRegistry.dispatch(gameState, name, input);
+
+          // Intercept rollback command — execute and exit
+          if (!result.is_error) {
+            try {
+              const parsed = JSON.parse(result.content);
+              if (parsed.type === "rollback") {
+                if (!repo) {
+                  return { content: "Rollback unavailable: git is disabled.", is_error: true };
+                }
+                const rb = await repo.rollback(parsed.target as string);
+                console.log(`\nRolled back to: ${rb.summary}\nRelaunch the game to resume from this point.\n`);
+                process.exit(0);
+              }
+            } catch { /* not JSON — pass through */ }
+          }
+
+          return { content: result.content, is_error: result.is_error };
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

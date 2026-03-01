@@ -35,6 +35,8 @@ export function createGitIO(): GitIO {
     },
 
     async checkout(dir, oid) {
+      // isomorphic-git: `ref` with a full SHA updates the working tree;
+      // the `oid` param alone only updates HEAD/index without touching files.
       await git.checkout({ fs, dir, ref: oid, force: true });
     },
 
