@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { NarrativeLine, ActiveModal, RetryOverlay } from "../../types/tui.js";
 import type { StyleVariant } from "../themes/types.js";
-import type { EngineState, EngineCallbacks } from "../../agents/game-engine.js";
+import type { EngineState, EngineCallbacks, TurnInfo } from "../../agents/game-engine.js";
 import type { TuiCommand, UsageStats } from "../../agents/agent-loop.js";
 import type { GameState } from "../../agents/game-state.js";
 import type { GameEngine } from "../../agents/game-engine.js";
@@ -212,6 +212,26 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
       const delaySec = Math.ceil(delayMs / 1000);
       setEngineState(`retry:${status}:${delaySec}`);
       setRetryOverlay({ status, delaySec });
+    },
+    onTurnStart(turn: TurnInfo) {
+      setNarrativeLines((prev) => {
+        const next = [...prev];
+        if (next.length > 0) {
+          next.push({ kind: "separator", text: "" });
+        }
+        next.push({ kind: "player", text: `> ${turn.characterName}: ${turn.inputText}` });
+        return next;
+      });
+    },
+    onTurnEnd(_turn: TurnInfo) {
+      // No-op for now; available for future per-turn usage display
+    },
+    onAIPlayerAction(characterName: string, action: string) {
+      setNarrativeLines((prev) => [
+        ...prev,
+        { kind: "separator", text: "" },
+        { kind: "player", text: `> ${characterName} (AI): ${action}` },
+      ]);
     },
   }), [dispatchTuiCommand, setNarrativeLines, setEngineState,
        setErrorMsg, setActiveModal, setChoiceIndex, setRetryOverlay,

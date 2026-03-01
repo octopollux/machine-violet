@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
 import { GameEngine } from "./game-engine.js";
 import { pruneEmptyDirs } from "../tools/git/index.js";
-import type { EngineCallbacks, EngineState } from "./game-engine.js";
+import type { EngineCallbacks, EngineState, TurnInfo } from "./game-engine.js";
 import type { GameState } from "./game-state.js";
 import type { SceneState, FileIO } from "./scene-manager.js";
 import type { DMSessionState } from "./dm-prompt.js";
@@ -140,6 +140,9 @@ interface CallbackLog {
   usageUpdates: UsageStats[];
   exchangeDrops: number;
   devLogs: string[];
+  turnStarts: TurnInfo[];
+  turnEnds: TurnInfo[];
+  aiPlayerActions: { characterName: string; action: string }[];
 }
 
 function mockCallbacks(): { callbacks: EngineCallbacks; log: CallbackLog } {
@@ -154,6 +157,9 @@ function mockCallbacks(): { callbacks: EngineCallbacks; log: CallbackLog } {
     usageUpdates: [],
     exchangeDrops: 0,
     devLogs: [],
+    turnStarts: [],
+    turnEnds: [],
+    aiPlayerActions: [],
   };
 
   return {
@@ -170,6 +176,9 @@ function mockCallbacks(): { callbacks: EngineCallbacks; log: CallbackLog } {
       onError: (error) => log.errors.push(error),
       onDevLog: (msg) => log.devLogs.push(msg),
       onRetry: () => {},
+      onTurnStart: (turn) => log.turnStarts.push(turn),
+      onTurnEnd: (turn) => log.turnEnds.push(turn),
+      onAIPlayerAction: (characterName, action) => log.aiPlayerActions.push({ characterName, action }),
     },
   };
 }
@@ -882,8 +891,8 @@ describe("GameEngine AI Auto-Turn", () => {
     await vi.advanceTimersByTimeAsync(0);
 
     expect(aiPlayerTurn).toHaveBeenCalled();
-    expect(log.narrativeDeltas).toEqual(
-      expect.arrayContaining([expect.stringContaining("Zara (AI)")])
+    expect(log.aiPlayerActions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ characterName: "Zara" })])
     );
 
     vi.useRealTimers();
@@ -1219,6 +1228,198 @@ describe("GameEngine Behavioral Reminder", () => {
     await engine.processInput("Aldric", "Four.");
 
     expect(log.devLogs.some((m) => m.includes("[dm-note]"))).toBe(true);
+  });
+});
+
+describe("GameEngine Turn Lifecycle", () => {
+  beforeEach(() => {
+    vi.mocked(aiPlayerTurn).mockClear();
+    vi.mocked(aiPlayerTurn).mockResolvedValue({
+      text: "I attack the goblin.",
+      action: "I attack the goblin.",
+      usage: { inputTokens: 50, outputTokens: 20, cacheReadTokens: 0, cacheCreationTokens: 0 },
+    });
+  });
+
+  it("fires onTurnStart before onNarrativeComplete and onTurnEnd after onNarrativeComplete", async () => {
+    const client = mockClient([textMessage("The door opens.")]);
+    const { callbacks } = mockCallbacks();
+    const events: string[] = [];
+
+    // Wrap callbacks to track ordering
+    const origOnTurnStart = callbacks.onTurnStart;
+    callbacks.onTurnStart = (turn) => { events.push("turnStart"); origOnTurnStart(turn); };
+    const origComplete = callbacks.onNarrativeComplete;
+    callbacks.onNarrativeComplete = (text) => { events.push("complete"); origComplete(text); };
+    const origEnd = callbacks.onTurnEnd;
+    callbacks.onTurnEnd = (turn) => { events.push("turnEnd"); origEnd(turn); };
+
+    const engine = new GameEngine({
+      client, gameState: mockState(), scene: mockScene(),
+      sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "I open the door.");
+
+    expect(events.indexOf("turnStart")).toBeLessThan(events.indexOf("complete"));
+    expect(events.indexOf("complete")).toBeLessThan(events.indexOf("turnEnd"));
+  });
+
+  it("turnNumber increments across calls", async () => {
+    const client = mockClient([
+      textMessage("One."),
+      textMessage("Two."),
+      textMessage("Three."),
+    ]);
+    const { callbacks, log } = mockCallbacks();
+
+    const engine = new GameEngine({
+      client, gameState: mockState(), scene: mockScene(),
+      sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "One.");
+    await engine.processInput("Aldric", "Two.");
+    await engine.processInput("Aldric", "Three.");
+
+    expect(log.turnStarts).toHaveLength(3);
+    expect(log.turnStarts[0].turnNumber).toBe(1);
+    expect(log.turnStarts[1].turnNumber).toBe(2);
+    expect(log.turnStarts[2].turnNumber).toBe(3);
+  });
+
+  it("source is 'human' for regular input and 'ai' for AI turns", async () => {
+    vi.useFakeTimers();
+    const state = {
+      maps: {},
+      clocks: createClocksState(),
+      combat: createCombatState(),
+      combatConfig: createDefaultConfig(),
+      decks: createDecksState(),
+      config: {
+        name: "Test",
+        dm_personality: { name: "grim", prompt_fragment: "Be terse." },
+        players: [
+          { name: "Alice", character: "Aldric", type: "human" },
+          { name: "Bot", character: "Zara", type: "ai" },
+        ],
+        combat: createDefaultConfig(),
+        context: { retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 },
+        recovery: { auto_commit_interval: 300, max_commits: 100, enable_git: false },
+        choices: { campaign_default: "often", player_overrides: {} },
+      },
+      campaignRoot: "/tmp/test-campaign",
+      activePlayerIndex: 0,
+    } satisfies GameState;
+
+    const client = mockClient([
+      textMessage("Response to human."),
+      textMessage("Response to AI."),
+    ]);
+    const { callbacks, log } = mockCallbacks();
+
+    const engine = new GameEngine({
+      client, gameState: state, scene: mockScene(),
+      sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    // Human turn
+    await engine.processInput("Aldric", "Hello.");
+    expect(log.turnStarts[0].source).toBe("human");
+    expect(log.turnEnds[0].source).toBe("human");
+
+    // AI turn (via fromAI flag)
+    await engine.processInput("Zara", "I attack!", { fromAI: true });
+    expect(log.turnStarts[1].source).toBe("ai");
+    expect(log.turnEnds[1].source).toBe("ai");
+
+    vi.useRealTimers();
+  });
+
+  it("fires onAIPlayerAction in executeAITurn instead of onNarrativeDelta", async () => {
+    vi.useFakeTimers();
+    vi.mocked(aiPlayerTurn).mockClear();
+
+    const state = {
+      maps: {},
+      clocks: createClocksState(),
+      combat: createCombatState(),
+      combatConfig: createDefaultConfig(),
+      decks: createDecksState(),
+      config: {
+        name: "Test",
+        dm_personality: { name: "grim", prompt_fragment: "Be terse." },
+        players: [
+          { name: "Alice", character: "Aldric", type: "human" },
+          { name: "Bot", character: "Zara", type: "ai" },
+        ],
+        combat: createDefaultConfig(),
+        context: { retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 },
+        recovery: { auto_commit_interval: 300, max_commits: 100, enable_git: false },
+        choices: { campaign_default: "often", player_overrides: {} },
+      },
+      campaignRoot: "/tmp/test-campaign",
+      activePlayerIndex: 1,
+    } satisfies GameState;
+
+    const client = mockClient([textMessage("DM responds to AI.")]);
+    const { callbacks, log } = mockCallbacks();
+
+    const engine = new GameEngine({
+      client, gameState: state, scene: mockScene(),
+      sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.executeAITurn();
+
+    expect(log.aiPlayerActions).toHaveLength(1);
+    expect(log.aiPlayerActions[0].characterName).toBe("Zara");
+    expect(log.aiPlayerActions[0].action).toBe("I attack the goblin.");
+    // Should NOT have emitted a raw narrative delta for the AI action
+    expect(log.narrativeDeltas.every((d) => !d.includes("Zara (AI)"))).toBe(true);
+
+    vi.useRealTimers();
+  });
+
+  it("behavioral counters only increment on human turns", async () => {
+    const client = mockClient([
+      textMessage("One."),
+      textMessage("Two."),
+      textMessage("Three."),
+      textMessage("AI Response."), // fromAI turn — should NOT increment counters
+      textMessage("Four."),
+    ]);
+    const { callbacks } = mockCallbacks();
+
+    const engine = new GameEngine({
+      client, gameState: mockState(), scene: mockScene(),
+      sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "One.");
+    await engine.processInput("Aldric", "Two.");
+    await engine.processInput("Aldric", "Three.");
+
+    // AI turn should NOT increment the counter
+    await engine.processInput("Zara", "AI does stuff.", { fromAI: true });
+
+    // Fourth human turn — counter should be at 3 (not 4)
+    // If AI turn had counted, this would be turn 5 and would trigger reminder
+    await engine.processInput("Aldric", "Four.");
+
+    // Extract messages from the 5th stream call (index 4)
+    const streamFn = client.messages.stream as ReturnType<typeof vi.fn>;
+    const msgs = (streamFn.mock.calls[4][0] as { messages: Anthropic.MessageParam[] }).messages;
+    const dmNote = msgs.find((m) => typeof m.content === "string" && m.content.includes("[dm-note]"));
+    // Should have the reminder because human turns 1-3 are toolless, then AI doesn't count,
+    // then human turn 4 — conversation.size is now ≥3 and turnsWithoutTools is 3+
+    expect(dmNote).toBeDefined();
+    expect(dmNote!.content).toContain("use your tools");
   });
 });
 

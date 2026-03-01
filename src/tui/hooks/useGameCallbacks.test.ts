@@ -151,6 +151,87 @@ describe("dispatchTuiCommand logic", () => {
 
 const dm = (text: string): NarrativeLine => ({ kind: "dm", text });
 const player = (text: string): NarrativeLine => ({ kind: "player", text });
+const separator = (): NarrativeLine => ({ kind: "separator", text: "" });
+
+describe("onTurnStart callback", () => {
+  it("pushes separator + player line to narrative", () => {
+    const deps = makeDeps();
+    const setNarrativeLines = deps.setNarrativeLines;
+
+    // Simulate onTurnStart logic from buildCallbacks
+    const onTurnStart = (turn: { characterName: string; inputText: string }) => {
+      setNarrativeLines((prev: NarrativeLine[]) => {
+        const next = [...prev];
+        if (next.length > 0) {
+          next.push({ kind: "separator", text: "" });
+        }
+        next.push({ kind: "player", text: `> ${turn.characterName}: ${turn.inputText}` });
+        return next;
+      });
+    };
+
+    const existingLines: NarrativeLine[] = [dm("The tavern is warm.")];
+    onTurnStart({ characterName: "Aldric", inputText: "I look around." });
+
+    const updater = setNarrativeLines.mock.calls[0][0];
+    const result = updater(existingLines);
+    expect(result).toEqual([
+      dm("The tavern is warm."),
+      separator(),
+      player("> Aldric: I look around."),
+    ]);
+  });
+
+  it("first turn (empty narrative) skips separator, only adds player line", () => {
+    const deps = makeDeps();
+    const setNarrativeLines = deps.setNarrativeLines;
+
+    const onTurnStart = (turn: { characterName: string; inputText: string }) => {
+      setNarrativeLines((prev: NarrativeLine[]) => {
+        const next = [...prev];
+        if (next.length > 0) {
+          next.push({ kind: "separator", text: "" });
+        }
+        next.push({ kind: "player", text: `> ${turn.characterName}: ${turn.inputText}` });
+        return next;
+      });
+    };
+
+    onTurnStart({ characterName: "Aldric", inputText: "Hello." });
+
+    const updater = setNarrativeLines.mock.calls[0][0];
+    const result = updater([]);
+    expect(result).toEqual([
+      player("> Aldric: Hello."),
+    ]);
+  });
+});
+
+describe("onAIPlayerAction callback", () => {
+  it("pushes separator + player-kind line for AI action", () => {
+    const deps = makeDeps();
+    const setNarrativeLines = deps.setNarrativeLines;
+
+    const onAIPlayerAction = (characterName: string, action: string) => {
+      setNarrativeLines((prev: NarrativeLine[]) => [
+        ...prev,
+        { kind: "separator", text: "" },
+        { kind: "player", text: `> ${characterName} (AI): ${action}` },
+      ]);
+    };
+
+    const existingLines: NarrativeLine[] = [dm("The goblin snarls.")];
+    onAIPlayerAction("Zara", "I attack the goblin!");
+
+    const updater = setNarrativeLines.mock.calls[0][0];
+    const result = updater(existingLines);
+    expect(result).toEqual([
+      dm("The goblin snarls."),
+      separator(),
+      player("> Zara (AI): I attack the goblin!"),
+    ]);
+  });
+});
 
 describe("appendDelta (typed NarrativeLine)", () => {
   it("preserves blank line separator when DM delta arrives", () => {

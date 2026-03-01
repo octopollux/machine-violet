@@ -594,12 +594,11 @@ describe("processNarrativeLines", () => {
       dm("<b>bold</b> text"),
       { kind: "player", text: "> Alice: attack" },
     ], 80);
-    // Phase 5 inserts blank separators at kind transitions:
-    // system, [sep], dm, [sep], player
+    // No automatic separators — turn boundaries are handled by the engine
     const kinds = result.map((l) => l.kind);
     expect(kinds.filter((k) => k === "system")).toHaveLength(1);
-    expect(kinds.filter((k) => k === "dm")).toHaveLength(2); // separator + content
-    expect(kinds.filter((k) => k === "player")).toHaveLength(2); // separator + content
+    expect(kinds.filter((k) => k === "dm")).toHaveLength(1);
+    expect(kinds.filter((k) => k === "player")).toHaveLength(1);
     expect(result[0].kind).toBe("system");
     expect(result[result.length - 1].kind).toBe("player");
   });
@@ -612,7 +611,7 @@ describe("processNarrativeLines", () => {
       dm('world"'),
     ], 80, quoteColor);
     // The dev line should not affect DM quote state
-    // Find the last dm line (after separators inserted by Phase 5)
+    // Find the last dm line
     const dmLines = result.filter((l) => l.kind === "dm");
     const lastDM = dmLines[dmLines.length - 1];
     const hasColor = lastDM.nodes.some(
@@ -644,32 +643,17 @@ describe("processNarrativeLines", () => {
     expect(hasItalic).toBe(true);
   });
 
-  it("inserts blank line at kind transitions (turn separator)", () => {
+  it("does not insert automatic separators at kind transitions", () => {
     const result = processNarrativeLines([
       dm("DM narration."),
       { kind: "player", text: "> I attack." },
       dm("The blow lands."),
     ], 80);
-    // dm, [sep], player, [sep], dm
-    expect(result).toHaveLength(5);
-    expect(toPlainText(result[0].nodes)).toBe("DM narration.");
-    expect(toPlainText(result[1].nodes)).toBe(""); // separator
-    expect(toPlainText(result[2].nodes)).toBe("> I attack.");
-    expect(toPlainText(result[3].nodes)).toBe(""); // separator
-    expect(toPlainText(result[4].nodes)).toBe("The blow lands.");
-  });
-
-  it("does not double-up separator when blank DM line precedes kind change", () => {
-    const result = processNarrativeLines([
-      dm("End of DM paragraph."),
-      dm(""),  // existing blank line
-      { kind: "player", text: "> I look around." },
-    ], 80);
-    // dm, blank(already there), [sep], player
-    // The blank dm line is already present, but it's a different kind from player,
-    // so Phase 5 checks the last *output* line — the blank dm line IS empty,
-    // so no extra separator is inserted.
+    // No automatic separators — turn boundaries managed by engine callbacks
     expect(result).toHaveLength(3);
+    expect(toPlainText(result[0].nodes)).toBe("DM narration.");
+    expect(toPlainText(result[1].nodes)).toBe("> I attack.");
+    expect(toPlainText(result[2].nodes)).toBe("The blow lands.");
   });
 
   it("dangling b/i/u does not bleed past paragraph boundary (blank DM line)", () => {

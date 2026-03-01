@@ -351,25 +351,7 @@ export function processNarrativeLines(
     }
   }
 
-  // Phase 5: Turn separators — ensure a blank line at kind transitions
-  // (e.g. DM→player, player→DM). Skip if the previous output line is
-  // already blank so we never double-up on existing paragraph breaks.
-  const separated: ProcessedLine[] = [];
-  for (let i = 0; i < result.length; i++) {
-    if (i > 0 && result[i].kind !== result[i - 1].kind) {
-      const prev = separated[separated.length - 1];
-      if (prev && !isEmptyProcessedLine(prev)) {
-        separated.push({ kind: result[i].kind, nodes: [] });
-      }
-    }
-    separated.push(result[i]);
-  }
-
-  return separated;
-}
-
-function isEmptyProcessedLine(line: ProcessedLine): boolean {
-  return isEmptyNodes(line.nodes);
+  return result;
 }
 
 function isAlignmentNode(nodes: FormattingNode[]): boolean {
