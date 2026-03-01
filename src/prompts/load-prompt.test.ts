@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { loadPrompt, loadTemplate, resetPromptCache } from "./load-prompt.js";
+import {
+  loadPrompt,
+  loadTemplate,
+  resetPromptCache,
+  stripComments,
+} from "./load-prompt.js";
 
 beforeEach(() => {
   resetPromptCache();
@@ -46,6 +51,50 @@ describe("loadPrompt", () => {
     const text = loadPrompt(name);
     expect(text.length).toBeGreaterThan(0);
     expect(typeof text).toBe("string");
+  });
+});
+
+describe("stripComments", () => {
+  it("strips %% line comments", () => {
+    const input = "line 1\n%% a comment\nline 2\n";
+    expect(stripComments(input)).toBe("line 1\nline 2\n");
+  });
+
+  it("strips %% without trailing space", () => {
+    expect(stripComments("%%bare comment\nkeep\n")).toBe("keep\n");
+  });
+
+  it("strips empty %% lines", () => {
+    expect(stripComments("%%\nkeep\n")).toBe("keep\n");
+  });
+
+  it("does not strip %% mid-line", () => {
+    expect(stripComments("keep %% this\n")).toBe("keep %% this\n");
+  });
+
+  it("strips single-line <!-- --> comments", () => {
+    const input = "before <!-- gone --> after\n";
+    expect(stripComments(input)).toBe("before  after\n");
+  });
+
+  it("strips multi-line <!-- --> blocks", () => {
+    const input = "before\n<!--\nblock\ncomment\n-->\nafter\n";
+    expect(stripComments(input)).toBe("before\n\nafter\n");
+  });
+
+  it("strips both %% and <!-- --> together", () => {
+    const input = "%% line comment\nbefore\n<!-- block -->\nafter\n";
+    expect(stripComments(input)).toBe("before\n\nafter\n");
+  });
+
+  it("collapses 3+ blank lines to 2", () => {
+    const input = "a\n\n\n\nb\n";
+    expect(stripComments(input)).toBe("a\n\nb\n");
+  });
+
+  it("passes through text without comments unchanged", () => {
+    const input = "no comments here\njust text\n";
+    expect(stripComments(input)).toBe(input);
   });
 });
 
