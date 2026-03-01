@@ -376,15 +376,34 @@ describe("SessionRecapModal", () => {
           width={100}
           height={30}
           lines={[
-            "The party entered the Shattered Hall.",
-            "Aldric confronted the shadow king.",
+            "The party entered the hall.",
+            "Aldric confronted the king.",
           ]}
         />
       </Box>,
     );
     const frame = lastFrame();
     expect(frame).toContain("Previously on...");
-    expect(frame).toContain("The party entered the Shattered Hall.");
+    expect(frame).toContain("The party entered the hall.");
     expect(frame).toContain("ESC or Enter to continue");
+  });
+
+  it("word-wraps long lines to fit 40-char modal", () => {
+    const { lastFrame } = render(
+      <Box width={100} height={30}>
+        <SessionRecapModal
+          variant={gothic}
+          width={100}
+          height={30}
+          lines={[
+            "The adventurers ventured deep into the ancient catacombs beneath the city.",
+          ]}
+        />
+      </Box>,
+    );
+    const frame = lastFrame()!;
+    // Long line should be wrapped, not truncated — both parts present
+    expect(frame).toContain("adventurers");
+    expect(frame).toContain("catacombs");
   });
 });

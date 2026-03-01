@@ -1,13 +1,34 @@
-import React, { useRef, useState, useCallback, useEffect, forwardRef } from "react";
+import React, { useMemo, useRef, useState, useCallback, useEffect, forwardRef } from "react";
 import { Box, Text } from "ink";
 import { ScrollView } from "ink-scroll-view";
 import type { ScrollViewRef } from "ink-scroll-view";
 import type { FormattingNode, FrameStyleVariant } from "../../types/tui.js";
-import { renderHorizontalFrame, renderHorizontalFrameParts, renderContentLine, renderStyledContentLine } from "../frames/index.js";
+import { renderHorizontalFrame, renderHorizontalFrameParts, renderContentLine, renderStyledContentLine, stringWidth } from "../frames/index.js";
+import { wrapNodes } from "../formatting.js";
 import { useScrollHandle } from "../hooks/useScrollHandle.js";
 import type { ScrollHandle } from "../hooks/useScrollHandle.js";
 
 export type CenteredModalHandle = ScrollHandle;
+
+/** Word-wrap a single plain-text line to fit within the given width. */
+function wrapPlainLine(text: string, width: number): string[] {
+  if (width <= 0 || stringWidth(text) <= width) return [text];
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    if (current === "") {
+      current = word;
+    } else if (stringWidth(current) + 1 + stringWidth(word) <= width) {
+      current += " " + word;
+    } else {
+      lines.push(current);
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.length > 0 ? lines : [""];
+}
 
 interface CenteredModalProps {
   variant: FrameStyleVariant;
@@ -27,6 +48,8 @@ interface CenteredModalProps {
   footer?: string;
   /** Color for the footer text (default "yellow") */
   footerColor?: string;
+  /** Vertical offset added to top margin (e.g. to center within conversation pane) */
+  topOffset?: number;
 }
 
 /**
@@ -47,18 +70,31 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
     widthFraction = 0.5,
     footer,
     footerColor = "yellow",
+    topOffset = 0,
   }, ref) {
     const modalWidth = Math.max(minWidth, Math.min(Math.floor(width * widthFraction), maxWidth));
-    const lineCount = styledChildren ? styledChildren.length : children.length;
+    const innerWidth = modalWidth - 4; // 2 borders + 2 padding spaces
 
-    // Max content rows = screen height minus borders (2) minus some padding (4 top+bottom)
-    const maxContentRows = Math.max(3, height - 6);
+    // Word-wrap content to fit within modal inner width
+    const wrappedChildren = useMemo(
+      () => children.flatMap((line) => wrapPlainLine(line, innerWidth)),
+      [children, innerWidth],
+    );
+    const wrappedStyled = useMemo(
+      () => styledChildren?.flatMap((line) => wrapNodes(line, innerWidth)),
+      [styledChildren, innerWidth],
+    );
+
+    const lineCount = wrappedStyled ? wrappedStyled.length : wrappedChildren.length;
+
+    // Max content rows = height minus borders (2) minus 1-line margin top+bottom (2)
+    const maxContentRows = Math.max(3, height - 4);
     const needsScroll = lineCount > maxContentRows;
     const visibleRows = needsScroll ? maxContentRows : lineCount;
 
     // Total modal height = borders (2) + visible content rows
     const modalHeight = visibleRows + 2;
-    const topMargin = Math.max(0, Math.floor((height - modalHeight) / 2));
+    const topMargin = Math.max(0, topOffset + Math.floor((height - modalHeight) / 2));
     const leftPad = Math.max(0, Math.floor((width - modalWidth) / 2));
 
     const scrollRef = useRef<ScrollViewRef>(null);
@@ -99,13 +135,13 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
         </Box>
         <Box height={visibleRows} flexDirection="column">
           <ScrollView ref={scrollRef} onScroll={handleScroll}>
-            {styledChildren
-              ? styledChildren.map((nodes, i) => (
+            {wrappedStyled
+              ? wrappedStyled.map((nodes, i) => (
                 <Box key={i}>
                   {renderStyledContentLine(variant, nodes, modalWidth)}
                 </Box>
               ))
-              : children.map((line, i) => (
+              : wrappedChildren.map((line, i) => (
                 <Box key={i}>
                   <Text color={variant.color}>
                     {renderContentLine(variant, line, modalWidth)}
