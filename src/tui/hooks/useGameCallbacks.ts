@@ -214,21 +214,21 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
       setRetryOverlay({ status, delaySec });
     },
     onTurnStart(turn: TurnInfo) {
-      // AI-sourced turns skip — onAIPlayerAction already displayed the player line
-      if (turn.source === "ai") return;
-      setNarrativeLines((prev) => [
-        ...prev,
-        { kind: "player", text: `> ${turn.characterName}: ${turn.inputText}` },
-      ]);
+      if (turn.role === "player") {
+        setNarrativeLines((prev) => [
+          ...prev,
+          { kind: "player", text: `> ${turn.participant}: ${turn.text}` },
+        ]);
+      } else if (turn.role === "ai") {
+        setNarrativeLines((prev) => [
+          ...prev,
+          { kind: "player", text: `> ${turn.participant} (AI): ${turn.text}` },
+        ]);
+      }
+      // role === "dm" → no-op (onNarrativeDelta handles DM text rendering)
     },
     onTurnEnd(_turn: TurnInfo) {
       setNarrativeLines((prev) => [...prev, { kind: "separator", text: "" }]);
-    },
-    onAIPlayerAction(characterName: string, action: string) {
-      setNarrativeLines((prev) => [
-        ...prev,
-        { kind: "player", text: `> ${characterName} (AI): ${action}` },
-      ]);
     },
   }), [dispatchTuiCommand, setNarrativeLines, setEngineState,
        setErrorMsg, setActiveModal, setChoiceIndex, setRetryOverlay,

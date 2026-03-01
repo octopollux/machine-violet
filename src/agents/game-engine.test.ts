@@ -142,7 +142,6 @@ interface CallbackLog {
   devLogs: string[];
   turnStarts: TurnInfo[];
   turnEnds: TurnInfo[];
-  aiPlayerActions: { characterName: string; action: string }[];
 }
 
 function mockCallbacks(): { callbacks: EngineCallbacks; log: CallbackLog } {
@@ -159,7 +158,6 @@ function mockCallbacks(): { callbacks: EngineCallbacks; log: CallbackLog } {
     devLogs: [],
     turnStarts: [],
     turnEnds: [],
-    aiPlayerActions: [],
   };
 
   return {
@@ -178,7 +176,6 @@ function mockCallbacks(): { callbacks: EngineCallbacks; log: CallbackLog } {
       onRetry: () => {},
       onTurnStart: (turn) => log.turnStarts.push(turn),
       onTurnEnd: (turn) => log.turnEnds.push(turn),
-      onAIPlayerAction: (characterName, action) => log.aiPlayerActions.push({ characterName, action }),
     },
   };
 }
@@ -891,8 +888,8 @@ describe("GameEngine AI Auto-Turn", () => {
     await vi.advanceTimersByTimeAsync(0);
 
     expect(aiPlayerTurn).toHaveBeenCalled();
-    expect(log.aiPlayerActions).toEqual(
-      expect.arrayContaining([expect.objectContaining({ characterName: "Zara" })])
+    expect(log.turnStarts).toEqual(
+      expect.arrayContaining([expect.objectContaining({ role: "ai", participant: "Zara" })])
     );
 
     vi.useRealTimers();
@@ -1241,18 +1238,18 @@ describe("GameEngine Turn Lifecycle", () => {
     });
   });
 
-  it("fires onTurnStart before onNarrativeComplete and onTurnEnd after onNarrativeComplete", async () => {
+  it("fires player turn, then DM turn with onNarrativeComplete inside", async () => {
     const client = mockClient([textMessage("The door opens.")]);
     const { callbacks } = mockCallbacks();
     const events: string[] = [];
 
     // Wrap callbacks to track ordering
     const origOnTurnStart = callbacks.onTurnStart;
-    callbacks.onTurnStart = (turn) => { events.push("turnStart"); origOnTurnStart(turn); };
+    callbacks.onTurnStart = (turn) => { events.push(`turnStart:${turn.role}`); origOnTurnStart(turn); };
     const origComplete = callbacks.onNarrativeComplete;
     callbacks.onNarrativeComplete = (text) => { events.push("complete"); origComplete(text); };
     const origEnd = callbacks.onTurnEnd;
-    callbacks.onTurnEnd = (turn) => { events.push("turnEnd"); origEnd(turn); };
+    callbacks.onTurnEnd = (turn) => { events.push(`turnEnd:${turn.role}`); origEnd(turn); };
 
     const engine = new GameEngine({
       client, gameState: mockState(), scene: mockScene(),
@@ -1262,15 +1259,19 @@ describe("GameEngine Turn Lifecycle", () => {
 
     await engine.processInput("Aldric", "I open the door.");
 
-    expect(events.indexOf("turnStart")).toBeLessThan(events.indexOf("complete"));
-    expect(events.indexOf("complete")).toBeLessThan(events.indexOf("turnEnd"));
+    expect(events).toEqual([
+      "turnStart:player",
+      "turnEnd:player",
+      "turnStart:dm",
+      "complete",
+      "turnEnd:dm",
+    ]);
   });
 
-  it("turnNumber increments across calls", async () => {
+  it("turnNumber increments across calls (player + DM per input)", async () => {
     const client = mockClient([
       textMessage("One."),
       textMessage("Two."),
-      textMessage("Three."),
     ]);
     const { callbacks, log } = mockCallbacks();
 
@@ -1282,38 +1283,16 @@ describe("GameEngine Turn Lifecycle", () => {
 
     await engine.processInput("Aldric", "One.");
     await engine.processInput("Aldric", "Two.");
-    await engine.processInput("Aldric", "Three.");
 
-    expect(log.turnStarts).toHaveLength(3);
-    expect(log.turnStarts[0].turnNumber).toBe(1);
-    expect(log.turnStarts[1].turnNumber).toBe(2);
-    expect(log.turnStarts[2].turnNumber).toBe(3);
+    // Each processInput fires player turn + DM turn = 4 total starts
+    expect(log.turnStarts).toHaveLength(4);
+    expect(log.turnStarts[0]).toMatchObject({ turnNumber: 1, role: "player" });
+    expect(log.turnStarts[1]).toMatchObject({ turnNumber: 2, role: "dm" });
+    expect(log.turnStarts[2]).toMatchObject({ turnNumber: 3, role: "player" });
+    expect(log.turnStarts[3]).toMatchObject({ turnNumber: 4, role: "dm" });
   });
 
-  it("source is 'human' for regular input and 'ai' for AI turns", async () => {
-    vi.useFakeTimers();
-    const state = {
-      maps: {},
-      clocks: createClocksState(),
-      combat: createCombatState(),
-      combatConfig: createDefaultConfig(),
-      decks: createDecksState(),
-      config: {
-        name: "Test",
-        dm_personality: { name: "grim", prompt_fragment: "Be terse." },
-        players: [
-          { name: "Alice", character: "Aldric", type: "human" },
-          { name: "Bot", character: "Zara", type: "ai" },
-        ],
-        combat: createDefaultConfig(),
-        context: { retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 },
-        recovery: { auto_commit_interval: 300, max_commits: 100, enable_git: false },
-        choices: { campaign_default: "often", player_overrides: {} },
-      },
-      campaignRoot: "/tmp/test-campaign",
-      activePlayerIndex: 0,
-    } satisfies GameState;
-
+  it("human input fires player+dm roles; fromAI fires only dm role", async () => {
     const client = mockClient([
       textMessage("Response to human."),
       textMessage("Response to AI."),
@@ -1321,25 +1300,23 @@ describe("GameEngine Turn Lifecycle", () => {
     const { callbacks, log } = mockCallbacks();
 
     const engine = new GameEngine({
-      client, gameState: state, scene: mockScene(),
+      client, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
     });
 
-    // Human turn
+    // Human turn — fires player + dm
     await engine.processInput("Aldric", "Hello.");
-    expect(log.turnStarts[0].source).toBe("human");
-    expect(log.turnEnds[0].source).toBe("human");
+    expect(log.turnStarts[0]).toMatchObject({ role: "player", participant: "Aldric" });
+    expect(log.turnStarts[1]).toMatchObject({ role: "dm", participant: "DM" });
 
-    // AI turn (via fromAI flag)
+    // AI turn (via fromAI flag) — fires only dm (AI turn was emitted by executeAITurn)
     await engine.processInput("Zara", "I attack!", { fromAI: true });
-    expect(log.turnStarts[1].source).toBe("ai");
-    expect(log.turnEnds[1].source).toBe("ai");
-
-    vi.useRealTimers();
+    expect(log.turnStarts).toHaveLength(3);
+    expect(log.turnStarts[2]).toMatchObject({ role: "dm", participant: "DM" });
   });
 
-  it("fires onAIPlayerAction in executeAITurn instead of onNarrativeDelta", async () => {
+  it("fires AI turn via onTurnStart/onTurnEnd in executeAITurn", async () => {
     vi.useFakeTimers();
     vi.mocked(aiPlayerTurn).mockClear();
 
@@ -1376,9 +1353,16 @@ describe("GameEngine Turn Lifecycle", () => {
 
     await engine.executeAITurn();
 
-    expect(log.aiPlayerActions).toHaveLength(1);
-    expect(log.aiPlayerActions[0].characterName).toBe("Zara");
-    expect(log.aiPlayerActions[0].action).toBe("I attack the goblin.");
+    // Should fire AI turn (DM turn skipped because executeAITurn sets
+    // state to dm_thinking before calling processInput, which returns early)
+    const aiStarts = log.turnStarts.filter((t) => t.role === "ai");
+    expect(aiStarts).toHaveLength(1);
+    expect(aiStarts[0].participant).toBe("Zara");
+    expect(aiStarts[0].text).toBe("I attack the goblin.");
+
+    const aiEnds = log.turnEnds.filter((t) => t.role === "ai");
+    expect(aiEnds).toHaveLength(1);
+
     // Should NOT have emitted a raw narrative delta for the AI action
     expect(log.narrativeDeltas.every((d) => !d.includes("Zara (AI)"))).toBe(true);
 

@@ -35,9 +35,9 @@ export type EngineState =
 
 export interface TurnInfo {
   turnNumber: number;
-  characterName: string;
-  inputText: string;
-  source: "human" | "ai";
+  role: "player" | "dm" | "ai";
+  participant: string;   // character name, or "DM"
+  text: string;          // player/AI input text; empty string for DM turns
 }
 
 export interface EngineCallbacks {
@@ -65,10 +65,8 @@ export interface EngineCallbacks {
   onRetry: (status: number, delayMs: number) => void;
   /** A player turn is starting (before any API work) */
   onTurnStart: (turn: TurnInfo) => void;
-  /** A player turn has ended (after DM response completes) */
+  /** A participant turn has ended */
   onTurnEnd: (turn: TurnInfo) => void;
-  /** An AI player chose an action (before the DM processes it) */
-  onAIPlayerAction: (characterName: string, action: string) => void;
 }
 
 /**
@@ -245,15 +243,28 @@ export class GameEngine {
       this.aiTurnDepth = 0;
     }
 
-    // Build turn info and fire lifecycle callback
+    // Fire player turn lifecycle (skipped for AI — executeAITurn already fired it)
+    if (!opts?.fromAI) {
+      this.turnCounter++;
+      const playerTurn: TurnInfo = {
+        turnNumber: this.turnCounter,
+        role: "player",
+        participant: characterName,
+        text,
+      };
+      this.callbacks.onTurnStart(playerTurn);
+      this.callbacks.onTurnEnd(playerTurn);
+    }
+
+    // Fire DM turn lifecycle
     this.turnCounter++;
-    const turn: TurnInfo = {
+    const dmTurn: TurnInfo = {
       turnNumber: this.turnCounter,
-      characterName,
-      inputText: text,
-      source: opts?.fromAI ? "ai" : "human",
+      role: "dm",
+      participant: "DM",
+      text: "",
     };
-    this.callbacks.onTurnStart(turn);
+    this.callbacks.onTurnStart(dmTurn);
 
     this.setState("dm_thinking");
 
@@ -399,7 +410,7 @@ export class GameEngine {
 
       // Notify completion
       this.callbacks.onNarrativeComplete(result.text);
-      this.callbacks.onTurnEnd(turn);
+      this.callbacks.onTurnEnd(dmTurn);
 
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
@@ -790,8 +801,16 @@ export class GameEngine {
         recentNarration: recentAssistant || "It's your turn. What do you do?",
       });
 
-      // Display AI action in narrative
-      this.callbacks.onAIPlayerAction(characterName, result.action);
+      // Fire AI player turn lifecycle
+      this.turnCounter++;
+      const aiTurn: TurnInfo = {
+        turnNumber: this.turnCounter,
+        role: "ai",
+        participant: characterName,
+        text: result.action,
+      };
+      this.callbacks.onTurnStart(aiTurn);
+      this.callbacks.onTurnEnd(aiTurn);
 
       // Accumulate usage from subagent
       accUsage(this.sessionUsage, result.usage);
