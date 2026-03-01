@@ -1,9 +1,10 @@
 import React, { useState, useRef, useMemo, useCallback } from "react";
-import { useInput, useStdout, Box } from "ink";
+import { useInput, Box } from "ink";
 import { appendDelta } from "../tui/narrative-helpers.js";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
 import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
+import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { Layout } from "../tui/layout.js";
 import { ChoiceOverlay, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, ApiErrorModal, getMenuItems } from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
@@ -27,9 +28,7 @@ export function PlayingPhase() {
     retryOverlay,
     dispatchTuiCommand, onShutdown, onEndSession, onRecapDismissed,
   } = useGameContext();
-  const { stdout } = useStdout();
-  const cols = stdout?.columns ?? 80;
-  const rows = stdout?.rows ?? 40;
+  const { columns: cols, rows } = useTerminalSize();
   const tooSmall = cols < MIN_COLUMNS || rows < MIN_ROWS;
 
   // Local state — only used within playing phase input/render

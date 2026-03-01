@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from "react";
-import { useInput, useStdout, Text, Box } from "ink";
+import { useInput, Text, Box } from "ink";
 import Anthropic from "@anthropic-ai/sdk";
 import type { NarrativeLine } from "../types/tui.js";
 import type { ResolvedTheme } from "../tui/themes/types.js";
@@ -10,6 +10,7 @@ import { ChoiceModal } from "../tui/modals/index.js";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
 import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
+import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import type { SetupStep, SetupResult } from "../agents/setup-agent.js";
 import { fastPathSetup } from "../agents/setup-agent.js";
 import { createSetupConversation } from "../agents/subagents/setup-conversation.js";
@@ -29,9 +30,7 @@ export interface SetupPhaseProps {
 }
 
 export function SetupPhase({ mode, theme, costTracker, onComplete, onCancel, onError }: SetupPhaseProps) {
-  const { stdout } = useStdout();
-  const cols = stdout?.columns ?? 80;
-  const rows = stdout?.rows ?? 40;
+  const { columns: cols, rows } = useTerminalSize();
   const tooSmall = cols < MIN_COLUMNS || rows < MIN_ROWS;
 
   const narrativeRef = useRef<NarrativeAreaHandle>(null);
