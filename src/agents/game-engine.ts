@@ -502,6 +502,8 @@ export class GameEngine {
     }
     this.callbacks.onDevLog?.(`[dev] rollback: rolling back to "${target}"`);
     const result = await this.repo.rollback(target);
+    // isomorphic-git doesn't remove directories emptied by checkout — clean them up
+    await pruneEmptyDirs(this.gameState.campaignRoot, this.fileIO);
     console.log(`\nRolled back to: ${result.summary}\nRelaunch the game to resume from this point.\n`);
     process.exit(0);
   }
@@ -856,5 +858,72 @@ export class GameEngine {
       // Non-critical — precis update failure doesn't break gameplay
     }
   }
+}
+
+// --- Post-rollback cleanup ---
+
+/**
+ * Recursively remove empty directories under known campaign subdirectories.
+ * isomorphic-git's checkout removes files but leaves empty parent directories
+ * behind, which confuses scene detection.
+ *
+ * Safety: only walks known campaign subdirectories (characters, locations, etc.)
+ * and requires config.json to exist at root — won't accidentally nuke anything
+ * if called with a wrong path.
+ */
+export async function pruneEmptyDirs(root: string, io: FileIO): Promise<number> {
+  // Safety: verify this looks like a campaign root
+  const configPath = norm(root) + "/config.json";
+  if (!(await io.exists(configPath))) return 0;
+
+  let removed = 0;
+  const normalizedRoot = norm(root);
+
+  async function walk(dir: string): Promise<void> {
+    let entries: string[];
+    try {
+      entries = await io.listDir(dir);
+    } catch {
+      return;
+    }
+    // Recurse into subdirectories first (depth-first)
+    for (const entry of entries) {
+      const child = norm(dir) + "/" + entry;
+      // Skip dotfiles/dirs (e.g. .git)
+      if (entry.startsWith(".")) continue;
+      // Heuristic: entries without a dot extension are likely directories
+      if (!entry.includes(".")) {
+        await walk(child);
+      }
+    }
+    // Re-read after pruning children
+    try {
+      entries = await io.listDir(dir);
+    } catch {
+      return;
+    }
+    // Don't prune the root or top-level subdirs themselves
+    if (entries.length === 0 && norm(dir) !== normalizedRoot) {
+      try {
+        await io.rmdir?.(dir);
+        removed++;
+      } catch {
+        // Directory not empty or permission error — skip
+      }
+    }
+  }
+
+  // Only walk known campaign subdirectories — never arbitrary paths
+  const campaignSubdirs = [
+    "campaign/scenes", "campaign/session-recaps",
+    "characters", "locations", "factions", "lore", "players",
+  ];
+  for (const sub of campaignSubdirs) {
+    const subPath = normalizedRoot + "/" + sub;
+    if (await io.exists(subPath)) {
+      await walk(subPath);
+    }
+  }
+  return removed;
 }
 

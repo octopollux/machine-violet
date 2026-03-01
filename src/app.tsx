@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Text, Box, useInput } from "ink";
 import Anthropic from "@anthropic-ai/sdk";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { readFile, writeFile, appendFile, mkdir, readdir, stat, unlink } from "node:fs/promises";
+import { readFile, writeFile, appendFile, mkdir, readdir, stat, unlink, rmdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 
 import { getStyle } from "./tui/frames/index.js";
@@ -103,6 +103,9 @@ function createFileIO(): FileIO {
     },
     async deleteFile(path: string) {
       await unlink(path);
+    },
+    async rmdir(path: string) {
+      await rmdir(path);
     },
   };
 }

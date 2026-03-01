@@ -74,6 +74,8 @@ export interface FileIO {
   exists(path: string): Promise<boolean>;
   listDir(path: string): Promise<string[]>;
   deleteFile?(path: string): Promise<void>;
+  /** Remove an empty directory. Rejects if the directory is not empty. */
+  rmdir?(path: string): Promise<void>;
 }
 
 /** Ordered cascade steps for scene transitions. Used for resume logic. */
@@ -781,7 +783,9 @@ export async function detectSceneState(campaignRoot: string, io: FileIO): Promis
       const match = entry.match(/^(\d+)-(.+)$/);
       if (match) {
         const n = parseInt(match[1], 10);
-        if (n > maxScene) {
+        // Skip ghost directories left behind by rollback (no transcript.md)
+        const tPath = paths.sceneTranscript(n, match[2]);
+        if (n > maxScene && await io.exists(tPath)) {
           maxScene = n;
           lastSlug = match[2];
         }

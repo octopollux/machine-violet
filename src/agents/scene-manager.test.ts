@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
-import { SceneManager, parseTranscriptEntries, classifyTranscriptEntry, buildScenePacing } from "./scene-manager.js";
+import { SceneManager, parseTranscriptEntries, classifyTranscriptEntry, buildScenePacing, detectSceneState } from "./scene-manager.js";
 import type { SceneState, FileIO } from "./scene-manager.js";
 import type { CampaignRepo } from "../tools/git/index.js";
 import type { GameState } from "./game-state.js";
@@ -1238,5 +1238,50 @@ describe("buildScenePacing", () => {
     scene.openThreads = "";
     const result = buildScenePacing(scene)!;
     expect(result).toContain("Open threads: 0");
+  });
+});
+
+describe("detectSceneState", () => {
+  it("skips scene folders without a transcript (ghost dirs from rollback)", async () => {
+    const io = mockFileIO();
+    // Scene 1 has a transcript, scene 2 is a ghost directory (no transcript.md)
+    files[norm("/tmp/test-campaign/campaign/scenes/001-opening/transcript.md")] =
+      "# Scene 1\n\n**DM:** Welcome.\n";
+    dirs.add(norm("/tmp/test-campaign/campaign/scenes"));
+    dirs.add(norm("/tmp/test-campaign/campaign/scenes/001-opening"));
+    dirs.add(norm("/tmp/test-campaign/campaign/scenes/002-tavern"));
+
+    (io.listDir as ReturnType<typeof vi.fn>).mockImplementation(async (path: string) => {
+      const p = norm(path);
+      if (p.endsWith("campaign/scenes")) return ["001-opening", "002-tavern"];
+      if (p.endsWith("session-recaps")) return [];
+      return [];
+    });
+
+    const result = await detectSceneState("/tmp/test-campaign", io);
+    // Should pick scene 1 (has transcript), NOT scene 2 (ghost)
+    expect(result.sceneNumber).toBe(1);
+    expect(result.slug).toBe("opening");
+    expect(result.transcript).toHaveLength(1);
+    expect(result.transcript[0]).toContain("Welcome");
+  });
+
+  it("falls back to opening when all scene folders are ghosts", async () => {
+    const io = mockFileIO();
+    // Ghost directory — no transcript.md inside
+    dirs.add(norm("/tmp/test-campaign/campaign/scenes"));
+    dirs.add(norm("/tmp/test-campaign/campaign/scenes/001-opening"));
+
+    (io.listDir as ReturnType<typeof vi.fn>).mockImplementation(async (path: string) => {
+      const p = norm(path);
+      if (p.endsWith("campaign/scenes")) return ["001-opening"];
+      if (p.endsWith("session-recaps")) return [];
+      return [];
+    });
+
+    const result = await detectSceneState("/tmp/test-campaign", io);
+    expect(result.sceneNumber).toBe(1);
+    expect(result.slug).toBe("opening");
+    expect(result.transcript).toHaveLength(0);
   });
 });
