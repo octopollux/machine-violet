@@ -58,7 +58,7 @@ The layout is split into two panes:
 
 **Top frame** — Multi-line themed border (from the active `.theme` asset) with resource display. Shows the active character's key resources (HP + 1-2 others). See [Resource Display](#resource-display). Height and art determined by the theme asset's `edge_top`, `corner_tl/tr`, and `separator` components.
 
-**Left and right side columns** — Multi-line themed vertical borders (width determined by the theme asset's `edge_left`/`edge_right` components). Decorative — no information content. Part of the Conversation Pane. Dropped at ≤40 columns.
+**Left and right side columns** — Multi-line themed vertical borders (width determined by the theme asset's `edge_left`/`edge_right` components). Decorative — no information content. Part of the Conversation Pane. Visible at both tiers.
 
 
 ## Resource Display
@@ -260,36 +260,21 @@ This creates atmospheric consistency — a haunted crypt always feels dark purpl
 
 ## Responsive Design
 
-The TUI degrades gracefully as the viewport shrinks. Elements are dropped in a fixed order to preserve the most essential information.
+The TUI targets **80×25 minimum**, with **80×40 for the full experience**. Two tiers handle the difference.
 
 ### Breakpoints
 
-| Tier | Columns | Rows | Layout |
-|---|---|---|---|
-| **Full** | ≥80 | ≥40 | All elements visible. Left/right frames. Full activity line. |
-| **Narrow** | 40–79 | ≥40 | Left/right frames dropped. All other elements present. |
-| **Short** | ≥40 | 24–39 | Top frame dropped. Activity line dropped (glyph moves to modeline). |
-| **Compact** | 40–79 | 24–39 | No side frames, no top frame, no activity line. |
-| **Minimal** | 20–39 | 12–23 | DM text + input line only. Lower frame, modeline, and player selector also dropped. |
+| Tier | Requirement | Layout |
+|---|---|---|
+| **Full** | ≥80 cols, ≥40 rows | All elements visible. Side frames, top frame, activity line, lower frame. |
+| **Standard** | Everything else | Top frame and activity line dropped. Activity glyph moves to modeline. |
 
-### Drop order (first dropped → last dropped)
+Below 80×25 the standard tier still renders (no crash) but isn't designed for it.
 
-1. **Left/right frames** — decorative only, first to go
-2. **Top frame** (resource display) — resources still available via character sheet
-3. **Activity line** — degrades to single glyph in modeline
-4. **Lower frame** (turn indicator) — turn info moves to modeline prefix
-5. **Modeline** — status info is lost but available on request
-6. **Player selector** — active player shown in input prompt instead
+### Drop order (full → standard)
 
-At minimum viable viewport (20×12), the player sees DM narration and a text input. Everything else is available through OOC queries.
-
-### Column responsiveness
-
-Within a given row tier, elements also adapt horizontally:
-- Modeline truncates less-important fields first (conditions → location → resources)
-- Top frame drops campaign name, then right-side resources, then left-side resources
-- Lower frame simplifies flourishes to plain separators
-- Themes fall back to simple ASCII (`-`, `|`, `+`) below 40 columns
+1. **Top frame** (resource display) — resources still available via character sheet
+2. **Activity line** — degrades to single glyph in modeline
 
 
 ## Modals

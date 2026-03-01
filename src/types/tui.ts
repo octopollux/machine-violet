@@ -23,12 +23,7 @@ export interface FrameStyle {
 
 export type StyleVariant = "exploration" | "combat" | "ooc" | "levelup" | "dev";
 
-export type ViewportTier =
-  | "full"
-  | "narrow"
-  | "short"
-  | "compact"
-  | "minimal";
+export type ViewportTier = "full" | "standard";
 
 export interface ViewportDimensions {
   columns: number;

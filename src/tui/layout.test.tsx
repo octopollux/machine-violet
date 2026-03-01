@@ -50,34 +50,16 @@ describe("Layout", () => {
     expect(frame).toContain("The Shattered Crown");
   });
 
-  it("drops elements at narrow viewport", () => {
-    const { lastFrame } = render(
-      <Layout {...baseProps} dimensions={{ columns: 60, rows: 40 }} />,
-    );
-    const frame = lastFrame();
-    expect(frame).toContain("The door groans open");
-    expect(frame).toContain("Aldric");
-  });
-
-  it("shows activity glyph in modeline at compact viewport", () => {
+  it("shows activity glyph in modeline at standard viewport", () => {
     const { lastFrame } = render(
       <Layout
         {...baseProps}
-        dimensions={{ columns: 60, rows: 30 }}
+        dimensions={{ columns: 80, rows: 30 }}
         engineState="dm_thinking"
       />,
     );
     const frame = lastFrame();
     expect(frame).toContain("◆");
-  });
-
-  it("renders minimal layout", () => {
-    const { lastFrame } = render(
-      <Layout {...baseProps} dimensions={{ columns: 30, rows: 12 }} />,
-    );
-    const frame = lastFrame();
-    expect(frame).toContain("Aldric");
-    expect(frame).toContain(">");
   });
 
   it("renders with combat theme variant", () => {

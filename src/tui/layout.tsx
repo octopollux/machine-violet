@@ -112,11 +112,8 @@ export function Layout(props: LayoutProps) {
   const activity = getActivity(engineState);
   const actGlyph = elements.activityGlyphInModeline ? activity?.glyph : undefined;
 
-  // Turn info for modeline (when lower frame dropped)
-  const turnForModeline = elements.turnInfoInModeline ? turnHolder : undefined;
-
   // Pre-split modeline so we know its height before sizing the narrative area
-  const modelineDisplay = buildModelineDisplay(modelineText, actGlyph, turnForModeline);
+  const modelineDisplay = buildModelineDisplay(modelineText, actGlyph);
   const modelineLines = splitModeline(modelineDisplay, width);
 
   // Build resource string for top frame title
@@ -212,7 +209,7 @@ export function Layout(props: LayoutProps) {
                 {!hideInputLine && (
                   <InputLine
                     characterName={activeCharacterName}
-                    showPlayerName={elements.playerInPrompt}
+                    showPlayerName={false}
                     playerName={players[activePlayerIndex]?.name}
                     width={width - 4}
                     isDisabled={inputIsDisabled}
@@ -227,20 +224,6 @@ export function Layout(props: LayoutProps) {
           </Box>
           <PlayerPaneSide theme={theme} side="right" color={playerColor} height={playerPaneContentHeight} />
         </Box>
-      )}
-
-      {/* Input Line when modeline is hidden (minimal tier) */}
-      {!elements.modeline && !hideInputLine && (
-        <InputLine
-          characterName={activeCharacterName}
-          showPlayerName={elements.playerInPrompt}
-          playerName={players[activePlayerIndex]?.name}
-          width={width}
-          isDisabled={inputIsDisabled}
-          onChange={onInputChange}
-          onSubmit={onInputSubmit}
-          resetKey={inputResetKey}
-        />
       )}
 
       {/* Player Pane bottom border */}
