@@ -211,11 +211,21 @@ body {
 }
 
 .content-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
   font-size: 11px;
   color: var(--text-muted);
   padding-bottom: 8px;
   margin-bottom: 12px;
   border-bottom: 1px solid var(--border);
+}
+
+.token-count {
+  color: var(--text-muted);
+  font-size: 10px;
+  flex-shrink: 0;
+  margin-left: 12px;
 }
 
 /* Markdown viewer */

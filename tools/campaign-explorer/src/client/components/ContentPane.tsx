@@ -5,6 +5,15 @@ import { ContextDumpViewer } from "./ContextDumpViewer";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import type { FileCategory } from "../../shared/protocol";
 
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+function formatK(n: number): string {
+  if (n < 1000) return String(n);
+  return (n / 1000).toFixed(1).replace(/\.0$/, "") + "k";
+}
+
 interface ContentPaneProps {
   campaignSlug: string | null;
   selectedFile: string | null;
@@ -75,7 +84,10 @@ export function ContentPane({
 
   return (
     <div className="content-pane" ref={scrollRef}>
-      <div className="content-header">{selectedFile}</div>
+      <div className="content-header">
+        <span>{selectedFile}</span>
+        <span className="token-count">~{formatK(estimateTokens(content))} tokens</span>
+      </div>
       {isContextDump ? (
         <ContextDumpViewer content={content} />
       ) : isJson ? (
