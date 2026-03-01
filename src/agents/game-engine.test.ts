@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
-import { GameEngine } from "./game-engine.js";
+import { GameEngine, pruneEmptyDirs } from "./game-engine.js";
 import type { EngineCallbacks, EngineState } from "./game-engine.js";
 import type { GameState } from "./game-state.js";
 import type { SceneState, FileIO } from "./scene-manager.js";
@@ -1218,5 +1218,90 @@ describe("GameEngine Behavioral Reminder", () => {
     await engine.processInput("Aldric", "Four.");
 
     expect(log.devLogs.some((m) => m.includes("[dm-note]"))).toBe(true);
+  });
+});
+
+describe("pruneEmptyDirs", () => {
+  it("removes empty directories under campaign subdirs", async () => {
+    const io = mockFileIO();
+    const rmdirCalls: string[] = [];
+    io.rmdir = vi.fn(async (path: string) => { rmdirCalls.push(norm(path)); });
+
+    // config.json must exist (safety check)
+    files[norm("/tmp/campaign/config.json")] = "{}";
+    dirs.add(norm("/tmp/campaign/campaign/scenes"));
+    dirs.add(norm("/tmp/campaign/campaign/scenes/002-tavern"));
+
+    // First listDir: scenes has one empty subdir
+    (io.listDir as ReturnType<typeof vi.fn>).mockImplementation(async (path: string) => {
+      const p = norm(path);
+      if (p.endsWith("campaign/scenes")) return ["002-tavern"];
+      if (p.endsWith("002-tavern")) return []; // empty!
+      return [];
+    });
+
+    const removed = await pruneEmptyDirs("/tmp/campaign", io);
+    expect(removed).toBe(1);
+    expect(rmdirCalls[0]).toContain("002-tavern");
+  });
+
+  it("does nothing when config.json is missing (safety guard)", async () => {
+    const io = mockFileIO();
+    io.rmdir = vi.fn(async () => {});
+    // No config.json — not a campaign root
+    dirs.add(norm("/tmp/not-campaign/campaign/scenes"));
+
+    const removed = await pruneEmptyDirs("/tmp/not-campaign", io);
+    expect(removed).toBe(0);
+    expect(io.rmdir).not.toHaveBeenCalled();
+  });
+
+  it("does not remove non-empty directories", async () => {
+    const io = mockFileIO();
+    io.rmdir = vi.fn(async () => {});
+
+    files[norm("/tmp/campaign/config.json")] = "{}";
+    files[norm("/tmp/campaign/campaign/scenes/001-opening/transcript.md")] = "# Scene 1";
+    dirs.add(norm("/tmp/campaign/campaign/scenes"));
+    dirs.add(norm("/tmp/campaign/campaign/scenes/001-opening"));
+
+    (io.listDir as ReturnType<typeof vi.fn>).mockImplementation(async (path: string) => {
+      const p = norm(path);
+      if (p.endsWith("campaign/scenes")) return ["001-opening"];
+      if (p.endsWith("001-opening")) return ["transcript.md"];
+      return [];
+    });
+
+    const removed = await pruneEmptyDirs("/tmp/campaign", io);
+    expect(removed).toBe(0);
+  });
+
+  it("prunes nested empty directories depth-first", async () => {
+    const io = mockFileIO();
+    const rmdirCalls: string[] = [];
+    io.rmdir = vi.fn(async (path: string) => { rmdirCalls.push(norm(path)); });
+
+    files[norm("/tmp/campaign/config.json")] = "{}";
+    dirs.add(norm("/tmp/campaign/locations"));
+    dirs.add(norm("/tmp/campaign/locations/old-tavern"));
+
+    let tavernPruned = false;
+    (io.listDir as ReturnType<typeof vi.fn>).mockImplementation(async (path: string) => {
+      const p = norm(path);
+      if (p.endsWith("/locations") && tavernPruned) return [];
+      if (p.endsWith("/locations")) return ["old-tavern"];
+      if (p.endsWith("old-tavern")) {
+        tavernPruned = true;
+        return [];
+      }
+      return [];
+    });
+
+    const removed = await pruneEmptyDirs("/tmp/campaign", io);
+    // Both old-tavern and locations should be pruned
+    expect(removed).toBe(2);
+    // old-tavern should be pruned before locations (depth-first)
+    expect(rmdirCalls[0]).toContain("old-tavern");
+    expect(rmdirCalls[1]).toContain("locations");
   });
 });
