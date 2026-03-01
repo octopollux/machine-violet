@@ -1,16 +1,19 @@
 import type { ViewportTier, ViewportDimensions } from "../types/tui.js";
 
+/** Minimum supported terminal width. */
+export const MIN_COLUMNS = 80;
+
+/** Minimum supported terminal height. */
+export const MIN_ROWS = 25;
+
 /**
  * Determine the viewport tier based on terminal dimensions.
+ * ≥80 cols and ≥40 rows → "full"; everything else → "standard".
  */
 export function getViewportTier(dims: ViewportDimensions): ViewportTier {
   const { columns, rows } = dims;
-
   if (columns >= 80 && rows >= 40) return "full";
-  if (columns >= 40 && rows >= 40) return "narrow";
-  if (columns >= 80 && rows >= 24) return "short";
-  if (columns >= 40 && rows >= 24) return "compact";
-  return "minimal";
+  return "standard";
 }
 
 /** Which UI elements are visible at a given tier */
@@ -22,13 +25,12 @@ export interface VisibleElements {
   modeline: boolean;
   playerSelector: boolean;
   activityGlyphInModeline: boolean; // when activity line is dropped
-  turnInfoInModeline: boolean;      // when lower frame is dropped
-  playerInPrompt: boolean;          // when player selector is dropped
 }
 
 /**
  * Determine which UI elements are visible for a viewport tier.
- * Drop order: side frames → top frame → activity line → lower frame → modeline → player selector
+ * Full: everything visible.
+ * Standard: top frame and activity line dropped; activity glyph moves to modeline.
  */
 export function getVisibleElements(tier: ViewportTier): VisibleElements {
   switch (tier) {
@@ -41,22 +43,8 @@ export function getVisibleElements(tier: ViewportTier): VisibleElements {
         modeline: true,
         playerSelector: true,
         activityGlyphInModeline: false,
-        turnInfoInModeline: false,
-        playerInPrompt: false,
       };
-    case "narrow":
-      return {
-        topFrame: true,
-        sideFrames: false,
-        activityLine: true,
-        lowerFrame: true,
-        modeline: true,
-        playerSelector: true,
-        activityGlyphInModeline: false,
-        turnInfoInModeline: false,
-        playerInPrompt: false,
-      };
-    case "short":
+    case "standard":
       return {
         topFrame: false,
         sideFrames: true,
@@ -65,42 +53,8 @@ export function getVisibleElements(tier: ViewportTier): VisibleElements {
         modeline: true,
         playerSelector: true,
         activityGlyphInModeline: true,
-        turnInfoInModeline: false,
-        playerInPrompt: false,
-      };
-    case "compact":
-      return {
-        topFrame: false,
-        sideFrames: false,
-        activityLine: false,
-        lowerFrame: true,
-        modeline: true,
-        playerSelector: true,
-        activityGlyphInModeline: true,
-        turnInfoInModeline: false,
-        playerInPrompt: false,
-      };
-    case "minimal":
-      return {
-        topFrame: false,
-        sideFrames: false,
-        activityLine: false,
-        lowerFrame: false,
-        modeline: false,
-        playerSelector: false,
-        activityGlyphInModeline: false,
-        turnInfoInModeline: false,
-        playerInPrompt: true,
       };
   }
-}
-
-/**
- * Whether to use ASCII fallback for frame rendering.
- * Below 40 columns, Unicode box-drawing may not render well.
- */
-export function useAsciiFallback(columns: number): boolean {
-  return columns < 40;
 }
 
 /** Fixed height of the Player Pane including top/bottom borders. */
@@ -118,15 +72,11 @@ export function narrativeRows(
   borderHeight = 2,
   playerCount = 2,
 ): number {
+  void hideInputLine; // Player Pane is always visible; hideInputLine has no effect on row count
   let used = 0;
 
-  if (elements.modeline) {
-    // Player Pane is fixed-height (includes borders, modeline, and input line)
-    used += PLAYER_PANE_HEIGHT;
-  } else {
-    // Minimal tier: standalone InputLine (no Player Pane)
-    if (!hideInputLine) used += 1;
-  }
+  // Player Pane is fixed-height (includes borders, modeline, and input line)
+  used += PLAYER_PANE_HEIGHT;
 
   if (elements.topFrame) used += borderHeight;
   if (elements.lowerFrame) used += borderHeight;
