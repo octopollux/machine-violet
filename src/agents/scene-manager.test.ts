@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
-import { SceneManager, parseTranscriptEntries, classifyTranscriptEntry, buildScenePacing, detectSceneState } from "./scene-manager.js";
+import { SceneManager, parseTranscriptEntries, classifyTranscriptEntry, buildScenePacing, buildSceneAnchor, detectSceneState } from "./scene-manager.js";
 import type { SceneState, FileIO } from "./scene-manager.js";
 import type { CampaignRepo } from "../tools/git/index.js";
 import type { GameState } from "./game-state.js";
@@ -286,7 +286,8 @@ describe("SceneManager", () => {
     // Scene advanced
     expect(mgr.getScene().sceneNumber).toBe(2);
     expect(mgr.getScene().transcript).toHaveLength(0);
-    expect(mgr.getScene().precis).toBe("");
+    // Precis is seeded with an anchor from the campaign log
+    expect(mgr.getScene().precis).toContain("Previous scene (Tavern Meeting):");
 
     // Pending op cleared
     expect(mgr.getPendingOp()).toBeNull();
@@ -1238,6 +1239,105 @@ describe("buildScenePacing", () => {
     scene.openThreads = "";
     const result = buildScenePacing(scene)!;
     expect(result).toContain("Open threads: 0");
+  });
+});
+
+describe("buildSceneAnchor", () => {
+  it("extracts last 3 bullets from campaign log entry", () => {
+    const logEntry = "- Aldric arrived at Euston Station\n- Met the conductor\n- Boarded the midnight express\n- Reached the dining car";
+    const result = buildSceneAnchor("Midnight Express", logEntry, []);
+    expect(result).toContain("Previous scene (Midnight Express):");
+    expect(result).toContain("- Met the conductor");
+    expect(result).toContain("- Boarded the midnight express");
+    expect(result).toContain("- Reached the dining car");
+    // First bullet excluded (only last 3)
+    expect(result).not.toContain("Aldric arrived");
+  });
+
+  it("returns empty string for empty campaign log", () => {
+    const result = buildSceneAnchor("Empty Scene", "", []);
+    expect(result).toBe("");
+  });
+
+  it("includes alarms fired section", () => {
+    const result = buildSceneAnchor("Test", "", ["The clock strikes midnight", "Guards change shift"]);
+    expect(result).toContain("Alarms fired during transition:");
+    expect(result).toContain("- The clock strikes midnight");
+    expect(result).toContain("- Guards change shift");
+  });
+
+  it("takes all bullets when fewer than 3", () => {
+    const logEntry = "- Single bullet point";
+    const result = buildSceneAnchor("Short Scene", logEntry, []);
+    expect(result).toContain("Previous scene (Short Scene):");
+    expect(result).toContain("- Single bullet point");
+  });
+
+  it("combines campaign log tail with alarms", () => {
+    const logEntry = "- Arrived at the castle";
+    const result = buildSceneAnchor("Castle", logEntry, ["Drawbridge raised"]);
+    expect(result).toContain("Previous scene (Castle):");
+    expect(result).toContain("- Arrived at the castle");
+    expect(result).toContain("Alarms fired during transition:");
+    expect(result).toContain("- Drawbridge raised");
+  });
+});
+
+describe("scene transition seeds precis", () => {
+  it("sceneTransition seeds precis with campaign log anchor", async () => {
+    const client = mockClient([
+      textResponse("- Aldric entered the tavern\n- Met the innkeeper\n- Ordered a drink\n- Heard a rumor"),
+      textResponse(""),
+    ]);
+
+    const fileIO = mockFileIO();
+    (fileIO.listDir as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    await mgr.sceneTransition(client, "Tavern Meeting");
+
+    const scene = mgr.getScene();
+    expect(scene.precis).toContain("Previous scene (Tavern Meeting):");
+    expect(scene.precis).toContain("- Met the innkeeper");
+    expect(scene.precis).toContain("- Ordered a drink");
+    expect(scene.precis).toContain("- Heard a rumor");
+  });
+
+  it("resumePendingTransition seeds precis with campaign log anchor", async () => {
+    const client = mockClient([
+      textResponse("- Explored the dungeon\n- Found a key"),
+      textResponse(""),
+    ]);
+
+    const fileIO = mockFileIO();
+    (fileIO.listDir as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    await mgr.resumePendingTransition(client, {
+      type: "scene_transition",
+      step: "subagent_updates" as import("./scene-manager.js").PendingStep,
+      sceneNumber: 1,
+      title: "Dungeon Depths",
+    });
+
+    const scene = mgr.getScene();
+    expect(scene.precis).toContain("Previous scene (Dungeon Depths):");
+    expect(scene.precis).toContain("- Explored the dungeon");
+    expect(scene.precis).toContain("- Found a key");
   });
 });
 

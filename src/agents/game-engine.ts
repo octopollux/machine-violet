@@ -445,6 +445,9 @@ export class GameEngine {
       // Persist the reset scene state (new sceneNumber, cleared precis/transcript)
       this.persistCurrentScene();
 
+      // Refresh context so the DM sees the updated campaign log
+      await this.sceneManager.contextRefresh();
+
       // Auto-apply theme from location entity if it has theme metadata
       await this.applyLocationTheme(title);
 
@@ -512,6 +515,9 @@ export class GameEngine {
         accUsage(this.sessionUsage, result.usage);
         this.callbacks.onUsageUpdate(this.sessionUsage);
       }
+
+      this.persistCurrentScene();
+      await this.sceneManager.contextRefresh();
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
       await this.dumpDebugInfo(error);
