@@ -214,22 +214,19 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
       setRetryOverlay({ status, delaySec });
     },
     onTurnStart(turn: TurnInfo) {
-      setNarrativeLines((prev) => {
-        const next = [...prev];
-        if (next.length > 0) {
-          next.push({ kind: "separator", text: "" });
-        }
-        next.push({ kind: "player", text: `> ${turn.characterName}: ${turn.inputText}` });
-        return next;
-      });
+      // AI-sourced turns skip — onAIPlayerAction already displayed the player line
+      if (turn.source === "ai") return;
+      setNarrativeLines((prev) => [
+        ...prev,
+        { kind: "player", text: `> ${turn.characterName}: ${turn.inputText}` },
+      ]);
     },
     onTurnEnd(_turn: TurnInfo) {
-      // No-op for now; available for future per-turn usage display
+      setNarrativeLines((prev) => [...prev, { kind: "separator", text: "" }]);
     },
     onAIPlayerAction(characterName: string, action: string) {
       setNarrativeLines((prev) => [
         ...prev,
-        { kind: "separator", text: "" },
         { kind: "player", text: `> ${characterName} (AI): ${action}` },
       ]);
     },

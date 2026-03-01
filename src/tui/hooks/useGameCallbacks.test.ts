@@ -154,24 +154,20 @@ const player = (text: string): NarrativeLine => ({ kind: "player", text });
 const separator = (): NarrativeLine => ({ kind: "separator", text: "" });
 
 describe("onTurnStart callback", () => {
-  it("pushes separator + player line to narrative", () => {
+  it("pushes player line to narrative (no separator — onTurnEnd handles that)", () => {
     const deps = makeDeps();
     const setNarrativeLines = deps.setNarrativeLines;
 
-    // Simulate onTurnStart logic from buildCallbacks
-    const onTurnStart = (turn: { characterName: string; inputText: string }) => {
-      setNarrativeLines((prev: NarrativeLine[]) => {
-        const next = [...prev];
-        if (next.length > 0) {
-          next.push({ kind: "separator", text: "" });
-        }
-        next.push({ kind: "player", text: `> ${turn.characterName}: ${turn.inputText}` });
-        return next;
-      });
+    const onTurnStart = (turn: { characterName: string; inputText: string; source: string }) => {
+      if (turn.source === "ai") return;
+      setNarrativeLines((prev: NarrativeLine[]) => [
+        ...prev,
+        { kind: "player", text: `> ${turn.characterName}: ${turn.inputText}` },
+      ]);
     };
 
-    const existingLines: NarrativeLine[] = [dm("The tavern is warm.")];
-    onTurnStart({ characterName: "Aldric", inputText: "I look around." });
+    const existingLines: NarrativeLine[] = [dm("The tavern is warm."), separator()];
+    onTurnStart({ characterName: "Aldric", inputText: "I look around.", source: "human" });
 
     const updater = setNarrativeLines.mock.calls[0][0];
     const result = updater(existingLines);
@@ -182,45 +178,59 @@ describe("onTurnStart callback", () => {
     ]);
   });
 
-  it("first turn (empty narrative) skips separator, only adds player line", () => {
+  it("skips player line for AI-sourced turns (onAIPlayerAction already displayed it)", () => {
     const deps = makeDeps();
     const setNarrativeLines = deps.setNarrativeLines;
 
-    const onTurnStart = (turn: { characterName: string; inputText: string }) => {
-      setNarrativeLines((prev: NarrativeLine[]) => {
-        const next = [...prev];
-        if (next.length > 0) {
-          next.push({ kind: "separator", text: "" });
-        }
-        next.push({ kind: "player", text: `> ${turn.characterName}: ${turn.inputText}` });
-        return next;
-      });
+    const onTurnStart = (turn: { characterName: string; inputText: string; source: string }) => {
+      if (turn.source === "ai") return;
+      setNarrativeLines((prev: NarrativeLine[]) => [
+        ...prev,
+        { kind: "player", text: `> ${turn.characterName}: ${turn.inputText}` },
+      ]);
     };
 
-    onTurnStart({ characterName: "Aldric", inputText: "Hello." });
+    onTurnStart({ characterName: "Zara", inputText: "I attack!", source: "ai" });
+
+    expect(setNarrativeLines).not.toHaveBeenCalled();
+  });
+});
+
+describe("onTurnEnd callback", () => {
+  it("pushes separator after DM response", () => {
+    const deps = makeDeps();
+    const setNarrativeLines = deps.setNarrativeLines;
+
+    const onTurnEnd = () => {
+      setNarrativeLines((prev: NarrativeLine[]) => [...prev, { kind: "separator", text: "" }]);
+    };
+
+    const existingLines: NarrativeLine[] = [player("> Aldric: Hello."), dm("The tavern is warm.")];
+    onTurnEnd();
 
     const updater = setNarrativeLines.mock.calls[0][0];
-    const result = updater([]);
+    const result = updater(existingLines);
     expect(result).toEqual([
       player("> Aldric: Hello."),
+      dm("The tavern is warm."),
+      separator(),
     ]);
   });
 });
 
 describe("onAIPlayerAction callback", () => {
-  it("pushes separator + player-kind line for AI action", () => {
+  it("pushes player-kind line for AI action (no separator — onTurnEnd handles that)", () => {
     const deps = makeDeps();
     const setNarrativeLines = deps.setNarrativeLines;
 
     const onAIPlayerAction = (characterName: string, action: string) => {
       setNarrativeLines((prev: NarrativeLine[]) => [
         ...prev,
-        { kind: "separator", text: "" },
         { kind: "player", text: `> ${characterName} (AI): ${action}` },
       ]);
     };
 
-    const existingLines: NarrativeLine[] = [dm("The goblin snarls.")];
+    const existingLines: NarrativeLine[] = [dm("The goblin snarls."), separator()];
     onAIPlayerAction("Zara", "I attack the goblin!");
 
     const updater = setNarrativeLines.mock.calls[0][0];
