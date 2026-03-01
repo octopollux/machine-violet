@@ -27,7 +27,7 @@ npx tsx src/index.tsx    # launch (needs ANTHROPIC_API_KEY in .env)
 | `medium` | Sonnet | OOC mode, AI players |
 | `small` | Haiku | All mechanical subagents (summarizer, precis, changelog, choices, resolve, promotion) |
 
-Configured in `src/config/models.ts`. Override with `dev-config.json` (gitignored):
+Configured in `src/config/models.ts`. Override with `dev-config.json`:
 ```json
 { "models": { "large": "claude-sonnet-4-5-20250929" } }
 ```
