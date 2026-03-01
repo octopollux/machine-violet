@@ -11,11 +11,13 @@ interface SessionRecapModalProps {
   lines: string[];
   /** Ref for scroll control */
   scrollRef?: React.Ref<CenteredModalHandle>;
+  /** Vertical offset for centering within conversation pane */
+  topOffset?: number;
 }
 
 /**
  * Session recap modal. Displays "Previously on..." text at session start.
- * Uses CenteredModal for centered overlay with scroll support.
+ * Fixed at 40 columns wide, sized to fit the conversation pane.
  */
 export function SessionRecapModal({
   variant,
@@ -23,6 +25,7 @@ export function SessionRecapModal({
   height,
   lines,
   scrollRef,
+  topOffset,
 }: SessionRecapModalProps) {
   return (
     <CenteredModal
@@ -33,6 +36,9 @@ export function SessionRecapModal({
       title="Previously on..."
       children={lines}
       footer="ESC or Enter to continue"
+      minWidth={40}
+      maxWidth={40}
+      topOffset={topOffset}
     />
   );
 }

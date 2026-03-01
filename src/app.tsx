@@ -495,12 +495,11 @@ export default function App({ shutdownRef }: AppProps) {
     process.exit(0);
   }, [shutdownRef]);
 
-  // --- Recap dismissed: fire the deferred DM resume turn ---
+  // --- Recap dismissed: player takes first turn (recap replaces DM opening narration) ---
   const handleRecapDismissed = useCallback(() => {
-    const pending = pendingResumeRef.current;
-    if (!pending) return;
     pendingResumeRef.current = null;
-    engineRef.current?.processInput(pending.characterName, pending.text, { skipTranscript: true });
+    // Engine is already in waiting_input from resumeSession().
+    // The recap served as the session-opening narration, so the player goes first.
   }, []);
 
   // --- End Session: full session-end housekeeping then exit ---

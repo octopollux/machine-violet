@@ -12,6 +12,8 @@ interface CharacterSheetModalProps {
   content: string;
   /** Ref for scroll control */
   scrollRef?: React.Ref<CenteredModalHandle>;
+  /** Vertical offset for centering within conversation pane */
+  topOffset?: number;
 }
 
 /** Wrap bare hex color strings (#rrggbb) in color tags so they render in their own color. */
@@ -30,6 +32,7 @@ export function CharacterSheetModal({
   height,
   content,
   scrollRef,
+  topOffset,
 }: CharacterSheetModalProps) {
   const rawLines = content.split("\n");
 
@@ -62,6 +65,7 @@ export function CharacterSheetModal({
       minWidth={30}
       maxWidth={999}
       widthFraction={0.7}
+      topOffset={topOffset}
     />
   );
 }

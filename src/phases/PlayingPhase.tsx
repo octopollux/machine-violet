@@ -3,7 +3,7 @@ import { useInput, Box } from "ink";
 import { appendDelta } from "../tui/narrative-helpers.js";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
 import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
-import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
+import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, narrativeRows } from "../tui/responsive.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { Layout } from "../tui/layout.js";
 import { ChoiceOverlay, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, ApiErrorModal, getMenuItems } from "../tui/modals/index.js";
@@ -376,6 +376,12 @@ export function PlayingPhase() {
   })();
   const layoutRows = rows - modalHeight;
 
+  // Compute conversation pane dimensions for modal sizing/centering
+  const tier = getViewportTier({ columns: cols, rows: layoutRows });
+  const visibleElements = getVisibleElements(tier);
+  const narRows = narrativeRows(layoutRows, visibleElements, activeModal?.kind === "choice", theme.asset.height, players.length);
+  const conversationPaneTop = visibleElements.topFrame ? theme.asset.height : 0;
+
   // Build overlay for choice modal (replaces Player Pane content)
   const choiceOverlay = activeModal?.kind === "choice" ? (
     <ChoiceOverlay
@@ -429,18 +435,20 @@ export function PlayingPhase() {
         <SessionRecapModal
           variant={modalVariant}
           width={cols}
-          height={rows}
+          height={narRows}
           lines={activeModal.lines}
           scrollRef={modalScrollRef}
+          topOffset={conversationPaneTop}
         />
       )}
       {activeModal?.kind === "character_sheet" && (
         <CharacterSheetModal
           variant={modalVariant}
           width={cols}
-          height={rows}
+          height={narRows}
           content={activeModal.content}
           scrollRef={modalScrollRef}
+          topOffset={conversationPaneTop}
         />
       )}
       {retryOverlay && (
