@@ -36,7 +36,7 @@ export function InputLine({
   const inputWidth = width != null ? width - prefixWidth : undefined;
 
   return (
-    <Box height={1}>
+    <Box height={1} width={width}>
       <Text bold>{prefix}</Text>
       <Text> &gt; </Text>
       <InlineTextInput

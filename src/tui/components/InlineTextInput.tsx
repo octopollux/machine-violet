@@ -255,14 +255,16 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", availab
   }
 
   const rendered = useMemo(() => {
-    if (isDisabled) {
-      return renderState.value;
-    }
-    if (renderState.value.length === 0) {
-      return cursorChar;
-    }
+    let result: string;
+    let visibleLen: number;
 
-    if (needsViewport) {
+    if (isDisabled) {
+      result = renderState.value;
+      visibleLen = renderState.value.length;
+    } else if (renderState.value.length === 0) {
+      result = cursorChar;
+      visibleLen = 1;
+    } else if (needsViewport) {
       const viewStart = computeViewStart(viewStartRef.current, renderState.cursorOffset, availableWidth, renderState.value.length);
       viewStartRef.current = viewStart;
 
@@ -272,7 +274,7 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", availab
       const sliceEnd = atEnd ? Math.min(viewEnd - 1, renderState.value.length) : Math.min(viewEnd, renderState.value.length);
       const visible = renderState.value.slice(viewStart, sliceEnd);
 
-      let result = "";
+      result = "";
       for (let i = 0; i < visible.length; i++) {
         const globalIndex = viewStart + i;
         result += globalIndex === renderState.cursorOffset ? chalk.inverse(visible[i]) : visible[i];
@@ -280,19 +282,29 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", availab
       if (atEnd && renderState.cursorOffset >= viewStart && renderState.cursorOffset < viewEnd) {
         result += cursorChar;
       }
-      return result;
+      // Viewport already fills availableWidth
+      visibleLen = availableWidth;
+    } else {
+      // No viewport needed — render full text
+      result = "";
+      let index = 0;
+      for (const char of renderState.value) {
+        result += index === renderState.cursorOffset ? chalk.inverse(char) : char;
+        index++;
+      }
+      const atEnd = renderState.cursorOffset === renderState.value.length;
+      if (atEnd) {
+        result += cursorChar;
+      }
+      visibleLen = renderState.value.length + (atEnd ? 1 : 0);
     }
 
-    // No viewport needed — render full text
-    let result = "";
-    let index = 0;
-    for (const char of renderState.value) {
-      result += index === renderState.cursorOffset ? chalk.inverse(char) : char;
-      index++;
+    // Pad to fixed width so the Text element never changes visual width.
+    // This prevents Yoga layout reflows that corrupt Ink's ANSI output.
+    if (availableWidth != null && availableWidth > 0 && visibleLen < availableWidth) {
+      result += " ".repeat(availableWidth - visibleLen);
     }
-    if (renderState.cursorOffset === renderState.value.length) {
-      result += cursorChar;
-    }
+
     return result;
   }, [isDisabled, renderState.value, renderState.cursorOffset, availableWidth, needsViewport]);
 
