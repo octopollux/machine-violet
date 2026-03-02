@@ -2,7 +2,7 @@
  * Theme system types for multi-line ASCII art borders.
  */
 
-import type { Color, SwatchParams, HarmonyType } from "../color/index.js";
+import type { Color, SwatchParams, HarmonyType, GradientPreset } from "../color/index.js";
 
 /** A single theme component (corner, edge, separator, etc.) */
 export interface ThemeComponent {
@@ -86,6 +86,12 @@ export interface ThemeColorMap {
   sideFrame: number;
 }
 
+/** Gradient configuration for per-character border color variation. */
+export interface GradientConfig {
+  /** Name of a registered gradient preset. */
+  preset: string;
+}
+
 /** Swatch configuration for generating colors from a key color. */
 export interface SwatchConfig {
   preset: string;
@@ -101,6 +107,8 @@ export type StyleVariant = "exploration" | "combat" | "ooc" | "levelup" | "dev";
 export interface VariantOverride {
   swatchConfig?: Partial<SwatchConfig>;
   colorMap?: Partial<ThemeColorMap>;
+  /** Override gradient; null disables gradient for this variant. */
+  gradient?: GradientConfig | null;
 }
 
 /** Full theme definition — asset reference + swatch config + variant overrides. */
@@ -113,6 +121,8 @@ export interface ThemeDefinition {
   swatchConfig: SwatchConfig;
   /** Default color map. */
   colorMap: ThemeColorMap;
+  /** Gradient configuration for per-character border variation. */
+  gradient?: GradientConfig;
   /** Per-variant overrides. */
   variants?: Partial<Record<StyleVariant, VariantOverride>>;
 }
@@ -126,4 +136,6 @@ export interface ResolvedTheme {
   variant: StyleVariant;
   /** The key color used to generate this theme. */
   keyColor: string;
+  /** Resolved gradient preset, if configured. */
+  gradient?: GradientPreset;
 }
