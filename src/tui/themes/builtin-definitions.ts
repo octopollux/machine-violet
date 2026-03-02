@@ -25,10 +25,12 @@ export const BUILTIN_DEFINITIONS: Record<string, ThemeDefinition> = {
       combat: {
         swatchConfig: { preset: "ember" },
         colorMap: { border: 6, corner: 7 },
+        gradient: { preset: "hueShift" },  // ominous hue shift in combat
       },
       ooc: {
         swatchConfig: { preset: "ethereal" },
         colorMap: { border: 1, corner: 2 },
+        gradient: null,  // flat, calm for meta discussion
       },
     },
   },
@@ -42,6 +44,7 @@ export const BUILTIN_DEFINITIONS: Record<string, ThemeDefinition> = {
       combat: {
         swatchConfig: { preset: "cyberpunk" },
         colorMap: { border: 5, corner: 6 },
+        gradient: { preset: "hueShift" },  // chaotic magical energy
       },
     },
   },
@@ -54,9 +57,11 @@ export const BUILTIN_DEFINITIONS: Record<string, ThemeDefinition> = {
     variants: {
       combat: {
         colorMap: { border: 7, corner: 8 },
+        gradient: { preset: "vignette" },  // targeting scope darkening
       },
       ooc: {
         swatchConfig: { preset: "ethereal" },
+        gradient: { preset: "shimmer" },  // softer for OOC
       },
     },
   },
@@ -66,6 +71,15 @@ export const BUILTIN_DEFINITIONS: Record<string, ThemeDefinition> = {
     swatchConfig: { preset: "foliage", harmony: "analogous" },
     colorMap: { ...DEFAULT_COLOR_MAP, border: 0, corner: 0, separator: 0 },
     gradient: { preset: "shimmer" },
+    variants: {
+      combat: {
+        colorMap: { border: 3, corner: 4 },
+        gradient: { preset: "vignette" },  // subtle edge drama
+      },
+      ooc: {
+        gradient: null,  // flattest possible for minimal OOC
+      },
+    },
   },
 };
 

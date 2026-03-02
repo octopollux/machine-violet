@@ -57,8 +57,8 @@ describe("resolveTheme", () => {
 
   it("variant without override uses base config", () => {
     const def = BUILTIN_DEFINITIONS["clean"];
-    // clean has no variant overrides
-    const resolved = resolveTheme(def, "combat", "#888888");
+    // clean has no levelup variant override
+    const resolved = resolveTheme(def, "levelup", "#888888");
     expect(resolved.colorMap.border).toBe(0);
   });
 
