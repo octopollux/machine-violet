@@ -137,19 +137,22 @@ describe("parseThemeAsset", () => {
     expect(asset.components.turn_separator.rows).toEqual(["── ◆ ──"]);
   });
 
-  it("edges are height-exempt (can be shorter than @height)", () => {
-    // height-2 theme with single-row edges
+  it("edges and separators are height-flexible (can be shorter than @height)", () => {
+    // height-2 theme with single-row edges and separators
     const theme = TWO_ROW_THEME
       .replace("[edge_top]\n═─\n ·", "[edge_top]\n═─")
       .replace("[edge_bottom]\n ·\n═─", "[edge_bottom]\n═─")
       .replace("[edge_left]\n║\n║", "[edge_left]\n║")
-      .replace("[edge_right]\n║\n║", "[edge_right]\n║");
+      .replace("[edge_right]\n║\n║", "[edge_right]\n║")
+      .replace("[separator_left_top]\n╠═\n║", "[separator_left_top]\n╠═")
+      .replace("[separator_right_top]\n═╣\n ║", "[separator_right_top]\n═╣")
+      .replace("[separator_left_bottom]\n║\n╠═", "[separator_left_bottom]\n╠═")
+      .replace("[separator_right_bottom]\n ║\n═╣", "[separator_right_bottom]\n═╣");
     const asset = parseThemeAsset(theme);
     expect(asset.height).toBe(2);
     expect(asset.components.edge_top.height).toBe(1);
-    expect(asset.components.edge_bottom.height).toBe(1);
-    expect(asset.components.edge_left.height).toBe(1);
-    expect(asset.components.edge_right.height).toBe(1);
+    expect(asset.components.separator_left_top.height).toBe(1);
+    expect(asset.components.separator_right_bottom.height).toBe(1);
     // Corners still match @height
     expect(asset.components.corner_tl.height).toBe(2);
   });

@@ -286,15 +286,14 @@ function buildThemeAsset(parsed: ParsedSections): ThemeAsset {
     throw new Error("Theme file missing @name metadata");
   }
 
-  // Components that are NOT height-constrained.
+  // Only corners are height-constrained to @height.
   // Edges tile to fill (composer uses rows[r] ?? "" / i % height),
-  // so they can be shorter than @height. Turn separator is freeform.
-  const heightExempt = new Set<string>([
-    "edge_top",
-    "edge_bottom",
-    "edge_left",
-    "edge_right",
-    "turn_separator",
+  // separators use rows[r] ?? "" fallback, and turn_separator is freeform.
+  const heightConstrained = new Set<string>([
+    "corner_tl",
+    "corner_tr",
+    "corner_bl",
+    "corner_br",
   ]);
 
   const result: Partial<Record<ComponentName, ThemeComponent>> = {};
@@ -305,7 +304,7 @@ function buildThemeAsset(parsed: ParsedSections): ThemeAsset {
       throw new Error(`Theme "${name}" missing required component: [${compName}]`);
     }
 
-    const expectedHeight = heightExempt.has(compName) ? null : height;
+    const expectedHeight = heightConstrained.has(compName) ? height : null;
     result[compName] = buildComponent(name, compName, rows, expectedHeight);
   }
 
