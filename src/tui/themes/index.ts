@@ -31,12 +31,14 @@ export {
   loadCustomTheme,
   listBuiltinThemes,
   loadBuiltinPlayerFrame,
+  loadThemeDefinition,
   resetThemeCache,
 } from "./loader.js";
 
 export { resolveTheme } from "./resolver.js";
 
 export {
+  DEFAULT_DEFINITION,
   BUILTIN_DEFINITIONS,
   getBuiltinDefinition,
   listBuiltinDefinitions,

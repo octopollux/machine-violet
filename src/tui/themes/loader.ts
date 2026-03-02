@@ -6,15 +6,39 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
-import type { ThemeAsset, PlayerPaneFrame } from "./types.js";
-import { parseThemeAsset, parsePlayerPaneFrame } from "./parser.js";
+import type { ThemeAsset, PlayerPaneFrame, ThemeDefinition } from "./types.js";
+import {
+  parseSections,
+  parseThemeAsset,
+  parsePlayerPaneFrame,
+  extractThemeConfig,
+  type ParsedSections,
+} from "./parser.js";
+import { DEFAULT_DEFINITION, resetBuiltinDefinitionsCache } from "./builtin-definitions.js";
 
 const cache = new Map<string, ThemeAsset>();
 const playerFrameCache = new Map<string, PlayerPaneFrame>();
+const parsedSectionsCache = new Map<string, ParsedSections>();
+const definitionCache = new Map<string, ThemeDefinition>();
 
 /** Directory containing built-in .theme files. */
 function assetsDir(): string {
   return join(import.meta.dirname, "assets");
+}
+
+/**
+ * Load and cache parsed sections for a built-in theme file.
+ * Shared by loadBuiltinTheme and loadThemeDefinition to avoid double-reading.
+ */
+function loadParsedSections(name: string): ParsedSections {
+  const cached = parsedSectionsCache.get(name);
+  if (cached) return cached;
+
+  const filePath = join(assetsDir(), `${name}.theme`);
+  const content = readFileSync(filePath, "utf-8");
+  const parsed = parseSections(content);
+  parsedSectionsCache.set(name, parsed);
+  return parsed;
 }
 
 /**
@@ -25,9 +49,8 @@ export function loadBuiltinTheme(name: string): ThemeAsset {
   const cached = cache.get(name);
   if (cached) return cached;
 
-  const filePath = join(assetsDir(), `${name}.theme`);
-  const content = readFileSync(filePath, "utf-8");
-  const asset = parseThemeAsset(content);
+  const parsed = loadParsedSections(name);
+  const asset = parseThemeAsset(parsed);
   cache.set(name, asset);
   return asset;
 }
@@ -61,6 +84,52 @@ export function loadBuiltinPlayerFrame(name: string): PlayerPaneFrame {
   return frame;
 }
 
+/**
+ * Load a ThemeDefinition from a built-in .theme file.
+ * Reads [colors] + [variant_*] config sections and merges onto DEFAULT_DEFINITION.
+ * @param name - Theme name without .theme extension
+ */
+export function loadThemeDefinition(name: string): ThemeDefinition {
+  const cached = definitionCache.get(name);
+  if (cached) return cached;
+
+  const parsed = loadParsedSections(name);
+  const fileConfig = extractThemeConfig(parsed.metadata, parsed.sections);
+
+  const definition: ThemeDefinition = {
+    ...DEFAULT_DEFINITION,
+    assetName: name,
+    swatchConfig: {
+      ...DEFAULT_DEFINITION.swatchConfig,
+      ...fileConfig.swatchConfig,
+    },
+    colorMap: {
+      ...DEFAULT_DEFINITION.colorMap,
+      ...fileConfig.colorMap,
+    },
+  };
+
+  if (fileConfig.gradient !== undefined) {
+    if (fileConfig.gradient === null) {
+      // Explicitly no gradient — omit the key
+      delete definition.gradient;
+    } else {
+      definition.gradient = fileConfig.gradient;
+    }
+  }
+
+  if (fileConfig.playerFrameName) {
+    definition.playerFrameName = fileConfig.playerFrameName;
+  }
+
+  if (fileConfig.variants) {
+    definition.variants = fileConfig.variants;
+  }
+
+  definitionCache.set(name, definition);
+  return definition;
+}
+
 /** List available built-in theme names. */
 export function listBuiltinThemes(): string[] {
   const dir = assetsDir();
@@ -73,4 +142,7 @@ export function listBuiltinThemes(): string[] {
 export function resetThemeCache(): void {
   cache.clear();
   playerFrameCache.clear();
+  parsedSectionsCache.clear();
+  definitionCache.clear();
+  resetBuiltinDefinitionsCache();
 }

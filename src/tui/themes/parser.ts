@@ -1,6 +1,7 @@
 /**
  * Parser for .theme and .player-frame asset files.
  * INI-like format with [section] headers and literal ASCII art content.
+ * Supports HTML-style comments (<!-- ... -->) and [colors]/[variant_*] config sections.
  */
 
 import {
@@ -9,6 +10,11 @@ import {
   type ComponentName,
   type PlayerPaneFrame,
   type PlayerPaneComponentName,
+  type SwatchConfig,
+  type ThemeColorMap,
+  type GradientConfig,
+  type StyleVariant,
+  type VariantOverride,
   REQUIRED_COMPONENTS,
   PLAYER_PANE_COMPONENTS,
   PLAYER_PANE_EDGE_COMPONENTS,
@@ -22,14 +28,24 @@ function displayWidth(s: string): number {
 }
 
 /** Parsed metadata and raw sections from an INI-like asset file. */
-interface ParsedSections {
+export interface ParsedSections {
   metadata: Record<string, string>;
   sections: Map<string, string[]>;
+}
+
+/** Color/gradient/variant config extracted from a .theme file. */
+export interface ThemeFileConfig {
+  swatchConfig?: Partial<SwatchConfig>;
+  colorMap?: Partial<ThemeColorMap>;
+  gradient?: GradientConfig | null;
+  playerFrameName?: string;
+  variants?: Partial<Record<StyleVariant, VariantOverride>>;
 }
 
 /**
  * Parse the INI-like structure shared by .theme and .player-frame files.
  * Returns raw metadata key/value pairs and section name → row content.
+ * HTML comments (<!-- ... -->) are stripped before processing.
  */
 export function parseSections(content: string): ParsedSections {
   const lines = content.replace(/\r\n/g, "\n").split("\n");
@@ -38,8 +54,24 @@ export function parseSections(content: string): ParsedSections {
   const sections = new Map<string, string[]>();
   let currentSection: string | null = null;
   let currentRows: string[] = [];
+  let inComment = false;
 
   for (const line of lines) {
+    // Comment handling
+    if (inComment) {
+      if (line.includes("-->")) {
+        inComment = false;
+      }
+      continue;
+    }
+    if (line.includes("<!--")) {
+      if (!line.includes("-->")) {
+        inComment = true;
+      }
+      // Single-line comment (contains both <!-- and -->) or opening line: skip
+      continue;
+    }
+
     // Metadata line
     if (line.startsWith("@")) {
       const colonIdx = line.indexOf(":");
@@ -73,6 +105,118 @@ export function parseSections(content: string): ParsedSections {
   }
 
   return { metadata, sections };
+}
+
+/**
+ * Parse key: value lines from a config section's raw rows.
+ * Skips blank lines and lines without a colon.
+ */
+export function parseConfigLines(lines: string[]): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const colonIdx = trimmed.indexOf(":");
+    if (colonIdx === -1) continue;
+    const key = trimmed.slice(0, colonIdx).trim();
+    const value = trimmed.slice(colonIdx + 1).trim();
+    if (key) result[key] = value;
+  }
+  return result;
+}
+
+/** Color map keys in .theme files → ThemeColorMap property names. */
+const COLOR_MAP_KEYS: Record<string, keyof ThemeColorMap> = {
+  border: "border",
+  corner: "corner",
+  separator: "separator",
+  title: "title",
+  turn_indicator: "turnIndicator",
+  side_frame: "sideFrame",
+};
+
+/**
+ * Parse a single config section (colors or variant) into swatch/colorMap/gradient parts.
+ */
+function parseColorSection(kv: Record<string, string>): {
+  swatchConfig?: Partial<SwatchConfig>;
+  colorMap?: Partial<ThemeColorMap>;
+  gradient?: GradientConfig | null;
+} {
+  let swatchConfig: Partial<SwatchConfig> | undefined;
+  let colorMap: Partial<ThemeColorMap> | undefined;
+  let gradient: GradientConfig | null | undefined;
+
+  if (kv["preset"]) {
+    swatchConfig = { ...swatchConfig, preset: kv["preset"] };
+  }
+  if (kv["harmony"]) {
+    swatchConfig = { ...swatchConfig, harmony: kv["harmony"] as SwatchConfig["harmony"] };
+  }
+
+  if (kv["gradient"] !== undefined) {
+    gradient = kv["gradient"] === "none" ? null : { preset: kv["gradient"] };
+  }
+
+  for (const [fileKey, mapKey] of Object.entries(COLOR_MAP_KEYS)) {
+    if (kv[fileKey] !== undefined) {
+      const n = parseInt(kv[fileKey], 10);
+      if (!isNaN(n)) {
+        colorMap = { ...colorMap, [mapKey]: n };
+      }
+    }
+  }
+
+  return {
+    ...(swatchConfig ? { swatchConfig } : {}),
+    ...(colorMap ? { colorMap } : {}),
+    ...(gradient !== undefined ? { gradient } : {}),
+  };
+}
+
+/**
+ * Extract theme color/gradient/variant config from parsed sections.
+ * Reads [colors] for base config and [variant_*] for per-variant overrides.
+ * Also reads @player_frame metadata.
+ */
+export function extractThemeConfig(
+  metadata: Record<string, string>,
+  sections: Map<string, string[]>,
+): ThemeFileConfig {
+  const result: ThemeFileConfig = {};
+
+  // @player_frame metadata
+  if (metadata["player_frame"]) {
+    result.playerFrameName = metadata["player_frame"];
+  }
+
+  // [colors] section → base swatch + color map + gradient
+  const colorsRows = sections.get("colors");
+  if (colorsRows) {
+    const kv = parseConfigLines(colorsRows);
+    const parsed = parseColorSection(kv);
+    if (parsed.swatchConfig) result.swatchConfig = parsed.swatchConfig;
+    if (parsed.colorMap) result.colorMap = parsed.colorMap;
+    if (parsed.gradient !== undefined) result.gradient = parsed.gradient;
+  }
+
+  // [variant_*] sections → per-variant overrides
+  for (const [sectionName, rows] of sections) {
+    const variantMatch = sectionName.match(/^variant_(.+)$/);
+    if (!variantMatch) continue;
+    const variantName = variantMatch[1] as StyleVariant;
+    const kv = parseConfigLines(rows);
+    const parsed = parseColorSection(kv);
+    const override: VariantOverride = {};
+    if (parsed.swatchConfig) override.swatchConfig = parsed.swatchConfig;
+    if (parsed.colorMap) override.colorMap = parsed.colorMap;
+    if (parsed.gradient !== undefined) override.gradient = parsed.gradient;
+    if (Object.keys(override).length > 0) {
+      result.variants = { ...result.variants, [variantName]: override };
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -111,12 +255,20 @@ function buildComponent(
   };
 }
 
+/** Config section names that should not be treated as visual components. */
+const CONFIG_SECTIONS = new Set(["colors"]);
+const CONFIG_SECTION_PREFIX = "variant_";
+
+function isConfigSection(name: string): boolean {
+  return CONFIG_SECTIONS.has(name) || name.startsWith(CONFIG_SECTION_PREFIX);
+}
+
 /**
- * Parse a .theme file content into a ThemeAsset.
- * Validates that all required components are present and row counts match @height.
+ * Build a ThemeAsset from pre-parsed sections.
+ * Config sections ([colors], [variant_*]) are skipped — only art sections are processed.
  */
-export function parseThemeAsset(content: string): ThemeAsset {
-  const { metadata, sections } = parseSections(content);
+function buildThemeAsset(parsed: ParsedSections): ThemeAsset {
+  const { metadata, sections } = parsed;
 
   const name = metadata["name"] ?? "";
   const genreTags = metadata["genre_tags"]
@@ -155,6 +307,25 @@ export function parseThemeAsset(content: string): ThemeAsset {
     height,
     components: result as Record<ComponentName, ThemeComponent>,
   };
+}
+
+/**
+ * Parse a .theme file content into a ThemeAsset.
+ * Validates that all required components are present and row counts match @height.
+ * Accepts either raw content string or pre-parsed ParsedSections.
+ */
+export function parseThemeAsset(input: string | ParsedSections): ThemeAsset {
+  const parsed = typeof input === "string" ? parseSections(input) : input;
+
+  // Filter out config sections so they don't interfere with component parsing
+  const artSections = new Map<string, string[]>();
+  for (const [name, rows] of parsed.sections) {
+    if (!isConfigSection(name)) {
+      artSections.set(name, rows);
+    }
+  }
+
+  return buildThemeAsset({ metadata: parsed.metadata, sections: artSections });
 }
 
 /**

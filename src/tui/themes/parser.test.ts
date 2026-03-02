@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { parseThemeAsset, parsePlayerPaneFrame } from "./parser.js";
+import {
+  parseThemeAsset,
+  parsePlayerPaneFrame,
+  parseSections,
+  parseConfigLines,
+  extractThemeConfig,
+} from "./parser.js";
 
 const MINIMAL_THEME = `@name: test
 @genre_tags: fantasy, horror
@@ -327,5 +333,328 @@ describe("parsePlayerPaneFrame", () => {
     const frame = parsePlayerPaneFrame(crlf);
     expect(frame.name).toBe("test-frame");
     expect(frame.components.corner_tl.rows).toEqual(["┌"]);
+  });
+});
+
+describe("parseSections — comment stripping", () => {
+  it("strips single-line comments", () => {
+    const content = `@name: test
+<!-- This is a comment -->
+@height: 1
+
+[corner_tl]
+╔
+`;
+    const { metadata } = parseSections(content);
+    expect(metadata["name"]).toBe("test");
+    expect(metadata["height"]).toBe("1");
+  });
+
+  it("strips multi-line comments", () => {
+    const content = `@name: test
+<!--
+  This is a
+  multi-line comment
+-->
+@height: 1
+
+[corner_tl]
+╔
+`;
+    const { metadata } = parseSections(content);
+    expect(metadata["name"]).toBe("test");
+    expect(metadata["height"]).toBe("1");
+  });
+
+  it("strips comments inside sections", () => {
+    const content = `@name: test
+@height: 1
+
+[colors]
+preset: ember
+<!-- harmony: triadic -->
+harmony: analogous
+
+[corner_tl]
+╔
+`;
+    const { sections } = parseSections(content);
+    const colorLines = sections.get("colors")!;
+    expect(colorLines.join("\n")).not.toContain("triadic");
+    expect(colorLines.join("\n")).toContain("analogous");
+  });
+
+  it("strips multi-line comments spanning section content", () => {
+    const content = `@name: test
+
+<!--
+[variant_combat]
+preset: cyberpunk
+border: 5
+-->
+
+[corner_tl]
+╔
+`;
+    const { sections } = parseSections(content);
+    expect(sections.has("variant_combat")).toBe(false);
+  });
+
+  it("does not include comment content as section rows", () => {
+    const content = `@name: test
+
+[colors]
+preset: ember
+<!-- This should not appear -->
+gradient: vignette
+`;
+    const { sections } = parseSections(content);
+    const lines = sections.get("colors")!;
+    const joined = lines.join("\n");
+    expect(joined).not.toContain("should not appear");
+    expect(joined).toContain("preset: ember");
+    expect(joined).toContain("gradient: vignette");
+  });
+});
+
+describe("parseConfigLines", () => {
+  it("parses key: value pairs", () => {
+    const result = parseConfigLines(["preset: ember", "harmony: analogous"]);
+    expect(result).toEqual({ preset: "ember", harmony: "analogous" });
+  });
+
+  it("skips blank lines", () => {
+    const result = parseConfigLines(["preset: ember", "", "harmony: analogous"]);
+    expect(result).toEqual({ preset: "ember", harmony: "analogous" });
+  });
+
+  it("skips lines without colons", () => {
+    const result = parseConfigLines(["preset: ember", "no colon here", "harmony: analogous"]);
+    expect(result).toEqual({ preset: "ember", harmony: "analogous" });
+  });
+
+  it("handles leading/trailing whitespace", () => {
+    const result = parseConfigLines(["  preset:  ember  ", "  border : 3 "]);
+    expect(result).toEqual({ preset: "ember", border: "3" });
+  });
+
+  it("returns empty object for empty input", () => {
+    expect(parseConfigLines([])).toEqual({});
+  });
+});
+
+describe("extractThemeConfig", () => {
+  it("extracts base colors config from [colors] section", () => {
+    const sections = new Map<string, string[]>();
+    sections.set("colors", [
+      "preset: ember",
+      "harmony: analogous",
+      "gradient: vignette",
+      "border: 2",
+      "corner: 3",
+      "separator: 4",
+      "title: 5",
+      "turn_indicator: 6",
+      "side_frame: 1",
+    ]);
+
+    const config = extractThemeConfig({}, sections);
+    expect(config.swatchConfig).toEqual({ preset: "ember", harmony: "analogous" });
+    expect(config.colorMap).toEqual({
+      border: 2,
+      corner: 3,
+      separator: 4,
+      title: 5,
+      turnIndicator: 6,
+      sideFrame: 1,
+    });
+    expect(config.gradient).toEqual({ preset: "vignette" });
+  });
+
+  it("handles gradient: none → null", () => {
+    const sections = new Map<string, string[]>();
+    sections.set("colors", ["gradient: none"]);
+
+    const config = extractThemeConfig({}, sections);
+    expect(config.gradient).toBeNull();
+  });
+
+  it("extracts variant overrides from [variant_*] sections", () => {
+    const sections = new Map<string, string[]>();
+    sections.set("variant_combat", [
+      "preset: ember",
+      "border: 6",
+      "corner: 7",
+      "gradient: hueShift",
+    ]);
+    sections.set("variant_ooc", [
+      "preset: ethereal",
+      "border: 1",
+      "corner: 2",
+      "gradient: none",
+    ]);
+
+    const config = extractThemeConfig({}, sections);
+    expect(config.variants?.combat).toEqual({
+      swatchConfig: { preset: "ember" },
+      colorMap: { border: 6, corner: 7 },
+      gradient: { preset: "hueShift" },
+    });
+    expect(config.variants?.ooc).toEqual({
+      swatchConfig: { preset: "ethereal" },
+      colorMap: { border: 1, corner: 2 },
+      gradient: null,
+    });
+  });
+
+  it("returns empty config when no [colors] or [variant_*] present", () => {
+    const sections = new Map<string, string[]>();
+    sections.set("corner_tl", ["╔"]);
+    const config = extractThemeConfig({}, sections);
+    expect(config.swatchConfig).toBeUndefined();
+    expect(config.colorMap).toBeUndefined();
+    expect(config.gradient).toBeUndefined();
+    expect(config.variants).toBeUndefined();
+  });
+
+  it("extracts @player_frame from metadata", () => {
+    const config = extractThemeConfig({ player_frame: "ornate" }, new Map());
+    expect(config.playerFrameName).toBe("ornate");
+  });
+
+  it("partial color map (only some indices)", () => {
+    const sections = new Map<string, string[]>();
+    sections.set("colors", ["border: 0", "corner: 0"]);
+    const config = extractThemeConfig({}, sections);
+    expect(config.colorMap).toEqual({ border: 0, corner: 0 });
+  });
+});
+
+describe("parseThemeAsset with config sections", () => {
+  const THEME_WITH_CONFIG = `@name: test
+@genre_tags: fantasy
+@height: 1
+
+[colors]
+preset: ember
+harmony: analogous
+gradient: vignette
+border: 2
+
+[variant_combat]
+preset: cyberpunk
+border: 6
+
+[corner_tl]
+╔
+
+[corner_tr]
+╗
+
+[corner_bl]
+╚
+
+[corner_br]
+╝
+
+[edge_top]
+═
+
+[edge_bottom]
+═
+
+[edge_left]
+║
+
+[edge_right]
+║
+
+[separator_left_top]
+╠
+
+[separator_right_top]
+╣
+
+[separator_left_bottom]
+╠
+
+[separator_right_bottom]
+╣
+
+[turn_separator]
+── ◆ ──
+`;
+
+  it("parses theme with config sections without errors", () => {
+    const asset = parseThemeAsset(THEME_WITH_CONFIG);
+    expect(asset.name).toBe("test");
+    expect(asset.height).toBe(1);
+    expect(Object.keys(asset.components)).toHaveLength(13);
+  });
+
+  it("config sections do not appear as components", () => {
+    const asset = parseThemeAsset(THEME_WITH_CONFIG);
+    expect((asset.components as Record<string, unknown>)["colors"]).toBeUndefined();
+    expect((asset.components as Record<string, unknown>)["variant_combat"]).toBeUndefined();
+  });
+
+  it("accepts pre-parsed ParsedSections", () => {
+    const parsed = parseSections(THEME_WITH_CONFIG);
+    const asset = parseThemeAsset(parsed);
+    expect(asset.name).toBe("test");
+    expect(asset.components.corner_tl.rows).toEqual(["╔"]);
+  });
+
+  it("theme with comments + config parses cleanly", () => {
+    const content = `<!-- Test Theme -->
+@name: commented
+@height: 1
+
+[colors]
+<!-- Base palette -->
+preset: ember
+
+[corner_tl]
+╔
+
+[corner_tr]
+╗
+
+[corner_bl]
+╚
+
+[corner_br]
+╝
+
+[edge_top]
+═
+
+[edge_bottom]
+═
+
+[edge_left]
+║
+
+[edge_right]
+║
+
+[separator_left_top]
+╠
+
+[separator_right_top]
+╣
+
+[separator_left_bottom]
+╠
+
+[separator_right_bottom]
+╣
+
+[turn_separator]
+── ◆ ──
+`;
+    const asset = parseThemeAsset(content);
+    expect(asset.name).toBe("commented");
+    expect(Object.keys(asset.components)).toHaveLength(13);
   });
 });
