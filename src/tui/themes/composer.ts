@@ -3,7 +3,7 @@
  * Assembles multi-line ASCII art borders from ThemeAsset components.
  */
 
-import type { ThemeAsset, PlayerPaneFrame } from "./types.js";
+import type { ThemeAsset, ThemeComponent, PlayerPaneFrame } from "./types.js";
 
 /** A composed frame: an array of string rows ready for rendering. */
 export interface ComposedFrame {
@@ -87,9 +87,19 @@ export function composeTopFrame(
 }
 
 /**
+ * Bottom-align a component's row access: short components align to the last row.
+ * For a 1-row edge in a height-2 frame, row 0 → "" and row 1 → the content.
+ */
+function bottomRow(comp: ThemeComponent, r: number, frameHeight: number): string {
+  const idx = r - (frameHeight - comp.height);
+  return idx >= 0 ? (comp.rows[idx] ?? "") : "";
+}
+
+/**
  * Compose the bottom frame (Conversation Pane bottom border).
  * Same structure as top but uses corner_bl/br, edge_bottom, separator_left/right_bottom.
  * Turn indicator text appears on the last row.
+ * Non-corner components are bottom-aligned so short edges sit on the closing row.
  */
 export function composeBottomFrame(
   asset: ThemeAsset,
@@ -112,9 +122,9 @@ export function composeBottomFrame(
   for (let r = 0; r < asset.height; r++) {
     const cbl = corner_bl.rows[r] ?? "";
     const cbr = corner_br.rows[r] ?? "";
-    const slb = turnWidth > 0 ? (separator_left_bottom.rows[r] ?? "") : "";
-    const srb = turnWidth > 0 ? (separator_right_bottom.rows[r] ?? "") : "";
-    const edge = edge_bottom.rows[r] ?? "";
+    const slb = turnWidth > 0 ? bottomRow(separator_left_bottom, r, asset.height) : "";
+    const srb = turnWidth > 0 ? bottomRow(separator_right_bottom, r, asset.height) : "";
+    const edge = bottomRow(edge_bottom, r, asset.height);
 
     const fixedWidth = cbl.length + cbr.length + slb.length + srb.length;
     const centerWidth = turnWidth > 0 ? turnWidth : 0;
