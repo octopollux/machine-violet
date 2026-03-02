@@ -286,8 +286,16 @@ function buildThemeAsset(parsed: ParsedSections): ThemeAsset {
     throw new Error("Theme file missing @name metadata");
   }
 
-  // Components that are NOT height-constrained
-  const heightExempt = new Set<string>(["turn_separator"]);
+  // Components that are NOT height-constrained.
+  // Edges tile to fill (composer uses rows[r] ?? "" / i % height),
+  // so they can be shorter than @height. Turn separator is freeform.
+  const heightExempt = new Set<string>([
+    "edge_top",
+    "edge_bottom",
+    "edge_left",
+    "edge_right",
+    "turn_separator",
+  ]);
 
   const result: Partial<Record<ComponentName, ThemeComponent>> = {};
 
