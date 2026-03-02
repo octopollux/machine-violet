@@ -139,17 +139,19 @@ interface ThemedSideFrameProps {
  */
 export function ThemedSideFrame({ theme, side, height }: ThemedSideFrameProps) {
   const rows = composeSideColumn(theme.asset, side, height);
-  const baseHex = themeColor(theme, "sideFrame");
+  const sideHex = themeColor(theme, "sideFrame");
+  // Gradient uses the border color as base so hue/chroma shifts match
+  // the horizontal borders for cohesive picture-frame symmetry.
+  const gradientBaseHex = themeColor(theme, "border") ?? sideHex;
   const frameWidth = theme.asset.components.edge_left.width;
   const gradient = theme.gradient;
 
   return (
     <Box flexDirection="column" width={frameWidth}>
       {rows.map((row, i) => {
-        if (gradient && baseHex) {
-          // One color per row: t = mirrorT(rowIndex, totalHeight)
+        if (gradient && gradientBaseHex) {
           const t = mirrorT(i, rows.length);
-          const rowColor = applyGradient(gradient, hexToOklch(baseHex), t);
+          const rowColor = applyGradient(gradient, hexToOklch(gradientBaseHex), t);
           return (
             <Text key={i} color={rowColor}>
               {row}
@@ -157,7 +159,7 @@ export function ThemedSideFrame({ theme, side, height }: ThemedSideFrameProps) {
           );
         }
         return (
-          <Text key={i} color={baseHex}>
+          <Text key={i} color={sideHex}>
             {row}
           </Text>
         );
