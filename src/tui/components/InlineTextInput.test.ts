@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeViewStart, reducer } from "./InlineTextInput.js";
+import { computeViewStart, reducer, RENDER_THROTTLE_MS } from "./InlineTextInput.js";
 
 describe("computeViewStart", () => {
   it("returns 0 when text fits in view", () => {
@@ -106,5 +106,46 @@ describe("reducer", () => {
       expect(next.value).toBe("");
       expect(next.cursorOffset).toBe(0);
     });
+  });
+});
+
+describe("render throttle constant", () => {
+  it("exports RENDER_THROTTLE_MS as a positive number", () => {
+    expect(RENDER_THROTTLE_MS).toBeGreaterThan(0);
+    expect(Number.isFinite(RENDER_THROTTLE_MS)).toBe(true);
+  });
+});
+
+describe("reducer with rapid sequential deletes", () => {
+  it("correctly chains multiple deletes from the same starting state", () => {
+    const make = (value: string, cursorOffset: number) => ({
+      previousValue: value,
+      value,
+      cursorOffset,
+    });
+
+    // Simulate rapid backspace: 5 deletes on "hello world" (cursor at end)
+    let state = make("hello world", 11);
+    for (let i = 0; i < 5; i++) {
+      state = reducer(state, { type: "delete" });
+    }
+    expect(state.value).toBe("hello ");
+    expect(state.cursorOffset).toBe(6);
+  });
+
+  it("stops deleting when cursor reaches position 0", () => {
+    const make = (value: string, cursorOffset: number) => ({
+      previousValue: value,
+      value,
+      cursorOffset,
+    });
+
+    // More deletes than characters: should empty the string, not crash
+    let state = make("abc", 3);
+    for (let i = 0; i < 10; i++) {
+      state = reducer(state, { type: "delete" });
+    }
+    expect(state.value).toBe("");
+    expect(state.cursorOffset).toBe(0);
   });
 });

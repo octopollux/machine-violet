@@ -1,4 +1,4 @@
-import React, { useReducer, useCallback, useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Text, useInput, useStdin } from "ink";
 import chalk from "chalk";
 
@@ -106,19 +106,70 @@ export interface InlineTextInputProps {
   onSubmit?: (value: string) => void;
 }
 
+/** Minimum interval (ms) between React re-renders triggered by input. */
+export const RENDER_THROTTLE_MS = 16;
+
 /**
  * Uncontrolled text input with full cursor positioning.
  * Supports: left/right arrows, Home/End, Ctrl+A/E, backspace, delete.
  * Clear by changing the React `key` prop.
+ *
+ * Actions are applied immediately to a ref-held state so the value is
+ * always current, but React re-renders are throttled to ~60 fps to
+ * prevent terminal rendering corruption during rapid key repeats.
  */
 export function InlineTextInput({ isDisabled = false, defaultValue = "", availableWidth, onChange, onSubmit }: InlineTextInputProps) {
-  const [state, dispatch] = useReducer(reducer, {
+  const initialState: State = {
     previousValue: defaultValue,
     value: defaultValue,
     cursorOffset: defaultValue.length,
-  });
+  };
+
+  // True state lives in a ref — always current, never triggers a render.
+  const stateRef = useRef<State>(initialState);
+
+  // Render state — synced from stateRef at a throttled rate.
+  const [renderState, setRenderState] = useState<State>(initialState);
+
+  // Timer handle for the throttled render sync.
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Track last value reported to onChange to avoid duplicate callbacks.
+  const lastReportedValueRef = useRef(defaultValue);
 
   const viewStartRef = useRef(0);
+
+  /** Flush ref state to render state immediately. */
+  const flushRender = useCallback(() => {
+    if (flushTimerRef.current !== null) {
+      clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = null;
+    }
+    setRenderState(stateRef.current);
+  }, []);
+
+  /** Apply an action and schedule a throttled render. */
+  const processAction = useCallback((action: Action) => {
+    const prev = stateRef.current;
+    const next = reducer(prev, action);
+    if (next === prev) return; // No state change (e.g. backspace at position 0)
+    stateRef.current = next;
+    if (flushTimerRef.current === null) {
+      flushTimerRef.current = setTimeout(() => {
+        flushTimerRef.current = null;
+        setRenderState(stateRef.current);
+      }, RENDER_THROTTLE_MS);
+    }
+  }, []);
+
+  // Clean up throttle timer on unmount.
+  useEffect(() => {
+    return () => {
+      if (flushTimerRef.current !== null) {
+        clearTimeout(flushTimerRef.current);
+      }
+    };
+  }, []);
 
   // Access Ink's internal event emitter to detect Home/End keys.
   // Ink's useInput doesn't expose these — its parser recognizes them but
@@ -134,25 +185,28 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", availab
 
     const handleRaw = (data: string) => {
       if (HOME_SEQUENCES.has(data)) {
-        dispatch({ type: "move-cursor-start" });
+        processAction({ type: "move-cursor-start" });
       } else if (END_SEQUENCES.has(data)) {
-        dispatch({ type: "move-cursor-end" });
+        processAction({ type: "move-cursor-end" });
       }
     };
 
     emitter.on("input", handleRaw);
     return () => { emitter.removeListener("input", handleRaw); };
-  }, [isDisabled, stdinCtx]);
+  }, [isDisabled, stdinCtx, processAction]);
 
   const submit = useCallback(() => {
-    onSubmit?.(state.value);
-  }, [state.value, onSubmit]);
+    flushRender();
+    onSubmit?.(stateRef.current.value);
+  }, [onSubmit, flushRender]);
 
+  // Fire onChange when the rendered value diverges from the last reported value.
   useEffect(() => {
-    if (state.value !== state.previousValue) {
-      onChange?.(state.value);
+    if (renderState.value !== lastReportedValueRef.current) {
+      lastReportedValueRef.current = renderState.value;
+      onChange?.(renderState.value);
     }
-  }, [state.previousValue, state.value, onChange]);
+  }, [renderState.value, onChange]);
 
   useInput((input, key) => {
     // Pass through keys we don't handle
@@ -165,22 +219,22 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", availab
     }
     // Ctrl+A → start of line (readline/emacs convention)
     if (key.ctrl && input === "a") {
-      dispatch({ type: "move-cursor-start" });
+      processAction({ type: "move-cursor-start" });
       return;
     }
     // Ctrl+E → end of line (readline/emacs convention)
     if (key.ctrl && input === "e") {
-      dispatch({ type: "move-cursor-end" });
+      processAction({ type: "move-cursor-end" });
       return;
     }
     if (key.leftArrow) {
-      dispatch({ type: "move-cursor-left" });
+      processAction({ type: "move-cursor-left" });
     } else if (key.rightArrow) {
-      dispatch({ type: "move-cursor-right" });
+      processAction({ type: "move-cursor-right" });
     } else if (key.backspace || key.delete) {
-      dispatch({ type: "delete" });
+      processAction({ type: "delete" });
     } else if (input && !key.ctrl && !key.meta) {
-      dispatch({ type: "insert", text: input });
+      processAction({ type: "insert", text: input });
     }
   }, { isActive: !isDisabled });
 
@@ -188,7 +242,7 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", availab
   const needsViewport = availableWidth != null
     && Number.isFinite(availableWidth)
     && availableWidth > 0
-    && state.value.length + 1 > availableWidth;
+    && renderState.value.length + 1 > availableWidth;
 
   // Reset viewport whenever the text fits without scrolling — this prevents
   // a stale offset from causing the window to jump when text grows back past
@@ -199,28 +253,28 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", availab
 
   const rendered = useMemo(() => {
     if (isDisabled) {
-      return state.value;
+      return renderState.value;
     }
-    if (state.value.length === 0) {
+    if (renderState.value.length === 0) {
       return cursorChar;
     }
 
     if (needsViewport) {
-      const viewStart = computeViewStart(viewStartRef.current, state.cursorOffset, availableWidth, state.value.length);
+      const viewStart = computeViewStart(viewStartRef.current, renderState.cursorOffset, availableWidth, renderState.value.length);
       viewStartRef.current = viewStart;
 
       const viewEnd = viewStart + availableWidth;
       // If cursor is at end of text, we need room for the cursor block
-      const atEnd = state.cursorOffset === state.value.length;
-      const sliceEnd = atEnd ? Math.min(viewEnd - 1, state.value.length) : Math.min(viewEnd, state.value.length);
-      const visible = state.value.slice(viewStart, sliceEnd);
+      const atEnd = renderState.cursorOffset === renderState.value.length;
+      const sliceEnd = atEnd ? Math.min(viewEnd - 1, renderState.value.length) : Math.min(viewEnd, renderState.value.length);
+      const visible = renderState.value.slice(viewStart, sliceEnd);
 
       let result = "";
       for (let i = 0; i < visible.length; i++) {
         const globalIndex = viewStart + i;
-        result += globalIndex === state.cursorOffset ? chalk.inverse(visible[i]) : visible[i];
+        result += globalIndex === renderState.cursorOffset ? chalk.inverse(visible[i]) : visible[i];
       }
-      if (atEnd && state.cursorOffset >= viewStart && state.cursorOffset < viewEnd) {
+      if (atEnd && renderState.cursorOffset >= viewStart && renderState.cursorOffset < viewEnd) {
         result += cursorChar;
       }
       return result;
@@ -229,15 +283,15 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", availab
     // No viewport needed — render full text
     let result = "";
     let index = 0;
-    for (const char of state.value) {
-      result += index === state.cursorOffset ? chalk.inverse(char) : char;
+    for (const char of renderState.value) {
+      result += index === renderState.cursorOffset ? chalk.inverse(char) : char;
       index++;
     }
-    if (state.cursorOffset === state.value.length) {
+    if (renderState.cursorOffset === renderState.value.length) {
       result += cursorChar;
     }
     return result;
-  }, [isDisabled, state.value, state.cursorOffset, availableWidth, needsViewport]);
+  }, [isDisabled, renderState.value, renderState.cursorOffset, availableWidth, needsViewport]);
 
   return <Text>{rendered}</Text>;
 }
