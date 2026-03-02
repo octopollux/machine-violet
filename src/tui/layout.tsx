@@ -135,7 +135,8 @@ export function Layout(props: LayoutProps) {
 
   // Height of the middle section (narrative + activity) for side frames
   const middleHeight = narRows + (elements.activityLine ? 1 : 0);
-  const innerWidth = elements.sideFrames ? width - 2 * sideFrameWidth : width;
+  const sidePadding = elements.sideFrames ? 1 : 0;
+  const innerWidth = elements.sideFrames ? width - 2 * sideFrameWidth - 2 * sidePadding : width;
 
   return (
     <Box flexDirection="column" width={width} height={dimensions.rows}>
@@ -157,7 +158,7 @@ export function Layout(props: LayoutProps) {
           <ThemedSideFrame theme={theme} side="left" height={middleHeight} />
         )}
 
-        <Box flexDirection="column" width={innerWidth}>
+        <Box flexDirection="column" width={innerWidth + 2 * sidePadding} paddingLeft={sidePadding} paddingRight={sidePadding}>
           {/* Narrative Area */}
           <NarrativeArea
             ref={narrativeRef}
