@@ -53,11 +53,9 @@ gradient: none
 
 [edge_top]
 ─·
--
 
 [edge_bottom]
 ·─
--
 
 [edge_left]
 │
@@ -69,18 +67,14 @@ gradient: none
 
 [separator_left_top]
 ─◇
- │
 
 [separator_right_top]
 ◇─
-│
 
 [separator_left_bottom]
- │
 ─◇
 
 [separator_right_bottom]
-│
 ◇─
 
 [turn_separator]
