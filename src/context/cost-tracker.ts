@@ -36,8 +36,8 @@ export function formatK(n: number): string {
   return m >= 10 ? `${Math.round(m)}M` : `${+m.toFixed(1)}M`;
 }
 
-// Tier display labels
-const TIER_LABELS: Record<ModelTier, string> = { large: "L", medium: "M", small: "S" };
+// Tier display order: small → medium → large (cheapest first)
+const TIER_ORDER: ModelTier[] = ["small", "medium", "large"];
 
 // --- Session token tracker ---
 
@@ -84,16 +84,14 @@ export class CostTracker {
 
   /**
    * Format a compact token summary for display in the Esc menu footer.
-   * Example: "L 5.2k/40k | M 2k/15k | S 8k/60k"
-   * Tiers with 0 input and 0 cached are omitted.
+   * Each tier shows in/out/cached. Order: small | medium | large.
+   * Example: "8k/0/60k | 2k/0/15k | 5k/200/40k"
    */
   formatTokens(): string {
-    const parts: string[] = [];
-    for (const tier of ["large", "medium", "small"] as ModelTier[]) {
+    return TIER_ORDER.map((tier) => {
       const t = this.breakdown.byTier[tier];
-      if (t.input === 0 && t.cached === 0) continue;
-      parts.push(`${TIER_LABELS[tier]} ${formatK(t.input)}/${formatK(t.cached)}`);
-    }
-    return parts.join(" | ");
+      const pureInput = t.input - t.output;
+      return `${formatK(pureInput)}/${formatK(t.output)}/${formatK(t.cached)}`;
+    }).join(" | ");
   }
 }

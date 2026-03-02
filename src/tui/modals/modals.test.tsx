@@ -226,12 +226,12 @@ describe("GameMenu", () => {
           width={60}
           height={24}
           selectedIndex={0}
-          tokenSummary="L 5.2k/40k | M 2k/15k"
+          tokenSummary="0/0/0 | 2k/0/15k | 5k/200/40k"
         />
       </Box>,
     );
     const frame = lastFrame();
-    expect(frame).toContain("L 5.2k/40k | M 2k/15k");
+    expect(frame).toContain("0/0/0 | 2k/0/15k | 5k/200/40k");
   });
 
   it("highlights selected item", () => {

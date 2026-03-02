@@ -71,31 +71,32 @@ describe("CostTracker", () => {
   });
 
   describe("formatTokens", () => {
-    it("returns empty string when no tokens recorded", () => {
+    it("shows zeros for all tiers when no tokens recorded", () => {
       const tracker = new CostTracker();
-      expect(tracker.formatTokens()).toBe("");
+      expect(tracker.formatTokens()).toBe("0/0/0 | 0/0/0 | 0/0/0");
     });
 
-    it("formats single tier", () => {
+    it("formats single tier with zeros for unused tiers", () => {
       const tracker = new CostTracker();
       tracker.record({ inputTokens: 5000, outputTokens: 200, cacheReadTokens: 40000, cacheCreationTokens: 0 }, "large");
-      expect(tracker.formatTokens()).toBe("L 5.2k/40k");
+      // small | medium | large
+      expect(tracker.formatTokens()).toBe("0/0/0 | 0/0/0 | 5k/200/40k");
     });
 
-    it("formats multiple tiers, skips empty ones", () => {
+    it("formats multiple tiers, shows zeros for unused", () => {
       const tracker = new CostTracker();
       tracker.record({ inputTokens: 5000, outputTokens: 200, cacheReadTokens: 40000, cacheCreationTokens: 0 }, "large");
       tracker.record({ inputTokens: 2000, outputTokens: 0, cacheReadTokens: 15000, cacheCreationTokens: 0 }, "medium");
-      // small has nothing
-      expect(tracker.formatTokens()).toBe("L 5.2k/40k | M 2k/15k");
+      // small | medium | large
+      expect(tracker.formatTokens()).toBe("0/0/0 | 2k/0/15k | 5k/200/40k");
     });
 
-    it("shows all three tiers when all have usage", () => {
+    it("shows all three tiers in order small | medium | large", () => {
       const tracker = new CostTracker();
       tracker.record({ inputTokens: 5000, outputTokens: 200, cacheReadTokens: 40000, cacheCreationTokens: 0 }, "large");
       tracker.record({ inputTokens: 2000, outputTokens: 0, cacheReadTokens: 15000, cacheCreationTokens: 0 }, "medium");
       tracker.record({ inputTokens: 8000, outputTokens: 0, cacheReadTokens: 60000, cacheCreationTokens: 0 }, "small");
-      expect(tracker.formatTokens()).toBe("L 5.2k/40k | M 2k/15k | S 8k/60k");
+      expect(tracker.formatTokens()).toBe("8k/0/60k | 2k/0/15k | 5k/200/40k");
     });
   });
 });
