@@ -107,10 +107,10 @@ export interface InlineTextInputProps {
 }
 
 /** Minimum interval (ms) between React re-renders triggered by input.
- *  ~34ms ≈ 30fps — fast enough for responsive typing, slow enough
+ *  50ms ≈ 20fps — fast enough for responsive typing, slow enough
  *  to let the terminal fully process each frame's ANSI escape codes
  *  before the next arrives. */
-export const RENDER_THROTTLE_MS = 34;
+export const RENDER_THROTTLE_MS = 50;
 
 /**
  * Uncontrolled text input with full cursor positioning.
