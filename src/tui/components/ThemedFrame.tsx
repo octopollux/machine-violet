@@ -13,11 +13,40 @@ import {
   composeSideColumn,
   playerPaneSideColumn,
 } from "../themes/composer.js";
+import { colorizeSegments, mirrorT, applyGradient, hexToOklch } from "../color/index.js";
+import type { GradientPreset } from "../color/index.js";
 
 /** Get hex color for a frame part from the resolved theme's swatch + color map. */
 function themeColor(theme: ResolvedTheme, part: keyof ResolvedTheme["colorMap"]): string | undefined {
   const idx = theme.colorMap[part];
   return theme.swatch[idx]?.hex;
+}
+
+/** Render a string with per-character gradient coloring, or flat if no gradient. */
+function renderGradientRow(
+  row: string,
+  baseHex: string | undefined,
+  gradient: GradientPreset | undefined,
+  offset: number,
+  totalLength: number,
+  key: React.Key,
+): React.ReactNode {
+  if (!gradient || !baseHex) {
+    return (
+      <Box key={key}>
+        <Text color={baseHex}>{row}</Text>
+      </Box>
+    );
+  }
+  const baseOklch = hexToOklch(baseHex);
+  const segments = colorizeSegments(row, gradient, baseOklch, offset, totalLength);
+  return (
+    <Box key={key}>
+      {segments.map((seg, j) => (
+        <Text key={j} color={seg.color}>{seg.text}</Text>
+      ))}
+    </Box>
+  );
 }
 
 // --- Themed Horizontal Border ---
@@ -49,6 +78,8 @@ export function ThemedHorizontalBorder({
   const borderColor = themeColor(theme, "border");
   const titleColor = centerTextColor ?? themeColor(theme, "title");
 
+  const gradient = theme.gradient;
+
   return (
     <Box flexDirection="column">
       {frame.rows.map((row, i) => {
@@ -59,6 +90,27 @@ export function ThemedHorizontalBorder({
             const before = row.slice(0, textIdx);
             const middle = ` ${centerText} `;
             const after = row.slice(textIdx + middle.length);
+
+            if (gradient && borderColor) {
+              // Gradient the before/after portions with correct offsets
+              // so mirrorT sees the full row width for symmetry
+              const baseOklch = hexToOklch(borderColor);
+              const beforeSegs = colorizeSegments(before, gradient, baseOklch, 0, row.length);
+              const afterOffset = textIdx + middle.length;
+              const afterSegs = colorizeSegments(after, gradient, baseOklch, afterOffset, row.length);
+              return (
+                <Box key={i}>
+                  {beforeSegs.map((seg, j) => (
+                    <Text key={`b${j}`} color={seg.color}>{seg.text}</Text>
+                  ))}
+                  <Text color={titleColor}>{middle}</Text>
+                  {afterSegs.map((seg, j) => (
+                    <Text key={`a${j}`} color={seg.color}>{seg.text}</Text>
+                  ))}
+                </Box>
+              );
+            }
+
             return (
               <Box key={i}>
                 <Text color={borderColor}>{before}</Text>
@@ -68,11 +120,7 @@ export function ThemedHorizontalBorder({
             );
           }
         }
-        return (
-          <Box key={i}>
-            <Text color={borderColor}>{row}</Text>
-          </Box>
-        );
+        return renderGradientRow(row, borderColor, gradient, 0, row.length, i);
       })}
     </Box>
   );
@@ -91,16 +139,29 @@ interface ThemedSideFrameProps {
  */
 export function ThemedSideFrame({ theme, side, height }: ThemedSideFrameProps) {
   const rows = composeSideColumn(theme.asset, side, height);
-  const color = themeColor(theme, "sideFrame");
+  const baseHex = themeColor(theme, "sideFrame");
   const frameWidth = theme.asset.components.edge_left.width;
+  const gradient = theme.gradient;
 
   return (
     <Box flexDirection="column" width={frameWidth}>
-      {rows.map((row, i) => (
-        <Text key={i} color={color}>
-          {row}
-        </Text>
-      ))}
+      {rows.map((row, i) => {
+        if (gradient && baseHex) {
+          // One color per row: t = mirrorT(rowIndex, totalHeight)
+          const t = mirrorT(i, rows.length);
+          const rowColor = applyGradient(gradient, hexToOklch(baseHex), t);
+          return (
+            <Text key={i} color={rowColor}>
+              {row}
+            </Text>
+          );
+        }
+        return (
+          <Text key={i} color={baseHex}>
+            {row}
+          </Text>
+        );
+      })}
     </Box>
   );
 }

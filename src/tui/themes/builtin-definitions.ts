@@ -20,6 +20,7 @@ export const BUILTIN_DEFINITIONS: Record<string, ThemeDefinition> = {
     assetName: "gothic",
     swatchConfig: { preset: "ember", harmony: "analogous" },
     colorMap: { ...DEFAULT_COLOR_MAP },
+    gradient: { preset: "vignette" },
     variants: {
       combat: {
         swatchConfig: { preset: "ember" },
@@ -36,6 +37,7 @@ export const BUILTIN_DEFINITIONS: Record<string, ThemeDefinition> = {
     assetName: "arcane",
     swatchConfig: { preset: "ethereal", harmony: "triadic" },
     colorMap: { ...DEFAULT_COLOR_MAP },
+    gradient: { preset: "shimmer" },
     variants: {
       combat: {
         swatchConfig: { preset: "cyberpunk" },
@@ -48,6 +50,7 @@ export const BUILTIN_DEFINITIONS: Record<string, ThemeDefinition> = {
     assetName: "terminal",
     swatchConfig: { preset: "cyberpunk", harmony: "complementary" },
     colorMap: { ...DEFAULT_COLOR_MAP, border: 1, sideFrame: 0 },
+    gradient: { preset: "hueShift" },
     variants: {
       combat: {
         colorMap: { border: 7, corner: 8 },
@@ -62,6 +65,7 @@ export const BUILTIN_DEFINITIONS: Record<string, ThemeDefinition> = {
     assetName: "clean",
     swatchConfig: { preset: "foliage", harmony: "analogous" },
     colorMap: { ...DEFAULT_COLOR_MAP, border: 0, corner: 0, separator: 0 },
+    gradient: { preset: "shimmer" },
   },
 };
 

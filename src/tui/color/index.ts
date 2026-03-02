@@ -15,6 +15,18 @@ export {
   simpleArc,
 } from "./swatch.js";
 
-// Side-effect import: registers built-in presets
+export type { ChannelModulation, GradientPreset, ColorizeSegment } from "./gradient.js";
+export {
+  mirrorT,
+  applyGradient,
+  colorizeSegments,
+  registerGradient,
+  getGradient,
+  listGradients,
+} from "./gradient.js";
+
+// Side-effect imports: register built-in presets and gradient presets
 import "./presets.js";
+import "./gradient-presets.js";
 export { foliage, cyberpunk, ember, ethereal } from "./presets.js";
+export { vignette, shimmer, hueShift } from "./gradient-presets.js";
