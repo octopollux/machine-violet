@@ -1,5 +1,9 @@
-import { describe, it, expect } from "vitest";
-import { computeViewStart, reducer } from "./InlineTextInput.js";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { computeViewStart, reducer, DELETE_RELEASE_MS } from "./InlineTextInput.js";
+import React from "react";
+import { render } from "ink-testing-library";
+import chalk from "chalk";
+import { InlineTextInput } from "./InlineTextInput.js";
 
 describe("computeViewStart", () => {
   it("returns 0 when text fits in view", () => {
@@ -73,13 +77,14 @@ describe("computeViewStart", () => {
 });
 
 describe("reducer", () => {
-  const make = (value: string, cursorOffset: number) => ({
+  const make = (value: string, cursorOffset: number, pendingDeleteCount = 0) => ({
     previousValue: value,
     value,
     cursorOffset,
+    pendingDeleteCount,
   });
 
-  describe("delete (backspace)", () => {
+  describe("delete (Delete key)", () => {
     it("is a no-op when cursor is at position 0", () => {
       const state = make("hello", 0);
       const next = reducer(state, { type: "delete" });
@@ -106,5 +111,237 @@ describe("reducer", () => {
       expect(next.value).toBe("");
       expect(next.cursorOffset).toBe(0);
     });
+  });
+
+  describe("mark-delete", () => {
+    it("is a no-op when cursor is at position 0", () => {
+      const state = make("hello", 0);
+      const next = reducer(state, { type: "mark-delete" });
+      expect(next).toBe(state);
+    });
+
+    it("decrements cursor and increments pending count without mutating value", () => {
+      const state = make("hello", 5);
+      const next = reducer(state, { type: "mark-delete" });
+      expect(next.value).toBe("hello");
+      expect(next.cursorOffset).toBe(4);
+      expect(next.pendingDeleteCount).toBe(1);
+    });
+
+    it("accumulates multiple mark-deletes", () => {
+      let state = make("hello", 5);
+      state = reducer(state, { type: "mark-delete" });
+      state = reducer(state, { type: "mark-delete" });
+      state = reducer(state, { type: "mark-delete" });
+      expect(state.value).toBe("hello");
+      expect(state.cursorOffset).toBe(2);
+      expect(state.pendingDeleteCount).toBe(3);
+    });
+
+    it("stops at position 0", () => {
+      let state = make("hi", 2);
+      for (let i = 0; i < 5; i++) {
+        state = reducer(state, { type: "mark-delete" });
+      }
+      expect(state.cursorOffset).toBe(0);
+      expect(state.pendingDeleteCount).toBe(2);
+      expect(state.value).toBe("hi");
+    });
+
+    it("works from mid-string position", () => {
+      const state = make("hello", 3);
+      const next = reducer(state, { type: "mark-delete" });
+      expect(next.value).toBe("hello");
+      expect(next.cursorOffset).toBe(2);
+      expect(next.pendingDeleteCount).toBe(1);
+    });
+  });
+
+  describe("commit-delete", () => {
+    it("is a no-op when no pending deletes", () => {
+      const state = make("hello", 3);
+      const next = reducer(state, { type: "commit-delete" });
+      expect(next).toBe(state);
+    });
+
+    it("removes pending characters from end of string", () => {
+      // "hello" cursor at 3, pending 2 → remove [3,5) = "lo"
+      const state = make("hello", 3, 2);
+      const next = reducer(state, { type: "commit-delete" });
+      expect(next.value).toBe("hel");
+      expect(next.cursorOffset).toBe(3);
+      expect(next.pendingDeleteCount).toBe(0);
+    });
+
+    it("removes pending characters from mid-string", () => {
+      // "abcdef" cursor at 2, pending 2 → remove [2,4) = "cd"
+      const state = make("abcdef", 2, 2);
+      const next = reducer(state, { type: "commit-delete" });
+      expect(next.value).toBe("abef");
+      expect(next.cursorOffset).toBe(2);
+      expect(next.pendingDeleteCount).toBe(0);
+    });
+
+    it("removes all characters when fully marked", () => {
+      const state = make("abc", 0, 3);
+      const next = reducer(state, { type: "commit-delete" });
+      expect(next.value).toBe("");
+      expect(next.cursorOffset).toBe(0);
+      expect(next.pendingDeleteCount).toBe(0);
+    });
+  });
+
+  describe("auto-commit before other actions", () => {
+    it("commits pending deletes before insert", () => {
+      const state = make("hello", 3, 2);
+      const next = reducer(state, { type: "insert", text: "X" });
+      expect(next.value).toBe("helX");
+      expect(next.cursorOffset).toBe(4);
+      expect(next.pendingDeleteCount).toBe(0);
+    });
+
+    it("commits pending deletes before move-cursor-left", () => {
+      const state = make("hello", 3, 2);
+      const next = reducer(state, { type: "move-cursor-left" });
+      expect(next.value).toBe("hel");
+      expect(next.cursorOffset).toBe(2);
+      expect(next.pendingDeleteCount).toBe(0);
+    });
+
+    it("commits pending deletes before move-cursor-right", () => {
+      const state = make("hello", 3, 2);
+      const next = reducer(state, { type: "move-cursor-right" });
+      // After commit: "hel" cursor=3 (at end), then right: min(3, 3) = 3
+      expect(next.value).toBe("hel");
+      expect(next.cursorOffset).toBe(3);
+      expect(next.pendingDeleteCount).toBe(0);
+    });
+
+    it("commits pending deletes before move-cursor-start", () => {
+      const state = make("hello", 3, 2);
+      const next = reducer(state, { type: "move-cursor-start" });
+      expect(next.value).toBe("hel");
+      expect(next.cursorOffset).toBe(0);
+      expect(next.pendingDeleteCount).toBe(0);
+    });
+
+    it("commits pending deletes before move-cursor-end", () => {
+      const state = make("hello", 3, 2);
+      const next = reducer(state, { type: "move-cursor-end" });
+      expect(next.value).toBe("hel");
+      expect(next.cursorOffset).toBe(3);
+      expect(next.pendingDeleteCount).toBe(0);
+    });
+
+    it("commits pending deletes before delete (Delete key)", () => {
+      // "hello" cursor at 2, pending 2 → commit → "heo" cursor=2 → delete → "ho" cursor=1
+      const state = make("hello", 2, 2);
+      const next = reducer(state, { type: "delete" });
+      expect(next.value).toBe("ho");
+      expect(next.cursorOffset).toBe(1);
+      expect(next.pendingDeleteCount).toBe(0);
+    });
+
+    it("is a no-op when nothing pending", () => {
+      const state = make("hello", 3, 0);
+      const next = reducer(state, { type: "insert", text: "X" });
+      expect(next.value).toBe("helXlo");
+      expect(next.cursorOffset).toBe(4);
+      expect(next.pendingDeleteCount).toBe(0);
+    });
+  });
+});
+
+describe("DELETE_RELEASE_MS constant", () => {
+  it("exports DELETE_RELEASE_MS as a positive number", () => {
+    expect(DELETE_RELEASE_MS).toBeGreaterThan(0);
+    expect(Number.isFinite(DELETE_RELEASE_MS)).toBe(true);
+  });
+});
+
+describe("reducer with rapid sequential deletes", () => {
+  const make = (value: string, cursorOffset: number) => ({
+    previousValue: value,
+    value,
+    cursorOffset,
+    pendingDeleteCount: 0,
+  });
+
+  it("correctly chains multiple deletes from the same starting state", () => {
+    // Simulate rapid Delete key presses: 5 deletes on "hello world" (cursor at end)
+    let state = make("hello world", 11);
+    for (let i = 0; i < 5; i++) {
+      state = reducer(state, { type: "delete" });
+    }
+    expect(state.value).toBe("hello ");
+    expect(state.cursorOffset).toBe(6);
+  });
+
+  it("stops deleting when cursor reaches position 0", () => {
+    // More deletes than characters: should empty the string, not crash
+    let state = make("abc", 3);
+    for (let i = 0; i < 10; i++) {
+      state = reducer(state, { type: "delete" });
+    }
+    expect(state.value).toBe("");
+    expect(state.cursorOffset).toBe(0);
+  });
+});
+
+describe("InlineTextInput component", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shows strikethrough styling on backspace", () => {
+    const { lastFrame, stdin } = render(
+      React.createElement(InlineTextInput, { defaultValue: "hello" }),
+    );
+    // Simulate backspace (mark-delete)
+    stdin.write("\x7f");
+    const frame = lastFrame()!;
+    // The cursor character ("o") should get strikethrough + inverse
+    expect(frame).toContain(chalk.strikethrough.inverse("o"));
+  });
+
+  it("shows strikethrough.dim on non-cursor pending chars", () => {
+    const { lastFrame, stdin } = render(
+      React.createElement(InlineTextInput, { defaultValue: "hello" }),
+    );
+    // Two backspaces: cursor on "l" (strikethrough.inverse), "o" (strikethrough.dim)
+    stdin.write("\x7f");
+    stdin.write("\x7f");
+    const frame = lastFrame()!;
+    expect(frame).toContain(chalk.strikethrough.inverse("l"));
+    expect(frame).toContain(chalk.strikethrough.dim("o"));
+  });
+
+  it("commits pending deletes after release timeout", async () => {
+    vi.useFakeTimers();
+    const onChange = vi.fn();
+    const { stdin } = render(
+      React.createElement(InlineTextInput, { defaultValue: "hello", onChange }),
+    );
+    // Simulate backspace (mark-delete — value stays "hello")
+    stdin.write("\x7f");
+    // Fire the release timer callback (calls setRenderState with committed value)
+    vi.advanceTimersByTime(DELETE_RELEASE_MS);
+    // Restore real timers so Ink's internal render pipeline can flush
+    vi.useRealTimers();
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(onChange).toHaveBeenCalledWith("hell");
+  });
+
+  it("does not commit before release timeout", () => {
+    vi.useFakeTimers();
+    const onChange = vi.fn();
+    const { stdin } = render(
+      React.createElement(InlineTextInput, { defaultValue: "hello", onChange }),
+    );
+    stdin.write("\x7f");
+    // Advance but not past the timeout
+    vi.advanceTimersByTime(DELETE_RELEASE_MS - 1);
+    // onChange should not have been called — value hasn't changed (still "hello")
+    expect(onChange).not.toHaveBeenCalled();
   });
 });

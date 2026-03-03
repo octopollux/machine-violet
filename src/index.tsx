@@ -5,6 +5,18 @@ import { render } from "ink";
 import App from "./app.js";
 import type { ShutdownContext } from "./shutdown.js";
 import { gracefulShutdown } from "./shutdown.js";
+import { installSyncWriteCombiner } from "./tui/hooks/syncWriteCombiner.js";
+import { installRawModeGuard } from "./tui/hooks/rawModeGuard.js";
+
+// Prevent stdin raw mode from ever being disabled while the TUI is running.
+// On Windows, even a momentary drop to cooked mode causes the console to
+// process pending Backspace bytes destructively, visually erasing UI text.
+const unlockRawMode = installRawModeGuard(process.stdin);
+
+// Combine Ink's separate BSU / content / ESU writes into single atomic
+// stdout writes so the terminal never displays intermediate states
+// (e.g. a cleared screen before new content during rapid re-renders).
+const removeCombiner = installSyncWriteCombiner(process.stdout);
 
 let shuttingDown = false;
 
@@ -32,6 +44,8 @@ async function handleShutdownSignal() {
     // Best-effort
   }
 
+  unlockRawMode();
+  removeCombiner();
   unmount();
   process.exit(0);
 }
