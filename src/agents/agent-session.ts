@@ -202,8 +202,17 @@ export async function runAgentLoop(
   const workingMessages = [...messages];
   const tuiToolNames = config.tuiToolNames ?? new Set<string>();
 
+  let params: CreateParams = {
+    model: config.model,
+    max_tokens: effectiveMaxTokens,
+    system: effectiveSystem,
+    messages: workingMessages,
+    thinking: tc.param,
+    ...(tools ? { tools } : {}),
+  };
+
   for (let round = 0; round < maxToolRounds; round++) {
-    const params: CreateParams = {
+    params = {
       model: config.model,
       max_tokens: effectiveMaxTokens,
       system: effectiveSystem,
@@ -295,6 +304,9 @@ export async function runAgentLoop(
       truncated = true;
     }
   }
+
+  // Final context dump captures the last round's thinking traces
+  dumpContext(config.name, params);
 
   config.onComplete?.(totalUsage);
   return { text: fullText, tuiCommands, usage: totalUsage, truncated };
