@@ -97,7 +97,8 @@ export async function validateCampaign(
     existingPaths.add(ef.path);
   }
   // Also add common paths that might be linked
-  existingPaths.add(`${campaignRoot}/log.md`);
+  existingPaths.add(`${campaignRoot}/log.json`);
+  existingPaths.add(`${campaignRoot}/log.md`); // legacy
   existingPaths.add(`${campaignRoot}/config.json`);
 
   const wikiErrors = validateWikilinks(entityFiles, existingPaths);

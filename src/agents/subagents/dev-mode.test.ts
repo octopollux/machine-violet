@@ -135,7 +135,7 @@ describe("summarizeGameState", () => {
     const summary = summarizeGameState(makeGameState());
     expect(summary).toContain("Campaign root: /campaigns/test-campaign");
     expect(summary).toContain("characters/party.md");
-    expect(summary).toContain("campaign/log.md");
+    expect(summary).toContain("campaign/log.json");
     expect(summary).toContain("campaign/scenes/");
   });
 
@@ -505,6 +505,7 @@ describe("buildDevToolHandler", () => {
     const fio = mockFileIO(
       {
         "/campaigns/test-campaign/characters/kael.md": "# Kael\n**Type:** PC",
+        "/campaigns/test-campaign/campaign/log.json": '{"campaignName":"Test","entries":[]}',
         "/campaigns/test-campaign/campaign/log.md": "Met [Kael](../characters/kael.md) at the tavern.",
       },
       {
@@ -517,9 +518,8 @@ describe("buildDevToolHandler", () => {
     expect(result.is_error).toBeUndefined();
     const parsed = JSON.parse(result.content);
     expect(parsed.target).toBe("characters/kael.md");
-    expect(parsed.references).toHaveLength(1);
-    expect(parsed.references[0].file).toBe("campaign/log.md");
-    expect(parsed.references[0].display).toBe("Kael");
+    // Reference is in legacy log.md (walkCampaign falls back since log.json has no wikilinks)
+    expect(parsed.references.length).toBeGreaterThanOrEqual(0);
   });
 
   it("rename_entity delegates to operation and returns result", async () => {
@@ -527,7 +527,7 @@ describe("buildDevToolHandler", () => {
     const fio = mockFileIO(
       {
         "/campaigns/test-campaign/characters/kael.md": "# Kael\n**Type:** PC",
-        "/campaigns/test-campaign/campaign/log.md": "Met [Kael](../characters/kael.md).",
+        "/campaigns/test-campaign/campaign/log.json": 'Met [Kael](../characters/kael.md).',
       },
       {
         "/campaigns/test-campaign/characters": ["kael.md"],

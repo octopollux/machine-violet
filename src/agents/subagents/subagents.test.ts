@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
-import { summarizeScene } from "./scene-summarizer.js";
+import { summarizeScene, parseSummaryOutput } from "./scene-summarizer.js";
 import { updatePrecis, parsePrecisResult } from "./precis-updater.js";
 import { updateChangelogs } from "./changelog-updater.js";
 import { resolveAction } from "./resolve-action.js";
@@ -49,25 +49,61 @@ function mockClient(responses: Anthropic.Message[]): Anthropic {
 }
 
 describe("summarizeScene", () => {
-  it("returns campaign log entry", async () => {
+  it("returns campaign log entry with full and mini", async () => {
     const client = mockClient([
-      textResponse("- [Aldric](../characters/aldric.md) entered the throne room\n- Fought [G1](../characters/g1.md), eliminated R4"),
+      textResponse("- [[Aldric]] entered the throne room\n- Fought [[G1]], eliminated R4\n---MINI---\n[[Aldric]] fought [[G1]] in the throne room."),
     ]);
 
     const result = await summarizeScene(client, "## Scene transcript\n[Aldric] I enter the throne room...");
 
-    expect(result.text).toContain("Aldric");
-    expect(result.text).toContain("throne room");
+    expect(result.full).toContain("Aldric");
+    expect(result.full).toContain("throne room");
+    expect(result.mini).toContain("Aldric");
+    expect(result.mini).toContain("throne room");
     expect(result.usage.inputTokens).toBe(50);
   });
 
-  it("passes terse system prompt", async () => {
-    const client = mockClient([textResponse("Summary.")]);
+  it("falls back to first bullet when ---MINI--- missing", async () => {
+    const client = mockClient([
+      textResponse("- [[Aldric]] entered the throne room\n- Fought [[G1]]"),
+    ]);
+
+    const result = await summarizeScene(client, "transcript");
+    expect(result.full).toContain("Aldric");
+    expect(result.mini).toBe("[[Aldric]] entered the throne room");
+  });
+
+  it("passes terse system prompt with MINI instructions", async () => {
+    const client = mockClient([textResponse("- Summary.\n---MINI---\nSummary.")]);
     await summarizeScene(client, "transcript");
 
     const call = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(call.system).toContain("terse");
     expect(call.system).toContain("wikilinks");
+    expect(call.system).toContain("---MINI---");
+  });
+});
+
+describe("parseSummaryOutput", () => {
+  it("splits on ---MINI--- delimiter", () => {
+    const text = "- Bullet one\n- Bullet two\n---MINI---\nDense one-liner.";
+    const { full, mini } = parseSummaryOutput(text);
+    expect(full).toBe("- Bullet one\n- Bullet two");
+    expect(mini).toBe("Dense one-liner.");
+  });
+
+  it("falls back to first bullet when no delimiter", () => {
+    const text = "- First bullet\n- Second bullet";
+    const { full, mini } = parseSummaryOutput(text);
+    expect(full).toBe("- First bullet\n- Second bullet");
+    expect(mini).toBe("First bullet");
+  });
+
+  it("handles text without bullets and no delimiter", () => {
+    const text = "Just a plain sentence.";
+    const { full, mini } = parseSummaryOutput(text);
+    expect(full).toBe("Just a plain sentence.");
+    expect(mini).toBe("Just a plain sentence.");
   });
 });
 

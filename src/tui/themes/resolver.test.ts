@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { resolveTheme } from "./resolver.js";
 import { resetThemeCache } from "./loader.js";
 import { BUILTIN_DEFINITIONS } from "./builtin-definitions.js";
+import type { ThemeDefinition } from "./types.js";
 
 describe("resolveTheme", () => {
   beforeEach(() => {
@@ -56,8 +57,51 @@ describe("resolveTheme", () => {
 
   it("variant without override uses base config", () => {
     const def = BUILTIN_DEFINITIONS["clean"];
-    // clean has no variant overrides
-    const resolved = resolveTheme(def, "combat", "#888888");
+    // clean has no levelup variant override
+    const resolved = resolveTheme(def, "levelup", "#888888");
     expect(resolved.colorMap.border).toBe(0);
+  });
+
+  it("resolves gradient preset from theme definition", () => {
+    const def = BUILTIN_DEFINITIONS["gothic"];
+    const resolved = resolveTheme(def, "exploration", "#cc4444");
+    expect(resolved.gradient).toBeDefined();
+    expect(resolved.gradient?.name).toBe("vignette");
+  });
+
+  it("theme without gradient config resolves to undefined gradient", () => {
+    const def: ThemeDefinition = {
+      assetName: "gothic",
+      swatchConfig: { preset: "ember", harmony: "analogous" },
+      colorMap: { border: 2, corner: 3, separator: 4, title: 5, turnIndicator: 6, sideFrame: 1 },
+      // no gradient
+    };
+    const resolved = resolveTheme(def, "exploration", "#888888");
+    expect(resolved.gradient).toBeUndefined();
+  });
+
+  it("variant gradient: null disables gradient", () => {
+    const def: ThemeDefinition = {
+      assetName: "gothic",
+      swatchConfig: { preset: "ember", harmony: "analogous" },
+      colorMap: { border: 2, corner: 3, separator: 4, title: 5, turnIndicator: 6, sideFrame: 1 },
+      gradient: { preset: "vignette" },
+      variants: {
+        combat: { gradient: null },
+      },
+    };
+    const resolved = resolveTheme(def, "combat", "#888888");
+    expect(resolved.gradient).toBeUndefined();
+  });
+
+  it("unknown gradient preset name resolves to undefined", () => {
+    const def: ThemeDefinition = {
+      assetName: "gothic",
+      swatchConfig: { preset: "ember", harmony: "analogous" },
+      colorMap: { border: 2, corner: 3, separator: 4, title: 5, turnIndicator: 6, sideFrame: 1 },
+      gradient: { preset: "nonexistent-gradient-12345" },
+    };
+    const resolved = resolveTheme(def, "exploration", "#888888");
+    expect(resolved.gradient).toBeUndefined();
   });
 });

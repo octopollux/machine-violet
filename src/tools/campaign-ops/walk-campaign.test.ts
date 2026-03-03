@@ -80,7 +80,17 @@ describe("walkCampaignFiles", () => {
     ]);
   });
 
-  it("walks campaign log", async () => {
+  it("walks campaign log (JSON)", async () => {
+    const fio = mockFileIO(
+      { "/camp/campaign/log.json": '{"campaignName":"Test","entries":[]}' },
+      {},
+    );
+    const result = await walkCampaignFiles("/camp", fio);
+    expect(result).toHaveLength(1);
+    expect(result[0].relativePath).toBe("campaign/log.json");
+  });
+
+  it("falls back to legacy log.md when log.json missing", async () => {
     const fio = mockFileIO(
       { "/camp/campaign/log.md": "# Campaign Log" },
       {},

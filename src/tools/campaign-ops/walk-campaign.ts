@@ -76,13 +76,21 @@ export async function walkCampaignFiles(
   // Locations (with subdirs containing index.md)
   await walkWithSubdirs(normalizedRoot + "/locations", "locations");
 
-  // Campaign log
+  // Campaign log (JSON format — expand entries into searchable text)
   try {
-    const logPath = normalizedRoot + "/campaign/log.md";
-    const content = await fileIO.readFile(logPath);
-    files.push({ relativePath: "campaign/log.md", content });
+    const logPath = normalizedRoot + "/campaign/log.json";
+    const raw = await fileIO.readFile(logPath);
+    // Provide the raw JSON as content — wikilink scanner handles text matching
+    files.push({ relativePath: "campaign/log.json", content: raw });
   } catch {
-    // Missing log is fine
+    // Try legacy log.md as fallback
+    try {
+      const legacyPath = normalizedRoot + "/campaign/log.md";
+      const content = await fileIO.readFile(legacyPath);
+      files.push({ relativePath: "campaign/log.md", content });
+    } catch {
+      // Missing log is fine
+    }
   }
 
   // Scene transcripts and dm-notes

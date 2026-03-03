@@ -1,6 +1,39 @@
+<!-- Arcane Theme
+     Mystical border style for high fantasy and epic campaigns.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
 @name: arcane
 @genre_tags: high_fantasy, epic, arcane
 @height: 2
+
+[colors]
+preset: ethereal
+harmony: triadic
+gradient: shimmer
+border: 2
+corner: 3
+separator: 4
+title: 5
+turn_indicator: 6
+side_frame: 1
+
+[variant_combat]
+<!-- Chaotic magical energy -->
+preset: cyberpunk
+border: 5
+corner: 6
+gradient: hueShift
+
+<!-- Uncomment to customize OOC appearance:
+[variant_ooc]
+gradient: none
+-->
 
 [corner_tl]
 ┌─
@@ -20,10 +53,8 @@
 
 [edge_top]
 ─·
- ·
 
 [edge_bottom]
-·
 ·─
 
 [edge_left]
@@ -36,19 +67,15 @@
 
 [separator_left_top]
 ─◇
- │
 
 [separator_right_top]
 ◇─
-│
 
 [separator_left_bottom]
- │
 ─◇
 
 [separator_right_bottom]
-│
 ◇─
 
 [turn_separator]
-···── ◆ ──···
+···──·─── ◆ ───·──···

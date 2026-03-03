@@ -3,10 +3,11 @@
  * and generates the final swatch + color map.
  */
 
-import type { Color } from "../color/index.js";
-import { fromPreset, generateArc, simpleArc } from "../color/index.js";
-// Side-effect: ensure presets are registered
+import type { Color, GradientPreset } from "../color/index.js";
+import { fromPreset, generateArc, simpleArc, getGradient } from "../color/index.js";
+// Side-effect: ensure presets and gradient presets are registered
 import "../color/presets.js";
+import "../color/gradient-presets.js";
 
 import type {
   ThemeDefinition,
@@ -67,6 +68,18 @@ export function resolveTheme(
     }
   }
 
+  // Resolve gradient preset
+  // Variant override: explicit null disables gradient; explicit config overrides base
+  let gradient: GradientPreset | undefined;
+  const variantGradient = variantOverride?.gradient;
+  if (variantGradient === null) {
+    gradient = undefined; // explicitly disabled
+  } else if (variantGradient) {
+    gradient = getGradient(variantGradient.preset);
+  } else if (definition.gradient) {
+    gradient = getGradient(definition.gradient.preset);
+  }
+
   return {
     asset,
     playerPaneFrame,
@@ -74,5 +87,6 @@ export function resolveTheme(
     colorMap,
     variant,
     keyColor,
+    gradient,
   };
 }
