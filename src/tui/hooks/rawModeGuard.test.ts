@@ -1,9 +1,18 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { installRawModeGuard, WATCHDOG_INTERVAL_MS } from "./rawModeGuard.js";
+import type { RawModeGuardStdin } from "./rawModeGuard.js";
 
-function makeStdin(options?: { isTTY?: boolean }) {
+function makeStdin(options?: { isTTY?: boolean }): {
+  stdin: RawModeGuardStdin & {
+    setRawMode: (mode: boolean) => unknown;
+    isRaw: boolean;
+  };
+  calls: boolean[];
+  readableListeners: (() => void)[];
+} {
   const calls: boolean[] = [];
-  const stdin = {
+  const readableListeners: (() => void)[] = [];
+  const stdin: RawModeGuardStdin & { isRaw: boolean; setRawMode: (mode: boolean) => unknown } = {
     isTTY: options?.isTTY ?? true,
     isRaw: true,
     setRawMode: vi.fn((mode: boolean) => {
@@ -11,12 +20,17 @@ function makeStdin(options?: { isTTY?: boolean }) {
       stdin.isRaw = mode;
       return stdin;
     }),
-  } as unknown as NodeJS.ReadStream & {
-    setRawMode: (mode: boolean) => NodeJS.ReadStream;
-    isRaw: boolean;
-    isTTY: boolean;
+    prependListener: vi.fn((_event: string, listener: () => void) => {
+      readableListeners.push(listener);
+      return stdin;
+    }),
+    removeListener: vi.fn((_event: string, listener: () => void) => {
+      const idx = readableListeners.indexOf(listener);
+      if (idx >= 0) readableListeners.splice(idx, 1);
+      return stdin;
+    }),
   };
-  return { stdin, calls };
+  return { stdin, calls, readableListeners };
 }
 
 describe("installRawModeGuard", () => {
@@ -74,14 +88,13 @@ describe("installRawModeGuard", () => {
 
     // Watchdog should no longer fire
     calls.length = 0;
-    stdin.isRaw = false;
     vi.advanceTimersByTime(WATCHDOG_INTERVAL_MS * 5);
     expect(calls).toEqual([]);
   });
 
   it("is a no-op when stdin has no setRawMode", () => {
-    const stdin = {} as NodeJS.ReadStream;
-    const unlock = installRawModeGuard(stdin as never);
+    const stdin = {} as RawModeGuardStdin;
+    const unlock = installRawModeGuard(stdin);
     expect(unlock).toBeTypeOf("function");
     unlock(); // should not throw
   });
@@ -89,36 +102,43 @@ describe("installRawModeGuard", () => {
   it("is a no-op when stdin is not a TTY", () => {
     const { stdin, calls } = makeStdin({ isTTY: false });
     const unlock = installRawModeGuard(stdin);
-    // Should not have called setRawMode at all
     expect(calls).toEqual([]);
     unlock();
   });
 
-  it("watchdog re-asserts raw mode when externally disabled", () => {
+  it("watchdog unconditionally re-asserts raw mode", () => {
     vi.useFakeTimers();
     const { stdin, calls } = makeStdin();
     const unlock = installRawModeGuard(stdin);
     calls.length = 0;
 
-    // Simulate OS externally disabling raw mode
-    stdin.isRaw = false;
-
+    // isRaw is true — watchdog should STILL call setRawMode(true)
+    // because it's unconditional (isRaw can be stale)
     vi.advanceTimersByTime(WATCHDOG_INTERVAL_MS);
     expect(calls).toContain(true);
-    expect(stdin.isRaw).toBe(true);
     unlock();
   });
 
-  it("watchdog does not call setRawMode when already raw", () => {
-    vi.useFakeTimers();
-    const { stdin, calls } = makeStdin();
+  it("pre-read hook re-asserts raw mode on readable", () => {
+    const { stdin, calls, readableListeners } = makeStdin();
     const unlock = installRawModeGuard(stdin);
     calls.length = 0;
 
-    // isRaw is already true — watchdog should not call setRawMode
-    vi.advanceTimersByTime(WATCHDOG_INTERVAL_MS * 5);
-    expect(calls).toEqual([]);
+    // Simulate a readable event
+    expect(readableListeners.length).toBeGreaterThan(0);
+    readableListeners[0]!();
+
+    expect(calls).toContain(true);
     unlock();
+  });
+
+  it("unlock removes the readable listener", () => {
+    const { stdin, readableListeners } = makeStdin();
+    const unlock = installRawModeGuard(stdin);
+    expect(readableListeners.length).toBe(1);
+
+    unlock();
+    expect(readableListeners.length).toBe(0);
   });
 
   it("exports WATCHDOG_INTERVAL_MS as a positive number", () => {
