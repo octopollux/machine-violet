@@ -6,6 +6,7 @@ interface State {
   previousValue: string;
   value: string;
   cursorOffset: number;
+  pendingDeleteCount: number;
 }
 
 type Action =
@@ -14,9 +15,27 @@ type Action =
   | { type: "move-cursor-start" }
   | { type: "move-cursor-end" }
   | { type: "insert"; text: string }
-  | { type: "delete" };
+  | { type: "delete" }
+  | { type: "mark-delete" }
+  | { type: "commit-delete" };
+
+/** Flush any pending (strikethrough-marked) deletes into the string. */
+function commitPendingDeletes(state: State): State {
+  if (state.pendingDeleteCount === 0) return state;
+  return {
+    ...state,
+    previousValue: state.value,
+    value: state.value.slice(0, state.cursorOffset) + state.value.slice(state.cursorOffset + state.pendingDeleteCount),
+    pendingDeleteCount: 0,
+  };
+}
 
 export function reducer(state: State, action: Action): State {
+  // Auto-commit pending deletes before any action except mark-delete / commit-delete
+  if (action.type !== "mark-delete" && action.type !== "commit-delete") {
+    state = commitPendingDeletes(state);
+  }
+
   switch (action.type) {
     case "move-cursor-left":
       return { ...state, cursorOffset: Math.max(0, state.cursorOffset - 1) };
@@ -43,6 +62,16 @@ export function reducer(state: State, action: Action): State {
         cursorOffset: newOffset,
       };
     }
+    case "mark-delete": {
+      if (state.cursorOffset === 0) return state;
+      return {
+        ...state,
+        cursorOffset: state.cursorOffset - 1,
+        pendingDeleteCount: state.pendingDeleteCount + 1,
+      };
+    }
+    case "commit-delete":
+      return commitPendingDeletes(state);
   }
 }
 
@@ -106,70 +135,75 @@ export interface InlineTextInputProps {
   onSubmit?: (value: string) => void;
 }
 
-/** Minimum interval (ms) between React re-renders triggered by input.
- *  50ms ≈ 20fps — fast enough for responsive typing, slow enough
- *  to let the terminal fully process each frame's ANSI escape codes
- *  before the next arrives. */
-export const RENDER_THROTTLE_MS = 50;
+/** Delay (ms) after the last Backspace before pending deletes are committed.
+ *  120ms > 2× Windows key repeat interval (~33ms), reliably detects key release. */
+export const DELETE_RELEASE_MS = 120;
 
 /**
  * Uncontrolled text input with full cursor positioning.
  * Supports: left/right arrows, Home/End, Ctrl+A/E, backspace, delete.
  * Clear by changing the React `key` prop.
  *
- * Actions are applied immediately to a ref-held state so the value is
- * always current, but React re-renders are throttled to ~60 fps to
- * prevent terminal rendering corruption during rapid key repeats.
+ * Backspace uses a two-phase "mark then delete" approach: characters are
+ * visually marked with strikethrough while the key is held, then removed
+ * all at once on release. This sidesteps Windows ConPTY corruption caused
+ * by rapid intermediate re-renders during Backspace key repeat.
  */
 export function InlineTextInput({ isDisabled = false, defaultValue = "", availableWidth, onChange, onSubmit }: InlineTextInputProps) {
   const initialState: State = {
     previousValue: defaultValue,
     value: defaultValue,
     cursorOffset: defaultValue.length,
+    pendingDeleteCount: 0,
   };
 
   // True state lives in a ref — always current, never triggers a render.
   const stateRef = useRef<State>(initialState);
 
-  // Render state — synced from stateRef at a throttled rate.
+  // Render state — synced from stateRef on every action.
   const [renderState, setRenderState] = useState<State>(initialState);
 
-  // Timer handle for the throttled render sync.
-  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Timer handle for the Backspace release detection.
+  const releaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Track last value reported to onChange to avoid duplicate callbacks.
   const lastReportedValueRef = useRef(defaultValue);
 
   const viewStartRef = useRef(0);
 
-  /** Flush ref state to render state immediately. */
-  const flushRender = useCallback(() => {
-    if (flushTimerRef.current !== null) {
-      clearTimeout(flushTimerRef.current);
-      flushTimerRef.current = null;
-    }
-    setRenderState(stateRef.current);
-  }, []);
-
-  /** Apply an action and schedule a throttled render. */
+  /** Apply an action and immediately sync to render state. */
   const processAction = useCallback((action: Action) => {
     const prev = stateRef.current;
     const next = reducer(prev, action);
     if (next === prev) return; // No state change (e.g. backspace at position 0)
     stateRef.current = next;
-    if (flushTimerRef.current === null) {
-      flushTimerRef.current = setTimeout(() => {
-        flushTimerRef.current = null;
-        setRenderState(stateRef.current);
-      }, RENDER_THROTTLE_MS);
+    setRenderState(next);
+
+    if (action.type === "mark-delete") {
+      // Reset release timer — commit will fire when Backspace key is released
+      if (releaseTimerRef.current !== null) {
+        clearTimeout(releaseTimerRef.current);
+      }
+      releaseTimerRef.current = setTimeout(() => {
+        releaseTimerRef.current = null;
+        const committed = commitPendingDeletes(stateRef.current);
+        if (committed !== stateRef.current) {
+          stateRef.current = committed;
+          setRenderState(committed);
+        }
+      }, DELETE_RELEASE_MS);
+    } else if (releaseTimerRef.current !== null) {
+      // Non-backspace action — auto-commit already handled in reducer, cancel timer
+      clearTimeout(releaseTimerRef.current);
+      releaseTimerRef.current = null;
     }
   }, []);
 
-  // Clean up throttle timer on unmount.
+  // Clean up release timer on unmount.
   useEffect(() => {
     return () => {
-      if (flushTimerRef.current !== null) {
-        clearTimeout(flushTimerRef.current);
+      if (releaseTimerRef.current !== null) {
+        clearTimeout(releaseTimerRef.current);
       }
     };
   }, []);
@@ -199,9 +233,19 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", availab
   }, [isDisabled, stdinCtx, processAction]);
 
   const submit = useCallback(() => {
-    flushRender();
+    // Commit any pending deletes before submitting
+    const committed = commitPendingDeletes(stateRef.current);
+    if (committed !== stateRef.current) {
+      stateRef.current = committed;
+      setRenderState(committed);
+    }
+    // Cancel release timer if pending
+    if (releaseTimerRef.current !== null) {
+      clearTimeout(releaseTimerRef.current);
+      releaseTimerRef.current = null;
+    }
     onSubmit?.(stateRef.current.value);
-  }, [onSubmit, flushRender]);
+  }, [onSubmit]);
 
   // Fire onChange when the rendered value diverges from the last reported value.
   useEffect(() => {
@@ -234,7 +278,9 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", availab
       processAction({ type: "move-cursor-left" });
     } else if (key.rightArrow) {
       processAction({ type: "move-cursor-right" });
-    } else if (key.backspace || key.delete) {
+    } else if (key.backspace) {
+      processAction({ type: "mark-delete" });
+    } else if (key.delete) {
       processAction({ type: "delete" });
     } else if (input && !key.ctrl && !key.meta) {
       processAction({ type: "insert", text: input });
@@ -255,31 +301,44 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", availab
   }
 
   const rendered = useMemo(() => {
+    const { value, cursorOffset, pendingDeleteCount } = renderState;
+
+    /** Style a single character based on cursor position and pending-delete range. */
+    const styleChar = (char: string, globalIndex: number): string => {
+      const isPending = pendingDeleteCount > 0
+        && globalIndex >= cursorOffset
+        && globalIndex < cursorOffset + pendingDeleteCount;
+      const isCursor = globalIndex === cursorOffset;
+      if (isCursor && isPending) return chalk.strikethrough.inverse(char);
+      if (isPending) return chalk.strikethrough.dim(char);
+      if (isCursor) return chalk.inverse(char);
+      return char;
+    };
+
     let result: string;
     let visibleLen: number;
 
     if (isDisabled) {
-      result = renderState.value;
-      visibleLen = renderState.value.length;
-    } else if (renderState.value.length === 0) {
+      result = value;
+      visibleLen = value.length;
+    } else if (value.length === 0) {
       result = cursorChar;
       visibleLen = 1;
     } else if (needsViewport) {
-      const viewStart = computeViewStart(viewStartRef.current, renderState.cursorOffset, availableWidth, renderState.value.length);
+      const viewStart = computeViewStart(viewStartRef.current, cursorOffset, availableWidth, value.length);
       viewStartRef.current = viewStart;
 
       const viewEnd = viewStart + availableWidth;
       // If cursor is at end of text, we need room for the cursor block
-      const atEnd = renderState.cursorOffset === renderState.value.length;
-      const sliceEnd = atEnd ? Math.min(viewEnd - 1, renderState.value.length) : Math.min(viewEnd, renderState.value.length);
-      const visible = renderState.value.slice(viewStart, sliceEnd);
+      const atEnd = cursorOffset === value.length;
+      const sliceEnd = atEnd ? Math.min(viewEnd - 1, value.length) : Math.min(viewEnd, value.length);
+      const visible = value.slice(viewStart, sliceEnd);
 
       result = "";
       for (let i = 0; i < visible.length; i++) {
-        const globalIndex = viewStart + i;
-        result += globalIndex === renderState.cursorOffset ? chalk.inverse(visible[i]) : visible[i];
+        result += styleChar(visible[i], viewStart + i);
       }
-      if (atEnd && renderState.cursorOffset >= viewStart && renderState.cursorOffset < viewEnd) {
+      if (atEnd && cursorOffset >= viewStart && cursorOffset < viewEnd) {
         result += cursorChar;
       }
       // Viewport already fills availableWidth
@@ -288,15 +347,15 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", availab
       // No viewport needed — render full text
       result = "";
       let index = 0;
-      for (const char of renderState.value) {
-        result += index === renderState.cursorOffset ? chalk.inverse(char) : char;
+      for (const char of value) {
+        result += styleChar(char, index);
         index++;
       }
-      const atEnd = renderState.cursorOffset === renderState.value.length;
+      const atEnd = cursorOffset === value.length;
       if (atEnd) {
         result += cursorChar;
       }
-      visibleLen = renderState.value.length + (atEnd ? 1 : 0);
+      visibleLen = value.length + (atEnd ? 1 : 0);
     }
 
     // Pad to fixed width so the Text element never changes visual width.
@@ -306,7 +365,7 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", availab
     }
 
     return result;
-  }, [isDisabled, renderState.value, renderState.cursorOffset, availableWidth, needsViewport]);
+  }, [isDisabled, renderState.value, renderState.cursorOffset, renderState.pendingDeleteCount, availableWidth, needsViewport]);
 
   return <Text>{rendered}</Text>;
 }
