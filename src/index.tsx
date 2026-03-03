@@ -29,7 +29,7 @@ function ShutdownWrapper() {
   return <App shutdownRef={ref} />;
 }
 
-const { unmount } = render(<ShutdownWrapper />);
+const { unmount } = render(<ShutdownWrapper />, { maxFps: 45 });
 
 async function handleShutdownSignal() {
   if (shuttingDown) {

@@ -3,7 +3,6 @@ import { Text, useInput, useStdin } from "ink";
 import chalk from "chalk";
 
 interface State {
-  previousValue: string;
   value: string;
   cursorOffset: number;
   pendingDeleteCount: number;
@@ -15,7 +14,6 @@ type Action =
   | { type: "move-cursor-start" }
   | { type: "move-cursor-end" }
   | { type: "insert"; text: string }
-  | { type: "delete" }
   | { type: "mark-delete" }
   | { type: "commit-delete" };
 
@@ -24,7 +22,6 @@ function commitPendingDeletes(state: State): State {
   if (state.pendingDeleteCount === 0) return state;
   return {
     ...state,
-    previousValue: state.value,
     value: state.value.slice(0, state.cursorOffset) + state.value.slice(state.cursorOffset + state.pendingDeleteCount),
     pendingDeleteCount: 0,
   };
@@ -48,20 +45,9 @@ export function reducer(state: State, action: Action): State {
     case "insert":
       return {
         ...state,
-        previousValue: state.value,
         value: state.value.slice(0, state.cursorOffset) + action.text + state.value.slice(state.cursorOffset),
         cursorOffset: state.cursorOffset + action.text.length,
       };
-    case "delete": {
-      if (state.cursorOffset === 0) return state;
-      const newOffset = state.cursorOffset - 1;
-      return {
-        ...state,
-        previousValue: state.value,
-        value: state.value.slice(0, newOffset) + state.value.slice(newOffset + 1),
-        cursorOffset: newOffset,
-      };
-    }
     case "mark-delete": {
       if (state.cursorOffset === 0) return state;
       return {
@@ -151,7 +137,6 @@ export const DELETE_RELEASE_MS = 120;
  */
 export function InlineTextInput({ isDisabled = false, defaultValue = "", availableWidth, onChange, onSubmit }: InlineTextInputProps) {
   const initialState: State = {
-    previousValue: defaultValue,
     value: defaultValue,
     cursorOffset: defaultValue.length,
     pendingDeleteCount: 0,
@@ -278,10 +263,10 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", availab
       processAction({ type: "move-cursor-left" });
     } else if (key.rightArrow) {
       processAction({ type: "move-cursor-right" });
-    } else if (key.backspace) {
+    } else if (key.backspace || key.delete) {
+      // Ink maps the physical Backspace key (\x7f) to key.delete, not
+      // key.backspace (\x08). We must catch both to reach mark-delete.
       processAction({ type: "mark-delete" });
-    } else if (key.delete) {
-      processAction({ type: "delete" });
     } else if (input && !key.ctrl && !key.meta) {
       processAction({ type: "insert", text: input });
     }
