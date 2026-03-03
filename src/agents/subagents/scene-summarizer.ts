@@ -15,7 +15,7 @@ const MINI_DELIMITER = "---MINI---";
 export interface SceneSummaryResult extends SubagentResult {
   /** Full bullet-list summary */
   full: string;
-  /** Dense one-liner (~25 words, preserving critical wikilinks) */
+  /** Dense one-liner (max 128 chars, preserving critical wikilinks) */
   mini: string;
 }
 

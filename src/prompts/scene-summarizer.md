@@ -9,4 +9,4 @@ Rules:
 - When a character has aliases (listed under "Entity aliases"), use their canonical filename in wikilinks.
 
 After the bullet list, write a line containing only ---MINI---
-then write a single dense sentence (max 25 words) capturing the scene's most important outcome. Preserve the 1-2 most critical wikilinks. No bullets, just one sentence.
+then write a single dense sentence (max 128 characters) capturing the scene's most important outcome. Preserve the 1-2 most critical wikilinks. No bullets, just one sentence.

@@ -7,7 +7,7 @@ export interface CampaignLogEntry {
   title: string;
   /** Bullet-list summary (existing format) */
   full: string;
-  /** Dense one-liner (~25 words, preserving critical wikilinks) */
+  /** Dense one-liner (max 128 chars, preserving critical wikilinks) */
   mini: string;
 }
 
