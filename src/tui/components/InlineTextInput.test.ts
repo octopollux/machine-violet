@@ -78,39 +78,9 @@ describe("computeViewStart", () => {
 
 describe("reducer", () => {
   const make = (value: string, cursorOffset: number, pendingDeleteCount = 0) => ({
-    previousValue: value,
     value,
     cursorOffset,
     pendingDeleteCount,
-  });
-
-  describe("delete (Delete key)", () => {
-    it("is a no-op when cursor is at position 0", () => {
-      const state = make("hello", 0);
-      const next = reducer(state, { type: "delete" });
-      expect(next).toBe(state); // same reference → no mutation
-    });
-
-    it("deletes the character before the cursor", () => {
-      const state = make("hello", 3);
-      const next = reducer(state, { type: "delete" });
-      expect(next.value).toBe("helo");
-      expect(next.cursorOffset).toBe(2);
-    });
-
-    it("deletes the last character when cursor is at end", () => {
-      const state = make("hi", 2);
-      const next = reducer(state, { type: "delete" });
-      expect(next.value).toBe("h");
-      expect(next.cursorOffset).toBe(1);
-    });
-
-    it("empties the string when one character remains and cursor is at end", () => {
-      const state = make("x", 1);
-      const next = reducer(state, { type: "delete" });
-      expect(next.value).toBe("");
-      expect(next.cursorOffset).toBe(0);
-    });
   });
 
   describe("mark-delete", () => {
@@ -233,15 +203,6 @@ describe("reducer", () => {
       expect(next.pendingDeleteCount).toBe(0);
     });
 
-    it("commits pending deletes before delete (Delete key)", () => {
-      // "hello" cursor at 2, pending 2 → commit → "heo" cursor=2 → delete → "ho" cursor=1
-      const state = make("hello", 2, 2);
-      const next = reducer(state, { type: "delete" });
-      expect(next.value).toBe("ho");
-      expect(next.cursorOffset).toBe(1);
-      expect(next.pendingDeleteCount).toBe(0);
-    });
-
     it("is a no-op when nothing pending", () => {
       const state = make("hello", 3, 0);
       const next = reducer(state, { type: "insert", text: "X" });
@@ -259,30 +220,33 @@ describe("DELETE_RELEASE_MS constant", () => {
   });
 });
 
-describe("reducer with rapid sequential deletes", () => {
+describe("reducer with rapid sequential mark-deletes", () => {
   const make = (value: string, cursorOffset: number) => ({
-    previousValue: value,
     value,
     cursorOffset,
     pendingDeleteCount: 0,
   });
 
-  it("correctly chains multiple deletes from the same starting state", () => {
-    // Simulate rapid Delete key presses: 5 deletes on "hello world" (cursor at end)
+  it("correctly chains multiple mark-deletes then commits", () => {
     let state = make("hello world", 11);
     for (let i = 0; i < 5; i++) {
-      state = reducer(state, { type: "delete" });
+      state = reducer(state, { type: "mark-delete" });
     }
+    expect(state.value).toBe("hello world");
+    expect(state.pendingDeleteCount).toBe(5);
+    state = reducer(state, { type: "commit-delete" });
     expect(state.value).toBe("hello ");
     expect(state.cursorOffset).toBe(6);
   });
 
-  it("stops deleting when cursor reaches position 0", () => {
-    // More deletes than characters: should empty the string, not crash
+  it("stops marking when cursor reaches position 0", () => {
     let state = make("abc", 3);
     for (let i = 0; i < 10; i++) {
-      state = reducer(state, { type: "delete" });
+      state = reducer(state, { type: "mark-delete" });
     }
+    expect(state.cursorOffset).toBe(0);
+    expect(state.pendingDeleteCount).toBe(3);
+    state = reducer(state, { type: "commit-delete" });
     expect(state.value).toBe("");
     expect(state.cursorOffset).toBe(0);
   });
