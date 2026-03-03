@@ -7,15 +7,27 @@
  * re-enabled nanoseconds later, because the Windows console subsystem
  * processes the input in the gap.
  *
- * This guard intercepts `process.stdin.setRawMode(false)` and silently
- * swallows it so the console never leaves raw mode while the TUI is
- * running.  Call `unlock()` during shutdown to restore normal behavior.
+ * Two layers of protection:
+ * 1. Intercept `stdin.setRawMode(false)` and swallow it — prevents
+ *    Ink's reference-counting from ever turning raw mode off.
+ * 2. A watchdog timer that re-asserts `setRawMode(true)` every 10 ms
+ *    to recover from external OS-level console mode resets (e.g.
+ *    Windows resetting ENABLE_ECHO_INPUT on window focus changes).
+ *
+ * Call `unlock()` during shutdown to restore normal behavior.
  */
 
+/** How often the watchdog re-asserts raw mode (ms). */
+export const WATCHDOG_INTERVAL_MS = 10;
+
 export function installRawModeGuard(
-  stdin: NodeJS.ReadStream & { setRawMode?: (mode: boolean) => NodeJS.ReadStream },
+  stdin: NodeJS.ReadStream & {
+    setRawMode?: (mode: boolean) => NodeJS.ReadStream;
+    isRaw?: boolean;
+    isTTY?: boolean;
+  },
 ): () => void {
-  if (!stdin.setRawMode) {
+  if (!stdin.setRawMode || !stdin.isTTY) {
     // eslint-disable-next-line @typescript-eslint/no-empty-function -- no-op unlock when setRawMode unavailable
     return () => {};
   }
@@ -33,8 +45,21 @@ export function installRawModeGuard(
   // Ensure raw mode is on from the start.
   originalSetRawMode(true);
 
-  // Unlock: restore original so shutdown can actually disable raw mode.
+  // Watchdog: re-assert raw mode periodically to recover from
+  // external resets by the OS / terminal emulator / ConPTY.
+  const watchdog = setInterval(() => {
+    try {
+      if (stdin.isRaw === false) {
+        originalSetRawMode(true);
+      }
+    } catch {
+      // stdin may be destroyed during shutdown — ignore
+    }
+  }, WATCHDOG_INTERVAL_MS);
+
+  // Unlock: stop watchdog and restore original setRawMode.
   return () => {
+    clearInterval(watchdog);
     stdin.setRawMode = originalSetRawMode;
   };
 }
