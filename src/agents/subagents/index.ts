@@ -1,4 +1,5 @@
-export { summarizeScene } from "./scene-summarizer.js";
+export { summarizeScene, parseSummaryOutput } from "./scene-summarizer.js";
+export type { SceneSummaryResult } from "./scene-summarizer.js";
 export { updatePrecis } from "./precis-updater.js";
 export { updateChangelogs } from "./changelog-updater.js";
 export { resolveAction } from "./resolve-action.js";

@@ -53,8 +53,8 @@ locations/      subdirs with index.md
 factions/       .md files
 lore/           .md files
 campaign/
-  log.md        append-only campaign log
-  scenes/       001-slug/transcript.md per scene
+  log.json      structured campaign log (full + mini summaries per scene)
+  scenes/       001-slug/transcript.md + summary.md per scene
 ```
 
 Entities use `**Key:** Value` front matter (not YAML). Wikilinks: `[Name](../type/file.md)`.

@@ -327,13 +327,10 @@ describe("GameEngine", () => {
   });
 
   it("refreshes context after scene transition", async () => {
-    const client = mockClient([textMessage("- Party met in tavern")]);
+    const client = mockClient([textMessage("- Party met in tavern\n---MINI---\nParty met in tavern.")]);
     const { callbacks } = mockCallbacks();
     const fileIO = mockFileIO();
     const state = mockState();
-
-    // Pre-populate a campaign log file so contextRefresh can read it
-    files[norm("/tmp/test-campaign/campaign/log.md")] = "# Campaign Log\n\n## Scene 1\nOld entry";
 
     const sessionState = mockSessionState();
     const engine = new GameEngine({
@@ -348,24 +345,21 @@ describe("GameEngine", () => {
 
     await engine.transitionScene("Tavern Meeting", 60);
 
-    // After transition, campaign log should have been re-read by contextRefresh
-    // The appendFile from the transition adds the new entry, then contextRefresh re-reads it
+    // After transition, campaign log.json should have been written and re-read by contextRefresh
     expect(fileIO.readFile).toHaveBeenCalled();
     const readCalls = (fileIO.readFile as ReturnType<typeof vi.fn>).mock.calls
       .map(([p]: unknown[]) => norm(p as string));
-    expect(readCalls.some((p: string) => p.includes("log.md"))).toBe(true);
+    expect(readCalls.some((p: string) => p.includes("log.json"))).toBe(true);
 
-    // The session state should have the updated campaign summary
+    // The session state should have the updated campaign summary (rendered from JSON)
     expect(sessionState.campaignSummary).toContain("Party met in tavern");
   });
 
   it("refreshes context after resumePendingTransition", async () => {
-    const client = mockClient([textMessage("- Resumed summary")]);
+    const client = mockClient([textMessage("- Resumed summary\n---MINI---\nResumed summary.")]);
     const { callbacks } = mockCallbacks();
     const fileIO = mockFileIO();
     const state = mockState();
-
-    files[norm("/tmp/test-campaign/campaign/log.md")] = "# Campaign Log\nOld data";
 
     const sessionState = mockSessionState();
     const engine = new GameEngine({
@@ -385,10 +379,10 @@ describe("GameEngine", () => {
       title: "Resume Test",
     });
 
-    // contextRefresh should have re-read the campaign log
+    // contextRefresh should have re-read the campaign log.json
     const readCalls = (fileIO.readFile as ReturnType<typeof vi.fn>).mock.calls
       .map(([p]: unknown[]) => norm(p as string));
-    expect(readCalls.some((p: string) => p.includes("log.md"))).toBe(true);
+    expect(readCalls.some((p: string) => p.includes("log.json"))).toBe(true);
   });
 
   it("ends session", async () => {

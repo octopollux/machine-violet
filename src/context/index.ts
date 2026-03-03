@@ -7,3 +7,5 @@ export { CostTracker, formatK } from "./cost-tracker.js";
 export type { TokenBreakdown, TierTokens } from "./cost-tracker.js";
 export { StatePersister, STATE_FILES } from "./state-persistence.js";
 export type { StateSlice, PersistedSceneState, PersistedUIState, LoadedState } from "./state-persistence.js";
+export { renderCampaignLog, parseLegacyLog, formatFullEntry, formatMiniEntry } from "./campaign-log.js";
+export type { CampaignLog, CampaignLogEntry } from "./campaign-log.js";

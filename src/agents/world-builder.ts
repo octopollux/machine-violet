@@ -73,9 +73,13 @@ export async function buildCampaignWorld(
   );
   await fileIO.writeFile(playerPath, playerContent);
 
-  // 6. Write campaign log (first entry)
+  // 6. Write campaign log (empty JSON)
   const logPath = norm(paths.log);
-  const logContent = `# Campaign Log: ${result.campaignName}\n\n${result.campaignPremise}\n`;
+  const logContent = JSON.stringify(
+    { campaignName: result.campaignName, entries: [] },
+    null,
+    2,
+  );
   await fileIO.writeFile(logPath, logContent);
 
   // 7. Write starting location (minimal)
