@@ -234,7 +234,7 @@ describe("SceneManager", () => {
 
   it("clears player reads on scene transition", async () => {
     const client = mockClient([
-      textResponse("Summary"),
+      textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
 
@@ -256,9 +256,9 @@ describe("SceneManager", () => {
   });
 
   it("executes scene_transition cascade", async () => {
-    // Mock client: first call = scene summary, second call = changelog
+    // Mock client: first call = scene summary (with ---MINI---), second call = changelog
     const client = mockClient([
-      textResponse("- Aldric entered tavern\n- Met innkeeper"),
+      textResponse("- Aldric entered tavern\n- Met innkeeper\n---MINI---\nAldric entered tavern and met the innkeeper."),
       textResponse("aldric.md: Entered tavern in Scene 1"),
     ]);
 
@@ -279,9 +279,21 @@ describe("SceneManager", () => {
     expect(fileIO.writeFile).toHaveBeenCalled();
     expect(fileIO.mkdir).toHaveBeenCalled();
 
-    // Campaign log was appended
-    expect(fileIO.appendFile).toHaveBeenCalled();
+    // Campaign log.json was written (not appended)
+    const logWriteCalls = (fileIO.writeFile as ReturnType<typeof vi.fn>).mock.calls
+      .filter(([path]: unknown[]) => (path as string).includes("log.json"));
+    expect(logWriteCalls.length).toBeGreaterThanOrEqual(1);
+    const logJson = JSON.parse(logWriteCalls[0][1] as string);
+    expect(logJson.entries).toHaveLength(1);
+    expect(logJson.entries[0].full).toContain("Aldric entered tavern");
+    expect(logJson.entries[0].mini).toContain("Aldric entered tavern and met the innkeeper");
+
     expect(result.campaignLogEntry).toContain("Aldric entered tavern");
+
+    // Per-scene summary.md was written
+    const summaryCalls = (fileIO.writeFile as ReturnType<typeof vi.fn>).mock.calls
+      .filter(([path]: unknown[]) => (path as string).includes("summary.md"));
+    expect(summaryCalls.length).toBe(1);
 
     // Scene advanced
     expect(mgr.getScene().sceneNumber).toBe(2);
@@ -298,7 +310,7 @@ describe("SceneManager", () => {
 
   it("writes pending-operation.json during cascade", async () => {
     const client = mockClient([
-      textResponse("Summary"),
+      textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
 
@@ -321,7 +333,7 @@ describe("SceneManager", () => {
 
   it("advances calendar during scene transition", async () => {
     const client = mockClient([
-      textResponse("Summary"),
+      textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
 
@@ -343,7 +355,7 @@ describe("SceneManager", () => {
 
   it("sessionEnd writes recap file", async () => {
     const client = mockClient([
-      textResponse("- Session summary"),
+      textResponse("- Session summary\n---MINI---\nSession summary."),
       textResponse(""),
     ]);
 
@@ -367,7 +379,15 @@ describe("SceneManager", () => {
   it("sessionResume loads recap and campaign log", async () => {
     const fileIO = mockFileIO();
     files["/tmp/test-campaign/campaign/session-recaps/session-000.md"] = "# Session 0 Recap\nThe adventure began.";
-    files["/tmp/test-campaign/campaign/log.md"] = "# Campaign Log\n- Scene 1: Tavern";
+    files["/tmp/test-campaign/campaign/log.json"] = JSON.stringify({
+      campaignName: "Test Campaign",
+      entries: [{
+        sceneNumber: 1,
+        title: "Tavern",
+        full: "- Aldric entered the tavern",
+        mini: "Aldric visited the tavern.",
+      }],
+    });
 
     const sessionState = mockSessionState();
     const scene = mockScene();
@@ -383,12 +403,21 @@ describe("SceneManager", () => {
 
     const recap = await mgr.sessionResume();
     expect(recap).toContain("adventure began");
-    expect(sessionState.campaignSummary).toContain("Campaign Log");
+    expect(sessionState.campaignSummary).toContain("Campaign Log: Test Campaign");
+    expect(sessionState.campaignSummary).toContain("Scene 1");
   });
 
   it("contextRefresh populates sessionState fields from disk", async () => {
     const fileIO = mockFileIO();
-    files["/tmp/test-campaign/campaign/log.md"] = "# Campaign Log\nScene 1 happened.";
+    files["/tmp/test-campaign/campaign/log.json"] = JSON.stringify({
+      campaignName: "Test Campaign",
+      entries: [{
+        sceneNumber: 1,
+        title: "Opening",
+        full: "- Scene 1 happened",
+        mini: "Scene 1 happened.",
+      }],
+    });
     files["/tmp/test-campaign/campaign/session-recaps/session-000.md"] = "# Session 0\nRecap here.";
 
     const scene = mockScene();
@@ -409,7 +438,7 @@ describe("SceneManager", () => {
 
     await mgr.contextRefresh();
 
-    expect(sessionState.campaignSummary).toContain("Campaign Log");
+    expect(sessionState.campaignSummary).toContain("Campaign Log: Test Campaign");
     expect(sessionState.sessionRecap).toContain("Recap here");
     expect(sessionState.activeState).toContain("Aldric");
     expect(sessionState.scenePrecis).toBe("Current precis text");
@@ -418,7 +447,7 @@ describe("SceneManager", () => {
 
   it("contextRefresh produces enriched PC summaries with aliases", async () => {
     const fileIO = mockFileIO();
-    files["/tmp/test-campaign/campaign/log.md"] = "# Log";
+    files["/tmp/test-campaign/campaign/log.json"] = JSON.stringify({ campaignName: "Test", entries: [] });
     files["/tmp/test-campaign/characters/aldric.md"] =
       "# Aldric\n\n**Type:** PC\n**Additional Names:** The Hooded Figure\n\nA paladin.\n";
 
@@ -486,7 +515,7 @@ describe("SceneManager", () => {
     // The alias context is private, but we can verify it's passed to subagents
     // by checking the summarizer call in a transition
     const client = mockClient([
-      textResponse("- Summary"),
+      textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
     await mgr.sceneTransition(client, "Test");
@@ -520,7 +549,7 @@ describe("SceneManager", () => {
     await mgr.contextRefresh();
     // Verify no alias context in subagent calls
     const client = mockClient([
-      textResponse("- Summary"),
+      textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
     await mgr.sceneTransition(client, "Test");
@@ -544,9 +573,9 @@ describe("SceneManager", () => {
       return [];
     });
 
-    // Mock client: summarizer + changelog updater returns location entry
+    // Mock client: summarizer (with ---MINI---) + changelog updater returns location entry
     const client = mockClient([
-      textResponse("- Scene summary"),
+      textResponse("- Scene summary\n---MINI---\nScene summary."),
       textResponse("tavern/index.md: Party entered and caused a brawl"),
     ]);
 
@@ -623,7 +652,7 @@ describe("SceneManager", () => {
 
   it("sceneEntityIndex is cleared on scene transition", async () => {
     const client = mockClient([
-      textResponse("Summary"),
+      textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
 
@@ -690,7 +719,7 @@ describe("SceneManager", () => {
 
   it("sceneTransition populates validationIssues in result", async () => {
     const client = mockClient([
-      textResponse("Summary"),
+      textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
 
@@ -713,7 +742,7 @@ describe("SceneManager", () => {
 
   it("validation failure does not block scene transition", async () => {
     const client = mockClient([
-      textResponse("Summary"),
+      textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
 
@@ -741,7 +770,7 @@ describe("SceneManager", () => {
 
   it("stepCheckpoint commits via CampaignRepo during scene transition", async () => {
     const client = mockClient([
-      textResponse("Summary"),
+      textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
 
@@ -769,7 +798,7 @@ describe("SceneManager", () => {
 
   it("sessionEnd calls sessionCommit on CampaignRepo", async () => {
     const client = mockClient([
-      textResponse("Summary"),
+      textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
 
@@ -820,7 +849,7 @@ describe("SceneManager", () => {
   it("resumePendingTransition resumes from subagent_updates step", async () => {
     // Mock client: first call = scene summary, second call = changelog
     const client = mockClient([
-      textResponse("- Resumed summary"),
+      textResponse("- Resumed summary\n---MINI---\nResumed summary."),
       textResponse(""),
     ]);
 
@@ -847,14 +876,16 @@ describe("SceneManager", () => {
     const mkdirCalls = (fileIO.mkdir as ReturnType<typeof vi.fn>).mock.calls;
     expect(mkdirCalls.length).toBe(0);
 
-    // campaign log was appended
-    expect(fileIO.appendFile).toHaveBeenCalled();
+    // campaign log.json was written
+    const logWriteCalls = (fileIO.writeFile as ReturnType<typeof vi.fn>).mock.calls
+      .filter(([path]: unknown[]) => (path as string).includes("log.json"));
+    expect(logWriteCalls.length).toBeGreaterThanOrEqual(1);
     expect(result!.campaignLogEntry).toContain("Resumed summary");
   });
 
   it("resumePendingTransition clears pending-operation.json after success", async () => {
     const client = mockClient([
-      textResponse("Summary"),
+      textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
 
@@ -968,7 +999,7 @@ describe("SceneManager", () => {
 
   it("legacy pending-op step 'campaign_log' normalizes to subagent_updates", async () => {
     const client = mockClient([
-      textResponse("- Resumed summary"),
+      textResponse("- Resumed summary\n---MINI---\nResumed summary."),
       textResponse(""),
     ]);
 
@@ -997,7 +1028,7 @@ describe("SceneManager", () => {
 
   it("legacy pending-op step 'changelog_updates' normalizes to subagent_updates", async () => {
     const client = mockClient([
-      textResponse("- Summary"),
+      textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
 
@@ -1034,9 +1065,9 @@ describe("SceneManager", () => {
       return [];
     });
 
-    // Mock client: summarizer + changelog that returns an entry for aldric scene 1
+    // Mock client: summarizer (with ---MINI---) + changelog that returns an entry for aldric scene 1
     const client = mockClient([
-      textResponse("- Summary"),
+      textResponse("- Summary\n---MINI---\nSummary."),
       textResponse("aldric.md: Entered tavern in Scene 1"),
     ]);
 

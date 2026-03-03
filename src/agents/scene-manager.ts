@@ -1,6 +1,8 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { GameState } from "./game-state.js";
 import type { ConversationManager, DroppedExchange } from "../context/index.js";
+import { renderCampaignLog, parseLegacyLog } from "../context/index.js";
+import type { CampaignLog, CampaignLogEntry } from "../context/index.js";
 import { buildDMPrefix, buildActiveState } from "./dm-prompt.js";
 import type { DMSessionState } from "./dm-prompt.js";
 import { summarizeScene } from "./subagents/scene-summarizer.js";
@@ -399,10 +401,8 @@ export class SceneManager {
       narrativeRecap = await this.fileIO.readFile(narrativePath);
     }
 
-    // Load campaign log for summary
-    if (await this.fileIO.exists(paths.log)) {
-      this.sessionState.campaignSummary = await this.fileIO.readFile(paths.log);
-    }
+    // Load campaign log — migrate from legacy log.md if needed
+    this.sessionState.campaignSummary = await this.loadAndRenderCampaignLog();
 
     if (recap) {
       this.sessionState.sessionRecap = recap;
@@ -430,11 +430,9 @@ export class SceneManager {
     const root = this.state.campaignRoot;
     const paths = campaignPaths(root);
 
-    // Re-read campaign log
+    // Re-read campaign log (JSON, rendered with budget)
     try {
-      if (await this.fileIO.exists(paths.log)) {
-        this.sessionState.campaignSummary = await this.fileIO.readFile(paths.log);
-      }
+      this.sessionState.campaignSummary = await this.loadAndRenderCampaignLog();
     } catch { /* non-critical */ }
 
     // Re-read previous session recap
@@ -509,6 +507,40 @@ export class SceneManager {
     this.sceneEntityIndex.set(relativePath, { name, aliases: aliases || undefined });
   }
 
+  // --- Campaign log loading ---
+
+  /**
+   * Load campaign log JSON, migrating from legacy log.md if needed,
+   * and render with token budget for system prompt inclusion.
+   */
+  private async loadAndRenderCampaignLog(): Promise<string> {
+    const paths = campaignPaths(this.state.campaignRoot);
+    const budget = this.state.config.context?.campaign_log_budget ?? 15000;
+
+    // Try log.json first
+    if (await this.fileIO.exists(paths.log)) {
+      try {
+        const raw = await this.fileIO.readFile(paths.log);
+        const log = JSON.parse(raw) as CampaignLog;
+        return renderCampaignLog(log, budget);
+      } catch { /* corrupt JSON — try legacy */ }
+    }
+
+    // Migrate from legacy log.md
+    if (await this.fileIO.exists(paths.legacyLog)) {
+      try {
+        const md = await this.fileIO.readFile(paths.legacyLog);
+        const log = parseLegacyLog(md);
+        // Persist the migration
+        await this.fileIO.writeFile(paths.log, JSON.stringify(log, null, 2));
+        this.devLog?.("[dev] migrated campaign/log.md → campaign/log.json");
+        return renderCampaignLog(log, budget);
+      } catch { /* non-critical */ }
+    }
+
+    return "";
+  }
+
   // --- Transition step methods ---
 
   private async stepFinalizeTranscript(): Promise<void> {
@@ -535,12 +567,42 @@ export class SceneManager {
     this.devLog?.("[dev] subagent:summarizer starting");
     const summaryResult = await summarizeScene(client, transcript, this.aliasContext || undefined);
     this.devLog?.("[dev] subagent:summarizer done");
-    result.campaignLogEntry = summaryResult.text;
+    // campaignLogEntry stays as full text for buildSceneAnchor, session recaps, etc.
+    result.campaignLogEntry = summaryResult.full;
     accUsage(result.usage, summaryResult.usage);
 
     const paths = campaignPaths(this.state.campaignRoot);
-    const logEntry = `\n## Scene ${this.scene.sceneNumber}: ${title}\n${result.campaignLogEntry}\n`;
-    await this.fileIO.appendFile(paths.log, logEntry);
+
+    // Read existing log.json or create empty
+    let log: CampaignLog;
+    try {
+      if (await this.fileIO.exists(paths.log)) {
+        log = JSON.parse(await this.fileIO.readFile(paths.log)) as CampaignLog;
+      } else {
+        log = { campaignName: this.state.config.name, entries: [] };
+      }
+    } catch {
+      log = { campaignName: this.state.config.name, entries: [] };
+    }
+
+    // Build and push entry
+    const entry: CampaignLogEntry = {
+      sceneNumber: this.scene.sceneNumber,
+      title,
+      full: summaryResult.full,
+      mini: summaryResult.mini,
+    };
+    log.entries.push(entry);
+
+    // Write updated log.json
+    await this.fileIO.writeFile(paths.log, JSON.stringify(log, null, 2));
+
+    // Write per-scene summary file
+    const summaryPath = paths.sceneSummary(
+      this.scene.sceneNumber,
+      this.scene.slug || "untitled",
+    );
+    await this.fileIO.writeFile(summaryPath, summaryResult.full);
   }
 
   private async stepChangelogUpdates(

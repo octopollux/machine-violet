@@ -122,10 +122,12 @@ describe("buildCampaignWorld", () => {
     expect(charFile).toBeTruthy();
     expect(files[charFile!]).toContain(result.characterName);
 
-    // Campaign log was written
-    const logFile = Object.keys(files).find((p) => p.endsWith("log.md"));
+    // Campaign log was written (JSON format)
+    const logFile = Object.keys(files).find((p) => p.endsWith("log.json"));
     expect(logFile).toBeTruthy();
-    expect(files[logFile!]).toContain(result.campaignName);
+    const logData = JSON.parse(files[logFile!]);
+    expect(logData.campaignName).toBe(result.campaignName);
+    expect(logData.entries).toEqual([]);
 
     // Location was created
     const locationFile = Object.keys(files).find((p) => p.includes("/locations/"));

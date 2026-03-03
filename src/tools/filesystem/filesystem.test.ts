@@ -260,7 +260,9 @@ describe("campaignPaths", () => {
   it("generates correct file paths", () => {
     const paths = campaignPaths("/root");
     expect(norm(paths.config)).toContain("config.json");
-    expect(norm(paths.log)).toContain("campaign/log.md");
+    expect(norm(paths.log)).toContain("campaign/log.json");
+    expect(norm(paths.legacyLog)).toContain("campaign/log.md");
+    expect(norm(paths.sceneSummary(1, "tavern"))).toContain("campaign/scenes/001-tavern/summary.md");
     expect(norm(paths.character("aldric"))).toContain("characters/aldric.md");
     expect(norm(paths.player("alex"))).toContain("players/alex.md");
     expect(norm(paths.location("caves"))).toContain("locations/caves/index.md");

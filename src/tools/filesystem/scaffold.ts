@@ -39,7 +39,10 @@ export function sceneDir(
 export function campaignPaths(root: string) {
   return {
     config: join(root, "config.json"),
-    log: join(root, "campaign", "log.md"),
+    log: join(root, "campaign", "log.json"),
+    legacyLog: join(root, "campaign", "log.md"),
+    sceneSummary: (n: number, slug: string) =>
+      join(sceneDir(root, n, slug), "summary.md"),
     character: (name: string) => join(root, "characters", `${name}.md`),
     player: (name: string) => join(root, "players", `${name}.md`),
     location: (name: string) => join(root, "locations", name, "index.md"),

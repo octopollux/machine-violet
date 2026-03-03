@@ -558,7 +558,7 @@ export function summarizeGameState(gs: GameState): string {
   lines.push(`  Party: ${gs.campaignRoot}/characters/party.md`);
   lines.push(`  Players: ${gs.campaignRoot}/players/`);
   lines.push(`  Locations: ${gs.campaignRoot}/locations/`);
-  lines.push(`  Campaign log: ${gs.campaignRoot}/campaign/log.md`);
+  lines.push(`  Campaign log: ${gs.campaignRoot}/campaign/log.json`);
   lines.push(`  Scenes: ${gs.campaignRoot}/campaign/scenes/`);
 
   // Players
