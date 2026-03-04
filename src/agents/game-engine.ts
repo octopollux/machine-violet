@@ -7,7 +7,7 @@ import { ConversationManager } from "../context/conversation.js";
 import type { DroppedExchange, SerializedExchange } from "../context/conversation.js";
 import { StatePersister } from "../context/state-persistence.js";
 import type { StateSlice } from "../context/state-persistence.js";
-import { SceneManager } from "./scene-manager.js";
+import { SceneManager, buildScenePacing } from "./scene-manager.js";
 import type { SceneState, FileIO } from "./scene-manager.js";
 import type { DMSessionState } from "./dm-prompt.js";
 import { getModel, getThinkingConfig } from "../config/models.js";
@@ -67,6 +67,34 @@ export interface EngineCallbacks {
   onTurnStart: (turn: TurnInfo) => void;
   /** A participant turn has ended */
   onTurnEnd: (turn: TurnInfo) => void;
+}
+
+/**
+ * Stamp cache_control on the last content block of the last conversation
+ * message (BP4). This lets the API cache the entire conversation prefix
+ * so only the new user input is uncached.
+ */
+function stampConversationCache(messages: Anthropic.MessageParam[]): void {
+  if (messages.length === 0) return;
+  const last = messages[messages.length - 1];
+  if (typeof last.content === "string") {
+    // Convert string to block array so we can attach cache_control
+    messages[messages.length - 1] = {
+      role: last.role,
+      content: [{
+        type: "text" as const,
+        text: last.content,
+        cache_control: { type: "ephemeral" },
+      } as Anthropic.TextBlockParam],
+    };
+  } else if (Array.isArray(last.content) && last.content.length > 0) {
+    const blocks = [...last.content] as unknown as Record<string, unknown>[];
+    blocks[blocks.length - 1] = {
+      ...blocks[blocks.length - 1],
+      cache_control: { type: "ephemeral" },
+    };
+    messages[messages.length - 1] = { role: last.role, content: blocks as unknown as Anthropic.ContentBlockParam[] };
+  }
 }
 
 /**
@@ -276,17 +304,14 @@ export class GameEngine {
       this.sceneManager.appendPlayerInput(characterName, text);
     }
 
-    // Build the user message
-    const userMessage: Anthropic.MessageParam = {
-      role: "user",
-      content: taggedInput,
-    };
-
     // Get system prompt
     const systemPrompt = this.sceneManager.getSystemPrompt();
 
-    // Build message list; inject behavioral reminder before player input if needed
+    // Build message list; stamp conversation cache before new input
     const messages = [...this.conversation.getMessages()];
+    stampConversationCache(messages);
+
+    // Inject behavioral reminder before player input if needed
     if (!opts?.skipTranscript) {
       const reminder = this.buildBehaviorReminder();
       if (reminder) {
@@ -294,6 +319,20 @@ export class GameEngine {
         this.callbacks.onDevLog?.(`[dev] injection: ${reminder}`);
       }
     }
+
+    // Inject scene pacing every 3 exchanges
+    let userContent = taggedInput;
+    if (this.conversation.size > 0 && this.conversation.size % 3 === 0) {
+      const pacing = buildScenePacing(this.sceneManager.getScene());
+      if (pacing) {
+        userContent += `\n\n[scene-pacing] ${pacing}`;
+      }
+    }
+
+    const userMessage: Anthropic.MessageParam = {
+      role: "user",
+      content: userContent,
+    };
     messages.push(userMessage);
 
     // Wrap config to track whether any tool was called this turn
@@ -338,12 +377,16 @@ export class GameEngine {
         this.sceneManager.appendDMResponse(result.text);
       }
 
-      // Add exchange to conversation manager
+      // Split round messages into tool interactions and final assistant
+      const roundMsgs = result.roundMessages;
+      const toolMessages = roundMsgs.length > 1 ? roundMsgs.slice(0, -1) : [];
+
+      // Add exchange to conversation manager (assistant kept as string for handleDroppedExchange compat)
       const assistantMessage: Anthropic.MessageParam = {
         role: "assistant",
         content: result.text,
       };
-      const dropped = this.conversation.addExchange(userMessage, assistantMessage);
+      const dropped = this.conversation.addExchange(userMessage, assistantMessage, toolMessages);
 
       // Persist conversation after each exchange (crash resilience)
       if (this.persister) {

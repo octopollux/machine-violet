@@ -19,7 +19,6 @@ export interface DMSessionState {
   sessionRecap?: string;
   activeState?: string;
   scenePrecis?: string;
-  scenePacing?: string;
   playerRead?: string;
   entityIndex?: string;
   uiState?: string;

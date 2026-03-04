@@ -205,20 +205,18 @@ describe("buildOOCPrompt (structured)", () => {
     expect(allText).not.toContain("## Scene So Far");
   });
 
-  it("does not include DM-internal sections (scenePacing, playerRead, uiState)", () => {
+  it("does not include DM-internal sections (playerRead, uiState)", () => {
     const result = buildOOCPrompt({
       campaignName: "TestCampaign",
       config: mockConfig(),
       sessionState: {
         ...mockSessionState(),
-        scenePacing: "5 exchanges, threads ripe",
         playerRead: "Player seems engaged",
         uiState: "style=classic, variant=exploration",
       },
     }) as Anthropic.TextBlockParam[];
 
     const allText = result.map((b) => b.text).join("\n");
-    expect(allText).not.toContain("Scene Pacing");
     expect(allText).not.toContain("Player Read");
     expect(allText).not.toContain("UI State");
   });

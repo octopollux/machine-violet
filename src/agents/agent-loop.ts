@@ -53,6 +53,8 @@ export interface AgentLoopResult {
   usage: UsageStats;
   /** Whether the loop was cut short by maxToolRounds */
   truncated: boolean;
+  /** All messages appended during this loop (assistant + tool_result pairs, ending with final assistant). */
+  roundMessages: Anthropic.MessageParam[];
 }
 
 // Re-export stampToolsCacheControl from agent-session for backward compatibility

@@ -56,8 +56,8 @@ export class ConversationManager {
     const messages: Anthropic.MessageParam[] = [];
     for (const ex of this.exchanges) {
       messages.push(ex.user);
-      messages.push(ex.assistant);
       messages.push(...ex.toolResults);
+      messages.push(ex.assistant);
     }
     return messages;
   }
@@ -115,7 +115,9 @@ export class ConversationManager {
       const ex = this.exchanges[i];
       if (ex.stubbed || ex.toolResults.length === 0) continue;
 
-      ex.toolResults = ex.toolResults.map((tr) => stubToolResult(tr));
+      ex.toolResults = ex.toolResults.map((tr) =>
+        tr.role === "user" ? stubToolResult(tr) : tr,
+      );
       ex.stubbed = true;
 
       // Recompute token estimate

@@ -61,6 +61,8 @@ export interface AgentSessionResult {
   usage: UsageStats;
   /** Whether the loop was cut short by maxToolRounds. */
   truncated: boolean;
+  /** All messages appended during this loop (assistant + tool_result pairs, ending with final assistant). */
+  roundMessages: Anthropic.MessageParam[];
 }
 
 // --- Constants ---
@@ -200,6 +202,7 @@ export async function runAgentLoop(
   let truncated = false;
 
   const workingMessages = [...messages];
+  const loopStartIndex = workingMessages.length;
   const tuiToolNames = config.tuiToolNames ?? new Set<string>();
 
   let params: CreateParams = {
@@ -308,8 +311,10 @@ export async function runAgentLoop(
   // Final context dump captures the last round's thinking traces
   dumpContext(config.name, params);
 
+  const roundMessages = workingMessages.slice(loopStartIndex);
+
   config.onComplete?.(totalUsage);
-  return { text: fullText, tuiCommands, usage: totalUsage, truncated };
+  return { text: fullText, tuiCommands, usage: totalUsage, truncated, roundMessages };
 }
 
 // --- Internal retry helpers ---

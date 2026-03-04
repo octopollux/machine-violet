@@ -30,6 +30,18 @@ function toolResultMsg(toolUseId: string, content: string): Anthropic.MessagePar
   };
 }
 
+function assistantToolUseMsg(toolName: string, toolId: string): Anthropic.MessageParam {
+  return {
+    role: "assistant",
+    content: [{
+      type: "tool_use",
+      id: toolId,
+      name: toolName,
+      input: {},
+    } as Anthropic.ToolUseBlockParam],
+  };
+}
+
 describe("estimateTokens", () => {
   it("estimates ~4 chars per token", () => {
     expect(estimateTokens("hello")).toBe(2); // 5/4 = 1.25, ceil = 2
@@ -59,7 +71,7 @@ describe("ConversationManager", () => {
     expect(messages[1].role).toBe("assistant");
   });
 
-  it("includes tool results in messages", () => {
+  it("includes tool results in messages between user and assistant", () => {
     const mgr = new ConversationManager(defaultContextConfig);
     mgr.addExchange(
       userMsg("Roll"),
@@ -68,6 +80,38 @@ describe("ConversationManager", () => {
     );
     const messages = mgr.getMessages();
     expect(messages).toHaveLength(3);
+    // Order: user → tool_result → assistant
+    expect(messages[0].role).toBe("user");
+    expect(messages[0].content).toBe("Roll");
+    expect(messages[1].role).toBe("user"); // tool_result messages have role "user"
+    expect(messages[2].role).toBe("assistant");
+    expect(messages[2].content).toBe("Rolling...");
+  });
+
+  it("orders multi-round tool interactions correctly", () => {
+    const mgr = new ConversationManager(defaultContextConfig);
+    const toolInteractions: Anthropic.MessageParam[] = [
+      assistantToolUseMsg("roll_dice", "toolu_1"),
+      toolResultMsg("toolu_1", "1d20: [15]→20"),
+      assistantToolUseMsg("read_entity", "toolu_2"),
+      toolResultMsg("toolu_2", "Goblin: HP 7"),
+    ];
+    mgr.addExchange(
+      userMsg("Attack the goblin"),
+      assistantMsg("You strike the goblin for 5 damage!"),
+      toolInteractions,
+    );
+    const messages = mgr.getMessages();
+    // user → 4 tool interactions → final assistant = 6 messages
+    expect(messages).toHaveLength(6);
+    expect(messages[0].role).toBe("user");
+    expect(messages[0].content).toBe("Attack the goblin");
+    expect(messages[1].role).toBe("assistant"); // tool_use
+    expect(messages[2].role).toBe("user"); // tool_result
+    expect(messages[3].role).toBe("assistant"); // tool_use
+    expect(messages[4].role).toBe("user"); // tool_result
+    expect(messages[5].role).toBe("assistant");
+    expect(messages[5].content).toBe("You strike the goblin for 5 damage!");
   });
 
   it("drops oldest exchange when exceeding retention_exchanges", () => {
@@ -116,10 +160,41 @@ describe("ConversationManager", () => {
 
     const messages = mgr.getMessages();
     // The tool result from the first exchange should be stubbed
-    const toolMsg = messages[2]; // user, assistant, tool_result
+    // Order: user, tool_result, assistant, user, assistant
+    const toolMsg = messages[1]; // tool_result comes between user and assistant now
     const content = toolMsg.content as Anthropic.ToolResultBlockParam[];
     expect(typeof content[0].content).toBe("string");
     expect((content[0].content as string)).toContain("[stub]");
+  });
+
+  it("only stubs user messages in toolResults (not assistant tool_use)", () => {
+    const config: ContextConfig = { ...defaultContextConfig, tool_result_stub_after: 1 };
+    const mgr = new ConversationManager(config);
+
+    // First exchange with both assistant tool_use and user tool_result
+    const toolInteractions: Anthropic.MessageParam[] = [
+      assistantToolUseMsg("roll_dice", "toolu_1"),
+      toolResultMsg("toolu_1", "A very long tool result with lots of detail"),
+    ];
+    mgr.addExchange(
+      userMsg("Roll"),
+      assistantMsg("You rolled a 15!"),
+      toolInteractions,
+    );
+
+    // Second exchange triggers stubbing
+    mgr.addExchange(userMsg("Next"), assistantMsg("Done."));
+
+    const messages = mgr.getMessages();
+    // user, assistant(tool_use), user(tool_result), assistant, user, assistant = 6
+    // The assistant tool_use (messages[1]) should NOT be stubbed
+    const toolUseMsg = messages[1];
+    expect(toolUseMsg.role).toBe("assistant");
+    const toolUseContent = toolUseMsg.content as Anthropic.ToolUseBlockParam[];
+    expect(toolUseContent[0].type).toBe("tool_use");
+    // The user tool_result (messages[2]) SHOULD be stubbed
+    const toolResultContent = messages[2].content as Anthropic.ToolResultBlockParam[];
+    expect((toolResultContent[0].content as string)).toContain("[stub]");
   });
 
   it("clears all exchanges", () => {
@@ -185,16 +260,56 @@ describe("buildCachedPrefix", () => {
     expect(allText).not.toContain("Scene So Far");
   });
 
-  it("includes cache_control on stable sections", () => {
+  it("places BP1 on rules appendix, not on DM prompt", () => {
     const blocks = buildCachedPrefix(mockConfig, {
       dmPrompt: "You are the DM.",
       personality: "Terse.",
       rulesAppendix: "Some rules.",
     });
 
-    // First block (DM prompt) should have cache_control
+    // DM prompt (first block) should NOT have cache_control
     const dmBlock = blocks[0] as unknown as Record<string, unknown>;
-    expect(dmBlock["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
+    expect(dmBlock["cache_control"]).toBeUndefined();
+
+    // Rules appendix should have cache_control (BP1)
+    const rulesBlock = blocks.find((b) => b.text.includes("Rules Reference")) as unknown as Record<string, unknown>;
+    expect(rulesBlock["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
+  });
+
+  it("places BP2 on last Tier 2 block", () => {
+    const blocks = buildCachedPrefix(mockConfig, {
+      dmPrompt: "You are the DM.",
+      personality: "Terse.",
+      rulesAppendix: "Some rules.",
+      sessionRecap: "Last time...",
+      campaignSummary: "Scene 1.",
+      scenePrecis: "Round 1.",
+      playerRead: "Engagement: high",
+      activeState: "Location: Tavern",
+    });
+
+    // playerRead is the last Tier 2 block — should have cache_control
+    const playerReadBlock = blocks.find((b) => b.text.includes("Player Read")) as unknown as Record<string, unknown>;
+    expect(playerReadBlock["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
+
+    // Campaign summary should NOT have its own cache_control (BP2 is on playerRead)
+    const summaryBlock = blocks.find((b) => b.text.includes("Campaign Log")) as unknown as Record<string, unknown>;
+    expect(summaryBlock["cache_control"]).toBeUndefined();
+
+    // activeState (Tier 3) should NOT have cache_control
+    const stateBlock = blocks.find((b) => b.text.includes("Current State")) as unknown as Record<string, unknown>;
+    expect(stateBlock["cache_control"]).toBeUndefined();
+  });
+
+  it("places BP2 on campaign summary when it is the last Tier 2 block", () => {
+    const blocks = buildCachedPrefix(mockConfig, {
+      dmPrompt: "You are the DM.",
+      personality: "Terse.",
+      campaignSummary: "Scene 1: Party entered dungeon.",
+    });
+
+    const summaryBlock = blocks.find((b) => b.text.includes("Campaign Log")) as unknown as Record<string, unknown>;
+    expect(summaryBlock["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
   });
 
   it("includes Player Read block when provided", () => {
@@ -221,20 +336,7 @@ describe("buildCachedPrefix", () => {
     expect(allText).not.toContain("Player Read");
   });
 
-  it("includes Scene Pacing block when provided", () => {
-    const blocks = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the DM.",
-      personality: "Terse.",
-      scenePacing: "Exchanges: 6 | Open threads: 3",
-    });
-
-    const allText = blocks.map((b) => b.text).join("\n");
-    expect(allText).toContain("## Scene Pacing");
-    expect(allText).toContain("Exchanges: 6");
-    expect(allText).toContain("Open threads: 3");
-  });
-
-  it("omits Scene Pacing block when not provided", () => {
+  it("does not include Scene Pacing block (removed from prefix)", () => {
     const blocks = buildCachedPrefix(mockConfig, {
       dmPrompt: "You are the DM.",
       personality: "Terse.",
@@ -244,7 +346,42 @@ describe("buildCachedPrefix", () => {
     expect(allText).not.toContain("Scene Pacing");
   });
 
-  it("places session recap before campaign summary so it falls inside BP3 cache", () => {
+  it("orders blocks by stability tier: Tier 1 → Tier 2 → Tier 3", () => {
+    const blocks = buildCachedPrefix(mockConfig, {
+      dmPrompt: "You are the DM.",
+      personality: "Terse.",
+      rulesAppendix: "Some rules.",
+      sessionRecap: "Last time...",
+      campaignSummary: "Scene 1.",
+      scenePrecis: "Round 1.",
+      playerRead: "Engagement: high",
+      activeState: "Location: Tavern",
+      entityIndex: "entity-list",
+      uiState: "style=classic",
+    });
+
+    const rulesIdx = blocks.findIndex((b) => b.text.includes("Rules Reference"));
+    const recapIdx = blocks.findIndex((b) => b.text.includes("Last Session"));
+    const summaryIdx = blocks.findIndex((b) => b.text.includes("Campaign Log"));
+    const precisIdx = blocks.findIndex((b) => b.text.includes("Scene So Far"));
+    const playerReadIdx = blocks.findIndex((b) => b.text.includes("Player Read"));
+    const stateIdx = blocks.findIndex((b) => b.text.includes("Current State"));
+    const entityIdx = blocks.findIndex((b) => b.text.includes("Scene Entities"));
+    const uiIdx = blocks.findIndex((b) => b.text.includes("UI State"));
+
+    // Tier 1 before Tier 2
+    expect(rulesIdx).toBeLessThan(recapIdx);
+    // Tier 2 ordering
+    expect(recapIdx).toBeLessThan(summaryIdx);
+    expect(summaryIdx).toBeLessThan(precisIdx);
+    expect(precisIdx).toBeLessThan(playerReadIdx);
+    // Tier 2 before Tier 3
+    expect(playerReadIdx).toBeLessThan(stateIdx);
+    expect(stateIdx).toBeLessThan(entityIdx);
+    expect(entityIdx).toBeLessThan(uiIdx);
+  });
+
+  it("places session recap before campaign summary in Tier 2", () => {
     const blocks = buildCachedPrefix(mockConfig, {
       dmPrompt: "You are the DM.",
       personality: "Terse.",
@@ -259,8 +396,8 @@ describe("buildCachedPrefix", () => {
     expect(summaryIndex).toBeGreaterThan(-1);
     expect(recapIndex).toBeLessThan(summaryIndex);
 
-    // Campaign summary (BP3) should have cache_control, covering the recap
-    const summaryBlock = blocks[summaryIndex] as unknown as Record<string, unknown>;
-    expect(summaryBlock["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
+    // BP2 should be on the last Tier 2 block (campaign summary in this case)
+    const lastTier2 = blocks[summaryIndex] as unknown as Record<string, unknown>;
+    expect(lastTier2["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
   });
 });
