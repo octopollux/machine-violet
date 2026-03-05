@@ -275,6 +275,35 @@ describe("GameEngine", () => {
     expect(scene.transcript[1]).toContain("DM:");
   });
 
+  it("threads tool messages through addExchange", async () => {
+    const client = mockClient([
+      ...toolAndTextMessages("roll_dice", { expression: "1d20" }, "You rolled a 15!"),
+    ]);
+    const { callbacks } = mockCallbacks();
+
+    const engine = new GameEngine({
+      client,
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: mockFileIO(),
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "I attack the goblin.");
+
+    // Verify conversation has the exchange with tool messages
+    const conversation = engine.getConversation();
+    const messages = conversation.getMessages();
+    // Should have: user, assistant(tool_use), user(tool_result), assistant(text)
+    expect(messages.length).toBeGreaterThanOrEqual(4);
+    expect(messages[0].role).toBe("user");
+    expect(messages[1].role).toBe("assistant"); // tool_use
+    expect(messages[2].role).toBe("user"); // tool_result
+    expect(messages[3].role).toBe("assistant"); // final text
+  });
+
   it("handles errors gracefully", async () => {
     const client = {
       messages: {

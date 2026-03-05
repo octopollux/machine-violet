@@ -280,6 +280,41 @@ describe("runAgentLoop", () => {
     });
   });
 
+  describe("roundMessages tracking", () => {
+    it("populates roundMessages for a single-round text response", async () => {
+      const client = mockClient([textMessage("Hello.")]);
+      const result = await runAgentLoop(
+        client,
+        "System",
+        [{ role: "user", content: "Hi" }],
+        baseConfig(),
+      );
+      expect(result.roundMessages).toHaveLength(1);
+      expect(result.roundMessages[0].role).toBe("assistant");
+    });
+
+    it("populates roundMessages for multi-round tool interactions", async () => {
+      const client = mockClient([
+        toolUseMessage("roll_dice", { expression: "1d20" }),
+        textMessage("You rolled a 17!"),
+      ]);
+      const toolHandler = vi.fn(() => ({ content: "1d20: [17]→17" }));
+
+      const result = await runAgentLoop(
+        client,
+        "System",
+        [{ role: "user", content: "Roll" }],
+        baseConfig({ toolHandler }),
+      );
+
+      // Should have: assistant(tool_use), user(tool_result), assistant(text)
+      expect(result.roundMessages).toHaveLength(3);
+      expect(result.roundMessages[0].role).toBe("assistant");
+      expect(result.roundMessages[1].role).toBe("user");
+      expect(result.roundMessages[2].role).toBe("assistant");
+    });
+  });
+
   describe("max tool rounds truncation", () => {
     it("truncates at maxToolRounds", async () => {
       const infiniteTools = Array.from({ length: 3 }, () =>

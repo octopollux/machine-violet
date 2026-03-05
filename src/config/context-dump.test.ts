@@ -144,7 +144,7 @@ describe("dumpThinking", () => {
     expect(writeFile).not.toHaveBeenCalled();
   });
 
-  it("writes thinking to {agent}-thinking.json", async () => {
+  it("writes thinking to {agent}-thinking.json as full traces array", async () => {
     const { writeFile } = await import("node:fs/promises");
     (writeFile as ReturnType<typeof vi.fn>).mockClear();
     process.env.DEV_MODE = "true";
@@ -164,9 +164,10 @@ describe("dumpThinking", () => {
     const written = (writeFile as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
     const parsed = JSON.parse(written);
     expect(parsed.agent).toBe("dm");
-    expect(parsed.round).toBe(2);
     expect(parsed.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-    expect(parsed.thinking).toBe("The player wants to enter the cave...");
+    expect(parsed.traces).toHaveLength(1);
+    expect(parsed.traces[0].round).toBe(2);
+    expect(parsed.traces[0].thinking).toBe("The player wants to enter the cave...");
   });
 });
 
@@ -227,7 +228,7 @@ describe("thinking accumulation into dumpContext", () => {
     expect(parsed._thinking_trace[1].thinking).toBe("Second thought");
   });
 
-  it("drains the accumulator after dumpContext", async () => {
+  it("preserves traces after dumpContext (no drain)", async () => {
     const { writeFile } = await import("node:fs/promises");
     (writeFile as ReturnType<typeof vi.fn>).mockClear();
     process.env.DEV_MODE = "true";
@@ -236,7 +237,7 @@ describe("thinking accumulation into dumpContext", () => {
 
     dumpThinking("dm", 1, "Some thought");
     dumpContext("dm", { model: "test", messages: [] });
-    // Second dump should have no traces
+    // Second dump should still include the same traces (snapshot, not drain)
     dumpContext("dm", { model: "test", messages: [] });
 
     await new Promise((r) => setTimeout(r, 10));
@@ -247,7 +248,46 @@ describe("thinking accumulation into dumpContext", () => {
     const first = JSON.parse(contextCalls[0][1] as string);
     const second = JSON.parse(contextCalls[1][1] as string);
     expect(first._thinking_trace).toHaveLength(1);
-    expect(second._thinking_trace).toBeUndefined();
+    expect(second._thinking_trace).toHaveLength(1);
+    expect(second._thinking_trace[0].thinking).toBe("Some thought");
+  });
+
+  it("final dumpContext after loop captures all traces", async () => {
+    const { writeFile } = await import("node:fs/promises");
+    (writeFile as ReturnType<typeof vi.fn>).mockClear();
+    process.env.DEV_MODE = "true";
+    resetDevMode();
+    setContextDumpDir("/tmp/test-dump");
+
+    // Simulate real flow: dumpContext → API → dumpThinking → dumpContext → API → dumpThinking → final dumpContext
+    dumpContext("dm", { model: "test", messages: [], round: 1 });
+    dumpThinking("dm", 0, "Round 0 thought");
+    dumpContext("dm", { model: "test", messages: [], round: 2 });
+    dumpThinking("dm", 1, "Round 1 thought");
+    // Final dump after loop ends
+    dumpContext("dm", { model: "test", messages: [], round: "final" });
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    const contextCalls = (writeFile as ReturnType<typeof vi.fn>).mock.calls.filter(
+      (c: unknown[]) => typeof c[0] === "string" && (c[0] as string).endsWith("dm.json"),
+    );
+    expect(contextCalls.length).toBe(3);
+
+    // First dump: no traces yet
+    const first = JSON.parse(contextCalls[0][1] as string);
+    expect(first._thinking_trace).toBeUndefined();
+
+    // Second dump: has round 0 trace
+    const second = JSON.parse(contextCalls[1][1] as string);
+    expect(second._thinking_trace).toHaveLength(1);
+    expect(second._thinking_trace[0].round).toBe(0);
+
+    // Final dump: has both traces
+    const third = JSON.parse(contextCalls[2][1] as string);
+    expect(third._thinking_trace).toHaveLength(2);
+    expect(third._thinking_trace[0].thinking).toBe("Round 0 thought");
+    expect(third._thinking_trace[1].thinking).toBe("Round 1 thought");
   });
 
   it("keeps separate accumulators per agent", async () => {

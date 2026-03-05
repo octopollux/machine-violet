@@ -129,7 +129,6 @@ export class SceneManager {
       turnHolder: undefined,
     });
     this.sessionState.scenePrecis = buildScenePrecis(this.scene);
-    this.sessionState.scenePacing = buildScenePacing(this.scene);
     this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);
     this.sessionState.entityIndex = this.buildSceneEntityIndex();
     return buildDMPrefix(this.state.config, this.sessionState);

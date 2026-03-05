@@ -43,15 +43,15 @@ export type DumpableParams = Record<string, any>;
  * Dump context to a file as raw JSON. Fire-and-forget, errors swallowed.
  * Only runs when DEV_MODE is active and dumpDir has been set.
  *
- * Drains any accumulated thinking blocks for this agent and includes them
- * as `_thinking_trace` in the JSON envelope.
+ * Snapshots accumulated thinking blocks for this agent and includes them
+ * as `_thinking_trace` in the JSON envelope. Traces persist across dumps
+ * and are cleared explicitly via `clearThinking()`.
  */
 export function dumpContext(agentName: string, params: DumpableParams): void {
   if (!isDevMode() || !dumpDir) return;
 
-  // Drain accumulated thinking for this agent
-  const traces = thinkingAccumulator.get(agentName) ?? [];
-  thinkingAccumulator.delete(agentName);
+  // Snapshot accumulated thinking for this agent (don't drain — traces persist)
+  const traces = [...(thinkingAccumulator.get(agentName) ?? [])];
 
   const envelope = {
     agent: agentName,
@@ -88,8 +88,9 @@ export function dumpThinking(
   }
   thinkingAccumulator.get(agentName)?.push({ round, thinking: thinkingText, timestamp });
 
-  // Still write the separate file for backward compat
-  const envelope = { agent: agentName, round, timestamp, thinking: thinkingText };
+  // Write the full accumulated array so the file always has every trace
+  const allTraces = thinkingAccumulator.get(agentName) ?? [];
+  const envelope = { agent: agentName, timestamp, traces: [...allTraces] };
   const json = JSON.stringify(envelope, null, 2);
   const filePath = join(dumpDir, `${agentName}-thinking.json`);
 

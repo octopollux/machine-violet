@@ -176,7 +176,7 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
 
     const tc = getThinkingConfig("setup");
 
-    const response = await streamWithRetry(client, {
+    let lastParams: Anthropic.MessageCreateParamsNonStreaming = {
       model: getModel("medium"),
       max_tokens: TOKEN_LIMITS.SUBAGENT_LARGE + tc.budgetTokens,
       system: SYSTEM_PROMPT,
@@ -184,7 +184,9 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
       stream: false,
       tools: TOOLS,
       thinking: tc.param,
-    }, onDelta);
+    };
+
+    const response = await streamWithRetry(client, lastParams, onDelta);
 
     accRawUsage(totalUsage, response.usage);
 
@@ -226,6 +228,7 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
 
     // If we have pending choices, return now — app will call resolveChoice later
     if (pendingChoices) {
+      dumpContext("setup", lastParams);
       return {
         text,
         usage: { ...totalUsage },
@@ -237,7 +240,7 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
     if (toolResults.length > 0) {
       messages.push({ role: "user", content: toolResults });
 
-      const followUpMsg = await streamWithRetry(client, {
+      lastParams = {
         model: getModel("medium"),
         max_tokens: TOKEN_LIMITS.SUBAGENT_MEDIUM + tc.budgetTokens,
         system: SYSTEM_PROMPT,
@@ -245,7 +248,8 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
         stream: false,
         tools: TOOLS,
         thinking: tc.param,
-      }, onDelta);
+      };
+      const followUpMsg = await streamWithRetry(client, lastParams, onDelta);
 
       accRawUsage(totalUsage, followUpMsg.usage);
 
@@ -263,6 +267,9 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
       const filteredFollowUp = followUpMsg.content.filter((b) => b.type !== "thinking");
       messages.push({ role: "assistant", content: filteredFollowUp });
     }
+
+    // Final context dump captures all thinking traces
+    dumpContext("setup", lastParams);
 
     return {
       text,

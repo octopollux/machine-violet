@@ -254,6 +254,28 @@ describe("agentLoop", () => {
     }));
   });
 
+  it("passes through roundMessages from agent session", async () => {
+    const client = mockClient([
+      toolUseMessage("roll_dice", { expression: "1d20" }),
+      textMessage("You rolled a 15!"),
+    ]);
+
+    const result = await agentLoop(
+      client,
+      "System",
+      [{ role: "user", content: "Roll" }],
+      new ToolRegistry(),
+      mockState(),
+      mockConfig(),
+    );
+
+    // Should have: assistant(tool_use), user(tool_result), assistant(text)
+    expect(result.roundMessages).toHaveLength(3);
+    expect(result.roundMessages[0].role).toBe("assistant");
+    expect(result.roundMessages[1].role).toBe("user");
+    expect(result.roundMessages[2].role).toBe("assistant");
+  });
+
   it("handles tool errors gracefully", async () => {
     const client = mockClient([
       toolUseMessage("view_area", { map: "nonexistent", center: "0,0", radius: 1 }),
