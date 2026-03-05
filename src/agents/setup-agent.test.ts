@@ -1,66 +1,30 @@
 import { describe, it, expect, vi } from "vitest";
-import { fastPathSetup, fullSetup, buildCampaignConfig } from "./setup-agent.js";
-import type { SetupStep, SetupCallback } from "./setup-agent.js";
+import { buildCampaignConfig, generateThemeColor } from "./setup-agent.js";
+import type { SetupResult } from "./setup-agent.js";
 import { buildCampaignWorld, slugify } from "./world-builder.js";
 import type { FileIO } from "./scene-manager.js";
 
-/** Always picks the default (first) option */
-const defaultChoice: SetupCallback = async (step: SetupStep) => step.defaultIndex;
-
-/** Always picks index 1 */
-const secondChoice: SetupCallback = async () => 1;
-
-describe("fastPathSetup", () => {
-  it("completes with all defaults", async () => {
-    const result = await fastPathSetup(defaultChoice);
-
-    expect(result.genre).toBeTruthy();
-    expect(result.system).toBeNull(); // default is "no system"
-    expect(result.campaignName).toBeTruthy();
-    expect(result.personality.name).toBeTruthy();
-    expect(result.personality.prompt_fragment).toBeTruthy();
-    expect(result.characterName).toBeTruthy();
-  });
-
-  it("accepts freeform text input", async () => {
-    const freeform: SetupCallback = async (step) => {
-      if (step.prompt.includes("world")) return "Steampunk Victorian";
-      if (step.prompt.includes("system")) return "Custom homebrew";
-      if (step.prompt.includes("Dungeon Master")) return "A sardonic narrator who makes dry observations";
-      if (step.prompt.includes("Who are you")) return "Lord Ashworth, disgraced inventor";
-      return step.defaultIndex;
-    };
-
-    const result = await fastPathSetup(freeform);
-    expect(result.genre).toBe("Steampunk Victorian");
-    expect(result.characterName).toBe("Lord Ashworth, disgraced inventor");
-    expect(result.personality.name).toBe("Custom");
-  });
-});
-
-describe("fullSetup", () => {
-  it("completes full flow with defaults", async () => {
-    const result = await fullSetup(defaultChoice);
-
-    expect(result.genre).toBeTruthy();
-    expect(result.mood).toBeTruthy();
-    expect(result.difficulty).toBeTruthy();
-    expect(result.personality.name).toBeTruthy();
-    expect(result.characterName).toBeTruthy();
-    expect(result.playerName).toBe("Player"); // default is "Skip"
-  });
-
-  it("completes full flow with second choices", async () => {
-    const result = await fullSetup(secondChoice);
-
-    expect(result.genre).toBeTruthy();
-    expect(result.system).toBeTruthy(); // second choice is FATE
-  });
-});
+/** Helper to build a minimal SetupResult for testing */
+function makeSetupResult(overrides: Partial<SetupResult> = {}): SetupResult {
+  return {
+    genre: "Classic fantasy",
+    system: null,
+    campaignName: "The Shattered Crown",
+    campaignPremise: "A kingdom's heir is dead.",
+    mood: "Balanced",
+    difficulty: "Balanced",
+    personality: { name: "The Chronicler", prompt_fragment: "You are The Chronicler." },
+    playerName: "Player",
+    characterName: "Kael",
+    characterDescription: "A wandering sellsword",
+    themeColor: "#8888aa",
+    ...overrides,
+  };
+}
 
 describe("buildCampaignConfig", () => {
-  it("builds valid config from setup result", async () => {
-    const result = await fastPathSetup(defaultChoice);
+  it("builds valid config from setup result", () => {
+    const result = makeSetupResult();
     const config = buildCampaignConfig(result);
 
     expect(config.name).toBe(result.campaignName);
@@ -72,12 +36,25 @@ describe("buildCampaignConfig", () => {
     expect(config.recovery.enable_git).toBe(true);
   });
 
-  it("includes version and createdAt", async () => {
-    const result = await fastPathSetup(defaultChoice);
+  it("includes version and createdAt", () => {
+    const result = makeSetupResult();
     const config = buildCampaignConfig(result);
 
     expect(config.version).toBe(1);
     expect(config.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+});
+
+describe("generateThemeColor", () => {
+  it("returns a hex color string", () => {
+    const color = generateThemeColor("Kael");
+    expect(color).toMatch(/^#[0-9a-f]{6}$/);
+  });
+
+  it("returns different colors for different names", () => {
+    const c1 = generateThemeColor("Kael");
+    const c2 = generateThemeColor("Sister Venn");
+    expect(c1).not.toBe(c2);
   });
 });
 
@@ -105,7 +82,7 @@ describe("buildCampaignWorld", () => {
       listDir: vi.fn(async () => []),
     };
 
-    const result = await fastPathSetup(defaultChoice);
+    const result = makeSetupResult();
     const root = await buildCampaignWorld("/tmp/campaigns", result, fileIO);
 
     // Directory was created

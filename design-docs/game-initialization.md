@@ -4,24 +4,22 @@ Game initialization takes the player from first launch to gameplay. After a one-
 
 ## Design Principles
 
-- **Every prompt has a default.** Repeatedly hitting Enter takes the player to a random, systemless game with a random character. Zero friction to start.
-- **Options, not interrogation.** Each decision point offers 3-5 choices plus freeform input (the Claude Code pattern). The player picks one or types something else.
-- **"More Choices" is always available.** If the suggestions don't inspire, the player can ask the agent to generate more.
+- **Single conversational path.** There is one "New Campaign" entry point, with the setup agent offering Quick Start or Full Setup within the conversation. No separate code paths.
+- **Options, not interrogation.** Each decision point offers 2-5 choices via `present_choices`, plus freeform input via "Enter your own". The player picks one or types something else.
+- **"Show me more ideas" is always available.** Every `present_choices` call includes this as the last option. The app automatically appends "Enter your own" below it.
+- **Pre-finalize review is mandatory.** Before calling `finalize_setup`, the agent reads back the full configuration in natural language and asks the player to confirm or request changes.
 - **Setup is dramatic.** The setup agent has personality — it's not a form wizard, it's the opening act. It sets the tone before the DM (Opus) takes over.
-- **Two-tier architecture.** The Setup Agent (Sonnet) orchestrates the flow and handles finalization. The actual multi-turn conversation is delegated to a Setup Conversation subagent (Haiku) for cost efficiency. The player doesn't see the boundary — it's a seamless experience. See [subagents-catalog.md](subagents-catalog.md) §9-10.
-- **Mechanical work is delegated.** PDF imports, file creation, rule parsing, and chargen mechanics run on Haiku or in code (Tier 1/2).
+- **Mechanical work is delegated.** PDF imports, file creation, rule parsing, and chargen mechanics run on Haiku or in code.
 
 ## Flow
 
 ### Step 0: First Launch Setup (pure TUI, no model)
 
-First launch only. Two prompts:
+First launch only. One prompt:
 
 1. **API key.** Centered prompt: "Enter your Anthropic API key." Validates with a test API call. Saves to `.env`.
 
-2. **Home directory.** "Where should tui-rpg store your campaigns?" Displays the platform default; the user can accept or specify a custom path.
-
-Platform defaults are chosen to land inside folders that typically sync to cloud backup if enabled:
+Home directory uses platform defaults automatically — no interactive prompt. Platform defaults are chosen to land inside folders that typically sync to cloud backup if enabled:
 
 | Platform | Default path | Rationale |
 |---|---|---|
@@ -47,162 +45,44 @@ Subsequent launches skip Step 0 entirely.
 ```
   ┌─────────────────────────────┐
   │                             │
-  │   ◆ Start a new campaign    │
-  │   ○ Continue a campaign     │
-  │   ○ Just jump in            │
+  │   ◆ New Campaign            │
+  │   ○ Continue Campaign       │
+  │   ○ Quit                    │
   │                             │
   └─────────────────────────────┘
 ```
 
 - **Continue** → lists existing campaign directories, player picks one → `session_resume` → gameplay.
-- **Just jump in** → fast path (see below).
-- **Start a new campaign** → full setup flow (see below).
+- **New Campaign** → setup conversation (see below).
 
-### Step 2a: "Just Jump In" Fast Path
+### Step 2: Setup Conversation
 
-Optimized for minimum prompts to gameplay. Enter = random/default at every step.
+The setup agent welcomes the player with flair and offers two paths via `present_choices`:
 
-```
-Agent: "What kind of world?"
+#### Quick Start Path
 
-  ◆ Classic fantasy
-  ○ Sci-fi
-  ○ Modern supernatural
-  ○ Post-apocalyptic
-  ○ More choices...
+1. Agent presents 4-5 campaign seeds as game ideas
+2. Player picks one, selects "Show me some more ideas" for different options, or types their own idea
+3. Agent auto-fills remaining options (genre inferred from seed, default mood/difficulty/system/personality)
+4. Agent presents a natural-language summary of the configuration
+5. Player confirms or requests changes
+6. Agent asks for character (name + concept) and player name
+7. `finalize_setup`
 
-[Enter = random pick]
-```
+#### Full Setup Path
 
-```
-Agent: "What game system?"
+Conversational flow — the agent asks about each topic one or two at a time:
 
-  ◆ No system — pure narrative          [always first]
-  ○ FATE Accelerated — light mechanics
-  ○ 24XX — minimal dice
-  ○ More choices...
+1. Genre/setting
+2. Campaign concept (seeds offered via `present_choices`, or freeform)
+3. Mood
+4. Difficulty
+5. DM personality
+6. Character (name + one-sentence concept)
+7. Player name
+8. Game system
 
-[Enter = no system]
-```
-
-```
-Agent: "Your Dungeon Master?"
-
-  ◆ The Chronicler — measured, literary,
-    loves foreshadowing and callbacks
-  ○ The Trickster — chaotic, surprising,
-    delights in unlikely turns
-  ○ The Warden — fair but unforgiving,
-    the world doesn't care about your feelings
-  ○ More choices...
-
-[Enter = random pick]
-```
-
-```
-Agent: "Who are you?"
-
-  ◆ Kael, a wandering sellsword with a
-    debt and a bad reputation
-  ○ Sister Venn, excommunicated healer
-    searching for a forbidden cure
-  ○ Rook, a thief who accidentally stole
-    something that matters
-  ○ More choices...
-
-[Enter = random pick]
-```
-
-Four prompts (or zero, if you mash Enter). The agent creates the campaign directory, writes a minimal character file, picks a starting scenario, and hands off to the DM. Player is in the game in under a minute.
-
-### Step 2b: Full Setup Flow
-
-For players who want to configure their experience.
-
-**Game system:**
-```
-Agent: "What system shall we play?"
-
-  ○ D&D 5e
-  ○ FATE
-  ○ Ironsworn
-  ○ I have a rulebook (PDF)
-  ○ No system — freeform
-  ○ More choices...
-```
-
-- Known free system → fetch SRD at runtime, Haiku parses into rule files and distilled cards
-- PDF → document import pipeline (normal or batch, per [document-ingestion.md](document-ingestion.md))
-- No system → text adventure mode or hidden 24XX
-
-**Campaign source:**
-```
-Agent: "What kind of adventure?"
-
-  ○ I have a campaign book (PDF)
-  ○ Surprise me — build a world
-  ○ The Shattered Crown        [seed]
-  ○ Ghosts of Station Proxima  [seed]
-  ○ The Gilded Cage             [seed]
-  ○ More choices...
-```
-
-- Campaign PDF → import pipeline, DM cheat sheet generated
-- Surprise me → agent asks follow-up questions (see below)
-- Seed → minimal evocative premise, the DM fleshes it out
-
-If "Surprise me":
-```
-Agent: "Set the mood."
-
-  ○ Heroic — glory and triumph
-  ○ Grimdark — survival and hard choices
-  ○ Whimsical — humor and wonder
-  ○ Tense — mystery and paranoia
-  ○ More choices...
-```
-
-```
-Agent: "How forgiving should I be?"
-
-  ○ Gentle — the story goes on
-  ○ Balanced — consequences, but fair
-  ○ Unforgiving — death is real
-```
-
-**DM personality:**
-```
-Agent: "Who will be your Dungeon Master?"
-
-  ○ The Chronicler — measured, literary,
-    loves foreshadowing and callbacks
-  ○ The Trickster — chaotic, surprising,
-    delights in unlikely turns
-  ○ The Warden — fair but unforgiving,
-    the world doesn't care about your feelings
-  ○ The Bard — warm, character-driven,
-    every NPC has a story
-  ○ More choices...
-```
-
-See [DM Personalities](#dm-personalities) below for how this works under the hood.
-
-**Player info:**
-```
-Agent: "Anything I should know about you as a player?"
-
-  ○ First time playing a tabletop RPG
-  ○ Experienced player, just have fun
-  ○ I'd like to avoid [content boundaries]
-  ○ Skip — let's just play
-```
-
-Responses go into `players/[name].md`.
-
-**Character creation:**
-- For crunchy systems (5e, etc.): handed off to a player-facing Haiku subagent with the system's chargen rules. Full mechanical walkthrough — race, class, stats, background, equipment.
-- For light/no system: conversational. "Describe your character in a few words" or pick from generated options. Produces a minimal character file.
-- In both cases, the player can pick from suggestions or go freeform.
+Both paths include a mandatory pre-finalize review where the agent reads back the full configuration and gets explicit confirmation.
 
 ### Step 3: World Setup (behind the scenes)
 
@@ -232,20 +112,9 @@ The DM's first message is the opening narration. The game begins.
 
 ## Campaign Seeds
 
-Seeds are minimal — just evocative names and a one-sentence premise. They're "names from a hat" that the DM expands into a full world. Shipped with the app, numerous enough that players see fresh options.
+Seeds are minimal — just evocative names and a one-sentence premise. They're "names from a hat" that the DM expands into a full world. Shipped with the app in `src/config/seeds.ts`, numerous enough that players see fresh options. Genre-tagged so the setup agent can filter by player choice.
 
-Examples:
-```
-The Shattered Crown — A kingdom's heir is dead. Three factions claim the throne.
-Ghosts of Station Proxima — An abandoned space station just started broadcasting again.
-The Gilded Cage — You're the guest of honor at a party you can't leave.
-Hollowdeep — A mining town's deepest shaft broke into something old.
-The Last Caravan — Civilization is a month's ride behind you, and gaining.
-Red Tide — The fishing village's catch is rotting before it reaches shore.
-The Instrument — You found a weapon. It found you first.
-```
-
-The DM receives the seed as a starting premise and builds the world around it. Seeds are genre-tagged so the setup agent can filter them by the player's genre choice.
+Seeds are injected into the setup conversation's system prompt so the agent can present them as game ideas during Quick Start.
 
 ## DM Personalities
 
@@ -253,46 +122,16 @@ The player picks a DM personality during setup — like choosing a narrator in R
 
 Personalities are stored as short prompt fragments shipped with the app. Each is ~100-200 tokens — cheap enough to include in the cached prefix with no meaningful cost impact.
 
-### Shipped personalities (examples)
+### Shipped personalities
 
 **The Chronicler** — measured, literary, loves foreshadowing and callbacks.
-```
-You are The Chronicler. Your narration is deliberate and layered. You plant details
-early and pay them off later. You favor atmosphere over action, and your descriptions
-carry weight. You track recurring motifs. When something terrible happens, you
-describe it with quiet precision, not bombast. You remember everything.
-```
-
 **The Trickster** — chaotic, surprising, delights in unlikely turns.
-```
-You are The Trickster. You love the improbable. When rolling for narrative outcomes,
-weight the unusual options more heavily — the boring result is never your first choice.
-You delight in consequences the player didn't see coming, but you always play fair:
-the clues were there. Your NPCs have agendas that surprise even you. Tone shifts
-are your favorite tool.
-```
-
 **The Warden** — fair but unforgiving, the world has its own logic.
-```
-You are The Warden. The world runs on its own rules and does not bend for the player.
-Choices have consequences that ripple. You don't punish, but you don't protect either.
-Your narration is direct and unadorned — you state what happens. When the player asks
-"can I do this?", your answer is always "you can try." Success is earned. NPCs act
-in their own interest, not the player's story.
-```
-
 **The Bard** — warm, character-driven, every NPC has a story.
-```
-You are The Bard. Characters are your canvas. Every NPC, no matter how minor, has
-a voice and a want. You linger on dialogue and relationships. Combat is brief;
-its aftermath is where the story lives. You find the emotional core of every scene.
-You give the player's character moments of vulnerability and connection. The world
-is lived-in and human-scale.
-```
 
 ### Custom personalities
 
-The "More choices..." option in setup lets the player describe a DM personality in their own words. The setup agent writes a prompt fragment from the description and saves it. Players can also pick a shipped personality and modify it.
+The "Enter your own" option in setup lets the player describe a DM personality in their own words. The setup agent writes a prompt fragment from the description and saves it.
 
 ### Storage
 
@@ -313,13 +152,11 @@ The selected personality fragment is stored in `config.json` and loaded into the
 | Phase | Model | Rationale |
 |---|---|---|
 | API key validation | Haiku | Cheapest model for a test call |
-| Setup orchestration | Sonnet | Handles finalization and campaign directory creation |
-| Conversational setup | Haiku | Multi-turn player conversation delegated to Haiku for cost efficiency |
+| Setup conversation | Sonnet | Multi-turn player conversation with tools |
 | PDF import (extraction) | Haiku (vision) | Cheap, handles complex layouts |
 | PDF import (organization) | Haiku | Mechanical sorting into filesystem |
 | Rule card distillation | Haiku | Compression task, no creativity needed |
 | Character creation (crunchy) | Haiku (player-facing subagent) | Mechanical, follows rules |
-| Character creation (freeform) | Sonnet | Part of the conversational flow |
 | World building | Sonnet | Creative but not the main DM |
 | DM cheat sheet generation | Haiku | Summarization task |
 | Opening narration | Opus (the DM) | First in-game moment — this is where quality matters |

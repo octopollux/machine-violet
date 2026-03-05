@@ -4,6 +4,7 @@ import type { SubagentResult } from "../subagent.js";
 import type { SetupResult } from "../setup-agent.js";
 import { generateThemeColor } from "../setup-agent.js";
 import { PERSONALITIES } from "../../config/personalities.js";
+import { SEEDS } from "../../config/seeds.js";
 import { getModel, getThinkingConfig } from "../../config/models.js";
 import { accumulateUsage as accRawUsage } from "../../context/usage-helpers.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
@@ -96,7 +97,15 @@ const TOOLS = [FINALIZE_TOOL, PRESENT_CHOICES_TOOL];
 
 // --- System prompt ---
 
-const SYSTEM_PROMPT = loadPrompt("setup-conversation");
+function buildSystemPrompt(): string {
+  const base = loadPrompt("setup-conversation");
+  const seedList = SEEDS.map((s) =>
+    `- **${s.name}** — ${s.premise} (${s.genres.join(", ")})`
+  ).join("\n");
+  return base + "\n\n## Available campaign seeds\n\nUse these when presenting Quick Start options or campaign ideas. Pick seeds that match the player's genre if known.\n\n" + seedList;
+}
+
+const SYSTEM_PROMPT = buildSystemPrompt();
 
 // --- Streaming with retry ---
 

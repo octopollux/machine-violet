@@ -216,6 +216,20 @@ export function processNarrativeLines(
   width: number,
   quoteColor?: string,
 ): ProcessedLine[] {
+  // Phase 0: Split inline <center> and <right> blocks onto their own lines.
+  // The rendering pipeline expects these to be the sole content of a line.
+  const expandedLines: NarrativeLine[] = [];
+  for (const srcLine of lines) {
+    if (srcLine.kind === "dm" && srcLine.text.trim() !== "") {
+      const split = splitAlignmentBlocks(srcLine.text);
+      for (const part of split) {
+        expandedLines.push({ kind: "dm", text: part });
+      }
+    } else {
+      expandedLines.push(srcLine);
+    }
+  }
+
   // Phase 1: Heal cross-line tags on raw strings, then parse into AST.
   // Healing must happen before parsing because parseFormatting treats
   // unclosed tags as plain text.
@@ -224,7 +238,7 @@ export function processNarrativeLines(
   // Track open tags across DM source lines for cross-line healing
   const openStack: { raw: string; name: string }[] = [];
 
-  for (const srcLine of lines) {
+  for (const srcLine of expandedLines) {
     if (srcLine.kind !== "dm") {
       parsed.push({ kind: srcLine.kind, nodes: [srcLine.text], isSourceBoundary: true });
       continue;
@@ -352,6 +366,22 @@ export function processNarrativeLines(
   }
 
   return result;
+}
+
+/**
+ * Split a raw text line so that <center>...</center> and <right>...</right>
+ * blocks each end up on their own line. Text before/after is preserved as
+ * separate lines. If the line has no inline alignment blocks, returns [text].
+ */
+function splitAlignmentBlocks(text: string): string[] {
+  const pattern = /(<(?:center|right)>[\s\S]*?<\/(?:center|right)>)/;
+  const parts = text.split(pattern);
+  const result: string[] = [];
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (trimmed) result.push(trimmed);
+  }
+  return result.length > 0 ? result : [text];
 }
 
 function isAlignmentNode(nodes: FormattingNode[]): boolean {

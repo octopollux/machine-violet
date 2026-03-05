@@ -3,16 +3,14 @@ import { useInput, Text, Box } from "ink";
 import Anthropic from "@anthropic-ai/sdk";
 import type { NarrativeLine } from "../types/tui.js";
 import type { ResolvedTheme } from "../tui/themes/types.js";
-import { themeToVariant } from "../tui/themes/index.js";
 import { appendDelta } from "../tui/narrative-helpers.js";
 import { Layout } from "../tui/layout.js";
-import { ChoiceModal } from "../tui/modals/index.js";
+import { ChoiceOverlay } from "../tui/modals/index.js";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
 import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
-import type { SetupStep, SetupResult } from "../agents/setup-agent.js";
-import { fastPathSetup } from "../agents/setup-agent.js";
+import type { SetupResult } from "../agents/setup-agent.js";
 import { createSetupConversation } from "../agents/subagents/setup-conversation.js";
 import type { SetupConversation } from "../agents/subagents/setup-conversation.js";
 import type { UsageStats } from "../agents/agent-loop.js";
@@ -21,7 +19,6 @@ import { CostTracker } from "../context/cost-tracker.js";
 interface ActiveChoiceModal { kind: "choice"; prompt: string; choices: string[] }
 
 export interface SetupPhaseProps {
-  mode: "fast" | "full";
   theme: ResolvedTheme;
   costTracker: React.RefObject<CostTracker>;
   onComplete: (result: SetupResult) => void;
@@ -29,7 +26,7 @@ export interface SetupPhaseProps {
   onError: (msg: string) => void;
 }
 
-export function SetupPhase({ mode, theme, costTracker, onComplete, onCancel, onError }: SetupPhaseProps) {
+export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }: SetupPhaseProps) {
   const { columns: cols, rows } = useTerminalSize();
   const tooSmall = cols < MIN_COLUMNS || rows < MIN_ROWS;
 
@@ -45,17 +42,16 @@ export function SetupPhase({ mode, theme, costTracker, onComplete, onCancel, onE
     setResetKey((k) => k + 1);
   }, []);
 
-  // Choice modal state (shared by both modes)
+  // Choice modal state
   const [activeModal, setActiveModal] = useState<ActiveChoiceModal | null>(null);
   const [choiceIndex, setChoiceIndex] = useState(0);
 
+  // Custom input state for "Enter your own" in choice modals
+  const [customInputActive, setCustomInputActive] = useState(false);
+  const [customInputResetKey, setCustomInputResetKey] = useState(0);
+
   // Gate: hold finalized result until player presses ENTER
   const [pendingResult, setPendingResult] = useState<SetupResult | null>(null);
-
-  // Fast-path setup state
-  const [setupPrompt, setSetupPrompt] = useState<SetupStep | null>(null);
-  const setupResolveRef = useRef<((idx: number | string) => void) | null>(null);
-  const [setupChoiceIndex, setSetupChoiceIndex] = useState(0);
 
   // Track whether we've started (to avoid double-starting in strict mode)
   const startedRef = useRef(false);
@@ -72,6 +68,7 @@ export function SetupPhase({ mode, theme, costTracker, onComplete, onCancel, onE
 
     if (result.pendingChoices) {
       setChoiceIndex(0);
+      setCustomInputActive(false);
       setActiveModal({
         kind: "choice",
         prompt: result.pendingChoices.prompt,
@@ -84,9 +81,9 @@ export function SetupPhase({ mode, theme, costTracker, onComplete, onCancel, onE
       costTracker.current?.record(result.usage, "medium");
       setupConvoRef.current = null;
       setPendingResult(result.finalized);
-      setSetupConvoLines((prev) => [...prev, { kind: "dm", text: "" }, { kind: "dm", text: "<center><b>[Press ENTER to begin your adventure]</b></center>" }]);
+      setSetupConvoLines((prev) => [...prev, { kind: "dm", text: "<center><b>[Press ENTER to begin your adventure]</b></center>" }]);
     }
-  }, [costTracker, onComplete, setActiveModal]);
+  }, [costTracker]);
 
   // --- Send message in conversational setup ---
   const sendSetupMessage = useCallback(async (text: string) => {
@@ -113,6 +110,7 @@ export function SetupPhase({ mode, theme, costTracker, onComplete, onCancel, onE
 
     setActiveModal(null);
     setChoiceIndex(0);
+    setCustomInputActive(false);
     setSetupConvoLines((prev) => [...prev, { kind: "player", text: `> ${selectedText}` }, { kind: "dm", text: "" }, { kind: "dm", text: "" }]);
     setSetupConvoBusy(true);
 
@@ -126,41 +124,36 @@ export function SetupPhase({ mode, theme, costTracker, onComplete, onCancel, onE
     }
   }, [setActiveModal, setupStreamDelta, handleSetupTurnResult, onError, onCancel]);
 
+  // --- Handle custom input submit from "Enter your own" ---
+  const handleCustomInputSubmit = useCallback((value: string) => {
+    if (!value.trim()) return;
+    const text = value.trim();
+    setCustomInputActive(false);
+    setCustomInputResetKey((k) => k + 1);
+    resolveSetupChoice(text);
+  }, [resolveSetupChoice]);
+
   // --- Start setup (once) ---
   const startSetup = useCallback(async () => {
     if (startedRef.current) return;
     startedRef.current = true;
 
-    if (mode === "full") {
-      const client = new Anthropic();
-      const convo = createSetupConversation(client);
-      setupConvoRef.current = convo;
-      setSetupConvoLines([]);
-      clearInput();
-      setSetupConvoBusy(true);
+    const client = new Anthropic();
+    const convo = createSetupConversation(client);
+    setupConvoRef.current = convo;
+    setSetupConvoLines([]);
+    clearInput();
+    setSetupConvoBusy(true);
 
-      try {
-        const result = await convo.start(setupStreamDelta);
-        await handleSetupTurnResult(result);
-      } catch (e) {
-        setSetupConvoBusy(false);
-        onError(e instanceof Error ? e.message : String(e));
-        onCancel();
-      }
-    } else {
-      // Fast path: step-by-step choices
-      const setupCallback = async (step: SetupStep): Promise<number | string> => {
-        return new Promise<number | string>((resolve) => {
-          setSetupPrompt(step);
-          setSetupChoiceIndex(step.defaultIndex);
-          setupResolveRef.current = resolve;
-        });
-      };
-      const result = await fastPathSetup(setupCallback);
-      setSetupPrompt(null);
-      onComplete(result);
+    try {
+      const result = await convo.start(setupStreamDelta);
+      await handleSetupTurnResult(result);
+    } catch (e) {
+      setSetupConvoBusy(false);
+      onError(e instanceof Error ? e.message : String(e));
+      onCancel();
     }
-  }, [mode, clearInput, setupStreamDelta, handleSetupTurnResult, onComplete, onError, onCancel]);
+  }, [clearInput, setupStreamDelta, handleSetupTurnResult, onError, onCancel]);
 
   // Start on first render
   React.useEffect(() => {
@@ -178,7 +171,7 @@ export function SetupPhase({ mode, theme, costTracker, onComplete, onCancel, onE
     sendSetupMessage(text);
   }, [clearInput, sendSetupMessage]);
 
-  // --- Input handling (modals, menus — TextInput handles text editing) ---
+  // --- Input handling (modals — TextInput handles text editing) ---
   useInput((_input, key) => {
     // Waiting for ENTER after setup farewell
     if (pendingResult) {
@@ -192,16 +185,46 @@ export function SetupPhase({ mode, theme, costTracker, onComplete, onCancel, onE
     if (setupConvoRef.current) {
       // Choice modal active during setup
       if (activeModal && activeModal.kind === "choice") {
+        const totalOptions = activeModal.choices.length + 1; // +1 for "Enter your own"
+
+        if (customInputActive) {
+          if (key.escape) {
+            setCustomInputActive(false);
+            return;
+          }
+          if (key.upArrow) {
+            setCustomInputActive(false);
+            setCustomInputResetKey((k) => k + 1);
+            setChoiceIndex(activeModal.choices.length - 1);
+            return;
+          }
+          if (key.pageUp || key.pageDown) {
+            const step = scrollAmount(rows);
+            narrativeRef.current?.scrollBy(key.pageUp ? -step : step);
+            return;
+          }
+          return;
+        }
+
         if (key.upArrow) {
           setChoiceIndex((i) => Math.max(0, i - 1));
           return;
         }
         if (key.downArrow) {
-          const choices = activeModal.choices;
-          setChoiceIndex((i) => Math.min(choices.length - 1, i + 1));
+          setChoiceIndex((i) => {
+            const next = Math.min(totalOptions - 1, i + 1);
+            if (next === activeModal.choices.length) {
+              setCustomInputActive(true);
+            }
+            return next;
+          });
           return;
         }
         if (key.return) {
+          if (choiceIndex === activeModal.choices.length) {
+            setCustomInputActive(true);
+            return;
+          }
           const chosen = activeModal.choices[choiceIndex];
           resolveSetupChoice(chosen);
           return;
@@ -209,6 +232,7 @@ export function SetupPhase({ mode, theme, costTracker, onComplete, onCancel, onE
         if (key.escape) {
           setActiveModal(null);
           setChoiceIndex(0);
+          setCustomInputActive(false);
           return;
         }
         if (key.pageUp || key.pageDown) {
@@ -227,28 +251,11 @@ export function SetupPhase({ mode, theme, costTracker, onComplete, onCancel, onE
         setSetupConvoLines([]);
         clearInput();
         setActiveModal(null);
+        setCustomInputActive(false);
         onCancel();
         return;
       }
       return;
-    }
-
-    // Fast-path step-by-step choosing
-    if (setupPrompt && setupResolveRef.current) {
-      if (key.upArrow) {
-        setSetupChoiceIndex((i) => Math.max(0, i - 1));
-        return;
-      }
-      if (key.downArrow) {
-        setSetupChoiceIndex((i) => Math.min(setupPrompt.choices.length - 1, i + 1));
-        return;
-      }
-      if (key.return) {
-        const resolve = setupResolveRef.current;
-        setupResolveRef.current = null;
-        resolve(setupChoiceIndex);
-        return;
-      }
     }
   });
 
@@ -282,13 +289,25 @@ export function SetupPhase({ mode, theme, costTracker, onComplete, onCancel, onE
   // --- Render: conversational mode ---
   if (setupConvoRef.current) {
     const setupHasModal = activeModal?.kind === "choice";
-    const setupModalHeight = setupHasModal && activeModal
-      ? activeModal.choices.length + 5 + 2
-      : 0;
+
+    // Build overlay for choice modal (replaces Player Pane content)
+    const choiceOverlay = setupHasModal && activeModal ? (
+      <ChoiceOverlay
+        width={cols - 4}
+        prompt={activeModal.prompt}
+        choices={activeModal.choices}
+        selectedIndex={choiceIndex}
+        showCustomInput
+        customInputActive={customInputActive}
+        customInputResetKey={customInputResetKey}
+        onCustomInputSubmit={handleCustomInputSubmit}
+      />
+    ) : undefined;
+
     return (
       <Box flexDirection="column" width={cols} height={rows}>
         <Layout
-          dimensions={{ columns: cols, rows: rows - setupModalHeight }}
+          dimensions={{ columns: cols, rows }}
           theme={theme}
           narrativeLines={setupConvoLines}
           modelineText="Campaign Setup"
@@ -303,34 +322,9 @@ export function SetupPhase({ mode, theme, costTracker, onComplete, onCancel, onE
           turnHolder="You"
           engineState={setupConvoBusy ? "dm_thinking" : null}
           narrativeRef={narrativeRef}
+          hideInputLine={setupHasModal}
+          playerPaneOverlay={choiceOverlay}
         />
-        {setupHasModal && activeModal && (
-          <ChoiceModal
-            variant={themeToVariant(theme)}
-            width={cols}
-            prompt={activeModal.prompt}
-            choices={activeModal.choices}
-            selectedIndex={choiceIndex}
-          />
-        )}
-      </Box>
-    );
-  }
-
-  // --- Render: fast-path step-by-step ---
-  if (setupPrompt) {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Text bold>{setupPrompt.prompt}</Text>
-        <Text> </Text>
-        {setupPrompt.choices.map((c, i) => (
-          <Text key={c.label}>
-            {i === setupChoiceIndex ? ">" : " "} {c.label}
-            {c.description ? <Text dimColor> — {c.description}</Text> : null}
-          </Text>
-        ))}
-        <Text> </Text>
-        <Text dimColor>Arrow keys to select, Enter to confirm.</Text>
       </Box>
     );
   }

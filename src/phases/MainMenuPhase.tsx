@@ -6,7 +6,6 @@ export interface MainMenuPhaseProps {
   campaigns: CampaignEntry[];
   errorMsg: string | null;
   onNewCampaign: () => void;
-  onJumpIn: () => void;
   onResumeCampaign: (entry: CampaignEntry) => void;
 }
 
@@ -14,7 +13,6 @@ export function MainMenuPhase({
   campaigns,
   errorMsg,
   onNewCampaign,
-  onJumpIn,
   onResumeCampaign,
 }: MainMenuPhaseProps) {
   const [mainMenuIndex, setMainMenuIndex] = useState(0);
@@ -22,8 +20,8 @@ export function MainMenuPhase({
   const [campaignSelectIndex, setCampaignSelectIndex] = useState(0);
 
   const mainMenuItems = campaigns.length > 0
-    ? ["New Campaign", "Continue Campaign", "Just Jump In", "Quit"]
-    : ["New Campaign", "Just Jump In", "Quit"];
+    ? ["New Campaign", "Continue Campaign", "Quit"]
+    : ["New Campaign", "Quit"];
 
   useInput((input, key) => {
     // Campaign select sub-menu
@@ -63,8 +61,6 @@ export function MainMenuPhase({
       } else if (selected === "Continue Campaign") {
         setMenuOpen(true);
         setCampaignSelectIndex(0);
-      } else if (selected === "Just Jump In") {
-        onJumpIn();
       } else if (selected === "Quit") {
         process.exit(0);
       }
@@ -93,9 +89,8 @@ export function MainMenuPhase({
   }
 
   const mainMenuDescriptions: Record<string, string> = {
-    "New Campaign": "Full guided setup",
+    "New Campaign": "Start a new adventure",
     "Continue Campaign": `${campaigns.length} saved`,
-    "Just Jump In": "Quick start with defaults",
     "Quit": "",
   };
 

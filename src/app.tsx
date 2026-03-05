@@ -199,8 +199,6 @@ export default function App({ shutdownRef }: AppProps) {
     engine.setUIState(buildUIState({ modelines, styleName: themeName, variant }));
   }, [modelines, themeName, variant]);
 
-  // --- Setup mode tracking ---
-  const [setupMode, setSetupMode] = useState<"fast" | "full">("full");
 
   // --- First-launch: prefilled API key ---
   const [initialApiKey, setInitialApiKey] = useState("");
@@ -557,8 +555,7 @@ export default function App({ shutdownRef }: AppProps) {
       <MainMenuPhase
         campaigns={campaigns}
         errorMsg={errorMsg}
-        onNewCampaign={() => { setSetupMode("full"); setPhase("setup"); }}
-        onJumpIn={() => { setSetupMode("fast"); setPhase("setup"); }}
+        onNewCampaign={() => setPhase("setup")}
         onResumeCampaign={resumeCampaign}
       />
     );
@@ -567,7 +564,6 @@ export default function App({ shutdownRef }: AppProps) {
   if (phase === "setup") {
     return (
       <SetupPhase
-        mode={setupMode}
         theme={theme}
         costTracker={costTracker}
         onComplete={finalizeSetup}
