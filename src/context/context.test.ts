@@ -226,7 +226,7 @@ describe("buildCachedPrefix", () => {
   };
 
   it("builds prefix with all sections", () => {
-    const blocks = buildCachedPrefix(mockConfig, {
+    const { system, volatile } = buildCachedPrefix(mockConfig, {
       dmPrompt: "You are the Dungeon Master.",
       personality: "You are terse and ominous.",
       rulesAppendix: "## Combat\nRoll d20 + modifier.",
@@ -236,55 +236,56 @@ describe("buildCachedPrefix", () => {
       scenePrecis: "Round 3 of combat. Two goblins remain.",
     });
 
-    expect(blocks.length).toBeGreaterThan(0);
-    expect(blocks[0].text).toContain("Dungeon Master");
+    expect(system.length).toBeGreaterThan(0);
+    expect(system[0].text).toContain("Dungeon Master");
 
-    const allText = blocks.map((b) => b.text).join("\n");
+    const allText = system.map((b) => b.text).join("\n");
     expect(allText).toContain("terse and ominous");
     expect(allText).toContain("D&D 5e");
     expect(allText).toContain("Roll d20");
     expect(allText).toContain("Party entered dungeon");
     expect(allText).toContain("fought goblins");
-    expect(allText).toContain("Throne Room");
+    // Tier 3 content is in volatile, not system
+    expect(volatile).toContain("Throne Room");
     expect(allText).toContain("Two goblins remain");
   });
 
   it("omits empty sections", () => {
-    const blocks = buildCachedPrefix(mockConfig, {
+    const { system } = buildCachedPrefix(mockConfig, {
       dmPrompt: "You are the DM.",
       personality: "Terse.",
     });
 
-    const allText = blocks.map((b) => b.text).join("\n");
+    const allText = system.map((b) => b.text).join("\n");
     expect(allText).not.toContain("Campaign Log");
     expect(allText).not.toContain("Scene So Far");
   });
 
   it("places BP1 on rules appendix when present", () => {
-    const blocks = buildCachedPrefix(mockConfig, {
+    const { system } = buildCachedPrefix(mockConfig, {
       dmPrompt: "You are the DM.",
       personality: "Terse.",
       rulesAppendix: "Some rules.",
     });
 
     // Rules appendix (last Tier 1 block) should have cache_control (BP1)
-    const rulesBlock = blocks.find((b) => b.text.includes("Rules Reference")) as unknown as Record<string, unknown>;
+    const rulesBlock = system.find((b) => b.text.includes("Rules Reference")) as unknown as Record<string, unknown>;
     expect(rulesBlock["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
   });
 
   it("falls back BP1 to last Tier 1 block when rulesAppendix is absent", () => {
-    const blocks = buildCachedPrefix(mockConfig, {
+    const { system } = buildCachedPrefix(mockConfig, {
       dmPrompt: "You are the DM.",
       personality: "Terse.",
     });
 
     // Without rules, BP1 falls back to the personality block (last Tier 1)
-    const lastTier1 = blocks[blocks.length - 1] as unknown as Record<string, unknown>;
+    const lastTier1 = system[system.length - 1] as unknown as Record<string, unknown>;
     expect(lastTier1["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
   });
 
   it("places BP2 on last Tier 2 block", () => {
-    const blocks = buildCachedPrefix(mockConfig, {
+    const { system, volatile } = buildCachedPrefix(mockConfig, {
       dmPrompt: "You are the DM.",
       personality: "Terse.",
       rulesAppendix: "Some rules.",
@@ -296,65 +297,66 @@ describe("buildCachedPrefix", () => {
     });
 
     // playerRead is the last Tier 2 block — should have cache_control
-    const playerReadBlock = blocks.find((b) => b.text.includes("Player Read")) as unknown as Record<string, unknown>;
+    const playerReadBlock = system.find((b) => b.text.includes("Player Read")) as unknown as Record<string, unknown>;
     expect(playerReadBlock["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
 
     // Campaign summary should NOT have its own cache_control (BP2 is on playerRead)
-    const summaryBlock = blocks.find((b) => b.text.includes("Campaign Log")) as unknown as Record<string, unknown>;
+    const summaryBlock = system.find((b) => b.text.includes("Campaign Log")) as unknown as Record<string, unknown>;
     expect(summaryBlock["cache_control"]).toBeUndefined();
 
-    // activeState (Tier 3) should NOT have cache_control
-    const stateBlock = blocks.find((b) => b.text.includes("Current State")) as unknown as Record<string, unknown>;
-    expect(stateBlock["cache_control"]).toBeUndefined();
+    // activeState (Tier 3) should be in volatile, not in system blocks
+    expect(system.find((b) => b.text.includes("Current State"))).toBeUndefined();
+    expect(volatile).toContain("Current State");
+    expect(volatile).toContain("Location: Tavern");
   });
 
   it("places BP2 on campaign summary when it is the last Tier 2 block", () => {
-    const blocks = buildCachedPrefix(mockConfig, {
+    const { system } = buildCachedPrefix(mockConfig, {
       dmPrompt: "You are the DM.",
       personality: "Terse.",
       campaignSummary: "Scene 1: Party entered dungeon.",
     });
 
-    const summaryBlock = blocks.find((b) => b.text.includes("Campaign Log")) as unknown as Record<string, unknown>;
+    const summaryBlock = system.find((b) => b.text.includes("Campaign Log")) as unknown as Record<string, unknown>;
     expect(summaryBlock["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
   });
 
   it("includes Player Read block when provided", () => {
-    const blocks = buildCachedPrefix(mockConfig, {
+    const { system } = buildCachedPrefix(mockConfig, {
       dmPrompt: "You are the DM.",
       personality: "Terse.",
       scenePrecis: "Round 1 of combat.",
       playerRead: "Engagement: high | Focus: combat | Tone: aggressive | Pacing: pushing_forward | Off-script: no",
     });
 
-    const allText = blocks.map((b) => b.text).join("\n");
+    const allText = system.map((b) => b.text).join("\n");
     expect(allText).toContain("## Player Read");
     expect(allText).toContain("Engagement: high");
     expect(allText).toContain("Tone: aggressive");
   });
 
   it("omits Player Read block when not provided", () => {
-    const blocks = buildCachedPrefix(mockConfig, {
+    const { system } = buildCachedPrefix(mockConfig, {
       dmPrompt: "You are the DM.",
       personality: "Terse.",
     });
 
-    const allText = blocks.map((b) => b.text).join("\n");
+    const allText = system.map((b) => b.text).join("\n");
     expect(allText).not.toContain("Player Read");
   });
 
   it("does not include Scene Pacing block (removed from prefix)", () => {
-    const blocks = buildCachedPrefix(mockConfig, {
+    const { system } = buildCachedPrefix(mockConfig, {
       dmPrompt: "You are the DM.",
       personality: "Terse.",
     });
 
-    const allText = blocks.map((b) => b.text).join("\n");
+    const allText = system.map((b) => b.text).join("\n");
     expect(allText).not.toContain("Scene Pacing");
   });
 
-  it("orders blocks by stability tier: Tier 1 → Tier 2 → Tier 3", () => {
-    const blocks = buildCachedPrefix(mockConfig, {
+  it("Tier 3 content goes to volatile, not system blocks", () => {
+    const { system, volatile } = buildCachedPrefix(mockConfig, {
       dmPrompt: "You are the DM.",
       personality: "Terse.",
       rulesAppendix: "Some rules.",
@@ -367,29 +369,37 @@ describe("buildCachedPrefix", () => {
       uiState: "style=classic",
     });
 
-    const rulesIdx = blocks.findIndex((b) => b.text.includes("Rules Reference"));
-    const recapIdx = blocks.findIndex((b) => b.text.includes("Last Session"));
-    const summaryIdx = blocks.findIndex((b) => b.text.includes("Campaign Log"));
-    const precisIdx = blocks.findIndex((b) => b.text.includes("Scene So Far"));
-    const playerReadIdx = blocks.findIndex((b) => b.text.includes("Player Read"));
-    const stateIdx = blocks.findIndex((b) => b.text.includes("Current State"));
-    const entityIdx = blocks.findIndex((b) => b.text.includes("Scene Entities"));
-    const uiIdx = blocks.findIndex((b) => b.text.includes("UI State"));
+    // System blocks should only contain Tier 1 + Tier 2
+    const systemText = system.map((b) => b.text).join("\n");
+    expect(systemText).toContain("Rules Reference");
+    expect(systemText).toContain("Last Session");
+    expect(systemText).toContain("Campaign Log");
+    expect(systemText).toContain("Scene So Far");
+    expect(systemText).toContain("Player Read");
 
-    // Tier 1 before Tier 2
-    expect(rulesIdx).toBeLessThan(recapIdx);
-    // Tier 2 ordering
-    expect(recapIdx).toBeLessThan(summaryIdx);
-    expect(summaryIdx).toBeLessThan(precisIdx);
-    expect(precisIdx).toBeLessThan(playerReadIdx);
-    // Tier 2 before Tier 3
-    expect(playerReadIdx).toBeLessThan(stateIdx);
-    expect(stateIdx).toBeLessThan(entityIdx);
-    expect(entityIdx).toBeLessThan(uiIdx);
+    // Tier 3 is in volatile
+    expect(systemText).not.toContain("Current State");
+    expect(systemText).not.toContain("Scene Entities");
+    expect(systemText).not.toContain("UI State");
+    expect(volatile).toContain("Current State");
+    expect(volatile).toContain("Location: Tavern");
+    expect(volatile).toContain("Scene Entities");
+    expect(volatile).toContain("entity-list");
+    expect(volatile).toContain("UI State");
+    expect(volatile).toContain("style=classic");
+  });
+
+  it("volatile is empty when no Tier 3 content provided", () => {
+    const { volatile } = buildCachedPrefix(mockConfig, {
+      dmPrompt: "You are the DM.",
+      personality: "Terse.",
+    });
+
+    expect(volatile).toBe("");
   });
 
   it("places session recap before campaign summary in Tier 2", () => {
-    const blocks = buildCachedPrefix(mockConfig, {
+    const { system } = buildCachedPrefix(mockConfig, {
       dmPrompt: "You are the DM.",
       personality: "Terse.",
       rulesAppendix: "Some rules.",
@@ -397,14 +407,14 @@ describe("buildCachedPrefix", () => {
       sessionRecap: "Last time, the party fought goblins.",
     });
 
-    const recapIndex = blocks.findIndex((b) => b.text.includes("Last Session"));
-    const summaryIndex = blocks.findIndex((b) => b.text.includes("Campaign Log"));
+    const recapIndex = system.findIndex((b) => b.text.includes("Last Session"));
+    const summaryIndex = system.findIndex((b) => b.text.includes("Campaign Log"));
     expect(recapIndex).toBeGreaterThan(-1);
     expect(summaryIndex).toBeGreaterThan(-1);
     expect(recapIndex).toBeLessThan(summaryIndex);
 
     // BP2 should be on the last Tier 2 block (campaign summary in this case)
-    const lastTier2 = blocks[summaryIndex] as unknown as Record<string, unknown>;
+    const lastTier2 = system[summaryIndex] as unknown as Record<string, unknown>;
     expect(lastTier2["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
   });
 });

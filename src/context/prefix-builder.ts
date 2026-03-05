@@ -8,10 +8,14 @@ import type { CampaignConfig } from "../types/config.js";
  *
  *   Tier 1 (campaign-stable): DM prompt, personality, game system, campaign setting, rules  [BP1]
  *   Tier 2 (session/scene-stable): session recap, campaign summary, scene precis, player read  [BP2]
- *   Tier 3 (volatile): active state, entity index, UI state
+ *   Tier 3 (volatile): active state, entity index, UI state — injected into conversation, NOT system
  *
  * BP1 on rules appendix (1h). BP2 on last emitted Tier 2 block (1h).
  * BP3 on tools (stamped in agent-session). BP4 on conversation (stamped in game-engine).
+ *
+ * Tier 3 is returned separately as `volatile` so the caller can inject it
+ * into the conversation tail. This prevents Tier 3 changes from invalidating
+ * the tools cache (BP3), which was causing ~2k+ tokens of cache writes per turn.
  */
 export interface PrefixSections {
   dmPrompt: string;
@@ -26,15 +30,24 @@ export interface PrefixSections {
   uiState?: string;
 }
 
+export interface CachedPrefixResult {
+  /** System prompt blocks (Tier 1 + Tier 2, cache-stable). */
+  system: Anthropic.TextBlockParam[];
+  /** Volatile context string (Tier 3). Inject into conversation, not system prompt. */
+  volatile: string;
+}
+
 /**
  * Build the system prompt as an array of TextBlockParam.
  * Using array format allows the API to cache the stable prefix
  * and only pay full price for the changing parts.
+ *
+ * Returns both the cacheable system blocks and volatile context separately.
  */
 export function buildCachedPrefix(
   config: CampaignConfig,
   sections: PrefixSections,
-): Anthropic.TextBlockParam[] {
+): CachedPrefixResult {
   const blocks: Anthropic.TextBlockParam[] = [];
 
   // ── Tier 1: Campaign-stable (never invalidated) ──
@@ -133,33 +146,23 @@ export function buildCachedPrefix(
       { type: "ephemeral", ttl: "1h" };
   }
 
-  // ── Tier 3: Volatile (changes per turn, no cache_control) ──
+  // ── Tier 3: Volatile — returned separately for conversation injection ──
 
-  // Active state (changes during play)
+  const volatileParts: string[] = [];
+
   if (sections.activeState) {
-    blocks.push({
-      type: "text",
-      text: `\n\n## Current State\n${sections.activeState}`,
-    });
+    volatileParts.push(`## Current State\n${sections.activeState}`);
   }
 
-  // Scene entity index (prevents duplicate entity creation)
   if (sections.entityIndex) {
-    blocks.push({
-      type: "text",
-      text: `\n\n## Scene Entities\n${sections.entityIndex}`,
-    });
+    volatileParts.push(`## Scene Entities\n${sections.entityIndex}`);
   }
 
-  // UI state (modelines, style — changes frequently)
   if (sections.uiState) {
-    blocks.push({
-      type: "text",
-      text: `\n\n## UI State\n${sections.uiState}`,
-    });
+    volatileParts.push(`## UI State\n${sections.uiState}`);
   }
 
-  return blocks;
+  return { system: blocks, volatile: volatileParts.join("\n\n") };
 }
 
 /**

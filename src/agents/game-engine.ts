@@ -308,12 +308,20 @@ export class GameEngine {
       this.sceneManager.appendPlayerInput(characterName, text);
     }
 
-    // Get system prompt
-    const systemPrompt = this.sceneManager.getSystemPrompt();
+    // Get system prompt (cached Tier 1+2) and volatile context (Tier 3)
+    const { system: systemPrompt, volatile: volatileContext } = this.sceneManager.getSystemPrompt();
 
     // Build message list; stamp conversation cache before new input
     const messages = [...this.conversation.getMessages()];
     stampConversationCache(messages);
+
+    // Inject volatile context (Tier 3: activeState, entityIndex, uiState)
+    // as a system-instruction message before the player input.
+    // This keeps it out of the system prompt so BP3 (tools) stays cached.
+    if (volatileContext) {
+      messages.push({ role: "user", content: `[context]\n${volatileContext}` });
+      messages.push({ role: "assistant", content: "Noted." });
+    }
 
     // Inject behavioral reminder before player input if needed
     if (!opts?.skipTranscript) {

@@ -43,9 +43,11 @@ export type DumpableParams = Record<string, any>;
  * Dump context to a file as raw JSON. Fire-and-forget, errors swallowed.
  * Only runs when DEV_MODE is active and dumpDir has been set.
  *
- * Snapshots accumulated thinking blocks for this agent and includes them
- * as `_thinking_trace` in the JSON envelope. Traces persist across dumps
- * and are cleared explicitly via `clearThinking()`.
+ * Structures the envelope with explicit property ordering:
+ *   agent, timestamp, model, system, tools, messages, _thinking_trace
+ * so the Campaign Explorer can render them in API-call order.
+ *
+ * Thinking traces are interleaved with messages by round number.
  */
 export function dumpContext(agentName: string, params: DumpableParams): void {
   if (!isDevMode() || !dumpDir) return;
@@ -53,12 +55,27 @@ export function dumpContext(agentName: string, params: DumpableParams): void {
   // Snapshot accumulated thinking for this agent (don't drain — traces persist)
   const traces = [...(thinkingAccumulator.get(agentName) ?? [])];
 
-  const envelope = {
+  // Build envelope with explicit property ordering so tools come before
+  // messages and thinking traces are available for interleaving.
+  const envelope: Record<string, unknown> = {
     agent: agentName,
     timestamp: new Date().toISOString(),
-    ...params,
-    ...(traces.length > 0 ? { _thinking_trace: traces } : {}),
   };
+  if (params.model != null) envelope.model = params.model;
+  if (params.max_tokens != null) envelope.max_tokens = params.max_tokens;
+  if (params.system != null) envelope.system = params.system;
+  if (params.thinking != null) envelope.thinking = params.thinking;
+  if (params.tools != null) envelope.tools = params.tools;
+  if (params.messages != null) envelope.messages = params.messages;
+  if (traces.length > 0) envelope._thinking_trace = traces;
+
+  // Copy any remaining params not already included
+  for (const [key, value] of Object.entries(params)) {
+    if (!(key in envelope)) {
+      envelope[key] = value;
+    }
+  }
+
   const json = JSON.stringify(envelope, null, 2);
   const filePath = join(dumpDir, `${agentName}.json`);
 

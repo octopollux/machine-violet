@@ -1,7 +1,6 @@
 import type { CampaignConfig } from "../types/config.js";
 import { buildCachedPrefix } from "../context/index.js";
-import type { PrefixSections } from "../context/index.js";
-import type Anthropic from "@anthropic-ai/sdk";
+import type { PrefixSections, CachedPrefixResult } from "../context/index.js";
 import { loadPrompt } from "../prompts/load-prompt.js";
 
 /**
@@ -26,12 +25,14 @@ export interface DMSessionState {
 
 /**
  * Build the full DM system prompt as a cached prefix.
- * Returns TextBlockParam[] for the Claude API system field.
+ * Returns system blocks (Tier 1+2) and volatile context (Tier 3) separately.
+ * Volatile context should be injected into the conversation, not the system prompt,
+ * to avoid invalidating the tools cache (BP3) on every turn.
  */
 export function buildDMPrefix(
   config: CampaignConfig,
   sessionState: DMSessionState,
-): Anthropic.TextBlockParam[] {
+): CachedPrefixResult {
   const sections: PrefixSections = {
     dmPrompt: DM_PROMPT,
     personality: config.dm_personality.prompt_fragment,

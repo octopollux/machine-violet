@@ -133,9 +133,9 @@ describe("SceneManager", () => {
       mockFileIO(),
     );
 
-    const prompt = mgr.getSystemPrompt();
-    expect(prompt.length).toBeGreaterThan(0);
-    expect(prompt[0].text).toContain("Dungeon Master");
+    const { system } = mgr.getSystemPrompt();
+    expect(system.length).toBeGreaterThan(0);
+    expect(system[0].text).toContain("Dungeon Master");
   });
 
   it("handles dropped exchange by updating precis", async () => {
@@ -607,12 +607,11 @@ describe("SceneManager", () => {
     );
 
     mgr.notifyEntityTouched("/tmp/test-campaign/characters/phone-booth-man.md", "Phone Booth Man");
-    const prompt = mgr.getSystemPrompt();
-    const combined = prompt.map((b) => b.text).join("");
-    expect(combined).toContain("Scene Entities");
-    expect(combined).toContain("characters/phone-booth-man.md");
-    expect(combined).toContain("Phone Booth Man");
-    expect(combined).toContain("do not create duplicates");
+    const { volatile } = mgr.getSystemPrompt();
+    expect(volatile).toContain("Scene Entities");
+    expect(volatile).toContain("characters/phone-booth-man.md");
+    expect(volatile).toContain("Phone Booth Man");
+    expect(volatile).toContain("do not create duplicates");
   });
 
   it("notifyEntityTouched includes aliases when provided", () => {
@@ -630,9 +629,8 @@ describe("SceneManager", () => {
       "Flood Street Watcher",
       "The Watcher",
     );
-    const prompt = mgr.getSystemPrompt();
-    const combined = prompt.map((b) => b.text).join("");
-    expect(combined).toContain("Flood Street Watcher (also: The Watcher)");
+    const { volatile } = mgr.getSystemPrompt();
+    expect(volatile).toContain("Flood Street Watcher (also: The Watcher)");
   });
 
   it("getSystemPrompt omits entity index when no entities touched", () => {
@@ -645,9 +643,8 @@ describe("SceneManager", () => {
       mockFileIO(),
     );
 
-    const prompt = mgr.getSystemPrompt();
-    const combined = prompt.map((b) => b.text).join("");
-    expect(combined).not.toContain("Scene Entities");
+    const { volatile } = mgr.getSystemPrompt();
+    expect(volatile).not.toContain("Scene Entities");
   });
 
   it("sceneEntityIndex is cleared on scene transition", async () => {
@@ -667,14 +664,14 @@ describe("SceneManager", () => {
 
     mgr.notifyEntityTouched("/tmp/test-campaign/characters/grimjaw.md", "Grimjaw");
     // Verify it was added
-    let prompt = mgr.getSystemPrompt();
-    expect(prompt.map((b) => b.text).join("")).toContain("Grimjaw");
+    let { volatile } = mgr.getSystemPrompt();
+    expect(volatile).toContain("Grimjaw");
 
     await mgr.sceneTransition(client, "End of scene");
 
     // After transition, entity index should be cleared
-    prompt = mgr.getSystemPrompt();
-    expect(prompt.map((b) => b.text).join("")).not.toContain("Scene Entities");
+    ({ volatile } = mgr.getSystemPrompt());
+    expect(volatile).not.toContain("Scene Entities");
   });
 
   it("notifyEntityTouched upserts — second call updates entry", () => {

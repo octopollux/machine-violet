@@ -176,6 +176,76 @@ function SystemPrompt({ system }: { system: string | Array<{ type: string; text?
   );
 }
 
+/**
+ * Build an interleaved view of messages and thinking traces.
+ * Thinking traces are inserted before each assistant response in the
+ * matching round, giving a natural "thought then spoke" reading order.
+ *
+ * Round mapping: round 0 → before the first assistant message,
+ * round 1 → before the second, etc.
+ */
+function InterleavedMessages({
+  messages,
+  traces,
+}: {
+  messages: Message[];
+  traces: ThinkingTrace[];
+}) {
+  // Index traces by round for O(1) lookup
+  const tracesByRound = new Map<number, ThinkingTrace[]>();
+  for (const t of traces) {
+    const list = tracesByRound.get(t.round) ?? [];
+    list.push(t);
+    tracesByRound.set(t.round, list);
+  }
+
+  const elements: ReactNode[] = [];
+  let assistantCount = 0;
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+
+    // Insert thinking traces before each assistant message
+    if (msg.role === "assistant") {
+      const roundTraces = tracesByRound.get(assistantCount);
+      if (roundTraces) {
+        for (const t of roundTraces) {
+          elements.push(
+            <div key={`think-${assistantCount}-${elements.length}`} className="dump-thinking">
+              <div style={{ fontSize: 10, marginBottom: 4, opacity: 0.7 }}>
+                Round {t.round} thinking | {t.timestamp}
+              </div>
+              {t.thinking}
+            </div>,
+          );
+        }
+      }
+      assistantCount++;
+    }
+
+    elements.push(<MessageBlock key={`msg-${i}`} msg={msg} />);
+  }
+
+  // Any traces for rounds beyond the last assistant message (shouldn't happen
+  // normally, but defensive)
+  for (const [round, roundTraces] of tracesByRound) {
+    if (round >= assistantCount) {
+      for (const t of roundTraces) {
+        elements.push(
+          <div key={`think-tail-${round}-${elements.length}`} className="dump-thinking">
+            <div style={{ fontSize: 10, marginBottom: 4, opacity: 0.7 }}>
+              Round {t.round} thinking | {t.timestamp}
+            </div>
+            {t.thinking}
+          </div>,
+        );
+      }
+    }
+  }
+
+  return <>{elements}</>;
+}
+
 export function ContextDumpViewer({ content }: ContextDumpViewerProps) {
   let dump: ContextDump;
   try {
@@ -185,6 +255,7 @@ export function ContextDumpViewer({ content }: ContextDumpViewerProps) {
   }
 
   const thinkingTraces = dump._thinking_trace ?? [];
+  const hasMessages = dump.messages && dump.messages.length > 0;
 
   return (
     <div className="context-dump-viewer">
@@ -209,15 +280,16 @@ export function ContextDumpViewer({ content }: ContextDumpViewerProps) {
         </Section>
       )}
 
-      {dump.messages && dump.messages.length > 0 && (
-        <Section title={`Messages (${dump.messages.length})`} color="var(--role-user)">
-          {dump.messages.map((msg, i) => (
-            <MessageBlock key={i} msg={msg} />
-          ))}
+      {hasMessages && (
+        <Section
+          title={`Conversation (${dump.messages!.length} messages${thinkingTraces.length > 0 ? `, ${thinkingTraces.length} thinking` : ""})`}
+          color="var(--role-user)"
+        >
+          <InterleavedMessages messages={dump.messages!} traces={thinkingTraces} />
         </Section>
       )}
 
-      {thinkingTraces.length > 0 && (
+      {!hasMessages && thinkingTraces.length > 0 && (
         <Section title={`Thinking Traces (${thinkingTraces.length})`} color="#f48fb1">
           {thinkingTraces.map((t, i) => (
             <div key={i} className="dump-thinking">
