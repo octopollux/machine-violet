@@ -28,6 +28,6 @@ export { promoteCharacter } from "./subagents/index.js";
 export type { PromotionInput, PromotionResult } from "./subagents/index.js";
 export { getActivePlayer, switchToNextPlayer, switchToPlayer, getCombatActivePlayer, isAITurn, getPlayerEntries } from "./player-manager.js";
 export type { ActivePlayer } from "./player-manager.js";
-export { fastPathSetup, fullSetup, buildCampaignConfig } from "./setup-agent.js";
-export type { SetupResult, SetupStep, SetupChoice, SetupCallback } from "./setup-agent.js";
+export { buildCampaignConfig } from "./setup-agent.js";
+export type { SetupResult, SetupChoice } from "./setup-agent.js";
 export { buildCampaignWorld, slugify } from "./world-builder.js";

@@ -724,6 +724,37 @@ describe("processNarrativeLines", () => {
       expect(hasBold).toBe(true);
     }
   });
+
+  it("splits inline <center> blocks onto their own lines", () => {
+    const result = processNarrativeLines([
+      dm("Before text <center>Title</center> After text"),
+    ], 80);
+    // Should split into: Before text, (blank), center, (blank), After text
+    const plainTexts = result.map((l) => toPlainText(l.nodes));
+    expect(plainTexts).toContain("Before text");
+    expect(plainTexts).toContain("After text");
+    const centerLine = result.find((l) => l.alignment === "center");
+    expect(centerLine).toBeDefined();
+    expect(toPlainText(centerLine!.nodes)).toBe("Title");
+  });
+
+  it("splits inline <right> blocks onto their own lines", () => {
+    const result = processNarrativeLines([
+      dm("Some text <right>— Author</right> more text"),
+    ], 80);
+    const rightLine = result.find((l) => l.alignment === "right");
+    expect(rightLine).toBeDefined();
+    expect(toPlainText(rightLine!.nodes)).toBe("— Author");
+  });
+
+  it("handles center block already on its own line", () => {
+    const result = processNarrativeLines([
+      dm("<center>Title</center>"),
+    ], 80);
+    const centerLine = result.find((l) => l.alignment === "center");
+    expect(centerLine).toBeDefined();
+    expect(toPlainText(centerLine!.nodes)).toBe("Title");
+  });
 });
 
 describe("paragraph boundary split", () => {
