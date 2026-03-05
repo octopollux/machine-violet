@@ -76,13 +76,19 @@ export function buildCachedPrefix(
     }
   }
 
-  // Rules appendix — BP1 (1h, covers all of Tier 1)
+  // Rules appendix
   if (sections.rulesAppendix) {
     blocks.push({
       type: "text",
       text: `\n\n## Rules Reference\n${sections.rulesAppendix}`,
-      cache_control: { type: "ephemeral", ttl: "1h" },
-    } as Anthropic.TextBlockParam);
+    });
+  }
+
+  // BP1 — stamp on last Tier 1 block (1h, covers all campaign-stable content)
+  // Falls back to DM prompt/personality/setting when rulesAppendix is absent
+  if (blocks.length > 0) {
+    (blocks[blocks.length - 1] as unknown as Record<string, unknown>).cache_control =
+      { type: "ephemeral", ttl: "1h" };
   }
 
   // ── Tier 2: Session/scene-stable (invalidated at scene transitions) ──

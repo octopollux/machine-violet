@@ -73,6 +73,10 @@ export interface EngineCallbacks {
  * Stamp cache_control on the last content block of the last conversation
  * message (BP4). This lets the API cache the entire conversation prefix
  * so only the new user input is uncached.
+ *
+ * Intentionally omits `ttl` — the API default is 5 minutes, which is
+ * appropriate since conversation changes every turn (unlike system/tools
+ * which use 1h TTL).
  */
 function stampConversationCache(messages: Anthropic.MessageParam[]): void {
   if (messages.length === 0) return;
@@ -377,14 +381,34 @@ export class GameEngine {
         this.sceneManager.appendDMResponse(result.text);
       }
 
-      // Split round messages into tool interactions and final assistant
+      // Split round messages into tool interactions and final assistant.
+      // When truncated, roundMessages may end with a user tool_result (no final assistant).
       const roundMsgs = result.roundMessages;
-      const toolMessages = roundMsgs.length > 1 ? roundMsgs.slice(0, -1) : [];
+      let toolMessages: Anthropic.MessageParam[] = [];
+      let finalAssistantText = result.text;
+      if (roundMsgs.length > 0) {
+        const lastMsg = roundMsgs[roundMsgs.length - 1];
+        if (roundMsgs.length > 1 && lastMsg.role === "assistant") {
+          toolMessages = roundMsgs.slice(0, -1);
+          // Extract text from only the final assistant to avoid duplicating
+          // text that appeared in intermediate tool-use rounds
+          finalAssistantText = typeof lastMsg.content === "string"
+            ? lastMsg.content
+            : (lastMsg.content as Anthropic.ContentBlock[])
+                .filter((b): b is Anthropic.TextBlock => b.type === "text")
+                .map((b) => b.text)
+                .join("");
+        } else {
+          // Truncated or single-message: keep all as tool context
+          toolMessages = roundMsgs;
+          finalAssistantText = "";
+        }
+      }
 
       // Add exchange to conversation manager (assistant kept as string for handleDroppedExchange compat)
       const assistantMessage: Anthropic.MessageParam = {
         role: "assistant",
-        content: result.text,
+        content: finalAssistantText || result.text,
       };
       const dropped = this.conversation.addExchange(userMessage, assistantMessage, toolMessages);
 

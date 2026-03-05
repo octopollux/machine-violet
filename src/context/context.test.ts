@@ -260,20 +260,27 @@ describe("buildCachedPrefix", () => {
     expect(allText).not.toContain("Scene So Far");
   });
 
-  it("places BP1 on rules appendix, not on DM prompt", () => {
+  it("places BP1 on rules appendix when present", () => {
     const blocks = buildCachedPrefix(mockConfig, {
       dmPrompt: "You are the DM.",
       personality: "Terse.",
       rulesAppendix: "Some rules.",
     });
 
-    // DM prompt (first block) should NOT have cache_control
-    const dmBlock = blocks[0] as unknown as Record<string, unknown>;
-    expect(dmBlock["cache_control"]).toBeUndefined();
-
-    // Rules appendix should have cache_control (BP1)
+    // Rules appendix (last Tier 1 block) should have cache_control (BP1)
     const rulesBlock = blocks.find((b) => b.text.includes("Rules Reference")) as unknown as Record<string, unknown>;
     expect(rulesBlock["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
+  });
+
+  it("falls back BP1 to last Tier 1 block when rulesAppendix is absent", () => {
+    const blocks = buildCachedPrefix(mockConfig, {
+      dmPrompt: "You are the DM.",
+      personality: "Terse.",
+    });
+
+    // Without rules, BP1 falls back to the personality block (last Tier 1)
+    const lastTier1 = blocks[blocks.length - 1] as unknown as Record<string, unknown>;
+    expect(lastTier1["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
   });
 
   it("places BP2 on last Tier 2 block", () => {

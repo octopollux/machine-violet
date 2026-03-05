@@ -43,8 +43,9 @@ export type DumpableParams = Record<string, any>;
  * Dump context to a file as raw JSON. Fire-and-forget, errors swallowed.
  * Only runs when DEV_MODE is active and dumpDir has been set.
  *
- * Drains any accumulated thinking blocks for this agent and includes them
- * as `_thinking_trace` in the JSON envelope.
+ * Snapshots accumulated thinking blocks for this agent and includes them
+ * as `_thinking_trace` in the JSON envelope. Traces persist across dumps
+ * and are cleared explicitly via `clearThinking()`.
  */
 export function dumpContext(agentName: string, params: DumpableParams): void {
   if (!isDevMode() || !dumpDir) return;
