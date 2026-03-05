@@ -3,10 +3,9 @@ import { useInput, Text, Box } from "ink";
 import Anthropic from "@anthropic-ai/sdk";
 import type { NarrativeLine } from "../types/tui.js";
 import type { ResolvedTheme } from "../tui/themes/types.js";
-import { themeToVariant } from "../tui/themes/index.js";
 import { appendDelta } from "../tui/narrative-helpers.js";
 import { Layout } from "../tui/layout.js";
-import { ChoiceModal } from "../tui/modals/index.js";
+import { ChoiceOverlay } from "../tui/modals/index.js";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
 import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
@@ -290,13 +289,25 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
   // --- Render: conversational mode ---
   if (setupConvoRef.current) {
     const setupHasModal = activeModal?.kind === "choice";
-    const setupModalHeight = setupHasModal && activeModal
-      ? activeModal.choices.length + 5 + 2 + (1) // +1 for "Enter your own" row
-      : 0;
+
+    // Build overlay for choice modal (replaces Player Pane content)
+    const choiceOverlay = setupHasModal && activeModal ? (
+      <ChoiceOverlay
+        width={cols - 4}
+        prompt={activeModal.prompt}
+        choices={activeModal.choices}
+        selectedIndex={choiceIndex}
+        showCustomInput
+        customInputActive={customInputActive}
+        customInputResetKey={customInputResetKey}
+        onCustomInputSubmit={handleCustomInputSubmit}
+      />
+    ) : undefined;
+
     return (
       <Box flexDirection="column" width={cols} height={rows}>
         <Layout
-          dimensions={{ columns: cols, rows: rows - setupModalHeight }}
+          dimensions={{ columns: cols, rows }}
           theme={theme}
           narrativeLines={setupConvoLines}
           modelineText="Campaign Setup"
@@ -311,20 +322,9 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
           turnHolder="You"
           engineState={setupConvoBusy ? "dm_thinking" : null}
           narrativeRef={narrativeRef}
+          hideInputLine={setupHasModal}
+          playerPaneOverlay={choiceOverlay}
         />
-        {setupHasModal && activeModal && (
-          <ChoiceModal
-            variant={themeToVariant(theme)}
-            width={cols}
-            prompt={activeModal.prompt}
-            choices={activeModal.choices}
-            selectedIndex={choiceIndex}
-            showCustomInput
-            customInputActive={customInputActive}
-            customInputResetKey={customInputResetKey}
-            onCustomInputSubmit={handleCustomInputSubmit}
-          />
-        )}
       </Box>
     );
   }
