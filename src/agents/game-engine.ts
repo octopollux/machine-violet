@@ -315,37 +315,50 @@ export class GameEngine {
     const messages = [...this.conversation.getMessages()];
     stampConversationCache(messages);
 
-    // Inject volatile context (Tier 3: activeState, entityIndex, uiState)
-    // as a system-instruction message before the player input.
-    // This keeps it out of the system prompt so BP3 (tools) stays cached.
+    // Build the user message: player input with system-generated preamble.
+    // All injections (volatile context, behavioral reminders, scene pacing)
+    // are prepended as a <context> block to the single user message rather
+    // than using separate synthetic turns.
+    const preambleParts: string[] = [];
+
+    // Volatile context (Tier 3: activeState, entityIndex, uiState)
     if (volatileContext) {
-      messages.push({ role: "user", content: `[context]\n${volatileContext}` });
-      messages.push({ role: "assistant", content: "Noted." });
+      preambleParts.push(volatileContext);
     }
 
-    // Inject behavioral reminder before player input if needed
+    // Behavioral reminder
     if (!opts?.skipTranscript) {
       const reminder = this.buildBehaviorReminder();
       if (reminder) {
-        messages.push({ role: "user", content: reminder });
+        preambleParts.push(reminder);
         this.callbacks.onDevLog?.(`[dev] injection: ${reminder}`);
       }
     }
 
-    // Inject scene pacing every 3 exchanges
-    let userContent = taggedInput;
+    // Scene pacing every 3 exchanges
     if (this.conversation.size > 0 && this.conversation.size % 3 === 0) {
       const pacing = buildScenePacing(this.sceneManager.getScene());
       if (pacing) {
-        userContent += `\n\n[scene-pacing] ${pacing}`;
+        preambleParts.push(`[scene-pacing] ${pacing}`);
       }
     }
 
-    const userMessage: Anthropic.MessageParam = {
+    const preamble = preambleParts.length > 0
+      ? `<context>\n${preambleParts.join("\n")}\n</context>\n\n`
+      : "";
+
+    // The API message includes the preamble; the stored exchange does not.
+    // Volatile context and reminders are ephemeral per-turn injections that
+    // should not persist in conversation history.
+    const apiUserMessage: Anthropic.MessageParam = {
       role: "user",
-      content: userContent,
+      content: `${preamble}${taggedInput}`,
     };
-    messages.push(userMessage);
+    const storedUserMessage: Anthropic.MessageParam = {
+      role: "user",
+      content: taggedInput,
+    };
+    messages.push(apiUserMessage);
 
     // Wrap config to track whether any tool was called this turn
     let toolUsedThisTurn = false;
@@ -418,7 +431,7 @@ export class GameEngine {
         role: "assistant",
         content: finalAssistantText || result.text,
       };
-      const dropped = this.conversation.addExchange(userMessage, assistantMessage, toolMessages);
+      const dropped = this.conversation.addExchange(storedUserMessage, assistantMessage, toolMessages);
 
       // Persist conversation after each exchange (crash resilience)
       if (this.persister) {
