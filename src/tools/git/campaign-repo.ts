@@ -57,6 +57,14 @@ export class CampaignRepo {
   private initialized = false;
   private initPromise: Promise<void> | null = null;
 
+  /**
+   * Optional hook called before every commit to flush pending I/O.
+   * The engine sets this to flush the StatePersister so that
+   * state/conversation.json, state/scene.json, etc. are on disk
+   * before stageAll() reads the filesystem.
+   */
+  preCommitHook: (() => Promise<void>) | null = null;
+
   constructor(params: {
     dir: string;
     git: GitIO;
@@ -221,6 +229,8 @@ export class CampaignRepo {
   // --- Internal ---
 
   private async stageAll(): Promise<void> {
+    // Flush any pending I/O so state files are on disk before we read the filesystem
+    await this.preCommitHook?.();
     const matrix = await this.git.statusMatrix(this.dir);
     for (const [filepath, head, workdir, stage] of matrix) {
       if (workdir === 0 && head !== 0) {
