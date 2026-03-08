@@ -18,6 +18,7 @@ import type { ToolResult } from "./tool-registry.js";
 import { isAITurn, getActivePlayer } from "./player-manager.js";
 import { aiPlayerTurn } from "./subagents/ai-player.js";
 import { campaignPaths, parseFrontMatter, serializeEntity, formatChangelogEntry } from "../tools/filesystem/index.js";
+import { runScribe } from "./subagents/scribe.js";
 import { norm } from "../utils/paths.js";
 import { CampaignRepo, performRollback } from "../tools/git/index.js";
 import type { GitIO } from "../tools/git/index.js";
@@ -480,10 +481,8 @@ export class GameEngine {
           await this.rollbackAndExit(cmd.target as string);
         } else if (cmd.type === "context_refresh") {
           await this.refreshContext();
-        } else if (cmd.type === "create_entity") {
-          await this.createEntity(cmd);
-        } else if (cmd.type === "update_entity") {
-          await this.updateEntity(cmd);
+        } else if (cmd.type === "scribe") {
+          await this.handleScribe(cmd);
         } else if (cmd.type === "dm_notes") {
           await this.handleDmNotes(cmd);
         } else if (cmd.type === "style_scene") {
@@ -649,93 +648,33 @@ export class GameEngine {
 
   // --- Worldbuilding Entity I/O ---
 
-  /** Write a new entity file (from create_entity tool) */
-  private async createEntity(cmd: TuiCommand): Promise<void> {
-    const { entity_type, name, file_path, content } = cmd as unknown as {
-      entity_type: string; name: string; file_path: string; content: string;
-    };
-    const filePath = norm(file_path);
+  /** Spawn the scribe subagent to process batched entity updates */
+  private async handleScribe(cmd: TuiCommand): Promise<void> {
+    const updates = cmd.updates as { visibility: string; content: string }[];
+    if (!updates || updates.length === 0) return;
 
     try {
-      // Locations use subdirectories — ensure parent dir exists
-      if (entity_type === "location") {
-        const parentDir = filePath.replace(/\/index\.md$/, "");
-        await this.fileIO.mkdir(parentDir);
+      const sceneNumber = this.sceneManager.getScene().sceneNumber;
+      const result = await runScribe(this.client, {
+        updates: updates.map(u => ({
+          visibility: u.visibility as "private" | "player-facing",
+          content: u.content,
+        })),
+        campaignRoot: this.gameState.campaignRoot,
+        sceneNumber,
+      }, this.fileIO);
+
+      // Notify scene manager about touched entities
+      for (const filePath of [...result.created, ...result.updated]) {
+        const slug = filePath.replace(/.*\//, "").replace(/\.md$/, "").replace(/\/index$/, "");
+        this.sceneManager.notifyEntityTouched(filePath, slug);
       }
 
-      if (await this.fileIO.exists(filePath)) {
-        this.callbacks.onDevLog?.(`[dev] create_entity: "${name}" already exists at ${filePath}, skipping`);
-        return;
-      }
-
-      await this.fileIO.writeFile(filePath, content);
-      this.sceneManager.notifyEntityTouched(filePath, name);
-      this.callbacks.onDevLog?.(`[dev] create_entity: wrote ${entity_type} "${name}" → ${filePath}`);
+      this.accUsage(result.usage);
+      this.callbacks.onDevLog?.(`[dev] scribe: ${result.summary}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      this.callbacks.onDevLog?.(`[dev] create_entity: failed for "${name}" — ${msg}`);
-    }
-  }
-
-  /** Update an existing entity file (from update_entity tool) */
-  private async updateEntity(cmd: TuiCommand): Promise<void> {
-    const { name, file_path, front_matter_updates, body_append, changelog_entry } = cmd as unknown as {
-      name: string; file_path: string;
-      front_matter_updates?: Record<string, unknown>;
-      body_append?: string;
-      changelog_entry?: string;
-    };
-    const filePath = norm(file_path);
-
-    try {
-      if (!(await this.fileIO.exists(filePath))) {
-        this.callbacks.onDevLog?.(`[dev] update_entity: "${name}" not found at ${filePath}`);
-        return;
-      }
-
-      const raw = await this.fileIO.readFile(filePath);
-      const { frontMatter, body, changelog } = parseFrontMatter(raw);
-      const title = frontMatter._title ?? name;
-      const parts: string[] = [];
-
-      // Merge front matter updates (null deletes keys)
-      if (front_matter_updates) {
-        for (const [key, value] of Object.entries(front_matter_updates)) {
-          if (value === null) {
-            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-            delete frontMatter[key];
-          } else {
-            frontMatter[key] = value;
-          }
-        }
-        parts.push(`fm:${Object.keys(front_matter_updates).length} keys`);
-      }
-
-      // Append body text
-      let newBody = body;
-      if (body_append) {
-        newBody = body ? `${body}\n\n${body_append}` : body_append;
-        parts.push("+body");
-      }
-
-      // Add changelog entry
-      const newChangelog = [...changelog];
-      if (changelog_entry) {
-        const sceneNumber = this.sceneManager.getScene().sceneNumber;
-        newChangelog.push(formatChangelogEntry(sceneNumber, changelog_entry));
-        parts.push("+changelog");
-      }
-
-      const updated = serializeEntity(title as string, frontMatter, newBody, newChangelog);
-      await this.fileIO.writeFile(filePath, updated);
-
-      const rawAliases = frontMatter.additional_names;
-      const aliases = (Array.isArray(rawAliases) ? rawAliases.join(", ") : typeof rawAliases === "string" ? rawAliases : undefined)?.trim() || undefined;
-      this.sceneManager.notifyEntityTouched(filePath, title as string, aliases);
-      this.callbacks.onDevLog?.(`[dev] update_entity: updated "${name}" — ${parts.join(", ")}`);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      this.callbacks.onDevLog?.(`[dev] update_entity: failed for "${name}" — ${msg}`);
+      this.callbacks.onDevLog?.(`[dev] scribe: failed — ${msg}`);
     }
   }
 

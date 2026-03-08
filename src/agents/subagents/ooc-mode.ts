@@ -17,8 +17,8 @@ import type { MapData } from "../../types/maps.js";
 import type { ClocksState } from "../../types/clocks.js";
 import { findReferences } from "../../tools/campaign-ops/index.js";
 import { validateCampaign } from "../../tools/validation/index.js";
-import { parseFrontMatter, serializeEntity } from "../../tools/filesystem/index.js";
 import { norm } from "../../utils/paths.js";
+import { runScribe } from "./scribe.js";
 import type { ModeSession } from "../../tui/game-context.js";
 
 // --- DM tool categories available in OOC mode ---
@@ -28,7 +28,7 @@ const OOC_READONLY_TOOLS = [
   "line_of_sight", "tiles_in_range", "find_nearest", "check_clocks",
 ];
 
-const OOC_ENTITY_TOOLS = ["create_entity", "update_entity"];
+const OOC_ENTITY_TOOLS = ["scribe"];
 
 const OOC_TUI_TOOLS = ["style_scene", "set_display_resources", "show_character_sheet"];
 
@@ -280,6 +280,7 @@ export function buildOOCTools(hasFileIO: boolean, hasGameState: boolean): Anthro
 
 /** Build OOC tool handler. */
 export function buildOOCToolHandler(
+  client: Anthropic | undefined,
   repo?: CampaignRepo,
   campaignRoot?: string,
   fileIO?: FileIO,
@@ -338,7 +339,7 @@ export function buildOOCToolHandler(
         default:
           // DM tool dispatch
           if (OOC_DM_TOOL_SET.has(name) && gameState) {
-            return await dispatchDMTool(name, input, gameState, repo, fileIO, campaignRoot, onTuiCommand);
+            return await dispatchDMTool(name, input, gameState, client, repo, fileIO, campaignRoot, onTuiCommand);
           }
           return { content: `Unknown tool: ${name}`, is_error: true };
       }
@@ -354,6 +355,7 @@ async function dispatchDMTool(
   name: string,
   input: Record<string, unknown>,
   gameState: GameState,
+  client?: Anthropic,
   repo?: CampaignRepo,
   fileIO?: FileIO,
   campaignRoot?: string,
@@ -376,12 +378,20 @@ async function dispatchDMTool(
     return { content: `Applied: ${name}` };
   }
 
-  // Entity tools — execute file I/O directly
-  if (OOC_ENTITY_TOOLS.includes(name)) {
-    if (!fileIO || !campaignRoot) {
-      return { content: "File I/O not available for entity operations", is_error: true };
+  // Scribe — spawn subagent to handle entity operations
+  if (name === "scribe") {
+    if (!client || !fileIO || !campaignRoot) {
+      return { content: "Client and file I/O required for scribe", is_error: true };
     }
-    return await executeEntityCommand(name, input, gameState, fileIO, campaignRoot);
+    const result = registry.dispatch(gameState, name, input);
+    if (result.is_error) return result;
+    const cmd = JSON.parse(result.content);
+    const scribeResult = await runScribe(client, {
+      updates: cmd.updates,
+      campaignRoot,
+      sceneNumber: 0, // OOC has no scene number
+    }, fileIO);
+    return { content: scribeResult.summary };
   }
 
   // Rollback — execute via repo (prunes ghost dirs + exits)
@@ -390,68 +400,6 @@ async function dispatchDMTool(
   }
 
   return { content: `Unknown OOC tool: ${name}`, is_error: true };
-}
-
-/** Execute entity create/update via FileIO. */
-async function executeEntityCommand(
-  name: string,
-  input: Record<string, unknown>,
-  gameState: GameState,
-  fileIO: FileIO,
-  _campaignRoot: string,
-): Promise<{ content: string; is_error?: boolean }> {
-  // Use registry.dispatch to get the validated command structure
-  const result = registry.dispatch(gameState, name, input);
-  if (result.is_error) return result;
-
-  const cmd = JSON.parse(result.content);
-
-  if (name === "create_entity") {
-    const dirPath = cmd.file_path.substring(0, cmd.file_path.lastIndexOf("/"));
-    await fileIO.mkdir(dirPath);
-    await fileIO.writeFile(cmd.file_path, cmd.content);
-    return { content: `Created ${cmd.entity_type} "${cmd.name}" at ${cmd.file_path}` };
-  }
-
-  if (name === "update_entity") {
-    // Read existing file
-    let existing: string;
-    try {
-      existing = await fileIO.readFile(cmd.file_path);
-    } catch {
-      return { content: `Entity file not found: ${cmd.file_path}`, is_error: true };
-    }
-
-    // Parse, merge, re-serialize
-    const { frontMatter, body, changelog } = parseFrontMatter(existing);
-    const title = frontMatter._title ?? cmd.name;
-
-    // Merge front matter updates (null = remove key)
-    if (cmd.front_matter_updates) {
-      for (const [key, value] of Object.entries(cmd.front_matter_updates)) {
-        if (value === null) {
-          frontMatter[key] = undefined;
-        } else {
-          frontMatter[key] = value;
-        }
-      }
-    }
-
-    // Append body text
-    const newBody = cmd.body_append ? (body ? body + "\n\n" + cmd.body_append : cmd.body_append) : body;
-
-    // Add changelog entry (no scene prefix in OOC)
-    const newChangelog = [...changelog];
-    if (cmd.changelog_entry) {
-      newChangelog.push(cmd.changelog_entry);
-    }
-
-    const updated = serializeEntity(title, frontMatter, newBody, newChangelog);
-    await fileIO.writeFile(cmd.file_path, updated);
-    return { content: `Updated ${cmd.entity_type} "${cmd.name}"` };
-  }
-
-  return { content: `Unknown entity command: ${name}`, is_error: true };
 }
 
 /** Execute rollback via performRollback — prunes ghost dirs then exits. */
@@ -518,7 +466,7 @@ export async function enterOOC(
   const hasTools = !!options.repo || hasFileIO || hasGameState;
   const tools = hasTools ? buildOOCTools(hasFileIO, hasGameState) : undefined;
   const toolHandler = hasTools
-    ? buildOOCToolHandler(options.repo, options.campaignRoot, options.fileIO, options.maps, options.clocks, options.gameState, options.onTuiCommand)
+    ? buildOOCToolHandler(client, options.repo, options.campaignRoot, options.fileIO, options.maps, options.clocks, options.gameState, options.onTuiCommand)
     : undefined;
 
   const result = await spawnSubagent(

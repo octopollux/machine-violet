@@ -139,8 +139,7 @@ export const TUI_TOOLS = new Set([
   "scene_transition",
   "session_end",
   "context_refresh",
-  "create_entity",
-  "update_entity",
+  "scribe",
   "dm_notes",
 ]);
 

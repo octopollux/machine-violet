@@ -464,12 +464,11 @@ describe("buildOOCTools", () => {
 
   it("returns 18 tools when both fileIO and gameState are available", () => {
     const tools = buildOOCTools(true, true);
-    expect(tools).toHaveLength(18);
+    expect(tools).toHaveLength(17);
     const names = tools.map((t) => t.name);
     expect(names).toContain("roll_dice");
     expect(names).toContain("check_clocks");
-    expect(names).toContain("create_entity");
-    expect(names).toContain("update_entity");
+    expect(names).toContain("scribe");
     expect(names).toContain("style_scene");
     expect(names).toContain("show_character_sheet");
     expect(names).toContain("rollback");
@@ -477,7 +476,7 @@ describe("buildOOCTools", () => {
 
   it("returns 15 tools when gameState but no fileIO", () => {
     const tools = buildOOCTools(false, true);
-    expect(tools).toHaveLength(15);
+    expect(tools).toHaveLength(14);
     const names = tools.map((t) => t.name);
     expect(names).toContain("roll_dice");
     expect(names).not.toContain("read_file");
@@ -491,7 +490,7 @@ describe("buildOOCToolHandler", () => {
     await repo.sceneCommit("The Dragon's Lair");
     await repo.autoCommit("auto: exchanges");
 
-    const handler = buildOOCToolHandler(repo);
+    const handler = buildOOCToolHandler(undefined, repo);
     const result = await handler("get_commit_log", {});
     expect(result.is_error).toBeUndefined();
     expect(result.content).toContain("[scene]");
@@ -508,7 +507,7 @@ describe("buildOOCToolHandler", () => {
     await repo.sceneCommit("The Dragon's Lair");
     await repo.autoCommit("auto: exchanges");
 
-    const handler = buildOOCToolHandler(repo);
+    const handler = buildOOCToolHandler(undefined, repo);
     const result = await handler("get_commit_log", { type: "scene" });
     expect(result.content).toContain("[scene]");
     expect(result.content).not.toContain("[auto]");
@@ -517,7 +516,7 @@ describe("buildOOCToolHandler", () => {
   it("returns error for unknown tool", async () => {
     const git = mockGitIO();
     const repo = new CampaignRepo({ dir: "/tmp/campaign", git });
-    const handler = buildOOCToolHandler(repo);
+    const handler = buildOOCToolHandler(undefined, repo);
     const result = await handler("nonexistent", {});
     expect(result.is_error).toBe(true);
   });
@@ -526,7 +525,7 @@ describe("buildOOCToolHandler", () => {
     const fio = mockFileIO({
       "/camp/characters/kael.md": "# Kael\n**Type:** PC",
     });
-    const handler = buildOOCToolHandler(undefined, "/camp", fio);
+    const handler = buildOOCToolHandler(undefined, undefined, "/camp", fio);
 
     const result = await handler("read_file", { path: "characters/kael.md" });
     expect(result.is_error).toBeUndefined();
@@ -535,7 +534,7 @@ describe("buildOOCToolHandler", () => {
 
   it("read_file rejects path traversal", async () => {
     const fio = mockFileIO();
-    const handler = buildOOCToolHandler(undefined, "/camp", fio);
+    const handler = buildOOCToolHandler(undefined, undefined, "/camp", fio);
 
     const result = await handler("read_file", { path: "../etc/passwd" });
     expect(result.is_error).toBe(true);
@@ -543,7 +542,7 @@ describe("buildOOCToolHandler", () => {
   });
 
   it("read_file errors without fileIO", async () => {
-    const handler = buildOOCToolHandler();
+    const handler = buildOOCToolHandler(undefined);
     const result = await handler("read_file", { path: "characters/kael.md" });
     expect(result.is_error).toBe(true);
     expect(result.content).toContain("File I/O not available");
@@ -559,7 +558,7 @@ describe("buildOOCToolHandler", () => {
         "/camp/characters": ["kael.md"],
       },
     );
-    const handler = buildOOCToolHandler(undefined, "/camp", fio);
+    const handler = buildOOCToolHandler(undefined, undefined, "/camp", fio);
 
     const result = await handler("find_references", { path: "characters/kael.md" });
     expect(result.is_error).toBeUndefined();
@@ -579,7 +578,7 @@ describe("buildOOCToolHandler", () => {
         "/camp/lore": [],
       },
     );
-    const handler = buildOOCToolHandler(undefined, "/camp", fio);
+    const handler = buildOOCToolHandler(undefined, undefined, "/camp", fio);
 
     const result = await handler("validate_campaign", {});
     expect(result.is_error).toBeUndefined();
@@ -616,7 +615,7 @@ function mockGameState(overrides?: Partial<GameState>): GameState {
 describe("buildOOCToolHandler (DM tools)", () => {
   it("roll_dice dispatches and returns result directly", async () => {
     const gs = mockGameState();
-    const handler = buildOOCToolHandler(undefined, "/camp", undefined, undefined, undefined, gs);
+    const handler = buildOOCToolHandler(undefined, undefined, "/camp", undefined, undefined, undefined, gs);
     const result = await handler("roll_dice", { expression: "1d6" });
     expect(result.is_error).toBeUndefined();
     expect(result.content).toContain("1d6");
@@ -625,7 +624,7 @@ describe("buildOOCToolHandler (DM tools)", () => {
 
   it("check_clocks dispatches and returns result directly", async () => {
     const gs = mockGameState();
-    const handler = buildOOCToolHandler(undefined, "/camp", undefined, undefined, undefined, gs);
+    const handler = buildOOCToolHandler(undefined, undefined, "/camp", undefined, undefined, undefined, gs);
     const result = await handler("check_clocks", {});
     expect(result.is_error).toBeUndefined();
     expect(result.content).toContain("calendar");
@@ -634,7 +633,7 @@ describe("buildOOCToolHandler (DM tools)", () => {
   it("style_scene dispatches and calls onTuiCommand", async () => {
     const gs = mockGameState();
     const onTuiCommand = vi.fn();
-    const handler = buildOOCToolHandler(undefined, "/camp", undefined, undefined, undefined, gs, onTuiCommand);
+    const handler = buildOOCToolHandler(undefined, undefined, "/camp", undefined, undefined, undefined, gs, onTuiCommand);
     const result = await handler("style_scene", { key_color: "#8844aa" });
     expect(result.is_error).toBeUndefined();
     expect(result.content).toBe("Applied: style_scene");
@@ -647,7 +646,7 @@ describe("buildOOCToolHandler (DM tools)", () => {
   it("show_character_sheet dispatches and calls onTuiCommand", async () => {
     const gs = mockGameState();
     const onTuiCommand = vi.fn();
-    const handler = buildOOCToolHandler(undefined, "/camp", undefined, undefined, undefined, gs, onTuiCommand);
+    const handler = buildOOCToolHandler(undefined, undefined, "/camp", undefined, undefined, undefined, gs, onTuiCommand);
     const result = await handler("show_character_sheet", { character: "Kael" });
     expect(result.is_error).toBeUndefined();
     expect(result.content).toBe("Applied: show_character_sheet");
@@ -657,58 +656,15 @@ describe("buildOOCToolHandler (DM tools)", () => {
     expect(cmd.character).toBe("Kael");
   });
 
-  it("create_entity writes file via FileIO", async () => {
+  it("scribe without client returns error", async () => {
     const gs = mockGameState();
     const fio = mockFileIO();
-    const handler = buildOOCToolHandler(undefined, "/camp", fio, undefined, undefined, gs);
-    const result = await handler("create_entity", {
-      entity_type: "character",
-      name: "Grimjaw",
-      front_matter: { disposition: "hostile" },
-      body: "A scarred orc.",
-    });
-    expect(result.is_error).toBeUndefined();
-    expect(result.content).toContain("Created character");
-    expect(result.content).toContain("Grimjaw");
-    expect(fio.writeFile).toHaveBeenCalledOnce();
-    expect(fio.mkdir).toHaveBeenCalledOnce();
-    const writtenContent = (fio.writeFile as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
-    expect(writtenContent).toContain("# Grimjaw");
-    expect(writtenContent).toContain("hostile");
-  });
-
-  it("update_entity reads/merges/writes file via FileIO", async () => {
-    const existingFile = "# Grimjaw\n\n**Type:** character\n**Disposition:** hostile\n\nA scarred orc.\n";
-    const gs = mockGameState();
-    const fio = mockFileIO({ "/camp/characters/grimjaw.md": existingFile });
-    const handler = buildOOCToolHandler(undefined, "/camp", fio, undefined, undefined, gs);
-    const result = await handler("update_entity", {
-      entity_type: "character",
-      name: "Grimjaw",
-      front_matter_updates: { disposition: "friendly" },
-      body_append: "Now an ally.",
-      changelog_entry: "Befriended by Kael",
-    });
-    expect(result.is_error).toBeUndefined();
-    expect(result.content).toContain("Updated character");
-    expect(fio.writeFile).toHaveBeenCalledOnce();
-    const writtenContent = (fio.writeFile as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
-    expect(writtenContent).toContain("friendly");
-    expect(writtenContent).toContain("Now an ally.");
-    expect(writtenContent).toContain("Befriended by Kael");
-  });
-
-  it("update_entity returns error when file not found", async () => {
-    const gs = mockGameState();
-    const fio = mockFileIO();
-    const handler = buildOOCToolHandler(undefined, "/camp", fio, undefined, undefined, gs);
-    const result = await handler("update_entity", {
-      entity_type: "character",
-      name: "Nobody",
-      front_matter_updates: { disposition: "friendly" },
+    const handler = buildOOCToolHandler(undefined, undefined, "/camp", fio, undefined, undefined, gs);
+    const result = await handler("scribe", {
+      updates: [{ visibility: "private", content: "Test" }],
     });
     expect(result.is_error).toBe(true);
-    expect(result.content).toContain("not found");
+    expect(result.content).toContain("Client");
   });
 
   it("rollback calls performRollback and exits", async () => {
@@ -721,7 +677,7 @@ describe("buildOOCToolHandler (DM tools)", () => {
     const gs = mockGameState();
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
     try {
-      const handler = buildOOCToolHandler(repo, "/camp", fio, undefined, undefined, gs);
+      const handler = buildOOCToolHandler(undefined, repo, "/camp", fio, undefined, undefined, gs);
       await handler("rollback", { target: "last" });
       expect(git.resetTo).toHaveBeenCalled();
       expect(exitSpy).toHaveBeenCalledWith(0);
@@ -733,7 +689,7 @@ describe("buildOOCToolHandler (DM tools)", () => {
   it("rollback without repo returns error", async () => {
     const gs = mockGameState();
     const fio = mockFileIO();
-    const handler = buildOOCToolHandler(undefined, "/camp", fio, undefined, undefined, gs);
+    const handler = buildOOCToolHandler(undefined, undefined, "/camp", fio, undefined, undefined, gs);
     const result = await handler("rollback", { target: "last" });
     expect(result.is_error).toBe(true);
     expect(result.content).toContain("not available");
@@ -745,27 +701,25 @@ describe("buildOOCToolHandler (DM tools)", () => {
     await repo.sceneCommit("The Dragon's Lair");
 
     const gs = mockGameState();
-    const handler = buildOOCToolHandler(repo, "/camp", undefined, undefined, undefined, gs);
+    const handler = buildOOCToolHandler(undefined, repo, "/camp", undefined, undefined, undefined, gs);
     const result = await handler("rollback", { target: "last" });
     expect(result.is_error).toBe(true);
     expect(result.content).toContain("File I/O not available");
   });
 
-  it("entity tools without fileIO return error", async () => {
+  it("scribe without fileIO returns error", async () => {
     const gs = mockGameState();
-    const handler = buildOOCToolHandler(undefined, undefined, undefined, undefined, undefined, gs);
-    const result = await handler("create_entity", {
-      entity_type: "character",
-      name: "Test",
-      body: "test",
+    const handler = buildOOCToolHandler(undefined, undefined, undefined, undefined, undefined, undefined, gs);
+    const result = await handler("scribe", {
+      updates: [{ visibility: "private", content: "Test" }],
     });
     expect(result.is_error).toBe(true);
-    expect(result.content).toContain("File I/O not available");
+    expect(result.content).toContain("Client");
   });
 });
 
 describe("enterOOC with gameState", () => {
-  it("passes 18 tools when gameState and fileIO are provided", async () => {
+  it("passes 17 tools when gameState and fileIO are provided", async () => {
     const gs = mockGameState();
     const fio = mockFileIO();
     const client = mockClient([textResponse("Done.")]);
@@ -779,10 +733,10 @@ describe("enterOOC with gameState", () => {
 
     const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     if (createCall) {
-      expect(createCall.tools).toHaveLength(18);
+      expect(createCall.tools).toHaveLength(17);
       const names = createCall.tools.map((t: { name: string }) => t.name);
       expect(names).toContain("roll_dice");
-      expect(names).toContain("create_entity");
+      expect(names).toContain("scribe");
       expect(names).toContain("style_scene");
       expect(names).toContain("rollback");
     }

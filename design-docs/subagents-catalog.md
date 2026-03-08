@@ -126,6 +126,27 @@ Scans the completed scene transcript. Identifies every entity meaningfully invol
 
 ---
 
+### 6b. Scribe Subagent
+
+| Property | Value |
+|---|---|
+| **Model** | Haiku |
+| **Visibility** | Silent |
+| **Trigger** | DM calls `scribe` tool |
+| **Source doc** | [entity-filesystem.md](entity-filesystem.md) |
+
+Autonomous entity file manager. Receives batched natural-language updates tagged `private` or `player-facing`. Has its own tools (`list_entities`, `read_entity`, `write_entity`) to manage the campaign filesystem. Handles entity creation, updates, front matter merging, changelog entries, and deduplication. Replaces the old `create_entity` / `update_entity` DM tools.
+
+**Context**: The DM's update batch (natural language). ~200-500 tokens.
+
+**Tools**: `list_entities(type)`, `read_entity(type, slug)`, `write_entity(mode, type, name, front_matter?, body?, changelog_entry?)`.
+
+**Max tool rounds**: 8 (needs to list → read → write multiple entities).
+
+**Returns**: Terse summary of entities created/updated. Usage stats accumulated to session total.
+
+---
+
 ### 7. Character Promotion Subagent
 
 | Property | Value |

@@ -103,6 +103,7 @@ All T1 (initiative rolling may delegate to T2 for complex systems). Called by DM
 
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
+| `scribe` | T2 (Haiku) | DM | `({ updates: [{ visibility, content }] })` | Batch entity creation/updates. Each update tagged `private` or `player-facing`. Spawns Haiku subagent with `list_entities`, `read_entity`, `write_entity` tools for autonomous entity file management. Handles deduplication, front matter, changelogs. |
 | `promote_character` | T2 (Haiku) | DM | `({ name, file, level, context })` | Expand a character from minimal to full sheet. Haiku reads rules + existing notes, generates appropriate stats, writes/updates file. |
 
 ---
