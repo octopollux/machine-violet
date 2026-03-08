@@ -19,6 +19,18 @@ vi.mock("../agents/subagents/dev-mode.js", () => ({
   summarizeGameState: vi.fn().mockReturnValue("summary"),
 }));
 
+vi.mock("node:v8", () => ({
+  default: { writeHeapSnapshot: vi.fn().mockReturnValue("heap-mock.heapsnapshot") },
+}));
+
+vi.mock("node:fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs")>();
+  return { ...actual, writeFileSync: vi.fn() };
+});
+
+import { writeFileSync } from "node:fs";
+import v8 from "node:v8";
+
 // Prevent process.exit from actually exiting
 const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
 
@@ -332,6 +344,37 @@ describe("trySlashCommand", () => {
       expect(ctx.setActiveSession).toHaveBeenCalledWith(null);
       // Then entered Dev
       expect(createDevSession).toHaveBeenCalled();
+    });
+  });
+
+  describe("/snapshot", () => {
+    it("writes a heap snapshot file", () => {
+      const ctx = mockCtx();
+      trySlashCommand("/snapshot", ctx);
+
+      expect(v8.writeHeapSnapshot).toHaveBeenCalled();
+      expect(writeFileSync).toHaveBeenCalled();
+      const text = lastAppended(ctx).text;
+      expect(text).toContain("Heap snapshot written");
+    });
+
+    it("reports error when snapshot fails", () => {
+      const ctx = mockCtx();
+      vi.mocked(writeFileSync).mockImplementationOnce(() => {
+        throw new Error("ENOSPC");
+      });
+
+      trySlashCommand("/snapshot", ctx);
+
+      const text = lastAppended(ctx).text;
+      expect(text).toContain("Snapshot failed");
+      expect(text).toContain("ENOSPC");
+    });
+
+    it("appears in /help output", () => {
+      const ctx = mockCtx();
+      trySlashCommand("/help", ctx);
+      expect(lastAppended(ctx).text).toContain("/snapshot");
     });
   });
 
