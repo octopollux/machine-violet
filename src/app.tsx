@@ -5,7 +5,6 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { readFile, writeFile, appendFile, mkdir, readdir, stat, unlink, rmdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 
-import { getStyle } from "./tui/frames/index.js";
 import type { NarrativeLine, ActiveModal, RetryOverlay } from "./types/tui.js";
 import type { StyleVariant, ResolvedTheme } from "./tui/themes/types.js";
 import { BUILTIN_DEFINITIONS, resolveTheme, resetThemeCache } from "./tui/themes/index.js";
@@ -28,6 +27,7 @@ import { createClocksState } from "./tools/clocks/index.js";
 import { createCombatState } from "./tools/combat/index.js";
 import { createDecksState } from "./tools/cards/index.js";
 import { StatePersister } from "./context/state-persistence.js";
+import type { LoadedState } from "./context/state-persistence.js";
 import { CostTracker } from "./context/cost-tracker.js";
 import type { ShutdownContext } from "./shutdown.js";
 import { gracefulShutdown } from "./shutdown.js";
@@ -110,6 +110,48 @@ function createFileIO(): FileIO {
   };
 }
 
+// --- State hydration helpers (extracted from startEngine for readability) ---
+
+/** Apply loaded state slices to the mutable GameState and SceneState. */
+function hydrateGameState(gs: GameState, scene: SceneState, loaded: LoadedState): void {
+  if (loaded.combat) gs.combat = loaded.combat;
+  if (loaded.clocks) gs.clocks = loaded.clocks;
+  if (loaded.maps) gs.maps = loaded.maps;
+  if (loaded.decks) gs.decks = loaded.decks;
+  if (loaded.scene) {
+    gs.activePlayerIndex = loaded.scene.activePlayerIndex;
+    scene.precis = loaded.scene.precis;
+    scene.openThreads = loaded.scene.openThreads ?? "";
+    scene.npcIntents = loaded.scene.npcIntents ?? "";
+    scene.playerReads = loaded.scene.playerReads;
+  }
+}
+
+/** Load display-log tail, with compat bridge for pre-display-log campaigns. */
+async function loadDisplayHistory(
+  persister: StatePersister,
+  scene: SceneState,
+): Promise<NarrativeLine[]> {
+  let displayLogTail = await persister.loadDisplayLogTail(200);
+
+  // TODO(compat): Remove after all dev campaigns have been migrated.
+  // Bridge for pre-display-log campaigns: seed display-log.md from scene transcript.
+  if (displayLogTail.length === 0 && scene.transcript.length > 0) {
+    const migrated: NarrativeLine[] = [];
+    for (const entry of scene.transcript) {
+      const { kind, text } = classifyTranscriptEntry(entry);
+      if (kind !== "dev") migrated.push({ kind, text });
+    }
+    const md = narrativeLinesToMarkdown(migrated);
+    persister.appendDisplayLog(md);
+    displayLogTail = md.trimEnd().split("\n");
+  }
+
+  return displayLogTail.length > 0
+    ? markdownToNarrativeLines(displayLogTail)
+    : [];
+}
+
 // --- App component ---
 
 export interface AppProps {
@@ -131,7 +173,6 @@ export default function App({ shutdownRef }: AppProps) {
   const fileIO = useRef(createFileIO());
   const clientRef = useRef<Anthropic | null>(null);
   const persisterRef = useRef<StatePersister | null>(null);
-  const pendingResumeRef = useRef<{ characterName: string; text: string } | null>(null);
 
   // --- Campaigns ---
   const [campaigns, setCampaigns] = useState<CampaignEntry[]>([]);
@@ -161,6 +202,12 @@ export default function App({ shutdownRef }: AppProps) {
   const [variant, setVariant] = useState<StyleVariant>("exploration");
   const [theme, setTheme] = useState<ResolvedTheme>(() => resolveDefaultTheme());
   const variantRef = useRef<StyleVariant>("exploration");
+
+  // Gate for UI persistence effects. Must be set to true ONLY after all
+  // hydrated state (themeName, variant, modelines) has been applied via
+  // their respective setters in the same synchronous block. React batches
+  // the state updates, so the effects below won't fire until after the
+  // block yields — by which time all values are correct.
   const hydratedRef = useRef(false);
 
   // Re-resolve theme when variant, themeName, or keyColor changes
@@ -181,7 +228,7 @@ export default function App({ shutdownRef }: AppProps) {
     }
   }, []);
 
-  // Persist UI when theme/variant/modelines change (skip during resume hydration)
+  // Persist UI when theme/variant/modelines change (skip until hydration complete)
   useEffect(() => {
     if (!hydratedRef.current) return;
     persisterRef.current?.persistUI({
@@ -333,11 +380,9 @@ export default function App({ shutdownRef }: AppProps) {
     });
 
     engineRef.current = engine;
-    persisterRef.current = new StatePersister(
-      campaignRoot,
-      fileIO.current,
-      (error) => console.error("[state-persist]", error.message),
-    );
+    // Use the engine's own persister for UI persistence effects — single
+    // instance shared across engine writes and TUI-driven persists.
+    persisterRef.current = engine.getPersister();
     setCampaignName(config.name);
     process.stdout.write(`\x1b]0;${config.name}\x07`);
     setActivePlayerIndex(0);
@@ -353,100 +398,79 @@ export default function App({ shutdownRef }: AppProps) {
     }
 
     if (isResume) {
-      const persister = new StatePersister(
-        campaignRoot,
-        fileIO.current,
-        (error) => console.error("[state-persist]", error.message),
-      );
-      const loaded = await persister.loadAll();
-
-      if (loaded.combat) gs.combat = loaded.combat;
-      if (loaded.clocks) gs.clocks = loaded.clocks;
-      if (loaded.maps) gs.maps = loaded.maps;
-      if (loaded.decks) gs.decks = loaded.decks;
-      if (loaded.scene) {
-        gs.activePlayerIndex = loaded.scene.activePlayerIndex;
-        scene.precis = loaded.scene.precis;
-        scene.openThreads = loaded.scene.openThreads ?? "";
-        scene.npcIntents = loaded.scene.npcIntents ?? "";
-        scene.playerReads = loaded.scene.playerReads;
-        setActivePlayerIndex(loaded.scene.activePlayerIndex);
-      }
-
-      if (loaded.ui) {
-        // Restore theme from persisted style name
-        if (BUILTIN_DEFINITIONS[loaded.ui.styleName]) {
-          setThemeName(loaded.ui.styleName);
-        } else {
-          // Legacy: try old getStyle for backwards compat
-          const legacy = getStyle(loaded.ui.styleName);
-          if (legacy && BUILTIN_DEFINITIONS[legacy.name]) {
-            setThemeName(legacy.name);
-          }
-        }
-        setVariant(loaded.ui.variant);
-        if (loaded.ui.modelines) setModelines(loaded.ui.modelines);
-      }
-      hydratedRef.current = true;
-
-      // Resume interrupted cascade if present
-      const pendingOp = await persister.loadPendingOp();
-      if (pendingOp && pendingOp.step && pendingOp.step !== "done") {
-        await engine.resumePendingTransition(pendingOp);
-      }
-
-      const recap = await engine.resumeSession();
-
-      // Load display log tail for TUI — shows the player what happened before
-      let displayLogTail = await persister.loadDisplayLogTail(200);
-
-      // TODO(compat): Remove after all dev campaigns have been migrated.
-      // Bridge for pre-display-log campaigns: seed display-log.md from scene transcript.
-      if (displayLogTail.length === 0 && scene.transcript.length > 0) {
-        const migrated: NarrativeLine[] = [];
-        for (const entry of scene.transcript) {
-          const { kind, text } = classifyTranscriptEntry(entry);
-          if (kind !== "dev") migrated.push({ kind, text });
-        }
-        const md = narrativeLinesToMarkdown(migrated);
-        persister.appendDisplayLog(md);
-        displayLogTail = md.trimEnd().split("\n");
-      }
-
-      const historyLines: NarrativeLine[] = displayLogTail.length > 0
-        ? markdownToNarrativeLines(displayLogTail)
-        : [];
-
-      setNarrativeLines([...historyLines, { kind: "system", text: `Welcome back to ${config.name}.` }, { kind: "dm", text: "" }]);
-
-      // Only prompt the DM with a resume instruction when there's a session
-      // recap (i.e. a full session boundary happened). Otherwise the player
-      // has visual continuity via the display log and can just start typing.
-      if (recap) {
-        const activePlayer = getActivePlayer(gs);
-        const resumeParts = ["[Session resumes. Continue the narrative where we left off."];
-        if (config.premise) resumeParts.push(`Campaign premise: ${config.premise}`);
-        const pc = config.players[0];
-        if (pc) resumeParts.push(`The player character is ${pc.character}.`);
-        resumeParts.push("Pick up naturally from the last scene — do NOT restart, re-introduce the setting, or recap what has already happened.");
-
-        setActiveModal({ kind: "recap", lines: recap.split("\n") });
-        pendingResumeRef.current = { characterName: activePlayer.characterName, text: resumeParts.join(" ") + "]" };
-      }
-      setPhase("playing");
+      await resumeEngine(engine, config, gs, scene);
     } else {
-      hydratedRef.current = true;
-      setNarrativeLines([{ kind: "system", text: `Welcome to ${config.name}.` }, { kind: "dm", text: "" }, { kind: "system", text: "The story begins..." }]);
-      setPhase("playing");
-
-      const activePlayer = getActivePlayer(gs);
-      const openingParts = ["[Session begins. Set the scene."];
-      if (config.premise) openingParts.push(`Campaign premise: ${config.premise}`);
-      const pc = config.players[0];
-      if (pc) openingParts.push(`The player character is ${pc.character}.`);
-      await engine.processInput(activePlayer.characterName, openingParts.join(" ") + "]", { skipTranscript: true });
+      await startNewGame(engine, config, gs);
     }
   }, [buildGameState, buildCallbacks, shutdownRef]);
+
+  /** Resume an existing campaign: hydrate state, restore UI, show history. */
+  async function resumeEngine(
+    engine: GameEngine,
+    config: CampaignConfig,
+    gs: GameState,
+    scene: SceneState,
+  ): Promise<void> {
+    const persister = engine.getPersister();
+    if (!persister) throw new Error("Engine has no persister after start");
+    const loaded = await persister.loadAll();
+
+    hydrateGameState(gs, scene, loaded);
+    if (loaded.scene) setActivePlayerIndex(loaded.scene.activePlayerIndex);
+
+    // Restore theme — fall back to default if the persisted name is unknown
+    if (loaded.ui) {
+      if (BUILTIN_DEFINITIONS[loaded.ui.styleName]) {
+        setThemeName(loaded.ui.styleName);
+      }
+      setVariant(loaded.ui.variant);
+      if (loaded.ui.modelines) setModelines(loaded.ui.modelines);
+    }
+
+    // Mark hydration complete. All state setters above are in this
+    // synchronous block, so React's batched effects will see the
+    // correct values when they fire after this function yields.
+    hydratedRef.current = true;
+
+    // Resume interrupted cascade if present
+    const pendingOp = await persister.loadPendingOp();
+    if (pendingOp && pendingOp.step && pendingOp.step !== "done") {
+      await engine.resumePendingTransition(pendingOp);
+    }
+
+    const recap = await engine.resumeSession();
+
+    // Load display log tail for TUI — shows the player what happened before
+    const historyLines = await loadDisplayHistory(persister, scene);
+
+    setNarrativeLines([...historyLines, { kind: "system", text: `Welcome back to ${config.name}.` }, { kind: "dm", text: "" }]);
+
+    // Only show the recap modal when there's a session recap available
+    // (i.e. a full session boundary happened). The player has visual
+    // continuity via the display log and initiates the first turn.
+    if (recap) {
+      setActiveModal({ kind: "recap", lines: recap.split("\n") });
+    }
+    setPhase("playing");
+  }
+
+  /** Start a brand-new campaign: show welcome, prompt DM to set the scene. */
+  async function startNewGame(
+    engine: GameEngine,
+    config: CampaignConfig,
+    gs: GameState,
+  ): Promise<void> {
+    hydratedRef.current = true;
+    setNarrativeLines([{ kind: "system", text: `Welcome to ${config.name}.` }, { kind: "dm", text: "" }, { kind: "system", text: "The story begins..." }]);
+    setPhase("playing");
+
+    const activePlayer = getActivePlayer(gs);
+    const openingParts = ["[Session begins. Set the scene."];
+    if (config.premise) openingParts.push(`Campaign premise: ${config.premise}`);
+    const pc = config.players[0];
+    if (pc) openingParts.push(`The player character is ${pc.character}.`);
+    await engine.processInput(activePlayer.characterName, openingParts.join(" ") + "]", { skipTranscript: true });
+  }
 
   // --- Finalize setup result into a running campaign ---
   const finalizeSetup = useCallback(async (result: SetupResult) => {
@@ -503,13 +527,6 @@ export default function App({ shutdownRef }: AppProps) {
 
     process.exit(0);
   }, [shutdownRef]);
-
-  // --- Recap dismissed: player takes first turn (recap replaces DM opening narration) ---
-  const handleRecapDismissed = useCallback(() => {
-    pendingResumeRef.current = null;
-    // Engine is already in waiting_input from resumeSession().
-    // The recap served as the session-opening narration, so the player goes first.
-  }, []);
 
   // --- End Session: full session-end housekeeping then exit ---
   const doEndSession = useCallback(async () => {
@@ -620,7 +637,6 @@ export default function App({ shutdownRef }: AppProps) {
     dispatchTuiCommand,
     onShutdown: doSaveAndExit,
     onEndSession: doEndSession,
-    onRecapDismissed: handleRecapDismissed,
   };
 
   return (
