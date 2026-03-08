@@ -22,7 +22,7 @@ function mockFileIO(files: Record<string, string> = {}): ScribeFileIO {
       store[norm(path)] = content;
     }),
     exists: vi.fn(async (path: string) => norm(path) in store),
-    readdir: vi.fn(async (path: string) => {
+    listDir: vi.fn(async (path: string) => {
       const prefix = norm(path.endsWith("/") ? path : path + "/");
       const entries = new Set<string>();
       for (const key of Object.keys(store)) {

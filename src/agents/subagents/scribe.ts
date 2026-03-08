@@ -44,7 +44,7 @@ export interface ScribeFileIO {
   readFile(path: string): Promise<string>;
   writeFile(path: string, content: string): Promise<void>;
   exists(path: string): Promise<boolean>;
-  readdir(path: string): Promise<string[]>;
+  listDir(path: string): Promise<string[]>;
   mkdir(path: string): Promise<void>;
 }
 
@@ -169,7 +169,7 @@ export function buildScribeToolHandler(
         const entityType = input.entity_type as string;
         const dir = entityDir(entityType);
         try {
-          const entries = await fileIO.readdir(dir);
+          const entries = await fileIO.listDir(dir);
           const names = entries
             .filter(e => e.endsWith(".md"))
             .map(e => e.replace(/\.md$/, ""));
