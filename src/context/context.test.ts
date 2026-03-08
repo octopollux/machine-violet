@@ -211,6 +211,78 @@ describe("ConversationManager", () => {
     mgr.addExchange(userMsg("Hello world"), assistantMsg("Hi there"));
     expect(mgr.getEstimatedTokens()).toBeGreaterThan(0);
   });
+
+  it("getExchanges returns current exchanges", () => {
+    const mgr = new ConversationManager(defaultContextConfig);
+    mgr.addExchange(userMsg("Hello"), assistantMsg("Hi"));
+    mgr.addExchange(userMsg("Attack"), assistantMsg("You swing"));
+
+    const exchanges = mgr.getExchanges();
+    expect(exchanges).toHaveLength(2);
+    expect(exchanges[0].user.content).toBe("Hello");
+    expect(exchanges[1].assistant.content).toBe("You swing");
+  });
+
+  it("seedExchanges restores conversation with recomputed tokens", () => {
+    const mgr = new ConversationManager(defaultContextConfig);
+    mgr.seedExchanges([
+      {
+        user: userMsg("Search the room"),
+        assistant: assistantMsg("You find a chest."),
+        toolResults: [],
+        estimatedTokens: 0, // intentionally wrong — should be recomputed
+        stubbed: false,
+      },
+    ]);
+
+    expect(mgr.size).toBe(1);
+    expect(mgr.getEstimatedTokens()).toBeGreaterThan(0);
+    const messages = mgr.getMessages();
+    expect(messages).toHaveLength(2);
+    expect(messages[0].content).toBe("Search the room");
+    expect(messages[1].content).toBe("You find a chest.");
+  });
+
+  it("seedExchanges preserves tool results and stubbed state", () => {
+    const mgr = new ConversationManager(defaultContextConfig);
+    mgr.seedExchanges([
+      {
+        user: userMsg("Roll"),
+        assistant: assistantMsg("You rolled 15"),
+        toolResults: [toolResultMsg("toolu_1", "[stub] 1d20: [15]")],
+        estimatedTokens: 0,
+        stubbed: true,
+      },
+    ]);
+
+    const messages = mgr.getMessages();
+    expect(messages).toHaveLength(3);
+    expect(messages[1].role).toBe("user"); // tool_result
+  });
+
+  it("seeded exchanges participate in normal retention", () => {
+    const config: ContextConfig = { ...defaultContextConfig, retention_exchanges: 2 };
+    const mgr = new ConversationManager(config);
+
+    // Seed one exchange
+    mgr.seedExchanges([
+      {
+        user: userMsg("Old input"),
+        assistant: assistantMsg("Old response"),
+        toolResults: [],
+        estimatedTokens: 0,
+        stubbed: false,
+      },
+    ]);
+
+    // Add two more — should drop the seeded one
+    mgr.addExchange(userMsg("New 1"), assistantMsg("Resp 1"));
+    const dropped = mgr.addExchange(userMsg("New 2"), assistantMsg("Resp 2"));
+
+    expect(mgr.size).toBe(2);
+    expect(dropped).not.toBeNull();
+    expect(dropped!.exchange.user.content).toBe("Old input");
+  });
 });
 
 describe("buildCachedPrefix", () => {

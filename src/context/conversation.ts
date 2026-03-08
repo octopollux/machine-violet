@@ -77,6 +77,27 @@ export class ConversationManager {
     this.exchanges = [];
   }
 
+  /** Get raw exchanges for persistence. */
+  getExchanges(): ConversationExchange[] {
+    return this.exchanges;
+  }
+
+  /**
+   * Seed the conversation with previously-persisted exchanges.
+   * Token estimates are recomputed; retention is NOT enforced
+   * (the exchanges already survived retention when they were live).
+   */
+  seedExchanges(exchanges: ConversationExchange[]): void {
+    for (const ex of exchanges) {
+      // Recompute token estimates (they may have been serialized wrong)
+      ex.estimatedTokens =
+        estimateMessageTokens(ex.user) +
+        estimateMessageTokens(ex.assistant) +
+        ex.toolResults.reduce((sum, tr) => sum + estimateMessageTokens(tr), 0);
+      this.exchanges.push(ex);
+    }
+  }
+
   /** Replace tool results older than stub_after with one-line stubs */
   private stubOldToolResults(): void {
     const stubAfter = this.config.tool_result_stub_after;

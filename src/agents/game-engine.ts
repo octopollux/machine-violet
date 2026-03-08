@@ -227,6 +227,7 @@ export class GameEngine {
       playerReads: scene.playerReads,
       activePlayerIndex: this.gameState.activePlayerIndex,
     });
+    this.persister.persistConversation(this.conversation.getExchanges());
   }
 
   /** Get current engine state */
@@ -252,6 +253,11 @@ export class GameEngine {
   /** Get campaign repo (for shutdown use) */
   getRepo(): CampaignRepo | null {
     return this.repo;
+  }
+
+  /** Seed the conversation with previously-persisted exchanges (for resume). */
+  seedConversation(exchanges: import("../context/conversation.js").ConversationExchange[]): void {
+    this.conversation.seedExchanges(exchanges);
   }
 
   /** Update the UI state section of the DM's prefix (called from TUI layer). */
@@ -454,15 +460,18 @@ export class GameEngine {
           playerReads: scene.playerReads,
           activePlayerIndex: this.gameState.activePlayerIndex,
         });
+        this.persister.persistConversation(this.conversation.getExchanges());
       }
 
       // Track exchange for git auto-commit
       await this.repo?.trackExchange();
 
-      // Handle dropped exchange
+      // Handle dropped exchange — update precis, then re-persist scene
+      // so the precis written to disk includes the just-dropped content.
       if (dropped) {
         this.callbacks.onExchangeDropped();
         await this.handleDroppedExchange(dropped);
+        this.persistCurrentScene();
       }
 
       // Process TUI commands — intercept engine commands
