@@ -219,24 +219,16 @@ export default function App({ shutdownRef }: AppProps) {
   // Auto-sync variantRef (needed by dispatchTuiCommand's enter_ooc to save previous variant)
   useEffect(() => { variantRef.current = variant; }, [variant]);
 
-  // Legacy setStyle bridge — useGameCallbacks dispatches set_ui_style with style name.
-  // Map old style names to new theme names and update themeName.
-  const setStyle = useCallback((s: { name: string }) => {
-    // Old style names map directly to theme names
-    if (BUILTIN_DEFINITIONS[s.name]) {
-      setThemeName(s.name);
-    }
-  }, []);
-
-  // Persist UI when theme/variant/modelines change (skip until hydration complete)
+  // Persist UI when theme/variant/keyColor/modelines change (skip until hydration complete)
   useEffect(() => {
     if (!hydratedRef.current) return;
     persisterRef.current?.persistUI({
       styleName: themeName,
       variant,
+      keyColor: keyColor !== DEFAULT_KEY_COLOR ? keyColor : undefined,
       modelines: Object.keys(modelines).length > 0 ? modelines : undefined,
     });
-  }, [themeName, variant, modelines]);
+  }, [themeName, variant, keyColor, modelines]);
 
   // Sync UI state to engine for DM prefix
   useEffect(() => {
@@ -316,7 +308,7 @@ export default function App({ shutdownRef }: AppProps) {
   // --- Engine callbacks (extracted hook) ---
   const { buildCallbacks, dispatchTuiCommand } = useGameCallbacks({
     setNarrativeLines, setEngineState, setErrorMsg, setModelines,
-    setResources, setStyle, setVariant, setThemeName, setKeyColor,
+    setResources, setVariant, setThemeName, setKeyColor,
     setActiveModal, setChoiceIndex,
     setActiveSession, setRetryOverlay,
     gameStateRef, clientRef, engineRef, activeModalRef, variantRef, previousVariantRef,
@@ -424,6 +416,7 @@ export default function App({ shutdownRef }: AppProps) {
         setThemeName(loaded.ui.styleName);
       }
       setVariant(loaded.ui.variant);
+      if (loaded.ui.keyColor) setKeyColor(loaded.ui.keyColor);
       if (loaded.ui.modelines) setModelines(loaded.ui.modelines);
     }
 

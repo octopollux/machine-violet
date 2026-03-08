@@ -20,6 +20,7 @@ export interface SlashCommandContext {
   setVariant: (v: StyleVariant) => void;
   previousVariant: StyleVariant;
   setPreviousVariant: (v: StyleVariant) => void;
+  dispatchTuiCommand?: (cmd: import("../agents/agent-loop.js").TuiCommand) => void;
 }
 
 export interface SlashCommand {
@@ -166,6 +167,7 @@ function enterDevMode(ctx: SlashCommandContext): void {
     fileIO: ctx.engine.getSceneManager().getFileIO(),
     sceneManager: ctx.engine.getSceneManager(),
     repo: ctx.engine.getRepo() ?? undefined,
+    onTuiCommand: ctx.dispatchTuiCommand,
   }));
   ctx.setVariant("dev");
   ctx.appendLine({ kind: "system", text: "[Dev Mode — type to inspect, ESC to exit]" });

@@ -15,3 +15,7 @@ export type { GeneratedChoices } from "./choice-generator.js";
 export { promoteCharacter } from "./character-promotion.js";
 export type { PromotionInput, PromotionResult } from "./character-promotion.js";
 export { generateNarrativeRecap } from "./narrative-recap.js";
+export { styleTheme } from "./theme-styler.js";
+export type { ThemeStylerResult } from "./theme-styler.js";
+export { runScribe, buildScribeToolHandler } from "./scribe.js";
+export type { ScribeInput, ScribeResult, ScribeUpdate, ScribeFileIO } from "./scribe.js";

@@ -226,7 +226,7 @@ The campaign genre sets a default theme during game init. Each theme has **varia
 | `levelup` | During character advancement subagent |
 | `dev` | During dev mode (developer console) |
 
-The DM switches variants via `set_theme` or `set_ui_style` tool calls, or the engine switches automatically on mode changes (combat start, OOC entry, etc.).
+The DM switches variants via `style_scene` tool calls, or the engine switches automatically on mode changes (combat start, OOC entry, etc.).
 
 ### Theme resolution
 
@@ -248,7 +248,7 @@ An optional `keyColor` (hex) shifts the swatch hue to center on that color, allo
 
 ### Location-scoped themes
 
-The DM can persist a theme + key color to a location entity's front matter via the `set_theme` tool with `save_to_location: true`. On scene transition to that location, the theme auto-applies. Front matter fields:
+The DM can persist a theme + key color to a location entity's front matter via the `style_scene` tool with `save_to_location: true`. On scene transition to that location, the theme auto-applies. Front matter fields:
 
 ```
 **Theme:** gothic
@@ -399,15 +399,11 @@ The DM controls the UI through these tools:
 update_modeline({ text: "HP: 42/42 | Loc: The Shattered Hall | Conditions: Poisoned" })
 ```
 
-**`set_theme`** — Switch the UI theme, key color, and/or variant. Optionally persist to a location entity. Preferred over `set_ui_style` for full theme changes.
+**`style_scene`** — Style the UI to match the scene mood. Use `description` for natural-language requests (a Haiku stylist subagent picks theme, colors, and effects). Use `key_color` for direct hex-color changes. Optionally persist to a location entity.
 ```
-set_theme({ theme: "gothic", key_color: "#8844aa" })
-set_theme({ theme: "arcane", variant: "combat", save_to_location: true, location: "the-shattered-hall" })
-```
-
-**`set_ui_style`** — Switch variant only (combat/exploration/ooc/levelup/dev). Still works for quick variant-only changes, but `set_theme` is preferred for full theme changes.
-```
-set_ui_style({ variant: "combat" })
+style_scene({ description: "cyberpunk neon" })
+style_scene({ key_color: "#8844aa", save_to_location: true, location: "the-shattered-hall" })
+style_scene({ description: "haunted forest", variant: "exploration" })
 ```
 
 **`set_display_resources`** — Update which resources appear in the top frame for a character.

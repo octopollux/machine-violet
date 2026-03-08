@@ -35,6 +35,7 @@ export interface PersistedSceneState {
 export interface PersistedUIState {
   styleName: string;
   variant: StyleVariant;
+  keyColor?: string;
   modelines?: Record<string, string>;
 }
 

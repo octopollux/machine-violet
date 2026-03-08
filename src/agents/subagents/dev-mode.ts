@@ -16,6 +16,8 @@ import { queryCommitLog, performRollback } from "../../tools/git/index.js";
 import { ToolRegistry } from "../tool-registry.js";
 import { findReferences, renameEntity, mergeEntities, resolveDeadLinks } from "../../tools/campaign-ops/index.js";
 import type { ModeSession } from "../../tui/game-context.js";
+import type { TuiCommand } from "../agent-loop.js";
+import { styleTheme } from "./theme-styler.js";
 
 /**
  * Result from a Dev Mode exchange.
@@ -267,6 +269,7 @@ export function buildDevToolHandler(
   client?: Anthropic,
   sceneManager?: SceneManager,
   repo?: CampaignRepo,
+  onTuiCommand?: (cmd: TuiCommand) => void,
 ): (name: string, input: Record<string, unknown>) => Promise<{ content: string; is_error?: boolean }> {
   const root = gameState.campaignRoot;
   const dmRegistry = new ToolRegistry();
@@ -409,6 +412,31 @@ export function buildDevToolHandler(
           return { content: JSON.stringify(resolveResult, null, 2) };
         }
 
+        case "style_scene": {
+          // Handle style_scene with subagent support
+          const description = input.description as string | undefined;
+          if (description && client) {
+            const stylerResult = await styleTheme(client, description);
+            if (stylerResult.command && onTuiCommand) {
+              onTuiCommand(stylerResult.command);
+              return { content: `Styled: theme=${stylerResult.command.theme ?? "(unchanged)"} key_color=${stylerResult.command.key_color ?? "(unchanged)"}` };
+            }
+            if (stylerResult.command) {
+              return { content: JSON.stringify(stylerResult.command, null, 2) };
+            }
+            return { content: "Theme styler could not interpret the request.", is_error: true };
+          }
+          // Direct key_color/variant — dispatch as set_theme TUI command
+          const themeCmd: TuiCommand = { type: "set_theme" };
+          if (input.key_color) themeCmd.key_color = input.key_color as string;
+          if (input.variant) themeCmd.variant = input.variant as string;
+          if (onTuiCommand && (themeCmd.key_color || themeCmd.variant)) {
+            onTuiCommand(themeCmd);
+            return { content: `Applied: ${themeCmd.key_color ? `key_color=${themeCmd.key_color}` : ""}${themeCmd.variant ? ` variant=${themeCmd.variant}` : ""}`.trim() };
+          }
+          return { content: JSON.stringify(themeCmd, null, 2) };
+        }
+
         default: {
           // Fall through to DM tool registry
           if (!dmRegistry.has(name)) {
@@ -427,6 +455,11 @@ export function buildDevToolHandler(
                 const rb = await performRollback(repo, parsed.target as string, root, fileIO);
                 console.log(`\nRolled back to: ${rb.summary}\nRelaunch the game to resume from this point.\n`);
                 process.exit(0);
+              }
+              // Forward TUI commands when callback is available
+              if (onTuiCommand && parsed.type) {
+                onTuiCommand(parsed as TuiCommand);
+                return { content: `Applied: ${name}` };
               }
             } catch { /* not JSON — pass through */ }
           }
@@ -506,6 +539,7 @@ export async function enterDevMode(
     fileIO?: FileIO;
     sceneManager?: SceneManager;
     repo?: CampaignRepo;
+    onTuiCommand?: (cmd: TuiCommand) => void;
   },
   onStream?: SubagentStreamCallback,
 ): Promise<DevModeResult> {
@@ -517,7 +551,7 @@ export async function enterDevMode(
   const hasTools = !!(options.gameState && options.fileIO);
   const tools = hasTools ? buildDevTools() : undefined;
   const toolHandler = hasTools
-    ? buildDevToolHandler(options.gameState as NonNullable<typeof options.gameState>, options.fileIO as NonNullable<typeof options.fileIO>, client, options.sceneManager, options.repo)
+    ? buildDevToolHandler(options.gameState as NonNullable<typeof options.gameState>, options.fileIO as NonNullable<typeof options.fileIO>, client, options.sceneManager, options.repo, options.onTuiCommand)
     : undefined;
 
   const result = await spawnSubagent(
@@ -628,6 +662,7 @@ export function createDevSession(
     fileIO?: FileIO;
     sceneManager?: SceneManager;
     repo?: CampaignRepo;
+    onTuiCommand?: (cmd: TuiCommand) => void;
   },
 ): ModeSession {
   return {

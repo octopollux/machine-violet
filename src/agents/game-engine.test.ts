@@ -19,7 +19,17 @@ vi.mock("./subagents/ai-player.js", () => ({
   })),
 }));
 
+vi.mock("./subagents/scribe.js", () => ({
+  runScribe: vi.fn(async () => ({
+    summary: "Created [[Grimjaw]] (character, private)",
+    created: ["/tmp/test-campaign/characters/grimjaw.md"],
+    updated: [],
+    usage: { inputTokens: 30, outputTokens: 15, cacheReadTokens: 0, cacheCreationTokens: 0 },
+  })),
+}));
+
 import { aiPlayerTurn } from "./subagents/ai-player.js";
+import { runScribe } from "./subagents/scribe.js";
 
 function mockUsage(): Anthropic.Usage {
   return { input_tokens: 100, output_tokens: 50, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: null, inference_geo: null, server_tool_use: null, service_tier: null };
@@ -211,7 +221,7 @@ describe("GameEngine", () => {
 
   it("handles tool calls and collects TUI commands", async () => {
     const client = mockClient([
-      ...toolAndTextMessages("set_ui_style", { variant: "combat" }, "Combat begins!"),
+      ...toolAndTextMessages("style_scene", { key_color: "#cc4444" }, "The mood shifts."),
     ]);
     const { callbacks, log } = mockCallbacks();
 
@@ -228,9 +238,9 @@ describe("GameEngine", () => {
     await engine.processInput("Aldric", "I attack!");
 
     expect(log.tuiCommands).toHaveLength(1);
-    expect(log.tuiCommands[0].type).toBe("set_ui_style");
-    expect(log.toolStarts).toContain("set_ui_style");
-    expect(log.toolEnds).toContain("set_ui_style");
+    expect(log.tuiCommands[0].type).toBe("set_theme");
+    expect(log.toolStarts).toContain("style_scene");
+    expect(log.toolEnds).toContain("style_scene");
   });
 
   it("tracks session usage", async () => {
@@ -526,39 +536,15 @@ describe("GameEngine", () => {
     expect(log.tuiCommands.filter((c) => c.type === "context_refresh")).toHaveLength(0);
   });
 
-  it("intercepts validate TUI command (not forwarded to TUI)", async () => {
-    const client = mockClient([
-      ...toolAndTextMessages("validate", {}, "Validation complete."),
-    ]);
-    const { callbacks, log } = mockCallbacks();
-    const fio = mockFileIO();
-    // Provide config.json so validation runs
-    files["/tmp/test-campaign/config.json"] = '{"name":"Test"}';
-
-    const engine = new GameEngine({
-      client,
-      gameState: mockState(),
-      scene: mockScene(),
-      sessionState: mockSessionState(),
-      fileIO: fio,
-      callbacks,
-      model: "claude-haiku-4-5-20251001",
-    });
-
-    await engine.processInput("Aldric", "Run validation.");
-
-    expect(log.tuiCommands.filter((c) => c.type === "validate")).toHaveLength(0);
-    // Should have emitted narrative delta with validation results
-    expect(log.narrativeDeltas.some((d) => d.includes("Validation"))).toBe(true);
-  });
 });
 
-describe("GameEngine Worldbuilding Entity I/O", () => {
-  it("create_entity writes file and does NOT forward to TUI", async () => {
+describe("GameEngine Scribe Integration", () => {
+  it("scribe tool spawns subagent and logs summary", async () => {
     const client = mockClient([
-      ...toolAndTextMessages("create_entity", {
-        entity_type: "character",
-        name: "Grimjaw",
+      ...toolAndTextMessages("scribe", {
+        updates: [
+          { visibility: "private", content: "Grimjaw is a scarred orc chieftain" },
+        ],
       }, "You see a scarred orc."),
     ]);
     const { callbacks, log } = mockCallbacks();
@@ -578,50 +564,21 @@ describe("GameEngine Worldbuilding Entity I/O", () => {
 
     await engine.processInput("Aldric", "I look at the orc.");
 
-    // Should NOT be forwarded to TUI
-    expect(log.tuiCommands.filter((c) => c.type === "create_entity")).toHaveLength(0);
-    // File should have been written
-    expect(fio.writeFile).toHaveBeenCalled();
-    // Dev log should confirm write
-    expect(devLogs.some((d) => d.includes("create_entity") && d.includes("wrote"))).toBe(true);
+    // Should NOT forward scribe command to TUI
+    expect(log.tuiCommands.filter((c) => c.type === "scribe")).toHaveLength(0);
+    // runScribe should have been called
+    expect(runScribe).toHaveBeenCalled();
+    // Dev log should show scribe summary
+    expect(devLogs.some((d) => d.includes("scribe"))).toBe(true);
   });
 
-  it("create_entity skips existing files", async () => {
-    // Pre-populate the file
-    files[norm("/tmp/test-campaign/characters/grimjaw.md")] = "# Grimjaw\n";
-
+  it("scribe notifies scene manager about created entities", async () => {
     const client = mockClient([
-      ...toolAndTextMessages("create_entity", {
-        entity_type: "character",
-        name: "Grimjaw",
-      }, "The orc is here."),
-    ]);
-    const { callbacks } = mockCallbacks();
-    const fio = mockFileIO();
-    const devLogs: string[] = [];
-    callbacks.onDevLog = (msg) => devLogs.push(msg);
-
-    const engine = new GameEngine({
-      client,
-      gameState: mockState(),
-      scene: mockScene(),
-      sessionState: mockSessionState(),
-      fileIO: fio,
-      callbacks,
-      model: "claude-haiku-4-5-20251001",
-    });
-
-    await engine.processInput("Aldric", "Look again.");
-
-    expect(devLogs.some((d) => d.includes("already exists"))).toBe(true);
-  });
-
-  it("create_entity for location creates parent directory", async () => {
-    const client = mockClient([
-      ...toolAndTextMessages("create_entity", {
-        entity_type: "location",
-        name: "Iron Forge",
-      }, "You arrive."),
+      ...toolAndTextMessages("scribe", {
+        updates: [
+          { visibility: "private", content: "Grimjaw is a scarred orc" },
+        ],
+      }, "You see an orc."),
     ]);
     const { callbacks } = mockCallbacks();
     const fio = mockFileIO();
@@ -636,178 +593,13 @@ describe("GameEngine Worldbuilding Entity I/O", () => {
       model: "claude-haiku-4-5-20251001",
     });
 
-    await engine.processInput("Aldric", "Travel there.");
+    await engine.processInput("Aldric", "I look around.");
 
-    expect(fio.mkdir).toHaveBeenCalled();
-    const mkdirCalls = vi.mocked(fio.mkdir).mock.calls.map((c) => c[0]);
-    expect(mkdirCalls.some((p) => p.includes("locations") && p.includes("iron-forge"))).toBe(true);
-  });
-
-  it("update_entity reads, merges front matter, appends body, adds changelog, writes back", async () => {
-    // Pre-populate entity file
-    files[norm("/tmp/test-campaign/characters/grimjaw.md")] =
-      "# Grimjaw\n\n**Type:** character\n**Disposition:** hostile\n\nA scarred orc.\n";
-
-    const client = mockClient([
-      ...toolAndTextMessages("update_entity", {
-        entity_type: "character",
-        name: "Grimjaw",
-        front_matter_updates: { disposition: "friendly" },
-        body_append: "Now an ally.",
-        changelog_entry: "Befriended",
-      }, "The orc nods."),
-    ]);
-    const { callbacks } = mockCallbacks();
-    const fio = mockFileIO();
-    const devLogs: string[] = [];
-    callbacks.onDevLog = (msg) => devLogs.push(msg);
-
-    const engine = new GameEngine({
-      client,
-      gameState: mockState(),
-      scene: mockScene(),
-      sessionState: mockSessionState(),
-      fileIO: fio,
-      callbacks,
-      model: "claude-haiku-4-5-20251001",
-    });
-
-    await engine.processInput("Aldric", "I befriend the orc.");
-
-    // Check updated content
-    const written = files[norm("/tmp/test-campaign/characters/grimjaw.md")];
-    expect(written).toContain("friendly");
-    expect(written).toContain("Now an ally.");
-    expect(written).toContain("Changelog");
-    expect(written).toContain("Befriended");
-    expect(devLogs.some((d) => d.includes("update_entity") && d.includes("updated"))).toBe(true);
-  });
-
-  it("create_entity notifies sceneManager entity index", async () => {
-    const client = mockClient([
-      ...toolAndTextMessages("create_entity", {
-        entity_type: "character",
-        name: "Grimjaw",
-        file_path: "/tmp/test-campaign/characters/grimjaw.md",
-        content: "# Grimjaw\n\n**Type:** character\n\nA scarred orc.\n",
-      }, "You see a scarred orc."),
-    ]);
-    const { callbacks } = mockCallbacks();
-    const fio = mockFileIO();
-
-    const engine = new GameEngine({
-      client,
-      gameState: mockState(),
-      scene: mockScene(),
-      sessionState: mockSessionState(),
-      fileIO: fio,
-      callbacks,
-      model: "claude-haiku-4-5-20251001",
-    });
-
-    await engine.processInput("Aldric", "I look at the orc.");
-
-    // The scene manager's entity index should now contain Grimjaw
-    // We can verify by inspecting the volatile context (Tier 3)
+    // The mock runScribe returns created: ["/tmp/test-campaign/characters/grimjaw.md"]
     const sm = engine.getSceneManager();
     const { volatile } = sm.getSystemPrompt();
     expect(volatile).toContain("Scene Entities");
-    expect(volatile).toContain("Grimjaw");
-  });
-
-  it("update_entity notifies sceneManager with aliases", async () => {
-    files[norm("/tmp/test-campaign/characters/grimjaw.md")] =
-      "# Grimjaw\n\n**Type:** character\n**Additional Names:** Captain Grimjaw\n\nA scarred orc.\n";
-
-    const client = mockClient([
-      ...toolAndTextMessages("update_entity", {
-        entity_type: "character",
-        name: "Grimjaw",
-        file_path: "/tmp/test-campaign/characters/grimjaw.md",
-        body_append: "Now an ally.",
-      }, "The orc nods."),
-    ]);
-    const { callbacks } = mockCallbacks();
-    const fio = mockFileIO();
-
-    const engine = new GameEngine({
-      client,
-      gameState: mockState(),
-      scene: mockScene(),
-      sessionState: mockSessionState(),
-      fileIO: fio,
-      callbacks,
-      model: "claude-haiku-4-5-20251001",
-    });
-
-    await engine.processInput("Aldric", "I befriend the orc.");
-
-    const sm = engine.getSceneManager();
-    const { volatile } = sm.getSystemPrompt();
-    expect(volatile).toContain("Scene Entities");
-    expect(volatile).toContain("Grimjaw (also: Captain Grimjaw)");
-  });
-
-  it("update_entity handles additional_names passed as array (#15)", async () => {
-    files[norm("/tmp/test-campaign/characters/grimjaw.md")] =
-      "# Grimjaw\n\n**Type:** character\n\nA scarred orc.\n";
-
-    const client = mockClient([
-      ...toolAndTextMessages("update_entity", {
-        entity_type: "character",
-        name: "Grimjaw",
-        file_path: "/tmp/test-campaign/characters/grimjaw.md",
-        front_matter_updates: { additional_names: ["Captain Grimjaw", "The Scarred"] },
-        body_append: "Now an ally.",
-      }, "The orc nods."),
-    ]);
-    const { callbacks } = mockCallbacks();
-    const fio = mockFileIO();
-
-    const engine = new GameEngine({
-      client,
-      gameState: mockState(),
-      scene: mockScene(),
-      sessionState: mockSessionState(),
-      fileIO: fio,
-      callbacks,
-      model: "claude-haiku-4-5-20251001",
-    });
-
-    await engine.processInput("Aldric", "I befriend the orc.");
-
-    const sm = engine.getSceneManager();
-    const { volatile } = sm.getSystemPrompt();
-    expect(volatile).toContain("Grimjaw (also: Captain Grimjaw, The Scarred)");
-  });
-
-  it("update_entity silently handles missing files", async () => {
-    const client = mockClient([
-      ...toolAndTextMessages("update_entity", {
-        entity_type: "character",
-        name: "Nobody",
-        body_append: "Some text",
-      }, "Nothing happens."),
-    ]);
-    const { callbacks, log } = mockCallbacks();
-    const fio = mockFileIO();
-    const devLogs: string[] = [];
-    callbacks.onDevLog = (msg) => devLogs.push(msg);
-
-    const engine = new GameEngine({
-      client,
-      gameState: mockState(),
-      scene: mockScene(),
-      sessionState: mockSessionState(),
-      fileIO: fio,
-      callbacks,
-      model: "claude-haiku-4-5-20251001",
-    });
-
-    await engine.processInput("Aldric", "Update nobody.");
-
-    expect(devLogs.some((d) => d.includes("not found"))).toBe(true);
-    expect(log.errors).toHaveLength(0);
+    expect(volatile).toContain("grimjaw");
   });
 });
 
@@ -1189,7 +981,7 @@ describe("GameEngine Behavioral Reminder", () => {
       textMessage("One."),            // turn 1 → stream[0]
       textMessage("Two."),            // turn 2 → stream[1]
       textMessage("Three."),          // turn 3 → stream[2]
-      ...toolAndTextMessages("set_ui_style", { variant: "default" }, "You roll a 14."), // turn 4 → stream[3,4]
+      ...toolAndTextMessages("style_scene", { key_color: "#888888" }, "You roll a 14."), // turn 4 → stream[3,4]
       textMessage("Five."),           // turn 5 → stream[5]
     ]);
     const { callbacks } = mockCallbacks();

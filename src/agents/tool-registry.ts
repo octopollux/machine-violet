@@ -52,9 +52,6 @@ import {
   getCurrentTurn,
   modifyInitiative,
 } from "../tools/combat/index.js";
-import { campaignPaths, serializeEntity } from "../tools/filesystem/index.js";
-import type { EntityFrontMatter } from "../types/entities.js";
-import { slugify } from "./world-builder.js";
 
 // --- Helpers ---
 
@@ -671,37 +668,21 @@ const TOOL_DEFS: RegisteredTool[] = [
   },
   {
     definition: {
-      name: "set_ui_style",
-      description: "Switch frame style or variant (combat/exploration/ooc/levelup).",
+      name: "style_scene",
+      description: "Style the UI to match the current scene's mood. Use `description` for natural-language requests (\"make it darker\", \"cyberpunk neon\", \"haunted forest\") — a stylist agent picks the right theme, colors, and effects. Use `key_color` for simple hex-color changes. Use `variant` for mechanical state changes (combat/exploration).",
       input_schema: {
         type: "object" as const,
         properties: {
-          style: { type: "string", description: "Style name (gothic, arcane, etc.)" },
+          description: { type: "string", description: "Natural-language mood/aesthetic request (e.g. 'cyberpunk neon', 'dark forest', 'make it warmer')" },
+          key_color: { type: "string", description: "Direct hex color override (e.g. #8844aa) — skips the stylist agent" },
           variant: { type: "string", enum: ["exploration", "combat", "ooc", "levelup"] },
-        },
-      },
-    },
-    handler: (_state, input) => {
-      return ok(JSON.stringify({ type: "set_ui_style", ...input }));
-    },
-  },
-  {
-    definition: {
-      name: "set_theme",
-      description: "Switch the UI theme, key color, and/or variant. Optionally persist the theme to a location entity.",
-      input_schema: {
-        type: "object" as const,
-        properties: {
-          theme: { type: "string", description: "Theme name (gothic, arcane, terminal, clean)" },
-          key_color: { type: "string", description: "Hex color for swatch generation (e.g. #8844aa)" },
-          variant: { type: "string", enum: ["exploration", "combat", "ooc", "levelup"] },
-          save_to_location: { type: "boolean", description: "If true, persist theme + key_color to the named location entity's front matter" },
+          save_to_location: { type: "boolean", description: "If true, persist resulting theme + key_color to the named location entity" },
           location: { type: "string", description: "Location slug/name to save theme to (required when save_to_location is true)" },
         },
       },
     },
     handler: (_state, input) => {
-      return ok(JSON.stringify({ type: "set_theme", ...input }));
+      return ok(JSON.stringify({ type: "style_scene", ...input }));
     },
   },
   {
@@ -882,122 +863,41 @@ const TOOL_DEFS: RegisteredTool[] = [
       return ok(JSON.stringify({ type: "rollback", target: input.target }));
     },
   },
-  {
-    definition: {
-      name: "validate",
-      description: "Run the validation suite on the campaign. Checks entity files, wikilinks, maps, clocks, and config integrity. Returns a list of issues.",
-      input_schema: { type: "object" as const, properties: {} },
-    },
-    handler: (_state) => {
-      return ok(JSON.stringify({ type: "validate" }));
-    },
-  },
-
   // ====== WORLDBUILDING ======
   {
     definition: {
-      name: "create_entity",
-      description: "Create a new entity file (NPC, location, faction, or lore). Silent DM note — not narrated to players.",
+      name: "scribe",
+      description: "Record game state changes — entity creation, updates, character sheet changes, changelogs. Batch multiple updates together. Each update is tagged private (DM-only: NPC secrets, plot notes, faction intel) or player-facing (PC sheets, public info the player can see). A subagent handles all entity file mechanics.",
       input_schema: {
         type: "object" as const,
         properties: {
-          entity_type: { type: "string", enum: ["character", "location", "faction", "lore"], description: "Entity type" },
-          name: { type: "string", description: "Entity name" },
-          front_matter: { type: "object", description: "Front matter key-value pairs (e.g. disposition, class)" },
-          body: { type: "string", description: "Markdown body content" },
+          updates: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                visibility: { type: "string", enum: ["private", "player-facing"], description: "Whether this info is DM-only or visible to players" },
+                content: { type: "string", description: "Natural language description of what changed" },
+              },
+              required: ["visibility", "content"],
+            },
+            description: "List of updates to process. Batch as many as possible into one call.",
+          },
         },
-        required: ["entity_type", "name"],
+        required: ["updates"],
       },
     },
-    handler: (state, input) => {
-      const entityType = input.entity_type as string;
-      const name = input.name as string;
-
-      if (!["character", "location", "faction", "lore"].includes(entityType)) {
-        return err(`Invalid entity_type: ${entityType}`);
+    handler: (_state, input) => {
+      const updates = input.updates as { visibility: string; content: string }[];
+      if (!updates || updates.length === 0) {
+        return err("At least one update is required.");
       }
-      if (!name || !name.trim()) {
-        return err("Entity name is required.");
+      for (const u of updates) {
+        if (!u.visibility || !u.content) {
+          return err("Each update must have visibility and content.");
+        }
       }
-
-      const slug = slugify(name);
-      const paths = campaignPaths(state.campaignRoot);
-      const pathFn = entityType === "character" ? paths.character
-        : entityType === "location" ? paths.location
-        : entityType === "faction" ? paths.faction
-        : paths.lore;
-      const filePath = pathFn(slug);
-
-      const fm: EntityFrontMatter = {
-        type: entityType,
-        ...(input.front_matter as Record<string, unknown> ?? {}),
-      };
-      const body = (input.body as string) ?? "";
-      const content = serializeEntity(name, fm, body, []);
-
-      return ok(JSON.stringify({
-        type: "create_entity",
-        entity_type: entityType,
-        name,
-        slug,
-        file_path: filePath,
-        content,
-      }));
-    },
-  },
-  {
-    definition: {
-      name: "update_entity",
-      description: "Update an existing entity file (NPC, PC, location, faction, lore): merge front matter, append body text, add changelog. Silent DM note — use for PC sheets when the player reveals character information.",
-      input_schema: {
-        type: "object" as const,
-        properties: {
-          entity_type: { type: "string", enum: ["character", "location", "faction", "lore"], description: "Entity type" },
-          name: { type: "string", description: "Entity name" },
-          front_matter_updates: { type: "object", description: "Front matter keys to merge (null value deletes key)" },
-          body_append: { type: "string", description: "Text to append to the body" },
-          changelog_entry: { type: "string", description: "Changelog entry to add" },
-        },
-        required: ["entity_type", "name"],
-      },
-    },
-    handler: (state, input) => {
-      const entityType = input.entity_type as string;
-      const name = input.name as string;
-
-      if (!["character", "location", "faction", "lore"].includes(entityType)) {
-        return err(`Invalid entity_type: ${entityType}`);
-      }
-      if (!name || !name.trim()) {
-        return err("Entity name is required.");
-      }
-
-      const fmUpdates = input.front_matter_updates as Record<string, unknown> | undefined;
-      const bodyAppend = input.body_append as string | undefined;
-      const changelogEntry = input.changelog_entry as string | undefined;
-
-      if (!fmUpdates && !bodyAppend && !changelogEntry) {
-        return err("At least one of front_matter_updates, body_append, or changelog_entry is required.");
-      }
-
-      const slug = slugify(name);
-      const paths = campaignPaths(state.campaignRoot);
-      const pathFn = entityType === "character" ? paths.character
-        : entityType === "location" ? paths.location
-        : entityType === "faction" ? paths.faction
-        : paths.lore;
-      const filePath = pathFn(slug);
-
-      return ok(JSON.stringify({
-        type: "update_entity",
-        entity_type: entityType,
-        name,
-        slug,
-        file_path: filePath,
-        front_matter_updates: fmUpdates,
-        body_append: bodyAppend,
-        changelog_entry: changelogEntry,
-      }));
+      return ok(JSON.stringify({ type: "scribe", updates }));
     },
   },
   {

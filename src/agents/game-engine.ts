@@ -18,11 +18,12 @@ import type { ToolResult } from "./tool-registry.js";
 import { isAITurn, getActivePlayer } from "./player-manager.js";
 import { aiPlayerTurn } from "./subagents/ai-player.js";
 import { campaignPaths, parseFrontMatter, serializeEntity, formatChangelogEntry } from "../tools/filesystem/index.js";
+import { runScribe } from "./subagents/scribe.js";
 import { norm } from "../utils/paths.js";
-import { validateCampaign } from "../tools/validation/index.js";
 import { CampaignRepo, performRollback } from "../tools/git/index.js";
 import type { GitIO } from "../tools/git/index.js";
 import { writeDebugDump } from "../tools/filesystem/debug-dump.js";
+import { styleTheme } from "./subagents/theme-styler.js";
 
 // --- Types ---
 
@@ -480,16 +481,14 @@ export class GameEngine {
           await this.rollbackAndExit(cmd.target as string);
         } else if (cmd.type === "context_refresh") {
           await this.refreshContext();
-        } else if (cmd.type === "validate") {
-          await this.runValidation();
-        } else if (cmd.type === "create_entity") {
-          await this.createEntity(cmd);
-        } else if (cmd.type === "update_entity") {
-          await this.updateEntity(cmd);
+        } else if (cmd.type === "scribe") {
+          await this.handleScribe(cmd);
         } else if (cmd.type === "dm_notes") {
           await this.handleDmNotes(cmd);
+        } else if (cmd.type === "style_scene") {
+          await this.handleStyleScene(cmd);
         } else if (cmd.type === "set_theme") {
-          // Persist to location entity if requested, then forward to TUI
+          // Direct theme command (from location auto-apply, OOC, etc.)
           if (cmd.save_to_location) {
             await this.saveThemeToLocation(cmd);
           }
@@ -647,122 +646,35 @@ export class GameEngine {
 
   // --- Validation ---
 
-  /** Run campaign validation and surface results */
-  private async runValidation(): Promise<void> {
-    this.callbacks.onDevLog?.("[dev] validate: running campaign validation");
-    try {
-      const result = await validateCampaign(
-        this.gameState.campaignRoot,
-        this.gameState.maps,
-        this.gameState.clocks,
-        this.fileIO,
-      );
-      if (result.errorCount === 0 && result.warningCount === 0) {
-        this.callbacks.onNarrativeDelta("[Validation: no issues found]\n");
-      } else {
-        const summary = result.issues
-          .map((i) => `  ${i.severity}: ${i.file} — ${i.message}`)
-          .join("\n");
-        this.callbacks.onNarrativeDelta(
-          `[Validation: ${result.errorCount} errors, ${result.warningCount} warnings]\n${summary}\n`,
-        );
-      }
-      this.callbacks.onDevLog?.(`[dev] validate: ${result.errorCount} errors, ${result.warningCount} warnings, ${result.filesChecked} files checked`);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      this.callbacks.onDevLog?.(`[dev] validate: failed — ${msg}`);
-    }
-  }
-
   // --- Worldbuilding Entity I/O ---
 
-  /** Write a new entity file (from create_entity tool) */
-  private async createEntity(cmd: TuiCommand): Promise<void> {
-    const { entity_type, name, file_path, content } = cmd as unknown as {
-      entity_type: string; name: string; file_path: string; content: string;
-    };
-    const filePath = norm(file_path);
+  /** Spawn the scribe subagent to process batched entity updates */
+  private async handleScribe(cmd: TuiCommand): Promise<void> {
+    const updates = cmd.updates as { visibility: string; content: string }[];
+    if (!updates || updates.length === 0) return;
 
     try {
-      // Locations use subdirectories — ensure parent dir exists
-      if (entity_type === "location") {
-        const parentDir = filePath.replace(/\/index\.md$/, "");
-        await this.fileIO.mkdir(parentDir);
+      const sceneNumber = this.sceneManager.getScene().sceneNumber;
+      const result = await runScribe(this.client, {
+        updates: updates.map(u => ({
+          visibility: u.visibility as "private" | "player-facing",
+          content: u.content,
+        })),
+        campaignRoot: this.gameState.campaignRoot,
+        sceneNumber,
+      }, this.fileIO);
+
+      // Notify scene manager about touched entities
+      for (const filePath of [...result.created, ...result.updated]) {
+        const slug = filePath.replace(/.*\//, "").replace(/\.md$/, "").replace(/\/index$/, "");
+        this.sceneManager.notifyEntityTouched(filePath, slug);
       }
 
-      if (await this.fileIO.exists(filePath)) {
-        this.callbacks.onDevLog?.(`[dev] create_entity: "${name}" already exists at ${filePath}, skipping`);
-        return;
-      }
-
-      await this.fileIO.writeFile(filePath, content);
-      this.sceneManager.notifyEntityTouched(filePath, name);
-      this.callbacks.onDevLog?.(`[dev] create_entity: wrote ${entity_type} "${name}" → ${filePath}`);
+      this.accUsage(result.usage);
+      this.callbacks.onDevLog?.(`[dev] scribe: ${result.summary}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      this.callbacks.onDevLog?.(`[dev] create_entity: failed for "${name}" — ${msg}`);
-    }
-  }
-
-  /** Update an existing entity file (from update_entity tool) */
-  private async updateEntity(cmd: TuiCommand): Promise<void> {
-    const { name, file_path, front_matter_updates, body_append, changelog_entry } = cmd as unknown as {
-      name: string; file_path: string;
-      front_matter_updates?: Record<string, unknown>;
-      body_append?: string;
-      changelog_entry?: string;
-    };
-    const filePath = norm(file_path);
-
-    try {
-      if (!(await this.fileIO.exists(filePath))) {
-        this.callbacks.onDevLog?.(`[dev] update_entity: "${name}" not found at ${filePath}`);
-        return;
-      }
-
-      const raw = await this.fileIO.readFile(filePath);
-      const { frontMatter, body, changelog } = parseFrontMatter(raw);
-      const title = frontMatter._title ?? name;
-      const parts: string[] = [];
-
-      // Merge front matter updates (null deletes keys)
-      if (front_matter_updates) {
-        for (const [key, value] of Object.entries(front_matter_updates)) {
-          if (value === null) {
-            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-            delete frontMatter[key];
-          } else {
-            frontMatter[key] = value;
-          }
-        }
-        parts.push(`fm:${Object.keys(front_matter_updates).length} keys`);
-      }
-
-      // Append body text
-      let newBody = body;
-      if (body_append) {
-        newBody = body ? `${body}\n\n${body_append}` : body_append;
-        parts.push("+body");
-      }
-
-      // Add changelog entry
-      const newChangelog = [...changelog];
-      if (changelog_entry) {
-        const sceneNumber = this.sceneManager.getScene().sceneNumber;
-        newChangelog.push(formatChangelogEntry(sceneNumber, changelog_entry));
-        parts.push("+changelog");
-      }
-
-      const updated = serializeEntity(title as string, frontMatter, newBody, newChangelog);
-      await this.fileIO.writeFile(filePath, updated);
-
-      const rawAliases = frontMatter.additional_names;
-      const aliases = (Array.isArray(rawAliases) ? rawAliases.join(", ") : typeof rawAliases === "string" ? rawAliases : undefined)?.trim() || undefined;
-      this.sceneManager.notifyEntityTouched(filePath, title as string, aliases);
-      this.callbacks.onDevLog?.(`[dev] update_entity: updated "${name}" — ${parts.join(", ")}`);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      this.callbacks.onDevLog?.(`[dev] update_entity: failed for "${name}" — ${msg}`);
+      this.callbacks.onDevLog?.(`[dev] scribe: failed — ${msg}`);
     }
   }
 
@@ -789,6 +701,64 @@ export class GameEngine {
       const msg = e instanceof Error ? e.message : String(e);
       this.callbacks.onDevLog?.(`[dev] dm_notes: write failed — ${msg}`);
     }
+  }
+
+  // --- Theme styling ---
+
+  /**
+   * Handle a style_scene command from the DM.
+   * If `description` is present, spawns a Haiku subagent to interpret
+   * the natural-language request. Otherwise, dispatches directly.
+   */
+  private async handleStyleScene(cmd: TuiCommand): Promise<void> {
+    const description = cmd.description as string | undefined;
+    const directKeyColor = cmd.key_color as string | undefined;
+    const variant = cmd.variant as string | undefined;
+
+    let themeCmd: TuiCommand;
+
+    if (description) {
+      // Spawn theme stylist subagent
+      this.callbacks.onDevLog?.(`[dev] style_scene: spawning theme-styler for "${description}"`);
+      try {
+        const result = await styleTheme(
+          this.client,
+          description,
+          undefined, // current theme name not easily accessible here
+          undefined, // current key color not easily accessible here
+        );
+        accUsage(this.sessionUsage, result.usage);
+        this.callbacks.onUsageUpdate(this.sessionUsage);
+
+        if (!result.command) {
+          this.callbacks.onDevLog?.("[dev] style_scene: subagent returned unparseable response, skipping");
+          return;
+        }
+
+        themeCmd = result.command;
+        this.callbacks.onDevLog?.(`[dev] style_scene: subagent chose theme=${themeCmd.theme ?? "(unchanged)"} key_color=${themeCmd.key_color ?? "(unchanged)"}`);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        this.callbacks.onDevLog?.(`[dev] style_scene: subagent failed — ${msg}`);
+        return;
+      }
+    } else {
+      // Direct mode — just forward key_color/variant
+      themeCmd = { type: "set_theme" };
+      if (directKeyColor) themeCmd.key_color = directKeyColor;
+    }
+
+    // Apply variant if specified (mechanical, no subagent needed)
+    if (variant) themeCmd.variant = variant;
+
+    // Persist to location entity if requested
+    if (cmd.save_to_location) {
+      await this.saveThemeToLocation({ ...themeCmd, save_to_location: true, location: cmd.location });
+    }
+
+    // Forward to TUI
+    themeCmd.type = "set_theme";
+    this.callbacks.onTuiCommand(themeCmd);
   }
 
   // --- Theme <-> Location persistence ---

@@ -214,7 +214,7 @@ describe("buildDevTools", () => {
     // Spot-check key DM tools are present
     expect(names).toContain("roll_dice");
     expect(names).toContain("rollback");
-    expect(names).toContain("create_entity");
+    expect(names).toContain("scribe");
     expect(names).toContain("start_combat");
     expect(names).toContain("set_alarm");
     expect(names).toContain("create_map");

@@ -26,7 +26,6 @@ export interface GameCallbackDeps {
   setErrorMsg: (s: string | null) => void;
   setModelines: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   setResources: (r: string[]) => void;
-  setStyle: (s: { name: string }) => void;
   setVariant: (v: StyleVariant) => void;
   setThemeName: (name: string) => void;
   setKeyColor: (color: string) => void;
@@ -53,7 +52,7 @@ export interface GameCallbackResult {
 export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
   const {
     setNarrativeLines, setEngineState, setErrorMsg, setModelines,
-    setResources, setStyle, setVariant, setThemeName, setKeyColor,
+    setResources, setVariant, setThemeName, setKeyColor,
     setActiveModal, setChoiceIndex,
     setActiveSession, setRetryOverlay,
     gameStateRef, clientRef, engineRef, activeModalRef, variantRef, previousVariantRef,
@@ -68,12 +67,8 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
         setModelines((prev) => ({ ...prev, [char]: text }));
         break;
       }
-      case "set_ui_style": {
-        setVariant(cmd.variant as StyleVariant);
-        if (cmd.style) setStyle({ name: cmd.style as string });
-        break;
-      }
-      case "set_theme": {
+      case "set_theme":
+      case "style_scene": {
         if (cmd.theme) setThemeName(cmd.theme as string);
         if (cmd.key_color) setKeyColor(cmd.key_color as string);
         if (cmd.variant) setVariant(cmd.variant as StyleVariant);
@@ -144,7 +139,7 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
         break;
       }
     }
-  }, [setModelines, setVariant, setStyle, setThemeName, setKeyColor, setResources, setChoiceIndex,
+  }, [setModelines, setVariant, setThemeName, setKeyColor, setResources, setChoiceIndex,
       setActiveModal, setActiveSession, setNarrativeLines, gameStateRef, clientRef, engineRef, fileIO,
       previousVariantRef, variantRef]);
 

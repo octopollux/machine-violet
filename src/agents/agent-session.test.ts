@@ -209,20 +209,20 @@ describe("runAgentLoop", () => {
   describe("TUI command extraction", () => {
     it("collects TUI commands from tool calls", async () => {
       const client = mockClient([
-        toolUseMessage("set_ui_style", { variant: "combat" }),
-        textMessage("Combat begins!"),
+        toolUseMessage("style_scene", { key_color: "#cc4444" }),
+        textMessage("The mood shifts."),
       ]);
-      const toolHandler = vi.fn(() => ({ content: JSON.stringify({ type: "set_ui_style", variant: "combat" }) }));
+      const toolHandler = vi.fn(() => ({ content: JSON.stringify({ type: "style_scene", key_color: "#cc4444" }) }));
 
       const result = await runAgentLoop(
         client,
         "System",
         [{ role: "user", content: "Attack" }],
-        baseConfig({ toolHandler, tuiToolNames: new Set(["set_ui_style"]) }),
+        baseConfig({ toolHandler, tuiToolNames: new Set(["style_scene"]) }),
       );
 
       expect(result.tuiCommands).toHaveLength(1);
-      expect(result.tuiCommands[0].type).toBe("set_ui_style");
+      expect(result.tuiCommands[0].type).toBe("style_scene");
     });
 
     it("ignores non-TUI tool results", async () => {
@@ -236,7 +236,7 @@ describe("runAgentLoop", () => {
         client,
         "System",
         [{ role: "user", content: "Roll" }],
-        baseConfig({ toolHandler, tuiToolNames: new Set(["set_ui_style"]) }),
+        baseConfig({ toolHandler, tuiToolNames: new Set(["style_scene"]) }),
       );
 
       expect(result.tuiCommands).toHaveLength(0);
@@ -539,7 +539,7 @@ describe("retryDelay", () => {
 
 describe("isTuiCommand", () => {
   it("recognizes TUI tool names", () => {
-    expect(isTuiCommand("set_ui_style")).toBe(true);
+    expect(isTuiCommand("style_scene")).toBe(true);
     expect(isTuiCommand("present_choices")).toBe(true);
     expect(isTuiCommand("update_modeline")).toBe(true);
   });

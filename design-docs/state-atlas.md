@@ -221,8 +221,7 @@ Legend: **R** = reads, **W** = writes (triggers persistence), **UI** = returns T
 | Tool | maps | clocks | combat | decks | config | activePlayerIndex | Notes |
 |------|------|--------|--------|-------|--------|-------------------|-------|
 | `update_modeline` | | | | | R | R | Reads config.players + activePlayerIndex for default character. Returns **UI**. |
-| `set_theme` | | | | | | | Returns **UI**. |
-| `set_ui_style` | | | | | | | Returns **UI**. |
+| `style_scene` | | | | | | | Returns **UI**. `description` triggers Haiku subagent. |
 | `set_display_resources` | | | | | | | Returns **UI**. |
 | `present_choices` | | | | | | | Returns **UI**. |
 | `present_roll` | | | | | | | Returns **UI**. |
@@ -246,8 +245,7 @@ Legend: **R** = reads, **W** = writes (triggers persistence), **UI** = returns T
 
 | Tool | maps | clocks | combat | decks | config | activePlayerIndex | Notes |
 |------|------|--------|--------|-------|--------|-------------------|-------|
-| `create_entity` | | | | | R | | Reads campaignRoot for paths. Returns **E** (file write). |
-| `update_entity` | | | | | R | | Same. |
+| `scribe` | | | | | R | | Reads campaignRoot for paths. Spawns Haiku subagent for entity I/O. |
 
 ### OOC / Mode
 
@@ -260,7 +258,6 @@ Legend: **R** = reads, **W** = writes (triggers persistence), **UI** = returns T
 | Tool | maps | clocks | combat | decks | config | activePlayerIndex | Notes |
 |------|------|--------|--------|-------|--------|-------------------|-------|
 | `rollback` | | | | | | | Returns **E**. Git-based. |
-| `validate` | | | | | | | Returns **E**. Reads maps + clocks via validator. |
 
 ### TOOL_STATE_MAP (`src/agents/tool-registry.ts:989`)
 
@@ -497,9 +494,6 @@ scene_transition(title, timeAdvance)
     ├─ 5. check_alarms
     │     checkClocks(clocks) — read-only status check
     │
-    ├─ 5b. validate
-    │      validateCampaign() — entity files, wikilinks, maps, clocks, config
-    │
     ├─ 6. reset_precis
     │     Clear precis, openThreads, npcIntents, playerReads
     │
@@ -581,7 +575,7 @@ Canonical directory tree for a campaign. Machine-managed files are marked with t
 
 **Machine-managed** = written by engine code, subagents, or tools. Never hand-edited during play.
 
-**DM-managed** = written by the DM agent via entity tools (`create_entity`, `update_entity`) or file I/O. The machine only appends changelog entries.
+**DM-managed** = written by the DM agent via the `scribe` subagent or file I/O. The machine only appends changelog entries.
 
 **Dual** = characters, locations, factions, lore files are DM-created but have machine-appended changelog sections.
 

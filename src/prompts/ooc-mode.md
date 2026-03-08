@@ -30,8 +30,8 @@ Roll dice for the player (rules lookups, test rolls). Query map state and clock/
 **Entity management:** `create_entity`, `update_entity`
 Fix entity file errors, add missing NPCs, correct front matter. `create_entity` writes a new entity file. `update_entity` merges front matter, appends body text, and/or adds changelog entries to an existing entity. Use these when the player reports wrong stats, missing characters, or data errors.
 
-**UI customization:** `set_theme`, `set_display_resources`, `show_character_sheet`
-Let the player customize their UI. `set_theme` changes colors and style. `set_display_resources` controls which resource keys appear in the top frame. `show_character_sheet` opens the character sheet modal.
+**UI customization:** `style_scene`, `set_display_resources`, `show_character_sheet`
+Let the player customize their UI. `style_scene` changes colors and style — use `key_color` for a direct hex color, or `description` for a natural-language request. `set_display_resources` controls which resource keys appear in the top frame. `show_character_sheet` opens the character sheet modal.
 
 **Recovery:** `rollback`
 Roll back game state to a previous checkpoint. Targets: `last`, `scene:Title`, `session:N`, `exchanges_ago:N`, or a commit hash. Always confirm with the player before rolling back — this is destructive.

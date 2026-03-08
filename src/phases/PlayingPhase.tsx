@@ -77,6 +77,7 @@ export function PlayingPhase() {
       setVariant,
       previousVariant: previousVariantRef.current,
       setPreviousVariant: (v) => { previousVariantRef.current = v; },
+      dispatchTuiCommand,
     })) {
       clearInput();
       return;
@@ -338,6 +339,7 @@ export function PlayingPhase() {
                 fileIO: engineRef.current?.getSceneManager().getFileIO(),
                 sceneManager: engineRef.current?.getSceneManager(),
                 repo: engineRef.current?.getRepo() ?? undefined,
+                onTuiCommand: (cmd) => dispatchTuiCommand(cmd),
               }));
               setVariant("dev");
               setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Dev Mode \u2014 type to inspect, ESC to exit]" }, { kind: "dm", text: "" }]);

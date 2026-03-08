@@ -144,8 +144,8 @@ describe("agentLoop", () => {
 
   it("collects TUI commands from tool calls", async () => {
     const client = mockClient([
-      toolUseMessage("set_ui_style", { variant: "combat" }),
-      textMessage("Combat begins!"),
+      toolUseMessage("style_scene", { key_color: "#cc4444" }),
+      textMessage("The mood darkens."),
     ]);
 
     const result = await agentLoop(
@@ -158,8 +158,8 @@ describe("agentLoop", () => {
     );
 
     expect(result.tuiCommands).toHaveLength(1);
-    expect(result.tuiCommands[0].type).toBe("set_ui_style");
-    expect(result.tuiCommands[0].variant).toBe("combat");
+    expect(result.tuiCommands[0].type).toBe("style_scene");
+    expect(result.tuiCommands[0].key_color).toBe("#cc4444");
   });
 
   it("handles text + tool_use in same response", async () => {
