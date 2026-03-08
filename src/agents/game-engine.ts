@@ -155,6 +155,24 @@ export class GameEngine {
       });
     }
 
+    // Wire persister flush into CampaignRepo so all state files are on disk
+    // before any git commit (auto, scene, session, checkpoint).
+    this.persister = new StatePersister(
+      params.gameState.campaignRoot,
+      params.fileIO,
+      (error) => this.callbacks.onError(error),
+    );
+    if (this.repo) {
+      const persister = this.persister;
+      this.repo.preCommitHook = async () => {
+        // Snapshot current conversation + scene to disk so the commit
+        // captures the true in-memory state (including post-clear).
+        persister.persistConversation(this.conversation.serialize());
+        this.persistCurrentScene();
+        await persister.flush();
+      };
+    }
+
     this.conversation = new ConversationManager(params.gameState.config.context);
     this.sceneManager = new SceneManager(
       params.gameState,
@@ -172,12 +190,7 @@ export class GameEngine {
       this.sceneManager.devLog = params.callbacks.onDevLog;
     }
 
-    // Wire up state persistence
-    this.persister = new StatePersister(
-      params.gameState.campaignRoot,
-      params.fileIO,
-      (error) => this.callbacks.onError(error),
-    );
+    // Wire up state change handlers
     this.registry.onStateChanged = (toolName, state, slices) => {
       this.persistSlices(state, slices);
       // switch_player mutates activePlayerIndex but has no state slice —
@@ -437,9 +450,19 @@ export class GameEngine {
       };
       const dropped = this.conversation.addExchange(storedUserMessage, assistantMessage, toolMessages);
 
-      // Persist conversation after each exchange (crash resilience)
+      // Persist conversation and scene state after each exchange.
+      // Writes are fire-and-forget for crash resilience; CampaignRepo's
+      // preCommitHook flushes them to disk before any git commit.
       if (this.persister) {
         this.persister.persistConversation(this.conversation.serialize());
+        const scene = this.sceneManager.getScene();
+        this.persister.persistScene({
+          precis: scene.precis,
+          openThreads: scene.openThreads || undefined,
+          npcIntents: scene.npcIntents || undefined,
+          playerReads: scene.playerReads,
+          activePlayerIndex: this.gameState.activePlayerIndex,
+        });
       }
 
       // Track exchange for git auto-commit
@@ -449,19 +472,6 @@ export class GameEngine {
       if (dropped) {
         this.callbacks.onExchangeDropped();
         await this.handleDroppedExchange(dropped);
-      }
-
-      // Persist scene state (precis, playerReads, activePlayerIndex)
-      if (this.persister) {
-        const scene = this.sceneManager.getScene();
-        this.persister.persistScene({
-          precis: scene.precis,
-          openThreads: scene.openThreads || undefined,
-          npcIntents: scene.npcIntents || undefined,
-    
-          playerReads: scene.playerReads,
-          activePlayerIndex: this.gameState.activePlayerIndex,
-        });
       }
 
       // Process TUI commands — intercept engine commands
