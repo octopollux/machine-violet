@@ -70,6 +70,9 @@ export interface LayoutProps {
 
   /** When set, replaces the Player Pane interior (Modeline + InputLine) with this element */
   playerPaneOverlay?: React.ReactNode;
+
+  /** Extra rows to add to the Player Pane (e.g. 3 for a description region in rich choices) */
+  playerPaneExtraHeight?: number;
 }
 
 /**
@@ -99,6 +102,7 @@ export function Layout(props: LayoutProps) {
     narrativeRef,
     hideInputLine,
     playerPaneOverlay,
+    playerPaneExtraHeight = 0,
   } = props;
 
   const tier = getViewportTier(dimensions);
@@ -128,10 +132,11 @@ export function Layout(props: LayoutProps) {
     hideInputLine,
     theme.asset.height,
     players.length,
+    playerPaneExtraHeight,
   );
 
   // Fixed content height inside the Player Pane (between top/bottom borders)
-  const playerPaneContentHeight = PLAYER_PANE_HEIGHT - 2;
+  const playerPaneContentHeight = PLAYER_PANE_HEIGHT + playerPaneExtraHeight - 2;
 
   // Height of the middle section (narrative + activity) for side frames
   const middleHeight = narRows + (elements.activityLine ? 1 : 0);

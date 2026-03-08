@@ -71,12 +71,14 @@ export function narrativeRows(
   hideInputLine = false,
   borderHeight = 2,
   playerCount = 2,
+  playerPaneExtraHeight = 0,
 ): number {
   void hideInputLine; // Player Pane is always visible; hideInputLine has no effect on row count
   let used = 0;
 
   // Player Pane is fixed-height (includes borders, modeline, and input line)
-  used += PLAYER_PANE_HEIGHT;
+  // playerPaneExtraHeight adds rows when e.g. a description region is shown
+  used += PLAYER_PANE_HEIGHT + playerPaneExtraHeight;
 
   if (elements.topFrame) used += borderHeight;
   if (elements.lowerFrame) used += borderHeight;

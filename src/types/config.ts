@@ -16,6 +16,7 @@ export interface PlayerConfig {
 
 export interface DMPersonality {
   name: string;
+  description?: string;
   prompt_fragment: string;
 }
 

@@ -6,7 +6,7 @@ import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, narrativeRows } from "../tui/responsive.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { Layout } from "../tui/layout.js";
-import { ChoiceOverlay, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, ApiErrorModal, getMenuItems } from "../tui/modals/index.js";
+import { ChoiceOverlay, DESCRIPTION_ROWS, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, ApiErrorModal, getMenuItems } from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { getActivePlayer, switchToNextPlayer, getPlayerEntries } from "../agents/player-manager.js";
 import { createOOCSession } from "../agents/subagents/ooc-mode.js";
@@ -395,11 +395,15 @@ export function PlayingPhase() {
   const conversationPaneTop = visibleElements.topFrame ? theme.asset.height : 0;
 
   // Build overlay for choice modal (replaces Player Pane content)
+  const choiceHasDescriptions = activeModal?.kind === "choice"
+    && activeModal.descriptions != null && activeModal.descriptions.length > 0;
+  const paneExtraHeight = choiceHasDescriptions ? DESCRIPTION_ROWS : 0;
   const choiceOverlay = activeModal?.kind === "choice" ? (
     <ChoiceOverlay
       width={cols - 4}
       prompt={activeModal.prompt}
       choices={activeModal.choices}
+      descriptions={activeModal.descriptions}
       selectedIndex={choiceIndex}
       showCustomInput
       customInputActive={customInputMode}
@@ -431,6 +435,7 @@ export function PlayingPhase() {
         narrativeRef={narrativeRef}
         hideInputLine={activeModal?.kind === "choice"}
         playerPaneOverlay={choiceOverlay}
+        playerPaneExtraHeight={paneExtraHeight}
       />
       {activeModal?.kind === "dice" && (
         <DiceRollModal

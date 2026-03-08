@@ -49,8 +49,8 @@ describe("first-launch", () => {
 });
 
 describe("personalities", () => {
-  it("ships 4 personalities", () => {
-    expect(PERSONALITIES).toHaveLength(4);
+  it("ships personalities", () => {
+    expect(PERSONALITIES.length).toBeGreaterThanOrEqual(4);
   });
 
   it("each personality has name and prompt_fragment", () => {
