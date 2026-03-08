@@ -278,8 +278,9 @@ export class GameEngine {
       this.aiTurnDepth = 0;
     }
 
-    // Fire player turn lifecycle (skipped for AI — executeAITurn already fired it)
-    if (!opts?.fromAI) {
+    // Fire player turn lifecycle (skipped for AI — executeAITurn already fired it,
+    // and skipped for system instructions like session open/resume)
+    if (!opts?.fromAI && !opts?.skipTranscript) {
       this.turnCounter++;
       const playerTurn: TurnInfo = {
         turnNumber: this.turnCounter,
