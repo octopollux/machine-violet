@@ -150,7 +150,11 @@ export class StatePersister {
       const raw = await this.fileIO.readFile(this.path(STATE_FILES.displayLog));
       if (!raw) return [];
       return tailLines(raw, maxLines);
-    } catch {
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException | null)?.code;
+      if (code !== "ENOENT") {
+        this.onError?.(e instanceof Error ? e : new Error(String(e)));
+      }
       return [];
     }
   }

@@ -215,6 +215,83 @@ describe("CampaignRepo", () => {
   });
 });
 
+describe("CampaignRepo preCommitHook", () => {
+  it("calls preCommitHook before staging during autoCommit", async () => {
+    const git = mockGitIO();
+    const repo = new CampaignRepo({ dir: "/tmp/campaign", git });
+
+    // Initialize first (this also calls stageAll internally)
+    await repo.init();
+
+    // Now set the hook and track call order for the autoCommit
+    const callOrder: string[] = [];
+    repo.preCommitHook = async () => {
+      callOrder.push("hook");
+    };
+    const origStatusMatrix = git.statusMatrix;
+    git.statusMatrix = vi.fn(async (...args) => {
+      callOrder.push("statusMatrix");
+      return origStatusMatrix(...args);
+    }) as typeof git.statusMatrix;
+
+    await repo.autoCommit("auto: test");
+
+    // Hook must be called before statusMatrix (staging reads the filesystem)
+    expect(callOrder[0]).toBe("hook");
+    expect(callOrder[1]).toBe("statusMatrix");
+  });
+
+  it("calls preCommitHook before scene commits", async () => {
+    const git = mockGitIO();
+    const repo = new CampaignRepo({ dir: "/tmp/campaign", git });
+    let hookCalled = false;
+    repo.preCommitHook = async () => { hookCalled = true; };
+
+    await repo.sceneCommit("The Tavern");
+
+    expect(hookCalled).toBe(true);
+  });
+
+  it("calls preCommitHook before session commits", async () => {
+    const git = mockGitIO();
+    const repo = new CampaignRepo({ dir: "/tmp/campaign", git });
+    let hookCalled = false;
+    repo.preCommitHook = async () => { hookCalled = true; };
+
+    await repo.sessionCommit(1);
+
+    expect(hookCalled).toBe(true);
+  });
+
+  it("calls preCommitHook before checkpoint commits", async () => {
+    const git = mockGitIO();
+    const repo = new CampaignRepo({ dir: "/tmp/campaign", git });
+    let hookCalled = false;
+    repo.preCommitHook = async () => { hookCalled = true; };
+
+    await repo.checkpoint("test");
+
+    expect(hookCalled).toBe(true);
+  });
+
+  it("calls preCommitHook before rollback safety checkpoint", async () => {
+    const git = mockGitIO();
+    const repo = new CampaignRepo({ dir: "/tmp/campaign", git });
+
+    // Create some history to rollback to
+    await repo.autoCommit("auto: exchanges 1");
+    await repo.autoCommit("auto: exchanges 2");
+
+    let hookCallCount = 0;
+    repo.preCommitHook = async () => { hookCallCount++; };
+
+    await repo.rollback("last");
+
+    // Hook should be called at least once (for the safety checkpoint's stageAll)
+    expect(hookCallCount).toBeGreaterThanOrEqual(1);
+  });
+});
+
 describe("CampaignRepo rollback", () => {
   async function setupWithHistory() {
     const git = mockGitIO();

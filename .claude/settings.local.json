@@ -47,7 +47,8 @@
       "Bash(mkdir:*)",
       "Bash(git worktree:*)",
       "Bash(git:*)",
-      "Bash(gh issue:*)"
+      "Bash(gh issue:*)",
+      "Bash(gh api:*)"
     ]
   }
 }
