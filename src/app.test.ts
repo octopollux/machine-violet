@@ -112,6 +112,8 @@ describe("gracefulShutdown", () => {
       commit: commitFn,
       log: vi.fn().mockResolvedValue([]),
       checkout: vi.fn().mockResolvedValue(undefined),
+      resetTo: vi.fn().mockResolvedValue(undefined),
+      pruneUnreachable: vi.fn().mockResolvedValue(0),
       statusMatrix: statusMatrixFn,
       listFiles: vi.fn().mockResolvedValue([]),
     };

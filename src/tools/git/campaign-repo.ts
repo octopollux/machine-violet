@@ -34,6 +34,10 @@ export interface GitIO {
   commit(dir: string, message: string, author: { name: string; email: string }): Promise<string>;
   log(dir: string, depth?: number): Promise<{ oid: string; commit: { message: string; author: { timestamp: number } } }[]>;
   checkout(dir: string, oid: string): Promise<void>;
+  /** Hard-reset: move branch ref to oid and update working tree. History after oid becomes dangling. */
+  resetTo(dir: string, oid: string): Promise<void>;
+  /** Delete loose objects not reachable from HEAD. Returns number of objects pruned. */
+  pruneUnreachable(dir: string): Promise<number>;
   statusMatrix(dir: string): Promise<[string, number, number, number][]>;
   listFiles(dir: string): Promise<string[]>;
 }
@@ -173,11 +177,16 @@ export class CampaignRepo {
       throw new Error(`Rollback target not found: ${target}`);
     }
 
-    // Safety checkpoint — preserves current state for recovery
+    // Safety checkpoint — preserves current state for recovery.
+    // Note: this checkpoint becomes dangling after the reset and will be pruned.
     await this.stageAll();
     await this.commitIfDirty("checkpoint: before rollback");
 
-    await this.git.checkout(this.dir, targetCommit.oid);
+    // Hard-reset: move branch to target, making everything after it dangling
+    await this.git.resetTo(this.dir, targetCommit.oid);
+
+    // Clean up dangling objects (old commits, trees, blobs)
+    await this.git.pruneUnreachable(this.dir);
 
     return {
       restoredTo: targetCommit.oid,

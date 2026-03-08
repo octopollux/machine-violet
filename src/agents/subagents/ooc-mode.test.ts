@@ -404,6 +404,8 @@ function mockGitIO(): GitIO {
       })),
     ),
     checkout: vi.fn(async () => {}),
+    resetTo: vi.fn(async () => {}),
+    pruneUnreachable: vi.fn(async () => 0),
     statusMatrix: vi.fn(async () =>
       staged.size > 0
         ? [...staged].map((f) => [f, 1, 2, 2] as [string, number, number, number])
@@ -721,7 +723,7 @@ describe("buildOOCToolHandler (DM tools)", () => {
     try {
       const handler = buildOOCToolHandler(repo, "/camp", fio, undefined, undefined, gs);
       await handler("rollback", { target: "last" });
-      expect(git.checkout).toHaveBeenCalled();
+      expect(git.resetTo).toHaveBeenCalled();
       expect(exitSpy).toHaveBeenCalledWith(0);
     } finally {
       exitSpy.mockRestore();
