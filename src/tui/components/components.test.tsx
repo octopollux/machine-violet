@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
-import { Modeline, buildModelineDisplay, splitModeline } from "./Modeline.js";
+import { Modeline, buildModelineDisplay, splitModeline, modelineVisibleLength } from "./Modeline.js";
 import { InputLine } from "./InputLine.js";
 import { PlayerSelector } from "./PlayerSelector.js";
 import { ActivityLine } from "./ActivityLine.js";
@@ -67,6 +67,23 @@ describe("splitModeline", () => {
   it("each segment too wide gets own line", () => {
     expect(splitModeline("AAAA | BBBB | CCCC", 4)).toEqual(["AAAA", "BBBB", "CCCC"]);
   });
+
+  it("measures visible length excluding formatting tags", () => {
+    // "<b>A</b> | B" has visible length 5 ("A | B"), fits in width 8
+    // Adding " | C" makes visible "A | B | C" = 9 → wraps
+    expect(splitModeline("<b>A</b> | B | C", 8)).toEqual(["<b>A</b> | B", "C"]);
+  });
+});
+
+describe("modelineVisibleLength", () => {
+  it("returns plain text length for unformatted string", () => {
+    expect(modelineVisibleLength("HP: 42/42")).toBe(9);
+  });
+
+  it("excludes formatting tags from length", () => {
+    expect(modelineVisibleLength("<b>HP:</b> 42/42")).toBe(9);
+    expect(modelineVisibleLength("<color=#ff0000>HP:</color> 42/42")).toBe(9);
+  });
 });
 
 describe("Modeline", () => {
@@ -82,6 +99,19 @@ describe("Modeline", () => {
     );
     expect(lastFrame()).toContain("HP: 42/42");
     expect(lastFrame()).toContain("Loc: The Shattered Hall");
+  });
+
+  it("renders inline formatting tags", () => {
+    const { lastFrame } = render(
+      <Modeline lines={["<b>HP:</b> 42/42 | <color=#ff0000>Poisoned</color>"]} />,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("HP:");
+    expect(frame).toContain("42/42");
+    expect(frame).toContain("Poisoned");
+    // Tags should not appear as literal text
+    expect(frame).not.toContain("<b>");
+    expect(frame).not.toContain("<color=");
   });
 });
 
