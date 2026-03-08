@@ -39,12 +39,10 @@ export async function gracefulShutdown(ctx: ShutdownContext): Promise<void> {
       // Best-effort — don't crash on shutdown
     }
 
-    // Persist conversation window for seamless resume
+    // Flush any pending display-log writes
     try {
       const persister = ctx.engine.getPersister();
       if (persister) {
-        const serialized = ctx.engine.getConversation().serialize();
-        persister.persistConversation(serialized);
         await persister.flush();
       }
     } catch {

@@ -23,7 +23,7 @@ export interface SetupTurnResult extends SubagentResult {
   /** Non-null when the agent called finalize_setup */
   finalized?: SetupResult;
   /** Non-null when the agent called present_choices — must be resolved before continuing */
-  pendingChoices?: { prompt: string; choices: string[] };
+  pendingChoices?: { prompt: string; choices: string[]; descriptions?: string[] };
 }
 
 /**
@@ -57,7 +57,7 @@ const FINALIZE_TOOL: Anthropic.Tool = {
       campaign_premise: { type: "string", description: "One-paragraph campaign hook" },
       mood: { type: "string", description: "Mood (e.g. 'Heroic', 'Grimdark', 'Whimsical', 'Tense')" },
       difficulty: { type: "string", description: "Difficulty ('Gentle', 'Balanced', 'Unforgiving')" },
-      dm_personality: { type: "string", description: "DM personality name (The Chronicler, The Trickster, The Warden, The Bard)" },
+      dm_personality: { type: "string", description: "DM personality name (must match a name from the available personalities list)" },
       player_name: { type: "string", description: "Player's real name, or 'Player'" },
       character_name: { type: "string", description: "Player character's name" },
       character_description: { type: "string", description: "One-sentence character concept" },
@@ -76,7 +76,9 @@ const PRESENT_CHOICES_TOOL: Anthropic.Tool = {
     "Present the player with a set of structured choices in a selection modal. " +
     "Use this when you want to offer 2-5 concrete options (e.g. genre, character concepts, campaign premises). " +
     "The player's selection will be returned as the tool result. " +
-    "You can include a short text message before calling this tool to give context.",
+    "You can include a short text message before calling this tool to give context. " +
+    "If a choice needs explanation, provide a descriptions array (same length as choices) — " +
+    "the description for the highlighted choice is shown in a preview region.",
   input_schema: {
     type: "object" as const,
     properties: {
@@ -84,9 +86,14 @@ const PRESENT_CHOICES_TOOL: Anthropic.Tool = {
       choices: {
         type: "array",
         items: { type: "string" },
-        description: "2-5 option strings for the player to choose from",
+        description: "2-5 short option labels for the player to choose from",
         minItems: 2,
         maxItems: 5,
+      },
+      descriptions: {
+        type: "array",
+        items: { type: "string" },
+        description: "Optional per-choice descriptions (same length as choices). Shown as a preview when the choice is highlighted.",
       },
     },
     required: ["prompt", "choices"],
@@ -99,10 +106,17 @@ const TOOLS = [FINALIZE_TOOL, PRESENT_CHOICES_TOOL];
 
 function buildSystemPrompt(): string {
   const base = loadPrompt("setup-conversation");
-  const seedList = SEEDS.map((s) =>
-    `- **${s.name}** — ${s.premise} (${s.genres.join(", ")})`
-  ).join("\n");
-  return base + "\n\n## Available campaign seeds\n\nUse these when presenting Quick Start options or campaign ideas. Pick seeds that match the player's genre if known.\n\n" + seedList;
+  const seedList = SEEDS.map((s) => {
+    const desc = s.description ? ` | Description: ${s.description}` : "";
+    return `- **${s.name}** — ${s.premise} (${s.genres.join(", ")})${desc}`;
+  }).join("\n");
+  const personalityList = PERSONALITIES.map((p) => {
+    const desc = p.description ? `: ${p.description}` : "";
+    return `- **${p.name}**${desc}`;
+  }).join("\n");
+  return base +
+    "\n\n## Available campaign seeds\n\nUse these when presenting Quick Start options or campaign ideas. Pick seeds that match the player's genre if known. When presenting seeds as choices, use the seed name as the choice label and the premise (or description if available) as the choice description.\n\n" + seedList +
+    "\n\n## Available DM personalities\n\nWhen presenting personality choices, use the name as the choice label and the description as the choice description.\n\n" + personalityList;
 }
 
 const SYSTEM_PROMPT = buildSystemPrompt();
@@ -202,7 +216,7 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
     // Process content blocks
     let text = "";
     const toolResults: Anthropic.ToolResultBlockParam[] = [];
-    let pendingChoices: { prompt: string; choices: string[] } | undefined;
+    let pendingChoices: { prompt: string; choices: string[]; descriptions?: string[] } | undefined;
 
     for (const block of response.content) {
       if (block.type === "text") {
@@ -210,10 +224,14 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
       } else if (block.type === "tool_use") {
         if (block.name === "present_choices") {
           // Don't resolve immediately — pause and return to the app for player input
-          const input = block.input as { prompt?: string; choices?: unknown };
+          const input = block.input as { prompt?: string; choices?: unknown; descriptions?: unknown };
           const rawChoices = Array.isArray(input.choices) ? input.choices : [];
           const choices = rawChoices.map((c: unknown) => typeof c === "string" ? c : String(c));
-          pendingChoices = { prompt: input.prompt ?? "Choose:", choices };
+          const rawDescs = Array.isArray(input.descriptions) ? input.descriptions : [];
+          const descriptions = rawDescs.length > 0
+            ? rawDescs.map((d: unknown) => typeof d === "string" ? d : String(d))
+            : undefined;
+          pendingChoices = { prompt: input.prompt ?? "Choose:", choices, descriptions };
           pendingToolUseId = block.id;
         } else if (block.name === "finalize_setup") {
           handleFinalize(block.input as Record<string, unknown>);

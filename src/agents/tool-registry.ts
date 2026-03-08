@@ -730,6 +730,7 @@ const TOOL_DEFS: RegisteredTool[] = [
         properties: {
           prompt: { type: "string" },
           choices: { type: "array", items: { type: "string" } },
+          descriptions: { type: "array", items: { type: "string" }, description: "Optional per-choice descriptions shown when highlighted." },
         },
       },
     },

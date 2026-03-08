@@ -15,20 +15,14 @@ describe("STATE_FILES contract", () => {
       maps: "state/maps.json",
       decks: "state/decks.json",
       scene: "state/scene.json",
-      conversation: "state/conversation.json",
       ui: "state/ui.json",
+      displayLog: "state/display-log.md",
     });
   });
 
   it("all state files are under state/ directory", () => {
     for (const path of Object.values(STATE_FILES)) {
       expect(path).toMatch(/^state\//);
-    }
-  });
-
-  it("all state files are JSON", () => {
-    for (const path of Object.values(STATE_FILES)) {
-      expect(path).toMatch(/\.json$/);
     }
   });
 });
