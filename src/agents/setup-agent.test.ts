@@ -60,10 +60,15 @@ describe("generateThemeColor", () => {
 
 describe("slugify", () => {
   it("converts names to filesystem slugs", () => {
-    expect(slugify("The Shattered Crown")).toBe("the-shattered-crown");
+    expect(slugify("The Shattered Crown")).toBe("shattered-crown");
     expect(slugify("Hello World!")).toBe("hello-world");
     expect(slugify("  spaces  ")).toBe("spaces");
     expect(slugify("A Very Long Name That Exceeds Fifty Characters In Total Length Here")).toHaveLength(50);
+    // Articles stripped — prevents duplicate entities
+    expect(slugify("The Black Coin")).toBe("black-coin");
+    expect(slugify("Black Coin")).toBe("black-coin");
+    expect(slugify("A Hooded Figure")).toBe("hooded-figure");
+    expect(slugify("An Old Tower")).toBe("old-tower");
   });
 });
 

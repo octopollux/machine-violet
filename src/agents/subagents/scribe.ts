@@ -123,6 +123,15 @@ const SCRIBE_TOOLS: Anthropic.Tool[] = [
   },
 ];
 
+/**
+ * Fix literal `\n` sequences that LLMs sometimes produce in JSON string values.
+ * JSON parsers handle real `\n` escapes, but models occasionally double-escape
+ * them, producing literal backslash-n in the parsed string.
+ */
+function unescapeNewlines(s: string): string {
+  return s.replace(/\\n/g, "\n");
+}
+
 // --- Tool Handler Factory ---
 
 export function buildScribeToolHandler(
@@ -208,10 +217,10 @@ export function buildScribeToolHandler(
               type: entityType,
               ...(input.front_matter as Record<string, unknown> ?? {}),
             };
-            const body = (input.body as string) ?? "";
+            const body = input.body ? unescapeNewlines(input.body as string) : "";
             const changelog: string[] = [];
             if (input.changelog_entry) {
-              changelog.push(formatChangelogEntry(sceneNumber, input.changelog_entry as string));
+              changelog.push(formatChangelogEntry(sceneNumber, unescapeNewlines(input.changelog_entry as string)));
             }
             const content = serializeEntity(entityName, fm, body, changelog);
             await fileIO.writeFile(filePath, content);
@@ -243,13 +252,14 @@ export function buildScribeToolHandler(
             // Append body
             let newBody = body;
             if (input.body) {
-              newBody = body ? `${body}\n\n${input.body as string}` : (input.body as string);
+              const appended = unescapeNewlines(input.body as string);
+              newBody = body ? `${body}\n\n${appended}` : appended;
             }
 
             // Add changelog
             const newChangelog = [...changelog];
             if (input.changelog_entry) {
-              newChangelog.push(formatChangelogEntry(sceneNumber, input.changelog_entry as string));
+              newChangelog.push(formatChangelogEntry(sceneNumber, unescapeNewlines(input.changelog_entry as string)));
             }
 
             const content = serializeEntity(title, frontMatter, newBody, newChangelog);

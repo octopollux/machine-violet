@@ -100,10 +100,13 @@ export async function buildCampaignWorld(
 
 /**
  * Convert a name to a filesystem-safe slug.
+ * Strips leading articles (the, a, an) so "The Black Coin" and "Black Coin"
+ * produce the same slug, preventing accidental duplicate entities.
  */
 export function slugify(name: string): string {
   return name
     .toLowerCase()
+    .replace(/^(the|a|an)\s+/i, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 50);

@@ -214,6 +214,24 @@ describe("buildScribeToolHandler", () => {
     });
   });
 
+  it("unescapes literal \\n in body and changelog", async () => {
+    const fio = mockFileIO();
+    const handler = buildScribeToolHandler(fio, "/camp", 1, [], []);
+
+    await handler("write_entity", {
+      mode: "create",
+      entity_type: "character",
+      name: "Test",
+      body: "Line one.\\nLine two.\\n\\nParagraph two.",
+      changelog_entry: "Created.\\nWith extra line.",
+    });
+
+    const content = vi.mocked(fio.writeFile).mock.calls[0][1] as string;
+    expect(content).toContain("Line one.\nLine two.");
+    expect(content).toContain("\n\nParagraph two.");
+    expect(content).not.toContain("\\n");
+  });
+
   it("returns error for unknown tool", async () => {
     const fio = mockFileIO();
     const handler = buildScribeToolHandler(fio, "/camp", 1, [], []);
