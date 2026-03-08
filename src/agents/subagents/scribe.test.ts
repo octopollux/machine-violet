@@ -2,24 +2,28 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { buildScribeToolHandler } from "./scribe.js";
 import type { ScribeFileIO } from "./scribe.js";
 import { resetPromptCache } from "../../prompts/load-prompt.js";
+import { norm } from "../../utils/paths.js";
 
 beforeEach(() => {
   resetPromptCache();
 });
 
 function mockFileIO(files: Record<string, string> = {}): ScribeFileIO {
-  const store = { ...files };
+  // Normalize all keys on construction for cross-platform compat
+  const store: Record<string, string> = {};
+  for (const [k, v] of Object.entries(files)) store[norm(k)] = v;
   return {
     readFile: vi.fn(async (path: string) => {
-      if (store[path]) return store[path];
-      throw new Error(`ENOENT: ${path}`);
+      const p = norm(path);
+      if (store[p]) return store[p];
+      throw new Error(`ENOENT: ${p}`);
     }),
     writeFile: vi.fn(async (path: string, content: string) => {
-      store[path] = content;
+      store[norm(path)] = content;
     }),
-    exists: vi.fn(async (path: string) => path in store),
+    exists: vi.fn(async (path: string) => norm(path) in store),
     readdir: vi.fn(async (path: string) => {
-      const prefix = path.endsWith("/") ? path : path + "/";
+      const prefix = norm(path.endsWith("/") ? path : path + "/");
       const entries = new Set<string>();
       for (const key of Object.keys(store)) {
         if (key.startsWith(prefix)) {

@@ -4,6 +4,7 @@ import type { SubagentResult } from "../subagent.js";
 import type { UsageStats } from "../agent-loop.js";
 import { getModel } from "../../config/models.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
+import { join, dirname } from "node:path";
 import { campaignPaths } from "../../tools/filesystem/index.js";
 import { parseFrontMatter, serializeEntity } from "../../tools/filesystem/index.js";
 import { formatChangelogEntry } from "../../tools/filesystem/index.js";
@@ -145,11 +146,11 @@ export function buildScribeToolHandler(
 
   function entityDir(entityType: string): string {
     switch (entityType) {
-      case "character": return `${campaignRoot}/characters`;
-      case "location": return `${campaignRoot}/locations`;
-      case "faction": return `${campaignRoot}/factions`;
-      case "lore": return `${campaignRoot}/lore`;
-      default: return `${campaignRoot}/lore`;
+      case "character": return join(campaignRoot, "characters");
+      case "location": return join(campaignRoot, "locations");
+      case "faction": return join(campaignRoot, "factions");
+      case "lore": return join(campaignRoot, "lore");
+      default: return join(campaignRoot, "lore");
     }
   }
 
@@ -200,11 +201,8 @@ export function buildScribeToolHandler(
               return { content: `Entity already exists at ${filePath}. Use mode: "update" instead.`, is_error: true };
             }
 
-            // Ensure parent directory exists (locations use subdirs)
-            if (entityType === "location") {
-              const parentDir = filePath.replace(/\/index\.md$/, "");
-              await fileIO.mkdir(parentDir);
-            }
+            // Ensure parent directory exists
+            await fileIO.mkdir(dirname(filePath));
 
             const fm: EntityFrontMatter = {
               type: entityType,
