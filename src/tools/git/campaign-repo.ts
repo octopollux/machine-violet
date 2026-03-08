@@ -34,6 +34,10 @@ export interface GitIO {
   commit(dir: string, message: string, author: { name: string; email: string }): Promise<string>;
   log(dir: string, depth?: number): Promise<{ oid: string; commit: { message: string; author: { timestamp: number } } }[]>;
   checkout(dir: string, oid: string): Promise<void>;
+  /** Hard-reset: move branch ref to oid and update working tree. History after oid becomes dangling. */
+  resetTo(dir: string, oid: string): Promise<void>;
+  /** Delete loose objects not reachable from HEAD. Returns number of objects pruned. */
+  pruneUnreachable(dir: string): Promise<number>;
   statusMatrix(dir: string): Promise<[string, number, number, number][]>;
   listFiles(dir: string): Promise<string[]>;
 }
@@ -173,11 +177,16 @@ export class CampaignRepo {
       throw new Error(`Rollback target not found: ${target}`);
     }
 
-    // Safety checkpoint — preserves current state for recovery
+    // Safety checkpoint — preserves current state for recovery.
+    // Note: this checkpoint becomes dangling after the reset and will be pruned.
     await this.stageAll();
     await this.commitIfDirty("checkpoint: before rollback");
 
-    await this.git.checkout(this.dir, targetCommit.oid);
+    // Hard-reset: move branch to target, making everything after it dangling
+    await this.git.resetTo(this.dir, targetCommit.oid);
+
+    // Clean up dangling objects (old commits, trees, blobs)
+    await this.git.pruneUnreachable(this.dir);
 
     return {
       restoredTo: targetCommit.oid,
@@ -384,14 +393,15 @@ function resolveTarget(log: CommitInfo[], target: string): CommitInfo | null {
     return log[0] ?? null;
   }
 
-  // "exchanges_ago:N" — find the Nth auto commit
+  // "exchanges_ago:N" — undo N exchanges (skip the most recent auto commit,
+  // which represents the current state, then count N auto commits back)
   if (target.startsWith("exchanges_ago:")) {
     const n = parseInt(target.split(":")[1], 10);
     let count = 0;
     for (const entry of log) {
       if (entry.type === "auto") {
         count++;
-        if (count >= n) return entry;
+        if (count > n) return entry;
       }
     }
     return null;

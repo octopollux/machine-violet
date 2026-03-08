@@ -13,6 +13,7 @@ function mockGitIO(): GitIO & {
   staged: Set<string>;
   removed: Set<string>;
   initCalled: boolean;
+  pruned: number;
 } {
   const commits: { message: string; oid: string; timestamp: number }[] = [];
   const staged = new Set<string>();
@@ -24,6 +25,7 @@ function mockGitIO(): GitIO & {
     staged,
     removed,
     initCalled: false,
+    pruned: 0,
 
     init: vi.fn(async () => { io.initCalled = true; }),
 
@@ -55,6 +57,19 @@ function mockGitIO(): GitIO & {
     }),
 
     checkout: vi.fn(async () => {}),
+
+    resetTo: vi.fn(async (_dir, oid) => {
+      // Simulate hard reset: truncate commits to the target and everything before it
+      const idx = commits.findIndex((c) => c.oid === oid);
+      if (idx >= 0) {
+        commits.splice(0, idx); // Remove everything newer than target
+      }
+    }),
+
+    pruneUnreachable: vi.fn(async () => {
+      io.pruned++;
+      return 0;
+    }),
 
     // Tracks staging: after add() puts a file in `staged`, statusMatrix
     // returns it as staged (head=1, workdir=2, stage=2 → head !== stage).
@@ -217,10 +232,10 @@ describe("CampaignRepo rollback", () => {
     const { git, repo } = await setupWithHistory();
 
     const result = await repo.rollback("last");
-    // "last" returns the most recent commit (which is the checkpoint created before rollback)
-    // After the checkpoint, the log has 5 entries (4 original + 1 checkpoint)
     expect(result.restoredTo).toBeTruthy();
-    expect(git.checkout).toHaveBeenCalled();
+    expect(git.resetTo).toHaveBeenCalled();
+    // Should NOT use plain checkout for rollback
+    expect(git.checkout).not.toHaveBeenCalled();
   });
 
   it("rolls back to a scene commit", async () => {
@@ -228,7 +243,7 @@ describe("CampaignRepo rollback", () => {
 
     const result = await repo.rollback("scene:goblin");
     expect(result.summary).toContain("Goblin Caves");
-    expect(git.checkout).toHaveBeenCalled();
+    expect(git.resetTo).toHaveBeenCalled();
   });
 
   it("rolls back to a session commit", async () => {
@@ -238,11 +253,13 @@ describe("CampaignRepo rollback", () => {
     expect(result.summary).toContain("session 1");
   });
 
-  it("rolls back by exchanges_ago", async () => {
+  it("rolls back by exchanges_ago (skips current auto commit)", async () => {
     const { repo } = await setupWithHistory();
 
+    // exchanges_ago:1 should undo the last exchange, restoring to the
+    // auto commit BEFORE the most recent one (exchanges 1-3, not 4-6)
     const result = await repo.rollback("exchanges_ago:1");
-    expect(result.summary).toContain("auto:");
+    expect(result.summary).toContain("exchanges 1-3");
   });
 
   it("throws on unknown target", async () => {
@@ -258,14 +275,30 @@ describe("CampaignRepo rollback", () => {
     await expect(repo.rollback("last")).rejects.toThrow("disabled");
   });
 
-  it("creates a safety checkpoint before rollback", async () => {
+  it("prunes dangling history after reset", async () => {
     const { git, repo } = await setupWithHistory();
 
-    await repo.rollback("last");
+    await repo.rollback("scene:goblin");
 
-    // Should have created a checkpoint commit before the rollback
-    const checkpointExists = git.commits.some((c) => c.message.includes("before rollback"));
-    expect(checkpointExists).toBe(true);
+    expect(git.pruneUnreachable).toHaveBeenCalledWith("/tmp/campaign");
+    expect(git.pruned).toBe(1);
+  });
+
+  it("produces linear history after rollback", async () => {
+    const { repo } = await setupWithHistory();
+
+    // History before: init, auto1, scene, auto2, session (5 commits)
+    const logBefore = await repo.getLog();
+    expect(logBefore).toHaveLength(5);
+
+    // Roll back to scene commit
+    await repo.rollback("scene:goblin");
+
+    // After reset, commits newer than the scene should be gone
+    // Mock's resetTo truncates: scene commit is now at index 0
+    const logAfter = await repo.getLog();
+    expect(logAfter.length).toBeLessThan(logBefore.length);
+    expect(logAfter[0].message).toContain("Goblin Caves");
   });
 });
 

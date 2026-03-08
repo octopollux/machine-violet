@@ -600,6 +600,8 @@ function mockGitIO(): GitIO {
       })),
     ),
     checkout: vi.fn(async () => {}),
+    resetTo: vi.fn(async () => {}),
+    pruneUnreachable: vi.fn(async () => 0),
     statusMatrix: vi.fn(async () =>
       staged.size > 0
         ? [...staged].map((f) => [f, 1, 2, 2] as [string, number, number, number])

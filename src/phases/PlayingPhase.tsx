@@ -13,6 +13,7 @@ import { createOOCSession } from "../agents/subagents/ooc-mode.js";
 import { createDevSession, summarizeGameState } from "../agents/subagents/dev-mode.js";
 import { useGameContext } from "../tui/game-context.js";
 import { themeToVariant } from "../tui/themes/index.js";
+import { trySlashCommand } from "../commands/index.js";
 
 export function PlayingPhase() {
   const {
@@ -65,6 +66,22 @@ export function PlayingPhase() {
     if (!value.trim()) return;
     const text = value.trim();
 
+    if (trySlashCommand(text, {
+      engine: engineRef.current,
+      gameState: gameStateRef.current,
+      client: clientRef.current,
+      appendLine: (line) => setNarrativeLines((prev) => [...prev, line]),
+      activeSession,
+      setActiveSession,
+      variant,
+      setVariant,
+      previousVariant: previousVariantRef.current,
+      setPreviousVariant: (v) => { previousVariantRef.current = v; },
+    })) {
+      clearInput();
+      return;
+    }
+
     if (activeSession) {
       setNarrativeLines((prev) => [...prev, { kind: "separator", text: "" }, { kind: "player", text: `> ${text}` }, { kind: "dm", text: "" }]);
       setModeBusy(true);
@@ -87,7 +104,7 @@ export function PlayingPhase() {
     }
 
     clearInput();
-  }, [activeSession, clearInput]);
+  }, [activeSession, clearInput, variant, setActiveSession, setVariant, setNarrativeLines]);
 
   const handleCustomChoiceSubmit = useCallback((value: string) => {
     if (!value.trim()) return;

@@ -821,6 +821,8 @@ describe("GameEngine Git Auto-Commit", () => {
       commit: vi.fn(async () => "abc123"),
       log: vi.fn(async () => []),
       checkout: vi.fn(async () => {}),
+      resetTo: vi.fn(async () => {}),
+      pruneUnreachable: vi.fn(async () => 0),
       // head=1, workdir=2, stage=2: file is staged and differs from HEAD → commit will fire
       statusMatrix: vi.fn(async () => [["file.md", 1, 2, 2] as [string, number, number, number]]),
       listFiles: vi.fn(async () => []),
