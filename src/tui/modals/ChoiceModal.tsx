@@ -6,14 +6,51 @@ import { InlineTextInput } from "../components/InlineTextInput.js";
 
 /* ──────────────────────────────────────────────────────────
  * ChoiceOverlay — frameless version that fills the Player Pane interior.
- * No borders; fits inside the 7-row Player Pane content area.
+ * No borders; fits inside the Player Pane content area.
  * ────────────────────────────────────────────────────────── */
+
+/** Number of fixed rows reserved for the description region. */
+export const DESCRIPTION_ROWS = 3;
+
+/** Word-wrap text to fit within a given width, returning exactly `rows` lines (padded or truncated). */
+function wrapToFixedRows(text: string, maxWidth: number, rows: number): string[] {
+  if (!text) return Array(rows).fill("");
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    if (current.length === 0) {
+      current = word;
+    } else if (current.length + 1 + word.length <= maxWidth) {
+      current += " " + word;
+    } else {
+      lines.push(current);
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+  // Pad or truncate to exact row count
+  while (lines.length < rows) lines.push("");
+  if (lines.length > rows) {
+    lines.length = rows;
+    // Add ellipsis to last visible line if we truncated
+    const last = lines[rows - 1];
+    if (last.length > maxWidth - 1) {
+      lines[rows - 1] = last.slice(0, maxWidth - 1) + "…";
+    } else {
+      lines[rows - 1] = last + "…";
+    }
+  }
+  return lines;
+}
 
 interface ChoiceOverlayProps {
   /** Inner width (cols - 2, between Player Pane side edges) */
   width: number;
   prompt: string;
   choices: string[];
+  /** Per-choice descriptions shown in a fixed-height region for the highlighted choice. */
+  descriptions?: string[];
   selectedIndex: number;
   showCustomInput?: boolean;
   customInputActive?: boolean;
@@ -24,15 +61,22 @@ interface ChoiceOverlayProps {
 /**
  * Frameless choice list for embedding inside the Player Pane.
  *
- * 7-row layout:
+ * Without descriptions — 7-row layout:
  *   Row 0: prompt text + ▲▼ scroll arrows
  *   Rows 1-5: choices (scrolled if >5 items)
  *   Row 6: right-aligned help hint
+ *
+ * With descriptions — 10-row layout:
+ *   Row 0: prompt text + ▲▼ scroll arrows
+ *   Rows 1-3: fixed-height description of highlighted choice (dimmed)
+ *   Rows 4-8: choices (scrolled if >5 items)
+ *   Row 9: right-aligned help hint
  */
 export function ChoiceOverlay({
   width,
   prompt,
   choices: rawChoices,
+  descriptions,
   selectedIndex,
   showCustomInput,
   customInputActive,
@@ -42,6 +86,9 @@ export function ChoiceOverlay({
   const choices = Array.isArray(rawChoices)
     ? rawChoices.map((c) => (typeof c === "string" ? c : String(c)))
     : [];
+
+  const hasDescriptions = descriptions != null && descriptions.length > 0;
+  const totalHeight = hasDescriptions ? 7 + DESCRIPTION_ROWS : 7;
 
   const totalItems = choices.length + (showCustomInput ? 1 : 0);
   const maxVisible = 5;
@@ -85,6 +132,12 @@ export function ChoiceOverlay({
       ? prompt.slice(0, maxPromptLen - 1) + "…"
       : prompt;
 
+  // Description for highlighted choice (word-wrapped to fixed rows)
+  const descText = hasDescriptions && selectedIndex < (descriptions?.length ?? 0)
+    ? (descriptions ?? [])[selectedIndex] ?? ""
+    : "";
+  const descLines = hasDescriptions ? wrapToFixedRows(descText, width, DESCRIPTION_ROWS) : [];
+
   // Help text
   const helpText = customInputActive
     ? "↵ submit  ESC back"
@@ -93,7 +146,7 @@ export function ChoiceOverlay({
   const customInputWidth = Math.max(1, width - 2); // "> " prefix
 
   return (
-    <Box flexDirection="column" height={7} width={width}>
+    <Box flexDirection="column" height={totalHeight} width={width}>
       {/* Row 0: prompt + scroll arrows */}
       <Box>
         <Box flexGrow={1}>
@@ -102,6 +155,17 @@ export function ChoiceOverlay({
         <Text color={canScrollUp ? "#aaff00" : undefined} dimColor={!canScrollUp}>▲</Text>
         <Text color={canScrollDown ? "#aaff00" : undefined} dimColor={!canScrollDown}>▼</Text>
       </Box>
+
+      {/* Description region (fixed height, only when descriptions provided) */}
+      {hasDescriptions && (
+        <Box flexDirection="column" height={DESCRIPTION_ROWS}>
+          {descLines.map((line, i) => (
+            <Box key={`desc-${i}`}>
+              <Text dimColor>{line}</Text>
+            </Box>
+          ))}
+        </Box>
+      )}
 
       {/* Choice rows */}
       {visibleItems.map((item) => {

@@ -5,7 +5,7 @@ import type { NarrativeLine } from "../types/tui.js";
 import type { ResolvedTheme } from "../tui/themes/types.js";
 import { appendDelta } from "../tui/narrative-helpers.js";
 import { Layout } from "../tui/layout.js";
-import { ChoiceOverlay } from "../tui/modals/index.js";
+import { ChoiceOverlay, DESCRIPTION_ROWS } from "../tui/modals/index.js";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
 import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
@@ -16,7 +16,7 @@ import type { SetupConversation } from "../agents/subagents/setup-conversation.j
 import type { UsageStats } from "../agents/agent-loop.js";
 import { CostTracker } from "../context/cost-tracker.js";
 
-interface ActiveChoiceModal { kind: "choice"; prompt: string; choices: string[] }
+interface ActiveChoiceModal { kind: "choice"; prompt: string; choices: string[]; descriptions?: string[] }
 
 export interface SetupPhaseProps {
   theme: ResolvedTheme;
@@ -62,7 +62,7 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
   }, []);
 
   // --- Handle turn result from conversation ---
-  const handleSetupTurnResult = useCallback(async (result: { finalized?: SetupResult; pendingChoices?: { prompt: string; choices: string[] }; usage: UsageStats }) => {
+  const handleSetupTurnResult = useCallback(async (result: { finalized?: SetupResult; pendingChoices?: { prompt: string; choices: string[]; descriptions?: string[] }; usage: UsageStats }) => {
     setSetupConvoBusy(false);
     setSetupConvoLines((prev) => [...prev, { kind: "dm", text: "" }]);
 
@@ -73,6 +73,7 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
         kind: "choice",
         prompt: result.pendingChoices.prompt,
         choices: result.pendingChoices.choices,
+        descriptions: result.pendingChoices.descriptions,
       });
       return;
     }
@@ -289,6 +290,8 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
   // --- Render: conversational mode ---
   if (setupConvoRef.current) {
     const setupHasModal = activeModal?.kind === "choice";
+    const hasDescriptions = setupHasModal && activeModal?.descriptions != null && activeModal.descriptions.length > 0;
+    const paneExtraHeight = hasDescriptions ? DESCRIPTION_ROWS : 0;
 
     // Build overlay for choice modal (replaces Player Pane content)
     const choiceOverlay = setupHasModal && activeModal ? (
@@ -296,6 +299,7 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
         width={cols - 4}
         prompt={activeModal.prompt}
         choices={activeModal.choices}
+        descriptions={activeModal.descriptions}
         selectedIndex={choiceIndex}
         showCustomInput
         customInputActive={customInputActive}
@@ -324,6 +328,7 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
           narrativeRef={narrativeRef}
           hideInputLine={setupHasModal}
           playerPaneOverlay={choiceOverlay}
+          playerPaneExtraHeight={paneExtraHeight}
         />
       </Box>
     );

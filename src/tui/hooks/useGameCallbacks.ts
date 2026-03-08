@@ -88,8 +88,12 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
           ? raw.map((c: unknown) => typeof c === "string" ? c : String(c))
           : [];
         if (choices.length > 0) {
+          const rawDescs = cmd.descriptions;
+          const descriptions = Array.isArray(rawDescs) && rawDescs.length > 0
+            ? rawDescs.map((d: unknown) => typeof d === "string" ? d : String(d))
+            : undefined;
           setChoiceIndex(0);
-          setActiveModal({ kind: "choice", prompt: (cmd.prompt as string) || "What do you do?", choices });
+          setActiveModal({ kind: "choice", prompt: (cmd.prompt as string) || "What do you do?", choices, descriptions });
         }
         break;
       }
