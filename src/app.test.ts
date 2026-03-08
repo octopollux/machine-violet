@@ -25,6 +25,7 @@ function mockScene(transcript: string[] = []): SceneState {
     precis: "",
     openThreads: "",
     npcIntents: "",
+    dmNotes: "",
     playerReads: [],
     sessionNumber: 1,
   };

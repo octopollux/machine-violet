@@ -312,6 +312,40 @@ describe("ToolRegistry", () => {
     expect(result.content).toContain("At least one");
   });
 
+  // ====== DM NOTES ======
+
+  it("write_dm_notes returns TUI command with notes", () => {
+    const reg = new ToolRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "write_dm_notes", {
+      notes: "The innkeeper is secretly a spy for the Red Hand.",
+    });
+    expect(result.is_error).toBeUndefined();
+    const parsed = JSON.parse(result.content);
+    expect(parsed.type).toBe("write_dm_notes");
+    expect(parsed.notes).toBe("The innkeeper is secretly a spy for the Red Hand.");
+  });
+
+  it("write_dm_notes trims whitespace", () => {
+    const reg = new ToolRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "write_dm_notes", {
+      notes: "  some notes  ",
+    });
+    const parsed = JSON.parse(result.content);
+    expect(parsed.notes).toBe("some notes");
+  });
+
+  it("write_dm_notes rejects empty notes", () => {
+    const reg = new ToolRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "write_dm_notes", {
+      notes: "   ",
+    });
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("empty");
+  });
+
   it("getDefinitionsFor returns only requested tools, skips unknown", () => {
     const reg = new ToolRegistry();
     const defs = reg.getDefinitionsFor(["roll_dice", "nonexistent", "check_clocks"]);

@@ -142,6 +142,7 @@ export const TUI_TOOLS = new Set([
   "validate",
   "create_entity",
   "update_entity",
+  "write_dm_notes",
 ]);
 
 export function isTuiCommand(toolName: string): boolean {

@@ -207,6 +207,7 @@ export class GameEngine {
       precis: scene.precis,
       openThreads: scene.openThreads || undefined,
       npcIntents: scene.npcIntents || undefined,
+      dmNotes: scene.dmNotes || undefined,
       playerReads: scene.playerReads,
       activePlayerIndex: this.gameState.activePlayerIndex,
     });
@@ -454,6 +455,7 @@ export class GameEngine {
           precis: scene.precis,
           openThreads: scene.openThreads || undefined,
           npcIntents: scene.npcIntents || undefined,
+          dmNotes: scene.dmNotes || undefined,
           playerReads: scene.playerReads,
           activePlayerIndex: this.gameState.activePlayerIndex,
         });
@@ -481,6 +483,8 @@ export class GameEngine {
           await this.createEntity(cmd);
         } else if (cmd.type === "update_entity") {
           await this.updateEntity(cmd);
+        } else if (cmd.type === "write_dm_notes") {
+          await this.writeDmNotes(cmd);
         } else if (cmd.type === "set_theme") {
           // Persist to location entity if requested, then forward to TUI
           if (cmd.save_to_location) {
@@ -756,6 +760,24 @@ export class GameEngine {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       this.callbacks.onDevLog?.(`[dev] update_entity: failed for "${name}" — ${msg}`);
+    }
+  }
+
+  /** Write DM notes for the current scene (from write_dm_notes tool) */
+  private async writeDmNotes(cmd: TuiCommand): Promise<void> {
+    const notes = (cmd.notes as string).trim();
+    const scene = this.sceneManager.getScene();
+    scene.dmNotes = notes;
+
+    // Also persist to the scene's dm-notes.md file
+    try {
+      const paths = campaignPaths(this.gameState.campaignRoot);
+      const filePath = norm(paths.sceneDmNotes(scene.sceneNumber, scene.slug));
+      await this.fileIO.writeFile(filePath, notes);
+      this.callbacks.onDevLog?.(`[dev] write_dm_notes: wrote ${notes.length} chars → ${filePath}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.callbacks.onDevLog?.(`[dev] write_dm_notes: file write failed — ${msg}`);
     }
   }
 

@@ -105,6 +105,7 @@ function mockScene(): SceneState {
     precis: "",
     openThreads: "",
     npcIntents: "",
+    dmNotes: "",
     playerReads: [],
     sessionNumber: 1,
   };

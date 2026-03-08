@@ -999,6 +999,26 @@ const TOOL_DEFS: RegisteredTool[] = [
       }));
     },
   },
+  {
+    definition: {
+      name: "write_dm_notes",
+      description: "Write or replace your private DM notes for the current scene. Use for secrets, plans, NPC motivations, and observations you want to remember but not show the player. Notes persist in the scene precis until the scene ends.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          notes: { type: "string", description: "Your DM notes (replaces any previous notes for this scene)" },
+        },
+        required: ["notes"],
+      },
+    },
+    handler: (_state, input) => {
+      const notes = input.notes as string;
+      if (!notes || !notes.trim()) {
+        return err("Notes cannot be empty.");
+      }
+      return ok(JSON.stringify({ type: "write_dm_notes", notes: notes.trim() }));
+    },
+  },
 ];
 
 // --- State change mapping ---

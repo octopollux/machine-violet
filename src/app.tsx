@@ -283,7 +283,7 @@ export default function App({ shutdownRef }: AppProps) {
 
     const scene: SceneState = isResume
       ? await detectSceneState(campaignRoot, fileIO.current)
-      : { sceneNumber: 1, slug: "opening", transcript: [], precis: "", openThreads: "", npcIntents: "", playerReads: [], sessionNumber: 1 };
+      : { sceneNumber: 1, slug: "opening", transcript: [], precis: "", openThreads: "", npcIntents: "", dmNotes: "", playerReads: [], sessionNumber: 1 };
 
     const sessionState: DMSessionState = {};
     const client = new Anthropic();
@@ -360,6 +360,7 @@ export default function App({ shutdownRef }: AppProps) {
         scene.precis = loaded.scene.precis;
         scene.openThreads = loaded.scene.openThreads ?? "";
         scene.npcIntents = loaded.scene.npcIntents ?? "";
+        scene.dmNotes = loaded.scene.dmNotes ?? "";
         scene.playerReads = loaded.scene.playerReads;
         setActivePlayerIndex(loaded.scene.activePlayerIndex);
       }

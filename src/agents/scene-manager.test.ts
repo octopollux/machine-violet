@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
-import { SceneManager, parseTranscriptEntries, classifyTranscriptEntry, buildScenePacing, buildSceneAnchor, detectSceneState } from "./scene-manager.js";
+import { SceneManager, parseTranscriptEntries, classifyTranscriptEntry, buildScenePrecis, buildScenePacing, buildSceneAnchor, detectSceneState } from "./scene-manager.js";
 import type { SceneState, FileIO } from "./scene-manager.js";
 import type { CampaignRepo } from "../tools/git/index.js";
 import type { GameState } from "./game-state.js";
@@ -69,6 +69,7 @@ function mockScene(): SceneState {
     precis: "",
     openThreads: "",
     npcIntents: "",
+    dmNotes: "",
     playerReads: [],
     sessionNumber: 1,
   };
@@ -1187,6 +1188,35 @@ describe("classifyTranscriptEntry", () => {
     const result = classifyTranscriptEntry("**DM:** First paragraph.\n\nSecond paragraph.");
     expect(result.kind).toBe("dm");
     expect(result.text).toBe("First paragraph.\n\nSecond paragraph.");
+  });
+});
+
+describe("buildScenePrecis", () => {
+  it("includes precis text alone when no extras", () => {
+    const scene = mockScene();
+    scene.precis = "The party entered the tavern.";
+    expect(buildScenePrecis(scene)).toBe("The party entered the tavern.");
+  });
+
+  it("appends NPC intents, open threads, and DM notes", () => {
+    const scene = mockScene();
+    scene.precis = "Combat began.";
+    scene.npcIntents = "[[Grimjaw]] intends to flank";
+    scene.openThreads = "[[goblin-ambush]]";
+    scene.dmNotes = "Grimjaw will betray the party in round 3.";
+    const result = buildScenePrecis(scene);
+    expect(result).toContain("Combat began.");
+    expect(result).toContain("NPC intents: [[Grimjaw]] intends to flank");
+    expect(result).toContain("Open: [[goblin-ambush]]");
+    expect(result).toContain("DM notes: Grimjaw will betray the party in round 3.");
+  });
+
+  it("omits DM notes line when dmNotes is empty", () => {
+    const scene = mockScene();
+    scene.precis = "Exploring the ruins.";
+    scene.dmNotes = "";
+    const result = buildScenePrecis(scene);
+    expect(result).not.toContain("DM notes:");
   });
 });
 
