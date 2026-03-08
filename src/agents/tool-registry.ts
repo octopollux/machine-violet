@@ -652,11 +652,11 @@ const TOOL_DEFS: RegisteredTool[] = [
   {
     definition: {
       name: "update_modeline",
-      description: "Set the modeline status text for a character. Defaults to the active character.",
+      description: "Set the modeline status text for a character. Defaults to the active character. Supports inline formatting: <b>, <i>, <u>, <color=#hex>.",
       input_schema: {
         type: "object" as const,
         properties: {
-          text: { type: "string", description: "Status line content" },
+          text: { type: "string", description: "Status line content. Supports inline formatting tags: <b>, <i>, <u>, <color=#hex>." },
           character: { type: "string", description: "Character name. Defaults to active character." },
         },
         required: ["text"],

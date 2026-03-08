@@ -1,5 +1,7 @@
 import React from "react";
 import { Text, Box } from "ink";
+import { parseFormatting, nodeVisibleLength } from "../formatting.js";
+import { renderNodes } from "../render-nodes.js";
 
 interface ModelineProps {
   lines: string[];
@@ -21,13 +23,19 @@ export function buildModelineDisplay(
   return parts.join(" ");
 }
 
+/** Visible length of a modeline string (excluding formatting tags). */
+export function modelineVisibleLength(text: string): number {
+  return nodeVisibleLength(parseFormatting(text));
+}
+
 /**
  * Split a modeline string into multiple lines by breaking at ` | ` boundaries.
  * Segments are greedily packed; the ` | ` at the break point is consumed.
  * A segment that alone exceeds width gets its own (truncated) line.
+ * Measurement uses visible length (formatting tags excluded).
  */
 export function splitModeline(text: string, width: number): string[] {
-  if (text.length <= width) return [text];
+  if (modelineVisibleLength(text) <= width) return [text];
 
   const segments = text.split(" | ");
   const lines: string[] = [];
@@ -35,7 +43,7 @@ export function splitModeline(text: string, width: number): string[] {
 
   for (let i = 1; i < segments.length; i++) {
     const candidate = current + " | " + segments[i];
-    if (candidate.length <= width) {
+    if (modelineVisibleLength(candidate) <= width) {
       current = candidate;
     } else {
       lines.push(current);
@@ -56,7 +64,7 @@ export function Modeline({ lines, width }: ModelineProps) {
   return (
     <Box flexDirection="column" width={width}>
       {lines.map((line, i) => (
-        <Text key={i} wrap="truncate">{line}</Text>
+        <Text key={i} wrap="truncate">{renderNodes(parseFormatting(line))}</Text>
       ))}
     </Box>
   );
