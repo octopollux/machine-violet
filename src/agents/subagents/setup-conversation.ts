@@ -57,7 +57,7 @@ const FINALIZE_TOOL: Anthropic.Tool = {
       campaign_premise: { type: "string", description: "One-paragraph campaign hook" },
       mood: { type: "string", description: "Mood (e.g. 'Heroic', 'Grimdark', 'Whimsical', 'Tense')" },
       difficulty: { type: "string", description: "Difficulty ('Gentle', 'Balanced', 'Unforgiving')" },
-      dm_personality: { type: "string", description: "DM personality name (The Chronicler, The Trickster, The Warden, The Bard)" },
+      dm_personality: { type: "string", description: "DM personality name (must match a name from the available personalities list)" },
       player_name: { type: "string", description: "Player's real name, or 'Player'" },
       character_name: { type: "string", description: "Player character's name" },
       character_description: { type: "string", description: "One-sentence character concept" },
