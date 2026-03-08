@@ -113,6 +113,33 @@ describe("StatePersister", () => {
     expect(loaded.scene).toEqual(scene);
   });
 
+  it("round-trips conversation exchanges", async () => {
+    const fio = mockFileIO();
+    const persister = new StatePersister("/tmp/campaign", fio);
+    const exchanges = [
+      {
+        user: { role: "user" as const, content: "I search the room." },
+        assistant: { role: "assistant" as const, content: "You find a dusty chest." },
+        toolResults: [],
+        estimatedTokens: 50,
+        stubbed: false,
+      },
+      {
+        user: { role: "user" as const, content: "I open it." },
+        assistant: { role: "assistant" as const, content: "Inside is a golden key." },
+        toolResults: [],
+        estimatedTokens: 40,
+        stubbed: false,
+      },
+    ];
+
+    persister.persistConversation(exchanges);
+    await vi.waitFor(() => expect(fio.writeFile).toHaveBeenCalled());
+
+    const loaded = await persister.loadAll();
+    expect(loaded.conversation).toEqual(exchanges);
+  });
+
   it("loadAll returns undefined for missing files", async () => {
     const fio = mockFileIO();
     const persister = new StatePersister("/tmp/campaign", fio);
@@ -123,6 +150,7 @@ describe("StatePersister", () => {
     expect(loaded.maps).toBeUndefined();
     expect(loaded.decks).toBeUndefined();
     expect(loaded.scene).toBeUndefined();
+    expect(loaded.conversation).toBeUndefined();
     expect(loaded.ui).toBeUndefined();
   });
 

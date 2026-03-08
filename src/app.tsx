@@ -409,6 +409,7 @@ export default function App({ shutdownRef }: AppProps) {
 
     hydrateGameState(gs, scene, loaded);
     if (loaded.scene) setActivePlayerIndex(loaded.scene.activePlayerIndex);
+    if (loaded.conversation) engine.seedConversation(loaded.conversation);
 
     // Restore theme — fall back to default if the persisted name is unknown
     if (loaded.ui) {
