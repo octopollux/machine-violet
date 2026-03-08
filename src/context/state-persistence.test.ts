@@ -3,9 +3,6 @@ import { StatePersister } from "./state-persistence.js";
 import type { FileIO } from "../agents/scene-manager.js";
 import type { CombatState } from "../types/combat.js";
 import type { MapData } from "../types/maps.js";
-import { ConversationManager } from "./conversation.js";
-import type { SerializedExchange } from "./conversation.js";
-import type { ContextConfig } from "../types/config.js";
 import { createClocksState } from "../tools/clocks/index.js";
 import { createCombatState } from "../tools/combat/index.js";
 import { createDecksState } from "../tools/cards/index.js";
@@ -116,25 +113,6 @@ describe("StatePersister", () => {
     expect(loaded.scene).toEqual(scene);
   });
 
-  it("round-trips conversation state", async () => {
-    const fio = mockFileIO();
-    const persister = new StatePersister("/tmp/campaign", fio);
-    const exchanges: SerializedExchange[] = [
-      {
-        user: { role: "user", content: "[Aldric] I open the door." },
-        assistant: { role: "assistant", content: "The door creaks open." },
-        toolResults: [],
-        stubbed: false,
-      },
-    ];
-
-    persister.persistConversation(exchanges);
-    await vi.waitFor(() => expect(fio.writeFile).toHaveBeenCalled());
-
-    const loaded = await persister.loadAll();
-    expect(loaded.conversation).toEqual(exchanges);
-  });
-
   it("loadAll returns undefined for missing files", async () => {
     const fio = mockFileIO();
     const persister = new StatePersister("/tmp/campaign", fio);
@@ -145,7 +123,6 @@ describe("StatePersister", () => {
     expect(loaded.maps).toBeUndefined();
     expect(loaded.decks).toBeUndefined();
     expect(loaded.scene).toBeUndefined();
-    expect(loaded.conversation).toBeUndefined();
     expect(loaded.ui).toBeUndefined();
   });
 
@@ -192,28 +169,6 @@ describe("StatePersister", () => {
     expect(loaded.ui!.modelines).toBeUndefined();
   });
 
-  it("clearConversation removes conversation file", async () => {
-    const fio = mockFileIO();
-    const persister = new StatePersister("/tmp/campaign", fio);
-    const exchanges: SerializedExchange[] = [
-      {
-        user: { role: "user", content: "Hello" },
-        assistant: { role: "assistant", content: "Hi" },
-        toolResults: [],
-        stubbed: false,
-      },
-    ];
-
-    persister.persistConversation(exchanges);
-    await persister.flush();
-
-    persister.clearConversation();
-    await persister.flush();
-
-    const loaded = await persister.loadAll();
-    expect(loaded.conversation).toBeUndefined();
-  });
-
   it("persist methods swallow errors silently", async () => {
     const fio = mockFileIO();
     (fio.writeFile as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("disk full"));
@@ -225,7 +180,6 @@ describe("StatePersister", () => {
     persister.persistMaps({});
     persister.persistDecks(createDecksState());
     persister.persistScene({ precis: "", playerReads: [], activePlayerIndex: 0 });
-    persister.persistConversation([]);
 
     // Give fire-and-forget promises time to settle
     await new Promise((r) => setTimeout(r, 10));
@@ -255,6 +209,58 @@ describe("StatePersister", () => {
     expect(loaded.combat).toBeUndefined();
     expect(onError).toHaveBeenCalled();
     expect(onError.mock.calls[0][0].message).toBe("permission denied");
+  });
+});
+
+describe("display log", () => {
+  it("appendDisplayLog appends text to display-log.md", async () => {
+    const fio = mockFileIO();
+    const persister = new StatePersister("/tmp/campaign", fio);
+
+    persister.appendDisplayLog("Hello world\n");
+    persister.appendDisplayLog("Second line\n");
+    await persister.flush();
+
+    expect(files[norm("/tmp/campaign/state/display-log.md")]).toBe("Hello world\nSecond line\n");
+  });
+
+  it("loadDisplayLogTail returns last N lines", async () => {
+    const fio = mockFileIO();
+    const persister = new StatePersister("/tmp/campaign", fio);
+
+    files[norm("/tmp/campaign/state/display-log.md")] = "line1\nline2\nline3\nline4\nline5\n";
+
+    const tail = await persister.loadDisplayLogTail(3);
+    expect(tail).toEqual(["line3", "line4", "line5"]);
+  });
+
+  it("loadDisplayLogTail returns all lines when fewer than max", async () => {
+    const fio = mockFileIO();
+    const persister = new StatePersister("/tmp/campaign", fio);
+
+    files[norm("/tmp/campaign/state/display-log.md")] = "line1\nline2\n";
+
+    const tail = await persister.loadDisplayLogTail(200);
+    expect(tail).toEqual(["line1", "line2"]);
+  });
+
+  it("loadDisplayLogTail returns empty for missing file", async () => {
+    const fio = mockFileIO();
+    const persister = new StatePersister("/tmp/campaign", fio);
+
+    const tail = await persister.loadDisplayLogTail(200);
+    expect(tail).toEqual([]);
+  });
+
+  it("appendDisplayLog swallows errors silently", async () => {
+    const fio = mockFileIO();
+    (fio.appendFile as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("disk full"));
+    const onError = vi.fn();
+    const persister = new StatePersister("/tmp/campaign", fio, onError);
+
+    persister.appendDisplayLog("test\n");
+    await new Promise((r) => setTimeout(r, 10));
+    expect(onError).toHaveBeenCalledWith(expect.any(Error));
   });
 });
 
@@ -343,96 +349,5 @@ describe("write serialization", () => {
     expect(loaded.combat).toBeDefined();
     expect(loaded.clocks).toBeDefined();
     expect(loaded.scene).toBeDefined();
-  });
-
-  it("clearConversation serialized with persistConversation", async () => {
-    const writeOrder: string[] = [];
-    const fio = mockFileIO();
-    (fio.writeFile as ReturnType<typeof vi.fn>).mockImplementation(
-      async (path: string, content: string) => {
-        if (norm(path).includes("conversation")) {
-          writeOrder.push(content || "<empty>");
-        }
-        await new Promise((r) => setTimeout(r, 5));
-        files[norm(path)] = content;
-      },
-    );
-
-    const persister = new StatePersister("/tmp/campaign", fio);
-    persister.persistConversation([{
-      user: { role: "user", content: "Hello" },
-      assistant: { role: "assistant", content: "Hi" },
-      toolResults: [],
-      stubbed: false,
-    }]);
-    persister.clearConversation();
-
-    await persister.flush();
-    expect(writeOrder).toHaveLength(2);
-    expect(writeOrder[1]).toBe("<empty>");
-  });
-});
-
-describe("ConversationManager serialize/hydrate", () => {
-  const config: ContextConfig = {
-    retention_exchanges: 5,
-    max_conversation_tokens: 8000,
-    tool_result_stub_after: 2,
-  };
-
-  it("round-trips exchanges through serialize/hydrate", () => {
-    const mgr = new ConversationManager(config);
-    mgr.addExchange(
-      { role: "user", content: "[Aldric] I look around." },
-      { role: "assistant", content: "The tavern is warm." },
-    );
-    mgr.addExchange(
-      { role: "user", content: "[Aldric] I approach the bar." },
-      { role: "assistant", content: "The bartender nods." },
-    );
-
-    const serialized = mgr.serialize();
-    expect(serialized).toHaveLength(2);
-    expect(serialized[0].user.content).toBe("[Aldric] I look around.");
-
-    const hydrated = ConversationManager.hydrate(serialized, config);
-    expect(hydrated.size).toBe(2);
-
-    const messages = hydrated.getMessages();
-    expect(messages).toHaveLength(4);
-    expect(messages[0].content).toBe("[Aldric] I look around.");
-    expect(messages[1].content).toBe("The tavern is warm.");
-  });
-
-  it("preserves stubbed flag through round-trip", () => {
-    const mgr = new ConversationManager({ ...config, tool_result_stub_after: 1 });
-
-    mgr.addExchange(
-      { role: "user", content: "Roll" },
-      { role: "assistant", content: "Rolling..." },
-      [{ role: "user", content: [{ type: "tool_result", tool_use_id: "toolu_1", content: "1d20: [15]->20" }] }],
-    );
-    // Add second to trigger stubbing of first
-    mgr.addExchange(
-      { role: "user", content: "Next" },
-      { role: "assistant", content: "Done." },
-    );
-
-    const serialized = mgr.serialize();
-    expect(serialized[0].stubbed).toBe(true);
-
-    const hydrated = ConversationManager.hydrate(serialized, config);
-    expect(hydrated.size).toBe(2);
-  });
-
-  it("serialize returns empty array for empty manager", () => {
-    const mgr = new ConversationManager(config);
-    expect(mgr.serialize()).toEqual([]);
-  });
-
-  it("hydrate with empty array returns empty manager", () => {
-    const hydrated = ConversationManager.hydrate([], config);
-    expect(hydrated.size).toBe(0);
-    expect(hydrated.getMessages()).toEqual([]);
   });
 });

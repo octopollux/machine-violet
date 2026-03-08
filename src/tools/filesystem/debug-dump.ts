@@ -1,6 +1,5 @@
 import { join } from "node:path";
 import type { FileIO } from "../../agents/scene-manager.js";
-import type { SerializedExchange } from "../../context/conversation.js";
 
 export interface DebugDumpData {
   error: Error;
@@ -10,7 +9,7 @@ export interface DebugDumpData {
   sessionNumber: number;
   precis: string;
   transcript: string[];
-  conversation: SerializedExchange[];
+  conversationSize: number;
 }
 
 /**
@@ -61,7 +60,7 @@ export async function writeDebugDump(
     sections.push("");
 
     sections.push("=== CONVERSATION ===");
-    sections.push(JSON.stringify(data.conversation, null, 2));
+    sections.push(`Active exchanges: ${data.conversationSize}`);
 
     await fileIO.writeFile(filepath, sections.join("\n"));
     return filepath;

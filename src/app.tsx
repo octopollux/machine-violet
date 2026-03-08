@@ -6,12 +6,12 @@ import { readFile, writeFile, appendFile, mkdir, readdir, stat, unlink, rmdir } 
 import { join, dirname } from "node:path";
 
 import { getStyle } from "./tui/frames/index.js";
-import { markdownToTags } from "./tui/formatting.js";
 import type { NarrativeLine, ActiveModal, RetryOverlay } from "./types/tui.js";
 import type { StyleVariant, ResolvedTheme } from "./tui/themes/types.js";
 import { BUILTIN_DEFINITIONS, resolveTheme, resetThemeCache } from "./tui/themes/index.js";
 import type { FileIO, SceneState } from "./agents/scene-manager.js";
-import { detectSceneState, classifyTranscriptEntry } from "./agents/scene-manager.js";
+import { detectSceneState } from "./agents/scene-manager.js";
+import { markdownToNarrativeLines } from "./context/display-log.js";
 import { GameEngine } from "./agents/game-engine.js";
 import type { GameState } from "./agents/game-state.js";
 import type { DMSessionState } from "./agents/dm-prompt.js";
@@ -397,44 +397,29 @@ export default function App({ shutdownRef }: AppProps) {
 
       const recap = await engine.resumeSession();
 
-      const transcriptLines: NarrativeLine[] = [];
-      for (const entry of scene.transcript) {
-        const { kind, text } = classifyTranscriptEntry(entry);
-        if (kind === "dm") {
-          const paragraphs = text.split("\n\n");
-          for (const para of paragraphs) {
-            const joined = para.replace(/\n/g, " ");
-            transcriptLines.push({ kind: "dm", text: markdownToTags(joined) });
-            transcriptLines.push({ kind: "dm", text: "" });
-          }
-        } else {
-          transcriptLines.push({ kind, text });
-        }
-      }
+      // Load display log tail for TUI — shows the player what happened before
+      const displayLogTail = await persister.loadDisplayLogTail(200);
+      const historyLines: NarrativeLine[] = displayLogTail.length > 0
+        ? markdownToNarrativeLines(displayLogTail)
+        : [];
 
-      if (loaded.conversation && loaded.conversation.length > 0) {
-        engine.hydrateConversation(loaded.conversation);
+      setNarrativeLines([...historyLines, { kind: "system", text: `Welcome back to ${config.name}.` }, { kind: "dm", text: "" }]);
 
-        setNarrativeLines([...transcriptLines, { kind: "system", text: `Welcome back to ${config.name}.` }, { kind: "dm", text: "" }]);
-        setPhase("playing");
+      // Always send resume instruction (conversation starts fresh each session)
+      const activePlayer = getActivePlayer(gs);
+      const resumeParts = ["[Session resumes. Continue the narrative where we left off."];
+      if (config.premise) resumeParts.push(`Campaign premise: ${config.premise}`);
+      const pc = config.players[0];
+      if (pc) resumeParts.push(`The player character is ${pc.character}.`);
+      resumeParts.push("Pick up naturally from the last scene — do NOT restart, re-introduce the setting, or recap what has already happened.");
+
+      if (recap) {
+        setActiveModal({ kind: "recap", lines: recap.split("\n") });
+        pendingResumeRef.current = { characterName: activePlayer.characterName, text: resumeParts.join(" ") + "]" };
       } else {
-        setNarrativeLines([...transcriptLines, { kind: "system", text: `Welcome back to ${config.name}.` }, { kind: "dm", text: "" }]);
-
-        const activePlayer = getActivePlayer(gs);
-        const resumeParts = ["[Session resumes. Continue the narrative where we left off."];
-        if (config.premise) resumeParts.push(`Campaign premise: ${config.premise}`);
-        const pc = config.players[0];
-        if (pc) resumeParts.push(`The player character is ${pc.character}.`);
-        resumeParts.push("Pick up naturally from the last scene — do NOT restart, re-introduce the setting, or recap what has already happened.");
-
-        if (recap) {
-          setActiveModal({ kind: "recap", lines: recap.split("\n") });
-          pendingResumeRef.current = { characterName: activePlayer.characterName, text: resumeParts.join(" ") + "]" };
-        } else {
-          await engine.processInput(activePlayer.characterName, resumeParts.join(" ") + "]", { skipTranscript: true });
-        }
-        setPhase("playing");
+        await engine.processInput(activePlayer.characterName, resumeParts.join(" ") + "]", { skipTranscript: true });
       }
+      setPhase("playing");
     } else {
       hydratedRef.current = true;
       setNarrativeLines([{ kind: "system", text: `Welcome to ${config.name}.` }, { kind: "dm", text: "" }, { kind: "system", text: "The story begins..." }]);

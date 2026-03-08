@@ -4,7 +4,8 @@ import type { GameState } from "./game-state.js";
 import { agentLoopStreaming } from "./agent-loop.js";
 import type { AgentLoopConfig, TuiCommand, UsageStats } from "./agent-loop.js";
 import { ConversationManager } from "../context/conversation.js";
-import type { DroppedExchange, SerializedExchange } from "../context/conversation.js";
+import type { DroppedExchange } from "../context/conversation.js";
+import { narrativeLinesToMarkdown } from "../context/display-log.js";
 import { StatePersister } from "../context/state-persistence.js";
 import type { StateSlice } from "../context/state-persistence.js";
 import { SceneManager, buildScenePacing } from "./scene-manager.js";
@@ -230,11 +231,6 @@ export class GameEngine {
     return this.sceneManager;
   }
 
-  /** Get conversation manager (for shutdown serialization) */
-  getConversation(): ConversationManager {
-    return this.conversation;
-  }
-
   /** Get persister (for shutdown and resume) */
   getPersister(): StatePersister | null {
     return this.persister;
@@ -248,20 +244,6 @@ export class GameEngine {
   /** Update the UI state section of the DM's prefix (called from TUI layer). */
   setUIState(uiState: string | undefined): void {
     this.sceneManager.getSessionState().uiState = uiState;
-  }
-
-  /** Hydrate conversation from saved exchanges */
-  hydrateConversation(exchanges: SerializedExchange[]): void {
-    this.conversation = ConversationManager.hydrate(exchanges, this.gameState.config.context);
-    // Re-link scene manager to the new conversation instance
-    this.sceneManager = new SceneManager(
-      this.gameState,
-      this.sceneManager.getScene(),
-      this.conversation,
-      this.sceneManager.getSessionState(),
-      this.sceneManager.getFileIO(),
-      this.repo ?? undefined,
-    );
   }
 
   /**
@@ -437,9 +419,16 @@ export class GameEngine {
       };
       const dropped = this.conversation.addExchange(storedUserMessage, assistantMessage, toolMessages);
 
-      // Persist conversation after each exchange (crash resilience)
-      if (this.persister) {
-        this.persister.persistConversation(this.conversation.serialize());
+      // Append to rolling display log (human-readable, survives restarts)
+      if (this.persister && !opts?.skipTranscript) {
+        const logLines: import("../types/tui.js").NarrativeLine[] = [
+          { kind: "player", text: `[${characterName}] ${text}` },
+        ];
+        if (result.text) {
+          logLines.push({ kind: "dm", text: result.text });
+        }
+        logLines.push({ kind: "dm", text: "" }); // paragraph separator
+        this.persister.appendDisplayLog(narrativeLinesToMarkdown(logLines));
       }
 
       // Track exchange for git auto-commit
@@ -971,7 +960,7 @@ export class GameEngine {
         sessionNumber: scene.sessionNumber,
         precis: scene.precis,
         transcript: scene.transcript,
-        conversation: this.conversation.serialize(),
+        conversationSize: this.conversation.size,
       });
       if (path) {
         this.callbacks.onDevLog?.(`[dev] debug dump saved: ${path}`);
