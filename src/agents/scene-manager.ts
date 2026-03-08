@@ -5,6 +5,7 @@ import { renderCampaignLog, parseLegacyLog } from "../context/index.js";
 import type { CampaignLog, CampaignLogEntry } from "../context/index.js";
 import { buildDMPrefix, buildActiveState } from "./dm-prompt.js";
 import type { DMSessionState } from "./dm-prompt.js";
+import type { CachedPrefixResult } from "../context/index.js";
 import { summarizeScene } from "./subagents/scene-summarizer.js";
 import { generateNarrativeRecap } from "./subagents/narrative-recap.js";
 import { updatePrecis } from "./subagents/precis-updater.js";
@@ -121,8 +122,8 @@ export class SceneManager {
     this.pcSummaries = state.config.players.map((p) => p.character);
   }
 
-  /** Get the current system prompt (cached prefix) */
-  getSystemPrompt(): Anthropic.TextBlockParam[] {
+  /** Get the current system prompt (cached prefix) and volatile context. */
+  getSystemPrompt(): CachedPrefixResult {
     this.sessionState.activeState = buildActiveState({
       pcSummaries: this.pcSummaries,
       pendingAlarms: [],

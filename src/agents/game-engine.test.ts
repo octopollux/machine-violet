@@ -710,12 +710,11 @@ describe("GameEngine Worldbuilding Entity I/O", () => {
     await engine.processInput("Aldric", "I look at the orc.");
 
     // The scene manager's entity index should now contain Grimjaw
-    // We can verify by inspecting the system prompt
+    // We can verify by inspecting the volatile context (Tier 3)
     const sm = engine.getSceneManager();
-    const prompt = sm.getSystemPrompt();
-    const combined = prompt.map((b) => b.text).join("");
-    expect(combined).toContain("Scene Entities");
-    expect(combined).toContain("Grimjaw");
+    const { volatile } = sm.getSystemPrompt();
+    expect(volatile).toContain("Scene Entities");
+    expect(volatile).toContain("Grimjaw");
   });
 
   it("update_entity notifies sceneManager with aliases", async () => {
@@ -746,10 +745,9 @@ describe("GameEngine Worldbuilding Entity I/O", () => {
     await engine.processInput("Aldric", "I befriend the orc.");
 
     const sm = engine.getSceneManager();
-    const prompt = sm.getSystemPrompt();
-    const combined = prompt.map((b) => b.text).join("");
-    expect(combined).toContain("Scene Entities");
-    expect(combined).toContain("Grimjaw (also: Captain Grimjaw)");
+    const { volatile } = sm.getSystemPrompt();
+    expect(volatile).toContain("Scene Entities");
+    expect(volatile).toContain("Grimjaw (also: Captain Grimjaw)");
   });
 
   it("update_entity handles additional_names passed as array (#15)", async () => {
@@ -781,9 +779,8 @@ describe("GameEngine Worldbuilding Entity I/O", () => {
     await engine.processInput("Aldric", "I befriend the orc.");
 
     const sm = engine.getSceneManager();
-    const prompt = sm.getSystemPrompt();
-    const combined = prompt.map((b) => b.text).join("");
-    expect(combined).toContain("Grimjaw (also: Captain Grimjaw, The Scarred)");
+    const { volatile } = sm.getSystemPrompt();
+    expect(volatile).toContain("Grimjaw (also: Captain Grimjaw, The Scarred)");
   });
 
   it("update_entity silently handles missing files", async () => {
