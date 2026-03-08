@@ -1,3 +1,5 @@
+import v8 from "node:v8";
+import { writeFileSync } from "node:fs";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { NarrativeLine, StyleVariant } from "../types/tui.js";
 import type { GameEngine } from "../agents/game-engine.js";
@@ -205,6 +207,23 @@ const devCommand: SlashCommand = {
   },
 };
 
+const snapshotCommand: SlashCommand = {
+  name: "snapshot",
+  usage: "/snapshot",
+  description: "Write a V8 heap snapshot for memory debugging",
+  execute(_args, ctx) {
+    ctx.appendLine({ kind: "system", text: "[Writing heap snapshot — this may pause for a few seconds...]" });
+    const file = `heap-${Date.now()}.heapsnapshot`;
+    try {
+      writeFileSync(file, v8.writeHeapSnapshot());
+      ctx.appendLine({ kind: "system", text: `[Heap snapshot written: ${file}]` });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      ctx.appendLine({ kind: "system", text: `[Snapshot failed: ${msg}]` });
+    }
+  },
+};
+
 // --- Registry ---
 
 const commands: SlashCommand[] = [
@@ -215,6 +234,7 @@ const commands: SlashCommand[] = [
   sceneCommand,
   oocCommand,
   devCommand,
+  snapshotCommand,
 ];
 
 const commandMap = new Map<string, SlashCommand>(
