@@ -671,22 +671,6 @@ const TOOL_DEFS: RegisteredTool[] = [
   },
   {
     definition: {
-      name: "set_ui_style",
-      description: "Switch frame style or variant (combat/exploration/ooc/levelup).",
-      input_schema: {
-        type: "object" as const,
-        properties: {
-          style: { type: "string", description: "Style name (gothic, arcane, etc.)" },
-          variant: { type: "string", enum: ["exploration", "combat", "ooc", "levelup"] },
-        },
-      },
-    },
-    handler: (_state, input) => {
-      return ok(JSON.stringify({ type: "set_ui_style", ...input }));
-    },
-  },
-  {
-    definition: {
       name: "style_scene",
       description: "Style the UI to match the current scene's mood. Use `description` for natural-language requests (\"make it darker\", \"cyberpunk neon\", \"haunted forest\") — a stylist agent picks the right theme, colors, and effects. Use `key_color` for simple hex-color changes. Use `variant` for mechanical state changes (combat/exploration).",
       input_schema: {
@@ -882,17 +866,6 @@ const TOOL_DEFS: RegisteredTool[] = [
       return ok(JSON.stringify({ type: "rollback", target: input.target }));
     },
   },
-  {
-    definition: {
-      name: "validate",
-      description: "Run the validation suite on the campaign. Checks entity files, wikilinks, maps, clocks, and config integrity. Returns a list of issues.",
-      input_schema: { type: "object" as const, properties: {} },
-    },
-    handler: (_state) => {
-      return ok(JSON.stringify({ type: "validate" }));
-    },
-  },
-
   // ====== WORLDBUILDING ======
   {
     definition: {

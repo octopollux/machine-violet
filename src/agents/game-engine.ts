@@ -19,7 +19,6 @@ import { isAITurn, getActivePlayer } from "./player-manager.js";
 import { aiPlayerTurn } from "./subagents/ai-player.js";
 import { campaignPaths, parseFrontMatter, serializeEntity, formatChangelogEntry } from "../tools/filesystem/index.js";
 import { norm } from "../utils/paths.js";
-import { validateCampaign } from "../tools/validation/index.js";
 import { CampaignRepo, performRollback } from "../tools/git/index.js";
 import type { GitIO } from "../tools/git/index.js";
 import { writeDebugDump } from "../tools/filesystem/debug-dump.js";
@@ -481,8 +480,6 @@ export class GameEngine {
           await this.rollbackAndExit(cmd.target as string);
         } else if (cmd.type === "context_refresh") {
           await this.refreshContext();
-        } else if (cmd.type === "validate") {
-          await this.runValidation();
         } else if (cmd.type === "create_entity") {
           await this.createEntity(cmd);
         } else if (cmd.type === "update_entity") {
@@ -649,33 +646,6 @@ export class GameEngine {
   }
 
   // --- Validation ---
-
-  /** Run campaign validation and surface results */
-  private async runValidation(): Promise<void> {
-    this.callbacks.onDevLog?.("[dev] validate: running campaign validation");
-    try {
-      const result = await validateCampaign(
-        this.gameState.campaignRoot,
-        this.gameState.maps,
-        this.gameState.clocks,
-        this.fileIO,
-      );
-      if (result.errorCount === 0 && result.warningCount === 0) {
-        this.callbacks.onNarrativeDelta("[Validation: no issues found]\n");
-      } else {
-        const summary = result.issues
-          .map((i) => `  ${i.severity}: ${i.file} — ${i.message}`)
-          .join("\n");
-        this.callbacks.onNarrativeDelta(
-          `[Validation: ${result.errorCount} errors, ${result.warningCount} warnings]\n${summary}\n`,
-        );
-      }
-      this.callbacks.onDevLog?.(`[dev] validate: ${result.errorCount} errors, ${result.warningCount} warnings, ${result.filesChecked} files checked`);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      this.callbacks.onDevLog?.(`[dev] validate: failed — ${msg}`);
-    }
-  }
 
   // --- Worldbuilding Entity I/O ---
 

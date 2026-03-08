@@ -16,7 +16,6 @@ type MockFn = ReturnType<typeof vi.fn> & ((...args: any[]) => any);
 function createDispatch(deps: {
   setModelines: MockFn;
   setVariant: MockFn;
-  setStyle: MockFn;
   setResources: MockFn;
   setChoiceIndex: MockFn;
   setActiveModal: MockFn;
@@ -72,7 +71,6 @@ function makeDeps() {
   return {
     setModelines: vi.fn(),
     setVariant: vi.fn(),
-    setStyle: vi.fn(),
     setResources: vi.fn(),
     setChoiceIndex: vi.fn(),
     setActiveModal: vi.fn() as ReturnType<typeof vi.fn> & ((m: ActiveModal) => void),

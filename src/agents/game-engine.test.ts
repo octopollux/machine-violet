@@ -211,7 +211,7 @@ describe("GameEngine", () => {
 
   it("handles tool calls and collects TUI commands", async () => {
     const client = mockClient([
-      ...toolAndTextMessages("set_ui_style", { variant: "combat" }, "Combat begins!"),
+      ...toolAndTextMessages("style_scene", { key_color: "#cc4444" }, "The mood shifts."),
     ]);
     const { callbacks, log } = mockCallbacks();
 
@@ -228,9 +228,9 @@ describe("GameEngine", () => {
     await engine.processInput("Aldric", "I attack!");
 
     expect(log.tuiCommands).toHaveLength(1);
-    expect(log.tuiCommands[0].type).toBe("set_ui_style");
-    expect(log.toolStarts).toContain("set_ui_style");
-    expect(log.toolEnds).toContain("set_ui_style");
+    expect(log.tuiCommands[0].type).toBe("set_theme");
+    expect(log.toolStarts).toContain("style_scene");
+    expect(log.toolEnds).toContain("style_scene");
   });
 
   it("tracks session usage", async () => {
@@ -526,31 +526,6 @@ describe("GameEngine", () => {
     expect(log.tuiCommands.filter((c) => c.type === "context_refresh")).toHaveLength(0);
   });
 
-  it("intercepts validate TUI command (not forwarded to TUI)", async () => {
-    const client = mockClient([
-      ...toolAndTextMessages("validate", {}, "Validation complete."),
-    ]);
-    const { callbacks, log } = mockCallbacks();
-    const fio = mockFileIO();
-    // Provide config.json so validation runs
-    files["/tmp/test-campaign/config.json"] = '{"name":"Test"}';
-
-    const engine = new GameEngine({
-      client,
-      gameState: mockState(),
-      scene: mockScene(),
-      sessionState: mockSessionState(),
-      fileIO: fio,
-      callbacks,
-      model: "claude-haiku-4-5-20251001",
-    });
-
-    await engine.processInput("Aldric", "Run validation.");
-
-    expect(log.tuiCommands.filter((c) => c.type === "validate")).toHaveLength(0);
-    // Should have emitted narrative delta with validation results
-    expect(log.narrativeDeltas.some((d) => d.includes("Validation"))).toBe(true);
-  });
 });
 
 describe("GameEngine Worldbuilding Entity I/O", () => {
@@ -1189,7 +1164,7 @@ describe("GameEngine Behavioral Reminder", () => {
       textMessage("One."),            // turn 1 → stream[0]
       textMessage("Two."),            // turn 2 → stream[1]
       textMessage("Three."),          // turn 3 → stream[2]
-      ...toolAndTextMessages("set_ui_style", { variant: "default" }, "You roll a 14."), // turn 4 → stream[3,4]
+      ...toolAndTextMessages("style_scene", { key_color: "#888888" }, "You roll a 14."), // turn 4 → stream[3,4]
       textMessage("Five."),           // turn 5 → stream[5]
     ]);
     const { callbacks } = mockCallbacks();

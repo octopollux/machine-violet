@@ -113,7 +113,6 @@ All T1 (initiative rolling may delegate to T2 for complex systems). Called by DM
 |---|---|---|---|---|
 | `update_modeline` | T1 | DM | `({ text })` | Set modeline content. Freeform text string. |
 | `style_scene` | T1 + T2 | DM, Engine | `({ description?, key_color?, variant?, save_to_location?, location? })` | Style UI to match scene mood. `description` triggers Haiku stylist subagent; `key_color` is direct. Optionally persist to location entity. |
-| `set_ui_style` | T1 | DM, Engine | `({ style?, variant? })` | Switch variant (combat/exploration/ooc/levelup/dev). Still works for variant-only changes; `style_scene` preferred for full theme changes. |
 | `set_display_resources` | T1 | DM, Setup | `({ character, resources[] })` | Update which resource keys appear in the top frame for a character. |
 | `present_choices` | T1 + T2 | DM, Engine | `({ prompt?, choices[]? })` | Show choice modal. No params = Haiku subagent generates options. Explicit params = DM's choices. |
 | `present_roll` | T1 | DM | `({ result, label })` | Display a dice roll as a dramatic modal. |
@@ -142,7 +141,6 @@ All T1 (initiative rolling may delegate to T2 for complex systems). Called by DM
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
 | `rollback` | T1 | OOC agent | `({ target })` | Restore campaign state to a git commit. Target can be a commit hash, scene label, "last", or "exchanges_ago:N". Triggers `session_resume` after. |
-| `validate` | T1 | DM, OOC agent | `({})` | Run the full validation suite on demand. Checks entity files, wikilinks, maps, clocks, and config integrity. Returns a list of issues with severity levels. Also runs automatically at scene transitions and session start. |
 
 ---
 

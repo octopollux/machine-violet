@@ -129,7 +129,6 @@ export function stampToolsCacheControl(tools: Anthropic.Tool[]): Anthropic.Tool[
 
 export const TUI_TOOLS = new Set([
   "update_modeline",
-  "set_ui_style",
   "set_theme",
   "style_scene",
   "set_display_resources",
@@ -140,7 +139,6 @@ export const TUI_TOOLS = new Set([
   "scene_transition",
   "session_end",
   "context_refresh",
-  "validate",
   "create_entity",
   "update_entity",
   "dm_notes",

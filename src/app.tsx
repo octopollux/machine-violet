@@ -219,15 +219,6 @@ export default function App({ shutdownRef }: AppProps) {
   // Auto-sync variantRef (needed by dispatchTuiCommand's enter_ooc to save previous variant)
   useEffect(() => { variantRef.current = variant; }, [variant]);
 
-  // Legacy setStyle bridge — useGameCallbacks dispatches set_ui_style with style name.
-  // Map old style names to new theme names and update themeName.
-  const setStyle = useCallback((s: { name: string }) => {
-    // Old style names map directly to theme names
-    if (BUILTIN_DEFINITIONS[s.name]) {
-      setThemeName(s.name);
-    }
-  }, []);
-
   // Persist UI when theme/variant/keyColor/modelines change (skip until hydration complete)
   useEffect(() => {
     if (!hydratedRef.current) return;
@@ -317,7 +308,7 @@ export default function App({ shutdownRef }: AppProps) {
   // --- Engine callbacks (extracted hook) ---
   const { buildCallbacks, dispatchTuiCommand } = useGameCallbacks({
     setNarrativeLines, setEngineState, setErrorMsg, setModelines,
-    setResources, setStyle, setVariant, setThemeName, setKeyColor,
+    setResources, setVariant, setThemeName, setKeyColor,
     setActiveModal, setChoiceIndex,
     setActiveSession, setRetryOverlay,
     gameStateRef, clientRef, engineRef, activeModalRef, variantRef, previousVariantRef,

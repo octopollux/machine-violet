@@ -226,7 +226,7 @@ The campaign genre sets a default theme during game init. Each theme has **varia
 | `levelup` | During character advancement subagent |
 | `dev` | During dev mode (developer console) |
 
-The DM switches variants via `style_scene` or `set_ui_style` tool calls, or the engine switches automatically on mode changes (combat start, OOC entry, etc.).
+The DM switches variants via `style_scene` tool calls, or the engine switches automatically on mode changes (combat start, OOC entry, etc.).
 
 ### Theme resolution
 
@@ -404,11 +404,6 @@ update_modeline({ text: "HP: 42/42 | Loc: The Shattered Hall | Conditions: Poiso
 style_scene({ description: "cyberpunk neon" })
 style_scene({ key_color: "#8844aa", save_to_location: true, location: "the-shattered-hall" })
 style_scene({ description: "haunted forest", variant: "exploration" })
-```
-
-**`set_ui_style`** — Switch variant only (combat/exploration/ooc/levelup/dev). Still works for quick variant-only changes, but `style_scene` is preferred for full theme changes.
-```
-set_ui_style({ variant: "combat" })
 ```
 
 **`set_display_resources`** — Update which resources appear in the top frame for a character.
