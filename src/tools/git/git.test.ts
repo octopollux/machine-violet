@@ -285,7 +285,7 @@ describe("CampaignRepo rollback", () => {
   });
 
   it("produces linear history after rollback", async () => {
-    const { git, repo } = await setupWithHistory();
+    const { repo } = await setupWithHistory();
 
     // History before: init, auto1, scene, auto2, session (5 commits)
     const logBefore = await repo.getLog();
