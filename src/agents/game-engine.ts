@@ -4,7 +4,8 @@ import type { GameState } from "./game-state.js";
 import { agentLoopStreaming } from "./agent-loop.js";
 import type { AgentLoopConfig, TuiCommand, UsageStats } from "./agent-loop.js";
 import { ConversationManager } from "../context/conversation.js";
-import type { DroppedExchange, SerializedExchange } from "../context/conversation.js";
+import type { DroppedExchange } from "../context/conversation.js";
+import { narrativeLinesToMarkdown } from "../context/display-log.js";
 import { StatePersister } from "../context/state-persistence.js";
 import type { StateSlice } from "../context/state-persistence.js";
 import { SceneManager, buildScenePacing } from "./scene-manager.js";
@@ -165,9 +166,8 @@ export class GameEngine {
     if (this.repo) {
       const persister = this.persister;
       this.repo.preCommitHook = async () => {
-        // Snapshot current conversation + scene to disk so the commit
-        // captures the true in-memory state (including post-clear).
-        persister.persistConversation(this.conversation.serialize());
+        // Snapshot current scene to disk so the commit captures the
+        // true in-memory state. Display log is already append-flushed.
         this.persistCurrentScene();
         await persister.flush();
       };
@@ -243,11 +243,6 @@ export class GameEngine {
     return this.sceneManager;
   }
 
-  /** Get conversation manager (for shutdown serialization) */
-  getConversation(): ConversationManager {
-    return this.conversation;
-  }
-
   /** Get persister (for shutdown and resume) */
   getPersister(): StatePersister | null {
     return this.persister;
@@ -261,20 +256,6 @@ export class GameEngine {
   /** Update the UI state section of the DM's prefix (called from TUI layer). */
   setUIState(uiState: string | undefined): void {
     this.sceneManager.getSessionState().uiState = uiState;
-  }
-
-  /** Hydrate conversation from saved exchanges */
-  hydrateConversation(exchanges: SerializedExchange[]): void {
-    this.conversation = ConversationManager.hydrate(exchanges, this.gameState.config.context);
-    // Re-link scene manager to the new conversation instance
-    this.sceneManager = new SceneManager(
-      this.gameState,
-      this.sceneManager.getScene(),
-      this.conversation,
-      this.sceneManager.getSessionState(),
-      this.sceneManager.getFileIO(),
-      this.repo ?? undefined,
-    );
   }
 
   /**
@@ -450,11 +431,20 @@ export class GameEngine {
       };
       const dropped = this.conversation.addExchange(storedUserMessage, assistantMessage, toolMessages);
 
-      // Persist conversation and scene state after each exchange.
+      // Persist display log and scene state after each exchange.
       // Writes are fire-and-forget for crash resilience; CampaignRepo's
       // preCommitHook flushes them to disk before any git commit.
       if (this.persister) {
-        this.persister.persistConversation(this.conversation.serialize());
+        if (!opts?.skipTranscript) {
+          const logLines: import("../types/tui.js").NarrativeLine[] = [
+            { kind: "player", text: `[${characterName}] ${text}` },
+          ];
+          if (result.text) {
+            logLines.push({ kind: "dm", text: result.text });
+          }
+          logLines.push({ kind: "dm", text: "" }); // paragraph separator
+          this.persister.appendDisplayLog(narrativeLinesToMarkdown(logLines));
+        }
         const scene = this.sceneManager.getScene();
         this.persister.persistScene({
           precis: scene.precis,
@@ -981,7 +971,7 @@ export class GameEngine {
         sessionNumber: scene.sessionNumber,
         precis: scene.precis,
         transcript: scene.transcript,
-        conversation: this.conversation.serialize(),
+        conversationSize: this.conversation.size,
       });
       if (path) {
         this.callbacks.onDevLog?.(`[dev] debug dump saved: ${path}`);

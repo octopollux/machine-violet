@@ -27,7 +27,7 @@ export function PlayingPhase() {
     activeSession, setActiveSession, previousVariantRef,
     devModeEnabled,
     retryOverlay,
-    dispatchTuiCommand, onShutdown, onEndSession, onRecapDismissed,
+    dispatchTuiCommand, onShutdown, onEndSession,
   } = useGameContext();
   const { columns: cols, rows } = useTerminalSize();
   const tooSmall = cols < MIN_COLUMNS || rows < MIN_ROWS;
@@ -162,9 +162,7 @@ export function PlayingPhase() {
     // Scrollable modals (character sheet, recap)
     if (activeModal && (activeModal.kind === "character_sheet" || activeModal.kind === "recap")) {
       if (key.escape || key.return) {
-        const wasRecap = activeModal.kind === "recap";
         setActiveModal(null);
-        if (wasRecap) onRecapDismissed();
         return;
       }
       if (key.pageUp || key.pageDown) {

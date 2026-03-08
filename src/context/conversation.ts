@@ -77,35 +77,6 @@ export class ConversationManager {
     this.exchanges = [];
   }
 
-  /** Serialize exchanges for persistence. All fields are plain JSON-safe. */
-  serialize(): SerializedExchange[] {
-    return this.exchanges.map((ex) => ({
-      user: ex.user,
-      assistant: ex.assistant,
-      toolResults: ex.toolResults,
-      stubbed: ex.stubbed,
-    }));
-  }
-
-  /** Hydrate a ConversationManager from serialized data */
-  static hydrate(data: SerializedExchange[], config: ContextConfig): ConversationManager {
-    const mgr = new ConversationManager(config);
-    for (const ex of data) {
-      const estimatedTokens =
-        estimateMessageTokens(ex.user) +
-        estimateMessageTokens(ex.assistant) +
-        ex.toolResults.reduce((sum, tr) => sum + estimateMessageTokens(tr), 0);
-      mgr.exchanges.push({
-        user: ex.user,
-        assistant: ex.assistant,
-        toolResults: ex.toolResults,
-        estimatedTokens,
-        stubbed: ex.stubbed,
-      });
-    }
-    return mgr;
-  }
-
   /** Replace tool results older than stub_after with one-line stubs */
   private stubOldToolResults(): void {
     const stubAfter = this.config.tool_result_stub_after;
@@ -156,14 +127,6 @@ export class ConversationManager {
 export interface DroppedExchange {
   exchange: ConversationExchange;
   reason: "exchange_count" | "token_limit";
-}
-
-/** Serializable subset of ConversationExchange for persistence */
-export interface SerializedExchange {
-  user: Anthropic.MessageParam;
-  assistant: Anthropic.MessageParam;
-  toolResults: Anthropic.MessageParam[];
-  stubbed: boolean;
 }
 
 /** Replace a tool_result message with a terse stub */

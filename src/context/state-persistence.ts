@@ -6,8 +6,8 @@ import type { ClocksState } from "../types/clocks.js";
 import type { DecksState } from "../types/cards.js";
 import type { MapData } from "../types/maps.js";
 import type { SceneState } from "../agents/scene-manager.js";
-import type { SerializedExchange } from "./conversation.js";
 import type { StyleVariant } from "../types/tui.js";
+import { tailLines } from "./display-log.js";
 
 /** Paths within campaign root for persisted state files */
 export const STATE_FILES = {
@@ -16,8 +16,8 @@ export const STATE_FILES = {
   maps: "state/maps.json",
   decks: "state/decks.json",
   scene: "state/scene.json",
-  conversation: "state/conversation.json",
   ui: "state/ui.json",
+  displayLog: "state/display-log.md",
 } as const;
 
 export type StateSlice = "combat" | "clocks" | "maps" | "decks";
@@ -45,7 +45,6 @@ export interface LoadedState {
   maps?: Record<string, MapData>;
   decks?: DecksState;
   scene?: PersistedSceneState;
-  conversation?: SerializedExchange[];
   ui?: PersistedUIState;
 }
 
@@ -86,6 +85,20 @@ export class StatePersister {
     this.writeQueues.set(file, next);
   }
 
+  private async doAppend(file: string, content: string): Promise<void> {
+    try {
+      await this.fileIO.appendFile(this.path(file), content);
+    } catch (e) {
+      this.onError?.(e instanceof Error ? e : new Error(String(e)));
+    }
+  }
+
+  private enqueueAppend(file: string, content: string): void {
+    const prev = this.writeQueues.get(file) ?? Promise.resolve();
+    const next = prev.then(() => this.doAppend(file, content)).catch(() => { /* fire-and-forget */ });
+    this.writeQueues.set(file, next);
+  }
+
   /** Wait for all pending writes to complete. */
   async flush(): Promise<void> {
     await Promise.all(this.writeQueues.values());
@@ -122,12 +135,28 @@ export class StatePersister {
     this.enqueueWrite(STATE_FILES.scene, JSON.stringify(scene, null, 2));
   }
 
-  persistConversation(exchanges: SerializedExchange[]): void {
-    this.enqueueWrite(STATE_FILES.conversation, JSON.stringify(exchanges, null, 2));
-  }
-
   persistUI(state: PersistedUIState): void {
     this.enqueueWrite(STATE_FILES.ui, JSON.stringify(state, null, 2));
+  }
+
+  /** Append text to the rolling display log (human-readable, never cleared). */
+  appendDisplayLog(text: string): void {
+    this.enqueueAppend(STATE_FILES.displayLog, text);
+  }
+
+  /** Load the last N lines of the display log for TUI population on resume. */
+  async loadDisplayLogTail(maxLines: number): Promise<string[]> {
+    try {
+      const raw = await this.fileIO.readFile(this.path(STATE_FILES.displayLog));
+      if (!raw) return [];
+      return tailLines(raw, maxLines);
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException | null)?.code;
+      if (code !== "ENOENT") {
+        this.onError?.(e instanceof Error ? e : new Error(String(e)));
+      }
+      return [];
+    }
   }
 
   /** Load pending operation file (for crash recovery) */
@@ -135,23 +164,17 @@ export class StatePersister {
     return this.readJSON<import("../agents/scene-manager.js").PendingOperation>("pending-operation.json");
   }
 
-  /** Delete conversation state (called on clean session boundary) */
-  clearConversation(): void {
-    this.enqueueWrite(STATE_FILES.conversation, "");
-  }
-
   /** Load all persisted state files. Missing files return undefined per key. */
   async loadAll(): Promise<LoadedState> {
-    const [combat, clocks, maps, decks, scene, conversation, ui] = await Promise.all([
+    const [combat, clocks, maps, decks, scene, ui] = await Promise.all([
       this.readJSON<CombatState>(STATE_FILES.combat),
       this.readJSON<ClocksState>(STATE_FILES.clocks),
       this.readJSON<Record<string, MapData>>(STATE_FILES.maps),
       this.readJSON<DecksState>(STATE_FILES.decks),
       this.readJSON<PersistedSceneState>(STATE_FILES.scene),
-      this.readJSON<SerializedExchange[]>(STATE_FILES.conversation),
       this.readJSON<PersistedUIState>(STATE_FILES.ui),
     ]);
 
-    return { combat, clocks, maps, decks, scene, conversation, ui };
+    return { combat, clocks, maps, decks, scene, ui };
   }
 }

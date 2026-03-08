@@ -56,7 +56,6 @@ export interface GameContextValue {
   dispatchTuiCommand: (cmd: TuiCommand) => void;
   onShutdown: () => void;
   onEndSession: () => void;
-  onRecapDismissed: () => void;
 }
 
 const GameContext = createContext<GameContextValue | null>(null);

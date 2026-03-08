@@ -43,14 +43,7 @@ describe("writeDebugDump", () => {
       sessionNumber: 1,
       precis: "The party entered the tavern.",
       transcript: ["Player says hello.", "DM describes the room."],
-      conversation: [
-        {
-          user: { role: "user", content: "[Aria] hello" },
-          assistant: { role: "assistant", content: "Welcome..." },
-          toolResults: [],
-          stubbed: false,
-        },
-      ],
+      conversationSize: 3,
     });
 
     expect(result).toBeTruthy();
@@ -75,8 +68,7 @@ describe("writeDebugDump", () => {
     expect(content).toContain("Player says hello.");
     expect(content).toContain("DM describes the room.");
     expect(content).toContain("=== CONVERSATION ===");
-    expect(content).toContain("[Aria] hello");
-    expect(content).toContain("Welcome...");
+    expect(content).toContain("Active exchanges: 3");
   });
 
   it("creates .gitignore with .debug/ entry when none exists", async () => {
@@ -91,7 +83,7 @@ describe("writeDebugDump", () => {
       sessionNumber: 1,
       precis: "",
       transcript: [],
-      conversation: [],
+      conversationSize: 0,
     });
 
     const gitignore = fio.files[norm("/camp/.gitignore")];
@@ -111,7 +103,7 @@ describe("writeDebugDump", () => {
       sessionNumber: 1,
       precis: "",
       transcript: [],
-      conversation: [],
+      conversationSize: 0,
     });
 
     const gitignore = fio.files[norm("/camp/.gitignore")];
@@ -132,7 +124,7 @@ describe("writeDebugDump", () => {
       sessionNumber: 1,
       precis: "",
       transcript: [],
-      conversation: [],
+      conversationSize: 0,
     });
 
     // Should not duplicate
@@ -154,7 +146,7 @@ describe("writeDebugDump", () => {
       sessionNumber: 1,
       precis: "",
       transcript: [],
-      conversation: [],
+      conversationSize: 0,
     });
 
     expect(result).toBeNull();
@@ -172,7 +164,7 @@ describe("writeDebugDump", () => {
       sessionNumber: 1,
       precis: "",
       transcript: [],
-      conversation: [],
+      conversationSize: 0,
     });
 
     const dumpFile = Object.entries(fio.files).find(([k]) => k.includes("crash-"));
