@@ -134,7 +134,7 @@ export function ChoiceOverlay({
 
   // Description for highlighted choice (word-wrapped to fixed rows)
   const descText = hasDescriptions && selectedIndex < (descriptions?.length ?? 0)
-    ? descriptions![selectedIndex] ?? ""
+    ? (descriptions ?? [])[selectedIndex] ?? ""
     : "";
   const descLines = hasDescriptions ? wrapToFixedRows(descText, width, DESCRIPTION_ROWS) : [];
 
