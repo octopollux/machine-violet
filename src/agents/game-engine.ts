@@ -23,6 +23,7 @@ import { validateCampaign } from "../tools/validation/index.js";
 import { CampaignRepo, performRollback } from "../tools/git/index.js";
 import type { GitIO } from "../tools/git/index.js";
 import { writeDebugDump } from "../tools/filesystem/debug-dump.js";
+import { styleTheme } from "./subagents/theme-styler.js";
 
 // --- Types ---
 
@@ -488,8 +489,10 @@ export class GameEngine {
           await this.updateEntity(cmd);
         } else if (cmd.type === "dm_notes") {
           await this.handleDmNotes(cmd);
+        } else if (cmd.type === "style_scene") {
+          await this.handleStyleScene(cmd);
         } else if (cmd.type === "set_theme") {
-          // Persist to location entity if requested, then forward to TUI
+          // Direct theme command (from location auto-apply, OOC, etc.)
           if (cmd.save_to_location) {
             await this.saveThemeToLocation(cmd);
           }
@@ -789,6 +792,64 @@ export class GameEngine {
       const msg = e instanceof Error ? e.message : String(e);
       this.callbacks.onDevLog?.(`[dev] dm_notes: write failed — ${msg}`);
     }
+  }
+
+  // --- Theme styling ---
+
+  /**
+   * Handle a style_scene command from the DM.
+   * If `description` is present, spawns a Haiku subagent to interpret
+   * the natural-language request. Otherwise, dispatches directly.
+   */
+  private async handleStyleScene(cmd: TuiCommand): Promise<void> {
+    const description = cmd.description as string | undefined;
+    const directKeyColor = cmd.key_color as string | undefined;
+    const variant = cmd.variant as string | undefined;
+
+    let themeCmd: TuiCommand;
+
+    if (description) {
+      // Spawn theme stylist subagent
+      this.callbacks.onDevLog?.(`[dev] style_scene: spawning theme-styler for "${description}"`);
+      try {
+        const result = await styleTheme(
+          this.client,
+          description,
+          undefined, // current theme name not easily accessible here
+          undefined, // current key color not easily accessible here
+        );
+        accUsage(this.sessionUsage, result.usage);
+        this.callbacks.onUsageUpdate(this.sessionUsage);
+
+        if (!result.command) {
+          this.callbacks.onDevLog?.("[dev] style_scene: subagent returned unparseable response, skipping");
+          return;
+        }
+
+        themeCmd = result.command;
+        this.callbacks.onDevLog?.(`[dev] style_scene: subagent chose theme=${themeCmd.theme ?? "(unchanged)"} key_color=${themeCmd.key_color ?? "(unchanged)"}`);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        this.callbacks.onDevLog?.(`[dev] style_scene: subagent failed — ${msg}`);
+        return;
+      }
+    } else {
+      // Direct mode — just forward key_color/variant
+      themeCmd = { type: "set_theme" };
+      if (directKeyColor) themeCmd.key_color = directKeyColor;
+    }
+
+    // Apply variant if specified (mechanical, no subagent needed)
+    if (variant) themeCmd.variant = variant;
+
+    // Persist to location entity if requested
+    if (cmd.save_to_location) {
+      await this.saveThemeToLocation({ ...themeCmd, save_to_location: true, location: cmd.location });
+    }
+
+    // Forward to TUI
+    themeCmd.type = "set_theme";
+    this.callbacks.onTuiCommand(themeCmd);
   }
 
   // --- Theme <-> Location persistence ---

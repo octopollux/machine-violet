@@ -228,15 +228,16 @@ export default function App({ shutdownRef }: AppProps) {
     }
   }, []);
 
-  // Persist UI when theme/variant/modelines change (skip until hydration complete)
+  // Persist UI when theme/variant/keyColor/modelines change (skip until hydration complete)
   useEffect(() => {
     if (!hydratedRef.current) return;
     persisterRef.current?.persistUI({
       styleName: themeName,
       variant,
+      keyColor: keyColor !== DEFAULT_KEY_COLOR ? keyColor : undefined,
       modelines: Object.keys(modelines).length > 0 ? modelines : undefined,
     });
-  }, [themeName, variant, modelines]);
+  }, [themeName, variant, keyColor, modelines]);
 
   // Sync UI state to engine for DM prefix
   useEffect(() => {
@@ -424,6 +425,7 @@ export default function App({ shutdownRef }: AppProps) {
         setThemeName(loaded.ui.styleName);
       }
       setVariant(loaded.ui.variant);
+      if (loaded.ui.keyColor) setKeyColor(loaded.ui.keyColor);
       if (loaded.ui.modelines) setModelines(loaded.ui.modelines);
     }
 

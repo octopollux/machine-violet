@@ -470,7 +470,7 @@ describe("buildOOCTools", () => {
     expect(names).toContain("check_clocks");
     expect(names).toContain("create_entity");
     expect(names).toContain("update_entity");
-    expect(names).toContain("set_theme");
+    expect(names).toContain("style_scene");
     expect(names).toContain("show_character_sheet");
     expect(names).toContain("rollback");
   });
@@ -631,17 +631,17 @@ describe("buildOOCToolHandler (DM tools)", () => {
     expect(result.content).toContain("calendar");
   });
 
-  it("set_theme dispatches and calls onTuiCommand", async () => {
+  it("style_scene dispatches and calls onTuiCommand", async () => {
     const gs = mockGameState();
     const onTuiCommand = vi.fn();
     const handler = buildOOCToolHandler(undefined, "/camp", undefined, undefined, undefined, gs, onTuiCommand);
-    const result = await handler("set_theme", { theme: "gothic", key_color: "#8844aa" });
+    const result = await handler("style_scene", { key_color: "#8844aa" });
     expect(result.is_error).toBeUndefined();
-    expect(result.content).toBe("Applied: set_theme");
+    expect(result.content).toBe("Applied: style_scene");
     expect(onTuiCommand).toHaveBeenCalledOnce();
     const cmd = onTuiCommand.mock.calls[0][0] as TuiCommand;
-    expect(cmd.type).toBe("set_theme");
-    expect(cmd.theme).toBe("gothic");
+    expect(cmd.type).toBe("style_scene");
+    expect(cmd.key_color).toBe("#8844aa");
   });
 
   it("show_character_sheet dispatches and calls onTuiCommand", async () => {
@@ -783,7 +783,7 @@ describe("enterOOC with gameState", () => {
       const names = createCall.tools.map((t: { name: string }) => t.name);
       expect(names).toContain("roll_dice");
       expect(names).toContain("create_entity");
-      expect(names).toContain("set_theme");
+      expect(names).toContain("style_scene");
       expect(names).toContain("rollback");
     }
   });

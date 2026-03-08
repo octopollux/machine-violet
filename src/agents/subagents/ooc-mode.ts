@@ -30,7 +30,7 @@ const OOC_READONLY_TOOLS = [
 
 const OOC_ENTITY_TOOLS = ["create_entity", "update_entity"];
 
-const OOC_TUI_TOOLS = ["set_theme", "set_display_resources", "show_character_sheet"];
+const OOC_TUI_TOOLS = ["style_scene", "set_display_resources", "show_character_sheet"];
 
 const OOC_RECOVERY_TOOLS = ["rollback"];
 

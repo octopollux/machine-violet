@@ -687,21 +687,21 @@ const TOOL_DEFS: RegisteredTool[] = [
   },
   {
     definition: {
-      name: "set_theme",
-      description: "Switch the UI theme, key color, and/or variant. Optionally persist the theme to a location entity.",
+      name: "style_scene",
+      description: "Style the UI to match the current scene's mood. Use `description` for natural-language requests (\"make it darker\", \"cyberpunk neon\", \"haunted forest\") — a stylist agent picks the right theme, colors, and effects. Use `key_color` for simple hex-color changes. Use `variant` for mechanical state changes (combat/exploration).",
       input_schema: {
         type: "object" as const,
         properties: {
-          theme: { type: "string", description: "Theme name (gothic, arcane, terminal, clean)" },
-          key_color: { type: "string", description: "Hex color for swatch generation (e.g. #8844aa)" },
+          description: { type: "string", description: "Natural-language mood/aesthetic request (e.g. 'cyberpunk neon', 'dark forest', 'make it warmer')" },
+          key_color: { type: "string", description: "Direct hex color override (e.g. #8844aa) — skips the stylist agent" },
           variant: { type: "string", enum: ["exploration", "combat", "ooc", "levelup"] },
-          save_to_location: { type: "boolean", description: "If true, persist theme + key_color to the named location entity's front matter" },
+          save_to_location: { type: "boolean", description: "If true, persist resulting theme + key_color to the named location entity" },
           location: { type: "string", description: "Location slug/name to save theme to (required when save_to_location is true)" },
         },
       },
     },
     handler: (_state, input) => {
-      return ok(JSON.stringify({ type: "set_theme", ...input }));
+      return ok(JSON.stringify({ type: "style_scene", ...input }));
     },
   },
   {

@@ -73,7 +73,8 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
         if (cmd.style) setStyle({ name: cmd.style as string });
         break;
       }
-      case "set_theme": {
+      case "set_theme":
+      case "style_scene": {
         if (cmd.theme) setThemeName(cmd.theme as string);
         if (cmd.key_color) setKeyColor(cmd.key_color as string);
         if (cmd.variant) setVariant(cmd.variant as StyleVariant);

@@ -221,7 +221,7 @@ Legend: **R** = reads, **W** = writes (triggers persistence), **UI** = returns T
 | Tool | maps | clocks | combat | decks | config | activePlayerIndex | Notes |
 |------|------|--------|--------|-------|--------|-------------------|-------|
 | `update_modeline` | | | | | R | R | Reads config.players + activePlayerIndex for default character. Returns **UI**. |
-| `set_theme` | | | | | | | Returns **UI**. |
+| `style_scene` | | | | | | | Returns **UI**. `description` triggers Haiku subagent. |
 | `set_ui_style` | | | | | | | Returns **UI**. |
 | `set_display_resources` | | | | | | | Returns **UI**. |
 | `present_choices` | | | | | | | Returns **UI**. |

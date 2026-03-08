@@ -131,6 +131,7 @@ export const TUI_TOOLS = new Set([
   "update_modeline",
   "set_ui_style",
   "set_theme",
+  "style_scene",
   "set_display_resources",
   "present_choices",
   "present_roll",
