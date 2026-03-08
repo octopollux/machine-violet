@@ -199,7 +199,10 @@ export function buildScribeToolHandler(
       case "write_entity": {
         const mode = input.mode as string;
         const entityType = input.entity_type as string;
-        const entityName = input.name as string;
+        const entityName = input.name as string | undefined;
+        if (!entityName) {
+          return { content: "write_entity requires a 'name' field", is_error: true };
+        }
         const slug = slugify(entityName);
         const filePath = norm(entityPath(entityType, slug));
 

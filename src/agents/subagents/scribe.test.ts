@@ -232,6 +232,20 @@ describe("buildScribeToolHandler", () => {
     expect(content).not.toContain("\\n");
   });
 
+  it("returns error when write_entity is called without name", async () => {
+    const fio = mockFileIO();
+    const handler = buildScribeToolHandler(fio, "/camp", 1, [], []);
+
+    const result = await handler("write_entity", {
+      mode: "create",
+      entity_type: "character",
+      body: "A mysterious figure.",
+    });
+
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("name");
+  });
+
   it("returns error for unknown tool", async () => {
     const fio = mockFileIO();
     const handler = buildScribeToolHandler(fio, "/camp", 1, [], []);
