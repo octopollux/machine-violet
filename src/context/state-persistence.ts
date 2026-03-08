@@ -27,7 +27,6 @@ export interface PersistedSceneState {
   precis: string;
   openThreads?: string;
   npcIntents?: string;
-  dmNotes?: string;
   playerReads: SceneState["playerReads"];
   activePlayerIndex: number;
 }

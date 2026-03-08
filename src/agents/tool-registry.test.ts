@@ -314,36 +314,58 @@ describe("ToolRegistry", () => {
 
   // ====== DM NOTES ======
 
-  it("write_dm_notes returns TUI command with notes", () => {
+  it("dm_notes write returns TUI command with notes", () => {
     const reg = new ToolRegistry();
     const state = mockState();
-    const result = reg.dispatch(state, "write_dm_notes", {
+    const result = reg.dispatch(state, "dm_notes", {
+      action: "write",
       notes: "The innkeeper is secretly a spy for the Red Hand.",
     });
     expect(result.is_error).toBeUndefined();
     const parsed = JSON.parse(result.content);
-    expect(parsed.type).toBe("write_dm_notes");
+    expect(parsed.type).toBe("dm_notes");
+    expect(parsed.action).toBe("write");
     expect(parsed.notes).toBe("The innkeeper is secretly a spy for the Red Hand.");
   });
 
-  it("write_dm_notes trims whitespace", () => {
+  it("dm_notes read returns TUI command", () => {
     const reg = new ToolRegistry();
     const state = mockState();
-    const result = reg.dispatch(state, "write_dm_notes", {
+    const result = reg.dispatch(state, "dm_notes", { action: "read" });
+    expect(result.is_error).toBeUndefined();
+    const parsed = JSON.parse(result.content);
+    expect(parsed.type).toBe("dm_notes");
+    expect(parsed.action).toBe("read");
+  });
+
+  it("dm_notes write trims whitespace", () => {
+    const reg = new ToolRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "dm_notes", {
+      action: "write",
       notes: "  some notes  ",
     });
     const parsed = JSON.parse(result.content);
     expect(parsed.notes).toBe("some notes");
   });
 
-  it("write_dm_notes rejects empty notes", () => {
+  it("dm_notes write rejects empty notes", () => {
     const reg = new ToolRegistry();
     const state = mockState();
-    const result = reg.dispatch(state, "write_dm_notes", {
+    const result = reg.dispatch(state, "dm_notes", {
+      action: "write",
       notes: "   ",
     });
     expect(result.is_error).toBe(true);
     expect(result.content).toContain("empty");
+  });
+
+  it("dm_notes rejects invalid action", () => {
+    const reg = new ToolRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "dm_notes", { action: "delete" });
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("Invalid action");
   });
 
   it("getDefinitionsFor returns only requested tools, skips unknown", () => {

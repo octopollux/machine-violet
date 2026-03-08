@@ -1001,22 +1001,30 @@ const TOOL_DEFS: RegisteredTool[] = [
   },
   {
     definition: {
-      name: "write_dm_notes",
-      description: "Write or replace your private DM notes for the current scene. Use for secrets, plans, NPC motivations, and observations you want to remember but not show the player. Notes persist in the scene precis until the scene ends.",
+      name: "dm_notes",
+      description: "Read or write your private campaign-scope DM notes. This is your persistent scratchpad — use it for secrets, plot plans, NPC motivations, player observations, or anything you want to survive across scenes and context windows. Notes are always visible in your prefix.",
       input_schema: {
         type: "object" as const,
         properties: {
-          notes: { type: "string", description: "Your DM notes (replaces any previous notes for this scene)" },
+          action: { type: "string", enum: ["read", "write"], description: "Read current notes or write new ones" },
+          notes: { type: "string", description: "Your DM notes (replaces all previous notes). Required for write." },
         },
-        required: ["notes"],
+        required: ["action"],
       },
     },
     handler: (_state, input) => {
-      const notes = input.notes as string;
-      if (!notes || !notes.trim()) {
-        return err("Notes cannot be empty.");
+      const action = input.action as string;
+      if (action === "write") {
+        const notes = input.notes as string;
+        if (!notes || !notes.trim()) {
+          return err("Notes cannot be empty.");
+        }
+        return ok(JSON.stringify({ type: "dm_notes", action: "write", notes: notes.trim() }));
       }
-      return ok(JSON.stringify({ type: "write_dm_notes", notes: notes.trim() }));
+      if (action === "read") {
+        return ok(JSON.stringify({ type: "dm_notes", action: "read" }));
+      }
+      return err(`Invalid action: ${action}`);
     },
   },
 ];

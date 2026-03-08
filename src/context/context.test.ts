@@ -345,6 +345,44 @@ describe("buildCachedPrefix", () => {
     expect(allText).not.toContain("Player Read");
   });
 
+  it("includes DM Notes block in Tier 2 when provided", () => {
+    const { system } = buildCachedPrefix(mockConfig, {
+      dmPrompt: "You are the DM.",
+      personality: "Terse.",
+      dmNotes: "The innkeeper is a spy. Plot hook: missing merchant.",
+    });
+
+    const allText = system.map((b) => b.text).join("\n");
+    expect(allText).toContain("## DM Notes");
+    expect(allText).toContain("The innkeeper is a spy");
+  });
+
+  it("omits DM Notes block when not provided", () => {
+    const { system } = buildCachedPrefix(mockConfig, {
+      dmPrompt: "You are the DM.",
+      personality: "Terse.",
+    });
+
+    const allText = system.map((b) => b.text).join("\n");
+    expect(allText).not.toContain("DM Notes");
+  });
+
+  it("places BP2 on DM Notes when it is the last Tier 2 block", () => {
+    const { system } = buildCachedPrefix(mockConfig, {
+      dmPrompt: "You are the DM.",
+      personality: "Terse.",
+      playerRead: "Engagement: high",
+      dmNotes: "Secret plot info.",
+    });
+
+    const dmNotesBlock = system.find((b) => b.text.includes("DM Notes")) as unknown as Record<string, unknown>;
+    expect(dmNotesBlock["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
+
+    // playerRead should NOT have cache_control since dmNotes comes after
+    const playerReadBlock = system.find((b) => b.text.includes("Player Read")) as unknown as Record<string, unknown>;
+    expect(playerReadBlock["cache_control"]).toBeUndefined();
+  });
+
   it("does not include Scene Pacing block (removed from prefix)", () => {
     const { system } = buildCachedPrefix(mockConfig, {
       dmPrompt: "You are the DM.",

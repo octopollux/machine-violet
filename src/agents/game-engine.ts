@@ -119,6 +119,7 @@ export class GameEngine {
   private model: AgentLoopConfig["model"];
   private persister: StatePersister | null;
   private fileIO: FileIO;
+  private sessionState: DMSessionState;
   private repo: CampaignRepo | null = null;
   private aiTurnDepth = 0;
   private turnCounter = 0;
@@ -141,6 +142,7 @@ export class GameEngine {
     this.registry = new ToolRegistry();
     this.gameState = params.gameState;
     this.fileIO = params.fileIO;
+    this.sessionState = params.sessionState;
 
     // Create CampaignRepo if gitIO provided
     if (params.gitIO) {
@@ -207,7 +209,7 @@ export class GameEngine {
       precis: scene.precis,
       openThreads: scene.openThreads || undefined,
       npcIntents: scene.npcIntents || undefined,
-      dmNotes: scene.dmNotes || undefined,
+
       playerReads: scene.playerReads,
       activePlayerIndex: this.gameState.activePlayerIndex,
     });
@@ -455,7 +457,7 @@ export class GameEngine {
           precis: scene.precis,
           openThreads: scene.openThreads || undefined,
           npcIntents: scene.npcIntents || undefined,
-          dmNotes: scene.dmNotes || undefined,
+    
           playerReads: scene.playerReads,
           activePlayerIndex: this.gameState.activePlayerIndex,
         });
@@ -483,8 +485,8 @@ export class GameEngine {
           await this.createEntity(cmd);
         } else if (cmd.type === "update_entity") {
           await this.updateEntity(cmd);
-        } else if (cmd.type === "write_dm_notes") {
-          await this.writeDmNotes(cmd);
+        } else if (cmd.type === "dm_notes") {
+          await this.handleDmNotes(cmd);
         } else if (cmd.type === "set_theme") {
           // Persist to location entity if requested, then forward to TUI
           if (cmd.save_to_location) {
@@ -763,21 +765,28 @@ export class GameEngine {
     }
   }
 
-  /** Write DM notes for the current scene (from write_dm_notes tool) */
-  private async writeDmNotes(cmd: TuiCommand): Promise<void> {
-    const notes = (cmd.notes as string).trim();
-    const scene = this.sceneManager.getScene();
-    scene.dmNotes = notes;
+  /** Handle dm_notes tool (read/write campaign-scope DM notes) */
+  private async handleDmNotes(cmd: TuiCommand): Promise<void> {
+    const paths = campaignPaths(this.gameState.campaignRoot);
+    const filePath = norm(paths.dmNotes);
 
-    // Also persist to the scene's dm-notes.md file
+    if (cmd.action === "read") {
+      // Read is a no-op for the engine — notes are already in the prefix.
+      // The tool result from the registry returns the TUI command; the actual
+      // content is injected via DMSessionState.dmNotes in the cached prefix.
+      this.callbacks.onDevLog?.("[dev] dm_notes: read (notes already in prefix)");
+      return;
+    }
+
+    // Write
+    const notes = (cmd.notes as string).trim();
     try {
-      const paths = campaignPaths(this.gameState.campaignRoot);
-      const filePath = norm(paths.sceneDmNotes(scene.sceneNumber, scene.slug));
       await this.fileIO.writeFile(filePath, notes);
-      this.callbacks.onDevLog?.(`[dev] write_dm_notes: wrote ${notes.length} chars → ${filePath}`);
+      this.sessionState.dmNotes = notes;
+      this.callbacks.onDevLog?.(`[dev] dm_notes: wrote ${notes.length} chars → ${filePath}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      this.callbacks.onDevLog?.(`[dev] write_dm_notes: file write failed — ${msg}`);
+      this.callbacks.onDevLog?.(`[dev] dm_notes: write failed — ${msg}`);
     }
   }
 

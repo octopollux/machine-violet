@@ -60,5 +60,6 @@ export function campaignPaths(root: string) {
       join(sceneDir(root, n, slug), "transcript.md"),
     sceneDmNotes: (n: number, slug: string) =>
       join(sceneDir(root, n, slug), "dm-notes.md"),
+    dmNotes: join(root, "campaign", "dm-notes.md"),
   };
 }

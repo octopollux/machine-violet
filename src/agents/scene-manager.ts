@@ -36,8 +36,6 @@ export interface SceneState {
   npcIntents: string;
   playerReads: PlayerRead[];
   sessionNumber: number;
-  /** DM-only scratchpad notes for the current scene, written via write_dm_notes tool. */
-  dmNotes: string;
 }
 
 export type PendingStep =
@@ -676,7 +674,6 @@ export class SceneManager {
     this.scene.precis = "";
     this.scene.openThreads = "";
     this.scene.npcIntents = "";
-    this.scene.dmNotes = "";
     this.scene.playerReads = [];
     this.sceneEntityIndex.clear();
   }
@@ -896,7 +893,6 @@ export async function detectSceneState(campaignRoot: string, io: FileIO): Promis
     precis: "",
     openThreads: "",
     npcIntents: "",
-    dmNotes: "",
     playerReads: [],
     sessionNumber: maxSession + 1,
   };
@@ -996,12 +992,11 @@ export function classifyTranscriptEntry(entry: string): { kind: "dm" | "player" 
  * exchange count, open thread count, and whether any threads
  * have been resolved (precis updates happened but thread count stayed or dropped).
  */
-/** Assemble the scene precis string from precis text, NPC intents, open threads, and DM notes. */
+/** Assemble the scene precis string from precis text, NPC intents, and open threads. */
 export function buildScenePrecis(scene: SceneState): string {
   let result = scene.precis;
   if (scene.npcIntents) result += `\nNPC intents: ${scene.npcIntents}`;
   if (scene.openThreads) result += `\nOpen: ${scene.openThreads}`;
-  if (scene.dmNotes) result += `\nDM notes: ${scene.dmNotes}`;
   return result;
 }
 

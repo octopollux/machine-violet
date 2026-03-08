@@ -19,6 +19,7 @@ export interface DMSessionState {
   activeState?: string;
   scenePrecis?: string;
   playerRead?: string;
+  dmNotes?: string;
   entityIndex?: string;
   uiState?: string;
 }
