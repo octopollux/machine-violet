@@ -253,11 +253,13 @@ describe("CampaignRepo rollback", () => {
     expect(result.summary).toContain("session 1");
   });
 
-  it("rolls back by exchanges_ago", async () => {
+  it("rolls back by exchanges_ago (skips current auto commit)", async () => {
     const { repo } = await setupWithHistory();
 
+    // exchanges_ago:1 should undo the last exchange, restoring to the
+    // auto commit BEFORE the most recent one (exchanges 1-3, not 4-6)
     const result = await repo.rollback("exchanges_ago:1");
-    expect(result.summary).toContain("auto:");
+    expect(result.summary).toContain("exchanges 1-3");
   });
 
   it("throws on unknown target", async () => {

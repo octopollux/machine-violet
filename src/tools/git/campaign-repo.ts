@@ -393,14 +393,15 @@ function resolveTarget(log: CommitInfo[], target: string): CommitInfo | null {
     return log[0] ?? null;
   }
 
-  // "exchanges_ago:N" — find the Nth auto commit
+  // "exchanges_ago:N" — undo N exchanges (skip the most recent auto commit,
+  // which represents the current state, then count N auto commits back)
   if (target.startsWith("exchanges_ago:")) {
     const n = parseInt(target.split(":")[1], 10);
     let count = 0;
     for (const entry of log) {
       if (entry.type === "auto") {
         count++;
-        if (count >= n) return entry;
+        if (count > n) return entry;
       }
     }
     return null;
