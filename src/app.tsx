@@ -419,19 +419,19 @@ export default function App({ shutdownRef }: AppProps) {
 
       setNarrativeLines([...historyLines, { kind: "system", text: `Welcome back to ${config.name}.` }, { kind: "dm", text: "" }]);
 
-      // Always send resume instruction (conversation starts fresh each session)
-      const activePlayer = getActivePlayer(gs);
-      const resumeParts = ["[Session resumes. Continue the narrative where we left off."];
-      if (config.premise) resumeParts.push(`Campaign premise: ${config.premise}`);
-      const pc = config.players[0];
-      if (pc) resumeParts.push(`The player character is ${pc.character}.`);
-      resumeParts.push("Pick up naturally from the last scene — do NOT restart, re-introduce the setting, or recap what has already happened.");
-
+      // Only prompt the DM with a resume instruction when there's a session
+      // recap (i.e. a full session boundary happened). Otherwise the player
+      // has visual continuity via the display log and can just start typing.
       if (recap) {
+        const activePlayer = getActivePlayer(gs);
+        const resumeParts = ["[Session resumes. Continue the narrative where we left off."];
+        if (config.premise) resumeParts.push(`Campaign premise: ${config.premise}`);
+        const pc = config.players[0];
+        if (pc) resumeParts.push(`The player character is ${pc.character}.`);
+        resumeParts.push("Pick up naturally from the last scene — do NOT restart, re-introduce the setting, or recap what has already happened.");
+
         setActiveModal({ kind: "recap", lines: recap.split("\n") });
         pendingResumeRef.current = { characterName: activePlayer.characterName, text: resumeParts.join(" ") + "]" };
-      } else {
-        await engine.processInput(activePlayer.characterName, resumeParts.join(" ") + "]", { skipTranscript: true });
       }
       setPhase("playing");
     } else {
