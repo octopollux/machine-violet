@@ -119,6 +119,7 @@ export class GameEngine {
   private model: AgentLoopConfig["model"];
   private persister: StatePersister | null;
   private fileIO: FileIO;
+  private sessionState: DMSessionState;
   private repo: CampaignRepo | null = null;
   private aiTurnDepth = 0;
   private turnCounter = 0;
@@ -141,6 +142,7 @@ export class GameEngine {
     this.registry = new ToolRegistry();
     this.gameState = params.gameState;
     this.fileIO = params.fileIO;
+    this.sessionState = params.sessionState;
 
     // Create CampaignRepo if gitIO provided
     if (params.gitIO) {
@@ -207,6 +209,7 @@ export class GameEngine {
       precis: scene.precis,
       openThreads: scene.openThreads || undefined,
       npcIntents: scene.npcIntents || undefined,
+
       playerReads: scene.playerReads,
       activePlayerIndex: this.gameState.activePlayerIndex,
     });
@@ -454,6 +457,7 @@ export class GameEngine {
           precis: scene.precis,
           openThreads: scene.openThreads || undefined,
           npcIntents: scene.npcIntents || undefined,
+    
           playerReads: scene.playerReads,
           activePlayerIndex: this.gameState.activePlayerIndex,
         });
@@ -481,6 +485,8 @@ export class GameEngine {
           await this.createEntity(cmd);
         } else if (cmd.type === "update_entity") {
           await this.updateEntity(cmd);
+        } else if (cmd.type === "dm_notes") {
+          await this.handleDmNotes(cmd);
         } else if (cmd.type === "set_theme") {
           // Persist to location entity if requested, then forward to TUI
           if (cmd.save_to_location) {
@@ -756,6 +762,31 @@ export class GameEngine {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       this.callbacks.onDevLog?.(`[dev] update_entity: failed for "${name}" — ${msg}`);
+    }
+  }
+
+  /** Handle dm_notes tool (read/write campaign-scope DM notes) */
+  private async handleDmNotes(cmd: TuiCommand): Promise<void> {
+    const paths = campaignPaths(this.gameState.campaignRoot);
+    const filePath = norm(paths.dmNotes);
+
+    if (cmd.action === "read") {
+      // Read is a no-op for the engine — notes are already in the prefix.
+      // The tool result from the registry returns the TUI command; the actual
+      // content is injected via DMSessionState.dmNotes in the cached prefix.
+      this.callbacks.onDevLog?.("[dev] dm_notes: read (notes already in prefix)");
+      return;
+    }
+
+    // Write
+    const notes = (cmd.notes as string).trim();
+    try {
+      await this.fileIO.writeFile(filePath, notes);
+      this.sessionState.dmNotes = notes;
+      this.callbacks.onDevLog?.(`[dev] dm_notes: wrote ${notes.length} chars → ${filePath}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.callbacks.onDevLog?.(`[dev] dm_notes: write failed — ${msg}`);
     }
   }
 

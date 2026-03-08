@@ -26,6 +26,7 @@ export interface PrefixSections {
   activeState?: string;
   scenePrecis?: string;
   playerRead?: string;
+  dmNotes?: string;
   entityIndex?: string;
   uiState?: string;
 }
@@ -137,6 +138,14 @@ export function buildCachedPrefix(
     blocks.push({
       type: "text",
       text: `\n\n## Player Read\n${sections.playerRead}`,
+    });
+  }
+
+  // DM notes (campaign-scope scratchpad)
+  if (sections.dmNotes) {
+    blocks.push({
+      type: "text",
+      text: `\n\n## DM Notes\n${sections.dmNotes}`,
     });
   }
 

@@ -36,7 +36,7 @@ import { useGameCallbacks } from "./tui/hooks/useGameCallbacks.js";
 import { useRawModeGuardian } from "./tui/hooks/useRawModeGuardian.js";
 import { isDevMode, wrapFileIOWithDevLog } from "./config/dev-mode.js";
 import { setContextDumpDir } from "./config/context-dump.js";
-import { sandboxFileIO } from "./tools/filesystem/index.js";
+import { sandboxFileIO, campaignPaths } from "./tools/filesystem/index.js";
 
 import { FirstLaunchPhase } from "./phases/FirstLaunchPhase.js";
 import { MainMenuPhase } from "./phases/MainMenuPhase.js";
@@ -286,6 +286,15 @@ export default function App({ shutdownRef }: AppProps) {
       : { sceneNumber: 1, slug: "opening", transcript: [], precis: "", openThreads: "", npcIntents: "", playerReads: [], sessionNumber: 1 };
 
     const sessionState: DMSessionState = {};
+
+    // Load campaign-scope DM notes (if they exist)
+    try {
+      const dmNotesPath = campaignPaths(campaignRoot).dmNotes;
+      if (await fileIO.current.exists(dmNotesPath)) {
+        sessionState.dmNotes = await fileIO.current.readFile(dmNotesPath);
+      }
+    } catch { /* ignore — file may not exist yet */ }
+
     const client = new Anthropic();
     clientRef.current = client;
 

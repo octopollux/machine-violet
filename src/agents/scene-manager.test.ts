@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
-import { SceneManager, parseTranscriptEntries, classifyTranscriptEntry, buildScenePacing, buildSceneAnchor, detectSceneState } from "./scene-manager.js";
+import { SceneManager, parseTranscriptEntries, classifyTranscriptEntry, buildScenePrecis, buildScenePacing, buildSceneAnchor, detectSceneState } from "./scene-manager.js";
 import type { SceneState, FileIO } from "./scene-manager.js";
 import type { CampaignRepo } from "../tools/git/index.js";
 import type { GameState } from "./game-state.js";
@@ -69,6 +69,7 @@ function mockScene(): SceneState {
     precis: "",
     openThreads: "",
     npcIntents: "",
+
     playerReads: [],
     sessionNumber: 1,
   };
@@ -1187,6 +1188,33 @@ describe("classifyTranscriptEntry", () => {
     const result = classifyTranscriptEntry("**DM:** First paragraph.\n\nSecond paragraph.");
     expect(result.kind).toBe("dm");
     expect(result.text).toBe("First paragraph.\n\nSecond paragraph.");
+  });
+});
+
+describe("buildScenePrecis", () => {
+  it("includes precis text alone when no extras", () => {
+    const scene = mockScene();
+    scene.precis = "The party entered the tavern.";
+    expect(buildScenePrecis(scene)).toBe("The party entered the tavern.");
+  });
+
+  it("appends NPC intents and open threads", () => {
+    const scene = mockScene();
+    scene.precis = "Combat began.";
+    scene.npcIntents = "[[Grimjaw]] intends to flank";
+    scene.openThreads = "[[goblin-ambush]]";
+    const result = buildScenePrecis(scene);
+    expect(result).toContain("Combat began.");
+    expect(result).toContain("NPC intents: [[Grimjaw]] intends to flank");
+    expect(result).toContain("Open: [[goblin-ambush]]");
+  });
+
+  it("omits NPC intents when empty", () => {
+    const scene = mockScene();
+    scene.precis = "Exploring the ruins.";
+    scene.npcIntents = "";
+    const result = buildScenePrecis(scene);
+    expect(result).not.toContain("NPC intents:");
   });
 });
 

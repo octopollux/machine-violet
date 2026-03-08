@@ -123,6 +123,7 @@ function mockSceneManager(scene?: Partial<SceneState>): SceneManager {
       transcript: ["**DM:** You enter.", "**[Kael]** I look around."],
       precis: "A brawl broke out in the tavern.",
       openThreads: "Who started the fight?",
+      npcIntents: "",
       playerReads: [],
       sessionNumber: 1,
       ...scene,
