@@ -331,14 +331,4 @@ Haiku, silent. Summarizes campaign book structure for DM cached prefix. See [doc
 | 13 | Theme Styler | Haiku | Silent | Runtime — natural-language theme interpretation |
 | 16 | Dev Mode | Sonnet | Player-facing | Runtime — developer console |
 
-### Model distribution (implemented)
-
-- **Haiku**: 10 subagents (cheap mechanical work)
-- **Sonnet**: 4 subagents (OOC, setup agent, setup conversation, dev mode)
-- **Haiku/Sonnet configurable**: 1 (AI player)
-- **Opus**: 0 subagents (Opus IS the DM, never delegated to)
-
-### Visibility distribution (implemented)
-
-- **Silent**: 11 (DM-only, player never sees)
-- **Player-facing**: 4 (OOC, setup agent, setup conversation, dev mode)
+**Opus is never a subagent** — Opus IS the DM. All subagents are Haiku (cheap mechanical work) or Sonnet (personality/quality needed). The summary table above is the canonical list; model and visibility are columns, not separate counts to maintain.

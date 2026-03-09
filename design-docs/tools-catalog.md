@@ -152,25 +152,6 @@ Note: `promote_character` is not a registered tool — it's a subagent function 
 
 ---
 
-## Summary
-
-| Domain | Tool count | Tiers |
-|---|---|---|
-| Map queries | 6 | T1 |
-| Map mutations | 5 | T1 |
-| Map bulk setup | 3 | T1 |
-| Randomization (primitives) | 2 | T1 |
-| Clocks | 5 | T1 |
-| Combat | 4 | T1 |
-| Scene/Session | 3 | T1+T2 |
-| Entity | 1 | T2 |
-| Worldbuilding | 1 | T1 |
-| TUI | 6 | T1, T1+T2 |
-| Player Management | 1 | T1 |
-| OOC/Mode | 1 | T1 |
-| Error recovery | 1 | T1 |
-| **Total** | **39** | |
-
 ### Not tools (engine-managed, no DM call needed)
 
 These are automatic behaviors, not callable tools:
