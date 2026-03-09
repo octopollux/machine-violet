@@ -221,7 +221,7 @@ Drives the entire game initialization conversation. Personality: dramatic, the o
 
 | Property | Value |
 |---|---|
-| **Model** | Haiku |
+| **Model** | Sonnet |
 | **Visibility** | Player-facing |
 | **Trigger** | Setup agent delegates interactive campaign generation |
 | **Source doc** | [game-initialization.md](game-initialization.md) |
@@ -234,92 +234,84 @@ Multi-turn conversational subagent for interactive campaign setup. The setup age
 
 ---
 
-### 11. Character Creation Subagent (Crunchy)
-
-| Property | Value |
-|---|---|
-| **Model** | Haiku |
-| **Visibility** | Player-facing |
-| **Trigger** | Setup agent delegates during chargen for rules-heavy systems |
-| **Source doc** | [game-initialization.md](game-initialization.md) |
-
-Walks the player through mechanical character creation — race, class, stats, background, equipment. Follows the system's chargen rules exactly.
-
-**Context**: Game system chargen rules + player's choices so far. ~3-5K tokens.
-
-**Returns**: Completed character file written to `characters/`.
-
----
-
-### 12. PDF Extraction Subagent
-
-| Property | Value |
-|---|---|
-| **Model** | Haiku (vision) |
-| **Visibility** | Silent |
-| **Trigger** | Document import pipeline, Phase 1 |
-| **Source doc** | [document-ingestion.md](document-ingestion.md) |
-
-Extracts structured text from PDF pages. Uses vision for complex layouts (multi-column, stat blocks, sidebars). Each page processed independently.
-
-**Context**: One PDF page (image or text) + extraction instructions. ~1-2K tokens input.
-
-**Returns**: Structured markdown of the page content.
-
----
-
-### 13. PDF Organization Subagent
+### 11. Narrative Recap Generator
 
 | Property | Value |
 |---|---|
 | **Model** | Haiku |
 | **Visibility** | Silent |
-| **Trigger** | Document import pipeline, Phase 2 |
-| **Source doc** | [document-ingestion.md](document-ingestion.md) |
+| **Trigger** | Session resume — converts bullet recap to prose |
+| **Source** | `src/agents/subagents/narrative-recap.ts` |
 
-Reads extracted content from Phase 1 and sorts it into the entity filesystem: rules → `rules/`, locations → `locations/`, NPCs → `characters/`, etc. Converts cross-references to wikilinks.
+Converts bullet-point session recap to narrative prose for the "Previously on..." modal at session start.
 
-**Context**: Extracted page content + filesystem structure. Variable size.
+**Context**: Bullet-point recap + campaign name. ~500 tokens.
 
-**Returns**: Files written to campaign directory.
+**Returns**: Narrative prose recap. ~100-200 tokens.
 
 ---
 
-### 14. Rule Card Distiller
+### 12. Repair State Subagent
 
 | Property | Value |
 |---|---|
 | **Model** | Haiku |
 | **Visibility** | Silent |
-| **Trigger** | Game init (after rules import) or document import pipeline |
-| **Source doc** | [randomization.md](randomization.md), [document-ingestion.md](document-ingestion.md) |
+| **Trigger** | Campaign operations — scans for missing entities |
+| **Source** | `src/agents/subagents/repair-state.ts` |
 
-Reads full game rules and produces dense reference cards — compressed cheat sheets optimized for mechanical resolution. Cuts rules payload by 60-80% for crunchy systems.
+Scans scene transcripts for wikilink targets and generates missing entity files. Ensures the entity filesystem stays consistent with what's been narrated.
 
-**Context**: Full rules text for a topic (e.g., combat chapter). Variable size.
+**Context**: Transcript text + existing entity list. Variable size.
 
-**Returns**: Distilled rule card markdown. ~200-500 tokens per topic.
+**Returns**: `RepairResult` — list of entities created/updated.
 
 ---
 
-### 15. DM Cheat Sheet Generator
+### 13. Theme Styler Subagent
 
 | Property | Value |
 |---|---|
 | **Model** | Haiku |
 | **Visibility** | Silent |
-| **Trigger** | Document import pipeline, Phase 3 (campaign books only) |
-| **Source doc** | [document-ingestion.md](document-ingestion.md) |
+| **Trigger** | DM calls `style_scene({ description })` |
+| **Source** | `src/agents/subagents/theme-styler.ts` |
 
-Summarizes campaign book structure into a dense cheat sheet: act/chapter breakdown, key NPCs, plot branches, ticking clocks, important locations. Goes into the DM's cached prefix at session start.
+Translates natural-language theme requests (e.g., "cyberpunk neon") into structured theme commands. Interprets the DM's aesthetic intent and maps it to the theme system.
 
-**Context**: Full organized campaign content. Variable size.
+**Context**: Description string + current theme + current key color. ~200 tokens.
 
-**Returns**: DM cheat sheet markdown. ~500-1000 tokens.
+**Returns**: `ThemeStylerResult` with parsed TUI command.
 
 ---
 
-## Summary
+## Planned Subagents (Not Yet Implemented)
+
+> These subagents are designed but have no code. Each links to its tracking issue.
+
+### Character Creation Subagent (Crunchy) — [#69](https://github.com/Orthodox-531/tui-rpg/issues/69)
+
+Haiku, player-facing. Walks player through mechanical chargen for rules-heavy systems. See [game-initialization.md](game-initialization.md).
+
+### Rule Card Distiller — [#68](https://github.com/Orthodox-531/tui-rpg/issues/68)
+
+Haiku, silent. Reads full game rules, produces dense reference cards. Cuts rules payload by 60-80%. See [randomization.md](randomization.md).
+
+### PDF Extraction Subagent — [#67](https://github.com/Orthodox-531/tui-rpg/issues/67)
+
+Haiku (vision), silent. Extracts structured text from PDF pages. See [document-ingestion.md](document-ingestion.md).
+
+### PDF Organization Subagent — [#67](https://github.com/Orthodox-531/tui-rpg/issues/67)
+
+Haiku, silent. Sorts extracted PDF content into entity filesystem. See [document-ingestion.md](document-ingestion.md).
+
+### DM Cheat Sheet Generator — [#67](https://github.com/Orthodox-531/tui-rpg/issues/67)
+
+Haiku, silent. Summarizes campaign book structure for DM cached prefix. See [document-ingestion.md](document-ingestion.md).
+
+---
+
+## Summary (Implemented Only)
 
 | # | Subagent | Model | Visibility | When |
 |---|---|---|---|---|
@@ -329,25 +321,24 @@ Summarizes campaign book structure into a dense cheat sheet: act/chapter breakdo
 | 4 | Scene Summarizer | Haiku | Silent | Runtime — scene transition |
 | 5 | Precis Updater + PlayerRead | Haiku | Silent | Runtime — context pruning + engagement tracking |
 | 6 | Changelog Updater | Haiku | Silent | Runtime — scene transition |
+| 6b | Scribe | Haiku | Silent | Runtime — entity file management |
 | 7 | Character Promotion | Haiku | Silent | Runtime — on demand |
 | 8 | AI Player | Haiku/Sonnet | Silent | Runtime — AI player turns |
 | 9 | Setup Agent | Sonnet | Player-facing | Init — game setup (orchestrator) |
-| 10 | Setup Conversation | Haiku | Player-facing | Init — interactive campaign generation |
-| 11 | Character Creation | Haiku | Player-facing | Init — crunchy chargen |
-| 12 | PDF Extraction | Haiku (vision) | Silent | Init — document import |
-| 13 | PDF Organization | Haiku | Silent | Init — document import |
-| 14 | Rule Card Distiller | Haiku | Silent | Init — rules compression |
-| 15 | DM Cheat Sheet | Haiku | Silent | Init — campaign book summary |
+| 10 | Setup Conversation | Sonnet | Player-facing | Init — interactive campaign generation |
+| 11 | Narrative Recap | Haiku | Silent | Runtime — session resume prose |
+| 12 | Repair State | Haiku | Silent | Runtime — missing entity generation |
+| 13 | Theme Styler | Haiku | Silent | Runtime — natural-language theme interpretation |
 | 16 | Dev Mode | Sonnet | Player-facing | Runtime — developer console |
 
-### Model distribution
+### Model distribution (implemented)
 
-- **Haiku**: 12 subagents (cheap mechanical work)
-- **Sonnet**: 3 subagents (OOC, setup orchestrator, dev mode — need personality/quality)
+- **Haiku**: 10 subagents (cheap mechanical work)
+- **Sonnet**: 4 subagents (OOC, setup agent, setup conversation, dev mode)
 - **Haiku/Sonnet configurable**: 1 (AI player)
 - **Opus**: 0 subagents (Opus IS the DM, never delegated to)
 
-### Visibility distribution
+### Visibility distribution (implemented)
 
-- **Silent**: 10 (DM-only, player never sees)
-- **Player-facing**: 6 (OOC, setup, setup conversation, crunchy chargen, resolution when input needed, dev mode)
+- **Silent**: 11 (DM-only, player never sees)
+- **Player-facing**: 4 (OOC, setup agent, setup conversation, dev mode)
