@@ -679,7 +679,8 @@ export class GameEngine {
         this.sceneManager.notifyEntityTouched(filePath, slug);
       }
 
-      this.accUsage(result.usage);
+      accUsage(this.sessionUsage, result.usage);
+      this.callbacks.onUsageUpdate(this.sessionUsage);
       this.callbacks.onDevLog?.(`[dev] scribe: ${result.summary}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
