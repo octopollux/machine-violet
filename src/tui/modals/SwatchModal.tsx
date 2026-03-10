@@ -36,15 +36,14 @@ export function SwatchModal({ theme, width, height, topOffset }: SwatchModalProp
     .map(([part, value]) => `${part}: ${value}`)
     .join("  ");
 
-  const gridWidth = headerLine.length + 4;
-  // Content rows: header + grid rows + blank + assignments
-  const contentRows = 1 + harmonySwatch.length + 1 + 1;
-
   // Compute inner content width (same formula as CenteredModal)
   const sideWidth = theme.asset.components.edge_left.width;
   const sidePadding = 1;
-  const modalWidth = gridWidth; // minWidth == maxWidth == gridWidth
-  const innerWidth = modalWidth - 2 * sideWidth - 2 * sidePadding;
+  const gridWidth = headerLine.length + 2 * sideWidth + 2 * sidePadding;
+  const innerWidth = gridWidth - 2 * sideWidth - 2 * sidePadding;
+
+  // Content rows: header + grid rows + blank + assignments
+  const contentRows = 1 + harmonySwatch.length + 1 + 1;
 
   return (
     <CenteredModal

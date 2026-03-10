@@ -100,8 +100,8 @@ describe("swatch", () => {
     it("analogous: 3 anchors ±30°", () => {
       const anchors = generateAnchors(base, "analogous");
       expect(anchors).toHaveLength(3);
-      // Middle anchor is base hue
-      expect(anchors[1]).toBeCloseTo(baseHue, 1);
+      // First anchor is base hue
+      expect(anchors[0]).toBeCloseTo(baseHue, 1);
     });
 
     it("complementary: 2 anchors 180° apart", () => {

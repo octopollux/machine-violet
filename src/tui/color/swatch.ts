@@ -111,7 +111,7 @@ export function generateAnchors(baseHex: string, harmony: HarmonyType): number[]
 
   switch (harmony) {
     case "analogous":
-      return [normalizeHue(H - 30), H, normalizeHue(H + 30)];
+      return [H, normalizeHue(H - 30), normalizeHue(H + 30)];
     case "complementary":
       return [H, normalizeHue(H + 180)];
     case "split-complementary":

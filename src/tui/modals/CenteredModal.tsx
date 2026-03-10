@@ -208,7 +208,7 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
               {contentRows}
             </ScrollView>
             {linesBelow > 0 && (
-              <Box position="absolute" width={innerWidth} marginTop={visibleRows - 1} justifyContent="flex-end">
+              <Box position="absolute" width={fullRowWidth} marginTop={visibleRows - 1} justifyContent="flex-end">
                 <Text color="greenBright">{` scroll (${linesBelow}) more `}</Text>
               </Box>
             )}

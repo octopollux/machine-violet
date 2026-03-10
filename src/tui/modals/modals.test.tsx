@@ -8,6 +8,7 @@ import { GameMenu, getMenuItems } from "./GameMenu.js";
 import { CharacterSheetModal } from "./CharacterSheetModal.js";
 import { DiceRollModal } from "./DiceRollModal.js";
 import { SessionRecapModal } from "./SessionRecapModal.js";
+import { SwatchModal } from "./SwatchModal.js";
 import { resolveTheme } from "../themes/resolver.js";
 import { resetThemeCache } from "../themes/loader.js";
 import { BUILTIN_DEFINITIONS } from "../themes/builtin-definitions.js";
@@ -411,5 +412,46 @@ describe("SessionRecapModal", () => {
     const frame = lastFrame()!;
     expect(frame).toContain("adventurers");
     expect(frame).toContain("catacombs");
+  });
+});
+
+describe("SwatchModal", () => {
+  it("renders the theme title in the frame", () => {
+    const { lastFrame } = render(
+      <Box width={100} height={30}>
+        <SwatchModal theme={theme} width={100} height={30} />
+      </Box>,
+    );
+    const frame = lastFrame();
+    expect(frame).toContain(theme.asset.name);
+  });
+
+  it("renders anchor row labels", () => {
+    const { lastFrame } = render(
+      <Box width={100} height={30}>
+        <SwatchModal theme={theme} width={100} height={30} />
+      </Box>,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("0:");
+    expect(frame).toContain("100:");
+  });
+
+  it("renders the dismiss footer", () => {
+    const { lastFrame } = render(
+      <Box width={100} height={30}>
+        <SwatchModal theme={theme} width={100} height={30} />
+      </Box>,
+    );
+    expect(lastFrame()).toContain("Press any key to dismiss");
+  });
+
+  it("renders colorMap assignment text", () => {
+    const { lastFrame } = render(
+      <Box width={100} height={30}>
+        <SwatchModal theme={theme} width={100} height={30} />
+      </Box>,
+    );
+    expect(lastFrame()).toContain("border:");
   });
 });

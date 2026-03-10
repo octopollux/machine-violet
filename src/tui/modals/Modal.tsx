@@ -1,7 +1,7 @@
 import React from "react";
 import { Text, Box } from "ink";
 import type { ResolvedTheme } from "../themes/types.js";
-import { ThemedHorizontalBorder } from "../components/ThemedFrame.js";
+import { ThemedHorizontalBorder, ThemedSideFrame } from "../components/ThemedFrame.js";
 import { themeColor } from "../themes/color-resolve.js";
 import { stringWidth } from "../frames/index.js";
 
@@ -25,14 +25,20 @@ export function Modal({ theme, width, title, lines }: ModalProps) {
   return (
     <Box flexDirection="column">
       <ThemedHorizontalBorder theme={theme} width={width} position="top" centerText={title} />
-      {lines.map((line, i) => {
-        const pad = Math.max(0, innerWidth - stringWidth(line));
-        return (
-          <Box key={i} flexDirection="row">
-            <Text color={textColor}>{" ".repeat(sideWidth + sidePadding)}{line}{" ".repeat(pad + sidePadding + sideWidth)}</Text>
-          </Box>
-        );
-      })}
+      <Box flexDirection="row">
+        <ThemedSideFrame theme={theme} side="left" height={lines.length} />
+        <Box flexDirection="column">
+          {lines.map((line, i) => {
+            const pad = Math.max(0, innerWidth - stringWidth(line));
+            return (
+              <Box key={i} flexDirection="row">
+                <Text color={textColor}>{" ".repeat(sidePadding)}{line}{" ".repeat(pad + sidePadding)}</Text>
+              </Box>
+            );
+          })}
+        </Box>
+        <ThemedSideFrame theme={theme} side="right" height={lines.length} />
+      </Box>
       <ThemedHorizontalBorder theme={theme} width={width} position="bottom" />
     </Box>
   );
