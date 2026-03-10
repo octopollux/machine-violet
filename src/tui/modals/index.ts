@@ -7,3 +7,4 @@ export { CharacterSheetModal } from "./CharacterSheetModal.js";
 export { DiceRollModal } from "./DiceRollModal.js";
 export { SessionRecapModal } from "./SessionRecapModal.js";
 export { ApiErrorModal } from "./ApiErrorModal.js";
+export { SwatchModal } from "./SwatchModal.js";

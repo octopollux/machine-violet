@@ -15,12 +15,7 @@ import {
 } from "../themes/composer.js";
 import { colorizeSegments, mirrorT, applyGradient, hexToOklch } from "../color/index.js";
 import type { GradientPreset } from "../color/index.js";
-
-/** Get hex color for a frame part from the resolved theme's swatch + color map. */
-function themeColor(theme: ResolvedTheme, part: keyof ResolvedTheme["colorMap"]): string | undefined {
-  const idx = theme.colorMap[part];
-  return theme.swatch[idx]?.hex;
-}
+import { themeColor } from "../themes/color-resolve.js";
 
 /** Render a string with per-character gradient coloring, or flat if no gradient. */
 function renderGradientRow(

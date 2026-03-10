@@ -6,7 +6,7 @@ import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, narrativeRows } from "../tui/responsive.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { Layout } from "../tui/layout.js";
-import { ChoiceOverlay, DESCRIPTION_ROWS, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, ApiErrorModal, getMenuItems } from "../tui/modals/index.js";
+import { ChoiceOverlay, DESCRIPTION_ROWS, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, ApiErrorModal, SwatchModal, getMenuItems } from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { getActivePlayer, switchToNextPlayer, getPlayerEntries } from "../agents/player-manager.js";
 import { createOOCSession } from "../agents/subagents/ooc-mode.js";
@@ -78,6 +78,7 @@ export function PlayingPhase() {
       previousVariant: previousVariantRef.current,
       setPreviousVariant: (v) => { previousVariantRef.current = v; },
       dispatchTuiCommand,
+      setActiveModal,
     })) {
       clearInput();
       return;
@@ -154,8 +155,8 @@ export function PlayingPhase() {
     // Retry overlay: block all input (triple-ESC above still works)
     if (retryOverlay) return;
 
-    // Dice modal: any key dismisses
-    if (activeModal && activeModal.kind === "dice") {
+    // Dice / swatch modal: any key dismisses
+    if (activeModal && (activeModal.kind === "dice" || activeModal.kind === "swatch")) {
       setActiveModal(null);
       return;
     }
@@ -449,6 +450,9 @@ export function PlayingPhase() {
           total={activeModal.total}
           reason={activeModal.reason}
         />
+      )}
+      {activeModal?.kind === "swatch" && (
+        <SwatchModal theme={theme} width={cols} />
       )}
       {activeModal?.kind === "recap" && (
         <SessionRecapModal

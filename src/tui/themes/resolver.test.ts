@@ -94,6 +94,35 @@ describe("resolveTheme", () => {
     expect(resolved.gradient).toBeUndefined();
   });
 
+  it("includes harmonySwatch with correct row count", () => {
+    const def = BUILTIN_DEFINITIONS["gothic"];
+    const resolved = resolveTheme(def, "exploration", "#cc4444");
+    // gothic uses ember preset with analogous harmony → 3 anchors
+    expect(resolved.harmonySwatch).toBeDefined();
+    expect(resolved.harmonySwatch.length).toBeGreaterThanOrEqual(2);
+    // swatch should equal harmonySwatch[0]
+    expect(resolved.swatch).toBe(resolved.harmonySwatch[0]);
+  });
+
+  it("all harmony rows have same step count", () => {
+    const def = BUILTIN_DEFINITIONS["gothic"];
+    const resolved = resolveTheme(def, "exploration", "#cc4444");
+    const stepCount = resolved.harmonySwatch[0].length;
+    for (const row of resolved.harmonySwatch) {
+      expect(row.length).toBe(stepCount);
+    }
+  });
+
+  it("harmony rows produce valid hex colors", () => {
+    const def = BUILTIN_DEFINITIONS["terminal"];
+    const resolved = resolveTheme(def, "exploration", "#00ff88");
+    for (const row of resolved.harmonySwatch) {
+      for (const color of row) {
+        expect(color.hex).toMatch(/^#[0-9a-f]{6}$/);
+      }
+    }
+  });
+
   it("unknown gradient preset name resolves to undefined", () => {
     const def: ThemeDefinition = {
       assetName: "gothic",
