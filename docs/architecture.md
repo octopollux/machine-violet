@@ -54,7 +54,7 @@ Model selection: `src/config/models.ts` — `getModel("large" | "medium" | "smal
 
 **Persistence:** All state serializes to JSON under `<campaignRoot>/state/`. `StatePersister` (`src/context/state-persistence.ts`) writes specific slices after tool dispatch, keyed by `TOOL_STATE_MAP` in `tool-registry.ts`.
 
-Full schema and invariants: [design-docs/state-atlas.md](../design-docs/state-atlas.md)
+Full schema and invariants: [state-atlas.md](state-atlas.md)
 
 ## Context Window Management
 
@@ -73,7 +73,7 @@ Conversation is deliberately short. When exchanges drop off, a Haiku precis upda
 
 **Code:** `src/context/prefix-builder.ts` (prefix assembly), `src/context/conversation.ts` (retention), `src/agents/scene-manager.ts` (precis updates)
 
-Full details: [design-docs/context-management.md](../design-docs/context-management.md)
+Full details: [context-management.md](context-management.md)
 
 ## Scene Transitions
 
@@ -116,7 +116,7 @@ Entity I/O is abstracted through **FileIO** and **GitIO** interfaces. Production
 
 **Code:** `src/tools/filesystem/` (parsing, validation, scaffolding), `src/agents/subagents/scribe.ts` (entity writes)
 
-Full details: [design-docs/entity-filesystem.md](../design-docs/entity-filesystem.md)
+Full details: [entity-filesystem.md](entity-filesystem.md)
 
 ## Subagent Pattern
 
@@ -142,7 +142,7 @@ const result = await spawnSubagent(client, {
 
 **Code:** `src/agents/subagent.ts` (infrastructure), `src/agents/subagents/` (all subagent implementations)
 
-Full catalog: [design-docs/subagents-catalog.md](../design-docs/subagents-catalog.md)
+Full catalog: [subagents-catalog.md](subagents-catalog.md)
 
 ## Tool System
 
@@ -155,7 +155,7 @@ Tool handlers receive `(state: GameState, input: T)` and return `ToolResult`:
 
 Tools are organized by domain in `src/tools/`: dice, cards, clocks, combat, maps, filesystem, git, validation.
 
-Full catalog: [design-docs/tools-catalog.md](../design-docs/tools-catalog.md)
+Full catalog: [tools-catalog.md](tools-catalog.md)
 
 ## TUI Rendering
 
@@ -176,4 +176,4 @@ Tags supported: `<b>`, `<i>`, `<u>`, `<center>`, `<right>`, `<color=#hex>`. Quot
 
 **Code:** `src/tui/` (components, formatting, themes, modals, hooks)
 
-Full details: [design-docs/tui-design.md](../design-docs/tui-design.md)
+Full details: [tui-design.md](tui-design.md)

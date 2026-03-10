@@ -16,32 +16,32 @@ This project maintains a closed loop between code and documentation. When you ch
 ### Adding a new tool
 
 1. Register in `src/agents/tool-registry.ts`
-2. Add entry to [design-docs/tools-catalog.md](../design-docs/tools-catalog.md) in the appropriate domain section
-3. If the tool reads/writes state, add to `TOOL_STATE_MAP` in `tool-registry.ts` and update the matrix in [design-docs/state-atlas.md](../design-docs/state-atlas.md)
+2. Add entry to [tools-catalog.md](tools-catalog.md) in the appropriate domain section
+3. If the tool reads/writes state, add to `TOOL_STATE_MAP` in `tool-registry.ts` and update the matrix in [state-atlas.md](state-atlas.md)
 
 ### Adding a new subagent
 
 1. Create file in `src/agents/subagents/`
-2. Add entry to [design-docs/subagents-catalog.md](../design-docs/subagents-catalog.md) — include model, visibility, trigger, and source
+2. Add entry to [subagents-catalog.md](subagents-catalog.md) — include model, visibility, trigger, and source
 3. Update the summary table at the bottom of the catalog
 4. Add to the subagents section of [docs/module-map.md](module-map.md)
 
 ### Adding a new state field
 
 1. Add to the type definition
-2. Update the schema tree in [design-docs/state-atlas.md](../design-docs/state-atlas.md)
+2. Update the schema tree in [state-atlas.md](state-atlas.md)
 3. If persisted, update the persistence map table
 4. If it has invariants, add to the invariants catalog
 
 ### Adding a new TUI component
 
 1. Create in `src/tui/components/` or `src/tui/modals/`
-2. If it's a new modal type, add to [design-docs/tui-design.md](../design-docs/tui-design.md)
+2. If it's a new modal type, add to [tui-design.md](tui-design.md)
 3. Add to the tui section of [docs/module-map.md](module-map.md)
 
 ### Changing the scene transition cascade
 
-1. Update step list in [design-docs/state-atlas.md](../design-docs/state-atlas.md) (section 6)
+1. Update step list in [state-atlas.md](state-atlas.md) (section 6)
 2. Update the cascade diagram in [docs/architecture.md](architecture.md)
 
 ### Adding a new src/ directory or major file
@@ -50,13 +50,13 @@ This project maintains a closed loop between code and documentation. When you ch
 
 ### Changing model tier assignments
 
-1. Update [design-docs/subagents-catalog.md](../design-docs/subagents-catalog.md) if it affects a subagent
+1. Update [subagents-catalog.md](subagents-catalog.md) if it affects a subagent
 2. Execution tiers table in [docs/architecture.md](architecture.md) if it changes the tier structure
 
 ### Adding a new config field
 
 1. Update the relevant type in `src/types/config.ts`
-2. Update [design-docs/state-atlas.md](../design-docs/state-atlas.md) schema tree
+2. Update [state-atlas.md](state-atlas.md) schema tree
 
 ### Changes that DON'T need doc updates
 
@@ -71,12 +71,12 @@ This project maintains a closed loop between code and documentation. When you ch
 |---|---|---|
 | Architecture overview | [docs/architecture.md](architecture.md) | System architecture mapped to code |
 | Module map | [docs/module-map.md](module-map.md) | src/ directory guide |
-| Tools catalog | [design-docs/tools-catalog.md](../design-docs/tools-catalog.md) | Tool signatures and behavior |
-| Subagents catalog | [design-docs/subagents-catalog.md](../design-docs/subagents-catalog.md) | Subagent contracts |
-| State atlas | [design-docs/state-atlas.md](../design-docs/state-atlas.md) | State schema, persistence, invariants, lifecycle |
-| Context management | [design-docs/context-management.md](../design-docs/context-management.md) | Token economics, retention, caching |
-| Entity filesystem | [design-docs/entity-filesystem.md](../design-docs/entity-filesystem.md) | Entity format, wikilinks, changelogs |
-| TUI design | [design-docs/tui-design.md](../design-docs/tui-design.md) | Layout, themes, formatting |
+| Tools catalog | [tools-catalog.md](tools-catalog.md) | Tool signatures and behavior |
+| Subagents catalog | [subagents-catalog.md](subagents-catalog.md) | Subagent contracts |
+| State atlas | [state-atlas.md](state-atlas.md) | State schema, persistence, invariants, lifecycle |
+| Context management | [context-management.md](context-management.md) | Token economics, retention, caching |
+| Entity filesystem | [entity-filesystem.md](entity-filesystem.md) | Entity format, wikilinks, changelogs |
+| TUI design | [tui-design.md](tui-design.md) | Layout, themes, formatting |
 | Conventions | [CLAUDE.md](../CLAUDE.md) | Code style, testing, imports |
 
 ## Principles
