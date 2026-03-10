@@ -29,7 +29,7 @@ export function SwatchModal({ theme, width, height, topOffset }: SwatchModalProp
 
   // Column headers
   const stepLabels = Array.from({ length: steps }, (_, i) => String(i).padStart(3));
-  const headerLine = "      " + stepLabels.join(" ");
+  const headerLine = "      " + stepLabels.join("");
 
   // Current colorMap assignments
   const assignments = Object.entries(colorMap)
@@ -50,13 +50,16 @@ export function SwatchModal({ theme, width, height, topOffset }: SwatchModalProp
       theme={theme}
       width={width}
       height={height}
-      title={`${theme.asset.name} / ${theme.variant} / ${keyColor}`}
+      title="Color Swatch"
       footer="Press any key to dismiss"
       minWidth={gridWidth}
       maxWidth={gridWidth}
-      contentHeight={contentRows}
+      contentHeight={contentRows + 1}
       topOffset={topOffset}
     >
+      {/* Theme info */}
+      <Text dimColor>{padTo(`${theme.asset.name} / ${theme.variant} / ${keyColor}`, innerWidth)}</Text>
+
       {/* Column headers */}
       <Text dimColor>{padTo(headerLine, innerWidth)}</Text>
 
