@@ -57,6 +57,8 @@ interface CenteredModalProps {
   footerColor?: string;
   /** Vertical offset added to top margin (e.g. to center within conversation pane) */
   topOffset?: number;
+  /** Explicit content height (rows) when using children — sizes modal to fit */
+  contentHeight?: number;
 }
 
 /**
@@ -79,6 +81,7 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
     footer,
     footerColor,
     topOffset = 0,
+    contentHeight,
   }, ref) {
     const sideWidth = theme.asset.components.edge_left.width;
     const borderHeight = theme.asset.height;
@@ -103,7 +106,7 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
     // Max content rows = height minus themed borders (2 * borderHeight) minus margin (2)
     const maxContentRows = Math.max(3, height - 2 * borderHeight - 2);
     const visibleRows = hasReactChildren
-      ? maxContentRows
+      ? Math.min(contentHeight ?? maxContentRows, maxContentRows)
       : Math.min(lineCount, maxContentRows);
 
     const modalHeight = visibleRows + 2 * borderHeight;

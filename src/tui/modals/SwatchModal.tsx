@@ -29,9 +29,9 @@ export function SwatchModal({ theme, width, height, topOffset }: SwatchModalProp
     .map(([part, value]) => `${part}: ${value}`)
     .join("  ");
 
-  // Grid needs: title + blank + header + rows + blank + assignments + dismiss = ~N lines
-  // Use wide enough modal to fit the grid
   const gridWidth = headerLine.length + 4;
+  // Content rows: header + grid rows + blank + assignments
+  const contentRows = 1 + harmonySwatch.length + 1 + 1;
 
   return (
     <CenteredModal
@@ -42,6 +42,7 @@ export function SwatchModal({ theme, width, height, topOffset }: SwatchModalProp
       footer="Press any key to dismiss"
       minWidth={gridWidth}
       maxWidth={gridWidth}
+      contentHeight={contentRows}
       topOffset={topOffset}
     >
       {/* Column headers */}
