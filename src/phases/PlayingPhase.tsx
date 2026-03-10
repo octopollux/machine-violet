@@ -12,7 +12,6 @@ import { getActivePlayer, switchToNextPlayer, getPlayerEntries } from "../agents
 import { createOOCSession } from "../agents/subagents/ooc-mode.js";
 import { createDevSession, summarizeGameState } from "../agents/subagents/dev-mode.js";
 import { useGameContext } from "../tui/game-context.js";
-import { themeToVariant } from "../tui/themes/index.js";
 import { trySlashCommand } from "../commands/index.js";
 
 export function PlayingPhase() {
@@ -49,9 +48,6 @@ export function PlayingPhase() {
   const escTimestamps = useRef<number[]>([]);
 
   const menuItems = useMemo(() => getMenuItems(devModeEnabled), [devModeEnabled]);
-
-  // Compatibility: extract FrameStyleVariant for modals that still use old interface
-  const modalVariant = useMemo(() => themeToVariant(theme), [theme]);
 
   // Whether TextInput should be disabled
   const textInputDisabled =
@@ -442,7 +438,7 @@ export function PlayingPhase() {
       />
       {activeModal?.kind === "dice" && (
         <DiceRollModal
-          variant={modalVariant}
+          theme={theme}
           width={cols}
           expression={activeModal.expression}
           rolls={activeModal.rolls}
@@ -452,11 +448,11 @@ export function PlayingPhase() {
         />
       )}
       {activeModal?.kind === "swatch" && (
-        <SwatchModal theme={theme} width={cols} />
+        <SwatchModal theme={theme} width={cols} height={narRows} topOffset={conversationPaneTop} />
       )}
       {activeModal?.kind === "recap" && (
         <SessionRecapModal
-          variant={modalVariant}
+          theme={theme}
           width={cols}
           height={narRows}
           lines={activeModal.lines}
@@ -466,7 +462,7 @@ export function PlayingPhase() {
       )}
       {activeModal?.kind === "character_sheet" && (
         <CharacterSheetModal
-          variant={modalVariant}
+          theme={theme}
           width={cols}
           height={narRows}
           content={activeModal.content}
@@ -476,7 +472,7 @@ export function PlayingPhase() {
       )}
       {retryOverlay && (
         <ApiErrorModal
-          variant={modalVariant}
+          theme={theme}
           width={cols}
           height={rows}
           overlay={retryOverlay}
@@ -484,7 +480,7 @@ export function PlayingPhase() {
       )}
       {menuOpen && (
         <GameMenu
-          variant={modalVariant}
+          theme={theme}
           width={cols}
           height={rows}
           selectedIndex={menuIndex}

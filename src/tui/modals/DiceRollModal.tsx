@@ -1,9 +1,9 @@
 import React from "react";
-import type { FrameStyleVariant } from "../../types/tui.js";
+import type { ResolvedTheme } from "../themes/types.js";
 import { Modal } from "./Modal.js";
 
 interface DiceRollModalProps {
-  variant: FrameStyleVariant;
+  theme: ResolvedTheme;
   width: number;
   expression: string;
   rolls: number[];
@@ -17,7 +17,7 @@ interface DiceRollModalProps {
  * Shows expression, individual rolls, kept dice, and total.
  */
 export function DiceRollModal({
-  variant,
+  theme,
   width,
   expression,
   rolls,
@@ -43,5 +43,5 @@ export function DiceRollModal({
   lines.push("");
   lines.push(`Total: ${total}`);
 
-  return <Modal variant={variant} width={width} title="Dice Roll" children={lines} />;
+  return <Modal theme={theme} width={width} title="Dice Roll" lines={lines} />;
 }

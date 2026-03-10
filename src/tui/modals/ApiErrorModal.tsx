@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
-import type { FrameStyleVariant, RetryOverlay } from "../../types/tui.js";
+import type { RetryOverlay } from "../../types/tui.js";
+import type { ResolvedTheme } from "../themes/types.js";
 import { CenteredModal } from "./CenteredModal.js";
 import { retryLabel } from "../activity.js";
 
 interface ApiErrorModalProps {
-  variant: FrameStyleVariant;
+  theme: ResolvedTheme;
   width: number;
   height: number;
   overlay: RetryOverlay;
@@ -15,11 +16,10 @@ interface ApiErrorModalProps {
  * Owns its own countdown timer that ticks once per second.
  * Auto-dismisses when the parent clears the overlay on successful retry.
  */
-export function ApiErrorModal({ variant, width, height, overlay }: ApiErrorModalProps) {
+export function ApiErrorModal({ theme, width, height, overlay }: ApiErrorModalProps) {
   const [remaining, setRemaining] = useState(overlay.delaySec);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Reset countdown when overlay props change (new retry attempt)
   useEffect(() => {
     setRemaining(overlay.delaySec);
 
@@ -45,13 +45,13 @@ export function ApiErrorModal({ variant, width, height, overlay }: ApiErrorModal
 
   return (
     <CenteredModal
-      variant={variant}
+      theme={theme}
       width={width}
       height={height}
       title="Connection Error"
       minWidth={36}
       maxWidth={44}
-      children={lines}
+      lines={lines}
     />
   );
 }

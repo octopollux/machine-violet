@@ -1,10 +1,13 @@
 import React from "react";
 import { Text, Box } from "ink";
 import type { ResolvedTheme } from "../themes/types.js";
+import { CenteredModal } from "./CenteredModal.js";
 
 interface SwatchModalProps {
   theme: ResolvedTheme;
   width: number;
+  height: number;
+  topOffset?: number;
 }
 
 /**
@@ -13,41 +16,43 @@ interface SwatchModalProps {
  * Row labels are hundreds-based (0, 100, 200, ...) so they read directly
  * as ThemeColorMap values.
  */
-export function SwatchModal({ theme, width }: SwatchModalProps) {
+export function SwatchModal({ theme, width, height, topOffset }: SwatchModalProps) {
   const { harmonySwatch, colorMap, keyColor } = theme;
   const steps = harmonySwatch[0]?.length ?? 0;
 
-  // Header: step indices
+  // Column headers
   const stepLabels = Array.from({ length: steps }, (_, i) => String(i).padStart(3));
   const headerLine = "      " + stepLabels.join(" ");
 
-  // Current colorMap assignments for the footer
+  // Current colorMap assignments
   const assignments = Object.entries(colorMap)
     .map(([part, value]) => `${part}: ${value}`)
     .join("  ");
 
-  // Compute centering
-  const gridWidth = headerLine.length;
-  const padLeft = Math.max(0, Math.floor((width - gridWidth) / 2));
-  const pad = " ".repeat(padLeft);
+  // Grid needs: title + blank + header + rows + blank + assignments + dismiss = ~N lines
+  // Use wide enough modal to fit the grid
+  const gridWidth = headerLine.length + 4;
 
   return (
-    <Box flexDirection="column" alignItems="center" marginTop={1} marginBottom={1}>
-      {/* Title */}
-      <Text dimColor>
-        {pad}Swatch: {theme.asset.name} / {theme.variant} / {keyColor}
-      </Text>
-      <Text>{pad}</Text>
-
+    <CenteredModal
+      theme={theme}
+      width={width}
+      height={height}
+      title={`${theme.asset.name} / ${theme.variant} / ${keyColor}`}
+      footer="Press any key to dismiss"
+      minWidth={gridWidth}
+      maxWidth={gridWidth}
+      topOffset={topOffset}
+    >
       {/* Column headers */}
-      <Text dimColor>{pad}{headerLine}</Text>
+      <Text dimColor>{headerLine}</Text>
 
       {/* Grid rows */}
       {harmonySwatch.map((row, anchorIdx) => {
         const label = String(anchorIdx * 100).padStart(5) + ":";
         return (
           <Box key={anchorIdx}>
-            <Text dimColor>{pad}{label}</Text>
+            <Text dimColor>{label}</Text>
             {row.map((color, stepIdx) => (
               <Text key={stepIdx} color={color.hex}>
                 {"  \u2588"}
@@ -57,14 +62,10 @@ export function SwatchModal({ theme, width }: SwatchModalProps) {
         );
       })}
 
-      <Text>{pad}</Text>
+      <Text> </Text>
 
-      {/* Footer: current assignments */}
-      <Text dimColor>{pad}{assignments}</Text>
-
-      <Text dimColor>
-        {pad}Press any key to dismiss
-      </Text>
-    </Box>
+      {/* Current assignments */}
+      <Text dimColor>{assignments}</Text>
+    </CenteredModal>
   );
 }

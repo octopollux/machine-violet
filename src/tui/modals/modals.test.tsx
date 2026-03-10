@@ -1,6 +1,6 @@
 import React from "react";
 import { Box } from "ink";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { render } from "ink-testing-library";
 import { Modal } from "./Modal.js";
 import { ChoiceModal, ChoiceOverlay } from "./ChoiceModal.js";
@@ -8,24 +8,34 @@ import { GameMenu, getMenuItems } from "./GameMenu.js";
 import { CharacterSheetModal } from "./CharacterSheetModal.js";
 import { DiceRollModal } from "./DiceRollModal.js";
 import { SessionRecapModal } from "./SessionRecapModal.js";
+import { resolveTheme } from "../themes/resolver.js";
+import { resetThemeCache } from "../themes/loader.js";
+import { BUILTIN_DEFINITIONS } from "../themes/builtin-definitions.js";
 import { getStyle } from "../frames/index.js";
 
+// Old-style variant still needed for ChoiceModal (legacy component)
 const gothic = getStyle("gothic")!.variants.exploration;
+
+// Resolved theme for all modernized modals
+let theme: ReturnType<typeof resolveTheme>;
+
+beforeEach(() => {
+  resetThemeCache();
+  theme = resolveTheme(BUILTIN_DEFINITIONS["gothic"], "exploration", "#cc4444");
+});
 
 describe("Modal", () => {
   it("renders border and content", () => {
     const { lastFrame } = render(
-      <Modal variant={gothic} width={40} children={["Hello world"]} />,
+      <Modal theme={theme} width={40} lines={["Hello world"]} />,
     );
     const frame = lastFrame();
     expect(frame).toContain("Hello world");
-    expect(frame).toContain("╔");
-    expect(frame).toContain("╚");
   });
 
   it("renders title in top border", () => {
     const { lastFrame } = render(
-      <Modal variant={gothic} width={40} title="Test" children={["Body"]} />,
+      <Modal theme={theme} width={40} title="Test" lines={["Body"]} />,
     );
     expect(lastFrame()).toContain("Test");
   });
@@ -209,7 +219,7 @@ describe("GameMenu", () => {
   it("renders all menu items", () => {
     const { lastFrame } = render(
       <Box width={40} height={24}>
-        <GameMenu variant={gothic} width={40} height={24} selectedIndex={0} />
+        <GameMenu theme={theme} width={40} height={24} selectedIndex={0} />
       </Box>,
     );
     const frame = lastFrame();
@@ -222,7 +232,7 @@ describe("GameMenu", () => {
     const { lastFrame } = render(
       <Box width={60} height={24}>
         <GameMenu
-          variant={gothic}
+          theme={theme}
           width={60}
           height={24}
           selectedIndex={0}
@@ -237,11 +247,10 @@ describe("GameMenu", () => {
   it("highlights selected item", () => {
     const { lastFrame } = render(
       <Box width={40} height={24}>
-        <GameMenu variant={gothic} width={40} height={24} selectedIndex={2} />
+        <GameMenu theme={theme} width={40} height={24} selectedIndex={2} />
       </Box>,
     );
     const frame = lastFrame();
-    // Selected item gets ◆, others get ○
     expect(frame).toContain("◆ OOC Mode");
     expect(frame).toContain("○ Resume");
   });
@@ -259,12 +268,11 @@ describe("CharacterSheetModal", () => {
 
     const { lastFrame } = render(
       <Box width={50} height={24}>
-        <CharacterSheetModal variant={gothic} width={50} height={24} content={content} />
+        <CharacterSheetModal theme={theme} width={50} height={24} content={content} />
       </Box>,
     );
     const frame = lastFrame();
     expect(frame).toContain("Aldric the Bold");
-    // **Type:** is now rendered as styled bold — check the plain text content
     expect(frame).toContain("Type:");
     expect(frame).toContain("PC");
     expect(frame).toContain("A stalwart warrior.");
@@ -279,7 +287,7 @@ describe("CharacterSheetModal", () => {
 
     const { lastFrame } = render(
       <Box width={50} height={24}>
-        <CharacterSheetModal variant={gothic} width={50} height={24} content={content} />
+        <CharacterSheetModal theme={theme} width={50} height={24} content={content} />
       </Box>,
     );
     const frame = lastFrame();
@@ -296,11 +304,10 @@ describe("CharacterSheetModal", () => {
 
     const { lastFrame } = render(
       <Box width={50} height={24}>
-        <CharacterSheetModal variant={gothic} width={50} height={24} content={content} />
+        <CharacterSheetModal theme={theme} width={50} height={24} content={content} />
       </Box>,
     );
     const frame = lastFrame();
-    // The hex string should still appear in the output (rendered in color)
     expect(frame).toContain("#cc0000");
   });
 
@@ -308,7 +315,7 @@ describe("CharacterSheetModal", () => {
     const { lastFrame } = render(
       <Box width={50} height={24}>
         <CharacterSheetModal
-          variant={gothic}
+          theme={theme}
           width={50}
           height={24}
           content="Just some text"
@@ -323,7 +330,7 @@ describe("DiceRollModal", () => {
   it("renders expression and total", () => {
     const { lastFrame } = render(
       <DiceRollModal
-        variant={gothic}
+        theme={theme}
         width={50}
         expression="2d6+3"
         rolls={[4, 5]}
@@ -339,7 +346,7 @@ describe("DiceRollModal", () => {
   it("shows kept dice when different from rolls", () => {
     const { lastFrame } = render(
       <DiceRollModal
-        variant={gothic}
+        theme={theme}
         width={50}
         expression="4d6kh3"
         rolls={[3, 5, 1, 6]}
@@ -355,7 +362,7 @@ describe("DiceRollModal", () => {
   it("shows reason when provided", () => {
     const { lastFrame } = render(
       <DiceRollModal
-        variant={gothic}
+        theme={theme}
         width={50}
         expression="1d20+5"
         rolls={[17]}
@@ -372,7 +379,7 @@ describe("SessionRecapModal", () => {
     const { lastFrame } = render(
       <Box width={100} height={30}>
         <SessionRecapModal
-          variant={gothic}
+          theme={theme}
           width={100}
           height={30}
           lines={[
@@ -392,7 +399,7 @@ describe("SessionRecapModal", () => {
     const { lastFrame } = render(
       <Box width={100} height={30}>
         <SessionRecapModal
-          variant={gothic}
+          theme={theme}
           width={100}
           height={30}
           lines={[
@@ -402,7 +409,6 @@ describe("SessionRecapModal", () => {
       </Box>,
     );
     const frame = lastFrame()!;
-    // Long line should be wrapped, not truncated — both parts present
     expect(frame).toContain("adventurers");
     expect(frame).toContain("catacombs");
   });

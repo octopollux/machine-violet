@@ -1,17 +1,24 @@
 import React from "react";
 import { Box } from "ink";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { render } from "ink-testing-library";
 import { ApiErrorModal } from "./ApiErrorModal.js";
-import { getStyle } from "../frames/index.js";
+import { resolveTheme } from "../themes/resolver.js";
+import { resetThemeCache } from "../themes/loader.js";
+import { BUILTIN_DEFINITIONS } from "../themes/builtin-definitions.js";
 
-const gothic = getStyle("gothic")!.variants.exploration;
+let theme: ReturnType<typeof resolveTheme>;
+
+beforeEach(() => {
+  resetThemeCache();
+  theme = resolveTheme(BUILTIN_DEFINITIONS["gothic"], "exploration", "#cc4444");
+});
 
 describe("ApiErrorModal", () => {
   it("renders title, status label, and countdown for 429", () => {
     const { lastFrame } = render(
       <Box width={60} height={24}>
-        <ApiErrorModal variant={gothic} width={60} height={24} overlay={{ status: 429, delaySec: 10 }} />
+        <ApiErrorModal theme={theme} width={60} height={24} overlay={{ status: 429, delaySec: 10 }} />
       </Box>,
     );
     const frame = lastFrame();
@@ -24,7 +31,7 @@ describe("ApiErrorModal", () => {
   it("renders status label for 529 (API overloaded)", () => {
     const { lastFrame } = render(
       <Box width={60} height={24}>
-        <ApiErrorModal variant={gothic} width={60} height={24} overlay={{ status: 529, delaySec: 30 }} />
+        <ApiErrorModal theme={theme} width={60} height={24} overlay={{ status: 529, delaySec: 30 }} />
       </Box>,
     );
     const frame = lastFrame();
@@ -35,7 +42,7 @@ describe("ApiErrorModal", () => {
   it("renders status label for 0 (connection lost)", () => {
     const { lastFrame } = render(
       <Box width={60} height={24}>
-        <ApiErrorModal variant={gothic} width={60} height={24} overlay={{ status: 0, delaySec: 5 }} />
+        <ApiErrorModal theme={theme} width={60} height={24} overlay={{ status: 0, delaySec: 5 }} />
       </Box>,
     );
     const frame = lastFrame();
@@ -46,7 +53,7 @@ describe("ApiErrorModal", () => {
   it("renders generic status label for 500", () => {
     const { lastFrame } = render(
       <Box width={60} height={24}>
-        <ApiErrorModal variant={gothic} width={60} height={24} overlay={{ status: 500, delaySec: 15 }} />
+        <ApiErrorModal theme={theme} width={60} height={24} overlay={{ status: 500, delaySec: 15 }} />
       </Box>,
     );
     const frame = lastFrame();

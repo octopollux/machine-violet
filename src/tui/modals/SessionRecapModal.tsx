@@ -1,17 +1,14 @@
 import React from "react";
-import type { FrameStyleVariant } from "../../types/tui.js";
+import type { ResolvedTheme } from "../themes/types.js";
 import { CenteredModal } from "./CenteredModal.js";
 import type { CenteredModalHandle } from "./CenteredModal.js";
 
 interface SessionRecapModalProps {
-  variant: FrameStyleVariant;
+  theme: ResolvedTheme;
   width: number;
   height: number;
-  /** Recap text lines — "Previously on..." style summary */
   lines: string[];
-  /** Ref for scroll control */
   scrollRef?: React.Ref<CenteredModalHandle>;
-  /** Vertical offset for centering within conversation pane */
   topOffset?: number;
 }
 
@@ -20,7 +17,7 @@ interface SessionRecapModalProps {
  * Fixed at 40 columns wide, sized to fit the conversation pane.
  */
 export function SessionRecapModal({
-  variant,
+  theme,
   width,
   height,
   lines,
@@ -30,11 +27,11 @@ export function SessionRecapModal({
   return (
     <CenteredModal
       ref={scrollRef}
-      variant={variant}
+      theme={theme}
       width={width}
       height={height}
       title="Previously on..."
-      children={lines}
+      lines={lines}
       footer="ESC or Enter to continue"
       minWidth={40}
       maxWidth={40}

@@ -2,9 +2,13 @@ import React, { useMemo, useRef, useState, useCallback, useEffect, forwardRef } 
 import { Box, Text } from "ink";
 import { ScrollView } from "ink-scroll-view";
 import type { ScrollViewRef } from "ink-scroll-view";
-import type { FormattingNode, FrameStyleVariant } from "../../types/tui.js";
-import { renderHorizontalFrame, renderHorizontalFrameParts, renderContentLine, renderStyledContentLine, stringWidth } from "../frames/index.js";
+import type { FormattingNode } from "../../types/tui.js";
+import type { ResolvedTheme } from "../themes/types.js";
+import { ThemedHorizontalBorder, ThemedSideFrame } from "../components/ThemedFrame.js";
+import { themeColor } from "../themes/color-resolve.js";
+import { stringWidth } from "../frames/index.js";
 import { wrapNodes } from "../formatting.js";
+import { renderNodes } from "../render-nodes.js";
 import { useScrollHandle } from "../hooks/useScrollHandle.js";
 import type { ScrollHandle } from "../hooks/useScrollHandle.js";
 
@@ -31,13 +35,16 @@ function wrapPlainLine(text: string, width: number): string[] {
 }
 
 interface CenteredModalProps {
-  variant: FrameStyleVariant;
+  theme: ResolvedTheme;
   width: number;
   height: number;
   title?: string;
-  children: string[];
-  /** Pre-parsed styled content lines (overrides children when present) */
-  styledChildren?: FormattingNode[][];
+  /** Plain text content lines */
+  lines?: string[];
+  /** Pre-parsed styled content lines (takes precedence over lines) */
+  styledLines?: FormattingNode[][];
+  /** Arbitrary React content (takes precedence over lines and styledLines) */
+  children?: React.ReactNode;
   /** Min width of modal content (default 40) */
   minWidth?: number;
   /** Max width cap (default 60) */
@@ -46,54 +53,60 @@ interface CenteredModalProps {
   widthFraction?: number;
   /** Text to display in the bottom frame border */
   footer?: string;
-  /** Color for the footer text (default "yellow") */
+  /** Color for the footer text */
   footerColor?: string;
   /** Vertical offset added to top margin (e.g. to center within conversation pane) */
   topOffset?: number;
 }
 
 /**
- * A centered modal overlay with scroll support.
- * Positions itself in the center of the screen using absolute positioning.
- * Content scrolls when it exceeds available height; a scroll indicator shows remaining lines.
+ * A centered modal overlay with themed multi-line borders and scroll support.
+ * Uses ThemedHorizontalBorder and ThemedSideFrame for the same art-deco
+ * borders as the main conversation pane.
  */
 export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>(
   function CenteredModal({
-    variant,
+    theme,
     width,
     height,
     title,
+    lines,
+    styledLines,
     children,
-    styledChildren,
     minWidth = 40,
     maxWidth = 60,
     widthFraction = 0.5,
     footer,
-    footerColor = "yellow",
+    footerColor,
     topOffset = 0,
   }, ref) {
-    const modalWidth = Math.max(minWidth, Math.min(Math.floor(width * widthFraction), maxWidth));
-    const innerWidth = modalWidth - 4; // 2 borders + 2 padding spaces
+    const sideWidth = theme.asset.components.edge_left.width;
+    const borderHeight = theme.asset.height;
+    const sidePadding = 1;
 
-    // Word-wrap content to fit within modal inner width
-    const wrappedChildren = useMemo(
-      () => children.flatMap((line) => wrapPlainLine(line, innerWidth)),
-      [children, innerWidth],
+    const modalWidth = Math.max(minWidth, Math.min(Math.floor(width * widthFraction), maxWidth));
+    const innerWidth = modalWidth - 2 * sideWidth - 2 * sidePadding;
+
+    // Word-wrap text content
+    const wrappedLines = useMemo(
+      () => lines?.flatMap((line) => wrapPlainLine(line, innerWidth)) ?? [],
+      [lines, innerWidth],
     );
     const wrappedStyled = useMemo(
-      () => styledChildren?.flatMap((line) => wrapNodes(line, innerWidth)),
-      [styledChildren, innerWidth],
+      () => styledLines?.flatMap((line) => wrapNodes(line, innerWidth)),
+      [styledLines, innerWidth],
     );
 
-    const lineCount = wrappedStyled ? wrappedStyled.length : wrappedChildren.length;
+    const hasReactChildren = children != null;
+    const lineCount = hasReactChildren ? 0 : (wrappedStyled ? wrappedStyled.length : wrappedLines.length);
 
-    // Max content rows = height minus borders (2) minus 1-line margin top+bottom (2)
-    const maxContentRows = Math.max(3, height - 4);
-    const needsScroll = lineCount > maxContentRows;
-    const visibleRows = needsScroll ? maxContentRows : lineCount;
+    // Max content rows = height minus themed borders (2 * borderHeight) minus margin (2)
+    const maxContentRows = Math.max(3, height - 2 * borderHeight - 2);
+    const visibleRows = hasReactChildren
+      ? maxContentRows
+      : Math.min(lineCount, maxContentRows);
 
-    // Total modal height = borders (2) + visible content rows
-    const modalHeight = visibleRows + 2;
+    const modalHeight = visibleRows + 2 * borderHeight;
     const topMargin = Math.max(0, topOffset + Math.floor((height - modalHeight) / 2));
     const leftPad = Math.max(0, Math.floor((width - modalWidth) / 2));
 
@@ -112,7 +125,6 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
       updateScrollState();
     }, [updateScrollState]);
 
-    // Initial measurement after mount
     useEffect(() => {
       const timer = setTimeout(() => updateScrollState(), 0);
       return () => clearTimeout(timer);
@@ -120,52 +132,53 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
 
     useScrollHandle(ref, scrollRef);
 
-    const top = renderHorizontalFrame(variant, modalWidth, "top", title);
-
-    // Bottom frame: use parts when footer is present so center can be colored differently
-    const bottomFrame = footer
-      ? renderHorizontalFrameParts(variant, modalWidth, "bottom", footer)
-      : null;
-    const bottom = footer ? null : renderHorizontalFrame(variant, modalWidth, "bottom");
+    const textColor = themeColor(theme, "sideFrame");
+    const resolvedFooterColor = footerColor ?? themeColor(theme, "title");
 
     return (
       <Box position="absolute" flexDirection="column" marginTop={topMargin} marginLeft={leftPad}>
-        <Box>
-          <Text color={variant.color}>{top}</Text>
+        <ThemedHorizontalBorder
+          theme={theme}
+          width={modalWidth}
+          position="top"
+          centerText={title}
+        />
+        <Box height={visibleRows} flexDirection="row">
+          <ThemedSideFrame theme={theme} side="left" height={visibleRows} />
+          <Box flexDirection="column" width={innerWidth + 2 * sidePadding} paddingLeft={sidePadding} paddingRight={sidePadding}>
+            <ScrollView ref={scrollRef} onScroll={handleScroll}>
+              {hasReactChildren
+                ? <Box flexDirection="column">{children}</Box>
+                : wrappedStyled
+                  ? wrappedStyled.map((nodes, i) => (
+                    <Box key={i}>
+                      <Text>{...renderNodes(nodes)}</Text>
+                    </Box>
+                  ))
+                  : wrappedLines.map((line, i) => {
+                    const pad = Math.max(0, innerWidth - stringWidth(line));
+                    return (
+                      <Box key={i}>
+                        <Text color={textColor}>{line}{" ".repeat(pad)}</Text>
+                      </Box>
+                    );
+                  })}
+            </ScrollView>
+            {linesBelow > 0 && (
+              <Box position="absolute" width={innerWidth} marginTop={visibleRows - 1} justifyContent="flex-end">
+                <Text color="greenBright">{` scroll (${linesBelow}) more `}</Text>
+              </Box>
+            )}
+          </Box>
+          <ThemedSideFrame theme={theme} side="right" height={visibleRows} />
         </Box>
-        <Box height={visibleRows} flexDirection="column">
-          <ScrollView ref={scrollRef} onScroll={handleScroll}>
-            {wrappedStyled
-              ? wrappedStyled.map((nodes, i) => (
-                <Box key={i}>
-                  {renderStyledContentLine(variant, nodes, modalWidth)}
-                </Box>
-              ))
-              : wrappedChildren.map((line, i) => (
-                <Box key={i}>
-                  <Text color={variant.color}>
-                    {renderContentLine(variant, line, modalWidth)}
-                  </Text>
-                </Box>
-              ))}
-          </ScrollView>
-          {linesBelow > 0 && (
-            <Box position="absolute" width={modalWidth} marginTop={visibleRows - 1} justifyContent="flex-end">
-              <Text color="greenBright">{` scroll (${linesBelow}) more `}</Text>
-            </Box>
-          )}
-        </Box>
-        <Box>
-          {bottomFrame ? (
-            <Text>
-              <Text color={variant.color}>{bottomFrame.left}</Text>
-              <Text color={footerColor}>{bottomFrame.center}</Text>
-              <Text color={variant.color}>{bottomFrame.right}</Text>
-            </Text>
-          ) : (
-            <Text color={variant.color}>{bottom}</Text>
-          )}
-        </Box>
+        <ThemedHorizontalBorder
+          theme={theme}
+          width={modalWidth}
+          position="bottom"
+          centerText={footer}
+          centerTextColor={resolvedFooterColor}
+        />
       </Box>
     );
   },

@@ -44,6 +44,4 @@ export {
   listBuiltinDefinitions,
 } from "./builtin-definitions.js";
 
-export { themeToVariant } from "./compat.js";
-
 export { resolveSwatchColor, themeColor } from "./color-resolve.js";
