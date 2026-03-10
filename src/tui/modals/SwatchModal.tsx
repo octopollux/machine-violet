@@ -2,12 +2,19 @@ import React from "react";
 import { Text, Box } from "ink";
 import type { ResolvedTheme } from "../themes/types.js";
 import { CenteredModal } from "./CenteredModal.js";
+import { stringWidth } from "../frames/index.js";
 
 interface SwatchModalProps {
   theme: ResolvedTheme;
   width: number;
   height: number;
   topOffset?: number;
+}
+
+/** Pad a string to exactly `w` visible characters with trailing spaces. */
+function padTo(text: string, w: number): string {
+  const pad = Math.max(0, w - stringWidth(text));
+  return pad > 0 ? text + " ".repeat(pad) : text;
 }
 
 /**
@@ -33,6 +40,12 @@ export function SwatchModal({ theme, width, height, topOffset }: SwatchModalProp
   // Content rows: header + grid rows + blank + assignments
   const contentRows = 1 + harmonySwatch.length + 1 + 1;
 
+  // Compute inner content width (same formula as CenteredModal)
+  const sideWidth = theme.asset.components.edge_left.width;
+  const sidePadding = 1;
+  const modalWidth = gridWidth; // minWidth == maxWidth == gridWidth
+  const innerWidth = modalWidth - 2 * sideWidth - 2 * sidePadding;
+
   return (
     <CenteredModal
       theme={theme}
@@ -46,11 +59,13 @@ export function SwatchModal({ theme, width, height, topOffset }: SwatchModalProp
       topOffset={topOffset}
     >
       {/* Column headers */}
-      <Text dimColor>{headerLine}</Text>
+      <Text dimColor>{padTo(headerLine, innerWidth)}</Text>
 
-      {/* Grid rows */}
+      {/* Grid rows — pad short rows to fill innerWidth */}
       {harmonySwatch.map((row, anchorIdx) => {
         const label = String(anchorIdx * 100).padStart(5) + ":";
+        const rowWidth = stringWidth(label) + row.length * 3;
+        const trailingPad = Math.max(0, innerWidth - rowWidth);
         return (
           <Box key={anchorIdx}>
             <Text dimColor>{label}</Text>
@@ -59,14 +74,15 @@ export function SwatchModal({ theme, width, height, topOffset }: SwatchModalProp
                 {"  \u2588"}
               </Text>
             ))}
+            {trailingPad > 0 && <Text>{" ".repeat(trailingPad)}</Text>}
           </Box>
         );
       })}
 
-      <Text> </Text>
+      <Text>{" ".repeat(innerWidth)}</Text>
 
       {/* Current assignments */}
-      <Text dimColor>{assignments}</Text>
+      <Text dimColor>{padTo(assignments, innerWidth)}</Text>
     </CenteredModal>
   );
 }
