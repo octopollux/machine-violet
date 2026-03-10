@@ -269,7 +269,9 @@ The TUI targets **80×25 minimum**, with **80×40 for the full experience**. Two
 | **Full** | ≥80 cols, ≥40 rows | All elements visible. Side frames, top frame, activity line, lower frame. |
 | **Standard** | Everything else | Top frame and activity line dropped. Activity glyph moves to modeline. |
 
-Below 80×25 the standard tier still renders (no crash) but isn't designed for it.
+Below 80×25, the game replaces the entire UI with a fullscreen `TerminalTooSmall` blocker showing the current dimensions, the minimum required (80×25), and "Resize your terminal to continue." The blocker clears automatically when the terminal is resized above the minimum. Both `PlayingPhase` and `SetupPhase` enforce this.
+
+**Code:** `src/tui/components/TerminalTooSmall.tsx`, checked in `src/phases/PlayingPhase.tsx` and `src/phases/SetupPhase.tsx`
 
 ### Drop order (full → standard)
 
@@ -310,7 +312,7 @@ present_choices({})
 → subagent generates options from recent context, displays modal
 ```
 
-Explicit choices: The DM sets specific options when it matters narratively.
+Explicit choices: The DM sets specific options when it matters narratively. Optional `descriptions` provide per-choice detail shown in a fixed-height region (3 rows) that updates as the player highlights each option.
 
 ```
 present_choices({
@@ -319,9 +321,18 @@ present_choices({
     "Take its hand",
     "Refuse",
     "Ask its name first"
+  ],
+  descriptions: [
+    "Trust this being and accept whatever bond it offers.",
+    "Step back. You owe this creature nothing.",
+    "Buy time. Learn what you're dealing with before committing."
   ]
 })
 ```
+
+**Player Pane expansion:** Choices render inside the Player Pane, not as a floating modal. When descriptions are present, the Player Pane expands by `DESCRIPTION_ROWS` (3) to accommodate the description region above the choice list. The Conversation Pane shrinks to compensate. Without descriptions, the standard 7-row Player Pane layout is used.
+
+**Code:** `src/tui/modals/ChoiceModal.tsx` (`ChoiceOverlay`, `DESCRIPTION_ROWS`), `src/tui/layout.tsx` (`playerPaneExtraHeight`)
 
 The player's selection (or freeform text) is returned to the DM as the player's action, tagged normally: `[Aldric] Take its hand`.
 
