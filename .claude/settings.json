@@ -23,6 +23,8 @@
       "Read(vitest.config.ts)",
       "Read(CLAUDE.md)",
       "Read(.claude/**)",
+      "Read(scripts/**)",
+      "Bash(npx tsx scripts/dump-state.ts:*)",
       "Edit(src/**)",
       "Edit(design-docs/**)",
       "Write(src/**)",
