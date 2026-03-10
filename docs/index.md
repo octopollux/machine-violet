@@ -9,32 +9,32 @@ Ink (React for CLI) + Anthropic Claude SDK + TypeScript.
 |---|---|
 | Understand the system architecture | [architecture.md](architecture.md) |
 | Find where code lives | [module-map.md](module-map.md) |
-| Look up a tool's signature or behavior | [design-docs/tools-catalog.md](../design-docs/tools-catalog.md) |
-| Look up a subagent's contract | [design-docs/subagents-catalog.md](../design-docs/subagents-catalog.md) |
-| Understand state shape and persistence | [design-docs/state-atlas.md](../design-docs/state-atlas.md) |
-| Understand context window management | [design-docs/context-management.md](../design-docs/context-management.md) |
-| Understand entity files and wikilinks | [design-docs/entity-filesystem.md](../design-docs/entity-filesystem.md) |
-| Understand DM text formatting | [design-docs/tui-design.md](../design-docs/tui-design.md) |
-| Understand clocks, alarms, calendar | [design-docs/clocks-and-alarms.md](../design-docs/clocks-and-alarms.md) |
-| Understand maps and spatial queries | [design-docs/map-system.md](../design-docs/map-system.md) |
-| Understand dice, cards, resolution | [design-docs/randomization.md](../design-docs/randomization.md) |
-| Understand combat and initiative | [design-docs/multiplayer-and-initiative.md](../design-docs/multiplayer-and-initiative.md) |
-| Understand DM identity and prompting | [design-docs/dm-prompt.md](../design-docs/dm-prompt.md) |
-| Understand game setup flow | [design-docs/game-initialization.md](../design-docs/game-initialization.md) |
-| Understand error recovery and git | [design-docs/error-recovery.md](../design-docs/error-recovery.md) |
+| Look up a tool's signature or behavior | [tools-catalog.md](tools-catalog.md) |
+| Look up a subagent's contract | [subagents-catalog.md](subagents-catalog.md) |
+| Understand state shape and persistence | [state-atlas.md](state-atlas.md) |
+| Understand context window management | [context-management.md](context-management.md) |
+| Understand entity files and wikilinks | [entity-filesystem.md](entity-filesystem.md) |
+| Understand DM text formatting | [tui-design.md](tui-design.md) |
+| Understand clocks, alarms, calendar | [clocks-and-alarms.md](clocks-and-alarms.md) |
+| Understand maps and spatial queries | [map-system.md](map-system.md) |
+| Understand dice, cards, resolution | [randomization.md](randomization.md) |
+| Understand combat and initiative | [multiplayer-and-initiative.md](multiplayer-and-initiative.md) |
+| Understand DM identity and prompting | [dm-prompt.md](dm-prompt.md) |
+| Understand game setup flow | [game-initialization.md](game-initialization.md) |
+| Understand error recovery and git | [error-recovery.md](error-recovery.md) |
 | Update documentation after a code change | [maintenance.md](maintenance.md) |
 
 ## Document Layers
 
 This project has three documentation layers. Each has a distinct purpose:
 
-**[docs/](.)** — Navigation and discovery. Start here to find what you need. Maps concepts to code, describes how modules connect.
+**Navigation & architecture** — [index.md](index.md), [architecture.md](architecture.md), [module-map.md](module-map.md). Start here to find what you need.
 
-**[design-docs/](../design-docs/)** — Specifications. Detailed descriptions of each subsystem: data models, invariants, tool contracts, subagent protocols. The canonical reference for "how does X work?" Start with [design-docs/overview.md](../design-docs/overview.md) for the full index.
+**Specifications** — The rest of this directory: data models, invariants, tool contracts, subagent protocols. The canonical reference for "how does X work?" Start with [overview.md](overview.md) for the full index.
 
 **[CLAUDE.md](../CLAUDE.md)** — Conventions. Rules for writing code in this project: imports, testing, state management, formatting. The canonical reference for "how should I do X?"
 
-All three layers describe only what is implemented. Planned features live in GitHub issues, not in documentation.
+All docs describe only what is implemented. Planned features live in GitHub issues, not in documentation.
 
 ## Running the Project
 
