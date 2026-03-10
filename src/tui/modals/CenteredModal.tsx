@@ -7,7 +7,7 @@ import type { ResolvedTheme } from "../themes/types.js";
 import { ThemedHorizontalBorder, ThemedSideFrame } from "../components/ThemedFrame.js";
 import { themeColor } from "../themes/color-resolve.js";
 import { stringWidth } from "../frames/index.js";
-import { wrapNodes } from "../formatting.js";
+import { wrapNodes, toPlainText } from "../formatting.js";
 import { renderNodes } from "../render-nodes.js";
 import { useScrollHandle } from "../hooks/useScrollHandle.js";
 import type { ScrollHandle } from "../hooks/useScrollHandle.js";
@@ -135,6 +135,54 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
     const textColor = themeColor(theme, "sideFrame");
     const resolvedFooterColor = footerColor ?? themeColor(theme, "title");
 
+    // Build an opaque blank line that fills the full content width.
+    // Every row in the modal must emit real characters to cover what's behind it.
+    const blankLine = " ".repeat(innerWidth);
+
+    // Pad a plain-text line to exactly innerWidth with trailing spaces.
+    const padLine = (line: string): string => {
+      const pad = Math.max(0, innerWidth - stringWidth(line));
+      return pad > 0 ? line + " ".repeat(pad) : line;
+    };
+
+    // Build the full set of visible rows (content + blank fill) so the modal is opaque.
+    const contentRows: React.ReactNode[] = [];
+    if (hasReactChildren) {
+      // React children: render as-is, then fill remaining rows with blanks
+      contentRows.push(
+        <Box key="children" flexDirection="column">{children}</Box>,
+      );
+    } else if (wrappedStyled) {
+      for (let i = 0; i < wrappedStyled.length; i++) {
+        const plainLen = stringWidth(toPlainText(wrappedStyled[i]));
+        const styledPad = Math.max(0, innerWidth - plainLen);
+        contentRows.push(
+          <Box key={i}>
+            <Text>{...renderNodes(wrappedStyled[i])}</Text>
+            <Text>{" ".repeat(styledPad)}</Text>
+          </Box>,
+        );
+      }
+    } else {
+      for (let i = 0; i < wrappedLines.length; i++) {
+        contentRows.push(
+          <Box key={i}>
+            <Text color={textColor}>{padLine(wrappedLines[i])}</Text>
+          </Box>,
+        );
+      }
+    }
+
+    // Fill remaining visible rows with blank lines to make the modal opaque
+    const renderedCount = hasReactChildren ? visibleRows : (wrappedStyled ? wrappedStyled.length : wrappedLines.length);
+    for (let i = renderedCount; i < visibleRows; i++) {
+      contentRows.push(
+        <Box key={`blank-${i}`}>
+          <Text>{blankLine}</Text>
+        </Box>,
+      );
+    }
+
     return (
       <Box position="absolute" flexDirection="column" marginTop={topMargin} marginLeft={leftPad}>
         <ThemedHorizontalBorder
@@ -147,22 +195,7 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
           <ThemedSideFrame theme={theme} side="left" height={visibleRows} />
           <Box flexDirection="column" width={innerWidth + 2 * sidePadding} paddingLeft={sidePadding} paddingRight={sidePadding}>
             <ScrollView ref={scrollRef} onScroll={handleScroll}>
-              {hasReactChildren
-                ? <Box flexDirection="column">{children}</Box>
-                : wrappedStyled
-                  ? wrappedStyled.map((nodes, i) => (
-                    <Box key={i}>
-                      <Text>{...renderNodes(nodes)}</Text>
-                    </Box>
-                  ))
-                  : wrappedLines.map((line, i) => {
-                    const pad = Math.max(0, innerWidth - stringWidth(line));
-                    return (
-                      <Box key={i}>
-                        <Text color={textColor}>{line}{" ".repeat(pad)}</Text>
-                      </Box>
-                    );
-                  })}
+              {contentRows}
             </ScrollView>
             {linesBelow > 0 && (
               <Box position="absolute" width={innerWidth} marginTop={visibleRows - 1} justifyContent="flex-end">
