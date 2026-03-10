@@ -37,8 +37,8 @@ All T1. All called by DM (or setup agent during init).
 
 | Tool | Signature | Effect |
 |---|---|---|
-| `create_map` | `(id, gridType, bounds, defaultTerrain)` | Initialize a new map JSON file. |
-| `define_region` | `(map, bounds, terrain)` | Set terrain for a rectangular area. |
+| `create_map` | `({ id, grid_type, width, height, default_terrain })` | Initialize a new map JSON file. |
+| `define_region` | `({ map, x1, y1, x2, y2, terrain })` | Set terrain for a rectangular area. |
 | `import_entities` | `(map, entities[])` | Batch-place multiple entities. |
 
 ---
@@ -54,11 +54,7 @@ All T1. All called by DM (or setup agent during init).
 
 ### Resolution
 
-| Tool | Tier | Caller | Signature | Returns |
-|---|---|---|---|---|
-| `resolve_action` | T2 (Haiku) | DM | `({ actor, action, target, conditions })` | Summary, rolls breakdown, target stat, details, state changes. The DM's workhorse for mechanical resolution. |
-
-`resolve_action` is a subagent wrapper — it spawns a Haiku subagent that reads character sheets and rules, calls `roll_dice`, evaluates, and returns a structured result. Player-facing when it needs input ("Use Divine Smite?"), silent for NPC actions.
+The resolution subagent is not a registered tool — it's an internal subagent spawned by the engine. See [subagents-catalog.md](subagents-catalog.md) #1.
 
 ---
 
@@ -70,6 +66,7 @@ All T1. All called by DM.
 |---|---|---|
 | `set_alarm` | `({ clock, in, message, repeating? })` | Set an alarm on calendar or combat clock. Returns alarm ID + fire time. |
 | `clear_alarm` | `({ id })` | Remove an alarm by ID. |
+| `advance_calendar` | `({ minutes })` | Advance calendar clock by minutes. Fires triggered alarms. |
 | `next_round` | `({})` | Advance combat round counter. Checks and fires combat alarms. Returns round number + any fired alarms. |
 | `check_clocks` | `({})` | Read current state of both clocks and pending alarms. |
 
@@ -92,10 +89,11 @@ All T1 (initiative rolling may delegate to T2 for complex systems). Called by DM
 
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
-| `scene_transition` | T1 + T2 | DM | `({ title, time_advance })` | Cascade: finalize transcript, write campaign log entry (Haiku), update entity changelogs (Haiku), advance calendar clock, check alarms, update precis, prune context, checkpoint state. |
-| `session_end` | T1 + T2 | DM | `({})` | Final scene transition + Haiku writes session recap. Saves state. |
-| `session_resume` | T1 + T2 | Engine | `({})` | Load campaign state, build cached prefix, display "Previously on..." recap modal, start DM with fresh context. |
+| `scene_transition` | T1 + T2 | DM | `({ title, time_advance })` | Cascade: finalize transcript, run subagent updates (campaign log + changelogs in parallel), advance calendar, check alarms, validate, reset precis, prune context, checkpoint. |
+| `session_end` | T1 + T2 | DM | `({ title, time_advance? })` | Final scene transition + Haiku writes session recap. Saves state. |
 | `context_refresh` | T1 + T2 | DM | `({})` | Mid-scene reorientation: regenerate scene precis from transcript on disk, re-read active state, refresh cached prefix. Conversation retained as-is. |
+
+Note: Session resume is an engine operation, not a callable tool. It runs automatically on app launch when a campaign exists.
 
 ---
 
@@ -104,7 +102,8 @@ All T1 (initiative rolling may delegate to T2 for complex systems). Called by DM
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
 | `scribe` | T2 (Haiku) | DM | `({ updates: [{ visibility, content }] })` | Batch entity creation/updates. Each update tagged `private` or `player-facing`. Spawns Haiku subagent with `list_entities`, `read_entity`, `write_entity` tools for autonomous entity file management. Handles deduplication, front matter, changelogs. |
-| `promote_character` | T2 (Haiku) | DM | `({ name, file, level, context })` | Expand a character from minimal to full sheet. Haiku reads rules + existing notes, generates appropriate stats, writes/updates file. |
+
+Note: `promote_character` is not a registered tool — it's a subagent function called internally. See [subagents-catalog.md](subagents-catalog.md) #7.
 
 ---
 
@@ -116,7 +115,7 @@ All T1 (initiative rolling may delegate to T2 for complex systems). Called by DM
 | `style_scene` | T1 + T2 | DM, Engine | `({ description?, key_color?, variant?, save_to_location?, location? })` | Style UI to match scene mood. `description` triggers Haiku stylist subagent; `key_color` is direct. Optionally persist to location entity. |
 | `set_display_resources` | T1 | DM, Setup | `({ character, resources[] })` | Update which resource keys appear in the top frame for a character. |
 | `present_choices` | T1 + T2 | DM, Engine | `({ prompt?, choices[]? })` | Show choice modal. No params = Haiku subagent generates options. Explicit params = DM's choices. |
-| `present_roll` | T1 | DM | `({ result, label })` | Display a dice roll as a dramatic modal. |
+| `present_roll` | T1 | DM | `({ expression, rolls, total, kept?, label? })` | Display a dice roll as a dramatic modal. |
 | `show_character_sheet` | T1 | DM, Player | `({ character })` | Open character sheet modal. |
 
 ---
@@ -129,11 +128,19 @@ All T1 (initiative rolling may delegate to T2 for complex systems). Called by DM
 
 ---
 
+## Worldbuilding Tools
+
+| Tool | Tier | Caller | Signature | Effect |
+|---|---|---|---|---|
+| `dm_notes` | T1 | DM | `({ action: "read" \| "write", notes? })` | Read or write persistent DM campaign notes. A private scratchpad for the DM to track plans, secrets, and reminders across scenes. |
+
+---
+
 ## OOC / Mode Tools → [dm-prompt.md](dm-prompt.md), [overview.md](overview.md)
 
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
-| `enter_ooc` | T1 | DM | `({})` | Hand conversation to the OOC subagent (Sonnet). TUI switches to OOC style. DM receives terse summary when OOC ends. |
+| `enter_ooc` | T1 | DM | `({ reason })` | Hand conversation to the OOC subagent (Sonnet). TUI switches to OOC style. DM receives terse summary when OOC ends. |
 
 ---
 
@@ -144,24 +151,6 @@ All T1 (initiative rolling may delegate to T2 for complex systems). Called by DM
 | `rollback` | T1 | OOC agent | `({ target })` | Restore campaign state to a git commit. Target can be a commit hash, scene label, "last", or "exchanges_ago:N". Triggers `session_resume` after. |
 
 ---
-
-## Summary
-
-| Domain | Tool count | Tiers |
-|---|---|---|
-| Map queries | 6 | T1 |
-| Map mutations | 5 | T1 |
-| Map bulk setup | 3 | T1 |
-| Randomization | 3 | T1, T2 |
-| Clocks | 4 | T1 |
-| Combat | 4 | T1 |
-| Scene/Session | 4 | T1+T2 |
-| Entity | 1 | T2 |
-| TUI | 7 | T1, T1+T2 |
-| Player Management | 1 | T1 |
-| OOC/Mode | 1 | T1 |
-| Error recovery | 2 | T1 |
-| **Total** | **41** | |
 
 ### Not tools (engine-managed, no DM call needed)
 

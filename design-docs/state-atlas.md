@@ -106,6 +106,8 @@ DMSessionState
 ├── scenePrecis?: string                   Built from SceneState.precis + threads + intents
 ├── scenePacing?: string                   Built from exchange count + thread count
 ├── playerRead?: string                    Synthesized from SceneState.playerReads
+├── dmNotes?: string                       Loaded from campaign dm-notes
+├── entityIndex?: string                   Built from entity filesystem scan
 └── uiState?: string                       Built from modelines + style info
 ```
 
@@ -131,8 +133,8 @@ ConversationManager
 PersistedUIState                                  → state/ui.json
 ├── styleName: string                             Theme/style name (e.g. "gothic")
 ├── variant: StyleVariant
+├── keyColor?: string                             OKLCH key color override
 └── modelines?: Record<string, string>
-<!-- TODO: migrate to themeName + keyColor fields when theme system is fully wired -->
 ```
 
 ---
@@ -394,7 +396,7 @@ Key isolation properties:
 |------|-------|----------|
 | `CombatState.active` and `CombatClock.active` must stay in sync | `start_combat` handler calls both `clockStartCombat(state.clocks)` and `startCombat(state.combat, ...)`. `end_combat` handler calls both `endCombat(state.combat)` and `clockEndCombat(state.clocks)`. | Hard (enforced by tool handler pairing) |
 | `switch_player` target must exist in `config.players` | `switch_player` handler — `if (idx === -1) return err(...)` | Soft (error result) |
-| `activePlayerIndex` must be valid index into `config.players` | Only mutated by `switch_player`, which validates first | Hard (implicit) |
+| `activePlayerIndex` must be valid index into `config.players` | Mutated by `switch_player` tool + internal player-manager functions (`switchToNextPlayer`, `switchToPlayer`, `getCombatActivePlayer`) — all validate bounds | Hard (implicit) |
 
 *Source: `src/agents/tool-registry.ts`*
 
@@ -482,17 +484,17 @@ scene_transition(title, timeAdvance)
     ├─ 1. finalize_transcript
     │     Write transcript.md to campaign/scenes/NNN-slug/
     │
-    ├─ 2. campaign_log          (Haiku: scene summarizer)
-    │     Append "## Scene N: Title\n{summary}" to campaign/log.md
+    ├─ 2. subagent_updates      (Haiku: scene summarizer + changelog updater, parallelized)
+    │     Append campaign log entry + scan transcript for entity changelog entries
     │
-    ├─ 3. changelog_updates     (Haiku: changelog updater)
-    │     Scan transcript, append one-line entries to entity files
-    │
-    ├─ 4. advance_calendar
+    ├─ 3. advance_calendar
     │     advanceCalendar(clocks, timeAdvance) — fires alarms
     │
-    ├─ 5. check_alarms
+    ├─ 4. check_alarms
     │     checkClocks(clocks) — read-only status check
+    │
+    ├─ 5. validate
+    │     Run validation checks on campaign state
     │
     ├─ 6. reset_precis
     │     Clear precis, openThreads, npcIntents, playerReads
@@ -507,6 +509,8 @@ scene_transition(title, timeAdvance)
           Clear pending-operation.json
           Increment sceneNumber, reset slug + transcript
 ```
+
+Legacy step names (`campaign_log`, `changelog_updates`) are normalized to `subagent_updates` during crash recovery.
 
 ### Session End
 
@@ -540,7 +544,7 @@ Canonical directory tree for a campaign. Machine-managed files are marked with t
 │   ├── decks.json                         DecksState
 │   ├── scene.json                         PersistedSceneState (precis, threads, intents, playerReads, activePlayerIndex)
 │   ├── conversation.json                  SerializedExchange[]
-│   └── ui.json                            PersistedUIState (styleName, variant, modelines)
+│   └── ui.json                            PersistedUIState (styleName, variant, keyColor, modelines)
 │
 ├── campaign/                              [machine + DM] The knowledge backbone.
 │   ├── log.md                             [machine] Append-only campaign log. Dense, wikilinked.

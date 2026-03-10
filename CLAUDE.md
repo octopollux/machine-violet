@@ -33,10 +33,22 @@ Configured in `src/config/models.ts`. Override with `dev-config.json`:
 ```
 Model config is cached after first load; tests must call `loadModelConfig({ reset: true })`.
 
-## Design Docs
+## Documentation
 
-All in `design-docs/`. Start with `overview.md` — it links to everything else.
-Key docs: `tools-catalog.md`, `subagents-catalog.md`, `development-plan.md`, `tui-design.md`, `dm-prompt.md`, `context-management.md`, `entity-filesystem.md`.
+Start at `docs/index.md` for navigation. Three layers:
+
+- **`docs/`** — Architecture, module map, navigation. Start here to find things.
+- **`design-docs/`** — Specifications: data models, tool contracts, subagent protocols. Start with `overview.md`.
+- **`CLAUDE.md`** (this file) — Conventions and rules for writing code.
+
+### Documentation Maintenance
+
+Code and docs stay in sync. See `docs/maintenance.md` for the full guide.
+
+1. **Before starting work:** check relevant docs (module map, design docs) for context.
+2. **After changing code:** update any docs affected by the change. See `docs/maintenance.md` for what to update when.
+3. **Same commit:** code changes and doc updates go together.
+4. **Docs describe what exists.** Planned features go in GitHub issues, not docs. No derived counts.
 
 ## Conventions
 

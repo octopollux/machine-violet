@@ -154,18 +154,11 @@ Not needed for systemless play. Tackle when moving beyond narrative-only mode.
 
 ---
 
-## Part D: Summary Statistics
+## Part D: Remaining Gaps
 
-| Category | Designed | Implemented | Gap |
-|----------|----------|-------------|-----|
-| Tools (registered) | 37 | 36 | 1 missing + 2 not-registered |
-| Subagents | 14 | 10 | 2 missing (excl. ingestion) + 1 new |
-| Frame styles | 6 | 2 | 4 missing |
-| Frame variants | 4 | 5 | 1 new (dev) |
-| Game systems offered | 10+ | 2 | ~8 missing |
-| Auto-behaviors wired | 10 | ~4 | ~6 not wired |
-| DM personalities | 4 | 4 | 0 |
-| Responsive tiers | 5 | 5 | 0 |
-| Modal types | 5 | 5+ | 0 (game menu is extra) |
+The core gameplay loop, tools, TUI, and context management are solid. Remaining gaps are tracked as GitHub issues:
 
-**Verdict:** Core gameplay loop, tools, TUI, and context management are solid. The main gaps are in automation wiring (choice gen, AI turns, git commits), session lifecycle tools (scene transition, context refresh), rules infrastructure (fetching, distillation), and error recovery (rollback, cascades). The implementation also introduced useful features not in the specs (dev mode, player engagement tracking, cost display) that should be documented.
+- **[#67](https://github.com/Orthodox-531/tui-rpg/issues/67)** — Document ingestion pipeline
+- **[#68](https://github.com/Orthodox-531/tui-rpg/issues/68)** — Rules system integration (fetching, selection, distillation)
+- **[#69](https://github.com/Orthodox-531/tui-rpg/issues/69)** — Character creation subagent (crunchy systems)
+- **[#70](https://github.com/Orthodox-531/tui-rpg/issues/70)** — Wire rollback end-to-end
