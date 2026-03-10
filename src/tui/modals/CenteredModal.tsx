@@ -135,9 +135,11 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
     const textColor = themeColor(theme, "sideFrame");
     const resolvedFooterColor = footerColor ?? themeColor(theme, "title");
 
-    // Build an opaque blank line that fills the full content width.
+    // Build an opaque blank line that fills the full content area (inner + side padding).
     // Every row in the modal must emit real characters to cover what's behind it.
-    const blankLine = " ".repeat(innerWidth);
+    const fullRowWidth = innerWidth + 2 * sidePadding;
+    const blankLine = " ".repeat(fullRowWidth);
+    const padStr = " ".repeat(sidePadding);
 
     // Pad a plain-text line to exactly innerWidth with trailing spaces.
     const padLine = (line: string): string => {
@@ -148,9 +150,13 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
     // Build the full set of visible rows (content + blank fill) so the modal is opaque.
     const contentRows: React.ReactNode[] = [];
     if (hasReactChildren) {
-      // React children: render as-is, then fill remaining rows with blanks
+      // React children: wrap with padding columns so edges are opaque
       contentRows.push(
-        <Box key="children" flexDirection="column">{children}</Box>,
+        <Box key="children" flexDirection="row">
+          <Text>{padStr}</Text>
+          <Box flexDirection="column">{children}</Box>
+          <Text>{padStr}</Text>
+        </Box>,
       );
     } else if (wrappedStyled) {
       for (let i = 0; i < wrappedStyled.length; i++) {
@@ -158,8 +164,9 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
         const styledPad = Math.max(0, innerWidth - plainLen);
         contentRows.push(
           <Box key={i}>
+            <Text>{padStr}</Text>
             <Text>{...renderNodes(wrappedStyled[i])}</Text>
-            <Text>{" ".repeat(styledPad)}</Text>
+            <Text>{" ".repeat(styledPad)}{padStr}</Text>
           </Box>,
         );
       }
@@ -167,7 +174,7 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
       for (let i = 0; i < wrappedLines.length; i++) {
         contentRows.push(
           <Box key={i}>
-            <Text color={textColor}>{padLine(wrappedLines[i])}</Text>
+            <Text color={textColor}>{padStr}{padLine(wrappedLines[i])}{padStr}</Text>
           </Box>,
         );
       }
@@ -193,7 +200,7 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
         />
         <Box height={visibleRows} flexDirection="row">
           <ThemedSideFrame theme={theme} side="left" height={visibleRows} />
-          <Box flexDirection="column" width={innerWidth + 2 * sidePadding} paddingLeft={sidePadding} paddingRight={sidePadding}>
+          <Box flexDirection="column" width={fullRowWidth}>
             <ScrollView ref={scrollRef} onScroll={handleScroll}>
               {contentRows}
             </ScrollView>
