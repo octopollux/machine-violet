@@ -111,7 +111,7 @@ export function generateAnchors(baseHex: string, harmony: HarmonyType): number[]
 
   switch (harmony) {
     case "analogous":
-      return [normalizeHue(H - 30), H, normalizeHue(H + 30)];
+      return [H, normalizeHue(H - 30), normalizeHue(H + 30)];
     case "complementary":
       return [H, normalizeHue(H + 180)];
     case "split-complementary":
@@ -121,6 +121,32 @@ export function generateAnchors(baseHex: string, harmony: HarmonyType): number[]
     case "tetradic":
       return [H, normalizeHue(H + 90), normalizeHue(H + 180), normalizeHue(H + 270)];
   }
+}
+
+// --- Harmony swatch (multi-arc) ---
+
+/**
+ * Generate a 2D harmony swatch: one arc per harmony anchor.
+ * Each row uses the same preset but centered on a different anchor hue.
+ * Row 0 = key color arc (identical to a single-arc swatch).
+ *
+ * @returns Color[][] — harmonySwatch[anchor][step]
+ */
+export function generateHarmonySwatch(
+  presetName: string,
+  baseHex: string,
+  harmony: HarmonyType,
+): Color[][] {
+  const preset = presetRegistry.get(presetName);
+  if (!preset) throw new Error(`Unknown color preset: ${presetName}`);
+
+  const baseOklch = hexToOklch(baseHex);
+  const anchors = generateAnchors(baseHex, harmony);
+
+  return anchors.map((anchorHue) => {
+    const syntheticHex = oklchToHex({ L: baseOklch.L, C: baseOklch.C, H: anchorHue });
+    return generateArc(preset.build(syntheticHex));
+  });
 }
 
 // --- Presets ---

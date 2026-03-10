@@ -4,7 +4,7 @@
  */
 
 import type { Color, GradientPreset } from "../color/index.js";
-import { fromPreset, generateArc, simpleArc, getGradient } from "../color/index.js";
+import { generateHarmonySwatch, generateArc, simpleArc, getGradient } from "../color/index.js";
 // Side-effect: ensure presets and gradient presets are registered
 import "../color/presets.js";
 import "../color/gradient-presets.js";
@@ -51,22 +51,23 @@ export function resolveTheme(
     ...variantOverride?.colorMap,
   };
 
-  // Generate swatch
+  // Generate harmony swatch (multi-arc: one row per harmony anchor)
   const SAFE_DEFAULT_HEX = "#8888aa";
-  let swatch: Color[];
+  let harmonySwatch: Color[][];
   try {
-    swatch = fromPreset(swatchConfig.preset, keyColor);
+    harmonySwatch = generateHarmonySwatch(swatchConfig.preset, keyColor, swatchConfig.harmony);
   } catch {
     try {
       // Fallback to simple arc if preset not found
       const params = simpleArc(keyColor);
-      swatch = generateArc(params);
+      harmonySwatch = [generateArc(params)];
     } catch {
       // Fallback to safe default if keyColor is invalid hex
       const params = simpleArc(SAFE_DEFAULT_HEX);
-      swatch = generateArc(params);
+      harmonySwatch = [generateArc(params)];
     }
   }
+  const swatch = harmonySwatch[0];
 
   // Resolve gradient preset
   // Variant override: explicit null disables gradient; explicit config overrides base
@@ -84,6 +85,7 @@ export function resolveTheme(
     asset,
     playerPaneFrame,
     swatch,
+    harmonySwatch,
     colorMap,
     variant,
     keyColor,

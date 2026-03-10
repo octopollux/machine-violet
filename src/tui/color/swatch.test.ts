@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   generateArc,
   generateAnchors,
+  generateHarmonySwatch,
   fromPreset,
   listPresets,
   simpleArc,
@@ -99,8 +100,8 @@ describe("swatch", () => {
     it("analogous: 3 anchors ±30°", () => {
       const anchors = generateAnchors(base, "analogous");
       expect(anchors).toHaveLength(3);
-      // Middle anchor is base hue
-      expect(anchors[1]).toBeCloseTo(baseHue, 1);
+      // First anchor is base hue
+      expect(anchors[0]).toBeCloseTo(baseHue, 1);
     });
 
     it("complementary: 2 anchors 180° apart", () => {
@@ -147,6 +148,54 @@ describe("swatch", () => {
 
     it("throws on unknown preset", () => {
       expect(() => fromPreset("nonexistent", "#ff0000")).toThrow("Unknown color preset");
+    });
+  });
+
+  describe("generateHarmonySwatch", () => {
+    it("complementary: 2 rows with same step count", () => {
+      const result = generateHarmonySwatch("foliage", "#ff4488", "complementary");
+      expect(result).toHaveLength(2);
+      expect(result[0].length).toBe(result[1].length);
+    });
+
+    it("triadic: 3 rows", () => {
+      const result = generateHarmonySwatch("foliage", "#44aaff", "triadic");
+      expect(result).toHaveLength(3);
+    });
+
+    it("tetradic: 4 rows", () => {
+      const result = generateHarmonySwatch("cyberpunk", "#ff0000", "tetradic");
+      expect(result).toHaveLength(4);
+    });
+
+    it("analogous: 3 rows", () => {
+      const result = generateHarmonySwatch("ember", "#00ff00", "analogous");
+      expect(result).toHaveLength(3);
+    });
+
+    it("each row produces valid hex colors", () => {
+      const result = generateHarmonySwatch("ethereal", "#884488", "triadic");
+      for (const row of result) {
+        for (const c of row) {
+          expect(c.hex).toMatch(/^#[0-9a-f]{6}$/);
+        }
+      }
+    });
+
+    it("rows have different hue centers", () => {
+      const result = generateHarmonySwatch("foliage", "#ff0000", "complementary");
+      // Anchor 0 and anchor 1 should have distinct hue centers
+      const hue0 = result[0][Math.floor(result[0].length / 2)].oklch.H;
+      const hue1 = result[1][Math.floor(result[1].length / 2)].oklch.H;
+      const diff = Math.abs(hue0 - hue1);
+      const angularDiff = Math.min(diff, 360 - diff);
+      expect(angularDiff).toBeGreaterThan(90); // complementary should be ~180° apart
+    });
+
+    it("throws on unknown preset", () => {
+      expect(() => generateHarmonySwatch("nonexistent", "#ff0000", "triadic")).toThrow(
+        "Unknown color preset",
+      );
     });
   });
 

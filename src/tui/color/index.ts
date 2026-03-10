@@ -8,6 +8,7 @@ export type { HueArc, SwatchParams, Color, HarmonyType, PresetFactory } from "./
 export {
   generateArc,
   generateAnchors,
+  generateHarmonySwatch,
   fromPreset,
   listPresets,
   getPreset,

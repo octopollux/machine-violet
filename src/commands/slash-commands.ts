@@ -1,7 +1,7 @@
 import v8 from "node:v8";
 import { writeFileSync } from "node:fs";
 import type Anthropic from "@anthropic-ai/sdk";
-import type { NarrativeLine, StyleVariant } from "../types/tui.js";
+import type { ActiveModal, NarrativeLine, StyleVariant } from "../types/tui.js";
 import type { GameEngine } from "../agents/game-engine.js";
 import type { GameState } from "../agents/game-state.js";
 import type { ModeSession } from "../tui/game-context.js";
@@ -21,6 +21,7 @@ export interface SlashCommandContext {
   previousVariant: StyleVariant;
   setPreviousVariant: (v: StyleVariant) => void;
   dispatchTuiCommand?: (cmd: import("../agents/agent-loop.js").TuiCommand) => void;
+  setActiveModal?: (modal: ActiveModal) => void;
 }
 
 export interface SlashCommand {
@@ -226,6 +227,19 @@ const snapshotCommand: SlashCommand = {
   },
 };
 
+const swatchCommand: SlashCommand = {
+  name: "swatch",
+  usage: "/swatch",
+  description: "Show the active theme's color swatch grid",
+  execute(_args, ctx) {
+    if (!ctx.setActiveModal) {
+      ctx.appendLine({ kind: "system", text: "[Swatch modal unavailable]" });
+      return;
+    }
+    ctx.setActiveModal({ kind: "swatch" });
+  },
+};
+
 // --- Registry ---
 
 const commands: SlashCommand[] = [
@@ -237,6 +251,7 @@ const commands: SlashCommand[] = [
   oocCommand,
   devCommand,
   snapshotCommand,
+  swatchCommand,
 ];
 
 const commandMap = new Map<string, SlashCommand>(

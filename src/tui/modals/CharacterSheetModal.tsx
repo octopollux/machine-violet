@@ -1,18 +1,16 @@
 import React from "react";
-import type { FormattingNode, FrameStyleVariant } from "../../types/tui.js";
+import type { FormattingNode } from "../../types/tui.js";
+import type { ResolvedTheme } from "../themes/types.js";
 import { markdownToTags, parseFormatting } from "../formatting.js";
 import { CenteredModal } from "./CenteredModal.js";
 import type { CenteredModalHandle } from "./CenteredModal.js";
 
 interface CharacterSheetModalProps {
-  variant: FrameStyleVariant;
+  theme: ResolvedTheme;
   width: number;
   height: number;
-  /** Entity markdown content — front matter lines rendered as-is */
   content: string;
-  /** Ref for scroll control */
   scrollRef?: React.Ref<CenteredModalHandle>;
-  /** Vertical offset for centering within conversation pane */
   topOffset?: number;
 }
 
@@ -27,7 +25,7 @@ function colorizeHexStrings(line: string): string {
  * Width: min 30, 70% of screen, no max cap.
  */
 export function CharacterSheetModal({
-  variant,
+  theme,
   width,
   height,
   content,
@@ -36,7 +34,6 @@ export function CharacterSheetModal({
 }: CharacterSheetModalProps) {
   const rawLines = content.split("\n");
 
-  // Extract title from first H1
   let title = "Character Sheet";
   const bodyLines: string[] = [];
   for (const line of rawLines) {
@@ -47,8 +44,6 @@ export function CharacterSheetModal({
     }
   }
 
-  // Parse markdown → tags → FormattingNode[] for styled rendering
-  // colorizeHexStrings wraps #rrggbb strings in <color> tags so they preview in their own color
   const styledLines: FormattingNode[][] = bodyLines.map(
     (line) => parseFormatting(colorizeHexStrings(markdownToTags(line))),
   );
@@ -56,12 +51,12 @@ export function CharacterSheetModal({
   return (
     <CenteredModal
       ref={scrollRef}
-      variant={variant}
+      theme={theme}
       width={width}
       height={height}
       title={title}
-      children={bodyLines}
-      styledChildren={styledLines}
+      lines={bodyLines}
+      styledLines={styledLines}
       minWidth={30}
       maxWidth={999}
       widthFraction={0.7}

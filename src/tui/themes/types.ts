@@ -70,7 +70,15 @@ export interface ThemeAsset {
   components: Record<ComponentName, ThemeComponent>;
 }
 
-/** Maps swatch indices to frame parts for coloring. */
+/**
+ * Maps swatch indices to frame parts for coloring.
+ *
+ * Values encode a position in the harmony swatch grid:
+ * - Values 0–99: index into anchor 0 (the key color arc). `value` = step.
+ * - Values ≥ 100: `anchor = Math.floor(value / 100)`, `step = value % 100`.
+ *
+ * Examples: `3` = anchor 0 step 3, `102` = anchor 1 step 2, `205` = anchor 2 step 5.
+ */
 export interface ThemeColorMap {
   /** Index into swatch for the frame border. */
   border: number;
@@ -131,7 +139,10 @@ export interface ThemeDefinition {
 export interface ResolvedTheme {
   asset: ThemeAsset;
   playerPaneFrame: PlayerPaneFrame;
+  /** Anchor 0 arc (key color). Shortcut for `harmonySwatch[0]`. */
   swatch: Color[];
+  /** Full harmony swatch: harmonySwatch[anchor][step]. */
+  harmonySwatch: Color[][];
   colorMap: ThemeColorMap;
   variant: StyleVariant;
   /** The key color used to generate this theme. */

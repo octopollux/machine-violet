@@ -19,6 +19,7 @@ import {
   SimpleBorder,
   PlayerPaneSide,
 } from "./components/ThemedFrame.js";
+import { themeColor } from "./themes/color-resolve.js";
 import {
   getViewportTier,
   getVisibleElements,
@@ -173,7 +174,7 @@ export function Layout(props: LayoutProps) {
             playerColor={playerColor}
             width={innerWidth}
             themeAsset={theme.asset}
-            separatorColor={theme.swatch[theme.colorMap.separator]?.hex}
+            separatorColor={themeColor(theme, "separator")}
           />
 
           {/* Activity Line */}

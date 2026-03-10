@@ -378,6 +378,29 @@ describe("trySlashCommand", () => {
     });
   });
 
+  describe("/swatch", () => {
+    it("invokes setActiveModal with swatch kind", () => {
+      const setActiveModal = vi.fn();
+      const ctx = mockCtx({ setActiveModal });
+      trySlashCommand("/swatch", ctx);
+      expect(setActiveModal).toHaveBeenCalledWith({ kind: "swatch" });
+    });
+
+    it("appends fallback system message when setActiveModal is absent", () => {
+      const ctx = mockCtx();
+      // setActiveModal is not in the default mockCtx
+      trySlashCommand("/swatch", ctx);
+      expect(lastAppended(ctx).text).toContain("Swatch modal unavailable");
+      expect(lastAppended(ctx).kind).toBe("system");
+    });
+
+    it("appears in /help output", () => {
+      const ctx = mockCtx();
+      trySlashCommand("/help", ctx);
+      expect(lastAppended(ctx).text).toContain("/swatch");
+    });
+  });
+
   it("is case-insensitive for command names", () => {
     const ctx = mockCtx();
     expect(trySlashCommand("/HELP", ctx)).toBe(true);

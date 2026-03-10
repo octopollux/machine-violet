@@ -1,9 +1,9 @@
 import React from "react";
-import type { FrameStyleVariant } from "../../types/tui.js";
+import type { ResolvedTheme } from "../themes/types.js";
 import { CenteredModal } from "./CenteredModal.js";
 
 interface GameMenuProps {
-  variant: FrameStyleVariant;
+  theme: ResolvedTheme;
   width: number;
   height: number;
   selectedIndex: number;
@@ -37,7 +37,7 @@ export function getMenuItems(devModeEnabled?: boolean): string[] {
  * ESC menu modal. Standard navigation options.
  */
 export function GameMenu({
-  variant,
+  theme,
   width,
   height,
   selectedIndex,
@@ -55,6 +55,5 @@ export function GameMenu({
     return `  ${marker} ${label}`;
   });
 
-  return <CenteredModal variant={variant} width={width} height={height} title="Menu" footer={tokenSummary} children={lines} />;
+  return <CenteredModal theme={theme} width={width} height={height} title="Menu" footer={tokenSummary} lines={lines} />;
 }
-

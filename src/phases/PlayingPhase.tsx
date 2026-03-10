@@ -6,13 +6,12 @@ import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, narrativeRows } from "../tui/responsive.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { Layout } from "../tui/layout.js";
-import { ChoiceOverlay, DESCRIPTION_ROWS, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, ApiErrorModal, getMenuItems } from "../tui/modals/index.js";
+import { ChoiceOverlay, DESCRIPTION_ROWS, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, ApiErrorModal, SwatchModal, getMenuItems } from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { getActivePlayer, switchToNextPlayer, getPlayerEntries } from "../agents/player-manager.js";
 import { createOOCSession } from "../agents/subagents/ooc-mode.js";
 import { createDevSession, summarizeGameState } from "../agents/subagents/dev-mode.js";
 import { useGameContext } from "../tui/game-context.js";
-import { themeToVariant } from "../tui/themes/index.js";
 import { trySlashCommand } from "../commands/index.js";
 
 export function PlayingPhase() {
@@ -50,9 +49,6 @@ export function PlayingPhase() {
 
   const menuItems = useMemo(() => getMenuItems(devModeEnabled), [devModeEnabled]);
 
-  // Compatibility: extract FrameStyleVariant for modals that still use old interface
-  const modalVariant = useMemo(() => themeToVariant(theme), [theme]);
-
   // Whether TextInput should be disabled
   const textInputDisabled =
     !!(activeModal && activeModal.kind === "dice") ||
@@ -78,6 +74,7 @@ export function PlayingPhase() {
       previousVariant: previousVariantRef.current,
       setPreviousVariant: (v) => { previousVariantRef.current = v; },
       dispatchTuiCommand,
+      setActiveModal,
     })) {
       clearInput();
       return;
@@ -154,8 +151,8 @@ export function PlayingPhase() {
     // Retry overlay: block all input (triple-ESC above still works)
     if (retryOverlay) return;
 
-    // Dice modal: any key dismisses
-    if (activeModal && activeModal.kind === "dice") {
+    // Dice / swatch modal: any key dismisses
+    if (activeModal && (activeModal.kind === "dice" || activeModal.kind === "swatch")) {
       setActiveModal(null);
       return;
     }
@@ -441,7 +438,7 @@ export function PlayingPhase() {
       />
       {activeModal?.kind === "dice" && (
         <DiceRollModal
-          variant={modalVariant}
+          theme={theme}
           width={cols}
           expression={activeModal.expression}
           rolls={activeModal.rolls}
@@ -450,9 +447,12 @@ export function PlayingPhase() {
           reason={activeModal.reason}
         />
       )}
+      {activeModal?.kind === "swatch" && (
+        <SwatchModal theme={theme} width={cols} height={narRows} topOffset={conversationPaneTop} />
+      )}
       {activeModal?.kind === "recap" && (
         <SessionRecapModal
-          variant={modalVariant}
+          theme={theme}
           width={cols}
           height={narRows}
           lines={activeModal.lines}
@@ -462,7 +462,7 @@ export function PlayingPhase() {
       )}
       {activeModal?.kind === "character_sheet" && (
         <CharacterSheetModal
-          variant={modalVariant}
+          theme={theme}
           width={cols}
           height={narRows}
           content={activeModal.content}
@@ -472,7 +472,7 @@ export function PlayingPhase() {
       )}
       {retryOverlay && (
         <ApiErrorModal
-          variant={modalVariant}
+          theme={theme}
           width={cols}
           height={rows}
           overlay={retryOverlay}
@@ -480,7 +480,7 @@ export function PlayingPhase() {
       )}
       {menuOpen && (
         <GameMenu
-          variant={modalVariant}
+          theme={theme}
           width={cols}
           height={rows}
           selectedIndex={menuIndex}
