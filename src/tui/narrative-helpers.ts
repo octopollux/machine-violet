@@ -3,6 +3,11 @@ import type { NarrativeLine } from "../types/tui.js";
 /**
  * Append a streaming text delta to a NarrativeLine array.
  * Handles newline splitting and blank-line separator preservation.
+ *
+ * Returns a new array (immutable — safe for raw useState and the
+ * batching hook alike).  The batching hook applies updaters eagerly
+ * against a decoupled working copy, so intermediate copies don't
+ * reach React state and the per-token cost is just a shallow copy.
  */
 export function appendDelta(
   prev: NarrativeLine[],

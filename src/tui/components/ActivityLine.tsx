@@ -11,7 +11,7 @@ interface ActivityLineProps {
  * Hidden when idle (null state).
  * Retry/connection-loss states are handled by ApiErrorModal instead.
  */
-export function ActivityLine({ engineState }: ActivityLineProps) {
+export const ActivityLine = React.memo(function ActivityLine({ engineState }: ActivityLineProps) {
   const activity = getActivity(engineState);
   if (!activity) return null;
 
@@ -20,4 +20,4 @@ export function ActivityLine({ engineState }: ActivityLineProps) {
       <Text dimColor>{activity.label}</Text>
     </Box>
   );
-}
+});

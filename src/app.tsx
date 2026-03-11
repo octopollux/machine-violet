@@ -34,6 +34,7 @@ import { gracefulShutdown } from "./shutdown.js";
 import { createGitIO } from "./tools/git/isogit-adapter.js";
 import { useGameCallbacks } from "./tui/hooks/useGameCallbacks.js";
 import { useRawModeGuardian } from "./tui/hooks/useRawModeGuardian.js";
+import { useBatchedNarrativeLines } from "./tui/hooks/useBatchedNarrativeLines.js";
 import { isDevMode, wrapFileIOWithDevLog } from "./config/dev-mode.js";
 import { setContextDumpDir } from "./config/context-dump.js";
 import { sandboxFileIO, campaignPaths } from "./tools/filesystem/index.js";
@@ -162,7 +163,7 @@ export interface AppProps {
 export default function App({ shutdownRef }: AppProps) {
   // --- Core state ---
   const [phase, setPhase] = useState<AppPhase>("loading");
-  const [narrativeLines, setNarrativeLines] = useState<NarrativeLine[]>([]);
+  const { lines: narrativeLines, setLines: setNarrativeLines } = useBatchedNarrativeLines();
   const [engineState, setEngineState] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
