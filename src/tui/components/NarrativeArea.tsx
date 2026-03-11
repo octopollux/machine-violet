@@ -130,14 +130,16 @@ export function scrollAmount(viewportRows: number): number {
 export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>(
   function NarrativeArea({ lines, maxRows, quoteColor, playerColor, width, themeAsset, separatorColor }, ref) {
   const scrollRef = useRef<ScrollViewRef>(null);
+  const localHandleRef = useRef<ScrollHandle>(null);
   const [linesBelow, setLinesBelow] = useState(0);
   const atBottomRef = useRef(true);
 
-  // Expose scrollBy to parent (clamped so forward scroll stops at bottom)
+  // Build a clamped ScrollHandle and expose it to both parent and local refs
   useScrollHandle(ref, scrollRef);
+  useScrollHandle(localHandleRef, scrollRef);
 
-  // Mouse wheel → single-line scroll (uses raw ScrollViewRef directly)
-  useMouseScroll(scrollRef);
+  // Mouse wheel → single-line scroll (clamped to content bounds)
+  useMouseScroll(localHandleRef);
 
   // Track scroll position
   const updateScrollState = useCallback(() => {
