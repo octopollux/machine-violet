@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Box } from "ink";
 import type { ViewportDimensions, NarrativeLine } from "../types/tui.js";
 import type { ResolvedTheme } from "./themes/types.js";
@@ -80,7 +80,7 @@ export interface LayoutProps {
  * Main TUI layout — two-pane structure (Conversation Pane + Player Pane).
  * Composes all elements with responsive breakpoints.
  */
-export function Layout(props: LayoutProps) {
+export const Layout = React.memo(function Layout(props: LayoutProps) {
   const {
     dimensions,
     theme,
@@ -144,25 +144,58 @@ export function Layout(props: LayoutProps) {
   const sidePadding = elements.sideFrames ? 1 : 0;
   const innerWidth = elements.sideFrames ? width - 2 * sideFrameWidth - 2 * sidePadding : width;
 
+  // Memoize expensive sub-trees that don't change during streaming
+
+  const topFrame = useMemo(
+    () => elements.topFrame ? (
+      <ThemedHorizontalBorder theme={theme} width={width} position="top" centerText={titleText} />
+    ) : null,
+    [elements.topFrame, theme, width, titleText],
+  );
+
+  const bottomFrame = useMemo(
+    () => elements.lowerFrame ? (
+      <ThemedHorizontalBorder
+        theme={theme} width={width} position="bottom"
+        centerText={turnHolder ? `${turnHolder}'s Turn` : undefined}
+        centerTextColor={turnIndicatorColor}
+      />
+    ) : null,
+    [elements.lowerFrame, theme, width, turnHolder, turnIndicatorColor],
+  );
+
+  const leftSide = useMemo(
+    () => elements.sideFrames ? <ThemedSideFrame theme={theme} side="left" height={middleHeight} /> : null,
+    [elements.sideFrames, theme, middleHeight],
+  );
+
+  const rightSide = useMemo(
+    () => elements.sideFrames ? <ThemedSideFrame theme={theme} side="right" height={middleHeight} /> : null,
+    [elements.sideFrames, theme, middleHeight],
+  );
+
+  const separatorColor = useMemo(() => themeColor(theme, "separator"), [theme]);
+
+  const playerPaneTopBorder = useMemo(
+    () => elements.modeline ? <SimpleBorder theme={theme} width={width} position="top" color={playerColor} /> : null,
+    [elements.modeline, theme, width, playerColor],
+  );
+
+  const playerPaneBottomBorder = useMemo(
+    () => elements.modeline ? <SimpleBorder theme={theme} width={width} position="bottom" color={playerColor} /> : null,
+    [elements.modeline, theme, width, playerColor],
+  );
+
   return (
     <Box flexDirection="column" width={width} height={dimensions.rows}>
       {/* === CONVERSATION PANE === */}
 
       {/* Top Frame (themed multi-line border + campaign title) */}
-      {elements.topFrame && (
-        <ThemedHorizontalBorder
-          theme={theme}
-          width={width}
-          position="top"
-          centerText={titleText}
-        />
-      )}
+      {topFrame}
 
       {/* Middle section: optional side frames + narrative + activity */}
       <Box flexDirection="row">
-        {elements.sideFrames && (
-          <ThemedSideFrame theme={theme} side="left" height={middleHeight} />
-        )}
+        {leftSide}
 
         <Box flexDirection="column" width={innerWidth + 2 * sidePadding} paddingLeft={sidePadding} paddingRight={sidePadding}>
           {/* Narrative Area */}
@@ -174,35 +207,23 @@ export function Layout(props: LayoutProps) {
             playerColor={playerColor}
             width={innerWidth}
             themeAsset={theme.asset}
-            separatorColor={themeColor(theme, "separator")}
+            separatorColor={separatorColor}
           />
 
           {/* Activity Line */}
           {elements.activityLine && <ActivityLine engineState={engineState} />}
         </Box>
 
-        {elements.sideFrames && (
-          <ThemedSideFrame theme={theme} side="right" height={middleHeight} />
-        )}
+        {rightSide}
       </Box>
 
       {/* Bottom Frame (themed multi-line border + turn indicator) */}
-      {elements.lowerFrame && (
-        <ThemedHorizontalBorder
-          theme={theme}
-          width={width}
-          position="bottom"
-          centerText={turnHolder ? `${turnHolder}'s Turn` : undefined}
-          centerTextColor={turnIndicatorColor}
-        />
-      )}
+      {bottomFrame}
 
       {/* === PLAYER PANE === */}
 
       {/* Player Pane top border (simple 1-row with corners) */}
-      {elements.modeline && (
-        <SimpleBorder theme={theme} width={width} position="top" color={playerColor} />
-      )}
+      {playerPaneTopBorder}
 
       {/* Player Pane content: side edges + modeline + input (fixed height) */}
       {elements.modeline && (
@@ -234,9 +255,7 @@ export function Layout(props: LayoutProps) {
       )}
 
       {/* Player Pane bottom border */}
-      {elements.modeline && (
-        <SimpleBorder theme={theme} width={width} position="bottom" color={playerColor} />
-      )}
+      {playerPaneBottomBorder}
 
       {/* Player Selector */}
       {elements.playerSelector && (
@@ -244,4 +263,4 @@ export function Layout(props: LayoutProps) {
       )}
     </Box>
   );
-}
+});

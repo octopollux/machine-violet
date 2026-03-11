@@ -60,7 +60,7 @@ export function splitModeline(text: string, width: number): string[] {
  * Receives pre-split lines from the layout (so the layout can account
  * for the line count when sizing the narrative area).
  */
-export function Modeline({ lines, width }: ModelineProps) {
+export const Modeline = React.memo(function Modeline({ lines, width }: ModelineProps) {
   return (
     <Box flexDirection="column" width={width}>
       {lines.map((line, i) => (
@@ -68,4 +68,4 @@ export function Modeline({ lines, width }: ModelineProps) {
       ))}
     </Box>
   );
-}
+});

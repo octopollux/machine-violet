@@ -32,10 +32,24 @@ function prefixStable(a: NarrativeLine[], b: NarrativeLine[], count: number): bo
   return true;
 }
 
+/** Build a cheap content fingerprint for a NarrativeLine slice. */
+function tailFingerprint(lines: NarrativeLine[]): string {
+  // For short tails (typical during streaming), join texts directly.
+  // This is O(n) in tail length but the tail is usually < 20 lines.
+  let fp = "";
+  for (const l of lines) {
+    fp += l.kind;
+    fp += ":";
+    fp += l.text;
+    fp += "\n";
+  }
+  return fp;
+}
+
 /**
  * Incrementally process narrative lines by caching the "frozen" prefix
  * (everything before the last blank DM line) and only reprocessing
- * the current paragraph tail on each call.
+ * the current paragraph tail when its content actually changes.
  */
 export function useProcessedLines(
   lines: NarrativeLine[],
@@ -48,6 +62,8 @@ export function useProcessedLines(
     quoteColor: string | undefined;
     splitIdx: number;            // index of blank DM line where we split
     frozenResult: ProcessedLine[];
+    tailFp: string;              // content fingerprint of the tail
+    tailResult: ProcessedLine[];
     fullResult: ProcessedLine[];
   } | null>(null);
 
@@ -64,8 +80,15 @@ export function useProcessedLines(
     cache.lines.length <= lines.length &&
     prefixStable(cache.lines, lines, splitIdx + 1)
   ) {
-    // Frozen prefix is still valid — only reprocess the tail
+    // Frozen prefix is still valid — check if tail content changed
     const tail = lines.slice(splitIdx + 1);
+    const fp = tailFingerprint(tail);
+
+    if (fp === cache.tailFp) {
+      // Tail content unchanged — return cached result as-is
+      return cache.fullResult;
+    }
+
     const tailResult = processNarrativeLines(tail, width, quoteColor);
     const fullResult = [...cache.frozenResult, ...tailResult];
     cacheRef.current = {
@@ -74,6 +97,8 @@ export function useProcessedLines(
       quoteColor,
       splitIdx,
       frozenResult: cache.frozenResult,
+      tailFp: fp,
+      tailResult,
       fullResult,
     };
     return fullResult;
@@ -86,13 +111,18 @@ export function useProcessedLines(
     const frozenResult = processNarrativeLines(prefix, width, quoteColor);
     const tailResult = processNarrativeLines(tail, width, quoteColor);
     const fullResult = [...frozenResult, ...tailResult];
-    cacheRef.current = { lines, width, quoteColor, splitIdx, frozenResult, fullResult };
+    const fp = tailFingerprint(tail);
+    cacheRef.current = { lines, width, quoteColor, splitIdx, frozenResult, tailFp: fp, tailResult, fullResult };
     return fullResult;
   }
 
   // No blank DM line — no split possible, process everything
+  const fp = tailFingerprint(lines);
+  if (cache !== null && cache.width === width && cache.quoteColor === quoteColor && cache.splitIdx === -1 && fp === cache.tailFp) {
+    return cache.fullResult;
+  }
   const fullResult = processNarrativeLines(lines, width, quoteColor);
-  cacheRef.current = { lines, width, quoteColor, splitIdx, frozenResult: [], fullResult };
+  cacheRef.current = { lines, width, quoteColor, splitIdx, frozenResult: [], tailFp: fp, tailResult: fullResult, fullResult };
   return fullResult;
 }
 

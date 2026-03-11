@@ -58,7 +58,7 @@ interface ThemedHorizontalBorderProps {
  * Multi-line themed horizontal border (top or bottom of Conversation Pane).
  * Uses composeTopFrame/composeBottomFrame from the composition engine.
  */
-export function ThemedHorizontalBorder({
+export const ThemedHorizontalBorder = React.memo(function ThemedHorizontalBorder({
   theme,
   width,
   position,
@@ -119,7 +119,7 @@ export function ThemedHorizontalBorder({
       })}
     </Box>
   );
-}
+});
 
 // --- Themed Side Frame ---
 
@@ -132,7 +132,7 @@ interface ThemedSideFrameProps {
 /**
  * Vertical side frame for Conversation Pane.
  */
-export function ThemedSideFrame({ theme, side, height }: ThemedSideFrameProps) {
+export const ThemedSideFrame = React.memo(function ThemedSideFrame({ theme, side, height }: ThemedSideFrameProps) {
   const rows = composeSideColumn(theme.asset, side, height);
   const sideHex = themeColor(theme, "sideFrame");
   // Gradient uses the border color as base so hue/chroma shifts match
@@ -161,7 +161,7 @@ export function ThemedSideFrame({ theme, side, height }: ThemedSideFrameProps) {
       })}
     </Box>
   );
-}
+});
 
 // --- Simple Border (Player Pane) ---
 
@@ -175,7 +175,7 @@ interface SimpleBorderProps {
 /**
  * Simple 1-row border for the Player Pane.
  */
-export function SimpleBorder({ theme, width, position, color }: SimpleBorderProps) {
+export const SimpleBorder = React.memo(function SimpleBorder({ theme, width, position, color }: SimpleBorderProps) {
   const frame = composeSimpleBorder(theme.playerPaneFrame, width, position);
   const borderColor = color ?? themeColor(theme, "border");
 
@@ -184,7 +184,7 @@ export function SimpleBorder({ theme, width, position, color }: SimpleBorderProp
       <Text color={borderColor}>{frame.rows[0]}</Text>
     </Box>
   );
-}
+});
 
 // --- Player Pane Side Edges ---
 
@@ -200,7 +200,7 @@ interface PlayerPaneSideProps {
  * Side edge for Player Pane content rows.
  * Renders a vertical column of characters composited from multi-row corners + edge.
  */
-export function PlayerPaneSide({ theme, side, color, height }: PlayerPaneSideProps) {
+export const PlayerPaneSide = React.memo(function PlayerPaneSide({ theme, side, color, height }: PlayerPaneSideProps) {
   const borderColor = color ?? themeColor(theme, "border");
   const h = height ?? 1;
   const chars = playerPaneSideColumn(theme.playerPaneFrame, side, h);
@@ -214,4 +214,4 @@ export function PlayerPaneSide({ theme, side, color, height }: PlayerPaneSidePro
     );
   }
   return <Text color={borderColor}>{chars[0] ?? " "}</Text>;
-}
+});
