@@ -8,6 +8,10 @@
  *
  * Non-delta updates (player lines, system messages) flush immediately
  * so the UI never feels laggy for discrete events.
+ *
+ * GC optimization: functional updaters (the streaming hot path) are
+ * applied eagerly against a mutable working copy in the ref, so only
+ * one array snapshot is created per flush instead of one per token.
  */
 
 import { useState, useRef, useCallback, useEffect } from "react";
@@ -29,34 +33,36 @@ export function useBatchedNarrativeLines(
 ): BatchedNarrativeLines {
   const [lines, setLinesReal] = useState<NarrativeLine[]>([]);
 
-  // Pending updaters accumulated between flushes.
-  const pendingRef = useRef<Array<React.SetStateAction<NarrativeLine[]>>>([]);
+  // Mutable working copy that functional updaters are applied to eagerly.
+  // Between flushes, this accumulates all mutations without creating
+  // intermediate array copies — each appendDelta mutates in-place.
+  const workingRef = useRef<NarrativeLine[]>(lines);
+  // Whether the working copy has been modified since the last flush.
+  const dirtyRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Latest committed value (avoids stale closure in flush).
+  // Latest committed value (for direct-set path).
   const linesRef = useRef(lines);
   linesRef.current = lines;
 
-  // Flush: apply all pending updaters in order, commit once.
+  // Flush: snapshot the working copy into React state.
   const flush = useCallback(() => {
     timerRef.current = null;
-    const pending = pendingRef.current;
-    if (pending.length === 0) return;
-    pendingRef.current = [];
-
-    // Reduce all pending actions into a single state value.
-    let current = linesRef.current;
-    for (const action of pending) {
-      current = typeof action === "function" ? action(current) : action;
-    }
-    setLinesReal(current);
+    if (!dirtyRef.current) return;
+    dirtyRef.current = false;
+    // Snapshot: create an immutable copy for React.
+    const snapshot = [...workingRef.current];
+    setLinesReal(snapshot);
   }, []);
 
   // Stable setter that batches functional updates and flushes direct sets.
   const setLines: React.Dispatch<React.SetStateAction<NarrativeLine[]>> = useCallback(
     (action) => {
       if (typeof action === "function") {
-        // Functional update (streaming delta) — batch it.
-        pendingRef.current.push(action);
+        // Functional update (streaming delta) — apply eagerly to working copy.
+        // The updater (e.g. appendDelta) returns a new array, but we only keep
+        // the latest result — no intermediate snapshots are retained.
+        workingRef.current = action(workingRef.current);
+        dirtyRef.current = true;
         if (timerRef.current === null) {
           timerRef.current = setTimeout(flush, flushInterval);
         }
@@ -66,17 +72,8 @@ export function useBatchedNarrativeLines(
           clearTimeout(timerRef.current);
           timerRef.current = null;
         }
-        // Apply any pending functional updates first, then the direct set.
-        if (pendingRef.current.length > 0) {
-          const pending = pendingRef.current;
-          pendingRef.current = [];
-          let current = linesRef.current;
-          for (const p of pending) {
-            current = typeof p === "function" ? p(current) : p;
-          }
-          // The direct set replaces everything anyway.
-        }
-        pendingRef.current = [];
+        dirtyRef.current = false;
+        workingRef.current = action;
         setLinesReal(action);
       }
     },
