@@ -45,7 +45,9 @@ async function handleShutdownSignal() {
     // Best-effort
   }
 
-  disableMouseReporting(process.stdout);
+  if (process.stdout.isTTY) {
+    disableMouseReporting(process.stdout);
+  }
   unlockRawMode();
   removeCombiner();
   unmount();

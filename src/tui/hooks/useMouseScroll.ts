@@ -155,8 +155,8 @@ export function useMouseScroll(
     const output = process.stdout;
     const input = process.stdin;
 
-    // Skip in non-TTY environments (tests, piped output).
-    if (!output.isTTY) return;
+    // Skip in non-TTY environments (tests, piped input/output).
+    if (!output.isTTY || !input.isTTY) return;
 
     enableMouseReporting(output);
 
