@@ -37,15 +37,18 @@ export class ConversationManager {
     assistant: Anthropic.MessageParam,
     toolResults: Anthropic.MessageParam[] = [],
   ): DroppedExchange | null {
+    // Stub tool results immediately so exchange content is stable from the
+    // first turn it appears — retroactive stubbing would invalidate cache.
+    const stubbedResults = toolResults.map((tr) =>
+      tr.role === "user" ? stubToolResult(tr) : tr,
+    );
+
     const estimatedTokens =
       estimateMessageTokens(user) +
       estimateMessageTokens(assistant) +
-      toolResults.reduce((sum, tr) => sum + estimateMessageTokens(tr), 0);
+      stubbedResults.reduce((sum, tr) => sum + estimateMessageTokens(tr), 0);
 
-    this.exchanges.push({ user, assistant, toolResults, estimatedTokens, stubbed: false });
-
-    // Stub old tool results
-    this.stubOldToolResults();
+    this.exchanges.push({ user, assistant, toolResults: stubbedResults, estimatedTokens, stubbed: true });
 
     // Enforce retention limits
     return this.enforceRetention();
@@ -95,28 +98,6 @@ export class ConversationManager {
         estimateMessageTokens(ex.assistant) +
         ex.toolResults.reduce((sum, tr) => sum + estimateMessageTokens(tr), 0);
       this.exchanges.push(ex);
-    }
-  }
-
-  /** Replace tool results older than stub_after with one-line stubs */
-  private stubOldToolResults(): void {
-    const stubAfter = this.config.tool_result_stub_after;
-    const cutoff = this.exchanges.length - stubAfter;
-
-    for (let i = 0; i < cutoff; i++) {
-      const ex = this.exchanges[i];
-      if (ex.stubbed || ex.toolResults.length === 0) continue;
-
-      ex.toolResults = ex.toolResults.map((tr) =>
-        tr.role === "user" ? stubToolResult(tr) : tr,
-      );
-      ex.stubbed = true;
-
-      // Recompute token estimate
-      ex.estimatedTokens =
-        estimateMessageTokens(ex.user) +
-        estimateMessageTokens(ex.assistant) +
-        ex.toolResults.reduce((sum, r) => sum + estimateMessageTokens(r), 0);
     }
   }
 

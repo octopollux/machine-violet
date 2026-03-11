@@ -144,34 +144,27 @@ describe("ConversationManager", () => {
     expect(dropped!.reason).toBe("token_limit");
   });
 
-  it("stubs old tool results", () => {
-    const config: ContextConfig = { ...defaultContextConfig, tool_result_stub_after: 1 };
-    const mgr = new ConversationManager(config);
+  it("stubs tool results on insertion to preserve cache stability", () => {
+    const mgr = new ConversationManager(defaultContextConfig);
 
-    // First exchange with tool result
+    // Tool result is stubbed immediately on insertion
     mgr.addExchange(
       userMsg("Roll"),
       assistantMsg("Rolling..."),
       [toolResultMsg("toolu_1", "A very long tool result with lots of detail that should be stubbed")],
     );
 
-    // Second exchange (triggers stubbing of first)
-    mgr.addExchange(userMsg("Next"), assistantMsg("Done."));
-
     const messages = mgr.getMessages();
-    // The tool result from the first exchange should be stubbed
-    // Order: user, tool_result, assistant, user, assistant
-    const toolMsg = messages[1]; // tool_result comes between user and assistant now
+    const toolMsg = messages[1]; // tool_result comes between user and assistant
     const content = toolMsg.content as Anthropic.ToolResultBlockParam[];
     expect(typeof content[0].content).toBe("string");
     expect((content[0].content as string)).toContain("[stub]");
   });
 
   it("only stubs user messages in toolResults (not assistant tool_use)", () => {
-    const config: ContextConfig = { ...defaultContextConfig, tool_result_stub_after: 1 };
-    const mgr = new ConversationManager(config);
+    const mgr = new ConversationManager(defaultContextConfig);
 
-    // First exchange with both assistant tool_use and user tool_result
+    // Exchange with both assistant tool_use and user tool_result
     const toolInteractions: Anthropic.MessageParam[] = [
       assistantToolUseMsg("roll_dice", "toolu_1"),
       toolResultMsg("toolu_1", "A very long tool result with lots of detail"),
@@ -182,11 +175,8 @@ describe("ConversationManager", () => {
       toolInteractions,
     );
 
-    // Second exchange triggers stubbing
-    mgr.addExchange(userMsg("Next"), assistantMsg("Done."));
-
     const messages = mgr.getMessages();
-    // user, assistant(tool_use), user(tool_result), assistant, user, assistant = 6
+    // user, assistant(tool_use), user(tool_result), assistant = 4
     // The assistant tool_use (messages[1]) should NOT be stubbed
     const toolUseMsg = messages[1];
     expect(toolUseMsg.role).toBe("assistant");

@@ -70,7 +70,7 @@ Conversation accumulates within a scene and is cleared at scene transition. With
 
 **`max_conversation_tokens`**: Safety ceiling. If a scene runs unusually long or becomes tool-heavy, oldest exchanges are dropped to stay under this cap. This is the only mid-scene drop trigger in normal operation.
 
-**`tool_result_stub_after`**: Full tool results (map viewports, resolve_action breakdowns) are replaced with one-line stubs after N exchanges. A resolve_action result from 5 turns ago becomes `[resolve_action → "Hit, 9 slashing, G1: 3/12 HP"]`. The DM already narrated it; the stub is just a breadcrumb.
+**`tool_result_stub_after`**: *(Legacy, no longer used.)* Tool results are now stubbed at insertion time — when `addExchange()` records a completed exchange, tool results are immediately replaced with one-line stubs. The DM has already seen and narrated the full result during the agent loop; the stub is just a breadcrumb for context. Stubbing on insertion (rather than retroactively) ensures exchange content is stable from the first turn it appears, preserving cache.
 
 ## Scene Summary: The Running Precis
 
@@ -139,7 +139,7 @@ Session start:
 Each exchange:
   → Player input added to conversation
   → DM responds (tool calls + narrative)
-  → Tool results older than stub threshold → replaced with stubs
+  → Exchange recorded: tool results stubbed on insertion (cache-safe)
   → If conversation exceeds max_conversation_tokens:
       → Oldest exchanges dropped until under cap
       → Haiku appends terse summary to scene precis
