@@ -422,8 +422,9 @@ describe("SwatchModal", () => {
         <SwatchModal theme={theme} width={100} height={30} />
       </Box>,
     );
-    const frame = lastFrame();
+    const frame = lastFrame()!;
     expect(frame).toContain(theme.asset.name);
+    expect(frame).toContain("exploration");
   });
 
   it("renders anchor row labels", () => {

@@ -29,18 +29,33 @@ export function SwatchModal({ theme, width, height, topOffset }: SwatchModalProp
 
   // Column headers
   const stepLabels = Array.from({ length: steps }, (_, i) => String(i).padStart(3));
-  const headerLine = "      " + stepLabels.join(" ");
+  const headerLine = "      " + stepLabels.join("");
 
   // Current colorMap assignments
   const assignments = Object.entries(colorMap)
     .map(([part, value]) => `${part}: ${value}`)
     .join("  ");
 
-  // Compute inner content width (same formula as CenteredModal)
   const sideWidth = theme.asset.components.edge_left.width;
   const sidePadding = 1;
-  const gridWidth = headerLine.length + 2 * sideWidth + 2 * sidePadding;
-  const innerWidth = gridWidth - 2 * sideWidth - 2 * sidePadding;
+  const chrome = 2 * sideWidth + 2 * sidePadding;
+
+  // Title drives minimum width: title + padding spaces + corners + separators
+  const title = `${theme.asset.name} / ${theme.variant} / ${keyColor}`;
+  const { corner_tl, corner_tr, separator_left_top, separator_right_top } = theme.asset.components;
+  const titleChrome = corner_tl.width + corner_tr.width
+    + separator_left_top.width + separator_right_top.width;
+  const titleMinWidth = stringWidth(title) + 2 + titleChrome; // +2 for padding spaces
+
+  const gridContentWidth = headerLine.length;
+  const modalWidth = Math.max(gridContentWidth + chrome, titleMinWidth);
+  const innerWidth = modalWidth - chrome;
+
+  // Center the grid within the (possibly wider) inner area
+  const gridPadLeft = Math.floor((innerWidth - gridContentWidth) / 2);
+  const gridPadRight = innerWidth - gridContentWidth - gridPadLeft;
+  const leftPad = " ".repeat(gridPadLeft);
+  const rightPad = " ".repeat(gridPadRight);
 
   // Content rows: header + grid rows + blank + assignments
   const contentRows = 1 + harmonySwatch.length + 1 + 1;
@@ -50,30 +65,30 @@ export function SwatchModal({ theme, width, height, topOffset }: SwatchModalProp
       theme={theme}
       width={width}
       height={height}
-      title={`${theme.asset.name} / ${theme.variant} / ${keyColor}`}
+      title={title}
       footer="Press any key to dismiss"
-      minWidth={gridWidth}
-      maxWidth={gridWidth}
+      minWidth={modalWidth}
+      maxWidth={modalWidth}
       contentHeight={contentRows}
       topOffset={topOffset}
     >
       {/* Column headers */}
-      <Text dimColor>{padTo(headerLine, innerWidth)}</Text>
+      <Text dimColor>{padTo(leftPad + headerLine, innerWidth)}</Text>
 
-      {/* Grid rows — pad short rows to fill innerWidth */}
+      {/* Grid rows — centered and padded to fill innerWidth */}
       {harmonySwatch.map((row, anchorIdx) => {
         const label = String(anchorIdx * 100).padStart(5) + ":";
-        const rowWidth = stringWidth(label) + row.length * 3;
+        const rowWidth = gridPadLeft + stringWidth(label) + row.length * 3 + gridPadRight;
         const trailingPad = Math.max(0, innerWidth - rowWidth);
         return (
           <Box key={anchorIdx}>
-            <Text dimColor>{label}</Text>
+            <Text dimColor>{leftPad}{label}</Text>
             {row.map((color, stepIdx) => (
               <Text key={stepIdx} color={color.hex}>
                 {"  \u2588"}
               </Text>
             ))}
-            {trailingPad > 0 && <Text>{" ".repeat(trailingPad)}</Text>}
+            <Text>{rightPad}{trailingPad > 0 ? " ".repeat(trailingPad) : ""}</Text>
           </Box>
         );
       })}
