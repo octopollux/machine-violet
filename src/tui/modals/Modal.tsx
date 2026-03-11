@@ -1,8 +1,8 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Text, Box } from "ink";
 import type { ResolvedTheme } from "../themes/types.js";
 import { ThemedHorizontalBorder, ThemedSideFrame } from "../components/ThemedFrame.js";
-import { themeColor } from "../themes/color-resolve.js";
+import { themeColor, deriveModalTheme } from "../themes/color-resolve.js";
 import { stringWidth } from "../frames/index.js";
 
 interface ModalProps {
@@ -17,16 +17,17 @@ interface ModalProps {
  * Renders below the layout. No scroll support.
  */
 export function Modal({ theme, width, title, lines }: ModalProps) {
+  const modalTheme = useMemo(() => deriveModalTheme(theme), [theme]);
   const sideWidth = theme.asset.components.edge_left.width;
   const sidePadding = 1;
   const innerWidth = width - 2 * sideWidth - 2 * sidePadding;
-  const textColor = themeColor(theme, "sideFrame");
+  const textColor = themeColor(modalTheme, "sideFrame");
 
   return (
     <Box flexDirection="column">
-      <ThemedHorizontalBorder theme={theme} width={width} position="top" centerText={title} />
+      <ThemedHorizontalBorder theme={modalTheme} width={width} position="top" centerText={title} />
       <Box flexDirection="row">
-        <ThemedSideFrame theme={theme} side="left" height={lines.length} />
+        <ThemedSideFrame theme={modalTheme} side="left" height={lines.length} />
         <Box flexDirection="column">
           {lines.map((line, i) => {
             const pad = Math.max(0, innerWidth - stringWidth(line));
@@ -37,9 +38,9 @@ export function Modal({ theme, width, title, lines }: ModalProps) {
             );
           })}
         </Box>
-        <ThemedSideFrame theme={theme} side="right" height={lines.length} />
+        <ThemedSideFrame theme={modalTheme} side="right" height={lines.length} />
       </Box>
-      <ThemedHorizontalBorder theme={theme} width={width} position="bottom" />
+      <ThemedHorizontalBorder theme={modalTheme} width={width} position="bottom" />
     </Box>
   );
 }

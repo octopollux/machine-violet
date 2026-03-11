@@ -21,3 +21,24 @@ export function resolveSwatchColor(theme: ResolvedTheme, value: number): string 
 export function themeColor(theme: ResolvedTheme, part: keyof ResolvedTheme["colorMap"]): string | undefined {
   return resolveSwatchColor(theme, theme.colorMap[part]);
 }
+
+/**
+ * Derive a modal-specific theme by shifting colors to anchor 1 (complementary
+ * hue, 180° away) and mirroring step indices (inverted lightness).
+ *
+ * This makes modals visually offset from the main game frame — darker where the
+ * frame is light, and in the complementary hue.
+ */
+export function deriveModalTheme(theme: ResolvedTheme): ResolvedTheme {
+  const steps = theme.swatch.length;
+  const mirrorStep = (step: number): number =>
+    steps > 1 ? steps - 1 - Math.min(step, steps - 1) : 0;
+
+  const newColorMap = {} as ResolvedTheme["colorMap"];
+  for (const [part, value] of Object.entries(theme.colorMap)) {
+    const step = value % 100;
+    newColorMap[part as keyof ResolvedTheme["colorMap"]] = 100 + mirrorStep(step);
+  }
+
+  return { ...theme, colorMap: newColorMap };
+}

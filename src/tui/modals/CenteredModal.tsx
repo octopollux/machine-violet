@@ -5,7 +5,7 @@ import type { ScrollViewRef } from "ink-scroll-view";
 import type { FormattingNode } from "../../types/tui.js";
 import type { ResolvedTheme } from "../themes/types.js";
 import { ThemedHorizontalBorder, ThemedSideFrame } from "../components/ThemedFrame.js";
-import { themeColor } from "../themes/color-resolve.js";
+import { themeColor, deriveModalTheme } from "../themes/color-resolve.js";
 import { stringWidth } from "../frames/index.js";
 import { wrapNodes, toPlainText } from "../formatting.js";
 import { renderNodes } from "../render-nodes.js";
@@ -83,6 +83,9 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
     topOffset = 0,
     contentHeight,
   }, ref) {
+    // Derive modal-specific colors: complementary hue + inverted lightness
+    const modalTheme = useMemo(() => deriveModalTheme(theme), [theme]);
+
     const sideWidth = theme.asset.components.edge_left.width;
     const borderHeight = theme.asset.height;
     const sidePadding = 1;
@@ -135,8 +138,8 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
 
     useScrollHandle(ref, scrollRef);
 
-    const textColor = themeColor(theme, "sideFrame");
-    const resolvedFooterColor = footerColor ?? themeColor(theme, "title");
+    const textColor = themeColor(modalTheme, "sideFrame");
+    const resolvedFooterColor = footerColor ?? themeColor(modalTheme, "title");
 
     // Build an opaque blank line that fills the full content area (inner + side padding).
     // Every row in the modal must emit real characters to cover what's behind it.
@@ -196,13 +199,13 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
     return (
       <Box position="absolute" flexDirection="column" marginTop={topMargin} marginLeft={leftPad}>
         <ThemedHorizontalBorder
-          theme={theme}
+          theme={modalTheme}
           width={modalWidth}
           position="top"
           centerText={title}
         />
         <Box height={visibleRows} flexDirection="row">
-          <ThemedSideFrame theme={theme} side="left" height={visibleRows} />
+          <ThemedSideFrame theme={modalTheme} side="left" height={visibleRows} />
           <Box flexDirection="column" width={fullRowWidth}>
             <ScrollView ref={scrollRef} onScroll={handleScroll}>
               {contentRows}
@@ -213,10 +216,10 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
               </Box>
             )}
           </Box>
-          <ThemedSideFrame theme={theme} side="right" height={visibleRows} />
+          <ThemedSideFrame theme={modalTheme} side="right" height={visibleRows} />
         </Box>
         <ThemedHorizontalBorder
-          theme={theme}
+          theme={modalTheme}
           width={modalWidth}
           position="bottom"
           centerText={footer}
