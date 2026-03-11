@@ -416,15 +416,15 @@ describe("SessionRecapModal", () => {
 });
 
 describe("SwatchModal", () => {
-  it("renders the theme info and title", () => {
+  it("renders the theme title in the frame", () => {
     const { lastFrame } = render(
       <Box width={100} height={30}>
         <SwatchModal theme={theme} width={100} height={30} />
       </Box>,
     );
     const frame = lastFrame()!;
-    expect(frame).toContain("Color Swatch");
     expect(frame).toContain(theme.asset.name);
+    expect(frame).toContain("exploration");
   });
 
   it("renders anchor row labels", () => {
