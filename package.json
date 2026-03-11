@@ -1,7 +1,7 @@
 {
-  "name": "tui-rpg-engine",
+  "name": "machine-violet",
   "version": "1.0.0",
-  "description": "A console TUI RPG engine powered by Claude AI and Ink",
+  "description": "Machine Violet — an agentic AI Dungeon Master that runs any tabletop RPG in a terminal",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {

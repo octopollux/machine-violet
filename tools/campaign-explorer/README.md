@@ -1,6 +1,6 @@
 # Campaign Explorer
 
-Real-time web viewer for TUI-RPG campaign data. Browse entity files, state JSON, transcripts, and context dumps as they're written during gameplay.
+Real-time web viewer for Machine Violet campaign data. Browse entity files, state JSON, transcripts, and context dumps as they're written during gameplay.
 
 ## Quick Start
 
@@ -19,7 +19,7 @@ The server finds campaigns in this order:
 
 1. `--campaigns-dir <path>` CLI argument
 2. `campaigns_dir` from the main app's `config.json`
-3. Platform default: `~/Documents/.tui-rpg/campaigns`
+3. Platform default: `~/Documents/.machine-violet/campaigns`
 
 Each subdirectory containing a `config.json` is treated as a campaign.
 

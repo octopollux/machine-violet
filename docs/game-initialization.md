@@ -23,14 +23,14 @@ Home directory uses platform defaults automatically — no interactive prompt. P
 
 | Platform | Default path | Rationale |
 |---|---|---|
-| Windows | `%USERPROFILE%\Documents\.tui-rpg\` | Inside Documents, which OneDrive backs up by default |
-| macOS | `~/Documents/.tui-rpg/` | Inside Documents, which iCloud Drive backs up by default |
-| Linux | `~/.local/share/.tui-rpg/` | XDG data directory (no cloud default, but the conventional location) |
+| Windows | `%USERPROFILE%\Documents\.machine-violet\` | Inside Documents, which OneDrive backs up by default |
+| macOS | `~/Documents/.machine-violet/` | Inside Documents, which iCloud Drive backs up by default |
+| Linux | `~/.local/share/.machine-violet/` | XDG data directory (no cloud default, but the conventional location) |
 
 All campaign directories, cached rule systems, app configuration, and persistent state live under this root. The path is saved to the app's config file (stored alongside the `.env`) and used for all subsequent launches.
 
 ```
-.tui-rpg/                         # home directory
+.machine-violet/                         # home directory
 ├── campaigns/
 │   ├── the-shattered-crown/      # one campaign
 │   └── ghosts-of-proxima/        # another campaign

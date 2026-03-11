@@ -96,7 +96,7 @@ export function MainMenuPhase({
 
   return (
     <Box flexDirection="column" padding={1}>
-      <Text bold>TUI-RPG</Text>
+      <Text bold>Machine Violet</Text>
       <Text> </Text>
       {mainMenuItems.map((item, i) => (
         <Text key={item}>

@@ -34,7 +34,7 @@ export function FirstLaunchPhase({ initialApiKey, externalError, onComplete }: F
 
   return (
     <Box flexDirection="column" padding={1}>
-      <Text bold>TUI-RPG — First Time Setup</Text>
+      <Text bold>Machine Violet — First Time Setup</Text>
       <Text> </Text>
       <Text>Paste your Anthropic API key:</Text>
       <Text> </Text>

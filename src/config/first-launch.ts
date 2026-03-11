@@ -22,7 +22,7 @@ export function isConfigured(envPath: string, readFileSync: (path: string) => st
 }
 
 /**
- * Get the platform default home directory for tui-rpg.
+ * Get the platform default home directory for Machine Violet.
  */
 export function getDefaultHomeDir(): string {
   return defaultCampaignRoot(process.platform);

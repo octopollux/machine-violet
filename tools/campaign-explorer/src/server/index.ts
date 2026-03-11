@@ -37,7 +37,7 @@ async function resolveCampaignsDir(): Promise<string> {
 
   // Platform default
   const home = process.env.HOME ?? process.env.USERPROFILE ?? ".";
-  return join(home, "Documents", ".tui-rpg", "campaigns");
+  return join(home, "Documents", ".machine-violet", "campaigns");
 }
 
 async function main(): Promise<void> {

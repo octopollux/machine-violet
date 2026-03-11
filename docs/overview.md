@@ -1,11 +1,11 @@
-# tui-rpg: An Agentic RPG in Your Console
+# Machine Violet: An Agentic RPG in Your Console
 
-TUI-RPG is an agentic DM and game state manager designed to run any tabletop RPG in a terminal. The AI is the Dungeon Master — it narrates, adjudicates, manages the world, and manipulates the UI directly. The player never sees game files or internal state. Everything is narrated.
+Machine Violet is an agentic DM and game state manager designed to run any tabletop RPG in a terminal. The AI is the Dungeon Master — it narrates, adjudicates, manages the world, and manipulates the UI directly. The player never sees game files or internal state. Everything is narrated.
 
 
 ## Architecture
 
-tui-rpg is a single Ink (React for CLI) application. The game engine, Claude SDK integration, and TUI are all one process — no abstraction layer between engine and interface. The DM agent has tools that manipulate both game state and the UI directly, so it can do things that weren't anticipated at design time.
+Machine Violet is a single Ink (React for CLI) application. The game engine, Claude SDK integration, and TUI are all one process — no abstraction layer between engine and interface. The DM agent has tools that manipulate both game state and the UI directly, so it can do things that weren't anticipated at design time.
 
 Game state lives on the filesystem as markdown and JSON. Automatic git snapshots (via isomorphic-git, no system dependency) provide rollback and recovery. A web API could be exposed later but is not an architectural prerequisite.
 
@@ -45,7 +45,7 @@ Two clocks manage time automatically. A **calendar** tracks narrative time and a
 
 ## Game Systems
 
-tui-rpg ships with support for freely available RPG systems (fetched at runtime), a catalog of pre-built options, and the ability to import user-supplied sourcebooks via PDF. A "Just jump in" mode uses a hidden lightweight system (24XX or text-adventure conventions) for zero-friction freeform play. → [Rules Systems Reference](rules-systems.md), [Document Ingestion Design](document-ingestion.md)
+Machine Violet ships with support for freely available RPG systems (fetched at runtime), a catalog of pre-built options, and the ability to import user-supplied sourcebooks via PDF. A "Just jump in" mode uses a hidden lightweight system (24XX or text-adventure conventions) for zero-friction freeform play. → [Rules Systems Reference](rules-systems.md), [Document Ingestion Design](document-ingestion.md)
 
 
 ## Randomization

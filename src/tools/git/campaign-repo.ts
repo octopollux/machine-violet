@@ -42,7 +42,7 @@ export interface GitIO {
   listFiles(dir: string): Promise<string[]>;
 }
 
-const AUTHOR = { name: "tui-rpg", email: "tui-rpg@local" };
+const AUTHOR = { name: "machine-violet", email: "machine-violet@local" };
 
 /**
  * Campaign repository — manages git snapshots for a campaign directory.

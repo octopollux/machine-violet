@@ -3,7 +3,7 @@
 > **Status: Reference Only** — this is a catalog of candidate systems. Runtime fetching, caching, and distillation are not implemented. Only FATE Accelerated and 24XX are currently offered in setup.
 > Tracked in [#68](https://github.com/Orthodox-531/tui-rpg/issues/68).
 
-This document catalogs freely available tabletop RPG systems that tui-rpg can use as bundled rule sets. The selection criterion is **"free to fetch at runtime"**: the full system rules must be downloadable from an official, stable URL at no cost, with no login gate. This sidesteps bundling-license concerns entirely — we fetch, parse, and cache the document at game-initialization time rather than shipping copyrighted text inside the application.
+This document catalogs freely available tabletop RPG systems that Machine Violet can use as bundled rule sets. The selection criterion is **"free to fetch at runtime"**: the full system rules must be downloadable from an official, stable URL at no cost, with no login gate. This sidesteps bundling-license concerns entirely — we fetch, parse, and cache the document at game-initialization time rather than shipping copyrighted text inside the application.
 
 For each system, note whether the license also permits *redistribution* of the parsed/cached data (relevant if we ever ship pre-built rule packs).
 
