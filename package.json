@@ -5,8 +5,8 @@
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "start": "node dist/index.js",
-    "dev": "cross-env DEV_MODE=true tsx src/index.tsx",
+    "start": "node --max-semi-space-size=16 dist/index.js",
+    "dev": "cross-env DEV_MODE=true node --max-semi-space-size=16 --import tsx/esm src/index.tsx",
     "build": "tsc",
     "postbuild": "node -e \"const fs=require('fs'),p=require('path');[['src/prompts','dist/prompts','.md'],['src/tui/themes/assets','dist/tui/themes/assets','.theme'],['src/tui/themes/assets','dist/tui/themes/assets','.player-frame']].forEach(([s,d,ext])=>{fs.mkdirSync(d,{recursive:true});fs.readdirSync(s).filter(f=>f.endsWith(ext)).forEach(f=>fs.copyFileSync(p.join(s,f),p.join(d,f)))})\"",
     "watch": "tsc --watch",
