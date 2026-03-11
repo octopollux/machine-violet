@@ -100,14 +100,22 @@ describe("installMouseFilter", () => {
     };
   }
 
-  it("calls onScroll for scroll events and returns null for fully-consumed chunk", () => {
+  /** Flush process.nextTick queue so deferred onScroll calls execute. */
+  function flushNextTick(): Promise<void> {
+    return new Promise((resolve) => process.nextTick(resolve));
+  }
+
+  it("returns empty string for fully-consumed chunk and defers onScroll", async () => {
     const stdin = makeFakeStdin(["\x1b[<64;10;20M"]);
     const scrolls: number[] = [];
 
     const remove = installMouseFilter(stdin, (d) => scrolls.push(d));
 
     const result = stdin.read();
-    expect(result).toBeNull(); // fully consumed
+    expect(result).toBe(""); // fully consumed → empty string, not null
+    expect(scrolls).toEqual([]); // not yet — deferred
+
+    await flushNextTick();
     expect(scrolls).toEqual([-1]);
 
     remove();
@@ -124,7 +132,7 @@ describe("installMouseFilter", () => {
     remove();
   });
 
-  it("strips mouse sequences from mixed data and passes remainder", () => {
+  it("strips mouse sequences from mixed data and passes remainder", async () => {
     const stdin = makeFakeStdin(["key\x1b[<65;1;1Mpress"]);
     const scrolls: number[] = [];
 
@@ -132,6 +140,8 @@ describe("installMouseFilter", () => {
 
     const result = stdin.read();
     expect(result).toBe("keypress");
+
+    await flushNextTick();
     expect(scrolls).toEqual([1]);
 
     remove();
@@ -147,7 +157,7 @@ describe("installMouseFilter", () => {
     remove();
   });
 
-  it("restores original read on teardown", () => {
+  it("restores original read on teardown", async () => {
     const stdin = makeFakeStdin([
       "\x1b[<64;1;1M",  // consumed by filter
       "\x1b[<64;1;1M",  // after teardown, passes through
@@ -157,6 +167,7 @@ describe("installMouseFilter", () => {
     const remove = installMouseFilter(stdin, (d) => scrolls.push(d));
 
     stdin.read(); // filtered
+    await flushNextTick();
     expect(scrolls).toEqual([-1]);
 
     remove();
@@ -167,7 +178,7 @@ describe("installMouseFilter", () => {
     expect(scrolls).toEqual([-1]); // no new scroll events
   });
 
-  it("handles Buffer chunks and returns Buffer", () => {
+  it("handles Buffer chunks and returns Buffer", async () => {
     const buf = Buffer.from("abc\x1b[<65;1;1Mdef");
     const stdin: ReadableStdin = {
       read: vi.fn().mockReturnValueOnce(buf),
@@ -179,7 +190,24 @@ describe("installMouseFilter", () => {
     const result = stdin.read();
     expect(Buffer.isBuffer(result)).toBe(true);
     expect((result as Buffer).toString("utf8")).toBe("abcdef");
+
+    await flushNextTick();
     expect(scrolls).toEqual([1]);
+
+    remove();
+  });
+
+  it("returns empty Buffer for fully-consumed Buffer chunk", () => {
+    const buf = Buffer.from("\x1b[<64;10;20M");
+    const stdin: ReadableStdin = {
+      read: vi.fn().mockReturnValueOnce(buf),
+    };
+
+    const remove = installMouseFilter(stdin, () => {});
+
+    const result = stdin.read();
+    expect(Buffer.isBuffer(result)).toBe(true);
+    expect((result as Buffer).length).toBe(0);
 
     remove();
   });

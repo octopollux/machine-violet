@@ -87,8 +87,11 @@ export interface ReadableStdin {
 /**
  * Install a stdin filter that wraps read() to strip SGR mouse sequences
  * from chunks before Ink processes them. Calls `onScroll` for each scroll
- * event found. If a chunk is entirely mouse data, read() returns null
- * (no data available), which is correct for the readable protocol.
+ * event found, deferred via process.nextTick so the read() call completes
+ * before any React re-rendering occurs. If a chunk is entirely mouse data,
+ * read() returns an empty string so the stream's readable state stays
+ * consistent (returning null would signal "no data" and can desync the
+ * stream's internal buffer tracking).
  *
  * Returns a teardown function that restores the original read.
  */
@@ -104,15 +107,23 @@ export function installMouseFilter(
 
     const str = typeof chunk === "string" ? chunk : chunk.toString("utf8");
 
-    // Extract scroll events
+    // Extract scroll events — defer dispatch so read() returns before
+    // any React/Ink re-rendering is triggered by scrollBy().
     const scrolls = parseScrollEvents(str);
-    for (const delta of scrolls) {
-      onScroll(delta);
+    if (scrolls.length > 0) {
+      process.nextTick(() => {
+        for (const delta of scrolls) {
+          onScroll(delta);
+        }
+      });
     }
 
-    // Strip all mouse sequences; pass remainder to Ink
+    // Strip all mouse sequences; pass remainder to Ink.
+    // Return empty string (not null) when fully consumed — null would
+    // signal "no data available" and can desync the stream's internal
+    // buffer state since originalRead() already consumed the bytes.
     const remainder = stripMouseSequences(str);
-    if (remainder === null) return null; // fully consumed
+    if (remainder === null) return typeof chunk === "string" ? "" : Buffer.alloc(0);
 
     // Preserve the original type (Ink sets encoding to utf8, so string)
     if (typeof chunk === "string") return remainder;
