@@ -14,11 +14,11 @@ export function defaultCampaignRoot(
   const home = homedir();
 
   if (platform === "win32" || platform === "darwin") {
-    return join(home, "Documents", ".tui-rpg");
+    return join(home, "Documents", ".machine-violet");
   }
 
   // Linux / others: respect XDG
   const xdg = process.env["XDG_DATA_HOME"];
-  if (xdg) return join(xdg, ".tui-rpg");
-  return join(home, ".local", "share", ".tui-rpg");
+  if (xdg) return join(xdg, ".machine-violet");
+  return join(home, ".local", "share", ".machine-violet");
 }

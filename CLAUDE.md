@@ -1,4 +1,4 @@
-# TUI-RPG
+# Machine Violet
 
 Agentic AI Dungeon Master that runs any tabletop RPG in a terminal.
 Ink (React for CLI) + Anthropic Claude SDK + TypeScript.

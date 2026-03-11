@@ -158,7 +158,7 @@ Not needed for systemless play. Tackle when moving beyond narrative-only mode.
 
 The core gameplay loop, tools, TUI, and context management are solid. Remaining gaps are tracked as GitHub issues:
 
-- **[#67](https://github.com/Orthodox-531/tui-rpg/issues/67)** — Document ingestion pipeline
-- **[#68](https://github.com/Orthodox-531/tui-rpg/issues/68)** — Rules system integration (fetching, selection, distillation)
-- **[#69](https://github.com/Orthodox-531/tui-rpg/issues/69)** — Character creation subagent (crunchy systems)
-- **[#70](https://github.com/Orthodox-531/tui-rpg/issues/70)** — Wire rollback end-to-end
+- **[#67](https://github.com/Orthodox-531/machine-violet/issues/67)** — Document ingestion pipeline
+- **[#68](https://github.com/Orthodox-531/machine-violet/issues/68)** — Rules system integration (fetching, selection, distillation)
+- **[#69](https://github.com/Orthodox-531/machine-violet/issues/69)** — Character creation subagent (crunchy systems)
+- **[#70](https://github.com/Orthodox-531/machine-violet/issues/70)** — Wire rollback end-to-end

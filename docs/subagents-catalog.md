@@ -289,23 +289,23 @@ Translates natural-language theme requests (e.g., "cyberpunk neon") into structu
 
 > These subagents are designed but have no code. Each links to its tracking issue.
 
-### Character Creation Subagent (Crunchy) — [#69](https://github.com/Orthodox-531/tui-rpg/issues/69)
+### Character Creation Subagent (Crunchy) — [#69](https://github.com/Orthodox-531/machine-violet/issues/69)
 
 Haiku, player-facing. Walks player through mechanical chargen for rules-heavy systems. See [game-initialization.md](game-initialization.md).
 
-### Rule Card Distiller — [#68](https://github.com/Orthodox-531/tui-rpg/issues/68)
+### Rule Card Distiller — [#68](https://github.com/Orthodox-531/machine-violet/issues/68)
 
 Haiku, silent. Reads full game rules, produces dense reference cards. Cuts rules payload by 60-80%. See [randomization.md](randomization.md).
 
-### PDF Extraction Subagent — [#67](https://github.com/Orthodox-531/tui-rpg/issues/67)
+### PDF Extraction Subagent — [#67](https://github.com/Orthodox-531/machine-violet/issues/67)
 
 Haiku (vision), silent. Extracts structured text from PDF pages. See [document-ingestion.md](document-ingestion.md).
 
-### PDF Organization Subagent — [#67](https://github.com/Orthodox-531/tui-rpg/issues/67)
+### PDF Organization Subagent — [#67](https://github.com/Orthodox-531/machine-violet/issues/67)
 
 Haiku, silent. Sorts extracted PDF content into entity filesystem. See [document-ingestion.md](document-ingestion.md).
 
-### DM Cheat Sheet Generator — [#67](https://github.com/Orthodox-531/tui-rpg/issues/67)
+### DM Cheat Sheet Generator — [#67](https://github.com/Orthodox-531/machine-violet/issues/67)
 
 Haiku, silent. Summarizes campaign book structure for DM cached prefix. See [document-ingestion.md](document-ingestion.md).
 

@@ -25,7 +25,7 @@ describe("first-launch", () => {
 
   it("returns platform default home dir", () => {
     const dir = getDefaultHomeDir();
-    expect(dir).toContain(".tui-rpg");
+    expect(dir).toContain(".machine-violet");
   });
 
   it("builds .env content", () => {
@@ -34,9 +34,9 @@ describe("first-launch", () => {
   });
 
   it("builds app config JSON", () => {
-    const content = buildAppConfig("/home/user/tui-rpg");
+    const content = buildAppConfig("/home/user/machine-violet");
     const parsed = JSON.parse(content);
-    expect(parsed.home_dir).toBe("/home/user/tui-rpg");
+    expect(parsed.home_dir).toBe("/home/user/machine-violet");
     expect(parsed.campaigns_dir).toContain("campaigns");
   });
 

@@ -8,7 +8,7 @@ describe("model config", () => {
   let testDir: string;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `tui-rpg-model-test-${Date.now()}`);
+    testDir = join(tmpdir(), `mv-model-test-${Date.now()}`);
     mkdirSync(testDir, { recursive: true });
   });
 
@@ -214,7 +214,7 @@ describe("pricing config", () => {
   let testDir: string;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `tui-rpg-pricing-test-${Date.now()}`);
+    testDir = join(tmpdir(), `mv-pricing-test-${Date.now()}`);
     mkdirSync(testDir, { recursive: true });
   });
 

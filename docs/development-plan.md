@@ -1,6 +1,6 @@
 # Development Plan
 
-Detailed implementation roadmap for tui-rpg. Organized into phases with clear dependencies. Each phase produces testable, runnable output. Earlier phases have zero AI dependencies — we build and validate the deterministic foundation before wiring up the agent loop.
+Detailed implementation roadmap for Machine Violet. Organized into phases with clear dependencies. Each phase produces testable, runnable output. Earlier phases have zero AI dependencies — we build and validate the deterministic foundation before wiring up the agent loop.
 
 **Existing scaffolding**: `package.json` (Ink 5, React 18, Claude SDK, tsx, TypeScript 5), `tsconfig.json` (ES2022, strict, JSX), `.env.example`. Branch: `Initial-Code`.
 
@@ -15,7 +15,7 @@ Get the project building, testing, and linting. No game logic yet.
 - [ ] Add test script to `package.json`
 - [ ] Add linting: **ESLint** with TypeScript plugin (flat config)
 - [ ] Add lint script to `package.json`
-- [ ] Create `src/index.tsx` — minimal Ink app that renders "tui-rpg" and exits
+- [ ] Create `src/index.tsx` — minimal Ink app that renders "Machine Violet" and exits
 - [ ] Verify `npm run dev`, `npm run build`, `npm test`, `npm run lint` all work
 - [ ] Create `.gitignore` covering node_modules, dist, .env, *.tsbuildinfo
 

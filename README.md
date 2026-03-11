@@ -1,6 +1,6 @@
-# TUI RPG Engine
+# Machine Violet
 
-A console TUI (Text User Interface) RPG engine powered by Claude AI and Ink.
+An agentic AI Dungeon Master that runs any tabletop RPG in a terminal. Powered by Claude AI and Ink.
 
 ## Tech Stack
 

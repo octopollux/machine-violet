@@ -28,12 +28,12 @@
       "Edit(src/**)",
       "Edit(design-docs/**)",
       "Write(src/**)",
-      "Read(~/Documents/.tui-rpg/**)",
-      "Edit(~/Documents/.tui-rpg/**)",
-      "Write(~/Documents/.tui-rpg/**)",
-      "Read(~/.local/share/.tui-rpg/**)",
-      "Edit(~/.local/share/.tui-rpg/**)",
-      "Write(~/.local/share/.tui-rpg/**)"
+      "Read(~/Documents/.machine-violet/**)",
+      "Edit(~/Documents/.machine-violet/**)",
+      "Write(~/Documents/.machine-violet/**)",
+      "Read(~/.local/share/.machine-violet/**)",
+      "Edit(~/.local/share/.machine-violet/**)",
+      "Write(~/.local/share/.machine-violet/**)"
     ]
   }
 }
