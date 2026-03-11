@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import type { EventEmitter } from "events";
 
 /** Anything with a scrollBy method (ScrollHandle, ScrollViewRef, etc.). */
 interface Scrollable {
@@ -45,9 +44,9 @@ export function disableMouseReporting(output: { write(s: string): boolean }): vo
  *
  * Returns +1 (down) / -1 (up) per scroll event found, or empty array.
  */
-export function parseScrollEvents(data: Buffer): number[] {
+export function parseScrollEvents(data: Buffer | string): number[] {
   const results: number[] = [];
-  const str = data.toString("utf8");
+  const str = typeof data === "string" ? data : data.toString("utf8");
 
   const re = new RegExp(SGR_MOUSE_RE.source, SGR_MOUSE_RE.flags);
   let m: RegExpExecArray | null;
@@ -62,60 +61,66 @@ export function parseScrollEvents(data: Buffer): number[] {
 }
 
 /**
- * Strip all SGR mouse sequences from a buffer, returning the remainder.
- * Returns null if the entire buffer was mouse sequences.
+ * Strip all SGR mouse sequences from a string, returning the remainder.
+ * Returns null if the entire string was mouse sequences.
  */
-export function stripMouseSequences(data: Buffer): Buffer | null {
-  const str = data.toString("utf8");
-  const stripped = str.replace(SGR_MOUSE_RE, "");
+export function stripMouseSequences(data: string): string | null {
+  const stripped = data.replace(SGR_MOUSE_RE, "");
   if (stripped.length === 0) return null;
-  if (stripped.length === str.length) return data; // nothing changed
-  return Buffer.from(stripped, "utf8");
+  if (stripped.length === data.length) return data; // nothing changed
+  return stripped;
 }
 
 // ---------------------------------------------------------------------------
-// stdin filter — intercepts emit('data') to strip mouse sequences before
-// Ink's input handler sees them. Same monkey-patch pattern as rawModeGuard.
+// stdin filter — intercepts read() to strip mouse sequences before
+// Ink's input handler sees them.
+//
+// Ink uses the readable stream protocol: it listens for 'readable' events
+// then pulls chunks via stdin.read(). Intercepting emit('data') does nothing
+// because Ink never uses 'data' events. We monkey-patch read() instead.
 // ---------------------------------------------------------------------------
 
-export interface FilterableInput extends EventEmitter {
-  emit(event: string | symbol, ...args: unknown[]): boolean;
+export interface ReadableStdin {
+  read(size?: number): Buffer | string | null;
 }
 
 /**
- * Install a stdin filter that strips SGR mouse sequences from data events,
- * calling `onScroll` for each scroll event found. Non-mouse bytes pass
- * through to downstream listeners (Ink). If the entire buffer is mouse
- * data, the emit is suppressed entirely.
+ * Install a stdin filter that wraps read() to strip SGR mouse sequences
+ * from chunks before Ink processes them. Calls `onScroll` for each scroll
+ * event found. If a chunk is entirely mouse data, read() returns null
+ * (no data available), which is correct for the readable protocol.
  *
- * Returns a teardown function that restores the original emit.
+ * Returns a teardown function that restores the original read.
  */
 export function installMouseFilter(
-  input: FilterableInput,
+  input: ReadableStdin,
   onScroll: (delta: number) => void,
 ): () => void {
-  const originalEmit = input.emit.bind(input);
+  const originalRead = input.read.bind(input);
 
-  input.emit = function filteredEmit(event: string | symbol, ...args: unknown[]): boolean {
-    if (event !== "data") return originalEmit(event, ...args);
+  input.read = function filteredRead(size?: number): Buffer | string | null {
+    const chunk = originalRead(size);
+    if (chunk === null) return null;
 
-    const data = args[0];
-    if (!Buffer.isBuffer(data)) return originalEmit(event, ...args);
+    const str = typeof chunk === "string" ? chunk : chunk.toString("utf8");
 
     // Extract scroll events
-    const scrolls = parseScrollEvents(data);
+    const scrolls = parseScrollEvents(str);
     for (const delta of scrolls) {
       onScroll(delta);
     }
 
     // Strip all mouse sequences; pass remainder to Ink
-    const remainder = stripMouseSequences(data);
-    if (remainder === null) return true; // fully consumed
-    return originalEmit(event, remainder, ...args.slice(1));
+    const remainder = stripMouseSequences(str);
+    if (remainder === null) return null; // fully consumed
+
+    // Preserve the original type (Ink sets encoding to utf8, so string)
+    if (typeof chunk === "string") return remainder;
+    return Buffer.from(remainder, "utf8");
   };
 
   return () => {
-    input.emit = originalEmit;
+    input.read = originalRead;
   };
 }
 
@@ -127,7 +132,7 @@ export function installMouseFilter(
  * Enable terminal mouse reporting and scroll the narrative area on wheel
  * events. Each wheel tick scrolls by exactly 1 line.
  *
- * Installs a stdin filter that intercepts mouse sequences before Ink sees
+ * Wraps stdin.read() to intercept mouse sequences before Ink processes
  * them (preventing garbage in the text input). Enables reporting on mount,
  * disables on unmount. A process 'exit' listener acts as a safety net so
  * a crash doesn't leave the terminal in mouse mode.
@@ -145,7 +150,7 @@ export function useMouseScroll(
     enableMouseReporting(output);
 
     const removeFilter = installMouseFilter(
-      input as FilterableInput,
+      input as ReadableStdin,
       (delta) => { scrollRef.current?.scrollBy(delta); },
     );
 

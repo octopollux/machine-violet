@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from "vitest";
-import { EventEmitter } from "events";
 import {
   parseScrollEvents,
   stripMouseSequences,
@@ -7,6 +6,7 @@ import {
   disableMouseReporting,
   installMouseFilter,
 } from "./useMouseScroll.js";
+import type { ReadableStdin } from "./useMouseScroll.js";
 
 // ---------------------------------------------------------------------------
 // parseScrollEvents
@@ -56,6 +56,10 @@ describe("parseScrollEvents", () => {
     const buf = Buffer.from("text\x1b[<65;1;1Mmore text");
     expect(parseScrollEvents(buf)).toEqual([1]);
   });
+
+  it("accepts string input", () => {
+    expect(parseScrollEvents("\x1b[<64;1;1M")).toEqual([-1]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -63,27 +67,21 @@ describe("parseScrollEvents", () => {
 // ---------------------------------------------------------------------------
 
 describe("stripMouseSequences", () => {
-  it("returns null when entire buffer is mouse sequences", () => {
-    const buf = Buffer.from("\x1b[<64;10;20M\x1b[<0;5;5M");
-    expect(stripMouseSequences(buf)).toBeNull();
+  it("returns null when entire string is mouse sequences", () => {
+    expect(stripMouseSequences("\x1b[<64;10;20M\x1b[<0;5;5M")).toBeNull();
   });
 
-  it("returns original buffer when no mouse sequences present", () => {
-    const buf = Buffer.from("hello world");
-    expect(stripMouseSequences(buf)).toBe(buf); // reference-equal
+  it("returns original string when no mouse sequences present", () => {
+    const str = "hello world";
+    expect(stripMouseSequences(str)).toBe(str); // reference-equal
   });
 
   it("strips mouse sequences and returns remainder", () => {
-    const buf = Buffer.from("abc\x1b[<65;1;1Mdef");
-    const result = stripMouseSequences(buf);
-    expect(result).not.toBeNull();
-    expect(result!.toString("utf8")).toBe("abcdef");
+    expect(stripMouseSequences("abc\x1b[<65;1;1Mdef")).toBe("abcdef");
   });
 
   it("strips multiple mouse sequences from mixed content", () => {
-    const buf = Buffer.from("\x1b[<0;1;1Mhello\x1b[<64;2;2M");
-    const result = stripMouseSequences(buf);
-    expect(result!.toString("utf8")).toBe("hello");
+    expect(stripMouseSequences("\x1b[<0;1;1Mhello\x1b[<64;2;2M")).toBe("hello");
   });
 });
 
@@ -92,97 +90,96 @@ describe("stripMouseSequences", () => {
 // ---------------------------------------------------------------------------
 
 describe("installMouseFilter", () => {
-  it("calls onScroll for scroll events and suppresses emit", () => {
-    const ee = new EventEmitter();
+  function makeFakeStdin(chunks: (string | null)[]): ReadableStdin {
+    let i = 0;
+    return {
+      read(_size?: number) {
+        if (i >= chunks.length) return null;
+        return chunks[i++];
+      },
+    };
+  }
+
+  it("calls onScroll for scroll events and returns null for fully-consumed chunk", () => {
+    const stdin = makeFakeStdin(["\x1b[<64;10;20M"]);
     const scrolls: number[] = [];
-    const downstream = vi.fn();
 
-    ee.on("data", downstream);
-    const remove = installMouseFilter(ee, (d) => scrolls.push(d));
+    const remove = installMouseFilter(stdin, (d) => scrolls.push(d));
 
-    ee.emit("data", Buffer.from("\x1b[<64;10;20M"));
-
+    const result = stdin.read();
+    expect(result).toBeNull(); // fully consumed
     expect(scrolls).toEqual([-1]);
-    expect(downstream).not.toHaveBeenCalled(); // fully consumed
 
     remove();
   });
 
-  it("passes non-mouse data through to downstream listeners", () => {
-    const ee = new EventEmitter();
-    const downstream = vi.fn();
+  it("passes non-mouse data through unchanged", () => {
+    const stdin = makeFakeStdin(["hello"]);
 
-    ee.on("data", downstream);
-    const remove = installMouseFilter(ee, () => {});
+    const remove = installMouseFilter(stdin, () => {});
 
-    ee.emit("data", Buffer.from("hello"));
-
-    expect(downstream).toHaveBeenCalledTimes(1);
-    expect(downstream.mock.calls[0][0].toString("utf8")).toBe("hello");
+    const result = stdin.read();
+    expect(result).toBe("hello");
 
     remove();
   });
 
   it("strips mouse sequences from mixed data and passes remainder", () => {
-    const ee = new EventEmitter();
+    const stdin = makeFakeStdin(["key\x1b[<65;1;1Mpress"]);
     const scrolls: number[] = [];
-    const downstream = vi.fn();
 
-    ee.on("data", downstream);
-    const remove = installMouseFilter(ee, (d) => scrolls.push(d));
+    const remove = installMouseFilter(stdin, (d) => scrolls.push(d));
 
-    ee.emit("data", Buffer.from("key\x1b[<65;1;1Mpress"));
-
+    const result = stdin.read();
+    expect(result).toBe("keypress");
     expect(scrolls).toEqual([1]);
-    expect(downstream).toHaveBeenCalledTimes(1);
-    expect(downstream.mock.calls[0][0].toString("utf8")).toBe("keypress");
 
     remove();
   });
 
-  it("does not interfere with non-data events", () => {
-    const ee = new EventEmitter();
-    const listener = vi.fn();
+  it("returns null when original read returns null", () => {
+    const stdin = makeFakeStdin([null]);
 
-    ee.on("end", listener);
-    const remove = installMouseFilter(ee, () => {});
+    const remove = installMouseFilter(stdin, () => {});
 
-    ee.emit("end");
-
-    expect(listener).toHaveBeenCalledTimes(1);
+    expect(stdin.read()).toBeNull();
 
     remove();
   });
 
-  it("restores original emit on teardown", () => {
-    const ee = new EventEmitter();
-    const downstream = vi.fn();
-    ee.on("data", downstream);
+  it("restores original read on teardown", () => {
+    const stdin = makeFakeStdin([
+      "\x1b[<64;1;1M",  // consumed by filter
+      "\x1b[<64;1;1M",  // after teardown, passes through
+    ]);
+    const scrolls: number[] = [];
 
-    const remove = installMouseFilter(ee, () => {});
+    const remove = installMouseFilter(stdin, (d) => scrolls.push(d));
 
-    // While active, mouse sequences are stripped
-    ee.emit("data", Buffer.from("\x1b[<64;1;1M"));
-    expect(downstream).not.toHaveBeenCalled();
+    stdin.read(); // filtered
+    expect(scrolls).toEqual([-1]);
 
     remove();
 
-    // After teardown, mouse sequences pass through unfiltered
-    ee.emit("data", Buffer.from("\x1b[<64;1;1M"));
-    expect(downstream).toHaveBeenCalledTimes(1);
+    // After teardown, mouse sequences pass through as-is
+    const result = stdin.read();
+    expect(result).toBe("\x1b[<64;1;1M");
+    expect(scrolls).toEqual([-1]); // no new scroll events
   });
 
-  it("handles non-Buffer data events (passes through unchanged)", () => {
-    const ee = new EventEmitter();
-    const downstream = vi.fn();
+  it("handles Buffer chunks and returns Buffer", () => {
+    const buf = Buffer.from("abc\x1b[<65;1;1Mdef");
+    const stdin: ReadableStdin = {
+      read: vi.fn().mockReturnValueOnce(buf),
+    };
+    const scrolls: number[] = [];
 
-    ee.on("data", downstream);
-    const remove = installMouseFilter(ee, () => {});
+    const remove = installMouseFilter(stdin, (d) => scrolls.push(d));
 
-    ee.emit("data", "string data");
-
-    expect(downstream).toHaveBeenCalledTimes(1);
-    expect(downstream.mock.calls[0][0]).toBe("string data");
+    const result = stdin.read();
+    expect(Buffer.isBuffer(result)).toBe(true);
+    expect((result as Buffer).toString("utf8")).toBe("abcdef");
+    expect(scrolls).toEqual([1]);
 
     remove();
   });
