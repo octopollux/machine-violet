@@ -96,7 +96,7 @@ function MessageBlock({ msg }: { msg: Message }) {
         return (
           <div key={i} className="dump-message role-tool_use">
             <div className="dump-role-label">tool_use: {block.name}</div>
-            <pre style={{ fontSize: 11 }}>
+            <pre style={{ fontSize: 11, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
               {JSON.stringify(block.input, null, 2)}
             </pre>
           </div>
@@ -106,7 +106,7 @@ function MessageBlock({ msg }: { msg: Message }) {
         return (
           <div key={i} className="dump-message role-tool_result">
             <div className="dump-role-label">tool_result ({block.tool_use_id})</div>
-            <pre style={{ fontSize: 11 }}>
+            <pre style={{ fontSize: 11, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
               {typeof block.content === "string"
                 ? block.content
                 : JSON.stringify(block.content, null, 2)}
@@ -115,7 +115,7 @@ function MessageBlock({ msg }: { msg: Message }) {
         );
       }
       return (
-        <pre key={i} style={{ fontSize: 11 }}>
+        <pre key={i} style={{ fontSize: 11, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
           {JSON.stringify(block, null, 2)}
         </pre>
       );
