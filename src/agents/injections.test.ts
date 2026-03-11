@@ -187,7 +187,6 @@ describe("LengthSteeringInjection", () => {
     expect(result).toContain("[length]");
     expect(result).toContain("100 cols");
     expect(result).toContain("25 visible rows");
-    expect(result).toContain("≤ 1 page");
   });
 
   it("returns null on subsequent calls when dims unchanged and no overlong", () => {

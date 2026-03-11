@@ -118,9 +118,7 @@ export class LengthSteeringInjection implements Injection {
 
     if (!this.dimsInjectedOnce || dimsChanged) {
       parts.push(
-        `Terminal: ${dims.columns} cols × ${dims.narrativeRows} visible rows.`
-        + ` One "page" of narration ≈ ${dims.narrativeRows} wrapped lines.`
-        + ` Keep responses ≤ 1 page unless the moment demands more.`,
+        `Terminal: ${dims.columns} cols × ${dims.narrativeRows} visible rows.`,
       );
       this.lastReportedDims = { ...dims };
       this.dimsInjectedOnce = true;
