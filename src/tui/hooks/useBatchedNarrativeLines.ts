@@ -6,12 +6,12 @@
  * component tree re-render.  This hook accumulates deltas in a ref and
  * flushes to real React state on a timer, cutting re-renders by ~10-20×.
  *
- * Non-delta updates (player lines, system messages) flush immediately
- * so the UI never feels laggy for discrete events.
+ * All functional updaters are batched (up to ~16ms delay, within one
+ * frame).  Direct sets (non-function values) flush immediately.
  *
- * GC optimization: functional updaters (the streaming hot path) are
- * applied eagerly against a mutable working copy in the ref, so only
- * one array snapshot is created per flush instead of one per token.
+ * GC optimization: functional updaters are applied eagerly against a
+ * mutable working copy in the ref, so only one immutable snapshot is
+ * created per flush instead of one per token.
  */
 
 import { useState, useRef, useCallback, useEffect } from "react";
@@ -34,15 +34,12 @@ export function useBatchedNarrativeLines(
   const [lines, setLinesReal] = useState<NarrativeLine[]>([]);
 
   // Mutable working copy that functional updaters are applied to eagerly.
-  // Between flushes, this accumulates all mutations without creating
-  // intermediate array copies — each appendDelta mutates in-place.
+  // Between flushes, this accumulates all results without triggering
+  // React re-renders — only the final snapshot is committed.
   const workingRef = useRef<NarrativeLine[]>(lines);
   // Whether the working copy has been modified since the last flush.
   const dirtyRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Latest committed value (for direct-set path).
-  const linesRef = useRef(lines);
-  linesRef.current = lines;
 
   // Flush: snapshot the working copy into React state.
   const flush = useCallback(() => {
@@ -58,9 +55,7 @@ export function useBatchedNarrativeLines(
   const setLines: React.Dispatch<React.SetStateAction<NarrativeLine[]>> = useCallback(
     (action) => {
       if (typeof action === "function") {
-        // Functional update (streaming delta) — apply eagerly to working copy.
-        // The updater (e.g. appendDelta) returns a new array, but we only keep
-        // the latest result — no intermediate snapshots are retained.
+        // Functional update — apply eagerly to working copy, batch via timer.
         workingRef.current = action(workingRef.current);
         dirtyRef.current = true;
         if (timerRef.current === null) {
@@ -73,7 +68,9 @@ export function useBatchedNarrativeLines(
           timerRef.current = null;
         }
         dirtyRef.current = false;
-        workingRef.current = action;
+        // Decouple: working copy must be a separate array from what
+        // React holds, so future in-place mutations don't corrupt state.
+        workingRef.current = [...action];
         setLinesReal(action);
       }
     },
