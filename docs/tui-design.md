@@ -54,7 +54,7 @@ The layout is split into two panes:
 
 **Activity line** — Automatic indicators for in-flight engine operations (inside the Conversation Pane). Not DM-controlled. See [Activity Indicators](#activity-indicators).
 
-**DM narrative text** — Scrolling text area (inside the Conversation Pane). The main content region. The DM's narration renders here. Supports inline formatting (see [DM Text Formatting](#dm-text-formatting)). Shows a scroll indicator when content overflows (e.g. `scroll (12) more`) and supports PageUp/PageDown keyboard scrolling. Auto-scrolls to the bottom when new content arrives, unless the user has scrolled up.
+**DM narrative text** — Scrolling text area (inside the Conversation Pane). The main content region. The DM's narration renders here. Supports inline formatting (see [DM Text Formatting](#dm-text-formatting)). Shows a scroll indicator when content overflows (e.g. `scroll (12) more`). Supports PageUp/PageDown keyboard scrolling (multi-line jumps) and mouse wheel scrolling (single-line). Auto-scrolls to the bottom when new content arrives, unless the user has scrolled up. Mouse reporting is enabled on startup and disabled on shutdown; a `process.on('exit')` safety net ensures the terminal is restored even after a crash.
 
 **Top frame** — Multi-line themed border (from the active `.theme` asset) with resource display. Shows the active character's key resources (HP + 1-2 others). See [Resource Display](#resource-display). Height and art determined by the theme asset's `edge_top`, `corner_tl/tr`, and `separator` components.
 

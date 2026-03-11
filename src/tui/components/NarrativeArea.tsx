@@ -7,6 +7,7 @@ import { processNarrativeLines } from "../formatting.js";
 import { renderNodes } from "../render-nodes.js";
 import { useScrollHandle } from "../hooks/useScrollHandle.js";
 import type { ScrollHandle } from "../hooks/useScrollHandle.js";
+import { useMouseScroll } from "../hooks/useMouseScroll.js";
 import { composeTurnSeparator } from "../themes/composer.js";
 import type { ThemeAsset } from "../themes/types.js";
 
@@ -129,11 +130,16 @@ export function scrollAmount(viewportRows: number): number {
 export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>(
   function NarrativeArea({ lines, maxRows, quoteColor, playerColor, width, themeAsset, separatorColor }, ref) {
   const scrollRef = useRef<ScrollViewRef>(null);
+  const localHandleRef = useRef<ScrollHandle>(null);
   const [linesBelow, setLinesBelow] = useState(0);
   const atBottomRef = useRef(true);
 
-  // Expose scrollBy to parent (clamped so forward scroll stops at bottom)
+  // Build a clamped ScrollHandle and expose it to both parent and local refs
   useScrollHandle(ref, scrollRef);
+  useScrollHandle(localHandleRef, scrollRef);
+
+  // Mouse wheel → single-line scroll (clamped to content bounds)
+  useMouseScroll(localHandleRef);
 
   // Track scroll position
   const updateScrollState = useCallback(() => {

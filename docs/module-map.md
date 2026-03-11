@@ -89,7 +89,7 @@ Ink (React for CLI) components, formatting pipeline, theme system.
 | `themes/` | Theme parser, loader, resolver. Built-in themes in `themes/assets/` |
 | `color/` | OKLCH color space utilities, gradient generation |
 | `frames/` | Box drawing, styled content lines, string measurement |
-| `hooks/` | `useGameCallbacks()`, `useTextInput()`, `useTerminalSize()`, `useScrollHandle()` |
+| `hooks/` | `useGameCallbacks()`, `useTextInput()`, `useTerminalSize()`, `useScrollHandle()`, `useMouseScroll()` |
 
 ## src/config/ — Configuration
 
