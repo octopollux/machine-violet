@@ -63,6 +63,47 @@ export function reducer(state: State, action: Action): State {
 
 const cursorChar = chalk.inverse(" ");
 
+/**
+ * Style a text string by splitting into segments around the cursor and
+ * pending-delete range, applying chalk once per segment rather than per
+ * character. Reduces chalk calls from O(n) to O(1).
+ */
+function styleSegments(
+  text: string,
+  cursorOffset: number,
+  pendingDeleteCount: number,
+): string {
+  if (text.length === 0) return "";
+
+  // Common case: no pending deletes — 3 segments max
+  if (pendingDeleteCount === 0) {
+    const before = text.slice(0, cursorOffset);
+    const cursorCh = text[cursorOffset];
+    if (cursorCh === undefined) return before; // cursor past end
+    const after = text.slice(cursorOffset + 1);
+    return before + chalk.inverse(cursorCh) + after;
+  }
+
+  // With pending deletes: up to 4 segments
+  // [before cursor] [cursor char (strikethrough+inverse)] [pending (strikethrough+dim)] [after pending]
+  const before = text.slice(0, cursorOffset);
+  const cursorCh = text[cursorOffset];
+  const pendingStart = cursorOffset + 1;
+  const pendingEnd = cursorOffset + pendingDeleteCount;
+  const pendingText = text.slice(pendingStart, pendingEnd);
+  const after = text.slice(pendingEnd);
+
+  let result = before;
+  if (cursorCh !== undefined) {
+    result += chalk.strikethrough.inverse(cursorCh);
+  }
+  if (pendingText.length > 0) {
+    result += chalk.strikethrough.dim(pendingText);
+  }
+  result += after;
+  return result;
+}
+
 /** Known Home key escape sequences across terminal emulators. */
 const HOME_SEQUENCES = new Set([
   "\x1b[H",   // xterm
@@ -135,7 +176,7 @@ export const DELETE_RELEASE_MS = 120;
  * all at once on release. This sidesteps Windows ConPTY corruption caused
  * by rapid intermediate re-renders during Backspace key repeat.
  */
-export function InlineTextInput({ isDisabled = false, defaultValue = "", availableWidth, onChange, onSubmit }: InlineTextInputProps) {
+export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled = false, defaultValue = "", availableWidth, onChange, onSubmit }: InlineTextInputProps) {
   const initialState: State = {
     value: defaultValue,
     cursorOffset: defaultValue.length,
@@ -288,18 +329,6 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", availab
   const rendered = useMemo(() => {
     const { value, cursorOffset, pendingDeleteCount } = renderState;
 
-    /** Style a single character based on cursor position and pending-delete range. */
-    const styleChar = (char: string, globalIndex: number): string => {
-      const isPending = pendingDeleteCount > 0
-        && globalIndex >= cursorOffset
-        && globalIndex < cursorOffset + pendingDeleteCount;
-      const isCursor = globalIndex === cursorOffset;
-      if (isCursor && isPending) return chalk.strikethrough.inverse(char);
-      if (isPending) return chalk.strikethrough.dim(char);
-      if (isCursor) return chalk.inverse(char);
-      return char;
-    };
-
     let result: string;
     let visibleLen: number;
 
@@ -314,29 +343,20 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", availab
       viewStartRef.current = viewStart;
 
       const viewEnd = viewStart + availableWidth;
-      // If cursor is at end of text, we need room for the cursor block
       const atEnd = cursorOffset === value.length;
       const sliceEnd = atEnd ? Math.min(viewEnd - 1, value.length) : Math.min(viewEnd, value.length);
       const visible = value.slice(viewStart, sliceEnd);
 
-      result = "";
-      for (let i = 0; i < visible.length; i++) {
-        result += styleChar(visible[i], viewStart + i);
-      }
+      // Segment-based styling: O(1) chalk calls instead of per-character
+      result = styleSegments(visible, cursorOffset - viewStart, pendingDeleteCount);
       if (atEnd && cursorOffset >= viewStart && cursorOffset < viewEnd) {
         result += cursorChar;
       }
-      // Viewport already fills availableWidth
       visibleLen = availableWidth;
     } else {
-      // No viewport needed — render full text
-      result = "";
-      let index = 0;
-      for (const char of value) {
-        result += styleChar(char, index);
-        index++;
-      }
+      // No viewport needed — render full text with segment-based styling
       const atEnd = cursorOffset === value.length;
+      result = styleSegments(value, cursorOffset, pendingDeleteCount);
       if (atEnd) {
         result += cursorChar;
       }
@@ -353,4 +373,4 @@ export function InlineTextInput({ isDisabled = false, defaultValue = "", availab
   }, [isDisabled, renderState.value, renderState.cursorOffset, renderState.pendingDeleteCount, availableWidth, needsViewport]);
 
   return <Text>{rendered}</Text>;
-}
+});

@@ -15,7 +15,7 @@ interface PlayerSelectorProps {
  * Bottom bar showing all players. Active player is highlighted.
  * AI players marked with (AI).
  */
-export function PlayerSelector({
+export const PlayerSelector = React.memo(function PlayerSelector({
   players,
   activeIndex,
 }: PlayerSelectorProps) {
@@ -40,4 +40,4 @@ export function PlayerSelector({
       })}
     </Box>
   );
-}
+});

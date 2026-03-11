@@ -17,7 +17,7 @@ interface InputLineProps {
  * Text input line with character name prefix.
  * Wraps InlineTextInput for proper cursor management.
  */
-export function InputLine({
+export const InputLine = React.memo(function InputLine({
   characterName,
   showPlayerName,
   playerName,
@@ -48,4 +48,4 @@ export function InputLine({
       />
     </Box>
   );
-}
+});
