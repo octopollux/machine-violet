@@ -1,7 +1,7 @@
 # Document Ingestion Design
 
 > **Status: Not Implemented** — this is a design spec for a planned feature. No code exists yet.
-> Tracked in [#67](https://github.com/Orthodox-531/tui-rpg/issues/67).
+> Tracked in [#67](https://github.com/Orthodox-531/machine-violet/issues/67).
 
 Machine Violet needs to import RPG sourcebooks (rulebooks and campaign books) from user-supplied files, primarily PDFs. These are complex, high-production-value documents with multi-column layouts, stat blocks, sidebars, tables, and decorative elements.
 

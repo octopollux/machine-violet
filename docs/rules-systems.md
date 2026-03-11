@@ -1,7 +1,7 @@
 # Rules Systems Reference
 
 > **Status: Reference Only** — this is a catalog of candidate systems. Runtime fetching, caching, and distillation are not implemented. Only FATE Accelerated and 24XX are currently offered in setup.
-> Tracked in [#68](https://github.com/Orthodox-531/tui-rpg/issues/68).
+> Tracked in [#68](https://github.com/Orthodox-531/machine-violet/issues/68).
 
 This document catalogs freely available tabletop RPG systems that Machine Violet can use as bundled rule sets. The selection criterion is **"free to fetch at runtime"**: the full system rules must be downloadable from an official, stable URL at no cost, with no login gate. This sidesteps bundling-license concerns entirely — we fetch, parse, and cache the document at game-initialization time rather than shipping copyrighted text inside the application.
 
@@ -237,7 +237,7 @@ D&D 5e (too much mandatory player bookkeeping), Open D6 (dice pools require play
 
 ## Implementation Notes (Not Yet Implemented)
 
-> These notes describe the planned integration. See [#68](https://github.com/Orthodox-531/tui-rpg/issues/68).
+> These notes describe the planned integration. See [#68](https://github.com/Orthodox-531/machine-violet/issues/68).
 
 - **Fetching strategy.** At game initialization, if a supported system is selected, the engine fetches the canonical SRD URL, caches it to the campaign directory as `rules-cache/<system>.md` (or `.html`/`.pdf`), and passes it to a Tier 2 (Haiku) parsing subagent that extracts structured rule data into `rules-cache/<system>.json`.
 - **Parsing subagent output.** The JSON should capture: core resolution procedure, stat/attribute list, character creation steps, and any named subsystems (combat, magic, etc.) as discrete objects. The DM loads only the relevant sections into context on demand.

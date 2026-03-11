@@ -25,7 +25,7 @@ In OOC mode, the player can ask to roll back:
 - "Roll back to before the last combat" → the OOC agent searches git log for the right commit, restores files, then `session_resume` reloads the DM's context from the restored state.
 - "Undo the last few turns" → restore to the most recent auto-commit before the problem.
 
-The engine provides a `rollback` tool available to the OOC agent (tool registered but not yet wired end-to-end — see [#70](https://github.com/Orthodox-531/tui-rpg/issues/70)):
+The engine provides a `rollback` tool available to the OOC agent (tool registered but not yet wired end-to-end — see [#70](https://github.com/Orthodox-531/machine-violet/issues/70)):
 
 ```
 rollback({
