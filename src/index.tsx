@@ -7,6 +7,7 @@ import type { ShutdownContext } from "./shutdown.js";
 import { gracefulShutdown } from "./shutdown.js";
 import { installSyncWriteCombiner } from "./tui/hooks/syncWriteCombiner.js";
 import { installRawModeGuard } from "./tui/hooks/rawModeGuard.js";
+import { disableMouseReporting } from "./tui/hooks/useMouseScroll.js";
 
 // Prevent stdin raw mode from ever being disabled while the TUI is running.
 // On Windows, even a momentary drop to cooked mode causes the console to
@@ -44,6 +45,7 @@ async function handleShutdownSignal() {
     // Best-effort
   }
 
+  disableMouseReporting(process.stdout);
   unlockRawMode();
   removeCombiner();
   unmount();

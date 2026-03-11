@@ -7,6 +7,7 @@ import { processNarrativeLines } from "../formatting.js";
 import { renderNodes } from "../render-nodes.js";
 import { useScrollHandle } from "../hooks/useScrollHandle.js";
 import type { ScrollHandle } from "../hooks/useScrollHandle.js";
+import { useMouseScroll } from "../hooks/useMouseScroll.js";
 import { composeTurnSeparator } from "../themes/composer.js";
 import type { ThemeAsset } from "../themes/types.js";
 
@@ -134,6 +135,9 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
 
   // Expose scrollBy to parent (clamped so forward scroll stops at bottom)
   useScrollHandle(ref, scrollRef);
+
+  // Mouse wheel → single-line scroll (uses raw ScrollViewRef directly)
+  useMouseScroll(scrollRef);
 
   // Track scroll position
   const updateScrollState = useCallback(() => {
