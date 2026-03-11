@@ -13,6 +13,8 @@ export { SceneManager } from "./scene-manager.js";
 export type { SceneState, FileIO, PendingOperation, TransitionResult } from "./scene-manager.js";
 export { GameEngine } from "./game-engine.js";
 export type { EngineState, EngineCallbacks, TurnInfo } from "./game-engine.js";
+export { InjectionRegistry, BehaviorInjection, ScenePacingInjection, LengthSteeringInjection } from "./injections.js";
+export type { Injection, InjectionContext, TerminalDims, ResponseInfo } from "./injections.js";
 export { summarizeScene } from "./subagents/index.js";
 export { updatePrecis } from "./subagents/index.js";
 export { updateChangelogs } from "./subagents/index.js";

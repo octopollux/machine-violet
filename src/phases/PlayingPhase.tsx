@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useCallback } from "react";
+import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { useInput, Box } from "ink";
 import { appendDelta } from "../tui/narrative-helpers.js";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
@@ -30,6 +30,18 @@ export function PlayingPhase() {
   } = useGameContext();
   const { columns: cols, rows } = useTerminalSize();
   const tooSmall = cols < MIN_COLUMNS || rows < MIN_ROWS;
+
+  // Sync terminal dimensions to engine for length steering.
+  // Compute from base rows (no modal subtraction) — this is the steady-state
+  // narrative area the DM should target.
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const tier = getViewportTier({ columns: cols, rows });
+    const elements = getVisibleElements(tier);
+    const narRows = narrativeRows(rows, elements, false, 2, 2);
+    engine.setTerminalDims({ columns: cols, rows, narrativeRows: narRows });
+  }, [cols, rows, engineRef]);
 
   // Local state — only used within playing phase input/render
   const [resetKey, setResetKey] = useState(0);

@@ -8,8 +8,12 @@ import type { DroppedExchange } from "../context/conversation.js";
 import { narrativeLinesToMarkdown } from "../context/display-log.js";
 import { StatePersister } from "../context/state-persistence.js";
 import type { StateSlice } from "../context/state-persistence.js";
-import { SceneManager, buildScenePacing } from "./scene-manager.js";
+import { SceneManager } from "./scene-manager.js";
 import type { SceneState, FileIO } from "./scene-manager.js";
+import { InjectionRegistry, BehaviorInjection, ScenePacingInjection, LengthSteeringInjection } from "./injections.js";
+import type { TerminalDims, InjectionContext } from "./injections.js";
+import { processNarrativeLines } from "../tui/formatting.js";
+import type { NarrativeLine } from "../types/tui.js";
 import type { DMSessionState } from "./dm-prompt.js";
 import { getModel, getThinkingConfig } from "../config/models.js";
 import { accUsage } from "../context/usage-helpers.js";
@@ -126,9 +130,8 @@ export class GameEngine {
   private aiTurnDepth = 0;
   private turnCounter = 0;
   private static MAX_AI_CHAIN = 10;
-  private turnsWithoutTools = 0;
-  private turnsWithoutEntities = 0;
-  private static readonly BEHAVIOR_THRESHOLD = 3;
+  private injectionRegistry: InjectionRegistry;
+  private terminalDims: TerminalDims | undefined;
 
   constructor(params: {
     client: Anthropic;
@@ -185,6 +188,12 @@ export class GameEngine {
     );
     this.callbacks = params.callbacks;
     this.model = params.model ?? getModel("large");
+
+    // Set up injection registry
+    this.injectionRegistry = new InjectionRegistry();
+    this.injectionRegistry.register(new BehaviorInjection());
+    this.injectionRegistry.register(new ScenePacingInjection());
+    this.injectionRegistry.register(new LengthSteeringInjection());
 
     // Wire dev logging to scene manager when available
     if (params.callbacks.onDevLog) {
@@ -265,6 +274,11 @@ export class GameEngine {
     this.sceneManager.getSessionState().uiState = uiState;
   }
 
+  /** Update terminal dimensions for length steering (called from TUI layer on resize). */
+  setTerminalDims(dims: TerminalDims): void {
+    this.terminalDims = dims;
+  }
+
   /**
    * Process player input: send to DM, stream response, handle tools.
    * This is the main game loop entry point.
@@ -321,9 +335,9 @@ export class GameEngine {
     stampConversationCache(messages);
 
     // Build the user message: player input with system-generated preamble.
-    // All injections (volatile context, behavioral reminders, scene pacing)
-    // are prepended as a <context> block to the single user message rather
-    // than using separate synthetic turns.
+    // All injections (volatile context, behavioral reminders, scene pacing,
+    // length steering) are prepended as a <context> block to the single user
+    // message rather than using separate synthetic turns.
     const preambleParts: string[] = [];
 
     // Volatile context (Tier 3: activeState, entityIndex, uiState)
@@ -331,22 +345,14 @@ export class GameEngine {
       preambleParts.push(volatileContext);
     }
 
-    // Behavioral reminder
-    if (!opts?.skipTranscript) {
-      const reminder = this.buildBehaviorReminder();
-      if (reminder) {
-        preambleParts.push(reminder);
-        this.callbacks.onDevLog?.(`[dev] injection: ${reminder}`);
-      }
-    }
-
-    // Scene pacing every 3 exchanges
-    if (this.conversation.size > 0 && this.conversation.size % 3 === 0) {
-      const pacing = buildScenePacing(this.sceneManager.getScene());
-      if (pacing) {
-        preambleParts.push(`[scene-pacing] ${pacing}`);
-      }
-    }
+    // Registered injections (behavior, scene-pacing, length steering, etc.)
+    const injCtx: InjectionContext = {
+      conversationSize: this.conversation.size,
+      scene: this.sceneManager.getScene(),
+      skipTranscript: !!opts?.skipTranscript,
+      terminalDims: this.terminalDims,
+    };
+    preambleParts.push(...this.injectionRegistry.buildAll(injCtx, this.callbacks.onDevLog));
 
     const preamble = preambleParts.length > 0
       ? `<context>\n${preambleParts.join("\n")}\n</context>\n\n`
@@ -387,20 +393,22 @@ export class GameEngine {
         config,
       );
 
-      // Update behavioral drift counters (only on human-initiated turns)
-      if (!opts?.fromAI) {
-        if (toolUsedThisTurn) {
-          this.turnsWithoutTools = 0;
-        } else {
-          this.turnsWithoutTools++;
-        }
-        const hasEntityLinks = /<color=[^>]+>[^<]+<\/color>/.test(result.text);
-        if (hasEntityLinks) {
-          this.turnsWithoutEntities = 0;
-        } else {
-          this.turnsWithoutEntities++;
-        }
+      // Count wrapped lines for length steering, then update all injection counters
+      let wrappedLineCount = 0;
+      if (result.text && this.terminalDims) {
+        // Approximate content width: subtract side frame chrome (~4 cols)
+        const contentWidth = Math.max(1, this.terminalDims.columns - 4);
+        const dmLines: NarrativeLine[] = result.text
+          .split("\n")
+          .map((line) => ({ kind: "dm" as const, text: line }));
+        wrappedLineCount = processNarrativeLines(dmLines, contentWidth).length;
       }
+      this.injectionRegistry.afterResponse({
+        text: result.text,
+        toolUsed: toolUsedThisTurn,
+        fromAI: !!opts?.fromAI,
+        wrappedLineCount,
+      });
 
       // Append to transcript
       if (result.text) {
@@ -443,7 +451,7 @@ export class GameEngine {
       // preCommitHook flushes them to disk before any git commit.
       if (this.persister) {
         if (!opts?.skipTranscript) {
-          const logLines: import("../types/tui.js").NarrativeLine[] = [
+          const logLines: NarrativeLine[] = [
             { kind: "player", text: `[${characterName}] ${text}` },
           ];
           if (result.text) {
@@ -531,8 +539,7 @@ export class GameEngine {
    * Execute a scene transition.
    */
   async transitionScene(title: string, timeAdvance?: number): Promise<void> {
-    this.turnsWithoutTools = 0;
-    this.turnsWithoutEntities = 0;
+    this.injectionRegistry.get<BehaviorInjection>("behavior")?.reset();
     this.setState("scene_transition");
 
     try {
@@ -567,8 +574,7 @@ export class GameEngine {
    * End the session.
    */
   async endSession(title: string, timeAdvance?: number): Promise<void> {
-    this.turnsWithoutTools = 0;
-    this.turnsWithoutEntities = 0;
+    this.injectionRegistry.get<BehaviorInjection>("behavior")?.reset();
     this.setState("session_ending");
 
     try {
@@ -959,20 +965,6 @@ export class GameEngine {
     } catch {
       // Debug dump itself failed — don't mask the original error
     }
-  }
-
-  /**
-   * Returns a terse behavioral reminder if the DM has gone BEHAVIOR_THRESHOLD
-   * turns without using tools or formatting entities, otherwise null.
-   * Injected ephemerally before the player message — not stored in conversation.
-   */
-  private buildBehaviorReminder(): string | null {
-    if (this.conversation.size < GameEngine.BEHAVIOR_THRESHOLD) return null;
-    const cues: string[] = [];
-    if (this.turnsWithoutTools >= GameEngine.BEHAVIOR_THRESHOLD) cues.push("use your tools");
-    if (this.turnsWithoutEntities >= GameEngine.BEHAVIOR_THRESHOLD) cues.push("color-code entity names");
-    if (cues.length === 0) return null;
-    return `[dm-note] ${cues.join("; ")}.`;
   }
 
   private buildAgentConfig(): AgentLoopConfig {
