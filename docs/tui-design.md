@@ -198,21 +198,46 @@ The composition engine (`composeTopFrame`, `composeBottomFrame`, `composeSideCol
 
 Colors are generated at runtime from an OKLCH arc generator (`src/tui/color/`). A **swatch** is an array of hex color strings produced by walking a parametric curve through OKLCH color space:
 
-- **Hue arc**: start hue → end hue (degrees)
-- **Chroma curve**: min/max chroma envelope
-- **Lightness curve**: min/max lightness envelope
-- **Steps**: number of colors to generate
+- **Hue arc**: start hue → end hue (degrees), direction (cw/ccw/shortest)
+- **Chroma curve**: composable `CurveFunction` (t ∈ [0,1] → value) mapped to a min/max range
+- **Lightness curve**: same, mapped to a min/max lightness range
+- **Steps**: number of colors to generate (typically 8–10)
 
-Built-in swatch presets: `foliage`, `cyberpunk`, `ember`, `ethereal`. Each preset defines hue/chroma/lightness parameters tuned for a genre feel.
+Curve primitives (`src/tui/color/curves.ts`): `constant`, `linearRamp`, `sinePulse`, `easeInOut`, `bell`, `compose`. Presets combine these to define genre-specific palette shapes.
 
-A `ThemeColorMap` assigns swatch indices to frame parts:
+Built-in swatch presets: `foliage`, `cyberpunk`, `ember`, `ethereal`. Each preset defines a `PresetFactory` that builds `SwatchParams` from a base hex color.
+
+#### Harmony swatches
+
+A single arc produces one row of colors (anchor 0). A **harmony swatch** extends this to multiple rows by generating parallel arcs centered on different hue anchors derived from color theory:
+
+| Harmony type | Anchors | Hue offsets |
+|---|---|---|
+| `analogous` | 3 | 0°, −30°, +30° |
+| `complementary` | 2 | 0°, 180° |
+| `split-complementary` | 3 | 0°, 150°, 210° |
+| `triadic` | 3 | 0°, 120°, 240° |
+| `tetradic` | 4 | 0°, 90°, 180°, 270° |
+
+Row 0 is always the key color arc. Each subsequent row uses the same preset but centered on a different harmony anchor hue.
+
+**Code:** `generateHarmonySwatch(preset, keyColor, harmony)` in `src/tui/color/swatch.ts`
+
+#### Color map encoding
+
+A `ThemeColorMap` assigns encoded swatch indices to frame parts. Values encode a position in the 2D harmony swatch grid:
+
+- **0–99**: index into anchor 0 (key color arc). `value` = step.
+- **≥ 100**: `anchor = floor(value / 100)`, `step = value % 100`. E.g., `102` = anchor 1 step 2.
 
 | Color map key | Applied to |
 |---|---|
 | `border` | Top/bottom frame edges |
+| `corner` | Corner decorations |
 | `title` | Resource display text, turn indicator text |
 | `sideFrame` | Left/right side columns |
 | `separator` | Activity line separator, turn separator flourish |
+| `turnIndicator` | Turn indicator text |
 
 ### Variants
 
@@ -232,8 +257,9 @@ The DM switches variants via `style_scene` tool calls, or the engine switches au
 
 A `ThemeDefinition` specifies the theme asset name, base swatch configuration, and per-variant overrides. `resolveTheme(definition, variant, keyColor?)` produces a `ResolvedTheme` containing:
 - The parsed `ThemeAsset` (art components)
-- A generated swatch (hex color array) for the active variant
+- A generated `swatch` (anchor 0 arc) and `harmonySwatch` (full 2D grid) for the active variant
 - A `ThemeColorMap` mapping frame parts to swatch colors
+- The `keyColor` and `variant` used to generate it
 
 An optional `keyColor` (hex) shifts the swatch hue to center on that color, allowing location-specific tinting without changing the theme art.
 
@@ -392,13 +418,22 @@ ESC key opens the game menu modal:
 
 Standard navigation (arrow keys + Enter). Settings covers choice frequency, display preferences, and other player-level configuration. OOC Mode from here is equivalent to the DM detecting an OOC request.
 
+### Color Swatch Modal
+
+The `/swatch` command opens a debug modal showing the full harmony swatch grid, column step indices, row anchor labels (0, 100, 200, ...), and current `colorMap` assignments. Useful for tuning color maps and verifying swatch generation. Dismissed with any key.
+
+**Code:** `src/tui/modals/SwatchModal.tsx`
+
 ### Modal behavior
 
 - Modals overlay the narrative area, not the full screen. The modeline and player selector remain visible underneath.
 - Modals inherit the active theme variant (a combat choice modal uses the combat theme variant).
+- **Modal colors are derived from the main theme** — `deriveModalTheme()` shifts all colorMap values to anchor 1 (complementary hue, 180° away) and mirrors step indices (inverted lightness). This makes modals visually distinct from the game frame without requiring separate color configuration.
 - Modals are dismissed with ESC (back to game), Enter (confirm selection), or the relevant hotkey.
 - When modal content exceeds available height, it scrolls with a scroll indicator (e.g. `scroll (5) more`) and supports PageUp/PageDown navigation.
 - At minimal viewport sizes, modals take the full screen.
+
+**Code:** `deriveModalTheme()` in `src/tui/themes/color-resolve.ts`, applied automatically in `CenteredModal` and `Modal`.
 
 
 ## DM Tool Interface
