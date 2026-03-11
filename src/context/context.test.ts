@@ -6,9 +6,9 @@ import { buildCachedPrefix } from "./prefix-builder.js";
 import type { ContextConfig, CampaignConfig } from "../types/config.js";
 
 const defaultContextConfig: ContextConfig = {
-  retention_exchanges: 5,
-  max_conversation_tokens: 8000,
-  tool_result_stub_after: 2,
+  retention_exchanges: 100,
+  max_conversation_tokens: 100_000,
+  tool_result_stub_after: 5,
 };
 
 function userMsg(text: string): Anthropic.MessageParam {
