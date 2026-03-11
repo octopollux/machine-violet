@@ -460,7 +460,6 @@ Player input
     ├─ SceneManager.appendToolResult(name, result)  (for each tool)
     │
     ├─ ConversationManager.addExchange(user, assistant, toolResults)
-    │   ├─ stubOldToolResults() — replace results older than stub_after with one-liners
     │   └─ enforceRetention()
     │       ├─ Drop oldest if exchanges > retention_exchanges
     │       ├─ Drop oldest if tokens > max_conversation_tokens
