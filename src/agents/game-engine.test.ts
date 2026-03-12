@@ -1370,7 +1370,7 @@ describe("pruneEmptyDirs", () => {
 });
 
 describe("GameEngine tool ack batching", () => {
-  it("stashes pending acks and prepends them to the next user message", async () => {
+  it("saves API call on TUI-only tool round and keeps history coherent", async () => {
     // Turn 1: DM responds with text + TUI-only tool call → bail-out
     const turn1Msg: Anthropic.Message = {
       id: "msg_1",
@@ -1419,27 +1419,36 @@ describe("GameEngine tool ack batching", () => {
       model: "claude-haiku-4-5-20251001",
     });
 
-    // Turn 1: DM bails out with pending acks
+    // Turn 1: DM bails out — only 1 API call (no ack round-trip)
     await engine.processInput("Aldric", "I enter the tavern.");
-
-    // Only 1 API call for turn 1 (no ack round-trip)
     expect(client.messages.stream).toHaveBeenCalledTimes(1);
 
-    // Turn 2: acks should be prepended
+    // Turn 2: conversation history should include the tool_use/tool_result
+    // pair from turn 1 so the DM sees a coherent exchange.
     await engine.processInput("Aldric", "I talk to the bartender.");
-
     expect(client.messages.stream).toHaveBeenCalledTimes(2);
 
-    // Inspect the messages sent in the second stream call.
-    // The last message is the new user turn (appended by processInput).
+    // Verify the second call's messages include the tool_use + tool_result
     const secondCallParams = streamCalls[1] as { messages: Anthropic.MessageParam[] };
-    const userMsgs = secondCallParams.messages.filter((m) => m.role === "user");
+    const msgs = secondCallParams.messages;
+
+    // Find the assistant message with tool_use from turn 1
+    const assistantWithTools = msgs.find((m) =>
+      m.role === "assistant" && Array.isArray(m.content) &&
+      (m.content as Anthropic.ContentBlock[]).some((b) => b.type === "tool_use"),
+    );
+    expect(assistantWithTools).toBeDefined();
+
+    // Find the matching tool_result
+    const toolResultMsg = msgs.find((m) =>
+      m.role === "user" && Array.isArray(m.content) &&
+      (m.content as Anthropic.ToolResultBlockParam[]).some((b) => b.type === "tool_result"),
+    );
+    expect(toolResultMsg).toBeDefined();
+
+    // The new user message should be a plain string (no orphaned tool_results)
+    const userMsgs = msgs.filter((m) => m.role === "user");
     const lastUserMsg = userMsgs[userMsgs.length - 1];
-    // Should be a block array containing tool_result + text
-    expect(Array.isArray(lastUserMsg.content)).toBe(true);
-    const blocks = lastUserMsg.content as Anthropic.ContentBlockParam[];
-    const types = blocks.map((b) => (b as { type: string }).type);
-    expect(types).toContain("tool_result");
-    expect(types).toContain("text");
+    expect(typeof lastUserMsg.content).toBe("string");
   });
 });

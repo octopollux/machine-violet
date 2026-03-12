@@ -484,9 +484,37 @@ describe("runAgentLoop", () => {
       expect(result.text).toBe("The tavern glows warmly.");
       // TUI command was collected
       expect(result.tuiCommands).toHaveLength(1);
-      // Pending acks were stashed
-      expect(result.pendingToolAcks).toHaveLength(1);
-      expect(result.pendingToolAcks![0].tool_use_id).toBe("toolu_test");
+    });
+
+    it("keeps tool_use/tool_result pair in roundMessages on bail-out", async () => {
+      const client = mockClient([
+        textAndToolMessage("Scene text.", "scribe", { updates: [] }),
+      ]);
+      const toolHandler = vi.fn(() => ({
+        content: JSON.stringify({ type: "scribe", updates: [] }),
+      }));
+
+      const result = await runAgentLoop(
+        client,
+        "System",
+        [{ role: "user", content: "Continue" }],
+        baseConfig({ toolHandler, tuiToolNames: new Set(["scribe"]) }),
+      );
+
+      // roundMessages: assistant(text+tool_use), user(tool_result)
+      expect(result.roundMessages).toHaveLength(2);
+      expect(result.roundMessages[0].role).toBe("assistant");
+      expect(result.roundMessages[1].role).toBe("user");
+
+      // Assistant message retains tool_use blocks
+      const assistantBlocks = result.roundMessages[0].content as Anthropic.ContentBlock[];
+      const types = assistantBlocks.map((b) => b.type);
+      expect(types).toContain("tool_use");
+      expect(types).toContain("text");
+
+      // User message has tool_result
+      const userBlocks = result.roundMessages[1].content as Anthropic.ToolResultBlockParam[];
+      expect(userBlocks[0].type).toBe("tool_result");
     });
 
     it("does NOT bail out when some tools are non-TUI", async () => {
@@ -520,34 +548,9 @@ describe("runAgentLoop", () => {
 
       // Two API calls — results sent back normally
       expect(client.messages.create).toHaveBeenCalledTimes(2);
-      expect(result.pendingToolAcks).toBeUndefined();
     });
 
-    it("strips tool_use blocks from stored roundMessages on bail-out", async () => {
-      const client = mockClient([
-        textAndToolMessage("Scene text.", "scribe", { updates: [] }),
-      ]);
-      const toolHandler = vi.fn(() => ({
-        content: JSON.stringify({ type: "scribe", updates: [] }),
-      }));
-
-      const result = await runAgentLoop(
-        client,
-        "System",
-        [{ role: "user", content: "Continue" }],
-        baseConfig({ toolHandler, tuiToolNames: new Set(["scribe"]) }),
-      );
-
-      // The assistant message in roundMessages should have no tool_use blocks
-      const assistantMsg = result.roundMessages.find((m) => m.role === "assistant");
-      expect(assistantMsg).toBeDefined();
-      const blocks = assistantMsg!.content as Anthropic.ContentBlock[];
-      const types = blocks.map((b) => b.type);
-      expect(types).not.toContain("tool_use");
-      expect(types).toContain("text");
-    });
-
-    it("preserves empty text block when bailing out with tool-only response", async () => {
+    it("handles tool-only response (no text) on bail-out", async () => {
       // DM returns ONLY tool_use blocks, no text
       const client = mockClient([
         toolUseMessage("update_modeline", { location: "Cave" }),
@@ -564,12 +567,9 @@ describe("runAgentLoop", () => {
       );
 
       expect(client.messages.create).toHaveBeenCalledTimes(1);
-      expect(result.pendingToolAcks).toHaveLength(1);
-      // roundMessages assistant content should have at least an empty text block
-      const assistantMsg = result.roundMessages.find((m) => m.role === "assistant");
-      const blocks = assistantMsg!.content as Anthropic.ContentBlock[];
-      expect(blocks).toHaveLength(1);
-      expect(blocks[0].type).toBe("text");
+      expect(result.text).toBe("");
+      // roundMessages: assistant(tool_use), user(tool_result)
+      expect(result.roundMessages).toHaveLength(2);
     });
   });
 });
