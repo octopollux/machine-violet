@@ -153,7 +153,7 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
       const gs = gameStateRef.current;
       if (gs && clientRef.current) {
         const dmProvided = activeModalRef.current?.kind === "choice";
-        if (shouldGenerateChoices(gs.config.choices.campaign_default, dmProvided)) {
+        if (text && shouldGenerateChoices(gs.config.choices.campaign_default, dmProvided)) {
           const activePlayer = getActivePlayer(gs);
           if (isDevMode()) {
             setNarrativeLines((prev) => [...prev, { kind: "dev", text: "[dev] subagent:choices starting" }]);
