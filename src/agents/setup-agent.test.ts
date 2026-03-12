@@ -32,7 +32,7 @@ describe("buildCampaignConfig", () => {
     expect(config.players).toHaveLength(1);
     expect(config.players[0].name).toBe(result.playerName);
     expect(config.players[0].character).toBe(result.characterName);
-    expect(config.context.retention_exchanges).toBe(5);
+    expect(config.context.retention_exchanges).toBe(100);
     expect(config.recovery.enable_git).toBe(true);
   });
 

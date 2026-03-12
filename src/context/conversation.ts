@@ -15,13 +15,13 @@ export interface ConversationExchange {
   toolResults: Anthropic.MessageParam[];
   /** Estimated total tokens for this exchange */
   estimatedTokens: number;
-  /** Has this exchange's tool results been stubbed? */
-  stubbed: boolean;
+  /** @deprecated No longer used. Kept for backward compat with persisted state. */
+  stubbed?: boolean;
 }
 
 /**
  * Manages the conversation window.
- * Tracks exchanges, enforces retention limits, stubs old tool results.
+ * Tracks exchanges and enforces retention limits.
  */
 export class ConversationManager {
   private exchanges: ConversationExchange[] = [];
@@ -42,10 +42,7 @@ export class ConversationManager {
       estimateMessageTokens(assistant) +
       toolResults.reduce((sum, tr) => sum + estimateMessageTokens(tr), 0);
 
-    this.exchanges.push({ user, assistant, toolResults, estimatedTokens, stubbed: false });
-
-    // Stub old tool results
-    this.stubOldToolResults();
+    this.exchanges.push({ user, assistant, toolResults, estimatedTokens });
 
     // Enforce retention limits
     return this.enforceRetention();
@@ -98,28 +95,6 @@ export class ConversationManager {
     }
   }
 
-  /** Replace tool results older than stub_after with one-line stubs */
-  private stubOldToolResults(): void {
-    const stubAfter = this.config.tool_result_stub_after;
-    const cutoff = this.exchanges.length - stubAfter;
-
-    for (let i = 0; i < cutoff; i++) {
-      const ex = this.exchanges[i];
-      if (ex.stubbed || ex.toolResults.length === 0) continue;
-
-      ex.toolResults = ex.toolResults.map((tr) =>
-        tr.role === "user" ? stubToolResult(tr) : tr,
-      );
-      ex.stubbed = true;
-
-      // Recompute token estimate
-      ex.estimatedTokens =
-        estimateMessageTokens(ex.user) +
-        estimateMessageTokens(ex.assistant) +
-        ex.toolResults.reduce((sum, r) => sum + estimateMessageTokens(r), 0);
-    }
-  }
-
   /** Enforce retention_exchanges and max_conversation_tokens */
   private enforceRetention(): DroppedExchange | null {
     let dropped: DroppedExchange | null = null;
@@ -148,29 +123,4 @@ export class ConversationManager {
 export interface DroppedExchange {
   exchange: ConversationExchange;
   reason: "exchange_count" | "token_limit";
-}
-
-/** Replace a tool_result message with a terse stub */
-function stubToolResult(msg: Anthropic.MessageParam): Anthropic.MessageParam {
-  if (typeof msg.content === "string") return msg;
-
-  const stubbedContent = (msg.content as Anthropic.ToolResultBlockParam[]).map((block) => {
-    if (block.type !== "tool_result") return block;
-    const original = typeof block.content === "string"
-      ? block.content
-      : Array.isArray(block.content)
-        ? block.content.filter((b) => b.type === "text").map((b) => (b as Anthropic.TextBlockParam).text).join(" ")
-        : "";
-
-    // Truncate to first line, max 80 chars
-    const firstLine = original.split("\n")[0] ?? "";
-    const stub = firstLine.length > 80 ? firstLine.slice(0, 77) + "..." : firstLine;
-
-    return {
-      ...block,
-      content: `[stub] ${stub}`,
-    } as Anthropic.ToolResultBlockParam;
-  });
-
-  return { role: msg.role, content: stubbedContent };
 }

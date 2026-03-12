@@ -208,6 +208,10 @@ export async function runAgentLoop(
   const loopStartIndex = workingMessages.length;
   const tuiToolNames = config.tuiToolNames ?? new Set<string>();
 
+  // Count assistant messages already in conversation so thinking trace round
+  // numbers align with assistant message indices in the context dump viewer.
+  const priorAssistantCount = messages.filter((m) => m.role === "assistant").length;
+
   let params: CreateParams = {
     model: config.model,
     max_tokens: effectiveMaxTokens,
@@ -276,7 +280,8 @@ export async function runAgentLoop(
         // Check if this is a TUI command
         if (tuiToolNames.has(block.name)) {
           try {
-            tuiCommands.push(JSON.parse(result.content) as TuiCommand);
+            const tui = result._tui ?? JSON.parse(result.content);
+            tuiCommands.push(tui as TuiCommand);
           } catch { /* not a TUI command after all */ }
         }
 
@@ -291,7 +296,7 @@ export async function runAgentLoop(
 
     // Dump thinking blocks (dev mode only)
     if (thinkingText) {
-      dumpThinking(config.name, round, thinkingText);
+      dumpThinking(config.name, priorAssistantCount + round, thinkingText);
     }
 
     // Append assistant message

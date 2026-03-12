@@ -44,6 +44,17 @@ interface ContextDump {
   [key: string]: unknown;
 }
 
+/** Try to pretty-print as JSON; fall back to the raw value for plain text. */
+function prettyPrint(value: unknown): string {
+  if (typeof value !== "string") return JSON.stringify(value, null, 2);
+  try {
+    const parsed = JSON.parse(value);
+    return JSON.stringify(parsed, null, 2);
+  } catch {
+    return value;
+  }
+}
+
 function Section({
   title,
   color,
@@ -96,7 +107,7 @@ function MessageBlock({ msg }: { msg: Message }) {
         return (
           <div key={i} className="dump-message role-tool_use">
             <div className="dump-role-label">tool_use: {block.name}</div>
-            <pre style={{ fontSize: 11 }}>
+            <pre style={{ fontSize: 11, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
               {JSON.stringify(block.input, null, 2)}
             </pre>
           </div>
@@ -106,16 +117,14 @@ function MessageBlock({ msg }: { msg: Message }) {
         return (
           <div key={i} className="dump-message role-tool_result">
             <div className="dump-role-label">tool_result ({block.tool_use_id})</div>
-            <pre style={{ fontSize: 11 }}>
-              {typeof block.content === "string"
-                ? block.content
-                : JSON.stringify(block.content, null, 2)}
+            <pre style={{ fontSize: 11, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+              {prettyPrint(block.content)}
             </pre>
           </div>
         );
       }
       return (
-        <pre key={i} style={{ fontSize: 11 }}>
+        <pre key={i} style={{ fontSize: 11, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
           {JSON.stringify(block, null, 2)}
         </pre>
       );

@@ -21,10 +21,10 @@ The entity filesystem, campaign log, and scene transcripts are the DM's long-ter
 │ Current scene summary: running precis          ~500t  │
 │                                        Total: ~7500t  │
 ├───────────────────────────────────────────────────────┤
-│ CONVERSATION (recent exchanges only, full input cost) │
+│ CONVERSATION (accumulates within scene, cached rate)   │
 │                                                       │
-│ Last N exchanges: player input, tool stubs,           │
-│ DM responses                           Target: ~3-5Kt │
+│ All scene exchanges: player input, tool stubs,        │
+│ DM responses            Cleared at scene transition   │
 ├───────────────────────────────────────────────────────┤
 │ CURRENT INPUT (full input cost)                       │
 │                                                       │
@@ -32,52 +32,54 @@ The entity filesystem, campaign log, and scene transcripts are the DM's long-ter
 └───────────────────────────────────────────────────────┘
 ```
 
-### Cost model (at current Opus pricing: $5/M input, $0.50/M cached, $25/M output)
+### Cost model (at current Opus pricing: $5/M input, $1.25/M cached, $25/M output)
+
+With automatic caching, conversation tokens that were present on the previous turn are read at cache rate (~25% of full input). Only the newest exchange pays full input rate. This makes retaining the full scene conversation cheap.
 
 ```
-Cached prefix:     ~8K tokens × $0.50/M  = ~$0.004/turn
-Conversation:      ~4K tokens × $5/M     = ~$0.02/turn
+Cached prefix:     ~8K tokens × $1.25/M  = ~$0.01/turn
+Conversation:      ~4K cached  × $1.25/M = ~$0.005/turn
+                   + ~0.5K new × $5/M    = ~$0.0025/turn
 Output:            ~300 tokens × $25/M   = ~$0.008/turn
 ───────────────────────────────────────────────────
-Per turn:          ~$0.03
-Per session (60t): ~$1.80-2.00 for Opus DM
+Per turn:          ~$0.025
+Per session (60t): ~$1.50 for Opus DM
 Haiku subagents:   ~$0.30-0.70 for the session
 ───────────────────────────────────────────────────
-Total session:     ~$2-3
+Total session:     ~$2-2.50
 ```
 
 ## Conversation Retention
 
-The conversation history keeps only the last N exchanges. An "exchange" is one player input + the DM's tool calls and response. Everything older is dropped from conversation history (but is already captured in the scene transcript on disk).
+Conversation accumulates within a scene and is cleared at scene transition. With automatic caching, retained exchanges are read at cache rate (~25% of full input), so the cost of keeping more history is low. The `max_conversation_tokens` limit acts as a safety brake for unusually long scenes.
 
-### The retention window is a tunable knob.
+### Configuration
 
 ```jsonc
 // config.json
 {
   "context": {
-    "retention_exchanges": 5,     // keep last N exchanges in conversation
-    "max_conversation_tokens": 8000,  // hard cap regardless of exchange count
-    "tool_result_stub_after": 2   // replace full tool results with stubs after N exchanges
+    "retention_exchanges": 100,       // effectively unlimited within a scene
+    "max_conversation_tokens": 100000  // safety brake for runaway scenes
   }
 }
 ```
 
-**`retention_exchanges`**: How many recent exchanges to keep in full. Start at 5, tune from there. Too low and the DM loses the thread of a conversation. Too high and costs climb. The right number probably depends on play style — combat needs fewer (each round is self-contained), deep NPC roleplay needs more (conversational callbacks matter).
+**`retention_exchanges`**: Maximum exchanges to keep. Set high (100) so exchanges accumulate until scene transition clears them. The DM sees the full scene conversation, which improves coherence and eliminates mid-scene cache invalidation from dropped exchanges.
 
-**`max_conversation_tokens`**: A hard ceiling. Even if 5 exchanges happen to be very tool-heavy, the conversation won't exceed this. Oldest exchanges are dropped first.
+**`max_conversation_tokens`**: Safety ceiling. If a scene runs unusually long or becomes tool-heavy, oldest exchanges are dropped to stay under this cap. This is the only mid-scene drop trigger in normal operation.
 
-**`tool_result_stub_after`**: Full tool results (map viewports, resolve_action breakdowns) are replaced with one-line stubs after N exchanges. A resolve_action result from 3 turns ago becomes `[resolve_action → "Hit, 9 slashing, G1: 3/12 HP"]`. The DM already narrated it; the stub is just a breadcrumb.
+**No tool result stubbing.** Tool results are kept in full. With caching, prior-turn tool results are read at cache rate, so the token savings from stubbing are negligible. Keeping full results lets the DM reference recent rolls, lookups, and actions without re-querying.
 
 ## Scene Summary: The Running Precis
 
-The cached prefix includes a "current scene summary" — a running precis of the current scene so far. This compensates for the short conversation window by giving the DM a compressed record of everything that's happened in this scene, not just the last few exchanges.
+The cached prefix includes a "current scene summary" — a running precis of the current scene so far. With the full conversation retained, the precis primarily serves as a compact summary for the cached prefix rather than as a compensating mechanism for lost exchanges.
 
-This precis is updated periodically:
-- Every time an exchange is dropped from the conversation window, a Haiku subagent appends a terse summary of that exchange to the precis and extracts a **PlayerRead** — structured engagement signals (engagement level, focus tags, tone, pacing, off-script detection). See [subagents-catalog.md](subagents-catalog.md) §5 for the full PlayerRead interface.
+The precis is updated when:
+- An exchange is dropped due to `max_conversation_tokens` — a Haiku subagent appends a terse summary and extracts a **PlayerRead** (engagement level, focus tags, tone, pacing, off-script detection). See [subagents-catalog.md](subagents-catalog.md) §5 for the full PlayerRead interface.
 - On `context_refresh`, the full precis is regenerated from the scene transcript on disk
 
-This is the key mechanism that lets the DM feel like it has a handle on the scene despite only seeing the last few exchanges verbatim. The precis is in the cached prefix, so it costs ~10% of the conversation rate.
+**PlayerRead note:** Since exchanges rarely drop mid-scene (only when `max_conversation_tokens` triggers), PlayerRead signals are sparse during normal play. This is an accepted tradeoff — the DM operates well without per-exchange engagement tracking. If finer-grained PlayerRead data is needed, a periodic extraction trigger could be added (see issue #73).
 
 Example precis:
 ```
@@ -139,12 +141,11 @@ Each exchange:
   → If all tool calls are TUI-only (fire-and-forget):
       → Tool results recorded in conversation history
       → Acknowledgment API call skipped (saves one Opus round-trip)
-  → If conversation exceeds retention_exchanges:
-      → Oldest exchange dropped from conversation
-      → Haiku appends terse summary to scene precis
-      → Tool results older than stub threshold → replaced with stubs
+  → Exchange recorded in full (tool results preserved)
   → If conversation exceeds max_conversation_tokens:
-      → Additional oldest exchanges dropped until under cap
+      → Oldest exchanges dropped until under cap
+      → Haiku appends terse summary to scene precis
+  → Exchange accumulates in conversation (no mid-scene drops normally)
 
 Scene transition:
   → Full transcript already on disk

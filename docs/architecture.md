@@ -67,11 +67,11 @@ The DM's context is structured in layers with cache breakpoints:
 [BP2] Campaign summary + session recap       ← cached 1h, rebuilt on scene change
       + scene precis + active state
 [BP3] Tool definitions                       ← cached per request
-[BP4] Conversation exchanges                 ← ephemeral, 3-5 exchanges retained
+[BP4] Conversation exchanges                 ← accumulates within scene, cached rate
       + current player input
 ```
 
-Conversation is deliberately short. When exchanges drop off, a Haiku precis updater appends a terse summary to the scene precis (which lives in the cached prefix). The DM never loses information — it moves from conversation to precis.
+Conversation accumulates within a scene and is cleared at scene transition. With automatic caching, prior exchanges are read at cache rate. A `max_conversation_tokens` safety brake drops oldest exchanges in unusually long scenes; when that fires, a Haiku precis updater compresses the dropped exchange into the scene precis.
 
 **Code:** `src/context/prefix-builder.ts` (prefix assembly), `src/context/conversation.ts` (retention), `src/agents/scene-manager.ts` (precis updates)
 

@@ -6,9 +6,9 @@ import { buildCachedPrefix } from "./prefix-builder.js";
 import type { ContextConfig, CampaignConfig } from "../types/config.js";
 
 const defaultContextConfig: ContextConfig = {
-  retention_exchanges: 5,
-  max_conversation_tokens: 8000,
-  tool_result_stub_after: 2,
+  retention_exchanges: 100,
+  max_conversation_tokens: 100_000,
+  tool_result_stub_after: 5,
 };
 
 function userMsg(text: string): Anthropic.MessageParam {
@@ -144,57 +144,23 @@ describe("ConversationManager", () => {
     expect(dropped!.reason).toBe("token_limit");
   });
 
-  it("stubs old tool results", () => {
-    const config: ContextConfig = { ...defaultContextConfig, tool_result_stub_after: 1 };
-    const mgr = new ConversationManager(config);
+  it("preserves full tool results in conversation (no stubbing)", () => {
+    const mgr = new ConversationManager(defaultContextConfig);
 
-    // First exchange with tool result
     mgr.addExchange(
       userMsg("Roll"),
       assistantMsg("Rolling..."),
-      [toolResultMsg("toolu_1", "A very long tool result with lots of detail that should be stubbed")],
+      [toolResultMsg("toolu_1", "1d20+5: [15]→20")],
     );
 
-    // Second exchange (triggers stubbing of first)
+    // Add more exchanges — tool result should remain intact
     mgr.addExchange(userMsg("Next"), assistantMsg("Done."));
+    mgr.addExchange(userMsg("Again"), assistantMsg("OK."));
 
     const messages = mgr.getMessages();
-    // The tool result from the first exchange should be stubbed
-    // Order: user, tool_result, assistant, user, assistant
-    const toolMsg = messages[1]; // tool_result comes between user and assistant now
+    const toolMsg = messages[1]; // tool_result between user and assistant
     const content = toolMsg.content as Anthropic.ToolResultBlockParam[];
-    expect(typeof content[0].content).toBe("string");
-    expect((content[0].content as string)).toContain("[stub]");
-  });
-
-  it("only stubs user messages in toolResults (not assistant tool_use)", () => {
-    const config: ContextConfig = { ...defaultContextConfig, tool_result_stub_after: 1 };
-    const mgr = new ConversationManager(config);
-
-    // First exchange with both assistant tool_use and user tool_result
-    const toolInteractions: Anthropic.MessageParam[] = [
-      assistantToolUseMsg("roll_dice", "toolu_1"),
-      toolResultMsg("toolu_1", "A very long tool result with lots of detail"),
-    ];
-    mgr.addExchange(
-      userMsg("Roll"),
-      assistantMsg("You rolled a 15!"),
-      toolInteractions,
-    );
-
-    // Second exchange triggers stubbing
-    mgr.addExchange(userMsg("Next"), assistantMsg("Done."));
-
-    const messages = mgr.getMessages();
-    // user, assistant(tool_use), user(tool_result), assistant, user, assistant = 6
-    // The assistant tool_use (messages[1]) should NOT be stubbed
-    const toolUseMsg = messages[1];
-    expect(toolUseMsg.role).toBe("assistant");
-    const toolUseContent = toolUseMsg.content as Anthropic.ToolUseBlockParam[];
-    expect(toolUseContent[0].type).toBe("tool_use");
-    // The user tool_result (messages[2]) SHOULD be stubbed
-    const toolResultContent = messages[2].content as Anthropic.ToolResultBlockParam[];
-    expect((toolResultContent[0].content as string)).toContain("[stub]");
+    expect(content[0].content).toBe("1d20+5: [15]→20");
   });
 
   it("clears all exchanges", () => {
@@ -243,21 +209,23 @@ describe("ConversationManager", () => {
     expect(messages[1].content).toBe("You find a chest.");
   });
 
-  it("seedExchanges preserves tool results and stubbed state", () => {
+  it("seedExchanges preserves tool results", () => {
     const mgr = new ConversationManager(defaultContextConfig);
     mgr.seedExchanges([
       {
         user: userMsg("Roll"),
         assistant: assistantMsg("You rolled 15"),
-        toolResults: [toolResultMsg("toolu_1", "[stub] 1d20: [15]")],
+        toolResults: [toolResultMsg("toolu_1", "1d20: [15]→20")],
         estimatedTokens: 0,
-        stubbed: true,
+        stubbed: false,
       },
     ]);
 
     const messages = mgr.getMessages();
     expect(messages).toHaveLength(3);
     expect(messages[1].role).toBe("user"); // tool_result
+    const content = messages[1].content as Anthropic.ToolResultBlockParam[];
+    expect(content[0].content).toBe("1d20: [15]→20");
   });
 
   it("seeded exchanges participate in normal retention", () => {
