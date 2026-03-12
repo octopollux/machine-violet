@@ -385,9 +385,9 @@ async function dispatchDMTool(
     }
     const result = registry.dispatch(gameState, name, input);
     if (result.is_error) return result;
-    const cmd = JSON.parse(result.content);
+    const cmd = result._tui ?? JSON.parse(result.content);
     const scribeResult = await runScribe(client, {
-      updates: cmd.updates,
+      updates: (cmd as Record<string, unknown>).updates as { visibility: string; content: string }[],
       campaignRoot,
       sceneNumber: 0, // OOC has no scene number
     }, fileIO);

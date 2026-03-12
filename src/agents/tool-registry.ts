@@ -14,6 +14,9 @@ export interface RegisteredTool {
 export interface ToolResult {
   content: string;
   is_error?: boolean;
+  /** TUI command payload, kept out of conversation. When set, agent-session
+   *  uses this for the TUI command instead of parsing `content`. */
+  _tui?: Record<string, unknown>;
 }
 
 // --- Imports from T1 tools ---
@@ -897,7 +900,17 @@ const TOOL_DEFS: RegisteredTool[] = [
           return err("Each update must have visibility and content.");
         }
       }
-      return ok(JSON.stringify({ type: "scribe", updates }));
+      // Extract wikilinks from update content for a terse tool_result
+      const links = new Set<string>();
+      for (const u of updates) {
+        for (const m of u.content.matchAll(/\[\[([^\]]+)\]\]/g)) {
+          links.add(`[[${m[1]}]]`);
+        }
+      }
+      const summary = links.size > 0
+        ? `Scribe queued: ${[...links].join(", ")}`
+        : `Scribe queued: ${updates.length} update(s)`;
+      return { content: summary, _tui: { type: "scribe", updates } };
     },
   },
   {
@@ -920,7 +933,7 @@ const TOOL_DEFS: RegisteredTool[] = [
         if (!notes || !notes.trim()) {
           return err("Notes cannot be empty.");
         }
-        return ok(JSON.stringify({ type: "dm_notes", action: "write", notes: notes.trim() }));
+        return { content: "DM notes saved.", _tui: { type: "dm_notes", action: "write", notes: notes.trim() } };
       }
       if (action === "read") {
         return ok(JSON.stringify({ type: "dm_notes", action: "read" }));

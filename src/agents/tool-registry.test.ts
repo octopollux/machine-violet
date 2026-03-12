@@ -214,21 +214,24 @@ describe("ToolRegistry", () => {
 
   // ====== WORLDBUILDING ======
 
-  it("scribe returns TUI command with batched updates", () => {
+  it("scribe returns terse content and _tui with batched updates", () => {
     const reg = new ToolRegistry();
     const state = mockState();
     const result = reg.dispatch(state, "scribe", {
       updates: [
-        { visibility: "private", content: "Merchant Voss is secretly a vampire thrall" },
-        { visibility: "player-facing", content: "Aldric took 8 damage, now at 34/42 HP" },
+        { visibility: "private", content: "[[Merchant Voss]] is secretly a vampire thrall" },
+        { visibility: "player-facing", content: "[[Aldric]] took 8 damage, now at 34/42 HP" },
       ],
     });
     expect(result.is_error).toBeUndefined();
-    const parsed = JSON.parse(result.content);
-    expect(parsed.type).toBe("scribe");
-    expect(parsed.updates).toHaveLength(2);
-    expect(parsed.updates[0].visibility).toBe("private");
-    expect(parsed.updates[1].visibility).toBe("player-facing");
+    expect(result.content).toContain("[[Merchant Voss]]");
+    expect(result.content).toContain("[[Aldric]]");
+    expect(result._tui).toBeDefined();
+    expect(result._tui!.type).toBe("scribe");
+    const updates = result._tui!.updates as { visibility: string }[];
+    expect(updates).toHaveLength(2);
+    expect(updates[0].visibility).toBe("private");
+    expect(updates[1].visibility).toBe("player-facing");
   });
 
   it("scribe rejects empty updates array", () => {
@@ -250,7 +253,7 @@ describe("ToolRegistry", () => {
 
   // ====== DM NOTES ======
 
-  it("dm_notes write returns TUI command with notes", () => {
+  it("dm_notes write returns terse content and _tui with notes", () => {
     const reg = new ToolRegistry();
     const state = mockState();
     const result = reg.dispatch(state, "dm_notes", {
@@ -258,10 +261,11 @@ describe("ToolRegistry", () => {
       notes: "The innkeeper is secretly a spy for the Red Hand.",
     });
     expect(result.is_error).toBeUndefined();
-    const parsed = JSON.parse(result.content);
-    expect(parsed.type).toBe("dm_notes");
-    expect(parsed.action).toBe("write");
-    expect(parsed.notes).toBe("The innkeeper is secretly a spy for the Red Hand.");
+    expect(result.content).toBe("DM notes saved.");
+    expect(result._tui).toBeDefined();
+    expect(result._tui!.type).toBe("dm_notes");
+    expect(result._tui!.action).toBe("write");
+    expect(result._tui!.notes).toBe("The innkeeper is secretly a spy for the Red Hand.");
   });
 
   it("dm_notes read returns TUI command", () => {
@@ -281,8 +285,7 @@ describe("ToolRegistry", () => {
       action: "write",
       notes: "  some notes  ",
     });
-    const parsed = JSON.parse(result.content);
-    expect(parsed.notes).toBe("some notes");
+    expect(result._tui!.notes).toBe("some notes");
   });
 
   it("dm_notes write rejects empty notes", () => {

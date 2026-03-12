@@ -280,7 +280,8 @@ export async function runAgentLoop(
         // Check if this is a TUI command
         if (tuiToolNames.has(block.name)) {
           try {
-            tuiCommands.push(JSON.parse(result.content) as TuiCommand);
+            const tui = result._tui ?? JSON.parse(result.content);
+            tuiCommands.push(tui as TuiCommand);
           } catch { /* not a TUI command after all */ }
         }
 
