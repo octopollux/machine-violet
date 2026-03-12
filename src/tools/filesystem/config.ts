@@ -106,9 +106,9 @@ export function createDefaultCampaignConfig(
       surprise_rules: true,
     },
     context: {
-      retention_exchanges: 50,
-      max_conversation_tokens: 30000,
-      tool_result_stub_after: 9999,
+      retention_exchanges: 100,
+      max_conversation_tokens: 100_000,
+      tool_result_stub_after: 5,
     },
     recovery: {
       auto_commit_interval: 3,

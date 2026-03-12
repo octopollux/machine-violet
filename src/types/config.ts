@@ -23,7 +23,8 @@ export interface DMPersonality {
 export interface ContextConfig {
   retention_exchanges: number;
   max_conversation_tokens: number;
-  tool_result_stub_after: number;
+  /** @deprecated No longer used. Tool results are kept in full; caching makes stubbing unnecessary. */
+  tool_result_stub_after?: number;
   /** Token budget for the rendered campaign log in the DM prefix. Default 15000. */
   campaign_log_budget?: number;
 }
