@@ -138,6 +138,9 @@ Session start:
 Each exchange:
   → Player input added to conversation
   → DM responds (tool calls + narrative)
+  → If all tool calls are TUI-only (fire-and-forget):
+      → Tool results recorded in conversation history
+      → Acknowledgment API call skipped (saves one Opus round-trip)
   → Exchange recorded in full (tool results preserved)
   → If conversation exceeds max_conversation_tokens:
       → Oldest exchanges dropped until under cap

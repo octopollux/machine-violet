@@ -88,6 +88,7 @@ function stampConversationCache(messages: Anthropic.MessageParam[]): void {
   if (messages.length === 0) return;
   const last = messages[messages.length - 1];
   if (typeof last.content === "string") {
+    if (!last.content) return; // API rejects cache_control on empty text
     // Convert string to block array so we can attach cache_control
     messages[messages.length - 1] = {
       role: last.role,
@@ -98,9 +99,22 @@ function stampConversationCache(messages: Anthropic.MessageParam[]): void {
       } as Anthropic.TextBlockParam],
     };
   } else if (Array.isArray(last.content) && last.content.length > 0) {
+    // Find the last non-empty text block to stamp cache_control on.
+    // The API rejects cache_control on empty text blocks (e.g. from
+    // fire-and-forget bail-out where tool_use blocks were stripped).
     const blocks = [...last.content] as unknown as Record<string, unknown>[];
-    blocks[blocks.length - 1] = {
-      ...blocks[blocks.length - 1],
+    let stampIdx = blocks.length - 1;
+    while (stampIdx >= 0) {
+      const b = blocks[stampIdx];
+      if (b.type === "text" && !(b.text as string)) {
+        stampIdx--;
+        continue;
+      }
+      break;
+    }
+    if (stampIdx < 0) return; // All blocks are empty text — nothing to stamp
+    blocks[stampIdx] = {
+      ...blocks[stampIdx],
       cache_control: { type: "ephemeral" },
     };
     messages[messages.length - 1] = { role: last.role, content: blocks as unknown as Anthropic.ContentBlockParam[] };

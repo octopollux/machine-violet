@@ -109,6 +109,8 @@ Note: `promote_character` is not a registered tool — it's a subagent function 
 
 ## TUI Tools → [tui-design.md](tui-design.md)
 
+TUI tools are **fire-and-forget**: their results drive engine/UI state but the DM doesn't need to reason about them. When ALL tool calls in a round are TUI tools, the agent loop bails out after dispatch — the tool_use/tool_result pair stays in conversation history but no acknowledgment API call is made. This saves one Opus round-trip per turn in the common case (narrate → update modeline → scribe). Mixed rounds (e.g. `roll_dice` + `update_modeline`) are NOT eligible for bail-out. See `TUI_TOOLS` in `src/agents/agent-session.ts`.
+
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
 | `update_modeline` | T1 | DM | `({ text })` | Set modeline content. Freeform text string. |

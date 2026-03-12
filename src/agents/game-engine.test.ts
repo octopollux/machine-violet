@@ -975,13 +975,13 @@ describe("GameEngine Behavioral Reminder", () => {
   });
 
   it("tool use resets the tool counter and suppresses the tool reminder", async () => {
-    // Turn 4 uses a tool → 2 stream calls (one per agent loop round).
+    // Turn 4 uses a non-TUI tool → 2 stream calls (one per agent loop round).
     // So turn 5 lands at stream-call index 5, not 4.
     const client = mockClient([
       textMessage("One."),            // turn 1 → stream[0]
       textMessage("Two."),            // turn 2 → stream[1]
       textMessage("Three."),          // turn 3 → stream[2]
-      ...toolAndTextMessages("style_scene", { key_color: "#888888" }, "You roll a 14."), // turn 4 → stream[3,4]
+      ...toolAndTextMessages("roll_dice", { expression: "1d20" }, "You roll a 14."), // turn 4 → stream[3,4]
       textMessage("Five."),           // turn 5 → stream[5]
     ]);
     const { callbacks } = mockCallbacks();
@@ -1366,5 +1366,89 @@ describe("pruneEmptyDirs", () => {
     // old-tavern should be pruned before locations (depth-first)
     expect(rmdirCalls[0]).toContain("old-tavern");
     expect(rmdirCalls[1]).toContain("locations");
+  });
+});
+
+describe("GameEngine tool ack batching", () => {
+  it("saves API call on TUI-only tool round and keeps history coherent", async () => {
+    // Turn 1: DM responds with text + TUI-only tool call → bail-out
+    const turn1Msg: Anthropic.Message = {
+      id: "msg_1",
+      type: "message",
+      role: "assistant",
+      model: "claude-opus-4-6",
+      content: [
+        { type: "text", text: "You enter the tavern." },
+        { type: "tool_use", id: "toolu_ml", name: "update_modeline", input: { location: "Tavern" } },
+      ],
+      stop_reason: "tool_use",
+      stop_sequence: null,
+      usage: mockUsage(),
+    } as Anthropic.Message;
+
+    // Turn 2: Normal text response
+    const turn2Msg = textMessage("The bartender nods.");
+
+    let streamCallIdx = 0;
+    const streamResponses = [turn1Msg, turn2Msg];
+    const streamCalls: unknown[] = [];
+
+    const client = {
+      messages: {
+        create: vi.fn(async () => textMessage("fallback")),
+        stream: vi.fn((...args: unknown[]) => {
+          streamCalls.push(args[0]);
+          const response = streamResponses[streamCallIdx++];
+          return {
+            on: vi.fn(),
+            finalMessage: vi.fn(async () => response),
+          };
+        }),
+      },
+    } as unknown as Anthropic;
+
+    const { callbacks } = mockCallbacks();
+
+    const engine = new GameEngine({
+      client,
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: mockFileIO(),
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    // Turn 1: DM bails out — only 1 API call (no ack round-trip)
+    await engine.processInput("Aldric", "I enter the tavern.");
+    expect(client.messages.stream).toHaveBeenCalledTimes(1);
+
+    // Turn 2: conversation history should include the tool_use/tool_result
+    // pair from turn 1 so the DM sees a coherent exchange.
+    await engine.processInput("Aldric", "I talk to the bartender.");
+    expect(client.messages.stream).toHaveBeenCalledTimes(2);
+
+    // Verify the second call's messages include the tool_use + tool_result
+    const secondCallParams = streamCalls[1] as { messages: Anthropic.MessageParam[] };
+    const msgs = secondCallParams.messages;
+
+    // Find the assistant message with tool_use from turn 1
+    const assistantWithTools = msgs.find((m) =>
+      m.role === "assistant" && Array.isArray(m.content) &&
+      (m.content as Anthropic.ContentBlock[]).some((b) => b.type === "tool_use"),
+    );
+    expect(assistantWithTools).toBeDefined();
+
+    // Find the matching tool_result
+    const toolResultMsg = msgs.find((m) =>
+      m.role === "user" && Array.isArray(m.content) &&
+      (m.content as Anthropic.ToolResultBlockParam[]).some((b) => b.type === "tool_result"),
+    );
+    expect(toolResultMsg).toBeDefined();
+
+    // The new user message should be a plain string (no orphaned tool_results)
+    const userMsgs = msgs.filter((m) => m.role === "user");
+    const lastUserMsg = userMsgs[userMsgs.length - 1];
+    expect(typeof lastUserMsg.content).toBe("string");
   });
 });
