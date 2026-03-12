@@ -136,6 +136,9 @@ Session start:
 Each exchange:
   → Player input added to conversation
   → DM responds (tool calls + narrative)
+  → If all tool calls are TUI-only (fire-and-forget):
+      → Tool results recorded in conversation history
+      → Acknowledgment API call skipped (saves one Opus round-trip)
   → If conversation exceeds retention_exchanges:
       → Oldest exchange dropped from conversation
       → Haiku appends terse summary to scene precis
