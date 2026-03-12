@@ -460,6 +460,118 @@ describe("runAgentLoop", () => {
       expect(client.messages.stream).not.toHaveBeenCalled();
     });
   });
+
+  describe("fire-and-forget TUI bail-out", () => {
+    it("bails out when all tool calls are TUI tools", async () => {
+      // Only one API call — no second round
+      const client = mockClient([
+        textAndToolMessage("The tavern glows warmly.", "update_modeline", { location: "Tavern" }),
+      ]);
+      const toolHandler = vi.fn(() => ({
+        content: JSON.stringify({ type: "update_modeline", location: "Tavern" }),
+      }));
+
+      const result = await runAgentLoop(
+        client,
+        "System",
+        [{ role: "user", content: "I enter the tavern." }],
+        baseConfig({ toolHandler, tuiToolNames: new Set(["update_modeline"]) }),
+      );
+
+      // Only one API call was made (no round-trip for ack)
+      expect(client.messages.create).toHaveBeenCalledTimes(1);
+      // Text was captured
+      expect(result.text).toBe("The tavern glows warmly.");
+      // TUI command was collected
+      expect(result.tuiCommands).toHaveLength(1);
+      // Pending acks were stashed
+      expect(result.pendingToolAcks).toHaveLength(1);
+      expect(result.pendingToolAcks![0].tool_use_id).toBe("toolu_test");
+    });
+
+    it("does NOT bail out when some tools are non-TUI", async () => {
+      const msg: Anthropic.Message = {
+        id: "msg_test",
+        type: "message",
+        role: "assistant",
+        model: "claude-haiku-4-5-20251001",
+        content: [
+          { type: "text", text: "Rolling and updating..." },
+          { type: "tool_use", id: "toolu_1", name: "roll_dice", input: { expression: "1d20" } },
+          { type: "tool_use", id: "toolu_2", name: "update_modeline", input: { location: "Arena" } },
+        ],
+        stop_reason: "tool_use",
+        stop_sequence: null,
+        usage: mockUsage(),
+      } as Anthropic.Message;
+
+      const client = mockClient([msg, textMessage("You rolled a 15!")]);
+      const toolHandler = vi.fn((name: string) => {
+        if (name === "roll_dice") return { content: "15" };
+        return { content: JSON.stringify({ type: "update_modeline", location: "Arena" }) };
+      });
+
+      const result = await runAgentLoop(
+        client,
+        "System",
+        [{ role: "user", content: "Attack" }],
+        baseConfig({ toolHandler, tuiToolNames: new Set(["update_modeline"]) }),
+      );
+
+      // Two API calls — results sent back normally
+      expect(client.messages.create).toHaveBeenCalledTimes(2);
+      expect(result.pendingToolAcks).toBeUndefined();
+    });
+
+    it("strips tool_use blocks from stored roundMessages on bail-out", async () => {
+      const client = mockClient([
+        textAndToolMessage("Scene text.", "scribe", { updates: [] }),
+      ]);
+      const toolHandler = vi.fn(() => ({
+        content: JSON.stringify({ type: "scribe", updates: [] }),
+      }));
+
+      const result = await runAgentLoop(
+        client,
+        "System",
+        [{ role: "user", content: "Continue" }],
+        baseConfig({ toolHandler, tuiToolNames: new Set(["scribe"]) }),
+      );
+
+      // The assistant message in roundMessages should have no tool_use blocks
+      const assistantMsg = result.roundMessages.find((m) => m.role === "assistant");
+      expect(assistantMsg).toBeDefined();
+      const blocks = assistantMsg!.content as Anthropic.ContentBlock[];
+      const types = blocks.map((b) => b.type);
+      expect(types).not.toContain("tool_use");
+      expect(types).toContain("text");
+    });
+
+    it("preserves empty text block when bailing out with tool-only response", async () => {
+      // DM returns ONLY tool_use blocks, no text
+      const client = mockClient([
+        toolUseMessage("update_modeline", { location: "Cave" }),
+      ]);
+      const toolHandler = vi.fn(() => ({
+        content: JSON.stringify({ type: "update_modeline", location: "Cave" }),
+      }));
+
+      const result = await runAgentLoop(
+        client,
+        "System",
+        [{ role: "user", content: "Look around" }],
+        baseConfig({ toolHandler, tuiToolNames: new Set(["update_modeline"]) }),
+      );
+
+      expect(client.messages.create).toHaveBeenCalledTimes(1);
+      expect(result.pendingToolAcks).toHaveLength(1);
+      // roundMessages assistant content should have at least an empty text block
+      const assistantMsg = result.roundMessages.find((m) => m.role === "assistant");
+      const blocks = assistantMsg!.content as Anthropic.ContentBlock[];
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0].type).toBe("text");
+    });
+  });
 });
 
 describe("stampToolsCacheControl", () => {

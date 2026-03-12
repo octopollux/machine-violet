@@ -132,6 +132,8 @@ export class GameEngine {
   private static MAX_AI_CHAIN = 10;
   private injectionRegistry: InjectionRegistry;
   private terminalDims: TerminalDims | undefined;
+  /** Stashed tool_results from fire-and-forget TUI tools, prepended to next turn. */
+  private pendingToolAcks: Anthropic.ToolResultBlockParam[] = [];
 
   constructor(params: {
     client: Anthropic;
@@ -361,10 +363,23 @@ export class GameEngine {
     // The API message includes the preamble; the stored exchange does not.
     // Volatile context and reminders are ephemeral per-turn injections that
     // should not persist in conversation history.
-    const apiUserMessage: Anthropic.MessageParam = {
-      role: "user",
-      content: `${preamble}${taggedInput}`,
-    };
+    //
+    // If we have pending tool acks from a previous fire-and-forget bail-out,
+    // prepend them so the API sees a tool_result for every prior tool_use.
+    const userText = `${preamble}${taggedInput}`;
+    let apiUserMessage: Anthropic.MessageParam;
+    if (this.pendingToolAcks.length > 0) {
+      apiUserMessage = {
+        role: "user",
+        content: [
+          ...this.pendingToolAcks,
+          { type: "text" as const, text: userText },
+        ],
+      };
+      this.pendingToolAcks = [];
+    } else {
+      apiUserMessage = { role: "user", content: userText };
+    }
     const storedUserMessage: Anthropic.MessageParam = {
       role: "user",
       content: taggedInput,
@@ -515,6 +530,11 @@ export class GameEngine {
         }
       }
 
+      // Stash pending tool acks for next turn
+      if (result.pendingToolAcks) {
+        this.pendingToolAcks = result.pendingToolAcks;
+      }
+
       // Accumulate usage
       accUsage(this.sessionUsage, result.usage);
       this.callbacks.onUsageUpdate(this.sessionUsage);
@@ -524,6 +544,9 @@ export class GameEngine {
       this.callbacks.onTurnEnd(dmTurn);
 
     } catch (e) {
+      // Clear pending acks on error — stale acks from a failed turn
+      // would confuse the model on the next successful turn.
+      this.pendingToolAcks = [];
       const error = e instanceof Error ? e : new Error(String(e));
       await this.dumpDebugInfo(error);
       this.callbacks.onError(error);
@@ -539,6 +562,7 @@ export class GameEngine {
    * Execute a scene transition.
    */
   async transitionScene(title: string, timeAdvance?: number): Promise<void> {
+    this.pendingToolAcks = []; // Scene transition resets conversation
     this.injectionRegistry.get<BehaviorInjection>("behavior")?.reset();
     this.setState("scene_transition");
 
@@ -574,6 +598,7 @@ export class GameEngine {
    * End the session.
    */
   async endSession(title: string, timeAdvance?: number): Promise<void> {
+    this.pendingToolAcks = []; // Session end resets conversation
     this.injectionRegistry.get<BehaviorInjection>("behavior")?.reset();
     this.setState("session_ending");
 

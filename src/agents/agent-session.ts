@@ -67,6 +67,13 @@ export interface AgentSessionResult {
    * true it may end with a user tool_result instead.
    */
   roundMessages: Anthropic.MessageParam[];
+  /**
+   * Tool results for fire-and-forget TUI tools that were not sent back to
+   * the model. These must be stashed and prepended to the next user message
+   * so the API contract (every tool_use gets a tool_result) is satisfied.
+   * Only set when the final round contained ONLY TUI tool calls.
+   */
+  pendingToolAcks?: Anthropic.ToolResultBlockParam[];
 }
 
 // --- Constants ---
@@ -300,6 +307,36 @@ export async function runAgentLoop(
     // If no tool use, we're done
     if (!hasToolUse || response.stop_reason === "end_turn") {
       break;
+    }
+
+    // Fire-and-forget bail-out: if EVERY tool_use in this round was a TUI
+    // tool, skip the next API call. Stash the tool_results so the caller
+    // can prepend them to the next turn (API requires a tool_result for
+    // every tool_use).
+    const toolUseBlocks = assistantContent.filter(
+      (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
+    );
+    const allTui = toolUseBlocks.length > 0 &&
+      toolUseBlocks.every((b) => tuiToolNames.has(b.name));
+
+    if (allTui) {
+      // Strip tool_use blocks from the stored assistant message so the
+      // conversation history doesn't contain orphaned tool_uses.
+      const textOnly = assistantContent.filter((b) => b.type !== "tool_use");
+      workingMessages[workingMessages.length - 1] = {
+        role: "assistant",
+        content: textOnly.length > 0 ? textOnly : [{ type: "text" as const, text: "" }],
+      };
+
+      // Final context dump before bailing
+      dumpContext(config.name, params);
+
+      const roundMessages = workingMessages.slice(loopStartIndex);
+      config.onComplete?.(totalUsage);
+      return {
+        text: fullText, tuiCommands, usage: totalUsage,
+        truncated, roundMessages, pendingToolAcks: toolResults,
+      };
     }
 
     // Append tool results as user message

@@ -975,13 +975,13 @@ describe("GameEngine Behavioral Reminder", () => {
   });
 
   it("tool use resets the tool counter and suppresses the tool reminder", async () => {
-    // Turn 4 uses a tool → 2 stream calls (one per agent loop round).
+    // Turn 4 uses a non-TUI tool → 2 stream calls (one per agent loop round).
     // So turn 5 lands at stream-call index 5, not 4.
     const client = mockClient([
       textMessage("One."),            // turn 1 → stream[0]
       textMessage("Two."),            // turn 2 → stream[1]
       textMessage("Three."),          // turn 3 → stream[2]
-      ...toolAndTextMessages("style_scene", { key_color: "#888888" }, "You roll a 14."), // turn 4 → stream[3,4]
+      ...toolAndTextMessages("roll_dice", { expression: "1d20" }, "You roll a 14."), // turn 4 → stream[3,4]
       textMessage("Five."),           // turn 5 → stream[5]
     ]);
     const { callbacks } = mockCallbacks();
@@ -1366,5 +1366,80 @@ describe("pruneEmptyDirs", () => {
     // old-tavern should be pruned before locations (depth-first)
     expect(rmdirCalls[0]).toContain("old-tavern");
     expect(rmdirCalls[1]).toContain("locations");
+  });
+});
+
+describe("GameEngine tool ack batching", () => {
+  it("stashes pending acks and prepends them to the next user message", async () => {
+    // Turn 1: DM responds with text + TUI-only tool call → bail-out
+    const turn1Msg: Anthropic.Message = {
+      id: "msg_1",
+      type: "message",
+      role: "assistant",
+      model: "claude-opus-4-6",
+      content: [
+        { type: "text", text: "You enter the tavern." },
+        { type: "tool_use", id: "toolu_ml", name: "update_modeline", input: { location: "Tavern" } },
+      ],
+      stop_reason: "tool_use",
+      stop_sequence: null,
+      usage: mockUsage(),
+    } as Anthropic.Message;
+
+    // Turn 2: Normal text response
+    const turn2Msg = textMessage("The bartender nods.");
+
+    let streamCallIdx = 0;
+    const streamResponses = [turn1Msg, turn2Msg];
+    const streamCalls: unknown[] = [];
+
+    const client = {
+      messages: {
+        create: vi.fn(async () => textMessage("fallback")),
+        stream: vi.fn((...args: unknown[]) => {
+          streamCalls.push(args[0]);
+          const response = streamResponses[streamCallIdx++];
+          return {
+            on: vi.fn(),
+            finalMessage: vi.fn(async () => response),
+          };
+        }),
+      },
+    } as unknown as Anthropic;
+
+    const { callbacks } = mockCallbacks();
+
+    const engine = new GameEngine({
+      client,
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: mockFileIO(),
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    // Turn 1: DM bails out with pending acks
+    await engine.processInput("Aldric", "I enter the tavern.");
+
+    // Only 1 API call for turn 1 (no ack round-trip)
+    expect(client.messages.stream).toHaveBeenCalledTimes(1);
+
+    // Turn 2: acks should be prepended
+    await engine.processInput("Aldric", "I talk to the bartender.");
+
+    expect(client.messages.stream).toHaveBeenCalledTimes(2);
+
+    // Inspect the messages sent in the second stream call.
+    // The last message is the new user turn (appended by processInput).
+    const secondCallParams = streamCalls[1] as { messages: Anthropic.MessageParam[] };
+    const userMsgs = secondCallParams.messages.filter((m) => m.role === "user");
+    const lastUserMsg = userMsgs[userMsgs.length - 1];
+    // Should be a block array containing tool_result + text
+    expect(Array.isArray(lastUserMsg.content)).toBe(true);
+    const blocks = lastUserMsg.content as Anthropic.ContentBlockParam[];
+    const types = blocks.map((b) => (b as { type: string }).type);
+    expect(types).toContain("tool_result");
+    expect(types).toContain("text");
   });
 });

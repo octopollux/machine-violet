@@ -59,6 +59,12 @@ export interface AgentLoopResult {
    * true it may end with a user tool_result instead.
    */
   roundMessages: Anthropic.MessageParam[];
+  /**
+   * Tool results for fire-and-forget TUI tools that were not sent back to
+   * the model. Stash these and prepend to the next user message so the API
+   * contract (every tool_use gets a tool_result) is satisfied.
+   */
+  pendingToolAcks?: Anthropic.ToolResultBlockParam[];
 }
 
 // Re-export stampToolsCacheControl from agent-session for backward compatibility
