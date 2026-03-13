@@ -23,6 +23,7 @@ import { isAITurn, getActivePlayer } from "./player-manager.js";
 import { aiPlayerTurn } from "./subagents/ai-player.js";
 import { campaignPaths, parseFrontMatter, serializeEntity, formatChangelogEntry } from "../tools/filesystem/index.js";
 import { runScribe } from "./subagents/scribe.js";
+import { searchCampaign } from "./subagents/search-campaign.js";
 import { norm } from "../utils/paths.js";
 import { CampaignRepo, performRollback } from "../tools/git/index.js";
 import type { GitIO } from "../tools/git/index.js";
@@ -1006,6 +1007,7 @@ export class GameEngine {
       maxTokens: TOKEN_LIMITS.DM_RESPONSE + tc.budgetTokens,
       maxToolRounds: 10,
       thinking: tc.param,
+      asyncToolHandler: (name, input) => this.handleAsyncTool(name, input),
       onTextDelta: (delta) => this.callbacks.onNarrativeDelta(delta),
       onToolStart: (name) => {
         this.setState("tool_running");
@@ -1019,6 +1021,36 @@ export class GameEngine {
         this.callbacks.onRetry(status, delayMs);
       },
     };
+  }
+
+  /** Handle tools that require async work (subagent spawning, I/O). */
+  private async handleAsyncTool(
+    name: string,
+    input: Record<string, unknown>,
+  ): Promise<import("./tool-registry.js").ToolResult | null> {
+    if (name !== "search_campaign") return null;
+
+    const query = input.query as string;
+    if (!query || !query.trim()) {
+      return { content: "Query cannot be empty.", is_error: true };
+    }
+
+    try {
+      const result = await searchCampaign(this.client, {
+        query,
+        campaignRoot: this.gameState.campaignRoot,
+      }, this.fileIO);
+
+      accUsage(this.sessionUsage, result.usage);
+      this.callbacks.onUsageUpdate(this.sessionUsage);
+      this.callbacks.onDevLog?.(`[dev] search_campaign: "${query}" → ${result.text.length} chars`);
+
+      return { content: result.text };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.callbacks.onDevLog?.(`[dev] search_campaign: failed — ${msg}`);
+      return { content: `Search failed: ${msg}`, is_error: true };
+    }
   }
 
   private async handleDroppedExchange(dropped: DroppedExchange): Promise<void> {

@@ -550,26 +550,26 @@ describe("runAgentLoop", () => {
       expect(client.messages.create).toHaveBeenCalledTimes(2);
     });
 
-    it("handles tool-only response (no text) on bail-out", async () => {
-      // DM returns ONLY tool_use blocks, no text
+    it("does NOT bail out when TUI tools fire before any text", async () => {
+      // DM calls dm_notes before narrating (e.g. first turn setup).
+      // Should NOT bail out — needs another round to produce text.
       const client = mockClient([
-        toolUseMessage("update_modeline", { location: "Cave" }),
+        toolUseMessage("dm_notes", { action: "write", notes: "setup" }),
+        textMessage("The rain hammered the window."),
       ]);
       const toolHandler = vi.fn(() => ({
-        content: JSON.stringify({ type: "update_modeline", location: "Cave" }),
+        content: "DM notes saved.",
       }));
 
       const result = await runAgentLoop(
         client,
         "System",
-        [{ role: "user", content: "Look around" }],
-        baseConfig({ toolHandler, tuiToolNames: new Set(["update_modeline"]) }),
+        [{ role: "user", content: "Begin" }],
+        baseConfig({ toolHandler, tuiToolNames: new Set(["dm_notes"]) }),
       );
 
-      expect(client.messages.create).toHaveBeenCalledTimes(1);
-      expect(result.text).toBe("");
-      // roundMessages: assistant(tool_use), user(tool_result)
-      expect(result.roundMessages).toHaveLength(2);
+      expect(client.messages.create).toHaveBeenCalledTimes(2);
+      expect(result.text).toBe("The rain hammered the window.");
     });
   });
 });
