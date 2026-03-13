@@ -539,7 +539,7 @@ describe("runAgentLoop", () => {
         return { content: JSON.stringify({ type: "update_modeline", location: "Arena" }) };
       });
 
-      const result = await runAgentLoop(
+      await runAgentLoop(
         client,
         "System",
         [{ role: "user", content: "Attack" }],

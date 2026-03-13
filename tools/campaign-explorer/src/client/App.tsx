@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useCampaigns } from "./hooks/useCampaigns";
 import { useFileTree } from "./hooks/useFileTree";
 import { useSSE } from "./hooks/useSSE";
@@ -7,12 +7,44 @@ import { FileTree } from "./components/FileTree";
 import { ContentPane } from "./components/ContentPane";
 import type { SSEEvent, FileChangeEvent } from "../shared/protocol";
 
+const STORAGE_KEY_CAMPAIGN = "ce:selectedCampaign";
+const STORAGE_KEY_FILE = "ce:selectedFile";
+
+function loadStored(key: string): string | null {
+  try { return sessionStorage.getItem(key); } catch { return null; }
+}
+
+function saveStored(key: string, value: string | null): void {
+  try {
+    if (value == null) sessionStorage.removeItem(key);
+    else sessionStorage.setItem(key, value);
+  } catch { /* storage unavailable */ }
+}
+
 export function App() {
-  const { campaigns, loading: campaignsLoading } = useCampaigns();
-  const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [campaignRefreshKey, setCampaignRefreshKey] = useState(0);
+  const { campaigns, loading: campaignsLoading } = useCampaigns(campaignRefreshKey);
+  const [selectedCampaign, setSelectedCampaign] = useState<string | null>(
+    loadStored(STORAGE_KEY_CAMPAIGN),
+  );
+  const [selectedFile, setSelectedFile] = useState<string | null>(
+    loadStored(STORAGE_KEY_FILE),
+  );
   const [refreshKey, setRefreshKey] = useState(0);
   const lastFileChangeRef = useRef<FileChangeEvent | null>(null);
+
+  // Validate restored selection once campaigns load — clear if the campaign no longer exists
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    if (campaignsLoading || restoredRef.current) return;
+    restoredRef.current = true;
+    if (selectedCampaign && !campaigns.some((c) => c.slug === selectedCampaign)) {
+      setSelectedCampaign(null);
+      setSelectedFile(null);
+      saveStored(STORAGE_KEY_CAMPAIGN, null);
+      saveStored(STORAGE_KEY_FILE, null);
+    }
+  }, [campaignsLoading, campaigns, selectedCampaign]);
 
   const { groups, loading: treeLoading, updatedItems, markRead, handleFileChange } =
     useFileTree(selectedCampaign, selectedFile);
@@ -30,6 +62,9 @@ export function App() {
         ) {
           setRefreshKey((k) => k + 1);
         }
+      } else if (event.type === "campaign-change") {
+        // Re-fetch campaign list when campaigns are added/removed
+        setCampaignRefreshKey((k) => k + 1);
       }
     },
     [handleFileChange, selectedCampaign, selectedFile],
@@ -40,6 +75,7 @@ export function App() {
   const handleSelectFile = useCallback(
     (relativePath: string) => {
       setSelectedFile(relativePath);
+      saveStored(STORAGE_KEY_FILE, relativePath);
       markRead(relativePath);
       setRefreshKey((k) => k + 1);
     },
@@ -49,6 +85,8 @@ export function App() {
   const handleCampaignChange = useCallback((slug: string | null) => {
     setSelectedCampaign(slug);
     setSelectedFile(null);
+    saveStored(STORAGE_KEY_CAMPAIGN, slug);
+    saveStored(STORAGE_KEY_FILE, null);
   }, []);
 
   // Get category of selected file

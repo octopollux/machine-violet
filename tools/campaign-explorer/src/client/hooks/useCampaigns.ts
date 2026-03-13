@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import type { CampaignInfo } from "../../shared/protocol";
 
 /** Fetch the list of campaigns from the API. */
-export function useCampaigns(): {
+export function useCampaigns(externalRefreshKey = 0): {
   campaigns: CampaignInfo[];
   loading: boolean;
   error: string | null;
@@ -23,7 +23,7 @@ export function useCampaigns(): {
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
-  }, [refreshKey]);
+  }, [refreshKey, externalRefreshKey]);
 
   return {
     campaigns,
