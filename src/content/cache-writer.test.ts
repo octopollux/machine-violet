@@ -41,7 +41,7 @@ describe("writeChunkPages", () => {
     const job = makeTestJob();
 
     const result: ChunkExtractionResult = {
-      customId: "test:chunk-0",
+      customId: "test_chunk-0",
       pages: [
         { pageNumber: 1, text: "Page one content" },
         { pageNumber: 2, text: "Page two content" },
@@ -63,7 +63,7 @@ describe("writeChunkPages", () => {
     const job = makeTestJob();
 
     const result: ChunkExtractionResult = {
-      customId: "test:chunk-0",
+      customId: "test_chunk-0",
       error: "API error",
     };
 
@@ -79,14 +79,14 @@ describe("writeBatchResults", () => {
 
     const results: ChunkExtractionResult[] = [
       {
-        customId: "test:chunk-0",
+        customId: "test_chunk-0",
         pages: [
           { pageNumber: 1, text: "Content 1" },
           { pageNumber: 2, text: "Content 2" },
         ],
       },
       {
-        customId: "test:chunk-1",
+        customId: "test_chunk-1",
         error: "Request expired",
       },
     ];

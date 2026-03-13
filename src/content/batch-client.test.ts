@@ -20,7 +20,7 @@ The adventure begins.
 # Chapter Two
 Deeper into the dungeon.`;
 
-    const pages = parsePageDelimiters(text, "job1:chunk-0");
+    const pages = parsePageDelimiters(text, "job1_chunk-0");
     expect(pages).toHaveLength(3);
     expect(pages[0].pageNumber).toBe(1);
     expect(pages[0].text).toContain("Introduction");
@@ -32,7 +32,7 @@ Deeper into the dungeon.`;
 
   it("handles text with no delimiters as a single page", () => {
     const text = "Some extracted text without any page markers.";
-    const pages = parsePageDelimiters(text, "job1:chunk-0");
+    const pages = parsePageDelimiters(text, "job1_chunk-0");
 
     expect(pages).toHaveLength(1);
     expect(pages[0].pageNumber).toBe(1);
@@ -41,7 +41,7 @@ Deeper into the dungeon.`;
 
   it("infers page number from chunk index when no delimiters found", () => {
     const text = "Some text from chunk 3.";
-    const pages = parsePageDelimiters(text, "job1:chunk-3");
+    const pages = parsePageDelimiters(text, "job1_chunk-3");
 
     expect(pages).toHaveLength(1);
     expect(pages[0].pageNumber).toBe(91); // chunk 3 * 30 + 1
@@ -54,7 +54,7 @@ First page content.
 ---PAGE  2---
 Second page content.`;
 
-    const pages = parsePageDelimiters(text, "job1:chunk-0");
+    const pages = parsePageDelimiters(text, "job1_chunk-0");
     expect(pages).toHaveLength(2);
     expect(pages[0].pageNumber).toBe(1);
     expect(pages[1].pageNumber).toBe(2);
@@ -67,7 +67,7 @@ Content of page 31.
 ---PAGE 32---
 Content of page 32.`;
 
-    const pages = parsePageDelimiters(text, "job1:chunk-1");
+    const pages = parsePageDelimiters(text, "job1_chunk-1");
     expect(pages).toHaveLength(2);
     expect(pages[0].pageNumber).toBe(31);
     expect(pages[1].pageNumber).toBe(32);
@@ -84,8 +84,8 @@ describe("buildBatchRequests", () => {
     const requests = buildBatchRequests("job-123", chunks);
 
     expect(requests).toHaveLength(2);
-    expect(requests[0].custom_id).toBe("job-123:chunk-0");
-    expect(requests[1].custom_id).toBe("job-123:chunk-1");
+    expect(requests[0].custom_id).toBe("job-123_chunk-0");
+    expect(requests[1].custom_id).toBe("job-123_chunk-1");
   });
 
   it("uses the small model tier", () => {

@@ -36,7 +36,7 @@ export function buildBatchRequests(
   const model = getModel("small");
 
   return chunks.map((chunk) => ({
-    custom_id: `${jobId}:chunk-${chunk.index}`,
+    custom_id: `${jobId}_chunk-${chunk.index}`,
     params: {
       model,
       max_tokens: 16384,
@@ -78,7 +78,7 @@ export async function submitBatch(
 
   const chunkMap: BatchSubmission["chunkMap"] = {};
   for (const chunk of chunks) {
-    const customId = `${jobId}:chunk-${chunk.index}`;
+    const customId = `${jobId}_chunk-${chunk.index}`;
     chunkMap[customId] = { jobId, chunkIndex: chunk.index };
   }
 
