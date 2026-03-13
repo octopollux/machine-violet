@@ -1369,6 +1369,94 @@ describe("pruneEmptyDirs", () => {
   });
 });
 
+describe("GameEngine OOC summary injection", () => {
+  it("injects pending OOC summary into preamble of next player turn", async () => {
+    const streamCalls: unknown[] = [];
+    let streamCallIdx = 0;
+    const responses = [textMessage("Welcome back."), textMessage("You look around.")];
+
+    const client = {
+      messages: {
+        create: vi.fn(async () => textMessage("fallback")),
+        stream: vi.fn((...args: unknown[]) => {
+          streamCalls.push(args[0]);
+          const response = responses[streamCallIdx++];
+          return {
+            on: vi.fn(),
+            finalMessage: vi.fn(async () => response),
+          };
+        }),
+      },
+    } as unknown as Anthropic;
+
+    const { callbacks } = mockCallbacks();
+    const engine = new GameEngine({
+      client,
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: mockFileIO(),
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    // Set pending OOC summary (simulating what PlayingPhase does on OOC exit)
+    engine.setPendingOOCSummary("Corrected HP from 12 to 18.\nClarified tavern location.");
+
+    // First processInput — should inject the OOC summary
+    await engine.processInput("Aldric", "I look around.");
+    const firstCall = streamCalls[0] as { messages: Anthropic.MessageParam[] };
+    const userMsgs = firstCall.messages.filter((m) => m.role === "user");
+    const lastUserContent = userMsgs[userMsgs.length - 1].content as string;
+    expect(lastUserContent).toContain("<ooc_summary>");
+    expect(lastUserContent).toContain("Corrected HP from 12 to 18.");
+    expect(lastUserContent).toContain("Clarified tavern location.");
+    expect(lastUserContent).toContain("</ooc_summary>");
+    expect(lastUserContent).toContain("[Aldric] I look around.");
+
+    // Second processInput — OOC summary should be cleared
+    await engine.processInput("Aldric", "I check the door.");
+    const secondCall = streamCalls[1] as { messages: Anthropic.MessageParam[] };
+    const userMsgs2 = secondCall.messages.filter((m) => m.role === "user");
+    const lastUserContent2 = userMsgs2[userMsgs2.length - 1].content as string;
+    expect(lastUserContent2).not.toContain("<ooc_summary>");
+  });
+
+  it("does not inject when no OOC summary is pending", async () => {
+    const streamCalls: unknown[] = [];
+
+    const client = {
+      messages: {
+        create: vi.fn(async () => textMessage("fallback")),
+        stream: vi.fn((...args: unknown[]) => {
+          streamCalls.push(args[0]);
+          return {
+            on: vi.fn(),
+            finalMessage: vi.fn(async () => textMessage("Hello.")),
+          };
+        }),
+      },
+    } as unknown as Anthropic;
+
+    const { callbacks } = mockCallbacks();
+    const engine = new GameEngine({
+      client,
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: mockFileIO(),
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "I open the door.");
+    const call = streamCalls[0] as { messages: Anthropic.MessageParam[] };
+    const userMsgs = call.messages.filter((m) => m.role === "user");
+    const content = userMsgs[userMsgs.length - 1].content as string;
+    expect(content).not.toContain("<ooc_summary>");
+  });
+});
+
 describe("GameEngine tool ack batching", () => {
   it("saves API call on TUI-only tool round and keeps history coherent", async () => {
     // Turn 1: DM responds with text + TUI-only tool call → bail-out

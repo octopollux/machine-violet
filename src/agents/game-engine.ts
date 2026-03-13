@@ -143,6 +143,7 @@ export class GameEngine {
   private repo: CampaignRepo | null = null;
   private aiTurnDepth = 0;
   private turnCounter = 0;
+  private pendingOOCSummary: string | null = null;
   private static MAX_AI_CHAIN = 10;
   private injectionRegistry: InjectionRegistry;
   private terminalDims: TerminalDims | undefined;
@@ -293,6 +294,11 @@ export class GameEngine {
     this.terminalDims = dims;
   }
 
+  /** Store a pending OOC summary to inject into the next DM turn (called from TUI layer on OOC exit). */
+  setPendingOOCSummary(summary: string): void {
+    this.pendingOOCSummary = summary;
+  }
+
   /**
    * Process player input: send to DM, stream response, handle tools.
    * This is the main game loop entry point.
@@ -353,6 +359,12 @@ export class GameEngine {
     // length steering) are prepended as a <context> block to the single user
     // message rather than using separate synthetic turns.
     const preambleParts: string[] = [];
+
+    // Inject pending OOC summary (player-initiated OOC mode just ended)
+    if (this.pendingOOCSummary) {
+      preambleParts.push(`<ooc_summary>\n${this.pendingOOCSummary}\n</ooc_summary>`);
+      this.pendingOOCSummary = null;
+    }
 
     // Volatile context (Tier 3: activeState, entityIndex, uiState)
     if (volatileContext) {
