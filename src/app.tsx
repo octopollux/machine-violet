@@ -43,6 +43,9 @@ import { FirstLaunchPhase } from "./phases/FirstLaunchPhase.js";
 import { MainMenuPhase } from "./phases/MainMenuPhase.js";
 import { SetupPhase } from "./phases/SetupPhase.js";
 import { PlayingPhase } from "./phases/PlayingPhase.js";
+import { AddContentPhase } from "./phases/AddContentPhase.js";
+import { validatePdfs, runIngestPipeline } from "./content/index.js";
+import type { ValidatedPdf, IngestProgress } from "./content/index.js";
 import { GameProvider } from "./tui/game-context.js";
 import type { GameContextValue } from "./tui/game-context.js";
 
@@ -52,6 +55,7 @@ export type AppPhase =
   | "loading"
   | "first_launch"
   | "main_menu"
+  | "add_content"
   | "setup"
   | "building"
   | "playing"
@@ -617,6 +621,42 @@ export default function App({ shutdownRef }: AppProps) {
     process.exit(0);
   }, []);
 
+  // --- Add Content state ---
+  const [contentStatusMsg, setContentStatusMsg] = useState<string | null>(null);
+
+  const handleAddContentSubmit = useCallback((collection: string, pdfs: ValidatedPdf[]) => {
+    (async () => {
+      try {
+        const client = new Anthropic();
+        const configPath = getConfigPath();
+        const raw = readFileSync(configPath, "utf-8");
+        const config = JSON.parse(raw);
+        const homeDir: string = config.home_dir || getDefaultHomeDir();
+
+        const onProgress = (progress: IngestProgress) => {
+          setContentStatusMsg(progress.message ?? `${progress.phase}...`);
+        };
+
+        await runIngestPipeline(client, fileIO.current, homeDir, collection, pdfs, onProgress);
+        setContentStatusMsg("Done! Returning to menu...");
+        setTimeout(() => {
+          setContentStatusMsg(null);
+          setErrorMsg(null);
+          setPhase("main_menu");
+        }, 2000);
+      } catch (e) {
+        setErrorMsg(e instanceof Error ? e.message : "Content import failed");
+        setContentStatusMsg(null);
+        setPhase("main_menu");
+      }
+    })();
+  }, [getConfigPath, fileIO]);
+
+  const handleValidatePdf = useCallback(async (path: string): Promise<ValidatedPdf> => {
+    const results = await validatePdfs([path]);
+    return results[0];
+  }, []);
+
   // --- First-launch complete handler ---
   const handleFirstLaunchComplete = useCallback((apiKey: string) => {
     const appDir = getAppDir();
@@ -646,7 +686,21 @@ export default function App({ shutdownRef }: AppProps) {
         errorMsg={errorMsg}
         onNewCampaign={() => setPhase("setup")}
         onResumeCampaign={resumeCampaign}
+        onAddContent={() => setPhase("add_content")}
         onQuit={doQuit}
+      />
+    );
+  }
+
+  if (phase === "add_content") {
+    return (
+      <AddContentPhase
+        theme={theme}
+        onSubmit={handleAddContentSubmit}
+        onCancel={() => { setErrorMsg(null); setContentStatusMsg(null); setPhase("main_menu"); }}
+        validatePdf={handleValidatePdf}
+        errorMsg={errorMsg}
+        statusMsg={contentStatusMsg}
       />
     );
   }

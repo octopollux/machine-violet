@@ -13,6 +13,7 @@ export interface MainMenuPhaseProps {
   errorMsg: string | null;
   onNewCampaign: () => void;
   onResumeCampaign: (entry: CampaignEntry) => void;
+  onAddContent: () => void;
   onQuit: () => void;
 }
 
@@ -22,6 +23,7 @@ export function MainMenuPhase({
   errorMsg,
   onNewCampaign,
   onResumeCampaign,
+  onAddContent,
   onQuit,
 }: MainMenuPhaseProps) {
   const { columns: cols, rows: termRows } = useTerminalSize();
@@ -30,8 +32,8 @@ export function MainMenuPhase({
   const [campaignSelectIndex, setCampaignSelectIndex] = useState(0);
 
   const mainMenuItems = campaigns.length > 0
-    ? ["New Campaign", "Continue Campaign", "Quit"]
-    : ["New Campaign", "Quit"];
+    ? ["New Campaign", "Continue Campaign", "Add Content", "Quit"]
+    : ["New Campaign", "Add Content", "Quit"];
 
   useInput((input, key) => {
     // Campaign sub-list navigation
@@ -76,6 +78,8 @@ export function MainMenuPhase({
       } else if (selected === "Continue Campaign") {
         setExpandedCampaigns(true);
         setCampaignSelectIndex(0);
+      } else if (selected === "Add Content") {
+        onAddContent();
       } else if (selected === "Quit") {
         onQuit();
       }
@@ -110,6 +114,7 @@ export function MainMenuPhase({
     let description = "";
     if (item === "New Campaign") description = "Start a new adventure";
     else if (item === "Continue Campaign" && campaigns.length > 0) description = `${campaigns.length} saved`;
+    else if (item === "Add Content") description = "Import PDFs for game systems";
 
     menuLines.push(
       <Text key={item}>

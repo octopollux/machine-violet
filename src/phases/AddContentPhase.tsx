@@ -1,0 +1,336 @@
+import React, { useState, useCallback } from "react";
+import { useInput, Text, Box } from "ink";
+import type { ResolvedTheme } from "../tui/themes/types.js";
+import { ThemedHorizontalBorder, ThemedSideFrame, TerminalTooSmall } from "../tui/components/index.js";
+import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
+import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
+import { themeColor } from "../tui/themes/color-resolve.js";
+import { InlineTextInput } from "../tui/components/InlineTextInput.js";
+import type { ValidatedPdf } from "../content/index.js";
+
+type Step = "name" | "drop" | "confirm" | "submitting" | "done" | "error";
+
+export interface AddContentPhaseProps {
+  theme: ResolvedTheme;
+  /** Called when user confirms submission. Parent handles the actual pipeline. */
+  onSubmit: (collection: string, pdfs: ValidatedPdf[]) => void;
+  /** Called when user cancels (Escape from name step). */
+  onCancel: () => void;
+  /** Validate a file path as a PDF — returns info or throws. */
+  validatePdf: (path: string) => Promise<ValidatedPdf>;
+  /** External error message (e.g. from pipeline failure). */
+  errorMsg?: string | null;
+  /** External status message (e.g. "Submitting batch..."). */
+  statusMsg?: string | null;
+}
+
+export function AddContentPhase({
+  theme,
+  onSubmit,
+  onCancel,
+  validatePdf,
+  errorMsg: externalError,
+  statusMsg,
+}: AddContentPhaseProps) {
+  const { columns: cols, rows: termRows } = useTerminalSize();
+  const [step, setStep] = useState<Step>("name");
+  const [collectionName, setCollectionName] = useState("");
+  const [pdfs, setPdfs] = useState<ValidatedPdf[]>([]);
+  const [dropInput, setDropInput] = useState("");
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [validating, setValidating] = useState(false);
+
+  const errorMsg = localError || externalError || null;
+
+  // --- Collection name input ---
+  const handleNameSubmit = useCallback((value: string) => {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      setLocalError("Collection name cannot be empty.");
+      return;
+    }
+    setCollectionName(trimmed);
+    setLocalError(null);
+    setStep("drop");
+  }, []);
+
+  // --- PDF drop input ---
+  const handleDropSubmit = useCallback(async (value: string) => {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      // Empty submit on drop step = done adding files
+      if (pdfs.length === 0) {
+        setLocalError("Add at least one PDF before continuing.");
+        return;
+      }
+      setLocalError(null);
+      setStep("confirm");
+      return;
+    }
+
+    // Parse paths — handle quoted paths and multiple space-separated paths.
+    // Windows drag-and-drop often wraps paths in quotes.
+    const paths = parsePaths(trimmed);
+
+    setValidating(true);
+    setLocalError(null);
+
+    for (const filePath of paths) {
+      try {
+        const info = await validatePdf(filePath);
+        // Avoid duplicates by base name
+        setPdfs((prev) => {
+          if (prev.some((p) => p.baseName === info.baseName)) return prev;
+          return [...prev, info];
+        });
+      } catch (e) {
+        setLocalError(e instanceof Error ? e.message : `Invalid PDF: ${filePath}`);
+      }
+    }
+    setValidating(false);
+    setDropInput("");
+  }, [pdfs.length, validatePdf]);
+
+  // --- Confirm step ---
+  const handleConfirm = useCallback(() => {
+    setStep("submitting");
+    onSubmit(collectionName, pdfs);
+  }, [collectionName, pdfs, onSubmit]);
+
+  // --- Key handling for confirm step ---
+  useInput((input, key) => {
+    if (step === "name" && key.escape) {
+      onCancel();
+      return;
+    }
+    if (step === "drop" && key.escape) {
+      if (pdfs.length === 0) {
+        setStep("name");
+      } else {
+        setStep("confirm");
+      }
+      return;
+    }
+    if (step === "confirm") {
+      if (key.return || input === "y" || input === "Y") {
+        handleConfirm();
+        return;
+      }
+      if (key.escape || input === "n" || input === "N") {
+        setStep("drop");
+        return;
+      }
+    }
+    if (step === "error" && (key.return || key.escape)) {
+      onCancel();
+    }
+  }, { isActive: step !== "submitting" && step !== "done" });
+
+  // --- Terminal too small ---
+  if (cols < MIN_COLUMNS || termRows < MIN_ROWS) {
+    return <TerminalTooSmall columns={cols} rows={termRows} />;
+  }
+
+  const borderColor = themeColor(theme, "border");
+  const dimColor = themeColor(theme, "separator") ?? "#666666";
+  const sideWidth = theme.asset.components.edge_left.width;
+  const topHeight = theme.asset.height;
+  const contentWidth = cols - sideWidth * 2;
+  const contentHeight = termRows - topHeight * 2;
+
+  // --- Build content lines ---
+  const lines: React.ReactNode[] = [];
+
+  lines.push(
+    <Text key="title" bold color={borderColor}>Add Content</Text>,
+  );
+  lines.push(<Text key="sp0"> </Text>);
+
+  if (step === "name") {
+    lines.push(
+      <Text key="prompt">Name this collection:</Text>,
+    );
+    lines.push(
+      <Box key="input" height={1}>
+        <Text color={borderColor}>{"> "}</Text>
+        <InlineTextInput
+          onSubmit={handleNameSubmit}
+          availableWidth={Math.max(20, contentWidth - 10)}
+        />
+      </Box>,
+    );
+    lines.push(<Text key="sp1"> </Text>);
+    lines.push(
+      <Text key="hint" color={dimColor}>
+        e.g. "D&D 5e", "Cairn", "My Homebrew System"
+      </Text>,
+    );
+    lines.push(
+      <Text key="escape" color={dimColor}>Esc to go back</Text>,
+    );
+  }
+
+  if (step === "drop" || step === "confirm") {
+    lines.push(
+      <Text key="col">
+        <Text color={borderColor}>Collection: </Text>
+        <Text bold>{collectionName}</Text>
+      </Text>,
+    );
+    lines.push(<Text key="sp1"> </Text>);
+
+    if (pdfs.length > 0) {
+      for (const pdf of pdfs) {
+        lines.push(
+          <Text key={`pdf-${pdf.baseName}`}>
+            <Text color="green">  {"  \u2713"} </Text>
+            <Text>{pdf.baseName}.pdf</Text>
+            <Text color={dimColor}>{`  (${pdf.pageCount} pp)`}</Text>
+          </Text>,
+        );
+      }
+      lines.push(<Text key="sp2"> </Text>);
+    }
+
+    if (step === "drop") {
+      lines.push(
+        <Text key="drop-prompt">
+          {validating ? "Validating..." : "Drop PDF files here (Enter when done):"}
+        </Text>,
+      );
+      lines.push(
+        <Box key="drop-input" height={1}>
+          <Text color={borderColor}>{"> "}</Text>
+          <InlineTextInput
+            key={pdfs.length}
+            isDisabled={validating}
+            onSubmit={handleDropSubmit}
+            availableWidth={Math.max(20, contentWidth - 10)}
+          />
+        </Box>,
+      );
+      lines.push(<Text key="sp3"> </Text>);
+      lines.push(
+        <Text key="drop-hint" color={dimColor}>
+          Drag-and-drop files or paste paths. Press Enter with no input when done.
+        </Text>,
+      );
+    }
+
+    if (step === "confirm") {
+      lines.push(
+        <Text key="confirm-prompt">
+          Submit {pdfs.length} PDF{pdfs.length !== 1 ? "s" : ""} for processing? <Text color={dimColor}>(y/n)</Text>
+        </Text>,
+      );
+    }
+  }
+
+  if (step === "submitting") {
+    lines.push(
+      <Text key="col">
+        <Text color={borderColor}>Collection: </Text>
+        <Text bold>{collectionName}</Text>
+      </Text>,
+    );
+    lines.push(<Text key="sp1"> </Text>);
+
+    for (const pdf of pdfs) {
+      lines.push(
+        <Text key={`pdf-${pdf.baseName}`}>
+          <Text color="green">  {"  \u2713"} </Text>
+          <Text>{pdf.baseName}.pdf</Text>
+          <Text color={dimColor}>{`  (${pdf.pageCount} pp)`}</Text>
+        </Text>,
+      );
+    }
+    lines.push(<Text key="sp2"> </Text>);
+    lines.push(
+      <Text key="status">{statusMsg ?? "Submitting to batch API..."}</Text>,
+    );
+  }
+
+  if (errorMsg) {
+    lines.push(
+      <Text key="error" color="red">{errorMsg}</Text>,
+    );
+  }
+
+  // Center vertically
+  const menuHeight = lines.length;
+  const topPad = Math.max(0, Math.floor((contentHeight - menuHeight) / 2));
+  const bottomPad = Math.max(0, contentHeight - menuHeight - topPad);
+
+  return (
+    <Box flexDirection="column" width={cols} height={termRows}>
+      <ThemedHorizontalBorder
+        theme={theme}
+        width={cols}
+        position="top"
+        centerText="Machine Violet"
+      />
+
+      <Box flexDirection="row" height={contentHeight}>
+        <ThemedSideFrame theme={theme} side="left" height={contentHeight} />
+        <Box flexDirection="column" width={contentWidth} alignItems="center">
+          {topPad > 0 && <Box height={topPad} />}
+          <Box flexDirection="column" alignItems="flex-start">
+            {lines}
+          </Box>
+          {bottomPad > 0 && <Box height={bottomPad} />}
+        </Box>
+        <ThemedSideFrame theme={theme} side="right" height={contentHeight} />
+      </Box>
+
+      <ThemedHorizontalBorder
+        theme={theme}
+        width={cols}
+        position="bottom"
+      />
+    </Box>
+  );
+}
+
+/**
+ * Parse drag-and-dropped file paths.
+ * Handles: quoted paths, multiple paths separated by spaces,
+ * Windows-style backslash paths.
+ */
+export function parsePaths(input: string): string[] {
+  const paths: string[] = [];
+  let remaining = input.trim();
+
+  while (remaining.length > 0) {
+    if (remaining.startsWith('"')) {
+      // Quoted path — find closing quote
+      const end = remaining.indexOf('"', 1);
+      if (end === -1) {
+        // No closing quote — take rest as path
+        paths.push(remaining.slice(1).trim());
+        break;
+      }
+      paths.push(remaining.slice(1, end));
+      remaining = remaining.slice(end + 1).trim();
+    } else if (remaining.startsWith("'")) {
+      const end = remaining.indexOf("'", 1);
+      if (end === -1) {
+        paths.push(remaining.slice(1).trim());
+        break;
+      }
+      paths.push(remaining.slice(1, end));
+      remaining = remaining.slice(end + 1).trim();
+    } else {
+      // Unquoted — take until next space (but handle drive letters on Windows)
+      // Windows paths like C:\foo\bar.pdf — if we see X:\ pattern, take until next space after .pdf
+      const spaceIdx = remaining.indexOf(" ");
+      if (spaceIdx === -1) {
+        paths.push(remaining);
+        break;
+      }
+      paths.push(remaining.slice(0, spaceIdx));
+      remaining = remaining.slice(spaceIdx).trim();
+    }
+  }
+
+  return paths.filter((p) => p.length > 0);
+}

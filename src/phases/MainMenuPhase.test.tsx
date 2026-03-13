@@ -23,6 +23,7 @@ function defaultProps(overrides?: Partial<MainMenuPhaseProps>): MainMenuPhasePro
     errorMsg: null,
     onNewCampaign: vi.fn(),
     onResumeCampaign: vi.fn(),
+    onAddContent: vi.fn(),
     onQuit: vi.fn(),
     ...overrides,
   };
