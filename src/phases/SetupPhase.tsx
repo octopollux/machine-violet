@@ -278,13 +278,13 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
           theme={theme}
           narrativeLines={setupConvoLines}
           modelineText="Campaign Setup"
-          activeCharacterName="You"
+          activeCharacterName="Player"
           inputIsDisabled
           players={[{ name: "Player", isAI: false }]}
           activePlayerIndex={0}
           campaignName="New Campaign"
           resources={[]}
-          turnHolder="You"
+          turnHolder="Player"
           engineState={null}
         />
       </Box>
@@ -319,7 +319,7 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
           theme={theme}
           narrativeLines={setupConvoLines}
           modelineText="Campaign Setup"
-          activeCharacterName="You"
+          activeCharacterName="Player"
           inputIsDisabled={textInputDisabled}
           inputResetKey={resetKey}
           onInputSubmit={handleSetupSubmit}
@@ -327,7 +327,7 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
           activePlayerIndex={0}
           campaignName="New Campaign"
           resources={[]}
-          turnHolder="You"
+          turnHolder="Player"
           engineState={setupConvoBusy ? "dm_thinking" : null}
           narrativeRef={narrativeRef}
           hideInputLine={setupHasModal}
