@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { NarrativeLine, ActiveModal, RetryOverlay } from "../types/tui.js";
+import type { ToolGlyph } from "./activity.js";
 import type { ResolvedTheme, StyleVariant } from "./themes/types.js";
 import type { GameEngine } from "../agents/game-engine.js";
 import type { GameState } from "../agents/game-state.js";
@@ -37,6 +38,7 @@ export interface GameContextValue {
   activePlayerIndex: number;
   setActivePlayerIndex: (i: number) => void;
   engineState: string | null;
+  toolGlyphs: ToolGlyph[];
   resources: string[];
   modelines: Record<string, string>;
   // Modal state

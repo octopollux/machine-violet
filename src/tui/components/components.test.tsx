@@ -176,6 +176,46 @@ describe("ActivityLine", () => {
     const { lastFrame } = render(<ActivityLine engineState={null} />);
     expect(lastFrame()).toBe("");
   });
+
+  it("renders accumulated tool glyphs after label", () => {
+    const glyphs = [
+      { glyph: "⚄", color: "yellow" },
+      { glyph: "⚔", color: "red" },
+    ];
+    const { lastFrame } = render(
+      <ActivityLine engineState="dm_thinking" toolGlyphs={glyphs} />,
+    );
+    const frame = lastFrame();
+    expect(frame).toContain("DM is thinking");
+    expect(frame).toContain("⚄");
+    expect(frame).toContain("⚔");
+  });
+
+  it("renders no glyphs when array is empty", () => {
+    const { lastFrame } = render(
+      <ActivityLine engineState="dm_thinking" toolGlyphs={[]} />,
+    );
+    const frame = lastFrame();
+    expect(frame).toContain("DM is thinking");
+    // No trailing space from empty glyph list
+    expect(frame).not.toContain("⚄");
+  });
+
+  it("renders duplicate glyphs for repeated tool calls", () => {
+    const glyphs = [
+      { glyph: "⚄", color: "yellow" },
+      { glyph: "⚄", color: "yellow" },
+      { glyph: "◈", color: "blue" },
+    ];
+    const { lastFrame } = render(
+      <ActivityLine engineState="dm_thinking" toolGlyphs={glyphs} />,
+    );
+    const frame = lastFrame();
+    // Both dice glyphs should appear (not deduplicated)
+    const diceCount = (frame.match(/⚄/g) || []).length;
+    expect(diceCount).toBe(2);
+    expect(frame).toContain("◈");
+  });
 });
 
 describe("NarrativeArea", () => {

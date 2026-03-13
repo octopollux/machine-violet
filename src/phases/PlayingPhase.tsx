@@ -20,7 +20,7 @@ export function PlayingPhase() {
     narrativeLines, setNarrativeLines,
     theme, variant, setVariant,
     campaignName, activePlayerIndex, setActivePlayerIndex,
-    engineState, resources, modelines,
+    engineState, toolGlyphs, resources, modelines,
     activeModal, setActiveModal,
     choiceIndex, setChoiceIndex,
     activeSession, setActiveSession, previousVariantRef,
@@ -440,6 +440,7 @@ export function PlayingPhase() {
         resources={resources}
         turnHolder={activeChar}
         engineState={engineState}
+        toolGlyphs={toolGlyphs}
         quoteColor="#ffffff"
         playerColor={gameStateRef.current?.config.players[activePlayerIndex]?.color}
         turnIndicatorColor={engineState === "waiting_input" ? gameStateRef.current?.config.players[activePlayerIndex]?.color : undefined}
