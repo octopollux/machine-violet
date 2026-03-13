@@ -3,8 +3,9 @@ import { Box, Text } from "ink";
 import type { FrameStyleVariant } from "../../types/tui.js";
 import { renderHorizontalFrame, renderContentLine } from "../frames/index.js";
 import { InlineTextInput } from "../components/InlineTextInput.js";
-import { parseFormatting } from "../formatting.js";
+import { parseFormatting, wrapNodes, nodeVisibleLength } from "../formatting.js";
 import { renderNodes } from "../render-nodes.js";
+import type { FormattingNode } from "../../types/tui.js";
 
 /* ──────────────────────────────────────────────────────────
  * ChoiceOverlay — frameless version that fills the Player Pane interior.
@@ -14,36 +15,24 @@ import { renderNodes } from "../render-nodes.js";
 /** Number of fixed rows reserved for the description region. */
 export const DESCRIPTION_ROWS = 3;
 
-/** Word-wrap text to fit within a given width, returning exactly `rows` lines (padded or truncated). */
-function wrapToFixedRows(text: string, maxWidth: number, rows: number): string[] {
-  if (!text) return Array(rows).fill("");
-  const words = text.split(/\s+/);
-  const lines: string[] = [];
-  let current = "";
-  for (const word of words) {
-    if (current.length === 0) {
-      current = word;
-    } else if (current.length + 1 + word.length <= maxWidth) {
-      current += " " + word;
+/** Word-wrap formatted text to fit within a given width, returning exactly `rows` lines of FormattingNode[]. */
+function wrapToFixedRows(text: string, maxWidth: number, rows: number): FormattingNode[][] {
+  if (!text) return Array.from({ length: rows }, () => [] as FormattingNode[]);
+  const nodes = parseFormatting(text);
+  const wrapped = wrapNodes(nodes, maxWidth);
+  // Pad to exact row count
+  while (wrapped.length < rows) wrapped.push([]);
+  // Truncate if too many lines, adding ellipsis
+  if (wrapped.length > rows) {
+    wrapped.length = rows;
+    const lastLine = wrapped[rows - 1];
+    if (nodeVisibleLength(lastLine) > maxWidth - 1) {
+      wrapped[rows - 1] = [...lastLine.slice(0, -1), "…"];
     } else {
-      lines.push(current);
-      current = word;
+      wrapped[rows - 1] = [...lastLine, "…"];
     }
   }
-  if (current) lines.push(current);
-  // Pad or truncate to exact row count
-  while (lines.length < rows) lines.push("");
-  if (lines.length > rows) {
-    lines.length = rows;
-    // Add ellipsis to last visible line if we truncated
-    const last = lines[rows - 1];
-    if (last.length > maxWidth - 1) {
-      lines[rows - 1] = last.slice(0, maxWidth - 1) + "…";
-    } else {
-      lines[rows - 1] = last + "…";
-    }
-  }
-  return lines;
+  return wrapped;
 }
 
 interface ChoiceOverlayProps {
@@ -138,7 +127,7 @@ export function ChoiceOverlay({
   const descText = hasDescriptions && selectedIndex < (descriptions?.length ?? 0)
     ? (descriptions ?? [])[selectedIndex] ?? ""
     : "";
-  const descLines = hasDescriptions ? wrapToFixedRows(descText, width, DESCRIPTION_ROWS) : [];
+  const descLines: FormattingNode[][] = hasDescriptions ? wrapToFixedRows(descText, width, DESCRIPTION_ROWS) : [];
 
   // Help text
   const helpText = customInputActive
@@ -163,7 +152,7 @@ export function ChoiceOverlay({
         <Box flexDirection="column" height={DESCRIPTION_ROWS}>
           {descLines.map((line, i) => (
             <Box key={`desc-${i}`}>
-              <Text dimColor>{line}</Text>
+              <Text dimColor>{line.length > 0 ? renderNodes(line) : ""}</Text>
             </Box>
           ))}
         </Box>

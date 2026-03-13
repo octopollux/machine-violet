@@ -237,6 +237,31 @@ describe("ChoiceOverlay", () => {
     const lines = lastFrame()!.split("\n");
     expect(lines.length).toBeLessThanOrEqual(7);
   });
+
+  it("renders formatted descriptions without raw tags", () => {
+    const { lastFrame } = render(
+      <ChoiceOverlay
+        width={60}
+        prompt="Choose a path"
+        choices={["Forest", "Cave"]}
+        descriptions={[
+          "A <b>dark</b> and <color=#22aa44>mossy</color> trail",
+          "Echoing <i>whispers</i> from within",
+        ]}
+        selectedIndex={0}
+      />,
+    );
+    const frame = lastFrame()!;
+    // Formatted text content is present
+    expect(frame).toContain("dark");
+    expect(frame).toContain("mossy");
+    // Raw tags are stripped
+    expect(frame).not.toContain("<b>");
+    expect(frame).not.toContain("</b>");
+    expect(frame).not.toContain("<color=");
+    expect(frame).not.toContain("</color>");
+    expect(frame).not.toContain("<i>");
+  });
 });
 
 describe("GameMenu", () => {
