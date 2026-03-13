@@ -89,8 +89,8 @@ export function ChoiceOverlay({
   const totalHeight = hasDescriptions ? 2 + MAX_CHOICE_ROWS + DESCRIPTION_ROWS : 2 + MAX_CHOICE_ROWS;
 
   // Pre-wrap all choice items
-  // Prefix layout: [arrow 1ch][cursor 1ch][space 1ch] = 3 chars
-  const prefixWidth = 3;
+  // Prefix layout: [arrow 1ch][gap 1ch][cursor 1ch][space 1ch] = 4 chars
+  const prefixWidth = 4;
   const labelWidth = Math.max(1, width - prefixWidth);
 
   interface WrappedItem { index: number; isCustom: boolean; lines: FormattingNode[][] }
@@ -227,7 +227,7 @@ export function ChoiceOverlay({
         if (row.isCustom && customInputActive && row.isItemFirstLine) {
           return (
             <Box key="custom-active">
-              {arrowElement}<Text>{cursorChar + " "}</Text>
+              {arrowElement}<Text>{" " + cursorChar + " "}</Text>
               <InlineTextInput
                 key={customInputResetKey}
                 isDisabled={false}
@@ -240,7 +240,7 @@ export function ChoiceOverlay({
 
         return (
           <Box key={`${row.itemIndex}-${rowIdx}`}>
-            {arrowElement}<Text>{cursorChar + " "}</Text>
+            {arrowElement}<Text>{" " + cursorChar + " "}</Text>
             <Text>{renderNodes(row.nodes)}</Text>
           </Box>
         );
