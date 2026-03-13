@@ -27,6 +27,8 @@ function mockState(): GameState {
     },
     campaignRoot: "/tmp/test",
     activePlayerIndex: 0,
+    displayResources: {},
+    resourceValues: {},
   };
 }
 

@@ -72,7 +72,9 @@ GameState
 │   └── calendar_display_format?: string
 │
 ├── campaignRoot: string                   const                          Session init
-└── activePlayerIndex: number              mut   → state/scene.json      DM (switch_player)
+├── activePlayerIndex: number              mut   → state/scene.json      DM (switch_player)
+├── displayResources: Record<string, string[]>     mut                   DM (set_display_resources)
+└── resourceValues: Record<string, Record<string, string>>  mut          DM (set_resource_values)
 ```
 
 ### Shadow State (alongside GameState, not inside it)
@@ -224,7 +226,8 @@ Legend: **R** = reads, **W** = writes (triggers persistence), **UI** = returns T
 |------|------|--------|--------|-------|--------|-------------------|-------|
 | `update_modeline` | | | | | R | R | Reads config.players + activePlayerIndex for default character. Returns **UI**. |
 | `style_scene` | | | | | | | Returns **UI**. `description` triggers Haiku subagent. |
-| `set_display_resources` | | | | | | | Returns **UI**. |
+| `set_display_resources` | | | | | | | W `displayResources`. Returns **UI**. |
+| `set_resource_values` | | | | | | | W `resourceValues`. Returns **UI**. |
 | `present_choices` | | | | | | | Returns **UI**. |
 | `present_roll` | | | | | | | Returns **UI**. |
 | `show_character_sheet` | | | | | | | Returns **UI**. |

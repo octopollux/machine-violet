@@ -295,6 +295,8 @@ export default function App({ shutdownRef }: AppProps) {
       config,
       campaignRoot,
       activePlayerIndex: 0,
+      displayResources: {},
+      resourceValues: {},
     };
   }, []);
 

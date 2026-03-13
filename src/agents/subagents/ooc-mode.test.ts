@@ -464,7 +464,7 @@ describe("buildOOCTools", () => {
 
   it("returns 18 tools when both fileIO and gameState are available", () => {
     const tools = buildOOCTools(true, true);
-    expect(tools).toHaveLength(17);
+    expect(tools).toHaveLength(18);
     const names = tools.map((t) => t.name);
     expect(names).toContain("roll_dice");
     expect(names).toContain("check_clocks");
@@ -476,7 +476,7 @@ describe("buildOOCTools", () => {
 
   it("returns 15 tools when gameState but no fileIO", () => {
     const tools = buildOOCTools(false, true);
-    expect(tools).toHaveLength(14);
+    expect(tools).toHaveLength(15);
     const names = tools.map((t) => t.name);
     expect(names).toContain("roll_dice");
     expect(names).not.toContain("read_file");
@@ -608,6 +608,8 @@ function mockGameState(overrides?: Partial<GameState>): GameState {
     },
     campaignRoot: "/camp",
     activePlayerIndex: 0,
+    displayResources: {},
+    resourceValues: {},
     ...overrides,
   };
 }
@@ -733,7 +735,7 @@ describe("enterOOC with gameState", () => {
 
     const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     if (createCall) {
-      expect(createCall.tools).toHaveLength(17);
+      expect(createCall.tools).toHaveLength(18);
       const names = createCall.tools.map((t: { name: string }) => t.name);
       expect(names).toContain("roll_dice");
       expect(names).toContain("scribe");

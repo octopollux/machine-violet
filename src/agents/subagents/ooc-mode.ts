@@ -30,7 +30,7 @@ const OOC_READONLY_TOOLS = [
 
 const OOC_ENTITY_TOOLS = ["scribe"];
 
-const OOC_TUI_TOOLS = ["style_scene", "set_display_resources", "show_character_sheet"];
+const OOC_TUI_TOOLS = ["style_scene", "set_display_resources", "set_resource_values", "show_character_sheet"];
 
 const OOC_RECOVERY_TOOLS = ["rollback"];
 

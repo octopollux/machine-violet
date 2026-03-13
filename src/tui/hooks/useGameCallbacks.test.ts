@@ -7,7 +7,9 @@ import { describe, it, expect, vi } from "vitest";
 
 import type { TuiCommand } from "../../agents/agent-loop.js";
 import type { StyleVariant, NarrativeLine, ActiveModal } from "../../types/tui.js";
+import type { GameState } from "../../agents/game-state.js";
 import { appendDelta } from "../narrative-helpers.js";
+import { formatResources } from "./useGameCallbacks.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type MockFn = ReturnType<typeof vi.fn> & ((...args: any[]) => any);
@@ -36,9 +38,26 @@ function createDispatch(deps: {
         deps.setModelines((prev: Record<string, string>) => ({ ...prev, [char]: text }));
         break;
       }
-      case "set_display_resources":
-        deps.setResources(cmd.resources as string[]);
+      case "set_display_resources": {
+        const gs1 = deps.gameStateRef.current as GameState | null;
+        if (gs1) {
+          const char = cmd.character as string;
+          gs1.displayResources[char] = cmd.resources as string[];
+          deps.setResources(formatResources(gs1));
+        }
         break;
+      }
+      case "set_resource_values": {
+        const gs2 = deps.gameStateRef.current as GameState | null;
+        if (gs2) {
+          const char = cmd.character as string;
+          const vals = cmd.values as Record<string, string>;
+          if (!gs2.resourceValues[char]) gs2.resourceValues[char] = {};
+          Object.assign(gs2.resourceValues[char], vals);
+          deps.setResources(formatResources(gs2));
+        }
+        break;
+      }
       case "present_choices": {
         const choices = cmd.choices as string[];
         if (choices && choices.length > 0) {
@@ -78,7 +97,7 @@ function makeDeps() {
     setNarrativeLines: vi.fn(),
     variantRef: { current: "exploration" as StyleVariant },
     previousVariantRef: { current: "exploration" as StyleVariant },
-    gameStateRef: { current: null },
+    gameStateRef: { current: { displayResources: {}, resourceValues: {} } },
     clientRef: { current: null },
     engineRef: { current: null },
     fileIO: { current: { readFile: vi.fn() } },
@@ -103,11 +122,23 @@ describe("dispatchTuiCommand logic", () => {
     expect(updater({ Kira: "HP 30/30" })).toEqual({ Kira: "HP 30/30", Aldric: "HP 45/50" });
   });
 
-  it("handles set_display_resources", () => {
+  it("handles set_display_resources with formatted values", () => {
     const deps = makeDeps();
+    const gs = deps.gameStateRef.current as GameState;
+    gs.resourceValues["Aldric"] = { HP: "24/30" };
     const dispatch = createDispatch(deps);
-    dispatch({ type: "set_display_resources", resources: ["HP: 10"] });
-    expect(deps.setResources).toHaveBeenCalledWith(["HP: 10"]);
+    dispatch({ type: "set_display_resources", character: "Aldric", resources: ["HP", "Spell Slots"] });
+    expect(deps.setResources).toHaveBeenCalledWith(["HP 24/30", "Spell Slots"]);
+  });
+
+  it("handles set_resource_values dispatch", () => {
+    const deps = makeDeps();
+    const gs = deps.gameStateRef.current as GameState;
+    gs.displayResources["Aldric"] = ["HP", "Spell Slots"];
+    const dispatch = createDispatch(deps);
+    dispatch({ type: "set_resource_values", character: "Aldric", values: { HP: "24/30", "Spell Slots": "3/4" } } as TuiCommand);
+    expect(deps.setResources).toHaveBeenCalledWith(["HP 24/30", "Spell Slots 3/4"]);
+    expect(gs.resourceValues["Aldric"]).toEqual({ HP: "24/30", "Spell Slots": "3/4" });
   });
 
   it("handles present_choices", () => {
@@ -150,6 +181,40 @@ describe("dispatchTuiCommand logic", () => {
 const dm = (text: string): NarrativeLine => ({ kind: "dm", text });
 const player = (text: string): NarrativeLine => ({ kind: "player", text });
 const separator = (): NarrativeLine => ({ kind: "separator", text: "" });
+
+describe("formatResources", () => {
+  it("combines keys and values into formatted strings", () => {
+    const gs = {
+      displayResources: { Aldric: ["HP", "Spell Slots"] },
+      resourceValues: { Aldric: { HP: "24/30", "Spell Slots": "3/4" } },
+    } as unknown as GameState;
+    expect(formatResources(gs)).toEqual(["HP 24/30", "Spell Slots 3/4"]);
+  });
+
+  it("returns key only when no value set", () => {
+    const gs = {
+      displayResources: { Aldric: ["HP", "Ki"] },
+      resourceValues: { Aldric: { HP: "24/30" } },
+    } as unknown as GameState;
+    expect(formatResources(gs)).toEqual(["HP 24/30", "Ki"]);
+  });
+
+  it("returns empty array when no display resources", () => {
+    const gs = {
+      displayResources: {},
+      resourceValues: {},
+    } as unknown as GameState;
+    expect(formatResources(gs)).toEqual([]);
+  });
+
+  it("handles multiple characters", () => {
+    const gs = {
+      displayResources: { Aldric: ["HP"], Rook: ["HP"] },
+      resourceValues: { Aldric: { HP: "24/30" }, Rook: { HP: "28/30" } },
+    } as unknown as GameState;
+    expect(formatResources(gs)).toEqual(["HP 24/30", "HP 28/30"]);
+  });
+});
 
 describe("onTurnStart callback", () => {
   it("pushes player line for role=player", () => {

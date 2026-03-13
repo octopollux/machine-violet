@@ -24,13 +24,15 @@ function mockState(): GameState {
     },
     campaignRoot: "/tmp/test-campaign",
     activePlayerIndex: 0,
+    displayResources: {},
+    resourceValues: {},
   };
 }
 
 describe("ToolRegistry", () => {
   it("registers all T1 tools", () => {
     const reg = new ToolRegistry();
-    // Map (14) + Dice (1) + Deck (1) + Clocks (5) + Combat (4) + TUI (6) = 31
+    // Map (14) + Dice (1) + Deck (1) + Clocks (5) + Combat (4) + TUI (7) = 32
     expect(reg.size).toBeGreaterThanOrEqual(30);
   });
 
@@ -338,6 +340,46 @@ describe("ToolRegistry", () => {
     expect(parsed.type).toBe("scene_transition");
     expect(parsed.title).toBe("The Dark Forest");
     expect(parsed.time_advance).toBe(60);
+  });
+
+  it("set_display_resources stores keys on state", () => {
+    const reg = new ToolRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "set_display_resources", {
+      character: "Aldric",
+      resources: ["HP", "Spell Slots"],
+    });
+    expect(result.is_error).toBeUndefined();
+    expect(state.displayResources["Aldric"]).toEqual(["HP", "Spell Slots"]);
+    const parsed = JSON.parse(result.content);
+    expect(parsed.type).toBe("set_display_resources");
+  });
+
+  it("set_resource_values stores and merges values on state", () => {
+    const reg = new ToolRegistry();
+    const state = mockState();
+    reg.dispatch(state, "set_resource_values", {
+      character: "Aldric",
+      values: { "HP": "24/30" },
+    });
+    expect(state.resourceValues["Aldric"]).toEqual({ "HP": "24/30" });
+
+    // Merge additional values
+    reg.dispatch(state, "set_resource_values", {
+      character: "Aldric",
+      values: { "Spell Slots": "3/4" },
+    });
+    expect(state.resourceValues["Aldric"]).toEqual({ "HP": "24/30", "Spell Slots": "3/4" });
+
+    // Overwrite existing key
+    const result = reg.dispatch(state, "set_resource_values", {
+      character: "Aldric",
+      values: { "HP": "20/30" },
+    });
+    expect(result.is_error).toBeUndefined();
+    expect(state.resourceValues["Aldric"]["HP"]).toBe("20/30");
+    const parsed = JSON.parse(result.content);
+    expect(parsed.type).toBe("set_resource_values");
   });
 
   it("dispatches session_end and returns TuiCommand JSON", () => {

@@ -93,6 +93,8 @@ function makeGameState(overrides?: Partial<GameState>): GameState {
     },
     campaignRoot: "/campaigns/test-campaign",
     activePlayerIndex: 0,
+    displayResources: {},
+    resourceValues: {},
     ...overrides,
   };
 }

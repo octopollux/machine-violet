@@ -53,6 +53,7 @@ export function buildActiveState(params: {
   pendingAlarms: string[];
   turnHolder?: string;
   combatRound?: number;
+  resourceValues?: Record<string, Record<string, string>>;
 }): string {
   const lines: string[] = [];
 
@@ -75,6 +76,19 @@ export function buildActiveState(params: {
     lines.push("Pending alarms:");
     for (const alarm of params.pendingAlarms) {
       lines.push(`  ${alarm}`);
+    }
+  }
+
+  if (params.resourceValues) {
+    const entries = Object.entries(params.resourceValues);
+    if (entries.length > 0) {
+      lines.push("Resources:");
+      for (const [char, kvs] of entries) {
+        const pairs = Object.entries(kvs).map(([k, v]) => `${k}=${v}`);
+        if (pairs.length > 0) {
+          lines.push(`  ${char}: ${pairs.join(", ")}`);
+        }
+      }
     }
   }
 

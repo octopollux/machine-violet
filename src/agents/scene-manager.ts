@@ -128,6 +128,7 @@ export class SceneManager {
       pcSummaries: this.pcSummaries,
       pendingAlarms: [],
       turnHolder: undefined,
+      resourceValues: this.state.resourceValues,
     });
     this.sessionState.scenePrecis = buildScenePrecis(this.scene);
     this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);
@@ -460,6 +461,7 @@ export class SceneManager {
     this.sessionState.activeState = buildActiveState({
       pcSummaries: this.pcSummaries,
       pendingAlarms,
+      resourceValues: this.state.resourceValues,
     });
 
     // Sync precis and player read
