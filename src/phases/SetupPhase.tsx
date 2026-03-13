@@ -67,8 +67,11 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
     setSetupConvoLines((prev) => [...prev, { kind: "dm", text: "" }]);
 
     if (result.pendingChoices) {
-      setChoiceIndex(0);
-      setCustomInputActive(false);
+      // When fewer than 5 options, default focus to "Enter your own" so the user can freely type
+      const customIndex = result.pendingChoices.choices.length;
+      setChoiceIndex(customIndex < 5 ? customIndex : 0);
+      setCustomInputActive(customIndex < 5);
+
       setActiveModal({
         kind: "choice",
         prompt: result.pendingChoices.prompt,

@@ -51,6 +51,14 @@ export function PlayingPhase() {
   const [customInputMode, setCustomInputMode] = useState(false);
   const [customInputResetKey, setCustomInputResetKey] = useState(0);
 
+  // When a choice modal appears with <5 options, default focus lands on "Enter your own"
+  // so choiceIndex === choices.length — activate custom input mode to match.
+  useEffect(() => {
+    if (activeModal?.kind === "choice" && choiceIndex === activeModal.choices.length) {
+      setCustomInputMode(true);
+    }
+  }, [activeModal, choiceIndex]);
+
   const clearInput = useCallback(() => {
     setResetKey((k) => k + 1);
   }, []);

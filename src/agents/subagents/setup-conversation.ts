@@ -74,7 +74,7 @@ const PRESENT_CHOICES_TOOL: Anthropic.Tool = {
   name: "present_choices",
   description:
     "Present the player with a set of structured choices in a selection modal. " +
-    "Use this when you want to offer 2-5 concrete options (e.g. genre, character concepts, campaign premises). " +
+    "Use this when you want to offer 2-10 concrete options (e.g. genre, character concepts, campaign premises). " +
     "The player's selection will be returned as the tool result. " +
     "You can include a short text message before calling this tool to give context. " +
     "If a choice needs explanation, provide a descriptions array (same length as choices) — " +
@@ -86,9 +86,9 @@ const PRESENT_CHOICES_TOOL: Anthropic.Tool = {
       choices: {
         type: "array",
         items: { type: "string" },
-        description: "2-5 short option labels for the player to choose from",
+        description: "2-10 short option labels for the player to choose from",
         minItems: 2,
-        maxItems: 5,
+        maxItems: 10,
       },
       descriptions: {
         type: "array",
