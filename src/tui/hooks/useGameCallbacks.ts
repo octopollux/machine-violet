@@ -52,6 +52,19 @@ export interface GameCallbackResult {
   dispatchTuiCommand: (cmd: TuiCommand) => void;
 }
 
+/** Combine display keys + values into formatted strings for the top frame. */
+export function formatResources(gs: GameState): string[] {
+  const result: string[] = [];
+  for (const [char, keys] of Object.entries(gs.displayResources)) {
+    const vals = gs.resourceValues[char] ?? {};
+    for (const key of keys) {
+      const val = vals[key];
+      result.push(val ? `${key} ${val}` : key);
+    }
+  }
+  return result;
+}
+
 export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
   const {
     setNarrativeLines, setEngineState, setErrorMsg, setModelines,
@@ -77,9 +90,26 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
         if (cmd.variant) setVariant(cmd.variant as StyleVariant);
         break;
       }
-      case "set_display_resources":
-        setResources(cmd.resources as string[]);
+      case "set_display_resources": {
+        const gs1 = gameStateRef.current;
+        if (gs1) {
+          const char = cmd.character as string;
+          gs1.displayResources[char] = cmd.resources as string[];
+          setResources(formatResources(gs1));
+        }
         break;
+      }
+      case "set_resource_values": {
+        const gs2 = gameStateRef.current;
+        if (gs2) {
+          const char = cmd.character as string;
+          const vals = cmd.values as Record<string, string>;
+          if (!gs2.resourceValues[char]) gs2.resourceValues[char] = {};
+          Object.assign(gs2.resourceValues[char], vals);
+          setResources(formatResources(gs2));
+        }
+        break;
+      }
       case "present_choices": {
         const raw = cmd.choices;
         const choices = Array.isArray(raw)

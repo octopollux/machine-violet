@@ -132,6 +132,7 @@ export const TUI_TOOLS = new Set([
   "set_theme",
   "style_scene",
   "set_display_resources",
+  "set_resource_values",
   "present_choices",
   "present_roll",
   "show_character_sheet",

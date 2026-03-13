@@ -66,6 +66,8 @@ function mockCtx(overrides?: Partial<SlashCommandContext>): SlashCommandContext 
       combatConfig: { system: "default", initiativeStat: "dexterity", autoRoll: false },
       decks: { decks: {} },
       activePlayerIndex: 0,
+      displayResources: {},
+      resourceValues: {},
     } as never,
     client: {} as never,
     appendLine: vi.fn(),

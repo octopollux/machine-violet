@@ -104,6 +104,8 @@ function mockState(): GameState {
     },
     campaignRoot: "/tmp/test-campaign",
     activePlayerIndex: 0,
+    displayResources: {},
+    resourceValues: {},
   };
 }
 
@@ -724,6 +726,8 @@ describe("GameEngine AI Auto-Turn", () => {
       },
       campaignRoot: "/tmp/test-campaign",
       activePlayerIndex: 0,
+      displayResources: {},
+      resourceValues: {},
     };
   }
 
@@ -1217,6 +1221,8 @@ describe("GameEngine Turn Lifecycle", () => {
       },
       campaignRoot: "/tmp/test-campaign",
       activePlayerIndex: 1,
+      displayResources: {},
+      resourceValues: {},
     } satisfies GameState;
 
     const client = mockClient([textMessage("DM responds to AI.")]);

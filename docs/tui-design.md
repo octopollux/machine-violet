@@ -452,9 +452,14 @@ style_scene({ key_color: "#8844aa", save_to_location: true, location: "the-shatt
 style_scene({ description: "haunted forest", variant: "exploration" })
 ```
 
-**`set_display_resources`** — Update which resources appear in the top frame for a character.
+**`set_display_resources`** — Update which resource keys appear in the top frame for a character. Stores keys on `GameState.displayResources`.
 ```
 set_display_resources({ character: "aldric", resources: ["HP", "Spell Slots", "Ki"] })
+```
+
+**`set_resource_values`** — Set current values for tracked resources. Values are merged into `GameState.resourceValues` and combined with display keys to produce formatted strings like `"HP 24/30"` in the top frame.
+```
+set_resource_values({ character: "aldric", values: { "HP": "24/30", "Spell Slots": "3/4" } })
 ```
 
 **`present_choices`** — Show a choice modal. No parameters = Haiku subagent generates options from recent context. Explicit parameters override.

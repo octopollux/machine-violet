@@ -18,4 +18,8 @@ export interface GameState {
   campaignRoot: string;
   /** Index into config.players — tracks whose turn it is */
   activePlayerIndex: number;
+  /** Per-character resource display keys */
+  displayResources: Record<string, string[]>;
+  /** Per-character resource values: character → key → value */
+  resourceValues: Record<string, Record<string, string>>;
 }

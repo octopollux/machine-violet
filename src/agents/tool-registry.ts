@@ -701,8 +701,38 @@ const TOOL_DEFS: RegisteredTool[] = [
         required: ["character", "resources"],
       },
     },
-    handler: (_state, input) => {
-      return ok(JSON.stringify({ type: "set_display_resources", ...input }));
+    handler: (state, input) => {
+      const character = input.character as string;
+      const resources = input.resources as string[];
+      state.displayResources[character] = resources;
+      return ok(JSON.stringify({ type: "set_display_resources", character, resources }));
+    },
+  },
+  {
+    definition: {
+      name: "set_resource_values",
+      description: "Set current values for a character's tracked resources (e.g. HP=24/30).",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          character: { type: "string", description: "Character name" },
+          values: {
+            type: "object" as const,
+            description: "Key-value pairs, e.g. { \"HP\": \"24/30\", \"Spell Slots\": \"3/4\" }",
+            additionalProperties: { type: "string" },
+          },
+        },
+        required: ["character", "values"],
+      },
+    },
+    handler: (state, input) => {
+      const character = input.character as string;
+      const values = input.values as Record<string, string>;
+      if (!state.resourceValues[character]) {
+        state.resourceValues[character] = {};
+      }
+      Object.assign(state.resourceValues[character], values);
+      return ok(JSON.stringify({ type: "set_resource_values", character, values }));
     },
   },
   {

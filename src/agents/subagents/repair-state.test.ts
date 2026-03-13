@@ -32,6 +32,8 @@ function makeGameState(root = "/campaigns/test"): GameState {
     },
     campaignRoot: root,
     activePlayerIndex: 0,
+    displayResources: {},
+    resourceValues: {},
   };
 }
 
