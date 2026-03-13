@@ -144,7 +144,7 @@ TUI tools are **fire-and-forget**: their results drive engine/UI state but the D
 
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
-| `enter_ooc` | T1 | DM | `({ reason })` | Hand conversation to the OOC subagent (Sonnet). TUI switches to OOC style. DM receives terse summary when OOC ends. |
+| `enter_ooc` | T1 | DM | `({ reason })` | Hand conversation to the OOC subagent (Sonnet). TUI switches to OOC style. DM receives terse summary when OOC ends. Also player-accessible via game menu / `/ooc`; player-initiated summaries are injected as `<ooc_summary>` on the next DM turn. The OOC agent can auto-exit by emitting `<END_OOC />` or `<END_OOC>player action</END_OOC>` to forward in-character input. |
 
 ---
 
