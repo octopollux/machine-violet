@@ -3,6 +3,8 @@ import { Box, Text } from "ink";
 import type { FrameStyleVariant } from "../../types/tui.js";
 import { renderHorizontalFrame, renderContentLine } from "../frames/index.js";
 import { InlineTextInput } from "../components/InlineTextInput.js";
+import { parseFormatting } from "../formatting.js";
+import { renderNodes } from "../render-nodes.js";
 
 /* ──────────────────────────────────────────────────────────
  * ChoiceOverlay — frameless version that fills the Player Pane interior.
@@ -185,10 +187,8 @@ export function ChoiceOverlay({
         }
         return (
           <Box key={item.index}>
-            <Text>
-              {isSelected ? "> " : "  "}
-              {item.text}
-            </Text>
+            <Text>{isSelected ? "> " : "  "}</Text>
+            <Text>{renderNodes(parseFormatting(item.text))}</Text>
           </Box>
         );
       })}
