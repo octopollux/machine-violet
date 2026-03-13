@@ -24,12 +24,26 @@ function mockIO(dirs: Record<string, string[]> = {}): FileIO {
 }
 
 describe("KNOWN_SYSTEMS", () => {
-  it("contains dnd-5e", () => {
-    expect(KNOWN_SYSTEMS).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ slug: "dnd-5e", bundled: true, hasRuleCard: true }),
-      ]),
-    );
+  it("contains all bundled systems", () => {
+    const slugs = KNOWN_SYSTEMS.map((s) => s.slug);
+    expect(slugs).toContain("dnd-5e");
+    expect(slugs).toContain("24xx");
+    expect(slugs).toContain("fate-accelerated");
+    expect(slugs).toContain("cairn");
+    expect(slugs).toContain("ironsworn");
+    expect(slugs).toContain("breathless");
+    expect(slugs).toContain("charge");
+  });
+
+  it("marks dnd-5e as having a rule card", () => {
+    const dnd = KNOWN_SYSTEMS.find((s) => s.slug === "dnd-5e");
+    expect(dnd?.hasRuleCard).toBe(true);
+  });
+
+  it("marks all entries as bundled", () => {
+    for (const sys of KNOWN_SYSTEMS) {
+      expect(sys.bundled).toBe(true);
+    }
   });
 });
 
@@ -49,9 +63,8 @@ describe("listAvailableSystems", () => {
   it("returns known systems with processed=false when no dirs exist", async () => {
     const io = mockIO({});
     const systems = await listAvailableSystems(io, "/home");
-    expect(systems.length).toBe(1);
-    expect(systems[0].slug).toBe("dnd-5e");
-    expect(systems[0].processed).toBe(false);
+    expect(systems.length).toBe(KNOWN_SYSTEMS.length);
+    expect(systems.every((s) => s.processed === false)).toBe(true);
   });
 
   it("marks known systems as processed when dir exists", async () => {
@@ -69,7 +82,7 @@ describe("listAvailableSystems", () => {
       "/home/systems": ["dnd-5e", "my-homebrew"],
     });
     const systems = await listAvailableSystems(io, "/home");
-    expect(systems.length).toBe(2);
+    expect(systems.length).toBe(KNOWN_SYSTEMS.length + 1);
     const custom = systems.find((s) => s.slug === "my-homebrew");
     expect(custom).toBeDefined();
     expect(custom!.bundled).toBe(false);
@@ -80,6 +93,6 @@ describe("listAvailableSystems", () => {
   it("handles missing systems directory gracefully", async () => {
     const io = mockIO({});
     const systems = await listAvailableSystems(io, "/nonexistent");
-    expect(systems.length).toBe(1); // just known systems
+    expect(systems.length).toBe(KNOWN_SYSTEMS.length);
   });
 });

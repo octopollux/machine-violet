@@ -1,0 +1,12 @@
+{
+  "name": "Cairn",
+  "slug": "cairn",
+  "version": "1e",
+  "license": "CC-BY-SA-4.0",
+  "licenseUrl": "https://github.com/yochaigal/cairn/blob/main/LICENSE",
+  "complexity": "light",
+  "dice": ["d4", "d6", "d8", "d10", "d12", "d20"],
+  "bundled": true,
+  "srdUrl": "https://cairnrpg.com/cairn-srd/",
+  "description": "Fiction-forward OSR fantasy. Attacks always hit, saves are d20-roll-under. Derived from Into the Odd and Knave."
+}
