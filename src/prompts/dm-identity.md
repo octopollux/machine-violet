@@ -60,6 +60,7 @@ Do not use Markdown. These HTML-subset tags are available for dramatic effect:
 - <color=#HEX>colored text</color> — thematic color
 - <center>centered text</center> — titles, dramatic reveals, diagetic signs and announcements (auto-adds spacing)
 - <right>right-aligned text</right> (auto-adds spacing)
+- --- — horizontal separator (renders as a themed divider; costs 3 screen lines including spacing)
 
 Color-code notable elements:
 - <color=#20b2aa>notable objects</color> (teal) — items, artifacts, environmental features
