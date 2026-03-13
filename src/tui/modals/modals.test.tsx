@@ -144,7 +144,21 @@ describe("ChoiceOverlay", () => {
     expect(frame).not.toContain("╚");
   });
 
-  it("shows scroll arrows", () => {
+  it("shows scroll arrows in left margin when scrollable", () => {
+    const { lastFrame } = render(
+      <ChoiceOverlay
+        width={60}
+        prompt="Pick one"
+        choices={["A", "B", "C", "D", "E", "F", "G"]}
+        selectedIndex={5}
+      />,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("▲");
+    expect(frame).toContain("▼");
+  });
+
+  it("hides scroll arrows when all choices fit", () => {
     const { lastFrame } = render(
       <ChoiceOverlay
         width={60}
@@ -154,8 +168,8 @@ describe("ChoiceOverlay", () => {
       />,
     );
     const frame = lastFrame()!;
-    expect(frame).toContain("▲");
-    expect(frame).toContain("▼");
+    expect(frame).not.toContain("▲");
+    expect(frame).not.toContain("▼");
   });
 
   it("shows ESC dismiss help text", () => {

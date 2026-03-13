@@ -56,15 +56,19 @@ const MAX_CHOICE_ROWS = 5;
  * Frameless choice list for embedding inside the Player Pane.
  *
  * Without descriptions — 7-row layout:
- *   Row 0: prompt text + ▲▼ scroll arrows
- *   Rows 1-5: choices (scrolled, line-wrapped)
+ *   Row 0: prompt text
+ *   Rows 1-5: choices (scrolled, line-wrapped; ▲/▼ in left margin)
  *   Row 6: right-aligned help hint
  *
  * With descriptions — 10-row layout:
- *   Row 0: prompt text + ▲▼ scroll arrows
+ *   Row 0: prompt text
  *   Rows 1-3: fixed-height description of highlighted choice (dimmed)
- *   Rows 4-8: choices (scrolled, line-wrapped)
+ *   Rows 4-8: choices (scrolled, line-wrapped; ▲/▼ in left margin)
  *   Row 9: right-aligned help hint
+ *
+ * Scroll indicators (▲/▼) appear in the first column of the first/last
+ * visible choice row, vertically aligned. The cursor (>) shares the same
+ * column; arrows take priority over the cursor when both apply.
  */
 export function ChoiceOverlay({
   width,
@@ -85,7 +89,7 @@ export function ChoiceOverlay({
   const totalHeight = hasDescriptions ? 2 + MAX_CHOICE_ROWS + DESCRIPTION_ROWS : 2 + MAX_CHOICE_ROWS;
 
   // Pre-wrap all choice items
-  const prefixWidth = 2; // "> " or "  "
+  const prefixWidth = 2; // "> " or "▲ " etc.
   const labelWidth = Math.max(1, width - prefixWidth);
 
   interface WrappedItem { index: number; isCustom: boolean; lines: FormattingNode[][] }
@@ -139,12 +143,29 @@ export function ChoiceOverlay({
 
   const visibleItems = allItems.slice(scrollStart, scrollEnd);
 
-  // Truncate prompt to fit alongside arrows
-  const arrowWidth = 3; // " ▲▼"
-  const maxPromptLen = Math.max(1, width - arrowWidth);
+  // Flatten visible items into visual rows for arrow placement
+  interface VisualRow {
+    itemIndex: number;
+    isCustom: boolean;
+    isItemFirstLine: boolean;
+    nodes: FormattingNode[];
+  }
+  const visualRows: VisualRow[] = [];
+  for (const item of visibleItems) {
+    for (let lineIdx = 0; lineIdx < item.lines.length; lineIdx++) {
+      visualRows.push({
+        itemIndex: item.index,
+        isCustom: item.isCustom,
+        isItemFirstLine: lineIdx === 0,
+        nodes: item.lines[lineIdx],
+      });
+    }
+  }
+
+  // Truncate prompt to available width
   const displayPrompt =
-    prompt.length > maxPromptLen
-      ? prompt.slice(0, maxPromptLen - 1) + "…"
+    prompt.length > width
+      ? prompt.slice(0, width - 1) + "…"
       : prompt;
 
   // Description for highlighted choice (word-wrapped to fixed rows)
@@ -162,13 +183,9 @@ export function ChoiceOverlay({
 
   return (
     <Box flexDirection="column" height={totalHeight} width={width}>
-      {/* Row 0: prompt + scroll arrows */}
+      {/* Row 0: prompt text */}
       <Box>
-        <Box flexGrow={1}>
-          <Text>{displayPrompt}</Text>
-        </Box>
-        <Text color={canScrollUp ? "#aaff00" : undefined} dimColor={!canScrollUp}>▲</Text>
-        <Text color={canScrollDown ? "#aaff00" : undefined} dimColor={!canScrollDown}>▼</Text>
+        <Text>{displayPrompt}</Text>
       </Box>
 
       {/* Description region (fixed height, only when descriptions provided) */}
@@ -182,13 +199,32 @@ export function ChoiceOverlay({
         </Box>
       )}
 
-      {/* Choice rows (wrapping-aware) */}
-      {visibleItems.map((item) => {
-        const isSelected = item.index === selectedIndex;
-        if (item.isCustom && customInputActive) {
+      {/* Choice rows — scroll arrows in left margin, vertically aligned */}
+      {visualRows.map((row, rowIdx) => {
+        const isFirstRow = rowIdx === 0;
+        const isLastRow = rowIdx === visualRows.length - 1;
+        const isSelected = row.itemIndex === selectedIndex;
+
+        // Determine the prefix character: arrow takes priority over cursor
+        let prefixChar = " ";
+        let prefixColor: string | undefined;
+        if (isFirstRow && canScrollUp) {
+          prefixChar = "▲";
+          prefixColor = "#aaff00";
+        } else if (isLastRow && canScrollDown) {
+          prefixChar = "▼";
+          prefixColor = "#aaff00";
+        } else if (row.isItemFirstLine && isSelected) {
+          prefixChar = ">";
+        }
+
+        // Special rendering for active custom input
+        if (row.isCustom && customInputActive && row.isItemFirstLine) {
           return (
             <Box key="custom-active">
-              <Text>{"> "}</Text>
+              {prefixColor
+                ? <Text color={prefixColor}>{prefixChar + " "}</Text>
+                : <Text>{prefixChar + " "}</Text>}
               <InlineTextInput
                 key={customInputResetKey}
                 isDisabled={false}
@@ -198,14 +234,13 @@ export function ChoiceOverlay({
             </Box>
           );
         }
+
         return (
-          <Box key={item.index} flexDirection="column">
-            {item.lines.map((line, lineIdx) => (
-              <Box key={`${item.index}-${lineIdx}`}>
-                <Text>{lineIdx === 0 ? (isSelected ? "> " : "  ") : "  "}</Text>
-                <Text>{renderNodes(line)}</Text>
-              </Box>
-            ))}
+          <Box key={`${row.itemIndex}-${rowIdx}`}>
+            {prefixColor
+              ? <Text color={prefixColor}>{prefixChar + " "}</Text>
+              : <Text>{prefixChar + " "}</Text>}
+            <Text>{renderNodes(row.nodes)}</Text>
           </Box>
         );
       })}
