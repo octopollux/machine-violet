@@ -16,6 +16,8 @@ export interface GameState {
   decks: DecksState;
   config: CampaignConfig;
   campaignRoot: string;
+  /** Application home directory (e.g. ~/.machine-violet) for system content paths. */
+  homeDir: string;
   /** Index into config.players — tracks whose turn it is */
   activePlayerIndex: number;
   /** Per-character resource display keys */

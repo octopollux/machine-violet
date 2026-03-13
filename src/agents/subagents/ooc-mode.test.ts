@@ -607,6 +607,7 @@ function mockGameState(overrides?: Partial<GameState>): GameState {
       choices: { campaign_default: "often", player_overrides: {} },
     },
     campaignRoot: "/camp",
+    homeDir: "/tmp/home",
     activePlayerIndex: 0,
     displayResources: {},
     resourceValues: {},

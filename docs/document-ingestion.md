@@ -64,6 +64,7 @@ After cracking, the raw cached text is processed through a five-stage pipeline. 
     <category>/<entity>.md
   entities/                # Stage 3 output (merged)
     <category>/<entity>.md
+    <category>/facets.json # Stage 4 output (faceted entity index per category)
   index.md                 # Stage 4 output
   cheat-sheet.md           # Stage 4 output
   rule-card.md             # Stage 5 output (generated or copied from bundled)
@@ -94,7 +95,7 @@ Compare-and-merge draft entities against existing content. Supports adding addit
 
 ### Stage 4: Index (Haiku, oneShot)
 
-Build table of contents and DM cheat sheet from the final filesystem state.
+Build table of contents, DM cheat sheet, and faceted entity indexes from the final filesystem state. Each category directory gets a `facets.json` file containing all entity front matter fields as a structured index. This enables the `search_content` tool to find entities by mechanical properties (CR, level, type, etc.) without reading every entity file.
 
 ### Stage 5: Rule Card
 

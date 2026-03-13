@@ -303,6 +303,9 @@ export default function App({ shutdownRef }: AppProps) {
 
   // --- Build game state from config ---
   const buildGameState = useCallback((config: CampaignConfig, campaignRoot: string): GameState => {
+    const raw = readFileSync(getConfigPath(), "utf-8");
+    const appCfg = JSON.parse(raw);
+    const hd: string = appCfg.home_dir || getDefaultHomeDir();
     return {
       maps: {},
       clocks: createClocksState(),
@@ -311,11 +314,12 @@ export default function App({ shutdownRef }: AppProps) {
       decks: createDecksState(),
       config,
       campaignRoot,
+      homeDir: hd,
       activePlayerIndex: 0,
       displayResources: {},
       resourceValues: {},
     };
-  }, []);
+  }, [getConfigPath]);
 
   // --- Raw mode: keep Ink's stdin listener alive across phase transitions ---
   // eslint-disable-next-line @typescript-eslint/no-empty-function -- intentional no-op to keep raw mode alive

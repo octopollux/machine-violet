@@ -919,6 +919,29 @@ const TOOL_DEFS: RegisteredTool[] = [
     },
   },
 
+  // ====== CONTENT SEARCH ======
+  {
+    definition: {
+      name: "search_content",
+      description: "Search the game system's content library — monsters, spells, equipment, rules, etc. A search subagent queries faceted indexes by mechanical properties (CR, level, type, rarity) and returns matching entities with key stats. Use when you need to find entities by game-mechanical criteria.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          query: { type: "string", description: "What to search for — e.g. 'CR 8-12 dragons', 'level 3 evocation spells', 'heavy weapons'" },
+        },
+        required: ["query"],
+      },
+    },
+    handler: (_state, input) => {
+      const query = input.query as string;
+      if (!query || !query.trim()) {
+        return err("Query cannot be empty.");
+      }
+      // Actual search is handled by asyncToolHandler in game engine
+      return ok("search_content requires async handler");
+    },
+  },
+
   // ====== WORLDBUILDING ======
   {
     definition: {

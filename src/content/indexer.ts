@@ -14,6 +14,7 @@ import { getModel } from "../config/models.js";
 import { oneShot } from "../agents/subagent.js";
 import { processingPaths } from "./processing-paths.js";
 import { loadContentPrompt } from "./prompts/load-content-prompt.js";
+import { buildFacets } from "./facet-builder.js";
 
 /** Display labels for known content types. Unknown types get auto-capitalized. */
 const KNOWN_LABELS: Record<string, string> = {
@@ -133,6 +134,9 @@ export async function runIndexer(
     const cheatSheet = await buildCheatSheet(client, indexContent);
     await io.writeFile(paths.cheatSheet, cheatSheet);
   }
+
+  // Build faceted indexes per category
+  await buildFacets(io, homeDir, collectionSlug);
 
   return result;
 }

@@ -120,9 +120,9 @@ describe("runIndexer", () => {
     },
   } as unknown as Anthropic;
 
-  it("writes index.md and cheat-sheet.md", async () => {
+  it("writes index.md, cheat-sheet.md, and facets.json", async () => {
     const io = mockIO({
-      "/home/systems/d-d-5e/entities/monsters/goblin.md": "# Goblin",
+      "/home/systems/d-d-5e/entities/monsters/goblin.md": "# Goblin\n\n**CR:** 1/4\n",
       "/home/systems/d-d-5e/entities/rules/combat.md": "# Combat",
     });
 
@@ -137,6 +137,13 @@ describe("runIndexer", () => {
     // Cheat sheet was written
     const cheatPath = "/home/systems/d-d-5e/cheat-sheet.md";
     expect(io.files[cheatPath]).toContain("Cheat Sheet");
+
+    // Facets were written
+    const facetsPath = "/home/systems/d-d-5e/entities/monsters/facets.json";
+    expect(io.files[facetsPath]).toBeDefined();
+    const facets = JSON.parse(io.files[facetsPath]);
+    expect(facets.category).toBe("monsters");
+    expect(facets.entities[0].fields.cr).toBe("1/4");
   });
 
   it("skips cheat sheet when no entities", async () => {

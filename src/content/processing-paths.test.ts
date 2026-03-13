@@ -39,6 +39,12 @@ describe("processingPaths", () => {
     expect(norm(paths.cheatSheet)).toContain("systems/d-d-5e/cheat-sheet.md");
   });
 
+  it("builds facets path per category", () => {
+    expect(norm(paths.facets("monsters"))).toContain(
+      "entities/monsters/facets.json",
+    );
+  });
+
   it("builds rule card path", () => {
     expect(norm(paths.ruleCard)).toContain("systems/d-d-5e/rule-card.md");
   });

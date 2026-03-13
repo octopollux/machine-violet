@@ -42,6 +42,8 @@ export function processingPaths(homeDir: string, collectionSlug: string) {
     index: join(base, "index.md"),
     /** Stage 4 output — cheat sheet. */
     cheatSheet: join(base, "cheat-sheet.md"),
+    /** Stage 4 output — faceted entity index per category. */
+    facets: (category: string) => join(base, "entities", category, "facets.json"),
     /** Stage 5 output — rule card. */
     ruleCard: join(base, "rule-card.md"),
   };
