@@ -7,20 +7,15 @@
 
 // Types
 export type {
-  ChunkStatus,
-  ChunkRecord,
   JobStatus,
   IngestJob,
   CollectionManifest,
-  PdfChunk,
   PdfInfo,
-  BatchSubmission,
   PageExtractionResult,
-  ChunkExtractionResult,
 } from "./types.js";
 
-// PDF splitting
-export { getPdfInfo, splitPdf, DEFAULT_CHUNK_SIZE } from "./pdf-split.js";
+// PDF info (validation)
+export { getPdfInfo } from "./pdf-split.js";
 
 // PDF text extraction (local, no API)
 export { extractTextFromPdf } from "./pdf-extract.js";
@@ -40,9 +35,6 @@ export {
   recomputeJobStatus,
 } from "./job-manager.js";
 
-// Batch API client (retained for future use with processing pipeline)
-export { buildBatchRequests, submitBatch, pollBatch, collectResults, parsePageDelimiters } from "./batch-client.js";
-
 // Cache writer
 export { writeChunkPages, writeBatchResults } from "./cache-writer.js";
 
@@ -52,3 +44,8 @@ export {
   runIngestPipeline,
 } from "./ingest.js";
 export type { IngestProgress, ProgressCallback, ValidatedPdf } from "./ingest.js";
+
+// NOTE: batch-client.ts, pdf-split.ts (splitPdf), and their types are
+// retained internally for the future content processing pipeline, which
+// will use the Batch API for Haiku-powered classification and extraction.
+// They are not re-exported here because they are not needed by consumers.
