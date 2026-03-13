@@ -41,8 +41,10 @@ export async function generateChoices(
   client: Anthropic,
   recentNarration: string,
   characterName: string,
+  playerAction?: string,
 ): Promise<GeneratedChoices> {
-  const userMessage = `Character: ${characterName}\n\nDM narration:\n${recentNarration}`;
+  const actionContext = playerAction ? `\n\nPlayer's last action:\n${playerAction}` : "";
+  const userMessage = `Character: ${characterName}${actionContext}\n\nDM narration:\n${recentNarration}`;
 
   const result = await oneShot(
     client,

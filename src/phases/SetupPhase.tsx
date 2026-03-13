@@ -6,6 +6,7 @@ import type { ResolvedTheme } from "../tui/themes/types.js";
 import { appendDelta } from "../tui/narrative-helpers.js";
 import { Layout } from "../tui/layout.js";
 import { ChoiceOverlay, DESCRIPTION_ROWS } from "../tui/modals/index.js";
+import { stripFormatting } from "../tui/formatting.js";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
 import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
@@ -67,8 +68,11 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
     setSetupConvoLines((prev) => [...prev, { kind: "dm", text: "" }]);
 
     if (result.pendingChoices) {
-      setChoiceIndex(0);
-      setCustomInputActive(false);
+      // When fewer than 5 options, default focus to "Enter your own" so the user can freely type
+      const customIndex = result.pendingChoices.choices.length;
+      setChoiceIndex(customIndex < 5 ? customIndex : 0);
+      setCustomInputActive(customIndex < 5);
+
       setActiveModal({
         kind: "choice",
         prompt: result.pendingChoices.prompt,
@@ -226,7 +230,7 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
             setCustomInputActive(true);
             return;
           }
-          const chosen = activeModal.choices[choiceIndex];
+          const chosen = stripFormatting(activeModal.choices[choiceIndex]);
           resolveSetupChoice(chosen);
           return;
         }

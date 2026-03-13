@@ -6,6 +6,7 @@ import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, narrativeRows } from "../tui/responsive.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { Layout } from "../tui/layout.js";
+import { stripFormatting } from "../tui/formatting.js";
 import { ChoiceOverlay, DESCRIPTION_ROWS, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, ApiErrorModal, SwatchModal, getMenuItems } from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { getActivePlayer, switchToNextPlayer, getPlayerEntries } from "../agents/player-manager.js";
@@ -50,6 +51,14 @@ export function PlayingPhase() {
   const [modeBusy, setModeBusy] = useState(false);
   const [customInputMode, setCustomInputMode] = useState(false);
   const [customInputResetKey, setCustomInputResetKey] = useState(0);
+
+  // When a choice modal appears with <5 options, default focus lands on "Enter your own"
+  // so choiceIndex === choices.length — activate custom input mode to match.
+  useEffect(() => {
+    if (activeModal?.kind === "choice" && choiceIndex === activeModal.choices.length) {
+      setCustomInputMode(true);
+    }
+  }, [activeModal, choiceIndex]);
 
   const clearInput = useCallback(() => {
     setResetKey((k) => k + 1);
@@ -258,7 +267,7 @@ export function PlayingPhase() {
           setCustomInputMode(true);
           return;
         }
-        const chosen = activeModal.choices[choiceIndex];
+        const chosen = stripFormatting(activeModal.choices[choiceIndex]);
         setActiveModal(null);
         setChoiceIndex(0);
         setCustomInputMode(false);

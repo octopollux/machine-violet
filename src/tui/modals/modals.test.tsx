@@ -201,6 +201,29 @@ describe("ChoiceOverlay", () => {
     expect(frame).toContain("ESC back");
   });
 
+  it("renders formatted choice labels without raw tags", () => {
+    const { lastFrame } = render(
+      <ChoiceOverlay
+        width={60}
+        prompt="Pick a mood"
+        choices={[
+          "<color=#cc4444>Dread and Horror</color> — Slow burn",
+          "<b>Grim Survival</b> — Desperate",
+        ]}
+        selectedIndex={0}
+      />,
+    );
+    const frame = lastFrame()!;
+    // Formatted text is present
+    expect(frame).toContain("Dread and Horror");
+    expect(frame).toContain("Grim Survival");
+    // Raw tags are not
+    expect(frame).not.toContain("<color=");
+    expect(frame).not.toContain("</color>");
+    expect(frame).not.toContain("<b>");
+    expect(frame).not.toContain("</b>");
+  });
+
   it("renders within 7 rows", () => {
     const { lastFrame } = render(
       <ChoiceOverlay

@@ -120,7 +120,8 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
           const descriptions = Array.isArray(rawDescs) && rawDescs.length > 0
             ? rawDescs.map((d: unknown) => typeof d === "string" ? d : String(d))
             : undefined;
-          setChoiceIndex(0);
+          // When fewer than 5 options, default focus to "Enter your own" so the user can freely type
+          setChoiceIndex(choices.length < 5 ? choices.length : 0);
           setActiveModal({ kind: "choice", prompt: (cmd.prompt as string) || "What do you do?", choices, descriptions });
         }
         break;
@@ -180,7 +181,7 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
     onNarrativeDelta(delta: string) {
       setNarrativeLines((prev) => appendDelta(prev, delta, "dm"));
     },
-    onNarrativeComplete(text: string) {
+    onNarrativeComplete(text: string, playerAction?: string) {
       setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }]);
 
       const gs = gameStateRef.current;
@@ -191,12 +192,13 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
           if (isDevMode()) {
             setNarrativeLines((prev) => [...prev, { kind: "dev", text: "[dev] subagent:choices starting" }]);
           }
-          generateChoices(clientRef.current, text, activePlayer.characterName).then((result) => {
+          generateChoices(clientRef.current, text, activePlayer.characterName, playerAction).then((result) => {
             if (isDevMode()) {
               setNarrativeLines((prev) => [...prev, { kind: "dev", text: `[dev] subagent:choices \u2192 ${result.choices.length} options generated` }]);
             }
             if (!activeModalRef.current && result.choices.length > 0) {
-              setChoiceIndex(0);
+              // When fewer than 5 options, default focus to "Enter your own"
+              setChoiceIndex(result.choices.length < 5 ? result.choices.length : 0);
               setActiveModal({ kind: "choice", prompt: "What do you do?", choices: result.choices });
             }
             costTracker.current?.record(result.usage, "small");

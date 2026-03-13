@@ -5,7 +5,7 @@ Game initialization takes the player from first launch to gameplay. After a one-
 ## Design Principles
 
 - **Single conversational path.** There is one "New Campaign" entry point, with the setup agent offering Quick Start or Full Setup within the conversation. No separate code paths.
-- **Options, not interrogation.** Each decision point offers 2-5 choices via `present_choices`, plus freeform input via "Enter your own". The player picks one or types something else.
+- **Options, not interrogation.** Each decision point offers 2-10 choices via `present_choices`, plus freeform input via "Enter your own". The player picks one or types something else. When fewer than 5 options are shown, focus defaults to "Enter your own" so the player can freely type.
 - **"Show me more ideas" is always available.** Every `present_choices` call includes this as the last option. The app automatically appends "Enter your own" below it.
 - **Pre-finalize review is mandatory.** Before calling `finalize_setup`, the agent reads back the full configuration in natural language and asks the player to confirm or request changes.
 - **Setup is dramatic.** The setup agent has personality — it's not a form wizard, it's the opening act. It sets the tone before the DM (Opus) takes over.

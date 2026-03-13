@@ -331,7 +331,7 @@ A core UX element. The DM (or the engine) presents the player with structured op
 
 **`present_choices`** — The DM's tool for this. Two modes:
 
-No parameters (default): A Haiku subagent reads recent context and generates 2-3 reasonable options. Cheap, fast, doesn't need to be brilliant — freeform is always available.
+No parameters (default): A Haiku subagent reads recent context and generates 2-3 reasonable options. Cheap, fast, doesn't need to be brilliant — freeform is always available. When fewer than 5 options are shown, focus defaults to "Enter your own" so the player can freely type and press Enter without navigating.
 
 ```
 present_choices({})

@@ -76,6 +76,11 @@ export function toPlainText(nodes: FormattingNode[]): string {
     .join("");
 }
 
+/** Parse and strip formatting tags from a string, returning plain text. */
+export function stripFormatting(input: string): string {
+  return toPlainText(parseFormatting(input));
+}
+
 /**
  * Compute the visible length of a FormattingNode array (strip all tags).
  */
