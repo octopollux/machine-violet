@@ -22,6 +22,10 @@ export type {
 // PDF splitting
 export { getPdfInfo, splitPdf, DEFAULT_CHUNK_SIZE } from "./pdf-split.js";
 
+// PDF text extraction (local, no API)
+export { extractTextFromPdf } from "./pdf-extract.js";
+export type { ExtractionResult } from "./pdf-extract.js";
+
 // Job management
 export {
   ingestPaths,
@@ -36,7 +40,7 @@ export {
   recomputeJobStatus,
 } from "./job-manager.js";
 
-// Batch API client
+// Batch API client (retained for future use with processing pipeline)
 export { buildBatchRequests, submitBatch, pollBatch, collectResults, parsePageDelimiters } from "./batch-client.js";
 
 // Cache writer
@@ -46,6 +50,5 @@ export { writeChunkPages, writeBatchResults } from "./cache-writer.js";
 export {
   validatePdfs,
   runIngestPipeline,
-  resumeInterruptedJobs,
 } from "./ingest.js";
 export type { IngestProgress, ProgressCallback, ValidatedPdf } from "./ingest.js";

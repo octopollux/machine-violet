@@ -34,6 +34,7 @@
     "ink-scroll-view": "^0.3.6",
     "isomorphic-git": "^1.37.1",
     "pdf-lib": "^1.17.1",
+    "pdf-parse": "^2.4.5",
     "react": "^19.0.0"
   },
   "devDependencies": {

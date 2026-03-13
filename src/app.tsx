@@ -627,7 +627,6 @@ export default function App({ shutdownRef }: AppProps) {
   const handleAddContentSubmit = useCallback((collection: string, pdfs: ValidatedPdf[]) => {
     (async () => {
       try {
-        const client = new Anthropic();
         const configPath = getConfigPath();
         const raw = readFileSync(configPath, "utf-8");
         const config = JSON.parse(raw);
@@ -637,7 +636,7 @@ export default function App({ shutdownRef }: AppProps) {
           setContentStatusMsg(progress.message ?? `${progress.phase}...`);
         };
 
-        await runIngestPipeline(client, fileIO.current, homeDir, collection, pdfs, onProgress);
+        await runIngestPipeline(fileIO.current, homeDir, collection, pdfs, onProgress);
         setContentStatusMsg("Done! Returning to menu...");
         setTimeout(() => {
           setContentStatusMsg(null);

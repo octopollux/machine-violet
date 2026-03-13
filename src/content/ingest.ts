@@ -1,37 +1,33 @@
 /**
- * Ingest orchestrator — top-level API for PDF cracking.
+ * Ingest orchestrator — top-level API for PDF text extraction.
  *
- * This is the entry point that the TUI calls. It coordinates:
- * 1. PDF validation and splitting
- * 2. Job creation and persistence
- * 3. Batch submission
- * 4. Polling and result collection
- * 5. Cache writing
+ * Uses local text extraction (pdf-parse) instead of the Claude API.
+ * This is a mechanical operation — no AI involved, no API calls,
+ * no cost, nearly instant.
  *
- * All operations are idempotent where possible.
+ * The extracted text is cached to disk per-page so the downstream
+ * processing pipeline can read it cheaply and repeatedly.
  */
 
-import type Anthropic from "@anthropic-ai/sdk";
 import type { FileIO } from "../agents/scene-manager.js";
-import type { IngestJob, BatchSubmission } from "./types.js";
-import { getPdfInfo, splitPdf } from "./pdf-split.js";
-import { buildBatchRequests, submitBatch, pollBatch, collectResults } from "./batch-client.js";
+import type { IngestJob } from "./types.js";
+import { getPdfInfo } from "./pdf-split.js";
+import { extractTextFromPdf } from "./pdf-extract.js";
 import {
   createJob,
   saveJob,
   saveCollectionManifest,
   updateChunkStatus,
   recomputeJobStatus,
+  ingestPaths,
   slugify,
 } from "./job-manager.js";
-import { writeBatchResults } from "./cache-writer.js";
 
 // --- Types for progress callbacks ---
 
 export interface IngestProgress {
-  phase: "splitting" | "submitting" | "polling" | "collecting" | "writing" | "done";
+  phase: "extracting" | "writing" | "done";
   jobName: string;
-  /** For splitting: pages processed. For polling: chunks completed. */
   current?: number;
   total?: number;
   message?: string;
@@ -69,17 +65,11 @@ export async function validatePdfs(filePaths: string[]): Promise<ValidatedPdf[]>
 // --- Full ingest pipeline ---
 
 /**
- * Run the full PDF cracking pipeline for a collection of PDFs.
+ * Run the PDF text extraction pipeline for a collection of PDFs.
  *
- * This is the main entry point. It:
- * 1. Splits each PDF into 30-page chunks
- * 2. Creates jobs and persists them
- * 3. Submits all chunks as one batch
- * 4. Polls until complete
- * 5. Collects results and writes to cache
- * 6. Updates job statuses
+ * Extracts text locally using pdf-parse (no API calls), then writes
+ * per-page markdown files to the ingest cache.
  *
- * @param client - Anthropic API client.
  * @param io - FileIO for persistence.
  * @param homeDir - Application home directory.
  * @param collection - User-provided collection name.
@@ -88,7 +78,6 @@ export async function validatePdfs(filePaths: string[]): Promise<ValidatedPdf[]>
  * @returns Array of completed jobs.
  */
 export async function runIngestPipeline(
-  client: Anthropic,
   io: FileIO,
   homeDir: string,
   collection: string,
@@ -96,199 +85,84 @@ export async function runIngestPipeline(
   onProgress?: ProgressCallback,
 ): Promise<IngestJob[]> {
   const jobs: IngestJob[] = [];
-  const allRequests: Anthropic.Messages.Batches.BatchCreateParams.Request[] = [];
-  const chunkMaps: BatchSubmission["chunkMap"] = {};
+  const collectionSlug = slugify(collection);
 
-  // Phase 1: Split PDFs and create jobs
   for (const pdf of pdfs) {
+    const jobName = `${collection} — ${pdf.baseName}`;
+
     onProgress?.({
-      phase: "splitting",
-      jobName: `${collection} — ${pdf.baseName}`,
-      message: `Splitting ${pdf.baseName} (${pdf.pageCount} pages)...`,
+      phase: "extracting",
+      jobName,
+      message: `Extracting text from ${pdf.baseName} (${pdf.pageCount} pages)...`,
+      current: 0,
+      total: pdf.pageCount,
     });
 
-    const chunks = await splitPdf(pdf.filePath);
-    const job = createJob(collection, pdf.baseName, pdf.filePath, pdf.pageCount, chunks);
+    // Create a job with a single "chunk" representing the whole PDF
+    // (we no longer split for API submission, but keep the job structure
+    // for consistency with the cache layout and status tracking)
+    const job = createJob(collection, pdf.baseName, pdf.filePath, pdf.pageCount, [
+      { index: 0, startPage: 1, endPage: pdf.pageCount, pdfBase64: "" },
+    ]);
 
-    // Build batch requests for this job's chunks
-    const requests = buildBatchRequests(job.id, chunks);
+    // Extract text locally
+    const extraction = await extractTextFromPdf(pdf.filePath);
 
-    // Update chunk custom_ids on the job
-    for (let i = 0; i < requests.length; i++) {
-      job.chunks[i].customId = requests[i].custom_id;
-      job.chunks[i].status = "submitted";
-      chunkMaps[requests[i].custom_id] = { jobId: job.id, chunkIndex: i };
+    // Write pages to cache
+    onProgress?.({
+      phase: "writing",
+      jobName,
+      message: `Writing ${extraction.pages.length} pages to cache...`,
+      current: 0,
+      total: extraction.pages.length,
+    });
+
+    const paths = ingestPaths(homeDir);
+    const jobSlug = slugify(pdf.baseName);
+    const pagesDir = paths.pagesDir(collectionSlug, jobSlug);
+    await io.mkdir(pagesDir);
+
+    let written = 0;
+    for (const page of extraction.pages) {
+      if (page.text.length > 0) {
+        const pagePath = paths.pageFile(collectionSlug, jobSlug, page.pageNumber);
+        await io.writeFile(pagePath, page.text);
+        written++;
+      }
     }
 
-    job.status = "submitted";
+    // Update job status
+    updateChunkStatus(job, 0, written > 0 ? "succeeded" : "errored",
+      written === 0 ? "No text extracted from any page" : undefined);
+    job.pagesCompleted = written;
+    job.pagesFailed = extraction.emptyPages;
+    job.status = written > 0 ? "complete" : "failed";
+
     await saveJob(io, homeDir, job);
     jobs.push(job);
-    allRequests.push(...requests);
-  }
 
-  // Phase 2: Submit all chunks as one batch
-  onProgress?.({
-    phase: "submitting",
-    jobName: collection,
-    message: `Submitting ${allRequests.length} chunks to batch API...`,
-    total: allRequests.length,
-  });
-
-  const batch = await client.messages.batches.create({ requests: allRequests });
-  const batchId = batch.id;
-
-  // Record batch ID on all jobs
-  for (const job of jobs) {
-    job.batchId = batchId;
-    job.status = "processing";
-    await saveJob(io, homeDir, job);
+    onProgress?.({
+      phase: "writing",
+      jobName,
+      message: `${pdf.baseName}: ${written} pages extracted` +
+        (extraction.emptyPages.length > 0 ? ` (${extraction.emptyPages.length} empty pages)` : ""),
+      current: written,
+      total: pdf.pageCount,
+    });
   }
 
   // Save collection manifest
   await saveCollectionManifest(io, homeDir, collection, jobs.map((j) => j.id));
 
-  // Phase 3: Poll until done
-  onProgress?.({
-    phase: "polling",
-    jobName: collection,
-    message: "Waiting for batch processing...",
-    current: 0,
-    total: allRequests.length,
-  });
-
-  await pollBatch(client, batchId, 5000, (counts) => {
-    onProgress?.({
-      phase: "polling",
-      jobName: collection,
-      message: `Processing: ${counts.succeeded} succeeded, ${counts.processing} in progress`,
-      current: counts.succeeded + counts.errored + counts.canceled + counts.expired,
-      total: allRequests.length,
-    });
-  });
-
-  // Phase 4: Collect results
-  onProgress?.({
-    phase: "collecting",
-    jobName: collection,
-    message: "Collecting results...",
-  });
-
-  const results = await collectResults(client, batchId);
-
-  // Phase 5: Write pages and update job statuses
-  for (const result of results) {
-    const mapping = chunkMaps[result.customId];
-    if (!mapping) continue;
-
-    const job = jobs.find((j) => j.id === mapping.jobId);
-    if (!job) continue;
-
-    if (result.error) {
-      updateChunkStatus(job, mapping.chunkIndex, "errored", result.error);
-    } else {
-      updateChunkStatus(job, mapping.chunkIndex, "succeeded");
-
-      onProgress?.({
-        phase: "writing",
-        jobName: job.name,
-        message: `Writing pages for chunk ${mapping.chunkIndex + 1}...`,
-      });
-
-      await writeBatchResults(io, homeDir, job, [result]);
-    }
-  }
-
-  // Finalize job statuses
-  for (const job of jobs) {
-    recomputeJobStatus(job);
-    await saveJob(io, homeDir, job);
-  }
+  const totalPages = jobs.reduce((sum, j) => sum + j.pagesCompleted, 0);
+  const totalEmpty = jobs.reduce((sum, j) => sum + j.pagesFailed.length, 0);
 
   onProgress?.({
     phase: "done",
     jobName: collection,
-    message: `Done. ${jobs.reduce((sum, j) => sum + j.pagesCompleted, 0)} pages extracted.`,
+    message: `Done. ${totalPages} pages extracted` +
+      (totalEmpty > 0 ? `, ${totalEmpty} empty pages skipped` : "") + ".",
   });
 
   return jobs;
-}
-
-/**
- * Resume polling and collection for jobs that were interrupted.
- *
- * Finds jobs with status "submitted" or "processing" and resumes
- * from where they left off.
- */
-export async function resumeInterruptedJobs(
-  client: Anthropic,
-  io: FileIO,
-  homeDir: string,
-  jobs: IngestJob[],
-  onProgress?: ProgressCallback,
-): Promise<void> {
-  // Group by batchId
-  const byBatch = new Map<string, IngestJob[]>();
-  for (const job of jobs) {
-    if (!job.batchId) continue;
-    if (job.status !== "submitted" && job.status !== "processing") continue;
-    const group = byBatch.get(job.batchId) ?? [];
-    group.push(job);
-    byBatch.set(job.batchId, group);
-  }
-
-  for (const [batchId, batchJobs] of byBatch) {
-    // Build chunk map from jobs
-    const chunkMaps: BatchSubmission["chunkMap"] = {};
-    for (const job of batchJobs) {
-      for (const chunk of job.chunks) {
-        if (chunk.customId) {
-          chunkMaps[chunk.customId] = { jobId: job.id, chunkIndex: chunk.index };
-        }
-      }
-    }
-
-    // Check batch status
-    const batch = await client.messages.batches.retrieve(batchId);
-
-    if (batch.processing_status !== "ended") {
-      // Still processing — poll
-      onProgress?.({
-        phase: "polling",
-        jobName: batchJobs[0].collection,
-        message: `Resuming poll for batch ${batchId}...`,
-      });
-
-      await pollBatch(client, batchId, 5000, (counts) => {
-        onProgress?.({
-          phase: "polling",
-          jobName: batchJobs[0].collection,
-          current: counts.succeeded + counts.errored,
-          total: counts.processing + counts.succeeded + counts.errored + counts.canceled + counts.expired,
-        });
-      });
-    }
-
-    // Collect and write
-    const results = await collectResults(client, batchId);
-
-    for (const result of results) {
-      const mapping = chunkMaps[result.customId];
-      if (!mapping) continue;
-
-      const job = batchJobs.find((j) => j.id === mapping.jobId);
-      if (!job) continue;
-
-      if (result.error) {
-        updateChunkStatus(job, mapping.chunkIndex, "errored", result.error);
-      } else {
-        updateChunkStatus(job, mapping.chunkIndex, "succeeded");
-        await writeBatchResults(io, homeDir, job, [result]);
-      }
-    }
-
-    for (const job of batchJobs) {
-      recomputeJobStatus(job);
-      await saveJob(io, homeDir, job);
-    }
-  }
 }
