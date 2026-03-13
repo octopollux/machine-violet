@@ -6,6 +6,7 @@ import type { AddContentPhaseProps } from "./AddContentPhase.js";
 import { resetThemeCache, resolveTheme, BUILTIN_DEFINITIONS } from "../tui/themes/index.js";
 import { resetPromptCache } from "../prompts/load-prompt.js";
 import type { ValidatedPdf } from "../content/index.js";
+import type { AvailableSystem } from "../config/systems.js";
 
 beforeEach(() => {
   resetPromptCache();
@@ -17,9 +18,14 @@ function makeTheme() {
   return resolveTheme(def, "exploration", "#8888aa");
 }
 
+const defaultSystems: AvailableSystem[] = [
+  { slug: "dnd-5e", name: "D&D 5th Edition", bundled: true, hasRuleCard: true, processed: false },
+];
+
 function defaultProps(overrides?: Partial<AddContentPhaseProps>): AddContentPhaseProps {
   return {
     theme: makeTheme(),
+    systems: defaultSystems,
     onSubmit: vi.fn(),
     onCancel: vi.fn(),
     validatePdf: vi.fn(async (path: string) => ({
@@ -37,40 +43,74 @@ describe("AddContentPhase", () => {
     expect(lastFrame()).toContain("Add Content");
   });
 
-  it("shows collection name prompt initially", () => {
+  it("shows system picker initially", () => {
     const { lastFrame } = render(<AddContentPhase {...defaultProps()} />);
-    expect(lastFrame()).toContain("Name this collection");
+    expect(lastFrame()).toContain("Select a game system");
+    expect(lastFrame()).toContain("D&D 5th Edition");
+    expect(lastFrame()).toContain("Other");
   });
 
-  it("calls onCancel on Escape from name step", async () => {
+  it("shows checkmark for processed systems", () => {
+    const processedSystems: AvailableSystem[] = [
+      { slug: "dnd-5e", name: "D&D 5th Edition", bundled: true, hasRuleCard: true, processed: true },
+    ];
+    const { lastFrame } = render(<AddContentPhase {...defaultProps({ systems: processedSystems })} />);
+    expect(lastFrame()).toContain("\u2713");
+  });
+
+  it("calls onCancel on Escape from pick step", async () => {
     const onCancel = vi.fn();
     const { stdin } = render(<AddContentPhase {...defaultProps({ onCancel })} />);
-    // Ink's escape key is represented as the escape character
     stdin.write("\u001B");
-    // useInput processes escape asynchronously in ink-testing-library
     await vi.waitFor(() => {
       expect(onCancel).toHaveBeenCalled();
     });
   });
 
-  it("advances to drop step after entering collection name", async () => {
+  it("advances to drop step after selecting a known system", async () => {
     const { stdin, lastFrame } = render(<AddContentPhase {...defaultProps()} />);
-    // Type a collection name and press Enter
-    stdin.write("D&D 5e");
+    // First option is already selected, press Enter
     stdin.write("\r");
 
-    // Should now show the collection name and drop prompt
     await vi.waitFor(() => {
-      expect(lastFrame()).toContain("D&D 5e");
+      expect(lastFrame()).toContain("D&D 5th Edition");
       expect(lastFrame()).toContain("Drop PDF");
     });
   });
 
-  it("shows error for empty collection name", async () => {
-    const { stdin, lastFrame } = render(<AddContentPhase {...defaultProps()} />);
-    stdin.write("\r"); // Enter with no input
+  it("shows name input when Other is selected", async () => {
+    // Pass only empty systems so Other is the first (and only non-Other) option
+    const emptySystemsList: AvailableSystem[] = [];
+    const { stdin, lastFrame } = render(
+      <AddContentPhase {...defaultProps({ systems: emptySystemsList })} />,
+    );
+    // Only option is "Other", already selected — press Enter
+    stdin.write("\r");
+
     await vi.waitFor(() => {
-      expect(lastFrame()).toContain("cannot be empty");
+      expect(lastFrame()).toContain("Name this system");
+    });
+  });
+
+  it("advances to drop step after entering custom name", async () => {
+    const emptySystemsList: AvailableSystem[] = [];
+    const { stdin, lastFrame } = render(
+      <AddContentPhase {...defaultProps({ systems: emptySystemsList })} />,
+    );
+    // Select Other
+    stdin.write("\r");
+
+    await vi.waitFor(() => {
+      expect(lastFrame()).toContain("Name this system");
+    });
+
+    // Type a custom name
+    stdin.write("Cairn");
+    stdin.write("\r");
+
+    await vi.waitFor(() => {
+      expect(lastFrame()).toContain("Cairn");
+      expect(lastFrame()).toContain("Drop PDF");
     });
   });
 
@@ -84,8 +124,7 @@ describe("AddContentPhase", () => {
       <AddContentPhase {...defaultProps({ validatePdf })} />,
     );
 
-    // Enter collection name
-    stdin.write("D&D 5e");
+    // Select first system
     stdin.write("\r");
 
     await vi.waitFor(() => {
@@ -112,8 +151,7 @@ describe("AddContentPhase", () => {
       <AddContentPhase {...defaultProps({ validatePdf })} />,
     );
 
-    // Enter collection name
-    stdin.write("Test");
+    // Select first system
     stdin.write("\r");
 
     await vi.waitFor(() => {

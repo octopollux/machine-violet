@@ -6,7 +6,7 @@
  * using Haiku/Sonnet with few-shot examples from bundled systems.
  */
 
-import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, copyFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { FileIO } from "../agents/scene-manager.js";
@@ -24,6 +24,21 @@ import { loadContentPrompt } from "./prompts/load-content-prompt.js";
 export function hasHandAuthoredRuleCard(projectRoot: string, collectionSlug: string): boolean {
   const ruleCardPath = join(projectRoot, "systems", collectionSlug, "rule-card.md");
   return existsSync(ruleCardPath);
+}
+
+/**
+ * Copy the bundled rule card to the processed output directory.
+ * Ensures ~/.machine-violet/systems/<slug>/rule-card.md always has the best available card.
+ */
+export function copyBundledRuleCard(
+  projectRoot: string,
+  collectionSlug: string,
+  homeDir: string,
+): void {
+  const src = join(projectRoot, "systems", collectionSlug, "rule-card.md");
+  const paths = processingPaths(homeDir, collectionSlug);
+  mkdirSync(join(paths.base), { recursive: true });
+  copyFileSync(src, paths.ruleCard);
 }
 
 /**
@@ -127,8 +142,9 @@ export async function runRuleCardGen(
   collectionSlug: string,
   projectRoot: string,
 ): Promise<boolean> {
-  // Skip if hand-authored rule card exists
+  // Copy bundled rule card if one exists
   if (hasHandAuthoredRuleCard(projectRoot, collectionSlug)) {
+    copyBundledRuleCard(projectRoot, collectionSlug, homeDir);
     return false;
   }
 

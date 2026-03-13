@@ -1,6 +1,6 @@
 # Document Ingestion
 
-PDF text extraction is implemented. Content processing is planned.
+PDF text extraction and content processing are implemented as a unified flow.
 
 Tracked in [#67](https://github.com/Orthodox-531/machine-violet/issues/67).
 
@@ -8,22 +8,23 @@ Tracked in [#67](https://github.com/Orthodox-531/machine-violet/issues/67).
 
 The pipeline has two distinct operations, separated by a durable cache:
 
-1. **PDF Cracking** (implemented) — local text extraction, no AI, no API calls
-2. **Content Processing** (planned) — Haiku-powered classification and organization
+1. **PDF Cracking** — local text extraction, no AI, no API calls
+2. **Content Processing** — Haiku-powered classification, extraction, merging, indexing, and rule card generation
 
 The content pipeline (`src/content/`) is **completely separate** from the game engine. They share only a filesystem format as interface.
 
-## PDF Cracking (Implemented)
-
-### User flow
+## User Flow
 
 1. User selects "Add Content" from the Main Menu
-2. User names a **collection** (e.g. "D&D 5e") — the grouping key for related PDFs
+2. User picks a **game system** from the system picker (known systems like "D&D 5th Edition" or custom via "Other")
 3. User drops one or more PDF file paths
 4. App validates PDFs and displays page counts
-5. On confirmation, text is extracted locally and cached
+5. On confirmation, the full pipeline runs:
+   - Text extraction (local, instant)
+   - 5-stage content processing (Haiku, uses Batch API)
+6. Processed output lands at `~/.machine-violet/systems/<slug>/`
 
-### How it works
+## PDF Cracking
 
 Text extraction uses `pdf-parse` (built on Mozilla's pdf.js) to read embedded text layers directly from PDF pages. This is a mechanical operation — no AI, no API calls, no cost, nearly instant. Most commercial RPG sourcebooks have embedded text layers.
 
@@ -34,17 +35,14 @@ Pages that yield no text (full-art pages, image-only scans) are tracked as empty
 ```
 ~/.machine-violet/ingest/
   cache/
-    <collection-slug>/
-      manifest.json                     # collection-level metadata
+    <system-slug>/
       <pdf-basename-slug>/
         pages/
           0001.md ... 0343.md           # one file per page, raw extracted text
   jobs/
-    <collection-slug>/
+    <system-slug>/
       <pdf-basename-slug>.json          # job status, page counts, errors
 ```
-
-Job naming: `{collection} — {PDF basename}` (e.g. "D&D 5e — Dungeon Master's Guide").
 
 ### Why not the Claude API?
 
@@ -52,15 +50,30 @@ The original design used the Claude API's native PDF support with Haiku for extr
 
 The Batch API client (`src/content/batch-client.ts`) is retained for the content processing pipeline, where AI is needed for *understanding* content, not reproducing it.
 
-## Content Processing (Planned)
+## Content Processing
 
 After cracking, the raw cached text is processed through a five-stage pipeline. Each stage reads from the previous stage's output, never from the PDF.
 
-### Stage 1: Classifier (Haiku)
+### Output structure
+
+```
+~/.machine-violet/systems/<slug>/
+  pipeline.json            # stage tracking for resume
+  catalog.json             # Stage 1 output
+  drafts/                  # Stage 2 output
+    <category>/<entity>.md
+  entities/                # Stage 3 output (merged)
+    <category>/<entity>.md
+  index.md                 # Stage 4 output
+  cheat-sheet.md           # Stage 4 output
+  rule-card.md             # Stage 5 output (generated or copied from bundled)
+```
+
+### Stage 1: Classifier (Haiku, Batch API)
 
 Reads cached page text in 20-page overlapping chunks (2-page overlap). Produces a structured content catalog mapping page ranges to content types. This catalog is a retainable intermediate artifact.
 
-### Stage 2: Extractors (Haiku, parallelizable)
+### Stage 2: Extractors (Haiku, Batch API)
 
 One job per catalog section, specialized by content type:
 - Monsters / creatures
@@ -75,17 +88,21 @@ One job per catalog section, specialized by content type:
 
 Every entity gets its own file (full granularity). Uses the Batch API for cost efficiency.
 
-### Stage 3: Merge (Haiku, agentic)
+### Stage 3: Merge (Haiku, oneShot)
 
-Compare-and-merge draft entities against existing content in the system cache. Supports adding additional sourcebooks to an existing system.
+Compare-and-merge draft entities against existing content. Supports adding additional sourcebooks to an existing system.
 
-### Stage 4: Index (Haiku)
+### Stage 4: Index (Haiku, oneShot)
 
 Build table of contents and DM cheat sheet from the final filesystem state.
 
-### Stage 5: Rule Card Generation (model TBD)
+### Stage 5: Rule Card
 
-Runs last, against all well-baked extracted content. Only fires for systems without a hand-authored rule card in `systems/`. Uses bundled rule cards as few-shot examples. Produces XML-directive format output matching the hand-authored card structure.
+For bundled systems with a hand-authored rule card in `systems/`, the bundled card is **copied** to the output directory. For unknown systems, a rule card is generated using Haiku with bundled rule cards as few-shot examples.
+
+## System Catalog
+
+Known game systems are defined in `src/config/systems.ts`. At runtime, `listAvailableSystems()` merges the static catalog with discovered directories in `~/.machine-violet/systems/` to show which systems have been processed.
 
 ## What Stays at Runtime vs What's Pre-Processed
 

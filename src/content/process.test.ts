@@ -165,23 +165,23 @@ describe("runProcessingPipeline", () => {
     expect(stages).toContain("complete");
 
     // Pipeline state should be at "complete"
-    const statePath = "/home/ingest/processed/test-system/pipeline.json";
+    const statePath = "/home/systems/test-system/pipeline.json";
     const state = JSON.parse(io.files[statePath]);
     expect(state.currentStage).toBe("complete");
 
     // Catalog should have been written
-    const catalogPath = "/home/ingest/processed/test-system/catalog.json";
+    const catalogPath = "/home/systems/test-system/catalog.json";
     expect(io.files[catalogPath]).toBeDefined();
 
     // Index should have been written
-    const indexPath = "/home/ingest/processed/test-system/index.md";
+    const indexPath = "/home/systems/test-system/index.md";
     expect(io.files[indexPath]).toBeDefined();
   });
 
   it("resumes from saved state", async () => {
     const io = mockIO({
       // Pre-existing pipeline state at merge stage
-      "/home/ingest/processed/test-system/pipeline.json": JSON.stringify({
+      "/home/systems/test-system/pipeline.json": JSON.stringify({
         collectionSlug: "test-system",
         currentStage: "merge",
         updatedAt: new Date().toISOString(),
@@ -189,7 +189,7 @@ describe("runProcessingPipeline", () => {
         batchIds: ["batch_old"],
       }),
       // Pre-existing draft entities (from completed extractor stage)
-      "/home/ingest/processed/test-system/drafts/rules/attack-action.md": "# Attack Action\n\n**Type:** Rule\n\nMake an attack.",
+      "/home/systems/test-system/drafts/rules/attack-action.md": "# Attack Action\n\n**Type:** Rule\n\nMake an attack.",
     });
 
     const client = buildMockClient();

@@ -53,9 +53,9 @@ function mockIO(initial: Record<string, string> = {}): FileIO & { files: Record<
 describe("listDraftEntities", () => {
   it("lists draft entities across categories", async () => {
     const io = mockIO({
-      "/home/ingest/processed/d-d-5e/drafts/characters/goblin.md": "# Goblin",
-      "/home/ingest/processed/d-d-5e/drafts/characters/orc.md": "# Orc",
-      "/home/ingest/processed/d-d-5e/drafts/locations/waterdeep.md": "# Waterdeep",
+      "/home/systems/d-d-5e/drafts/characters/goblin.md": "# Goblin",
+      "/home/systems/d-d-5e/drafts/characters/orc.md": "# Orc",
+      "/home/systems/d-d-5e/drafts/locations/waterdeep.md": "# Waterdeep",
     });
 
     const drafts = await listDraftEntities(io, "/home", "d-d-5e");
@@ -100,7 +100,7 @@ describe("runMerge", () => {
 
   it("creates new entities (no existing version)", async () => {
     const io = mockIO({
-      "/home/ingest/processed/d-d-5e/drafts/characters/goblin.md": "# Goblin\n\nNew creature.",
+      "/home/systems/d-d-5e/drafts/characters/goblin.md": "# Goblin\n\nNew creature.",
     });
 
     const result = await runMerge(mockClient, io, "/home", "d-d-5e");
@@ -109,7 +109,7 @@ describe("runMerge", () => {
     expect(result.merged).toBe(0);
 
     // Check entity was written
-    expect(io.files["/home/ingest/processed/d-d-5e/entities/characters/goblin.md"]).toBe(
+    expect(io.files["/home/systems/d-d-5e/entities/characters/goblin.md"]).toBe(
       "# Goblin\n\nNew creature.",
     );
   });
@@ -117,8 +117,8 @@ describe("runMerge", () => {
   it("skips identical entities", async () => {
     const content = "# Goblin\n\nSame content.";
     const io = mockIO({
-      "/home/ingest/processed/d-d-5e/drafts/characters/goblin.md": content,
-      "/home/ingest/processed/d-d-5e/entities/characters/goblin.md": content,
+      "/home/systems/d-d-5e/drafts/characters/goblin.md": content,
+      "/home/systems/d-d-5e/entities/characters/goblin.md": content,
     });
 
     const result = await runMerge(mockClient, io, "/home", "d-d-5e");
@@ -129,8 +129,8 @@ describe("runMerge", () => {
 
   it("merges conflicting entities via AI", async () => {
     const io = mockIO({
-      "/home/ingest/processed/d-d-5e/drafts/characters/goblin.md": "# Goblin\n\nNew version.",
-      "/home/ingest/processed/d-d-5e/entities/characters/goblin.md": "# Goblin\n\nOld version.",
+      "/home/systems/d-d-5e/drafts/characters/goblin.md": "# Goblin\n\nNew version.",
+      "/home/systems/d-d-5e/entities/characters/goblin.md": "# Goblin\n\nOld version.",
     });
 
     const result = await runMerge(mockClient, io, "/home", "d-d-5e");
@@ -139,6 +139,6 @@ describe("runMerge", () => {
     expect(result.skipped).toBe(0);
 
     // Check merged content was written
-    expect(io.files["/home/ingest/processed/d-d-5e/entities/characters/goblin.md"]).toContain("Merged");
+    expect(io.files["/home/systems/d-d-5e/entities/characters/goblin.md"]).toContain("Merged");
   });
 });

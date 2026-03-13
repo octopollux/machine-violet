@@ -1,7 +1,7 @@
 /**
  * Path builders for the content processing pipeline output.
  *
- * All processed output goes to ~/.machine-violet/ingest/processed/<collection-slug>/.
+ * All processed output goes to ~/.machine-violet/systems/<collection-slug>/.
  * Parallels ingestPaths() from job-manager.ts.
  */
 
@@ -14,7 +14,7 @@ import { join } from "node:path";
  * @param collectionSlug - Slugified collection name (e.g. "d-d-5e").
  */
 export function processingPaths(homeDir: string, collectionSlug: string) {
-  const base = join(homeDir, "ingest", "processed", collectionSlug);
+  const base = join(homeDir, "systems", collectionSlug);
   return {
     /** Root of processed output for this collection. */
     base,

@@ -7,14 +7,17 @@ import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
 import { InlineTextInput } from "../tui/components/InlineTextInput.js";
 import type { ValidatedPdf } from "../content/index.js";
+import type { AvailableSystem } from "../config/systems.js";
 
-type Step = "name" | "drop" | "confirm" | "submitting" | "done" | "error";
+type Step = "pick_system" | "name_other" | "drop" | "confirm" | "submitting" | "done" | "error";
 
 export interface AddContentPhaseProps {
   theme: ResolvedTheme;
+  /** Available game systems (known + discovered). */
+  systems: AvailableSystem[];
   /** Called when user confirms submission. Parent handles the actual pipeline. */
-  onSubmit: (collection: string, pdfs: ValidatedPdf[]) => void;
-  /** Called when user cancels (Escape from name step). */
+  onSubmit: (systemSlug: string, systemName: string, pdfs: ValidatedPdf[]) => void;
+  /** Called when user cancels (Escape from pick step). */
   onCancel: () => void;
   /** Validate a file path as a PDF — returns info or throws. */
   validatePdf: (path: string) => Promise<ValidatedPdf>;
@@ -26,6 +29,7 @@ export interface AddContentPhaseProps {
 
 export function AddContentPhase({
   theme,
+  systems,
   onSubmit,
   onCancel,
   validatePdf,
@@ -33,23 +37,47 @@ export function AddContentPhase({
   statusMsg,
 }: AddContentPhaseProps) {
   const { columns: cols, rows: termRows } = useTerminalSize();
-  const [step, setStep] = useState<Step>("name");
-  const [collectionName, setCollectionName] = useState("");
+  const [step, setStep] = useState<Step>("pick_system");
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [systemSlug, setSystemSlug] = useState("");
+  const [systemName, setSystemName] = useState("");
   const [pdfs, setPdfs] = useState<ValidatedPdf[]>([]);
-  const [dropInput, setDropInput] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
   const [validating, setValidating] = useState(false);
 
   const errorMsg = localError || externalError || null;
 
-  // --- Collection name input ---
+  // Build picker options: known systems + "Other"
+  const pickerOptions = [...systems, { slug: "__other__", name: "Other (enter name)", bundled: false, hasRuleCard: false, processed: false }];
+
+  // --- System picker ---
+  const handlePickerSelect = useCallback(() => {
+    const chosen = pickerOptions[selectedIndex];
+    if (chosen.slug === "__other__") {
+      setStep("name_other");
+      setLocalError(null);
+    } else {
+      setSystemSlug(chosen.slug);
+      setSystemName(chosen.name);
+      setLocalError(null);
+      setStep("drop");
+    }
+  }, [selectedIndex, pickerOptions]);
+
+  // --- Custom name input ---
   const handleNameSubmit = useCallback((value: string) => {
     const trimmed = value.trim();
     if (trimmed.length === 0) {
-      setLocalError("Collection name cannot be empty.");
+      setLocalError("System name cannot be empty.");
       return;
     }
-    setCollectionName(trimmed);
+    // Slugify the custom name
+    const slug = trimmed
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+    setSystemSlug(slug);
+    setSystemName(trimmed);
     setLocalError(null);
     setStep("drop");
   }, []);
@@ -88,24 +116,41 @@ export function AddContentPhase({
       }
     }
     setValidating(false);
-    setDropInput("");
   }, [pdfs.length, validatePdf]);
 
   // --- Confirm step ---
   const handleConfirm = useCallback(() => {
     setStep("submitting");
-    onSubmit(collectionName, pdfs);
-  }, [collectionName, pdfs, onSubmit]);
+    onSubmit(systemSlug, systemName, pdfs);
+  }, [systemSlug, systemName, pdfs, onSubmit]);
 
-  // --- Key handling for confirm step ---
+  // --- Key handling ---
   useInput((input, key) => {
-    if (step === "name" && key.escape) {
-      onCancel();
+    if (step === "pick_system") {
+      if (key.escape) {
+        onCancel();
+        return;
+      }
+      if (key.upArrow) {
+        setSelectedIndex((i) => Math.max(0, i - 1));
+        return;
+      }
+      if (key.downArrow) {
+        setSelectedIndex((i) => Math.min(pickerOptions.length - 1, i + 1));
+        return;
+      }
+      if (key.return) {
+        handlePickerSelect();
+        return;
+      }
+    }
+    if (step === "name_other" && key.escape) {
+      setStep("pick_system");
       return;
     }
     if (step === "drop" && key.escape) {
       if (pdfs.length === 0) {
-        setStep("name");
+        setStep("pick_system");
       } else {
         setStep("confirm");
       }
@@ -146,9 +191,37 @@ export function AddContentPhase({
   );
   lines.push(<Text key="sp0"> </Text>);
 
-  if (step === "name") {
+  if (step === "pick_system") {
     lines.push(
-      <Text key="prompt">Name this collection:</Text>,
+      <Text key="prompt">Select a game system:</Text>,
+    );
+    lines.push(<Text key="sp1"> </Text>);
+
+    for (const [i, opt] of pickerOptions.entries()) {
+      const isSelected = i === selectedIndex;
+      const prefix = isSelected ? "> " : "  ";
+      const processedMark = "processed" in opt && opt.processed ? " \u2713" : "";
+      lines.push(
+        <Text key={`opt-${opt.slug}`}>
+          <Text color={isSelected ? borderColor : undefined} bold={isSelected}>
+            {prefix}{opt.name}
+          </Text>
+          {processedMark && <Text color="green">{processedMark}</Text>}
+        </Text>,
+      );
+    }
+
+    lines.push(<Text key="sp2"> </Text>);
+    lines.push(
+      <Text key="hint" color={dimColor}>
+        Arrow keys to select, Enter to confirm, Esc to go back
+      </Text>,
+    );
+  }
+
+  if (step === "name_other") {
+    lines.push(
+      <Text key="prompt">Name this system:</Text>,
     );
     lines.push(
       <Box key="input" height={1}>
@@ -162,7 +235,7 @@ export function AddContentPhase({
     lines.push(<Text key="sp1"> </Text>);
     lines.push(
       <Text key="hint" color={dimColor}>
-        e.g. "D&D 5e", "Cairn", "My Homebrew System"
+        e.g. "Cairn", "My Homebrew System"
       </Text>,
     );
     lines.push(
@@ -172,9 +245,9 @@ export function AddContentPhase({
 
   if (step === "drop" || step === "confirm") {
     lines.push(
-      <Text key="col">
-        <Text color={borderColor}>Collection: </Text>
-        <Text bold>{collectionName}</Text>
+      <Text key="sys">
+        <Text color={borderColor}>System: </Text>
+        <Text bold>{systemName}</Text>
       </Text>,
     );
     lines.push(<Text key="sp1"> </Text>);
@@ -228,9 +301,9 @@ export function AddContentPhase({
 
   if (step === "submitting") {
     lines.push(
-      <Text key="col">
-        <Text color={borderColor}>Collection: </Text>
-        <Text bold>{collectionName}</Text>
+      <Text key="sys">
+        <Text color={borderColor}>System: </Text>
+        <Text bold>{systemName}</Text>
       </Text>,
     );
     lines.push(<Text key="sp1"> </Text>);
@@ -246,7 +319,7 @@ export function AddContentPhase({
     }
     lines.push(<Text key="sp2"> </Text>);
     lines.push(
-      <Text key="status">{statusMsg ?? "Submitting to batch API..."}</Text>,
+      <Text key="status">{statusMsg ?? "Processing..."}</Text>,
     );
   }
 

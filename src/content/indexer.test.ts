@@ -51,9 +51,9 @@ function mockIO(initial: Record<string, string> = {}): FileIO & { files: Record<
 describe("buildIndex", () => {
   it("builds TOC from entity files", async () => {
     const io = mockIO({
-      "/home/ingest/processed/d-d-5e/entities/monsters/goblin.md": "# Goblin",
-      "/home/ingest/processed/d-d-5e/entities/monsters/orc.md": "# Orc",
-      "/home/ingest/processed/d-d-5e/entities/locations/waterdeep.md": "# Waterdeep",
+      "/home/systems/d-d-5e/entities/monsters/goblin.md": "# Goblin",
+      "/home/systems/d-d-5e/entities/monsters/orc.md": "# Orc",
+      "/home/systems/d-d-5e/entities/locations/waterdeep.md": "# Waterdeep",
     });
 
     const { content, result } = await buildIndex(io, "/home", "d-d-5e");
@@ -80,9 +80,9 @@ describe("buildIndex", () => {
 
   it("sorts entities alphabetically within category", async () => {
     const io = mockIO({
-      "/home/ingest/processed/d-d-5e/entities/monsters/zombie.md": "",
-      "/home/ingest/processed/d-d-5e/entities/monsters/ancient-dragon.md": "",
-      "/home/ingest/processed/d-d-5e/entities/monsters/beholder.md": "",
+      "/home/systems/d-d-5e/entities/monsters/zombie.md": "",
+      "/home/systems/d-d-5e/entities/monsters/ancient-dragon.md": "",
+      "/home/systems/d-d-5e/entities/monsters/beholder.md": "",
     });
 
     const { content } = await buildIndex(io, "/home", "d-d-5e");
@@ -122,8 +122,8 @@ describe("runIndexer", () => {
 
   it("writes index.md and cheat-sheet.md", async () => {
     const io = mockIO({
-      "/home/ingest/processed/d-d-5e/entities/monsters/goblin.md": "# Goblin",
-      "/home/ingest/processed/d-d-5e/entities/rules/combat.md": "# Combat",
+      "/home/systems/d-d-5e/entities/monsters/goblin.md": "# Goblin",
+      "/home/systems/d-d-5e/entities/rules/combat.md": "# Combat",
     });
 
     const result = await runIndexer(mockClient, io, "/home", "d-d-5e");
@@ -131,11 +131,11 @@ describe("runIndexer", () => {
     expect(result.totalEntities).toBe(2);
 
     // Index was written
-    const indexPath = "/home/ingest/processed/d-d-5e/index.md";
+    const indexPath = "/home/systems/d-d-5e/index.md";
     expect(io.files[indexPath]).toContain("# Content Index");
 
     // Cheat sheet was written
-    const cheatPath = "/home/ingest/processed/d-d-5e/cheat-sheet.md";
+    const cheatPath = "/home/systems/d-d-5e/cheat-sheet.md";
     expect(io.files[cheatPath]).toContain("Cheat Sheet");
   });
 

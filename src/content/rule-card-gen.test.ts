@@ -1,6 +1,9 @@
 import { loadModelConfig } from "../config/models.js";
 import { resetContentPromptCache } from "./prompts/load-content-prompt.js";
-import { hasHandAuthoredRuleCard, runRuleCardGen } from "./rule-card-gen.js";
+import { hasHandAuthoredRuleCard, copyBundledRuleCard, runRuleCardGen } from "./rule-card-gen.js";
+import { readFileSync, existsSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import type { FileIO } from "../agents/scene-manager.js";
 import type Anthropic from "@anthropic-ai/sdk";
 
@@ -21,6 +24,26 @@ describe("hasHandAuthoredRuleCard", () => {
   it("returns false for non-existent system", () => {
     const projectRoot = process.cwd();
     expect(hasHandAuthoredRuleCard(projectRoot, "some-random-system")).toBe(false);
+  });
+});
+
+describe("copyBundledRuleCard", () => {
+  it("copies bundled rule card to output directory", () => {
+    const projectRoot = process.cwd();
+    const tempHome = join(tmpdir(), `mv-test-${Date.now()}`);
+
+    try {
+      copyBundledRuleCard(projectRoot, "dnd-5e", tempHome);
+
+      const destPath = join(tempHome, "systems", "dnd-5e", "rule-card.md");
+      expect(existsSync(destPath)).toBe(true);
+
+      const srcContent = readFileSync(join(projectRoot, "systems", "dnd-5e", "rule-card.md"), "utf-8");
+      const destContent = readFileSync(destPath, "utf-8");
+      expect(destContent).toBe(srcContent);
+    } finally {
+      rmSync(tempHome, { recursive: true, force: true });
+    }
   });
 });
 
@@ -121,14 +144,14 @@ describe("runRuleCardGen", () => {
     } as unknown as Anthropic;
 
     const io = mockIO({
-      "/home/ingest/processed/new-system/entities/rules/combat.md": "# Combat\n\nRoll to hit.",
+      "/home/systems/new-system/entities/rules/combat.md": "# Combat\n\nRoll to hit.",
     });
     const projectRoot = process.cwd();
 
     const generated = await runRuleCardGen(freshClient, io, "/home", "new-system", projectRoot);
     expect(generated).toBe(true);
 
-    const ruleCardPath = "/home/ingest/processed/new-system/rule-card.md";
+    const ruleCardPath = "/home/systems/new-system/rule-card.md";
     expect(io.files[ruleCardPath]).toContain("<system>");
   });
 });
