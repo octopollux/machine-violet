@@ -10,7 +10,7 @@ import type { ModelTier } from "../config/models.js";
 
 /** A non-DM mode session (OOC, Dev, or future modes). */
 export interface ModeSession {
-  send(text: string, onDelta: (delta: string) => void): Promise<{ usage: UsageStats }>;
+  send(text: string, onDelta: (delta: string) => void): Promise<{ usage: UsageStats; summary?: string }>;
   label: string;    // "OOC" | "Dev"
   tier: ModelTier;  // for cost tracking
 }

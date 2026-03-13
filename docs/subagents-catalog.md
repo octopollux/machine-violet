@@ -33,7 +33,7 @@ The DM's workhorse. Handles all mechanical resolution — attacks, skill checks,
 |---|---|
 | **Model** | Sonnet |
 | **Visibility** | Player-facing |
-| **Trigger** | DM calls `enter_ooc` |
+| **Trigger** | DM calls `enter_ooc`, or player via game menu / `/ooc` |
 | **Source doc** | [dm-prompt.md](dm-prompt.md), [overview.md](overview.md) |
 
 Sandboxed conversation for out-of-character discussion. Receives the DM's current context on entry. Handles rules questions, transcript searches, configuration changes, player corrections, validation requests, rollback.
@@ -41,6 +41,8 @@ Sandboxed conversation for out-of-character discussion. Receives the DM's curren
 **Context**: DM's cached prefix + recent conversation + OOC system prompt. Full access to campaign filesystem for lookups.
 
 **Returns**: Terse summary to the DM when OOC ends — just what the DM needs to know to resume narrating. Does NOT return the full OOC conversation.
+
+**DM injection (player-initiated only)**: When OOC is entered from the game menu or `/ooc` slash command (not via DM's `enter_ooc` tool), accumulated summaries are injected as an `<ooc_summary>` XML tag prepended to the next player message. This persists in conversation history so the DM retains OOC context across turns. The DM-initiated path does not need this because the DM already sees the tool result.
 
 **Tools available**: `rollback`, filesystem reads, validation suite, config updates. Cannot call DM-only tools.
 

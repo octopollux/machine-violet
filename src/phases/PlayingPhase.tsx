@@ -58,6 +58,7 @@ export function PlayingPhase() {
   const narrativeRef = useRef<NarrativeAreaHandle>(null);
   const modalScrollRef = useRef<CenteredModalHandle>(null);
   const escTimestamps = useRef<number[]>([]);
+  const oocSummaries = useRef<string[]>([]);
 
   const menuItems = useMemo(() => getMenuItems(devModeEnabled), [devModeEnabled]);
 
@@ -101,6 +102,10 @@ export function PlayingPhase() {
         setModeBusy(false);
         setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }]);
         costTracker.current?.record(result.usage, activeSession.tier);
+        // Accumulate OOC summaries for injection into the next DM turn
+        if (activeSession.label === "OOC" && result.summary) {
+          oocSummaries.current.push(result.summary);
+        }
       }).catch((err: unknown) => {
         setModeBusy(false);
         const msg = err instanceof Error ? err.message : String(err);
@@ -133,10 +138,19 @@ export function PlayingPhase() {
   const exitActiveSession = useCallback(() => {
     if (!activeSession) return;
     const label = activeSession.label;
+    // Flush accumulated OOC summaries to the engine for injection into the next DM turn
+    if (label === "OOC" && oocSummaries.current.length > 0) {
+      if (engineRef.current) {
+        engineRef.current.setPendingOOCSummary(
+          oocSummaries.current.join("\n"),
+        );
+      }
+      oocSummaries.current = [];
+    }
     setActiveSession(null);
     setVariant(previousVariantRef.current);
     setNarrativeLines((prev) => [...prev, { kind: "system", text: `[Exiting ${label} Mode]` }, { kind: "dm", text: "" }]);
-  }, [activeSession, setActiveSession, setVariant, previousVariantRef, setNarrativeLines]);
+  }, [activeSession, setActiveSession, setVariant, previousVariantRef, setNarrativeLines, engineRef]);
 
   // --- Input handling (modals, menus, scroll — TextInput handles text editing) ---
   useInput((input, key) => {

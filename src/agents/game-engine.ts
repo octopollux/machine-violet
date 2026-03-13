@@ -143,6 +143,7 @@ export class GameEngine {
   private repo: CampaignRepo | null = null;
   private aiTurnDepth = 0;
   private turnCounter = 0;
+  private pendingOOCSummary: string | null = null;
   private static MAX_AI_CHAIN = 10;
   private injectionRegistry: InjectionRegistry;
   private terminalDims: TerminalDims | undefined;
@@ -293,6 +294,13 @@ export class GameEngine {
     this.terminalDims = dims;
   }
 
+  /** Store a pending OOC summary to inject into the next DM turn (called from TUI layer on OOC exit). */
+  setPendingOOCSummary(summary: string): void {
+    this.pendingOOCSummary = this.pendingOOCSummary
+      ? `${this.pendingOOCSummary}\n${summary}`
+      : summary;
+  }
+
   /**
    * Process player input: send to DM, stream response, handle tools.
    * This is the main game loop entry point.
@@ -333,8 +341,14 @@ export class GameEngine {
 
     this.setState("dm_thinking");
 
-    // Tag the input with character name
-    const taggedInput = `[${characterName}] ${text}`;
+    // Tag the input with character name; prepend OOC summary if pending
+    // (persisted in conversation history so the DM retains OOC context)
+    let taggedInput = `[${characterName}] ${text}`;
+    const consumedOOCSummary = this.pendingOOCSummary;
+    if (consumedOOCSummary) {
+      taggedInput = `<ooc_summary>\n${consumedOOCSummary}\n</ooc_summary>\n\n${taggedInput}`;
+      this.pendingOOCSummary = null;
+    }
 
     // Append to transcript (skip for system instructions like session open/resume)
     if (!opts?.skipTranscript) {
@@ -538,6 +552,10 @@ export class GameEngine {
       this.callbacks.onTurnEnd(dmTurn);
 
     } catch (e) {
+      // Restore consumed OOC summary so it retries on the next turn
+      if (consumedOOCSummary) {
+        this.pendingOOCSummary = consumedOOCSummary;
+      }
       const error = e instanceof Error ? e : new Error(String(e));
       await this.dumpDebugInfo(error);
       this.callbacks.onError(error);
