@@ -6,7 +6,7 @@ import { useRef, useEffect } from "react";
  */
 export function useAutoScroll<T>(dep: T): React.RefObject<HTMLDivElement | null> {
   const containerRef = useRef<HTMLDivElement>(null);
-  const isNearBottom = useRef(true);
+  const isNearBottom = useRef(false);
 
   useEffect(() => {
     const el = containerRef.current;

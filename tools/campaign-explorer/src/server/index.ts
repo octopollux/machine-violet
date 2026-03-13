@@ -1,13 +1,13 @@
 import express from "express";
 import cors from "cors";
-import { readFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { readFile, stat } from "node:fs/promises";
+import { join, resolve, basename } from "node:path";
+import { watch, type FSWatcher } from "chokidar";
 import { scanCampaigns } from "./campaign-scanner.js";
 import { watchCampaign } from "./watcher.js";
 import { sseHandler, broadcast, clientCount } from "./sse.js";
 import { createApiRouter } from "./api.js";
 import type { CampaignInfo } from "../shared/protocol.js";
-import type { FSWatcher } from "chokidar";
 
 const PORT = parseInt(process.env.PORT ?? "3999", 10);
 
@@ -58,6 +58,75 @@ async function main(): Promise<void> {
     });
     watchers.push(watcher);
   }
+
+  // Watch the campaigns parent directory for new/removed campaign folders
+  const campaignWatchers = new Map<string, FSWatcher>();
+  for (const c of campaigns) campaignWatchers.set(c.slug, watchers[campaigns.indexOf(c)]);
+
+  /** Try to register a new campaign from a directory name. */
+  async function tryAddCampaign(dirName: string): Promise<void> {
+    if (campaigns.some((c) => c.slug === dirName)) return;
+    const dirPath = join(campaignsDir, dirName);
+    try {
+      const s = await stat(dirPath);
+      if (!s.isDirectory()) return;
+      const raw = await readFile(join(dirPath, "config.json"), "utf-8");
+      const config = JSON.parse(raw);
+      const info: CampaignInfo = {
+        slug: basename(dirPath),
+        name: config.name ?? basename(dirPath),
+        path: dirPath,
+      };
+      campaigns.push(info);
+      const watcher = watchCampaign(info.slug, info.path, {
+        onFileChange: (event) => broadcast(event),
+      });
+      watchers.push(watcher);
+      campaignWatchers.set(info.slug, watcher);
+      console.log(`[campaigns] added: ${info.name} (${info.slug})`);
+      broadcast({ type: "campaign-change", campaignSlug: info.slug, changeType: "add" });
+    } catch {
+      // Not a valid campaign yet (no config.json, etc.) — ignore
+    }
+  }
+
+  const parentWatcher = watch(campaignsDir, {
+    persistent: true,
+    ignoreInitial: true,
+    depth: 1,
+    usePolling: process.platform === "win32",
+    interval: 1000,
+    ignored: (path: string) => {
+      const b = path.split(/[/\\]/).pop() ?? "";
+      return b.startsWith(".") || b === "node_modules";
+    },
+  });
+
+  // A new file (e.g. config.json) or directory appearing may indicate a new campaign
+  parentWatcher.on("addDir", (_path) => {
+    const dirName = basename(_path);
+    if (_path === campaignsDir) return; // chokidar fires for the root itself
+    tryAddCampaign(dirName);
+  });
+  parentWatcher.on("add", (filePath) => {
+    // config.json appearing inside a subdir means a campaign just became valid
+    if (basename(filePath) === "config.json") {
+      const dirName = basename(join(filePath, ".."));
+      tryAddCampaign(dirName);
+    }
+  });
+  parentWatcher.on("unlinkDir", (dirPath) => {
+    const slug = basename(dirPath);
+    const idx = campaigns.findIndex((c) => c.slug === slug);
+    if (idx === -1) return;
+    campaigns.splice(idx, 1);
+    const w = campaignWatchers.get(slug);
+    if (w) { w.close(); campaignWatchers.delete(slug); }
+    const wIdx = watchers.indexOf(w!);
+    if (wIdx !== -1) watchers.splice(wIdx, 1);
+    console.log(`[campaigns] removed: ${slug}`);
+    broadcast({ type: "campaign-change", campaignSlug: slug, changeType: "remove" });
+  });
 
   // Set up Express
   const app = express();
