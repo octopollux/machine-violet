@@ -63,6 +63,19 @@ Code and docs stay in sync. See `docs/maintenance.md` for the full guide.
 - **GameState** (defined in `src/agents/game-state.ts`) is the single mutable source of truth, passed to every tool handler.
 - Tool results use `ok(data)` / `err(message)` helpers. `err` sets `is_error: true`.
 
+### Content Pipeline (`src/content/`)
+- **Completely separate from the game engine.** Never import content pipeline code from game code. Filesystem format is the only interface.
+- PDF text extraction is local (pdf-parse), not AI. No API calls for extraction.
+- Batch API client is retained for the processing pipeline (classifier, extractors).
+- Job state and cached pages are persisted to `~/.machine-violet/ingest/`.
+
+### Game Systems (`systems/`)
+- Template assets live at the repo root in `systems/<id>/`.
+- `metadata.json` — system identity, license, complexity, dice. JSON, not markdown.
+- `rule-card.md` — XML-directive format. Dense structured markup for mechanics, prose for guidance. Hand-authored by Opus, human-reviewed.
+- At game init, the selected system's template is copied to campaign state.
+- Bundled systems must be CC-BY-4.0 compatible (or similarly permissive).
+
 ### Entity Filesystem
 - **Front matter format:** `**Key:** Value` lines (not YAML). Parsed by `parseFrontMatter()` in `src/tools/filesystem/frontmatter.ts`.
 - **Wikilinks are mandatory** — every entity mention in transcripts/logs is a wikilink. Dead links are valid (entity exists in fiction but not yet detailed). Scene summarizer must preserve all wikilinks.

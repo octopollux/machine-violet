@@ -21,6 +21,8 @@ Ink (React for CLI) + Anthropic Claude SDK + TypeScript.
 | Understand combat and initiative | [multiplayer-and-initiative.md](multiplayer-and-initiative.md) |
 | Understand DM identity and prompting | [dm-prompt.md](dm-prompt.md) |
 | Understand game setup flow | [game-initialization.md](game-initialization.md) |
+| Understand game systems and rule cards | [rules-systems.md](rules-systems.md) |
+| Understand PDF import and content processing | [document-ingestion.md](document-ingestion.md) |
 | Understand error recovery and git | [error-recovery.md](error-recovery.md) |
 | Update documentation after a code change | [maintenance.md](maintenance.md) |
 

@@ -121,14 +121,29 @@ Shared TypeScript interfaces. No implementations. All re-exported from `index.ts
 | `entities.ts` | `EntityFrontMatter` |
 | `tui.ts` | `NarrativeLine`, `FormattingNode`, modal types |
 
+## src/content/ — Content Pipeline
+
+PDF ingestion and content processing. **Completely separate from the game engine** — the only shared interface is the filesystem format. If you delete this module, the game still runs.
+
+| File | Purpose |
+|---|---|
+| `pdf-extract.ts` | Local PDF text extraction via pdf-parse (no AI, no API calls) |
+| `pdf-split.ts` | PDF splitting (pdf-lib) and validation (`getPdfInfo()`) |
+| `batch-client.ts` | Anthropic Batch API helpers (polling, result collection) — for future processing pipeline |
+| `job-manager.ts` | Ingest job CRUD, collection manifests, status tracking |
+| `cache-writer.ts` | Write extracted pages to per-page .md cache files |
+| `ingest.ts` | Top-level orchestrator: validate → extract → cache → report |
+| `types.ts` | Interfaces for jobs, chunks, extraction results |
+
 ## src/phases/ — App Lifecycle
 
-State machine for the application: first launch → main menu → setup → playing → returning_to_menu → main menu (loop).
+State machine for the application: first launch → main menu → setup / add content → playing → returning_to_menu → main menu (loop).
 
 | File | Purpose |
 |---|---|
 | `FirstLaunchPhase.tsx` | Initial setup wizard (API key, config) |
-| `MainMenuPhase.tsx` | Themed campaign selection screen (full-frame borders, campaign titles from config.json) |
+| `MainMenuPhase.tsx` | Themed campaign selection screen with New Campaign, Continue, Add Content, Quit |
+| `AddContentPhase.tsx` | PDF import flow: name collection → drop files → validate → extract → cache |
 | `SetupPhase.tsx` | Campaign creation/load orchestration |
 | `PlayingPhase.tsx` | Main game loop (hosts GameEngine) |
 
@@ -143,6 +158,17 @@ Tests must call `resetPromptCache()` in `beforeEach`.
 ## src/commands/ — Slash Commands
 
 Player commands during gameplay. `trySlashCommand()` parses and dispatches.
+
+## systems/ — Game System Templates
+
+Content assets at the repo root (not in `src/`). Each system gets a subdirectory copied to campaign state at init.
+
+| File | Purpose |
+|---|---|
+| `<system-id>/metadata.json` | System identity, license, complexity, dice requirements |
+| `<system-id>/rule-card.md` | XML-directive format core mechanics reference, hand-authored by Opus |
+
+Currently bundled: `dnd-5e`.
 
 ## Root Files
 

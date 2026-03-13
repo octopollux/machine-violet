@@ -15,7 +15,7 @@ Tech stack:
 - **UI**: Ink (React for CLI)
 - **AI**: Anthropic Claude SDK (Opus for DM, Sonnet for setup/OOC, Haiku for mechanical tasks)
 - **State**: Filesystem (markdown + JSON) with isomorphic-git for snapshots
-- **Document import**: Claude vision for PDF extraction
+- **Document import**: Local text extraction (pdf-parse) for PDF ingestion; Batch API for content processing
 
 
 ## Execution Tiers
@@ -45,7 +45,17 @@ Two clocks manage time automatically. A **calendar** tracks narrative time and a
 
 ## Game Systems
 
-Machine Violet ships with support for freely available RPG systems (fetched at runtime), a catalog of pre-built options, and the ability to import user-supplied sourcebooks via PDF. A "Just jump in" mode uses a hidden lightweight system (24XX or text-adventure conventions) for zero-friction freeform play. → [Rules Systems Reference](rules-systems.md), [Document Ingestion Design](document-ingestion.md)
+Game system support uses a three-layer content model:
+
+1. **Template layer** (`systems/<id>/` in repo root) — hand-authored rule cards in XML-directive format and system metadata (JSON). Copied to campaign state at init. Rule cards are authored by Opus, reviewed by humans, and checked into the codebase. They provide the DM with mechanical fluency from turn one.
+2. **Ingested layer** (from PDF) — user-supplied sourcebooks extracted locally via pdf-parse, then processed by Haiku into entity files. Layered on top of templates.
+3. **Runtime layer** — character sheets, transcripts, and entity files created during play.
+
+The content pipeline (`src/content/`) is **completely separate** from the game engine. They share only a filesystem format as interface. PDF text extraction is local (no AI, no API calls); content processing uses the Batch API for Haiku-powered classification and extraction.
+
+A "Just jump in" mode uses a hidden lightweight system (24XX or text-adventure conventions) for zero-friction freeform play.
+
+→ [Rules Systems Reference](rules-systems.md), [Document Ingestion Design](document-ingestion.md)
 
 
 ## Randomization
