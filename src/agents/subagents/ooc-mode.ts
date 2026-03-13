@@ -13,6 +13,7 @@ import { loadPrompt } from "../../prompts/load-prompt.js";
 import type { CampaignConfig } from "../../types/config.js";
 import type { CampaignRepo } from "../../tools/git/index.js";
 import { queryCommitLog, performRollback } from "../../tools/git/index.js";
+import { RollbackCompleteError } from "../../teardown.js";
 import type { MapData } from "../../types/maps.js";
 import type { ClocksState } from "../../types/clocks.js";
 import { findReferences } from "../../tools/campaign-ops/index.js";
@@ -344,6 +345,7 @@ export function buildOOCToolHandler(
           return { content: `Unknown tool: ${name}`, is_error: true };
       }
     } catch (err) {
+      if (err instanceof RollbackCompleteError) throw err;
       const msg = err instanceof Error ? err.message : String(err);
       return { content: msg, is_error: true };
     }
@@ -417,8 +419,7 @@ async function executeRollback(
   }
   const target = input.target as string;
   const result = await performRollback(repo, target, campaignRoot, fileIO);
-  console.log(`\nRolled back to: ${result.summary}\nRelaunch the game to resume from this point.\n`);
-  process.exit(0);
+  throw new RollbackCompleteError(result.summary);
 }
 
 /**

@@ -18,8 +18,9 @@ const BASE_MENU_ITEMS = [
   "Character Sheet",
   "OOC Mode",
   "Settings",
-  "Save & Exit",
-  "End Session",
+  "Save & Return to Menu",
+  "End Session & Return",
+  "Quit",
 ];
 
 /**

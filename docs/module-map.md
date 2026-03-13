@@ -122,7 +122,7 @@ Shared TypeScript interfaces. No implementations. All re-exported from `index.ts
 
 ## src/phases/ — App Lifecycle
 
-State machine for the application: first launch → main menu → setup → playing.
+State machine for the application: first launch → main menu → setup → playing → returning_to_menu → main menu (loop).
 
 | File | Purpose |
 |---|---|
@@ -150,3 +150,4 @@ Player commands during gameplay. `trySlashCommand()` parses and dispatches.
 | `src/app.tsx` | Root Ink component — phase state machine, FileIO/GitIO setup, cost tracking |
 | `src/index.tsx` | Entry point — Ink render, raw mode guards |
 | `src/shutdown.ts` | Graceful shutdown (files, git, terminal) |
+| `src/teardown.ts` | Return-to-menu teardown: graceful shutdown + cache reset |

@@ -31,8 +31,8 @@ vi.mock("node:fs", async (importOriginal) => {
 import { writeFileSync } from "node:fs";
 import v8 from "node:v8";
 
-// Prevent process.exit from actually exiting
-const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
+// Prevent process.exit from actually exiting (fallback path when onReturnToMenu not set)
+vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
 
 import { queryCommitLog, performRollback } from "../tools/git/index.js";
 import { createOOCSession } from "../agents/subagents/ooc-mode.js";
@@ -228,11 +228,12 @@ describe("trySlashCommand", () => {
       });
     });
 
-    it("calls process.exit(0) after rollback", async () => {
-      const ctx = mockCtx();
+    it("calls onReturnToMenu after rollback", async () => {
+      const onReturnToMenu = vi.fn();
+      const ctx = mockCtx({ onReturnToMenu });
       trySlashCommand("/rollback 3", ctx);
       await vi.waitFor(() => {
-        expect(exitSpy).toHaveBeenCalledWith(0);
+        expect(onReturnToMenu).toHaveBeenCalled();
       });
     });
 

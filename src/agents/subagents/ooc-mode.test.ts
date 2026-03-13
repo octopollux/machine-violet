@@ -669,7 +669,8 @@ describe("buildOOCToolHandler (DM tools)", () => {
     expect(result.content).toContain("Client");
   });
 
-  it("rollback calls performRollback and exits", async () => {
+  it("rollback calls performRollback and throws RollbackCompleteError", async () => {
+    const { RollbackCompleteError } = await import("../../teardown.js");
     const git = mockGitIO();
     const repo = new CampaignRepo({ dir: "/tmp/campaign", git });
     await repo.sceneCommit("The Dragon's Lair");
@@ -677,15 +678,9 @@ describe("buildOOCToolHandler (DM tools)", () => {
 
     const fio = mockFileIO({ "/camp/config.json": "{}" });
     const gs = mockGameState();
-    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
-    try {
-      const handler = buildOOCToolHandler(undefined, repo, "/camp", fio, undefined, undefined, gs);
-      await handler("rollback", { target: "last" });
-      expect(git.resetTo).toHaveBeenCalled();
-      expect(exitSpy).toHaveBeenCalledWith(0);
-    } finally {
-      exitSpy.mockRestore();
-    }
+    const handler = buildOOCToolHandler(undefined, repo, "/camp", fio, undefined, undefined, gs);
+    await expect(handler("rollback", { target: "last" })).rejects.toThrow(RollbackCompleteError);
+    expect(git.resetTo).toHaveBeenCalled();
   });
 
   it("rollback without repo returns error", async () => {

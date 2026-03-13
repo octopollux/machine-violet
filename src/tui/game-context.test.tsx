@@ -44,8 +44,9 @@ export function makeTestContext(overrides: Partial<GameContextValue> = {}): Game
     devModeEnabled: false,
     dispatchTuiCommand: vi.fn(),
     retryOverlay: null,
-    onShutdown: vi.fn(),
-    onEndSession: vi.fn(),
+    onReturnToMenu: vi.fn(),
+    onEndSessionAndReturn: vi.fn(),
+    onQuit: vi.fn(),
     ...overrides,
   };
 }
