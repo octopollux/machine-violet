@@ -392,13 +392,12 @@ export default function App({ shutdownRef }: AppProps) {
     setActivePlayerIndex(0);
 
     if (shutdownRef) {
-      shutdownRef.current = {
-        engine,
-        campaignRoot,
-        fileIO: fileIO.current,
-        gitEnabled: config.recovery.enable_git,
-        gitIO,
-      };
+      const ctx = shutdownRef.current;
+      ctx.engine = engine;
+      ctx.campaignRoot = campaignRoot;
+      ctx.fileIO = fileIO.current;
+      ctx.gitEnabled = config.recovery.enable_git;
+      ctx.gitIO = gitIO;
     }
 
     if (isResume) {
@@ -545,55 +544,72 @@ export default function App({ shutdownRef }: AppProps) {
     setVariant("exploration");
 
     if (shutdownRef) {
-      shutdownRef.current = {} as ShutdownContext;
+      const ctx = shutdownRef.current;
+      ctx.engine = undefined;
+      ctx.campaignRoot = undefined;
+      ctx.fileIO = undefined;
+      ctx.gitEnabled = undefined;
+      ctx.gitIO = undefined;
     }
   }, [shutdownRef]);
 
   // --- Save & Return to Menu ---
-  const doSaveAndReturn = useCallback(async () => {
+  const doSaveAndReturn = useCallback(() => {
     setPhase("returning_to_menu");
 
-    await teardownGameSession({
-      engine: engineRef.current ?? undefined,
-      campaignRoot: gameStateRef.current?.campaignRoot,
-      fileIO: fileIO.current,
-      gitEnabled: gameStateRef.current?.config.recovery.enable_git,
-      gitIO: shutdownRef?.current?.gitIO,
-    });
+    void (async () => {
+      try {
+        await teardownGameSession({
+          engine: engineRef.current ?? undefined,
+          campaignRoot: gameStateRef.current?.campaignRoot,
+          fileIO: fileIO.current,
+          gitEnabled: gameStateRef.current?.config.recovery.enable_git,
+          gitIO: shutdownRef?.current?.gitIO,
+        });
+      } catch {
+        // Best-effort — still return to menu
+      }
 
-    resetGameState();
-    await loadCampaigns();
-    setPhase("main_menu");
+      resetGameState();
+      await loadCampaigns();
+      setPhase("main_menu");
+    })();
   }, [shutdownRef, resetGameState, loadCampaigns]);
 
   // Keep the ref in sync so useGameCallbacks' dispatchTuiCommand always calls the latest version
   returnToMenuRef.current = doSaveAndReturn;
 
   // --- End Session & Return: full session-end housekeeping then return ---
-  const doEndSessionAndReturn = useCallback(async () => {
+  const doEndSessionAndReturn = useCallback(() => {
     setPhase("returning_to_menu");
 
-    if (engineRef.current) {
-      try {
-        const sm = engineRef.current.getSceneManager();
-        const sessionNum = sm.getScene().sessionNumber;
-        await engineRef.current.endSession(`Session ${sessionNum}`);
-      } catch {
-        // Best-effort — still proceed with low-level save
+    void (async () => {
+      if (engineRef.current) {
+        try {
+          const sm = engineRef.current.getSceneManager();
+          const sessionNum = sm.getScene().sessionNumber;
+          await engineRef.current.endSession(`Session ${sessionNum}`);
+        } catch {
+          // Best-effort — still proceed with low-level save
+        }
       }
-    }
 
-    await teardownGameSession({
-      engine: engineRef.current ?? undefined,
-      campaignRoot: gameStateRef.current?.campaignRoot,
-      fileIO: fileIO.current,
-      gitEnabled: gameStateRef.current?.config.recovery.enable_git,
-      gitIO: shutdownRef?.current?.gitIO,
-    });
+      try {
+        await teardownGameSession({
+          engine: engineRef.current ?? undefined,
+          campaignRoot: gameStateRef.current?.campaignRoot,
+          fileIO: fileIO.current,
+          gitEnabled: gameStateRef.current?.config.recovery.enable_git,
+          gitIO: shutdownRef?.current?.gitIO,
+        });
+      } catch {
+        // Best-effort — still return to menu
+      }
 
-    resetGameState();
-    await loadCampaigns();
-    setPhase("main_menu");
+      resetGameState();
+      await loadCampaigns();
+      setPhase("main_menu");
+    })();
   }, [shutdownRef, resetGameState, loadCampaigns]);
 
   // --- Quit: hard exit ---

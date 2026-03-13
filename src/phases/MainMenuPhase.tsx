@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { useInput, Text, Box } from "ink";
 import type { CampaignEntry } from "../config/main-menu.js";
 import type { ResolvedTheme } from "../tui/themes/types.js";
-import { ThemedHorizontalBorder, ThemedSideFrame } from "../tui/components/index.js";
+import { ThemedHorizontalBorder, ThemedSideFrame, TerminalTooSmall } from "../tui/components/index.js";
+import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
 
@@ -85,6 +86,10 @@ export function MainMenuPhase({
     }
   });
 
+  if (cols < MIN_COLUMNS || termRows < MIN_ROWS) {
+    return <TerminalTooSmall columns={cols} rows={termRows} />;
+  }
+
   const borderColor = themeColor(theme, "border");
   const dimColor = themeColor(theme, "separator") ?? "#666666";
   const sideWidth = theme.asset.components.edge_left.width;
@@ -121,7 +126,7 @@ export function MainMenuPhase({
         const cMarker = cSelected ? "◆" : "○";
         const cColor = cSelected ? borderColor : dimColor;
         menuLines.push(
-          <Text key={`c-${campaigns[j].name}`}>
+          <Text key={`c-${campaigns[j].path}`}>
             <Text>{`    `}</Text>
             <Text color={cColor}>{cMarker}</Text>
             <Text>{` ${campaigns[j].name}`}</Text>
