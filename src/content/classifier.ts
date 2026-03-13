@@ -159,37 +159,67 @@ export function parseClassifierResults(
 
 /**
  * Merge overlapping sections from multiple chunk results.
- * Sections with the same title and overlapping page ranges are merged.
- * Sections with different titles but overlapping ranges keep the larger one.
+ *
+ * Two passes:
+ * 1. Merge sections with same contentType and overlapping/adjacent pages
+ *    (keeps the longer title). This handles the common case where overlapping
+ *    chunk windows produce the same section with slightly different titles.
+ * 2. Absorb tiny sections (≤2 pages) into their neighbors if same contentType.
  */
 export function mergeSections(sections: CatalogSection[]): CatalogSection[] {
   if (sections.length === 0) return [];
 
-  // Sort by startPage
-  const sorted = [...sections].sort((a, b) => a.startPage - b.startPage);
+  // Sort by startPage, then by size descending (larger first)
+  const sorted = [...sections].sort((a, b) => {
+    if (a.startPage !== b.startPage) return a.startPage - b.startPage;
+    return (b.endPage - b.startPage) - (a.endPage - a.startPage);
+  });
 
-  const merged: CatalogSection[] = [sorted[0]];
+  // Pass 1: merge same-contentType overlapping/adjacent sections
+  const pass1: CatalogSection[] = [{ ...sorted[0] }];
 
   for (let i = 1; i < sorted.length; i++) {
     const current = sorted[i];
-    const last = merged[merged.length - 1];
+    const last = pass1[pass1.length - 1];
 
-    // Same title and overlapping/adjacent → merge
     if (
-      current.title === last.title &&
       current.contentType === last.contentType &&
       current.startPage <= last.endPage + 1
     ) {
+      // Merge: extend range, keep the longer title
       last.endPage = Math.max(last.endPage, current.endPage);
+      if (current.title.length > last.title.length) {
+        last.title = current.title;
+      }
       if (current.description && !last.description) {
         last.description = current.description;
       }
+    } else if (
+      current.startPage >= last.startPage &&
+      current.endPage <= last.endPage
+    ) {
+      // Current is fully contained within last — skip it
+      continue;
     } else {
-      merged.push(current);
+      pass1.push({ ...current });
     }
   }
 
-  return merged;
+  // Pass 2: absorb tiny sections (≤2 pages) into adjacent same-type
+  const pass2: CatalogSection[] = [];
+  for (const section of pass1) {
+    const size = section.endPage - section.startPage + 1;
+    if (size <= 2 && pass2.length > 0) {
+      const prev = pass2[pass2.length - 1];
+      if (prev.contentType === section.contentType && section.startPage <= prev.endPage + 3) {
+        prev.endPage = Math.max(prev.endPage, section.endPage);
+        continue;
+      }
+    }
+    pass2.push(section);
+  }
+
+  return pass2;
 }
 
 /**

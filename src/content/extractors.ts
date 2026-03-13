@@ -73,7 +73,7 @@ export function buildExtractorBatchRequests(
   collectionSlug: string,
 ): Anthropic.Messages.Batches.BatchCreateParams.Request[] {
   return sections.map((section, i) => ({
-    custom_id: `extract-${collectionSlug}-${section.startPage}-${section.endPage}`,
+    custom_id: `extract-${collectionSlug}-${i}-${section.startPage}-${section.endPage}`,
     params: {
       model: getModel("small"),
       max_tokens: 8192,
@@ -98,8 +98,8 @@ export function parseExtractorResults(
   collectionSlug: string,
 ): DraftEntity[] {
   const sectionMap = new Map<string, CatalogSection>();
-  for (const section of sections) {
-    const key = `extract-${collectionSlug}-${section.startPage}-${section.endPage}`;
+  for (const [i, section] of sections.entries()) {
+    const key = `extract-${collectionSlug}-${i}-${section.startPage}-${section.endPage}`;
     sectionMap.set(key, section);
   }
 

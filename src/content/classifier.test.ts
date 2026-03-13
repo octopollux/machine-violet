@@ -245,10 +245,22 @@ describe("mergeSections", () => {
     expect(merged[0].endPage).toBe(20);
   });
 
-  it("keeps sections with different titles separate", () => {
+  it("merges same-contentType overlapping sections even with different titles", () => {
     const sections: CatalogSection[] = [
       { contentType: "rules", title: "Combat", description: "", startPage: 1, endPage: 10 },
       { contentType: "rules", title: "Magic", description: "", startPage: 8, endPage: 20 },
+    ];
+
+    const merged = mergeSections(sections);
+    // Same contentType + overlapping → merged
+    expect(merged).toHaveLength(1);
+    expect(merged[0].endPage).toBe(20);
+  });
+
+  it("keeps sections with different contentTypes separate", () => {
+    const sections: CatalogSection[] = [
+      { contentType: "rules", title: "Combat", description: "", startPage: 1, endPage: 10 },
+      { contentType: "lore", title: "History", description: "", startPage: 8, endPage: 20 },
     ];
 
     const merged = mergeSections(sections);

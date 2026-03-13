@@ -117,7 +117,7 @@ Make a melee or ranged attack.`;
         results: vi.fn(async function* (id: string) {
           const isClassifier = id === "batch_1";
           yield {
-            custom_id: isClassifier ? "classify-test-system-1-5" : "extract-test-system-1-5",
+            custom_id: isClassifier ? "classify-test-system-1-5" : "extract-test-system-0-1-5",
             result: {
               type: "succeeded",
               message: {

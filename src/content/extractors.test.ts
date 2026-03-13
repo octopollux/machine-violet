@@ -46,8 +46,8 @@ describe("buildExtractorBatchRequests", () => {
     const requests = buildExtractorBatchRequests(sections, texts, "d-d-5e");
 
     expect(requests).toHaveLength(2);
-    expect(requests[0].custom_id).toBe("extract-d-d-5e-1-20");
-    expect(requests[1].custom_id).toBe("extract-d-d-5e-21-40");
+    expect(requests[0].custom_id).toBe("extract-d-d-5e-0-1-20");
+    expect(requests[1].custom_id).toBe("extract-d-d-5e-1-21-40");
     expect(requests[0].params.model).toBe("claude-haiku-4-5-20251001");
     expect(requests[0].params.max_tokens).toBe(8192);
   });
@@ -61,7 +61,7 @@ describe("parseExtractorResults", () => {
 
     const results = [
       {
-        customId: "extract-d-d-5e-1-20",
+        customId: "extract-d-d-5e-0-1-20",
         text: `--- ENTITY ---
 Name: Goblin
 Category: characters
