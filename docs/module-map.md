@@ -127,7 +127,7 @@ State machine for the application: first launch → main menu → setup → play
 | File | Purpose |
 |---|---|
 | `FirstLaunchPhase.tsx` | Initial setup wizard (API key, config) |
-| `MainMenuPhase.tsx` | Campaign selection screen |
+| `MainMenuPhase.tsx` | Themed campaign selection screen (full-frame borders, campaign titles from config.json) |
 | `SetupPhase.tsx` | Campaign creation/load orchestration |
 | `PlayingPhase.tsx` | Main game loop (hosts GameEngine) |
 
@@ -149,5 +149,5 @@ Player commands during gameplay. `trySlashCommand()` parses and dispatches.
 |---|---|
 | `src/app.tsx` | Root Ink component — phase state machine, FileIO/GitIO setup, cost tracking |
 | `src/index.tsx` | Entry point — Ink render, raw mode guards |
-| `src/shutdown.ts` | Graceful shutdown (files, git, terminal) |
+| `src/shutdown.ts` | Graceful shutdown helper (files, git, terminal) — called by teardown.ts |
 | `src/teardown.ts` | Return-to-menu teardown: graceful shutdown + cache reset |

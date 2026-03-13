@@ -25,16 +25,15 @@ In OOC mode, the player can ask to roll back:
 - "Roll back to before the last combat" → the OOC agent searches git log for the right commit, restores files, then `session_resume` reloads the DM's context from the restored state.
 - "Undo the last few turns" → restore to the most recent auto-commit before the problem.
 
-The engine provides a `rollback` tool available to the OOC agent (tool registered but not yet wired end-to-end — see [#70](https://github.com/Orthodox-531/machine-violet/issues/70)):
+The engine provides a `rollback` tool available to the OOC agent, dev mode, and the `/rollback` slash command:
 
 ```
 rollback({
   target: "scene:Escape from the Goblin Caves"   // or a commit hash, or "last", or "exchanges_ago:5"
 })
-→ { restored_to: "commit abc123", timestamp: "...", summary: "State before scene transition" }
 ```
 
-After rollback, the DM receives a fresh `session_resume` with context rebuilt from the restored files.
+After rollback completes, the game returns to the main menu. Internally, rollback throws a `RollbackCompleteError` (from `src/teardown.ts`) which propagates through the agent loop and triggers the return-to-menu teardown flow. Re-entering the campaign loads the restored state via `session_resume`.
 
 ### Configuration
 
