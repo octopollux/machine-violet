@@ -30,7 +30,7 @@ import { StatePersister } from "./context/state-persistence.js";
 import type { LoadedState } from "./context/state-persistence.js";
 import { CostTracker } from "./context/cost-tracker.js";
 import type { ShutdownContext } from "./shutdown.js";
-import { gracefulShutdown } from "./shutdown.js";
+import { teardownGameSession } from "./teardown.js";
 import { createGitIO } from "./tools/git/isogit-adapter.js";
 import { useGameCallbacks } from "./tui/hooks/useGameCallbacks.js";
 import { useRawModeGuardian } from "./tui/hooks/useRawModeGuardian.js";
@@ -55,6 +55,7 @@ export type AppPhase =
   | "setup"
   | "building"
   | "playing"
+  | "returning_to_menu"
   | "shutting_down";
 
 // --- Theme helpers ---
@@ -261,6 +262,7 @@ export default function App({ shutdownRef }: AppProps) {
         async (p) => {
           try { await stat(p); return true; } catch { return false; }
         },
+        (p) => readFile(p, "utf-8"),
       );
       setCampaigns(found);
     } catch {
@@ -304,13 +306,19 @@ export default function App({ shutdownRef }: AppProps) {
   // --- Raw mode: keep Ink's stdin listener alive across phase transitions ---
   // eslint-disable-next-line @typescript-eslint/no-empty-function -- intentional no-op to keep raw mode alive
   const stableNoOp = useCallback(() => {}, []);
-  useInput(stableNoOp, { isActive: phase !== "loading" && phase !== "shutting_down" });
+  useInput(stableNoOp, { isActive: phase !== "loading" && phase !== "shutting_down" && phase !== "returning_to_menu" });
 
   // --- Raw mode guardian: re-enable raw mode if OS/terminal disabled it (e.g. window blur) ---
-  useRawModeGuardian({ enabled: phase !== "loading" && phase !== "shutting_down" });
+  useRawModeGuardian({ enabled: phase !== "loading" && phase !== "shutting_down" && phase !== "returning_to_menu" });
+
+  // Ref-based indirection: doSaveAndReturn is defined later but useGameCallbacks
+  // needs it now. The ref is updated after doSaveAndReturn is created.
+  // eslint-disable-next-line @typescript-eslint/no-empty-function -- placeholder until doSaveAndReturn is defined
+  const returnToMenuRef = useRef<() => void>(() => {});
 
   // --- Engine callbacks (extracted hook) ---
   const { buildCallbacks, dispatchTuiCommand } = useGameCallbacks({
+    onReturnToMenu: () => returnToMenuRef.current(),
     setNarrativeLines, setEngineState, setErrorMsg, setModelines,
     setResources, setVariant, setThemeName, setKeyColor,
     setActiveModal, setChoiceIndex,
@@ -384,13 +392,12 @@ export default function App({ shutdownRef }: AppProps) {
     setActivePlayerIndex(0);
 
     if (shutdownRef) {
-      shutdownRef.current = {
-        engine,
-        campaignRoot,
-        fileIO: fileIO.current,
-        gitEnabled: config.recovery.enable_git,
-        gitIO,
-      };
+      const ctx = shutdownRef.current;
+      ctx.engine = engine;
+      ctx.campaignRoot = campaignRoot;
+      ctx.fileIO = fileIO.current;
+      ctx.gitEnabled = config.recovery.enable_git;
+      ctx.gitIO = gitIO;
     }
 
     if (isResume) {
@@ -510,47 +517,105 @@ export default function App({ shutdownRef }: AppProps) {
     }
   }, [startEngine]);
 
-  // --- Save & Exit: persist state without session-end housekeeping ---
-  const doSaveAndExit = useCallback(async () => {
-    setPhase("shutting_down");
-    setNarrativeLines([{ kind: "system", text: "Saving and exiting..." }]);
+  // --- Reset all React/ref state for a clean return to menu ---
+  const resetGameState = useCallback(() => {
+    engineRef.current = null;
+    gameStateRef.current = null;
+    clientRef.current = null;
+    persisterRef.current = null;
+    hydratedRef.current = false;
 
-    await gracefulShutdown({
-      engine: engineRef.current ?? undefined,
-      campaignRoot: gameStateRef.current?.campaignRoot,
-      fileIO: fileIO.current,
-      gitEnabled: gameStateRef.current?.config.recovery.enable_git,
-      gitIO: shutdownRef?.current?.gitIO,
-    });
+    setNarrativeLines([]);
+    setEngineState(null);
+    setToolGlyphs([]);
+    setActiveModal(null);
+    setRetryOverlay(null);
+    setChoiceIndex(0);
+    setActiveSession(null);
+    setResources([]);
+    setModelines({});
+    setCampaignName("");
+    setActivePlayerIndex(0);
+    setErrorMsg(null);
 
-    process.exit(0);
-  }, [shutdownRef]);
+    // Reset theme to defaults
+    setThemeName(DEFAULT_THEME_NAME);
+    setKeyColor(DEFAULT_KEY_COLOR);
+    setVariant("exploration");
 
-  // --- End Session: full session-end housekeeping then exit ---
-  const doEndSession = useCallback(async () => {
-    setPhase("shutting_down");
-    setNarrativeLines([{ kind: "system", text: "Ending session..." }]);
-
-    if (engineRef.current) {
-      try {
-        const sm = engineRef.current.getSceneManager();
-        const sessionNum = sm.getScene().sessionNumber;
-        await engineRef.current.endSession(`Session ${sessionNum}`);
-      } catch {
-        // Best-effort — still proceed with low-level save
-      }
+    if (shutdownRef) {
+      const ctx = shutdownRef.current;
+      ctx.engine = undefined;
+      ctx.campaignRoot = undefined;
+      ctx.fileIO = undefined;
+      ctx.gitEnabled = undefined;
+      ctx.gitIO = undefined;
     }
-
-    await gracefulShutdown({
-      engine: engineRef.current ?? undefined,
-      campaignRoot: gameStateRef.current?.campaignRoot,
-      fileIO: fileIO.current,
-      gitEnabled: gameStateRef.current?.config.recovery.enable_git,
-      gitIO: shutdownRef?.current?.gitIO,
-    });
-
-    process.exit(0);
   }, [shutdownRef]);
+
+  // --- Save & Return to Menu ---
+  const doSaveAndReturn = useCallback(() => {
+    setPhase("returning_to_menu");
+
+    void (async () => {
+      try {
+        await teardownGameSession({
+          engine: engineRef.current ?? undefined,
+          campaignRoot: gameStateRef.current?.campaignRoot,
+          fileIO: fileIO.current,
+          gitEnabled: gameStateRef.current?.config.recovery.enable_git,
+          gitIO: shutdownRef?.current?.gitIO,
+        });
+      } catch {
+        // Best-effort — still return to menu
+      }
+
+      resetGameState();
+      await loadCampaigns();
+      setPhase("main_menu");
+    })();
+  }, [shutdownRef, resetGameState, loadCampaigns]);
+
+  // Keep the ref in sync so useGameCallbacks' dispatchTuiCommand always calls the latest version
+  returnToMenuRef.current = doSaveAndReturn;
+
+  // --- End Session & Return: full session-end housekeeping then return ---
+  const doEndSessionAndReturn = useCallback(() => {
+    setPhase("returning_to_menu");
+
+    void (async () => {
+      if (engineRef.current) {
+        try {
+          const sm = engineRef.current.getSceneManager();
+          const sessionNum = sm.getScene().sessionNumber;
+          await engineRef.current.endSession(`Session ${sessionNum}`);
+        } catch {
+          // Best-effort — still proceed with low-level save
+        }
+      }
+
+      try {
+        await teardownGameSession({
+          engine: engineRef.current ?? undefined,
+          campaignRoot: gameStateRef.current?.campaignRoot,
+          fileIO: fileIO.current,
+          gitEnabled: gameStateRef.current?.config.recovery.enable_git,
+          gitIO: shutdownRef?.current?.gitIO,
+        });
+      } catch {
+        // Best-effort — still return to menu
+      }
+
+      resetGameState();
+      await loadCampaigns();
+      setPhase("main_menu");
+    })();
+  }, [shutdownRef, resetGameState, loadCampaigns]);
+
+  // --- Quit: hard exit ---
+  const doQuit = useCallback(() => {
+    process.exit(0);
+  }, []);
 
   // --- First-launch complete handler ---
   const handleFirstLaunchComplete = useCallback((apiKey: string) => {
@@ -576,10 +641,12 @@ export default function App({ shutdownRef }: AppProps) {
   if (phase === "main_menu") {
     return (
       <MainMenuPhase
+        theme={theme}
         campaigns={campaigns}
         errorMsg={errorMsg}
         onNewCampaign={() => setPhase("setup")}
         onResumeCampaign={resumeCampaign}
+        onQuit={doQuit}
       />
     );
   }
@@ -600,6 +667,14 @@ export default function App({ shutdownRef }: AppProps) {
     return (
       <Box flexDirection="column" padding={1}>
         <Text>Building your world...</Text>
+      </Box>
+    );
+  }
+
+  if (phase === "returning_to_menu") {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Text>Saving...</Text>
       </Box>
     );
   }
@@ -633,8 +708,8 @@ export default function App({ shutdownRef }: AppProps) {
     activeSession, setActiveSession, previousVariantRef,
     devModeEnabled: isDevMode(),
     dispatchTuiCommand,
-    onShutdown: doSaveAndExit,
-    onEndSession: doEndSession,
+    onReturnToMenu: doSaveAndReturn,
+    onEndSessionAndReturn: doEndSessionAndReturn,
   };
 
   return (

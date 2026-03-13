@@ -56,8 +56,8 @@ export interface GameContextValue {
   devModeEnabled?: boolean;
   // Actions
   dispatchTuiCommand: (cmd: TuiCommand) => void;
-  onShutdown: () => void;
-  onEndSession: () => void;
+  onReturnToMenu: () => void;
+  onEndSessionAndReturn: () => void;
 }
 
 const GameContext = createContext<GameContextValue | null>(null);

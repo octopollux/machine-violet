@@ -19,9 +19,12 @@ import { isDevMode } from "../../config/dev-mode.js";
 import type { ToolResult } from "../../agents/tool-registry.js";
 import { appendDelta } from "../narrative-helpers.js";
 import { getToolGlyph } from "../activity.js";
+import { RollbackCompleteError } from "../../teardown.js";
 
 /** All external state/setters the hook needs, passed as a single deps object. */
 export interface GameCallbackDeps {
+  // Return-to-menu callback (triggered by rollback TUI command)
+  onReturnToMenu: () => void;
   // Setters
   setNarrativeLines: React.Dispatch<React.SetStateAction<NarrativeLine[]>>;
   setEngineState: (s: string | null) => void;
@@ -67,6 +70,7 @@ export function formatResources(gs: GameState): string[] {
 
 export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
   const {
+    onReturnToMenu,
     setNarrativeLines, setEngineState, setErrorMsg, setModelines,
     setResources, setVariant, setThemeName, setKeyColor,
     setActiveModal, setChoiceIndex,
@@ -149,6 +153,10 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
         }
         break;
       }
+      case "return_to_menu": {
+        onReturnToMenu();
+        break;
+      }
       case "enter_ooc": {
         previousVariantRef.current = variantRef.current ?? "exploration";
         const gs = gameStateRef.current;
@@ -173,7 +181,7 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
         break;
       }
     }
-  }, [setModelines, setVariant, setThemeName, setKeyColor, setResources, setChoiceIndex,
+  }, [onReturnToMenu, setModelines, setVariant, setThemeName, setKeyColor, setResources, setChoiceIndex,
       setActiveModal, setActiveSession, setNarrativeLines, gameStateRef, clientRef, engineRef, fileIO,
       previousVariantRef, variantRef]);
 
@@ -244,6 +252,8 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
       costTracker.current?.record(usage, "large");
     },
     onError(error: Error) {
+      // Rollback-complete errors are handled via TUI command — not a real error
+      if (error instanceof RollbackCompleteError) return;
       setErrorMsg(error.message);
       setNarrativeLines((prev) => [
         ...prev,

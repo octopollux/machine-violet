@@ -26,6 +26,7 @@ import { runScribe } from "./subagents/scribe.js";
 import { searchCampaign } from "./subagents/search-campaign.js";
 import { norm } from "../utils/paths.js";
 import { CampaignRepo, performRollback } from "../tools/git/index.js";
+import { RollbackCompleteError } from "../teardown.js";
 import type { GitIO } from "../tools/git/index.js";
 import { writeDebugDump } from "../tools/filesystem/debug-dump.js";
 import { styleTheme } from "./subagents/theme-styler.js";
@@ -680,7 +681,7 @@ export class GameEngine {
 
   // --- Rollback ---
 
-  /** Roll back to a previous git checkpoint and exit. */
+  /** Roll back to a previous git checkpoint and return to menu. */
   private async rollbackAndExit(target: string): Promise<void> {
     if (!this.repo) {
       this.callbacks.onError(new Error("Rollback unavailable: git is disabled for this campaign."));
@@ -688,8 +689,8 @@ export class GameEngine {
     }
     this.callbacks.onDevLog?.(`[dev] rollback: rolling back to "${target}"`);
     const result = await performRollback(this.repo, target, this.gameState.campaignRoot, this.fileIO);
-    console.log(`\nRolled back to: ${result.summary}\nRelaunch the game to resume from this point.\n`);
-    process.exit(0);
+    this.callbacks.onTuiCommand?.({ type: "return_to_menu" });
+    throw new RollbackCompleteError(result.summary);
   }
 
   // --- Validation ---

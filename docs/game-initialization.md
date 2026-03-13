@@ -52,8 +52,13 @@ Subsequent launches skip Step 0 entirely.
   └─────────────────────────────┘
 ```
 
-- **Continue** → lists existing campaign directories, player picks one → `session_resume` → gameplay.
+The main menu uses the full themed frame (same border components as the playing UI). Campaign titles are read from each campaign's `config.json`.
+
+- **Continue** → expands an inline sub-list of campaigns (by title), player picks one → `session_resume` → gameplay.
 - **New Campaign** → setup conversation (see below).
+- **Quit** → exits the process.
+
+Returning from a game via "Save & Exit" or "End Session" runs teardown (graceful shutdown + cache reset) and transitions back to this menu.
 
 ### Step 2: Setup Conversation
 

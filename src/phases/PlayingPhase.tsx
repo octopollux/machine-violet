@@ -14,6 +14,7 @@ import { createOOCSession } from "../agents/subagents/ooc-mode.js";
 import { createDevSession, summarizeGameState } from "../agents/subagents/dev-mode.js";
 import { useGameContext } from "../tui/game-context.js";
 import { trySlashCommand } from "../commands/index.js";
+import { RollbackCompleteError } from "../teardown.js";
 
 export function PlayingPhase() {
   const {
@@ -27,7 +28,7 @@ export function PlayingPhase() {
     activeSession, setActiveSession, previousVariantRef,
     devModeEnabled,
     retryOverlay,
-    dispatchTuiCommand, onShutdown, onEndSession,
+    dispatchTuiCommand, onReturnToMenu, onEndSessionAndReturn,
   } = useGameContext();
   const { columns: cols, rows } = useTerminalSize();
   const tooSmall = cols < MIN_COLUMNS || rows < MIN_ROWS;
@@ -97,6 +98,7 @@ export function PlayingPhase() {
       setPreviousVariant: (v) => { previousVariantRef.current = v; },
       dispatchTuiCommand,
       setActiveModal,
+      onReturnToMenu,
     })) {
       clearInput();
       return;
@@ -117,6 +119,10 @@ export function PlayingPhase() {
         }
       }).catch((err: unknown) => {
         setModeBusy(false);
+        if (err instanceof RollbackCompleteError) {
+          onReturnToMenu();
+          return;
+        }
         const msg = err instanceof Error ? err.message : String(err);
         setNarrativeLines((prev) => [...prev, { kind: "system", text: `[${activeSession.label} error: ${msg}]` }, { kind: "dm", text: "" }]);
       });
@@ -322,10 +328,10 @@ export function PlayingPhase() {
           setMenuOpen(false);
         } else if (item === "Save & Exit") {
           setMenuOpen(false);
-          onShutdown();
+          onReturnToMenu();
         } else if (item === "End Session") {
           setMenuOpen(false);
-          onEndSession();
+          onEndSessionAndReturn();
         } else if (item === "Character Sheet") {
           setMenuOpen(false);
           const gs = gameStateRef.current;
