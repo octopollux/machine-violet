@@ -80,6 +80,24 @@ export function PlayingPhase() {
     menuOpen ||
     (!!activeSession && modeBusy);
 
+  // Helper to exit active session mode
+  const exitActiveSession = useCallback(() => {
+    if (!activeSession) return;
+    const label = activeSession.label;
+    // Flush accumulated OOC summaries to the engine for injection into the next DM turn
+    if (label === "OOC" && oocSummaries.current.length > 0) {
+      if (engineRef.current) {
+        engineRef.current.setPendingOOCSummary(
+          oocSummaries.current.join("\n"),
+        );
+      }
+      oocSummaries.current = [];
+    }
+    setActiveSession(null);
+    setVariant(previousVariantRef.current);
+    setNarrativeLines((prev) => [...prev, { kind: "system", text: `[Exiting ${label} Mode]` }, { kind: "dm", text: "" }]);
+  }, [activeSession, setActiveSession, setVariant, previousVariantRef, setNarrativeLines, engineRef]);
+
   // --- Submit handler for TextInput ---
   const handleSubmit = useCallback((value: string) => {
     if (!value.trim()) return;
@@ -117,6 +135,15 @@ export function PlayingPhase() {
         if (activeSession.label === "OOC" && result.summary) {
           oocSummaries.current.push(result.summary);
         }
+        // Auto-exit if the OOC agent signaled END_OOC
+        if (result.endSession) {
+          exitActiveSession();
+          // Forward in-character action to DM if provided
+          if (result.playerAction && engineRef.current && gameStateRef.current) {
+            const active = getActivePlayer(gameStateRef.current);
+            engineRef.current.processInput(active.characterName, result.playerAction);
+          }
+        }
       }).catch((err: unknown) => {
         setModeBusy(false);
         if (err instanceof RollbackCompleteError) {
@@ -134,7 +161,7 @@ export function PlayingPhase() {
     }
 
     clearInput();
-  }, [activeSession, clearInput, variant, setActiveSession, setVariant, setNarrativeLines]);
+  }, [activeSession, exitActiveSession, clearInput, variant, setActiveSession, setVariant, setNarrativeLines]);
 
   const handleCustomChoiceSubmit = useCallback((value: string) => {
     if (!value.trim()) return;
@@ -148,24 +175,6 @@ export function PlayingPhase() {
       engineRef.current.processInput(active.characterName, text);
     }
   }, []);
-
-  // Helper to exit active session mode
-  const exitActiveSession = useCallback(() => {
-    if (!activeSession) return;
-    const label = activeSession.label;
-    // Flush accumulated OOC summaries to the engine for injection into the next DM turn
-    if (label === "OOC" && oocSummaries.current.length > 0) {
-      if (engineRef.current) {
-        engineRef.current.setPendingOOCSummary(
-          oocSummaries.current.join("\n"),
-        );
-      }
-      oocSummaries.current = [];
-    }
-    setActiveSession(null);
-    setVariant(previousVariantRef.current);
-    setNarrativeLines((prev) => [...prev, { kind: "system", text: `[Exiting ${label} Mode]` }, { kind: "dm", text: "" }]);
-  }, [activeSession, setActiveSession, setVariant, previousVariantRef, setNarrativeLines, engineRef]);
 
   // --- Input handling (modals, menus, scroll — TextInput handles text editing) ---
   useInput((input, key) => {

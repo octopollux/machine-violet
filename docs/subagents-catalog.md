@@ -42,6 +42,8 @@ Sandboxed conversation for out-of-character discussion. Receives the DM's curren
 
 **Returns**: Terse summary to the DM when OOC ends — just what the DM needs to know to resume narrating. Does NOT return the full OOC conversation.
 
+**Auto-exit**: The OOC agent can signal session end by emitting `<END_OOC />` (no player action) or `<END_OOC>player action text</END_OOC>` (with in-character text to forward). When a payload is provided, PlayingPhase auto-exits OOC and forwards the text to the DM as player input. This handles the case where the player drifts back to in-character mid-OOC. The player can also still exit manually via ESC.
+
 **DM injection (player-initiated only)**: When OOC is entered from the game menu or `/ooc` slash command (not via DM's `enter_ooc` tool), accumulated summaries are injected as an `<ooc_summary>` XML tag prepended to the next player message. This persists in conversation history so the DM retains OOC context across turns. The DM-initiated path does not need this because the DM already sees the tool result.
 
 **Tools available**: `rollback`, filesystem reads, validation suite, config updates. Cannot call DM-only tools.
