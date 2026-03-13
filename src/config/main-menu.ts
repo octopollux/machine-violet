@@ -19,6 +19,7 @@ export async function listCampaigns(
   campaignsDir: string,
   listDir: (path: string) => Promise<string[]>,
   exists: (path: string) => Promise<boolean>,
+  readFile?: (path: string) => Promise<string>,
 ): Promise<CampaignEntry[]> {
   const entries: CampaignEntry[] = [];
 
@@ -33,7 +34,17 @@ export async function listCampaigns(
     const campaignPath = join(campaignsDir, dir);
     const configPath = join(campaignPath, "config.json");
     if (await exists(configPath)) {
-      entries.push({ name: dir, path: campaignPath });
+      let title = dir;
+      if (readFile) {
+        try {
+          const raw = await readFile(configPath);
+          const config = JSON.parse(raw);
+          if (typeof config.name === "string" && config.name) {
+            title = config.name;
+          }
+        } catch { /* fall back to directory name */ }
+      }
+      entries.push({ name: title, path: campaignPath });
     }
   }
 

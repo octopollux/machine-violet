@@ -262,6 +262,7 @@ export default function App({ shutdownRef }: AppProps) {
         async (p) => {
           try { await stat(p); return true; } catch { return false; }
         },
+        (p) => readFile(p, "utf-8"),
       );
       setCampaigns(found);
     } catch {
