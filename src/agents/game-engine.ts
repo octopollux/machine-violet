@@ -49,8 +49,8 @@ export interface TurnInfo {
 export interface EngineCallbacks {
   /** DM text streams in as it generates */
   onNarrativeDelta: (delta: string) => void;
-  /** DM finished responding — full text available */
-  onNarrativeComplete: (text: string) => void;
+  /** DM finished responding — full text available. playerAction is the tagged input that triggered this response. */
+  onNarrativeComplete: (text: string, playerAction?: string) => void;
   /** Engine state changed (for activity indicators) */
   onStateChange: (state: EngineState) => void;
   /** TUI command from a tool call */
@@ -547,8 +547,8 @@ export class GameEngine {
       accUsage(this.sessionUsage, result.usage);
       this.callbacks.onUsageUpdate(this.sessionUsage);
 
-      // Notify completion
-      this.callbacks.onNarrativeComplete(result.text);
+      // Notify completion — pass player action for context-aware choice generation
+      this.callbacks.onNarrativeComplete(result.text, text || undefined);
       this.callbacks.onTurnEnd(dmTurn);
 
     } catch (e) {

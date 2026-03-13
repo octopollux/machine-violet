@@ -151,7 +151,7 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
     onNarrativeDelta(delta: string) {
       setNarrativeLines((prev) => appendDelta(prev, delta, "dm"));
     },
-    onNarrativeComplete(text: string) {
+    onNarrativeComplete(text: string, playerAction?: string) {
       setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }]);
 
       const gs = gameStateRef.current;
@@ -162,7 +162,7 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
           if (isDevMode()) {
             setNarrativeLines((prev) => [...prev, { kind: "dev", text: "[dev] subagent:choices starting" }]);
           }
-          generateChoices(clientRef.current, text, activePlayer.characterName).then((result) => {
+          generateChoices(clientRef.current, text, activePlayer.characterName, playerAction).then((result) => {
             if (isDevMode()) {
               setNarrativeLines((prev) => [...prev, { kind: "dev", text: `[dev] subagent:choices \u2192 ${result.choices.length} options generated` }]);
             }
