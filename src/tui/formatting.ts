@@ -212,6 +212,14 @@ function flattenToWords(
 }
 
 /**
+ * Test whether a raw text line is a legal Markdown horizontal rule.
+ * Matches 3+ of the same character (-, *, _) with optional spaces.
+ */
+export function isHorizontalRule(text: string): boolean {
+  return /^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/.test(text);
+}
+
+/**
  * Unified processing pipeline for NarrativeLines.
  * Heal → parse → wrap → pad alignment → quote highlight.
  * Returns ProcessedLine[] ready for direct rendering.
@@ -223,12 +231,17 @@ export function processNarrativeLines(
 ): ProcessedLine[] {
   // Phase 0: Split inline <center> and <right> blocks onto their own lines.
   // The rendering pipeline expects these to be the sole content of a line.
+  // Also converts DM horizontal rules (---, ***, ___) into separator lines.
   const expandedLines: NarrativeLine[] = [];
   for (const srcLine of lines) {
     if (srcLine.kind === "dm" && srcLine.text.trim() !== "") {
-      const split = splitAlignmentBlocks(srcLine.text);
-      for (const part of split) {
-        expandedLines.push({ kind: "dm", text: part });
+      if (isHorizontalRule(srcLine.text)) {
+        expandedLines.push({ kind: "separator", text: "" });
+      } else {
+        const split = splitAlignmentBlocks(srcLine.text);
+        for (const part of split) {
+          expandedLines.push({ kind: "dm", text: part });
+        }
       }
     } else {
       expandedLines.push(srcLine);

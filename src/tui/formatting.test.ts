@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseFormatting, toPlainText, stripFormatting, highlightQuotesWithState, markdownToTags, nodeVisibleLength, wrapNodes, processNarrativeLines } from "./formatting.js";
+import { parseFormatting, toPlainText, stripFormatting, highlightQuotesWithState, markdownToTags, nodeVisibleLength, wrapNodes, processNarrativeLines, isHorizontalRule } from "./formatting.js";
 import type { FormattingTag, FormattingNode, NarrativeLine } from "../types/tui.js";
 
 describe("parseFormatting", () => {
@@ -768,6 +768,118 @@ describe("processNarrativeLines", () => {
     const centerLine = result.find((l) => l.alignment === "center");
     expect(centerLine).toBeDefined();
     expect(toPlainText(centerLine!.nodes)).toBe("Title");
+  });
+});
+
+describe("isHorizontalRule", () => {
+  it("matches three dashes", () => {
+    expect(isHorizontalRule("---")).toBe(true);
+  });
+
+  it("matches four or more dashes", () => {
+    expect(isHorizontalRule("----")).toBe(true);
+    expect(isHorizontalRule("----------")).toBe(true);
+  });
+
+  it("matches three asterisks", () => {
+    expect(isHorizontalRule("***")).toBe(true);
+  });
+
+  it("matches three underscores", () => {
+    expect(isHorizontalRule("___")).toBe(true);
+  });
+
+  it("matches spaced variants", () => {
+    expect(isHorizontalRule("- - -")).toBe(true);
+    expect(isHorizontalRule("* * *")).toBe(true);
+    expect(isHorizontalRule("_ _ _")).toBe(true);
+  });
+
+  it("allows leading whitespace (up to 3 spaces)", () => {
+    expect(isHorizontalRule("   ---")).toBe(true);
+    expect(isHorizontalRule(" ---")).toBe(true);
+  });
+
+  it("rejects 4+ leading spaces (code block)", () => {
+    expect(isHorizontalRule("    ---")).toBe(false);
+  });
+
+  it("rejects fewer than 3 characters", () => {
+    expect(isHorizontalRule("--")).toBe(false);
+    expect(isHorizontalRule("-")).toBe(false);
+  });
+
+  it("rejects mixed characters", () => {
+    expect(isHorizontalRule("-*-")).toBe(false);
+    expect(isHorizontalRule("--*")).toBe(false);
+  });
+
+  it("rejects text content", () => {
+    expect(isHorizontalRule("---text")).toBe(false);
+    expect(isHorizontalRule("hello")).toBe(false);
+  });
+
+  it("rejects empty string", () => {
+    expect(isHorizontalRule("")).toBe(false);
+  });
+});
+
+describe("processNarrativeLines — horizontal rule conversion", () => {
+  const dm = (text: string): NarrativeLine => ({ kind: "dm", text });
+
+  it("converts --- DM line to separator kind", () => {
+    const result = processNarrativeLines([dm("---")], 80);
+    expect(result).toHaveLength(1);
+    expect(result[0].kind).toBe("separator");
+  });
+
+  it("converts *** DM line to separator kind", () => {
+    const result = processNarrativeLines([dm("***")], 80);
+    expect(result).toHaveLength(1);
+    expect(result[0].kind).toBe("separator");
+  });
+
+  it("converts ___ DM line to separator kind", () => {
+    const result = processNarrativeLines([dm("___")], 80);
+    expect(result).toHaveLength(1);
+    expect(result[0].kind).toBe("separator");
+  });
+
+  it("preserves surrounding DM lines", () => {
+    const result = processNarrativeLines([
+      dm("Before."),
+      dm("---"),
+      dm("After."),
+    ], 80);
+    expect(result).toHaveLength(3);
+    expect(result[0].kind).toBe("dm");
+    expect(toPlainText(result[0].nodes)).toBe("Before.");
+    expect(result[1].kind).toBe("separator");
+    expect(result[2].kind).toBe("dm");
+    expect(toPlainText(result[2].nodes)).toBe("After.");
+  });
+
+  it("does not convert non-DM separator-like lines", () => {
+    const result = processNarrativeLines([
+      { kind: "player", text: "---" },
+    ], 80);
+    expect(result[0].kind).toBe("player");
+  });
+
+  it("does not affect cross-line healing state", () => {
+    const result = processNarrativeLines([
+      dm("<i>italic start"),
+      dm("---"),
+      dm("still italic</i>"),
+    ], 80);
+    // The separator should break the DM line sequence but italic
+    // should still heal across because separators don't reset the stack
+    const dmLines = result.filter((l) => l.kind === "dm");
+    const lastDM = dmLines[dmLines.length - 1];
+    const hasItalic = lastDM.nodes.some(
+      (n) => typeof n !== "string" && n.type === "italic",
+    );
+    expect(hasItalic).toBe(true);
   });
 });
 
