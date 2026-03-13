@@ -206,6 +206,8 @@ export function ChoiceOverlay({
 
 /* ──────────────────────────────────────────────────────────
  * ChoiceModal — original framed version (kept for compatibility).
+ * NOT used in production — only in tests. Does NOT support
+ * formatting tags in choice labels (uses renderContentLine).
  * ────────────────────────────────────────────────────────── */
 
 interface ChoiceModalProps {

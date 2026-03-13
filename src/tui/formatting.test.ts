@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseFormatting, toPlainText, highlightQuotesWithState, markdownToTags, nodeVisibleLength, wrapNodes, processNarrativeLines } from "./formatting.js";
+import { parseFormatting, toPlainText, stripFormatting, highlightQuotesWithState, markdownToTags, nodeVisibleLength, wrapNodes, processNarrativeLines } from "./formatting.js";
 import type { FormattingTag, FormattingNode, NarrativeLine } from "../types/tui.js";
 
 describe("parseFormatting", () => {
@@ -134,6 +134,20 @@ describe("toPlainText", () => {
 
   it("handles empty input", () => {
     expect(toPlainText([])).toBe("");
+  });
+});
+
+describe("stripFormatting", () => {
+  it("strips bold and color tags from a string", () => {
+    expect(stripFormatting("<b>Bold</b> <color=#f00>Red</color>")).toBe("Bold Red");
+  });
+
+  it("strips nested tags", () => {
+    expect(stripFormatting("<b><color=#cc4444>Dread</color> and Horror</b>")).toBe("Dread and Horror");
+  });
+
+  it("passes plain text through unchanged", () => {
+    expect(stripFormatting("no tags here")).toBe("no tags here");
   });
 });
 
