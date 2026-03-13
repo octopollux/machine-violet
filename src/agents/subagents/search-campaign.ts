@@ -63,6 +63,24 @@ const SEARCH_TOOLS: Anthropic.Tool[] = [
 
 // --- Tool handler factory ---
 
+/** Allowlisted top-level directories — matches what walkCampaignFiles reads. */
+const ALLOWED_PREFIXES = [
+  "characters/",
+  "locations/",
+  "factions/",
+  "lore/",
+  "players/",
+  "campaign/",
+  "rules/",
+];
+
+function isAllowedPath(relativePath: string): boolean {
+  const normalized = relativePath.replace(/\\/g, "/");
+  // Block dotfile directories (.debug/, .dev-mode/) and state/
+  if (normalized.startsWith(".") || normalized.startsWith("state/")) return false;
+  return ALLOWED_PREFIXES.some((p) => normalized.startsWith(p));
+}
+
 function matchesFilter(relativePath: string, filter: string): boolean {
   switch (filter) {
     case "entities":
@@ -140,6 +158,12 @@ export function buildSearchToolHandler(
 
       case "read_campaign_file": {
         const relPath = input.path as string;
+        if (!isAllowedPath(relPath)) {
+          return {
+            content: `Access denied: ${relPath} — only campaign content directories are searchable`,
+            is_error: true,
+          };
+        }
         const absPath = norm(campaignRoot + "/" + relPath);
         try {
           const content = await fileIO.readFile(absPath);

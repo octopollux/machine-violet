@@ -171,6 +171,55 @@ describe("buildSearchToolHandler", () => {
       expect(result.is_error).toBe(true);
       expect(result.content).toContain("not found");
     });
+
+    it("blocks access to .debug/ directory", async () => {
+      const fio = mockFileIO({
+        "/camp/.debug/crash-2026.txt": "stack trace here",
+      });
+      const handler = buildSearchToolHandler(SAMPLE_FILES, fio, "/camp");
+      const result = await handler("read_campaign_file", { path: ".debug/crash-2026.txt" });
+
+      expect(result.is_error).toBe(true);
+      expect(result.content).toContain("Access denied");
+    });
+
+    it("blocks access to .dev-mode/ directory", async () => {
+      const fio = mockFileIO({
+        "/camp/.dev-mode/campaigns/context/dm.json": "{}",
+      });
+      const handler = buildSearchToolHandler(SAMPLE_FILES, fio, "/camp");
+      const result = await handler("read_campaign_file", { path: ".dev-mode/campaigns/context/dm.json" });
+
+      expect(result.is_error).toBe(true);
+      expect(result.content).toContain("Access denied");
+    });
+
+    it("blocks access to state/ directory", async () => {
+      const fio = mockFileIO({
+        "/camp/state/conversation.json": '{"exchanges":[]}',
+      });
+      const handler = buildSearchToolHandler(SAMPLE_FILES, fio, "/camp");
+      const result = await handler("read_campaign_file", { path: "state/conversation.json" });
+
+      expect(result.is_error).toBe(true);
+      expect(result.content).toContain("Access denied");
+    });
+
+    it("allows access to campaign content directories", async () => {
+      const fio = mockFileIO({
+        "/camp/campaign/scenes/001-test/transcript.md": "# Scene 1",
+        "/camp/rules/core.md": "# Rules",
+      });
+      const handler = buildSearchToolHandler(SAMPLE_FILES, fio, "/camp");
+
+      const r1 = await handler("read_campaign_file", { path: "campaign/scenes/001-test/transcript.md" });
+      expect(r1.is_error).toBeUndefined();
+      expect(r1.content).toBe("# Scene 1");
+
+      const r2 = await handler("read_campaign_file", { path: "rules/core.md" });
+      expect(r2.is_error).toBeUndefined();
+      expect(r2.content).toBe("# Rules");
+    });
   });
 
   describe("unknown tool", () => {
