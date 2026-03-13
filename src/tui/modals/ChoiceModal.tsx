@@ -3,8 +3,9 @@ import { Box, Text } from "ink";
 import type { FrameStyleVariant } from "../../types/tui.js";
 import { renderHorizontalFrame, renderContentLine } from "../frames/index.js";
 import { InlineTextInput } from "../components/InlineTextInput.js";
-import { parseFormatting } from "../formatting.js";
+import { parseFormatting, wrapNodes, nodeVisibleLength } from "../formatting.js";
 import { renderNodes } from "../render-nodes.js";
+import type { FormattingNode } from "../../types/tui.js";
 
 /* ──────────────────────────────────────────────────────────
  * ChoiceOverlay — frameless version that fills the Player Pane interior.
@@ -14,36 +15,24 @@ import { renderNodes } from "../render-nodes.js";
 /** Number of fixed rows reserved for the description region. */
 export const DESCRIPTION_ROWS = 3;
 
-/** Word-wrap text to fit within a given width, returning exactly `rows` lines (padded or truncated). */
-function wrapToFixedRows(text: string, maxWidth: number, rows: number): string[] {
-  if (!text) return Array(rows).fill("");
-  const words = text.split(/\s+/);
-  const lines: string[] = [];
-  let current = "";
-  for (const word of words) {
-    if (current.length === 0) {
-      current = word;
-    } else if (current.length + 1 + word.length <= maxWidth) {
-      current += " " + word;
+/** Word-wrap formatted text to fit within a given width, returning exactly `rows` lines of FormattingNode[]. */
+function wrapToFixedRows(text: string, maxWidth: number, rows: number): FormattingNode[][] {
+  if (!text) return Array.from({ length: rows }, () => [] as FormattingNode[]);
+  const nodes = parseFormatting(text);
+  const wrapped = wrapNodes(nodes, maxWidth);
+  // Pad to exact row count
+  while (wrapped.length < rows) wrapped.push([]);
+  // Truncate if too many lines, adding ellipsis
+  if (wrapped.length > rows) {
+    wrapped.length = rows;
+    const lastLine = wrapped[rows - 1];
+    if (nodeVisibleLength(lastLine) > maxWidth - 1) {
+      wrapped[rows - 1] = [...lastLine.slice(0, -1), "…"];
     } else {
-      lines.push(current);
-      current = word;
+      wrapped[rows - 1] = [...lastLine, "…"];
     }
   }
-  if (current) lines.push(current);
-  // Pad or truncate to exact row count
-  while (lines.length < rows) lines.push("");
-  if (lines.length > rows) {
-    lines.length = rows;
-    // Add ellipsis to last visible line if we truncated
-    const last = lines[rows - 1];
-    if (last.length > maxWidth - 1) {
-      lines[rows - 1] = last.slice(0, maxWidth - 1) + "…";
-    } else {
-      lines[rows - 1] = last + "…";
-    }
-  }
-  return lines;
+  return wrapped;
 }
 
 interface ChoiceOverlayProps {
@@ -54,25 +43,34 @@ interface ChoiceOverlayProps {
   /** Per-choice descriptions shown in a fixed-height region for the highlighted choice. */
   descriptions?: string[];
   selectedIndex: number;
+  /** Hex color for the selection cursor (">"). Falls back to default text color. */
+  accentColor?: string;
   showCustomInput?: boolean;
   customInputActive?: boolean;
   customInputResetKey?: number;
   onCustomInputSubmit?: (value: string) => void;
 }
 
+/** Maximum visual rows available for choice items. */
+const MAX_CHOICE_ROWS = 5;
+
 /**
  * Frameless choice list for embedding inside the Player Pane.
  *
  * Without descriptions — 7-row layout:
- *   Row 0: prompt text + ▲▼ scroll arrows
- *   Rows 1-5: choices (scrolled if >5 items)
+ *   Row 0: prompt text
+ *   Rows 1-5: choices (scrolled, line-wrapped; ▲/▼ in left margin)
  *   Row 6: right-aligned help hint
  *
  * With descriptions — 10-row layout:
- *   Row 0: prompt text + ▲▼ scroll arrows
+ *   Row 0: prompt text
  *   Rows 1-3: fixed-height description of highlighted choice (dimmed)
- *   Rows 4-8: choices (scrolled if >5 items)
+ *   Rows 4-8: choices (scrolled, line-wrapped; ▲/▼ in left margin)
  *   Row 9: right-aligned help hint
+ *
+ * Scroll indicators (▲/▼) live in a dedicated first column at the
+ * top-left of the choice region (row 0 = ▲, row 1 = ▼). The cursor
+ * (>) occupies the second column. The two never interfere.
  */
 export function ChoiceOverlay({
   width,
@@ -80,6 +78,7 @@ export function ChoiceOverlay({
   choices: rawChoices,
   descriptions,
   selectedIndex,
+  accentColor,
   showCustomInput,
   customInputActive,
   customInputResetKey,
@@ -90,72 +89,107 @@ export function ChoiceOverlay({
     : [];
 
   const hasDescriptions = descriptions != null && descriptions.length > 0;
-  const totalHeight = hasDescriptions ? 7 + DESCRIPTION_ROWS : 7;
+  const totalHeight = hasDescriptions ? 2 + MAX_CHOICE_ROWS + DESCRIPTION_ROWS : 2 + MAX_CHOICE_ROWS;
 
-  const totalItems = choices.length + (showCustomInput ? 1 : 0);
-  const maxVisible = 5;
-  const needsScroll = totalItems > maxVisible;
+  // Pre-wrap all choice items
+  // Prefix layout: [arrow 1ch][gap 1ch][cursor 1ch][space 1ch] = 4 chars
+  const prefixWidth = 4;
+  const labelWidth = Math.max(1, width - prefixWidth);
 
-  // Keep selectedIndex in the visible window
-  let scrollStart = 0;
-  if (needsScroll) {
-    scrollStart = Math.max(
-      0,
-      Math.min(
-        selectedIndex - Math.floor(maxVisible / 2),
-        totalItems - maxVisible,
-      ),
-    );
+  interface WrappedItem { index: number; isCustom: boolean; lines: FormattingNode[][] }
+  const allItems: WrappedItem[] = [];
+  for (let i = 0; i < choices.length; i++) {
+    const nodes = parseFormatting(choices[i]);
+    const lines = wrapNodes(nodes, labelWidth);
+    // Cap to MAX_CHOICE_ROWS (a single item can't exceed the budget)
+    if (lines.length > MAX_CHOICE_ROWS) {
+      lines.length = MAX_CHOICE_ROWS;
+      const lastLine = lines[MAX_CHOICE_ROWS - 1];
+      lines[MAX_CHOICE_ROWS - 1] = [...lastLine, "…"];
+    }
+    allItems.push({ index: i, isCustom: false, lines });
   }
-  const scrollEnd = scrollStart + Math.min(totalItems, maxVisible);
+  if (showCustomInput) {
+    allItems.push({
+      index: choices.length,
+      isCustom: true,
+      lines: [["Enter your own..."]],
+    });
+  }
 
-  const canScrollUp = needsScroll && scrollStart > 0;
-  const canScrollDown = needsScroll && scrollEnd < totalItems;
+  // Find visible window: fit items within MAX_CHOICE_ROWS visual rows,
+  // ensuring selectedIndex is visible.
+  const getVisibleEnd = (start: number): number => {
+    let rows = 0;
+    let end = start;
+    while (end < allItems.length) {
+      const itemRows = allItems[end].lines.length;
+      if (rows + itemRows > MAX_CHOICE_ROWS && end > start) break;
+      rows += itemRows;
+      end++;
+    }
+    return end;
+  };
 
-  // Build visible item list
-  const visibleItems: { index: number; isCustom: boolean; text: string }[] = [];
-  for (let i = scrollStart; i < scrollEnd; i++) {
-    if (i < choices.length) {
-      visibleItems.push({ index: i, isCustom: false, text: choices[i] });
-    } else if (showCustomInput) {
-      visibleItems.push({
-        index: i,
-        isCustom: true,
-        text: "Enter your own...",
+  let scrollStart = 0;
+  // Push scrollStart forward until selectedIndex is visible
+  while (scrollStart < allItems.length && getVisibleEnd(scrollStart) <= selectedIndex) {
+    scrollStart++;
+  }
+  // Pull scrollStart back to show more context above when possible
+  while (scrollStart > 0 && getVisibleEnd(scrollStart - 1) > selectedIndex) {
+    scrollStart--;
+  }
+
+  const scrollEnd = getVisibleEnd(scrollStart);
+  const canScrollUp = scrollStart > 0;
+  const canScrollDown = scrollEnd < allItems.length;
+
+  const visibleItems = allItems.slice(scrollStart, scrollEnd);
+
+  // Flatten visible items into visual rows for arrow placement
+  interface VisualRow {
+    itemIndex: number;
+    isCustom: boolean;
+    isItemFirstLine: boolean;
+    nodes: FormattingNode[];
+  }
+  const visualRows: VisualRow[] = [];
+  for (const item of visibleItems) {
+    for (let lineIdx = 0; lineIdx < item.lines.length; lineIdx++) {
+      visualRows.push({
+        itemIndex: item.index,
+        isCustom: item.isCustom,
+        isItemFirstLine: lineIdx === 0,
+        nodes: item.lines[lineIdx],
       });
     }
   }
 
-  // Truncate prompt to fit alongside arrows
-  const arrowWidth = 3; // " ▲▼"
-  const maxPromptLen = Math.max(1, width - arrowWidth);
+  // Truncate prompt to available width
   const displayPrompt =
-    prompt.length > maxPromptLen
-      ? prompt.slice(0, maxPromptLen - 1) + "…"
+    prompt.length > width
+      ? prompt.slice(0, width - 1) + "…"
       : prompt;
 
   // Description for highlighted choice (word-wrapped to fixed rows)
   const descText = hasDescriptions && selectedIndex < (descriptions?.length ?? 0)
     ? (descriptions ?? [])[selectedIndex] ?? ""
     : "";
-  const descLines = hasDescriptions ? wrapToFixedRows(descText, width, DESCRIPTION_ROWS) : [];
+  const descLines: FormattingNode[][] = hasDescriptions ? wrapToFixedRows(descText, width, DESCRIPTION_ROWS) : [];
 
   // Help text
   const helpText = customInputActive
     ? "↵ submit  ESC back"
     : "ESC dismiss";
 
-  const customInputWidth = Math.max(1, width - 2); // "> " prefix
+  const customInputWidth = Math.max(1, width - prefixWidth);
 
   return (
     <Box flexDirection="column" height={totalHeight} width={width}>
-      {/* Row 0: prompt + scroll arrows */}
+      {/* Row 0: prompt text */}
       <Box>
-        <Box flexGrow={1}>
-          <Text>{displayPrompt}</Text>
-        </Box>
-        <Text color={canScrollUp ? "#aaff00" : undefined} dimColor={!canScrollUp}>▲</Text>
-        <Text color={canScrollDown ? "#aaff00" : undefined} dimColor={!canScrollDown}>▼</Text>
+        <Text>{displayPrompt}</Text>
       </Box>
 
       {/* Description region (fixed height, only when descriptions provided) */}
@@ -163,19 +197,45 @@ export function ChoiceOverlay({
         <Box flexDirection="column" height={DESCRIPTION_ROWS}>
           {descLines.map((line, i) => (
             <Box key={`desc-${i}`}>
-              <Text dimColor>{line}</Text>
+              <Text dimColor>{line.length > 0 ? renderNodes(line) : ""}</Text>
             </Box>
           ))}
         </Box>
       )}
 
-      {/* Choice rows */}
-      {visibleItems.map((item) => {
-        const isSelected = item.index === selectedIndex;
-        if (item.isCustom && customInputActive) {
+      {/* Choice rows — arrow column (col 0) + cursor column (col 1) */}
+      {visualRows.map((row, rowIdx) => {
+        const isSelected = row.itemIndex === selectedIndex;
+
+        // Arrow column: ▲ on row 0, ▼ on row 1 — bright when scrollable, dimmed otherwise
+        let arrowChar = " ";
+        let arrowColor: string | undefined;
+        let arrowDim = false;
+        if (rowIdx === 0) {
+          arrowChar = "▲";
+          if (canScrollUp) { arrowColor = "#aaff00"; } else { arrowDim = true; }
+        } else if (rowIdx === 1) {
+          arrowChar = "▼";
+          if (canScrollDown) { arrowColor = "#aaff00"; } else { arrowDim = true; }
+        }
+
+        // Cursor column: > on first line of selected item
+        const showCursor = row.isItemFirstLine && isSelected;
+        const cursorStr = showCursor ? ">" : " ";
+
+        const arrowElement = arrowColor
+          ? <Text color={arrowColor}>{arrowChar}</Text>
+          : <Text dimColor={arrowDim}>{arrowChar}</Text>;
+
+        const cursorElement = showCursor && accentColor
+          ? <Text color={accentColor}>{" " + cursorStr + " "}</Text>
+          : <Text>{" " + cursorStr + " "}</Text>;
+
+        // Special rendering for active custom input
+        if (row.isCustom && customInputActive && row.isItemFirstLine) {
           return (
             <Box key="custom-active">
-              <Text>{"> "}</Text>
+              {arrowElement}{cursorElement}
               <InlineTextInput
                 key={customInputResetKey}
                 isDisabled={false}
@@ -185,10 +245,11 @@ export function ChoiceOverlay({
             </Box>
           );
         }
+
         return (
-          <Box key={item.index}>
-            <Text>{isSelected ? "> " : "  "}</Text>
-            <Text>{renderNodes(parseFormatting(item.text))}</Text>
+          <Box key={`${row.itemIndex}-${rowIdx}`}>
+            {arrowElement}{cursorElement}
+            <Text>{renderNodes(row.nodes)}</Text>
           </Box>
         );
       })}

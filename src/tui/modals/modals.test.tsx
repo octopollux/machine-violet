@@ -144,7 +144,21 @@ describe("ChoiceOverlay", () => {
     expect(frame).not.toContain("╚");
   });
 
-  it("shows scroll arrows", () => {
+  it("shows scroll arrows in left margin when scrollable", () => {
+    const { lastFrame } = render(
+      <ChoiceOverlay
+        width={60}
+        prompt="Pick one"
+        choices={["A", "B", "C", "D", "E", "F", "G"]}
+        selectedIndex={5}
+      />,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("▲");
+    expect(frame).toContain("▼");
+  });
+
+  it("shows dimmed scroll arrows when all choices fit", () => {
     const { lastFrame } = render(
       <ChoiceOverlay
         width={60}
@@ -154,6 +168,7 @@ describe("ChoiceOverlay", () => {
       />,
     );
     const frame = lastFrame()!;
+    // Arrows are always present (dimmed when inactive)
     expect(frame).toContain("▲");
     expect(frame).toContain("▼");
   });
@@ -232,6 +247,63 @@ describe("ChoiceOverlay", () => {
         choices={["A", "B", "C"]}
         selectedIndex={0}
         showCustomInput
+      />,
+    );
+    const lines = lastFrame()!.split("\n");
+    expect(lines.length).toBeLessThanOrEqual(7);
+  });
+
+  it("renders formatted descriptions without raw tags", () => {
+    const { lastFrame } = render(
+      <ChoiceOverlay
+        width={60}
+        prompt="Choose a path"
+        choices={["Forest", "Cave"]}
+        descriptions={[
+          "A <b>dark</b> and <color=#22aa44>mossy</color> trail",
+          "Echoing <i>whispers</i> from within",
+        ]}
+        selectedIndex={0}
+      />,
+    );
+    const frame = lastFrame()!;
+    // Formatted text content is present
+    expect(frame).toContain("dark");
+    expect(frame).toContain("mossy");
+    // Raw tags are stripped
+    expect(frame).not.toContain("<b>");
+    expect(frame).not.toContain("</b>");
+    expect(frame).not.toContain("<color=");
+    expect(frame).not.toContain("</color>");
+    expect(frame).not.toContain("<i>");
+  });
+
+  it("wraps long choice labels across multiple lines", () => {
+    const longChoice = "◆ Venture deep into the ancient forest where the twisted oaks whisper forgotten secrets to those brave enough to listen";
+    const { lastFrame } = render(
+      <ChoiceOverlay
+        width={40}
+        prompt="What next?"
+        choices={[longChoice, "◆ Rest"]}
+        selectedIndex={0}
+      />,
+    );
+    const frame = lastFrame()!;
+    // The long choice should be visible (wrapped, not truncated)
+    expect(frame).toContain("Venture deep");
+    expect(frame).toContain("Rest");
+    // First line gets "> " prefix, continuation lines get "  "
+    expect(frame).toContain("> ");
+  });
+
+  it("renders within 7 rows even with wrapped choices", () => {
+    const longChoice = "◆ This is a very long choice label that will definitely need to wrap at a narrow width";
+    const { lastFrame } = render(
+      <ChoiceOverlay
+        width={30}
+        prompt="Pick"
+        choices={[longChoice, "◆ Short"]}
+        selectedIndex={0}
       />,
     );
     const lines = lastFrame()!.split("\n");

@@ -315,18 +315,16 @@ Triggered by the player (hotkey) or the DM (tool call). Renders the active chara
 
 ### Player Choices
 
-A core UX element. The DM (or the engine) presents the player with structured options at decision points. The player picks A/B/C or types freeform.
+A core UX element. The DM (or the engine) presents the player with structured options at decision points. The player picks from the list or types freeform.
 
 ```
-╔══════════════════════════════════════╗
-║  The passage forks ahead.            ║
-║                                      ║
-║  A) Left — you hear running water    ║
-║  B) Right — a draft smells of smoke  ║
-║  C) Listen carefully first           ║
-║                                      ║
-║  > _                                 ║
-╚══════════════════════════════════════╝
+The passage forks ahead.
+▲  > ◆ Left — you hear running water
+▼    ◆ Right — a draft smells of smoke
+     ◆ Listen carefully first
+     ◆ Enter your own...
+
+                            ESC dismiss
 ```
 
 **`present_choices`** — The DM's tool for this. Two modes:
@@ -344,9 +342,9 @@ Explicit choices: The DM sets specific options when it matters narratively. Opti
 present_choices({
   prompt: "The creature extends a hand. Its eyes are ancient.",
   choices: [
-    "Take its hand",
-    "Refuse",
-    "Ask its name first"
+    "◆ Take its hand",
+    "◆ Refuse",
+    "◆ Ask its name first"
   ],
   descriptions: [
     "Trust this being and accept whatever bond it offers.",
@@ -356,9 +354,13 @@ present_choices({
 })
 ```
 
-**Player Pane expansion:** Choices render inside the Player Pane, not as a floating modal. When descriptions are present, the Player Pane expands by `DESCRIPTION_ROWS` (3) to accommodate the description region above the choice list. The Conversation Pane shrinks to compensate. Without descriptions, the standard 7-row Player Pane layout is used.
+**Formatting:** Choice labels and descriptions support the same inline formatting tags as DM narration (`<b>`, `<i>`, `<u>`, `<color=#hex>`). Labels are word-wrapped via `wrapNodes` when they exceed the available width — the scroll window operates on visual rows so wrapped items simply consume more of the 5-row budget. All three choice-producing agents (DM, setup conversation, choice generator) prepend a Unicode bullet glyph to each label; `stripLeadingBullet()` removes it before the selection is sent back as a player action. Descriptions are parsed through `parseFormatting` and rendered with `renderNodes`.
 
-**Code:** `src/tui/modals/ChoiceModal.tsx` (`ChoiceOverlay`, `DESCRIPTION_ROWS`), `src/tui/layout.tsx` (`playerPaneExtraHeight`)
+**Layout:** Choices render inside the Player Pane as a `ChoiceOverlay`. The prefix for each choice row is 4 characters: `[arrow][gap][cursor][space]`. Scroll indicators (▲/▼) occupy the first column at rows 0–1 of the choice region, always visible (bright `#aaff00` when scrollable, dimmed when not). The selection cursor (>) occupies the third column, colored with the active player's theme color (falling back to the theme's key color during setup). The two columns never interfere.
+
+**Player Pane expansion:** When descriptions are present, the Player Pane expands by `DESCRIPTION_ROWS` (3) to accommodate the description region above the choice list. The Conversation Pane shrinks to compensate. Without descriptions, the standard 7-row Player Pane layout is used.
+
+**Code:** `src/tui/modals/ChoiceModal.tsx` (`ChoiceOverlay`, `DESCRIPTION_ROWS`), `src/tui/layout.tsx` (`playerPaneExtraHeight`), `src/tui/formatting.ts` (`stripLeadingBullet`)
 
 The player's selection (or freeform text) is returned to the DM as the player's action, tagged normally: `[Aldric] Take its hand`.
 

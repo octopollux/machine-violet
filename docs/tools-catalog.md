@@ -118,7 +118,7 @@ TUI tools are **fire-and-forget**: their results drive engine/UI state but the D
 | `style_scene` | T1 + T2 | DM, Engine | `({ description?, key_color?, variant?, save_to_location?, location? })` | Style UI to match scene mood. `description` triggers Haiku stylist subagent; `key_color` is direct. Optionally persist to location entity. |
 | `set_display_resources` | T1 | DM, Setup | `({ character, resources[] })` | Update which resource keys appear in the top frame for a character. Also stores keys on `GameState.displayResources`. |
 | `set_resource_values` | T1 | DM | `({ character, values: Record<string,string> })` | Set current values for a character's tracked resources (e.g. `{ "HP": "24/30" }`). Merges into `GameState.resourceValues`. |
-| `present_choices` | T1 + T2 | DM, Engine | `({ prompt?, choices[]? })` | Show choice modal. No params = Haiku subagent generates options. Explicit params = DM's choices. |
+| `present_choices` | T1 + T2 | DM, Engine | `({ prompt?, choices[]?, descriptions[]? })` | Show choice modal. No params = Haiku subagent generates options. Explicit params = DM's choices. Labels and descriptions support formatting tags; labels are bullet-prefixed. |
 | `present_roll` | T1 | DM | `({ expression, rolls, total, kept?, label? })` | Display a dice roll as a dramatic modal. |
 | `show_character_sheet` | T1 | DM, Player | `({ character })` | Open character sheet modal. |
 

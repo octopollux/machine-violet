@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseFormatting, toPlainText, stripFormatting, highlightQuotesWithState, markdownToTags, nodeVisibleLength, wrapNodes, processNarrativeLines, isHorizontalRule } from "./formatting.js";
+import { parseFormatting, toPlainText, stripFormatting, stripLeadingBullet, highlightQuotesWithState, markdownToTags, nodeVisibleLength, wrapNodes, processNarrativeLines, isHorizontalRule } from "./formatting.js";
 import type { FormattingTag, FormattingNode, NarrativeLine } from "../types/tui.js";
 
 describe("parseFormatting", () => {
@@ -148,6 +148,29 @@ describe("stripFormatting", () => {
 
   it("passes plain text through unchanged", () => {
     expect(stripFormatting("no tags here")).toBe("no tags here");
+  });
+});
+
+describe("stripLeadingBullet", () => {
+  it("strips common bullet glyphs", () => {
+    expect(stripLeadingBullet("◆ Attack")).toBe("Attack");
+    expect(stripLeadingBullet("▸ Flee")).toBe("Flee");
+    expect(stripLeadingBullet("● Talk")).toBe("Talk");
+    expect(stripLeadingBullet("✦ Hide")).toBe("Hide");
+    expect(stripLeadingBullet("◇ Sneak")).toBe("Sneak");
+  });
+
+  it("strips emoji bullets with variation selectors", () => {
+    expect(stripLeadingBullet("🗡️ Attack")).toBe("Attack");
+    expect(stripLeadingBullet("⚔️ Fight")).toBe("Fight");
+    expect(stripLeadingBullet("🔥 Fire")).toBe("Fire");
+  });
+
+  it("preserves plain text and formatting tags", () => {
+    expect(stripLeadingBullet("Attack")).toBe("Attack");
+    expect(stripLeadingBullet("<b>Bold</b>")).toBe("<b>Bold</b>");
+    expect(stripLeadingBullet("42 things")).toBe("42 things");
+    expect(stripLeadingBullet("  spaced")).toBe("  spaced");
   });
 });
 
