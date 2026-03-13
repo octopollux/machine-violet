@@ -1370,7 +1370,7 @@ describe("pruneEmptyDirs", () => {
 });
 
 describe("GameEngine OOC summary injection", () => {
-  it("injects pending OOC summary into preamble of next player turn", async () => {
+  it("injects OOC summary into player message and persists in conversation history", async () => {
     const streamCalls: unknown[] = [];
     let streamCallIdx = 0;
     const responses = [textMessage("Welcome back."), textMessage("You look around.")];
@@ -1414,12 +1414,18 @@ describe("GameEngine OOC summary injection", () => {
     expect(lastUserContent).toContain("</ooc_summary>");
     expect(lastUserContent).toContain("[Aldric] I look around.");
 
-    // Second processInput — OOC summary should be cleared
+    // Second processInput — OOC summary should be cleared from new input,
+    // but the prior stored exchange should still contain it in conversation history
     await engine.processInput("Aldric", "I check the door.");
     const secondCall = streamCalls[1] as { messages: Anthropic.MessageParam[] };
-    const userMsgs2 = secondCall.messages.filter((m) => m.role === "user");
-    const lastUserContent2 = userMsgs2[userMsgs2.length - 1].content as string;
-    expect(lastUserContent2).not.toContain("<ooc_summary>");
+    const allMsgs = secondCall.messages;
+    // The new user message should NOT have OOC summary
+    const newUserContent = allMsgs[allMsgs.length - 1].content as string;
+    expect(newUserContent).not.toContain("<ooc_summary>");
+    // The stored conversation history (prior user message) should still have it.
+    // Serialize all prior messages to check the OOC summary persisted.
+    const priorMsgsJson = JSON.stringify(allMsgs.slice(0, -1));
+    expect(priorMsgsJson).toContain("<ooc_summary>");
   });
 
   it("does not inject when no OOC summary is pending", async () => {

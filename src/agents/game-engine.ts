@@ -339,8 +339,13 @@ export class GameEngine {
 
     this.setState("dm_thinking");
 
-    // Tag the input with character name
-    const taggedInput = `[${characterName}] ${text}`;
+    // Tag the input with character name; prepend OOC summary if pending
+    // (persisted in conversation history so the DM retains OOC context)
+    let taggedInput = `[${characterName}] ${text}`;
+    if (this.pendingOOCSummary) {
+      taggedInput = `<ooc_summary>\n${this.pendingOOCSummary}\n</ooc_summary>\n\n${taggedInput}`;
+      this.pendingOOCSummary = null;
+    }
 
     // Append to transcript (skip for system instructions like session open/resume)
     if (!opts?.skipTranscript) {
@@ -359,12 +364,6 @@ export class GameEngine {
     // length steering) are prepended as a <context> block to the single user
     // message rather than using separate synthetic turns.
     const preambleParts: string[] = [];
-
-    // Inject pending OOC summary (player-initiated OOC mode just ended)
-    if (this.pendingOOCSummary) {
-      preambleParts.push(`<ooc_summary>\n${this.pendingOOCSummary}\n</ooc_summary>`);
-      this.pendingOOCSummary = null;
-    }
 
     // Volatile context (Tier 3: activeState, entityIndex, uiState)
     if (volatileContext) {
