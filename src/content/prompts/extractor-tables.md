@@ -7,7 +7,7 @@ For each table, output:
 ```
 --- ENTITY ---
 Name: <table name>
-Category: rules
+Category: tables
 Slug: <url-safe-slug>
 
 **Type:** Table
@@ -18,7 +18,7 @@ Slug: <url-safe-slug>
 
 Rules:
 - One `--- ENTITY ---` delimiter per table
-- Category is `rules` for tables
+- Category is always `tables`
 - Preserve all table entries — do not truncate
 - Use proper markdown table formatting
 - Include any instructions or notes that accompany the table

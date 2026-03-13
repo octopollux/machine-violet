@@ -72,18 +72,11 @@ export interface ContentCatalog {
 
 // --- Draft entities (Stage 2 output) ---
 
-export type EntityCategory =
-  | "characters"
-  | "locations"
-  | "lore"
-  | "rules"
-  | "factions";
-
 export interface DraftEntity {
   /** Entity name. */
   name: string;
-  /** Category determines output subdirectory. */
-  category: EntityCategory;
+  /** Category determines output subdirectory. Matches ContentType. */
+  category: ContentType;
   /** URL-safe slug for filename. */
   slug: string;
   /** Front matter key-value pairs. */

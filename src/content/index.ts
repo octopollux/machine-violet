@@ -53,7 +53,6 @@ export type {
   ContentType,
   CatalogSection,
   ContentCatalog,
-  EntityCategory,
   DraftEntity,
 } from "./processing-types.js";
 export {

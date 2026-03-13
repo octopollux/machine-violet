@@ -16,11 +16,6 @@ import { getModel } from "../config/models.js";
 import { oneShot } from "../agents/subagent.js";
 import { processingPaths } from "./processing-paths.js";
 import { loadContentPrompt } from "./prompts/load-content-prompt.js";
-import type { EntityCategory } from "./processing-types.js";
-
-const ALL_CATEGORIES: EntityCategory[] = [
-  "characters", "locations", "lore", "rules", "factions",
-];
 
 export interface MergeResult {
   /** Entities copied as new (no prior version). */
@@ -40,11 +35,15 @@ export async function listDraftEntities(
   io: FileIO,
   homeDir: string,
   collectionSlug: string,
-): Promise<{ category: EntityCategory; slug: string }[]> {
+): Promise<{ category: string; slug: string }[]> {
   const paths = processingPaths(homeDir, collectionSlug);
-  const results: { category: EntityCategory; slug: string }[] = [];
+  const results: { category: string; slug: string }[] = [];
 
-  for (const cat of ALL_CATEGORIES) {
+  // Discover categories dynamically from the filesystem
+  if (!(await io.exists(paths.draftsDir))) return results;
+  const subdirs = await io.listDir(paths.draftsDir);
+
+  for (const cat of subdirs) {
     const dir = paths.draftCategoryDir(cat);
     if (!(await io.exists(dir))) continue;
 

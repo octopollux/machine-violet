@@ -7,7 +7,7 @@ For each option, output:
 ```
 --- ENTITY ---
 Name: <option name>
-Category: characters
+Category: chargen
 Slug: <url-safe-slug>
 
 **Type:** <Class|Race|Background|Feat|Subclass>
@@ -20,5 +20,5 @@ Rules:
 - One `--- ENTITY ---` delimiter per option
 - Classes and subclasses are separate entities
 - Include all level progression features for classes
-- Category is `characters` for races, classes, backgrounds, feats
+- Category is always `chargen`
 - Preserve all mechanical details — do not omit feature descriptions or stat bonuses

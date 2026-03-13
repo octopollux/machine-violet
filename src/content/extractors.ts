@@ -17,7 +17,7 @@ import { ingestPaths } from "./job-manager.js";
 import { parseEntities } from "./entity-parser.js";
 import { loadContentPrompt } from "./prompts/load-content-prompt.js";
 import { processingPaths } from "./processing-paths.js";
-import type { CatalogSection, ContentType, DraftEntity, EntityCategory } from "./processing-types.js";
+import type { CatalogSection, ContentType, DraftEntity } from "./processing-types.js";
 
 /** Map contentType → extractor prompt name. */
 const PROMPT_MAP: Record<ContentType, string> = {
@@ -126,7 +126,7 @@ export async function writeDraftEntities(
   entities: DraftEntity[],
 ): Promise<number> {
   const paths = processingPaths(homeDir, collectionSlug);
-  const categories = new Set<EntityCategory>();
+  const categories = new Set<string>();
   let written = 0;
 
   for (const entity of entities) {

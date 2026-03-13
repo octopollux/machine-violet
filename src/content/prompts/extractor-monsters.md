@@ -7,7 +7,7 @@ For each creature, output:
 ```
 --- ENTITY ---
 Name: <creature name>
-Category: characters
+Category: monsters
 Slug: <url-safe-slug>
 
 **Type:** Monster
@@ -22,7 +22,7 @@ Slug: <url-safe-slug>
 
 Rules:
 - One `--- ENTITY ---` delimiter per creature
-- Category is always `characters` for creatures
+- Category is always `monsters` for creatures
 - Slug: lowercase, hyphens, no special characters (e.g., "young-red-dragon")
 - Preserve all mechanical data faithfully — do not summarize or omit stats
 - Use wikilinks for cross-references to other entities

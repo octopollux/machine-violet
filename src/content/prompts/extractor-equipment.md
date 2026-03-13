@@ -7,7 +7,7 @@ For each item, output:
 ```
 --- ENTITY ---
 Name: <item name>
-Category: lore
+Category: equipment
 Slug: <url-safe-slug>
 
 **Type:** <Weapon|Armor|Gear|Magic Item|Potion|Wondrous Item>
@@ -22,5 +22,5 @@ Rules:
 - One `--- ENTITY ---` delimiter per item
 - Mundane items can be grouped by category (e.g., all simple melee weapons in one entity) if they share a table
 - Magic items always get individual entities
-- Category is `lore` for equipment
+- Category is always `equipment`
 - Preserve all mechanical properties faithfully

@@ -14,30 +14,34 @@ import { getModel } from "../config/models.js";
 import { oneShot } from "../agents/subagent.js";
 import { processingPaths } from "./processing-paths.js";
 import { loadContentPrompt } from "./prompts/load-content-prompt.js";
-import type { EntityCategory } from "./processing-types.js";
 
-const ALL_CATEGORIES: EntityCategory[] = [
-  "characters", "factions", "locations", "lore", "rules",
-];
-
-const CATEGORY_LABELS: Record<EntityCategory, string> = {
-  characters: "Characters & Creatures",
-  factions: "Factions",
-  locations: "Locations",
-  lore: "Lore & Items",
+/** Display labels for known content types. Unknown types get auto-capitalized. */
+const KNOWN_LABELS: Record<string, string> = {
+  monsters: "Monsters & Creatures",
+  spells: "Spells",
   rules: "Rules & Mechanics",
+  chargen: "Character Creation",
+  equipment: "Equipment & Items",
+  tables: "Tables",
+  lore: "Lore",
+  locations: "Locations",
+  generic: "Other",
 };
+
+function categoryLabel(dir: string): string {
+  return KNOWN_LABELS[dir] ?? dir.charAt(0).toUpperCase() + dir.slice(1).replace(/-/g, " ");
+}
 
 export interface IndexResult {
   /** Number of entities indexed. */
   totalEntities: number;
   /** Categories that have entities. */
-  categories: EntityCategory[];
+  categories: string[];
 }
 
 /**
  * Build index.md — mechanical TOC of all entities by category.
- * Returns the index content and metadata.
+ * Discovers categories dynamically from the entities directory.
  */
 export async function buildIndex(
   io: FileIO,
@@ -47,9 +51,14 @@ export async function buildIndex(
   const paths = processingPaths(homeDir, collectionSlug);
   const lines: string[] = ["# Content Index", ""];
   let totalEntities = 0;
-  const activeCategories: EntityCategory[] = [];
+  const activeCategories: string[] = [];
 
-  for (const cat of ALL_CATEGORIES) {
+  // Discover categories from filesystem
+  const subdirs = (await io.exists(paths.entitiesDir))
+    ? (await io.listDir(paths.entitiesDir)).sort()
+    : [];
+
+  for (const cat of subdirs) {
     const dir = paths.entityCategoryDir(cat);
     if (!(await io.exists(dir))) continue;
 
@@ -58,7 +67,7 @@ export async function buildIndex(
     if (mdFiles.length === 0) continue;
 
     activeCategories.push(cat);
-    lines.push(`## ${CATEGORY_LABELS[cat]}`);
+    lines.push(`## ${categoryLabel(cat)}`);
     lines.push("");
 
     for (const file of mdFiles) {

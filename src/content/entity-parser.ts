@@ -9,7 +9,7 @@
  * ```
  * --- ENTITY ---
  * Name: Goblin
- * Category: characters
+ * Category: monsters
  * Slug: goblin
  *
  * **Type:** Monster
@@ -19,18 +19,15 @@
  * ```
  */
 
-import type { DraftEntity, EntityCategory } from "./processing-types.js";
+import type { ContentType, DraftEntity } from "./processing-types.js";
 
 const ENTITY_DELIMITER = /^---\s*ENTITY\s*---\s*$/m;
 const HEADER_PATTERN = /^([A-Za-z]+):\s*(.+)$/;
 const FRONT_MATTER_PATTERN = /^\*\*([^*]+):\*\*\s*(.*)$/;
 
-const VALID_CATEGORIES = new Set<EntityCategory>([
-  "characters",
-  "locations",
-  "lore",
-  "rules",
-  "factions",
+const VALID_CATEGORIES = new Set<ContentType>([
+  "monsters", "spells", "rules", "chargen", "equipment",
+  "tables", "lore", "locations", "generic",
 ]);
 
 /**
@@ -82,10 +79,10 @@ function parseOneEntity(block: string, sourceSection?: string): DraftEntity | nu
 
   if (!name || !slug) return null;
 
-  // Normalize category — default to "lore" if missing or invalid
-  const category = (VALID_CATEGORIES.has(categoryRaw as EntityCategory)
+  // Normalize category — default to "generic" if missing or invalid
+  const category = (VALID_CATEGORIES.has(categoryRaw as ContentType)
     ? categoryRaw
-    : "lore") as EntityCategory;
+    : "generic") as ContentType;
 
   // Parse front matter (**Key:** Value lines)
   const frontMatter: Record<string, string> = {};

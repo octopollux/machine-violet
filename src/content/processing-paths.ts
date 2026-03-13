@@ -6,7 +6,6 @@
  */
 
 import { join } from "node:path";
-import type { EntityCategory } from "./processing-types.js";
 
 /**
  * Build paths for processed output of a collection.
@@ -26,18 +25,18 @@ export function processingPaths(homeDir: string, collectionSlug: string) {
     /** Stage 2 output — draft entities root. */
     draftsDir: join(base, "drafts"),
     /** Stage 2 output — draft entity file. */
-    draftFile: (category: EntityCategory, slug: string) =>
+    draftFile: (category: string, slug: string) =>
       join(base, "drafts", category, `${slug}.md`),
     /** Stage 2 output — draft category directory. */
-    draftCategoryDir: (category: EntityCategory) =>
+    draftCategoryDir: (category: string) =>
       join(base, "drafts", category),
     /** Stage 3 output — merged entities root. */
     entitiesDir: join(base, "entities"),
     /** Stage 3 output — merged entity file. */
-    entityFile: (category: EntityCategory, slug: string) =>
+    entityFile: (category: string, slug: string) =>
       join(base, "entities", category, `${slug}.md`),
     /** Stage 3 output — entity category directory. */
-    entityCategoryDir: (category: EntityCategory) =>
+    entityCategoryDir: (category: string) =>
       join(base, "entities", category),
     /** Stage 4 output — index. */
     index: join(base, "index.md"),

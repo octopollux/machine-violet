@@ -7,7 +7,7 @@ For each topic, output:
 ```
 --- ENTITY ---
 Name: <topic name>
-Category: lore
+Category: generic
 Slug: <url-safe-slug>
 
 **Type:** <best description of content type>
@@ -17,7 +17,7 @@ Slug: <url-safe-slug>
 
 Rules:
 - One `--- ENTITY ---` delimiter per topic
-- Default category is `lore` unless the content clearly belongs in `rules`, `characters`, `locations`, or `factions`
+- Category is always `generic`
 - Group related content into logical entities
 - Wikilinks for all proper nouns
 - Preserve factual and mechanical details

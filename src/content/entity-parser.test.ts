@@ -5,7 +5,7 @@ describe("parseEntities", () => {
     const raw = `
 --- ENTITY ---
 Name: Goblin
-Category: characters
+Category: monsters
 Slug: goblin
 
 **Type:** Monster
@@ -18,7 +18,7 @@ Small, green, and mean. Goblins attack in packs.
 
     const e = entities[0];
     expect(e.name).toBe("Goblin");
-    expect(e.category).toBe("characters");
+    expect(e.category).toBe("monsters");
     expect(e.slug).toBe("goblin");
     expect(e.frontMatter).toEqual({ type: "Monster", cr: "1/4" });
     expect(e.body).toContain("Small, green, and mean");
@@ -70,7 +70,7 @@ This one is fine.
     expect(entities[0].name).toBe("Valid Entity");
   });
 
-  it("defaults category to lore for invalid categories", () => {
+  it("defaults category to generic for invalid categories", () => {
     const raw = `
 --- ENTITY ---
 Name: Strange Thing
@@ -81,10 +81,10 @@ Body text.
 `;
     const entities = parseEntities(raw);
     expect(entities).toHaveLength(1);
-    expect(entities[0].category).toBe("lore");
+    expect(entities[0].category).toBe("generic");
   });
 
-  it("defaults category to lore when missing", () => {
+  it("defaults category to generic when missing", () => {
     const raw = `
 --- ENTITY ---
 Name: Mystery
@@ -94,7 +94,7 @@ No category given.
 `;
     const entities = parseEntities(raw);
     expect(entities).toHaveLength(1);
-    expect(entities[0].category).toBe("lore");
+    expect(entities[0].category).toBe("generic");
   });
 
   it("handles entity with no body", () => {

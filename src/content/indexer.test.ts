@@ -51,18 +51,18 @@ function mockIO(initial: Record<string, string> = {}): FileIO & { files: Record<
 describe("buildIndex", () => {
   it("builds TOC from entity files", async () => {
     const io = mockIO({
-      "/home/ingest/processed/d-d-5e/entities/characters/goblin.md": "# Goblin",
-      "/home/ingest/processed/d-d-5e/entities/characters/orc.md": "# Orc",
+      "/home/ingest/processed/d-d-5e/entities/monsters/goblin.md": "# Goblin",
+      "/home/ingest/processed/d-d-5e/entities/monsters/orc.md": "# Orc",
       "/home/ingest/processed/d-d-5e/entities/locations/waterdeep.md": "# Waterdeep",
     });
 
     const { content, result } = await buildIndex(io, "/home", "d-d-5e");
 
     expect(result.totalEntities).toBe(3);
-    expect(result.categories).toContain("characters");
+    expect(result.categories).toContain("monsters");
     expect(result.categories).toContain("locations");
     expect(content).toContain("# Content Index");
-    expect(content).toContain("## Characters & Creatures");
+    expect(content).toContain("## Monsters & Creatures");
     expect(content).toContain("[[Goblin]]");
     expect(content).toContain("[[Orc]]");
     expect(content).toContain("## Locations");
@@ -80,9 +80,9 @@ describe("buildIndex", () => {
 
   it("sorts entities alphabetically within category", async () => {
     const io = mockIO({
-      "/home/ingest/processed/d-d-5e/entities/characters/zombie.md": "",
-      "/home/ingest/processed/d-d-5e/entities/characters/ancient-dragon.md": "",
-      "/home/ingest/processed/d-d-5e/entities/characters/beholder.md": "",
+      "/home/ingest/processed/d-d-5e/entities/monsters/zombie.md": "",
+      "/home/ingest/processed/d-d-5e/entities/monsters/ancient-dragon.md": "",
+      "/home/ingest/processed/d-d-5e/entities/monsters/beholder.md": "",
     });
 
     const { content } = await buildIndex(io, "/home", "d-d-5e");
@@ -122,7 +122,7 @@ describe("runIndexer", () => {
 
   it("writes index.md and cheat-sheet.md", async () => {
     const io = mockIO({
-      "/home/ingest/processed/d-d-5e/entities/characters/goblin.md": "# Goblin",
+      "/home/ingest/processed/d-d-5e/entities/monsters/goblin.md": "# Goblin",
       "/home/ingest/processed/d-d-5e/entities/rules/combat.md": "# Combat",
     });
 

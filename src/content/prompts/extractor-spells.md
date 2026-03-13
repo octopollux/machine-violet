@@ -7,7 +7,7 @@ For each spell, output:
 ```
 --- ENTITY ---
 Name: <spell name>
-Category: rules
+Category: spells
 Slug: <url-safe-slug>
 
 **Type:** Spell
@@ -24,7 +24,7 @@ Slug: <url-safe-slug>
 
 Rules:
 - One `--- ENTITY ---` delimiter per spell
-- Category is always `rules` for spells
+- Category is always `spells` for spells
 - Slug: lowercase, hyphens (e.g., "cure-wounds")
 - Preserve all mechanical text verbatim — do not paraphrase effect descriptions
 - Use wikilinks for cross-references
