@@ -1,0 +1,12 @@
+{
+  "name": "D&D 5th Edition",
+  "slug": "dnd-5e",
+  "version": "SRD 5.2",
+  "license": "CC-BY-4.0",
+  "licenseUrl": "https://www.dndbeyond.com/resources/1781-systems-reference-document-srd",
+  "complexity": "high",
+  "dice": ["d4", "d6", "d8", "d10", "d12", "d20", "d100"],
+  "bundled": true,
+  "srdUrl": "https://www.dndbeyond.com/sources/dnd/free-rules",
+  "description": "The world's most popular tabletop RPG. High fantasy, class-based, d20 system."
+}
