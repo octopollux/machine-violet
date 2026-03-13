@@ -80,8 +80,9 @@ export function PlayingPhase() {
     menuOpen ||
     (!!activeSession && modeBusy);
 
-  // Helper to exit active session mode
-  const exitActiveSession = useCallback(() => {
+  // Helper to exit active session mode.
+  // Pass silent=true for agent-initiated exits (END_OOC) to skip the system line.
+  const exitActiveSession = useCallback((silent = false) => {
     if (!activeSession) return;
     const label = activeSession.label;
     // Flush accumulated OOC summaries to the engine for injection into the next DM turn
@@ -95,7 +96,9 @@ export function PlayingPhase() {
     }
     setActiveSession(null);
     setVariant(previousVariantRef.current);
-    setNarrativeLines((prev) => [...prev, { kind: "system", text: `[Exiting ${label} Mode]` }, { kind: "dm", text: "" }]);
+    if (!silent) {
+      setNarrativeLines((prev) => [...prev, { kind: "system", text: `[Exiting ${label} Mode]` }, { kind: "dm", text: "" }]);
+    }
   }, [activeSession, setActiveSession, setVariant, previousVariantRef, setNarrativeLines, engineRef]);
 
   // --- Submit handler for TextInput ---
@@ -137,7 +140,7 @@ export function PlayingPhase() {
         }
         // Auto-exit if the OOC agent signaled END_OOC
         if (result.endSession) {
-          exitActiveSession();
+          exitActiveSession(true);
           // Forward in-character action to DM if provided
           if (result.playerAction && engineRef.current && gameStateRef.current) {
             const active = getActivePlayer(gameStateRef.current);
