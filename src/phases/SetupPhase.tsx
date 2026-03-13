@@ -305,7 +305,7 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
         choices={activeModal.choices}
         descriptions={activeModal.descriptions}
         selectedIndex={choiceIndex}
-        accentColor={theme.swatch[0]?.hex}
+        accentColor={theme.keyColor}
         showCustomInput
         customInputActive={customInputActive}
         customInputResetKey={customInputResetKey}
