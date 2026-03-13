@@ -61,7 +61,7 @@ A subagent is a nested Claude API conversation with its own context window. The 
 
 **Player-facing** (takes over the TUI): Character generation, level-up, OOC mode.
 
-OOC mode is a sandboxed Sonnet subagent. It receives the DM's context on entry, handles rules questions, transcript searches, and configuration changes, and returns only a terse summary to the DM when it ends. The DM controls OOC entry and exit via tools.
+OOC mode is a sandboxed Sonnet subagent — an ablative context layer that speaks to the player in the DM's persona without polluting the DM's context window. It receives the DM's context on entry and handles rules questions, transcript searches, configuration changes, and player corrections. Entry is via the DM's `enter_ooc` tool or player-initiated (game menu / `/ooc`). The agent can signal session end via `<END_OOC />`, optionally forwarding in-character player input to the DM. Only a terse summary is returned to the DM.
 
 
 ## Scene and Session Management

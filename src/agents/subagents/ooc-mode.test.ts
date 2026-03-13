@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
-import { buildOOCPrompt, buildOOCTools, buildOOCToolHandler, enterOOC } from "./ooc-mode.js";
+import { buildOOCPrompt, buildOOCTools, buildOOCToolHandler, enterOOC, parseEndOOCSignal } from "./ooc-mode.js";
 import type { DMSessionState } from "../dm-prompt.js";
 import type { FileIO } from "../scene-manager.js";
 import type { GameState } from "../game-state.js";
@@ -773,5 +773,92 @@ describe("enterOOC with gameState", () => {
       // We verify tools exist to confirm hasTools path was taken
       expect(createCall.tools).toBeDefined();
     }
+  });
+});
+
+describe("parseEndOOCSignal", () => {
+  it("detects self-closing tag", () => {
+    const result = parseEndOOCSignal("Thanks for asking!\n<END_OOC />");
+    expect(result.found).toBe(true);
+    expect(result.playerAction).toBeUndefined();
+    expect(result.cleanedText).toBe("Thanks for asking!");
+  });
+
+  it("detects self-closing tag without space", () => {
+    const result = parseEndOOCSignal("Done.<END_OOC/>");
+    expect(result.found).toBe(true);
+    expect(result.cleanedText).toBe("Done.");
+  });
+
+  it("detects tag with player action payload", () => {
+    const result = parseEndOOCSignal("Back to the game!\n<END_OOC>I attack the goblin</END_OOC>");
+    expect(result.found).toBe(true);
+    expect(result.playerAction).toBe("I attack the goblin");
+    expect(result.cleanedText).toBe("Back to the game!");
+  });
+
+  it("preserves multiline payload", () => {
+    const result = parseEndOOCSignal('OK!\n<END_OOC>I say to the guard:\n"Let us pass."</END_OOC>');
+    expect(result.found).toBe(true);
+    expect(result.playerAction).toBe('I say to the guard:\n"Let us pass."');
+  });
+
+  it("returns found=false when no signal present", () => {
+    const text = "Here's how grappling works in FATE...";
+    const result = parseEndOOCSignal(text);
+    expect(result.found).toBe(false);
+    expect(result.cleanedText).toBe(text);
+    expect(result.playerAction).toBeUndefined();
+  });
+
+  it("ignores signal that is not at the end", () => {
+    const result = parseEndOOCSignal("<END_OOC /> and then some more text");
+    expect(result.found).toBe(false);
+  });
+
+  it("handles trailing whitespace after tag", () => {
+    const result = parseEndOOCSignal("Done.\n<END_OOC />  \n");
+    expect(result.found).toBe(true);
+    expect(result.cleanedText).toBe("Done.");
+  });
+
+  it("trims payload whitespace", () => {
+    const result = parseEndOOCSignal("OK!\n<END_OOC>  I draw my sword  </END_OOC>");
+    expect(result.found).toBe(true);
+    expect(result.playerAction).toBe("I draw my sword");
+  });
+});
+
+describe("enterOOC END_OOC integration", () => {
+  it("sets endSession when agent emits END_OOC", async () => {
+    const client = mockClient([textResponse("Grappling uses Athletics.\n<END_OOC />")]);
+    const result = await enterOOC(client, "How does grappling work?", {
+      campaignName: "Test",
+      previousVariant: "exploration",
+    });
+    expect(result.endSession).toBe(true);
+    expect(result.playerAction).toBeUndefined();
+    expect(result.text).toBe("Grappling uses Athletics.");
+  });
+
+  it("captures playerAction from END_OOC payload", async () => {
+    const client = mockClient([textResponse("Back to the game!\n<END_OOC>I grab the guard</END_OOC>")]);
+    const result = await enterOOC(client, "I grab the guard", {
+      campaignName: "Test",
+      previousVariant: "exploration",
+    });
+    expect(result.endSession).toBe(true);
+    expect(result.playerAction).toBe("I grab the guard");
+    expect(result.text).toBe("Back to the game!");
+  });
+
+  it("does not set endSession when no signal", async () => {
+    const client = mockClient([textResponse("Here's how that works...")]);
+    const result = await enterOOC(client, "How does X work?", {
+      campaignName: "Test",
+      previousVariant: "exploration",
+    });
+    expect(result.endSession).toBeUndefined();
+    expect(result.playerAction).toBeUndefined();
   });
 });

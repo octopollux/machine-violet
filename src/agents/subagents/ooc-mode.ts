@@ -62,6 +62,10 @@ export interface OOCResult extends SubagentResult {
   summary: string;
   /** The snapshot to restore */
   snapshot: OOCSnapshot;
+  /** Agent signaled that OOC should end */
+  endSession?: boolean;
+  /** In-character text to forward to the DM as player input */
+  playerAction?: string;
 }
 
 /**
@@ -486,18 +490,57 @@ export async function enterOOC(
     onStream,
   );
 
-  // The subagent's response IS the OOC content.
-  // We also need a terse summary for the DM.
-  // For a single-exchange OOC, the response itself is sufficient.
-  // For multi-exchange, we'd need a follow-up summarization.
-  // For now, truncate to first sentence as the summary.
-  const summary = extractSummary(result.text);
+  // Parse END_OOC signal if present
+  const signal = parseEndOOCSignal(result.text);
+  const summary = extractSummary(signal.cleanedText);
 
   return {
     ...result,
+    text: signal.cleanedText,
     summary,
     snapshot,
+    endSession: signal.found || undefined,
+    playerAction: signal.playerAction,
   };
+}
+
+/**
+ * Parse the END_OOC signal from the agent's response.
+ * The signal must appear at the end of the response text.
+ *
+ * Formats:
+ *   <END_OOC />           — session complete, no player action
+ *   <END_OOC>action</END_OOC> — session complete, forward action to DM
+ */
+export interface EndOOCSignal {
+  found: boolean;
+  playerAction?: string;
+  cleanedText: string;
+}
+
+export function parseEndOOCSignal(text: string): EndOOCSignal {
+  // With payload: <END_OOC>...content...</END_OOC>
+  const withPayload = /\s*<END_OOC>([\s\S]*?)<\/END_OOC>\s*$/;
+  const payloadMatch = text.match(withPayload);
+  if (payloadMatch) {
+    return {
+      found: true,
+      playerAction: payloadMatch[1].trim(),
+      cleanedText: text.replace(withPayload, "").trimEnd(),
+    };
+  }
+
+  // Self-closing: <END_OOC /> or <END_OOC/>
+  const selfClosing = /\s*<END_OOC\s*\/>\s*$/;
+  const selfMatch = text.match(selfClosing);
+  if (selfMatch) {
+    return {
+      found: true,
+      cleanedText: text.replace(selfClosing, "").trimEnd(),
+    };
+  }
+
+  return { found: false, cleanedText: text };
 }
 
 /**
