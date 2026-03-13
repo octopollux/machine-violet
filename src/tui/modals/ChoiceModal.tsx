@@ -43,6 +43,8 @@ interface ChoiceOverlayProps {
   /** Per-choice descriptions shown in a fixed-height region for the highlighted choice. */
   descriptions?: string[];
   selectedIndex: number;
+  /** Hex color for the selection cursor (">"). Falls back to default text color. */
+  accentColor?: string;
   showCustomInput?: boolean;
   customInputActive?: boolean;
   customInputResetKey?: number;
@@ -76,6 +78,7 @@ export function ChoiceOverlay({
   choices: rawChoices,
   descriptions,
   selectedIndex,
+  accentColor,
   showCustomInput,
   customInputActive,
   customInputResetKey,
@@ -217,17 +220,22 @@ export function ChoiceOverlay({
         }
 
         // Cursor column: > on first line of selected item
-        const cursorChar = (row.isItemFirstLine && isSelected) ? ">" : " ";
+        const showCursor = row.isItemFirstLine && isSelected;
+        const cursorStr = showCursor ? ">" : " ";
 
         const arrowElement = arrowColor
           ? <Text color={arrowColor}>{arrowChar}</Text>
           : <Text dimColor={arrowDim}>{arrowChar}</Text>;
 
+        const cursorElement = showCursor && accentColor
+          ? <Text color={accentColor}>{" " + cursorStr + " "}</Text>
+          : <Text>{" " + cursorStr + " "}</Text>;
+
         // Special rendering for active custom input
         if (row.isCustom && customInputActive && row.isItemFirstLine) {
           return (
             <Box key="custom-active">
-              {arrowElement}<Text>{" " + cursorChar + " "}</Text>
+              {arrowElement}{cursorElement}
               <InlineTextInput
                 key={customInputResetKey}
                 isDisabled={false}
@@ -240,7 +248,7 @@ export function ChoiceOverlay({
 
         return (
           <Box key={`${row.itemIndex}-${rowIdx}`}>
-            {arrowElement}<Text>{" " + cursorChar + " "}</Text>
+            {arrowElement}{cursorElement}
             <Text>{renderNodes(row.nodes)}</Text>
           </Box>
         );

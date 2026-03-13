@@ -457,6 +457,7 @@ export function PlayingPhase() {
       choices={activeModal.choices}
       descriptions={activeModal.descriptions}
       selectedIndex={choiceIndex}
+      accentColor={theme.swatch[0]?.hex}
       showCustomInput
       customInputActive={customInputMode}
       customInputResetKey={customInputResetKey}
