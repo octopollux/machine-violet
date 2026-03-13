@@ -6,7 +6,7 @@ import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, narrativeRows } from "../tui/responsive.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { Layout } from "../tui/layout.js";
-import { stripFormatting } from "../tui/formatting.js";
+import { stripFormatting, stripLeadingBullet } from "../tui/formatting.js";
 import { ChoiceOverlay, DESCRIPTION_ROWS, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, ApiErrorModal, SwatchModal, getMenuItems } from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { getActivePlayer, switchToNextPlayer, getPlayerEntries } from "../agents/player-manager.js";
@@ -285,7 +285,7 @@ export function PlayingPhase() {
           setCustomInputMode(true);
           return;
         }
-        const chosen = stripFormatting(activeModal.choices[choiceIndex]);
+        const chosen = stripLeadingBullet(stripFormatting(activeModal.choices[choiceIndex]));
         setActiveModal(null);
         setChoiceIndex(0);
         setCustomInputMode(false);

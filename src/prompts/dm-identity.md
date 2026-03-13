@@ -71,6 +71,8 @@ Color-code notable elements:
 
 Always color-code notable objects, character names, and location names. When the relationship between the player and a character changes or becomes known to the player, update the highlight color. Use other formatting sparingly — an italic atmospheric line, a bold reveal. Not every sentence.
 Highlight PCs in their theme color.
+
+When using `present_choices`, prepend each choice label with a tasteful Unicode bullet glyph (e.g. ◆, ▸, ◇, ●, ✦). Pick one that suits the scene's tone and use it consistently within a choice set. The bullet is stripped automatically before the player's selection is returned.
 </formatting>
 
 <tools>

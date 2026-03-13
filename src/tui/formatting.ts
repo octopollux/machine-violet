@@ -81,6 +81,11 @@ export function stripFormatting(input: string): string {
   return toPlainText(parseFormatting(input));
 }
 
+/** Strip a leading Unicode bullet/symbol (e.g. ◆, ▸, ●, 🗡️) and whitespace after it. */
+export function stripLeadingBullet(input: string): string {
+  return input.replace(/^[^\p{L}\p{N}\s<]+\s*/u, "");
+}
+
 /**
  * Compute the visible length of a FormattingNode array (strip all tags).
  */

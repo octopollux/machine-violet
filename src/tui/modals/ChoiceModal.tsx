@@ -49,18 +49,21 @@ interface ChoiceOverlayProps {
   onCustomInputSubmit?: (value: string) => void;
 }
 
+/** Maximum visual rows available for choice items. */
+const MAX_CHOICE_ROWS = 5;
+
 /**
  * Frameless choice list for embedding inside the Player Pane.
  *
  * Without descriptions — 7-row layout:
  *   Row 0: prompt text + ▲▼ scroll arrows
- *   Rows 1-5: choices (scrolled if >5 items)
+ *   Rows 1-5: choices (scrolled, line-wrapped)
  *   Row 6: right-aligned help hint
  *
  * With descriptions — 10-row layout:
  *   Row 0: prompt text + ▲▼ scroll arrows
  *   Rows 1-3: fixed-height description of highlighted choice (dimmed)
- *   Rows 4-8: choices (scrolled if >5 items)
+ *   Rows 4-8: choices (scrolled, line-wrapped)
  *   Row 9: right-aligned help hint
  */
 export function ChoiceOverlay({
@@ -79,41 +82,62 @@ export function ChoiceOverlay({
     : [];
 
   const hasDescriptions = descriptions != null && descriptions.length > 0;
-  const totalHeight = hasDescriptions ? 7 + DESCRIPTION_ROWS : 7;
+  const totalHeight = hasDescriptions ? 2 + MAX_CHOICE_ROWS + DESCRIPTION_ROWS : 2 + MAX_CHOICE_ROWS;
 
-  const totalItems = choices.length + (showCustomInput ? 1 : 0);
-  const maxVisible = 5;
-  const needsScroll = totalItems > maxVisible;
+  // Pre-wrap all choice items
+  const prefixWidth = 2; // "> " or "  "
+  const labelWidth = Math.max(1, width - prefixWidth);
 
-  // Keep selectedIndex in the visible window
-  let scrollStart = 0;
-  if (needsScroll) {
-    scrollStart = Math.max(
-      0,
-      Math.min(
-        selectedIndex - Math.floor(maxVisible / 2),
-        totalItems - maxVisible,
-      ),
-    );
-  }
-  const scrollEnd = scrollStart + Math.min(totalItems, maxVisible);
-
-  const canScrollUp = needsScroll && scrollStart > 0;
-  const canScrollDown = needsScroll && scrollEnd < totalItems;
-
-  // Build visible item list
-  const visibleItems: { index: number; isCustom: boolean; text: string }[] = [];
-  for (let i = scrollStart; i < scrollEnd; i++) {
-    if (i < choices.length) {
-      visibleItems.push({ index: i, isCustom: false, text: choices[i] });
-    } else if (showCustomInput) {
-      visibleItems.push({
-        index: i,
-        isCustom: true,
-        text: "Enter your own...",
-      });
+  interface WrappedItem { index: number; isCustom: boolean; lines: FormattingNode[][] }
+  const allItems: WrappedItem[] = [];
+  for (let i = 0; i < choices.length; i++) {
+    const nodes = parseFormatting(choices[i]);
+    const lines = wrapNodes(nodes, labelWidth);
+    // Cap to MAX_CHOICE_ROWS (a single item can't exceed the budget)
+    if (lines.length > MAX_CHOICE_ROWS) {
+      lines.length = MAX_CHOICE_ROWS;
+      const lastLine = lines[MAX_CHOICE_ROWS - 1];
+      lines[MAX_CHOICE_ROWS - 1] = [...lastLine, "…"];
     }
+    allItems.push({ index: i, isCustom: false, lines });
   }
+  if (showCustomInput) {
+    allItems.push({
+      index: choices.length,
+      isCustom: true,
+      lines: [["Enter your own..."]],
+    });
+  }
+
+  // Find visible window: fit items within MAX_CHOICE_ROWS visual rows,
+  // ensuring selectedIndex is visible.
+  const getVisibleEnd = (start: number): number => {
+    let rows = 0;
+    let end = start;
+    while (end < allItems.length) {
+      const itemRows = allItems[end].lines.length;
+      if (rows + itemRows > MAX_CHOICE_ROWS && end > start) break;
+      rows += itemRows;
+      end++;
+    }
+    return end;
+  };
+
+  let scrollStart = 0;
+  // Push scrollStart forward until selectedIndex is visible
+  while (scrollStart < allItems.length && getVisibleEnd(scrollStart) <= selectedIndex) {
+    scrollStart++;
+  }
+  // Pull scrollStart back to show more context above when possible
+  while (scrollStart > 0 && getVisibleEnd(scrollStart - 1) > selectedIndex) {
+    scrollStart--;
+  }
+
+  const scrollEnd = getVisibleEnd(scrollStart);
+  const canScrollUp = scrollStart > 0;
+  const canScrollDown = scrollEnd < allItems.length;
+
+  const visibleItems = allItems.slice(scrollStart, scrollEnd);
 
   // Truncate prompt to fit alongside arrows
   const arrowWidth = 3; // " ▲▼"
@@ -134,7 +158,7 @@ export function ChoiceOverlay({
     ? "↵ submit  ESC back"
     : "ESC dismiss";
 
-  const customInputWidth = Math.max(1, width - 2); // "> " prefix
+  const customInputWidth = Math.max(1, width - prefixWidth);
 
   return (
     <Box flexDirection="column" height={totalHeight} width={width}>
@@ -158,7 +182,7 @@ export function ChoiceOverlay({
         </Box>
       )}
 
-      {/* Choice rows */}
+      {/* Choice rows (wrapping-aware) */}
       {visibleItems.map((item) => {
         const isSelected = item.index === selectedIndex;
         if (item.isCustom && customInputActive) {
@@ -175,9 +199,13 @@ export function ChoiceOverlay({
           );
         }
         return (
-          <Box key={item.index}>
-            <Text>{isSelected ? "> " : "  "}</Text>
-            <Text>{renderNodes(parseFormatting(item.text))}</Text>
+          <Box key={item.index} flexDirection="column">
+            {item.lines.map((line, lineIdx) => (
+              <Box key={`${item.index}-${lineIdx}`}>
+                <Text>{lineIdx === 0 ? (isSelected ? "> " : "  ") : "  "}</Text>
+                <Text>{renderNodes(line)}</Text>
+              </Box>
+            ))}
           </Box>
         );
       })}

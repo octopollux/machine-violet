@@ -262,6 +262,38 @@ describe("ChoiceOverlay", () => {
     expect(frame).not.toContain("</color>");
     expect(frame).not.toContain("<i>");
   });
+
+  it("wraps long choice labels across multiple lines", () => {
+    const longChoice = "◆ Venture deep into the ancient forest where the twisted oaks whisper forgotten secrets to those brave enough to listen";
+    const { lastFrame } = render(
+      <ChoiceOverlay
+        width={40}
+        prompt="What next?"
+        choices={[longChoice, "◆ Rest"]}
+        selectedIndex={0}
+      />,
+    );
+    const frame = lastFrame()!;
+    // The long choice should be visible (wrapped, not truncated)
+    expect(frame).toContain("Venture deep");
+    expect(frame).toContain("Rest");
+    // First line gets "> " prefix, continuation lines get "  "
+    expect(frame).toContain("> ");
+  });
+
+  it("renders within 7 rows even with wrapped choices", () => {
+    const longChoice = "◆ This is a very long choice label that will definitely need to wrap at a narrow width";
+    const { lastFrame } = render(
+      <ChoiceOverlay
+        width={30}
+        prompt="Pick"
+        choices={[longChoice, "◆ Short"]}
+        selectedIndex={0}
+      />,
+    );
+    const lines = lastFrame()!.split("\n");
+    expect(lines.length).toBeLessThanOrEqual(7);
+  });
 });
 
 describe("GameMenu", () => {
