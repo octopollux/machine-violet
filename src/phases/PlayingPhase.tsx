@@ -28,7 +28,7 @@ export function PlayingPhase() {
     activeSession, setActiveSession, previousVariantRef,
     devModeEnabled,
     retryOverlay,
-    dispatchTuiCommand, onReturnToMenu, onEndSessionAndReturn, onQuit,
+    dispatchTuiCommand, onReturnToMenu, onEndSessionAndReturn,
   } = useGameContext();
   const { columns: cols, rows } = useTerminalSize();
   const tooSmall = cols < MIN_COLUMNS || rows < MIN_ROWS;
@@ -326,15 +326,12 @@ export function PlayingPhase() {
         const item = menuItems[menuIndex];
         if (item === "Resume") {
           setMenuOpen(false);
-        } else if (item === "Save & Return to Menu") {
+        } else if (item === "Save & Exit") {
           setMenuOpen(false);
           onReturnToMenu();
-        } else if (item === "End Session & Return") {
+        } else if (item === "End Session") {
           setMenuOpen(false);
           onEndSessionAndReturn();
-        } else if (item === "Quit") {
-          setMenuOpen(false);
-          onQuit();
         } else if (item === "Character Sheet") {
           setMenuOpen(false);
           const gs = gameStateRef.current;

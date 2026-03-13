@@ -694,7 +694,6 @@ export default function App({ shutdownRef }: AppProps) {
     dispatchTuiCommand,
     onReturnToMenu: doSaveAndReturn,
     onEndSessionAndReturn: doEndSessionAndReturn,
-    onQuit: doQuit,
   };
 
   return (

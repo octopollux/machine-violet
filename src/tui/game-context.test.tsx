@@ -46,7 +46,6 @@ export function makeTestContext(overrides: Partial<GameContextValue> = {}): Game
     retryOverlay: null,
     onReturnToMenu: vi.fn(),
     onEndSessionAndReturn: vi.fn(),
-    onQuit: vi.fn(),
     ...overrides,
   };
 }
