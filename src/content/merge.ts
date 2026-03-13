@@ -40,9 +40,9 @@ export async function listDraftEntities(
   io: FileIO,
   homeDir: string,
   collectionSlug: string,
-): Promise<Array<{ category: EntityCategory; slug: string }>> {
+): Promise<{ category: EntityCategory; slug: string }[]> {
   const paths = processingPaths(homeDir, collectionSlug);
-  const results: Array<{ category: EntityCategory; slug: string }> = [];
+  const results: { category: EntityCategory; slug: string }[] = [];
 
   for (const cat of ALL_CATEGORIES) {
     const dir = paths.draftCategoryDir(cat);

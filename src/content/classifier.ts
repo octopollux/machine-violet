@@ -8,7 +8,6 @@
  */
 
 import type Anthropic from "@anthropic-ai/sdk";
-import { join } from "node:path";
 import type { FileIO } from "../agents/scene-manager.js";
 import { getModel } from "../config/models.js";
 import { ingestPaths } from "./job-manager.js";
@@ -112,7 +111,7 @@ export function buildClassifierBatchRequests(
  * Each result should be a JSON array of CatalogSection objects.
  */
 export function parseClassifierResults(
-  results: Array<{ customId: string; text?: string; error?: string }>,
+  results: { customId: string; text?: string; error?: string }[],
 ): CatalogSection[] {
   const allSections: CatalogSection[] = [];
 
@@ -127,7 +126,7 @@ export function parseClassifierResults(
         jsonText = fenceMatch[1].trim();
       }
 
-      const sections = JSON.parse(jsonText) as Array<Record<string, unknown>>;
+      const sections = JSON.parse(jsonText) as Record<string, unknown>[];
       if (!Array.isArray(sections)) continue;
 
       for (const s of sections) {

@@ -45,7 +45,29 @@ export {
 } from "./ingest.js";
 export type { IngestProgress, ProgressCallback, ValidatedPdf } from "./ingest.js";
 
-// NOTE: batch-client.ts, pdf-split.ts (splitPdf), and their types are
-// retained internally for the future content processing pipeline, which
-// will use the Batch API for Haiku-powered classification and extraction.
-// They are not re-exported here because they are not needed by consumers.
+// Processing pipeline — Haiku-powered classification, extraction, merge, indexing
+export { processingPaths } from "./processing-paths.js";
+export type {
+  PipelineStage,
+  PipelineState,
+  ContentType,
+  CatalogSection,
+  ContentCatalog,
+  EntityCategory,
+  DraftEntity,
+} from "./processing-types.js";
+export {
+  createPipelineState,
+  loadPipelineState,
+  savePipelineState,
+  advanceStage,
+  hasReachedStage,
+} from "./processing-state.js";
+export { parseEntities } from "./entity-parser.js";
+export { runProcessingPipeline } from "./process.js";
+export type { ProcessingProgress, ProcessingProgressCallback, ProcessingOptions } from "./process.js";
+
+// NOTE: batch-client.ts, pdf-split.ts, classifier.ts, extractors.ts,
+// merge.ts, indexer.ts, and rule-card-gen.ts are internal modules used
+// by the processing pipeline orchestrator (process.ts). They are not
+// re-exported because consumers should use runProcessingPipeline().

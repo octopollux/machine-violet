@@ -6,7 +6,7 @@
  * using Haiku/Sonnet with few-shot examples from bundled systems.
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { FileIO } from "../agents/scene-manager.js";
@@ -36,7 +36,6 @@ export function loadFewShotExamples(projectRoot: string): string[] {
 
   const examples: string[] = [];
   try {
-    const { readdirSync } = require("node:fs");
     const dirs = readdirSync(systemsDir, { withFileTypes: true });
     for (const dir of dirs) {
       if (!dir.isDirectory()) continue;

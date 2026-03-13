@@ -93,7 +93,7 @@ export function buildExtractorBatchRequests(
  * Maps each result back to its source section for provenance.
  */
 export function parseExtractorResults(
-  results: Array<{ customId: string; text?: string; error?: string }>,
+  results: { customId: string; text?: string; error?: string }[],
   sections: CatalogSection[],
   collectionSlug: string,
 ): DraftEntity[] {
