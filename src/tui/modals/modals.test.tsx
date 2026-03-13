@@ -158,7 +158,7 @@ describe("ChoiceOverlay", () => {
     expect(frame).toContain("▼");
   });
 
-  it("hides scroll arrows when all choices fit", () => {
+  it("shows dimmed scroll arrows when all choices fit", () => {
     const { lastFrame } = render(
       <ChoiceOverlay
         width={60}
@@ -168,8 +168,9 @@ describe("ChoiceOverlay", () => {
       />,
     );
     const frame = lastFrame()!;
-    expect(frame).not.toContain("▲");
-    expect(frame).not.toContain("▼");
+    // Arrows are always present (dimmed when inactive)
+    expect(frame).toContain("▲");
+    expect(frame).toContain("▼");
   });
 
   it("shows ESC dismiss help text", () => {

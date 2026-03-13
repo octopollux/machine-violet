@@ -204,27 +204,30 @@ export function ChoiceOverlay({
       {visualRows.map((row, rowIdx) => {
         const isSelected = row.itemIndex === selectedIndex;
 
-        // Arrow column: ▲ on row 0, ▼ on row 1 (only when scrollable)
+        // Arrow column: ▲ on row 0, ▼ on row 1 — bright when scrollable, dimmed otherwise
         let arrowChar = " ";
         let arrowColor: string | undefined;
-        if (rowIdx === 0 && canScrollUp) {
+        let arrowDim = false;
+        if (rowIdx === 0) {
           arrowChar = "▲";
-          arrowColor = "#aaff00";
-        } else if (rowIdx === 1 && canScrollDown) {
+          if (canScrollUp) { arrowColor = "#aaff00"; } else { arrowDim = true; }
+        } else if (rowIdx === 1) {
           arrowChar = "▼";
-          arrowColor = "#aaff00";
+          if (canScrollDown) { arrowColor = "#aaff00"; } else { arrowDim = true; }
         }
 
         // Cursor column: > on first line of selected item
         const cursorChar = (row.isItemFirstLine && isSelected) ? ">" : " ";
 
+        const arrowElement = arrowColor
+          ? <Text color={arrowColor}>{arrowChar}</Text>
+          : <Text dimColor={arrowDim}>{arrowChar}</Text>;
+
         // Special rendering for active custom input
         if (row.isCustom && customInputActive && row.isItemFirstLine) {
           return (
             <Box key="custom-active">
-              {arrowColor
-                ? <><Text color={arrowColor}>{arrowChar}</Text><Text>{cursorChar + " "}</Text></>
-                : <Text>{arrowChar + cursorChar + " "}</Text>}
+              {arrowElement}<Text>{cursorChar + " "}</Text>
               <InlineTextInput
                 key={customInputResetKey}
                 isDisabled={false}
@@ -237,9 +240,7 @@ export function ChoiceOverlay({
 
         return (
           <Box key={`${row.itemIndex}-${rowIdx}`}>
-            {arrowColor
-              ? <><Text color={arrowColor}>{arrowChar}</Text><Text>{cursorChar + " "}</Text></>
-              : <Text>{arrowChar + cursorChar + " "}</Text>}
+            {arrowElement}<Text>{cursorChar + " "}</Text>
             <Text>{renderNodes(row.nodes)}</Text>
           </Box>
         );
