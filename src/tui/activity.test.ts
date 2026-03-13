@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getActivity, ACTIVITY_MAP, parseRetryState, retryLabel } from "./activity.js";
+import { getActivity, getToolGlyph, ACTIVITY_MAP, parseRetryState, retryLabel } from "./activity.js";
 
 describe("activity indicators", () => {
   it("returns indicator for known states", () => {
@@ -62,6 +62,37 @@ describe("retryLabel", () => {
   it("returns generic label for other statuses", () => {
     expect(retryLabel(500)).toBe("API error (500)");
     expect(retryLabel(502)).toBe("API error (502)");
+  });
+});
+
+describe("getToolGlyph", () => {
+  it("returns glyph for known tool names", () => {
+    const dice = getToolGlyph("roll_dice");
+    expect(dice).toBeDefined();
+    expect(dice!.glyph).toBe("⚄");
+    expect(dice!.color).toBe("yellow");
+  });
+
+  it("returns colored glyphs for combat tools", () => {
+    const combat = getToolGlyph("start_combat");
+    expect(combat).toBeDefined();
+    expect(combat!.glyph).toBe("⚔");
+    expect(combat!.color).toBe("red");
+  });
+
+  it("returns glyph for map tools", () => {
+    expect(getToolGlyph("move_entity")!.glyph).toBe("◈");
+    expect(getToolGlyph("view_area")!.glyph).toBe("◈");
+    expect(getToolGlyph("create_map")!.glyph).toBe("◈");
+  });
+
+  it("returns glyph for entity/scribe tools", () => {
+    expect(getToolGlyph("scribe")!.glyph).toBe("✎");
+    expect(getToolGlyph("dm_notes")!.glyph).toBe("✎");
+  });
+
+  it("returns undefined for unknown tool names", () => {
+    expect(getToolGlyph("nonexistent_tool")).toBeUndefined();
   });
 });
 

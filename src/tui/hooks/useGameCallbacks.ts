@@ -8,6 +8,7 @@ import type { GameState } from "../../agents/game-state.js";
 import type { GameEngine } from "../../agents/game-engine.js";
 import type { FileIO } from "../../agents/scene-manager.js";
 import type { ModeSession } from "../game-context.js";
+import type { ToolGlyph } from "../activity.js";
 
 import { campaignPaths } from "../../tools/filesystem/index.js";
 import { getActivePlayer } from "../../agents/player-manager.js";
@@ -17,6 +18,7 @@ import { CostTracker } from "../../context/cost-tracker.js";
 import { isDevMode } from "../../config/dev-mode.js";
 import type { ToolResult } from "../../agents/tool-registry.js";
 import { appendDelta } from "../narrative-helpers.js";
+import { getToolGlyph } from "../activity.js";
 
 /** All external state/setters the hook needs, passed as a single deps object. */
 export interface GameCallbackDeps {
@@ -33,6 +35,7 @@ export interface GameCallbackDeps {
   setChoiceIndex: React.Dispatch<React.SetStateAction<number>>;
   setActiveSession: (s: ModeSession | null) => void;
   setRetryOverlay: (o: RetryOverlay | null) => void;
+  setToolGlyphs: React.Dispatch<React.SetStateAction<ToolGlyph[]>>;
   // Refs
   gameStateRef: React.RefObject<GameState | null>;
   clientRef: React.RefObject<Anthropic | null>;
@@ -54,7 +57,7 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
     setNarrativeLines, setEngineState, setErrorMsg, setModelines,
     setResources, setVariant, setThemeName, setKeyColor,
     setActiveModal, setChoiceIndex,
-    setActiveSession, setRetryOverlay,
+    setActiveSession, setRetryOverlay, setToolGlyphs,
     gameStateRef, clientRef, engineRef, activeModalRef, variantRef, previousVariantRef,
     costTracker, fileIO,
   } = deps;
@@ -174,11 +177,20 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
     onStateChange(state: EngineState) {
       setEngineState(state);
       setRetryOverlay(null);
+      // Clear accumulated tool glyphs when the DM turn ends
+      if (state === "waiting_input" || state === "idle") {
+        setToolGlyphs([]);
+      }
     },
     onTuiCommand(cmd: TuiCommand) {
       dispatchTuiCommand(cmd);
     },
     onToolStart(name: string) {
+      // Accumulate a glyph on the activity line for each tool call
+      const tg = getToolGlyph(name);
+      if (tg) {
+        setToolGlyphs((prev) => [...prev, tg]);
+      }
       if (isDevMode()) {
         setNarrativeLines((prev) => [...prev, { kind: "dev", text: `[dev] tool:${name} ...` }]);
       }
@@ -230,7 +242,7 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
       setNarrativeLines((prev) => [...prev, { kind: "separator", text: "" }]);
     },
   }), [dispatchTuiCommand, setNarrativeLines, setEngineState,
-       setErrorMsg, setActiveModal, setChoiceIndex, setRetryOverlay,
+       setErrorMsg, setActiveModal, setChoiceIndex, setRetryOverlay, setToolGlyphs,
        gameStateRef, clientRef, activeModalRef, costTracker]);
 
   return { buildCallbacks, dispatchTuiCommand };

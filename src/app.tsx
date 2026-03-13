@@ -165,6 +165,7 @@ export default function App({ shutdownRef }: AppProps) {
   const [phase, setPhase] = useState<AppPhase>("loading");
   const { lines: narrativeLines, setLines: setNarrativeLines } = useBatchedNarrativeLines();
   const [engineState, setEngineState] = useState<string | null>(null);
+  const [toolGlyphs, setToolGlyphs] = useState<import("./tui/activity.js").ToolGlyph[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // --- Game state refs (stable across renders) ---
@@ -311,7 +312,7 @@ export default function App({ shutdownRef }: AppProps) {
     setNarrativeLines, setEngineState, setErrorMsg, setModelines,
     setResources, setVariant, setThemeName, setKeyColor,
     setActiveModal, setChoiceIndex,
-    setActiveSession, setRetryOverlay,
+    setActiveSession, setRetryOverlay, setToolGlyphs,
     gameStateRef, clientRef, engineRef, activeModalRef, variantRef, previousVariantRef,
     costTracker, fileIO,
   });
@@ -623,7 +624,7 @@ export default function App({ shutdownRef }: AppProps) {
     narrativeLines, setNarrativeLines,
     theme, variant, setVariant, setTheme, keyColor, setKeyColor,
     campaignName, activePlayerIndex, setActivePlayerIndex,
-    engineState, resources, modelines,
+    engineState, toolGlyphs, resources, modelines,
     activeModal, setActiveModal,
     choiceIndex, setChoiceIndex,
     retryOverlay,

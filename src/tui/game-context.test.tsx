@@ -31,6 +31,7 @@ export function makeTestContext(overrides: Partial<GameContextValue> = {}): Game
     activePlayerIndex: 0,
     setActivePlayerIndex: vi.fn(),
     engineState: null,
+    toolGlyphs: [],
     resources: [],
     modelines: {},
     activeModal: null,

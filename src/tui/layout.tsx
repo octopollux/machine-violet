@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { Box } from "ink";
 import type { ViewportDimensions, NarrativeLine } from "../types/tui.js";
+import type { ToolGlyph } from "./activity.js";
 import type { ResolvedTheme } from "./themes/types.js";
 import type { PlayerEntry } from "./components/index.js";
 import type { NarrativeAreaHandle } from "./components/index.js";
@@ -56,6 +57,7 @@ export interface LayoutProps {
   // Turn/activity
   turnHolder?: string;
   engineState: string | null;
+  toolGlyphs?: ToolGlyph[];
 
   // Display options
   quoteColor?: string;
@@ -97,6 +99,7 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
     resources,
     turnHolder,
     engineState,
+    toolGlyphs,
     quoteColor,
     playerColor,
     turnIndicatorColor,
@@ -211,7 +214,7 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
           />
 
           {/* Activity Line */}
-          {elements.activityLine && <ActivityLine engineState={engineState} />}
+          {elements.activityLine && <ActivityLine engineState={engineState} toolGlyphs={toolGlyphs} />}
         </Box>
 
         {rightSide}
