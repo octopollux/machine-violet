@@ -66,9 +66,9 @@ const MAX_CHOICE_ROWS = 5;
  *   Rows 4-8: choices (scrolled, line-wrapped; ▲/▼ in left margin)
  *   Row 9: right-aligned help hint
  *
- * Scroll indicators (▲/▼) appear in the first column of the first/last
- * visible choice row, vertically aligned. The cursor (>) shares the same
- * column; arrows take priority over the cursor when both apply.
+ * Scroll indicators (▲/▼) live in a dedicated first column at the
+ * top-left of the choice region (row 0 = ▲, row 1 = ▼). The cursor
+ * (>) occupies the second column. The two never interfere.
  */
 export function ChoiceOverlay({
   width,
@@ -89,7 +89,8 @@ export function ChoiceOverlay({
   const totalHeight = hasDescriptions ? 2 + MAX_CHOICE_ROWS + DESCRIPTION_ROWS : 2 + MAX_CHOICE_ROWS;
 
   // Pre-wrap all choice items
-  const prefixWidth = 2; // "> " or "▲ " etc.
+  // Prefix layout: [arrow 1ch][cursor 1ch][space 1ch] = 3 chars
+  const prefixWidth = 3;
   const labelWidth = Math.max(1, width - prefixWidth);
 
   interface WrappedItem { index: number; isCustom: boolean; lines: FormattingNode[][] }
@@ -199,32 +200,31 @@ export function ChoiceOverlay({
         </Box>
       )}
 
-      {/* Choice rows — scroll arrows in left margin, vertically aligned */}
+      {/* Choice rows — arrow column (col 0) + cursor column (col 1) */}
       {visualRows.map((row, rowIdx) => {
-        const isFirstRow = rowIdx === 0;
-        const isLastRow = rowIdx === visualRows.length - 1;
         const isSelected = row.itemIndex === selectedIndex;
 
-        // Determine the prefix character: arrow takes priority over cursor
-        let prefixChar = " ";
-        let prefixColor: string | undefined;
-        if (isFirstRow && canScrollUp) {
-          prefixChar = "▲";
-          prefixColor = "#aaff00";
-        } else if (isLastRow && canScrollDown) {
-          prefixChar = "▼";
-          prefixColor = "#aaff00";
-        } else if (row.isItemFirstLine && isSelected) {
-          prefixChar = ">";
+        // Arrow column: ▲ on row 0, ▼ on row 1 (only when scrollable)
+        let arrowChar = " ";
+        let arrowColor: string | undefined;
+        if (rowIdx === 0 && canScrollUp) {
+          arrowChar = "▲";
+          arrowColor = "#aaff00";
+        } else if (rowIdx === 1 && canScrollDown) {
+          arrowChar = "▼";
+          arrowColor = "#aaff00";
         }
+
+        // Cursor column: > on first line of selected item
+        const cursorChar = (row.isItemFirstLine && isSelected) ? ">" : " ";
 
         // Special rendering for active custom input
         if (row.isCustom && customInputActive && row.isItemFirstLine) {
           return (
             <Box key="custom-active">
-              {prefixColor
-                ? <Text color={prefixColor}>{prefixChar + " "}</Text>
-                : <Text>{prefixChar + " "}</Text>}
+              {arrowColor
+                ? <><Text color={arrowColor}>{arrowChar}</Text><Text>{cursorChar + " "}</Text></>
+                : <Text>{arrowChar + cursorChar + " "}</Text>}
               <InlineTextInput
                 key={customInputResetKey}
                 isDisabled={false}
@@ -237,9 +237,9 @@ export function ChoiceOverlay({
 
         return (
           <Box key={`${row.itemIndex}-${rowIdx}`}>
-            {prefixColor
-              ? <Text color={prefixColor}>{prefixChar + " "}</Text>
-              : <Text>{prefixChar + " "}</Text>}
+            {arrowColor
+              ? <><Text color={arrowColor}>{arrowChar}</Text><Text>{cursorChar + " "}</Text></>
+              : <Text>{arrowChar + cursorChar + " "}</Text>}
             <Text>{renderNodes(row.nodes)}</Text>
           </Box>
         );
