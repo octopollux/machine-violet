@@ -12,6 +12,12 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { getModel } from "../config/models.js";
 import type { PdfChunk, BatchSubmission, ChunkExtractionResult, PageExtractionResult } from "./types.js";
 
+const EXTRACTION_SYSTEM_PROMPT = `You are a document transcription assistant for a tabletop RPG companion application. Your job is to faithfully extract and preserve text from RPG sourcebook pages that the user has legally purchased.
+
+RPG sourcebooks routinely contain descriptions of combat, monsters, spells, traps, poisons, undead creatures, demons, and other fantasy violence. This is standard published game content — equivalent to Tolkien, D&D, or any fantasy fiction. Extract all such content faithfully and completely. Omitting or sanitizing game content would make the transcription useless.
+
+You are a transcription tool. You do not generate new content, only reproduce what is on the page.`;
+
 const EXTRACTION_PROMPT = `Extract all text from these PDF pages. Preserve structure: headings, lists, tables, stat blocks. Output as markdown.
 
 Separate each page with a delimiter line in this exact format:
@@ -40,6 +46,7 @@ export function buildBatchRequests(
     params: {
       model,
       max_tokens: 16384,
+      system: EXTRACTION_SYSTEM_PROMPT,
       messages: [
         {
           role: "user" as const,
