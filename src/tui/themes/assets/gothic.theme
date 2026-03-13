@@ -55,7 +55,6 @@ gradient: none
 
 [edge_top]
 ══
--
 
 [edge_bottom]
 ══
@@ -71,11 +70,9 @@ gradient: none
 
 [separator_left_top]
 ═╡
- │
 
 [separator_right_top]
 ╞═
-│
 
 [separator_left_bottom]
  │
@@ -86,4 +83,4 @@ gradient: none
 ╞═
 
 [turn_separator]
-───── † ─────
+··══───── † ─────══··
