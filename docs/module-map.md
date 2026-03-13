@@ -33,6 +33,7 @@ Each file is an isolated Claude conversation for a specific task. All use `spawn
 | `choice-generator.ts` | Haiku | Generate 2-3 player action choices from recent narration |
 | `character-promotion.ts` | Haiku | Expand minimal NPC → full character sheet |
 | `scribe.ts` | Haiku | Autonomous entity file manager (list/read/write tools, 8 rounds) |
+| `search-campaign.ts` | Haiku | Agentic campaign search (grep/read tools, 5 rounds) |
 | `narrative-recap.ts` | Haiku | Bullet recap → prose for "Previously on..." modal |
 | `repair-state.ts` | Haiku | Scan transcripts, generate missing entity files |
 | `theme-styler.ts` | Haiku | Natural-language theme description → theme commands |

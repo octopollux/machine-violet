@@ -102,6 +102,7 @@ Note: Session resume is an engine operation, not a callable tool. It runs automa
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
 | `scribe` | T2 (Haiku) | DM | `({ updates: [{ visibility, content }] })` | Batch entity creation/updates. Each update tagged `private` or `player-facing`. Spawns Haiku subagent with `list_entities`, `read_entity`, `write_entity` tools for autonomous entity file management. Handles deduplication, front matter, changelogs. |
+| `search_campaign` | T2 (Haiku) | DM | `({ query })` | Search across all campaign files — entities, scene summaries, transcripts, session recaps, logs. Spawns Haiku subagent with `grep_campaign` and `read_campaign_file` tools. Returns terse excerpts with `[[wikilinks]]` and source references. |
 
 Note: `promote_character` is not a registered tool — it's a subagent function called internally. See [subagents-catalog.md](subagents-catalog.md) #7.
 

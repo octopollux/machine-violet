@@ -149,6 +149,27 @@ Autonomous entity file manager. Receives batched natural-language updates tagged
 
 ---
 
+### 6c. Campaign Search Subagent
+
+| Property | Value |
+|---|---|
+| **Model** | Haiku |
+| **Visibility** | Silent |
+| **Trigger** | DM calls `search_campaign` tool |
+| **Source** | `src/agents/subagents/search-campaign.ts` |
+
+Agentic search across the entire campaign filesystem. Walks all campaign files into memory once, then uses code-backed grep/read tools to find and cross-reference information. Returns terse excerpts with wikilinks and source references to the DM.
+
+**Context**: Search query. ~50 tokens input.
+
+**Tools**: `grep_campaign(pattern, file_filter?)`, `read_campaign_file(path)`.
+
+**Max tool rounds**: 5 (grep → read → refine → read → summarize).
+
+**Returns**: Terse summary of findings with `[[wikilinks]]` and `(source: path)` references. Results go back to the DM as the tool_result (not fire-and-forget).
+
+---
+
 ### 7. Character Promotion Subagent
 
 | Property | Value |
@@ -324,6 +345,7 @@ Haiku, silent. Summarizes campaign book structure for DM cached prefix. See [doc
 | 5 | Precis Updater + PlayerRead | Haiku | Silent | Runtime — context pruning + engagement tracking |
 | 6 | Changelog Updater | Haiku | Silent | Runtime — scene transition |
 | 6b | Scribe | Haiku | Silent | Runtime — entity file management |
+| 6c | Campaign Search | Haiku | Silent | Runtime — agentic campaign search |
 | 7 | Character Promotion | Haiku | Silent | Runtime — on demand |
 | 8 | AI Player | Haiku/Sonnet | Silent | Runtime — AI player turns |
 | 9 | Setup Agent | Sonnet | Player-facing | Init — game setup (orchestrator) |

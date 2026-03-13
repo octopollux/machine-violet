@@ -19,3 +19,5 @@ export { styleTheme } from "./theme-styler.js";
 export type { ThemeStylerResult } from "./theme-styler.js";
 export { runScribe, buildScribeToolHandler } from "./scribe.js";
 export type { ScribeInput, ScribeResult, ScribeUpdate, ScribeFileIO } from "./scribe.js";
+export { searchCampaign, buildSearchToolHandler } from "./search-campaign.js";
+export type { SearchCampaignInput, SearchCampaignResult } from "./search-campaign.js";

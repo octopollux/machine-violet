@@ -17,6 +17,9 @@ export interface AgentLoopConfig {
   maxToolRounds: number;
   /** Extended thinking config. Omit or undefined to disable. */
   thinking?: Anthropic.Messages.ThinkingConfigParam;
+  /** Async tool handler override. Called before registry dispatch.
+   *  Return a ToolResult to handle the tool, or null to fall through to registry. */
+  asyncToolHandler?: (name: string, input: Record<string, unknown>) => Promise<ToolResult | null>;
   /** Called when DM text streams in */
   onTextDelta?: (delta: string) => void;
   /** Called when a tool call starts */
@@ -78,6 +81,7 @@ export async function agentLoop(
   gameState: GameState,
   config: AgentLoopConfig,
 ): Promise<AgentLoopResult> {
+  const asyncHandler = config.asyncToolHandler;
   return runAgentLoop(client, systemPrompt, messages, {
     name: "dm",
     model: config.model,
@@ -86,7 +90,9 @@ export async function agentLoop(
     thinking: config.thinking,
     stream: false,
     tools: registry.getDefinitions(),
-    toolHandler: (name, input) => registry.dispatch(gameState, name, input),
+    toolHandler: asyncHandler
+      ? async (name, input) => (await asyncHandler(name, input)) ?? registry.dispatch(gameState, name, input)
+      : (name, input) => registry.dispatch(gameState, name, input),
     retry: true,
     cacheTools: true,
     tuiToolNames: TUI_TOOLS,
@@ -113,6 +119,7 @@ export async function agentLoopStreaming(
   gameState: GameState,
   config: AgentLoopConfig,
 ): Promise<AgentLoopResult> {
+  const asyncHandler = config.asyncToolHandler;
   return runAgentLoop(client, systemPrompt, messages, {
     name: "dm",
     model: config.model,
@@ -121,7 +128,9 @@ export async function agentLoopStreaming(
     thinking: config.thinking,
     stream: true,
     tools: registry.getDefinitions(),
-    toolHandler: (name, input) => registry.dispatch(gameState, name, input),
+    toolHandler: asyncHandler
+      ? async (name, input) => (await asyncHandler(name, input)) ?? registry.dispatch(gameState, name, input)
+      : (name, input) => registry.dispatch(gameState, name, input),
     retry: true,
     cacheTools: true,
     tuiToolNames: TUI_TOOLS,

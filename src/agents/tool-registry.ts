@@ -896,6 +896,29 @@ const TOOL_DEFS: RegisteredTool[] = [
       return ok(JSON.stringify({ type: "rollback", target: input.target }));
     },
   },
+  // ====== SEARCH ======
+  {
+    definition: {
+      name: "search_campaign",
+      description: "Search across all campaign files — entities, scene summaries, transcripts, session recaps, and logs. A search subagent greps, reads, and cross-references results, returning terse excerpts with [[wikilinks]] to sources. Use when you need to recall details that aren't in your current context.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          query: { type: "string", description: "What to search for — entity names, events, plot details, keywords" },
+        },
+        required: ["query"],
+      },
+    },
+    handler: (_state, input) => {
+      const query = input.query as string;
+      if (!query || !query.trim()) {
+        return err("Query cannot be empty.");
+      }
+      // Actual search is handled by asyncToolHandler in game engine
+      return ok("search_campaign requires async handler");
+    },
+  },
+
   // ====== WORLDBUILDING ======
   {
     definition: {
