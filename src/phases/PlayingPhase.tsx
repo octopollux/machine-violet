@@ -139,10 +139,12 @@ export function PlayingPhase() {
     if (!activeSession) return;
     const label = activeSession.label;
     // Flush accumulated OOC summaries to the engine for injection into the next DM turn
-    if (label === "OOC" && oocSummaries.current.length > 0 && engineRef.current) {
-      engineRef.current.setPendingOOCSummary(
-        oocSummaries.current.join("\n"),
-      );
+    if (label === "OOC" && oocSummaries.current.length > 0) {
+      if (engineRef.current) {
+        engineRef.current.setPendingOOCSummary(
+          oocSummaries.current.join("\n"),
+        );
+      }
       oocSummaries.current = [];
     }
     setActiveSession(null);

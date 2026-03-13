@@ -296,7 +296,9 @@ export class GameEngine {
 
   /** Store a pending OOC summary to inject into the next DM turn (called from TUI layer on OOC exit). */
   setPendingOOCSummary(summary: string): void {
-    this.pendingOOCSummary = summary;
+    this.pendingOOCSummary = this.pendingOOCSummary
+      ? `${this.pendingOOCSummary}\n${summary}`
+      : summary;
   }
 
   /**
@@ -342,8 +344,9 @@ export class GameEngine {
     // Tag the input with character name; prepend OOC summary if pending
     // (persisted in conversation history so the DM retains OOC context)
     let taggedInput = `[${characterName}] ${text}`;
-    if (this.pendingOOCSummary) {
-      taggedInput = `<ooc_summary>\n${this.pendingOOCSummary}\n</ooc_summary>\n\n${taggedInput}`;
+    const consumedOOCSummary = this.pendingOOCSummary;
+    if (consumedOOCSummary) {
+      taggedInput = `<ooc_summary>\n${consumedOOCSummary}\n</ooc_summary>\n\n${taggedInput}`;
       this.pendingOOCSummary = null;
     }
 
@@ -549,6 +552,10 @@ export class GameEngine {
       this.callbacks.onTurnEnd(dmTurn);
 
     } catch (e) {
+      // Restore consumed OOC summary so it retries on the next turn
+      if (consumedOOCSummary) {
+        this.pendingOOCSummary = consumedOOCSummary;
+      }
       const error = e instanceof Error ? e : new Error(String(e));
       await this.dumpDebugInfo(error);
       this.callbacks.onError(error);
