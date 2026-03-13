@@ -70,6 +70,16 @@ describe("buildActiveState", () => {
     expect(result).not.toContain("Resources:");
   });
 
+  it("omits resources section when characters have empty value maps", () => {
+    const result = buildActiveState({
+      pcSummaries: ["Aldric"],
+      pendingAlarms: [],
+      resourceValues: { Aldric: {} },
+    });
+
+    expect(result).not.toContain("Resources:");
+  });
+
   it("omits resources section when empty", () => {
     const result = buildActiveState({
       pcSummaries: ["Aldric"],

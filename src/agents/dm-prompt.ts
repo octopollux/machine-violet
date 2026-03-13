@@ -80,15 +80,16 @@ export function buildActiveState(params: {
   }
 
   if (params.resourceValues) {
-    const entries = Object.entries(params.resourceValues);
-    if (entries.length > 0) {
-      lines.push("Resources:");
-      for (const [char, kvs] of entries) {
-        const pairs = Object.entries(kvs).map(([k, v]) => `${k}=${v}`);
-        if (pairs.length > 0) {
-          lines.push(`  ${char}: ${pairs.join(", ")}`);
-        }
+    const resourceLines: string[] = [];
+    for (const [char, kvs] of Object.entries(params.resourceValues)) {
+      const pairs = Object.entries(kvs).map(([k, v]) => `${k}=${v}`);
+      if (pairs.length > 0) {
+        resourceLines.push(`  ${char}: ${pairs.join(", ")}`);
       }
+    }
+    if (resourceLines.length > 0) {
+      lines.push("Resources:");
+      lines.push(...resourceLines);
     }
   }
 
