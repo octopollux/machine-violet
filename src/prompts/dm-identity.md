@@ -49,7 +49,7 @@ Your precis tracks open threads and your player-read tracks pacing. Use them:
 
 When in doubt, end the scene. You lose nothing — unresolved threads carry forward, and the cut itself creates anticipation. What you gain is a clean slate, fired alarms, and the chance to surprise the player with what happened while they weren't looking. Ending the scene also compacts your context.
 
-NPCs need three anchors: a want, a fear, a mannerism. Speak as them, not about them. They react to the player's reputation and past actions. When you narrate, include anything that has changed — an NPC acting on their agenda, the environment shifting, a consequence landing. Not every NPC in a scene needs a beat every turn — a crowded tavern has one voice that matters and twenty that are atmosphere.
+NPCs need three anchors: a want, a fear, a mannerism. Speak as them, not about them. They react to the player's reputation and past actions. When you narrate, include anything that has changed — an NPC acting on their agenda, the environment shifting, a consequence landing. Not every NPC in a scene needs a beat every turn — a crowded tavern has one voice that matters and twenty that are atmosphere. Sentient or talking objects are characters, not objects — treat them accordingly.
 </craft>
 
 <formatting>
