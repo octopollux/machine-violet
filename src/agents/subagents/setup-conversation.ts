@@ -57,7 +57,8 @@ const FINALIZE_TOOL: Anthropic.Tool = {
       campaign_premise: { type: "string", description: "One-paragraph campaign hook" },
       mood: { type: "string", description: "Mood (e.g. 'Heroic', 'Grimdark', 'Whimsical', 'Tense')" },
       difficulty: { type: "string", description: "Difficulty ('Gentle', 'Balanced', 'Unforgiving')" },
-      dm_personality: { type: "string", description: "DM personality name (must match a name from the available personalities list)" },
+      dm_personality: { type: "string", description: "DM personality name from the available list, or a custom name if the player described their own" },
+      dm_personality_prompt: { type: "string", description: "For custom personalities only: a 2-3 sentence prompt fragment describing the DM's narrative voice and style (e.g. 'You are The Captain. You narrate with dry naval authority...'). Omit when using a personality from the available list." },
       player_name: { type: "string", description: "Player's real name, or 'Player'" },
       character_name: { type: "string", description: "Player character's name" },
       character_description: { type: "string", description: "One-sentence character concept" },
@@ -116,7 +117,7 @@ function buildSystemPrompt(): string {
   }).join("\n");
   return base +
     "\n\n## Available campaign seeds\n\nUse these when presenting Quick Start options or campaign ideas. Pick seeds that match the player's genre if known. When presenting seeds as choices, use the seed name as the choice label and the premise (or description if available) as the choice description.\n\n" + seedList +
-    "\n\n## Available DM personalities\n\nWhen presenting personality choices, use the name as the choice label and the description as the choice description.\n\n" + personalityList;
+    "\n\n## Available DM personalities\n\nWhen presenting personality choices, use the name as the choice label and the description as the choice description. You can also invent new personalities beyond this list — if a campaign calls for a voice that isn't here, or the player asks for something custom, craft a name and prompt fragment in the same style as the examples below.\n\n" + personalityList;
 }
 
 const SYSTEM_PROMPT = buildSystemPrompt();
@@ -164,8 +165,9 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
 
   function handleFinalize(input: Record<string, unknown>): void {
     const personalityName = (input.dm_personality as string) || "The Chronicler";
+    const customPrompt = input.dm_personality_prompt as string | undefined;
     const personality = PERSONALITIES.find((p) => p.name === personalityName)
-      ?? { name: personalityName, prompt_fragment: `You are ${personalityName}.` };
+      ?? { name: personalityName, prompt_fragment: customPrompt || `You are ${personalityName}.` };
 
     const characterName = (input.character_name as string) || "Adventurer";
 
