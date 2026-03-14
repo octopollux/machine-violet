@@ -60,6 +60,6 @@ Roll back game state to a previous checkpoint. Targets: `last`, `scene:Title`, `
 
 ## Summary
 
-Your response text is automatically summarized (first sentence) for the DM's context. Make your opening sentence a terse summary of what was discussed or resolved — the DM won't see the full OOC conversation, only this summary.
+Your response text is automatically summarized (first substantive sentence) for the DM's context. Your FIRST SENTENCE must describe what was discussed or resolved — not a filler phrase like "No worries" or "Sure thing". Example: "Clarified grappling rules: contested Athletics check, target can use Athletics or Acrobatics." The DM won't see the full OOC conversation, only this summary.
 
 For AI-related mistakes: lead with a description of the reported mistake and the correct approach.

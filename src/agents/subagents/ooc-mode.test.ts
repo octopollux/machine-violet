@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
-import { buildOOCPrompt, buildOOCTools, buildOOCToolHandler, enterOOC, parseEndOOCSignal } from "./ooc-mode.js";
+import { buildOOCPrompt, buildOOCTools, buildOOCToolHandler, enterOOC, parseEndOOCSignal, extractSummary } from "./ooc-mode.js";
 import type { DMSessionState } from "../dm-prompt.js";
 import type { FileIO } from "../scene-manager.js";
 import type { GameState } from "../game-state.js";
@@ -861,5 +861,44 @@ describe("enterOOC END_OOC integration", () => {
     });
     expect(result.endSession).toBeUndefined();
     expect(result.playerAction).toBeUndefined();
+  });
+});
+
+describe("extractSummary", () => {
+  it("extracts first substantive sentence", () => {
+    expect(extractSummary("Grappling lets you restrain foes. You need a STR check."))
+      .toBe("Grappling lets you restrain foes.");
+  });
+
+  it("skips filler phrases and takes second sentence", () => {
+    expect(extractSummary("No worries. Clarified the grappling rules for the player."))
+      .toBe("Clarified the grappling rules for the player.");
+  });
+
+  it("handles end-of-string without trailing space", () => {
+    expect(extractSummary("Corrected HP from 12 to 18."))
+      .toBe("Corrected HP from 12 to 18.");
+  });
+
+  it("returns fallback for empty text", () => {
+    expect(extractSummary("")).toBe("OOC discussion.");
+    expect(extractSummary("   ")).toBe("OOC discussion.");
+  });
+
+  it("truncates over 100 chars", () => {
+    const long = "A".repeat(110) + ".";
+    const result = extractSummary(long);
+    expect(result).toHaveLength(100);
+    expect(result).toMatch(/\.\.\.$/);
+  });
+
+  it("uses first sentence when all sentences are short filler", () => {
+    // All sentences under 15 chars — falls back to first
+    expect(extractSummary("Got it. OK. Done.")).toBe("Got it.");
+  });
+
+  it("adds period if sentence lacks punctuation", () => {
+    expect(extractSummary("Explained the combat rules to the player"))
+      .toBe("Explained the combat rules to the player.");
   });
 });
