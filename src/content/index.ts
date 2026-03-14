@@ -63,7 +63,7 @@ export {
   hasReachedStage,
 } from "./processing-state.js";
 export { parseEntities } from "./entity-parser.js";
-export { runProcessingPipeline } from "./process.js";
+export { runProcessingPipeline, runPerBookStages, runSharedStages } from "./process.js";
 export type { ProcessingProgress, ProcessingProgressCallback, ProcessingOptions } from "./process.js";
 
 // NOTE: batch-client.ts, pdf-split.ts, classifier.ts, extractors.ts,

@@ -82,6 +82,15 @@ export function hasReachedStage(state: PipelineState, stage: PipelineStage): boo
 }
 
 /**
+ * Reset pipeline state back to a given stage (for multi-PDF re-runs).
+ * Does not persist — caller must save.
+ */
+export function resetToStage(state: PipelineState, stage: PipelineStage): void {
+  state.currentStage = stage;
+  state.updatedAt = new Date().toISOString();
+}
+
+/**
  * Get the stage order index (for comparison).
  */
 export function stageIndex(stage: PipelineStage): number {
