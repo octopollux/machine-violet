@@ -4,6 +4,8 @@ import { buildCampaignConfig } from "./setup-agent.js";
 import { campaignDirs, campaignPaths } from "../tools/filesystem/index.js";
 import { serializeEntity } from "../tools/filesystem/index.js";
 import { norm } from "../utils/paths.js";
+import { findSystem, readBundledRuleCard } from "../config/systems.js";
+import { processingPaths } from "../config/processing-paths.js";
 
 /**
  * Build the entire campaign directory from setup results.
@@ -13,6 +15,7 @@ export async function buildCampaignWorld(
   campaignsDir: string,
   result: SetupResult,
   fileIO: FileIO,
+  homeDir?: string,
 ): Promise<string> {
   // Generate campaign directory name (slug), ensuring uniqueness
   const baseSlug = slugify(result.campaignName);
@@ -94,6 +97,19 @@ export async function buildCampaignWorld(
     [],
   );
   await fileIO.writeFile(locationPath, locationContent);
+
+  // 8. Copy bundled rule card to ~/.machine-violet/systems/<slug>/ if available
+  if (homeDir && result.system) {
+    const system = findSystem(result.system);
+    if (system?.hasRuleCard) {
+      const ruleCardContent = readBundledRuleCard(result.system);
+      if (ruleCardContent) {
+        const sysPaths = processingPaths(homeDir, result.system);
+        await fileIO.mkdir(norm(sysPaths.base));
+        await fileIO.writeFile(norm(sysPaths.ruleCard), ruleCardContent);
+      }
+    }
+  }
 
   return root;
 }
