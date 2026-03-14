@@ -1037,6 +1037,30 @@ const TOOL_DEFS: RegisteredTool[] = [
       return err("resolve_turn requires async handling. This is a bug.");
     },
   },
+  {
+    definition: {
+      name: "promote_character",
+      description: "Level up, build, or update a character sheet. Use for initial character creation from a player description, level-ups, class feature changes, or stat corrections. Spawns a specialist subagent that reads the current sheet and rules, then produces an updated sheet with changelog.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          character: { type: "string", description: "Character name (must match an existing character file, or a new one will be created)" },
+          context: { type: "string", description: "What changed — e.g. 'Build initial sheet: half-orc barbarian level 3', 'Reached level 5 after defeating the dragon', 'Correct AC from 13 to 14'" },
+        },
+        required: ["character", "context"],
+      },
+    },
+    handler: (_state, input) => {
+      const character = input.character as string;
+      const context = input.context as string;
+      if (!character?.trim()) return err("Character name is required.");
+      if (!context?.trim()) return err("Context is required — describe what changed.");
+      return {
+        content: `Promoting ${character}...`,
+        _tui: { type: "promote_character", character: character.trim(), context: context.trim() },
+      };
+    },
+  },
 ];
 
 // --- State change mapping ---

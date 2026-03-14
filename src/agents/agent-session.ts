@@ -142,6 +142,7 @@ export const TUI_TOOLS = new Set([
   "context_refresh",
   "scribe",
   "dm_notes",
+  "promote_character",
 ]);
 
 export function isTuiCommand(toolName: string): boolean {

@@ -29,7 +29,7 @@ const OOC_READONLY_TOOLS = [
   "line_of_sight", "tiles_in_range", "find_nearest", "check_clocks",
 ];
 
-const OOC_ENTITY_TOOLS = ["scribe"];
+const OOC_ENTITY_TOOLS = ["scribe", "promote_character"];
 
 const OOC_TUI_TOOLS = ["style_scene", "set_display_resources", "set_resource_values", "show_character_sheet"];
 
@@ -398,6 +398,43 @@ async function dispatchDMTool(
       sceneNumber: 0, // OOC has no scene number
     }, fileIO);
     return { content: scribeResult.summary };
+  }
+
+  // Promote character — read sheet, spawn subagent, write back
+  if (name === "promote_character") {
+    if (!client || !fileIO || !campaignRoot) {
+      return { content: "Client and file I/O required for promote_character", is_error: true };
+    }
+    const result = registry.dispatch(gameState, name, input);
+    if (result.is_error) return result;
+    const cmd = result._tui ?? JSON.parse(result.content);
+    const characterName = (cmd as Record<string, unknown>).character as string;
+    const context = (cmd as Record<string, unknown>).context as string;
+
+    const { campaignPaths } = await import("../../tools/filesystem/index.js");
+    const { norm } = await import("../../utils/paths.js");
+    const paths = campaignPaths(campaignRoot);
+    const filePath = norm(paths.character(characterName));
+
+    let currentSheet: string;
+    try {
+      currentSheet = await fileIO.readFile(filePath);
+    } catch {
+      currentSheet = `# ${characterName}\n\n**Type:** character\n`;
+    }
+
+    const { promoteCharacter } = await import("./character-promotion.js");
+    const promoResult = await promoteCharacter(client, {
+      characterName,
+      characterSheet: currentSheet,
+      context,
+    });
+
+    if (promoResult.updatedSheet) {
+      await fileIO.writeFile(filePath, promoResult.updatedSheet);
+    }
+
+    return { content: `Updated ${characterName}: ${promoResult.changelogEntry}` };
   }
 
   // Rollback — execute via repo (prunes ghost dirs + exits)
