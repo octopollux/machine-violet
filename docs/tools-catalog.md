@@ -54,7 +54,13 @@ All T1. All called by DM (or setup agent during init).
 
 ### Resolution
 
-The resolution subagent is not a registered tool — it's an internal subagent spawned by the engine. See [subagents-catalog.md](subagents-catalog.md) #1.
+| Tool | Tier | Caller | Signature | Returns |
+|---|---|---|---|---|
+| `resolve_turn` | T2 (Sonnet) | DM | `({ actor, action, targets?, conditions? })` | Structured result: narrative, dice rolls, state deltas (HP changes, conditions, resource spends). Engine auto-applies deltas to GameState. |
+
+The DM calls `resolve_turn` for complex multi-step combat actions (Extra Attack, conditional abilities, reactions). For simple one-off checks outside combat, the DM uses `roll_dice` directly.
+
+Requires active combat (`start_combat` must have been called). The persistent resolve session accumulates context across all turns — see [subagents-catalog.md](subagents-catalog.md) #1.
 
 ---
 

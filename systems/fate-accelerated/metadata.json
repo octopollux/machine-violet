@@ -1,0 +1,12 @@
+{
+  "name": "FATE Accelerated",
+  "slug": "fate-accelerated",
+  "version": "FAE SRD",
+  "license": "CC-BY-3.0",
+  "licenseUrl": "https://www.faterpg.com/licensing/licensing-fate-cc-by/",
+  "complexity": "light",
+  "dice": ["dF"],
+  "bundled": true,
+  "srdUrl": "https://fate-srd.com/fate-accelerated/get-started",
+  "description": "Streamlined Fate with six Approaches instead of skills. Aspects and Fate points drive narrative play."
+}

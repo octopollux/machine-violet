@@ -43,6 +43,11 @@ import { FirstLaunchPhase } from "./phases/FirstLaunchPhase.js";
 import { MainMenuPhase } from "./phases/MainMenuPhase.js";
 import { SetupPhase } from "./phases/SetupPhase.js";
 import { PlayingPhase } from "./phases/PlayingPhase.js";
+import { AddContentPhase } from "./phases/AddContentPhase.js";
+import { validatePdfs, runIngestPipeline, runProcessingPipeline, slugify } from "./content/index.js";
+import type { ValidatedPdf, IngestProgress, ProcessingProgress } from "./content/index.js";
+import { listAvailableSystems } from "./config/systems.js";
+import type { AvailableSystem } from "./config/systems.js";
 import { GameProvider } from "./tui/game-context.js";
 import type { GameContextValue } from "./tui/game-context.js";
 
@@ -52,6 +57,7 @@ export type AppPhase =
   | "loading"
   | "first_launch"
   | "main_menu"
+  | "add_content"
   | "setup"
   | "building"
   | "playing"
@@ -180,6 +186,9 @@ export default function App({ shutdownRef }: AppProps) {
   // --- Campaigns ---
   const [campaigns, setCampaigns] = useState<CampaignEntry[]>([]);
 
+  // --- Systems ---
+  const [systems, setSystems] = useState<AvailableSystem[]>([]);
+
   // --- Modal state (shared with PlayingPhase via props, set by buildCallbacks/dispatchTuiCommand) ---
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [retryOverlay, setRetryOverlay] = useState<RetryOverlay | null>(null);
@@ -249,13 +258,14 @@ export default function App({ shutdownRef }: AppProps) {
   const getAppDir = useCallback(() => process.cwd(), []);
   const getConfigPath = useCallback(() => join(getAppDir(), "config.json"), [getAppDir]);
 
-  // --- Load campaigns ---
+  // --- Load campaigns and systems ---
   const loadCampaigns = useCallback(async () => {
     try {
       const configPath = getConfigPath();
       const raw = readFileSync(configPath, "utf-8");
       const config = JSON.parse(raw);
       const campaignsDir = config.campaigns_dir || join(getDefaultHomeDir(), "campaigns");
+      const homeDir: string = config.home_dir || getDefaultHomeDir();
       const found = await listCampaigns(
         campaignsDir,
         (p) => readdir(p),
@@ -265,6 +275,10 @@ export default function App({ shutdownRef }: AppProps) {
         (p) => readFile(p, "utf-8"),
       );
       setCampaigns(found);
+
+      // Load available systems in parallel
+      const availSystems = await listAvailableSystems(fileIO.current, homeDir);
+      setSystems(availSystems);
     } catch {
       setCampaigns([]);
     }
@@ -289,6 +303,9 @@ export default function App({ shutdownRef }: AppProps) {
 
   // --- Build game state from config ---
   const buildGameState = useCallback((config: CampaignConfig, campaignRoot: string): GameState => {
+    const raw = readFileSync(getConfigPath(), "utf-8");
+    const appCfg = JSON.parse(raw);
+    const hd: string = appCfg.home_dir || getDefaultHomeDir();
     return {
       maps: {},
       clocks: createClocksState(),
@@ -297,11 +314,12 @@ export default function App({ shutdownRef }: AppProps) {
       decks: createDecksState(),
       config,
       campaignRoot,
+      homeDir: hd,
       activePlayerIndex: 0,
       displayResources: {},
       resourceValues: {},
     };
-  }, []);
+  }, [getConfigPath]);
 
   // --- Raw mode: keep Ink's stdin listener alive across phase transitions ---
   // eslint-disable-next-line @typescript-eslint/no-empty-function -- intentional no-op to keep raw mode alive
@@ -617,6 +635,67 @@ export default function App({ shutdownRef }: AppProps) {
     process.exit(0);
   }, []);
 
+  // --- Add Content state ---
+  const [contentStatusMsg, setContentStatusMsg] = useState<string | null>(null);
+
+  const handleAddContentSubmit = useCallback((systemSlug: string, systemName: string, pdfs: ValidatedPdf[]) => {
+    (async () => {
+      try {
+        const configPath = getConfigPath();
+        const raw = readFileSync(configPath, "utf-8");
+        const config = JSON.parse(raw);
+        const homeDir: string = config.home_dir || getDefaultHomeDir();
+        const projectRoot = process.cwd();
+
+        // Phase 1: Text extraction
+        const onIngestProgress = (progress: IngestProgress) => {
+          setContentStatusMsg(progress.message ?? `Extracting text...`);
+        };
+        setContentStatusMsg("Extracting text...");
+
+        const jobs = await runIngestPipeline(fileIO.current, homeDir, systemSlug, pdfs, onIngestProgress);
+
+        // Phase 2: Processing pipeline (one run per PDF)
+        const client = new Anthropic();
+        for (let i = 0; i < jobs.length; i++) {
+          const job = jobs[i];
+          const jobSlug = slugify(pdfs[i].baseName);
+          const onProcessingProgress = (progress: ProcessingProgress) => {
+            setContentStatusMsg(progress.message);
+          };
+
+          await runProcessingPipeline({
+            client,
+            io: fileIO.current,
+            homeDir,
+            collectionSlug: systemSlug,
+            jobSlug,
+            totalPages: job.totalPages,
+            projectRoot,
+            onProgress: onProcessingProgress,
+          });
+        }
+
+        setContentStatusMsg("Done! Returning to menu...");
+        setTimeout(async () => {
+          setContentStatusMsg(null);
+          setErrorMsg(null);
+          await loadCampaigns();
+          setPhase("main_menu");
+        }, 2000);
+      } catch (e) {
+        setErrorMsg(e instanceof Error ? e.message : "Content import failed");
+        setContentStatusMsg(null);
+        setPhase("main_menu");
+      }
+    })();
+  }, [getConfigPath, fileIO, loadCampaigns]);
+
+  const handleValidatePdf = useCallback(async (path: string): Promise<ValidatedPdf> => {
+    const results = await validatePdfs([path]);
+    return results[0];
+  }, []);
+
   // --- First-launch complete handler ---
   const handleFirstLaunchComplete = useCallback((apiKey: string) => {
     const appDir = getAppDir();
@@ -646,7 +725,22 @@ export default function App({ shutdownRef }: AppProps) {
         errorMsg={errorMsg}
         onNewCampaign={() => setPhase("setup")}
         onResumeCampaign={resumeCampaign}
+        onAddContent={() => setPhase("add_content")}
         onQuit={doQuit}
+      />
+    );
+  }
+
+  if (phase === "add_content") {
+    return (
+      <AddContentPhase
+        theme={theme}
+        systems={systems}
+        onSubmit={handleAddContentSubmit}
+        onCancel={() => { setErrorMsg(null); setContentStatusMsg(null); setPhase("main_menu"); }}
+        validatePdf={handleValidatePdf}
+        errorMsg={errorMsg}
+        statusMsg={contentStatusMsg}
       />
     );
   }

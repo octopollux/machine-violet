@@ -1,0 +1,12 @@
+{
+  "name": "Ironsworn",
+  "slug": "ironsworn",
+  "version": "SRD",
+  "license": "CC-BY-4.0",
+  "licenseUrl": "https://tomkinpress.com/pages/licensing",
+  "complexity": "medium",
+  "dice": ["d6", "d10"],
+  "bundled": true,
+  "srdUrl": "https://shawn-tomkin.itch.io/ironsworn",
+  "description": "Oracle-driven solo/co-op RPG. Vow-based progression, 2d10 vs d6+stat resolution. Designed for GM-less play."
+}

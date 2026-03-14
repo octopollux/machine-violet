@@ -24,6 +24,11 @@ export interface ResolveActionInput {
  * Handles all mechanical resolution — attacks, skill checks, saves, ability uses.
  * Can call roll_dice as a tool. Player-facing when input is needed.
  *
+ * @deprecated Use ResolveSession (src/agents/resolve-session.ts) for combat resolution.
+ * ResolveSession provides persistent context across turns, structured output with
+ * StateDelta[], and runs at Sonnet tier for complex multi-step turns.
+ * This fire-and-forget subagent remains available for simple non-combat checks.
+ *
  * @param client - Anthropic client
  * @param input - Action details + character sheets
  * @param onStream - Optional stream callback for player-facing mode

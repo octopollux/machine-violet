@@ -54,6 +54,7 @@ function mockState(): GameState {
       choices: { campaign_default: "often", player_overrides: {} },
     },
     campaignRoot: "/tmp/test-campaign",
+    homeDir: "/tmp/home",
     activePlayerIndex: 0,
     displayResources: {},
     resourceValues: {},

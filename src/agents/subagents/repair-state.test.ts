@@ -31,6 +31,7 @@ function makeGameState(root = "/campaigns/test"): GameState {
       choices: { campaign_default: "often", player_overrides: {} },
     },
     campaignRoot: root,
+    homeDir: "/tmp/home",
     activePlayerIndex: 0,
     displayResources: {},
     resourceValues: {},

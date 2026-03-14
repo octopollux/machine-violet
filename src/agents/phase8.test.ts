@@ -91,6 +91,7 @@ function makeState(players: PlayerConfig[], activeIndex = 0): GameState {
     decks: { decks: {} },
     config: makeConfig(players),
     campaignRoot: "/tmp/test",
+    homeDir: "/tmp/home",
     activePlayerIndex: activeIndex,
     displayResources: {},
     resourceValues: {},
@@ -431,8 +432,13 @@ describe("new Phase 8 tools", () => {
     expect(result.content).toContain("not found");
   });
 
-  it("registry has 41 tools total", () => {
+  it("registers resolve_turn tool", () => {
     const registry = new ToolRegistry();
-    expect(registry.size).toBe(41);
+    expect(registry.has("resolve_turn")).toBe(true);
+  });
+
+  it("registry has 43 tools total", () => {
+    const registry = new ToolRegistry();
+    expect(registry.size).toBe(43);
   });
 });

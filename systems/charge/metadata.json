@@ -1,0 +1,12 @@
+{
+  "name": "Charge RPG",
+  "slug": "charge",
+  "version": "SRD v1.0",
+  "license": "CC-BY-4.0",
+  "licenseUrl": "https://farirpgs.itch.io/charge-srd",
+  "complexity": "light",
+  "dice": ["d6"],
+  "bundled": true,
+  "srdUrl": "https://charge.farirpgs.com/",
+  "description": "Generic action RPG. Dice pool of d6s, highest die determines outcome. Clean modern PbtA-adjacent design."
+}

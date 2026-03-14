@@ -1,11 +1,22 @@
 # Rules Systems Reference
 
-> **Status: Reference Only** — this is a catalog of candidate systems. Runtime fetching, caching, and distillation are not implemented. Only FATE Accelerated and 24XX are currently offered in setup.
-> Tracked in [#68](https://github.com/Orthodox-531/machine-violet/issues/68).
+> **Status: Partially Implemented.** The `systems/` template directory exists with D&D 5e as the first bundled system (metadata + rule card). Only FATE Accelerated and 24XX are currently offered in setup. Expanding system selection is tracked in [#68](https://github.com/Orthodox-531/machine-violet/issues/68).
 
-This document catalogs freely available tabletop RPG systems that Machine Violet can use as bundled rule sets. The selection criterion is **"free to fetch at runtime"**: the full system rules must be downloadable from an official, stable URL at no cost, with no login gate. This sidesteps bundling-license concerns entirely — we fetch, parse, and cache the document at game-initialization time rather than shipping copyrighted text inside the application.
+## How Systems Work
 
-For each system, note whether the license also permits *redistribution* of the parsed/cached data (relevant if we ever ship pre-built rule packs).
+Game systems use a **three-layer content model**:
+
+1. **Template layer** (`systems/<id>/` in repo root) — hand-authored rule cards in XML-directive format and metadata (JSON). Copied to campaign state at init.
+2. **Ingested layer** (from PDF) — user-supplied sourcebooks extracted locally, then processed into entity files. Layered on top of templates.
+3. **Runtime layer** — content created during play.
+
+**Rule cards** are code artifacts, not runtime products. For known systems, Opus authors them once with full attention; they are reviewed by a human and shipped in the repo. Rule cards use a mix of XML-directive structured markup for mechanics and prose for DM guidance, optimized for model comprehension.
+
+**We bundle rule cards even for bring-your-own-PDF systems.** SRDs enable authoring a mechanical skeleton that gives the DM fluency from turn one. The user brings the PDF for the rich reference content (spells, monsters, class features). Bundled systems must be CC-BY-4.0 compatible (or similarly permissive).
+
+## System Catalog
+
+This catalogs freely available RPG systems. For each system, note license compatibility for bundling rule cards and whether users will typically bring their own PDF for full content.
 
 
 ---

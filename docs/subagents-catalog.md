@@ -8,22 +8,38 @@ Every subagent pattern specified across the design docs. A subagent is a nested 
 
 ## Runtime Subagents (during gameplay)
 
-### 1. Resolution Subagent
+### 1. Resolve Session (Combat)
+
+| Property | Value |
+|---|---|
+| **Model** | Sonnet (`medium` tier) |
+| **Visibility** | Silent |
+| **Trigger** | DM calls `resolve_turn` during active combat |
+| **Lifecycle** | Created at `start_combat`, torn down at `end_combat` |
+| **Source** | `src/agents/resolve-session.ts`, `src/prompts/resolve-session.md` |
+
+**Persistent** combat resolution engine. Unlike fire-and-forget subagents, the resolve session accumulates context across all turns and rounds within a combat encounter. Messages are never pruned — Sonnet's 1M context window handles even marathon combats.
+
+**Context**: System prompt with session identity + output format (BP1), rule card combat rules (BP2), all combatant stat blocks (BP3). Per-turn: combat state snapshot (round, initiative order, HP/conditions), action declaration.
+
+**Tools**: `roll_dice`, `read_character_sheet`, `read_stat_block`, `query_rules`, `search_content` (fallback).
+
+**Returns**: `ResolutionResult` with structured `StateDelta[]` (engine auto-applies HP/conditions/resources), `RollRecord[]`, and a narrative summary for the DM. Output format is XML (`<resolution>` block). Graceful fallback: if no XML block found, full text returned as narrative.
+
+**Cost**: ~$0.20 for a 20-turn combat with prompt caching. Turns 2-20 read prior context at cache rate.
+
+### 1b. Resolution Subagent (Legacy)
 
 | Property | Value |
 |---|---|
 | **Model** | Haiku |
 | **Visibility** | Silent (NPC actions) or Player-facing (when player input needed) |
-| **Trigger** | DM calls `resolve_action` |
+| **Trigger** | Internal (not directly DM-callable) |
 | **Source doc** | [randomization.md](randomization.md) |
 
-The DM's workhorse. Handles all mechanical resolution — attacks, skill checks, saves, ability uses. Reads character sheets and distilled rule cards, determines modifiers, calls `roll_dice` (T1), evaluates results, computes state changes.
+**Deprecated** — use Resolve Session for combat. This fire-and-forget subagent remains available for simple non-combat mechanical checks. No persistent context between calls.
 
-**Context**: System prompt with distilled rule cards (cached after first call in a combat), actor's character sheet, target's stats, conditions from the DM. ~2-4K tokens input.
-
-**Returns**: Terse structured result — summary, rolls breakdown, target stat, state changes. ~20-50 tokens.
-
-**Player-facing mode**: When the resolution needs player input ("Use Divine Smite on this hit?", "Which spell slot?"), the subagent temporarily takes over the TUI to ask. The DM doesn't mediate mechanical negotiations.
+**Returns**: Terse structured result — summary, rolls breakdown, state changes. ~20-50 tokens.
 
 ---
 

@@ -1,0 +1,12 @@
+{
+  "name": "24XX",
+  "slug": "24xx",
+  "version": "SRD v1.0",
+  "license": "CC-BY-4.0",
+  "licenseUrl": "https://jasontocci.itch.io/24xx",
+  "complexity": "ultra-light",
+  "dice": ["d4", "d6", "d8", "d10", "d12"],
+  "bundled": true,
+  "srdUrl": "https://jasontocci.itch.io/24xx",
+  "description": "Ultra-light universal RPG. One die, one result bracket, no math. Fits on a business card."
+}

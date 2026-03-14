@@ -24,12 +24,15 @@ import { aiPlayerTurn } from "./subagents/ai-player.js";
 import { campaignPaths, parseFrontMatter, serializeEntity, formatChangelogEntry } from "../tools/filesystem/index.js";
 import { runScribe } from "./subagents/scribe.js";
 import { searchCampaign } from "./subagents/search-campaign.js";
+import { searchContent } from "./subagents/search-content.js";
 import { norm } from "../utils/paths.js";
 import { CampaignRepo, performRollback } from "../tools/git/index.js";
 import { RollbackCompleteError } from "../teardown.js";
 import type { GitIO } from "../tools/git/index.js";
 import { writeDebugDump } from "../tools/filesystem/debug-dump.js";
 import { styleTheme } from "./subagents/theme-styler.js";
+import { ResolveSession } from "./resolve-session.js";
+import type { ActionDeclaration, StateDelta } from "../types/resolve-session.js";
 
 // --- Types ---
 
@@ -149,6 +152,7 @@ export class GameEngine {
   private static MAX_AI_CHAIN = 10;
   private injectionRegistry: InjectionRegistry;
   private terminalDims: TerminalDims | undefined;
+  private resolveSession: ResolveSession | null = null;
 
   constructor(params: {
     client: Anthropic;
@@ -224,6 +228,12 @@ export class GameEngine {
       // persist it via scene state immediately
       if (toolName === "switch_player") {
         this.persistCurrentScene();
+      }
+      // Combat lifecycle hooks for resolve session
+      if (toolName === "start_combat") {
+        void this.initResolveSession(state);
+      } else if (toolName === "end_combat") {
+        this.teardownResolveSession();
       }
     };
   }
@@ -1029,29 +1039,237 @@ export class GameEngine {
     name: string,
     input: Record<string, unknown>,
   ): Promise<import("./tool-registry.js").ToolResult | null> {
-    if (name !== "search_campaign") return null;
+    if (name === "resolve_turn") {
+      if (!this.resolveSession) {
+        return {
+          content: "No active combat session. Use start_combat first, or use roll_dice for non-combat checks.",
+          is_error: true,
+        };
+      }
+      const action: ActionDeclaration = {
+        actor: input.actor as string,
+        action: input.action as string,
+        targets: input.targets as string[] | undefined,
+        conditions: input.conditions as string | undefined,
+      };
+      try {
+        const result = await this.resolveSession.resolve(action);
+        this.applyResolutionDeltas(result.deltas);
+        accUsage(this.sessionUsage, result.usage);
+        this.callbacks.onUsageUpdate(this.sessionUsage);
+        this.callbacks.onDevLog?.(`[dev] resolve_turn: ${action.actor} — ${result.narrative.slice(0, 80)}`);
+        return { content: this.formatResolutionForDM(result) };
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        this.callbacks.onDevLog?.(`[dev] resolve_turn: failed — ${msg}`);
+        return { content: `Resolution failed: ${msg}`, is_error: true };
+      }
+    }
 
     const query = input.query as string;
-    if (!query || !query.trim()) {
-      return { content: "Query cannot be empty.", is_error: true };
+
+    if (name === "search_campaign") {
+      if (!query || !query.trim()) {
+        return { content: "Query cannot be empty.", is_error: true };
+      }
+
+      try {
+        const result = await searchCampaign(this.client, {
+          query,
+          campaignRoot: this.gameState.campaignRoot,
+        }, this.fileIO);
+
+        accUsage(this.sessionUsage, result.usage);
+        this.callbacks.onUsageUpdate(this.sessionUsage);
+        this.callbacks.onDevLog?.(`[dev] search_campaign: "${query}" → ${result.text.length} chars`);
+
+        return { content: result.text };
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        this.callbacks.onDevLog?.(`[dev] search_campaign: failed — ${msg}`);
+        return { content: `Search failed: ${msg}`, is_error: true };
+      }
     }
 
+    if (name === "search_content") {
+      if (!query || !query.trim()) {
+        return { content: "Query cannot be empty.", is_error: true };
+      }
+
+      const systemSlug = this.gameState.config.system;
+      if (!systemSlug) {
+        return { content: "No game system configured for this campaign.", is_error: true };
+      }
+
+      try {
+        const result = await searchContent(this.client, {
+          query,
+          systemSlug,
+          homeDir: this.gameState.homeDir,
+        }, this.fileIO);
+
+        accUsage(this.sessionUsage, result.usage);
+        this.callbacks.onUsageUpdate(this.sessionUsage);
+        this.callbacks.onDevLog?.(`[dev] search_content: "${query}" → ${result.text.length} chars`);
+
+        return { content: result.text };
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        this.callbacks.onDevLog?.(`[dev] search_content: failed — ${msg}`);
+        return { content: `Content search failed: ${msg}`, is_error: true };
+      }
+    }
+
+    return null;
+  }
+
+  // --- Resolve Session Lifecycle ---
+
+  /** Initialize the resolve session after combat starts. */
+  private async initResolveSession(state: GameState): Promise<void> {
     try {
-      const result = await searchCampaign(this.client, {
-        query,
-        campaignRoot: this.gameState.campaignRoot,
-      }, this.fileIO);
+      const sheets = await this.loadCombatantSheets(state);
+      const ruleCard = await this.loadRuleCardCombat();
+      const mapSnapshot = this.buildMapSnapshot();
 
-      accUsage(this.sessionUsage, result.usage);
-      this.callbacks.onUsageUpdate(this.sessionUsage);
-      this.callbacks.onDevLog?.(`[dev] search_campaign: "${query}" → ${result.text.length} chars`);
-
-      return { content: result.text };
+      this.resolveSession = new ResolveSession(this.client, this.fileIO, this.gameState);
+      await this.resolveSession.initCombat(sheets, ruleCard, mapSnapshot || undefined);
+      this.callbacks.onDevLog?.(`[dev] resolve_session: initialized for ${state.combat.order.length} combatants`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      this.callbacks.onDevLog?.(`[dev] search_campaign: failed — ${msg}`);
-      return { content: `Search failed: ${msg}`, is_error: true };
+      this.callbacks.onDevLog?.(`[dev] resolve_session: init failed — ${msg}`);
+      // Non-fatal — DM can still use roll_dice manually
     }
+  }
+
+  /** Tear down the resolve session when combat ends. */
+  private teardownResolveSession(): void {
+    if (this.resolveSession) {
+      const summary = this.resolveSession.teardown();
+      this.callbacks.onDevLog?.(`[dev] resolve_session: ${summary}`);
+      this.resolveSession = null;
+    }
+  }
+
+  /** Load character sheets for all combatants. */
+  private async loadCombatantSheets(state: GameState): Promise<string> {
+    const sheets: string[] = [];
+    for (const entry of state.combat.order) {
+      const paths = campaignPaths(state.campaignRoot);
+      try {
+        const content = await this.fileIO.readFile(norm(paths.character(entry.id)));
+        if (content) {
+          sheets.push(`### ${entry.id}\n${content}`);
+          continue;
+        }
+      } catch {
+        // Not a PC — might be an NPC/monster
+      }
+      sheets.push(`### ${entry.id}\nType: ${entry.type}, Initiative: ${entry.initiative}`);
+    }
+    return sheets.join("\n\n");
+  }
+
+  /** Load the combat-relevant section of the rule card. */
+  private async loadRuleCardCombat(): Promise<string> {
+    const systemSlug = this.gameState.config.system;
+    if (!systemSlug) return "No game system configured.";
+
+    // Try bundled system first, then processed content
+    try {
+      const { processingPaths } = await import("../content/processing-paths.js");
+      const paths = processingPaths(this.gameState.homeDir, systemSlug);
+      const ruleCard = await this.fileIO.readFile(norm(paths.ruleCard));
+      return ruleCard;
+    } catch {
+      // Try bundled system
+      try {
+        const bundledPath = norm(`systems/${systemSlug}/rule-card.md`);
+        const content = await this.fileIO.readFile(bundledPath);
+        return content;
+      } catch {
+        return "No rule card available.";
+      }
+    }
+  }
+
+  /** Build a compact map snapshot for the resolve session. */
+  private buildMapSnapshot(): string | null {
+    const mapKeys = Object.keys(this.gameState.maps);
+    if (mapKeys.length === 0) return null;
+
+    const lines: string[] = [];
+    for (const key of mapKeys) {
+      const map = this.gameState.maps[key];
+      lines.push(`Map: ${key} (${map.bounds.width}x${map.bounds.height})`);
+      if (map.entities) {
+        for (const [coord, entities] of Object.entries(map.entities)) {
+          for (const entity of entities) {
+            lines.push(`  ${entity.id}: ${coord}`);
+          }
+        }
+      }
+    }
+    return lines.join("\n");
+  }
+
+  /** Apply resolution deltas to game state. */
+  private applyResolutionDeltas(deltas: StateDelta[]): void {
+    for (const delta of deltas) {
+      switch (delta.type) {
+        case "hp_change":
+        case "resource_spend": {
+          // Update resource values for the target
+          const target = delta.target;
+          if (!this.gameState.resourceValues[target]) {
+            this.gameState.resourceValues[target] = {};
+          }
+          const values = this.gameState.resourceValues[target];
+          if (delta.type === "hp_change") {
+            const amount = delta.details.amount as number;
+            const currentStr = values.hp ?? "0";
+            const current = parseInt(currentStr, 10) || 0;
+            values.hp = String(current + amount);
+          } else {
+            const resource = delta.details.resource as string;
+            if (delta.details.remaining !== undefined) {
+              values[resource] = String(delta.details.remaining);
+            }
+          }
+          break;
+        }
+        case "condition_add":
+        case "condition_remove":
+        case "position_change":
+          // These are logged in the narrative but don't directly map to
+          // existing GameState fields. The DM reads them from the tool result.
+          break;
+      }
+    }
+  }
+
+  /** Format a ResolutionResult into a terse string for the DM's tool result. */
+  private formatResolutionForDM(result: import("../types/resolve-session.js").ResolutionResult): string {
+    const parts: string[] = [result.narrative];
+
+    if (result.rolls.length > 0) {
+      const rollLines = result.rolls.map(
+        (r) => `${r.reason}: ${r.detail} = ${r.result}`,
+      );
+      parts.push(`Rolls: ${rollLines.join("; ")}`);
+    }
+
+    if (result.deltas.length > 0) {
+      const deltaLines = result.deltas.map((d) => {
+        const details = Object.entries(d.details)
+          .map(([k, v]) => `${k}=${v}`)
+          .join(", ");
+        return `${d.type}(${d.target}): ${details}`;
+      });
+      parts.push(`Changes: ${deltaLines.join("; ")}`);
+    }
+
+    return parts.join("\n");
   }
 
   private async handleDroppedExchange(dropped: DroppedExchange): Promise<void> {

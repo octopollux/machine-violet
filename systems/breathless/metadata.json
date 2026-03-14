@@ -1,0 +1,12 @@
+{
+  "name": "Breathless",
+  "slug": "breathless",
+  "version": "SRD v1.0",
+  "license": "CC-BY-4.0",
+  "licenseUrl": "https://farirpgs.itch.io/breathless-srd",
+  "complexity": "light",
+  "dice": ["d4", "d6", "d8", "d10", "d12", "d20"],
+  "bundled": true,
+  "srdUrl": "https://farirpgs.itch.io/breathless-srd",
+  "description": "Survival-horror PbtA-adjacent system. Skills degrade as you use them, creating escalating tension."
+}

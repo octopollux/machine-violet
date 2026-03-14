@@ -103,6 +103,7 @@ function mockState(): GameState {
       choices: { campaign_default: "often", player_overrides: {} },
     },
     campaignRoot: "/tmp/test-campaign",
+    homeDir: "/tmp/home",
     activePlayerIndex: 0,
     displayResources: {},
     resourceValues: {},
@@ -725,6 +726,7 @@ describe("GameEngine AI Auto-Turn", () => {
         choices: { campaign_default: "often", player_overrides: {} },
       },
       campaignRoot: "/tmp/test-campaign",
+      homeDir: "/tmp/home",
       activePlayerIndex: 0,
       displayResources: {},
       resourceValues: {},
@@ -1220,6 +1222,7 @@ describe("GameEngine Turn Lifecycle", () => {
         choices: { campaign_default: "often", player_overrides: {} },
       },
       campaignRoot: "/tmp/test-campaign",
+      homeDir: "/tmp/home",
       activePlayerIndex: 1,
       displayResources: {},
       resourceValues: {},
@@ -1550,5 +1553,35 @@ describe("GameEngine tool ack batching", () => {
     const userMsgs = msgs.filter((m) => m.role === "user");
     const lastUserMsg = userMsgs[userMsgs.length - 1];
     expect(typeof lastUserMsg.content).toBe("string");
+  });
+});
+
+describe("GameEngine resolve_turn routing", () => {
+  it("returns error when no combat session is active", async () => {
+    // DM calls resolve_turn without start_combat
+    const client = mockClient([
+      ...toolAndTextMessages("resolve_turn", {
+        actor: "Kael",
+        action: "Attack goblin",
+      }, "I'll try something else."),
+    ]);
+    const { callbacks, log } = mockCallbacks();
+
+    const engine = new GameEngine({
+      client,
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: mockFileIO(),
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "I attack!");
+
+    // The tool should have returned an error
+    expect(log.toolEnds).toContain("resolve_turn");
+    // But engine should still complete normally
+    expect(engine.getState()).toBe("waiting_input");
   });
 });
