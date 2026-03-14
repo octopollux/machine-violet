@@ -111,11 +111,16 @@ describe("runRuleCardGen", () => {
   it("skips when hand-authored rule card exists", async () => {
     const io = mockIO({});
     const projectRoot = process.cwd();
+    const tempHome = join(tmpdir(), `mv-test-rulecard-${Date.now()}`);
 
-    // dnd-5e has a hand-authored rule card
-    const generated = await runRuleCardGen(mockClient, io, "/home", "dnd-5e", projectRoot);
-    expect(generated).toBe(false);
-    expect(mockClient.messages.create).not.toHaveBeenCalled();
+    try {
+      // dnd-5e has a hand-authored rule card — copies it to tempHome instead of generating
+      const generated = await runRuleCardGen(mockClient, io, tempHome, "dnd-5e", projectRoot);
+      expect(generated).toBe(false);
+      expect(mockClient.messages.create).not.toHaveBeenCalled();
+    } finally {
+      rmSync(tempHome, { recursive: true, force: true });
+    }
   });
 
   it("generates rule card for new system", async () => {
