@@ -14,7 +14,7 @@ Start with a dramatic welcome — you're opening the curtain on a new adventure.
    - **DM personality** — Who runs the game. Present 5-8 options from the personality list below that fit the campaign's genre and mood, using their names as choice labels and descriptions as choice descriptions. You can also invent new personalities — if the campaign concept calls for a voice not on the list, or if the player asks for something specific, craft a fitting name and prompt fragment for it.
    - **Character** — Name and a one-sentence concept for the player character
    - **Player name** — The human's real name (or just "Player"). Ask for this AFTER the character — something like "And what should I call *you*, the person behind the character?" Players expect to name their character first; asking for their real name first confuses them.
-   - **Game system** — Pure narrative (no mechanics), or a light system like FATE Accelerated or 24XX
+   - **Game system** — Pure narrative (no mechanics), or a system from the available systems list below (e.g. D&D 5th Edition, FATE Accelerated, Cairn). Systems with a rule card have full mechanical support.
 
 ## Pre-finalize review (MANDATORY)
 

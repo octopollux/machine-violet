@@ -5,6 +5,7 @@ import type { SetupResult } from "../setup-agent.js";
 import { generateThemeColor } from "../setup-agent.js";
 import { PERSONALITIES } from "../../config/personalities.js";
 import { SEEDS } from "../../config/seeds.js";
+import { KNOWN_SYSTEMS } from "../../config/systems.js";
 import { getModel, getThinkingConfig } from "../../config/models.js";
 import { accumulateUsage as accRawUsage } from "../../context/usage-helpers.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
@@ -52,7 +53,7 @@ const FINALIZE_TOOL: Anthropic.Tool = {
     type: "object" as const,
     properties: {
       genre: { type: "string", description: "Genre (e.g. 'Classic fantasy', 'Sci-fi', 'Modern supernatural')" },
-      system: { type: "string", description: "Game system name, or null for pure narrative", nullable: true },
+      system: { type: "string", description: "Game system slug from the available systems list (e.g. 'dnd-5e', 'fate-accelerated'), or null for pure narrative. Use the slug, not the display name.", nullable: true },
       campaign_name: { type: "string", description: "Short evocative campaign title" },
       campaign_premise: { type: "string", description: "One-paragraph campaign hook" },
       mood: { type: "string", description: "Mood (e.g. 'Heroic', 'Grimdark', 'Whimsical', 'Tense')" },
@@ -115,7 +116,13 @@ function buildSystemPrompt(): string {
     const desc = p.description ? `: ${p.description}` : "";
     return `- **${p.name}**${desc}`;
   }).join("\n");
+  const systemList = KNOWN_SYSTEMS.map((s) => {
+    const ruleCard = s.hasRuleCard ? " (has rule card)" : "";
+    return `- \`${s.slug}\` — ${s.name}${ruleCard}`;
+  }).join("\n");
+
   return base +
+    "\n\n## Available game systems\n\nWhen the player wants mechanics, pick from this list. Use the **slug** (e.g. `dnd-5e`) in `finalize_setup`, not the display name. For pure narrative (no mechanics), pass `null` for system.\n\n" + systemList +
     "\n\n## Available campaign seeds\n\nUse these when presenting Quick Start options or campaign ideas. Pick seeds that match the player's genre if known. When presenting seeds as choices, use the seed name as the choice label and the premise (or description if available) as the choice description.\n\n" + seedList +
     "\n\n## Available DM personalities\n\nWhen presenting personality choices, use the name as the choice label and the description as the choice description. You can also invent new personalities beyond this list — if a campaign calls for a voice that isn't here, or the player asks for something custom, craft a name and prompt fragment in the same style as the examples below.\n\n" + personalityList;
 }
@@ -150,6 +157,26 @@ async function streamWithRetry(
 
 // --- Implementation ---
 
+/**
+ * Resolve a free-form system string to a known slug.
+ * Tries: exact slug match → display name match → slugified match → passthrough.
+ */
+export function resolveSystemSlug(raw: string): string {
+  // Already a known slug?
+  if (KNOWN_SYSTEMS.some((s) => s.slug === raw)) return raw;
+  // Match by display name (case-insensitive)?
+  const byName = KNOWN_SYSTEMS.find(
+    (s) => s.name.toLowerCase() === raw.toLowerCase(),
+  );
+  if (byName) return byName.slug;
+  // Fuzzy: slugify the input and check against known slugs
+  const slugified = raw.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const bySlugged = KNOWN_SYSTEMS.find((s) => s.slug === slugified);
+  if (bySlugged) return bySlugged.slug;
+  // Unknown system — return slugified form (user-processed or free-form)
+  return slugified || raw;
+}
+
 export function createSetupConversation(client: Anthropic): SetupConversation {
   const messages: Anthropic.MessageParam[] = [];
   const totalUsage: UsageStats = {
@@ -171,9 +198,14 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
 
     const characterName = (input.character_name as string) || "Adventurer";
 
+    // Resolve system to a known slug — the agent should pass a slug, but
+    // if it passes a display name (e.g. "D&D 5e") we map it to the slug.
+    const rawSystem = (input.system as string) || null;
+    const resolvedSystem = rawSystem ? resolveSystemSlug(rawSystem) : null;
+
     finalized = {
       genre: (input.genre as string) || "Classic fantasy",
-      system: (input.system as string) || null,
+      system: resolvedSystem,
       campaignName: (input.campaign_name as string) || "A New Story",
       campaignPremise: (input.campaign_premise as string) || "An adventure awaits.",
       mood: (input.mood as string) || "Balanced",
