@@ -462,9 +462,9 @@ describe("buildOOCTools", () => {
     expect(names).toEqual(["get_commit_log", "read_file", "find_references", "validate_campaign"]);
   });
 
-  it("returns 18 tools when both fileIO and gameState are available", () => {
+  it("returns 19 tools when both fileIO and gameState are available", () => {
     const tools = buildOOCTools(true, true);
-    expect(tools).toHaveLength(18);
+    expect(tools).toHaveLength(19);
     const names = tools.map((t) => t.name);
     expect(names).toContain("roll_dice");
     expect(names).toContain("check_clocks");
@@ -474,9 +474,9 @@ describe("buildOOCTools", () => {
     expect(names).toContain("rollback");
   });
 
-  it("returns 15 tools when gameState but no fileIO", () => {
+  it("returns 16 tools when gameState but no fileIO", () => {
     const tools = buildOOCTools(false, true);
-    expect(tools).toHaveLength(15);
+    expect(tools).toHaveLength(16);
     const names = tools.map((t) => t.name);
     expect(names).toContain("roll_dice");
     expect(names).not.toContain("read_file");
@@ -731,7 +731,7 @@ describe("enterOOC with gameState", () => {
 
     const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     if (createCall) {
-      expect(createCall.tools).toHaveLength(18);
+      expect(createCall.tools).toHaveLength(19);
       const names = createCall.tools.map((t: { name: string }) => t.name);
       expect(names).toContain("roll_dice");
       expect(names).toContain("scribe");

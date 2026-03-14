@@ -23,6 +23,7 @@ import { isAITurn, getActivePlayer } from "./player-manager.js";
 import { aiPlayerTurn } from "./subagents/ai-player.js";
 import { campaignPaths, parseFrontMatter, serializeEntity, formatChangelogEntry } from "../tools/filesystem/index.js";
 import { runScribe } from "./subagents/scribe.js";
+import { promoteCharacter } from "./subagents/character-promotion.js";
 import { searchCampaign } from "./subagents/search-campaign.js";
 import { searchContent } from "./subagents/search-content.js";
 import { norm } from "../utils/paths.js";
@@ -540,6 +541,8 @@ export class GameEngine {
           await this.refreshContext();
         } else if (cmd.type === "scribe") {
           await this.handleScribe(cmd);
+        } else if (cmd.type === "promote_character") {
+          await this.handlePromoteCharacter(cmd);
         } else if (cmd.type === "dm_notes") {
           await this.handleDmNotes(cmd);
         } else if (cmd.type === "style_scene") {
@@ -735,6 +738,53 @@ export class GameEngine {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       this.callbacks.onDevLog?.(`[dev] scribe: failed — ${msg}`);
+    }
+  }
+
+  /** Handle promote_character tool — spawns subagent to update character sheet. */
+  private async handlePromoteCharacter(cmd: TuiCommand): Promise<void> {
+    const characterName = cmd.character as string;
+    const context = cmd.context as string;
+    if (!characterName) return;
+
+    const paths = campaignPaths(this.gameState.campaignRoot);
+    const filePath = norm(paths.character(characterName));
+
+    try {
+      // Read current sheet (may not exist for initial creation)
+      let currentSheet = "";
+      try {
+        currentSheet = await this.fileIO.readFile(filePath);
+      } catch {
+        // New character — start from minimal template
+        currentSheet = `# ${characterName}\n\n**Type:** character\n`;
+      }
+
+      // Load system rules if available
+      const ruleCard = await this.loadRuleCardCombat();
+
+      const result = await promoteCharacter(this.client, {
+        characterName,
+        characterSheet: currentSheet,
+        context,
+        systemRules: ruleCard !== "No rule card available." ? ruleCard : undefined,
+      });
+
+      // Write the updated sheet
+      if (result.updatedSheet) {
+        await this.fileIO.writeFile(filePath, result.updatedSheet);
+      }
+
+      // Notify scene manager
+      const slug = characterName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+      this.sceneManager.notifyEntityTouched(filePath, slug);
+
+      accUsage(this.sessionUsage, result.usage);
+      this.callbacks.onUsageUpdate(this.sessionUsage);
+      this.callbacks.onDevLog?.(`[dev] promote_character: ${characterName} — ${result.changelogEntry}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.callbacks.onDevLog?.(`[dev] promote_character: failed — ${msg}`);
     }
   }
 
