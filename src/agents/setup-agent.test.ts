@@ -3,6 +3,7 @@ import { buildCampaignConfig, generateThemeColor } from "./setup-agent.js";
 import type { SetupResult } from "./setup-agent.js";
 import { buildCampaignWorld, slugify } from "./world-builder.js";
 import type { FileIO } from "./scene-manager.js";
+import { resolveSystemSlug } from "./subagents/setup-conversation.js";
 
 /** Helper to build a minimal SetupResult for testing */
 function makeSetupResult(overrides: Partial<SetupResult> = {}): SetupResult {
@@ -69,6 +70,36 @@ describe("slugify", () => {
     expect(slugify("Black Coin")).toBe("black-coin");
     expect(slugify("A Hooded Figure")).toBe("hooded-figure");
     expect(slugify("An Old Tower")).toBe("old-tower");
+  });
+});
+
+describe("resolveSystemSlug", () => {
+  it("returns known slugs unchanged", () => {
+    expect(resolveSystemSlug("dnd-5e")).toBe("dnd-5e");
+    expect(resolveSystemSlug("fate-accelerated")).toBe("fate-accelerated");
+    expect(resolveSystemSlug("24xx")).toBe("24xx");
+  });
+
+  it("maps display names to slugs (case-insensitive)", () => {
+    expect(resolveSystemSlug("D&D 5th Edition")).toBe("dnd-5e");
+    expect(resolveSystemSlug("d&d 5th edition")).toBe("dnd-5e");
+    expect(resolveSystemSlug("FATE Accelerated")).toBe("fate-accelerated");
+    expect(resolveSystemSlug("Cairn")).toBe("cairn");
+    expect(resolveSystemSlug("Charge RPG")).toBe("charge");
+  });
+
+  it("maps slugified display names to known slugs", () => {
+    // "D&D 5e" → slugify → "d-d-5e" — doesn't match "dnd-5e"
+    // but "D&D 5th Edition" → slugify → "d-d-5th-edition" — also doesn't match
+    // These fall through to the slugified passthrough
+    expect(resolveSystemSlug("Ironsworn")).toBe("ironsworn");
+    expect(resolveSystemSlug("Breathless")).toBe("breathless");
+  });
+
+  it("returns slugified form for unknown systems", () => {
+    expect(resolveSystemSlug("Mothership")).toBe("mothership");
+    expect(resolveSystemSlug("Call of Cthulhu")).toBe("call-of-cthulhu");
+    expect(resolveSystemSlug("My Custom System!")).toBe("my-custom-system");
   });
 });
 
