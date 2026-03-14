@@ -23,12 +23,12 @@ export interface AvailableSystem extends SystemEntry {
 }
 
 export const KNOWN_SYSTEMS: SystemEntry[] = [
-  { slug: "24xx", name: "24XX", bundled: true, hasRuleCard: false },
-  { slug: "fate-accelerated", name: "FATE Accelerated", bundled: true, hasRuleCard: false },
+  { slug: "24xx", name: "24XX", bundled: true, hasRuleCard: true },
+  { slug: "fate-accelerated", name: "FATE Accelerated", bundled: true, hasRuleCard: true },
   { slug: "cairn", name: "Cairn", bundled: true, hasRuleCard: false },
   { slug: "ironsworn", name: "Ironsworn", bundled: true, hasRuleCard: false },
-  { slug: "breathless", name: "Breathless", bundled: true, hasRuleCard: false },
-  { slug: "charge", name: "Charge RPG", bundled: true, hasRuleCard: false },
+  { slug: "breathless", name: "Breathless", bundled: true, hasRuleCard: true },
+  { slug: "charge", name: "Charge RPG", bundled: true, hasRuleCard: true },
   { slug: "dnd-5e", name: "D&D 5th Edition", bundled: true, hasRuleCard: true },
 ];
 
