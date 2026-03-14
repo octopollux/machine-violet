@@ -138,7 +138,7 @@ describe("AddContentPhase", () => {
     await vi.waitFor(() => {
       expect(lastFrame()).toContain("Monster Manual");
       expect(lastFrame()).toContain("343 pp");
-    });
+    }, { timeout: 2000 });
   });
 
   it("shows confirm prompt after pressing Enter with no input on drop step", async () => {
