@@ -136,13 +136,13 @@ const SYSTEM_PROMPT = buildSystemPrompt();
  */
 async function streamWithRetry(
   client: Anthropic,
-  params: Anthropic.MessageCreateParamsNonStreaming,
+  params: Omit<Anthropic.MessageCreateParams, "stream">,
   onDelta: (delta: string) => void,
 ): Promise<Anthropic.Message> {
   for (let attempt = 0; ; attempt++) {
     try {
       dumpContext("setup", params);
-      const stream = client.messages.stream({ ...params });
+      const stream = client.messages.stream(params);
       stream.on("text", (delta) => { onDelta(delta); });
       return await stream.finalMessage();
     } catch (e) {
@@ -233,12 +233,11 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
 
     const tc = getThinkingConfig("setup");
 
-    let lastParams: Anthropic.MessageCreateParamsNonStreaming = {
+    let lastParams = {
       model: getModel("medium"),
       max_tokens: TOKEN_LIMITS.SUBAGENT_LARGE + tc.budgetTokens,
       system: SYSTEM_PROMPT,
       messages,
-      stream: false,
       tools: TOOLS,
       thinking: tc.param,
     };
@@ -306,7 +305,6 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
         max_tokens: TOKEN_LIMITS.SUBAGENT_MEDIUM + tc.budgetTokens,
         system: SYSTEM_PROMPT,
         messages,
-        stream: false,
         tools: TOOLS,
         thinking: tc.param,
       };

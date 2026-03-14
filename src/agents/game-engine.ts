@@ -1058,6 +1058,10 @@ export class GameEngine {
         accUsage(this.sessionUsage, result.usage);
         this.callbacks.onUsageUpdate(this.sessionUsage);
         this.callbacks.onDevLog?.(`[dev] resolve_turn: ${action.actor} — ${result.narrative.slice(0, 80)}`);
+        // Emit resolution to the player so they always see the mechanical outcome,
+        // regardless of whether the DM narrates it. This is visible in the TUI
+        // as formatted text before the DM's narrative response.
+        this.emitResolutionToPlayer(action.actor, result);
         return { content: this.formatResolutionForDM(result) };
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -1245,6 +1249,47 @@ export class GameEngine {
           // existing GameState fields. The DM reads them from the tool result.
           break;
       }
+    }
+  }
+
+  /**
+   * Emit the resolution result to the player via onNarrativeDelta.
+   * Shows rolls and outcome so the player always sees what happened mechanically.
+   */
+  private emitResolutionToPlayer(
+    actor: string,
+    result: import("../types/resolve-session.js").ResolutionResult,
+  ): void {
+    const lines: string[] = [];
+
+    // Rolls — formatted as "⚔ reason: detail = result"
+    for (const roll of result.rolls) {
+      lines.push(`<color=#888888>⚔ ${roll.reason}: ${roll.detail}</color>`);
+    }
+
+    // Outcome narrative
+    if (result.narrative) {
+      lines.push(`<i>${result.narrative}</i>`);
+    }
+
+    // State changes summary (HP, conditions)
+    for (const delta of result.deltas) {
+      if (delta.type === "hp_change") {
+        const amt = delta.details.amount as number;
+        const sign = amt >= 0 ? "+" : "";
+        lines.push(`<color=#888888>${delta.target} HP ${sign}${amt}</color>`);
+      } else if (delta.type === "condition_add") {
+        lines.push(`<color=#888888>${delta.target}: +${delta.details.condition}</color>`);
+      } else if (delta.type === "condition_remove") {
+        lines.push(`<color=#888888>${delta.target}: -${delta.details.condition}</color>`);
+      } else if (delta.type === "resource_spend") {
+        lines.push(`<color=#888888>${delta.target}: ${delta.details.resource} -${delta.details.spent}</color>`);
+      }
+    }
+
+    if (lines.length > 0) {
+      const block = `\n<color=#666666>───── ${actor} ─────</color>\n${lines.join("\n")}\n`;
+      this.callbacks.onNarrativeDelta(block);
     }
   }
 
