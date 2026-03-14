@@ -66,7 +66,7 @@ async function main() {
 
   console.log("");
   console.log("Done! Check output at:");
-  console.log(`  ${resolve(homeDir, "ingest", "processed", collectionSlug)}/`);
+  console.log(`  ${resolve(homeDir, "systems", collectionSlug)}/`);
 }
 
 main().catch((err) => {

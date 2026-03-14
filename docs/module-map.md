@@ -168,7 +168,7 @@ Content assets at the repo root (not in `src/`). Each system gets a subdirectory
 | `<system-id>/metadata.json` | System identity, license, complexity, dice requirements |
 | `<system-id>/rule-card.md` | XML-directive format core mechanics reference, hand-authored by Opus |
 
-Currently bundled: `dnd-5e`.
+Currently bundled: `24xx`, `breathless`, `cairn`, `charge`, `dnd-5e`, `fate-accelerated`, `ironsworn`.
 
 ## Root Files
 

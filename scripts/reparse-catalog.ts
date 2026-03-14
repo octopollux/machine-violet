@@ -31,10 +31,10 @@ async function main() {
   }
 
   // Write catalog
-  const catalog = buildCatalog("d-d-5e", rawSections, 320);
+  const catalog = buildCatalog("dnd-5e", rawSections, 320);
   const outPath = resolve(
     process.env.USERPROFILE ?? process.env.HOME ?? "~",
-    "Documents", ".machine-violet", "ingest", "processed", "d-d-5e", "catalog.json",
+    "Documents", ".machine-violet", "systems", "dnd-5e", "catalog.json",
   );
   writeFileSync(outPath, JSON.stringify(catalog, null, 2));
   console.log(`\nWrote catalog to: ${outPath}`);

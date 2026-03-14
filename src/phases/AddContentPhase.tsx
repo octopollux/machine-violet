@@ -71,11 +71,11 @@ export function AddContentPhase({
       setLocalError("System name cannot be empty.");
       return;
     }
-    // Slugify the custom name
+    // Slugify the custom name (must match slugify() in job-manager.ts)
     const slug = trimmed
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "");
+      .replace(/^-+|-+$/g, "");
     setSystemSlug(slug);
     setSystemName(trimmed);
     setLocalError(null);
