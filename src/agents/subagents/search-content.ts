@@ -5,7 +5,7 @@ import type { UsageStats } from "../agent-loop.js";
 import { getModel } from "../../config/models.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import type { FileIO } from "../scene-manager.js";
-import { processingPaths } from "../../content/processing-paths.js";
+import { processingPaths } from "../../config/processing-paths.js";
 import type { CategoryFacets, EntityFacet } from "../../types/facets.js";
 
 // --- Types ---

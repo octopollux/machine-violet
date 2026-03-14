@@ -15,7 +15,7 @@ import { getModel } from "../config/models.js";
 import { TOKEN_LIMITS } from "../config/tokens.js";
 import { loadPrompt } from "../prompts/load-prompt.js";
 import { searchContent } from "./subagents/search-content.js";
-import { processingPaths } from "../content/processing-paths.js";
+import { processingPaths } from "../config/processing-paths.js";
 import { norm } from "../utils/paths.js";
 import { campaignPaths } from "../tools/filesystem/index.js";
 
