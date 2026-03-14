@@ -22,7 +22,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 export async function pollBatch(
   client: Anthropic,
   batchId: string,
-  pollIntervalMs: number = 5000,
+  pollIntervalMs = 5000,
   onProgress?: (counts: Anthropic.Messages.Batches.MessageBatchRequestCounts) => void,
 ): Promise<Anthropic.Messages.Batches.MessageBatch> {
   while (true) {
@@ -49,8 +49,8 @@ export async function pollBatch(
 export async function collectBatchResults(
   client: Anthropic,
   batchId: string,
-): Promise<Array<{ customId: string; text?: string; error?: string }>> {
-  const results: Array<{ customId: string; text?: string; error?: string }> = [];
+): Promise<{ customId: string; text?: string; error?: string }[]> {
+  const results: { customId: string; text?: string; error?: string }[] = [];
   const decoder = await client.messages.batches.results(batchId);
 
   for await (const item of decoder) {

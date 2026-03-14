@@ -1,9 +1,8 @@
 import { PDFDocument } from "pdf-lib";
 import { splitPdf, getPdfInfo, DEFAULT_CHUNK_SIZE } from "./pdf-split.js";
-import { writeFile, unlink, mkdtemp } from "node:fs/promises";
+import { writeFile, mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { norm } from "../utils/paths.js";
 
 /** Create a minimal PDF with the given number of blank pages. */
 async function createTestPdf(pageCount: number): Promise<Buffer> {

@@ -7,7 +7,6 @@ import {
   loadJob,
   saveCollectionManifest,
   listCollections,
-  listCollectionJobs,
   updateChunkStatus,
   recomputeJobStatus,
   ingestPaths,

@@ -18,7 +18,6 @@ import {
   saveJob,
   saveCollectionManifest,
   updateChunkStatus,
-  recomputeJobStatus,
   ingestPaths,
   slugify,
 } from "./job-manager.js";

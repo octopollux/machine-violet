@@ -60,7 +60,6 @@ export function createJob(
 ): IngestJob {
   const now = new Date().toISOString();
   const collectionSlug = slugify(collection);
-  const jobSlug = slugify(pdfBaseName);
 
   return {
     id: generateId(),
