@@ -38,6 +38,7 @@ import {
   savePipelineState,
   advanceStage,
   hasReachedStage,
+  resetToStage,
 } from "./processing-state.js";
 import type { ContentCatalog, PipelineStage } from "./processing-types.js";
 
@@ -187,6 +188,153 @@ export async function runProcessingPipeline(opts: ProcessingOptions): Promise<vo
     const generated = await runRuleCardGen(client, io, homeDir, collectionSlug, projectRoot);
     progress("rule-card", generated ? "Rule card generated" : "Rule card skipped (hand-authored exists)");
 
+    advanceStage(state);
+    await savePipelineState(io, homeDir, state);
+  }
+
+  progress("complete", "Processing pipeline complete");
+}
+
+// --- Split pipeline for multi-PDF support ---
+
+export interface PerBookOptions {
+  client: Anthropic;
+  io: FileIO;
+  homeDir: string;
+  collectionSlug: string;
+  jobSlug: string;
+  totalPages: number;
+  onProgress?: ProcessingProgressCallback;
+}
+
+/**
+ * Run per-book stages (classifier + extractors) for a single PDF.
+ * Resets pipeline state to "classifier" so each PDF gets processed
+ * even if a previous run already completed.
+ */
+export async function runPerBookStages(opts: PerBookOptions): Promise<void> {
+  const { client, io, homeDir, collectionSlug, jobSlug, totalPages, onProgress } = opts;
+  const paths = processingPaths(homeDir, collectionSlug);
+
+  let state = await loadPipelineState(io, homeDir, collectionSlug);
+  if (!state) {
+    state = createPipelineState(collectionSlug);
+    await io.mkdir(paths.base);
+  } else {
+    // Reset to classifier so this PDF's stages 1-2 run fresh
+    resetToStage(state, "classifier");
+  }
+  await savePipelineState(io, homeDir, state);
+
+  const progress = (stage: "classifier" | "extractors", message: string, detail?: string) => {
+    onProgress?.({ stage, message, detail });
+  };
+
+  // Stage 1: Classifier
+  if (!hasReachedStage(state, "extractors")) {
+    progress("classifier", "Classifying content sections...");
+    const chunks = computeChunks(totalPages);
+    const chunkTexts: string[] = [];
+    for (const chunk of chunks) {
+      chunkTexts.push(await loadChunkPages(io, homeDir, collectionSlug, jobSlug, chunk));
+    }
+    const requests = buildClassifierBatchRequests(chunks, chunkTexts, collectionSlug);
+    progress("classifier", `Submitting ${requests.length} classifier requests to batch API...`);
+    const batch = await client.messages.batches.create({ requests });
+    state.batchIds.push(batch.id);
+    await savePipelineState(io, homeDir, state);
+    progress("classifier", "Polling classifier batch...");
+    await pollBatch(client, batch.id);
+    const results = await collectBatchResults(client, batch.id);
+    const sections = parseClassifierResults(results);
+    const catalog = buildCatalog(collectionSlug, sections, totalPages);
+    await io.writeFile(paths.catalog, JSON.stringify(catalog, null, 2));
+    progress("classifier", `Classified ${catalog.sections.length} sections`);
+    advanceStage(state);
+    await savePipelineState(io, homeDir, state);
+  }
+
+  // Stage 2: Extractors
+  if (!hasReachedStage(state, "merge")) {
+    progress("extractors", "Loading catalog...");
+    const catalogRaw = await io.readFile(paths.catalog);
+    const catalog: ContentCatalog = JSON.parse(catalogRaw);
+    const sectionTexts: string[] = [];
+    for (const section of catalog.sections) {
+      sectionTexts.push(await loadSectionPages(io, homeDir, collectionSlug, jobSlug, section));
+    }
+    const requests = buildExtractorBatchRequests(catalog.sections, sectionTexts, collectionSlug);
+    progress("extractors", `Submitting ${requests.length} extractor requests to batch API...`);
+    const batch = await client.messages.batches.create({ requests });
+    state.batchIds.push(batch.id);
+    await savePipelineState(io, homeDir, state);
+    progress("extractors", "Polling extractor batch...");
+    await pollBatch(client, batch.id);
+    const results = await collectBatchResults(client, batch.id);
+    const entities = parseExtractorResults(results, catalog.sections, collectionSlug);
+    progress("extractors", `Writing ${entities.length} draft entities...`);
+    await writeDraftEntities(io, homeDir, collectionSlug, entities);
+    progress("extractors", `Extracted ${entities.length} entities`);
+    advanceStage(state);
+    await savePipelineState(io, homeDir, state);
+  }
+}
+
+export interface SharedStagesOptions {
+  client: Anthropic;
+  io: FileIO;
+  homeDir: string;
+  collectionSlug: string;
+  projectRoot: string;
+  onProgress?: ProcessingProgressCallback;
+}
+
+/**
+ * Run shared stages (merge + index + rule card) once across all entities.
+ * Call this after all per-book stages have completed.
+ */
+export async function runSharedStages(opts: SharedStagesOptions): Promise<void> {
+  const { client, io, homeDir, collectionSlug, projectRoot, onProgress } = opts;
+  const paths = processingPaths(homeDir, collectionSlug);
+
+  let state = await loadPipelineState(io, homeDir, collectionSlug);
+  if (!state) {
+    state = createPipelineState(collectionSlug);
+    await io.mkdir(paths.base);
+  }
+  // Ensure we're at least at "merge" stage
+  if (!hasReachedStage(state, "merge")) {
+    resetToStage(state, "merge");
+  }
+  await savePipelineState(io, homeDir, state);
+
+  const progress = (stage: "merge" | "index" | "rule-card" | "complete", message: string, detail?: string) => {
+    onProgress?.({ stage, message, detail });
+  };
+
+  // Stage 3: Merge
+  if (!hasReachedStage(state, "index")) {
+    progress("merge", "Merging drafts with existing entities...");
+    const mergeResult = await runMerge(client, io, homeDir, collectionSlug);
+    progress("merge", `Merge: ${mergeResult.created} created, ${mergeResult.skipped} skipped, ${mergeResult.merged} merged`);
+    advanceStage(state);
+    await savePipelineState(io, homeDir, state);
+  }
+
+  // Stage 4: Index
+  if (!hasReachedStage(state, "rule-card")) {
+    progress("index", "Building index and cheat sheet...");
+    const indexResult = await runIndexer(client, io, homeDir, collectionSlug);
+    progress("index", `Indexed ${indexResult.totalEntities} entities across ${indexResult.categories.length} categories`);
+    advanceStage(state);
+    await savePipelineState(io, homeDir, state);
+  }
+
+  // Stage 5: Rule Card
+  if (!hasReachedStage(state, "complete")) {
+    progress("rule-card", "Checking for rule card...");
+    const generated = await runRuleCardGen(client, io, homeDir, collectionSlug, projectRoot);
+    progress("rule-card", generated ? "Rule card generated" : "Rule card skipped (hand-authored exists)");
     advanceStage(state);
     await savePipelineState(io, homeDir, state);
   }

@@ -44,7 +44,7 @@ import { MainMenuPhase } from "./phases/MainMenuPhase.js";
 import { SetupPhase } from "./phases/SetupPhase.js";
 import { PlayingPhase } from "./phases/PlayingPhase.js";
 import { AddContentPhase } from "./phases/AddContentPhase.js";
-import { validatePdfs, runIngestPipeline, runProcessingPipeline, slugify } from "./content/index.js";
+import { validatePdfs, runIngestPipeline, runPerBookStages, runSharedStages, slugify } from "./content/index.js";
 import type { ValidatedPdf, IngestProgress, ProcessingProgress } from "./content/index.js";
 import { listAvailableSystems } from "./config/systems.js";
 import type { AvailableSystem } from "./config/systems.js";
@@ -655,26 +655,36 @@ export default function App({ shutdownRef }: AppProps) {
 
         const jobs = await runIngestPipeline(fileIO.current, homeDir, systemSlug, pdfs, onIngestProgress);
 
-        // Phase 2: Processing pipeline (one run per PDF)
+        // Phase 2: Per-book stages (classifier + extractors) for each PDF
         const client = new Anthropic();
+        const onProcessingProgress = (progress: ProcessingProgress) => {
+          setContentStatusMsg(progress.message);
+        };
+
         for (let i = 0; i < jobs.length; i++) {
           const job = jobs[i];
           const jobSlug = slugify(pdfs[i].baseName);
-          const onProcessingProgress = (progress: ProcessingProgress) => {
-            setContentStatusMsg(progress.message);
-          };
 
-          await runProcessingPipeline({
+          await runPerBookStages({
             client,
             io: fileIO.current,
             homeDir,
             collectionSlug: systemSlug,
             jobSlug,
             totalPages: job.totalPages,
-            projectRoot,
             onProgress: onProcessingProgress,
           });
         }
+
+        // Phase 3: Shared stages (merge + index + rule card) once across all entities
+        await runSharedStages({
+          client,
+          io: fileIO.current,
+          homeDir,
+          collectionSlug: systemSlug,
+          projectRoot,
+          onProgress: onProcessingProgress,
+        });
 
         setContentStatusMsg("Done! Returning to menu...");
         setTimeout(async () => {
