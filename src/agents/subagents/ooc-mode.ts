@@ -544,14 +544,27 @@ export function parseEndOOCSignal(text: string): EndOOCSignal {
 }
 
 /**
- * Extract a terse summary from OOC text — first sentence, max 100 chars.
+ * Extract a terse summary from OOC text.
+ * Takes the first substantive sentence (skips filler phrases < 15 chars).
+ * Falls back to first 100 chars if no sentence boundary found.
  */
-function extractSummary(text: string): string {
-  const firstSentence = text.split(/[.!?]\s/)[0];
-  if (!firstSentence) return "OOC discussion.";
-  const trimmed = firstSentence.trim();
+export function extractSummary(text: string): string {
+  if (!text.trim()) return "OOC discussion.";
+
+  // Split on sentence boundaries (period/exclaim/question followed by space or end-of-string)
+  const sentences = text.split(/(?<=[.!?])(?:\s|$)/).filter((s) => s.trim());
+
+  // Find first substantive sentence (skip filler like "No worries", "Sure thing")
+  const substantive = sentences.find((s) => s.trim().length >= 15);
+  const best = substantive ?? sentences[0];
+
+  if (!best) return "OOC discussion.";
+
+  let trimmed = best.trim();
+  // Ensure it ends with punctuation
+  if (!/[.!?]$/.test(trimmed)) trimmed += ".";
   if (trimmed.length > 100) return trimmed.slice(0, 97) + "...";
-  return trimmed + ".";
+  return trimmed;
 }
 
 /**
