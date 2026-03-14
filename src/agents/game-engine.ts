@@ -1253,18 +1253,33 @@ export class GameEngine {
   }
 
   /**
+   * Look up a character's player color by actor name.
+   * Returns the player's color if the actor is a PC, or null for NPCs/monsters.
+   */
+  private getActorColor(actor: string): string | null {
+    const lower = actor.toLowerCase();
+    const player = this.gameState.config.players.find(
+      (p) => p.character.toLowerCase() === lower,
+    );
+    return player?.color ?? null;
+  }
+
+  /**
    * Emit the resolution result to the player via onNarrativeDelta.
-   * Shows rolls and outcome so the player always sees what happened mechanically.
+   * PC rolls appear in the character's color; NPC rolls in muted grey.
    */
   private emitResolutionToPlayer(
     actor: string,
     result: import("../types/resolve-session.js").ResolutionResult,
   ): void {
     const lines: string[] = [];
+    const actorColor = this.getActorColor(actor);
+    const rollColor = actorColor ?? "#888888";
+    const muteColor = "#666666";
 
-    // Rolls — formatted as "⚔ reason: detail = result"
+    // Rolls — in actor's color for PCs, grey for NPCs
     for (const roll of result.rolls) {
-      lines.push(`<color=#888888>⚔ ${roll.reason}: ${roll.detail}</color>`);
+      lines.push(`<color=${rollColor}>⚔ ${roll.reason}: ${roll.detail}</color>`);
     }
 
     // Outcome narrative
@@ -1272,23 +1287,24 @@ export class GameEngine {
       lines.push(`<i>${result.narrative}</i>`);
     }
 
-    // State changes summary (HP, conditions)
+    // State changes summary — always muted
     for (const delta of result.deltas) {
       if (delta.type === "hp_change") {
         const amt = delta.details.amount as number;
         const sign = amt >= 0 ? "+" : "";
-        lines.push(`<color=#888888>${delta.target} HP ${sign}${amt}</color>`);
+        lines.push(`<color=${muteColor}>${delta.target} HP ${sign}${amt}</color>`);
       } else if (delta.type === "condition_add") {
-        lines.push(`<color=#888888>${delta.target}: +${delta.details.condition}</color>`);
+        lines.push(`<color=${muteColor}>${delta.target}: +${delta.details.condition}</color>`);
       } else if (delta.type === "condition_remove") {
-        lines.push(`<color=#888888>${delta.target}: -${delta.details.condition}</color>`);
+        lines.push(`<color=${muteColor}>${delta.target}: -${delta.details.condition}</color>`);
       } else if (delta.type === "resource_spend") {
-        lines.push(`<color=#888888>${delta.target}: ${delta.details.resource} -${delta.details.spent}</color>`);
+        lines.push(`<color=${muteColor}>${delta.target}: ${delta.details.resource} -${delta.details.spent}</color>`);
       }
     }
 
     if (lines.length > 0) {
-      const block = `\n<color=#666666>───── ${actor} ─────</color>\n${lines.join("\n")}\n`;
+      const headerColor = actorColor ?? muteColor;
+      const block = `\n<color=${headerColor}>───── ${actor} ─────</color>\n${lines.join("\n")}\n`;
       this.callbacks.onNarrativeDelta(block);
     }
   }
