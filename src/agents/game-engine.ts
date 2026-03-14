@@ -1181,7 +1181,7 @@ export class GameEngine {
 
     // Try bundled system first, then processed content
     try {
-      const { processingPaths } = await import("../content/processing-paths.js");
+      const { processingPaths } = await import("../config/processing-paths.js");
       const paths = processingPaths(this.gameState.homeDir, systemSlug);
       const ruleCard = await this.fileIO.readFile(norm(paths.ruleCard));
       return ruleCard;
