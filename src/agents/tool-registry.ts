@@ -1017,6 +1017,26 @@ const TOOL_DEFS: RegisteredTool[] = [
       return err(`Invalid action: ${action}`);
     },
   },
+  {
+    definition: {
+      name: "resolve_turn",
+      description: "Resolve a combat action mechanically. Handles multi-step turns (Extra Attack, bonus actions, reactions, conditional abilities like Divine Smite). Returns structured results with dice rolls, damage, HP changes, and conditions. Use for complex combat actions; use roll_dice directly for simple one-off checks.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          actor: { type: "string", description: "Who is acting" },
+          action: { type: "string", description: "What they're doing — be specific about abilities, targets, conditions" },
+          targets: { type: "array", items: { type: "string" }, description: "Target names" },
+          conditions: { type: "string", description: "Relevant conditions: advantage/disadvantage, terrain, ongoing effects" },
+        },
+        required: ["actor", "action"],
+      },
+    },
+    handler: (_state, _input) => {
+      // Async stub — real work is done in GameEngine.handleAsyncTool
+      return err("resolve_turn requires async handling. This is a bug.");
+    },
+  },
 ];
 
 // --- State change mapping ---
@@ -1043,6 +1063,7 @@ export const TOOL_STATE_MAP: Record<string, StateSlice[]> = {
   define_region: ["maps"],
   deck: ["decks"],
   switch_player: [],
+  resolve_turn: [],
 };
 
 export type OnStateChanged = (toolName: string, state: GameState, slices: StateSlice[]) => void;

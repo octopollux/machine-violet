@@ -432,8 +432,13 @@ describe("new Phase 8 tools", () => {
     expect(result.content).toContain("not found");
   });
 
-  it("registry has 42 tools total", () => {
+  it("registers resolve_turn tool", () => {
     const registry = new ToolRegistry();
-    expect(registry.size).toBe(42);
+    expect(registry.has("resolve_turn")).toBe(true);
+  });
+
+  it("registry has 43 tools total", () => {
+    const registry = new ToolRegistry();
+    expect(registry.size).toBe(43);
   });
 });

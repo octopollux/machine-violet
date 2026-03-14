@@ -1555,3 +1555,33 @@ describe("GameEngine tool ack batching", () => {
     expect(typeof lastUserMsg.content).toBe("string");
   });
 });
+
+describe("GameEngine resolve_turn routing", () => {
+  it("returns error when no combat session is active", async () => {
+    // DM calls resolve_turn without start_combat
+    const client = mockClient([
+      ...toolAndTextMessages("resolve_turn", {
+        actor: "Kael",
+        action: "Attack goblin",
+      }, "I'll try something else."),
+    ]);
+    const { callbacks, log } = mockCallbacks();
+
+    const engine = new GameEngine({
+      client,
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: mockFileIO(),
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "I attack!");
+
+    // The tool should have returned an error
+    expect(log.toolEnds).toContain("resolve_turn");
+    // But engine should still complete normally
+    expect(engine.getState()).toBe("waiting_input");
+  });
+});
