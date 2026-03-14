@@ -511,7 +511,8 @@ export default function App({ shutdownRef }: AppProps) {
         campaignsDir = join(getDefaultHomeDir(), "campaigns");
       }
 
-      const campaignRoot = await buildCampaignWorld(campaignsDir, result, fileIO.current);
+      const homeDir = getDefaultHomeDir();
+      const campaignRoot = await buildCampaignWorld(campaignsDir, result, fileIO.current, homeDir);
       const config = buildCampaignConfig(result);
       await startEngine(config, campaignRoot);
     } catch (e) {

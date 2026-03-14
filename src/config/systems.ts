@@ -7,6 +7,7 @@
 
 import type { FileIO } from "../agents/scene-manager.js";
 import { join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
 
 export interface SystemEntry {
   slug: string;
@@ -31,6 +32,26 @@ export const KNOWN_SYSTEMS: SystemEntry[] = [
   { slug: "charge", name: "Charge RPG", bundled: true, hasRuleCard: true },
   { slug: "dnd-5e", name: "D&D 5th Edition", bundled: true, hasRuleCard: true },
 ];
+
+/**
+ * Resolve the path to the bundled systems/ directory.
+ * Works from both src/ (dev via tsx) and dist/ (built).
+ * Layout: repo-root/systems/<slug>/rule-card.md
+ */
+export function getBundledSystemsDir(): string {
+  // src/config/systems.ts → ../../systems/
+  // dist/config/systems.js → ../../systems/
+  return join(import.meta.dirname, "..", "..", "systems");
+}
+
+/**
+ * Read a bundled rule card for a system. Returns null if not found.
+ */
+export function readBundledRuleCard(slug: string): string | null {
+  const rcPath = join(getBundledSystemsDir(), slug, "rule-card.md");
+  if (!existsSync(rcPath)) return null;
+  return readFileSync(rcPath, "utf-8");
+}
 
 /**
  * Find a known system by slug.

@@ -1229,21 +1229,17 @@ export class GameEngine {
     const systemSlug = this.gameState.config.system;
     if (!systemSlug) return "No game system configured.";
 
-    // Try bundled system first, then processed content
+    // Try processed/copied rule card at ~/.machine-violet/systems/<slug>/
     try {
       const { processingPaths } = await import("../config/processing-paths.js");
       const paths = processingPaths(this.gameState.homeDir, systemSlug);
       const ruleCard = await this.fileIO.readFile(norm(paths.ruleCard));
       return ruleCard;
     } catch {
-      // Try bundled system
-      try {
-        const bundledPath = norm(`systems/${systemSlug}/rule-card.md`);
-        const content = await this.fileIO.readFile(bundledPath);
-        return content;
-      } catch {
-        return "No rule card available.";
-      }
+      // Fall back to bundled rule card (from repo systems/ directory)
+      const { readBundledRuleCard } = await import("../config/systems.js");
+      const content = readBundledRuleCard(systemSlug);
+      return content ?? "No rule card available.";
     }
   }
 
