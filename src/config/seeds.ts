@@ -365,6 +365,14 @@ export const SEEDS: CampaignSeed[] = [
       "A support group for people who survived encounters with the supernatural. Someone's lying about theirs.",
     genres: ["modern", "horror", "mystery"],
   },
+
+  // ── Developer test seeds ────────────────────────────────────────────
+  {
+    name: "The Rumble Pit",
+    premise: "DEVELOPER TEST CAMPAIGN. A gladiatorial arena where a champion faces one combat after another. Lightly narrate a framing device — the roaring crowd, the arena master, the gates opening — then begin combat immediately. After each combat, fully restore the player's HP, spell slots, and all resources, then introduce the next wave. Escalate difficulty. No overworld, no puzzles, no shopping. Just fights, back to back. Use resolve_turn for all mechanical resolution. Use start_combat / end_combat to bracket each encounter.",
+    description: "Combat stress-test: back-to-back arena fights with full restore between rounds.",
+    genres: ["fantasy", "dev"],
+  },
 ];
 
 /** Get seeds filtered by genre */
