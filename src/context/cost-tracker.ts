@@ -55,6 +55,9 @@ export class CostTracker {
     apiCalls: 0,
   };
 
+  /** Optional callback fired after every record() with the new total token count. */
+  onRecord?: (totalTokens: number) => void;
+
   /** Seed from previously persisted breakdown (e.g. on campaign resume). */
   seed(saved: TokenBreakdown): void {
     for (const tier of TIER_ORDER) {
@@ -79,6 +82,13 @@ export class CostTracker {
     this.breakdown.tokens.cacheReadTokens += usage.cacheReadTokens;
     this.breakdown.tokens.cacheCreationTokens += usage.cacheCreationTokens;
     this.breakdown.apiCalls++;
+
+    this.onRecord?.(this.getTotalTokens());
+  }
+
+  /** Total tokens consumed this session (input + output). */
+  getTotalTokens(): number {
+    return this.breakdown.tokens.inputTokens + this.breakdown.tokens.outputTokens;
   }
 
   /** Get the current token breakdown (independent copy). */

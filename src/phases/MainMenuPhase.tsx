@@ -11,19 +11,30 @@ export interface MainMenuPhaseProps {
   theme: ResolvedTheme;
   campaigns: CampaignEntry[];
   errorMsg: string | null;
+  /** Whether the active API key passed its health check. */
+  apiKeyValid: boolean;
+  /** Short status text for the active key (e.g. "Valid", "Invalid"). */
+  apiKeyStatus?: string;
   onNewCampaign: () => void;
   onResumeCampaign: (entry: CampaignEntry) => void;
   onAddContent: () => void;
+  onApiKeys: () => void;
   onQuit: () => void;
 }
+
+/** Items that require a valid API key to select. */
+const API_REQUIRED_ITEMS = new Set(["New Campaign", "Continue Campaign", "Add Content"]);
 
 export function MainMenuPhase({
   theme,
   campaigns,
   errorMsg,
+  apiKeyValid,
+  apiKeyStatus,
   onNewCampaign,
   onResumeCampaign,
   onAddContent,
+  onApiKeys,
   onQuit,
 }: MainMenuPhaseProps) {
   const { columns: cols, rows: termRows } = useTerminalSize();
@@ -32,15 +43,17 @@ export function MainMenuPhase({
   const [campaignSelectIndex, setCampaignSelectIndex] = useState(0);
 
   const mainMenuItems = campaigns.length > 0
-    ? ["New Campaign", "Continue Campaign", "Add Content", "Quit"]
-    : ["New Campaign", "Add Content", "Quit"];
+    ? ["New Campaign", "Continue Campaign", "Add Content", "API Keys", "Quit"]
+    : ["New Campaign", "Add Content", "API Keys", "Quit"];
+
+  const isItemDisabled = (item: string): boolean =>
+    API_REQUIRED_ITEMS.has(item) && !apiKeyValid;
 
   useInput((input, key) => {
     // Campaign sub-list navigation
     if (expandedCampaigns && campaigns.length > 0) {
       if (key.upArrow) {
         if (campaignSelectIndex === 0) {
-          // Move back to "Continue Campaign" item
           setExpandedCampaigns(false);
         } else {
           setCampaignSelectIndex((i) => i - 1);
@@ -73,6 +86,7 @@ export function MainMenuPhase({
     }
     if (key.return) {
       const selected = mainMenuItems[mainMenuIndex];
+      if (isItemDisabled(selected)) return; // blocked
       if (selected === "New Campaign") {
         onNewCampaign();
       } else if (selected === "Continue Campaign") {
@@ -80,6 +94,8 @@ export function MainMenuPhase({
         setCampaignSelectIndex(0);
       } else if (selected === "Add Content") {
         onAddContent();
+      } else if (selected === "API Keys") {
+        onApiKeys();
       } else if (selected === "Quit") {
         onQuit();
       }
@@ -99,28 +115,29 @@ export function MainMenuPhase({
   const sideWidth = theme.asset.components.edge_left.width;
   const topHeight = theme.asset.height;
 
-  // Content area dimensions
   const contentWidth = cols - sideWidth * 2;
-  const contentHeight = termRows - topHeight * 2; // top + bottom borders
+  const contentHeight = termRows - topHeight * 2;
 
   // Build menu lines
   const menuLines: React.ReactNode[] = [];
   for (let i = 0; i < mainMenuItems.length; i++) {
     const item = mainMenuItems[i];
     const isSelected = !expandedCampaigns && i === mainMenuIndex;
+    const disabled = isItemDisabled(item);
     const marker = isSelected ? "◆" : "○";
-    const markerColor = isSelected ? borderColor : dimColor;
+    const markerColor = disabled ? "#555555" : isSelected ? borderColor : dimColor;
 
     let description = "";
     if (item === "New Campaign") description = "Start a new adventure";
     else if (item === "Continue Campaign" && campaigns.length > 0) description = `${campaigns.length} saved`;
     else if (item === "Add Content") description = "Import PDFs for game systems";
+    else if (item === "API Keys") description = apiKeyStatus ?? "";
 
     menuLines.push(
       <Text key={item}>
         <Text color={markerColor}>{marker}</Text>
-        <Text>{` ${item}`}</Text>
-        {description ? <Text color={dimColor}>{` — ${description}`}</Text> : null}
+        <Text color={disabled ? "#555555" : undefined} dimColor={disabled}>{` ${item}`}</Text>
+        {description ? <Text color={disabled ? "#555555" : dimColor} dimColor={disabled}>{` — ${description}`}</Text> : null}
       </Text>,
     );
 

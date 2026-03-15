@@ -21,9 +21,11 @@ function defaultProps(overrides?: Partial<MainMenuPhaseProps>): MainMenuPhasePro
     theme: makeTheme(),
     campaigns: [],
     errorMsg: null,
+    apiKeyValid: true,
     onNewCampaign: vi.fn(),
     onResumeCampaign: vi.fn(),
     onAddContent: vi.fn(),
+    onApiKeys: vi.fn(),
     onQuit: vi.fn(),
     ...overrides,
   };
@@ -81,5 +83,18 @@ describe("MainMenuPhase", () => {
     // Selected item should have ◆, others ○
     expect(frame).toContain("◆");
     expect(frame).toContain("○");
+  });
+
+  it("renders API Keys menu item", () => {
+    const { lastFrame } = render(<MainMenuPhase {...defaultProps()} />);
+    expect(lastFrame()).toContain("API Keys");
+  });
+
+  it("blocks New Campaign when apiKeyValid is false", () => {
+    const onNewCampaign = vi.fn();
+    const { stdin } = render(<MainMenuPhase {...defaultProps({ apiKeyValid: false, onNewCampaign })} />);
+    // First item is New Campaign — pressing Enter should be blocked
+    stdin.write("\r");
+    expect(onNewCampaign).not.toHaveBeenCalled();
   });
 });
