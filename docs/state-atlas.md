@@ -110,7 +110,8 @@ DMSessionState
 ├── playerRead?: string                    Synthesized from SceneState.playerReads
 ├── dmNotes?: string                       Loaded from campaign dm-notes
 ├── entityIndex?: string                   Built from entity filesystem scan
-└── uiState?: string                       Built from modelines + style info
+├── uiState?: string                       Built from modelines + style info
+└── compendiumSummary?: string             Rendered from campaign/compendium.json
 ```
 
 #### Conversation (`src/context/conversation.ts`)
@@ -550,6 +551,7 @@ Canonical directory tree for a campaign. Machine-managed files are marked with t
 │
 ├── campaign/                              [machine + DM] The knowledge backbone.
 │   ├── log.md                             [machine] Append-only campaign log. Dense, wikilinked.
+│   ├── compendium.json                    [machine] Player-facing knowledge base. Updated at scene transitions.
 │   ├── session-recaps/
 │   │   └── session-NNN.md                 [machine] Haiku-generated session recaps.
 │   └── scenes/

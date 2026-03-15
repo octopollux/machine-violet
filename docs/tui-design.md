@@ -400,6 +400,18 @@ present_roll({ result: "Rolled d20+3: [17] → 20", label: "Death Save" })
 
 This is cosmetic — the same information would appear inline otherwise. The DM uses it for pacing and emphasis.
 
+### Compendium Browser
+
+Player-accessible via ESC menu → Compendium. Displays a navigable tree of everything the player has learned, organized into five categories: Characters, Places, Storyline, Lore, Objectives.
+
+**Navigation**: Up/Down arrows move cursor, Enter on category expands/collapses, Enter on entry shows detail view, ESC in detail goes back, ESC in tree closes modal.
+
+**Detail view**: Shows entry summary, aliases, scene range, and related entries.
+
+**Data source**: `campaign/compendium.json`, maintained by a Haiku subagent at scene transitions. Player-facing only — no DM secrets.
+
+**Code:** `src/tui/modals/CompendiumModal.tsx`
+
 ### Session Recap
 
 On `session_resume`, the "Previously on..." summary displays as a modal before gameplay begins. Sets the mood and reminds the player where they left off.
@@ -412,6 +424,7 @@ ESC key opens the game menu modal:
 ╔══════════════════════╗
 ║     ◆ Resume         ║
 ║     ○ Character Sheet ║
+║     ○ Compendium     ║
 ║     ○ OOC Mode       ║
 ║     ○ Settings       ║
 ║     ○ Save & Exit    ║
