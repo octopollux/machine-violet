@@ -90,17 +90,10 @@ describe("MainMenuPhase", () => {
     expect(lastFrame()).toContain("API Keys");
   });
 
-  it("greys out New Campaign when apiKeyValid is false", () => {
+  it("blocks New Campaign when apiKeyValid is false", () => {
     const onNewCampaign = vi.fn();
     const { stdin } = render(<MainMenuPhase {...defaultProps({ apiKeyValid: false, onNewCampaign })} />);
     // First item is New Campaign — pressing Enter should be blocked
-    stdin.write("\r");
-    expect(onNewCampaign).not.toHaveBeenCalled();
-  });
-
-  it("does not call onNewCampaign when key is invalid", () => {
-    const onNewCampaign = vi.fn();
-    const { stdin } = render(<MainMenuPhase {...defaultProps({ apiKeyValid: false, onNewCampaign })} />);
     stdin.write("\r");
     expect(onNewCampaign).not.toHaveBeenCalled();
   });

@@ -158,11 +158,11 @@ export function ApiKeysPhase({
       onBack();
       return;
     }
-    if (key.upArrow) {
+    if (key.upArrow && store.keys.length > 0) {
       setSelectedIndex((i) => Math.max(0, i - 1));
       return;
     }
-    if (key.downArrow) {
+    if (key.downArrow && store.keys.length > 0) {
       setSelectedIndex((i) => Math.min(store.keys.length - 1, i + 1));
       return;
     }

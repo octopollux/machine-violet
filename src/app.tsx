@@ -255,7 +255,11 @@ export default function App({ shutdownRef }: AppProps) {
   // --- API key management ---
   const [keyStore, setKeyStore] = useState<ApiKeyStore>({ keys: [], activeKeyId: null });
   const [keyHealth, setKeyHealth] = useState<Record<string, KeyHealthResult>>({});
+  const keyHealthRef = useRef<Record<string, KeyHealthResult>>({});
   const tokenWarningRef = useRef({ lastWarnedAt: 0 });
+
+  // Keep ref in sync for synchronous reads from refreshKeyStore
+  useEffect(() => { keyHealthRef.current = keyHealth; }, [keyHealth]);
 
   // --- Modal state (shared with PlayingPhase via props, set by buildCallbacks/dispatchTuiCommand) ---
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
@@ -354,7 +358,15 @@ export default function App({ shutdownRef }: AppProps) {
 
   // --- API key helpers ---
 
-  /** Load key store from disk, merge env key, and kick off health checks. */
+  /** Trigger a health check for a single key. */
+  const handleCheckHealth = useCallback((keyId: string, apiKey: string) => {
+    setKeyHealth((prev) => ({ ...prev, [keyId]: { status: "checking", message: "Checking...", checkedAt: new Date().toISOString() } }));
+    void checkKeyHealth(apiKey).then((result) => {
+      setKeyHealth((prev) => ({ ...prev, [keyId]: result }));
+    });
+  }, []);
+
+  /** Load key store from disk, merge env key, and check unchecked keys. */
   const refreshKeyStore = useCallback(() => {
     const appDir = getAppDir();
     const stored = loadKeyStore(appDir);
@@ -365,13 +377,14 @@ export default function App({ shutdownRef }: AppProps) {
     const activeVal = getActiveKeyValue(effective);
     if (activeVal) process.env.ANTHROPIC_API_KEY = activeVal;
 
-    // Check health for all keys
+    // Only check keys that don't already have a result
+    const current = keyHealthRef.current;
     for (const entry of effective.keys) {
-      void checkKeyHealth(entry.key).then((result) => {
-        setKeyHealth((prev) => ({ ...prev, [entry.id]: result }));
-      });
+      if (!current[entry.id]) {
+        handleCheckHealth(entry.id, entry.key);
+      }
     }
-  }, [getAppDir]);
+  }, [getAppDir, handleCheckHealth]);
 
   /** Handle store updates from the ApiKeysPhase (or anywhere). */
   const handleUpdateKeyStore = useCallback((updated: ApiKeyStore) => {
@@ -382,14 +395,6 @@ export default function App({ shutdownRef }: AppProps) {
     const activeVal = getActiveKeyValue(updated);
     if (activeVal) process.env.ANTHROPIC_API_KEY = activeVal;
   }, [getAppDir]);
-
-  /** Trigger a health check for a single key. */
-  const handleCheckHealth = useCallback((keyId: string, apiKey: string) => {
-    setKeyHealth((prev) => ({ ...prev, [keyId]: { status: "checking", message: "Checking...", checkedAt: new Date().toISOString() } }));
-    void checkKeyHealth(apiKey).then((result) => {
-      setKeyHealth((prev) => ({ ...prev, [keyId]: result }));
-    });
-  }, []);
 
   /**
    * Gate for API-requiring menu items. Only block when we *know* the key
@@ -589,6 +594,7 @@ export default function App({ shutdownRef }: AppProps) {
     hydrateGameState(gs, scene, loaded);
     if (loaded.scene) setActivePlayerIndex(loaded.scene.activePlayerIndex);
     if (loaded.conversation) engine.seedConversation(loaded.conversation);
+    if (loaded.usage) costTracker.current?.seed(loaded.usage);
 
     // Restore theme — fall back to default if the persisted name is unknown
     if (loaded.ui) {

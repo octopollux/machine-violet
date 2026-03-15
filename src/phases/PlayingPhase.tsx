@@ -133,7 +133,11 @@ export function PlayingPhase() {
       }).then((result) => {
         setModeBusy(false);
         setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }]);
-        costTracker.current?.record(result.usage, activeSession.tier);
+        const ct = costTracker.current;
+        if (ct) {
+          ct.record(result.usage, activeSession.tier);
+          engineRef.current?.getPersister()?.persistUsage(ct.getBreakdown());
+        }
         // Accumulate OOC summaries for injection into the next DM turn
         if (activeSession.label === "OOC" && result.summary) {
           oocSummaries.current.push(result.summary);

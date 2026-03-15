@@ -5,6 +5,7 @@
  * Extracts rate-limit metadata from response headers when available.
  */
 import Anthropic from "@anthropic-ai/sdk";
+import { getModel } from "./models.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -30,19 +31,18 @@ export interface KeyHealthResult {
 // Health check
 // ---------------------------------------------------------------------------
 
-const HEALTH_CHECK_MODEL = "claude-haiku-4-5-20251001";
-
 /**
  * Validate an API key by making a minimal API call.
- * Uses Haiku with max_tokens=1 — costs a fraction of a cent.
+ * Uses the configured small-tier model with max_tokens=1.
  */
 export async function checkKeyHealth(apiKey: string): Promise<KeyHealthResult> {
   const client = new Anthropic({ apiKey });
+  const model = getModel("small");
   const now = new Date().toISOString();
 
   try {
     const raw = await client.messages.create({
-      model: HEALTH_CHECK_MODEL,
+      model,
       max_tokens: 1,
       messages: [{ role: "user", content: "." }],
     }).withResponse();
