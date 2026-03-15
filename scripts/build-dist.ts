@@ -40,7 +40,7 @@ const cmd = [
   "bun build --compile",
   `--outfile ${join(DIST, exeName)}`,
   `--define "process.env.MV_VERSION='${version}'"`,
-  isWindows ? `--windows-icon=${join(ROOT, "machine-violet.ico")}` : "",
+  isWindows ? `--windows-icon=${join(ROOT, "assets", "machine-violet.ico")}` : "",
   isWindows ? `--windows-title="Machine Violet"` : "",
   isWindows ? `--windows-description="AI Dungeon Master for tabletop RPGs"` : "",
   isWindows ? `--windows-version=${version}.0` : "",

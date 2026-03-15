@@ -59,7 +59,7 @@ jobs:
           # Windows-specific flags
           WIN_FLAGS=""
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            WIN_FLAGS="--windows-icon=machine-violet.ico --windows-title=Machine\ Violet --windows-description=AI\ Dungeon\ Master\ for\ tabletop\ RPGs --windows-version=${VERSION}.0"
+            WIN_FLAGS="--windows-icon=assets/machine-violet.ico --windows-title=Machine\ Violet --windows-description=AI\ Dungeon\ Master\ for\ tabletop\ RPGs --windows-version=${VERSION}.0"
           fi
 
           # Compile
