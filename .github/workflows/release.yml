@@ -3,6 +3,11 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -29,6 +34,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - uses: oven-sh/setup-bun@v2
 
@@ -42,7 +49,8 @@ jobs:
       - name: Build distribution
         shell: bash
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          TAG="${{ inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
           EXE_NAME="machine-violet"
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
             EXE_NAME="machine-violet.exe"
@@ -70,7 +78,8 @@ jobs:
         if: matrix.archive == 'zip'
         shell: bash
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          TAG="${{ inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
           cd dist
           7z a "../machine-violet-${VERSION}-${{ matrix.asset_suffix }}.zip" .
 
@@ -78,7 +87,8 @@ jobs:
         if: matrix.archive == 'tar.gz'
         shell: bash
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          TAG="${{ inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
           tar -czf "machine-violet-${VERSION}-${{ matrix.asset_suffix }}.tar.gz" -C dist .
 
       - name: Upload artifact
@@ -98,5 +108,6 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
           generate_release_notes: true
           files: machine-violet-*
