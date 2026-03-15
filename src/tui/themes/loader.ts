@@ -6,6 +6,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
+import { assetDir } from "../../utils/paths.js";
 import type { ThemeAsset, PlayerPaneFrame, ThemeDefinition } from "./types.js";
 import {
   parseSections,
@@ -23,7 +24,7 @@ const definitionCache = new Map<string, ThemeDefinition>();
 
 /** Directory containing built-in .theme files. */
 function assetsDir(): string {
-  return join(import.meta.dirname, "assets");
+  return assetDir("themes");
 }
 
 /**

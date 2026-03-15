@@ -50,7 +50,6 @@ import type { ApiKeyStore } from "./config/api-keys.js";
 import { checkKeyHealth, formatHealthStatus } from "./config/api-key-health.js";
 import type { KeyHealthResult } from "./config/api-key-health.js";
 import { formatK } from "./context/cost-tracker.js";
-import { validatePdfs, runIngestPipeline, runPerBookStages, runSharedStages, slugify } from "./content/index.js";
 import type { ValidatedPdf, IngestProgress, ProcessingProgress } from "./content/index.js";
 import { listAvailableSystems, readBundledRuleCard } from "./config/systems.js";
 import type { AvailableSystem } from "./config/systems.js";
@@ -820,6 +819,7 @@ export default function App({ shutdownRef }: AppProps) {
         };
         setContentStatusMsg("Extracting text...");
 
+        const { runIngestPipeline, runPerBookStages, runSharedStages, slugify } = await import("./content/index.js");
         const jobs = await runIngestPipeline(fileIO.current, homeDir, systemSlug, pdfs, onIngestProgress);
 
         // Phase 2: Per-book stages (classifier + extractors) for each PDF
@@ -869,6 +869,7 @@ export default function App({ shutdownRef }: AppProps) {
   }, [getConfigPath, fileIO, loadCampaigns]);
 
   const handleValidatePdf = useCallback(async (path: string): Promise<ValidatedPdf> => {
+    const { validatePdfs } = await import("./content/index.js");
     const results = await validatePdfs([path]);
     return results[0];
   }, []);

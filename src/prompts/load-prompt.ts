@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { assetDir } from "../utils/paths.js";
 
 const cache = new Map<string, string>();
 
@@ -27,7 +28,7 @@ export function loadPrompt(name: string): string {
   const cached = cache.get(name);
   if (cached !== undefined) return cached;
 
-  const dir = import.meta.dirname;
+  const dir = assetDir("prompts");
   const filePath = join(dir, `${name}.md`);
   const content = stripComments(
     readFileSync(filePath, "utf-8").replace(/\r\n/g, "\n"),
