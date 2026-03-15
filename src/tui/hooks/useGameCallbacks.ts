@@ -3,7 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { NarrativeLine, ActiveModal, RetryOverlay } from "../../types/tui.js";
 import type { StyleVariant } from "../themes/types.js";
 import type { EngineState, EngineCallbacks, TurnInfo } from "../../agents/game-engine.js";
-import type { TuiCommand, UsageStats } from "../../agents/agent-loop.js";
+import type { TuiCommand } from "../../agents/agent-loop.js";
 import type { GameState } from "../../agents/game-state.js";
 import type { GameEngine } from "../../agents/game-engine.js";
 import type { FileIO } from "../../agents/scene-manager.js";
