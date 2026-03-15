@@ -70,6 +70,52 @@ describe("CostTracker", () => {
     expect(b2.apiCalls).toBe(1);
   });
 
+  it("seeds from a persisted breakdown", () => {
+    const tracker1 = new CostTracker();
+    tracker1.record(usage, "large");
+    tracker1.record(usage, "small");
+    const saved = tracker1.getBreakdown();
+
+    const tracker2 = new CostTracker();
+    tracker2.seed(saved);
+
+    const b = tracker2.getBreakdown();
+    expect(b.apiCalls).toBe(2);
+    expect(b.tokens.inputTokens).toBe(2000);
+    expect(b.byTier.large.input).toBe(1200);
+    expect(b.byTier.small.input).toBe(1200);
+    expect(b.byTier.medium.input).toBe(0);
+  });
+
+  it("accumulates on top of seeded data", () => {
+    const tracker1 = new CostTracker();
+    tracker1.record(usage, "large");
+    const saved = tracker1.getBreakdown();
+
+    const tracker2 = new CostTracker();
+    tracker2.seed(saved);
+    tracker2.record(usage, "small");
+
+    const b = tracker2.getBreakdown();
+    expect(b.apiCalls).toBe(2);
+    expect(b.tokens.inputTokens).toBe(2000);
+    expect(b.byTier.large.input).toBe(1200);
+    expect(b.byTier.small.input).toBe(1200);
+  });
+
+  it("round-trips through JSON serialization", () => {
+    const tracker1 = new CostTracker();
+    tracker1.record(usage, "large");
+    tracker1.record(usage, "medium");
+    const json = JSON.stringify(tracker1.getBreakdown());
+
+    const tracker2 = new CostTracker();
+    tracker2.seed(JSON.parse(json));
+
+    expect(tracker2.formatTokens()).toBe(tracker1.formatTokens());
+    expect(tracker2.getBreakdown()).toEqual(tracker1.getBreakdown());
+  });
+
   describe("formatTokens", () => {
     it("shows zeros for all tiers when no tokens recorded", () => {
       const tracker = new CostTracker();
