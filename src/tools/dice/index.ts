@@ -1,4 +1,4 @@
-import type { RollDiceInput, RollDiceOutput, DiceRollResult } from "../../types/dice.js";
+import type { RollDiceInput, RollDiceOutput, DiceRollResult, CustomDieDefinition, CustomDiceResult } from "../../types/dice.js";
 import type { RNG } from "./rng.js";
 import { cryptoRng } from "./rng.js";
 import { parseMulti } from "./parser.js";
@@ -110,4 +110,52 @@ function applyKeepForClaim(
   if (expr.keep.highest) return sorted.slice(-expr.keep.highest);
   if (expr.keep.lowest) return sorted.slice(0, expr.keep.lowest);
   return rolls;
+}
+
+// --- Custom-face dice ---
+
+/**
+ * Roll custom-face dice. Each die picks a random face from the definition.
+ * Returns the individual faces rolled and aggregated symbol counts.
+ *
+ * Symbols on a face are "+"-delimited (e.g. "success+advantage").
+ * Empty string faces = blank (no symbols).
+ */
+export function rollCustomDice(
+  definition: CustomDieDefinition,
+  count: number,
+  rng: RNG = cryptoRng,
+): CustomDiceResult {
+  if (definition.faces.length === 0) {
+    throw new Error(`Custom die "${definition.name}" has no faces`);
+  }
+  if (count < 0) {
+    throw new Error(`Invalid die count: ${count}`);
+  }
+
+  const faces: string[] = [];
+  const symbols: Record<string, number> = {};
+
+  for (let i = 0; i < count; i++) {
+    const faceIdx = rng.int(0, definition.faces.length - 1);
+    const face = definition.faces[faceIdx];
+    faces.push(face);
+
+    // Parse symbols from face ("+"-delimited, skip blanks)
+    if (face) {
+      for (const sym of face.split("+")) {
+        const trimmed = sym.trim();
+        if (trimmed) {
+          symbols[trimmed] = (symbols[trimmed] ?? 0) + 1;
+        }
+      }
+    }
+  }
+
+  return {
+    die: definition.name,
+    count,
+    faces,
+    symbols,
+  };
 }

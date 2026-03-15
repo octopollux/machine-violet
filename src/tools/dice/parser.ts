@@ -16,7 +16,7 @@ import type { DiceExpression } from "../../types/dice.js";
  */
 
 const DICE_REGEX =
-  /^(\d+)d(\d+|F)(kh\d+|kl\d+)?(!)?(>=\d+)?([+-]\d+)?$/;
+  /^(\d+)d(\d+|F|%)(kh\d+|kl\d+)?(!)?(>=\d+)?([+-]\d+)?$/;
 
 export function parseExpression(input: string): DiceExpression {
   const trimmed = input.trim();
@@ -28,7 +28,7 @@ export function parseExpression(input: string): DiceExpression {
   const [, countStr, sidesStr, keepStr, exploding, successStr, modStr] = match;
 
   const count = parseInt(countStr, 10);
-  const sides: number | "F" = sidesStr === "F" ? "F" : parseInt(sidesStr, 10);
+  const sides: number | "F" = sidesStr === "F" ? "F" : sidesStr === "%" ? 100 : parseInt(sidesStr, 10);
 
   if (typeof sides === "number" && sides < 1) {
     throw new Error(`Invalid die size: d${sides}`);

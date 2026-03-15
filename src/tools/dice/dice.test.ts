@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { parseExpression, parseMulti } from "./parser.js";
 import { evaluate } from "./evaluator.js";
-import { rollDice, seededRng } from "./index.js";
+import { rollDice, rollCustomDice, seededRng } from "./index.js";
+import type { CustomDieDefinition } from "../../types/dice.js";
 
 describe("dice parser", () => {
   it("parses basic expressions", () => {
@@ -237,5 +238,108 @@ describe("rollDice (full tool)", () => {
         claimed_result: { rolls: [1, -1, 2, 0], total: 2 },
       }),
     ).toThrow("Invalid FATE die result: 2");
+  });
+});
+
+describe("d% (percentile) notation", () => {
+  it("parses d% as d100", () => {
+    const expr = parseExpression("1d%");
+    expect(expr.sides).toBe(100);
+    expect(expr.count).toBe(1);
+  });
+
+  it("rolls d% in 1-100 range", () => {
+    const rng = seededRng(42);
+    const expr = parseExpression("1d%");
+    const result = evaluate(expr, rng);
+    expect(result.rolls[0]).toBeGreaterThanOrEqual(1);
+    expect(result.rolls[0]).toBeLessThanOrEqual(100);
+  });
+
+  it("supports modifiers on d%", () => {
+    const expr = parseExpression("1d%+10");
+    expect(expr.sides).toBe(100);
+    expect(expr.modifier).toBe(10);
+  });
+});
+
+describe("custom-face dice", () => {
+  const genesysBoost: CustomDieDefinition = {
+    name: "boost",
+    faces: ["", "", "success", "success+advantage", "advantage+advantage", "advantage"],
+  };
+
+  const yearZeroStress: CustomDieDefinition = {
+    name: "stress",
+    faces: ["panic", "", "", "", "", "success"],
+  };
+
+  it("rolls custom dice and returns faces", () => {
+    const rng = seededRng(42);
+    const result = rollCustomDice(genesysBoost, 2, rng);
+    expect(result.die).toBe("boost");
+    expect(result.count).toBe(2);
+    expect(result.faces).toHaveLength(2);
+    // Each face should be from the definition
+    for (const face of result.faces) {
+      expect(genesysBoost.faces).toContain(face);
+    }
+  });
+
+  it("aggregates symbols across dice", () => {
+    const rng = seededRng(7);
+    const result = rollCustomDice(genesysBoost, 10, rng);
+    // With 10 dice, we should have some symbols
+    const totalSymbols = Object.values(result.symbols).reduce((a, b) => a + b, 0);
+    // Blanks don't contribute, so total might be less than 10
+    expect(totalSymbols).toBeGreaterThanOrEqual(0);
+    // All symbol keys should be known
+    for (const key of Object.keys(result.symbols)) {
+      expect(["success", "advantage"]).toContain(key);
+    }
+  });
+
+  it("handles blank faces", () => {
+    const allBlank: CustomDieDefinition = { name: "blank", faces: ["", "", ""] };
+    const rng = seededRng(42);
+    const result = rollCustomDice(allBlank, 3, rng);
+    expect(result.faces).toHaveLength(3);
+    expect(Object.keys(result.symbols)).toHaveLength(0);
+  });
+
+  it("handles single-face compound symbols", () => {
+    const rng = seededRng(1);
+    // Force a specific face by using a die with only compound faces
+    const compound: CustomDieDefinition = { name: "test", faces: ["success+advantage"] };
+    const result = rollCustomDice(compound, 1, rng);
+    expect(result.symbols.success).toBe(1);
+    expect(result.symbols.advantage).toBe(1);
+  });
+
+  it("handles stress/panic dice", () => {
+    const rng = seededRng(42);
+    const result = rollCustomDice(yearZeroStress, 5, rng);
+    expect(result.die).toBe("stress");
+    expect(result.faces).toHaveLength(5);
+    for (const key of Object.keys(result.symbols)) {
+      expect(["panic", "success"]).toContain(key);
+    }
+  });
+
+  it("is deterministic with seeded RNG", () => {
+    const r1 = rollCustomDice(genesysBoost, 5, seededRng(42));
+    const r2 = rollCustomDice(genesysBoost, 5, seededRng(42));
+    expect(r1.faces).toEqual(r2.faces);
+    expect(r1.symbols).toEqual(r2.symbols);
+  });
+
+  it("rejects die with no faces", () => {
+    expect(() => rollCustomDice({ name: "empty", faces: [] }, 1)).toThrow("has no faces");
+  });
+
+  it("handles zero count", () => {
+    const result = rollCustomDice(genesysBoost, 0);
+    expect(result.faces).toHaveLength(0);
+    expect(Object.keys(result.symbols)).toHaveLength(0);
   });
 });
