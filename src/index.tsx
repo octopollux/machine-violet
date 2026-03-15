@@ -1,5 +1,15 @@
 import "./suppress-warnings.js";
-import "dotenv/config";
+import { loadEnv, getAppVersion } from "./config/first-launch.js";
+
+// --version flag: print and exit before any TUI setup
+if (process.argv.includes("--version") || process.argv.includes("-v")) {
+  console.log(`Machine Violet ${getAppVersion()}`);
+  process.exit(0);
+}
+
+// Load API key from config dir, falling back to cwd .env
+loadEnv();
+
 import React, { useRef } from "react";
 import { render } from "ink";
 import App from "./app.js";
