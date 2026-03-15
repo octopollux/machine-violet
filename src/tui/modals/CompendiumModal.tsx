@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useInput, Box, Text } from "ink";
 import type { ResolvedTheme } from "../themes/types.js";
 import { CenteredModal } from "./CenteredModal.js";
@@ -72,7 +72,9 @@ export function CompendiumModal({
 
   // Clamp cursor when rows change
   const clampedCursor = Math.min(cursor, Math.max(0, rows.length - 1));
-  if (clampedCursor !== cursor) setCursor(clampedCursor);
+  useEffect(() => {
+    if (clampedCursor !== cursor) setCursor(clampedCursor);
+  }, [clampedCursor, cursor]);
 
   const toggleCategory = useCallback((cat: CompendiumCategory) => {
     setExpanded((prev) => {

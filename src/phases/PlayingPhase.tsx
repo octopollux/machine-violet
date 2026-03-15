@@ -14,8 +14,7 @@ import { createOOCSession } from "../agents/subagents/ooc-mode.js";
 import { createDevSession, summarizeGameState } from "../agents/subagents/dev-mode.js";
 import { useGameContext } from "../tui/game-context.js";
 import { campaignPaths } from "../tools/filesystem/index.js";
-import { emptyCompendium } from "../agents/subagents/compendium-updater.js";
-import type { Compendium } from "../types/compendium.js";
+import { emptyCompendium, parseCompendiumOutput } from "../agents/subagents/compendium-updater.js";
 import { trySlashCommand } from "../commands/index.js";
 import { RollbackCompleteError } from "../teardown.js";
 
@@ -370,7 +369,7 @@ export function PlayingPhase() {
           if (gs && io) {
             const path = campaignPaths(gs.campaignRoot).compendium;
             io.readFile(path).then((raw: string) => {
-              const data = JSON.parse(raw) as Compendium;
+              const data = parseCompendiumOutput(raw, emptyCompendium());
               setActiveModal({ kind: "compendium", data });
             }).catch(() => {
               setActiveModal({ kind: "compendium", data: emptyCompendium() });
