@@ -1,51 +1,47 @@
 # Machine Violet
 
-An agentic AI Dungeon Master that runs any tabletop RPG in a terminal. Powered by Claude AI and Ink.
+An agentic AI Dungeon Master that runs any tabletop RPG in a terminal.
 
-## Tech Stack
+Machine Violet is a complete game engine: it narrates, inhabits NPCs, tracks state, rolls dice, manages scenes, and maintains a living campaign filesystem — all from your terminal. The DM is opinionated, surprising, and plays to win. You just need an Anthropic API key.
 
-- **Runtime**: Node.js (18+)
-- **UI Framework**: Ink (React for CLI)
-- **AI Engine**: Anthropic Claude SDK
-- **Language**: TypeScript
-- **Platforms**: Windows, macOS, Linux
+## Install
 
-## Project Structure
-
-```
-src/
-  ├── components/     # Ink UI components
-  ├── engine/         # Game engine core
-  ├── services/       # Claude AI integration
-  └── types/          # TypeScript types
+**Windows** (PowerShell):
+```powershell
+irm https://raw.githubusercontent.com/Orthodox-531/machine-violet/main/scripts/install.ps1 | iex
 ```
 
-## Setup
+**macOS / Linux**:
+```bash
+curl -fsSL https://raw.githubusercontent.com/Orthodox-531/machine-violet/main/scripts/install.sh | bash
+```
 
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
+Then run `machine-violet` in your terminal. On first launch you'll be prompted for your [Anthropic API key](https://console.anthropic.com/).
 
-2. Copy `.env.example` to `.env` and add your Anthropic API key:
-   ```bash
-   cp .env.example .env
-   ```
+> **Terminal requirement:** Use Windows Terminal, iTerm2, or any modern terminal with ANSI support. cmd.exe and PowerShell ISE are not supported.
 
-3. Get your API key from: https://console.anthropic.com/
+## What it does
+
+- **Runs any TTRPG.** Bundled rule cards for D&D 5e, FATE Accelerated, Ironsworn, Breathless, Charge, 24XX, Cairn — or play freeform with no system at all.
+- **Persistent campaign state.** Characters, locations, factions, and lore are markdown files with wikilinks. The campaign transcript is the knowledge backbone.
+- **Mechanical delegation.** Dice rolls, action resolution, character sheets, and bookkeeping are handled by fast Haiku subagents — the DM focuses on narrative.
+- **Scene-driven architecture.** Scene transitions fire ticking clocks, offscreen consequences, and context compaction. The DM surprises itself.
+- **Git-backed recovery.** Auto-commits at scene boundaries. Crash mid-session? Resume exactly where you left off.
 
 ## Development
 
 ```bash
-# Run in development mode
-npm run dev
-
-# Build
-npm run build
-
-# Run production build
-npm start
+npm install
+npx tsx src/index.tsx          # launch (needs ANTHROPIC_API_KEY in .env)
+npm run check                  # lint + tests + coverage
+npm run dist                   # build standalone binary (requires Bun)
 ```
+
+See [CLAUDE.md](CLAUDE.md) for architecture, conventions, and contribution guidelines. Full documentation lives in [docs/](docs/index.md).
+
+## Cost
+
+Machine Violet uses the Claude API. The DM runs on Opus ($15/$75 per MTok input/output); mechanical subagents run on Haiku ($0.25/$1.25 per MTok). A typical session uses 50k–200k input tokens depending on scene complexity. Set `"large": "claude-sonnet-4-5-20250929"` in `dev-config.json` to use Sonnet for the DM during development.
 
 ## License
 
