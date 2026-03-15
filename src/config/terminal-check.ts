@@ -15,7 +15,8 @@ function die(reason: string, suggestion: string): never {
 
 /**
  * Check that the current terminal can run Ink.
- * Call this before any Ink imports. Exits the process on failure.
+ * Call this before TUI initialization (render, raw mode setup).
+ * Exits the process on failure.
  */
 export function checkTerminal(): void {
   // stdin must be a TTY for raw mode (Ink requirement)
