@@ -34,3 +34,23 @@ export interface DiceRollResult {
 export interface RollDiceOutput {
   results: DiceRollResult[];
 }
+
+// --- Custom-face dice (Genesys, Year Zero, narrative systems) ---
+
+/**
+ * A custom die definition: named faces with symbol strings.
+ * Example Genesys Boost die: { name: "boost", faces: ["", "", "success", "success+advantage", "advantage+advantage", "advantage"] }
+ * Symbols are free-form strings — the game system's rule card defines their meaning.
+ */
+export interface CustomDieDefinition {
+  name: string;
+  faces: string[];
+}
+
+/** Result of rolling custom-face dice. */
+export interface CustomDiceResult {
+  die: string;           // die definition name
+  count: number;         // how many were rolled
+  faces: string[];       // the face that came up on each die
+  symbols: Record<string, number>; // aggregated symbol counts
+}
