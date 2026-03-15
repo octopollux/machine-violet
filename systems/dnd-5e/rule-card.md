@@ -7,6 +7,18 @@ Ability modifier = floor((score - 10) / 2).
 Proficiency bonus scales with level: +2 (1-4), +3 (5-8), +4 (9-12), +5 (13-16), +6 (17-20).
 </core_mechanic>
 
+<character_creation>
+Choose race (human, elf, dwarf, halfling, etc.) — each grants ability bonuses and traits.
+Choose class (fighter, wizard, rogue, cleric, etc.) — determines hit die, proficiencies, features.
+Choose background (soldier, sage, criminal, etc.) — grants 2 skill proficiencies + equipment + a feature.
+Ability scores: use standard array 15/14/13/12/10/8 or roll 4d6-drop-lowest six times, assign to STR/DEX/CON/INT/WIS/CHA.
+HP at level 1 = hit die maximum + CON modifier.
+Proficiency bonus at level 1 = +2.
+Starting equipment: from class + background, or buy with starting gold.
+Armor Class: depends on armor worn + DEX modifier (or class feature).
+Pick spells if a spellcaster (number of cantrips + prepared/known spells per class table).
+</character_creation>
+
 <advantage_disadvantage>
 Advantage: roll 2d20, take higher. Disadvantage: roll 2d20, take lower.
 Multiple sources don't stack — any advantage + any disadvantage = straight roll.

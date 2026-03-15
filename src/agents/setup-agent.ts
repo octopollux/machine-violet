@@ -21,6 +21,7 @@ export interface SetupResult {
   playerName: string;
   characterName: string;
   characterDescription: string;
+  characterDetails: string | null;
   themeColor: string;
 }
 

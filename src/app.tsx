@@ -21,7 +21,7 @@ import { listCampaigns } from "./config/main-menu.js";
 import type { CampaignEntry } from "./config/main-menu.js";
 import { buildCampaignConfig } from "./agents/setup-agent.js";
 import type { SetupResult } from "./agents/setup-agent.js";
-import { buildCampaignWorld } from "./agents/world-builder.js";
+import { buildCampaignWorld, slugify as worldSlugify } from "./agents/world-builder.js";
 import { getActivePlayer } from "./agents/player-manager.js";
 import { createClocksState } from "./tools/clocks/index.js";
 import { createCombatState } from "./tools/combat/index.js";
@@ -46,8 +46,11 @@ import { PlayingPhase } from "./phases/PlayingPhase.js";
 import { AddContentPhase } from "./phases/AddContentPhase.js";
 import { validatePdfs, runIngestPipeline, runPerBookStages, runSharedStages, slugify } from "./content/index.js";
 import type { ValidatedPdf, IngestProgress, ProcessingProgress } from "./content/index.js";
-import { listAvailableSystems } from "./config/systems.js";
+import { listAvailableSystems, readBundledRuleCard } from "./config/systems.js";
 import type { AvailableSystem } from "./config/systems.js";
+import { promoteCharacter } from "./agents/subagents/character-promotion.js";
+import { processingPaths } from "./config/processing-paths.js";
+import { norm } from "./utils/paths.js";
 import { GameProvider } from "./tui/game-context.js";
 import type { GameContextValue } from "./tui/game-context.js";
 
@@ -158,6 +161,59 @@ async function loadDisplayHistory(
   return displayLogTail.length > 0
     ? markdownToNarrativeLines(displayLogTail)
     : [];
+}
+
+// --- Post-setup character sheet building ---
+
+/**
+ * Build an initial character sheet using the promoteCharacter subagent.
+ * Called after buildCampaignWorld when we have system + character details.
+ * Silently — no streaming (the "Building your world..." phase covers this).
+ */
+async function buildInitialSheet(
+  campaignRoot: string,
+  result: SetupResult,
+  io: FileIO,
+  homeDir: string,
+): Promise<void> {
+  const charSlug = worldSlugify(result.characterName);
+  const charPath = norm(campaignPaths(campaignRoot).character(charSlug));
+
+  // Read the stub we just wrote
+  let stub: string;
+  try {
+    stub = await io.readFile(charPath);
+  } catch {
+    return; // stub doesn't exist — nothing to promote
+  }
+
+  // Load rule card: prefer user-processed, fall back to bundled
+  let ruleCard: string | null = null;
+  if (result.system) {
+    const sysPaths = processingPaths(homeDir, result.system);
+    try {
+      ruleCard = await io.readFile(norm(sysPaths.ruleCard));
+    } catch {
+      ruleCard = readBundledRuleCard(result.system);
+    }
+  }
+
+  if (!ruleCard) return; // no rule card — can't build a proper sheet
+
+  const client = new Anthropic();
+  try {
+    const { updatedSheet } = await promoteCharacter(client, {
+      characterSheet: stub,
+      systemRules: ruleCard,
+      context: `Build initial character sheet: ${result.characterDetails}`,
+      characterName: result.characterName,
+    });
+    if (updatedSheet) {
+      await io.writeFile(charPath, updatedSheet);
+    }
+  } catch {
+    // Best-effort — the stub is still a valid character file
+  }
 }
 
 // --- App component ---
@@ -513,6 +569,12 @@ export default function App({ shutdownRef }: AppProps) {
 
       const homeDir = getDefaultHomeDir();
       const campaignRoot = await buildCampaignWorld(campaignsDir, result, fileIO.current, homeDir);
+
+      // Build initial character sheet if we have system + details
+      if (result.system && result.characterDetails) {
+        await buildInitialSheet(campaignRoot, result, fileIO.current, homeDir);
+      }
+
       const config = buildCampaignConfig(result);
       await startEngine(config, campaignRoot);
     } catch (e) {

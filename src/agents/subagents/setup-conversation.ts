@@ -5,7 +5,8 @@ import type { SetupResult } from "../setup-agent.js";
 import { generateThemeColor } from "../setup-agent.js";
 import { PERSONALITIES } from "../../config/personalities.js";
 import { SEEDS } from "../../config/seeds.js";
-import { KNOWN_SYSTEMS } from "../../config/systems.js";
+import { KNOWN_SYSTEMS, readChargenSection } from "../../config/systems.js";
+import type { SystemComplexity } from "../../config/systems.js";
 import { getModel, getThinkingConfig } from "../../config/models.js";
 import { accumulateUsage as accRawUsage } from "../../context/usage-helpers.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
@@ -63,6 +64,7 @@ const FINALIZE_TOOL: Anthropic.Tool = {
       player_name: { type: "string", description: "Player's real name, or 'Player'" },
       character_name: { type: "string", description: "Player character's name" },
       character_description: { type: "string", description: "One-sentence character concept" },
+      character_details: { type: "string", description: "Mechanical character details gathered during setup (class, skills, approaches, etc). Free-form text. Omit or null for pure narrative.", nullable: true },
     },
     required: [
       "genre", "campaign_name", "campaign_premise", "mood",
@@ -106,6 +108,20 @@ const TOOLS = [FINALIZE_TOOL, PRESENT_CHOICES_TOOL];
 
 // --- System prompt ---
 
+/** Group systems by complexity tier label. */
+function groupByTier(systems: typeof KNOWN_SYSTEMS): { light: typeof KNOWN_SYSTEMS; crunchy: typeof KNOWN_SYSTEMS } {
+  const lightComplexities: SystemComplexity[] = ["ultra-light", "light"];
+  return {
+    light: systems.filter((s) => lightComplexities.includes(s.complexity)),
+    crunchy: systems.filter((s) => !lightComplexities.includes(s.complexity)),
+  };
+}
+
+function formatSystemLine(s: typeof KNOWN_SYSTEMS[number]): string {
+  const ruleCard = s.hasRuleCard ? " ✦ full rule card" : "";
+  return `- \`${s.slug}\` — ${s.name}: ${s.description}${ruleCard}`;
+}
+
 function buildSystemPrompt(): string {
   const base = loadPrompt("setup-conversation");
   const seedList = SEEDS.map((s) => {
@@ -116,14 +132,30 @@ function buildSystemPrompt(): string {
     const desc = p.description ? `: ${p.description}` : "";
     return `- **${p.name}**${desc}`;
   }).join("\n");
-  const systemList = KNOWN_SYSTEMS.map((s) => {
-    const ruleCard = s.hasRuleCard ? " (has rule card)" : "";
-    return `- \`${s.slug}\` — ${s.name}${ruleCard}`;
-  }).join("\n");
+
+  const { light, crunchy } = groupByTier(KNOWN_SYSTEMS);
+  const lightList = light.map(formatSystemLine).join("\n");
+  const crunchyList = crunchy.map(formatSystemLine).join("\n");
+
+  let systemSection = "## Available game systems\n\nUse the **slug** (e.g. `dnd-5e`) in `finalize_setup`, not the display name. For pure narrative (no mechanics), pass `null` for system.\n\n";
+  systemSection += "### Light systems (simple rules, fast play)\n" + lightList + "\n\n";
+  if (crunchy.length > 0) {
+    systemSection += "### Crunchy systems (detailed mechanics)\n" + crunchyList + "\n\n";
+  }
+
+  // Inject chargen rules for all systems that have them
+  let chargenSection = "## Character creation rules by system\n\nAfter the player picks a system, use the matching section below to ask smart character questions.\n\n";
+  for (const sys of KNOWN_SYSTEMS) {
+    const section = readChargenSection(sys.slug);
+    if (section) {
+      chargenSection += `### ${sys.name} (\`${sys.slug}\`)\n${section}\n\n`;
+    }
+  }
 
   return base +
-    "\n\n## Available game systems\n\nWhen the player wants mechanics, pick from this list. Use the **slug** (e.g. `dnd-5e`) in `finalize_setup`, not the display name. For pure narrative (no mechanics), pass `null` for system.\n\n" + systemList +
-    "\n\n## Available campaign seeds\n\nUse these when presenting Quick Start options or campaign ideas. Pick seeds that match the player's genre if known. When presenting seeds as choices, use the seed name as the choice label and the premise (or description if available) as the choice description.\n\n" + seedList +
+    "\n\n" + systemSection +
+    chargenSection +
+    "## Available campaign seeds\n\nUse these when presenting Quick Start options or campaign ideas. Pick seeds that match the player's genre if known. When presenting seeds as choices, use the seed name as the choice label and the premise (or description if available) as the choice description.\n\n" + seedList +
     "\n\n## Available DM personalities\n\nWhen presenting personality choices, use the name as the choice label and the description as the choice description. You can also invent new personalities beyond this list — if a campaign calls for a voice that isn't here, or the player asks for something custom, craft a name and prompt fragment in the same style as the examples below.\n\n" + personalityList;
 }
 
@@ -214,6 +246,7 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
       playerName: (input.player_name as string) || "Player",
       characterName,
       characterDescription: (input.character_description as string) || "",
+      characterDetails: (input.character_details as string) || null,
       themeColor: generateThemeColor(characterName),
     };
   }

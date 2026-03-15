@@ -9,6 +9,8 @@ import type { FileIO } from "../agents/scene-manager.js";
 import { join } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 
+export type SystemComplexity = "ultra-light" | "light" | "medium" | "high";
+
 export interface SystemEntry {
   slug: string;
   name: string;
@@ -16,6 +18,10 @@ export interface SystemEntry {
   bundled: boolean;
   /** True if a bundled rule-card.md exists. */
   hasRuleCard: boolean;
+  /** Mechanical complexity tier for grouping in system selection. */
+  complexity: SystemComplexity;
+  /** One-liner for choice descriptions in setup. */
+  description: string;
 }
 
 export interface AvailableSystem extends SystemEntry {
@@ -24,13 +30,13 @@ export interface AvailableSystem extends SystemEntry {
 }
 
 export const KNOWN_SYSTEMS: SystemEntry[] = [
-  { slug: "24xx", name: "24XX", bundled: true, hasRuleCard: true },
-  { slug: "fate-accelerated", name: "FATE Accelerated", bundled: true, hasRuleCard: true },
-  { slug: "cairn", name: "Cairn", bundled: true, hasRuleCard: false },
-  { slug: "ironsworn", name: "Ironsworn", bundled: true, hasRuleCard: false },
-  { slug: "breathless", name: "Breathless", bundled: true, hasRuleCard: true },
-  { slug: "charge", name: "Charge RPG", bundled: true, hasRuleCard: true },
-  { slug: "dnd-5e", name: "D&D 5th Edition", bundled: true, hasRuleCard: true },
+  { slug: "24xx", name: "24XX", bundled: true, hasRuleCard: true, complexity: "ultra-light", description: "Micro-RPG framework. 3 skills, d6-d12 ladder." },
+  { slug: "breathless", name: "Breathless", bundled: true, hasRuleCard: true, complexity: "light", description: "Degrading dice pools. Skills deplete as you use them." },
+  { slug: "cairn", name: "Cairn", bundled: true, hasRuleCard: false, complexity: "light", description: "Into the Odd\u2013style. No to-hit rolls, direct damage." },
+  { slug: "charge", name: "Charge RPG", bundled: true, hasRuleCard: true, complexity: "light", description: "Forged in the Dark\u2013lite. Action rolls + momentum." },
+  { slug: "fate-accelerated", name: "FATE Accelerated", bundled: true, hasRuleCard: true, complexity: "light", description: "Approaches, aspects, fate points. Fiction-first." },
+  { slug: "ironsworn", name: "Ironsworn", bundled: true, hasRuleCard: false, complexity: "medium", description: "Solo/co-op PbtA with iron vows and progress tracks." },
+  { slug: "dnd-5e", name: "D&D 5th Edition", bundled: true, hasRuleCard: true, complexity: "high", description: "Classic d20 system. Classes, levels, spells, combat grid." },
 ];
 
 /**
@@ -51,6 +57,17 @@ export function readBundledRuleCard(slug: string): string | null {
   const rcPath = join(getBundledSystemsDir(), slug, "rule-card.md");
   if (!existsSync(rcPath)) return null;
   return readFileSync(rcPath, "utf-8");
+}
+
+/**
+ * Read the <character_creation> section from a system's bundled rule card.
+ * Returns the inner text, or null if the section or rule card doesn't exist.
+ */
+export function readChargenSection(slug: string): string | null {
+  const card = readBundledRuleCard(slug);
+  if (!card) return null;
+  const match = card.match(/<character_creation>([\s\S]*?)<\/character_creation>/);
+  return match ? match[1].trim() : null;
 }
 
 /**
@@ -95,6 +112,8 @@ export async function listAvailableSystems(
         name: dir, // use slug as display name for custom systems
         bundled: false,
         hasRuleCard: false,
+        complexity: "medium",
+        description: "User-processed system.",
         processed: true,
       });
     }
