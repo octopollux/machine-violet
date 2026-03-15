@@ -1,6 +1,6 @@
 # Rules Systems Reference
 
-> **Status: Partially Implemented.** The `systems/` template directory exists with D&D 5e as the first bundled system (metadata + rule card). Only FATE Accelerated and 24XX are currently offered in setup. Expanding system selection is tracked in [#68](https://github.com/Orthodox-531/machine-violet/issues/68).
+> **Status: Partially Implemented.** The `systems/` template directory exists with D&D 5e as the first bundled system (metadata + rule card). Only FATE Accelerated and 24XX are currently offered in setup. Expanding system selection is tracked in [#68](https://github.com/octopollux/machine-violet/issues/68).
 
 ## How Systems Work
 
@@ -248,7 +248,7 @@ D&D 5e (too much mandatory player bookkeeping), Open D6 (dice pools require play
 
 ## Implementation Notes (Not Yet Implemented)
 
-> These notes describe the planned integration. See [#68](https://github.com/Orthodox-531/machine-violet/issues/68).
+> These notes describe the planned integration. See [#68](https://github.com/octopollux/machine-violet/issues/68).
 
 - **Fetching strategy.** At game initialization, if a supported system is selected, the engine fetches the canonical SRD URL, caches it to the campaign directory as `rules-cache/<system>.md` (or `.html`/`.pdf`), and passes it to a Tier 2 (Haiku) parsing subagent that extracts structured rule data into `rules-cache/<system>.json`.
 - **Parsing subagent output.** The JSON should capture: core resolution procedure, stat/attribute list, character creation steps, and any named subsystems (combat, magic, etc.) as discrete objects. The DM loads only the relevant sections into context on demand.

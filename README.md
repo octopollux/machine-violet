@@ -8,12 +8,12 @@ Machine Violet is a complete game engine: it narrates, inhabits NPCs, tracks sta
 
 **Windows** (PowerShell):
 ```powershell
-irm https://raw.githubusercontent.com/Orthodox-531/machine-violet/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/octopollux/machine-violet/main/scripts/install.ps1 | iex
 ```
 
 **macOS / Linux**:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Orthodox-531/machine-violet/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/octopollux/machine-violet/main/scripts/install.sh | bash
 ```
 
 Then run `machine-violet` in your terminal. On first launch you'll be prompted for your [Anthropic API key](https://console.anthropic.com/).

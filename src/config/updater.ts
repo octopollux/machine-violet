@@ -11,7 +11,7 @@ import { execSync } from "node:child_process";
 import { isCompiled } from "../utils/paths.js";
 import { getAppVersion } from "./first-launch.js";
 
-const REPO = "Orthodox-531/machine-violet";
+const REPO = "octopollux/machine-violet";
 
 export interface UpdateInfo {
   available: boolean;

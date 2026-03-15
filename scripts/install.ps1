@@ -15,7 +15,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$repo = "Orthodox-531/machine-violet"
+$repo = "octopollux/machine-violet"
 $installDir = Join-Path $env:LOCALAPPDATA "machine-violet"
 
 Write-Host ""
