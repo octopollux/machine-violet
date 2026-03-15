@@ -8,6 +8,7 @@
 import type { FileIO } from "../agents/scene-manager.js";
 import { join } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
+import { assetDir } from "../utils/paths.js";
 
 export type SystemComplexity = "ultra-light" | "light" | "medium" | "high";
 
@@ -45,9 +46,7 @@ export const KNOWN_SYSTEMS: SystemEntry[] = [
  * Layout: repo-root/systems/<slug>/rule-card.md
  */
 export function getBundledSystemsDir(): string {
-  // src/config/systems.ts → ../../systems/
-  // dist/config/systems.js → ../../systems/
-  return join(import.meta.dirname, "..", "..", "systems");
+  return assetDir("systems");
 }
 
 /**
