@@ -47,24 +47,9 @@ export function checkTerminal(): void {
       );
     }
 
-    // Older conhost without VT support.
-    // Windows Terminal sets WT_SESSION; ConEmu sets ConEmuPID;
-    // mintty/Git Bash sets TERM. If none of these are present and
-    // we're on an older Windows build, warn.
-    const hasModernTerminal =
-      process.env.WT_SESSION ||      // Windows Terminal
-      process.env.ConEmuPID ||        // ConEmu / Cmder
-      process.env.TERM_PROGRAM ||     // VSCode terminal, etc.
-      process.env.TERM ||             // mintty, Git Bash, WSL
-      process.env.ALACRITTY_LOG;      // Alacritty
-
-    if (!hasModernTerminal) {
-      // Can't detect any modern terminal marker — warn but don't block,
-      // the user might be on a capable terminal we don't recognize.
-      console.warn("");
-      console.warn("  Warning: Could not detect a known modern terminal.");
-      console.warn("  If rendering looks broken, try Windows Terminal: https://aka.ms/terminal");
-      console.warn("");
-    }
+    // Note: we don't warn on "unknown" terminals. Windows conhost has
+    // supported VT sequences since Win 10 1511, and when Windows Terminal
+    // is the default console host (Win 11), it doesn't set WT_SESSION for
+    // processes launched via Explorer. Only block on known-broken terminals.
   }
 }
