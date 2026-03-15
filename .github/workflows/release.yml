@@ -56,11 +56,18 @@ jobs:
             EXE_NAME="machine-violet.exe"
           fi
 
+          # Windows-specific flags
+          WIN_FLAGS=""
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            WIN_FLAGS="--windows-icon=assets/machine-violet.ico --windows-title=Machine\ Violet --windows-description=AI\ Dungeon\ Master\ for\ tabletop\ RPGs --windows-version=${VERSION}.0"
+          fi
+
           # Compile
           bun build --compile \
             --target=${{ matrix.target }} \
             --outfile "dist/$EXE_NAME" \
             --define "process.env.MV_VERSION='$VERSION'" \
+            $WIN_FLAGS \
             src/index.tsx
 
           # Copy assets
