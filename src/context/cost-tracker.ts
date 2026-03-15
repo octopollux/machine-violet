@@ -55,16 +55,66 @@ export class CostTracker {
     apiCalls: 0,
   };
 
+  /**
+   * Coerce an arbitrary value to a finite number, or fall back if not possible.
+   * This is used when seeding from persisted JSON, which may be missing or corrupted.
+   */
+  private coerceNumber(value: unknown, fallback: number): number {
+    const n = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(n) ? n : fallback;
+  }
+
   /** Seed from previously persisted breakdown (e.g. on campaign resume). */
-  seed(saved: TokenBreakdown): void {
+  seed(saved: unknown): void {
+    if (typeof saved !== "object" || saved === null) {
+      // Unusable persisted state; keep existing zeroed breakdown.
+      return;
+    }
+
+    const anySaved = saved as any;
+
+    // Seed per-tier breakdown, tolerating missing/partial byTier.
+    const savedByTier = (anySaved.byTier ?? {}) as Record<string, unknown>;
     for (const tier of TIER_ORDER) {
-      const src = saved.byTier[tier];
-      if (src) {
-        this.breakdown.byTier[tier] = { ...src };
+      const src = savedByTier[tier] as Partial<TierTokens> | undefined;
+      if (src && typeof src === "object") {
+        const current = this.breakdown.byTier[tier];
+        this.breakdown.byTier[tier] = {
+          input: this.coerceNumber((src as any).input, current.input),
+          output: this.coerceNumber((src as any).output, current.output),
+          cached: this.coerceNumber((src as any).cached, current.cached),
+        };
       }
     }
-    this.breakdown.tokens = { ...saved.tokens };
-    this.breakdown.apiCalls = saved.apiCalls;
+
+    // Seed aggregate token totals, tolerating missing/partial tokens.
+    const savedTokens = anySaved.tokens as Partial<UsageStats> | undefined;
+    if (savedTokens && typeof savedTokens === "object") {
+      const currentTokens = this.breakdown.tokens;
+      this.breakdown.tokens = {
+        inputTokens: this.coerceNumber(
+          (savedTokens as any).inputTokens,
+          currentTokens.inputTokens,
+        ),
+        outputTokens: this.coerceNumber(
+          (savedTokens as any).outputTokens,
+          currentTokens.outputTokens,
+        ),
+        cacheReadTokens: this.coerceNumber(
+          (savedTokens as any).cacheReadTokens,
+          currentTokens.cacheReadTokens,
+        ),
+        cacheCreationTokens: this.coerceNumber(
+          (savedTokens as any).cacheCreationTokens,
+          currentTokens.cacheCreationTokens,
+        ),
+      };
+    }
+
+    // Seed API call count, ensuring it's a non-negative finite number.
+    const savedApiCalls = anySaved.apiCalls;
+    const coercedApiCalls = this.coerceNumber(savedApiCalls, this.breakdown.apiCalls);
+    this.breakdown.apiCalls = coercedApiCalls >= 0 ? coercedApiCalls : this.breakdown.apiCalls;
   }
 
   /** Record usage from an API call, bucketed by tier. */
