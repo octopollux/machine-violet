@@ -28,13 +28,36 @@ function textResponse(text: string): Anthropic.Message {
   } as Anthropic.Message;
 }
 
-function mockClient(responses: Anthropic.Message[]): Anthropic {
+/** Empty compendium JSON response for the compendium updater subagent */
+const EMPTY_COMPENDIUM_RESPONSE = textResponse(
+  JSON.stringify({ version: 1, lastUpdatedScene: 1, characters: [], places: [], storyline: [], lore: [], objectives: [] }),
+);
+
+/**
+ * Mock Anthropic client. Responses are consumed in order.
+ * Pass `fallback` to handle extra calls (e.g. from parallel compendium subagent)
+ * instead of crashing on exhaustion.
+ */
+function mockClient(
+  responses: Anthropic.Message[],
+  opts?: { fallback?: Anthropic.Message },
+): Anthropic {
   let callIdx = 0;
   return {
     messages: {
-      create: vi.fn(async () => responses[callIdx++]),
+      create: vi.fn(async () => {
+        const resp = responses[callIdx++];
+        if (resp) return resp;
+        if (opts?.fallback) return opts.fallback;
+        throw new Error(`mockClient: no response at index ${callIdx - 1}`);
+      }),
     },
   } as unknown as Anthropic;
+}
+
+/** Shorthand: mockClient with compendium fallback for tests that run scene transitions. */
+function transitionClient(responses: Anthropic.Message[]): Anthropic {
+  return mockClient(responses, { fallback: EMPTY_COMPENDIUM_RESPONSE });
 }
 
 function mockState(): GameState {
@@ -237,7 +260,7 @@ describe("SceneManager", () => {
   });
 
   it("clears player reads on scene transition", async () => {
-    const client = mockClient([
+    const client = transitionClient([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
@@ -261,7 +284,7 @@ describe("SceneManager", () => {
 
   it("executes scene_transition cascade", async () => {
     // Mock client: first call = scene summary (with ---MINI---), second call = changelog
-    const client = mockClient([
+    const client = transitionClient([
       textResponse("- Aldric entered tavern\n- Met innkeeper\n---MINI---\nAldric entered tavern and met the innkeeper."),
       textResponse("aldric.md: Entered tavern in Scene 1"),
     ]);
@@ -308,12 +331,12 @@ describe("SceneManager", () => {
     // Pending op cleared
     expect(mgr.getPendingOp()).toBeNull();
 
-    // Usage accumulated (1 Haiku call — no entity files to update changelogs)
-    expect(result.usage.inputTokens).toBe(50);
+    // Usage accumulated (2 Haiku calls — summarizer + compendium; no entity files to update changelogs)
+    expect(result.usage.inputTokens).toBe(100);
   });
 
   it("writes pending-operation.json during cascade", async () => {
-    const client = mockClient([
+    const client = transitionClient([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
@@ -336,7 +359,7 @@ describe("SceneManager", () => {
   });
 
   it("advances calendar during scene transition", async () => {
-    const client = mockClient([
+    const client = transitionClient([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
@@ -358,7 +381,7 @@ describe("SceneManager", () => {
   });
 
   it("sessionEnd writes recap file", async () => {
-    const client = mockClient([
+    const client = transitionClient([
       textResponse("- Session summary\n---MINI---\nSession summary."),
       textResponse(""),
     ]);
@@ -518,7 +541,7 @@ describe("SceneManager", () => {
     await mgr.contextRefresh();
     // The alias context is private, but we can verify it's passed to subagents
     // by checking the summarizer call in a transition
-    const client = mockClient([
+    const client = transitionClient([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
@@ -552,7 +575,7 @@ describe("SceneManager", () => {
 
     await mgr.contextRefresh();
     // Verify no alias context in subagent calls
-    const client = mockClient([
+    const client = transitionClient([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
@@ -577,9 +600,10 @@ describe("SceneManager", () => {
       return [];
     });
 
-    // Mock client: summarizer (with ---MINI---) + changelog updater returns location entry
-    const client = mockClient([
+    // Mock client: summarizer + compendium (resolves before changelog due to fewer awaits) + changelog
+    const client = transitionClient([
       textResponse("- Scene summary\n---MINI---\nScene summary."),
+      EMPTY_COMPENDIUM_RESPONSE,
       textResponse("tavern/index.md: Party entered and caused a brawl"),
     ]);
 
@@ -652,7 +676,7 @@ describe("SceneManager", () => {
   });
 
   it("sceneEntityIndex is cleared on scene transition", async () => {
-    const client = mockClient([
+    const client = transitionClient([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
@@ -719,7 +743,7 @@ describe("SceneManager", () => {
   });
 
   it("sceneTransition populates validationIssues in result", async () => {
-    const client = mockClient([
+    const client = transitionClient([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
@@ -742,7 +766,7 @@ describe("SceneManager", () => {
   });
 
   it("validation failure does not block scene transition", async () => {
-    const client = mockClient([
+    const client = transitionClient([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
@@ -770,7 +794,7 @@ describe("SceneManager", () => {
   });
 
   it("stepCheckpoint commits via CampaignRepo during scene transition", async () => {
-    const client = mockClient([
+    const client = transitionClient([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
@@ -798,7 +822,7 @@ describe("SceneManager", () => {
   });
 
   it("sessionEnd calls sessionCommit on CampaignRepo", async () => {
-    const client = mockClient([
+    const client = transitionClient([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
@@ -849,7 +873,7 @@ describe("SceneManager", () => {
 
   it("resumePendingTransition resumes from subagent_updates step", async () => {
     // Mock client: first call = scene summary, second call = changelog
-    const client = mockClient([
+    const client = transitionClient([
       textResponse("- Resumed summary\n---MINI---\nResumed summary."),
       textResponse(""),
     ]);
@@ -885,7 +909,7 @@ describe("SceneManager", () => {
   });
 
   it("resumePendingTransition clears pending-operation.json after success", async () => {
-    const client = mockClient([
+    const client = transitionClient([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
@@ -999,7 +1023,7 @@ describe("SceneManager", () => {
   });
 
   it("legacy pending-op step 'campaign_log' normalizes to subagent_updates", async () => {
-    const client = mockClient([
+    const client = transitionClient([
       textResponse("- Resumed summary\n---MINI---\nResumed summary."),
       textResponse(""),
     ]);
@@ -1028,7 +1052,7 @@ describe("SceneManager", () => {
   });
 
   it("legacy pending-op step 'changelog_updates' normalizes to subagent_updates", async () => {
-    const client = mockClient([
+    const client = transitionClient([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
@@ -1067,7 +1091,7 @@ describe("SceneManager", () => {
     });
 
     // Mock client: summarizer (with ---MINI---) + changelog that returns an entry for aldric scene 1
-    const client = mockClient([
+    const client = transitionClient([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse("aldric.md: Entered tavern in Scene 1"),
     ]);
@@ -1344,7 +1368,7 @@ describe("buildSceneAnchor", () => {
 
 describe("scene transition seeds precis", () => {
   it("sceneTransition seeds precis with campaign log anchor", async () => {
-    const client = mockClient([
+    const client = transitionClient([
       textResponse("- Aldric entered the tavern\n- Met the innkeeper\n- Ordered a drink\n- Heard a rumor"),
       textResponse(""),
     ]);
@@ -1370,7 +1394,7 @@ describe("scene transition seeds precis", () => {
   });
 
   it("resumePendingTransition seeds precis with campaign log anchor", async () => {
-    const client = mockClient([
+    const client = transitionClient([
       textResponse("- Explored the dungeon\n- Found a key"),
       textResponse(""),
     ]);

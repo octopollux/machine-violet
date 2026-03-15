@@ -146,6 +146,23 @@ Scans the completed scene transcript. Identifies every entity meaningfully invol
 
 ---
 
+### 6a. Compendium Updater
+
+| Property | Value |
+|---|---|
+| **Model** | Haiku |
+| **Visibility** | Silent |
+| **Trigger** | `scene_transition` cascade (parallel with summarizer + changelog) |
+| **Source** | `src/agents/subagents/compendium-updater.ts`, `src/prompts/compendium-updater.md` |
+
+Maintains the player-facing campaign compendium (`campaign/compendium.json`). Reads only the player-facing transcript (tool results filtered out), ensuring no DM secrets leak. Updates existing entries when new information is revealed; tracks identity shifts via `aliases` to prevent duplicates when NPCs are renamed.
+
+**Context**: Current compendium JSON + player-facing scene transcript + entity alias context. ~2-5k tokens.
+
+**Returns**: Updated compendium JSON written to disk. Also populates `DMSessionState.compendiumSummary` for the DM's "Player Knowledge" prefix section.
+
+---
+
 ### 6b. Scribe Subagent
 
 | Property | Value |
@@ -362,6 +379,7 @@ Haiku, silent. Summarizes campaign book structure for DM cached prefix. See [doc
 | 4 | Scene Summarizer | Haiku | Silent | Runtime — scene transition |
 | 5 | Precis Updater + PlayerRead | Haiku | Silent | Runtime — context pruning + engagement tracking |
 | 6 | Changelog Updater | Haiku | Silent | Runtime — scene transition |
+| 6a | Compendium Updater | Haiku | Silent | Runtime — scene transition |
 | 6b | Scribe | Haiku | Silent | Runtime — entity file management |
 | 6c | Campaign Search | Haiku | Silent | Runtime — agentic campaign search |
 | 7 | Character Promotion | Haiku | Silent | Runtime — on demand |

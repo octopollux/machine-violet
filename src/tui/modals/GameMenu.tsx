@@ -16,6 +16,7 @@ interface GameMenuProps {
 const BASE_MENU_ITEMS = [
   "Resume",
   "Character Sheet",
+  "Compendium",
   "OOC Mode",
   "Settings",
   "Save & Exit",

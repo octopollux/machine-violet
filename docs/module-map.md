@@ -29,6 +29,7 @@ Each file is an isolated Claude conversation for a specific task. All use `spawn
 | `scene-summarizer.ts` | Haiku | Scene transcript → campaign log entry |
 | `precis-updater.ts` | Haiku | Dropped exchange → precis append + PlayerRead extraction |
 | `changelog-updater.ts` | Haiku | Scene transcript → entity changelog entries |
+| `compendium-updater.ts` | Haiku | Scene transcript → player-facing compendium update |
 | `resolve-action.ts` | Haiku | Mechanical action resolution (attacks, checks, saves) |
 | `choice-generator.ts` | Haiku | Generate 2-3 player action choices from recent narration |
 | `character-promotion.ts` | Haiku | Expand minimal NPC → full character sheet |
@@ -86,7 +87,7 @@ Ink (React for CLI) components, formatting pipeline, theme system.
 | `activity.ts` | Activity/status bar state management |
 | `game-context.ts` | React context for game engine callbacks |
 | `components/` | Reusable: `Modeline`, `InputLine`, `NarrativeArea`, `PlayerSelector`, `ActivityLine`, `FrameBorder` |
-| `modals/` | `ChoiceModal`, `CharacterSheetModal`, `DiceRollModal`, `SessionRecapModal`, `GameMenu`, `ApiErrorModal` |
+| `modals/` | `ChoiceModal`, `CharacterSheetModal`, `CompendiumModal`, `DiceRollModal`, `SessionRecapModal`, `GameMenu`, `ApiErrorModal` |
 | `themes/` | Theme parser, loader, resolver. Built-in themes in `themes/assets/` |
 | `color/` | OKLCH color space utilities, gradient generation |
 | `frames/` | Box drawing, styled content lines, string measurement |
@@ -120,6 +121,7 @@ Shared TypeScript interfaces. No implementations. All re-exported from `index.ts
 | `dice.ts` | `DiceRollResult`, `RollDiceInput`, `DiceExpression` |
 | `entities.ts` | `EntityFrontMatter` |
 | `tui.ts` | `NarrativeLine`, `FormattingNode`, modal types |
+| `compendium.ts` | `Compendium`, `CompendiumEntry`, `CompendiumCategory` |
 
 ## src/content/ — Content Pipeline
 
