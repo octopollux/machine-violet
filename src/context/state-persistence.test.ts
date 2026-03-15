@@ -140,6 +140,26 @@ describe("StatePersister", () => {
     expect(loaded.conversation).toEqual(exchanges);
   });
 
+  it("round-trips usage breakdown", async () => {
+    const fio = mockFileIO();
+    const persister = new StatePersister("/tmp/campaign", fio);
+    const usage = {
+      byTier: {
+        large: { input: 1200, output: 200, cached: 5000 },
+        medium: { input: 0, output: 0, cached: 0 },
+        small: { input: 800, output: 100, cached: 3000 },
+      },
+      tokens: { inputTokens: 1500, outputTokens: 300, cacheReadTokens: 8000, cacheCreationTokens: 0 },
+      apiCalls: 5,
+    };
+
+    persister.persistUsage(usage);
+    await vi.waitFor(() => expect(fio.writeFile).toHaveBeenCalled());
+
+    const loaded = await persister.loadAll();
+    expect(loaded.usage).toEqual(usage);
+  });
+
   it("loadAll returns undefined for missing files", async () => {
     const fio = mockFileIO();
     const persister = new StatePersister("/tmp/campaign", fio);
@@ -152,6 +172,7 @@ describe("StatePersister", () => {
     expect(loaded.scene).toBeUndefined();
     expect(loaded.conversation).toBeUndefined();
     expect(loaded.ui).toBeUndefined();
+    expect(loaded.usage).toBeUndefined();
   });
 
   it("round-trips UI theme state", async () => {

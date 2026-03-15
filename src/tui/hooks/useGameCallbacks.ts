@@ -209,7 +209,11 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
               setChoiceIndex(result.choices.length < 5 ? result.choices.length : 0);
               setActiveModal({ kind: "choice", prompt: "What do you do?", choices: result.choices });
             }
-            costTracker.current?.record(result.usage, "small");
+            const ct = costTracker.current;
+            if (ct) {
+              ct.record(result.usage, "small");
+              engineRef.current?.getPersister()?.persistUsage(ct.getBreakdown());
+            }
           }).catch(() => { /* best-effort */ });
         }
       }
@@ -248,8 +252,12 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
       setNarrativeLines((prev) => [...prev, { kind: "dev", text: msg }]);
     },
     onExchangeDropped() { /* precis update handled internally */ },
-    onUsageUpdate(usage: UsageStats) {
-      costTracker.current?.record(usage, "large");
+    onUsageUpdate(delta, tier) {
+      const ct = costTracker.current;
+      if (ct) {
+        ct.record(delta, tier);
+        engineRef.current?.getPersister()?.persistUsage(ct.getBreakdown());
+      }
     },
     onError(error: Error) {
       // Rollback-complete errors are handled via TUI command — not a real error

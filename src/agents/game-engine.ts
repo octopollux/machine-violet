@@ -16,6 +16,7 @@ import { processNarrativeLines } from "../tui/formatting.js";
 import type { NarrativeLine } from "../types/tui.js";
 import type { DMSessionState } from "./dm-prompt.js";
 import { getModel, getThinkingConfig } from "../config/models.js";
+import type { ModelTier } from "../config/models.js";
 import { accUsage } from "../context/usage-helpers.js";
 import { TOKEN_LIMITS } from "../config/tokens.js";
 import type { ToolResult } from "./tool-registry.js";
@@ -69,8 +70,8 @@ export interface EngineCallbacks {
   onDevLog?: (msg: string) => void;
   /** Exchange dropped from conversation (precis will update) */
   onExchangeDropped: () => void;
-  /** Usage stats updated */
-  onUsageUpdate: (session: UsageStats) => void;
+  /** Usage stats updated (delta from a single API call, with its model tier) */
+  onUsageUpdate: (delta: UsageStats, tier: ModelTier) => void;
   /** Error occurred */
   onError: (error: Error) => void;
   /** API call is being retried after a retryable error */
@@ -560,7 +561,7 @@ export class GameEngine {
 
       // Accumulate usage
       accUsage(this.sessionUsage, result.usage);
-      this.callbacks.onUsageUpdate(this.sessionUsage);
+      this.callbacks.onUsageUpdate(result.usage, "large");
 
       // Notify completion — pass player action for context-aware choice generation
       this.callbacks.onNarrativeComplete(result.text, text || undefined);
@@ -597,7 +598,7 @@ export class GameEngine {
       );
 
       accUsage(this.sessionUsage, result.usage);
-      this.callbacks.onUsageUpdate(this.sessionUsage);
+      this.callbacks.onUsageUpdate(result.usage, "small");
 
       // Persist the reset scene state (new sceneNumber, cleared precis/transcript)
       this.persistCurrentScene();
@@ -632,7 +633,7 @@ export class GameEngine {
       );
 
       accUsage(this.sessionUsage, result.usage);
-      this.callbacks.onUsageUpdate(this.sessionUsage);
+      this.callbacks.onUsageUpdate(result.usage, "small");
 
       // Persist scene state after session end
       this.persistCurrentScene();
@@ -669,7 +670,7 @@ export class GameEngine {
 
       if (result) {
         accUsage(this.sessionUsage, result.usage);
-        this.callbacks.onUsageUpdate(this.sessionUsage);
+        this.callbacks.onUsageUpdate(result.usage, "small");
       }
 
       this.persistCurrentScene();
@@ -733,7 +734,7 @@ export class GameEngine {
       }
 
       accUsage(this.sessionUsage, result.usage);
-      this.callbacks.onUsageUpdate(this.sessionUsage);
+      this.callbacks.onUsageUpdate(result.usage, "small");
       this.callbacks.onDevLog?.(`[dev] scribe: ${result.summary}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -780,7 +781,7 @@ export class GameEngine {
       this.sceneManager.notifyEntityTouched(filePath, slug);
 
       accUsage(this.sessionUsage, result.usage);
-      this.callbacks.onUsageUpdate(this.sessionUsage);
+      this.callbacks.onUsageUpdate(result.usage, "small");
       this.callbacks.onDevLog?.(`[dev] promote_character: ${characterName} — ${result.changelogEntry}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -838,7 +839,7 @@ export class GameEngine {
           undefined, // current key color not easily accessible here
         );
         accUsage(this.sessionUsage, result.usage);
-        this.callbacks.onUsageUpdate(this.sessionUsage);
+        this.callbacks.onUsageUpdate(result.usage, "small");
 
         if (!result.command) {
           this.callbacks.onDevLog?.("[dev] style_scene: subagent returned unparseable response, skipping");
@@ -1019,8 +1020,9 @@ export class GameEngine {
       this.callbacks.onTurnEnd(aiTurn);
 
       // Accumulate usage from subagent
+      const aiTier: ModelTier = active.player.model === "sonnet" ? "medium" : "small";
       accUsage(this.sessionUsage, result.usage);
-      this.callbacks.onUsageUpdate(this.sessionUsage);
+      this.callbacks.onUsageUpdate(result.usage, aiTier);
 
       // Feed the action into the game loop as player input
       await this.processInput(characterName, result.action, { fromAI: true });
@@ -1106,7 +1108,7 @@ export class GameEngine {
         const result = await this.resolveSession.resolve(action);
         this.applyResolutionDeltas(result.deltas);
         accUsage(this.sessionUsage, result.usage);
-        this.callbacks.onUsageUpdate(this.sessionUsage);
+        this.callbacks.onUsageUpdate(result.usage, "small");
         this.callbacks.onDevLog?.(`[dev] resolve_turn: ${action.actor} — ${result.narrative.slice(0, 80)}`);
         // Emit resolution to the player so they always see the mechanical outcome,
         // regardless of whether the DM narrates it. This is visible in the TUI
@@ -1134,7 +1136,7 @@ export class GameEngine {
         }, this.fileIO);
 
         accUsage(this.sessionUsage, result.usage);
-        this.callbacks.onUsageUpdate(this.sessionUsage);
+        this.callbacks.onUsageUpdate(result.usage, "small");
         this.callbacks.onDevLog?.(`[dev] search_campaign: "${query}" → ${result.text.length} chars`);
 
         return { content: result.text };
@@ -1163,7 +1165,7 @@ export class GameEngine {
         }, this.fileIO);
 
         accUsage(this.sessionUsage, result.usage);
-        this.callbacks.onUsageUpdate(this.sessionUsage);
+        this.callbacks.onUsageUpdate(result.usage, "small");
         this.callbacks.onDevLog?.(`[dev] search_content: "${query}" → ${result.text.length} chars`);
 
         return { content: result.text };

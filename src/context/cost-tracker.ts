@@ -55,6 +55,18 @@ export class CostTracker {
     apiCalls: 0,
   };
 
+  /** Seed from previously persisted breakdown (e.g. on campaign resume). */
+  seed(saved: TokenBreakdown): void {
+    for (const tier of TIER_ORDER) {
+      const src = saved.byTier[tier];
+      if (src) {
+        this.breakdown.byTier[tier] = { ...src };
+      }
+    }
+    this.breakdown.tokens = { ...saved.tokens };
+    this.breakdown.apiCalls = saved.apiCalls;
+  }
+
   /** Record usage from an API call, bucketed by tier. */
   record(usage: UsageStats, tier: ModelTier): void {
     const t = this.breakdown.byTier[tier];

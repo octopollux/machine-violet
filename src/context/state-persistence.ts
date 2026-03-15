@@ -8,6 +8,7 @@ import type { MapData } from "../types/maps.js";
 import type { SceneState } from "../agents/scene-manager.js";
 import type { ConversationExchange } from "./conversation.js";
 import type { StyleVariant } from "../types/tui.js";
+import type { TokenBreakdown } from "./cost-tracker.js";
 import { tailLines } from "./display-log.js";
 
 /** Paths within campaign root for persisted state files */
@@ -19,6 +20,7 @@ export const STATE_FILES = {
   scene: "state/scene.json",
   conversation: "state/conversation.json",
   ui: "state/ui.json",
+  usage: "state/usage.json",
   displayLog: "state/display-log.md",
 } as const;
 
@@ -50,6 +52,7 @@ export interface LoadedState {
   scene?: PersistedSceneState;
   conversation?: ConversationExchange[];
   ui?: PersistedUIState;
+  usage?: TokenBreakdown;
 }
 
 /**
@@ -147,6 +150,10 @@ export class StatePersister {
     this.enqueueWrite(STATE_FILES.ui, JSON.stringify(state, null, 2));
   }
 
+  persistUsage(breakdown: TokenBreakdown): void {
+    this.enqueueWrite(STATE_FILES.usage, JSON.stringify(breakdown, null, 2));
+  }
+
   /** Append text to the rolling display log (human-readable, never cleared). */
   appendDisplayLog(text: string): void {
     this.enqueueAppend(STATE_FILES.displayLog, text);
@@ -174,7 +181,7 @@ export class StatePersister {
 
   /** Load all persisted state files. Missing files return undefined per key. */
   async loadAll(): Promise<LoadedState> {
-    const [combat, clocks, maps, decks, scene, conversation, ui] = await Promise.all([
+    const [combat, clocks, maps, decks, scene, conversation, ui, usage] = await Promise.all([
       this.readJSON<CombatState>(STATE_FILES.combat),
       this.readJSON<ClocksState>(STATE_FILES.clocks),
       this.readJSON<Record<string, MapData>>(STATE_FILES.maps),
@@ -182,8 +189,9 @@ export class StatePersister {
       this.readJSON<PersistedSceneState>(STATE_FILES.scene),
       this.readJSON<ConversationExchange[]>(STATE_FILES.conversation),
       this.readJSON<PersistedUIState>(STATE_FILES.ui),
+      this.readJSON<TokenBreakdown>(STATE_FILES.usage),
     ]);
 
-    return { combat, clocks, maps, decks, scene, conversation, ui };
+    return { combat, clocks, maps, decks, scene, conversation, ui, usage };
   }
 }

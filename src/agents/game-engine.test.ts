@@ -184,7 +184,7 @@ function mockCallbacks(): { callbacks: EngineCallbacks; log: CallbackLog } {
       onToolStart: (name) => log.toolStarts.push(name),
       onToolEnd: (name) => log.toolEnds.push(name),
       onExchangeDropped: () => log.exchangeDrops++,
-      onUsageUpdate: (usage) => log.usageUpdates.push({ ...usage }),
+      onUsageUpdate: (delta) => log.usageUpdates.push({ ...delta }),
       onError: (error) => log.errors.push(error),
       onDevLog: (msg) => log.devLogs.push(msg),
       onRetry: () => {},
