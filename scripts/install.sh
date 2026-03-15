@@ -5,13 +5,13 @@
 # and symlinks the binary to ~/.local/bin/.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/Orthodox-531/machine-violet/main/scripts/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/octopollux/machine-violet/main/scripts/install.sh | bash
 #   # or with a specific version:
 #   curl -fsSL ... | bash -s -- --version 1.0.0
 
 set -euo pipefail
 
-REPO="Orthodox-531/machine-violet"
+REPO="octopollux/machine-violet"
 INSTALL_DIR="${HOME}/.local/lib/machine-violet"
 BIN_DIR="${HOME}/.local/bin"
 VERSION=""

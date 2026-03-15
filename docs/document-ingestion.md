@@ -2,7 +2,7 @@
 
 PDF text extraction and content processing are implemented as a unified flow.
 
-Tracked in [#67](https://github.com/Orthodox-531/machine-violet/issues/67).
+Tracked in [#67](https://github.com/octopollux/machine-violet/issues/67).
 
 ## Architecture
 
