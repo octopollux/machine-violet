@@ -22,6 +22,7 @@ export interface DMSessionState {
   dmNotes?: string;
   entityIndex?: string;
   uiState?: string;
+  compendiumSummary?: string;
 }
 
 /**

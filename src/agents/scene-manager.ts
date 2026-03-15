@@ -11,6 +11,8 @@ import { generateNarrativeRecap } from "./subagents/narrative-recap.js";
 import { updatePrecis } from "./subagents/precis-updater.js";
 import type { PlayerRead } from "./subagents/precis-updater.js";
 import { updateChangelogs } from "./subagents/changelog-updater.js";
+import { updateCompendium, emptyCompendium, renderCompendiumForDM } from "./subagents/compendium-updater.js";
+import type { Compendium } from "../types/compendium.js";
 import { advanceCalendar, checkClocks } from "../tools/clocks/index.js";
 import { validateCampaign } from "../tools/validation/index.js";
 import type { ValidationResult } from "../tools/validation/index.js";
@@ -405,6 +407,16 @@ export class SceneManager {
     // Load campaign log — migrate from legacy log.md if needed
     this.sessionState.campaignSummary = await this.loadAndRenderCampaignLog();
 
+    // Load compendium for DM prefix (player knowledge)
+    try {
+      const compendiumPath = paths.compendium;
+      if (await this.fileIO.exists(compendiumPath)) {
+        const raw = await this.fileIO.readFile(compendiumPath);
+        const compendium = JSON.parse(raw) as Compendium;
+        this.sessionState.compendiumSummary = renderCompendiumForDM(compendium);
+      }
+    } catch { /* non-critical */ }
+
     if (recap) {
       this.sessionState.sessionRecap = recap;
     }
@@ -441,6 +453,15 @@ export class SceneManager {
       const recapPath = paths.sessionRecap(this.scene.sessionNumber - 1);
       if (await this.fileIO.exists(recapPath)) {
         this.sessionState.sessionRecap = await this.fileIO.readFile(recapPath);
+      }
+    } catch { /* non-critical */ }
+
+    // Load compendium for DM prefix (player knowledge)
+    try {
+      if (await this.fileIO.exists(paths.compendium)) {
+        const raw = await this.fileIO.readFile(paths.compendium);
+        const compendium = JSON.parse(raw) as Compendium;
+        this.sessionState.compendiumSummary = renderCompendiumForDM(compendium);
       }
     } catch { /* non-critical */ }
 
@@ -557,6 +578,9 @@ export class SceneManager {
     await Promise.all([
       this.stepCampaignLog(client, title, result),
       this.stepChangelogUpdates(client, result),
+      this.stepCompendiumUpdate(client, result).catch((e) => {
+        this.devLog?.(`[dev] compendium update failed (non-critical): ${e instanceof Error ? e.message : String(e)}`);
+      }),
     ]);
   }
 
@@ -638,6 +662,40 @@ export class SceneManager {
         );
       }
     }
+  }
+
+  private async stepCompendiumUpdate(
+    client: Anthropic,
+    result: TransitionResult,
+  ): Promise<void> {
+    const paths = campaignPaths(this.state.campaignRoot);
+    let current: Compendium;
+    try {
+      if (await this.fileIO.exists(paths.compendium)) {
+        current = JSON.parse(await this.fileIO.readFile(paths.compendium)) as Compendium;
+      } else {
+        current = emptyCompendium();
+      }
+    } catch {
+      current = emptyCompendium();
+    }
+
+    const transcript = this.scene.transcript.join("\n");
+    this.devLog?.("[dev] subagent:compendium starting");
+    const { compendium, usage } = await updateCompendium(
+      client,
+      current,
+      transcript,
+      this.scene.sceneNumber,
+      this.aliasContext || undefined,
+    );
+    accUsage(result.usage, usage);
+    this.devLog?.("[dev] subagent:compendium done");
+
+    await this.fileIO.writeFile(paths.compendium, JSON.stringify(compendium, null, 2));
+
+    // Update DM prefix with player knowledge
+    this.sessionState.compendiumSummary = renderCompendiumForDM(compendium);
   }
 
   private stepAdvanceCalendar(

@@ -7,12 +7,15 @@ import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, narrativeRo
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { Layout } from "../tui/layout.js";
 import { stripFormatting, stripLeadingBullet } from "../tui/formatting.js";
-import { ChoiceOverlay, DESCRIPTION_ROWS, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, ApiErrorModal, SwatchModal, getMenuItems } from "../tui/modals/index.js";
+import { ChoiceOverlay, DESCRIPTION_ROWS, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, CompendiumModal, ApiErrorModal, SwatchModal, getMenuItems } from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { getActivePlayer, switchToNextPlayer, getPlayerEntries } from "../agents/player-manager.js";
 import { createOOCSession } from "../agents/subagents/ooc-mode.js";
 import { createDevSession, summarizeGameState } from "../agents/subagents/dev-mode.js";
 import { useGameContext } from "../tui/game-context.js";
+import { campaignPaths } from "../tools/filesystem/index.js";
+import { emptyCompendium } from "../agents/subagents/compendium-updater.js";
+import type { Compendium } from "../types/compendium.js";
 import { trySlashCommand } from "../commands/index.js";
 import { RollbackCompleteError } from "../teardown.js";
 
@@ -214,6 +217,11 @@ export function PlayingPhase() {
       return;
     }
 
+    // Compendium modal: handles its own input via useInput
+    if (activeModal && activeModal.kind === "compendium") {
+      return;
+    }
+
     // Scrollable modals (character sheet, recap)
     if (activeModal && (activeModal.kind === "character_sheet" || activeModal.kind === "recap")) {
       if (key.escape || key.return) {
@@ -354,6 +362,21 @@ export function PlayingPhase() {
           if (gs) {
             const active = getActivePlayer(gs);
             dispatchTuiCommand({ type: "show_character_sheet", character: active.characterName });
+          }
+        } else if (item === "Compendium") {
+          setMenuOpen(false);
+          const gs = gameStateRef.current;
+          const io = engineRef.current?.getSceneManager().getFileIO();
+          if (gs && io) {
+            const path = campaignPaths(gs.campaignRoot).compendium;
+            io.readFile(path).then((raw: string) => {
+              const data = JSON.parse(raw) as Compendium;
+              setActiveModal({ kind: "compendium", data });
+            }).catch(() => {
+              setActiveModal({ kind: "compendium", data: emptyCompendium() });
+            });
+          } else {
+            setActiveModal({ kind: "compendium", data: emptyCompendium() });
           }
         } else if (item === "OOC Mode") {
           setMenuOpen(false);
@@ -526,6 +549,16 @@ export function PlayingPhase() {
           height={narRows}
           content={activeModal.content}
           scrollRef={modalScrollRef}
+          topOffset={conversationPaneTop}
+        />
+      )}
+      {activeModal?.kind === "compendium" && (
+        <CompendiumModal
+          theme={theme}
+          width={cols}
+          height={narRows}
+          data={activeModal.data}
+          onClose={() => setActiveModal(null)}
           topOffset={conversationPaneTop}
         />
       )}

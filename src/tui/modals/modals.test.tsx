@@ -347,7 +347,7 @@ describe("GameMenu", () => {
       </Box>,
     );
     const frame = lastFrame();
-    expect(frame).toContain("◆ OOC Mode");
+    expect(frame).toContain("◆ Compendium");
     expect(frame).toContain("○ Resume");
   });
 });

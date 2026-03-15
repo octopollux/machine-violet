@@ -4,6 +4,7 @@ export type { CenteredModalHandle } from "./CenteredModal.js";
 export { ChoiceModal, ChoiceOverlay, DESCRIPTION_ROWS } from "./ChoiceModal.js";
 export { GameMenu, getMenuItems } from "./GameMenu.js";
 export { CharacterSheetModal } from "./CharacterSheetModal.js";
+export { CompendiumModal } from "./CompendiumModal.js";
 export { DiceRollModal } from "./DiceRollModal.js";
 export { SessionRecapModal } from "./SessionRecapModal.js";
 export { ApiErrorModal } from "./ApiErrorModal.js";

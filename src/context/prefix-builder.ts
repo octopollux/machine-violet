@@ -29,6 +29,7 @@ export interface PrefixSections {
   dmNotes?: string;
   entityIndex?: string;
   uiState?: string;
+  compendiumSummary?: string;
 }
 
 export interface CachedPrefixResult {
@@ -146,6 +147,14 @@ export function buildCachedPrefix(
     blocks.push({
       type: "text",
       text: `\n\n## DM Notes\n${sections.dmNotes}`,
+    });
+  }
+
+  // Player knowledge (compendium summary)
+  if (sections.compendiumSummary) {
+    blocks.push({
+      type: "text",
+      text: `\n\n## Player Knowledge\nThe player currently knows about:\n${sections.compendiumSummary}`,
     });
   }
 

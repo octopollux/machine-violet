@@ -28,11 +28,16 @@ function textResponse(text: string): Anthropic.Message {
   } as Anthropic.Message;
 }
 
+/** Empty compendium JSON response for the compendium updater subagent */
+const EMPTY_COMPENDIUM_RESPONSE = textResponse(
+  JSON.stringify({ version: 1, lastUpdatedScene: 1, characters: [], places: [], storyline: [], lore: [], objectives: [] }),
+);
+
 function mockClient(responses: Anthropic.Message[]): Anthropic {
   let callIdx = 0;
   return {
     messages: {
-      create: vi.fn(async () => responses[callIdx++]),
+      create: vi.fn(async () => responses[callIdx++] ?? EMPTY_COMPENDIUM_RESPONSE),
     },
   } as unknown as Anthropic;
 }
@@ -308,8 +313,8 @@ describe("SceneManager", () => {
     // Pending op cleared
     expect(mgr.getPendingOp()).toBeNull();
 
-    // Usage accumulated (1 Haiku call — no entity files to update changelogs)
-    expect(result.usage.inputTokens).toBe(50);
+    // Usage accumulated (2 Haiku calls — summarizer + compendium; no entity files to update changelogs)
+    expect(result.usage.inputTokens).toBe(100);
   });
 
   it("writes pending-operation.json during cascade", async () => {
@@ -577,9 +582,10 @@ describe("SceneManager", () => {
       return [];
     });
 
-    // Mock client: summarizer (with ---MINI---) + changelog updater returns location entry
+    // Mock client: summarizer + compendium (resolves before changelog due to fewer awaits) + changelog
     const client = mockClient([
       textResponse("- Scene summary\n---MINI---\nScene summary."),
+      EMPTY_COMPENDIUM_RESPONSE,
       textResponse("tavern/index.md: Party entered and caused a brawl"),
     ]);
 
