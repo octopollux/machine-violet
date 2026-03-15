@@ -1,5 +1,8 @@
 import { defaultCampaignRoot } from "../tools/filesystem/platform.js";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { existsSync, readFileSync as fsReadFileSync } from "node:fs";
+import { config as dotenvConfig } from "dotenv";
+import { isCompiled } from "../utils/paths.js";
 
 /**
  * App-level config stored alongside .env.
@@ -62,4 +65,45 @@ export function getConfigPaths(appDir: string) {
     env: join(appDir, ".env"),
     appConfig: join(appDir, "config.json"),
   };
+}
+
+/**
+ * Load .env from the best available location.
+ * Priority: env var already set > exe directory > cwd
+ * No-op if ANTHROPIC_API_KEY is already in the environment.
+ */
+export function loadEnv(): void {
+  if (process.env.ANTHROPIC_API_KEY) return;
+
+  // In compiled mode, check next to the executable first
+  if (isCompiled()) {
+    const exeEnv = join(dirname(process.execPath), ".env");
+    if (existsSync(exeEnv)) {
+      dotenvConfig({ path: exeEnv });
+      return;
+    }
+  }
+
+  // Fall back to cwd (dev mode, or compiled without exe-local .env)
+  dotenvConfig();
+}
+
+/**
+ * Get the app version. Uses MV_VERSION define (set at build time),
+ * falling back to package.json.
+ */
+export function getAppVersion(): string {
+  // Build script injects this via --define
+  if (typeof process.env.MV_VERSION === "string" && process.env.MV_VERSION) {
+    return process.env.MV_VERSION;
+  }
+
+  // Dev fallback: read package.json
+  try {
+    const pkgPath = join(dirname(dirname(import.meta.dirname)), "package.json");
+    const pkg = JSON.parse(fsReadFileSync(pkgPath, "utf-8"));
+    return pkg.version ?? "dev";
+  } catch {
+    return "dev";
+  }
 }

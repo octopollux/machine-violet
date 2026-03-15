@@ -15,7 +15,8 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
-    "check": "eslint src/ && vitest run --coverage"
+    "check": "eslint src/ && vitest run --coverage",
+    "dist": "bun scripts/build-dist.ts"
   },
   "keywords": [
     "rpg",

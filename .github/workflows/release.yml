@@ -1,0 +1,102 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target: bun-windows-x64
+            archive: zip
+            asset_suffix: windows-x64
+          - os: macos-latest
+            target: bun-darwin-arm64
+            archive: tar.gz
+            asset_suffix: darwin-arm64
+          - os: ubuntu-latest
+            target: bun-linux-x64
+            archive: tar.gz
+            asset_suffix: linux-x64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build distribution
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          EXE_NAME="machine-violet"
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            EXE_NAME="machine-violet.exe"
+          fi
+
+          # Compile
+          bun build --compile \
+            --target=${{ matrix.target }} \
+            --outfile "dist/$EXE_NAME" \
+            --define "process.env.MV_VERSION='$VERSION'" \
+            src/index.tsx
+
+          # Copy assets
+          cp -r src/prompts dist/prompts
+          cp -r src/tui/themes/assets dist/themes
+          cp -r systems dist/systems
+
+          # Version file
+          echo "{\"version\":\"$VERSION\"}" > dist/version.json
+
+          # License
+          if [ -f LICENSE ]; then cp LICENSE dist/; fi
+
+      - name: Package (zip)
+        if: matrix.archive == 'zip'
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd dist
+          7z a "../machine-violet-${VERSION}-${{ matrix.asset_suffix }}.zip" .
+
+      - name: Package (tar.gz)
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          tar -czf "machine-violet-${VERSION}-${{ matrix.asset_suffix }}.tar.gz" -C dist .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: machine-violet-${{ matrix.asset_suffix }}
+          path: machine-violet-*.${{ matrix.archive }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: machine-violet-*
