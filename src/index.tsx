@@ -1,5 +1,6 @@
 import "./suppress-warnings.js";
 import { loadEnv, getAppVersion } from "./config/first-launch.js";
+import { checkTerminal } from "./config/terminal-check.js";
 
 // --version flag: print and exit before any TUI setup
 if (process.argv.includes("--version") || process.argv.includes("-v")) {
@@ -9,6 +10,9 @@ if (process.argv.includes("--version") || process.argv.includes("-v")) {
 
 // Load API key from config dir, falling back to cwd .env
 loadEnv();
+
+// Bail early on terminals that can't run a TUI
+checkTerminal();
 
 import React, { useRef } from "react";
 import { render } from "ink";
