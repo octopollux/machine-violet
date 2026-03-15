@@ -1,4 +1,4 @@
-import { KNOWN_SYSTEMS, findSystem, listAvailableSystems } from "./systems.js";
+import { KNOWN_SYSTEMS, findSystem, listAvailableSystems, readChargenSection } from "./systems.js";
 import type { FileIO } from "../agents/scene-manager.js";
 
 const norm = (p: string) => p.replace(/\\/g, "/");
@@ -43,6 +43,14 @@ describe("KNOWN_SYSTEMS", () => {
   it("marks all entries as bundled", () => {
     for (const sys of KNOWN_SYSTEMS) {
       expect(sys.bundled).toBe(true);
+    }
+  });
+
+  it("has complexity and description for all entries", () => {
+    const validComplexities = ["ultra-light", "light", "medium", "high"];
+    for (const sys of KNOWN_SYSTEMS) {
+      expect(validComplexities).toContain(sys.complexity);
+      expect(sys.description.length).toBeGreaterThan(0);
     }
   });
 });
@@ -94,5 +102,44 @@ describe("listAvailableSystems", () => {
     const io = mockIO({});
     const systems = await listAvailableSystems(io, "/nonexistent");
     expect(systems.length).toBe(KNOWN_SYSTEMS.length);
+  });
+
+  it("discovered systems get default complexity and description", async () => {
+    const io = mockIO({
+      "/home/systems": ["my-homebrew"],
+    });
+    const systems = await listAvailableSystems(io, "/home");
+    const custom = systems.find((s) => s.slug === "my-homebrew");
+    expect(custom).toBeDefined();
+    expect(custom!.complexity).toBe("medium");
+    expect(custom!.description).toBeTruthy();
+  });
+});
+
+describe("readChargenSection", () => {
+  it("returns chargen content for systems with a character_creation section", () => {
+    const section = readChargenSection("24xx");
+    expect(section).toBeTruthy();
+    expect(section).toContain("skill");
+  });
+
+  it("returns chargen content for dnd-5e", () => {
+    const section = readChargenSection("dnd-5e");
+    expect(section).toBeTruthy();
+    expect(section).toContain("class");
+  });
+
+  it("returns chargen content for fate-accelerated", () => {
+    const section = readChargenSection("fate-accelerated");
+    expect(section).toBeTruthy();
+    expect(section).toContain("High concept");
+  });
+
+  it("returns null for systems without a rule card", () => {
+    expect(readChargenSection("cairn")).toBeNull();
+  });
+
+  it("returns null for unknown systems", () => {
+    expect(readChargenSection("nonexistent")).toBeNull();
   });
 });

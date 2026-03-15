@@ -165,6 +165,21 @@ describe("createSetupConversation", () => {
     expect(result.finalized!.playerName).toBe("Alex");
     expect(result.finalized!.difficulty).toBe("Balanced");
     expect(result.finalized!.personality.name).toBe("The Chronicler");
+    expect(result.finalized!.characterDetails).toBeNull();
+  });
+
+  it("finalize_setup passes through characterDetails", async () => {
+    const input = { ...FINALIZE_INPUT, system: "dnd-5e", character_details: "Human Fighter, level 1, soldier background" };
+    const client = mockClient([
+      finalizeResponse(input),
+      textResponse("May your blade stay sharp!"),
+    ]);
+    const conv = createSetupConversation(client);
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.characterDetails).toBe("Human Fighter, level 1, soldier background");
+    expect(result.finalized!.system).toBe("dnd-5e");
   });
 
   it("finalize_setup triggers farewell follow-up", async () => {
@@ -202,6 +217,28 @@ describe("createSetupConversation", () => {
     expect(userMsg.content[0].type).toBe("tool_result");
     expect(userMsg.content[0].tool_use_id).toBe("toolu_choices_1");
     expect(userMsg.content[0].content).toContain("I want a pirate adventure");
+  });
+
+  it("system prompt includes complexity tiers and chargen rules", async () => {
+    const client = mockClient([textResponse("Welcome!")]);
+    const conv = createSetupConversation(client);
+    await conv.start(noop);
+
+    const streamCalls = (client.messages.stream as ReturnType<typeof vi.fn>).mock.calls;
+    const systemPrompt = streamCalls[0][0].system as string;
+
+    // Verify tiered system groups
+    expect(systemPrompt).toContain("Light systems");
+    expect(systemPrompt).toContain("Crunchy systems");
+
+    // Verify descriptions are included
+    expect(systemPrompt).toContain("Micro-RPG framework");
+    expect(systemPrompt).toContain("Classic d20 system");
+
+    // Verify chargen rules are injected
+    expect(systemPrompt).toContain("Character creation rules by system");
+    expect(systemPrompt).toContain("High concept");  // from FATE
+    expect(systemPrompt).toContain("Choose race");    // from D&D
   });
 
   it("usage accumulates across turns", async () => {

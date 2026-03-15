@@ -18,6 +18,7 @@ function makeSetupResult(overrides: Partial<SetupResult> = {}): SetupResult {
     playerName: "Player",
     characterName: "Kael",
     characterDescription: "A wandering sellsword",
+    characterDetails: null,
     themeColor: "#8888aa",
     ...overrides,
   };
@@ -104,6 +105,29 @@ describe("resolveSystemSlug", () => {
 });
 
 describe("buildCampaignWorld", () => {
+  it("includes characterDetails in character file when present", async () => {
+    const files: Record<string, string> = {};
+    const dirs = new Set<string>();
+    const { norm } = await import("../utils/paths.js");
+
+    const fileIO: FileIO = {
+      readFile: vi.fn(async (path) => files[norm(path)] ?? ""),
+      writeFile: vi.fn(async (path, content) => { files[norm(path)] = content; }),
+      appendFile: vi.fn(async (path, content) => { files[norm(path)] = (files[norm(path)] ?? "") + content; }),
+      mkdir: vi.fn(async (path) => { dirs.add(norm(path)); }),
+      exists: vi.fn(async (path) => norm(path) in files || dirs.has(norm(path))),
+      listDir: vi.fn(async () => []),
+    };
+
+    const result = makeSetupResult({ characterDetails: "Fighter, level 1, standard array" });
+    await buildCampaignWorld("/tmp/campaigns", result, fileIO);
+
+    const charFile = Object.keys(files).find((p) => p.includes("/characters/"));
+    expect(charFile).toBeTruthy();
+    expect(files[charFile!]).toContain("Character Details");
+    expect(files[charFile!]).toContain("Fighter, level 1, standard array");
+  });
+
   it("creates campaign directory structure and files", async () => {
     const files: Record<string, string> = {};
     const dirs = new Set<string>();

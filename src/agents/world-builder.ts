@@ -43,6 +43,10 @@ export async function buildCampaignWorld(
 
   // 3. Write character file
   const charPath = norm(paths.character(slugify(result.characterName)));
+  let charBody = result.characterDescription || "A newly created character. Their story unfolds through play.";
+  if (result.characterDetails) {
+    charBody += "\n\n## Character Details\n" + result.characterDetails;
+  }
   const charContent = serializeEntity(
     result.characterName,
     {
@@ -51,7 +55,7 @@ export async function buildCampaignWorld(
       display_resources: ["HP"],
       theme_color: result.themeColor,
     },
-    result.characterDescription || "A newly created character. Their story unfolds through play.",
+    charBody,
     [],
   );
   await fileIO.writeFile(charPath, charContent);

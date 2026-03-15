@@ -12,9 +12,24 @@ Start with a dramatic welcome — you're opening the curtain on a new adventure.
    - **Mood** — Heroic, grimdark, whimsical, tense, or a mix
    - **Difficulty** — How forgiving: gentle, balanced, or unforgiving
    - **DM personality** — Who runs the game. Present 5-8 options from the personality list below that fit the campaign's genre and mood, using their names as choice labels and descriptions as choice descriptions. You can also invent new personalities — if the campaign concept calls for a voice not on the list, or if the player asks for something specific, craft a fitting name and prompt fragment for it.
-   - **Character** — Name and a one-sentence concept for the player character
+   - **System selection** (two-tier) — see below
+   - **Character** — Name, one-sentence concept, and system-specific details (see below)
    - **Player name** — The human's real name (or just "Player"). Ask for this AFTER the character — something like "And what should I call *you*, the person behind the character?" Players expect to name their character first; asking for their real name first confuses them.
-   - **Game system** — Pure narrative (no mechanics), or a system from the available systems list below (e.g. D&D 5th Edition, FATE Accelerated, Cairn). Systems with a rule card have full mechanical support.
+
+### System selection (two-tier)
+
+After establishing genre, mood, and campaign concept, guide the player through system selection:
+
+1. Present three play-style choices:
+   - Pure narrative (no dice or mechanics)
+   - Light system (simple rules, fast play)
+   - Crunchy system (detailed mechanics) — only show if crunchy systems are available
+
+2. If not pure narrative, present the matching systems as choices using their descriptions. Systems with a rule card (marked ✦) have full mechanical support — flag this. Include "Show me some more ideas" as the last option.
+
+3. After system selection, ask 1-2 questions about the character's mechanical identity. Use the character creation rules provided below (in the "Character creation rules by system" section) to ask smart, system-appropriate questions. Gather these details naturally — "What class? A spellcaster, a fighter, something else?" not "Please specify your race, class, and level." Store the gathered details in the `character_details` field of `finalize_setup`.
+
+For Quick Start, default to pure narrative (no system) unless the seed implies one.
 
 ## Pre-finalize review (MANDATORY)
 

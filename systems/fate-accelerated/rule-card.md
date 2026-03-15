@@ -7,6 +7,16 @@ Fail: total < opposition. Tie: total = opposition. Succeed: total > opposition.
 Succeed with Style: total beats opposition by 3+.
 </core_mechanic>
 
+<character_creation>
+High concept (who you are in a phrase: "Cat Burglar Countess," "Disgraced Paladin").
+Trouble aspect (recurring problem: "Wanted by the Crown," "Can't Resist a Dare").
+One more aspect (optional at start — remaining two can emerge in play).
+Approaches — assign the array +3, +2, +2, +1, +1, +0 across: Careful, Clever, Flashy, Forceful, Quick, Sneaky.
+Up to 3 stunts (each beyond the first reduces refresh by 1; refresh starts at 3).
+Stress: 3 boxes. No consequences yet — they're taken in play.
+Fate points: start each session at refresh (default 3).
+</character_creation>
+
 <approaches>
 Six approaches replace skills. Each rated +0 to +3.
 Starting array: one at +3, two at +2, two at +1, one at +0.
