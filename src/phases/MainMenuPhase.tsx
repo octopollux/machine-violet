@@ -138,7 +138,6 @@ export function MainMenuPhase({
         <Text color={markerColor}>{marker}</Text>
         <Text color={disabled ? "#555555" : undefined} dimColor={disabled}>{` ${item}`}</Text>
         {description ? <Text color={disabled ? "#555555" : dimColor} dimColor={disabled}>{` — ${description}`}</Text> : null}
-        {disabled ? <Text color="#555555">{" (no valid key)"}</Text> : null}
       </Text>,
     );
 

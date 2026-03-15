@@ -391,20 +391,28 @@ export default function App({ shutdownRef }: AppProps) {
     });
   }, []);
 
-  /** Is the currently active key valid (passed health check)? */
+  /**
+   * Gate for API-requiring menu items. Only block when we *know* the key
+   * is bad: no key at all, or a completed check that returned invalid/error.
+   * "Checking" and "not yet checked" are treated as OK so the user isn't
+   * forced to wait on the health-check round-trip before playing.
+   */
   const activeKeyValid = (() => {
     const entry = getActiveKeyEntry(keyStore);
     if (!entry) return false;
     const h = keyHealth[entry.id];
-    return h?.status === "valid" || h?.status === "rate_limited";
+    if (!h) return true; // not checked yet — don't block
+    if (h.status === "checking") return true;
+    return h.status === "valid" || h.status === "rate_limited";
   })();
 
-  /** Short status string for the active key. */
+  /** Short status string for the active key (shown on API Keys menu item). */
   const activeKeyStatus = (() => {
     const entry = getActiveKeyEntry(keyStore);
     if (!entry) return "No key";
     const h = keyHealth[entry.id];
-    if (!h) return "Checking...";
+    if (!h || h.status === "checking") return "";
+    if (h.status === "valid") return ""; // don't clutter the menu when things are fine
     return formatHealthStatus(h);
   })();
 
