@@ -55,6 +55,9 @@ export class CostTracker {
     apiCalls: 0,
   };
 
+  /** Optional callback fired after every record() with the new total token count. */
+  onRecord?: (totalTokens: number) => void;
+
   /** Record usage from an API call, bucketed by tier. */
   record(usage: UsageStats, tier: ModelTier): void {
     const t = this.breakdown.byTier[tier];
@@ -67,6 +70,13 @@ export class CostTracker {
     this.breakdown.tokens.cacheReadTokens += usage.cacheReadTokens;
     this.breakdown.tokens.cacheCreationTokens += usage.cacheCreationTokens;
     this.breakdown.apiCalls++;
+
+    this.onRecord?.(this.getTotalTokens());
+  }
+
+  /** Total tokens consumed this session (input + output). */
+  getTotalTokens(): number {
+    return this.breakdown.tokens.inputTokens + this.breakdown.tokens.outputTokens;
   }
 
   /** Get the current token breakdown (independent copy). */

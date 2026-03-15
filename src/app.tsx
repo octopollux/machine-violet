@@ -41,9 +41,15 @@ import { sandboxFileIO, campaignPaths } from "./tools/filesystem/index.js";
 
 import { FirstLaunchPhase } from "./phases/FirstLaunchPhase.js";
 import { MainMenuPhase } from "./phases/MainMenuPhase.js";
+import { ApiKeysPhase } from "./phases/ApiKeysPhase.js";
 import { SetupPhase } from "./phases/SetupPhase.js";
 import { PlayingPhase } from "./phases/PlayingPhase.js";
 import { AddContentPhase } from "./phases/AddContentPhase.js";
+import { loadKeyStore, saveKeyStore, buildEffectiveStore, getActiveKeyValue, getActiveKeyEntry } from "./config/api-keys.js";
+import type { ApiKeyStore } from "./config/api-keys.js";
+import { checkKeyHealth, formatHealthStatus } from "./config/api-key-health.js";
+import type { KeyHealthResult } from "./config/api-key-health.js";
+import { formatK } from "./context/cost-tracker.js";
 import { validatePdfs, runIngestPipeline, runPerBookStages, runSharedStages, slugify } from "./content/index.js";
 import type { ValidatedPdf, IngestProgress, ProcessingProgress } from "./content/index.js";
 import { listAvailableSystems, readBundledRuleCard } from "./config/systems.js";
@@ -60,6 +66,7 @@ export type AppPhase =
   | "loading"
   | "first_launch"
   | "main_menu"
+  | "api_keys"
   | "add_content"
   | "setup"
   | "building"
@@ -245,6 +252,11 @@ export default function App({ shutdownRef }: AppProps) {
   // --- Systems ---
   const [systems, setSystems] = useState<AvailableSystem[]>([]);
 
+  // --- API key management ---
+  const [keyStore, setKeyStore] = useState<ApiKeyStore>({ keys: [], activeKeyId: null });
+  const [keyHealth, setKeyHealth] = useState<Record<string, KeyHealthResult>>({});
+  const tokenWarningRef = useRef({ lastWarnedAt: 0 });
+
   // --- Modal state (shared with PlayingPhase via props, set by buildCallbacks/dispatchTuiCommand) ---
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [retryOverlay, setRetryOverlay] = useState<RetryOverlay | null>(null);
@@ -340,6 +352,79 @@ export default function App({ shutdownRef }: AppProps) {
     }
   }, [getConfigPath]);
 
+  // --- API key helpers ---
+
+  /** Load key store from disk, merge env key, and kick off health checks. */
+  const refreshKeyStore = useCallback(() => {
+    const appDir = getAppDir();
+    const stored = loadKeyStore(appDir);
+    const effective = buildEffectiveStore(stored);
+    setKeyStore(effective);
+
+    // Sync process.env to the active key
+    const activeVal = getActiveKeyValue(effective);
+    if (activeVal) process.env.ANTHROPIC_API_KEY = activeVal;
+
+    // Check health for all keys
+    for (const entry of effective.keys) {
+      void checkKeyHealth(entry.key).then((result) => {
+        setKeyHealth((prev) => ({ ...prev, [entry.id]: result }));
+      });
+    }
+  }, [getAppDir]);
+
+  /** Handle store updates from the ApiKeysPhase (or anywhere). */
+  const handleUpdateKeyStore = useCallback((updated: ApiKeyStore) => {
+    setKeyStore(updated);
+    saveKeyStore(getAppDir(), updated);
+
+    // Sync active key to process.env
+    const activeVal = getActiveKeyValue(updated);
+    if (activeVal) process.env.ANTHROPIC_API_KEY = activeVal;
+  }, [getAppDir]);
+
+  /** Trigger a health check for a single key. */
+  const handleCheckHealth = useCallback((keyId: string, apiKey: string) => {
+    setKeyHealth((prev) => ({ ...prev, [keyId]: { status: "checking", message: "Checking...", checkedAt: new Date().toISOString() } }));
+    void checkKeyHealth(apiKey).then((result) => {
+      setKeyHealth((prev) => ({ ...prev, [keyId]: result }));
+    });
+  }, []);
+
+  /** Is the currently active key valid (passed health check)? */
+  const activeKeyValid = (() => {
+    const entry = getActiveKeyEntry(keyStore);
+    if (!entry) return false;
+    const h = keyHealth[entry.id];
+    return h?.status === "valid" || h?.status === "rate_limited";
+  })();
+
+  /** Short status string for the active key. */
+  const activeKeyStatus = (() => {
+    const entry = getActiveKeyEntry(keyStore);
+    if (!entry) return "No key";
+    const h = keyHealth[entry.id];
+    if (!h) return "Checking...";
+    return formatHealthStatus(h);
+  })();
+
+  // --- Token budget warning (fires during gameplay via CostTracker callback) ---
+  useEffect(() => {
+    const tracker = costTracker.current;
+    tracker.onRecord = (totalTokens: number) => {
+      const entry = getActiveKeyEntry(keyStore);
+      if (!entry?.tokenBudget) return;
+      const remaining = entry.tokenBudget - totalTokens;
+      if (remaining >= 100_000) return; // not low yet
+      if (totalTokens - tokenWarningRef.current.lastWarnedAt < 10_000) return; // throttle
+      tokenWarningRef.current.lastWarnedAt = totalTokens;
+      const msg = remaining > 0
+        ? `Token budget low: ~${formatK(remaining)} tokens remaining`
+        : `Token budget exceeded by ~${formatK(-remaining)} tokens`;
+      setNarrativeLines((prev) => [...prev, { kind: "system", text: msg }]);
+    };
+  }, [keyStore, setNarrativeLines]);
+
   // --- Loading phase ---
   useEffect(() => {
     if (phase !== "loading") return;
@@ -349,13 +434,14 @@ export default function App({ shutdownRef }: AppProps) {
       readFileSync(configPath, "utf-8");
       setPhase("main_menu");
       loadCampaigns();
+      refreshKeyStore();
       return;
     } catch { /* config.json doesn't exist — first launch */ }
 
     const envKey = process.env.ANTHROPIC_API_KEY;
     if (envKey) setInitialApiKey(envKey);
     setPhase("first_launch");
-  }, [phase, getConfigPath, loadCampaigns]);
+  }, [phase, getConfigPath, loadCampaigns, refreshKeyStore]);
 
   // --- Build game state from config ---
   const buildGameState = useCallback((config: CampaignConfig, campaignRoot: string): GameState => {
@@ -652,10 +738,12 @@ export default function App({ shutdownRef }: AppProps) {
       }
 
       resetGameState();
+      tokenWarningRef.current.lastWarnedAt = 0;
       await loadCampaigns();
+      refreshKeyStore();
       setPhase("main_menu");
     })();
-  }, [shutdownRef, resetGameState, loadCampaigns]);
+  }, [shutdownRef, resetGameState, loadCampaigns, refreshKeyStore]);
 
   // Keep the ref in sync so useGameCallbacks' dispatchTuiCommand always calls the latest version
   returnToMenuRef.current = doSaveAndReturn;
@@ -688,10 +776,12 @@ export default function App({ shutdownRef }: AppProps) {
       }
 
       resetGameState();
+      tokenWarningRef.current.lastWarnedAt = 0;
       await loadCampaigns();
+      refreshKeyStore();
       setPhase("main_menu");
     })();
-  }, [shutdownRef, resetGameState, loadCampaigns]);
+  }, [shutdownRef, resetGameState, loadCampaigns, refreshKeyStore]);
 
   // --- Quit: hard exit ---
   const doQuit = useCallback(() => {
@@ -779,10 +869,11 @@ export default function App({ shutdownRef }: AppProps) {
       process.env.ANTHROPIC_API_KEY = apiKey;
       setPhase("main_menu");
       loadCampaigns();
+      refreshKeyStore();
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : "Failed to write config");
     }
-  }, [getAppDir, loadCampaigns]);
+  }, [getAppDir, loadCampaigns, refreshKeyStore]);
 
   // --- Render ---
 
@@ -796,10 +887,26 @@ export default function App({ shutdownRef }: AppProps) {
         theme={theme}
         campaigns={campaigns}
         errorMsg={errorMsg}
+        apiKeyValid={activeKeyValid}
+        apiKeyStatus={activeKeyStatus}
         onNewCampaign={() => setPhase("setup")}
         onResumeCampaign={resumeCampaign}
         onAddContent={() => setPhase("add_content")}
+        onApiKeys={() => setPhase("api_keys")}
         onQuit={doQuit}
+      />
+    );
+  }
+
+  if (phase === "api_keys") {
+    return (
+      <ApiKeysPhase
+        theme={theme}
+        store={keyStore}
+        healthResults={keyHealth}
+        onUpdateStore={handleUpdateKeyStore}
+        onCheckHealth={handleCheckHealth}
+        onBack={() => setPhase("main_menu")}
       />
     );
   }
