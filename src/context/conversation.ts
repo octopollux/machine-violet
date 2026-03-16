@@ -106,8 +106,10 @@ export class ConversationManager {
       dropped = { exchange: removed, reason: "exchange_count" };
     }
 
-    // Drop by token count
+    // Drop by token count (0 = disabled — scene transitions and pacing nudges
+    // handle long scenes; mid-scene token pruning invalidates the prompt cache)
     while (
+      this.config.max_conversation_tokens > 0 &&
       this.exchanges.length > 1 &&
       this.getEstimatedTokens() > this.config.max_conversation_tokens
     ) {

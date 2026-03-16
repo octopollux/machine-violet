@@ -71,7 +71,7 @@ The DM's context is structured in layers with cache breakpoints:
       + current player input
 ```
 
-Conversation accumulates within a scene and is cleared at scene transition. With automatic caching, prior exchanges are read at cache rate. A `max_conversation_tokens` safety brake drops oldest exchanges in unusually long scenes; when that fires, a Haiku precis updater compresses the dropped exchange into the scene precis.
+Conversation accumulates within a scene and is cleared at scene transition. With automatic caching, prior exchanges are read at cache rate. Scene pacing nudges and transition pressure handle long scenes naturally; `max_conversation_tokens` defaults to 0 (disabled) since mid-scene pruning invalidates the prompt cache.
 
 **Code:** `src/context/prefix-builder.ts` (prefix assembly), `src/context/conversation.ts` (retention), `src/agents/scene-manager.ts` (precis updates)
 

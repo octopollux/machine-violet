@@ -50,7 +50,7 @@ export function buildCampaignConfig(result: SetupResult): CampaignConfig {
     combat: defaultCombatConfig(),
     context: {
       retention_exchanges: 100,
-      max_conversation_tokens: 100_000,
+      max_conversation_tokens: 0,
       tool_result_stub_after: 5,
     },
     recovery: {

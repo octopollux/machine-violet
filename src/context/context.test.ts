@@ -144,6 +144,22 @@ describe("ConversationManager", () => {
     expect(dropped!.reason).toBe("token_limit");
   });
 
+  it("does not drop exchanges when max_conversation_tokens is 0 (disabled)", () => {
+    const config: ContextConfig = {
+      retention_exchanges: 100,
+      max_conversation_tokens: 0,
+      tool_result_stub_after: 1,
+    };
+    const mgr = new ConversationManager(config);
+
+    // Add large exchanges that would exceed any reasonable limit
+    mgr.addExchange(userMsg("a".repeat(500)), assistantMsg("b".repeat(500)));
+    const dropped = mgr.addExchange(userMsg("c".repeat(500)), assistantMsg("d".repeat(500)));
+
+    expect(dropped).toBeNull();
+    expect(mgr.size).toBe(2);
+  });
+
   it("preserves full tool results in conversation (no stubbing)", () => {
     const mgr = new ConversationManager(defaultContextConfig);
 
