@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useInput, Text, Box } from "ink";
 import type { ResolvedTheme } from "../tui/themes/types.js";
 import { ThemedHorizontalBorder, ThemedSideFrame, TerminalTooSmall } from "../tui/components/index.js";
@@ -24,14 +24,15 @@ export function SettingsPhase({
 }: SettingsPhaseProps) {
   const { columns: cols, rows: termRows } = useTerminalSize();
   const [menuIndex, setMenuIndex] = useState(0);
-  const [navigated, setNavigated] = useState(false);
+  const navigatedRef = useRef(false);
 
-  // Deep-link: if initialView is set, navigate once on first render
-  if (initialView === "api_keys" && !navigated) {
-    setNavigated(true);
-    // Schedule navigation after render to avoid setState-during-render warnings
-    setTimeout(() => onApiKeys(), 0);
-  }
+  // Deep-link: if initialView is set, navigate once on mount
+  useEffect(() => {
+    if (initialView === "api_keys" && !navigatedRef.current) {
+      navigatedRef.current = true;
+      onApiKeys();
+    }
+  }, [initialView, onApiKeys]);
 
   useInput((_input, key) => {
     if (key.escape) {

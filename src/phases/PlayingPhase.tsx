@@ -201,6 +201,7 @@ export function PlayingPhase() {
         setCustomInputResetKey((k) => k + 1);
         setMenuOpen(false);
         setMenuIndex(0);
+        setCampaignSettingsOpen(false);
         if (activeSession) {
           exitActiveSession();
         }
