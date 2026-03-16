@@ -15,7 +15,7 @@ import type { TerminalDims, InjectionContext } from "./injections.js";
 import { processNarrativeLines } from "../tui/formatting.js";
 import type { NarrativeLine } from "../types/tui.js";
 import type { DMSessionState } from "./dm-prompt.js";
-import { getModel, getThinkingConfig } from "../config/models.js";
+import { getModel } from "../config/models.js";
 import type { ModelTier } from "../config/models.js";
 import { accUsage } from "../context/usage-helpers.js";
 import { TOKEN_LIMITS } from "../config/tokens.js";
@@ -1064,12 +1064,10 @@ export class GameEngine {
   }
 
   private buildAgentConfig(): AgentLoopConfig {
-    const tc = getThinkingConfig("dm");
     return {
       model: this.model,
-      maxTokens: TOKEN_LIMITS.DM_RESPONSE + tc.budgetTokens,
+      maxTokens: TOKEN_LIMITS.DM_RESPONSE,
       maxToolRounds: 10,
-      thinking: tc.param,
       asyncToolHandler: (name, input) => this.handleAsyncTool(name, input),
       onTextDelta: (delta) => this.callbacks.onNarrativeDelta(delta),
       onToolStart: (name) => {

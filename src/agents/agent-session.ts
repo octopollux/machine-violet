@@ -3,7 +3,8 @@ import type { ToolResult } from "./tool-registry.js";
 import type { UsageStats, TuiCommand, ModelId } from "./agent-loop.js";
 import { accumulateUsage } from "../context/usage-helpers.js";
 import { dumpContext, dumpThinking } from "../config/context-dump.js";
-import { getThinkingConfig } from "../config/models.js";
+import { getEffortConfig } from "../config/models.js";
+import type { EffortLevel } from "../config/models.js";
 
 // --- Types ---
 
@@ -22,8 +23,8 @@ export interface AgentSessionConfig {
   maxTokens: number;
   /** Max tool-use rounds before cutting off (default 3). */
   maxToolRounds?: number;
-  /** Extended thinking config. Auto-resolved from name if omitted. */
-  thinking?: Anthropic.Messages.ThinkingConfigParam;
+  /** Effort level override. Auto-resolved from name if omitted. */
+  effort?: EffortLevel | null;
   /** Whether to stream (default true). */
   stream?: boolean;
   /** Tool definitions available to this session. */
@@ -164,6 +165,7 @@ interface CreateParams {
   messages: Anthropic.MessageParam[];
   tools?: Anthropic.Tool[];
   thinking?: Anthropic.Messages.ThinkingConfigParam;
+  output_config?: Anthropic.Messages.OutputConfig;
 }
 
 /**
@@ -181,9 +183,11 @@ export async function runAgentLoop(
   const shouldStream = config.stream !== false && !!config.onTextDelta;
   const shouldRetry = config.retry ?? false;
 
-  // Resolve thinking config from agent name if not explicitly provided
-  const tc = config.thinking ? { param: config.thinking, budgetTokens: 0 } : getThinkingConfig(config.name);
-  const effectiveMaxTokens = config.maxTokens + tc.budgetTokens;
+  // Resolve effort config from agent name if not explicitly provided
+  const ec = config.effort !== undefined
+    ? { thinking: config.effort ? { type: "adaptive" as const } : { type: "disabled" as const }, effort: config.effort }
+    : getEffortConfig(config.name);
+  const outputConfig: Anthropic.Messages.OutputConfig | undefined = ec.effort ? { effort: ec.effort } : undefined;
 
   // Apply terse suffix
   let effectiveSystem = systemPrompt;
@@ -214,24 +218,20 @@ export async function runAgentLoop(
   // numbers align with assistant message indices in the context dump viewer.
   const priorAssistantCount = messages.filter((m) => m.role === "assistant").length;
 
-  let params: CreateParams = {
+  const buildParams = (): CreateParams => ({
     model: config.model,
-    max_tokens: effectiveMaxTokens,
+    max_tokens: config.maxTokens,
     system: effectiveSystem,
     messages: workingMessages,
-    thinking: tc.param,
+    thinking: ec.thinking,
+    ...(outputConfig ? { output_config: outputConfig } : {}),
     ...(tools ? { tools } : {}),
-  };
+  });
+
+  let params: CreateParams = buildParams();
 
   for (let round = 0; round < maxToolRounds; round++) {
-    params = {
-      model: config.model,
-      max_tokens: effectiveMaxTokens,
-      system: effectiveSystem,
-      messages: workingMessages,
-      thinking: tc.param,
-      ...(tools ? { tools } : {}),
-    };
+    params = buildParams();
 
     let response: Anthropic.Message;
 

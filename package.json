@@ -29,7 +29,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.78.0",
+    "@anthropic-ai/sdk": "^0.79.0",
     "dotenv": "^16.4.5",
     "ink": "^6.8.0",
     "ink-scroll-view": "^0.3.6",
