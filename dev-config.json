@@ -3,12 +3,18 @@
     "large": "claude-sonnet-4-6"
   },
   "effort": {
+    "default": null,
     "dm": "high",
     "ooc": "high",
     "dev-mode": "high",
     "ai-player": "low",
     "setup": "high",
     "setup-gen": "high",
+    "scene-summarizer": null,
+    "precis-updater": null,
+    "changelog-updater": null,
+    "compendium-updater": null,
+    "choice-generator": null,
     "resolve_action": "medium",
     "promote_character": "medium",
     "repair-state": "medium"
