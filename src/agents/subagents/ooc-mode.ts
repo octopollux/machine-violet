@@ -393,7 +393,7 @@ async function dispatchDMTool(
     if (result.is_error) return result;
     const cmd = result._tui ?? JSON.parse(result.content);
     const scribeResult = await runScribe(client, {
-      updates: (cmd as Record<string, unknown>).updates as { visibility: string; content: string }[],
+      updates: (cmd as Record<string, unknown>).updates as import("./scribe.js").ScribeUpdate[],
       campaignRoot,
       sceneNumber: 0, // OOC has no scene number
     }, fileIO);

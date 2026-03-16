@@ -24,7 +24,7 @@ function mockScene(overrides?: Partial<SceneState>): SceneState {
     precis: "",
     openThreads: "",
     npcIntents: "",
-    playerReads: "",
+    playerReads: [],
     sessionNumber: 1,
     ...overrides,
   };

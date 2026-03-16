@@ -1,3 +1,4 @@
+import { describe, it, expect } from "vitest";
 import { processingPaths } from "./processing-paths.js";
 
 /** Normalize backslashes for cross-platform assertions. */

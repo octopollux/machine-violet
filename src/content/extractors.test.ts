@@ -118,7 +118,7 @@ describe("writeDraftEntities", () => {
     const entities: DraftEntity[] = [
       {
         name: "Goblin",
-        category: "characters",
+        category: "monsters",
         slug: "goblin",
         frontMatter: { type: "Monster", cr: "1/4" },
         body: "A small green creature.",
@@ -142,12 +142,12 @@ describe("writeDraftEntities", () => {
     const writeCalls = (io.writeFile as ReturnType<typeof vi.fn>).mock.calls;
     expect(writeCalls).toHaveLength(2);
 
-    const paths = writeCalls.map((c: [string, string]) => norm(c[0]));
-    expect(paths.some((p: string) => p.includes("drafts/characters/goblin.md"))).toBe(true);
+    const paths = writeCalls.map((c: unknown[]) => norm(c[0] as string));
+    expect(paths.some((p: string) => p.includes("drafts/monsters/goblin.md"))).toBe(true);
     expect(paths.some((p: string) => p.includes("drafts/locations/waterdeep.md"))).toBe(true);
 
     // Check content uses serializeEntity format
-    const goblinContent = writeCalls.find((c: [string, string]) => c[0].includes("goblin"))?.[1] as string;
+    const goblinContent = writeCalls.find((c: unknown[]) => (c[0] as string).includes("goblin"))?.[1] as string;
     expect(goblinContent).toContain("# Goblin");
     expect(goblinContent).toContain("**Type:** Monster");
   });

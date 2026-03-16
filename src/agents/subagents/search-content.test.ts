@@ -1,3 +1,4 @@
+import { describe, it, expect, vi } from "vitest";
 import { buildContentSearchToolHandler } from "./search-content.js";
 import type { FileIO } from "../scene-manager.js";
 import type { CategoryFacets } from "../../types/facets.js";
