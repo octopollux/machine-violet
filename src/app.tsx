@@ -45,6 +45,7 @@ import { ApiKeysPhase } from "./phases/ApiKeysPhase.js";
 import { SetupPhase } from "./phases/SetupPhase.js";
 import { PlayingPhase } from "./phases/PlayingPhase.js";
 import { AddContentPhase } from "./phases/AddContentPhase.js";
+import { SettingsPhase } from "./phases/SettingsPhase.js";
 import { loadKeyStore, saveKeyStore, buildEffectiveStore, getActiveKeyValue, getActiveKeyEntry } from "./config/api-keys.js";
 import type { ApiKeyStore } from "./config/api-keys.js";
 import { checkKeyHealth, formatHealthStatus } from "./config/api-key-health.js";
@@ -65,6 +66,8 @@ export type AppPhase =
   | "loading"
   | "first_launch"
   | "main_menu"
+  | "settings"
+  | "settings_api_keys"
   | "api_keys"
   | "add_content"
   | "setup"
@@ -907,8 +910,20 @@ export default function App({ shutdownRef }: AppProps) {
         onNewCampaign={() => setPhase("setup")}
         onResumeCampaign={resumeCampaign}
         onAddContent={() => setPhase("add_content")}
-        onApiKeys={() => setPhase("api_keys")}
+        onSettings={() => setPhase("settings")}
+        onSettingsApiKeys={() => setPhase("settings_api_keys")}
         onQuit={doQuit}
+      />
+    );
+  }
+
+  if (phase === "settings" || phase === "settings_api_keys") {
+    return (
+      <SettingsPhase
+        theme={theme}
+        initialView={phase === "settings_api_keys" ? "api_keys" : undefined}
+        onApiKeys={() => setPhase("api_keys")}
+        onBack={() => setPhase("main_menu")}
       />
     );
   }
@@ -921,7 +936,7 @@ export default function App({ shutdownRef }: AppProps) {
         healthResults={keyHealth}
         onUpdateStore={handleUpdateKeyStore}
         onCheckHealth={handleCheckHealth}
-        onBack={() => setPhase("main_menu")}
+        onBack={() => setPhase("settings")}
       />
     );
   }

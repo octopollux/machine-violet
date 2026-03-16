@@ -7,7 +7,7 @@ import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, narrativeRo
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { Layout } from "../tui/layout.js";
 import { stripFormatting, stripLeadingBullet } from "../tui/formatting.js";
-import { ChoiceOverlay, DESCRIPTION_ROWS, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, CompendiumModal, ApiErrorModal, SwatchModal, getMenuItems } from "../tui/modals/index.js";
+import { ChoiceOverlay, DESCRIPTION_ROWS, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, CompendiumModal, ApiErrorModal, SwatchModal, CampaignSettingsModal, getMenuItems } from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { getActivePlayer, switchToNextPlayer, getPlayerEntries } from "../agents/player-manager.js";
 import { createOOCSession } from "../agents/subagents/ooc-mode.js";
@@ -52,6 +52,7 @@ export function PlayingPhase() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuIndex, setMenuIndex] = useState(0);
   const [modeBusy, setModeBusy] = useState(false);
+  const [campaignSettingsOpen, setCampaignSettingsOpen] = useState(false);
   const [customInputMode, setCustomInputMode] = useState(false);
   const [customInputResetKey, setCustomInputResetKey] = useState(0);
 
@@ -328,6 +329,15 @@ export function PlayingPhase() {
       return;
     }
 
+    // Campaign settings submenu: ESC returns to game menu
+    if (campaignSettingsOpen) {
+      if (key.escape) {
+        setCampaignSettingsOpen(false);
+        setMenuOpen(true);
+      }
+      return;
+    }
+
     // ESC toggles game menu
     if (key.escape) {
       setMenuOpen((v) => !v);
@@ -400,6 +410,9 @@ export function PlayingPhase() {
               setNarrativeLines((prev) => [...prev, { kind: "system", text: "[OOC Mode \u2014 type to chat, ESC to exit]" }, { kind: "dm", text: "" }]);
             }
           }
+        } else if (item === "Settings") {
+          setMenuOpen(false);
+          setCampaignSettingsOpen(true);
         } else if (item === "Dev Mode") {
           setMenuOpen(false);
           if ((activeSession as null | { label: string })?.label === "Dev") {
@@ -567,6 +580,14 @@ export function PlayingPhase() {
           width={cols}
           height={rows}
           overlay={retryOverlay}
+        />
+      )}
+      {campaignSettingsOpen && gameStateRef.current && (
+        <CampaignSettingsModal
+          theme={theme}
+          width={cols}
+          height={rows}
+          config={gameStateRef.current.config}
         />
       )}
       {menuOpen && (
