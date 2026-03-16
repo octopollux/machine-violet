@@ -18,7 +18,9 @@ export interface MainMenuPhaseProps {
   onNewCampaign: () => void;
   onResumeCampaign: (entry: CampaignEntry) => void;
   onAddContent: () => void;
-  onApiKeys: () => void;
+  onSettings: () => void;
+  /** Navigate to Settings with API Keys pre-focused (deep link). */
+  onSettingsApiKeys: () => void;
   onQuit: () => void;
 }
 
@@ -34,7 +36,8 @@ export function MainMenuPhase({
   onNewCampaign,
   onResumeCampaign,
   onAddContent,
-  onApiKeys,
+  onSettings,
+  onSettingsApiKeys,
   onQuit,
 }: MainMenuPhaseProps) {
   const { columns: cols, rows: termRows } = useTerminalSize();
@@ -42,9 +45,13 @@ export function MainMenuPhase({
   const [expandedCampaigns, setExpandedCampaigns] = useState(false);
   const [campaignSelectIndex, setCampaignSelectIndex] = useState(0);
 
-  const mainMenuItems = campaigns.length > 0
-    ? ["New Campaign", "Continue Campaign", "Add Content", "API Keys", "Quit"]
-    : ["New Campaign", "Add Content", "API Keys", "Quit"];
+  const mainMenuItems: string[] = [];
+  mainMenuItems.push("New Campaign");
+  if (campaigns.length > 0) mainMenuItems.push("Continue Campaign");
+  mainMenuItems.push("Add Content");
+  if (!apiKeyValid) mainMenuItems.push("API Keys");
+  mainMenuItems.push("Settings");
+  mainMenuItems.push("Quit");
 
   const isItemDisabled = (item: string): boolean =>
     API_REQUIRED_ITEMS.has(item) && !apiKeyValid;
@@ -95,7 +102,9 @@ export function MainMenuPhase({
       } else if (selected === "Add Content") {
         onAddContent();
       } else if (selected === "API Keys") {
-        onApiKeys();
+        onSettingsApiKeys();
+      } else if (selected === "Settings") {
+        onSettings();
       } else if (selected === "Quit") {
         onQuit();
       }
@@ -132,6 +141,7 @@ export function MainMenuPhase({
     else if (item === "Continue Campaign" && campaigns.length > 0) description = `${campaigns.length} saved`;
     else if (item === "Add Content") description = "Import PDFs for game systems";
     else if (item === "API Keys") description = apiKeyStatus ?? "";
+    else if (item === "Settings") description = "";
 
     menuLines.push(
       <Text key={item}>

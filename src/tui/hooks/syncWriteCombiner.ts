@@ -27,9 +27,9 @@ export function installSyncWriteCombiner(
   let inSync = false;
 
   stream.write = function (
-    chunk: unknown,
-    encodingOrCb?: BufferEncoding | ((err?: Error) => void),
-    cb?: (err?: Error) => void,
+    chunk: string | Uint8Array,
+    encodingOrCb?: BufferEncoding | ((err?: Error | null) => void),
+    cb?: (err?: Error | null) => void,
   ): boolean {
     const str = typeof chunk === "string" ? chunk : String(chunk);
 

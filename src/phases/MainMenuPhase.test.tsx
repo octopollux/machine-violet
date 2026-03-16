@@ -25,7 +25,8 @@ function defaultProps(overrides?: Partial<MainMenuPhaseProps>): MainMenuPhasePro
     onNewCampaign: vi.fn(),
     onResumeCampaign: vi.fn(),
     onAddContent: vi.fn(),
-    onApiKeys: vi.fn(),
+    onSettings: vi.fn(),
+    onSettingsApiKeys: vi.fn(),
     onQuit: vi.fn(),
     ...overrides,
   };
@@ -85,9 +86,21 @@ describe("MainMenuPhase", () => {
     expect(frame).toContain("○");
   });
 
-  it("renders API Keys menu item", () => {
-    const { lastFrame } = render(<MainMenuPhase {...defaultProps()} />);
+  it("renders API Keys in menu when key is invalid", () => {
+    const { lastFrame } = render(<MainMenuPhase {...defaultProps({ apiKeyValid: false })} />);
     expect(lastFrame()).toContain("API Keys");
+  });
+
+  it("hides API Keys from menu when key is valid", () => {
+    const { lastFrame } = render(<MainMenuPhase {...defaultProps({ apiKeyValid: true })} />);
+    // API Keys should not appear as a standalone item when key is valid
+    // (it's inside Settings instead)
+    expect(lastFrame()).not.toContain("API Keys");
+  });
+
+  it("renders Settings menu item", () => {
+    const { lastFrame } = render(<MainMenuPhase {...defaultProps()} />);
+    expect(lastFrame()).toContain("Settings");
   });
 
   it("blocks New Campaign when apiKeyValid is false", () => {

@@ -19,7 +19,7 @@ function makeTheme() {
 }
 
 const defaultSystems: AvailableSystem[] = [
-  { slug: "dnd-5e", name: "D&D 5th Edition", bundled: true, hasRuleCard: true, processed: false },
+  { slug: "dnd-5e", name: "D&D 5th Edition", bundled: true, hasRuleCard: true, processed: false, complexity: "high" as const, description: "The world's most popular RPG" },
 ];
 
 function defaultProps(overrides?: Partial<AddContentPhaseProps>): AddContentPhaseProps {
@@ -52,7 +52,7 @@ describe("AddContentPhase", () => {
 
   it("shows checkmark for processed systems", () => {
     const processedSystems: AvailableSystem[] = [
-      { slug: "dnd-5e", name: "D&D 5th Edition", bundled: true, hasRuleCard: true, processed: true },
+      { slug: "dnd-5e", name: "D&D 5th Edition", bundled: true, hasRuleCard: true, processed: true, complexity: "high" as const, description: "The world's most popular RPG" },
     ];
     const { lastFrame } = render(<AddContentPhase {...defaultProps({ systems: processedSystems })} />);
     expect(lastFrame()).toContain("\u2713");

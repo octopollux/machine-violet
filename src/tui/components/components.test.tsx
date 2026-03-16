@@ -210,7 +210,7 @@ describe("ActivityLine", () => {
     const { lastFrame } = render(
       <ActivityLine engineState="dm_thinking" toolGlyphs={glyphs} />,
     );
-    const frame = lastFrame();
+    const frame = lastFrame()!;
     // Both dice glyphs should appear (not deduplicated)
     const diceCount = (frame.match(/⚄/g) || []).length;
     expect(diceCount).toBe(2);

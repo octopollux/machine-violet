@@ -229,7 +229,7 @@ describe("CampaignRepo preCommitHook", () => {
       callOrder.push("hook");
     };
     const origStatusMatrix = git.statusMatrix;
-    git.statusMatrix = vi.fn(async (...args) => {
+    git.statusMatrix = vi.fn(async (...args: Parameters<typeof git.statusMatrix>) => {
       callOrder.push("statusMatrix");
       return origStatusMatrix(...args);
     }) as typeof git.statusMatrix;
