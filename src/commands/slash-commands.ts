@@ -23,6 +23,7 @@ export interface SlashCommandContext {
   dispatchTuiCommand?: (cmd: import("../agents/agent-loop.js").TuiCommand) => void;
   setActiveModal?: (modal: ActiveModal) => void;
   onReturnToMenu?: () => void;
+  onRollbackComplete?: (summary: string) => void;
 }
 
 export interface SlashCommand {
@@ -110,8 +111,10 @@ const rollbackCommand: SlashCommand = {
       return;
     }
     ctx.appendLine({ kind: "system", text: `[Rolling back ${n} exchange(s)...]` });
-    await performRollback(repo, `exchanges_ago:${n}`, gs.campaignRoot, fileIO);
-    if (ctx.onReturnToMenu) {
+    const result = await performRollback(repo, `exchanges_ago:${n}`, gs.campaignRoot, fileIO);
+    if (ctx.onRollbackComplete) {
+      ctx.onRollbackComplete(result.summary);
+    } else if (ctx.onReturnToMenu) {
       ctx.onReturnToMenu();
     } else {
       process.exit(0);

@@ -62,6 +62,7 @@ export interface GameContextValue {
   // Actions
   dispatchTuiCommand: (cmd: TuiCommand) => void;
   onReturnToMenu: () => void;
+  onRollbackReturn: () => void;
   onEndSessionAndReturn: () => void;
 }
 

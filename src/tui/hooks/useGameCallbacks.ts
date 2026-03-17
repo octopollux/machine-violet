@@ -157,6 +157,10 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
         onReturnToMenu();
         break;
       }
+      case "show_rollback_summary": {
+        setActiveModal({ kind: "rollback", summary: cmd.summary as string });
+        break;
+      }
       case "enter_ooc": {
         previousVariantRef.current = variantRef.current ?? "exploration";
         const gs = gameStateRef.current;

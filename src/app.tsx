@@ -30,7 +30,7 @@ import { StatePersister } from "./context/state-persistence.js";
 import type { LoadedState } from "./context/state-persistence.js";
 import { CostTracker } from "./context/cost-tracker.js";
 import type { ShutdownContext } from "./shutdown.js";
-import { teardownGameSession } from "./teardown.js";
+import { teardownGameSession, resetAllCaches } from "./teardown.js";
 import { createGitIO } from "./tools/git/isogit-adapter.js";
 import { useGameCallbacks } from "./tui/hooks/useGameCallbacks.js";
 import { useRawModeGuardian } from "./tui/hooks/useRawModeGuardian.js";
@@ -764,6 +764,19 @@ export default function App({ shutdownRef }: AppProps) {
   // Keep the ref in sync so useGameCallbacks' dispatchTuiCommand always calls the latest version
   returnToMenuRef.current = doSaveAndReturn;
 
+  // --- Rollback Return: skip gracefulShutdown (state already rolled back on disk) ---
+  const doRollbackReturn = useCallback(() => {
+    setPhase("returning_to_menu");
+    resetAllCaches();
+    resetGameState();
+    tokenWarningRef.current.lastWarnedAt = 0;
+    void (async () => {
+      await loadCampaigns();
+      refreshKeyStore();
+      setPhase("main_menu");
+    })();
+  }, [resetGameState, loadCampaigns, refreshKeyStore]);
+
   // --- End Session & Return: full session-end housekeeping then return ---
   const doEndSessionAndReturn = useCallback(() => {
     setPhase("returning_to_menu");
@@ -1013,6 +1026,7 @@ export default function App({ shutdownRef }: AppProps) {
     devModeEnabled: isDevMode(),
     dispatchTuiCommand,
     onReturnToMenu: doSaveAndReturn,
+    onRollbackReturn: doRollbackReturn,
     onEndSessionAndReturn: doEndSessionAndReturn,
   };
 
