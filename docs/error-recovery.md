@@ -33,7 +33,7 @@ rollback({
 })
 ```
 
-After rollback completes, the game returns to the main menu. Internally, rollback throws a `RollbackCompleteError` (from `src/teardown.ts`) which propagates through the agent loop and triggers the return-to-menu teardown flow. Re-entering the campaign loads the restored state via `session_resume`.
+After rollback completes, a `RollbackSummaryModal` displays what was restored and waits for the player to press Enter. Internally, rollback throws a `RollbackCompleteError` (from `src/teardown.ts`) which propagates through the agent loop and sets the rollback modal. On dismissal, a dedicated `doRollbackReturn()` path resets caches and UI state without calling `gracefulShutdown()` — this prevents in-memory state from being written back to disk and undoing the rollback. Re-entering the campaign loads the restored state via `session_resume`.
 
 ### Configuration
 
