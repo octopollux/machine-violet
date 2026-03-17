@@ -11,6 +11,7 @@ import type { CampaignConfig } from "../../types/config.js";
 import { createClocksState } from "../../tools/clocks/index.js";
 import { createCombatState, createDefaultConfig } from "../../tools/combat/index.js";
 import { createDecksState } from "../../tools/cards/index.js";
+import { createObjectivesState } from "../../tools/objectives/index.js";
 import { loadModelConfig } from "../../config/models.js";
 import { resetPromptCache } from "../../prompts/load-prompt.js";
 
@@ -597,6 +598,7 @@ function mockGameState(overrides?: Partial<GameState>): GameState {
     combat: createCombatState(),
     combatConfig: createDefaultConfig(),
     decks: createDecksState(),
+    objectives: createObjectivesState(),
     config: {
       name: "TestCampaign",
       dm_personality: { name: "Narrator", prompt_fragment: "terse" },

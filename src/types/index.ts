@@ -7,4 +7,5 @@ export * from "./entities.js";
 export * from "./config.js";
 export * from "./tui.js";
 export * from "./facets.js";
+export * from "./objectives.js";
 export * from "./resolve-session.js";

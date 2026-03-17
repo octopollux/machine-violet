@@ -2,6 +2,7 @@ import type { MapData } from "../types/maps.js";
 import type { ClocksState } from "../types/clocks.js";
 import type { CombatState, CombatConfig } from "../types/combat.js";
 import type { DecksState } from "../types/cards.js";
+import type { ObjectivesState } from "../types/objectives.js";
 import type { CampaignConfig } from "../types/config.js";
 
 /**
@@ -14,6 +15,7 @@ export interface GameState {
   combat: CombatState;
   combatConfig: CombatConfig;
   decks: DecksState;
+  objectives: ObjectivesState;
   config: CampaignConfig;
   campaignRoot: string;
   /** Application home directory (e.g. ~/.machine-violet) for system content paths. */

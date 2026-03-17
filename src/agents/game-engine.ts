@@ -249,6 +249,7 @@ export class GameEngine {
         case "clocks": this.persister.persistClocks(state.clocks); break;
         case "maps": this.persister.persistMaps(state.maps); break;
         case "decks": this.persister.persistDecks(state.decks); break;
+        case "objectives": this.persister.persistObjectives(state.objectives); break;
       }
     }
   }

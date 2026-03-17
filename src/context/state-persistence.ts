@@ -4,6 +4,7 @@ import type { FileIO } from "../agents/scene-manager.js";
 import type { CombatState } from "../types/combat.js";
 import type { ClocksState } from "../types/clocks.js";
 import type { DecksState } from "../types/cards.js";
+import type { ObjectivesState } from "../types/objectives.js";
 import type { MapData } from "../types/maps.js";
 import type { SceneState } from "../agents/scene-manager.js";
 import type { ConversationExchange } from "./conversation.js";
@@ -17,6 +18,7 @@ export const STATE_FILES = {
   clocks: "state/clocks.json",
   maps: "state/maps.json",
   decks: "state/decks.json",
+  objectives: "state/objectives.json",
   scene: "state/scene.json",
   conversation: "state/conversation.json",
   ui: "state/ui.json",
@@ -24,7 +26,7 @@ export const STATE_FILES = {
   displayLog: "state/display-log.md",
 } as const;
 
-export type StateSlice = "combat" | "clocks" | "maps" | "decks";
+export type StateSlice = "combat" | "clocks" | "maps" | "decks" | "objectives";
 
 /** Scene state subset that gets persisted */
 export interface PersistedSceneState {
@@ -49,6 +51,7 @@ export interface LoadedState {
   clocks?: ClocksState;
   maps?: Record<string, MapData>;
   decks?: DecksState;
+  objectives?: ObjectivesState;
   scene?: PersistedSceneState;
   conversation?: ConversationExchange[];
   ui?: PersistedUIState;
@@ -138,6 +141,10 @@ export class StatePersister {
     this.enqueueWrite(STATE_FILES.decks, JSON.stringify(state, null, 2));
   }
 
+  persistObjectives(state: ObjectivesState): void {
+    this.enqueueWrite(STATE_FILES.objectives, JSON.stringify(state, null, 2));
+  }
+
   persistScene(scene: PersistedSceneState): void {
     this.enqueueWrite(STATE_FILES.scene, JSON.stringify(scene, null, 2));
   }
@@ -181,17 +188,18 @@ export class StatePersister {
 
   /** Load all persisted state files. Missing files return undefined per key. */
   async loadAll(): Promise<LoadedState> {
-    const [combat, clocks, maps, decks, scene, conversation, ui, usage] = await Promise.all([
+    const [combat, clocks, maps, decks, objectives, scene, conversation, ui, usage] = await Promise.all([
       this.readJSON<CombatState>(STATE_FILES.combat),
       this.readJSON<ClocksState>(STATE_FILES.clocks),
       this.readJSON<Record<string, MapData>>(STATE_FILES.maps),
       this.readJSON<DecksState>(STATE_FILES.decks),
+      this.readJSON<ObjectivesState>(STATE_FILES.objectives),
       this.readJSON<PersistedSceneState>(STATE_FILES.scene),
       this.readJSON<ConversationExchange[]>(STATE_FILES.conversation),
       this.readJSON<PersistedUIState>(STATE_FILES.ui),
       this.readJSON<TokenBreakdown>(STATE_FILES.usage),
     ]);
 
-    return { combat, clocks, maps, decks, scene, conversation, ui, usage };
+    return { combat, clocks, maps, decks, objectives, scene, conversation, ui, usage };
   }
 }

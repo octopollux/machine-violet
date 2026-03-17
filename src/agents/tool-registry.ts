@@ -55,6 +55,8 @@ import {
   getCurrentTurn,
   modifyInitiative,
 } from "../tools/combat/index.js";
+import { manageObjectives } from "../tools/objectives/index.js";
+import type { ManageObjectivesInput } from "../tools/objectives/index.js";
 
 // --- Helpers ---
 
@@ -1061,6 +1063,29 @@ const TOOL_DEFS: RegisteredTool[] = [
       };
     },
   },
+
+  // ====== OBJECTIVES ======
+  {
+    definition: {
+      name: "manage_objectives",
+      description: "Manage long-term objectives (quests, missions, goals that span multiple scenes). Objectives are player-facing — they represent goals the characters are actively pursuing and will appear in game context. Use alarms to set deadlines or trigger events tied to objectives. For hidden DM goals or secrets, use DM notes and alarms instead. Actions: create | update | complete | fail | abandon | list.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          action: { type: "string", enum: ["create", "update", "complete", "fail", "abandon", "list"] },
+          id: { type: "string", description: "Objective ID (required for update/complete/fail/abandon)" },
+          title: { type: "string", description: "Player-facing objective name (required for create)" },
+          description: { type: "string", description: "1-2 sentence summary (required for create)" },
+        },
+        required: ["action"],
+      },
+    },
+    handler: (state, input) => {
+      const result = manageObjectives(state.objectives, state.objectives.current_scene, input as unknown as ManageObjectivesInput);
+      if (!result.ok) return err(result.error);
+      return ok(result.message);
+    },
+  },
 ];
 
 // --- State change mapping ---
@@ -1086,6 +1111,7 @@ export const TOOL_STATE_MAP: Record<string, StateSlice[]> = {
   import_entities: ["maps"],
   define_region: ["maps"],
   deck: ["decks"],
+  manage_objectives: ["objectives"],
   switch_player: [],
   resolve_turn: [],
 };

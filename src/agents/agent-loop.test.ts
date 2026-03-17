@@ -8,6 +8,7 @@ import type { GameState } from "./game-state.js";
 import { createClocksState } from "../tools/clocks/index.js";
 import { createCombatState, createDefaultConfig } from "../tools/combat/index.js";
 import { createDecksState } from "../tools/cards/index.js";
+import { createObjectivesState } from "../tools/objectives/index.js";
 
 function mockState(): GameState {
   return {
@@ -16,6 +17,7 @@ function mockState(): GameState {
     combat: createCombatState(),
     combatConfig: createDefaultConfig(),
     decks: createDecksState(),
+    objectives: createObjectivesState(),
     config: {
       name: "Test",
       dm_personality: { name: "test", prompt_fragment: "" },

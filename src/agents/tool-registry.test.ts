@@ -4,6 +4,7 @@ import type { GameState } from "./game-state.js";
 import { createClocksState } from "../tools/clocks/index.js";
 import { createCombatState, createDefaultConfig } from "../tools/combat/index.js";
 import { createDecksState } from "../tools/cards/index.js";
+import { createObjectivesState } from "../tools/objectives/index.js";
 import { createMap } from "../tools/maps/index.js";
 
 function mockState(): GameState {
@@ -13,6 +14,7 @@ function mockState(): GameState {
     combat: createCombatState(),
     combatConfig: createDefaultConfig(),
     decks: createDecksState(),
+    objectives: createObjectivesState(),
     config: {
       name: "Test Campaign",
       dm_personality: { name: "test", prompt_fragment: "You are terse." },

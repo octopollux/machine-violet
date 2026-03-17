@@ -10,6 +10,7 @@ import type { TuiCommand, UsageStats } from "./agent-loop.js";
 import { createClocksState } from "../tools/clocks/index.js";
 import { createCombatState, createDefaultConfig } from "../tools/combat/index.js";
 import { createDecksState } from "../tools/cards/index.js";
+import { createObjectivesState } from "../tools/objectives/index.js";
 
 vi.mock("./subagents/ai-player.js", () => ({
   aiPlayerTurn: vi.fn(async () => ({
@@ -93,6 +94,7 @@ function mockState(): GameState {
     combat: createCombatState(),
     combatConfig: createDefaultConfig(),
     decks: createDecksState(),
+    objectives: createObjectivesState(),
     config: {
       name: "Test",
       dm_personality: { name: "grim", prompt_fragment: "Be terse." },
@@ -713,6 +715,7 @@ describe("GameEngine AI Auto-Turn", () => {
       combat: createCombatState(),
       combatConfig: createDefaultConfig(),
       decks: createDecksState(),
+      objectives: createObjectivesState(),
       config: {
         name: "Test",
         dm_personality: { name: "grim", prompt_fragment: "Be terse." },
@@ -1209,6 +1212,7 @@ describe("GameEngine Turn Lifecycle", () => {
       combat: createCombatState(),
       combatConfig: createDefaultConfig(),
       decks: createDecksState(),
+      objectives: createObjectivesState(),
       config: {
         name: "Test",
         dm_personality: { name: "grim", prompt_fragment: "Be terse." },

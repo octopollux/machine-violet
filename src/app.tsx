@@ -26,6 +26,7 @@ import { getActivePlayer } from "./agents/player-manager.js";
 import { createClocksState } from "./tools/clocks/index.js";
 import { createCombatState } from "./tools/combat/index.js";
 import { createDecksState } from "./tools/cards/index.js";
+import { createObjectivesState } from "./tools/objectives/index.js";
 import { StatePersister } from "./context/state-persistence.js";
 import type { LoadedState } from "./context/state-persistence.js";
 import { CostTracker } from "./context/cost-tracker.js";
@@ -136,6 +137,7 @@ function hydrateGameState(gs: GameState, scene: SceneState, loaded: LoadedState)
   if (loaded.clocks) gs.clocks = loaded.clocks;
   if (loaded.maps) gs.maps = loaded.maps;
   if (loaded.decks) gs.decks = loaded.decks;
+  if (loaded.objectives) gs.objectives = loaded.objectives;
   if (loaded.scene) {
     gs.activePlayerIndex = loaded.scene.activePlayerIndex;
     scene.precis = loaded.scene.precis;
@@ -468,6 +470,7 @@ export default function App({ shutdownRef }: AppProps) {
       combat: createCombatState(),
       combatConfig: config.combat,
       decks: createDecksState(),
+      objectives: createObjectivesState(),
       config,
       campaignRoot,
       homeDir: hd,

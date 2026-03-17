@@ -55,6 +55,7 @@ export function buildActiveState(params: {
   turnHolder?: string;
   combatRound?: number;
   resourceValues?: Record<string, Record<string, string>>;
+  activeObjectives?: string[];
 }): string {
   const lines: string[] = [];
 
@@ -91,6 +92,13 @@ export function buildActiveState(params: {
     if (resourceLines.length > 0) {
       lines.push("Resources:");
       lines.push(...resourceLines);
+    }
+  }
+
+  if (params.activeObjectives && params.activeObjectives.length > 0) {
+    lines.push("Objectives:");
+    for (const obj of params.activeObjectives) {
+      lines.push(`  ${obj}`);
     }
   }
 

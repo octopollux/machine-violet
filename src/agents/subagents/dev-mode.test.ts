@@ -5,6 +5,7 @@ import type { GameState } from "../game-state.js";
 import type { FileIO, SceneState, SceneManager } from "../scene-manager.js";
 import { loadModelConfig } from "../../config/models.js";
 import { resetPromptCache } from "../../prompts/load-prompt.js";
+import { createObjectivesState } from "../../tools/objectives/index.js";
 import { CampaignRepo } from "../../tools/git/index.js";
 import type { GitIO } from "../../tools/git/index.js";
 
@@ -82,6 +83,7 @@ function makeGameState(overrides?: Partial<GameState>): GameState {
     combat: { active: false, order: [], round: 0, currentTurn: 0 },
     combatConfig: { initiative_method: "d20_dex", round_structure: "individual", surprise_rules: false },
     decks: { decks: {} },
+    objectives: createObjectivesState(),
     config: {
       name: "Test Campaign",
       dm_personality: { name: "Classic", prompt_fragment: "" },
