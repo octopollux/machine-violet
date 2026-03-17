@@ -156,6 +156,9 @@ export class GameEngine {
   private terminalDims: TerminalDims | undefined;
   private resolveSession: ResolveSession | null = null;
 
+  /** Tracks the last failed input so the player can press Enter to retry. */
+  private lastFailedInput: { characterName: string; text: string; opts?: { fromAI?: boolean; skipTranscript?: boolean } } | null = null;
+
   constructor(params: {
     client: Anthropic;
     gameState: GameState;
@@ -306,6 +309,49 @@ export class GameEngine {
   /** Update terminal dimensions for length steering (called from TUI layer on resize). */
   setTerminalDims(dims: TerminalDims): void {
     this.terminalDims = dims;
+  }
+
+  /** Whether the engine has a failed input that can be retried with Enter. */
+  hasPendingRetry(): boolean {
+    return this.lastFailedInput !== null;
+  }
+
+  /**
+   * Retry the last failed DM turn.
+   * Used by the "Press Enter to retry" prompt after API errors.
+   * Since the error occurred before the exchange was added to conversation,
+   * we just replay processInput with the same arguments.
+   */
+  retryLastTurn(): void {
+    const pending = this.lastFailedInput;
+    if (!pending) return;
+    // skipTranscript: true — transcript was already written on the original attempt
+    this.processInput(pending.characterName, pending.text, { ...pending.opts, skipTranscript: true });
+  }
+
+  /**
+   * Pop the last exchange from conversation and replay it.
+   * Used by /retry to discard a bad DM response and try again.
+   * Returns false if there's nothing to retry.
+   */
+  retryLastExchange(): boolean {
+    const popped = this.conversation.popLastExchange();
+    if (!popped) return false;
+    // Extract character name and text from the stored user message
+    const content = typeof popped.user.content === "string"
+      ? popped.user.content
+      : (popped.user.content as Anthropic.TextBlock[])
+          .filter((b): b is Anthropic.TextBlock => b.type === "text")
+          .map((b) => b.text)
+          .join("");
+    // Tagged format is "[CharName] text" — optionally with OOC prefix
+    const match = content.match(/(?:<ooc_summary>[\s\S]*?<\/ooc_summary>\s*)?(?:\[([^\]]+)\]\s*)([\s\S]*)/);
+    if (!match) return false;
+    const characterName = match[1];
+    const text = match[2];
+    // skipTranscript: true — the original transcript entry is already written
+    this.processInput(characterName, text, { skipTranscript: true });
+    return true;
   }
 
   /** Store a pending OOC summary to inject into the next DM turn (called from TUI layer on OOC exit). */
@@ -567,11 +613,16 @@ export class GameEngine {
       this.callbacks.onNarrativeComplete(result.text, text || undefined);
       this.callbacks.onTurnEnd(dmTurn);
 
+      // Clear any pending retry on success
+      this.lastFailedInput = null;
+
     } catch (e) {
       // Restore consumed OOC summary so it retries on the next turn
       if (consumedOOCSummary) {
         this.pendingOOCSummary = consumedOOCSummary;
       }
+      // Store the failed input so the player can press Enter to retry
+      this.lastFailedInput = { characterName, text, opts };
       const error = e instanceof Error ? e : new Error(String(e));
       await this.dumpDebugInfo(error);
       this.callbacks.onError(error);

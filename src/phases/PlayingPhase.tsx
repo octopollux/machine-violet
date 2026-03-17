@@ -106,7 +106,14 @@ export function PlayingPhase() {
 
   // --- Submit handler for TextInput ---
   const handleSubmit = useCallback((value: string) => {
-    if (!value.trim()) return;
+    // Empty Enter retries the last failed DM turn (if one is pending)
+    if (!value.trim()) {
+      if (engineRef.current?.hasPendingRetry()) {
+        engineRef.current.retryLastTurn();
+        clearInput();
+      }
+      return;
+    }
     const text = value.trim();
 
     if (trySlashCommand(text, {

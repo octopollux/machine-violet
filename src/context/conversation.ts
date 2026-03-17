@@ -69,6 +69,11 @@ export class ConversationManager {
     return this.exchanges.length;
   }
 
+  /** Remove and return the last exchange (for /retry). Returns null if empty. */
+  popLastExchange(): ConversationExchange | null {
+    return this.exchanges.pop() ?? null;
+  }
+
   /** Clear all exchanges (e.g. on scene transition) */
   clear(): void {
     this.exchanges = [];

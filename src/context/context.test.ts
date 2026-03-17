@@ -228,6 +228,26 @@ describe("ConversationManager", () => {
     expect(content[0].content).toBe("1d20: [15]→20");
   });
 
+  it("popLastExchange removes and returns last exchange", () => {
+    const mgr = new ConversationManager(defaultContextConfig);
+    mgr.addExchange(userMsg("First"), assistantMsg("Resp 1"));
+    mgr.addExchange(userMsg("Second"), assistantMsg("Resp 2"));
+
+    const popped = mgr.popLastExchange();
+    expect(popped).not.toBeNull();
+    expect(popped!.user.content).toBe("Second");
+    expect(popped!.assistant.content).toBe("Resp 2");
+    expect(mgr.size).toBe(1);
+    // Remaining exchange is the first one
+    const messages = mgr.getMessages();
+    expect(messages[0].content).toBe("First");
+  });
+
+  it("popLastExchange returns null when empty", () => {
+    const mgr = new ConversationManager(defaultContextConfig);
+    expect(mgr.popLastExchange()).toBeNull();
+  });
+
   it("seeded exchanges participate in normal retention", () => {
     const config: ContextConfig = { ...defaultContextConfig, retention_exchanges: 2 };
     const mgr = new ConversationManager(config);

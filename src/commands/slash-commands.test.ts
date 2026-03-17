@@ -381,6 +381,48 @@ describe("trySlashCommand", () => {
     });
   });
 
+  describe("/retry", () => {
+    it("shows unavailable when no engine", () => {
+      const ctx = mockCtx({ engine: null });
+      trySlashCommand("/retry", ctx);
+      expect(lastAppended(ctx).text).toContain("unavailable");
+    });
+
+    it("retries last failed turn when pending retry exists", () => {
+      const retryLastTurn = vi.fn();
+      const hasPendingRetry = vi.fn().mockReturnValue(true);
+      const ctx = mockCtx();
+      Object.assign(ctx.engine, { retryLastTurn, hasPendingRetry });
+      trySlashCommand("/retry", ctx);
+      expect(retryLastTurn).toHaveBeenCalled();
+    });
+
+    it("pops last exchange and retries when no pending error", () => {
+      const retryLastExchange = vi.fn().mockReturnValue(true);
+      const hasPendingRetry = vi.fn().mockReturnValue(false);
+      const ctx = mockCtx();
+      Object.assign(ctx.engine, { retryLastExchange, hasPendingRetry });
+      trySlashCommand("/retry", ctx);
+      expect(retryLastExchange).toHaveBeenCalled();
+      expect(lastAppended(ctx).text).toContain("Retrying last turn");
+    });
+
+    it("shows nothing-to-retry when no history", () => {
+      const retryLastExchange = vi.fn().mockReturnValue(false);
+      const hasPendingRetry = vi.fn().mockReturnValue(false);
+      const ctx = mockCtx();
+      Object.assign(ctx.engine, { retryLastExchange, hasPendingRetry });
+      trySlashCommand("/retry", ctx);
+      expect(lastAppended(ctx).text).toContain("Nothing to retry");
+    });
+
+    it("appears in /help output", () => {
+      const ctx = mockCtx();
+      trySlashCommand("/help", ctx);
+      expect(lastAppended(ctx).text).toContain("/retry");
+    });
+  });
+
   describe("/swatch", () => {
     it("invokes setActiveModal with swatch kind", () => {
       const setActiveModal = vi.fn();
