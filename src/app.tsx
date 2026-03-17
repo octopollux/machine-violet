@@ -177,7 +177,7 @@ async function loadDisplayHistory(
 /**
  * Build an initial character sheet using the promoteCharacter subagent.
  * Called after buildCampaignWorld when we have system + character details.
- * Silently — no streaming (the "Building your world..." phase covers this).
+ * Silently — no streaming (the "building" phase covers this).
  */
 async function buildInitialSheet(
   campaignRoot: string,
@@ -658,7 +658,7 @@ export default function App({ shutdownRef }: AppProps) {
   // --- Finalize setup result into a running campaign ---
   const finalizeSetup = useCallback(async (result: SetupResult) => {
     setPhase("building");
-    setNarrativeLines([{ kind: "system", text: "Building your world..." }]);
+    setNarrativeLines([{ kind: "system", text: "The DM is building the game world (this can take a few minutes)." }]);
 
     try {
       const configPath = getConfigPath();
@@ -952,7 +952,7 @@ export default function App({ shutdownRef }: AppProps) {
   if (phase === "building") {
     return (
       <Box flexDirection="column" padding={1}>
-        <Text>Building your world...</Text>
+        <Text>The DM is building the game world (this can take a few minutes).</Text>
       </Box>
     );
   }
