@@ -184,14 +184,17 @@ export async function runAgentLoop(
   const shouldRetry = config.retry ?? false;
 
   // Resolve effort config from agent name if not explicitly provided.
-  // When effort is set, it controls thinking implicitly — don't send both.
   const ec = config.effort !== undefined
     ? { effort: config.effort }
     : getEffortConfig(config.name);
-  const thinkingParam: Anthropic.Messages.ThinkingConfigParam | undefined =
-    ec.effort ? undefined : { type: "disabled" };
+
+  // effort + adaptive thinking is the recommended combo for Opus 4.6.
+  // For other models, effort is not supported — use thinking: disabled.
+  const isOpus = config.model.includes("opus");
+  const thinkingParam: Anthropic.Messages.ThinkingConfigParam =
+    ec.effort ? { type: "adaptive" } : { type: "disabled" };
   const outputConfig: Anthropic.Messages.OutputConfig | undefined =
-    ec.effort ? { effort: ec.effort } : undefined;
+    ec.effort && isOpus ? { effort: ec.effort } : undefined;
 
   // Apply terse suffix
   let effectiveSystem = systemPrompt;
@@ -227,7 +230,7 @@ export async function runAgentLoop(
     max_tokens: config.maxTokens,
     system: effectiveSystem,
     messages: workingMessages,
-    ...(thinkingParam ? { thinking: thinkingParam } : {}),
+    thinking: thinkingParam,
     ...(outputConfig ? { output_config: outputConfig } : {}),
     ...(tools ? { tools } : {}),
   });

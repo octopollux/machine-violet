@@ -265,16 +265,20 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
     pendingToolUseId = null;
 
     const ec = getEffortConfig("setup");
-    const outputConfig = ec.effort ? { effort: ec.effort } : undefined;
-    const thinkingParam = ec.effort ? undefined : { type: "disabled" as const };
+    const model = getModel("medium");
+    const isOpus = model.includes("opus");
+    const thinkingParam = ec.effort
+      ? { type: "adaptive" as const }
+      : { type: "disabled" as const };
+    const outputConfig = ec.effort && isOpus ? { effort: ec.effort } : undefined;
 
     let lastParams = {
-      model: getModel("medium"),
+      model,
       max_tokens: TOKEN_LIMITS.SUBAGENT_LARGE,
       system: SYSTEM_PROMPT,
       messages,
       tools: TOOLS,
-      ...(thinkingParam ? { thinking: thinkingParam } : {}),
+      thinking: thinkingParam,
       ...(outputConfig ? { output_config: outputConfig } : {}),
     };
 
@@ -337,12 +341,12 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
       messages.push({ role: "user", content: toolResults });
 
       lastParams = {
-        model: getModel("medium"),
+        model,
         max_tokens: TOKEN_LIMITS.SUBAGENT_MEDIUM,
         system: SYSTEM_PROMPT,
         messages,
         tools: TOOLS,
-        ...(thinkingParam ? { thinking: thinkingParam } : {}),
+        thinking: thinkingParam,
         ...(outputConfig ? { output_config: outputConfig } : {}),
       };
       const followUpMsg = await streamWithRetry(client, lastParams, onDelta);
