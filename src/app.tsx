@@ -16,7 +16,7 @@ import type { GameState } from "./agents/game-state.js";
 import type { DMSessionState } from "./agents/dm-prompt.js";
 import { buildUIState } from "./agents/dm-prompt.js";
 import type { CampaignConfig } from "./types/config.js";
-import { buildEnvContent, buildAppConfig, getDefaultHomeDir } from "./config/first-launch.js";
+import { buildAppConfig, getDefaultHomeDir } from "./config/first-launch.js";
 import { listCampaigns } from "./config/main-menu.js";
 import type { CampaignEntry } from "./config/main-menu.js";
 import { buildCampaignConfig } from "./agents/setup-agent.js";
@@ -39,7 +39,6 @@ import { isDevMode, wrapFileIOWithDevLog } from "./config/dev-mode.js";
 import { setContextDumpDir } from "./config/context-dump.js";
 import { sandboxFileIO, campaignPaths } from "./tools/filesystem/index.js";
 
-import { FirstLaunchPhase } from "./phases/FirstLaunchPhase.js";
 import { MainMenuPhase } from "./phases/MainMenuPhase.js";
 import { ApiKeysPhase } from "./phases/ApiKeysPhase.js";
 import { SetupPhase } from "./phases/SetupPhase.js";
@@ -64,7 +63,6 @@ import type { GameContextValue } from "./tui/game-context.js";
 
 export type AppPhase =
   | "loading"
-  | "first_launch"
   | "main_menu"
   | "settings"
   | "settings_api_keys"
@@ -325,9 +323,6 @@ export default function App({ shutdownRef }: AppProps) {
   }, [modelines, themeName, variant]);
 
 
-  // --- First-launch: prefilled API key ---
-  const [initialApiKey, setInitialApiKey] = useState("");
-
   // --- Config paths ---
   const getAppDir = useCallback(() => process.cwd(), []);
   const getConfigPath = useCallback(() => join(getAppDir(), "config.json"), [getAppDir]);
@@ -447,16 +442,20 @@ export default function App({ shutdownRef }: AppProps) {
     const configPath = getConfigPath();
     try {
       readFileSync(configPath, "utf-8");
-      setPhase("main_menu");
-      loadCampaigns();
-      refreshKeyStore();
-      return;
-    } catch { /* config.json doesn't exist — first launch */ }
-
-    const envKey = process.env.ANTHROPIC_API_KEY;
-    if (envKey) setInitialApiKey(envKey);
-    setPhase("first_launch");
-  }, [phase, getConfigPath, loadCampaigns, refreshKeyStore]);
+    } catch {
+      // First launch — create config.json with defaults
+      const appDir = getAppDir();
+      try {
+        mkdirSync(appDir, { recursive: true });
+        writeFileSync(configPath, buildAppConfig(getDefaultHomeDir()));
+      } catch (e) {
+        setErrorMsg(e instanceof Error ? e.message : "Failed to write config");
+      }
+    }
+    setPhase("main_menu");
+    loadCampaigns();
+    refreshKeyStore();
+  }, [phase, getAppDir, getConfigPath, loadCampaigns, refreshKeyStore]);
 
   // --- Build game state from config ---
   const buildGameState = useCallback((config: CampaignConfig, campaignRoot: string): GameState => {
@@ -877,27 +876,7 @@ export default function App({ shutdownRef }: AppProps) {
     return results[0];
   }, []);
 
-  // --- First-launch complete handler ---
-  const handleFirstLaunchComplete = useCallback((apiKey: string) => {
-    const appDir = getAppDir();
-    try {
-      mkdirSync(appDir, { recursive: true });
-      writeFileSync(join(appDir, ".env"), buildEnvContent(apiKey));
-      writeFileSync(join(appDir, "config.json"), buildAppConfig(getDefaultHomeDir()));
-      process.env.ANTHROPIC_API_KEY = apiKey;
-      setPhase("main_menu");
-      loadCampaigns();
-      refreshKeyStore();
-    } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : "Failed to write config");
-    }
-  }, [getAppDir, loadCampaigns, refreshKeyStore]);
-
   // --- Render ---
-
-  if (phase === "first_launch") {
-    return <FirstLaunchPhase initialApiKey={initialApiKey} externalError={errorMsg} onComplete={handleFirstLaunchComplete} />;
-  }
 
   if (phase === "main_menu") {
     return (
