@@ -7,16 +7,16 @@
     "dm": "high",
     "ooc": "high",
     "dev-mode": "high",
-    "ai-player": "low",
     "setup": "high",
     "setup-gen": "high",
+    "ai-player": null,
     "scene-summarizer": null,
     "precis-updater": null,
     "changelog-updater": null,
     "compendium-updater": null,
     "choice-generator": null,
-    "resolve_action": "medium",
-    "promote_character": "medium",
-    "repair-state": "medium"
+    "resolve_action": null,
+    "promote_character": null,
+    "repair-state": null
   }
 }

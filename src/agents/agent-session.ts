@@ -184,9 +184,15 @@ export async function runAgentLoop(
   const shouldRetry = config.retry ?? false;
 
   // Resolve effort config from agent name if not explicitly provided
-  const ec = config.effort !== undefined
+  const rawEc = config.effort !== undefined
     ? { thinking: config.effort ? { type: "adaptive" as const } : { type: "disabled" as const }, effort: config.effort }
     : getEffortConfig(config.name);
+
+  // Haiku doesn't support extended thinking — force disabled regardless of config
+  const isHaiku = config.model.includes("haiku");
+  const ec = isHaiku
+    ? { thinking: { type: "disabled" as const }, effort: null }
+    : rawEc;
   const outputConfig: Anthropic.Messages.OutputConfig | undefined = ec.effort ? { effort: ec.effort } : undefined;
 
   // Apply terse suffix
