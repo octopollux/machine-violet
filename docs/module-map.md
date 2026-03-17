@@ -102,7 +102,7 @@ Model selection, campaign init, DM personalities, campaign seeds.
 | `models.ts` | `getModel("large" \| "medium" \| "small")` — tier model selection (cached; tests need `loadModelConfig({ reset: true })`) |
 | `personalities.ts` | `PERSONALITIES`, `getPersonality()` — DM personality definitions |
 | `seeds.ts` | `SEEDS`, `seedsForGenre()` — campaign premise seeds by genre |
-| `first-launch.ts` | `.env` and config wizard for first run |
+| `first-launch.ts` | `.env` loading, config paths, API key format validation |
 | `main-menu.ts` | Campaign listing and selection |
 | `tokens.ts` | `TOKEN_LIMITS` — model token capacity constants |
 | `dev-mode.ts` | Dev override detection, FileIO wrapping for dev logging |
@@ -139,11 +139,10 @@ PDF ingestion and content processing. **Completely separate from the game engine
 
 ## src/phases/ — App Lifecycle
 
-State machine for the application: first launch → main menu → setup / add content → playing → returning_to_menu → main menu (loop).
+State machine for the application: main menu → setup / add content → playing → returning_to_menu → main menu (loop). On first launch, config.json is auto-created with defaults.
 
 | File | Purpose |
 |---|---|
-| `FirstLaunchPhase.tsx` | Initial setup wizard (API key, config) |
 | `MainMenuPhase.tsx` | Themed campaign selection screen with New Campaign, Continue, Add Content, Quit |
 | `AddContentPhase.tsx` | PDF import flow: name collection → drop files → validate → extract → cache |
 | `SetupPhase.tsx` | Campaign creation/load orchestration |
