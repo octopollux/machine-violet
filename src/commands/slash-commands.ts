@@ -232,6 +232,31 @@ const snapshotCommand: SlashCommand = {
   },
 };
 
+const retryCommand: SlashCommand = {
+  name: "retry",
+  usage: "/retry",
+  description: "Retry the last DM turn (discards current response)",
+  execute(_args, ctx) {
+    if (!ctx.engine) {
+      ctx.appendLine({ kind: "system", text: "[Retry unavailable — no active engine]" });
+      return;
+    }
+    // If there's a pending error retry, just replay that
+    if (ctx.engine.hasPendingRetry()) {
+      ctx.appendLine({ kind: "dev", text: "[dev] retrying last failed turn" });
+      ctx.engine.retryLastTurn();
+      return;
+    }
+    // Otherwise pop the last exchange and replay
+    const ok = ctx.engine.retryLastExchange();
+    if (!ok) {
+      ctx.appendLine({ kind: "system", text: "[Nothing to retry — no conversation history]" });
+      return;
+    }
+    ctx.appendLine({ kind: "system", text: "[Retrying last turn...]" });
+  },
+};
+
 const swatchCommand: SlashCommand = {
   name: "swatch",
   usage: "/swatch",
@@ -252,6 +277,7 @@ const commands: SlashCommand[] = [
   saveCommand,
   logCommand,
   rollbackCommand,
+  retryCommand,
   sceneCommand,
   oocCommand,
   devCommand,

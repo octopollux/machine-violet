@@ -60,6 +60,26 @@ Retry with exponential backoff (1s, 2s, 4s, 8s, capped at 12s) **indefinitely** 
 
 Retryable statuses: 429, 500, 502, 503, 529, plus synthetic status 0 for connection-level errors. No state has changed — the API call didn't complete — so there's nothing to roll back.
 
+### Non-retryable API errors (manual retry)
+
+When an API call fails with an error that exhausts automatic retries or isn't in the retryable set, the engine stores the failed input and prompts the player:
+
+```
+[Error: 401 Unauthorized]
+[Debug info saved to .debug/ folder]
+[Press Enter to retry]
+```
+
+Pressing Enter with an empty input replays the last DM turn (`processInput` with `skipTranscript: true`, since the transcript was already written). The pending retry is cleared on the next successful turn.
+
+### `/retry` slash command
+
+The `/retry` command retries the last DM turn at any time — useful for recovering from garbled output, tool loops, or any unsatisfying response:
+
+- If there's a pending error retry, `/retry` replays that failed input.
+- Otherwise, it pops the last exchange from conversation history and replays the original player input (with `skipTranscript: true`).
+- Both paths log a `dev` narrative line when dev mode is active.
+
 ### Subagent failures
 
 If a Haiku/Sonnet subagent call fails (during `resolve_action`, OOC, chargen, etc.), the engine retries the subagent call. The parent (Opus DM) doesn't see the failure unless retries are exhausted, in which case it receives an error result: "Resolution failed — resolve manually or retry." The DM can narrate around it or ask the player to wait.

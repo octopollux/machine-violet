@@ -263,11 +263,15 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
       // Rollback-complete errors are handled via TUI command — not a real error
       if (error instanceof RollbackCompleteError) return;
       setErrorMsg(error.message);
-      setNarrativeLines((prev) => [
-        ...prev,
+      const lines: NarrativeLine[] = [
         { kind: "system", text: `[Error: ${error.message}]` },
         { kind: "system", text: "[Debug info saved to .debug/ folder]" },
-      ]);
+      ];
+      // If the engine stored the failed input, prompt the player to retry
+      if (engineRef.current?.hasPendingRetry()) {
+        lines.push({ kind: "system", text: "[Press Enter to retry]" });
+      }
+      setNarrativeLines((prev) => [...prev, ...lines]);
     },
     onRetry(status: number, delayMs: number) {
       const delaySec = Math.ceil(delayMs / 1000);
