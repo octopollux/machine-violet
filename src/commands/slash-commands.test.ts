@@ -228,7 +228,18 @@ describe("trySlashCommand", () => {
       });
     });
 
-    it("calls onReturnToMenu after rollback", async () => {
+    it("calls onRollbackComplete with summary when available", async () => {
+      const onRollbackComplete = vi.fn();
+      const onReturnToMenu = vi.fn();
+      const ctx = mockCtx({ onRollbackComplete, onReturnToMenu });
+      trySlashCommand("/rollback 3", ctx);
+      await vi.waitFor(() => {
+        expect(onRollbackComplete).toHaveBeenCalledWith("ok");
+        expect(onReturnToMenu).not.toHaveBeenCalled();
+      });
+    });
+
+    it("falls back to onReturnToMenu when onRollbackComplete not set", async () => {
       const onReturnToMenu = vi.fn();
       const ctx = mockCtx({ onReturnToMenu });
       trySlashCommand("/rollback 3", ctx);

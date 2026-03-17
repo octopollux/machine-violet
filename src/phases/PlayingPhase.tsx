@@ -7,7 +7,7 @@ import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, narrativeRo
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { Layout } from "../tui/layout.js";
 import { stripFormatting, stripLeadingBullet } from "../tui/formatting.js";
-import { ChoiceOverlay, DESCRIPTION_ROWS, DiceRollModal, SessionRecapModal, GameMenu, CharacterSheetModal, CompendiumModal, ApiErrorModal, SwatchModal, CampaignSettingsModal, getMenuItems } from "../tui/modals/index.js";
+import { ChoiceOverlay, DESCRIPTION_ROWS, DiceRollModal, SessionRecapModal, RollbackSummaryModal, GameMenu, CharacterSheetModal, CompendiumModal, ApiErrorModal, SwatchModal, CampaignSettingsModal, getMenuItems } from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { getActivePlayer, switchToNextPlayer, getPlayerEntries } from "../agents/player-manager.js";
 import { createOOCSession } from "../agents/subagents/ooc-mode.js";
@@ -30,7 +30,7 @@ export function PlayingPhase() {
     activeSession, setActiveSession, previousVariantRef,
     devModeEnabled,
     retryOverlay,
-    dispatchTuiCommand, onReturnToMenu, onEndSessionAndReturn,
+    dispatchTuiCommand, onReturnToMenu, onRollbackReturn, onEndSessionAndReturn,
   } = useGameContext();
   const { columns: cols, rows } = useTerminalSize();
   const tooSmall = cols < MIN_COLUMNS || rows < MIN_ROWS;
@@ -130,6 +130,7 @@ export function PlayingPhase() {
       dispatchTuiCommand,
       setActiveModal,
       onReturnToMenu,
+      onRollbackComplete: (summary: string) => setActiveModal({ kind: "rollback", summary }),
     })) {
       clearInput();
       return;
@@ -164,7 +165,7 @@ export function PlayingPhase() {
       }).catch((err: unknown) => {
         setModeBusy(false);
         if (err instanceof RollbackCompleteError) {
-          onReturnToMenu();
+          setActiveModal({ kind: "rollback", summary: err.summary });
           return;
         }
         const msg = err instanceof Error ? err.message : String(err);
@@ -222,6 +223,15 @@ export function PlayingPhase() {
     // Dice / swatch modal: any key dismisses
     if (activeModal && (activeModal.kind === "dice" || activeModal.kind === "swatch")) {
       setActiveModal(null);
+      return;
+    }
+
+    // Rollback summary: Enter/ESC dismisses and returns to menu
+    if (activeModal && activeModal.kind === "rollback") {
+      if (key.escape || key.return) {
+        setActiveModal(null);
+        onRollbackReturn();
+      }
       return;
     }
 
@@ -551,6 +561,15 @@ export function PlayingPhase() {
       )}
       {activeModal?.kind === "swatch" && (
         <SwatchModal theme={theme} width={cols} height={narRows} topOffset={conversationPaneTop} />
+      )}
+      {activeModal?.kind === "rollback" && (
+        <RollbackSummaryModal
+          theme={theme}
+          width={cols}
+          height={narRows}
+          summary={activeModal.summary}
+          topOffset={conversationPaneTop}
+        />
       )}
       {activeModal?.kind === "recap" && (
         <SessionRecapModal

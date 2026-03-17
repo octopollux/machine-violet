@@ -45,6 +45,7 @@ export function makeTestContext(overrides: Partial<GameContextValue> = {}): Game
     dispatchTuiCommand: vi.fn(),
     retryOverlay: null,
     onReturnToMenu: vi.fn(),
+    onRollbackReturn: vi.fn(),
     onEndSessionAndReturn: vi.fn(),
     ...overrides,
   };

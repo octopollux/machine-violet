@@ -10,3 +10,4 @@ export { SessionRecapModal } from "./SessionRecapModal.js";
 export { ApiErrorModal } from "./ApiErrorModal.js";
 export { SwatchModal } from "./SwatchModal.js";
 export { CampaignSettingsModal } from "./CampaignSettingsModal.js";
+export { RollbackSummaryModal } from "./RollbackSummaryModal.js";

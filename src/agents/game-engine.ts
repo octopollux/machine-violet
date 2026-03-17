@@ -754,7 +754,7 @@ export class GameEngine {
     }
     this.callbacks.onDevLog?.(`[dev] rollback: rolling back to "${target}"`);
     const result = await performRollback(this.repo, target, this.gameState.campaignRoot, this.fileIO);
-    this.callbacks.onTuiCommand?.({ type: "return_to_menu" });
+    this.callbacks.onTuiCommand?.({ type: "show_rollback_summary", summary: result.summary });
     throw new RollbackCompleteError(result.summary);
   }
 
