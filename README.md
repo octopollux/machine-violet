@@ -1,5 +1,7 @@
 # Machine Violet
 
+[![Discord](https://img.shields.io/discord/1483251600071065691?logo=discord&label=Discord&color=5865F2)](https://discord.gg/dDbGZrecvX)
+
 An agentic AI Dungeon Master that runs any tabletop RPG in a terminal.
 
 Machine Violet is a complete game engine: it narrates, inhabits NPCs, tracks state, rolls dice, manages scenes, and maintains a living campaign filesystem — all from your terminal. The DM is opinionated, surprising, and plays to win. You just need an Anthropic API key.
@@ -16,7 +18,7 @@ irm https://raw.githubusercontent.com/octopollux/machine-violet/main/scripts/ins
 curl -fsSL https://raw.githubusercontent.com/octopollux/machine-violet/main/scripts/install.sh | bash
 ```
 
-Then run `machine-violet` in your terminal. On first launch you'll be prompted for your [Anthropic API key](https://console.anthropic.com/).
+Then run `machine-violet` in your terminal. You'll need an [Anthropic API key](https://console.anthropic.com/) — add it from the main menu on first launch.
 
 > **Terminal requirement:** Use Windows Terminal, iTerm2, or any modern terminal with ANSI support. cmd.exe and PowerShell ISE are not supported.
 
