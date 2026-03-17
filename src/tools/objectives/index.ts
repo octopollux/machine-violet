@@ -78,6 +78,7 @@ function updateObjective(
   if (!obj) return { ok: false, error: `Objective ${input.id} not found` };
   if (obj.status !== "active") return { ok: false, error: `Objective ${input.id} is already ${obj.status}` };
 
+  if (!input.title && !input.description) return { ok: false, error: "nothing to update — provide title or description" };
   if (input.title) obj.title = input.title;
   if (input.description) obj.description = input.description;
   return { ok: true, message: `Updated ${obj.id}: ${obj.title}` };

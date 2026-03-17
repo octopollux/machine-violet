@@ -83,6 +83,12 @@ describe("manage_objectives — update", () => {
     expect(r).toHaveProperty("error", "id is required");
   });
 
+  it("errors when no fields to update", () => {
+    const r = manageObjectives(state, 2, { action: "update", id: "obj-1" });
+    expect(r.ok).toBe(false);
+    expect(r).toHaveProperty("error", "nothing to update — provide title or description");
+  });
+
   it("errors when objective not found", () => {
     const r = manageObjectives(state, 2, { action: "update", id: "obj-99" });
     expect(r.ok).toBe(false);
