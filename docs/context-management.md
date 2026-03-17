@@ -51,7 +51,7 @@ Total session:     ~$2-2.50
 
 ## Conversation Retention
 
-Conversation accumulates within a scene and is cleared at scene transition. With automatic caching, retained exchanges are read at cache rate (~25% of full input), so the cost of keeping more history is low. The `max_conversation_tokens` limit acts as a safety brake for unusually long scenes.
+Conversation accumulates within a scene and is cleared at scene transition. With automatic caching, retained exchanges are read at cache rate (~25% of full input), so the cost of keeping more history is low. Scene pacing nudges and transition pressure handle long scenes naturally.
 
 ### Configuration
 
@@ -60,14 +60,14 @@ Conversation accumulates within a scene and is cleared at scene transition. With
 {
   "context": {
     "retention_exchanges": 100,       // effectively unlimited within a scene
-    "max_conversation_tokens": 100000  // safety brake for runaway scenes
+    "max_conversation_tokens": 0      // 0 = disabled (default)
   }
 }
 ```
 
 **`retention_exchanges`**: Maximum exchanges to keep. Set high (100) so exchanges accumulate until scene transition clears them. The DM sees the full scene conversation, which improves coherence and eliminates mid-scene cache invalidation from dropped exchanges.
 
-**`max_conversation_tokens`**: Safety ceiling. If a scene runs unusually long or becomes tool-heavy, oldest exchanges are dropped to stay under this cap. This is the only mid-scene drop trigger in normal operation.
+**`max_conversation_tokens`**: Token ceiling for the conversation window. **Default 0 (disabled).** Mid-scene exchange pruning invalidates the prompt cache and is counterproductive — scene transitions and pacing nudges are the intended mechanisms for managing long scenes. Can be set to a positive value as an emergency backstop, but should not be needed in normal operation.
 
 **No tool result stubbing.** Tool results are kept in full. With caching, prior-turn tool results are read at cache rate, so the token savings from stubbing are negligible. Keeping full results lets the DM reference recent rolls, lookups, and actions without re-querying.
 
@@ -76,10 +76,10 @@ Conversation accumulates within a scene and is cleared at scene transition. With
 The cached prefix includes a "current scene summary" — a running precis of the current scene so far. With the full conversation retained, the precis primarily serves as a compact summary for the cached prefix rather than as a compensating mechanism for lost exchanges.
 
 The precis is updated when:
-- An exchange is dropped due to `max_conversation_tokens` — a Haiku subagent appends a terse summary and extracts a **PlayerRead** (engagement level, focus tags, tone, pacing, off-script detection). See [subagents-catalog.md](subagents-catalog.md) §5 for the full PlayerRead interface.
+- An exchange is dropped due to `max_conversation_tokens` (if enabled) — a Haiku subagent appends a terse summary and extracts a **PlayerRead** (engagement level, focus tags, tone, pacing, off-script detection). See [subagents-catalog.md](subagents-catalog.md) §5 for the full PlayerRead interface.
 - On `context_refresh`, the full precis is regenerated from the scene transcript on disk
 
-**PlayerRead note:** Since exchanges rarely drop mid-scene (only when `max_conversation_tokens` triggers), PlayerRead signals are sparse during normal play. This is an accepted tradeoff — the DM operates well without per-exchange engagement tracking. If finer-grained PlayerRead data is needed, a periodic extraction trigger could be added (see issue #73).
+**PlayerRead note:** With `max_conversation_tokens` disabled by default, the precis updater and PlayerRead extraction only fire on `context_refresh`. If finer-grained PlayerRead data is needed, a periodic extraction trigger could be added (see issue #73).
 
 Example precis:
 ```

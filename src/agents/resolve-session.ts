@@ -183,7 +183,7 @@ export class ResolveSession {
         toolHandler,
         cacheTools: false, // already stamped
         retry: true,
-        thinking: { type: "disabled" },
+        effort: null,
       },
     );
 

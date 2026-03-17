@@ -15,8 +15,8 @@ export interface AgentLoopConfig {
   model: ModelId;
   maxTokens: number;
   maxToolRounds: number;
-  /** Extended thinking config. Omit or undefined to disable. */
-  thinking?: Anthropic.Messages.ThinkingConfigParam;
+  /** Effort level. Omit to auto-resolve from agent name. */
+  effort?: import("../config/models.js").EffortLevel | null;
   /** Async tool handler override. Called before registry dispatch.
    *  Return a ToolResult to handle the tool, or null to fall through to registry. */
   asyncToolHandler?: (name: string, input: Record<string, unknown>) => Promise<ToolResult | null>;
@@ -87,7 +87,7 @@ export async function agentLoop(
     model: config.model,
     maxTokens: config.maxTokens,
     maxToolRounds: config.maxToolRounds,
-    thinking: config.thinking,
+    effort: config.effort,
     stream: false,
     tools: registry.getDefinitions(),
     toolHandler: asyncHandler
@@ -125,7 +125,7 @@ export async function agentLoopStreaming(
     model: config.model,
     maxTokens: config.maxTokens,
     maxToolRounds: config.maxToolRounds,
-    thinking: config.thinking,
+    effort: config.effort,
     stream: true,
     tools: registry.getDefinitions(),
     toolHandler: asyncHandler

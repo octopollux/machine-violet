@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadModelConfig, getModel, getThinkingConfig, loadPricingConfig } from "./models.js";
+import { loadModelConfig, getModel, getEffortConfig, loadPricingConfig } from "./models.js";
 
 describe("model config", () => {
   let testDir: string;
@@ -84,128 +84,93 @@ describe("model config", () => {
     expect(getModel("small")).toBe("claude-haiku-4-5-20251001");
   });
 
-  it("defaults thinking with dev-mode adaptive", () => {
+  it("defaults effort with dev-mode high", () => {
     const config = loadModelConfig({ cwd: testDir, reset: true });
-    expect(config.thinking).toEqual({ "default": 0, "dev-mode": "adaptive" });
+    expect(config.effort).toEqual({ "default": null, "dev-mode": "high" });
   });
 
-  it("loads per-agent thinking map from dev-config.json", () => {
+  it("loads per-agent effort map from dev-config.json", () => {
     writeFileSync(
       join(testDir, "dev-config.json"),
-      JSON.stringify({ thinking: { dm: 2048, ooc: "adaptive" } }),
+      JSON.stringify({ effort: { dm: "high", ooc: "medium" } }),
     );
     const config = loadModelConfig({ cwd: testDir, reset: true });
-    expect(config.thinking.dm).toBe(2048);
-    expect(config.thinking.ooc).toBe("adaptive");
+    expect(config.effort.dm).toBe("high");
+    expect(config.effort.ooc).toBe("medium");
     // default key preserved from DEFAULTS
-    expect(config.thinking.default).toBe(0);
+    expect(config.effort.default).toBeNull();
   });
 
-  it("rejects thinking values below 1024", () => {
+  it("rejects invalid effort values", () => {
     writeFileSync(
       join(testDir, "dev-config.json"),
-      JSON.stringify({ thinking: { dm: 512, ooc: 2048 } }),
+      JSON.stringify({ effort: { dm: "turbo", ooc: "low" } }),
     );
     const config = loadModelConfig({ cwd: testDir, reset: true });
-    // dm: 512 is invalid, should not appear
-    expect(config.thinking.dm).toBeUndefined();
-    expect(config.thinking.ooc).toBe(2048);
+    expect(config.effort.dm).toBeUndefined();
+    expect(config.effort.ooc).toBe("low");
   });
 
-  it("rejects non-integer thinking values", () => {
+  it("accepts null/none as disabled effort", () => {
     writeFileSync(
       join(testDir, "dev-config.json"),
-      JSON.stringify({ thinking: { dm: 1024.5 } }),
+      JSON.stringify({ effort: { dm: null, ooc: "none" } }),
     );
     const config = loadModelConfig({ cwd: testDir, reset: true });
-    expect(config.thinking.dm).toBeUndefined();
+    expect(config.effort.dm).toBeNull();
+    expect(config.effort.ooc).toBeNull();
   });
 
-  it("accepts thinking value of 0 (disabled)", () => {
+  it("ignores effort if not an object", () => {
     writeFileSync(
       join(testDir, "dev-config.json"),
-      JSON.stringify({ thinking: { dm: 0 } }),
+      JSON.stringify({ effort: "high" }),
     );
     const config = loadModelConfig({ cwd: testDir, reset: true });
-    expect(config.thinking.dm).toBe(0);
+    expect(config.effort).toEqual({ "default": null, "dev-mode": "high" });
   });
 
-  it("accepts 'adaptive' in thinking map", () => {
-    writeFileSync(
-      join(testDir, "dev-config.json"),
-      JSON.stringify({ thinking: { dm: "adaptive" } }),
-    );
-    const config = loadModelConfig({ cwd: testDir, reset: true });
-    expect(config.thinking.dm).toBe("adaptive");
-  });
-
-  it("ignores thinking if not an object", () => {
-    writeFileSync(
-      join(testDir, "dev-config.json"),
-      JSON.stringify({ thinking: 2048 }),
-    );
-    const config = loadModelConfig({ cwd: testDir, reset: true });
-    expect(config.thinking).toEqual({ "default": 0, "dev-mode": "adaptive" });
-  });
-
-  describe("getThinkingConfig", () => {
-    it("returns disabled for unknown agent with default 0", () => {
+  describe("getEffortConfig", () => {
+    it("returns null effort for unknown agent with default null", () => {
       loadModelConfig({ cwd: testDir, reset: true });
-      const tc = getThinkingConfig("unknown-agent");
-      expect(tc.param).toEqual({ type: "disabled" });
-      expect(tc.budgetTokens).toBe(0);
+      const ec = getEffortConfig("unknown-agent");
+      expect(ec.effort).toBeNull();
     });
 
-    it("returns adaptive for dev-mode by default", () => {
+    it("returns high effort for dev-mode by default", () => {
       loadModelConfig({ cwd: testDir, reset: true });
-      const tc = getThinkingConfig("dev-mode");
-      expect(tc.param).toEqual({ type: "adaptive" });
-      expect(tc.budgetTokens).toBe(0);
+      const ec = getEffortConfig("dev-mode");
+      expect(ec.effort).toBe("high");
     });
 
     it("returns agent-specific config when set", () => {
       writeFileSync(
         join(testDir, "dev-config.json"),
-        JSON.stringify({ thinking: { dm: 2048 } }),
+        JSON.stringify({ effort: { dm: "max" } }),
       );
       loadModelConfig({ cwd: testDir, reset: true });
-      const tc = getThinkingConfig("dm");
-      expect(tc.param).toEqual({ type: "enabled", budget_tokens: 2048 });
-      expect(tc.budgetTokens).toBe(2048);
+      const ec = getEffortConfig("dm");
+      expect(ec.effort).toBe("max");
     });
 
     it("falls back to 'default' key for unconfigured agents", () => {
       writeFileSync(
         join(testDir, "dev-config.json"),
-        JSON.stringify({ thinking: { default: 4096 } }),
+        JSON.stringify({ effort: { default: "medium" } }),
       );
       loadModelConfig({ cwd: testDir, reset: true });
-      const tc = getThinkingConfig("scene-summarizer");
-      expect(tc.param).toEqual({ type: "enabled", budget_tokens: 4096 });
-      expect(tc.budgetTokens).toBe(4096);
-    });
-
-    it("returns adaptive config", () => {
-      writeFileSync(
-        join(testDir, "dev-config.json"),
-        JSON.stringify({ thinking: { ooc: "adaptive" } }),
-      );
-      loadModelConfig({ cwd: testDir, reset: true });
-      const tc = getThinkingConfig("ooc");
-      expect(tc.param).toEqual({ type: "adaptive" });
-      expect(tc.budgetTokens).toBe(0);
+      const ec = getEffortConfig("scene-summarizer");
+      expect(ec.effort).toBe("medium");
     });
 
     it("agent-specific overrides default", () => {
       writeFileSync(
         join(testDir, "dev-config.json"),
-        JSON.stringify({ thinking: { default: 2048, dm: 0 } }),
+        JSON.stringify({ effort: { default: "high", dm: null } }),
       );
       loadModelConfig({ cwd: testDir, reset: true });
-      const dmTc = getThinkingConfig("dm");
-      expect(dmTc.param).toEqual({ type: "disabled" });
-      const otherTc = getThinkingConfig("ooc");
-      expect(otherTc.param).toEqual({ type: "enabled", budget_tokens: 2048 });
+      expect(getEffortConfig("dm").effort).toBeNull();
+      expect(getEffortConfig("ooc").effort).toBe("high");
     });
   });
 });

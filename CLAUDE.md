@@ -15,7 +15,7 @@ npx tsx src/index.tsx    # launch (needs ANTHROPIC_API_KEY in .env)
 
 - **Single Ink process** — no frontend/backend split. DM tools manipulate UI directly.
 - **Filesystem IS the database** — markdown + JSON entities, wikilinked. The campaign transcript is the knowledge backbone; the DM rediscovers things by following wikilinks, not by re-reading its own context.
-- **Conversation accumulates within a scene** — exchanges are retained until scene transition clears them. With automatic caching, prior exchanges are read at cache rate. A `max_conversation_tokens` safety brake drops oldest exchanges in unusually long scenes. Tools return minimum viable information. Delegation to cheap subagents is how you avoid bloating DM context.
+- **Conversation accumulates within a scene** — exchanges are retained until scene transition clears them. With automatic caching, prior exchanges are read at cache rate. Scene pacing nudges and transition pressure handle long scenes naturally; `max_conversation_tokens` defaults to 0 (disabled) since mid-scene pruning invalidates the prompt cache. Tools return minimum viable information. Delegation to cheap subagents is how you avoid bloating DM context.
 - **isomorphic-git** for state snapshots (no system git dependency). Auto-commits happen every N exchanges and at scene/session boundaries.
 - **Scene transitions** are idempotent cascades (transcript → summarize → changelog → alarms → context refresh → clear conversation). Each step is safe to re-run; pending operations tracked in `state/pending-operation.json`.
 

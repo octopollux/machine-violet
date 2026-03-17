@@ -1,35 +1,35 @@
-import type Anthropic from "@anthropic-ai/sdk";
 import type { ModelId } from "../agents/agent-loop.js";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 export type ModelTier = "large" | "medium" | "small";
 
+export type EffortLevel = "low" | "medium" | "high" | "max";
+
+const VALID_EFFORT_LEVELS = new Set<string>(["low", "medium", "high", "max"]);
+
 export interface ModelConfig {
   large: ModelId;
   medium: ModelId;
   small: ModelId;
   /**
-   * Per-agent thinking configuration.
+   * Per-agent effort configuration.
    * Keys are agent names (e.g. "dm", "ooc", "scene-summarizer").
-   * Values: 0 = disabled, >= 1024 = explicit budget, "adaptive" = model decides.
+   * Values: effort level string, or null to omit (API default).
    * The "default" key serves as fallback for unconfigured agents.
    */
-  thinking: Record<string, number | "adaptive">;
+  effort: Record<string, EffortLevel | null>;
 }
 
-export type ThinkingParam = Anthropic.Messages.ThinkingConfigParam;
-
-export interface ThinkingConfig {
-  param: ThinkingParam;
-  budgetTokens: number;
+export interface EffortConfig {
+  effort: EffortLevel | null;
 }
 
 const DEFAULTS: ModelConfig = {
   large: "claude-opus-4-6",
   medium: "claude-sonnet-4-6",
   small: "claude-haiku-4-5-20251001",
-  thinking: { "default": 0, "dev-mode": "adaptive" },
+  effort: { "default": null, "dev-mode": "high" },
 };
 
 const VALID_MODELS = new Set<string>([
@@ -79,19 +79,19 @@ export function loadModelConfig(opts?: { cwd?: string; reset?: boolean }): Model
         }
       }
     }
-    const thinking = parsed?.thinking;
-    if (thinking && typeof thinking === "object" && !Array.isArray(thinking)) {
-      const map: Record<string, number | "adaptive"> = {};
-      for (const [key, val] of Object.entries(thinking)) {
-        if (val === "adaptive") {
-          map[key] = "adaptive";
-        } else if (typeof val === "number" && Number.isInteger(val) && (val === 0 || val >= 1024)) {
-          map[key] = val;
+    const effort = parsed?.effort;
+    if (effort && typeof effort === "object" && !Array.isArray(effort)) {
+      const map: Record<string, EffortLevel | null> = {};
+      for (const [key, val] of Object.entries(effort)) {
+        if (val === null || val === "none") {
+          map[key] = null;
+        } else if (typeof val === "string" && VALID_EFFORT_LEVELS.has(val)) {
+          map[key] = val as EffortLevel;
         }
         // Skip invalid entries silently
       }
       if (Object.keys(map).length > 0) {
-        config.thinking = { ...DEFAULTS.thinking, ...map };
+        config.effort = { ...DEFAULTS.effort, ...map };
       }
     }
   } catch {
@@ -110,15 +110,17 @@ export function getModel(tier: ModelTier): ModelId {
 }
 
 /**
- * Look up thinking configuration for a named agent.
- * Falls back to the "default" key, then disabled.
+ * Look up effort configuration for a named agent.
+ * Falls back to the "default" key, then null (API default).
+ *
+ * When effort is set, the caller should send `output_config: { effort }`
+ * and omit `thinking` (the API handles thinking implicitly).
+ * When effort is null, the caller should send `thinking: { type: "disabled" }`.
  */
-export function getThinkingConfig(agentName: string): ThinkingConfig {
-  const map = loadModelConfig().thinking;
-  const value = map[agentName] ?? map["default"] ?? 0;
-  if (value === "adaptive") return { param: { type: "adaptive" }, budgetTokens: 0 };
-  if (typeof value === "number" && value >= 1024) return { param: { type: "enabled", budget_tokens: value }, budgetTokens: value };
-  return { param: { type: "disabled" }, budgetTokens: 0 };
+export function getEffortConfig(agentName: string): EffortConfig {
+  const map = loadModelConfig().effort;
+  const level = agentName in map ? map[agentName] : (map["default"] ?? null);
+  return { effort: level };
 }
 
 /**

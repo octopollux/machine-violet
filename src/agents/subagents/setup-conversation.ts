@@ -7,7 +7,7 @@ import { PERSONALITIES } from "../../config/personalities.js";
 import { SEEDS } from "../../config/seeds.js";
 import { KNOWN_SYSTEMS, readChargenSection } from "../../config/systems.js";
 import type { SystemComplexity } from "../../config/systems.js";
-import { getModel, getThinkingConfig } from "../../config/models.js";
+import { getModel, getEffortConfig } from "../../config/models.js";
 import { accumulateUsage as accRawUsage } from "../../context/usage-helpers.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
@@ -264,15 +264,22 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
     finalized = undefined;
     pendingToolUseId = null;
 
-    const tc = getThinkingConfig("setup");
+    const ec = getEffortConfig("setup");
+    const model = getModel("medium");
+    const isOpus = model.includes("opus");
+    const thinkingParam = ec.effort
+      ? { type: "adaptive" as const }
+      : { type: "disabled" as const };
+    const outputConfig = ec.effort && isOpus ? { effort: ec.effort } : undefined;
 
     let lastParams = {
-      model: getModel("medium"),
-      max_tokens: TOKEN_LIMITS.SUBAGENT_LARGE + tc.budgetTokens,
+      model,
+      max_tokens: TOKEN_LIMITS.SUBAGENT_LARGE,
       system: SYSTEM_PROMPT,
       messages,
       tools: TOOLS,
-      thinking: tc.param,
+      thinking: thinkingParam,
+      ...(outputConfig ? { output_config: outputConfig } : {}),
     };
 
     const response = await streamWithRetry(client, lastParams, onDelta);
@@ -334,12 +341,13 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
       messages.push({ role: "user", content: toolResults });
 
       lastParams = {
-        model: getModel("medium"),
-        max_tokens: TOKEN_LIMITS.SUBAGENT_MEDIUM + tc.budgetTokens,
+        model,
+        max_tokens: TOKEN_LIMITS.SUBAGENT_MEDIUM,
         system: SYSTEM_PROMPT,
         messages,
         tools: TOOLS,
-        thinking: tc.param,
+        thinking: thinkingParam,
+        ...(outputConfig ? { output_config: outputConfig } : {}),
       };
       const followUpMsg = await streamWithRetry(client, lastParams, onDelta);
 
