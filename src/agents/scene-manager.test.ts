@@ -9,6 +9,7 @@ import type { DMSessionState } from "./dm-prompt.js";
 import { createClocksState } from "../tools/clocks/index.js";
 import { createCombatState, createDefaultConfig } from "../tools/combat/index.js";
 import { createDecksState } from "../tools/cards/index.js";
+import { createObjectivesState } from "../tools/objectives/index.js";
 import { norm } from "../utils/paths.js";
 
 function mockUsage(): Anthropic.Usage {
@@ -67,6 +68,7 @@ function mockState(): GameState {
     combat: createCombatState(),
     combatConfig: createDefaultConfig(),
     decks: createDecksState(),
+    objectives: createObjectivesState(),
     config: {
       name: "Test Campaign",
       dm_personality: { name: "grim", prompt_fragment: "Be terse." },

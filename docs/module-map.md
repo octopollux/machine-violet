@@ -53,6 +53,7 @@ Stateless game rule engines. Each subdirectory is a domain. Tool handlers take `
 | `cards/` | `deck()` (create/shuffle/draw/peek/return), `createStandard52()`, `createTarot()` |
 | `clocks/` | `createClocksState()`, `setAlarm()`, `clearAlarm()`, `advanceCalendar()`, `nextRound()`, `checkClocks()` |
 | `combat/` | `startCombat()`, `endCombat()`, `advanceTurn()`, `modifyInitiative()` |
+| `objectives/` | `createObjectivesState()`, `manageObjectives()` — long-lifecycle player-facing goals |
 | `maps/` | `createMap()`, `viewArea()`, `distance()`, `pathBetween()`, `lineOfSight()`, `placeEntity()`, `moveEntity()` |
 | `filesystem/` | `parseFrontMatter()`, `serializeEntity()`, `extractWikilinks()`, `campaignDirs()`, `campaignPaths()`, `validateConfig()`, `sandboxFileIO()` |
 | `git/` | `CampaignRepo`, `createGitIO()`, `queryCommitLog()`, `performRollback()` |

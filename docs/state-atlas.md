@@ -59,6 +59,18 @@ GameState
 │           ├── hands: Record<string, Card[]> mut (draw, return)
 │           └── template: string           const
 │
+├── objectives: ObjectivesState              mut   → state/objectives.json  DM via tools
+│   ├── objectives: Record<string, Objective>
+│   │   └── Objective
+│   │       ├── id: string                 const (auto: "obj-N")
+│   │       ├── title: string              mut   (update)
+│   │       ├── description: string        mut   (update)
+│   │       ├── status: active|completed|failed|abandoned  mut (complete/fail/abandon)
+│   │       ├── created_scene: number      const
+│   │       └── resolved_scene?: number    mut   (set on resolution)
+│   ├── next_id: number                    mut   (auto-incremented)
+│   └── current_scene: number              mut   (synced by scene manager)
+│
 ├── config: CampaignConfig                 const → config.json            Campaign init
 │   ├── version?: number                   const (CAMPAIGN_FORMAT_VERSION at creation)
 │   ├── createdAt?: string                 const (ISO 8601 timestamp at creation)
@@ -152,6 +164,7 @@ All state files live under `<campaignRoot>/state/`.
 | `state/clocks.json` | `ClocksState` | `StatePersister.persistClocks` | After any tool with `"clocks"` |
 | `state/maps.json` | `Record<string, MapData>` | `StatePersister.persistMaps` | After any tool with `"maps"` |
 | `state/decks.json` | `DecksState` | `StatePersister.persistDecks` | After any tool with `"decks"` |
+| `state/objectives.json` | `ObjectivesState` | `StatePersister.persistObjectives` | After any tool with `"objectives"` |
 | `state/scene.json` | `PersistedSceneState` | `StatePersister.persistScene` | After precis update, scene transition |
 | `state/conversation.json` | `SerializedExchange[]` | `StatePersister.persistConversation` | After each exchange |
 | `state/ui.json` | `PersistedUIState` | `StatePersister.persistUI` | After theme/style/modeline changes |
@@ -287,6 +300,7 @@ annotate        → ["maps"]
 import_entities → ["maps"]
 define_region   → ["maps"]
 deck            → ["decks"]
+manage_objectives → ["objectives"]
 switch_player   → []  (empty — activePlayerIndex persisted via scene state)
 ```
 
@@ -418,6 +432,7 @@ Load config.json from campaignRoot
     │   ├─ Read state/clocks.json   → hydrate GameState.clocks    (or createClocksState())
     │   ├─ Read state/maps.json     → hydrate GameState.maps      (or {})
     │   ├─ Read state/decks.json    → hydrate GameState.decks     (or createDecksState())
+    │   ├─ Read state/objectives.json → hydrate GameState.objectives (or createObjectivesState())
     │   ├─ Read state/scene.json    → hydrate SceneState subset   (precis, threads, intents, playerReads)
     │   ├─ Read state/conversation.json → ConversationManager.hydrate()
     │   └─ Read state/ui.json       → restore style/variant/modelines
@@ -545,6 +560,7 @@ Canonical directory tree for a campaign. Machine-managed files are marked with t
 │   ├── clocks.json                        ClocksState
 │   ├── maps.json                          Record<string, MapData>
 │   ├── decks.json                         DecksState
+│   ├── objectives.json                    ObjectivesState
 │   ├── scene.json                         PersistedSceneState (precis, threads, intents, playerReads, activePlayerIndex)
 │   ├── conversation.json                  SerializedExchange[]
 │   └── ui.json                            PersistedUIState (styleName, variant, keyColor, modelines)

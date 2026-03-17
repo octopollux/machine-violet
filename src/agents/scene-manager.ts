@@ -126,11 +126,13 @@ export class SceneManager {
 
   /** Get the current system prompt (cached prefix) and volatile context. */
   getSystemPrompt(): CachedPrefixResult {
+    this.state.objectives.current_scene = this.scene.sceneNumber;
     this.sessionState.activeState = buildActiveState({
       pcSummaries: this.pcSummaries,
       pendingAlarms: [],
       turnHolder: undefined,
       resourceValues: this.state.resourceValues,
+      activeObjectives: this.getActiveObjectives(),
     });
     this.sessionState.scenePrecis = buildScenePrecis(this.scene);
     this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);
@@ -479,10 +481,12 @@ export class SceneManager {
       pendingAlarms.push(clockStatus.combat.next_alarm.message);
     }
 
+    this.state.objectives.current_scene = this.scene.sceneNumber;
     this.sessionState.activeState = buildActiveState({
       pcSummaries: this.pcSummaries,
       pendingAlarms,
       resourceValues: this.state.resourceValues,
+      activeObjectives: this.getActiveObjectives(),
     });
 
     // Sync precis and player read
@@ -847,6 +851,13 @@ export class SceneManager {
   private async listEntityFiles(): Promise<string[]> {
     const entityFiles = await this.collectEntityFiles();
     return entityFiles.map((e) => e.file);
+  }
+
+  /** Get active objective summaries for the DM context. */
+  private getActiveObjectives(): string[] {
+    return Object.values(this.state.objectives.objectives)
+      .filter((o) => o.status === "active")
+      .map((o) => `${o.id}: ${o.title} — ${o.description}`);
   }
 
   /**

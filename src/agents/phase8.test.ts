@@ -13,6 +13,7 @@ import {
 import { aiPlayerTurn, buildAIPlayerPrompt } from "./subagents/ai-player.js";
 import { enterOOC, buildOOCPrompt } from "./subagents/ooc-mode.js";
 import { ToolRegistry } from "./tool-registry.js";
+import { createObjectivesState } from "../tools/objectives/index.js";
 
 // --- Test Helpers ---
 
@@ -89,6 +90,7 @@ function makeState(players: PlayerConfig[], activeIndex = 0): GameState {
     combat: { active: false, order: [], round: 0, currentTurn: 0 },
     combatConfig: { initiative_method: "d20_dex", round_structure: "individual", surprise_rules: false },
     decks: { decks: {} },
+    objectives: createObjectivesState(),
     config: makeConfig(players),
     campaignRoot: "/tmp/test",
     homeDir: "/tmp/home",
@@ -442,8 +444,8 @@ describe("new Phase 8 tools", () => {
     expect(registry.has("promote_character")).toBe(true);
   });
 
-  it("registry has 44 tools total", () => {
+  it("registry has 45 tools total", () => {
     const registry = new ToolRegistry();
-    expect(registry.size).toBe(44);
+    expect(registry.size).toBe(45);
   });
 });

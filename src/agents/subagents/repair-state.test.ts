@@ -5,6 +5,7 @@ import type { GameState } from "../game-state.js";
 import type { FileIO } from "../scene-manager.js";
 import { loadModelConfig } from "../../config/models.js";
 import { resetPromptCache } from "../../prompts/load-prompt.js";
+import { createObjectivesState } from "../../tools/objectives/index.js";
 
 beforeEach(() => {
   loadModelConfig({ reset: true });
@@ -21,6 +22,7 @@ function makeGameState(root = "/campaigns/test"): GameState {
     combat: { active: false, order: [], round: 0, currentTurn: 0 },
     combatConfig: { initiative_method: "d20_dex", round_structure: "individual", surprise_rules: false },
     decks: { decks: {} },
+    objectives: createObjectivesState(),
     config: {
       name: "Test Campaign",
       dm_personality: { name: "Classic", prompt_fragment: "" },

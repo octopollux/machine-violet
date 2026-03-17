@@ -6,6 +6,7 @@ import type { FileIO } from "./scene-manager.js";
 import { norm } from "../utils/paths.js";
 import { resetPromptCache } from "../prompts/load-prompt.js";
 import { loadModelConfig } from "../config/models.js";
+import { createObjectivesState } from "../tools/objectives/index.js";
 
 // --- Mocks ---
 
@@ -107,6 +108,7 @@ function mockState(): GameState {
     },
     combatConfig: { initiative_method: "d20_dex", round_structure: "individual", surprise_rules: false },
     decks: { decks: {} },
+    objectives: createObjectivesState(),
     config: {
       name: "Test",
       dm_personality: { name: "grim", prompt_fragment: "Be terse." },
