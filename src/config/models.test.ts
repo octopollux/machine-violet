@@ -131,17 +131,15 @@ describe("model config", () => {
   });
 
   describe("getEffortConfig", () => {
-    it("returns disabled thinking and null effort for unknown agent with default null", () => {
+    it("returns null effort for unknown agent with default null", () => {
       loadModelConfig({ cwd: testDir, reset: true });
       const ec = getEffortConfig("unknown-agent");
-      expect(ec.thinking).toEqual({ type: "disabled" });
       expect(ec.effort).toBeNull();
     });
 
-    it("returns adaptive thinking and high effort for dev-mode by default", () => {
+    it("returns high effort for dev-mode by default", () => {
       loadModelConfig({ cwd: testDir, reset: true });
       const ec = getEffortConfig("dev-mode");
-      expect(ec.thinking).toEqual({ type: "adaptive" });
       expect(ec.effort).toBe("high");
     });
 
@@ -152,7 +150,6 @@ describe("model config", () => {
       );
       loadModelConfig({ cwd: testDir, reset: true });
       const ec = getEffortConfig("dm");
-      expect(ec.thinking).toEqual({ type: "adaptive" });
       expect(ec.effort).toBe("max");
     });
 
@@ -163,7 +160,6 @@ describe("model config", () => {
       );
       loadModelConfig({ cwd: testDir, reset: true });
       const ec = getEffortConfig("scene-summarizer");
-      expect(ec.thinking).toEqual({ type: "adaptive" });
       expect(ec.effort).toBe("medium");
     });
 
@@ -173,12 +169,8 @@ describe("model config", () => {
         JSON.stringify({ effort: { default: "high", dm: null } }),
       );
       loadModelConfig({ cwd: testDir, reset: true });
-      const dmEc = getEffortConfig("dm");
-      expect(dmEc.thinking).toEqual({ type: "disabled" });
-      expect(dmEc.effort).toBeNull();
-      const otherEc = getEffortConfig("ooc");
-      expect(otherEc.thinking).toEqual({ type: "adaptive" });
-      expect(otherEc.effort).toBe("high");
+      expect(getEffortConfig("dm").effort).toBeNull();
+      expect(getEffortConfig("ooc").effort).toBe("high");
     });
   });
 });

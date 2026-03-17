@@ -1,4 +1,3 @@
-import type Anthropic from "@anthropic-ai/sdk";
 import type { ModelId } from "../agents/agent-loop.js";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -23,7 +22,6 @@ export interface ModelConfig {
 }
 
 export interface EffortConfig {
-  thinking: Anthropic.Messages.ThinkingConfigParam;
   effort: EffortLevel | null;
 }
 
@@ -115,16 +113,14 @@ export function getModel(tier: ModelTier): ModelId {
  * Look up effort configuration for a named agent.
  * Falls back to the "default" key, then null (API default).
  *
- * Returns a thinking config (adaptive when effort is set, disabled otherwise)
- * and the effort level for output_config.
+ * When effort is set, the caller should send `output_config: { effort }`
+ * and omit `thinking` (the API handles thinking implicitly).
+ * When effort is null, the caller should send `thinking: { type: "disabled" }`.
  */
 export function getEffortConfig(agentName: string): EffortConfig {
   const map = loadModelConfig().effort;
   const level = agentName in map ? map[agentName] : (map["default"] ?? null);
-  if (level) {
-    return { thinking: { type: "adaptive" }, effort: level };
-  }
-  return { thinking: { type: "disabled" }, effort: null };
+  return { effort: level };
 }
 
 /**

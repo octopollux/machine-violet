@@ -183,17 +183,15 @@ export async function runAgentLoop(
   const shouldStream = config.stream !== false && !!config.onTextDelta;
   const shouldRetry = config.retry ?? false;
 
-  // Resolve effort config from agent name if not explicitly provided
-  const rawEc = config.effort !== undefined
-    ? { thinking: config.effort ? { type: "adaptive" as const } : { type: "disabled" as const }, effort: config.effort }
+  // Resolve effort config from agent name if not explicitly provided.
+  // When effort is set, it controls thinking implicitly — don't send both.
+  const ec = config.effort !== undefined
+    ? { effort: config.effort }
     : getEffortConfig(config.name);
-
-  // Haiku doesn't support extended thinking — force disabled regardless of config
-  const isHaiku = config.model.includes("haiku");
-  const ec = isHaiku
-    ? { thinking: { type: "disabled" as const }, effort: null }
-    : rawEc;
-  const outputConfig: Anthropic.Messages.OutputConfig | undefined = ec.effort ? { effort: ec.effort } : undefined;
+  const thinkingParam: Anthropic.Messages.ThinkingConfigParam | undefined =
+    ec.effort ? undefined : { type: "disabled" };
+  const outputConfig: Anthropic.Messages.OutputConfig | undefined =
+    ec.effort ? { effort: ec.effort } : undefined;
 
   // Apply terse suffix
   let effectiveSystem = systemPrompt;
@@ -229,7 +227,7 @@ export async function runAgentLoop(
     max_tokens: config.maxTokens,
     system: effectiveSystem,
     messages: workingMessages,
-    thinking: ec.thinking,
+    ...(thinkingParam ? { thinking: thinkingParam } : {}),
     ...(outputConfig ? { output_config: outputConfig } : {}),
     ...(tools ? { tools } : {}),
   });

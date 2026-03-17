@@ -266,6 +266,7 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
 
     const ec = getEffortConfig("setup");
     const outputConfig = ec.effort ? { effort: ec.effort } : undefined;
+    const thinkingParam = ec.effort ? undefined : { type: "disabled" as const };
 
     let lastParams = {
       model: getModel("medium"),
@@ -273,7 +274,7 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
       system: SYSTEM_PROMPT,
       messages,
       tools: TOOLS,
-      thinking: ec.thinking,
+      ...(thinkingParam ? { thinking: thinkingParam } : {}),
       ...(outputConfig ? { output_config: outputConfig } : {}),
     };
 
@@ -341,7 +342,7 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
         system: SYSTEM_PROMPT,
         messages,
         tools: TOOLS,
-        thinking: ec.thinking,
+        ...(thinkingParam ? { thinking: thinkingParam } : {}),
         ...(outputConfig ? { output_config: outputConfig } : {}),
       };
       const followUpMsg = await streamWithRetry(client, lastParams, onDelta);
