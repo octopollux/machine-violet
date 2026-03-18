@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Text, Box, useInput } from "ink";
 import Anthropic from "@anthropic-ai/sdk";
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { readFile, writeFile, appendFile, mkdir, readdir, stat, unlink, rmdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 
@@ -56,7 +56,7 @@ import { listAvailableSystems, readBundledRuleCard } from "./config/systems.js";
 import type { AvailableSystem } from "./config/systems.js";
 import { promoteCharacter } from "./agents/subagents/character-promotion.js";
 import { processingPaths } from "./config/processing-paths.js";
-import { norm } from "./utils/paths.js";
+import { norm, isCompiled } from "./utils/paths.js";
 import { GameProvider } from "./tui/game-context.js";
 import type { GameContextValue } from "./tui/game-context.js";
 
@@ -381,7 +381,9 @@ export default function App({ shutdownRef }: AppProps) {
 
 
   // --- Config paths ---
-  const getAppDir = useCallback(() => process.cwd(), []);
+  // Compiled binaries store config next to the exe (stable location);
+  // dev mode uses cwd (the repo root).
+  const getAppDir = useCallback(() => isCompiled() ? dirname(process.execPath) : process.cwd(), []);
   const getConfigPath = useCallback(() => join(getAppDir(), "config.json"), [getAppDir]);
 
   // --- Load campaigns and systems ---
@@ -443,7 +445,11 @@ export default function App({ shutdownRef }: AppProps) {
   /** Handle store updates from the ApiKeysPhase (or anywhere). */
   const handleUpdateKeyStore = useCallback((updated: ApiKeyStore) => {
     setKeyStore(updated);
-    saveKeyStore(getAppDir(), updated);
+    try {
+      saveKeyStore(getAppDir(), updated);
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : "Failed to save API key store");
+    }
 
     // Sync active key to process.env
     const activeVal = getActiveKeyValue(updated);
@@ -501,9 +507,7 @@ export default function App({ shutdownRef }: AppProps) {
       readFileSync(configPath, "utf-8");
     } catch {
       // First launch — create config.json with defaults
-      const appDir = getAppDir();
       try {
-        mkdirSync(appDir, { recursive: true });
         writeFileSync(configPath, buildAppConfig(getDefaultHomeDir()));
       } catch (e) {
         setErrorMsg(e instanceof Error ? e.message : "Failed to write config");
