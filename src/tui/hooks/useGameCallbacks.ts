@@ -94,24 +94,13 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
         if (cmd.variant) setVariant(cmd.variant as StyleVariant);
         break;
       }
-      case "set_display_resources": {
+      case "set_display_resources":
+      case "set_resource_values":
+      case "resource_refresh": {
+        // GameState is already mutated by the tool handler in dispatch().
+        // Just sync React state so the TUI updates and the persist effect fires.
         const gs1 = gameStateRef.current;
-        if (gs1) {
-          const char = cmd.character as string;
-          gs1.displayResources[char] = cmd.resources as string[];
-          setResources(formatResources(gs1));
-        }
-        break;
-      }
-      case "set_resource_values": {
-        const gs2 = gameStateRef.current;
-        if (gs2) {
-          const char = cmd.character as string;
-          const vals = cmd.values as Record<string, string>;
-          if (!gs2.resourceValues[char]) gs2.resourceValues[char] = {};
-          Object.assign(gs2.resourceValues[char], vals);
-          setResources(formatResources(gs2));
-        }
+        if (gs1) setResources(formatResources(gs1));
         break;
       }
       case "present_choices": {

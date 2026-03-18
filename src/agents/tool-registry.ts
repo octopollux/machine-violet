@@ -1116,13 +1116,34 @@ export const TOOL_STATE_MAP: Record<string, StateSlice[]> = {
   resolve_turn: [],
 };
 
-export type OnStateChanged = (toolName: string, state: GameState, slices: StateSlice[]) => void;
+/**
+ * Callback fired after successful dispatch when the tool mutates state slices.
+ * Used by GameEngine to persist state to disk.
+ */
+export type PersistCallback = (state: GameState, slices: StateSlice[]) => void;
+
+/**
+ * Callback fired after any successful tool dispatch.
+ * Used by GameEngine for tool-specific side effects (combat lifecycle, etc.).
+ */
+export type ToolSuccessCallback = (toolName: string, state: GameState) => void;
 
 // --- Registry ---
 
-export class ToolRegistry {
+class ToolRegistry {
   private tools = new Map<string, RegisteredTool>();
-  onStateChanged?: OnStateChanged;
+
+  /**
+   * Called after successful dispatch when TOOL_STATE_MAP has entries for the tool.
+   * Wired once by GameEngine to persist state slices to disk.
+   */
+  persist?: PersistCallback;
+
+  /**
+   * Called after every successful dispatch (regardless of state slices).
+   * Wired by GameEngine for tool-specific side effects like combat lifecycle.
+   */
+  onToolSuccess?: ToolSuccessCallback;
 
   constructor() {
     for (const tool of TOOL_DEFS) {
@@ -1151,11 +1172,12 @@ export class ToolRegistry {
     }
     try {
       const result = tool.handler(state, input);
-      if (!result.is_error && this.onStateChanged) {
+      if (!result.is_error) {
         const slices = TOOL_STATE_MAP[name];
-        if (slices && slices.length > 0) {
-          this.onStateChanged(name, state, slices);
+        if (this.persist && slices && slices.length > 0) {
+          this.persist(state, slices);
         }
+        this.onToolSuccess?.(name, state);
       }
       return result;
     } catch (e) {
@@ -1175,5 +1197,16 @@ export class ToolRegistry {
   }
 }
 
-/** Singleton registry instance */
+/** The type of the singleton registry. Use `registry` — don't instantiate. */
+export type { ToolRegistry };
+
+/** Singleton registry instance — the only ToolRegistry in the process. */
 export const registry = new ToolRegistry();
+
+/**
+ * Create an isolated ToolRegistry for unit tests.
+ * Production code must use the singleton `registry`.
+ */
+export function createTestRegistry(): ToolRegistry {
+  return new ToolRegistry();
+}

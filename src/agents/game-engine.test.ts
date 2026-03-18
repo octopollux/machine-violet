@@ -1589,3 +1589,40 @@ describe("GameEngine resolve_turn routing", () => {
     expect(engine.getState()).toBe("waiting_input");
   });
 });
+
+describe("cross-mode resource dispatch: Engine + Dev Mode share singleton", () => {
+  it("Dev Mode tool dispatch mutates GameState and forwards TUI command", async () => {
+    const fio = mockFileIO();
+    const state = mockState();
+    const client = mockClient([textMessage("ok")]);
+    const { callbacks } = mockCallbacks();
+
+    // Construct engine (production code wires callbacks on singleton)
+    new GameEngine({
+      client,
+      gameState: state,
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: fio,
+      callbacks,
+    });
+
+    // Simulate Dev Mode dispatching resource tools via the same singleton
+    const { buildDevToolHandler } = await import("./subagents/dev-mode.js");
+    const onTuiCommand = vi.fn();
+    const handler = buildDevToolHandler(state, fio, undefined, undefined, undefined, onTuiCommand);
+
+    await handler("set_display_resources", { character: "Aldric", resources: ["HP", "MP"] });
+    await handler("set_resource_values", { character: "Aldric", values: { HP: "20/30", MP: "5/10" } });
+
+    // TUI command should have been forwarded (triggers React state → persist effect)
+    expect(onTuiCommand).toHaveBeenCalledTimes(2);
+
+    // GameState should be mutated (DM prompt reads this)
+    expect(state.displayResources["Aldric"]).toEqual(["HP", "MP"]);
+    expect(state.resourceValues["Aldric"]).toEqual({ HP: "20/30", MP: "5/10" });
+
+    // Persistence now happens via React useEffect in app.tsx (same pattern as modelines),
+    // not via the registry callback. The TUI command triggers setResources → effect → persist.
+  });
+});

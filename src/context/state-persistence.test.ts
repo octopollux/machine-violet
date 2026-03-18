@@ -160,6 +160,21 @@ describe("StatePersister", () => {
     expect(loaded.usage).toEqual(usage);
   });
 
+  it("round-trips resource state", async () => {
+    const fio = mockFileIO();
+    const persister = new StatePersister("/tmp/campaign", fio);
+    const resources = {
+      displayResources: { Aldric: ["HP", "Spell Slots"] },
+      resourceValues: { Aldric: { HP: "24/30", "Spell Slots": "3/4" } },
+    };
+
+    persister.persistResources(resources);
+    await vi.waitFor(() => expect(fio.writeFile).toHaveBeenCalled());
+
+    const loaded = await persister.loadAll();
+    expect(loaded.resources).toEqual(resources);
+  });
+
   it("loadAll returns undefined for missing files", async () => {
     const fio = mockFileIO();
     const persister = new StatePersister("/tmp/campaign", fio);
@@ -173,6 +188,7 @@ describe("StatePersister", () => {
     expect(loaded.conversation).toBeUndefined();
     expect(loaded.ui).toBeUndefined();
     expect(loaded.usage).toBeUndefined();
+    expect(loaded.resources).toBeUndefined();
   });
 
   it("round-trips UI theme state", async () => {

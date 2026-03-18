@@ -33,7 +33,7 @@ import { CostTracker } from "./context/cost-tracker.js";
 import type { ShutdownContext } from "./shutdown.js";
 import { teardownGameSession, resetAllCaches } from "./teardown.js";
 import { createGitIO } from "./tools/git/isogit-adapter.js";
-import { useGameCallbacks } from "./tui/hooks/useGameCallbacks.js";
+import { useGameCallbacks, formatResources } from "./tui/hooks/useGameCallbacks.js";
 import { useRawModeGuardian } from "./tui/hooks/useRawModeGuardian.js";
 import { useBatchedNarrativeLines } from "./tui/hooks/useBatchedNarrativeLines.js";
 import { isDevMode, wrapFileIOWithDevLog } from "./config/dev-mode.js";
@@ -138,12 +138,56 @@ function hydrateGameState(gs: GameState, scene: SceneState, loaded: LoadedState)
   if (loaded.maps) gs.maps = loaded.maps;
   if (loaded.decks) gs.decks = loaded.decks;
   if (loaded.objectives) gs.objectives = loaded.objectives;
+  if (loaded.resources) {
+    gs.displayResources = loaded.resources.displayResources;
+    gs.resourceValues = loaded.resources.resourceValues;
+  } else if (loaded.conversation) {
+    // Compat bridge: reconstruct resources from conversation history
+    // for campaigns created before resource persistence was added.
+    recoverResourcesFromConversation(gs, loaded.conversation);
+  }
   if (loaded.scene) {
     gs.activePlayerIndex = loaded.scene.activePlayerIndex;
     scene.precis = loaded.scene.precis;
     scene.openThreads = loaded.scene.openThreads ?? "";
     scene.npcIntents = loaded.scene.npcIntents ?? "";
     scene.playerReads = loaded.scene.playerReads;
+  }
+}
+
+/**
+ * Compat bridge: scan conversation history for resource tool results
+ * and replay them to reconstruct displayResources / resourceValues.
+ * Only needed for campaigns that predate resource persistence.
+ */
+function recoverResourcesFromConversation(
+  gs: GameState,
+  exchanges: ConversationExchange[],
+): void {
+  for (const ex of exchanges) {
+    for (const msg of ex.toolResults) {
+      // toolResults are MessageParam with content: string | ContentBlock[]
+      const blocks = typeof msg.content === "string"
+        ? [msg.content]
+        : Array.isArray(msg.content)
+          ? msg.content.map((b) => {
+              if (typeof b === "string") return b;
+              if ("content" in b && typeof b.content === "string") return b.content;
+              return "";
+            })
+          : [];
+      for (const text of blocks) {
+        try {
+          const parsed = JSON.parse(text);
+          if (parsed.type === "set_display_resources" && parsed.character && Array.isArray(parsed.resources)) {
+            gs.displayResources[parsed.character] = parsed.resources;
+          } else if (parsed.type === "set_resource_values" && parsed.character && parsed.values) {
+            if (!gs.resourceValues[parsed.character]) gs.resourceValues[parsed.character] = {};
+            Object.assign(gs.resourceValues[parsed.character], parsed.values);
+          }
+        } catch { /* not JSON — skip */ }
+      }
+    }
   }
 }
 
@@ -315,6 +359,17 @@ export default function App({ shutdownRef }: AppProps) {
       modelines: Object.keys(modelines).length > 0 ? modelines : undefined,
     });
   }, [themeName, variant, keyColor, modelines]);
+
+  // Persist resources when display state changes (same pattern as modelines above)
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    const gs = gameStateRef.current;
+    if (!gs) return;
+    persisterRef.current?.persistResources({
+      displayResources: gs.displayResources,
+      resourceValues: gs.resourceValues,
+    });
+  }, [resources]);
 
   // Sync UI state to engine for DM prefix
   useEffect(() => {
@@ -599,6 +654,13 @@ export default function App({ shutdownRef }: AppProps) {
     if (loaded.scene) setActivePlayerIndex(loaded.scene.activePlayerIndex);
     if (loaded.conversation) engine.seedConversation(loaded.conversation);
     if (loaded.usage) costTracker.current?.seed(loaded.usage);
+
+    // Restore resources for the top bar (from resources.json or compat bridge).
+    // setResources triggers the persist effect, which also writes resources.json
+    // for compat-bridged campaigns that don't have one yet.
+    if (Object.keys(gs.displayResources).length > 0) {
+      setResources(formatResources(gs));
+    }
 
     // Restore theme — fall back to default if the persisted name is unknown
     if (loaded.ui) {

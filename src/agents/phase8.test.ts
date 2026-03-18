@@ -12,7 +12,7 @@ import {
 } from "./player-manager.js";
 import { aiPlayerTurn, buildAIPlayerPrompt } from "./subagents/ai-player.js";
 import { enterOOC, buildOOCPrompt } from "./subagents/ooc-mode.js";
-import { ToolRegistry } from "./tool-registry.js";
+import { createTestRegistry } from "./tool-registry.js";
 import { createObjectivesState } from "../tools/objectives/index.js";
 
 // --- Test Helpers ---
@@ -397,13 +397,13 @@ describe("enterOOC", () => {
 
 describe("new Phase 8 tools", () => {
   it("registers enter_ooc tool", () => {
-    const registry = new ToolRegistry();
+    const registry = createTestRegistry();
     expect(registry.has("enter_ooc")).toBe(true);
   });
 
   it("enter_ooc returns TUI command", () => {
     const state = makeState([humanPlayer]);
-    const registry = new ToolRegistry();
+    const registry = createTestRegistry();
     const result = registry.dispatch(state, "enter_ooc", { reason: "Player asked about rules" });
 
     const cmd = JSON.parse(result.content);
@@ -412,13 +412,13 @@ describe("new Phase 8 tools", () => {
   });
 
   it("registers switch_player tool", () => {
-    const registry = new ToolRegistry();
+    const registry = createTestRegistry();
     expect(registry.has("switch_player")).toBe(true);
   });
 
   it("switch_player changes active player index", () => {
     const state = makeState([humanPlayer, aiPlayer]);
-    const registry = new ToolRegistry();
+    const registry = createTestRegistry();
     const result = registry.dispatch(state, "switch_player", { player: "Rook" });
 
     expect(result.content).toContain("Rook");
@@ -427,7 +427,7 @@ describe("new Phase 8 tools", () => {
 
   it("switch_player errors on unknown player", () => {
     const state = makeState([humanPlayer]);
-    const registry = new ToolRegistry();
+    const registry = createTestRegistry();
     const result = registry.dispatch(state, "switch_player", { player: "Nobody" });
 
     expect(result.is_error).toBe(true);
@@ -435,17 +435,17 @@ describe("new Phase 8 tools", () => {
   });
 
   it("registers resolve_turn tool", () => {
-    const registry = new ToolRegistry();
+    const registry = createTestRegistry();
     expect(registry.has("resolve_turn")).toBe(true);
   });
 
   it("registers promote_character tool", () => {
-    const registry = new ToolRegistry();
+    const registry = createTestRegistry();
     expect(registry.has("promote_character")).toBe(true);
   });
 
   it("registry has 45 tools total", () => {
-    const registry = new ToolRegistry();
+    const registry = createTestRegistry();
     expect(registry.size).toBe(45);
   });
 });

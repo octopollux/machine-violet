@@ -1,5 +1,5 @@
-export { ToolRegistry, registry } from "./tool-registry.js";
-export type { RegisteredTool, ToolResult } from "./tool-registry.js";
+export { registry, createTestRegistry } from "./tool-registry.js";
+export type { ToolRegistry, RegisteredTool, ToolResult } from "./tool-registry.js";
 export type { GameState } from "./game-state.js";
 export { agentLoop, agentLoopStreaming } from "./agent-loop.js";
 export type { AgentLoopConfig, AgentLoopResult, UsageStats, TuiCommand, ModelId } from "./agent-loop.js";
