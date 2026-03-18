@@ -1,0 +1,217 @@
+name: Nightly
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "*.md"
+      - "docs/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target: bun-windows-x64
+            archive: zip
+            asset_suffix: windows-x64
+          - os: macos-latest
+            target: bun-darwin-arm64
+            archive: tar.gz
+            asset_suffix: darwin-arm64
+          - os: ubuntu-latest
+            target: bun-linux-x64
+            archive: tar.gz
+            asset_suffix: linux-x64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build distribution
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          DATE=$(date -u +%Y%m%d)
+          NIGHTLY_VERSION="${VERSION}-nightly.${DATE}"
+          EXE_NAME="machine-violet"
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            EXE_NAME="machine-violet.exe"
+          fi
+
+          WIN_FLAGS=()
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            WIN_FLAGS=(
+              "--windows-icon=assets/machine-violet.ico"
+              "--windows-title=Machine Violet"
+              "--windows-description=AI Dungeon Master for tabletop RPGs"
+              "--windows-version=${VERSION}.0"
+            )
+          fi
+
+          bun build --compile \
+            --target=${{ matrix.target }} \
+            --outfile "dist/$EXE_NAME" \
+            --define "process.env.MV_VERSION='$NIGHTLY_VERSION'" \
+            "${WIN_FLAGS[@]}" \
+            src/index.tsx
+
+          cp -r src/prompts dist/prompts
+          cp -r src/tui/themes/assets dist/themes
+          cp -r systems dist/systems
+
+          echo "{\"version\":\"$NIGHTLY_VERSION\"}" > dist/version.json
+
+          if [ -f LICENSE ]; then cp LICENSE dist/; fi
+
+      - name: Azure login (OIDC)
+        if: matrix.os == 'windows-latest'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign Windows binary
+        if: matrix.os == 'windows-latest'
+        uses: azure/trusted-signing-action@v1
+        with:
+          endpoint: https://wus2.codesigning.azure.net
+          signing-account-name: mvcodesigning
+          certificate-profile-name: mv-public-trust
+          files: ${{ github.workspace }}/dist/machine-violet.exe
+          exclude-environment-credential: true
+          exclude-workload-identity-credential: true
+          exclude-managed-identity-credential: true
+          exclude-shared-token-cache-credential: true
+          exclude-visual-studio-credential: true
+          exclude-visual-studio-code-credential: true
+          exclude-azure-cli-credential: false
+          exclude-azure-powershell-credential: true
+          exclude-azure-developer-cli-credential: true
+          exclude-interactive-browser-credential: true
+
+      - name: Package (zip)
+        if: matrix.archive == 'zip'
+        shell: bash
+        run: |
+          cd dist
+          7z a "../machine-violet-nightly-${{ matrix.asset_suffix }}.zip" .
+
+      - name: Package (tar.gz)
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: |
+          tar -czf "machine-violet-nightly-${{ matrix.asset_suffix }}.tar.gz" -C dist .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: machine-violet-${{ matrix.asset_suffix }}
+          path: machine-violet-nightly-*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Create or update nightly release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Delete existing nightly release (if any)
+          gh release delete nightly --yes --repo ${{ github.repository }} 2>/dev/null || true
+
+          # Delete the old nightly tag
+          git push --delete origin nightly 2>/dev/null || true
+
+          # Create fresh nightly release
+          gh release create nightly \
+            --repo ${{ github.repository }} \
+            --title "Nightly ($(date -u +%Y-%m-%d))" \
+            --notes "Automated nightly build from \`main\` at $(date -u +%Y-%m-%d). **Not a stable release.**" \
+            --prerelease \
+            --target main \
+            machine-violet-nightly-*
+
+  update-homebrew:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update Homebrew formula
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          DARWIN_URL="https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-darwin-arm64.tar.gz"
+          LINUX_URL="https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-linux-x64.tar.gz"
+
+          DARWIN_SHA=$(curl -fsSL "$DARWIN_URL" | sha256sum | cut -d' ' -f1)
+          LINUX_SHA=$(curl -fsSL "$LINUX_URL" | sha256sum | cut -d' ' -f1)
+
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/octopollux/homebrew-mv-tap.git" tap
+          cd tap
+
+          cat > Formula/machine-violet.rb << 'FORMULA'
+          class MachineViolet < Formula
+            desc "AI Dungeon Master for tabletop RPGs"
+            homepage "https://github.com/octopollux/machine-violet"
+            version "nightly"
+            license "MIT"
+
+            on_macos do
+              on_arm do
+                url "https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-darwin-arm64.tar.gz"
+                sha256 "DARWIN_SHA_PLACEHOLDER"
+              end
+            end
+
+            on_linux do
+              on_intel do
+                url "https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-linux-x64.tar.gz"
+                sha256 "LINUX_SHA_PLACEHOLDER"
+              end
+            end
+
+            def install
+              libexec.install "machine-violet"
+              libexec.install "prompts" if Dir.exist?("prompts")
+              libexec.install "themes" if Dir.exist?("themes")
+              libexec.install "systems" if Dir.exist?("systems")
+
+              chmod 0755, libexec/"machine-violet"
+              bin.write_exec_script libexec/"machine-violet"
+            end
+
+            test do
+              assert_match "machine-violet", shell_output("#{bin}/machine-violet --version")
+            end
+          end
+          FORMULA
+
+          sed -i "s/DARWIN_SHA_PLACEHOLDER/${DARWIN_SHA}/g" Formula/machine-violet.rb
+          sed -i "s/LINUX_SHA_PLACEHOLDER/${LINUX_SHA}/g" Formula/machine-violet.rb
+          sed -i 's/^          //' Formula/machine-violet.rb
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/machine-violet.rb
+          git diff --cached --quiet && echo "No changes" || (git commit -m "Update machine-violet nightly ($(date -u +%Y-%m-%d))" && git push)
