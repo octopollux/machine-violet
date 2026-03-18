@@ -581,43 +581,29 @@ describe("buildDevToolHandler", () => {
   });
 });
 
-describe("buildDevToolHandler — resource persistence via singleton", () => {
-  it("set_display_resources triggers persist on the singleton registry", async () => {
-    const { registry } = await import("../tool-registry.js");
-    const persistSpy = vi.fn();
-    const prev = registry.persist;
-    registry.persist = persistSpy;
-    try {
-      const gs = makeGameState();
-      const fio = mockFileIO();
-      const onTuiCommand = vi.fn();
-      const handler = buildDevToolHandler(gs, fio, undefined, undefined, undefined, onTuiCommand);
-      const result = await handler("set_display_resources", { character: "Kael", resources: ["HP"] });
-      expect(result.is_error).toBeUndefined();
-      expect(gs.displayResources["Kael"]).toEqual(["HP"]);
-      expect(persistSpy).toHaveBeenCalledWith(gs, ["resources"]);
-    } finally {
-      registry.persist = prev;
-    }
+describe("buildDevToolHandler — resource tools mutate state and forward TUI command", () => {
+  it("set_display_resources mutates GameState and forwards TUI command", async () => {
+    const gs = makeGameState();
+    const fio = mockFileIO();
+    const onTuiCommand = vi.fn();
+    const handler = buildDevToolHandler(gs, fio, undefined, undefined, undefined, onTuiCommand);
+    const result = await handler("set_display_resources", { character: "Kael", resources: ["HP"] });
+    expect(result.is_error).toBeUndefined();
+    expect(gs.displayResources["Kael"]).toEqual(["HP"]);
+    expect(onTuiCommand).toHaveBeenCalledOnce();
+    expect((onTuiCommand.mock.calls[0][0] as { type: string }).type).toBe("set_display_resources");
   });
 
-  it("set_resource_values triggers persist on the singleton registry", async () => {
-    const { registry } = await import("../tool-registry.js");
-    const persistSpy = vi.fn();
-    const prev = registry.persist;
-    registry.persist = persistSpy;
-    try {
-      const gs = makeGameState();
-      const fio = mockFileIO();
-      const onTuiCommand = vi.fn();
-      const handler = buildDevToolHandler(gs, fio, undefined, undefined, undefined, onTuiCommand);
-      const result = await handler("set_resource_values", { character: "Kael", values: { HP: "24/30" } });
-      expect(result.is_error).toBeUndefined();
-      expect(gs.resourceValues["Kael"]).toEqual({ HP: "24/30" });
-      expect(persistSpy).toHaveBeenCalledWith(gs, ["resources"]);
-    } finally {
-      registry.persist = prev;
-    }
+  it("set_resource_values mutates GameState and forwards TUI command", async () => {
+    const gs = makeGameState();
+    const fio = mockFileIO();
+    const onTuiCommand = vi.fn();
+    const handler = buildDevToolHandler(gs, fio, undefined, undefined, undefined, onTuiCommand);
+    const result = await handler("set_resource_values", { character: "Kael", values: { HP: "24/30" } });
+    expect(result.is_error).toBeUndefined();
+    expect(gs.resourceValues["Kael"]).toEqual({ HP: "24/30" });
+    expect(onTuiCommand).toHaveBeenCalledOnce();
+    expect((onTuiCommand.mock.calls[0][0] as { type: string }).type).toBe("set_resource_values");
   });
 });
 

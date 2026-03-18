@@ -360,6 +360,17 @@ export default function App({ shutdownRef }: AppProps) {
     });
   }, [themeName, variant, keyColor, modelines]);
 
+  // Persist resources when display state changes (same pattern as modelines above)
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    const gs = gameStateRef.current;
+    if (!gs) return;
+    persisterRef.current?.persistResources({
+      displayResources: gs.displayResources,
+      resourceValues: gs.resourceValues,
+    });
+  }, [resources]);
+
   // Sync UI state to engine for DM prefix
   useEffect(() => {
     if (!hydratedRef.current) return;
@@ -644,17 +655,11 @@ export default function App({ shutdownRef }: AppProps) {
     if (loaded.conversation) engine.seedConversation(loaded.conversation);
     if (loaded.usage) costTracker.current?.seed(loaded.usage);
 
-    // Restore resources for the top bar (from resources.json or compat bridge)
-    const hasResources = Object.keys(gs.displayResources).length > 0;
-    if (hasResources) {
+    // Restore resources for the top bar (from resources.json or compat bridge).
+    // setResources triggers the persist effect, which also writes resources.json
+    // for compat-bridged campaigns that don't have one yet.
+    if (Object.keys(gs.displayResources).length > 0) {
       setResources(formatResources(gs));
-      // Persist recovered resources so the compat bridge doesn't run again
-      if (!loaded.resources) {
-        persister.persistResources({
-          displayResources: gs.displayResources,
-          resourceValues: gs.resourceValues,
-        });
-      }
     }
 
     // Restore theme — fall back to default if the persisted name is unknown

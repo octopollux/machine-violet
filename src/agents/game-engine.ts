@@ -254,10 +254,6 @@ export class GameEngine {
         case "maps": this.persister.persistMaps(state.maps); break;
         case "decks": this.persister.persistDecks(state.decks); break;
         case "objectives": this.persister.persistObjectives(state.objectives); break;
-        case "resources": this.persister.persistResources({
-          displayResources: state.displayResources,
-          resourceValues: state.resourceValues,
-        }); break;
       }
     }
   }
@@ -1163,7 +1159,8 @@ export class GameEngine {
         const result = await this.resolveSession.resolve(action);
         this.applyResolutionDeltas(result.deltas);
         if (result.deltas.some(d => d.type === "hp_change" || d.type === "resource_spend")) {
-          this.persistSlices(this.gameState, ["resources"]);
+          // Emit a resource refresh so the TUI's React effect persists the updated values
+          this.callbacks.onTuiCommand({ type: "resource_refresh" });
         }
         accUsage(this.sessionUsage, result.usage);
         this.callbacks.onUsageUpdate(result.usage, "small");

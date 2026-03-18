@@ -1590,14 +1590,14 @@ describe("GameEngine resolve_turn routing", () => {
   });
 });
 
-describe("cross-mode persistence: Engine + Dev Mode share singleton", () => {
-  it("Dev Mode tool dispatch writes resources.json via engine persist callback", async () => {
+describe("cross-mode resource dispatch: Engine + Dev Mode share singleton", () => {
+  it("Dev Mode tool dispatch mutates GameState and forwards TUI command", async () => {
     const fio = mockFileIO();
     const state = mockState();
     const client = mockClient([textMessage("ok")]);
     const { callbacks } = mockCallbacks();
 
-    // Construct engine — this wires `registry.persist` on the singleton
+    // Construct engine (production code wires callbacks on singleton)
     new GameEngine({
       client,
       gameState: state,
@@ -1607,7 +1607,7 @@ describe("cross-mode persistence: Engine + Dev Mode share singleton", () => {
       callbacks,
     });
 
-    // Now simulate Dev Mode dispatching resource tools via the same singleton
+    // Simulate Dev Mode dispatching resource tools via the same singleton
     const { buildDevToolHandler } = await import("./subagents/dev-mode.js");
     const onTuiCommand = vi.fn();
     const handler = buildDevToolHandler(state, fio, undefined, undefined, undefined, onTuiCommand);
@@ -1615,25 +1615,14 @@ describe("cross-mode persistence: Engine + Dev Mode share singleton", () => {
     await handler("set_display_resources", { character: "Aldric", resources: ["HP", "MP"] });
     await handler("set_resource_values", { character: "Aldric", values: { HP: "20/30", MP: "5/10" } });
 
-    // TUI command should have been forwarded
+    // TUI command should have been forwarded (triggers React state → persist effect)
     expect(onTuiCommand).toHaveBeenCalledTimes(2);
 
-    // State should be mutated
+    // GameState should be mutated (DM prompt reads this)
     expect(state.displayResources["Aldric"]).toEqual(["HP", "MP"]);
     expect(state.resourceValues["Aldric"]).toEqual({ HP: "20/30", MP: "5/10" });
 
-    // Check registry.persist is wired
-    const { registry } = await import("./tool-registry.js");
-    expect(registry.persist, "registry.persist should be defined after GameEngine construction").toBeDefined();
-
-    // resources.json should have been written to disk (fire-and-forget)
-    await vi.waitFor(() => {
-      const key = norm("/tmp/test-campaign/state/resources.json");
-      expect(files[key]).toBeDefined();
-    });
-
-    const resourcesFile = JSON.parse(files[norm("/tmp/test-campaign/state/resources.json")]);
-    expect(resourcesFile.displayResources["Aldric"]).toEqual(["HP", "MP"]);
-    expect(resourcesFile.resourceValues["Aldric"]).toEqual({ HP: "20/30", MP: "5/10" });
+    // Persistence now happens via React useEffect in app.tsx (same pattern as modelines),
+    // not via the registry callback. The TUI command triggers setResources → effect → persist.
   });
 });

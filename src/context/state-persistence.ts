@@ -27,7 +27,7 @@ export const STATE_FILES = {
   displayLog: "state/display-log.md",
 } as const;
 
-export type StateSlice = "combat" | "clocks" | "maps" | "decks" | "objectives" | "resources";
+export type StateSlice = "combat" | "clocks" | "maps" | "decks" | "objectives";
 
 /** Scene state subset that gets persisted */
 export interface PersistedSceneState {

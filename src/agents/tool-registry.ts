@@ -1112,8 +1112,6 @@ export const TOOL_STATE_MAP: Record<string, StateSlice[]> = {
   define_region: ["maps"],
   deck: ["decks"],
   manage_objectives: ["objectives"],
-  set_display_resources: ["resources"],
-  set_resource_values: ["resources"],
   switch_player: [],
   resolve_turn: [],
 };
