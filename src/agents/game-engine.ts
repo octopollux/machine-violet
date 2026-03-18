@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { ToolRegistry } from "./tool-registry.js";
+import { registry as singletonRegistry } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
 import { agentLoopStreaming } from "./agent-loop.js";
 import type { AgentLoopConfig, TuiCommand, UsageStats } from "./agent-loop.js";
@@ -19,7 +19,7 @@ import { getModel } from "../config/models.js";
 import type { ModelTier } from "../config/models.js";
 import { accUsage } from "../context/usage-helpers.js";
 import { TOKEN_LIMITS } from "../config/tokens.js";
-import type { ToolResult } from "./tool-registry.js";
+import type { ToolRegistry, ToolResult } from "./tool-registry.js";
 import { isAITurn, getActivePlayer } from "./player-manager.js";
 import { aiPlayerTurn } from "./subagents/ai-player.js";
 import { campaignPaths, parseFrontMatter, serializeEntity, formatChangelogEntry } from "../tools/filesystem/index.js";
@@ -170,7 +170,7 @@ export class GameEngine {
     gitIO?: GitIO;
   }) {
     this.client = params.client;
-    this.registry = new ToolRegistry();
+    this.registry = singletonRegistry;
     this.gameState = params.gameState;
     this.fileIO = params.fileIO;
     this.sessionState = params.sessionState;
@@ -226,15 +226,16 @@ export class GameEngine {
       this.sceneManager.devLog = params.callbacks.onDevLog;
     }
 
-    // Wire up state change handlers
-    this.registry.onStateChanged = (toolName, state, slices) => {
+    // Wire persistence — fires for any dispatch (engine, OOC, dev mode)
+    this.registry.persist = (state, slices) => {
       this.persistSlices(state, slices);
-      // switch_player mutates activePlayerIndex but has no state slice —
-      // persist it via scene state immediately
+    };
+
+    // Wire engine-specific tool hooks (combat lifecycle, player switching)
+    this.registry.onToolSuccess = (toolName, state) => {
       if (toolName === "switch_player") {
         this.persistCurrentScene();
       }
-      // Combat lifecycle hooks for resolve session
       if (toolName === "start_combat") {
         void this.initResolveSession(state);
       } else if (toolName === "end_combat") {

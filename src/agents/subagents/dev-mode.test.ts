@@ -581,6 +581,46 @@ describe("buildDevToolHandler", () => {
   });
 });
 
+describe("buildDevToolHandler — resource persistence via singleton", () => {
+  it("set_display_resources triggers persist on the singleton registry", async () => {
+    const { registry } = await import("../tool-registry.js");
+    const persistSpy = vi.fn();
+    const prev = registry.persist;
+    registry.persist = persistSpy;
+    try {
+      const gs = makeGameState();
+      const fio = mockFileIO();
+      const onTuiCommand = vi.fn();
+      const handler = buildDevToolHandler(gs, fio, undefined, undefined, undefined, onTuiCommand);
+      const result = await handler("set_display_resources", { character: "Kael", resources: ["HP"] });
+      expect(result.is_error).toBeUndefined();
+      expect(gs.displayResources["Kael"]).toEqual(["HP"]);
+      expect(persistSpy).toHaveBeenCalledWith(gs, ["resources"]);
+    } finally {
+      registry.persist = prev;
+    }
+  });
+
+  it("set_resource_values triggers persist on the singleton registry", async () => {
+    const { registry } = await import("../tool-registry.js");
+    const persistSpy = vi.fn();
+    const prev = registry.persist;
+    registry.persist = persistSpy;
+    try {
+      const gs = makeGameState();
+      const fio = mockFileIO();
+      const onTuiCommand = vi.fn();
+      const handler = buildDevToolHandler(gs, fio, undefined, undefined, undefined, onTuiCommand);
+      const result = await handler("set_resource_values", { character: "Kael", values: { HP: "24/30" } });
+      expect(result.is_error).toBeUndefined();
+      expect(gs.resourceValues["Kael"]).toEqual({ HP: "24/30" });
+      expect(persistSpy).toHaveBeenCalledWith(gs, ["resources"]);
+    } finally {
+      registry.persist = prev;
+    }
+  });
+});
+
 // --- Git mock for commit log tests ---
 
 const MOCK_BASE_TS = Math.floor(new Date("2025-03-15T12:00:00Z").getTime() / 1000);

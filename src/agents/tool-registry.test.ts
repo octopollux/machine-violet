@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ToolRegistry } from "./tool-registry.js";
+import { createTestRegistry } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
 import { createClocksState } from "../tools/clocks/index.js";
 import { createCombatState, createDefaultConfig } from "../tools/combat/index.js";
@@ -34,13 +34,13 @@ function mockState(): GameState {
 
 describe("ToolRegistry", () => {
   it("registers all T1 tools", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     // Map (14) + Dice (1) + Deck (1) + Clocks (5) + Combat (4) + TUI (7) = 32
     expect(reg.size).toBeGreaterThanOrEqual(30);
   });
 
   it("generates API-compatible tool definitions", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const defs = reg.getDefinitions();
     for (const def of defs) {
       expect(def.name).toBeTruthy();
@@ -49,7 +49,7 @@ describe("ToolRegistry", () => {
   });
 
   it("dispatches roll_dice", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     const result = reg.dispatch(state, "roll_dice", { expression: "1d6" });
     expect(result.is_error).toBeUndefined();
@@ -58,7 +58,7 @@ describe("ToolRegistry", () => {
   });
 
   it("dispatches deck create + draw", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     const create = reg.dispatch(state, "deck", { deck: "test", operation: "create", template: "standard52" });
     expect(create.is_error).toBeUndefined();
@@ -68,7 +68,7 @@ describe("ToolRegistry", () => {
   });
 
   it("dispatches create_map and view_area", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     reg.dispatch(state, "create_map", {
       id: "dungeon",
@@ -85,7 +85,7 @@ describe("ToolRegistry", () => {
   });
 
   it("dispatches place_entity and move_entity", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     state.maps["m"] = createMap("m", "square", 10, 10, "stone");
 
@@ -102,7 +102,7 @@ describe("ToolRegistry", () => {
   });
 
   it("dispatches set_alarm and check_clocks", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     const result = reg.dispatch(state, "set_alarm", {
       clock: "calendar",
@@ -117,7 +117,7 @@ describe("ToolRegistry", () => {
   });
 
   it("dispatches combat lifecycle", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     const start = reg.dispatch(state, "start_combat", {
       combatants: [
@@ -137,7 +137,7 @@ describe("ToolRegistry", () => {
   });
 
   it("returns TUI commands as JSON (update_modeline defaults character)", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     const result = reg.dispatch(state, "update_modeline", { text: "HP: 42/42" });
     const parsed = JSON.parse(result.content);
@@ -147,7 +147,7 @@ describe("ToolRegistry", () => {
   });
 
   it("update_modeline uses explicit character param", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     const result = reg.dispatch(state, "update_modeline", { text: "HP: 30/30", character: "Rook" });
     const parsed = JSON.parse(result.content);
@@ -157,7 +157,7 @@ describe("ToolRegistry", () => {
   });
 
   it("returns error for unknown tool", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     const result = reg.dispatch(state, "nonexistent_tool", {});
     expect(result.is_error).toBe(true);
@@ -165,7 +165,7 @@ describe("ToolRegistry", () => {
   });
 
   it("returns error for missing map", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     const result = reg.dispatch(state, "view_area", { map: "no_such_map", center: "0,0", radius: 1 });
     expect(result.is_error).toBe(true);
@@ -173,7 +173,7 @@ describe("ToolRegistry", () => {
   });
 
   it("catches handler exceptions gracefully", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     // roll_dice with invalid expression
     const result = reg.dispatch(state, "roll_dice", { expression: "" });
@@ -182,13 +182,13 @@ describe("ToolRegistry", () => {
   });
 
   it("has() returns correct results", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     expect(reg.has("roll_dice")).toBe(true);
     expect(reg.has("fake_tool")).toBe(false);
   });
 
   it("dispatches define_region and creates region on map", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     state.maps["m"] = createMap("m", "square", 10, 10, "stone");
 
@@ -202,7 +202,7 @@ describe("ToolRegistry", () => {
   });
 
   it("dispatches set_terrain with region input (regression)", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     state.maps["m"] = createMap("m", "square", 10, 10, "stone");
 
@@ -220,7 +220,7 @@ describe("ToolRegistry", () => {
   // ====== WORLDBUILDING ======
 
   it("scribe returns terse content and _tui with batched updates", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     const result = reg.dispatch(state, "scribe", {
       updates: [
@@ -240,7 +240,7 @@ describe("ToolRegistry", () => {
   });
 
   it("scribe rejects empty updates array", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     const result = reg.dispatch(state, "scribe", { updates: [] });
     expect(result.is_error).toBe(true);
@@ -248,7 +248,7 @@ describe("ToolRegistry", () => {
   });
 
   it("scribe rejects updates missing required fields", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     const result = reg.dispatch(state, "scribe", {
       updates: [{ visibility: "private" }],
@@ -259,7 +259,7 @@ describe("ToolRegistry", () => {
   // ====== DM NOTES ======
 
   it("dm_notes write returns terse content and _tui with notes", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     const result = reg.dispatch(state, "dm_notes", {
       action: "write",
@@ -274,7 +274,7 @@ describe("ToolRegistry", () => {
   });
 
   it("dm_notes read returns TUI command", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     const result = reg.dispatch(state, "dm_notes", { action: "read" });
     expect(result.is_error).toBeUndefined();
@@ -284,7 +284,7 @@ describe("ToolRegistry", () => {
   });
 
   it("dm_notes write trims whitespace", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     const result = reg.dispatch(state, "dm_notes", {
       action: "write",
@@ -294,7 +294,7 @@ describe("ToolRegistry", () => {
   });
 
   it("dm_notes write rejects empty notes", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     const result = reg.dispatch(state, "dm_notes", {
       action: "write",
@@ -305,7 +305,7 @@ describe("ToolRegistry", () => {
   });
 
   it("dm_notes rejects invalid action", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     const result = reg.dispatch(state, "dm_notes", { action: "delete" });
     expect(result.is_error).toBe(true);
@@ -313,7 +313,7 @@ describe("ToolRegistry", () => {
   });
 
   it("getDefinitionsFor returns only requested tools, skips unknown", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const defs = reg.getDefinitionsFor(["roll_dice", "nonexistent", "check_clocks"]);
     expect(defs).toHaveLength(2);
     expect(defs[0].name).toBe("roll_dice");
@@ -321,13 +321,13 @@ describe("ToolRegistry", () => {
   });
 
   it("getDefinitionsFor returns empty array for all-unknown names", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const defs = reg.getDefinitionsFor(["fake1", "fake2"]);
     expect(defs).toHaveLength(0);
   });
 
   it("dispatches context_refresh and returns TUI command JSON", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     const result = reg.dispatch(state, "context_refresh", {});
     const parsed = JSON.parse(result.content);
@@ -335,7 +335,7 @@ describe("ToolRegistry", () => {
   });
 
   it("dispatches scene_transition and returns TuiCommand JSON", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     const result = reg.dispatch(state, "scene_transition", { title: "The Dark Forest", time_advance: 60 });
     expect(result.is_error).toBeUndefined();
@@ -346,7 +346,7 @@ describe("ToolRegistry", () => {
   });
 
   it("set_display_resources stores keys on state", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     const result = reg.dispatch(state, "set_display_resources", {
       character: "Aldric",
@@ -359,7 +359,7 @@ describe("ToolRegistry", () => {
   });
 
   it("set_resource_values stores and merges values on state", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     reg.dispatch(state, "set_resource_values", {
       character: "Aldric",
@@ -386,7 +386,7 @@ describe("ToolRegistry", () => {
   });
 
   it("dispatches session_end and returns TuiCommand JSON", () => {
-    const reg = new ToolRegistry();
+    const reg = createTestRegistry();
     const state = mockState();
     const result = reg.dispatch(state, "session_end", { title: "End of Session 1" });
     expect(result.is_error).toBeUndefined();

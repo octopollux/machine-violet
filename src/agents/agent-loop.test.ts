@@ -3,7 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { agentLoop, stampToolsCacheControl } from "./agent-loop.js";
 import { extractStatus, retryDelay } from "./agent-session.js";
 import type { AgentLoopConfig } from "./agent-loop.js";
-import { ToolRegistry } from "./tool-registry.js";
+import { createTestRegistry } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
 import { createClocksState } from "../tools/clocks/index.js";
 import { createCombatState, createDefaultConfig } from "../tools/combat/index.js";
@@ -116,7 +116,7 @@ describe("agentLoop", () => {
       client,
       "You are a DM.",
       [{ role: "user", content: "I open the door." }],
-      new ToolRegistry(),
+      createTestRegistry(),
       mockState(),
       mockConfig(),
     );
@@ -137,7 +137,7 @@ describe("agentLoop", () => {
       client,
       "You are a DM.",
       [{ role: "user", content: "I attack the goblin." }],
-      new ToolRegistry(),
+      createTestRegistry(),
       mockState(),
       mockConfig({ onToolStart, onToolEnd }),
     );
@@ -157,7 +157,7 @@ describe("agentLoop", () => {
       client,
       "You are a DM.",
       [{ role: "user", content: "I attack!" }],
-      new ToolRegistry(),
+      createTestRegistry(),
       mockState(),
       mockConfig(),
     );
@@ -177,7 +177,7 @@ describe("agentLoop", () => {
       client,
       "You are a DM.",
       [{ role: "user", content: "I try to pick the lock." }],
-      new ToolRegistry(),
+      createTestRegistry(),
       mockState(),
       mockConfig(),
     );
@@ -195,7 +195,7 @@ describe("agentLoop", () => {
       client,
       "System",
       [{ role: "user", content: "Roll" }],
-      new ToolRegistry(),
+      createTestRegistry(),
       mockState(),
       mockConfig(),
     );
@@ -216,7 +216,7 @@ describe("agentLoop", () => {
       client,
       "System",
       [{ role: "user", content: "Roll a lot" }],
-      new ToolRegistry(),
+      createTestRegistry(),
       mockState(),
       mockConfig({ maxToolRounds: 3 }),
     );
@@ -232,7 +232,7 @@ describe("agentLoop", () => {
       client,
       "System",
       [{ role: "user", content: "Hi" }],
-      new ToolRegistry(),
+      createTestRegistry(),
       mockState(),
       mockConfig({ onTextDelta }),
     );
@@ -248,7 +248,7 @@ describe("agentLoop", () => {
       client,
       "System",
       [{ role: "user", content: "Go" }],
-      new ToolRegistry(),
+      createTestRegistry(),
       mockState(),
       mockConfig({ onComplete }),
     );
@@ -269,7 +269,7 @@ describe("agentLoop", () => {
       client,
       "System",
       [{ role: "user", content: "Roll" }],
-      new ToolRegistry(),
+      createTestRegistry(),
       mockState(),
       mockConfig(),
     );
@@ -292,7 +292,7 @@ describe("agentLoop", () => {
       client,
       "System",
       [{ role: "user", content: "Show map" }],
-      new ToolRegistry(),
+      createTestRegistry(),
       mockState(),
       mockConfig({ onToolEnd }),
     );
@@ -332,7 +332,7 @@ describe("thinking block filtering", () => {
       client,
       "System",
       [{ role: "user", content: "Roll a d20" }],
-      new ToolRegistry(),
+      createTestRegistry(),
       mockState(),
       mockConfig(),
     );
@@ -453,7 +453,7 @@ describe("retry behavior via agentLoop", () => {
       client,
       "System",
       [{ role: "user", content: "Hi" }],
-      new ToolRegistry(),
+      createTestRegistry(),
       mockState(),
       mockConfig({ onRetry }),
     );
@@ -485,7 +485,7 @@ describe("retry behavior via agentLoop", () => {
       client,
       "System",
       [{ role: "user", content: "Hi" }],
-      new ToolRegistry(),
+      createTestRegistry(),
       mockState(),
       mockConfig({ onRetry }),
     );
@@ -512,7 +512,7 @@ describe("retry behavior via agentLoop", () => {
         client,
         "System",
         [{ role: "user", content: "Hi" }],
-        new ToolRegistry(),
+        createTestRegistry(),
         mockState(),
         mockConfig({ onError }),
       ),

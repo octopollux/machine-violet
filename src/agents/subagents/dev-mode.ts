@@ -14,7 +14,7 @@ import * as path from "node:path";
 import type { CampaignRepo } from "../../tools/git/index.js";
 import { queryCommitLog, performRollback } from "../../tools/git/index.js";
 import { RollbackCompleteError } from "../../teardown.js";
-import { ToolRegistry } from "../tool-registry.js";
+import { registry as singletonRegistry } from "../tool-registry.js";
 import { findReferences, renameEntity, mergeEntities, resolveDeadLinks } from "../../tools/campaign-ops/index.js";
 import type { ModeSession } from "../../tui/game-context.js";
 import type { TuiCommand } from "../agent-loop.js";
@@ -238,8 +238,7 @@ export function buildDevTools(): Anthropic.Tool[] {
 
   // Append all DM tools, skipping any names already defined above
   const devNames = new Set(devTools.map((t) => t.name));
-  const registry = new ToolRegistry();
-  for (const def of registry.getDefinitions()) {
+  for (const def of singletonRegistry.getDefinitions()) {
     if (!devNames.has(def.name)) {
       devTools.push(def);
     }
@@ -273,7 +272,7 @@ export function buildDevToolHandler(
   onTuiCommand?: (cmd: TuiCommand) => void,
 ): (name: string, input: Record<string, unknown>) => Promise<{ content: string; is_error?: boolean }> {
   const root = gameState.campaignRoot;
-  const dmRegistry = new ToolRegistry();
+  const dmRegistry = singletonRegistry;
 
   return async (name: string, input: Record<string, unknown>) => {
     try {
