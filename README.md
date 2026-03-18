@@ -8,12 +8,17 @@ Machine Violet is a complete game engine: it narrates, inhabits NPCs, tracks sta
 
 ## Install
 
+**Homebrew** (macOS / Linux):
+```bash
+brew install octopollux/mv-tap/machine-violet
+```
+
 **Windows** (PowerShell):
 ```powershell
 irm https://raw.githubusercontent.com/octopollux/machine-violet/main/scripts/install.ps1 | iex
 ```
 
-**macOS / Linux**:
+**macOS / Linux** (manual):
 ```bash
 curl -fsSL https://raw.githubusercontent.com/octopollux/machine-violet/main/scripts/install.sh | bash
 ```

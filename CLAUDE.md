@@ -119,6 +119,14 @@ Code and docs stay in sync. See `docs/maintenance.md` for the full guide.
 
 Live API key in `.env` with limited credit. Opus is $5/$25 per MTok. Default dev override uses Sonnet for DM to save money. Don't make unnecessary API calls in manual testing.
 
+## Release & Distribution
+
+- **Release workflow** (`.github/workflows/release.yml`): builds standalone binaries for Windows, macOS, and Linux via `bun build --compile`. Triggered by `v*` tags or `workflow_call` from `cut-release.yml`.
+- **Windows signing**: the Windows `.exe` is Authenticode-signed via Azure Trusted Signing (Artifact Signing) using OIDC federation. The workflow runs `azure/login@v2` then `azure/trusted-signing-action@v1`. Infrastructure lives in `../mv-infrastructure/trusted-signing/`.
+- **Homebrew tap**: `octopollux/homebrew-mv-tap`. Formula auto-updated by the `update-homebrew` job in the release workflow. Binary + assets install to `libexec` (binary expects `prompts/`, `themes/`, `systems/` next to the executable — see `src/utils/paths.ts`).
+- **macOS Gatekeeper**: Homebrew installs bypass Gatekeeper. Direct tarball downloads will trigger quarantine prompts until Apple Developer notarization is set up.
+- **Linux**: distributed as a standalone tarball and via Homebrew. No GPG signing or distro packaging currently.
+
 ## Commit Hygeine
 
 After completing a coding task, make a detailed commit; you'll need this history later! In your final summary, mention that you have made a commit.
