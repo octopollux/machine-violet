@@ -13,7 +13,7 @@ describe("parseResolutionXml", () => {
     <roll expr="2d8" reason="Divine Smite (2nd level)" result="11" detail="[6,5]=11"/>
   </rolls>
   <deltas>
-    <delta type="hp_change" target="dragon" amount="-24" damage_type="slashing+radiant"/>
+    <delta type="hp_change" target="dragon" resource="HP" amount="-24" damage_type="slashing+radiant"/>
     <delta type="resource_spend" target="Kael" resource="spell_slots_2nd" spent="1" remaining="2"/>
   </deltas>
 </resolution>`;
@@ -38,7 +38,7 @@ describe("parseResolutionXml", () => {
     expect(result!.deltas[0]).toEqual({
       type: "hp_change",
       target: "dragon",
-      details: { amount: -24, damage_type: "slashing+radiant" },
+      details: { resource: "HP", amount: -24, damage_type: "slashing+radiant" },
     });
     expect(result!.deltas[1]).toEqual({
       type: "resource_spend",

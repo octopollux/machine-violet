@@ -1334,9 +1334,14 @@ export class GameEngine {
           const values = this.gameState.resourceValues[target];
           if (delta.type === "hp_change") {
             const amount = delta.details.amount as number;
-            const currentStr = values.hp ?? "0";
+            // Use the resource key from the delta (system-agnostic), or fall back
+            // to the first display resource for backward compat with old deltas.
+            const key = (delta.details.resource as string | undefined)
+              ?? this.gameState.displayResources[target]?.[0]
+              ?? "hp";
+            const currentStr = values[key] ?? "0";
             const current = parseInt(currentStr, 10) || 0;
-            values.hp = String(current + amount);
+            values[key] = String(current + amount);
           } else {
             const resource = delta.details.resource as string;
             if (delta.details.remaining !== undefined) {
@@ -1395,7 +1400,8 @@ export class GameEngine {
       if (delta.type === "hp_change") {
         const amt = delta.details.amount as number;
         const sign = amt >= 0 ? "+" : "";
-        lines.push(`<color=${muteColor}>${delta.target} HP ${sign}${amt}</color>`);
+        const key = (delta.details.resource as string | undefined) ?? "HP";
+        lines.push(`<color=${muteColor}>${delta.target} ${key} ${sign}${amt}</color>`);
       } else if (delta.type === "condition_add") {
         lines.push(`<color=${muteColor}>${delta.target}: +${delta.details.condition}</color>`);
       } else if (delta.type === "condition_remove") {

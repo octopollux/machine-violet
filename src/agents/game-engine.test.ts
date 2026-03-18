@@ -1626,3 +1626,58 @@ describe("cross-mode resource dispatch: Engine + Dev Mode share singleton", () =
     // not via the registry callback. The TUI command triggers setResources → effect → persist.
   });
 });
+
+describe("applyResolutionDeltas — system-agnostic hp_change", () => {
+  it("uses resource key from delta when present", async () => {
+    const state = mockState();
+    state.displayResources["Goblin"] = ["Hull Integrity"];
+    state.resourceValues["Goblin"] = { "Hull Integrity": "50" };
+
+    const client = mockClient([textMessage("ok")]);
+    const { callbacks } = mockCallbacks();
+    const engine = new GameEngine({
+      client, gameState: state, scene: mockScene(),
+      sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
+    });
+
+    const applyDeltas = (engine as unknown as { applyResolutionDeltas: (d: unknown[]) => void }).applyResolutionDeltas.bind(engine);
+    applyDeltas([{ type: "hp_change", target: "Goblin", details: { resource: "Hull Integrity", amount: -15 } }]);
+
+    expect(state.resourceValues["Goblin"]["Hull Integrity"]).toBe("35");
+  });
+
+  it("falls back to first displayResource key when delta has no resource", async () => {
+    const state = mockState();
+    state.displayResources["Kael"] = ["Vitality", "Mana"];
+    state.resourceValues["Kael"] = { Vitality: "100", Mana: "50" };
+
+    const client = mockClient([textMessage("ok")]);
+    const { callbacks } = mockCallbacks();
+    const engine = new GameEngine({
+      client, gameState: state, scene: mockScene(),
+      sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
+    });
+
+    const applyDeltas = (engine as unknown as { applyResolutionDeltas: (d: unknown[]) => void }).applyResolutionDeltas.bind(engine);
+    applyDeltas([{ type: "hp_change", target: "Kael", details: { amount: -20 } }]);
+
+    expect(state.resourceValues["Kael"]["Vitality"]).toBe("80");
+    expect(state.resourceValues["Kael"]["Mana"]).toBe("50"); // untouched
+  });
+
+  it("falls back to 'hp' when no displayResources and no resource in delta", async () => {
+    const state = mockState();
+    const client = mockClient([textMessage("ok")]);
+    const { callbacks } = mockCallbacks();
+    const engine = new GameEngine({
+      client, gameState: state, scene: mockScene(),
+      sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
+    });
+
+    const applyDeltas = (engine as unknown as { applyResolutionDeltas: (d: unknown[]) => void }).applyResolutionDeltas.bind(engine);
+    applyDeltas([{ type: "hp_change", target: "Goblin", details: { amount: -5 } }]);
+
+    // No displayResources, no resource in delta → falls back to "hp"
+    expect(state.resourceValues["Goblin"]["hp"]).toBe("-5");
+  });
+});

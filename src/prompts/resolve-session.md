@@ -31,7 +31,7 @@ After resolving, end your response with a `<resolution>` XML block:
     <roll expr="1d20+7" reason="Attack roll" result="23" detail="[16]+7=23"/>
   </rolls>
   <deltas>
-    <delta type="hp_change" target="goblin" amount="-12" damage_type="slashing"/>
+    <delta type="hp_change" target="goblin" resource="HP" amount="-12" damage_type="slashing"/>
     <delta type="resource_spend" target="Kael" resource="spell_slots_2nd" spent="1" remaining="2"/>
     <delta type="condition_add" target="goblin" condition="prone" duration="until end of next turn"/>
     <delta type="condition_remove" target="Kael" condition="frightened"/>
@@ -41,7 +41,7 @@ After resolving, end your response with a `<resolution>` XML block:
 ```
 
 ### Delta types
-- `hp_change`: `amount` (negative=damage, positive=healing), optional `damage_type`, `current`, `max`
+- `hp_change`: `resource` (the health resource key from the character's tracked resources, e.g. "HP", "Hull Integrity"), `amount` (negative=damage, positive=healing), optional `damage_type`, `current`, `max`
 - `condition_add`: `condition`, optional `duration`, `source`
 - `condition_remove`: `condition`
 - `resource_spend`: `resource`, `spent`, optional `remaining`
