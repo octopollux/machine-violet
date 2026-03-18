@@ -85,8 +85,8 @@ GameState
 │
 ├── campaignRoot: string                   const                          Session init
 ├── activePlayerIndex: number              mut   → state/scene.json      DM (switch_player)
-├── displayResources: Record<string, string[]>     mut                   DM (set_display_resources)
-└── resourceValues: Record<string, Record<string, string>>  mut          DM (set_resource_values)
+├── displayResources: Record<string, string[]>     mut   → state/resources.json  DM (set_display_resources)
+└── resourceValues: Record<string, Record<string, string>>  mut   → state/resources.json  DM (set_resource_values)
 ```
 
 ### Shadow State (alongside GameState, not inside it)
@@ -167,6 +167,7 @@ All state files live under `<campaignRoot>/state/`.
 | `state/objectives.json` | `ObjectivesState` | `StatePersister.persistObjectives` | After any tool with `"objectives"` |
 | `state/scene.json` | `PersistedSceneState` | `StatePersister.persistScene` | After precis update, scene transition |
 | `state/conversation.json` | `SerializedExchange[]` | `StatePersister.persistConversation` | After each exchange |
+| `state/resources.json` | `PersistedResourceState` | `StatePersister.persistResources` | After any tool with `"resources"`, or after `resolve_turn` deltas |
 | `state/ui.json` | `PersistedUIState` | `StatePersister.persistUI` | After theme/style/modeline changes |
 | `config.json` | `CampaignConfig` | `buildCampaignConfig` / `createDefaultCampaignConfig` | Campaign creation only. Read-only during play. Includes `version` (`CAMPAIGN_FORMAT_VERSION`) and `createdAt` (ISO 8601) manifest fields. |
 | `pending-operation.json` | `PendingOperation` | `SceneManager` | During scene transition cascade steps |
@@ -435,6 +436,7 @@ Load config.json from campaignRoot
     │   ├─ Read state/objectives.json → hydrate GameState.objectives (or createObjectivesState())
     │   ├─ Read state/scene.json    → hydrate SceneState subset   (precis, threads, intents, playerReads)
     │   ├─ Read state/conversation.json → ConversationManager.hydrate()
+    │   ├─ Read state/resources.json → hydrate displayResources + resourceValues + setResources()
     │   └─ Read state/ui.json       → restore style/variant/modelines
     │
     ├─ detectSceneState(campaignRoot)

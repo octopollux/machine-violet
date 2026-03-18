@@ -33,7 +33,7 @@ import { CostTracker } from "./context/cost-tracker.js";
 import type { ShutdownContext } from "./shutdown.js";
 import { teardownGameSession, resetAllCaches } from "./teardown.js";
 import { createGitIO } from "./tools/git/isogit-adapter.js";
-import { useGameCallbacks } from "./tui/hooks/useGameCallbacks.js";
+import { useGameCallbacks, formatResources } from "./tui/hooks/useGameCallbacks.js";
 import { useRawModeGuardian } from "./tui/hooks/useRawModeGuardian.js";
 import { useBatchedNarrativeLines } from "./tui/hooks/useBatchedNarrativeLines.js";
 import { isDevMode, wrapFileIOWithDevLog } from "./config/dev-mode.js";
@@ -138,6 +138,10 @@ function hydrateGameState(gs: GameState, scene: SceneState, loaded: LoadedState)
   if (loaded.maps) gs.maps = loaded.maps;
   if (loaded.decks) gs.decks = loaded.decks;
   if (loaded.objectives) gs.objectives = loaded.objectives;
+  if (loaded.resources) {
+    gs.displayResources = loaded.resources.displayResources;
+    gs.resourceValues = loaded.resources.resourceValues;
+  }
   if (loaded.scene) {
     gs.activePlayerIndex = loaded.scene.activePlayerIndex;
     scene.precis = loaded.scene.precis;
@@ -599,6 +603,9 @@ export default function App({ shutdownRef }: AppProps) {
     if (loaded.scene) setActivePlayerIndex(loaded.scene.activePlayerIndex);
     if (loaded.conversation) engine.seedConversation(loaded.conversation);
     if (loaded.usage) costTracker.current?.seed(loaded.usage);
+
+    // Restore resources for the top bar
+    if (loaded.resources) setResources(formatResources(gs));
 
     // Restore theme — fall back to default if the persisted name is unknown
     if (loaded.ui) {

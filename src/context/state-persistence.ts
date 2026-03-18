@@ -23,10 +23,11 @@ export const STATE_FILES = {
   conversation: "state/conversation.json",
   ui: "state/ui.json",
   usage: "state/usage.json",
+  resources: "state/resources.json",
   displayLog: "state/display-log.md",
 } as const;
 
-export type StateSlice = "combat" | "clocks" | "maps" | "decks" | "objectives";
+export type StateSlice = "combat" | "clocks" | "maps" | "decks" | "objectives" | "resources";
 
 /** Scene state subset that gets persisted */
 export interface PersistedSceneState {
@@ -45,6 +46,12 @@ export interface PersistedUIState {
   modelines?: Record<string, string>;
 }
 
+/** Persisted resource display + values */
+export interface PersistedResourceState {
+  displayResources: Record<string, string[]>;
+  resourceValues: Record<string, Record<string, string>>;
+}
+
 /** Full loaded state from disk */
 export interface LoadedState {
   combat?: CombatState;
@@ -56,6 +63,7 @@ export interface LoadedState {
   conversation?: ConversationExchange[];
   ui?: PersistedUIState;
   usage?: TokenBreakdown;
+  resources?: PersistedResourceState;
 }
 
 /**
@@ -153,6 +161,10 @@ export class StatePersister {
     this.enqueueWrite(STATE_FILES.conversation, JSON.stringify(exchanges));
   }
 
+  persistResources(state: PersistedResourceState): void {
+    this.enqueueWrite(STATE_FILES.resources, JSON.stringify(state, null, 2));
+  }
+
   persistUI(state: PersistedUIState): void {
     this.enqueueWrite(STATE_FILES.ui, JSON.stringify(state, null, 2));
   }
@@ -188,7 +200,7 @@ export class StatePersister {
 
   /** Load all persisted state files. Missing files return undefined per key. */
   async loadAll(): Promise<LoadedState> {
-    const [combat, clocks, maps, decks, objectives, scene, conversation, ui, usage] = await Promise.all([
+    const [combat, clocks, maps, decks, objectives, scene, conversation, ui, usage, resources] = await Promise.all([
       this.readJSON<CombatState>(STATE_FILES.combat),
       this.readJSON<ClocksState>(STATE_FILES.clocks),
       this.readJSON<Record<string, MapData>>(STATE_FILES.maps),
@@ -198,8 +210,9 @@ export class StatePersister {
       this.readJSON<ConversationExchange[]>(STATE_FILES.conversation),
       this.readJSON<PersistedUIState>(STATE_FILES.ui),
       this.readJSON<TokenBreakdown>(STATE_FILES.usage),
+      this.readJSON<PersistedResourceState>(STATE_FILES.resources),
     ]);
 
-    return { combat, clocks, maps, decks, objectives, scene, conversation, ui, usage };
+    return { combat, clocks, maps, decks, objectives, scene, conversation, ui, usage, resources };
   }
 }
