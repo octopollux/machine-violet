@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   build:
@@ -80,6 +81,27 @@ jobs:
 
           # License
           if [ -f LICENSE ]; then cp LICENSE dist/; fi
+
+      - name: Sign Windows binary
+        if: matrix.os == 'windows-latest'
+        uses: azure/trusted-signing-action@v0.5.0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          endpoint: https://wus2.codesigning.azure.net
+          signing-account-name: mvcodesigning
+          certificate-profile-name: mv-public-trust
+          files: ${{ github.workspace }}/dist/machine-violet.exe
+          exclude-environment-credential: true
+          exclude-workload-identity-credential: false
+          exclude-managed-identity-credential: true
+          exclude-shared-token-cache-credential: true
+          exclude-visual-studio-credential: true
+          exclude-visual-studio-code-credential: true
+          exclude-azure-cli-credential: true
+          exclude-azure-powershell-credential: true
+          exclude-azure-developer-cli-credential: true
+          exclude-interactive-browser-credential: true
 
       - name: Package (zip)
         if: matrix.archive == 'zip'
