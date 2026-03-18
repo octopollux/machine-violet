@@ -78,5 +78,6 @@ jobs:
     needs: tag
     if: ${{ !inputs.dry_run }}
     uses: ./.github/workflows/release.yml
+    secrets: inherit
     with:
       tag: ${{ needs.tag.outputs.tag }}
