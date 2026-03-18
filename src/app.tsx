@@ -141,6 +141,10 @@ function hydrateGameState(gs: GameState, scene: SceneState, loaded: LoadedState)
   if (loaded.resources) {
     gs.displayResources = loaded.resources.displayResources;
     gs.resourceValues = loaded.resources.resourceValues;
+  } else if (loaded.conversation) {
+    // Compat bridge: reconstruct resources from conversation history
+    // for campaigns created before resource persistence was added.
+    recoverResourcesFromConversation(gs, loaded.conversation);
   }
   if (loaded.scene) {
     gs.activePlayerIndex = loaded.scene.activePlayerIndex;
@@ -148,6 +152,42 @@ function hydrateGameState(gs: GameState, scene: SceneState, loaded: LoadedState)
     scene.openThreads = loaded.scene.openThreads ?? "";
     scene.npcIntents = loaded.scene.npcIntents ?? "";
     scene.playerReads = loaded.scene.playerReads;
+  }
+}
+
+/**
+ * Compat bridge: scan conversation history for resource tool results
+ * and replay them to reconstruct displayResources / resourceValues.
+ * Only needed for campaigns that predate resource persistence.
+ */
+function recoverResourcesFromConversation(
+  gs: GameState,
+  exchanges: ConversationExchange[],
+): void {
+  for (const ex of exchanges) {
+    for (const msg of ex.toolResults) {
+      // toolResults are MessageParam with content: string | ContentBlock[]
+      const blocks = typeof msg.content === "string"
+        ? [msg.content]
+        : Array.isArray(msg.content)
+          ? msg.content.map((b) => {
+              if (typeof b === "string") return b;
+              if ("content" in b && typeof b.content === "string") return b.content;
+              return "";
+            })
+          : [];
+      for (const text of blocks) {
+        try {
+          const parsed = JSON.parse(text);
+          if (parsed.type === "set_display_resources" && parsed.character && Array.isArray(parsed.resources)) {
+            gs.displayResources[parsed.character] = parsed.resources;
+          } else if (parsed.type === "set_resource_values" && parsed.character && parsed.values) {
+            if (!gs.resourceValues[parsed.character]) gs.resourceValues[parsed.character] = {};
+            Object.assign(gs.resourceValues[parsed.character], parsed.values);
+          }
+        } catch { /* not JSON — skip */ }
+      }
+    }
   }
 }
 
@@ -604,8 +644,18 @@ export default function App({ shutdownRef }: AppProps) {
     if (loaded.conversation) engine.seedConversation(loaded.conversation);
     if (loaded.usage) costTracker.current?.seed(loaded.usage);
 
-    // Restore resources for the top bar
-    if (loaded.resources) setResources(formatResources(gs));
+    // Restore resources for the top bar (from resources.json or compat bridge)
+    const hasResources = Object.keys(gs.displayResources).length > 0;
+    if (hasResources) {
+      setResources(formatResources(gs));
+      // Persist recovered resources so the compat bridge doesn't run again
+      if (!loaded.resources) {
+        persister.persistResources({
+          displayResources: gs.displayResources,
+          resourceValues: gs.resourceValues,
+        });
+      }
+    }
 
     // Restore theme — fall back to default if the persisted name is unknown
     if (loaded.ui) {
