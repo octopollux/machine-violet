@@ -89,7 +89,7 @@ jobs:
 
       - name: Sign Windows binary
         if: matrix.os == 'windows-latest'
-        uses: azure/trusted-signing-action@v0.5.0
+        uses: azure/trusted-signing-action@v1
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
