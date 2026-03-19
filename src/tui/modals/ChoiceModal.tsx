@@ -240,6 +240,7 @@ export function ChoiceOverlay({
                 key={customInputResetKey}
                 isDisabled={false}
                 availableWidth={customInputWidth}
+                placeholder="Enter your own..."
                 onSubmit={onCustomInputSubmit}
               />
             </Box>

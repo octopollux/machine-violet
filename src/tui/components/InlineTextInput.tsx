@@ -158,6 +158,8 @@ export interface InlineTextInputProps {
   isDisabled?: boolean;
   defaultValue?: string;
   availableWidth?: number;
+  /** Dim hint text shown when the input is empty. Clears on first keystroke. */
+  placeholder?: string;
   onChange?: (value: string) => void;
   onSubmit?: (value: string) => void;
 }
@@ -176,7 +178,7 @@ export const DELETE_RELEASE_MS = 120;
  * all at once on release. This sidesteps Windows ConPTY corruption caused
  * by rapid intermediate re-renders during Backspace key repeat.
  */
-export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled = false, defaultValue = "", availableWidth, onChange, onSubmit }: InlineTextInputProps) {
+export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled = false, defaultValue = "", availableWidth, placeholder, onChange, onSubmit }: InlineTextInputProps) {
   const initialState: State = {
     value: defaultValue,
     cursorOffset: defaultValue.length,
@@ -336,8 +338,13 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
       result = value;
       visibleLen = value.length;
     } else if (value.length === 0) {
-      result = cursorChar;
-      visibleLen = 1;
+      if (placeholder) {
+        result = cursorChar + chalk.dim(placeholder);
+        visibleLen = 1 + placeholder.length;
+      } else {
+        result = cursorChar;
+        visibleLen = 1;
+      }
     } else if (needsViewport) {
       const viewStart = computeViewStart(viewStartRef.current, cursorOffset, availableWidth, value.length);
       viewStartRef.current = viewStart;
