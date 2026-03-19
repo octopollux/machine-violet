@@ -77,6 +77,43 @@ jobs:
 
           if [ -f LICENSE ]; then cp LICENSE dist/; fi
 
+      - name: Bundle Windows Terminal portable
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          # Download Windows Terminal portable ZIP from GitHub releases.
+          # Pin to a known stable version; update periodically.
+          WT_VERSION="1.24.10621.0"
+          WT_TAG="v${WT_VERSION}"
+          WT_ZIP="Microsoft.WindowsTerminal_${WT_VERSION}_x64.zip"
+          WT_URL="https://github.com/microsoft/terminal/releases/download/${WT_TAG}/${WT_ZIP}"
+
+          echo "Downloading Windows Terminal portable ${WT_VERSION}..."
+          curl -fSL -o wt-portable.zip "$WT_URL"
+
+          # Verify integrity (update hash when bumping WT_VERSION)
+          WT_SHA256="SET_AFTER_FIRST_SUCCESSFUL_BUILD"
+          if [ "$WT_SHA256" != "SET_AFTER_FIRST_SUCCESSFUL_BUILD" ]; then
+            echo "$WT_SHA256  wt-portable.zip" | sha256sum -c -
+          else
+            echo "WARNING: SHA256 not pinned yet — skipping verification"
+            sha256sum wt-portable.zip
+          fi
+
+          # Extract into dist/terminal/
+          mkdir -p dist/terminal
+          unzip -q wt-portable.zip -d dist/terminal
+
+          # Enable portable mode (settings stored next to exe, not in %APPDATA%)
+          touch dist/terminal/.portable
+
+          # Include Windows Terminal's MIT license (third-party notice)
+          if [ -f dist/terminal/LICENSE ]; then
+            mv dist/terminal/LICENSE dist/terminal/LICENSE-windows-terminal.txt
+          fi
+
+          echo "Bundled Windows Terminal ${WT_VERSION} ($(du -sh dist/terminal | cut -f1))"
+
       - name: Azure login (OIDC)
         if: matrix.os == 'windows-latest'
         uses: azure/login@v2
