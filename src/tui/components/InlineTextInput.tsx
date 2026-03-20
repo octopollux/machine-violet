@@ -5,7 +5,6 @@ import chalk from "chalk";
 interface State {
   value: string;
   cursorOffset: number;
-  pendingDeleteCount: number;
 }
 
 type Action =
@@ -14,25 +13,9 @@ type Action =
   | { type: "move-cursor-start" }
   | { type: "move-cursor-end" }
   | { type: "insert"; text: string }
-  | { type: "mark-delete" }
-  | { type: "commit-delete" };
-
-/** Flush any pending (strikethrough-marked) deletes into the string. */
-function commitPendingDeletes(state: State): State {
-  if (state.pendingDeleteCount === 0) return state;
-  return {
-    ...state,
-    value: state.value.slice(0, state.cursorOffset) + state.value.slice(state.cursorOffset + state.pendingDeleteCount),
-    pendingDeleteCount: 0,
-  };
-}
+  | { type: "delete" };
 
 export function reducer(state: State, action: Action): State {
-  // Auto-commit pending deletes before any action except mark-delete / commit-delete
-  if (action.type !== "mark-delete" && action.type !== "commit-delete") {
-    state = commitPendingDeletes(state);
-  }
-
   switch (action.type) {
     case "move-cursor-left":
       return { ...state, cursorOffset: Math.max(0, state.cursorOffset - 1) };
@@ -48,60 +31,35 @@ export function reducer(state: State, action: Action): State {
         value: state.value.slice(0, state.cursorOffset) + action.text + state.value.slice(state.cursorOffset),
         cursorOffset: state.cursorOffset + action.text.length,
       };
-    case "mark-delete": {
+    case "delete": {
       if (state.cursorOffset === 0) return state;
       return {
         ...state,
+        value: state.value.slice(0, state.cursorOffset - 1) + state.value.slice(state.cursorOffset),
         cursorOffset: state.cursorOffset - 1,
-        pendingDeleteCount: state.pendingDeleteCount + 1,
       };
     }
-    case "commit-delete":
-      return commitPendingDeletes(state);
   }
 }
 
 const cursorChar = chalk.inverse(" ");
 
 /**
- * Style a text string by splitting into segments around the cursor and
- * pending-delete range, applying chalk once per segment rather than per
- * character. Reduces chalk calls from O(n) to O(1).
+ * Style a text string by splitting into segments around the cursor,
+ * applying chalk once per segment rather than per character.
+ * Reduces chalk calls from O(n) to O(1).
  */
 function styleSegments(
   text: string,
   cursorOffset: number,
-  pendingDeleteCount: number,
 ): string {
   if (text.length === 0) return "";
 
-  // Common case: no pending deletes — 3 segments max
-  if (pendingDeleteCount === 0) {
-    const before = text.slice(0, cursorOffset);
-    const cursorCh = text[cursorOffset];
-    if (cursorCh === undefined) return before; // cursor past end
-    const after = text.slice(cursorOffset + 1);
-    return before + chalk.inverse(cursorCh) + after;
-  }
-
-  // With pending deletes: up to 4 segments
-  // [before cursor] [cursor char (strikethrough+inverse)] [pending (strikethrough+dim)] [after pending]
   const before = text.slice(0, cursorOffset);
   const cursorCh = text[cursorOffset];
-  const pendingStart = cursorOffset + 1;
-  const pendingEnd = cursorOffset + pendingDeleteCount;
-  const pendingText = text.slice(pendingStart, pendingEnd);
-  const after = text.slice(pendingEnd);
-
-  let result = before;
-  if (cursorCh !== undefined) {
-    result += chalk.strikethrough.inverse(cursorCh);
-  }
-  if (pendingText.length > 0) {
-    result += chalk.strikethrough.dim(pendingText);
-  }
-  result += after;
-  return result;
+  if (cursorCh === undefined) return before; // cursor past end
+  const after = text.slice(cursorOffset + 1);
+  return before + chalk.inverse(cursorCh) + after;
 }
 
 /** Known Home key escape sequences across terminal emulators. */
@@ -164,25 +122,15 @@ export interface InlineTextInputProps {
   onSubmit?: (value: string) => void;
 }
 
-/** Delay (ms) after the last Backspace before pending deletes are committed.
- *  120ms > 2× Windows key repeat interval (~33ms), reliably detects key release. */
-export const DELETE_RELEASE_MS = 120;
-
 /**
  * Uncontrolled text input with full cursor positioning.
- * Supports: left/right arrows, Home/End, Ctrl+A/E, backspace, delete.
+ * Supports: left/right arrows, Home/End, Ctrl+A/E, backspace.
  * Clear by changing the React `key` prop.
- *
- * Backspace uses a two-phase "mark then delete" approach: characters are
- * visually marked with strikethrough while the key is held, then removed
- * all at once on release. This sidesteps Windows ConPTY corruption caused
- * by rapid intermediate re-renders during Backspace key repeat.
  */
 export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled = false, defaultValue = "", availableWidth, placeholder, onChange, onSubmit }: InlineTextInputProps) {
   const initialState: State = {
     value: defaultValue,
     cursorOffset: defaultValue.length,
-    pendingDeleteCount: 0,
   };
 
   // True state lives in a ref — always current, never triggers a render.
@@ -190,9 +138,6 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
 
   // Render state — synced from stateRef on every action.
   const [renderState, setRenderState] = useState<State>(initialState);
-
-  // Timer handle for the Backspace release detection.
-  const releaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Track last value reported to onChange to avoid duplicate callbacks.
   const lastReportedValueRef = useRef(defaultValue);
@@ -206,34 +151,6 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
     if (next === prev) return; // No state change (e.g. backspace at position 0)
     stateRef.current = next;
     setRenderState(next);
-
-    if (action.type === "mark-delete") {
-      // Reset release timer — commit will fire when Backspace key is released
-      if (releaseTimerRef.current !== null) {
-        clearTimeout(releaseTimerRef.current);
-      }
-      releaseTimerRef.current = setTimeout(() => {
-        releaseTimerRef.current = null;
-        const committed = commitPendingDeletes(stateRef.current);
-        if (committed !== stateRef.current) {
-          stateRef.current = committed;
-          setRenderState(committed);
-        }
-      }, DELETE_RELEASE_MS);
-    } else if (releaseTimerRef.current !== null) {
-      // Non-backspace action — auto-commit already handled in reducer, cancel timer
-      clearTimeout(releaseTimerRef.current);
-      releaseTimerRef.current = null;
-    }
-  }, []);
-
-  // Clean up release timer on unmount.
-  useEffect(() => {
-    return () => {
-      if (releaseTimerRef.current !== null) {
-        clearTimeout(releaseTimerRef.current);
-      }
-    };
   }, []);
 
   // Access Ink's internal event emitter to detect Home/End keys.
@@ -261,17 +178,6 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
   }, [isDisabled, stdinCtx, processAction]);
 
   const submit = useCallback(() => {
-    // Commit any pending deletes before submitting
-    const committed = commitPendingDeletes(stateRef.current);
-    if (committed !== stateRef.current) {
-      stateRef.current = committed;
-      setRenderState(committed);
-    }
-    // Cancel release timer if pending
-    if (releaseTimerRef.current !== null) {
-      clearTimeout(releaseTimerRef.current);
-      releaseTimerRef.current = null;
-    }
     onSubmit?.(stateRef.current.value);
   }, [onSubmit]);
 
@@ -308,8 +214,8 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
       processAction({ type: "move-cursor-right" });
     } else if (key.backspace || key.delete) {
       // Ink maps the physical Backspace key (\x7f) to key.delete, not
-      // key.backspace (\x08). We must catch both to reach mark-delete.
-      processAction({ type: "mark-delete" });
+      // key.backspace (\x08). We must catch both.
+      processAction({ type: "delete" });
     } else if (input && !key.ctrl && !key.meta) {
       processAction({ type: "insert", text: input });
     }
@@ -329,7 +235,7 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
   }
 
   const rendered = useMemo(() => {
-    const { value, cursorOffset, pendingDeleteCount } = renderState;
+    const { value, cursorOffset } = renderState;
 
     let result: string;
     let visibleLen: number;
@@ -357,7 +263,7 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
       const visible = value.slice(viewStart, sliceEnd);
 
       // Segment-based styling: O(1) chalk calls instead of per-character
-      result = styleSegments(visible, cursorOffset - viewStart, pendingDeleteCount);
+      result = styleSegments(visible, cursorOffset - viewStart);
       if (atEnd && cursorOffset >= viewStart && cursorOffset < viewEnd) {
         result += cursorChar;
       }
@@ -365,7 +271,7 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
     } else {
       // No viewport needed — render full text with segment-based styling
       const atEnd = cursorOffset === value.length;
-      result = styleSegments(value, cursorOffset, pendingDeleteCount);
+      result = styleSegments(value, cursorOffset);
       if (atEnd) {
         result += cursorChar;
       }
@@ -379,7 +285,7 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
     }
 
     return result;
-  }, [isDisabled, renderState.value, renderState.cursorOffset, renderState.pendingDeleteCount, availableWidth, needsViewport, placeholder]);
+  }, [isDisabled, renderState.value, renderState.cursorOffset, availableWidth, needsViewport, placeholder]);
 
   return <Text>{rendered}</Text>;
 });

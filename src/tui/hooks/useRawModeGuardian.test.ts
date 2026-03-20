@@ -1,64 +1,98 @@
-import { describe, it, expect, vi } from "vitest";
-import { checkAndRestoreRawMode } from "./useRawModeGuardian.js";
-import type { RawModeStdin } from "./useRawModeGuardian.js";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import React from "react";
+import { render } from "ink-testing-library";
+import { Text } from "ink";
+import { forceRefreshRawMode } from "./rawModeGuard.js";
+import { useRawModeGuardian } from "./useRawModeGuardian.js";
 
-function makeStdin(overrides: Partial<RawModeStdin> = {}) {
-  return {
-    isTTY: true,
-    isRaw: true,
-    setRawMode: vi.fn(),
-    ...overrides,
-  } as RawModeStdin & { setRawMode: ReturnType<typeof vi.fn> };
+vi.mock("./rawModeGuard.js", () => ({
+  forceRefreshRawMode: vi.fn(),
+}));
+
+const mockedForceRefresh = vi.mocked(forceRefreshRawMode);
+
+function TestComponent({ enabled = true, intervalMs }: { enabled?: boolean; intervalMs?: number }) {
+  useRawModeGuardian({ enabled, intervalMs });
+  return React.createElement(Text, null, "test");
 }
 
-describe("checkAndRestoreRawMode", () => {
-  it("does nothing when isRaw is true", () => {
-    const stdin = makeStdin({ isRaw: true });
-    checkAndRestoreRawMode(stdin);
-    expect(stdin.setRawMode).not.toHaveBeenCalled();
+describe("useRawModeGuardian", () => {
+  const originalPlatform = process.platform;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mockedForceRefresh.mockClear();
   });
 
-  it("calls setRawMode(true) when isRaw is false", () => {
-    const stdin = makeStdin({ isRaw: false });
-    checkAndRestoreRawMode(stdin);
-    expect(stdin.setRawMode).toHaveBeenCalledWith(true);
+  afterEach(() => {
+    vi.useRealTimers();
+    Object.defineProperty(process, "platform", { value: originalPlatform, writable: true });
   });
 
-  it("does nothing when isTTY is false", () => {
-    const stdin = makeStdin({ isTTY: false, isRaw: false });
-    checkAndRestoreRawMode(stdin);
-    expect(stdin.setRawMode).not.toHaveBeenCalled();
+  it("calls forceRefreshRawMode on interval on Windows", () => {
+    Object.defineProperty(process, "platform", { value: "win32", writable: true });
+
+    const { unmount } = render(React.createElement(TestComponent, { intervalMs: 100 }));
+
+    expect(mockedForceRefresh).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(100);
+    expect(mockedForceRefresh).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(100);
+    expect(mockedForceRefresh).toHaveBeenCalledTimes(2);
+
+    unmount();
   });
 
-  it("does nothing when isTTY is undefined", () => {
-    const stdin = makeStdin({ isTTY: undefined, isRaw: false });
-    checkAndRestoreRawMode(stdin);
-    expect(stdin.setRawMode).not.toHaveBeenCalled();
+  it("does not call forceRefreshRawMode on non-Windows", () => {
+    Object.defineProperty(process, "platform", { value: "linux", writable: true });
+
+    const { unmount } = render(React.createElement(TestComponent, { intervalMs: 100 }));
+
+    vi.advanceTimersByTime(500);
+    expect(mockedForceRefresh).not.toHaveBeenCalled();
+
+    unmount();
   });
 
-  it("calls onRestore callback when restoring raw mode", () => {
-    const stdin = makeStdin({ isRaw: false });
-    const onRestore = vi.fn();
-    checkAndRestoreRawMode(stdin, onRestore);
-    expect(onRestore).toHaveBeenCalledOnce();
+  it("does not poll when enabled is false", () => {
+    Object.defineProperty(process, "platform", { value: "win32", writable: true });
+
+    const { unmount } = render(React.createElement(TestComponent, { enabled: false, intervalMs: 100 }));
+
+    vi.advanceTimersByTime(500);
+    expect(mockedForceRefresh).not.toHaveBeenCalled();
+
+    unmount();
   });
 
-  it("does not call onRestore when no restore needed", () => {
-    const stdin = makeStdin({ isRaw: true });
-    const onRestore = vi.fn();
-    checkAndRestoreRawMode(stdin, onRestore);
-    expect(onRestore).not.toHaveBeenCalled();
+  it("cleans up interval on unmount", () => {
+    Object.defineProperty(process, "platform", { value: "win32", writable: true });
+
+    const { unmount } = render(React.createElement(TestComponent, { intervalMs: 100 }));
+
+    vi.advanceTimersByTime(100);
+    expect(mockedForceRefresh).toHaveBeenCalledTimes(1);
+
+    unmount();
+
+    vi.advanceTimersByTime(500);
+    // No additional calls after unmount
+    expect(mockedForceRefresh).toHaveBeenCalledTimes(1);
   });
 
-  it("handles setRawMode throwing (shutdown race)", () => {
-    const stdin = makeStdin({ isRaw: false });
-    stdin.setRawMode.mockImplementation(() => { throw new Error("EPERM"); });
-    // Should not throw
-    expect(() => checkAndRestoreRawMode(stdin)).not.toThrow();
-  });
+  it("uses default 500ms interval", () => {
+    Object.defineProperty(process, "platform", { value: "win32", writable: true });
 
-  it("handles missing setRawMode gracefully", () => {
-    const stdin: RawModeStdin = { isTTY: true, isRaw: false };
-    expect(() => checkAndRestoreRawMode(stdin)).not.toThrow();
+    const { unmount } = render(React.createElement(TestComponent));
+
+    vi.advanceTimersByTime(499);
+    expect(mockedForceRefresh).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1);
+    expect(mockedForceRefresh).toHaveBeenCalledTimes(1);
+
+    unmount();
   });
 });
