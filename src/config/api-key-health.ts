@@ -4,6 +4,7 @@
  * Validates a key by making a minimal Haiku API call (max_tokens: 1).
  * Extracts rate-limit metadata from response headers when available.
  */
+import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "./client.js";
 import { getModel } from "./models.js";
 
