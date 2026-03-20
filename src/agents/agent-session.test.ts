@@ -7,6 +7,7 @@ import {
   stampToolsCacheControl,
   isTuiCommand,
 } from "./agent-session.js";
+import { ContentRefusalError } from "../teardown.js";
 import type { AgentSessionConfig } from "./agent-session.js";
 
 // --- Test helpers ---
@@ -763,5 +764,74 @@ describe("retry behavior via runAgentLoop", () => {
       ),
     ).rejects.toThrow("overloaded");
     expect(onError).toHaveBeenCalled();
+  });
+
+  describe("content classifier refusal", () => {
+    function refusalMessage(content: Anthropic.ContentBlock[] = []): Anthropic.Message {
+      return {
+        id: "msg_test",
+        type: "message",
+        role: "assistant",
+        model: "claude-haiku-4-5-20251001",
+        content,
+        stop_reason: "refusal",
+        stop_sequence: null,
+        usage: mockUsage(),
+      } as Anthropic.Message;
+    }
+
+    it("throws ContentRefusalError on refusal with empty content", async () => {
+      const client = mockClient([refusalMessage()]);
+      await expect(
+        runAgentLoop(
+          client,
+          "System",
+          [{ role: "user", content: "Something" }],
+          baseConfig(),
+        ),
+      ).rejects.toThrow(ContentRefusalError);
+    });
+
+    it("throws ContentRefusalError on refusal with partial content", async () => {
+      const client = mockClient([refusalMessage([
+        { type: "text", text: "The dark ri" } as Anthropic.TextBlock,
+      ])]);
+      await expect(
+        runAgentLoop(
+          client,
+          "System",
+          [{ role: "user", content: "Something" }],
+          baseConfig(),
+        ),
+      ).rejects.toThrow(ContentRefusalError);
+    });
+
+    it("throws ContentRefusalError in streaming mode", async () => {
+      const client = mockClient([refusalMessage()]);
+      const onTextDelta = vi.fn();
+      await expect(
+        runAgentLoop(
+          client,
+          "System",
+          [{ role: "user", content: "Something" }],
+          baseConfig({ stream: true, onTextDelta }),
+        ),
+      ).rejects.toThrow(ContentRefusalError);
+      expect(client.messages.stream).toHaveBeenCalled();
+    });
+
+    it("does not fire onTextDelta for non-streaming refusals", async () => {
+      const client = mockClient([refusalMessage()]);
+      const onTextDelta = vi.fn();
+      await expect(
+        runAgentLoop(
+          client,
+          "System",
+          [{ role: "user", content: "Something" }],
+          baseConfig({ onTextDelta }),
+        ),
+      ).rejects.toThrow(ContentRefusalError);
+      expect(onTextDelta).not.toHaveBeenCalled();
+    });
   });
 });
