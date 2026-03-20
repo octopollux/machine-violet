@@ -1681,3 +1681,68 @@ describe("applyResolutionDeltas — system-agnostic hp_change", () => {
     expect(state.resourceValues["Goblin"]["hp"]).toBe("-5");
   });
 });
+
+describe("content classifier refusal", () => {
+  function refusalMessage(): Anthropic.Message {
+    return {
+      id: "msg_test",
+      type: "message",
+      role: "assistant",
+      model: "claude-opus-4-6",
+      content: [],
+      stop_reason: "refusal",
+      stop_sequence: null,
+      usage: mockUsage(),
+    } as Anthropic.Message;
+  }
+
+  it("fires onRefusal and does not persist exchange", async () => {
+    const client = mockClient([refusalMessage()]);
+    const { callbacks, log } = mockCallbacks();
+    let refusalFired = false;
+    callbacks.onRefusal = () => { refusalFired = true; };
+
+    const engine = new GameEngine({
+      client, gameState: mockState(), scene: mockScene(),
+      sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
+    });
+
+    await engine.processInput("Aldric", "Something problematic");
+
+    expect(refusalFired).toBe(true);
+    expect(log.errors).toHaveLength(0);
+    expect(engine.hasPendingRetry()).toBe(false);
+  });
+
+  it("fires onTurnEnd after refusal", async () => {
+    const client = mockClient([refusalMessage()]);
+    const { callbacks, log } = mockCallbacks();
+    callbacks.onRefusal = () => {};
+
+    const engine = new GameEngine({
+      client, gameState: mockState(), scene: mockScene(),
+      sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
+    });
+
+    await engine.processInput("Aldric", "Something problematic");
+
+    // DM turn started and ended
+    expect(log.turnStarts).toHaveLength(2); // player turn + dm turn
+    expect(log.turnEnds).toHaveLength(2);
+  });
+
+  it("does not include refusal in narrative completions", async () => {
+    const client = mockClient([refusalMessage()]);
+    const { callbacks, log } = mockCallbacks();
+    callbacks.onRefusal = () => {};
+
+    const engine = new GameEngine({
+      client, gameState: mockState(), scene: mockScene(),
+      sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
+    });
+
+    await engine.processInput("Aldric", "Something problematic");
+
+    expect(log.narrativeComplete).toHaveLength(0);
+  });
+});

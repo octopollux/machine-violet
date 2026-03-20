@@ -18,6 +18,18 @@ export class RollbackCompleteError extends Error {
 }
 
 /**
+ * Error thrown when the API content classifier refuses a response.
+ * Signals the engine to skip persistence and show a gentle system message
+ * instead of the standard error treatment.
+ */
+export class ContentRefusalError extends Error {
+  constructor() {
+    super("Content classifier refused the response");
+    this.name = "ContentRefusalError";
+  }
+}
+
+/**
  * Full teardown for returning to menu: persist state, commit, reset caches.
  */
 export async function teardownGameSession(ctx: ShutdownContext): Promise<void> {

@@ -29,7 +29,7 @@ import { searchCampaign } from "./subagents/search-campaign.js";
 import { searchContent } from "./subagents/search-content.js";
 import { norm } from "../utils/paths.js";
 import { CampaignRepo, performRollback } from "../tools/git/index.js";
-import { RollbackCompleteError } from "../teardown.js";
+import { RollbackCompleteError, ContentRefusalError } from "../teardown.js";
 import type { GitIO } from "../tools/git/index.js";
 import { writeDebugDump } from "../tools/filesystem/debug-dump.js";
 import { styleTheme } from "./subagents/theme-styler.js";
@@ -72,6 +72,8 @@ export interface EngineCallbacks {
   onExchangeDropped: () => void;
   /** Usage stats updated (delta from a single API call, with its model tier) */
   onUsageUpdate: (delta: UsageStats, tier: ModelTier) => void;
+  /** Content classifier refused the response — clear partial DM output */
+  onRefusal?: () => void;
   /** Error occurred */
   onError: (error: Error) => void;
   /** API call is being retried after a retryable error */
@@ -619,15 +621,26 @@ export class GameEngine {
       this.lastFailedInput = null;
 
     } catch (e) {
-      // Restore consumed OOC summary so it retries on the next turn
-      if (consumedOOCSummary) {
-        this.pendingOOCSummary = consumedOOCSummary;
+      if (e instanceof ContentRefusalError) {
+        // Content classifier refusal — don't persist exchange or set retry
+        // (same input would just re-trigger). Clear partial DM output and
+        // show a gentle system message instead.
+        if (consumedOOCSummary) {
+          this.pendingOOCSummary = consumedOOCSummary;
+        }
+        this.callbacks.onRefusal?.();
+        this.callbacks.onTurnEnd(dmTurn);
+      } else {
+        // Restore consumed OOC summary so it retries on the next turn
+        if (consumedOOCSummary) {
+          this.pendingOOCSummary = consumedOOCSummary;
+        }
+        // Store the failed input so the player can press Enter to retry
+        this.lastFailedInput = { characterName, text, opts };
+        const error = e instanceof Error ? e : new Error(String(e));
+        await this.dumpDebugInfo(error);
+        this.callbacks.onError(error);
       }
-      // Store the failed input so the player can press Enter to retry
-      this.lastFailedInput = { characterName, text, opts };
-      const error = e instanceof Error ? e : new Error(String(e));
-      await this.dumpDebugInfo(error);
-      this.callbacks.onError(error);
     }
 
     this.setState("waiting_input");

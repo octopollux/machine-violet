@@ -3,6 +3,7 @@ import type { ToolResult } from "./tool-registry.js";
 import type { UsageStats, TuiCommand, ModelId } from "./agent-loop.js";
 import { accumulateUsage } from "../context/usage-helpers.js";
 import { dumpContext, dumpThinking } from "../config/context-dump.js";
+import { ContentRefusalError } from "../teardown.js";
 import { getEffortConfig } from "../config/models.js";
 import type { EffortLevel } from "../config/models.js";
 
@@ -249,6 +250,11 @@ export async function runAgentLoop(
     } else {
       response = await callWithRetry(client, params, config, shouldRetry);
       accumulateUsage(totalUsage, response.usage);
+    }
+
+    // Content classifier refusal — abort before persisting anything
+    if (response.stop_reason === "refusal") {
+      throw new ContentRefusalError();
     }
 
     // Process content blocks

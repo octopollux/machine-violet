@@ -252,6 +252,19 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
         engineRef.current?.getPersister()?.persistUsage(ct.getBreakdown());
       }
     },
+    onRefusal() {
+      setNarrativeLines((prev) => {
+        // Remove trailing "dm" lines (partial streamed text from refused response)
+        let cutIdx = prev.length;
+        while (cutIdx > 0 && prev[cutIdx - 1].kind === "dm") {
+          cutIdx--;
+        }
+        return [
+          ...prev.slice(0, cutIdx),
+          { kind: "system" as const, text: "[The story went somewhere I can't follow. Try a different direction!]" },
+        ];
+      });
+    },
     onError(error: Error) {
       // Rollback-complete errors are handled via TUI command — not a real error
       if (error instanceof RollbackCompleteError) return;
