@@ -1,5 +1,7 @@
 # Machine Violet
 
+[![CI](https://github.com/octopollux/machine-violet/actions/workflows/ci.yml/badge.svg)](https://github.com/octopollux/machine-violet/actions/workflows/ci.yml)
+[![Nightly](https://github.com/octopollux/machine-violet/actions/workflows/nightly.yml/badge.svg)](https://github.com/octopollux/machine-violet/actions/workflows/nightly.yml)
 [![Discord](https://img.shields.io/discord/1483251600071065691?logo=discord&label=Discord&color=5865F2)](https://discord.gg/dDbGZrecvX)
 
 An agentic AI Dungeon Master that runs any tabletop RPG in a terminal.
