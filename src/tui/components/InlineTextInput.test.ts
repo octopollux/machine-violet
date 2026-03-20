@@ -216,9 +216,9 @@ describe("InlineTextInput component", () => {
       React.createElement(InlineTextInput, { defaultValue: "hello", onChange }),
     );
     stdin.write("\x7f");
-    // Wait for Ink's render pipeline
-    await new Promise(resolve => setTimeout(resolve, 50));
-    expect(onChange).toHaveBeenCalledWith("hell");
+    await vi.waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith("hell");
+    });
   });
 
   it("handles multiple rapid backspaces", async () => {
@@ -229,8 +229,9 @@ describe("InlineTextInput component", () => {
     stdin.write("\x7f");
     stdin.write("\x7f");
     stdin.write("\x7f");
-    await new Promise(resolve => setTimeout(resolve, 50));
-    expect(onChange).toHaveBeenLastCalledWith("he");
+    await vi.waitFor(() => {
+      expect(onChange).toHaveBeenLastCalledWith("he");
+    });
   });
 
   it("shows placeholder as dim text when input is empty", () => {

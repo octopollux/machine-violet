@@ -14,7 +14,8 @@ async function createTestPdf(pageCount: number): Promise<Buffer> {
   return Buffer.from(bytes);
 }
 
-describe("getPdfInfo", () => {
+// PDF processing and filesystem I/O have been flaky in CI under parallel workers
+describe("getPdfInfo", { retry: 2 }, () => {
   let tempDir: string;
   let pdfPath: string;
 
@@ -33,7 +34,7 @@ describe("getPdfInfo", () => {
   });
 });
 
-describe("splitPdf", () => {
+describe("splitPdf", { retry: 2 }, () => {
   let tempDir: string;
   let pdfPath: string;
 

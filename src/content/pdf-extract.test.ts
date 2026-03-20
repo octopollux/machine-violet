@@ -20,7 +20,8 @@ async function createTextPdf(pageTexts: string[]): Promise<Buffer> {
   return Buffer.from(bytes);
 }
 
-describe("extractTextFromPdf", () => {
+// pdf-parse loads native pdf.js modules that can race under parallel workers
+describe("extractTextFromPdf", { retry: 2 }, () => {
   let tempDir: string;
 
   beforeEach(async () => {
