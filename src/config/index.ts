@@ -1,3 +1,4 @@
+export { createClient } from "./client.js";
 export {
   isConfigured,
   getDefaultHomeDir,
