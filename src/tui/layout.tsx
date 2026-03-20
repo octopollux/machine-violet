@@ -5,6 +5,7 @@ import type { ToolGlyph } from "./activity.js";
 import type { ResolvedTheme } from "./themes/types.js";
 import type { PlayerEntry } from "./components/index.js";
 import type { NarrativeAreaHandle } from "./components/index.js";
+import type { ScrollHandle } from "./hooks/useScrollHandle.js";
 import {
   Modeline,
   buildModelineDisplay,
@@ -68,6 +69,9 @@ export interface LayoutProps {
   /** Ref to NarrativeArea scroll handle */
   narrativeRef?: React.Ref<NarrativeAreaHandle>;
 
+  /** When set, mouse scroll targets this handle instead of the narrative area */
+  mouseScrollOverrideRef?: React.RefObject<ScrollHandle | null>;
+
   /** When true, skip rendering the InputLine (e.g. choice modal provides its own input) */
   hideInputLine?: boolean;
 
@@ -104,6 +108,7 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
     playerColor,
     turnIndicatorColor,
     narrativeRef,
+    mouseScrollOverrideRef,
     hideInputLine,
     playerPaneOverlay,
     playerPaneExtraHeight = 0,
@@ -211,6 +216,7 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
             width={innerWidth}
             themeAsset={theme.asset}
             separatorColor={separatorColor}
+            mouseScrollOverrideRef={mouseScrollOverrideRef}
           />
 
           {/* Activity Line */}

@@ -139,9 +139,12 @@ export function installMouseFilter(
 // React hook
 // ---------------------------------------------------------------------------
 
+/** Lines scrolled per mouse wheel tick. */
+export const LINES_PER_TICK = 2;
+
 /**
  * Enable terminal mouse reporting and scroll the narrative area on wheel
- * events. Each wheel tick scrolls by exactly 1 line.
+ * events. Each wheel tick scrolls by {@link LINES_PER_TICK} lines.
  *
  * Wraps stdin.read() to intercept mouse sequences before Ink processes
  * them (preventing garbage in the text input). Enables reporting on mount,
@@ -162,7 +165,7 @@ export function useMouseScroll(
 
     const removeFilter = installMouseFilter(
       input as ReadableStdin,
-      (delta) => { scrollRef.current?.scrollBy(delta); },
+      (delta) => { scrollRef.current?.scrollBy(delta * LINES_PER_TICK); },
     );
 
     // Safety net: disable mouse reporting on process exit even if unmount

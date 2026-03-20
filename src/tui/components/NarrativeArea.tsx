@@ -143,6 +143,11 @@ interface NarrativeAreaProps {
   themeAsset?: ThemeAsset;
   /** Color for turn separator lines */
   separatorColor?: string;
+  /**
+   * When set and `.current` is non-null, mouse scroll targets this handle
+   * instead of the narrative. Used to redirect scroll to an overlay modal.
+   */
+  mouseScrollOverrideRef?: React.RefObject<ScrollHandle | null>;
 }
 
 /** Compute scroll step: 25% of viewport, min 2 if <25, min 1 if <12 */
@@ -158,7 +163,7 @@ export function scrollAmount(viewportRows: number): number {
  * Exposes scrollBy via ref for keyboard scrolling.
  */
 export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>(
-  function NarrativeArea({ lines, maxRows, quoteColor, playerColor, width, themeAsset, separatorColor }, ref) {
+  function NarrativeArea({ lines, maxRows, quoteColor, playerColor, width, themeAsset, separatorColor, mouseScrollOverrideRef }, ref) {
   const scrollRef = useRef<ScrollViewRef>(null);
   const localHandleRef = useRef<ScrollHandle>(null);
   const [linesBelow, setLinesBelow] = useState(0);
@@ -168,8 +173,12 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
   useScrollHandle(ref, scrollRef);
   useScrollHandle(localHandleRef, scrollRef);
 
-  // Mouse wheel → single-line scroll (clamped to content bounds)
-  useMouseScroll(localHandleRef);
+  // Mouse wheel scroll — routes to override (modal) when active, else narrative.
+  // mouseTargetRef is a stable object whose .current is updated each render;
+  // the installMouseFilter callback reads .current at event time.
+  const mouseTargetRef = useRef<ScrollHandle>(null);
+  mouseTargetRef.current = mouseScrollOverrideRef?.current ?? localHandleRef.current;
+  useMouseScroll(mouseTargetRef);
 
   // Track scroll position
   const updateScrollState = useCallback(() => {
