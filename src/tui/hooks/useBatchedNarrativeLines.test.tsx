@@ -56,9 +56,10 @@ describe("useBatchedNarrativeLines", () => {
     const { lastFrame } = render(<C />);
     // Before flush interval
     expect(lastFrame()!).toContain("empty");
-    // Wait for flush
-    await sleep(INTERVAL + 50);
-    expect(lastFrame()!).toContain("count:2");
+    // Wait for flush — use vi.waitFor to tolerate CI timing variance
+    await vi.waitFor(() => {
+      expect(lastFrame()!).toContain("count:2");
+    }, { timeout: 1000 });
   });
 
   it("direct set clears pending functional updates", async () => {

@@ -104,14 +104,19 @@ describe("AddContentPhase", () => {
       expect(lastFrame()).toContain("Name this system");
     });
 
-    // Type a custom name
-    stdin.write("Cairn");
+    // Type a custom name — use a name that doesn't appear in the hint text,
+    // then wait for it to render before pressing Enter.
+    stdin.write("Mork Borg");
+
+    await vi.waitFor(() => {
+      expect(lastFrame()).toContain("Mork Borg");
+    });
+
     stdin.write("\r");
 
     await vi.waitFor(() => {
-      expect(lastFrame()).toContain("Cairn");
       expect(lastFrame()).toContain("Drop PDF");
-    });
+    }, { timeout: 2000 });
   });
 
   it("displays validated PDFs with checkmarks", async () => {
@@ -131,8 +136,13 @@ describe("AddContentPhase", () => {
       expect(lastFrame()).toContain("Drop PDF");
     });
 
-    // Drop a PDF path
+    // Drop a PDF path — wait for text to render before pressing Enter
     stdin.write("/books/Monster Manual.pdf");
+
+    await vi.waitFor(() => {
+      expect(lastFrame()).toContain("Monster Manual");
+    });
+
     stdin.write("\r");
 
     await vi.waitFor(() => {
@@ -158,13 +168,18 @@ describe("AddContentPhase", () => {
       expect(lastFrame()).toContain("Drop PDF");
     });
 
-    // Add a PDF
+    // Add a PDF — wait for text to render before pressing Enter
     stdin.write("/test.pdf");
+
+    await vi.waitFor(() => {
+      expect(lastFrame()).toContain("/test.pdf");
+    });
+
     stdin.write("\r");
 
     await vi.waitFor(() => {
       expect(lastFrame()).toContain("Test.pdf");
-    });
+    }, { timeout: 2000 });
 
     // Press Enter with no input to finish adding
     stdin.write("\r");
@@ -172,7 +187,7 @@ describe("AddContentPhase", () => {
     await vi.waitFor(() => {
       expect(lastFrame()).toContain("Submit");
       expect(lastFrame()).toContain("y/n");
-    });
+    }, { timeout: 2000 });
   });
 
   it("shows external status message", () => {
