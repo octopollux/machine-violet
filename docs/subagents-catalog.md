@@ -395,11 +395,13 @@ Haiku, silent. Summarizes campaign book structure for DM cached prefix. See [doc
 
 ## Prompt Caching
 
-All subagents use prompt caching. Static system prompts are identical across all users, so cache writes amortize globally — most users only pay cache read rates (25% of input).
+Most subagents are wired for prompt caching. For subagents whose system prompts are fully static and identical across all users/sessions, cache writes amortize globally — the first call pays full price and subsequent calls see mostly cache reads (25% of input).
+
+Subagents with heavily dynamic system prompts (e.g. AI Player, whose prompt includes character sheet and situation context unique to each call) intentionally skip caching to avoid the cache-write surcharge with no reuse. Narrative Recap's prompt varies only by campaign name, so it caches well within a session.
 
 **Infrastructure** (`src/agents/subagent.ts`):
 - `cacheSystemPrompt(text)` wraps a string as `TextBlockParam[]` with `cache_control: { type: "ephemeral", ttl: "1h" }`.
-- `oneShot()` auto-wraps its system prompt via `cacheSystemPrompt()`, so all one-shot Haiku agents get caching automatically.
+- `oneShot()` auto-wraps its system prompt via `cacheSystemPrompt()`, so one-shot Haiku agents with static system prompts get caching automatically. Agents with fully dynamic prompts should call `spawnSubagent` directly instead.
 - `SubagentConfig.cacheTools` stamps `cache_control` on the last tool definition (1h TTL) via `stampToolsCacheControl()` in `agent-session.ts`.
 
 **Sonnet agents** (OOC, Dev Mode) use structured `TextBlockParam[]` system prompts with breakpoints separating stable (cached) and dynamic (uncached) content — the same pattern as the DM's cached prefix.

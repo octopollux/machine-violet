@@ -1,6 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { PlayerConfig } from "../../types/config.js";
-import { oneShot } from "../subagent.js";
+import { spawnSubagent } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import { getModel } from "../../config/models.js";
 import { loadTemplate } from "../../prompts/load-prompt.js";
@@ -68,14 +68,15 @@ export async function aiPlayerTurn(
 
   const userMessage = ctx.recentNarration || "It's your turn. What do you do?";
 
-  const result = await oneShot(
-    client,
+  // AI player prompts are fully dynamic (character sheet + situation change every call),
+  // so we skip system prompt caching to avoid paying the cache-write surcharge with no reuse.
+  const result = await spawnSubagent(client, {
+    name: "ai-player",
     model,
+    visibility: "silent",
     systemPrompt,
-    userMessage,
-    150, // AI players should be brief
-    "ai-player",
-  );
+    maxTokens: 150, // AI players should be brief
+  }, userMessage);
 
   return {
     ...result,
