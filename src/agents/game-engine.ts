@@ -839,6 +839,8 @@ export class GameEngine {
         delete fm.sheet_status;
         const title = fm._title ?? characterName;
         await this.fileIO.writeFile(filePath, serializeEntity(title, fm, fmBody, fmChangelog));
+        const slug = characterName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+        this.sceneManager.notifyEntityTouched(filePath, slug);
         this.callbacks.onDevLog?.(`[dev] promote_character: ${characterName} — skipped, sheet already complete`);
         return;
       }

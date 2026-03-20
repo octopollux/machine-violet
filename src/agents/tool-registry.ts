@@ -1042,7 +1042,7 @@ const TOOL_DEFS: RegisteredTool[] = [
   {
     definition: {
       name: "promote_character",
-      description: "Level up, build, or update a character sheet. Use for level-ups, class feature changes, or stat corrections. Do NOT call if the character's front matter has 'Sheet Status: complete' — the sheet is already built. Spawns a specialist subagent that reads the current sheet and rules, then produces an updated sheet with changelog.",
+      description: "Level up or update a character sheet. Use for level-ups, class feature changes, or stat corrections. Spawns a specialist subagent that reads the current sheet and rules, then produces an updated sheet with changelog.",
       input_schema: {
         type: "object" as const,
         properties: {
