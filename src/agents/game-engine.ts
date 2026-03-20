@@ -628,6 +628,11 @@ export class GameEngine {
         if (consumedOOCSummary) {
           this.pendingOOCSummary = consumedOOCSummary;
         }
+        // Still track usage — the API call cost money even though it was refused
+        if (e.usage) {
+          accUsage(this.sessionUsage, e.usage);
+          this.callbacks.onUsageUpdate(e.usage, "large");
+        }
         this.callbacks.onRefusal?.();
         this.callbacks.onTurnEnd(dmTurn);
       } else {

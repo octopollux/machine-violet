@@ -808,14 +808,16 @@ describe("retry behavior via runAgentLoop", () => {
 
     it("throws ContentRefusalError in streaming mode", async () => {
       const client = mockClient([refusalMessage()]);
+      const onTextDelta = vi.fn();
       await expect(
         runAgentLoop(
           client,
           "System",
           [{ role: "user", content: "Something" }],
-          baseConfig({ stream: true }),
+          baseConfig({ stream: true, onTextDelta }),
         ),
       ).rejects.toThrow(ContentRefusalError);
+      expect(client.messages.stream).toHaveBeenCalled();
     });
 
     it("does not fire onTextDelta for non-streaming refusals", async () => {

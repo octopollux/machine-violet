@@ -1745,4 +1745,21 @@ describe("content classifier refusal", () => {
 
     expect(log.narrativeComplete).toHaveLength(0);
   });
+
+  it("still tracks usage on refusal", async () => {
+    const client = mockClient([refusalMessage()]);
+    const { callbacks, log } = mockCallbacks();
+    callbacks.onRefusal = () => {};
+
+    const engine = new GameEngine({
+      client, gameState: mockState(), scene: mockScene(),
+      sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
+    });
+
+    await engine.processInput("Aldric", "Something problematic");
+
+    expect(log.usageUpdates).toHaveLength(1);
+    expect(log.usageUpdates[0].inputTokens).toBe(100);
+    expect(log.usageUpdates[0].outputTokens).toBe(50);
+  });
 });

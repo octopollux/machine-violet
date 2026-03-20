@@ -254,7 +254,9 @@ export async function runAgentLoop(
 
     // Content classifier refusal — abort before persisting anything
     if (response.stop_reason === "refusal") {
-      throw new ContentRefusalError();
+      const err = new ContentRefusalError();
+      err.usage = { ...totalUsage };
+      throw err;
     }
 
     // Process content blocks

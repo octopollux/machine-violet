@@ -23,6 +23,9 @@ export class RollbackCompleteError extends Error {
  * instead of the standard error treatment.
  */
 export class ContentRefusalError extends Error {
+  /** Usage from the refused API call (still costs money). */
+  usage?: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheCreationTokens: number };
+
   constructor() {
     super("Content classifier refused the response");
     this.name = "ContentRefusalError";
