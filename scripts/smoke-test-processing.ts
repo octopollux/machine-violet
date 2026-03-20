@@ -12,7 +12,7 @@
  */
 
 import "dotenv/config";
-import Anthropic from "@anthropic-ai/sdk";
+import { createClient } from "../src/config/client.js";
 import { readFile, writeFile, appendFile, mkdir, stat, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { FileIO } from "../src/agents/scene-manager.js";
@@ -34,7 +34,7 @@ const io: FileIO = {
 async function main() {
   loadModelConfig({ reset: true });
 
-  const client = new Anthropic();
+  const client = createClient();
   const homeDir = resolve(process.env.USERPROFILE ?? process.env.HOME ?? "~", "Documents", ".machine-violet");
   const projectRoot = resolve(import.meta.dirname, "..");
 

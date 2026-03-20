@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Text, Box, useInput } from "ink";
-import Anthropic from "@anthropic-ai/sdk";
+import { createClient } from "./config/client.js";
 import { readFileSync, writeFileSync } from "node:fs";
 import { readFile, writeFile, appendFile, mkdir, readdir, stat, unlink, rmdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
@@ -253,7 +253,7 @@ async function buildInitialSheet(
 
   if (!ruleCard) return; // no rule card — can't build a proper sheet
 
-  const client = new Anthropic();
+  const client = createClient();
   try {
     const { updatedSheet } = await promoteCharacter(client, {
       characterSheet: stub,
@@ -582,7 +582,7 @@ export default function App({ shutdownRef }: AppProps) {
       }
     } catch { /* ignore — file may not exist yet */ }
 
-    const client = new Anthropic();
+    const client = createClient();
     clientRef.current = client;
 
     // Sandbox FileIO to campaign root (and future content roots)
@@ -907,7 +907,7 @@ export default function App({ shutdownRef }: AppProps) {
         const jobs = await runIngestPipeline(fileIO.current, homeDir, systemSlug, pdfs, onIngestProgress);
 
         // Phase 2: Per-book stages (classifier + extractors) for each PDF
-        const client = new Anthropic();
+        const client = createClient();
         const onProcessingProgress = (progress: ProcessingProgress) => {
           setContentStatusMsg(progress.message);
         };

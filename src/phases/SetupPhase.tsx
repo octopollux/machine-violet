@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from "react";
 import { useInput, Text, Box } from "ink";
-import Anthropic from "@anthropic-ai/sdk";
+import { createClient } from "../config/client.js";
 import type { NarrativeLine } from "../types/tui.js";
 import type { ResolvedTheme } from "../tui/themes/types.js";
 import { appendDelta } from "../tui/narrative-helpers.js";
@@ -143,7 +143,7 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
     if (startedRef.current) return;
     startedRef.current = true;
 
-    const client = new Anthropic();
+    const client = createClient();
     const convo = createSetupConversation(client);
     setupConvoRef.current = convo;
     setSetupConvoLines([]);

@@ -3,7 +3,7 @@
  * Avoids re-running the classifier batch.
  */
 import "dotenv/config";
-import Anthropic from "@anthropic-ai/sdk";
+import { createClient } from "../src/config/client.js";
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { collectBatchResults } from "../src/content/batch-client.js";
@@ -12,7 +12,7 @@ import { loadModelConfig } from "../src/config/models.js";
 
 async function main() {
   loadModelConfig({ reset: true });
-  const client = new Anthropic();
+  const client = createClient();
   const batchId = "msgbatch_01EJbc9Cp3nGpjk62rWrcscr";
 
   console.log("Collecting batch results...");

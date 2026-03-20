@@ -5,6 +5,7 @@
  * Extracts rate-limit metadata from response headers when available.
  */
 import Anthropic from "@anthropic-ai/sdk";
+import { createClient } from "./client.js";
 import { getModel } from "./models.js";
 
 // ---------------------------------------------------------------------------
@@ -36,7 +37,7 @@ export interface KeyHealthResult {
  * Uses the configured small-tier model with max_tokens=1.
  */
 export async function checkKeyHealth(apiKey: string): Promise<KeyHealthResult> {
-  const client = new Anthropic({ apiKey });
+  const client = createClient({ apiKey });
   const model = getModel("small");
   const now = new Date().toISOString();
 
