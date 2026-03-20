@@ -557,6 +557,7 @@ export function PlayingPhase() {
         playerColor={gameStateRef.current?.config.players[activePlayerIndex]?.color}
         turnIndicatorColor={engineState === "waiting_input" ? gameStateRef.current?.config.players[activePlayerIndex]?.color : undefined}
         narrativeRef={narrativeRef}
+        mouseScrollOverrideRef={modalScrollRef}
         hideInputLine={activeModal?.kind === "choice"}
         playerPaneOverlay={choiceOverlay}
         playerPaneExtraHeight={paneExtraHeight}

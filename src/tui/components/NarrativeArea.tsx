@@ -143,6 +143,11 @@ interface NarrativeAreaProps {
   themeAsset?: ThemeAsset;
   /** Color for turn separator lines */
   separatorColor?: string;
+  /**
+   * When set and `.current` is non-null, mouse scroll targets this handle
+   * instead of the narrative. Used to redirect scroll to an overlay modal.
+   */
+  mouseScrollOverrideRef?: React.RefObject<ScrollHandle | null>;
 }
 
 /** Compute scroll step: 25% of viewport, min 2 if <25, min 1 if <12 */
@@ -158,7 +163,7 @@ export function scrollAmount(viewportRows: number): number {
  * Exposes scrollBy via ref for keyboard scrolling.
  */
 export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>(
-  function NarrativeArea({ lines, maxRows, quoteColor, playerColor, width, themeAsset, separatorColor }, ref) {
+  function NarrativeArea({ lines, maxRows, quoteColor, playerColor, width, themeAsset, separatorColor, mouseScrollOverrideRef }, ref) {
   const scrollRef = useRef<ScrollViewRef>(null);
   const localHandleRef = useRef<ScrollHandle>(null);
   const [linesBelow, setLinesBelow] = useState(0);
@@ -168,8 +173,22 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
   useScrollHandle(ref, scrollRef);
   useScrollHandle(localHandleRef, scrollRef);
 
-  // Mouse wheel → single-line scroll (clamped to content bounds)
-  useMouseScroll(localHandleRef);
+  // Mouse wheel scroll — routes to override (modal) when active, else narrative.
+  // We need a stable proxy that resolves the target at scroll-event time, not
+  // render time, because useImperativeHandle sets localHandleRef.current during
+  // the commit phase (after render). Reading .current during render would get
+  // null on first mount and after modal close.
+  const overrideRefStable = useRef(mouseScrollOverrideRef);
+  overrideRefStable.current = mouseScrollOverrideRef;
+  const mouseTargetRef = useRef<ScrollHandle | null>(null);
+  if (!mouseTargetRef.current) {
+    mouseTargetRef.current = {
+      scrollBy(delta: number) {
+        (overrideRefStable.current?.current ?? localHandleRef.current)?.scrollBy(delta);
+      },
+    };
+  }
+  useMouseScroll(mouseTargetRef);
 
   // Track scroll position
   const updateScrollState = useCallback(() => {

@@ -11,6 +11,7 @@ import { BUILTIN_DEFINITIONS, resolveTheme, resetThemeCache } from "./tui/themes
 import type { FileIO, SceneState } from "./agents/scene-manager.js";
 import { detectSceneState, classifyTranscriptEntry } from "./agents/scene-manager.js";
 import { markdownToNarrativeLines, narrativeLinesToMarkdown } from "./context/display-log.js";
+import type { ConversationExchange } from "./context/conversation.js";
 import { GameEngine } from "./agents/game-engine.js";
 import type { GameState } from "./agents/game-state.js";
 import type { DMSessionState } from "./agents/dm-prompt.js";
