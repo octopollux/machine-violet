@@ -174,10 +174,20 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
   useScrollHandle(localHandleRef, scrollRef);
 
   // Mouse wheel scroll — routes to override (modal) when active, else narrative.
-  // mouseTargetRef is a stable object whose .current is updated each render;
-  // the installMouseFilter callback reads .current at event time.
-  const mouseTargetRef = useRef<ScrollHandle>(null);
-  mouseTargetRef.current = mouseScrollOverrideRef?.current ?? localHandleRef.current;
+  // We need a stable proxy that resolves the target at scroll-event time, not
+  // render time, because useImperativeHandle sets localHandleRef.current during
+  // the commit phase (after render). Reading .current during render would get
+  // null on first mount and after modal close.
+  const overrideRefStable = useRef(mouseScrollOverrideRef);
+  overrideRefStable.current = mouseScrollOverrideRef;
+  const mouseTargetRef = useRef<ScrollHandle | null>(null);
+  if (!mouseTargetRef.current) {
+    mouseTargetRef.current = {
+      scrollBy(delta: number) {
+        (overrideRefStable.current?.current ?? localHandleRef.current)?.scrollBy(delta);
+      },
+    };
+  }
   useMouseScroll(mouseTargetRef);
 
   // Track scroll position
