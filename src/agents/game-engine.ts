@@ -832,6 +832,19 @@ export class GameEngine {
         currentSheet = `# ${characterName}\n\n**Type:** character\n`;
       }
 
+      // Skip if sheet was just built by post-setup (prevents duplicate sections).
+      // Clear the flag so future level-ups still work.
+      const { frontMatter: fm, body: fmBody, changelog: fmChangelog } = parseFrontMatter(currentSheet);
+      if (fm.sheet_status === "complete") {
+        delete fm.sheet_status;
+        const title = fm._title ?? characterName;
+        await this.fileIO.writeFile(filePath, serializeEntity(title, fm, fmBody, fmChangelog));
+        const slug = characterName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+        this.sceneManager.notifyEntityTouched(filePath, slug);
+        this.callbacks.onDevLog?.(`[dev] promote_character: ${characterName} — skipped, sheet already complete`);
+        return;
+      }
+
       // Load system rules if available
       const ruleCard = await this.loadRuleCardCombat();
 
