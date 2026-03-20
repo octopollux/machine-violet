@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { computeViewStart, reducer } from "./InlineTextInput.js";
 import React from "react";
 import { render } from "ink-testing-library";

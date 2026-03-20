@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import React from "react";
+import { render } from "ink-testing-library";
+import { Text } from "ink";
 import { forceRefreshRawMode } from "./rawModeGuard.js";
+import { useRawModeGuardian } from "./useRawModeGuardian.js";
 
 vi.mock("./rawModeGuard.js", () => ({
   forceRefreshRawMode: vi.fn(),
@@ -7,7 +11,12 @@ vi.mock("./rawModeGuard.js", () => ({
 
 const mockedForceRefresh = vi.mocked(forceRefreshRawMode);
 
-describe("useRawModeGuardian (unit)", () => {
+function TestComponent({ enabled = true, intervalMs }: { enabled?: boolean; intervalMs?: number }) {
+  useRawModeGuardian({ enabled, intervalMs });
+  return React.createElement(Text, null, "test");
+}
+
+describe("useRawModeGuardian", () => {
   const originalPlatform = process.platform;
 
   beforeEach(() => {
@@ -20,28 +29,70 @@ describe("useRawModeGuardian (unit)", () => {
     Object.defineProperty(process, "platform", { value: originalPlatform, writable: true });
   });
 
-  it("calls forceRefreshRawMode on interval on Windows", async () => {
+  it("calls forceRefreshRawMode on interval on Windows", () => {
     Object.defineProperty(process, "platform", { value: "win32", writable: true });
 
-    // Dynamically import to get the function after mock is set up
-    const { useRawModeGuardian } = await import("./useRawModeGuardian.js");
+    const { unmount } = render(React.createElement(TestComponent, { intervalMs: 100 }));
 
-    // We can't easily test a React hook without a component, so test the
-    // underlying logic: on Windows, forceRefreshRawMode should be callable
     expect(mockedForceRefresh).not.toHaveBeenCalled();
-    forceRefreshRawMode();
-    expect(mockedForceRefresh).toHaveBeenCalledOnce();
 
-    // Verify the hook is exported
-    expect(useRawModeGuardian).toBeTypeOf("function");
+    vi.advanceTimersByTime(100);
+    expect(mockedForceRefresh).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(100);
+    expect(mockedForceRefresh).toHaveBeenCalledTimes(2);
+
+    unmount();
   });
 
-  it("forceRefreshRawMode is a no-op on non-Windows", () => {
+  it("does not call forceRefreshRawMode on non-Windows", () => {
     Object.defineProperty(process, "platform", { value: "linux", writable: true });
 
-    // The real forceRefreshRawMode checks platform internally,
-    // but we're testing the mock here. The hook itself gates on platform.
-    forceRefreshRawMode();
-    expect(mockedForceRefresh).toHaveBeenCalledOnce();
+    const { unmount } = render(React.createElement(TestComponent, { intervalMs: 100 }));
+
+    vi.advanceTimersByTime(500);
+    expect(mockedForceRefresh).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it("does not poll when enabled is false", () => {
+    Object.defineProperty(process, "platform", { value: "win32", writable: true });
+
+    const { unmount } = render(React.createElement(TestComponent, { enabled: false, intervalMs: 100 }));
+
+    vi.advanceTimersByTime(500);
+    expect(mockedForceRefresh).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it("cleans up interval on unmount", () => {
+    Object.defineProperty(process, "platform", { value: "win32", writable: true });
+
+    const { unmount } = render(React.createElement(TestComponent, { intervalMs: 100 }));
+
+    vi.advanceTimersByTime(100);
+    expect(mockedForceRefresh).toHaveBeenCalledTimes(1);
+
+    unmount();
+
+    vi.advanceTimersByTime(500);
+    // No additional calls after unmount
+    expect(mockedForceRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses default 500ms interval", () => {
+    Object.defineProperty(process, "platform", { value: "win32", writable: true });
+
+    const { unmount } = render(React.createElement(TestComponent));
+
+    vi.advanceTimersByTime(499);
+    expect(mockedForceRefresh).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1);
+    expect(mockedForceRefresh).toHaveBeenCalledTimes(1);
+
+    unmount();
   });
 });
