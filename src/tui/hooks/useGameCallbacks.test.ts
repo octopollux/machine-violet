@@ -384,4 +384,30 @@ describe("appendDelta (typed NarrativeLine)", () => {
       dm("The Nine of Wands."),
     ]);
   });
+
+  it("trailing \\n produces spacer, not dm blank (no false paragraph boundary)", () => {
+    const spacer = (text: string): NarrativeLine => ({ kind: "spacer", text });
+    // Chunk ends with \n — trailing empty part becomes spacer
+    const result = appendDelta([dm("First line")], ".\n", "dm");
+    expect(result).toEqual([dm("First line."), spacer("")]);
+  });
+
+  it("\\n split across chunks: spacer + non-\\n delta stays spacer", () => {
+    const spacer = (text: string): NarrativeLine => ({ kind: "spacer", text });
+    // Chunk 1 ends with \n (trailing spacer), chunk 2 is normal text
+    const after1 = appendDelta([dm("First")], "\n", "dm");
+    expect(after1).toEqual([dm("First"), spacer("")]);
+    const after2 = appendDelta(after1, "Second", "dm");
+    // Spacer stays — tags persist across it
+    expect(after2).toEqual([dm("First"), spacer(""), dm("Second")]);
+  });
+
+  it("\\n\\n split across chunks: spacer promoted to dm blank", () => {
+    // Chunk 1 ends with \n (trailing spacer), chunk 2 starts with \n (confirming \n\n)
+    const after1 = appendDelta([dm("First")], "\n", "dm");
+    const after2 = appendDelta(after1, "\nSecond", "dm");
+    // Spacer promoted to dm("") — real paragraph boundary
+    const hasDmBlank = after2.some((l) => l.kind === "dm" && l.text === "");
+    expect(hasDmBlank).toBe(true);
+  });
 });

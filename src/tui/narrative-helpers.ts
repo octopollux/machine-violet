@@ -16,6 +16,13 @@ export function appendDelta(
 ): NarrativeLine[] {
   const lines = [...prev];
 
+  // If the last line is a pending spacer (from a trailing \n in a previous
+  // chunk) and the new delta starts with \n, this confirms \n\n: promote
+  // the spacer to a real blank DM line so it acts as a paragraph boundary.
+  if (lines.length > 0 && lines[lines.length - 1].kind === "spacer" && delta.startsWith("\n")) {
+    lines[lines.length - 1] = { kind, text: "" };
+  }
+
   if (lines.length === 0) {
     lines.push({ kind, text: delta });
   } else {
@@ -42,7 +49,15 @@ export function appendDelta(
       if (parts[i - 1] !== "" && parts[i] !== "") {
         lines.push({ kind: "spacer", text: "" });
       }
-      lines.push({ kind, text: parts[i] });
+      // Trailing empty part from a \n at end of chunk: use spacer so it
+      // doesn't act as a false paragraph boundary. If the next delta
+      // starts with \n (confirming \n\n), the promotion check above
+      // will convert it to a real blank DM line.
+      if (parts[i] === "" && i === parts.length - 1) {
+        lines.push({ kind: "spacer", text: "" });
+      } else {
+        lines.push({ kind, text: parts[i] });
+      }
     }
   }
 
