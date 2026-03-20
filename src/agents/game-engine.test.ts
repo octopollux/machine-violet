@@ -1693,7 +1693,7 @@ describe("content classifier refusal", () => {
       stop_reason: "refusal",
       stop_sequence: null,
       usage: mockUsage(),
-    } as Anthropic.Message;
+    } as unknown as Anthropic.Message;
   }
 
   it("fires onRefusal and does not persist exchange", async () => {

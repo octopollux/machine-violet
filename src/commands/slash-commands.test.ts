@@ -403,7 +403,7 @@ describe("trySlashCommand", () => {
       const retryLastTurn = vi.fn();
       const hasPendingRetry = vi.fn().mockReturnValue(true);
       const ctx = mockCtx();
-      Object.assign(ctx.engine, { retryLastTurn, hasPendingRetry });
+      Object.assign(ctx.engine!, { retryLastTurn, hasPendingRetry });
       trySlashCommand("/retry", ctx);
       expect(retryLastTurn).toHaveBeenCalled();
     });
@@ -412,7 +412,7 @@ describe("trySlashCommand", () => {
       const retryLastExchange = vi.fn().mockReturnValue(true);
       const hasPendingRetry = vi.fn().mockReturnValue(false);
       const ctx = mockCtx();
-      Object.assign(ctx.engine, { retryLastExchange, hasPendingRetry });
+      Object.assign(ctx.engine!, { retryLastExchange, hasPendingRetry });
       trySlashCommand("/retry", ctx);
       expect(retryLastExchange).toHaveBeenCalled();
       expect(lastAppended(ctx).text).toContain("Retrying last turn");
@@ -422,7 +422,7 @@ describe("trySlashCommand", () => {
       const retryLastExchange = vi.fn().mockReturnValue(false);
       const hasPendingRetry = vi.fn().mockReturnValue(false);
       const ctx = mockCtx();
-      Object.assign(ctx.engine, { retryLastExchange, hasPendingRetry });
+      Object.assign(ctx.engine!, { retryLastExchange, hasPendingRetry });
       trySlashCommand("/retry", ctx);
       expect(lastAppended(ctx).text).toContain("Nothing to retry");
     });
