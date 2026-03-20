@@ -189,11 +189,14 @@ export function ChoiceOverlay({
   const customInputWidth = Math.max(1, width - prefixWidth);
 
   return (
-    <Box flexDirection="column" width={width}>
+    <Box flexDirection="column" flexGrow={1} width={width}>
       {/* Row 0: prompt text */}
       <Box>
         <Text>{displayPrompt}</Text>
       </Box>
+
+      {/* Growth space: empty area between prompt and bottom-justified choices */}
+      <Box flexGrow={1} />
 
       {/* Description region (fixed height, only when descriptions provided) */}
       {hasDescriptions && (
