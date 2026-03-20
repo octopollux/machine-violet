@@ -116,6 +116,8 @@ describe("AddContentPhase", () => {
 
     await vi.waitFor(() => {
       expect(lastFrame()).toContain("Drop PDF");
+      expect(lastFrame()).toContain("System:");
+      expect(lastFrame()).toContain("Mork Borg");
     }, { timeout: 2000 });
   });
 

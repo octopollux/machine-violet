@@ -14,7 +14,7 @@ async function createTestPdf(pageCount: number): Promise<Buffer> {
   return Buffer.from(bytes);
 }
 
-// pdf-parse loads native pdf.js modules that can race under parallel workers
+// PDF processing and filesystem I/O have been flaky in CI under parallel workers
 describe("getPdfInfo", { retry: 2 }, () => {
   let tempDir: string;
   let pdfPath: string;
