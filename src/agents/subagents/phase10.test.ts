@@ -76,13 +76,13 @@ describe("generateChoices", () => {
     expect(result.choices[2]).toBe("Try to negotiate");
   });
 
-  it("caps at 4 choices", async () => {
+  it("caps at 6 choices", async () => {
     const client = mockClient([
-      textResponse("One\nTwo\nThree\nFour\nFive\nSix"),
+      textResponse("One\nTwo\nThree\nFour\nFive\nSix\nSeven\nEight"),
     ]);
 
     const result = await generateChoices(client, "...", "Aldric");
-    expect(result.choices).toHaveLength(4);
+    expect(result.choices).toHaveLength(6);
   });
 });
 

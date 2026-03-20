@@ -1,6 +1,6 @@
 /**
  * Auto-generates player choices after DM narration.
- * Fires a Haiku subagent with recent context to suggest 3-4 options.
+ * Fires a Haiku subagent with recent context to suggest 3-6 options.
  * Explicit DM choices (via present_choices tool) take precedence.
  */
 import type Anthropic from "@anthropic-ai/sdk";
@@ -51,7 +51,7 @@ export async function generateChoices(
     getModel("small"),
     SYSTEM_PROMPT,
     userMessage,
-    150,
+    250,
     "choice-generator",
   );
 
@@ -59,7 +59,7 @@ export async function generateChoices(
     .split("\n")
     .map((line) => line.replace(/^[-•*\d.)\s]+/, "").trim())
     .filter((line) => line.length > 0)
-    .slice(0, 4);
+    .slice(0, 6);
 
   return { ...result, choices };
 }

@@ -75,11 +75,11 @@ Sandboxed conversation for out-of-character discussion. Receives the DM's curren
 | **Trigger** | Engine auto-triggers based on frequency config, or DM calls `present_choices({})` with no params |
 | **Source doc** | [tui-design.md](tui-design.md) |
 
-Reads the last few exchanges of DM narration and generates 2-3 reasonable player options. Each choice is prepended with a Unicode bullet glyph (e.g. ◆, ▸, ◇) chosen to suit the scene's tone. Does not need to be brilliant — freeform input is always available as a fallback.
+Reads the last few exchanges of DM narration and generates 3-6 reasonable player options. Each choice is prepended with a Unicode bullet glyph (e.g. ◆, ▸, ◇) chosen to suit the scene's tone. Does not need to be brilliant — freeform input is always available as a fallback.
 
 **Context**: Last 3-5 exchanges of DM narration + player input. ~500-1K tokens.
 
-**Returns**: A prompt string and 2-3 bullet-prefixed choice strings. ~50 tokens.
+**Returns**: A prompt string and 3-6 bullet-prefixed choice strings. ~50-100 tokens.
 
 ---
 

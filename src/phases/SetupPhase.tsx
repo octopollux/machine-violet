@@ -8,8 +8,8 @@ import { Layout } from "../tui/layout.js";
 import { ChoiceOverlay, DESCRIPTION_ROWS } from "../tui/modals/index.js";
 import { stripFormatting, stripLeadingBullet } from "../tui/formatting.js";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
-import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
-import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
+import { scrollAmount, TerminalTooSmall, buildModelineDisplay, splitModeline } from "../tui/components/index.js";
+import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, choiceRowBudget } from "../tui/responsive.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import type { SetupResult } from "../agents/setup-agent.js";
 import { createSetupConversation } from "../agents/subagents/setup-conversation.js";
@@ -297,6 +297,11 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
     const hasDescriptions = setupHasModal && activeModal?.descriptions != null && activeModal.descriptions.length > 0;
     const paneExtraHeight = hasDescriptions ? DESCRIPTION_ROWS : 0;
 
+    // Compute dynamic choice row budget for this tier
+    const visibleElements = getVisibleElements(getViewportTier({ columns: cols, rows }));
+    const mlLineCount = splitModeline(buildModelineDisplay("Campaign Setup"), cols).length;
+    const setupMaxChoiceRows = choiceRowBudget(visibleElements, mlLineCount, hasDescriptions, DESCRIPTION_ROWS);
+
     // Build overlay for choice modal (replaces Player Pane content)
     const choiceOverlay = setupHasModal && activeModal ? (
       <ChoiceOverlay
@@ -306,6 +311,7 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
         descriptions={activeModal.descriptions}
         selectedIndex={choiceIndex}
         accentColor={theme.keyColor}
+        maxChoiceRows={setupMaxChoiceRows}
         showCustomInput
         customInputActive={customInputActive}
         customInputResetKey={customInputResetKey}

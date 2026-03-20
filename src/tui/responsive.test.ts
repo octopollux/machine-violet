@@ -3,6 +3,7 @@ import {
   getViewportTier,
   getVisibleElements,
   narrativeRows,
+  choiceRowBudget,
   PLAYER_PANE_HEIGHT,
   PLAYER_PANE_EXTRA_ROWS,
   MIN_COLUMNS,
@@ -112,5 +113,28 @@ describe("narrativeRows", () => {
     const two = narrativeRows(40, elements, false, 2, 2);
     const three = narrativeRows(40, elements, false, 2, 3);
     expect(three).toBe(two);
+  });
+});
+
+describe("choiceRowBudget", () => {
+  it("full tier gives more rows than standard", () => {
+    const full = choiceRowBudget(getVisibleElements("full"), 1, false, 3);
+    const standard = choiceRowBudget(getVisibleElements("standard"), 1, false, 3);
+    expect(full).toBeGreaterThan(standard);
+  });
+
+  it("full tier: 1-line modeline, no descriptions → 8 rows", () => {
+    // content = 9 + 4 - 2 = 11, mlRows = 1, overhead = 2 → 11 - 1 - 2 = 8
+    expect(choiceRowBudget(getVisibleElements("full"), 1, false, 3)).toBe(8);
+  });
+
+  it("standard tier: no modeline alongside, no descriptions → 5 rows", () => {
+    // content = 9 + 0 - 2 = 7, mlRows = 0, overhead = 2 → 7 - 0 - 2 = 5
+    expect(choiceRowBudget(getVisibleElements("standard"), 1, false, 3)).toBe(5);
+  });
+
+  it("never returns less than 1", () => {
+    // Even with an absurdly tall modeline, clamp to 1
+    expect(choiceRowBudget(getVisibleElements("full"), 100, false, 3)).toBe(1);
   });
 });

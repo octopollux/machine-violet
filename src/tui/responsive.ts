@@ -94,3 +94,25 @@ export function narrativeRows(
 
   return Math.max(1, totalRows - used);
 }
+
+/**
+ * Compute the maximum number of choice rows visible in the Player Pane overlay.
+ * @param elements — visible elements for the current tier.
+ * @param modelineLineCount — number of lines the modeline occupies (0 when not shown alongside).
+ * @param hasDescriptions — whether a description region is present.
+ * @param descriptionRows — rows reserved for descriptions (typically DESCRIPTION_ROWS = 3).
+ */
+export function choiceRowBudget(
+  elements: VisibleElements,
+  modelineLineCount: number,
+  hasDescriptions: boolean,
+  descriptionRows: number,
+): number {
+  const extraHeight = hasDescriptions ? descriptionRows : 0;
+  const contentHeight = PLAYER_PANE_HEIGHT + elements.playerPaneExtraRows + extraHeight - 2;
+  // modeline shown alongside overlay only when extra rows exist
+  const mlRows = elements.playerPaneExtraRows > 0 ? modelineLineCount : 0;
+  // overhead: prompt (1) + help hint (1) + optional description region
+  const overhead = 2 + (hasDescriptions ? descriptionRows : 0);
+  return Math.max(1, contentHeight - mlRows - overhead);
+}
