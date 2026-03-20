@@ -461,35 +461,38 @@ describe("processNarrativeLines", () => {
     expect(hasItalic).toBe(true);
   });
 
-  it("color resets at source line boundary", () => {
+  it("color persists across source line boundaries (like b/i/u)", () => {
     const result = processNarrativeLines([
       dm("<color=#ff0000>red text"),
       dm("next line"),
     ], 80);
-    // Second line should NOT have color
+    // Second line SHOULD have color (healed across line boundary)
     const plain1 = toPlainText(result[1].nodes);
     expect(plain1).toBe("next line");
-    // Should be plain text, no color tag
-    expect(result[1].nodes).toEqual(["next line"]);
+    const hasColor = result[1].nodes.some(
+      (n) => typeof n !== "string" && n.type === "color",
+    );
+    expect(hasColor).toBe(true);
   });
 
-  it("b persists but color resets at source boundary", () => {
+  it("color persists with bold across source boundary", () => {
     const result = processNarrativeLines([
       dm("<b><color=#ff0000>bold red"),
-      dm("next line</b>"),
+      dm("next line</color></b>"),
     ], 80);
-    // Second line should be bold but not colored
+    // Second line should be bold AND colored
     const plain1 = toPlainText(result[1].nodes);
     expect(plain1).toBe("next line");
     const hasBold = result[1].nodes.some(
       (n) => typeof n !== "string" && n.type === "bold",
     );
     expect(hasBold).toBe(true);
-    // Should NOT have a color tag at the top level
-    const hasColor = result[1].nodes.some(
-      (n) => typeof n !== "string" && n.type === "color",
-    );
-    expect(hasColor).toBe(false);
+    const hasColor = (function check(nodes: FormattingNode[]): boolean {
+      return nodes.some((n) =>
+        typeof n !== "string" && (n.type === "color" || check(n.content)),
+      );
+    })(result[1].nodes);
+    expect(hasColor).toBe(true);
   });
 
   it("handles lines with no tags", () => {
@@ -518,17 +521,27 @@ describe("processNarrativeLines", () => {
     expect(hasItalic1).toBe(true);
   });
 
-  it("color does not leak across multiple source lines", () => {
+  it("color persists across source lines but resets at paragraph boundary", () => {
     const result = processNarrativeLines([
       dm("<color=#ff0000>red</color>"),
       dm("normal"),
       dm("<color=#00ff00>green"),
+      dm("should be green too"),
+      dm(""),  // paragraph boundary
       dm("should not be green"),
     ], 80);
-    expect(toPlainText(result[1].nodes)).toBe("normal");
+    // Line after closed color tag: no color
     expect(result[1].nodes).toEqual(["normal"]);
-    expect(toPlainText(result[3].nodes)).toBe("should not be green");
-    expect(result[3].nodes).toEqual(["should not be green"]);
+    // Line after unclosed color: color persists within paragraph
+    expect(toPlainText(result[3].nodes)).toBe("should be green too");
+    const hasGreen = result[3].nodes.some(
+      (n) => typeof n !== "string" && n.type === "color",
+    );
+    expect(hasGreen).toBe(true);
+    // After paragraph boundary: color resets
+    const lastLine = result[result.length - 1];
+    expect(toPlainText(lastLine.nodes)).toBe("should not be green");
+    expect(lastLine.nodes).toEqual(["should not be green"]);
   });
 
   it("pads alignment lines with blank lines", () => {
@@ -1011,5 +1024,108 @@ describe("paragraph boundary split", () => {
     const full = processNarrativeLines(lines, WIDTH);
     const split = splitAndProcess(lines, 2, WIDTH);
     expect(split).toEqual(full);
+  });
+});
+
+describe("multi-line formatting across spacers", () => {
+  // Spacers (kind: "spacer") are visual blank lines inserted by appendDelta
+  // for single \n. They must NOT reset the healing tag stack.
+  const dm = (text: string): NarrativeLine => ({ kind: "dm", text });
+  const spacer = (): NarrativeLine => ({ kind: "spacer", text: "" });
+
+  it("center tag spans across a spacer", () => {
+    // Simulates: <center>Title\nSubtitle</center> after appendDelta split
+    const result = processNarrativeLines([
+      dm("<center>Title"),
+      spacer(),
+      dm("Subtitle</center>"),
+    ], 80);
+    const dmLines = result.filter((l) => l.kind === "dm");
+    // Both DM lines should be centered
+    expect(dmLines[0].alignment).toBe("center");
+    expect(dmLines[dmLines.length - 1].alignment).toBe("center");
+  });
+
+  it("color tag spans across a spacer", () => {
+    // Simulates: <color=#ff0000>Red line\nStill red</color> after appendDelta split
+    const result = processNarrativeLines([
+      dm("<color=#ff0000>Red line"),
+      spacer(),
+      dm("Still red</color>"),
+    ], 80);
+    const dmLines = result.filter((l) => l.kind === "dm");
+    expect(toPlainText(dmLines[0].nodes)).toBe("Red line");
+    expect(toPlainText(dmLines[1].nodes)).toBe("Still red");
+    // Both should have color
+    for (const line of dmLines) {
+      const hasColor = line.nodes.some(
+        (n) => typeof n !== "string" && n.type === "color",
+      );
+      expect(hasColor).toBe(true);
+    }
+  });
+
+  it("bold tag spans across a spacer", () => {
+    const result = processNarrativeLines([
+      dm("<b>Bold start"),
+      spacer(),
+      dm("Bold end</b>"),
+    ], 80);
+    const dmLines = result.filter((l) => l.kind === "dm");
+    for (const line of dmLines) {
+      const hasBold = line.nodes.some(
+        (n) => typeof n !== "string" && n.type === "bold",
+      );
+      expect(hasBold).toBe(true);
+    }
+  });
+
+  it("spacer renders as a spacer (not dm)", () => {
+    const result = processNarrativeLines([
+      dm("Line one"),
+      spacer(),
+      dm("Line two"),
+    ], 80);
+    expect(result[0].kind).toBe("dm");
+    expect(result[1].kind).toBe("spacer");
+    expect(result[2].kind).toBe("dm");
+  });
+
+  it("real blank dm line still resets tags (paragraph boundary)", () => {
+    const result = processNarrativeLines([
+      dm("<b>Bold start"),
+      dm(""),        // real paragraph boundary
+      dm("Not bold"),
+    ], 80);
+    const lastDm = result[result.length - 1];
+    expect(toPlainText(lastDm.nodes)).toBe("Not bold");
+    expect(lastDm.nodes).toEqual(["Not bold"]);
+  });
+
+  it("spacer between paragraphs does not prevent recovery", () => {
+    // Unclosed tag + real paragraph boundary still resets
+    const result = processNarrativeLines([
+      dm("<color=#ff0000>oops forgot to close"),
+      spacer(),
+      dm("still colored"),
+      dm(""),        // paragraph boundary resets
+      dm("clean"),
+    ], 80);
+    const lastDm = result[result.length - 1];
+    expect(toPlainText(lastDm.nodes)).toBe("clean");
+    expect(lastDm.nodes).toEqual(["clean"]);
+  });
+
+  it("no dangling close tags after spacer", () => {
+    // The core bug: close tag on second line should NOT appear as literal text
+    const result = processNarrativeLines([
+      dm("<center>Title"),
+      spacer(),
+      dm("Subtitle</center>"),
+    ], 80);
+    const dmLines = result.filter((l) => l.kind === "dm");
+    const lastPlain = toPlainText(dmLines[dmLines.length - 1].nodes);
+    expect(lastPlain).toBe("Subtitle");
+    expect(lastPlain).not.toContain("</center>");
   });
 });

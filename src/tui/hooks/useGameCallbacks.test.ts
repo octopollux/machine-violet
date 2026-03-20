@@ -357,10 +357,11 @@ describe("appendDelta (typed NarrativeLine)", () => {
     expect(result).toEqual([dm(""), player("> Player: Attack!"), dm(""), dm("The dragon roars!")]);
   });
 
-  it("splits on newlines within a delta (double-spaced)", () => {
+  it("splits on newlines within a delta (spacer between non-empty parts)", () => {
+    const spacer = (text: string): NarrativeLine => ({ kind: "spacer", text });
     const lines: NarrativeLine[] = [dm(""), player("> Player: Attack!"), dm(""), dm("First line")];
     const result = appendDelta(lines, ".\nSecond line", "dm");
-    expect(result).toEqual([dm(""), player("> Player: Attack!"), dm(""), dm("First line."), dm(""), dm("Second line")]);
+    expect(result).toEqual([dm(""), player("> Player: Attack!"), dm(""), dm("First line."), spacer(""), dm("Second line")]);
   });
 
   it("preserves single blank line for \\n\\n (no extra doubling)", () => {
@@ -382,5 +383,31 @@ describe("appendDelta (typed NarrativeLine)", () => {
       dev("[dev] file:write decks.json (100 chars)"),
       dm("The Nine of Wands."),
     ]);
+  });
+
+  it("trailing \\n produces spacer, not dm blank (no false paragraph boundary)", () => {
+    const spacer = (text: string): NarrativeLine => ({ kind: "spacer", text });
+    // Chunk ends with \n — trailing empty part becomes spacer
+    const result = appendDelta([dm("First line")], ".\n", "dm");
+    expect(result).toEqual([dm("First line."), spacer("")]);
+  });
+
+  it("\\n split across chunks: spacer + non-\\n delta stays spacer", () => {
+    const spacer = (text: string): NarrativeLine => ({ kind: "spacer", text });
+    // Chunk 1 ends with \n (trailing spacer), chunk 2 is normal text
+    const after1 = appendDelta([dm("First")], "\n", "dm");
+    expect(after1).toEqual([dm("First"), spacer("")]);
+    const after2 = appendDelta(after1, "Second", "dm");
+    // Spacer stays — tags persist across it
+    expect(after2).toEqual([dm("First"), spacer(""), dm("Second")]);
+  });
+
+  it("\\n\\n split across chunks: spacer promoted to dm blank", () => {
+    // Chunk 1 ends with \n (trailing spacer), chunk 2 starts with \n (confirming \n\n)
+    const after1 = appendDelta([dm("First")], "\n", "dm");
+    const after2 = appendDelta(after1, "\nSecond", "dm");
+    // Spacer promoted to dm("") — real paragraph boundary
+    const hasDmBlank = after2.some((l) => l.kind === "dm" && l.text === "");
+    expect(hasDmBlank).toBe(true);
   });
 });

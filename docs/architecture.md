@@ -174,7 +174,7 @@ DM text goes through a formatting pipeline (`src/tui/formatting.ts`):
 raw string → heal tags → parse to FormattingNode[] AST → wrap lines → pad alignment → quote highlight
 ```
 
-Tags supported: `<b>`, `<i>`, `<u>`, `<center>`, `<right>`, `<color=#hex>`. Quote state resets at paragraph boundaries.
+Tags supported: `<b>`, `<i>`, `<u>`, `<center>`, `<right>`, `<color=#hex>`. All tags persist across source lines; only real paragraph boundaries (blank DM lines) reset the tag stack. Quote state also resets at paragraph boundaries.
 
 **Theme system:** `.theme` asset files in `src/tui/themes/assets/` define color palettes using OKLCH color space. Variants: exploration, combat, ooc, levelup, dev.
 

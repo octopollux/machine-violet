@@ -120,7 +120,7 @@ Unrecognized tags are stripped. Malformed tags render as plain text. This is cos
 
 All DM text processing flows through `processNarrativeLines(lines, width, quoteColor?) → ProcessedLine[]`:
 
-1. **Heal** cross-line tags on raw strings (`b`/`i`/`u` persist across source lines; `color` resets at source boundaries)
+1. **Heal** cross-line tags on raw strings (all formatting tags persist across source lines; only real paragraph boundaries — blank DM lines from `\n\n` — reset the tag stack; visual spacers from single `\n` don't reset)
 2. **Parse** healed text into `FormattingNode[]` AST via `parseFormatting`
 3. **Wrap** each AST at terminal width via `wrapNodes` (tags never break across lines)
 4. **Pad** alignment lines (`<center>`, `<right>`) with blank lines for breathing room
