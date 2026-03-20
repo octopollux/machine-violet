@@ -268,15 +268,11 @@ export function processNarrativeLines(
     }
 
     // At paragraph boundaries (blank DM lines), reset all open tags.
-    // At other source boundaries, reset only color tags (b/i/u persist within a paragraph).
+    // All tags (b/i/u/color/center/right) persist across non-blank source lines.
+    // Visual spacers inserted by appendDelta use kind "spacer" and skip healing
+    // entirely, so tags also persist across single \n line breaks.
     if (srcLine.text.trim() === "") {
       openStack.length = 0;
-    } else {
-      for (let j = openStack.length - 1; j >= 0; j--) {
-        if (openStack[j].name === "color") {
-          openStack.splice(j, 1);
-        }
-      }
     }
 
     // Scan the original text for tag changes

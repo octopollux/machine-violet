@@ -357,10 +357,11 @@ describe("appendDelta (typed NarrativeLine)", () => {
     expect(result).toEqual([dm(""), player("> Player: Attack!"), dm(""), dm("The dragon roars!")]);
   });
 
-  it("splits on newlines within a delta (double-spaced)", () => {
+  it("splits on newlines within a delta (spacer between non-empty parts)", () => {
+    const spacer = (text: string): NarrativeLine => ({ kind: "spacer", text });
     const lines: NarrativeLine[] = [dm(""), player("> Player: Attack!"), dm(""), dm("First line")];
     const result = appendDelta(lines, ".\nSecond line", "dm");
-    expect(result).toEqual([dm(""), player("> Player: Attack!"), dm(""), dm("First line."), dm(""), dm("Second line")]);
+    expect(result).toEqual([dm(""), player("> Player: Attack!"), dm(""), dm("First line."), spacer(""), dm("Second line")]);
   });
 
   it("preserves single blank line for \\n\\n (no extra doubling)", () => {

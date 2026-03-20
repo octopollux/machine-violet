@@ -106,7 +106,7 @@ Code and docs stay in sync. See `docs/maintenance.md` for the full guide.
 ### DM Text Formatting Pipeline
 - `processNarrativeLines()` in `src/tui/formatting.ts` is the single entry point for the rendering pipeline.
 - Pipeline: heal raw strings → parse to `FormattingNode[]` AST → wrap (`wrapNodes`) → pad alignment → quote highlight.
-- Quote state resets at paragraph boundaries (blank DM lines). `b`/`i`/`u` persist across source lines; `color` resets.
+- Quote state resets at paragraph boundaries (blank DM lines). All formatting tags (`b`/`i`/`u`/`color`/`center`/`right`) persist across source lines; only real paragraph boundaries (blank DM lines from `\n\n`) reset the tag stack. Visual spacers (from single `\n`) don't reset tags.
 
 ### DM Identity (not an assistant)
 - The DM decides things, says no, lets bad things happen, has secrets, surprises itself.

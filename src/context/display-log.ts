@@ -20,6 +20,7 @@ export function narrativeLinesToMarkdown(lines: NarrativeLine[]): string {
       case "separator":
         parts.push("---");
         break;
+      case "spacer":
       case "dev":
         // Ephemeral — not logged
         break;

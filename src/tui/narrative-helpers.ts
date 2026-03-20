@@ -34,11 +34,13 @@ export function appendDelta(
     const parts = lastLine.text.split("\n");
     lines[lastIdx] = { kind: lastLine.kind, text: parts[0] };
     for (let i = 1; i < parts.length; i++) {
-      // Double-space: insert a blank line between consecutive non-empty parts
+      // Double-space: insert a visual spacer between consecutive non-empty parts
       // so every LLM newline gets visual paragraph separation.
-      // Existing \n\n (which produces an empty part) stays as one blank line.
+      // Existing \n\n (which produces an empty part) stays as one blank DM line.
+      // Spacers are invisible to the healing pipeline — formatting tags persist
+      // across them, unlike real blank DM lines which act as paragraph boundaries.
       if (parts[i - 1] !== "" && parts[i] !== "") {
-        lines.push({ kind, text: "" });
+        lines.push({ kind: "spacer", text: "" });
       }
       lines.push({ kind, text: parts[i] });
     }

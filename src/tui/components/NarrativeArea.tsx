@@ -249,6 +249,12 @@ interface NarrativeLineProps {
 const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
   line, playerColor, width, themeAsset, separatorColor,
 }: NarrativeLineProps) {
+  // Spacer lines render as visual blank lines (paragraph spacing)
+  // but are invisible to the formatting/healing pipeline.
+  if (line.kind === "spacer") {
+    return <Text>{" "}</Text>;
+  }
+
   // Separator lines always render the turn separator pattern
   if (line.kind === "separator") {
     if (themeAsset && width && width > 0) {

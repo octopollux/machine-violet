@@ -47,7 +47,8 @@ export type NarrativeLine =
   | { kind: "player"; text: string }
   | { kind: "dev"; text: string }
   | { kind: "system"; text: string }
-  | { kind: "separator"; text: string };
+  | { kind: "separator"; text: string }
+  | { kind: "spacer"; text: string };
 
 /** A fully processed line ready for rendering — nodes are pre-parsed, healed, wrapped, and quote-highlighted. */
 export interface ProcessedLine {
