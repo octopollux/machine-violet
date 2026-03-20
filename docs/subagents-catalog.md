@@ -392,3 +392,18 @@ Haiku, silent. Summarizes campaign book structure for DM cached prefix. See [doc
 | 16 | Dev Mode | Sonnet | Player-facing | Runtime — developer console |
 
 **Opus is never a subagent** — Opus IS the DM. All subagents are Haiku (cheap mechanical work) or Sonnet (personality/quality needed). The summary table above is the canonical list; model and visibility are columns, not separate counts to maintain.
+
+## Prompt Caching
+
+Most subagents are wired for prompt caching. For subagents whose system prompts are fully static and identical across all users/sessions, cache writes amortize globally — the first call pays full price and subsequent calls see mostly cache reads (25% of input).
+
+Subagents with heavily dynamic system prompts (e.g. AI Player, whose prompt includes character sheet and situation context unique to each call) intentionally skip caching to avoid the cache-write surcharge with no reuse. Narrative Recap's prompt varies only by campaign name, so it caches well within a session.
+
+**Infrastructure** (`src/agents/subagent.ts`):
+- `cacheSystemPrompt(text)` wraps a string as `TextBlockParam[]` with `cache_control: { type: "ephemeral", ttl: "1h" }`.
+- `oneShot()` auto-wraps its system prompt via `cacheSystemPrompt()`, so one-shot Haiku agents with static system prompts get caching automatically. Agents with fully dynamic prompts should call `spawnSubagent` directly instead.
+- `SubagentConfig.cacheTools` stamps `cache_control` on the last tool definition (1h TTL) via `stampToolsCacheControl()` in `agent-session.ts`.
+
+**Sonnet agents** (OOC, Dev Mode) use structured `TextBlockParam[]` system prompts with breakpoints separating stable (cached) and dynamic (uncached) content — the same pattern as the DM's cached prefix.
+
+**Multi-turn Haiku agents** with tools (scribe, search-campaign, search-content, resolve-action) set `cacheTools: true` so tool definitions are also cached across rounds.

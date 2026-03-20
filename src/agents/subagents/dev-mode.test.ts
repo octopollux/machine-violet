@@ -44,31 +44,42 @@ function mockClient(responses: Anthropic.Message[]): Anthropic {
   } as unknown as Anthropic;
 }
 
+/** Flatten TextBlockParam[] to a single string for assertion convenience. */
+function flattenPrompt(blocks: Anthropic.TextBlockParam[]): string {
+  return blocks.map((b) => b.text).join("");
+}
+
 describe("buildDevPrompt", () => {
+  it("returns TextBlockParam[] with cache_control on first block", () => {
+    const blocks = buildDevPrompt("Test");
+    expect(Array.isArray(blocks)).toBe(true);
+    expect((blocks[0] as Record<string, unknown>).cache_control).toEqual({ type: "ephemeral", ttl: "1h" });
+  });
+
   it("includes campaign name", () => {
-    const prompt = buildDevPrompt("Shadow of the Dragon");
+    const prompt = flattenPrompt(buildDevPrompt("Shadow of the Dragon"));
     expect(prompt).toContain("Campaign: Shadow of the Dragon");
   });
 
   it("includes game state summary when provided", () => {
-    const prompt = buildDevPrompt("Test", "combat active, 3 entities");
+    const prompt = flattenPrompt(buildDevPrompt("Test", "combat active, 3 entities"));
     expect(prompt).toContain("Current game state:\ncombat active, 3 entities");
   });
 
   it("omits optional blocks when absent", () => {
-    const prompt = buildDevPrompt("Test");
+    const prompt = flattenPrompt(buildDevPrompt("Test"));
     expect(prompt).not.toContain("Current game state:");
     expect(prompt).not.toContain("undefined");
   });
 
   it("contains developer-focused instructions", () => {
-    const prompt = buildDevPrompt("Test");
+    const prompt = flattenPrompt(buildDevPrompt("Test"));
     expect(prompt).toContain("Developer Console");
     expect(prompt).toContain("engine internals");
   });
 
   it("mentions tools in instructions", () => {
-    const prompt = buildDevPrompt("Test");
+    const prompt = flattenPrompt(buildDevPrompt("Test"));
     expect(prompt).toContain("USE TOOLS");
   });
 });

@@ -1,5 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { spawnSubagent } from "../subagent.js";
+import { spawnSubagent, cacheSystemPrompt } from "../subagent.js";
 import type { SubagentResult, SubagentStreamCallback } from "../subagent.js";
 import { rollDice } from "../../tools/dice/index.js";
 import type { RollDiceInput } from "../../types/dice.js";
@@ -7,7 +7,7 @@ import { getModel } from "../../config/models.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
-const SYSTEM_PROMPT = loadPrompt("resolve-action");
+const SYSTEM_PROMPT = cacheSystemPrompt(loadPrompt("resolve-action"));
 
 export interface ResolveActionInput {
   actor: string;
@@ -50,6 +50,7 @@ export async function resolveAction(
       systemPrompt: SYSTEM_PROMPT,
       maxTokens: TOKEN_LIMITS.SUBAGENT_SMALL,
       maxToolRounds: 3,
+      cacheTools: true,
       tools: [ROLL_DICE_TOOL],
       toolHandler: (name, toolInput) => {
         if (name === "roll_dice") {

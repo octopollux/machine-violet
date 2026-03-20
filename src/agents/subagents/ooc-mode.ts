@@ -519,7 +519,7 @@ export async function enterOOC(
       visibility: "player_facing",
       systemPrompt,
       maxTokens: hasTools ? TOKEN_LIMITS.SUBAGENT_LARGE : TOKEN_LIMITS.SUBAGENT_MEDIUM,
-      ...(tools ? { tools } : {}),
+      ...(tools ? { tools, cacheTools: true } : {}),
       ...(toolHandler ? { toolHandler } : {}),
       maxToolRounds: hasTools ? 8 : undefined,
     },

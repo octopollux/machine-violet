@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
-import { spawnSubagent, oneShot } from "./subagent.js";
+import { spawnSubagent, oneShot, cacheSystemPrompt } from "./subagent.js";
 
 function mockUsage(): Anthropic.Usage {
   return { input_tokens: 50, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: null, inference_geo: null, server_tool_use: null, service_tier: null };
@@ -154,6 +154,19 @@ describe("spawnSubagent", () => {
   });
 });
 
+describe("cacheSystemPrompt", () => {
+  it("wraps string as TextBlockParam[] with 1h cache_control", () => {
+    const blocks = cacheSystemPrompt("You are a summarizer.");
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].type).toBe("text");
+    expect(blocks[0].text).toBe("You are a summarizer.");
+    expect((blocks[0] as Record<string, unknown>).cache_control).toEqual({
+      type: "ephemeral",
+      ttl: "1h",
+    });
+  });
+});
+
 describe("oneShot", () => {
   it("runs a simple one-shot query", async () => {
     const client = mockClient([textResponse("Scene summary here.")]);
@@ -166,5 +179,21 @@ describe("oneShot", () => {
     );
 
     expect(result.text).toBe("Scene summary here.");
+  });
+
+  it("auto-wraps system prompt with cache_control", async () => {
+    const client = mockClient([textResponse("Done.")]);
+
+    await oneShot(client, "claude-haiku-4-5-20251001", "Test prompt.", "Go.");
+
+    const call = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    // System should be TextBlockParam[] (cached prompt + terse suffix)
+    expect(Array.isArray(call.system)).toBe(true);
+    const blocks = call.system as Anthropic.TextBlockParam[];
+    expect(blocks[0].text).toBe("Test prompt.");
+    expect((blocks[0] as Record<string, unknown>).cache_control).toEqual({
+      type: "ephemeral",
+      ttl: "1h",
+    });
   });
 });

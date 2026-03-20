@@ -1,6 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { SubagentStreamCallback } from "../subagent.js";
-import { spawnSubagent } from "../subagent.js";
+import { spawnSubagent, cacheSystemPrompt } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import type { GameState } from "../game-state.js";
 import type { FileIO, SceneManager } from "../scene-manager.js";
@@ -34,18 +34,23 @@ export interface DevModeResult extends SubagentResult {
 export function buildDevPrompt(
   campaignName: string,
   gameStateSummary?: string,
-): string {
-  let prompt = loadPrompt("dev-mode");
+): Anthropic.TextBlockParam[] {
+  const blocks: Anthropic.TextBlockParam[] = [
+    ...cacheSystemPrompt(loadPrompt("dev-mode")),
+  ];
 
+  const dynamicParts: string[] = [];
   if (campaignName) {
-    prompt += `\n\nCampaign: ${campaignName}`;
+    dynamicParts.push(`Campaign: ${campaignName}`);
   }
-
   if (gameStateSummary) {
-    prompt += `\n\nCurrent game state:\n${gameStateSummary}`;
+    dynamicParts.push(`Current game state:\n${gameStateSummary}`);
+  }
+  if (dynamicParts.length > 0) {
+    blocks.push({ type: "text", text: `\n\n${dynamicParts.join("\n\n")}` });
   }
 
-  return prompt;
+  return blocks;
 }
 
 // --- Tool definitions ---
@@ -562,7 +567,7 @@ export async function enterDevMode(
       visibility: "player_facing",
       systemPrompt,
       maxTokens: TOKEN_LIMITS.DEV_MODE,
-      ...(tools ? { tools } : {}),
+      ...(tools ? { tools, cacheTools: true } : {}),
       ...(toolHandler ? { toolHandler } : {}),
       maxToolRounds: hasTools ? 10 : undefined,
     },

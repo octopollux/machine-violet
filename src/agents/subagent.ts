@@ -23,6 +23,8 @@ export interface SubagentConfig {
   toolHandler?: (name: string, input: Record<string, unknown>) => { content: string; is_error?: boolean } | Promise<{ content: string; is_error?: boolean }>;
   /** Max tool-use rounds before cutting off */
   maxToolRounds?: number;
+  /** Stamp cache_control on the last tool definition (1h TTL) */
+  cacheTools?: boolean;
 }
 
 export interface SubagentResult {
@@ -34,6 +36,20 @@ export interface SubagentResult {
 
 /** Callback for player-facing subagents — receives text as it streams */
 export type SubagentStreamCallback = (delta: string) => void;
+
+// --- Cache helpers ---
+
+/**
+ * Wrap a plain-text system prompt as a single TextBlockParam with cache_control.
+ * Use for static prompts (loadPrompt output) that are identical across all users.
+ */
+export function cacheSystemPrompt(text: string): Anthropic.TextBlockParam[] {
+  return [{
+    type: "text",
+    text,
+    cache_control: { type: "ephemeral", ttl: "1h" },
+  } as Anthropic.TextBlockParam];
+}
 
 // --- Implementation ---
 
@@ -64,6 +80,7 @@ export async function spawnSubagent(
     stream: isStreaming,
     tools: config.tools,
     toolHandler: config.toolHandler,
+    cacheTools: config.cacheTools,
     terseSuffix: true,
     retry: config.visibility === "player_facing",
     onTextDelta: onStream,
@@ -75,6 +92,7 @@ export async function spawnSubagent(
 /**
  * Run a simple one-shot subagent (no tools, no streaming).
  * Good for Haiku summarization tasks.
+ * System prompt is automatically wrapped with cache_control (1h TTL).
  */
 export async function oneShot(
   client: Anthropic,
@@ -88,7 +106,7 @@ export async function oneShot(
     name,
     model,
     visibility: "silent",
-    systemPrompt,
+    systemPrompt: cacheSystemPrompt(systemPrompt),
     maxTokens,
   }, userMessage);
 }

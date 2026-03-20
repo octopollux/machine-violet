@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { spawnSubagent } from "../subagent.js";
+import { spawnSubagent, cacheSystemPrompt } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import type { UsageStats } from "../agent-loop.js";
 import { getModel } from "../../config/models.js";
@@ -194,7 +194,7 @@ export async function searchCampaign(
   input: SearchCampaignInput,
   fileIO: FileIO,
 ): Promise<SearchCampaignResult> {
-  const systemPrompt = loadPrompt("search-campaign");
+  const systemPrompt = cacheSystemPrompt(loadPrompt("search-campaign"));
 
   // Walk all files once — the subagent's grep tool searches this in-memory snapshot
   const files = await walkCampaignFiles(input.campaignRoot, fileIO);
@@ -213,6 +213,7 @@ export async function searchCampaign(
     maxTokens: 512,
     tools: SEARCH_TOOLS,
     toolHandler,
+    cacheTools: true,
     maxToolRounds: 5,
   }, `Search query: ${input.query}`);
 

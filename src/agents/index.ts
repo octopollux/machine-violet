@@ -5,7 +5,7 @@ export { agentLoop, agentLoopStreaming } from "./agent-loop.js";
 export type { AgentLoopConfig, AgentLoopResult, UsageStats, TuiCommand, ModelId } from "./agent-loop.js";
 export { runAgentLoop } from "./agent-session.js";
 export type { AgentSessionConfig, AgentSessionResult, ToolHandler } from "./agent-session.js";
-export { spawnSubagent, oneShot } from "./subagent.js";
+export { spawnSubagent, oneShot, cacheSystemPrompt } from "./subagent.js";
 export type { SubagentConfig, SubagentResult, SubagentVisibility, SubagentStreamCallback } from "./subagent.js";
 export { buildDMPrefix, buildActiveState, DM_PROMPT } from "./dm-prompt.js";
 export type { DMSessionState } from "./dm-prompt.js";
