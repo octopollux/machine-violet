@@ -140,7 +140,7 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
   );
 
   // Fixed content height inside the Player Pane (between top/bottom borders)
-  const playerPaneContentHeight = PLAYER_PANE_HEIGHT + playerPaneExtraHeight - 2;
+  const playerPaneContentHeight = PLAYER_PANE_HEIGHT + elements.playerPaneExtraRows + playerPaneExtraHeight - 2;
 
   // Height of the middle section (narrative + activity) for side frames
   const middleHeight = narRows + (elements.activityLine ? 1 : 0);
@@ -233,7 +233,14 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
         <Box flexDirection="row" height={playerPaneContentHeight}>
           <PlayerPaneSide theme={theme} side="left" color={playerColor} height={playerPaneContentHeight} />
           <Box flexDirection="column" width={width - 2} paddingLeft={1} paddingRight={1}>
-            {playerPaneOverlay ? playerPaneOverlay : (
+            {playerPaneOverlay ? (
+              elements.playerPaneExtraRows > 0 ? (
+                <>
+                  <Modeline lines={modelineLines} width={width - 4} />
+                  {playerPaneOverlay}
+                </>
+              ) : playerPaneOverlay
+            ) : (
               <>
                 <Modeline lines={modelineLines} width={width - 4} />
                 <Box flexGrow={1} />

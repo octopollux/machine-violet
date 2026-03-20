@@ -45,6 +45,8 @@ interface ChoiceOverlayProps {
   selectedIndex: number;
   /** Hex color for the selection cursor (">"). Falls back to default text color. */
   accentColor?: string;
+  /** Max visual rows for choice items. Defaults to MAX_CHOICE_ROWS (5). */
+  maxChoiceRows?: number;
   showCustomInput?: boolean;
   customInputActive?: boolean;
   customInputResetKey?: number;
@@ -79,6 +81,7 @@ export function ChoiceOverlay({
   descriptions,
   selectedIndex,
   accentColor,
+  maxChoiceRows: maxChoiceRowsProp,
   showCustomInput,
   customInputActive,
   customInputResetKey,
@@ -89,7 +92,7 @@ export function ChoiceOverlay({
     : [];
 
   const hasDescriptions = descriptions != null && descriptions.length > 0;
-  const totalHeight = hasDescriptions ? 2 + MAX_CHOICE_ROWS + DESCRIPTION_ROWS : 2 + MAX_CHOICE_ROWS;
+  const choiceRows = Math.max(1, maxChoiceRowsProp ?? MAX_CHOICE_ROWS);
 
   // Pre-wrap all choice items
   // Prefix layout: [arrow 1ch][gap 1ch][cursor 1ch][space 1ch] = 4 chars
@@ -117,14 +120,14 @@ export function ChoiceOverlay({
     });
   }
 
-  // Find visible window: fit items within MAX_CHOICE_ROWS visual rows,
+  // Find visible window: fit items within choiceRows visual rows,
   // ensuring selectedIndex is visible.
   const getVisibleEnd = (start: number): number => {
     let rows = 0;
     let end = start;
     while (end < allItems.length) {
       const itemRows = allItems[end].lines.length;
-      if (rows + itemRows > MAX_CHOICE_ROWS && end > start) break;
+      if (rows + itemRows > choiceRows && end > start) break;
       rows += itemRows;
       end++;
     }
@@ -186,11 +189,14 @@ export function ChoiceOverlay({
   const customInputWidth = Math.max(1, width - prefixWidth);
 
   return (
-    <Box flexDirection="column" height={totalHeight} width={width}>
+    <Box flexDirection="column" flexGrow={1} width={width}>
       {/* Row 0: prompt text */}
       <Box>
         <Text>{displayPrompt}</Text>
       </Box>
+
+      {/* Growth space: empty area between prompt and bottom-justified choices */}
+      <Box flexGrow={1} />
 
       {/* Description region (fixed height, only when descriptions provided) */}
       {hasDescriptions && (
@@ -240,6 +246,7 @@ export function ChoiceOverlay({
                 key={customInputResetKey}
                 isDisabled={false}
                 availableWidth={customInputWidth}
+                placeholder="Enter your own..."
                 onSubmit={onCustomInputSubmit}
               />
             </Box>
@@ -253,9 +260,6 @@ export function ChoiceOverlay({
           </Box>
         );
       })}
-
-      {/* Spacer to push help text to bottom */}
-      <Box flexGrow={1} />
 
       {/* Bottom row: right-aligned help */}
       <Box justifyContent="flex-end">

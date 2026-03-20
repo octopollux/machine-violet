@@ -71,14 +71,25 @@ describe("Layout", () => {
     expect(frame).toContain("Aldric's Turn");
   });
 
-  it("playerPaneOverlay replaces Modeline content", () => {
+  it("playerPaneOverlay shows modeline alongside overlay at full tier", () => {
     const overlay = <Text>OVERLAY CONTENT</Text>;
     const { lastFrame } = render(
       <Layout {...baseProps} playerPaneOverlay={overlay} />,
     );
     const frame = lastFrame()!;
     expect(frame).toContain("OVERLAY CONTENT");
-    // Modeline text should NOT appear when overlay is active
+    // At full tier (80x40), modeline is visible alongside the overlay
+    expect(frame).toContain("Loc: The Shattered Hall");
+  });
+
+  it("playerPaneOverlay replaces modeline at standard tier", () => {
+    const overlay = <Text>OVERLAY CONTENT</Text>;
+    const { lastFrame } = render(
+      <Layout {...baseProps} dimensions={{ columns: 80, rows: 30 }} playerPaneOverlay={overlay} />,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("OVERLAY CONTENT");
+    // At standard tier, modeline is hidden — overlay fills the pane
     expect(frame).not.toContain("Loc: The Shattered Hall");
   });
 });

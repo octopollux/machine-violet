@@ -4,6 +4,7 @@ import {
   getVisibleElements,
   narrativeRows,
   PLAYER_PANE_HEIGHT,
+  PLAYER_PANE_EXTRA_ROWS,
   MIN_COLUMNS,
   MIN_ROWS,
 } from "./responsive.js";
@@ -40,6 +41,7 @@ describe("getVisibleElements", () => {
     expect(e.modeline).toBe(true);
     expect(e.playerSelector).toBe(true);
     expect(e.activityGlyphInModeline).toBe(false);
+    expect(e.playerPaneExtraRows).toBe(PLAYER_PANE_EXTRA_ROWS);
   });
 
   it("standard drops top frame and activity line", () => {
@@ -51,6 +53,7 @@ describe("getVisibleElements", () => {
     expect(e.lowerFrame).toBe(true);
     expect(e.modeline).toBe(true);
     expect(e.playerSelector).toBe(true);
+    expect(e.playerPaneExtraRows).toBe(0);
   });
 });
 
@@ -68,14 +71,14 @@ describe("narrativeRows", () => {
   it("calculates rows for full layout with fixed player pane", () => {
     const elements = getVisibleElements("full");
     const rows = narrativeRows(40, elements);
-    // Full: playerPane(9) + topFrame(2) + activity(1) + lowerFrame(2) + playerSelector(1) = 15
-    expect(rows).toBe(25);
+    // Full: playerPane(9) + extraRows(4) + topFrame(2) + activity(1) + lowerFrame(2) + playerSelector(1) = 19
+    expect(rows).toBe(21);
   });
 
   it("calculates rows for standard layout", () => {
     const elements = getVisibleElements("standard");
     const rows = narrativeRows(30, elements);
-    // Standard: playerPane(9) + lowerFrame(2) + playerSelector(1) = 12
+    // Standard: playerPane(9) + extraRows(0) + lowerFrame(2) + playerSelector(1) = 12
     expect(rows).toBe(18);
   });
 
@@ -94,7 +97,7 @@ describe("narrativeRows", () => {
   it("player pane height is fixed regardless of modeline content", () => {
     const elements = getVisibleElements("full");
     const rows = narrativeRows(40, elements);
-    expect(rows).toBe(40 - (PLAYER_PANE_HEIGHT + 2 + 1 + 2 + 1));
+    expect(rows).toBe(40 - (PLAYER_PANE_HEIGHT + PLAYER_PANE_EXTRA_ROWS + 2 + 1 + 2 + 1));
   });
 
   it("does not reserve playerSelector row when only 1 PC", () => {

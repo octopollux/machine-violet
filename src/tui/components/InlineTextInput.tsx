@@ -116,6 +116,8 @@ export interface InlineTextInputProps {
   isDisabled?: boolean;
   defaultValue?: string;
   availableWidth?: number;
+  /** Dim hint text shown when the input is empty. Clears on first keystroke. */
+  placeholder?: string;
   onChange?: (value: string) => void;
   onSubmit?: (value: string) => void;
 }
@@ -125,7 +127,7 @@ export interface InlineTextInputProps {
  * Supports: left/right arrows, Home/End, Ctrl+A/E, backspace.
  * Clear by changing the React `key` prop.
  */
-export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled = false, defaultValue = "", availableWidth, onChange, onSubmit }: InlineTextInputProps) {
+export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled = false, defaultValue = "", availableWidth, placeholder, onChange, onSubmit }: InlineTextInputProps) {
   const initialState: State = {
     value: defaultValue,
     cursorOffset: defaultValue.length,
@@ -242,8 +244,15 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
       result = value;
       visibleLen = value.length;
     } else if (value.length === 0) {
-      result = cursorChar;
-      visibleLen = 1;
+      if (placeholder) {
+        const maxPh = availableWidth != null && availableWidth > 1 ? availableWidth - 1 : placeholder.length;
+        const ph = placeholder.length > maxPh ? placeholder.slice(0, maxPh) : placeholder;
+        result = cursorChar + chalk.dim(ph);
+        visibleLen = 1 + ph.length;
+      } else {
+        result = cursorChar;
+        visibleLen = 1;
+      }
     } else if (needsViewport) {
       const viewStart = computeViewStart(viewStartRef.current, cursorOffset, availableWidth, value.length);
       viewStartRef.current = viewStart;
@@ -276,7 +285,7 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
     }
 
     return result;
-  }, [isDisabled, renderState.value, renderState.cursorOffset, availableWidth, needsViewport]);
+  }, [isDisabled, renderState.value, renderState.cursorOffset, availableWidth, needsViewport, placeholder]);
 
   return <Text>{rendered}</Text>;
 });

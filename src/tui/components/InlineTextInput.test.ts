@@ -232,4 +232,26 @@ describe("InlineTextInput component", () => {
     await new Promise(resolve => setTimeout(resolve, 50));
     expect(onChange).toHaveBeenLastCalledWith("he");
   });
+
+  it("shows placeholder as dim text when input is empty", () => {
+    const { lastFrame } = render(
+      React.createElement(InlineTextInput, { placeholder: "Type here..." }),
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("Type here...");
+  });
+
+  it("hides placeholder after input", async () => {
+    const onChange = vi.fn();
+    const { lastFrame, stdin } = render(
+      React.createElement(InlineTextInput, { placeholder: "Type here...", onChange }),
+    );
+    stdin.write("H");
+    await vi.waitFor(() => {
+      const frame = lastFrame()!;
+      // After typing, placeholder should be gone and typed char should appear
+      expect(frame).not.toContain("Type here...");
+      expect(frame).toContain("H");
+    });
+  });
 });

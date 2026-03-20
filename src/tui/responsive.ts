@@ -16,6 +16,9 @@ export function getViewportTier(dims: ViewportDimensions): ViewportTier {
   return "standard";
 }
 
+/** Extra rows added to the Player Pane at higher viewport tiers. */
+export const PLAYER_PANE_EXTRA_ROWS = 4;
+
 /** Which UI elements are visible at a given tier */
 export interface VisibleElements {
   topFrame: boolean;
@@ -25,6 +28,7 @@ export interface VisibleElements {
   modeline: boolean;
   playerSelector: boolean;
   activityGlyphInModeline: boolean; // when activity line is dropped
+  playerPaneExtraRows: number; // extra rows for modeline + choice coexistence
 }
 
 /**
@@ -43,6 +47,7 @@ export function getVisibleElements(tier: ViewportTier): VisibleElements {
         modeline: true,
         playerSelector: true,
         activityGlyphInModeline: false,
+        playerPaneExtraRows: PLAYER_PANE_EXTRA_ROWS,
       };
     case "standard":
       return {
@@ -53,6 +58,7 @@ export function getVisibleElements(tier: ViewportTier): VisibleElements {
         modeline: true,
         playerSelector: true,
         activityGlyphInModeline: true,
+        playerPaneExtraRows: 0,
       };
   }
 }
@@ -77,8 +83,9 @@ export function narrativeRows(
   let used = 0;
 
   // Player Pane is fixed-height (includes borders, modeline, and input line)
+  // playerPaneExtraRows adds tier-based rows (modeline + choice coexistence)
   // playerPaneExtraHeight adds rows when e.g. a description region is shown
-  used += PLAYER_PANE_HEIGHT + playerPaneExtraHeight;
+  used += PLAYER_PANE_HEIGHT + elements.playerPaneExtraRows + playerPaneExtraHeight;
 
   if (elements.topFrame) used += borderHeight;
   if (elements.lowerFrame) used += borderHeight;
