@@ -5,7 +5,7 @@
  */
 import type Anthropic from "@anthropic-ai/sdk";
 import type { SubagentStreamCallback } from "../subagent.js";
-import { spawnSubagent } from "../subagent.js";
+import { spawnSubagent, cacheSystemPrompt } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import { getModel } from "../../config/models.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
@@ -29,7 +29,7 @@ export interface PromotionResult extends SubagentResult {
   changelogEntry: string;
 }
 
-const SYSTEM_PROMPT = loadPrompt("character-promotion");
+const BASE_PROMPT = loadPrompt("character-promotion");
 
 /**
  * Run the character promotion subagent.
@@ -40,11 +40,12 @@ export async function promoteCharacter(
   input: PromotionInput,
   onStream?: SubagentStreamCallback,
 ): Promise<PromotionResult> {
-  const rulesBlock = input.systemRules
-    ? `\n\nGame system rules:\n${input.systemRules}`
-    : "";
-
-  const systemPrompt = SYSTEM_PROMPT + rulesBlock;
+  const systemPrompt: Anthropic.TextBlockParam[] = [
+    ...cacheSystemPrompt(BASE_PROMPT),
+    ...(input.systemRules
+      ? [{ type: "text" as const, text: `\n\nGame system rules:\n${input.systemRules}` }]
+      : []),
+  ];
 
   const userMessage = `Character: ${input.characterName}
 Context: ${input.context}

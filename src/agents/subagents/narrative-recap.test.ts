@@ -59,7 +59,10 @@ describe("generateNarrativeRecap", () => {
     await generateNarrativeRecap(client, "- Stuff happened", "Shadows of Edyn");
 
     const call = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call.system).toContain("Shadows of Edyn");
+    const systemText = Array.isArray(call.system)
+      ? call.system.map((b: { text: string }) => b.text).join("")
+      : call.system;
+    expect(systemText).toContain("Shadows of Edyn");
   });
 
   it("sends bullet recap as user message", async () => {

@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { spawnSubagent } from "../subagent.js";
+import { spawnSubagent, cacheSystemPrompt } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import type { UsageStats } from "../agent-loop.js";
 import { getModel } from "../../config/models.js";
@@ -293,7 +293,7 @@ export async function runScribe(
   input: ScribeInput,
   fileIO: ScribeFileIO,
 ): Promise<ScribeResult> {
-  const systemPrompt = loadPrompt("scribe");
+  const systemPrompt = cacheSystemPrompt(loadPrompt("scribe"));
   const created: string[] = [];
   const updated: string[] = [];
 
@@ -320,6 +320,7 @@ export async function runScribe(
     maxTokens: 512,
     tools: SCRIBE_TOOLS,
     toolHandler,
+    cacheTools: true,
     maxToolRounds: 8,
   }, userMessage);
 

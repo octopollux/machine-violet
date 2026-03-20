@@ -78,9 +78,12 @@ describe("summarizeScene", () => {
     await summarizeScene(client, "transcript");
 
     const call = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call.system).toContain("terse");
-    expect(call.system).toContain("wikilinks");
-    expect(call.system).toContain("---MINI---");
+    const systemText = Array.isArray(call.system)
+      ? call.system.map((b: { text: string }) => b.text).join("")
+      : call.system;
+    expect(systemText).toContain("terse");
+    expect(systemText).toContain("wikilinks");
+    expect(systemText).toContain("---MINI---");
   });
 });
 

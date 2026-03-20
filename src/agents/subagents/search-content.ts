@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { spawnSubagent } from "../subagent.js";
+import { spawnSubagent, cacheSystemPrompt } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import type { UsageStats } from "../agent-loop.js";
 import { getModel } from "../../config/models.js";
@@ -253,7 +253,7 @@ export async function searchContent(
   input: SearchContentInput,
   fileIO: FileIO,
 ): Promise<SearchContentResult> {
-  const systemPrompt = loadPrompt("search-content");
+  const systemPrompt = cacheSystemPrompt(loadPrompt("search-content"));
 
   const toolHandler = buildContentSearchToolHandler(
     fileIO,
@@ -269,6 +269,7 @@ export async function searchContent(
     maxTokens: 512,
     tools: SEARCH_TOOLS,
     toolHandler,
+    cacheTools: true,
     maxToolRounds: 5,
   }, `Search query: ${input.query}`);
 
