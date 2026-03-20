@@ -4,6 +4,10 @@
 [![Nightly](https://github.com/octopollux/machine-violet/actions/workflows/nightly.yml/badge.svg)](https://github.com/octopollux/machine-violet/actions/workflows/nightly.yml)
 [![Discord](https://img.shields.io/discord/1483251600071065691?logo=discord&label=Discord&color=5865F2)](https://discord.gg/dDbGZrecvX)
 
+| | | |
+|:-:|:-:|:-:|
+| ![Screenshot 1](assets/screenshot-1.png) | ![Screenshot 2](assets/screenshot-2.png) | ![Screenshot 3](assets/screenshot-3.png) |
+
 An agentic AI Dungeon Master that runs any tabletop RPG in a terminal.
 
 Machine Violet is a complete game engine: it narrates, inhabits NPCs, tracks state, rolls dice, manages scenes, and maintains a living campaign filesystem — all from your terminal. The DM is opinionated, surprising, and plays to win. You just need an Anthropic API key.
