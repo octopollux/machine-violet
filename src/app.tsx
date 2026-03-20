@@ -22,6 +22,7 @@ import type { CampaignEntry } from "./config/main-menu.js";
 import { buildCampaignConfig } from "./agents/setup-agent.js";
 import type { SetupResult } from "./agents/setup-agent.js";
 import { buildCampaignWorld, slugify as worldSlugify } from "./agents/world-builder.js";
+import { parseFrontMatter, serializeEntity } from "./tools/filesystem/frontmatter.js";
 import { getActivePlayer } from "./agents/player-manager.js";
 import { createClocksState } from "./tools/clocks/index.js";
 import { createCombatState } from "./tools/combat/index.js";
@@ -262,7 +263,12 @@ async function buildInitialSheet(
       characterName: result.characterName,
     });
     if (updatedSheet) {
-      await io.writeFile(charPath, updatedSheet);
+      // Mark sheet as complete so the DM doesn't re-promote
+      const { frontMatter, body, changelog } = parseFrontMatter(updatedSheet);
+      frontMatter.sheet_status = "complete";
+      const title = frontMatter._title ?? result.characterName;
+      const tagged = serializeEntity(title, frontMatter, body, changelog);
+      await io.writeFile(charPath, tagged);
     }
   } catch {
     // Best-effort — the stub is still a valid character file

@@ -29,8 +29,18 @@ vi.mock("./subagents/scribe.js", () => ({
   })),
 }));
 
+vi.mock("./subagents/character-promotion.js", () => ({
+  promoteCharacter: vi.fn(async () => ({
+    updatedSheet: "# Storm\n\n**Type:** PC\n\n## Skills\n- Hack (d8)\n",
+    changelogEntry: "Built initial sheet",
+    text: "",
+    usage: { inputTokens: 50, outputTokens: 30, cacheReadTokens: 0, cacheCreationTokens: 0 },
+  })),
+}));
+
 import { aiPlayerTurn } from "./subagents/ai-player.js";
 import { runScribe } from "./subagents/scribe.js";
+import { promoteCharacter } from "./subagents/character-promotion.js";
 
 function mockUsage(): Anthropic.Usage {
   return { input_tokens: 100, output_tokens: 50, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: null, inference_geo: null, server_tool_use: null, service_tier: null };
@@ -1761,5 +1771,44 @@ describe("content classifier refusal", () => {
     expect(log.usageUpdates).toHaveLength(1);
     expect(log.usageUpdates[0].inputTokens).toBe(100);
     expect(log.usageUpdates[0].outputTokens).toBe(50);
+  });
+
+  it("skips promote_character when sheet_status is complete", async () => {
+    const charPath = norm("/tmp/test-campaign/characters/storm.md");
+    files[charPath] = "# Storm\n\n**Type:** PC\n**Sheet Status:** complete\n\n## Skills\n- Hack (d8)\n";
+
+    const client = mockClient([
+      ...toolAndTextMessages(
+        "promote_character",
+        { character: "storm", context: "Build initial sheet" },
+        "Storm is ready.",
+      ),
+    ]);
+    const { callbacks, log } = mockCallbacks();
+    const io = mockFileIO();
+
+    const engine = new GameEngine({
+      client,
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: io,
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "Look around");
+
+    // promoteCharacter subagent should NOT have been called
+    expect(promoteCharacter).not.toHaveBeenCalled();
+
+    // Dev log should say it was skipped
+    expect(log.devLogs.some((m) => m.includes("skipped, sheet already complete"))).toBe(true);
+
+    // The sheet_status flag should have been cleared for future level-ups
+    const updated = files[charPath];
+    expect(updated).not.toContain("Sheet Status");
+    // But the sheet content should be preserved
+    expect(updated).toContain("## Skills");
   });
 });

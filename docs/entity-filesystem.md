@@ -188,6 +188,8 @@ This is a Haiku subagent job:
 4. Write or update the file, preserving existing content and changelog
 5. Return a confirmation to the DM
 
+**Sheet Status flag:** When the post-setup `buildInitialSheet` creates a PC's full sheet, it adds `**Sheet Status:** complete` to front matter. This prevents the DM's opening turn from redundantly calling `promote_character` (which would duplicate sections like Skills and Stats). The flag is automatically cleared on the first `promote_character` attempt, so future level-ups work normally.
+
 The reverse is also natural: a character who was important can fade into irrelevance. The file stays (the changelog is historical record), but the DM simply stops linking to it in new transcripts.
 
 ## Changelog Automation
