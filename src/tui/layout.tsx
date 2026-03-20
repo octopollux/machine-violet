@@ -237,6 +237,7 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
               elements.playerPaneExtraRows > 0 ? (
                 <>
                   <Modeline lines={modelineLines} width={width - 4} />
+                  <Box flexGrow={1} />
                   {playerPaneOverlay}
                 </>
               ) : playerPaneOverlay
