@@ -92,7 +92,7 @@ export function ChoiceOverlay({
     : [];
 
   const hasDescriptions = descriptions != null && descriptions.length > 0;
-  const choiceRows = maxChoiceRowsProp ?? MAX_CHOICE_ROWS;
+  const choiceRows = Math.max(1, maxChoiceRowsProp ?? MAX_CHOICE_ROWS);
 
   // Pre-wrap all choice items
   // Prefix layout: [arrow 1ch][gap 1ch][cursor 1ch][space 1ch] = 4 chars

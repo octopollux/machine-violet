@@ -339,8 +339,10 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
       visibleLen = value.length;
     } else if (value.length === 0) {
       if (placeholder) {
-        result = cursorChar + chalk.dim(placeholder);
-        visibleLen = 1 + placeholder.length;
+        const maxPh = availableWidth != null && availableWidth > 1 ? availableWidth - 1 : placeholder.length;
+        const ph = placeholder.length > maxPh ? placeholder.slice(0, maxPh) : placeholder;
+        result = cursorChar + chalk.dim(ph);
+        visibleLen = 1 + ph.length;
       } else {
         result = cursorChar;
         visibleLen = 1;
@@ -377,7 +379,7 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
     }
 
     return result;
-  }, [isDisabled, renderState.value, renderState.cursorOffset, renderState.pendingDeleteCount, availableWidth, needsViewport]);
+  }, [isDisabled, renderState.value, renderState.cursorOffset, renderState.pendingDeleteCount, availableWidth, needsViewport, placeholder]);
 
   return <Text>{rendered}</Text>;
 });
