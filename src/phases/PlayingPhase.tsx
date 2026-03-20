@@ -2,8 +2,9 @@ import React, { useState, useRef, useMemo, useCallback, useEffect } from "react"
 import { useInput, Box } from "ink";
 import { appendDelta } from "../tui/narrative-helpers.js";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
-import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
-import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, narrativeRows } from "../tui/responsive.js";
+import { scrollAmount, TerminalTooSmall, buildModelineDisplay, splitModeline } from "../tui/components/index.js";
+import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, narrativeRows, PLAYER_PANE_HEIGHT } from "../tui/responsive.js";
+import { getActivity } from "../tui/activity.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { Layout } from "../tui/layout.js";
 import { stripFormatting, stripLeadingBullet } from "../tui/formatting.js";
@@ -507,6 +508,20 @@ export function PlayingPhase() {
   const choiceHasDescriptions = activeModal?.kind === "choice"
     && activeModal.descriptions != null && activeModal.descriptions.length > 0;
   const paneExtraHeight = choiceHasDescriptions ? DESCRIPTION_ROWS : 0;
+
+  // Compute dynamic max choice rows when modeline + overlay coexist (full tier)
+  let choiceMaxRows: number | undefined;
+  if (activeModal?.kind === "choice" && visibleElements.playerPaneExtraRows > 0) {
+    const activity = getActivity(engineState);
+    const actGlyph = visibleElements.activityGlyphInModeline ? activity?.glyph : undefined;
+    const mlDisplay = buildModelineDisplay(modelines[activeChar] ?? campaignName, actGlyph);
+    const mlLineCount = splitModeline(mlDisplay, cols).length;
+    const contentHeight = PLAYER_PANE_HEIGHT + visibleElements.playerPaneExtraRows + paneExtraHeight - 2;
+    // overhead: 2 (prompt + help) + description rows
+    const overhead = 2 + (choiceHasDescriptions ? DESCRIPTION_ROWS : 0);
+    choiceMaxRows = contentHeight - mlLineCount - overhead;
+  }
+
   const choiceOverlay = activeModal?.kind === "choice" ? (
     <ChoiceOverlay
       width={cols - 4}
@@ -515,6 +530,7 @@ export function PlayingPhase() {
       descriptions={activeModal.descriptions}
       selectedIndex={choiceIndex}
       accentColor={gameStateRef.current?.config.players[activePlayerIndex]?.color}
+      maxChoiceRows={choiceMaxRows}
       showCustomInput
       customInputActive={customInputMode}
       customInputResetKey={customInputResetKey}
