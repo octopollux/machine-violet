@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { installRawModeGuard } from "./rawModeGuard.js";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { installRawModeGuard, forceRefreshRawMode } from "./rawModeGuard.js";
 import type { RawModeGuardStdin } from "./rawModeGuard.js";
 
 function makeStdin(options?: { isTTY?: boolean }): {
@@ -83,5 +83,72 @@ describe("installRawModeGuard", () => {
     const unlock = installRawModeGuard(stdin);
     expect(calls).toEqual([]);
     unlock();
+  });
+});
+
+describe("forceRefreshRawMode", () => {
+  const originalPlatform = process.platform;
+
+  beforeEach(() => {
+    Object.defineProperty(process, "platform", { value: "win32", writable: true });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process, "platform", { value: originalPlatform, writable: true });
+  });
+
+  it("toggles raw mode off then on to defeat libuv cache", () => {
+    const { stdin, calls } = makeStdin();
+    const unlock = installRawModeGuard(stdin);
+    calls.length = 0;
+
+    forceRefreshRawMode();
+
+    // Should see false then true via the original setRawMode
+    expect(calls).toEqual([false, true]);
+    unlock();
+  });
+
+  it("is a no-op when no guard is installed", () => {
+    // No guard installed — should not throw
+    expect(() => forceRefreshRawMode()).not.toThrow();
+  });
+
+  it("is a no-op on non-Windows platforms", () => {
+    Object.defineProperty(process, "platform", { value: "linux", writable: true });
+    const { stdin, calls } = makeStdin();
+    const unlock = installRawModeGuard(stdin);
+    calls.length = 0;
+
+    forceRefreshRawMode();
+
+    expect(calls).toEqual([]);
+    unlock();
+  });
+
+  it("swallows errors during shutdown", () => {
+    const { stdin, calls } = makeStdin();
+    const unlock = installRawModeGuard(stdin);
+    calls.length = 0;
+
+    // Simulate stdin becoming destroyed after guard is installed —
+    // make the captured original throw on subsequent calls.
+    unlock();
+
+    let callCount = 0;
+    const conditionalStdin = {
+      isTTY: true,
+      isRaw: true,
+      setRawMode: vi.fn((_mode: boolean) => {
+        callCount++;
+        // First call (install) succeeds; subsequent calls (forceRefresh) throw
+        if (callCount > 1) throw new Error("EPERM");
+        return conditionalStdin;
+      }),
+    };
+    const unlock2 = installRawModeGuard(conditionalStdin);
+
+    expect(() => forceRefreshRawMode()).not.toThrow();
+    unlock2();
   });
 });
