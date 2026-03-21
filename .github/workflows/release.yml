@@ -19,14 +19,11 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            target: bun-windows-x64
             asset_suffix: windows-x64
           - os: macos-latest
-            target: bun-darwin-arm64
             archive: tar.gz
             asset_suffix: darwin-arm64
           - os: ubuntu-latest
-            target: bun-linux-x64
             archive: tar.gz
             asset_suffix: linux-x64
 
@@ -37,11 +34,9 @@ jobs:
         with:
           ref: ${{ inputs.tag || github.ref }}
 
-      - uses: oven-sh/setup-bun@v2
-
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 25
           cache: npm
 
       - run: npm ci
@@ -51,40 +46,7 @@ jobs:
         run: |
           TAG="${{ inputs.tag || github.ref_name }}"
           VERSION="${TAG#v}"
-          EXE_NAME="machine-violet"
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            EXE_NAME="machine-violet.exe"
-          fi
-
-          # Windows-specific flags (use array to preserve quoting)
-          WIN_FLAGS=()
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            WIN_FLAGS=(
-              "--windows-icon=assets/machine-violet.ico"
-              "--windows-title=Machine Violet"
-              "--windows-description=AI Dungeon Master for tabletop RPGs"
-              "--windows-version=${VERSION}.0"
-            )
-          fi
-
-          # Compile
-          bun build --compile \
-            --target=${{ matrix.target }} \
-            --outfile "dist/$EXE_NAME" \
-            --define "process.env.MV_VERSION='$VERSION'" \
-            "${WIN_FLAGS[@]}" \
-            src/index.tsx
-
-          # Copy assets
-          cp -r src/prompts dist/prompts
-          cp -r src/tui/themes/assets dist/themes
-          cp -r systems dist/systems
-
-          # Version file
-          echo "{\"version\":\"$VERSION\"}" > dist/version.json
-
-          # License
-          if [ -f LICENSE ]; then cp LICENSE dist/; fi
+          node scripts/build-dist.js --version="$VERSION"
 
       - name: Bundle Windows Terminal portable
         if: matrix.os == 'windows-latest'
@@ -193,4 +155,3 @@ jobs:
             MachineViolet-*
             machine-violet-*
             releases.win.json
-

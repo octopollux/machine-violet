@@ -15,14 +15,11 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            target: bun-windows-x64
             asset_suffix: windows-x64
           - os: macos-latest
-            target: bun-darwin-arm64
             archive: tar.gz
             asset_suffix: darwin-arm64
           - os: ubuntu-latest
-            target: bun-linux-x64
             archive: tar.gz
             asset_suffix: linux-x64
 
@@ -31,11 +28,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: oven-sh/setup-bun@v2
-
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 25
           cache: npm
 
       - run: npm ci
@@ -46,35 +41,7 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           DATE=$(date -u +%Y%m%d)
           NIGHTLY_VERSION="${VERSION}-nightly.${DATE}"
-          EXE_NAME="machine-violet"
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            EXE_NAME="machine-violet.exe"
-          fi
-
-          WIN_FLAGS=()
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            WIN_FLAGS=(
-              "--windows-icon=assets/machine-violet.ico"
-              "--windows-title=Machine Violet"
-              "--windows-description=AI Dungeon Master for tabletop RPGs"
-              "--windows-version=${VERSION}.0"
-            )
-          fi
-
-          bun build --compile \
-            --target=${{ matrix.target }} \
-            --outfile "dist/$EXE_NAME" \
-            --define "process.env.MV_VERSION='$NIGHTLY_VERSION'" \
-            "${WIN_FLAGS[@]}" \
-            src/index.tsx
-
-          cp -r src/prompts dist/prompts
-          cp -r src/tui/themes/assets dist/themes
-          cp -r systems dist/systems
-
-          echo "{\"version\":\"$NIGHTLY_VERSION\"}" > dist/version.json
-
-          if [ -f LICENSE ]; then cp LICENSE dist/; fi
+          node scripts/build-dist.js --version="$NIGHTLY_VERSION"
 
       - name: Bundle Windows Terminal portable
         if: matrix.os == 'windows-latest'

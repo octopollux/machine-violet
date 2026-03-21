@@ -16,7 +16,7 @@
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
     "check": "eslint src/ && vitest run --coverage",
-    "dist": "bun scripts/build-dist.ts"
+    "dist": "node scripts/build-dist.js"
   },
   "keywords": [
     "rpg",
@@ -44,8 +44,10 @@
     "@types/react": "^19.0.0",
     "@vitest/coverage-v8": "^4.0.18",
     "cross-env": "^10.1.0",
+    "esbuild": "^0.27.4",
     "eslint": "^10.0.0",
     "ink-testing-library": "^4.0.0",
+    "rcedit": "^5.0.2",
     "react-devtools-core": "^7.0.1",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3",
