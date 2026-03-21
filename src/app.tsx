@@ -322,8 +322,12 @@ export default function App({ shutdownRef }: AppProps) {
 
   // --- Discord Rich Presence ---
   const [discordEnabled, setDiscordEnabled] = useState<boolean | null>(null);
+  const discordEnabledRef = useRef<boolean | null>(null);
   const discordRef = useRef<DiscordPresence | null>(null);
   const discordTurnCounter = useRef(0);
+
+  // Keep ref in sync so startEngine always reads the latest value
+  useEffect(() => { discordEnabledRef.current = discordEnabled; }, [discordEnabled]);
 
   // --- Modal state (shared with PlayingPhase via props, set by buildCallbacks/dispatchTuiCommand) ---
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
@@ -686,7 +690,7 @@ export default function App({ shutdownRef }: AppProps) {
     }
 
     // Start Discord Rich Presence (fire-and-forget, silent on failure)
-    if (discordEnabled) {
+    if (discordEnabledRef.current) {
       const presence = new DiscordPresence();
       discordRef.current = presence;
       discordTurnCounter.current = 0;
