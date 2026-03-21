@@ -39,8 +39,8 @@ jobs:
         shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          DATE=$(date -u +%Y%m%d)
-          NIGHTLY_VERSION="${VERSION}-nightly.${DATE}"
+          TIMESTAMP=$(date -u +%Y%m%d-%H%M)
+          NIGHTLY_VERSION="${VERSION}-nightly.${TIMESTAMP}"
           node scripts/build-dist.js --version="$NIGHTLY_VERSION"
 
       - name: Bundle Windows Terminal portable
@@ -100,8 +100,8 @@ jobs:
         shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          DATE=$(date -u +%Y%m%d)
-          NIGHTLY_VERSION="${VERSION}-nightly.${DATE}"
+          TIMESTAMP=$(date -u +%Y%m%d-%H%M)
+          NIGHTLY_VERSION="${VERSION}-nightly.${TIMESTAMP}"
           vpk pack \
             --packId MachineViolet \
             --packVersion "$NIGHTLY_VERSION" \
@@ -138,22 +138,95 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: actions/download-artifact@v4
         with:
+          path: artifacts
           merge-multiple: true
+
+      - name: Compute nightly tag and find previous
+        id: tags
+        run: |
+          TIMESTAMP=$(date -u +%Y%m%d-%H%M)
+          NIGHTLY_TAG="nightly-${TIMESTAMP}"
+          echo "tag=$NIGHTLY_TAG" >> "$GITHUB_OUTPUT"
+          echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+          # Find the most recent nightly-* tag (if any)
+          PREV_TAG=$(git tag -l 'nightly-*' --sort=-version:refname | head -n1 || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            # Fall back to most recent v* tag
+            PREV_TAG=$(git tag -l 'v*' --sort=-version:refname | head -n1 || echo "")
+          fi
+          echo "prev=$PREV_TAG" >> "$GITHUB_OUTPUT"
+
+          if [ -n "$PREV_TAG" ]; then
+            echo "Changelog range: ${PREV_TAG}..HEAD"
+          else
+            echo "No previous tag found — first nightly"
+          fi
+
+      - name: Create dated nightly tag
+        run: |
+          git tag "${{ steps.tags.outputs.tag }}"
+          git push origin "${{ steps.tags.outputs.tag }}"
+
+      - name: Collect commits for changelog
+        id: commits
+        run: |
+          PREV="${{ steps.tags.outputs.prev }}"
+          if [ -n "$PREV" ]; then
+            COMMITS=$(git log --oneline "${PREV}..HEAD")
+          else
+            COMMITS="Initial nightly build."
+          fi
+          echo "log<<COMMITS_EOF" >> "$GITHUB_OUTPUT"
+          echo "$COMMITS" >> "$GITHUB_OUTPUT"
+          echo "COMMITS_EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        id: changelog
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.MV_RELEASE_NOTES_ANT_APIKEY }}
+          prompt: |
+            Write release notes for a nightly build of Machine Violet, an AI
+            Dungeon Master that runs tabletop RPGs in a terminal.
+
+            These notes are for PLAYERS, not engineers. Rules:
+            - Omit internal/boring commits: dependency bumps (Dependabot),
+              CI changes, refactoring, docs-only changes.
+            - Collapse multiple performance commits into one
+              "Performance improvements" bullet.
+            - Describe user-facing bug fixes and features in plain,
+              friendly language a player would understand.
+            - A few concise bullet points in markdown. No heading, no preamble.
+            - If there are genuinely no player-facing changes, output exactly:
+              "Internal improvements and maintenance."
+
+            Commits since last nightly (${{ steps.tags.outputs.prev }}):
+            ```
+            ${{ steps.commits.outputs.log }}
+            ```
+
+            Output ONLY the markdown bullet list — nothing else.
 
       - name: Create or update nightly release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Delete existing nightly release (if any)
+          # Delete existing rolling nightly release (if any)
           gh release delete nightly --yes --repo ${{ github.repository }} 2>/dev/null || true
-
-          # Delete the old nightly tag
           git push --delete origin nightly 2>/dev/null || true
 
-          # Create fresh nightly release
-          DATE=$(date -u +%Y-%m-%d)
+          DATE="${{ steps.tags.outputs.date }}"
+          NIGHTLY_TAG="${{ steps.tags.outputs.tag }}"
+          PREV_TAG="${{ steps.tags.outputs.prev }}"
+          RELEASE_NOTES="${{ steps.changelog.outputs.result }}"
+
           cat > nightly-body.md << 'BODYEOF'
           ## Download
 
@@ -174,11 +247,22 @@ jobs:
           | Tarball | [`machine-violet-nightly-linux-x64.tar.gz`](https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-linux-x64.tar.gz) |
 
           Also available via Homebrew: `brew install octopollux/mv-tap/machine-violet`
+          BODYEOF
+          sed -i 's/^          //' nightly-body.md
+
+          # Append the AI-generated release notes (variable, so outside the literal heredoc)
+          cat >> nightly-body.md << NOTESEOF
 
           ---
 
-          Automated nightly build from `main`. **Not a stable release.**
-          BODYEOF
+          ## What's New
+
+          ${RELEASE_NOTES}
+
+          ---
+
+          Automated nightly build from \`main\` · [\`${NIGHTLY_TAG}\`](https://github.com/octopollux/machine-violet/releases/tag/${NIGHTLY_TAG}). **Not a stable release.**
+          NOTESEOF
           sed -i 's/^          //' nightly-body.md
 
           gh release create nightly \
@@ -187,10 +271,43 @@ jobs:
             --notes-file nightly-body.md \
             --prerelease \
             --target main \
-            MachineViolet-* \
-            machine-violet-nightly-* \
-            releases.nightly.json \
-            assets.nightly.json
+            artifacts/MachineViolet-* \
+            artifacts/machine-violet-nightly-* \
+            artifacts/releases.nightly.json \
+            artifacts/assets.nightly.json
+
+      - name: Post to Discord
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_NIGHTLY_WEBHOOK }}
+        run: |
+          NIGHTLY_TAG="${{ steps.tags.outputs.tag }}"
+          RELEASE_NOTES="${{ steps.changelog.outputs.result }}"
+          RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/nightly"
+
+          # Discord webhook payload (max 2000 chars for content)
+          jq -n \
+            --arg content "$(printf '**Machine Violet Nightly** · `%s`\n\n%s\n\n🔗 %s' \
+              "$NIGHTLY_TAG" "$RELEASE_NOTES" "$RELEASE_URL")" \
+            '{content: $content}' > discord-payload.json
+
+          curl -fsSL -X POST \
+            -H "Content-Type: application/json" \
+            -d @discord-payload.json \
+            "$DISCORD_WEBHOOK"
+
+      - name: Prune old nightly tags
+        run: |
+          # Delete nightly-* tags older than 30 days
+          CUTOFF=$(date -u -d '30 days ago' +%Y%m%d)
+          for tag in $(git tag -l 'nightly-*'); do
+            # Extract YYYYMMDD from nightly-YYYYMMDD-HHMM
+            TAG_DATE=$(echo "$tag" | sed 's/nightly-\([0-9]\{8\}\).*/\1/')
+            if [ "$TAG_DATE" -lt "$CUTOFF" ] 2>/dev/null; then
+              echo "Pruning $tag"
+              git push --delete origin "$tag" 2>/dev/null || true
+              git tag -d "$tag" 2>/dev/null || true
+            fi
+          done
 
   update-homebrew:
     needs: release
