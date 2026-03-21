@@ -85,6 +85,21 @@ if (existsSync(exePath)) rmSync(exePath);
 execSync(`node --build-sea dist/sea-config.json`, { stdio: "inherit", cwd: ROOT });
 rmSync(seaConfigPath, { force: true });
 
+// Strip the existing Authenticode signature from the SEA binary.
+// node.exe ships pre-signed by Microsoft; --build-sea invalidates that
+// signature by modifying the binary. The stale signature must be removed
+// before re-signing (e.g. via Velopack + Azure Trusted Signing) or
+// signtool will fail with 0x800700C1 (ERROR_BAD_EXE_FORMAT).
+if (isWindows) {
+  try {
+    execSync(`signtool remove /s "${exePath}"`, { stdio: "inherit" });
+    console.log("  Stripped existing Authenticode signature.");
+  } catch {
+    // signtool not on PATH (local dev without Windows SDK) — skip silently.
+    // CI runners have it; local builds don't need signing.
+  }
+}
+
 // --- Step 3: Windows metadata via rcedit ---
 if (isWindows) {
   const icoPath = join(ROOT, "assets", "machine-violet.ico");
