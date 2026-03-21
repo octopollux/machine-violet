@@ -30,7 +30,7 @@ afterEach(() => {
 describe("dumpContext", () => {
   it("is a no-op when dev mode is off", async () => {
     const { writeFile } = await import("node:fs/promises");
-    delete process.env.DEV_MODE;
+    process.env.DEV_MODE = "false";
     resetDevMode();
     setContextDumpDir("/tmp/test-dump");
 
@@ -124,7 +124,7 @@ describe("dumpThinking", () => {
   it("is a no-op when dev mode is off", async () => {
     const { writeFile } = await import("node:fs/promises");
     (writeFile as ReturnType<typeof vi.fn>).mockClear();
-    delete process.env.DEV_MODE;
+    process.env.DEV_MODE = "false";
     resetDevMode();
     setContextDumpDir("/tmp/test-dump");
 
