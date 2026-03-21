@@ -25,14 +25,53 @@ function die(reason: string, suggestion: string): never {
 }
 
 /**
+ * The conhost GUID used in the DelegationConsole registry value.
+ * When this is set, the user has explicitly chosen Windows Console Host.
+ */
+const CONHOST_CLSID = "{B23D10C0-E52E-411E-9D5B-C09FDF709C7D}";
+
+/**
+ * Check whether a non-conhost terminal has registered as the default
+ * console host via the Windows DefaultTerminal / "delegation" mechanism.
+ *
+ * Registry: HKCU\Console\%%Startup\DelegationConsole
+ *   - Key missing          → no delegation support (Win10) → bare conhost
+ *   - CONHOST_CLSID        → user explicitly chose conhost
+ *   - {000...0}            → "Let Windows decide" (Win11 default — uses WT)
+ *   - Any other GUID       → a terminal registered as delegate (WT, Alacritty, etc.)
+ */
+function hasTerminalDelegation(): boolean {
+  try {
+    const result = execFileSync(
+      "reg",
+      ["query", "HKCU\\Console\\%%Startup", "/v", "DelegationConsole"],
+      { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"], timeout: 3000 },
+    );
+    const match = result.match(/DelegationConsole\s+REG_SZ\s+(\S+)/);
+    if (!match) return false;
+    const clsid = match[1].toUpperCase();
+    // Explicit conhost selection — no delegation
+    if (clsid === CONHOST_CLSID.toUpperCase()) return false;
+    // Any other value (including {000...0} "Let Windows decide") means
+    // a modern terminal is handling console hosting.
+    return true;
+  } catch {
+    // Key doesn't exist (Win10 without delegation support) or reg.exe failed
+    return false;
+  }
+}
+
+/**
  * Detect if we're running in a terminal that should be upgraded to
  * Windows Terminal. Returns false for known-good terminals that handle
  * emoji and formatting well; true for bare conhost (cmd.exe, Explorer
  * double-click, PowerShell 5 in legacy console).
  *
- * Logic: exclude known-good terminals, then default to upgrading.
- * This covers the Explorer double-click case where conhost is spawned
- * directly with no shell env vars set at all.
+ * Two-tier detection:
+ * 1. Environment variables — catches terminals launched explicitly
+ *    (WT tabs, Git Bash, Alacritty, ConEmu, etc.)
+ * 2. Registry delegation — catches WT-as-default-terminal and other
+ *    registered delegates where env vars aren't set.
  */
 function shouldUpgradeTerminal(): boolean {
   // Windows Terminal sets WT_SESSION for all child processes
@@ -47,8 +86,13 @@ function shouldUpgradeTerminal(): boolean {
   // ConEmu / Cmder
   if (process.env.ConEmuPID) return false;
 
-  // No known-good terminal detected — upgrade from conhost.
-  // This covers: cmd.exe, Explorer double-click, PowerShell 5 in legacy console.
+  // No env var detected — check if a modern terminal is registered as
+  // the default console host. This covers WT-as-default-terminal on
+  // Win11 (and any other registered delegate) where the process is
+  // launched by a shortcut/stub and env vars aren't propagated.
+  if (hasTerminalDelegation()) return false;
+
+  // Bare conhost with no delegation — upgrade.
   return true;
 }
 
