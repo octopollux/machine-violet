@@ -91,12 +91,32 @@ rmSync(seaConfigPath, { force: true });
 // before re-signing (e.g. via Velopack + Azure Trusted Signing) or
 // signtool will fail with 0x800700C1 (ERROR_BAD_EXE_FORMAT).
 if (isWindows) {
+  // signtool isn't on PATH by default — search Windows SDK locations
+  let signtool = "signtool";
+  const sdkBin = "C:\\Program Files (x86)\\Windows Kits\\10\\bin";
+  if (existsSync(sdkBin)) {
+    try {
+      // Find the latest SDK version directory that contains signtool
+      const { readdirSync } = await import("node:fs");
+      const versions = readdirSync(sdkBin)
+        .filter((d) => d.match(/^10\.\d/))
+        .sort()
+        .reverse();
+      for (const ver of versions) {
+        const candidate = join(sdkBin, ver, "x64", "signtool.exe");
+        if (existsSync(candidate)) {
+          signtool = `"${candidate}"`;
+          break;
+        }
+      }
+    } catch { /* fall through to bare signtool */ }
+  }
   try {
-    execSync(`signtool remove /s "${exePath}"`, { stdio: "inherit" });
+    execSync(`${signtool} remove /s "${exePath}"`, { stdio: "inherit" });
     console.log("  Stripped existing Authenticode signature.");
   } catch {
-    // signtool not on PATH (local dev without Windows SDK) — skip silently.
-    // CI runners have it; local builds don't need signing.
+    // signtool not available — skip. Local dev doesn't need signing.
+    // If this fails on CI, Velopack signing will fail with 0x800700C1.
   }
 }
 
