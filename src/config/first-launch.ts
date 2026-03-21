@@ -1,8 +1,8 @@
 import { defaultCampaignRoot } from "../tools/filesystem/platform.js";
 import { join, dirname } from "node:path";
-import { existsSync, readFileSync as fsReadFileSync } from "node:fs";
+import { existsSync, mkdirSync, copyFileSync, chmodSync, readFileSync as fsReadFileSync } from "node:fs";
 import { config as dotenvConfig } from "dotenv";
-import { isCompiled } from "../utils/paths.js";
+import { isCompiled, configDir } from "../utils/paths.js";
 
 /**
  * App-level config stored alongside .env.
@@ -58,25 +58,71 @@ export function validateApiKeyFormat(key: string): boolean {
 }
 
 /**
- * Get the paths for app config files.
+ * Get the paths for app config files (in the platform config directory).
  */
-export function getConfigPaths(appDir: string) {
+export function getConfigPaths(dir?: string) {
+  const d = dir ?? configDir();
   return {
-    env: join(appDir, ".env"),
-    appConfig: join(appDir, "config.json"),
+    env: join(d, ".env"),
+    appConfig: join(d, "config.json"),
   };
 }
 
 /**
+ * Migrate config files from the old exe-local location to the config dir.
+ * Copies files that exist next to the exe but not yet in the config dir.
+ * Only runs in compiled mode.
+ */
+const CONFIG_FILES = [".env", "config.json", "api-keys.json"] as const;
+
+const SECRET_FILES = new Set([".env", "api-keys.json"]);
+
+export function migrateConfigFromExeDir(): void {
+  if (!isCompiled()) return;
+
+  const cfgDir = configDir();
+  const exeDir = dirname(process.execPath);
+  if (cfgDir === exeDir) return;
+
+  try {
+    mkdirSync(cfgDir, { recursive: true, mode: 0o700 });
+
+    for (const file of CONFIG_FILES) {
+      const src = join(exeDir, file);
+      const dest = join(cfgDir, file);
+      if (existsSync(src) && !existsSync(dest)) {
+        copyFileSync(src, dest);
+        if (SECRET_FILES.has(file) && process.platform !== "win32") {
+          chmodSync(dest, 0o600);
+        }
+      }
+    }
+  } catch {
+    // Best-effort migration — if it fails the legacy exe-local
+    // fallback in loadEnv() will still find the files.
+  }
+}
+
+/**
  * Load .env from the best available location.
- * Priority: env var already set > exe directory > cwd
+ * Priority: env var already set > config dir > exe directory (legacy) > cwd
  * No-op if ANTHROPIC_API_KEY is already in the environment.
  */
 export function loadEnv(): void {
   if (process.env.ANTHROPIC_API_KEY) return;
 
-  // In compiled mode, check next to the executable first
+  // In compiled mode, use the platform config directory
   if (isCompiled()) {
+    // Migrate any config files left next to the exe from a prior version
+    migrateConfigFromExeDir();
+
+    const cfgEnv = join(configDir(), ".env");
+    if (existsSync(cfgEnv)) {
+      dotenvConfig({ path: cfgEnv });
+      return;
+    }
+
+    // Legacy fallback: check next to the executable
     const exeEnv = join(dirname(process.execPath), ".env");
     if (existsSync(exeEnv)) {
       dotenvConfig({ path: exeEnv });
@@ -84,7 +130,7 @@ export function loadEnv(): void {
     }
   }
 
-  // Fall back to cwd (dev mode, or compiled without exe-local .env)
+  // Fall back to cwd (dev mode, or compiled without config-dir .env)
   dotenvConfig();
 }
 
