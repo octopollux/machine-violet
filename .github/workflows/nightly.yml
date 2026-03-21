@@ -198,8 +198,8 @@ jobs:
           PREV="${{ steps.tags.outputs.prev }}"
 
           if [ -n "$PREV" ]; then
-            # Get the timestamp of the previous tag's commit
-            SINCE=$(git log -1 --format=%aI "$PREV")
+            # Get the timestamp of the previous tag's commit (by committer date)
+            SINCE=$(git log -1 --format=%cI "$PREV")
 
             # Fetch PRs merged since that timestamp
             PR_CONTEXT=$(gh pr list \
@@ -226,10 +226,9 @@ jobs:
         id: changelog
         env:
           ANTHROPIC_API_KEY: ${{ secrets.MV_RELEASE_NOTES_ANT_APIKEY }}
+          CHANGES: ${{ steps.changes.outputs.context }}
+          PREV_TAG: ${{ steps.tags.outputs.prev }}
         run: |
-          CHANGES='${{ steps.changes.outputs.context }}'
-          PREV_TAG="${{ steps.tags.outputs.prev }}"
-
           PROMPT=$(cat <<'PROMPT_EOF'
           Write release notes for a nightly build of Machine Violet, an AI
           Dungeon Master that runs tabletop RPGs in a terminal.
@@ -249,7 +248,7 @@ jobs:
           PROMPT_EOF
           PROMPT=$(echo "$PROMPT" | sed 's/^          //')
 
-          FULL_PROMPT="$(printf '%s\n\nHere are the PRs merged since the last nightly (%s):\n\n%s' "$PROMPT" "$PREV_TAG" "$CHANGES")"
+          FULL_PROMPT=$(printf '%s\n\nHere are the PRs merged since the last nightly (%s):\n\n%s' "$PROMPT" "$PREV_TAG" "$CHANGES")
 
           NOTES=$(curl -sf https://api.anthropic.com/v1/messages \
             -H "x-api-key: ${ANTHROPIC_API_KEY}" \
@@ -267,15 +266,15 @@ jobs:
       - name: Create or update nightly release
         env:
           GH_TOKEN: ${{ github.token }}
+          NIGHTLY_TAG: ${{ steps.tags.outputs.tag }}
+          PREV_TAG: ${{ steps.tags.outputs.prev }}
+          RELEASE_NOTES: ${{ steps.changelog.outputs.notes }}
         run: |
           # Delete existing rolling nightly release (if any)
           gh release delete nightly --yes --repo ${{ github.repository }} 2>/dev/null || true
           git push --delete origin nightly 2>/dev/null || true
 
           DATE="${{ steps.tags.outputs.date }}"
-          NIGHTLY_TAG="${{ steps.tags.outputs.tag }}"
-          PREV_TAG="${{ steps.tags.outputs.prev }}"
-          RELEASE_NOTES="${{ steps.changelog.outputs.notes }}"
 
           cat > nightly-body.md << 'BODYEOF'
           ## Download
@@ -328,9 +327,9 @@ jobs:
       - name: Post to Discord
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_NIGHTLY_WEBHOOK }}
+          NIGHTLY_TAG: ${{ steps.tags.outputs.tag }}
+          RELEASE_NOTES: ${{ steps.changelog.outputs.notes }}
         run: |
-          NIGHTLY_TAG="${{ steps.tags.outputs.tag }}"
-          RELEASE_NOTES="${{ steps.changelog.outputs.notes }}"
           RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/nightly"
 
           # Build message, truncating to fit Discord's 2000-char limit
