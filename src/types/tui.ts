@@ -75,4 +75,5 @@ export type ActiveModal =
   | { kind: "compendium"; data: import("./compendium.js").Compendium }
   | { kind: "swatch" }
   | { kind: "rollback"; summary: string }
+  | { kind: "notes"; content: string }
   | null;

@@ -8,6 +8,7 @@ import type { ModeSession } from "../tui/game-context.js";
 import { queryCommitLog, performRollback } from "../tools/git/index.js";
 import { createOOCSession } from "../agents/subagents/ooc-mode.js";
 import { createDevSession, summarizeGameState } from "../agents/subagents/dev-mode.js";
+import { campaignPaths } from "../tools/filesystem/scaffold.js";
 
 export interface SlashCommandContext {
   engine: GameEngine | null;
@@ -260,6 +261,30 @@ const retryCommand: SlashCommand = {
   },
 };
 
+const notesCommand: SlashCommand = {
+  name: "notes",
+  usage: "/notes",
+  description: "Open the player notes editor",
+  execute(_args, ctx) {
+    if (!ctx.setActiveModal) {
+      ctx.appendLine({ kind: "system", text: "[Notes unavailable]" });
+      return;
+    }
+    const gs = ctx.gameState;
+    const io = ctx.engine?.getSceneManager().getFileIO();
+    if (gs && io) {
+      const path = campaignPaths(gs.campaignRoot).playerNotes;
+      io.readFile(path).then((raw: string) => {
+        ctx.setActiveModal!({ kind: "notes", content: raw });
+      }).catch(() => {
+        ctx.setActiveModal!({ kind: "notes", content: "" });
+      });
+    } else {
+      ctx.setActiveModal!({ kind: "notes", content: "" });
+    }
+  },
+};
+
 const swatchCommand: SlashCommand = {
   name: "swatch",
   usage: "/swatch",
@@ -286,6 +311,7 @@ const commands: SlashCommand[] = [
   devCommand,
   snapshotCommand,
   swatchCommand,
+  notesCommand,
 ];
 
 const commandMap = new Map<string, SlashCommand>(

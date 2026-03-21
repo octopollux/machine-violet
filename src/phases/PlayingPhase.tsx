@@ -8,7 +8,7 @@ import { getActivity } from "../tui/activity.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { Layout } from "../tui/layout.js";
 import { stripFormatting, stripLeadingBullet } from "../tui/formatting.js";
-import { ChoiceOverlay, DESCRIPTION_ROWS, DiceRollModal, SessionRecapModal, RollbackSummaryModal, GameMenu, CharacterSheetModal, CompendiumModal, ApiErrorModal, SwatchModal, CampaignSettingsModal, getMenuItems } from "../tui/modals/index.js";
+import { ChoiceOverlay, DESCRIPTION_ROWS, DiceRollModal, SessionRecapModal, RollbackSummaryModal, GameMenu, CharacterSheetModal, CompendiumModal, PlayerNotesModal, ApiErrorModal, SwatchModal, CampaignSettingsModal, getMenuItems } from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { getActivePlayer, switchToNextPlayer, getPlayerEntries } from "../agents/player-manager.js";
 import { createOOCSession } from "../agents/subagents/ooc-mode.js";
@@ -241,6 +241,11 @@ export function PlayingPhase() {
       return;
     }
 
+    // Notes modal: handles its own input via useInput
+    if (activeModal && activeModal.kind === "notes") {
+      return;
+    }
+
     // Scrollable modals (character sheet, recap)
     if (activeModal && (activeModal.kind === "character_sheet" || activeModal.kind === "recap")) {
       if (key.escape || key.return) {
@@ -405,6 +410,20 @@ export function PlayingPhase() {
             });
           } else {
             setActiveModal({ kind: "compendium", data: emptyCompendium() });
+          }
+        } else if (item === "Player Notes") {
+          setMenuOpen(false);
+          const gs = gameStateRef.current;
+          const io = engineRef.current?.getSceneManager().getFileIO();
+          if (gs && io) {
+            const path = campaignPaths(gs.campaignRoot).playerNotes;
+            io.readFile(path).then((raw: string) => {
+              setActiveModal({ kind: "notes", content: raw });
+            }).catch(() => {
+              setActiveModal({ kind: "notes", content: "" });
+            });
+          } else {
+            setActiveModal({ kind: "notes", content: "" });
           }
         } else if (item === "OOC Mode") {
           setMenuOpen(false);
@@ -611,6 +630,24 @@ export function PlayingPhase() {
           width={cols}
           height={narRows}
           data={activeModal.data}
+          onClose={() => setActiveModal(null)}
+          topOffset={conversationPaneTop}
+        />
+      )}
+      {activeModal?.kind === "notes" && (
+        <PlayerNotesModal
+          theme={theme}
+          width={cols}
+          height={narRows}
+          initialContent={activeModal.content}
+          onSave={(content) => {
+            const gs = gameStateRef.current;
+            const io = engineRef.current?.getSceneManager().getFileIO();
+            if (gs && io) {
+              const path = campaignPaths(gs.campaignRoot).playerNotes;
+              io.writeFile(path, content);
+            }
+          }}
           onClose={() => setActiveModal(null)}
           topOffset={conversationPaneTop}
         />
