@@ -11,6 +11,8 @@ if (process.argv.includes("--version") || process.argv.includes("-v")) {
 // Velopack lifecycle hooks: headless invocations that must exit promptly.
 // These run during install/update/uninstall — no TUI, no terminal upgrade.
 if (process.argv.some((a) => a.startsWith("--veloapp-"))) {
+  const { handleVelopackHook } = await import("./config/velopack-hooks.js");
+  handleVelopackHook();
   process.exit(0);
 }
 
