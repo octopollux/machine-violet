@@ -208,6 +208,8 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.MV_RELEASE_NOTES_ANT_APIKEY }}
+          github_token: ${{ github.token }}
+          claude_args: '--json-schema {"type":"object","properties":{"notes":{"type":"string"}},"required":["notes"]}'
           prompt: |
             Write release notes for a nightly build of Machine Violet, an AI
             Dungeon Master that runs tabletop RPGs in a terminal.
@@ -228,7 +230,7 @@ jobs:
             ${{ steps.commits.outputs.log }}
             ```
 
-            Output ONLY the markdown bullet list — nothing else.
+            Return the notes in the "notes" field of your JSON response.
 
       - name: Create or update nightly release
         env:
@@ -241,7 +243,7 @@ jobs:
           DATE="${{ steps.tags.outputs.date }}"
           NIGHTLY_TAG="${{ steps.tags.outputs.tag }}"
           PREV_TAG="${{ steps.tags.outputs.prev }}"
-          RELEASE_NOTES="${{ steps.changelog.outputs.result }}"
+          RELEASE_NOTES=$(echo '${{ steps.changelog.outputs.structured_output }}' | jq -r '.notes // "Internal improvements and maintenance."')
 
           cat > nightly-body.md << 'BODYEOF'
           ## Download
@@ -296,7 +298,7 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_NIGHTLY_WEBHOOK }}
         run: |
           NIGHTLY_TAG="${{ steps.tags.outputs.tag }}"
-          RELEASE_NOTES="${{ steps.changelog.outputs.result }}"
+          RELEASE_NOTES=$(echo '${{ steps.changelog.outputs.structured_output }}' | jq -r '.notes // "Internal improvements and maintenance."')
           RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/nightly"
 
           # Build message, truncating to fit Discord's 2000-char limit
