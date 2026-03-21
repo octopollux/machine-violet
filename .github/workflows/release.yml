@@ -113,6 +113,7 @@ jobs:
             --packDir dist \
             --mainExe machine-violet.exe \
             --icon assets/machine-violet.ico \
+            --noDesktopShortcut \
             --azureTrustedSignFile assets/trusted-signing.json \
             --outputDir velopack-out
 
@@ -147,11 +148,47 @@ jobs:
           merge-multiple: true
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ inputs.tag || github.ref_name }}
-          generate_release_notes: true
-          files: |
-            MachineViolet-*
-            machine-violet-*
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+
+          # Generate changelog from GitHub
+          CHANGELOG=$(gh api repos/${{ github.repository }}/releases/generate-notes \
+            -f tag_name="$TAG" --jq '.body' 2>/dev/null || echo "")
+
+          cat > release-body.md << BODYEOF
+          ## Download
+
+          ### Windows
+          | | File |
+          |---|---|
+          | **Installer** (recommended) | [\`MachineViolet-Setup.exe\`](https://github.com/${{ github.repository }}/releases/download/${TAG}/MachineViolet-Setup.exe) |
+          | Portable (no install) | [\`MachineViolet-Portable.zip\`](https://github.com/${{ github.repository }}/releases/download/${TAG}/MachineViolet-Portable.zip) |
+
+          ### macOS (Apple Silicon)
+          | | File |
+          |---|---|
+          | Tarball | [\`machine-violet-${VERSION}-darwin-arm64.tar.gz\`](https://github.com/${{ github.repository }}/releases/download/${TAG}/machine-violet-${VERSION}-darwin-arm64.tar.gz) |
+
+          ### Linux (x64)
+          | | File |
+          |---|---|
+          | Tarball | [\`machine-violet-${VERSION}-linux-x64.tar.gz\`](https://github.com/${{ github.repository }}/releases/download/${TAG}/machine-violet-${VERSION}-linux-x64.tar.gz) |
+
+          Also available via Homebrew: \`brew install octopollux/mv-tap/machine-violet\`
+
+          ---
+
+          ${CHANGELOG}
+          BODYEOF
+          sed -i 's/^          //' release-body.md
+
+          gh release create "$TAG" \
+            --repo ${{ github.repository }} \
+            --title "Machine Violet ${VERSION}" \
+            --notes-file release-body.md \
+            MachineViolet-* \
+            machine-violet-* \
             releases.win.json
