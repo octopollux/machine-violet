@@ -21,6 +21,10 @@ export interface MainMenuPhaseProps {
   onSettings: () => void;
   /** Navigate to Settings with API Keys pre-focused (deep link). */
   onSettingsApiKeys: () => void;
+  /** Whether the Discord Rich Presence setting has not been configured yet. */
+  discordSettingUnset?: boolean;
+  /** Navigate to Discord Rich Presence settings. */
+  onDiscordSettings?: () => void;
   onQuit: () => void;
 }
 
@@ -38,6 +42,8 @@ export function MainMenuPhase({
   onAddContent,
   onSettings,
   onSettingsApiKeys,
+  discordSettingUnset,
+  onDiscordSettings,
   onQuit,
 }: MainMenuPhaseProps) {
   const { columns: cols, rows: termRows } = useTerminalSize();
@@ -50,6 +56,7 @@ export function MainMenuPhase({
   if (campaigns.length > 0) mainMenuItems.push("Continue Campaign");
   mainMenuItems.push("Add Content");
   if (!apiKeyValid) mainMenuItems.push("API Keys");
+  if (discordSettingUnset) mainMenuItems.push("Discord");
   mainMenuItems.push("Settings");
   mainMenuItems.push("Quit");
 
@@ -103,6 +110,8 @@ export function MainMenuPhase({
         onAddContent();
       } else if (selected === "API Keys") {
         onSettingsApiKeys();
+      } else if (selected === "Discord") {
+        onDiscordSettings?.();
       } else if (selected === "Settings") {
         onSettings();
       } else if (selected === "Quit") {
@@ -141,6 +150,7 @@ export function MainMenuPhase({
     else if (item === "Continue Campaign" && campaigns.length > 0) description = `${campaigns.length} saved`;
     else if (item === "Add Content") description = "Import PDFs for game systems";
     else if (item === "API Keys") description = apiKeyStatus ?? "";
+    else if (item === "Discord") description = "Set up Rich Presence";
     else if (item === "Settings") description = "";
 
     menuLines.push(
