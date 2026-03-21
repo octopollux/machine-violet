@@ -1,14 +1,23 @@
 import type { FileIO } from "../agents/scene-manager.js";
+import { isCompiled } from "../utils/paths.js";
 
 let cached: boolean | null = null;
 
 /**
- * Check if dev mode is active (DEV_MODE=true in .env).
+ * Check if dev mode is active.
+ *
+ * Priority:
+ * 1. Explicit `DEV_MODE=true` or `DEV_MODE=false` env var wins.
+ * 2. Otherwise, dev mode is ON when running from source, OFF in compiled binaries.
+ *
  * Result is cached after first call.
  */
 export function isDevMode(): boolean {
   if (cached !== null) return cached;
-  cached = process.env.DEV_MODE === "true";
+  const env = process.env.DEV_MODE;
+  if (env === "true") cached = true;
+  else if (env === "false") cached = false;
+  else cached = !isCompiled();
   return cached;
 }
 

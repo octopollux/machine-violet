@@ -1,17 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { isDevMode, resetDevMode, wrapFileIOWithDevLog } from "./dev-mode.js";
 import type { FileIO } from "../agents/scene-manager.js";
+import * as paths from "../utils/paths.js";
 
 describe("isDevMode", () => {
   beforeEach(() => resetDevMode());
   afterEach(() => {
     delete process.env.DEV_MODE;
     resetDevMode();
-  });
-
-  it("returns false when DEV_MODE is not set", () => {
-    delete process.env.DEV_MODE;
-    expect(isDevMode()).toBe(false);
+    vi.restoreAllMocks();
   });
 
   it("returns true when DEV_MODE is 'true'", () => {
@@ -19,9 +16,34 @@ describe("isDevMode", () => {
     expect(isDevMode()).toBe(true);
   });
 
-  it("returns false for other values", () => {
-    process.env.DEV_MODE = "1";
+  it("returns false when DEV_MODE is 'false'", () => {
+    process.env.DEV_MODE = "false";
     expect(isDevMode()).toBe(false);
+  });
+
+  it("returns false for non-boolean values like '1'", () => {
+    process.env.DEV_MODE = "1";
+    // Not "true" or "false", so falls through to isCompiled() check
+    vi.spyOn(paths, "isCompiled").mockReturnValue(true);
+    expect(isDevMode()).toBe(false);
+  });
+
+  it("defaults to true when running from source (not compiled)", () => {
+    delete process.env.DEV_MODE;
+    vi.spyOn(paths, "isCompiled").mockReturnValue(false);
+    expect(isDevMode()).toBe(true);
+  });
+
+  it("defaults to false when running as compiled binary", () => {
+    delete process.env.DEV_MODE;
+    vi.spyOn(paths, "isCompiled").mockReturnValue(true);
+    expect(isDevMode()).toBe(false);
+  });
+
+  it("explicit env var overrides compiled status", () => {
+    process.env.DEV_MODE = "true";
+    vi.spyOn(paths, "isCompiled").mockReturnValue(true);
+    expect(isDevMode()).toBe(true);
   });
 
   it("caches the result", () => {
