@@ -115,12 +115,18 @@ export class DiscordIPCClient {
 
   private tryConnect(path: string): Promise<Socket> {
     return new Promise((resolve, reject) => {
-      const socket = createConnection({ path }, () => resolve(socket));
-      socket.once("error", reject);
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         socket.destroy();
         reject(new Error("timeout"));
       }, CONNECT_TIMEOUT_MS);
+      const socket = createConnection({ path }, () => {
+        clearTimeout(timer);
+        resolve(socket);
+      });
+      socket.once("error", (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
     });
   }
 
