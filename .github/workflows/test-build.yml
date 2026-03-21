@@ -1,0 +1,145 @@
+name: Test Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      windows:
+        description: "Build Windows (installer + signing)"
+        type: boolean
+        default: true
+      macos:
+        description: "Build macOS"
+        type: boolean
+        default: false
+      linux:
+        description: "Build Linux"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-windows:
+    if: inputs.windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 25
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build distribution
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          node scripts/build-dist.js --version="${VERSION}-test"
+
+      - name: Bundle Windows Terminal portable
+        shell: bash
+        run: |
+          WT_VERSION="1.24.10621.0"
+          WT_TAG="v${WT_VERSION}"
+          WT_ZIP="Microsoft.WindowsTerminal_${WT_VERSION}_x64.zip"
+          WT_URL="https://github.com/microsoft/terminal/releases/download/${WT_TAG}/${WT_ZIP}"
+          curl -fSL -o wt-portable.zip "$WT_URL"
+          mkdir -p dist/terminal
+          unzip -q wt-portable.zip -d dist/terminal
+          touch dist/terminal/.portable
+          if [ -f dist/terminal/LICENSE ]; then
+            mv dist/terminal/LICENSE dist/terminal/LICENSE-windows-terminal.txt
+          fi
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install Velopack
+        shell: bash
+        run: |
+          dotnet tool install -g vpk
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      - name: Package and sign (Velopack)
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          vpk pack \
+            --packId MachineViolet \
+            --packVersion "${VERSION}-test" \
+            --packTitle "Machine Violet" \
+            --packDir dist \
+            --mainExe machine-violet.exe \
+            --icon assets/machine-violet.ico \
+            --shortcuts StartMenuRoot \
+            --azureTrustedSignFile assets/trusted-signing.json \
+            --channel test \
+            --outputDir velopack-out
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-build-windows-x64
+          path: velopack-out/*
+
+  build-macos:
+    if: inputs.macos
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 25
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build distribution
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          node scripts/build-dist.js --version="${VERSION}-test"
+
+      - name: Package
+        run: tar -czf machine-violet-test-darwin-arm64.tar.gz -C dist .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-build-darwin-arm64
+          path: machine-violet-test-darwin-arm64.tar.gz
+
+  build-linux:
+    if: inputs.linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 25
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build distribution
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          node scripts/build-dist.js --version="${VERSION}-test"
+
+      - name: Package
+        run: tar -czf machine-violet-test-linux-x64.tar.gz -C dist .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-build-linux-x64
+          path: machine-violet-test-linux-x64.tar.gz
