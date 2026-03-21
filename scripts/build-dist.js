@@ -107,18 +107,15 @@ cpSync(process.execPath, exePath);
 
 // Strip Authenticode signature on Windows before injection.
 // node.exe ships pre-signed by Microsoft. If we inject the blob first,
-// the stale signature makes the PE unsignable (0x800700C1) and rcedit
-// hangs indefinitely trying to modify a signed PE.
-let signatureStripped = false;
+// the stale signature makes the PE unsignable (0x800700C1).
 if (isWindows) {
   const signtool = findSigntool();
   if (signtool) {
     try {
       execFileSync(signtool, ["remove", "/s", exePath], { stdio: "inherit" });
-      signatureStripped = true;
       console.log("  Stripped Authenticode signature.");
     } catch {
-      console.warn("  Warning: signtool not available — skipping signature strip.");
+      console.warn("  Warning: signtool remove failed — signing may fail later.");
     }
   } else {
     console.warn("  Warning: signtool not found — skipping signature strip.");
@@ -137,34 +134,7 @@ execSync(
 rmSync(blobPath, { force: true });
 rmSync(join(DIST, "bundle.js"), { force: true });
 
-// --- Step 3: Windows metadata via rcedit ---
-// Only attempt rcedit if the signature was stripped (or not Windows).
-// rcedit hangs indefinitely on signed PEs — skip rather than block the build.
-if (isWindows && signatureStripped) {
-  const icoPath = join(ROOT, "assets", "machine-violet.ico");
-  if (existsSync(icoPath)) {
-    console.log("  Applying Windows metadata (rcedit)...");
-    try {
-      const { rcedit } = await import("rcedit");
-      await rcedit(exePath, {
-        icon: icoPath,
-        "version-string": {
-          ProductName: "Machine Violet",
-          FileDescription: "AI Dungeon Master for tabletop RPGs",
-          CompanyName: "Machine Violet",
-          LegalCopyright: "MIT License",
-        },
-        // file-version must be numeric (X.Y.Z.W) — strip any prerelease suffix
-        "file-version": `${version.replace(/-.*$/, "")}.0`,
-        "product-version": version,
-      });
-    } catch (err) {
-      console.warn(`  Warning: rcedit failed (${err instanceof Error ? err.message : String(err)}). Exe will lack icon/metadata.`);
-    }
-  }
-}
-
-// --- Step 4: Copy assets ---
+// --- Step 3: Copy assets ---
 const assets = [
   { src: "src/prompts", dest: "prompts" },
   { src: "src/tui/themes/assets", dest: "themes" },
