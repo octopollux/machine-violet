@@ -109,6 +109,7 @@ jobs:
             --packDir dist \
             --mainExe machine-violet.exe \
             --icon assets/machine-violet.ico \
+            --noDesktopShortcut \
             --azureTrustedSignFile assets/trusted-signing.json \
             --channel nightly \
             --outputDir velopack-out
@@ -152,10 +153,38 @@ jobs:
           git push --delete origin nightly 2>/dev/null || true
 
           # Create fresh nightly release
+          DATE=$(date -u +%Y-%m-%d)
+          cat > nightly-body.md << 'BODYEOF'
+          ## Download
+
+          ### Windows
+          | | File |
+          |---|---|
+          | **Installer** (recommended) | [`MachineViolet-nightly-Setup.exe`](https://github.com/octopollux/machine-violet/releases/download/nightly/MachineViolet-nightly-Setup.exe) |
+          | Portable (no install) | [`MachineViolet-nightly-Portable.zip`](https://github.com/octopollux/machine-violet/releases/download/nightly/MachineViolet-nightly-Portable.zip) |
+
+          ### macOS (Apple Silicon)
+          | | File |
+          |---|---|
+          | Tarball | [`machine-violet-nightly-darwin-arm64.tar.gz`](https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-darwin-arm64.tar.gz) |
+
+          ### Linux (x64)
+          | | File |
+          |---|---|
+          | Tarball | [`machine-violet-nightly-linux-x64.tar.gz`](https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-linux-x64.tar.gz) |
+
+          Also available via Homebrew: `brew install octopollux/mv-tap/machine-violet`
+
+          ---
+
+          Automated nightly build from `main`. **Not a stable release.**
+          BODYEOF
+          sed -i 's/^          //' nightly-body.md
+
           gh release create nightly \
             --repo ${{ github.repository }} \
-            --title "Nightly ($(date -u +%Y-%m-%d))" \
-            --notes "Automated nightly build from \`main\` at $(date -u +%Y-%m-%d). **Not a stable release.**" \
+            --title "Nightly ($DATE)" \
+            --notes-file nightly-body.md \
             --prerelease \
             --target main \
             MachineViolet-* \
