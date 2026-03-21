@@ -3,7 +3,7 @@ import { Box } from "ink";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render } from "ink-testing-library";
 import { PlayerNotesModal, editorReducer, ensureVisible } from "./PlayerNotesModal.js";
-import type { EditorState, EditorAction } from "./PlayerNotesModal.js";
+import type { EditorState } from "./PlayerNotesModal.js";
 import { resolveTheme } from "../themes/resolver.js";
 import { resetThemeCache } from "../themes/loader.js";
 import { BUILTIN_DEFINITIONS } from "../themes/builtin-definitions.js";

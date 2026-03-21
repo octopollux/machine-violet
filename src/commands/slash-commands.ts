@@ -270,17 +270,18 @@ const notesCommand: SlashCommand = {
       ctx.appendLine({ kind: "system", text: "[Notes unavailable]" });
       return;
     }
+    const setModal = ctx.setActiveModal;
     const gs = ctx.gameState;
     const io = ctx.engine?.getSceneManager().getFileIO();
     if (gs && io) {
       const path = campaignPaths(gs.campaignRoot).playerNotes;
       io.readFile(path).then((raw: string) => {
-        ctx.setActiveModal!({ kind: "notes", content: raw });
+        setModal({ kind: "notes", content: raw });
       }).catch(() => {
-        ctx.setActiveModal!({ kind: "notes", content: "" });
+        setModal({ kind: "notes", content: "" });
       });
     } else {
-      ctx.setActiveModal!({ kind: "notes", content: "" });
+      setModal({ kind: "notes", content: "" });
     }
   },
 };
