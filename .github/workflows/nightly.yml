@@ -190,60 +190,91 @@ jobs:
           git tag "${{ steps.tags.outputs.tag }}"
           git push origin "${{ steps.tags.outputs.tag }}"
 
-      - name: Collect commits for changelog
-        id: commits
+      - name: Collect changelog context
+        id: changes
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           PREV="${{ steps.tags.outputs.prev }}"
+
           if [ -n "$PREV" ]; then
-            COMMITS=$(git log --oneline "${PREV}..HEAD")
+            # Get the timestamp of the previous tag's commit (by committer date)
+            SINCE=$(git log -1 --format=%cI "$PREV")
+
+            # Fetch PRs merged since that timestamp
+            PR_CONTEXT=$(gh pr list \
+              --repo ${{ github.repository }} \
+              --state merged \
+              --base main \
+              --search "merged:>=${SINCE}" \
+              --json number,title,body \
+              --jq '.[] | "## PR #\(.number): \(.title)\n\(.body // "(no description)")\n---"')
+
+            # Fall back to commit log if no PRs found (direct pushes)
+            if [ -z "$PR_CONTEXT" ]; then
+              PR_CONTEXT=$(git log --oneline "${PREV}..HEAD")
+            fi
           else
-            COMMITS="Initial nightly build."
+            PR_CONTEXT="Initial nightly build — no previous tag to compare against."
           fi
-          echo "log<<COMMITS_EOF" >> "$GITHUB_OUTPUT"
-          echo "$COMMITS" >> "$GITHUB_OUTPUT"
-          echo "COMMITS_EOF" >> "$GITHUB_OUTPUT"
+
+          echo "context<<CONTEXT_EOF" >> "$GITHUB_OUTPUT"
+          echo "$PR_CONTEXT" >> "$GITHUB_OUTPUT"
+          echo "CONTEXT_EOF" >> "$GITHUB_OUTPUT"
 
       - name: Generate release notes
         id: changelog
-        uses: anthropics/claude-code-action@v1
-        with:
-          anthropic_api_key: ${{ secrets.MV_RELEASE_NOTES_ANT_APIKEY }}
-          github_token: ${{ github.token }}
-          claude_args: '--json-schema {"type":"object","properties":{"notes":{"type":"string"}},"required":["notes"]}'
-          prompt: |
-            Write release notes for a nightly build of Machine Violet, an AI
-            Dungeon Master that runs tabletop RPGs in a terminal.
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.MV_RELEASE_NOTES_ANT_APIKEY }}
+          CHANGES: ${{ steps.changes.outputs.context }}
+          PREV_TAG: ${{ steps.tags.outputs.prev }}
+        run: |
+          PROMPT=$(cat <<'PROMPT_EOF'
+          Write release notes for a nightly build of Machine Violet, an AI
+          Dungeon Master that runs tabletop RPGs in a terminal.
 
-            These notes are for PLAYERS, not engineers. Rules:
-            - Omit internal/boring commits: dependency bumps (Dependabot),
-              CI changes, refactoring, docs-only changes.
-            - Collapse multiple performance commits into one
-              "Performance improvements" bullet.
-            - Describe user-facing bug fixes and features in plain,
-              friendly language a player would understand.
-            - A few concise bullet points in markdown. No heading, no preamble.
-            - If there are genuinely no player-facing changes, output exactly:
-              "Internal improvements and maintenance."
+          These notes are for PLAYERS, not engineers. Rules:
+          - Omit internal/boring commits: dependency bumps (Dependabot),
+            CI changes, refactoring, docs-only changes.
+          - Collapse multiple performance commits into one
+            "Performance improvements" bullet.
+          - Describe user-facing bug fixes and features in plain,
+            friendly language a player would understand.
+          - A few concise bullet points in markdown. No heading, no preamble.
+          - If there are genuinely no player-facing changes, output exactly:
+            "Internal improvements and maintenance."
 
-            Commits since last nightly (${{ steps.tags.outputs.prev }}):
-            ```
-            ${{ steps.commits.outputs.log }}
-            ```
+          Output ONLY the markdown bullet list — nothing else.
+          PROMPT_EOF
+          PROMPT=$(echo "$PROMPT" | sed 's/^          //')
 
-            Return the notes in the "notes" field of your JSON response.
+          FULL_PROMPT=$(printf '%s\n\nHere are the PRs merged since the last nightly (%s):\n\n%s' "$PROMPT" "$PREV_TAG" "$CHANGES")
+
+          NOTES=$(curl -sf https://api.anthropic.com/v1/messages \
+            -H "x-api-key: ${ANTHROPIC_API_KEY}" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d "$(jq -n --arg prompt "$FULL_PROMPT" \
+              '{model:"claude-haiku-4-5-20251001", max_tokens:1024,
+                messages:[{role:"user",content:$prompt}]}')" \
+            | jq -r '.content[0].text') || NOTES="Internal improvements and maintenance."
+
+          echo "notes<<NOTES_EOF" >> "$GITHUB_OUTPUT"
+          echo "$NOTES" >> "$GITHUB_OUTPUT"
+          echo "NOTES_EOF" >> "$GITHUB_OUTPUT"
 
       - name: Create or update nightly release
         env:
           GH_TOKEN: ${{ github.token }}
+          NIGHTLY_TAG: ${{ steps.tags.outputs.tag }}
+          PREV_TAG: ${{ steps.tags.outputs.prev }}
+          RELEASE_NOTES: ${{ steps.changelog.outputs.notes }}
         run: |
           # Delete existing rolling nightly release (if any)
           gh release delete nightly --yes --repo ${{ github.repository }} 2>/dev/null || true
           git push --delete origin nightly 2>/dev/null || true
 
           DATE="${{ steps.tags.outputs.date }}"
-          NIGHTLY_TAG="${{ steps.tags.outputs.tag }}"
-          PREV_TAG="${{ steps.tags.outputs.prev }}"
-          RELEASE_NOTES=$(echo '${{ steps.changelog.outputs.structured_output }}' | jq -r '.notes // "Internal improvements and maintenance."')
 
           cat > nightly-body.md << 'BODYEOF'
           ## Download
@@ -296,9 +327,9 @@ jobs:
       - name: Post to Discord
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_NIGHTLY_WEBHOOK }}
+          NIGHTLY_TAG: ${{ steps.tags.outputs.tag }}
+          RELEASE_NOTES: ${{ steps.changelog.outputs.notes }}
         run: |
-          NIGHTLY_TAG="${{ steps.tags.outputs.tag }}"
-          RELEASE_NOTES=$(echo '${{ steps.changelog.outputs.structured_output }}' | jq -r '.notes // "Internal improvements and maintenance."')
           RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/nightly"
 
           # Build message, truncating to fit Discord's 2000-char limit
