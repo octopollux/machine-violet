@@ -2,7 +2,7 @@ import React, { useReducer, useMemo } from "react";
 import { useInput, Box, Text } from "ink";
 import chalk from "chalk";
 import type { ResolvedTheme } from "../themes/types.js";
-import { CenteredModal } from "./CenteredModal.js";
+import { ThemedHorizontalBorder, ThemedSideFrame } from "../components/ThemedFrame.js";
 import { themeColor, deriveModalTheme } from "../themes/color-resolve.js";
 import { stringWidth } from "../frames/index.js";
 
@@ -252,24 +252,37 @@ export function PlayerNotesModal({
   const footer = linesBelow > 0
     ? `ESC save & close  (${linesBelow} more)`
     : "ESC save & close";
+  const footerColor = themeColor(modalTheme, "title");
+
+  // Render frame directly (not via CenteredModal) so every row is a single
+  // opaque <Text> — no flexbox gaps that let the narrative bleed through.
+  const modalHeight = maxContentRows + 2 * borderHeight;
+  const topMargin = Math.max(0, (topOffset ?? 0) + Math.floor((height - modalHeight) / 2));
+  const leftPad = Math.max(0, Math.floor((width - modalWidth) / 2));
 
   return (
-    <CenteredModal
-      theme={theme}
-      width={width}
-      height={height}
-      title="Player Notes"
-      footer={footer}
-      minWidth={40}
-      maxWidth={999}
-      widthFraction={0.7}
-      topOffset={topOffset}
-      contentHeight={maxContentRows}
-    >
-      <Box flexDirection="column">
-        {contentRows}
+    <Box position="absolute" flexDirection="column" marginTop={topMargin} marginLeft={leftPad}>
+      <ThemedHorizontalBorder
+        theme={modalTheme}
+        width={modalWidth}
+        position="top"
+        centerText="Player Notes"
+      />
+      <Box height={maxContentRows} flexDirection="row">
+        <ThemedSideFrame theme={modalTheme} side="left" height={maxContentRows} />
+        <Box flexDirection="column" width={fullRowWidth}>
+          {contentRows}
+        </Box>
+        <ThemedSideFrame theme={modalTheme} side="right" height={maxContentRows} />
       </Box>
-    </CenteredModal>
+      <ThemedHorizontalBorder
+        theme={modalTheme}
+        width={modalWidth}
+        position="bottom"
+        centerText={footer}
+        centerTextColor={footerColor}
+      />
+    </Box>
   );
 }
 
