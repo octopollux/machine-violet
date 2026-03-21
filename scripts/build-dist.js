@@ -122,6 +122,22 @@ if (isWindows) {
   }
 }
 
+// Set Windows exe icon via rcedit (after sig strip, before blob injection).
+// The PE is clean and unsigned at this point so rcedit won't hang.
+// postject only touches the blob section — icon resources survive injection.
+if (isWindows) {
+  const icoPath = join(ROOT, "assets", "machine-violet.ico");
+  if (existsSync(icoPath)) {
+    console.log("  Setting exe icon (rcedit)...");
+    try {
+      const { rcedit } = await import("rcedit");
+      await rcedit(exePath, { icon: icoPath });
+    } catch (err) {
+      console.warn(`  Warning: rcedit failed (${err instanceof Error ? err.message : String(err)}). Exe will have Node icon.`);
+    }
+  }
+}
+
 // Inject blob with postject
 console.log("  Injecting SEA blob...");
 const postjectBin = join(ROOT, "node_modules", ".bin", isWindows ? "postject.cmd" : "postject");
