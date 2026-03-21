@@ -131,30 +131,11 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Sign Windows binary
-        if: matrix.os == 'windows-latest'
-        uses: azure/trusted-signing-action@v1
-        with:
-          endpoint: https://wus2.codesigning.azure.net
-          signing-account-name: mvcodesigning
-          certificate-profile-name: mv-public-trust
-          files: ${{ github.workspace }}/dist/machine-violet.exe
-          exclude-environment-credential: true
-          exclude-workload-identity-credential: true
-          exclude-managed-identity-credential: true
-          exclude-shared-token-cache-credential: true
-          exclude-visual-studio-credential: true
-          exclude-visual-studio-code-credential: true
-          exclude-azure-cli-credential: false
-          exclude-azure-powershell-credential: true
-          exclude-azure-developer-cli-credential: true
-          exclude-interactive-browser-credential: true
-
       - name: Install Velopack
         if: matrix.os == 'windows-latest'
         run: dotnet tool install -g vpk
 
-      - name: Package (Velopack — Windows)
+      - name: Package and sign (Velopack — Windows)
         if: matrix.os == 'windows-latest'
         shell: bash
         run: |
@@ -167,6 +148,7 @@ jobs:
             --packDir dist \
             --mainExe machine-violet.exe \
             --icon assets/machine-violet.ico \
+            --azureTrustedSignFile assets/trusted-signing.json \
             --outputDir velopack-out
 
       - name: Package (tar.gz)
