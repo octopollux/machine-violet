@@ -15,14 +15,11 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            target: bun-windows-x64
             asset_suffix: windows-x64
           - os: macos-latest
-            target: bun-darwin-arm64
             archive: tar.gz
             asset_suffix: darwin-arm64
           - os: ubuntu-latest
-            target: bun-linux-x64
             archive: tar.gz
             asset_suffix: linux-x64
 
@@ -31,11 +28,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: oven-sh/setup-bun@v2
-
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 25
           cache: npm
 
       - run: npm ci
@@ -51,23 +46,65 @@ jobs:
             EXE_NAME="machine-violet.exe"
           fi
 
-          WIN_FLAGS=()
+          # --- Step 1: esbuild bundle ---
+          echo "Bundling with esbuild..."
+          node -e "
+            import { build } from 'esbuild';
+            await build({
+              entryPoints: ['src/index.tsx'],
+              bundle: true,
+              outfile: 'dist/bundle.js',
+              platform: 'node',
+              target: 'node25',
+              format: 'esm',
+              jsx: 'automatic',
+              external: ['node:*'],
+              define: { 'process.env.MV_VERSION': JSON.stringify('$NIGHTLY_VERSION') },
+              banner: {
+                js: [
+                  'import { createRequire as __nodeCreateRequire } from \"node:module\";',
+                  'const require = __nodeCreateRequire(import.meta.url);',
+                ].join('\n'),
+              },
+              minify: false,
+              sourcemap: false,
+            });
+          "
+
+          # --- Step 2: Node SEA ---
+          echo "Building Node SEA executable..."
+          cat > sea-config.json << SEAEOF
+          {
+            "main": "dist/bundle.js",
+            "output": "dist/$EXE_NAME",
+            "mainFormat": "module",
+            "disableExperimentalSEAWarning": true
+          }
+          SEAEOF
+          sed -i 's/^          //' sea-config.json
+
+          node --build-sea sea-config.json
+
+          # --- Step 3: Windows metadata via rcedit ---
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            WIN_FLAGS=(
-              "--windows-icon=assets/machine-violet.ico"
-              "--windows-title=Machine Violet"
-              "--windows-description=AI Dungeon Master for tabletop RPGs"
-              "--windows-version=${VERSION}.0"
-            )
+            echo "Applying Windows exe metadata..."
+            node -e "
+              import { rcedit } from 'rcedit';
+              await rcedit('dist/$EXE_NAME', {
+                icon: 'assets/machine-violet.ico',
+                'version-string': {
+                  ProductName: 'Machine Violet',
+                  FileDescription: 'AI Dungeon Master for tabletop RPGs',
+                  CompanyName: 'Machine Violet',
+                  LegalCopyright: 'MIT License',
+                },
+                'file-version': '$VERSION.0',
+                'product-version': '$NIGHTLY_VERSION',
+              });
+            "
           fi
 
-          bun build --compile \
-            --target=${{ matrix.target }} \
-            --outfile "dist/$EXE_NAME" \
-            --define "process.env.MV_VERSION='$NIGHTLY_VERSION'" \
-            "${WIN_FLAGS[@]}" \
-            src/index.tsx
-
+          # --- Step 4: Copy assets ---
           cp -r src/prompts dist/prompts
           cp -r src/tui/themes/assets dist/themes
           cp -r systems dist/systems
@@ -75,6 +112,9 @@ jobs:
           echo "{\"version\":\"$NIGHTLY_VERSION\"}" > dist/version.json
 
           if [ -f LICENSE ]; then cp LICENSE dist/; fi
+
+          # Clean up bundle
+          rm -f dist/bundle.js sea-config.json
 
       - name: Bundle Windows Terminal portable
         if: matrix.os == 'windows-latest'

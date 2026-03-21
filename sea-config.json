@@ -1,0 +1,6 @@
+{
+  "main": "dist/bundle.js",
+  "output": "dist/machine-violet.exe",
+  "mainFormat": "module",
+  "disableExperimentalSEAWarning": true
+}
