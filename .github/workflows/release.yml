@@ -133,7 +133,10 @@ jobs:
 
       - name: Install Velopack
         if: matrix.os == 'windows-latest'
-        run: dotnet tool install -g vpk
+        shell: bash
+        run: |
+          dotnet tool install -g vpk
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
 
       - name: Package and sign (Velopack — Windows)
         if: matrix.os == 'windows-latest'
