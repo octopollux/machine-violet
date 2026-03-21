@@ -109,7 +109,7 @@ jobs:
             --packDir dist \
             --mainExe machine-violet.exe \
             --icon assets/machine-violet.ico \
-            --noDesktopShortcut \
+            --shortcuts StartMenuRoot \
             --azureTrustedSignFile assets/trusted-signing.json \
             --channel nightly \
             --outputDir velopack-out
