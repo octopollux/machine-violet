@@ -10,6 +10,7 @@ import {
   formatChangelogEntry,
   appendChangelog,
   defaultCampaignRoot,
+  defaultConfigDir,
   validateConfig,
   createDefaultCampaignConfig,
 } from "./index.js";
@@ -353,6 +354,32 @@ describe("defaultCampaignRoot", () => {
     const hasXdg = xdg ? root.includes(norm(xdg)) : false;
     const hasLocal = root.includes(".local/share");
     expect(hasXdg || hasLocal).toBe(true);
+  });
+});
+
+describe("defaultConfigDir", () => {
+  it("returns APPDATA path for Windows", () => {
+    const dir = norm(defaultConfigDir("win32"));
+    expect(dir).toContain("MachineViolet");
+    // Should be in AppData/Roaming or APPDATA
+    const appData = process.env["APPDATA"];
+    const hasAppData = appData ? dir.includes(norm(appData)) : false;
+    const hasRoaming = dir.includes("AppData/Roaming");
+    expect(hasAppData || hasRoaming).toBe(true);
+  });
+
+  it("returns Library/Application Support for macOS", () => {
+    const dir = norm(defaultConfigDir("darwin"));
+    expect(dir).toContain("Library/Application Support/MachineViolet");
+  });
+
+  it("returns XDG or .config for Linux", () => {
+    const dir = norm(defaultConfigDir("linux"));
+    expect(dir).toContain("machine-violet");
+    const xdgConfig = process.env["XDG_CONFIG_HOME"];
+    const hasXdg = xdgConfig ? dir.includes(norm(xdgConfig)) : false;
+    const hasConfig = dir.includes(".config");
+    expect(hasXdg || hasConfig).toBe(true);
   });
 });
 

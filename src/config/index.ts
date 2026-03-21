@@ -6,6 +6,7 @@ export {
   buildAppConfig,
   validateApiKeyFormat,
   getConfigPaths,
+  migrateConfigFromExeDir,
 } from "./first-launch.js";
 export type { AppSettings } from "./first-launch.js";
 export { PERSONALITIES, getPersonality, randomPersonality } from "./personalities.js";

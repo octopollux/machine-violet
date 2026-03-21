@@ -3,7 +3,7 @@ export { extractWikilinks, uniqueTargets } from "./wikilinks.js";
 export type { WikiLink } from "./wikilinks.js";
 export { campaignDirs, sceneDir, campaignPaths } from "./scaffold.js";
 export { formatChangelogEntry, appendChangelog } from "./changelog.js";
-export { defaultCampaignRoot } from "./platform.js";
+export { defaultCampaignRoot, defaultConfigDir } from "./platform.js";
 export { validateConfig, createDefaultCampaignConfig } from "./config.js";
 export {
   validateWikilinks,

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Text, Box, useInput } from "ink";
 import { createClient } from "./config/client.js";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { readFile, writeFile, appendFile, mkdir, readdir, stat, unlink, rmdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 
@@ -58,7 +58,7 @@ import { listAvailableSystems, readBundledRuleCard } from "./config/systems.js";
 import type { AvailableSystem } from "./config/systems.js";
 import { promoteCharacter } from "./agents/subagents/character-promotion.js";
 import { processingPaths } from "./config/processing-paths.js";
-import { norm, isCompiled } from "./utils/paths.js";
+import { norm, configDir } from "./utils/paths.js";
 import { GameProvider } from "./tui/game-context.js";
 import type { GameContextValue } from "./tui/game-context.js";
 
@@ -388,10 +388,10 @@ export default function App({ shutdownRef }: AppProps) {
 
 
   // --- Config paths ---
-  // Compiled binaries store config next to the exe (stable location);
-  // dev mode uses cwd (the repo root).
-  const getAppDir = useCallback(() => isCompiled() ? dirname(process.execPath) : process.cwd(), []);
-  const getConfigPath = useCallback(() => join(getAppDir(), "config.json"), [getAppDir]);
+  // Config files (.env, api-keys.json, config.json) live in the platform
+  // config directory (e.g. %APPDATA%\MachineViolet); dev mode uses cwd.
+  const getConfigDir = useCallback(() => configDir(), []);
+  const getConfigPath = useCallback(() => join(getConfigDir(), "config.json"), [getConfigDir]);
 
   // --- Load campaigns and systems ---
   const loadCampaigns = useCallback(async () => {
@@ -431,7 +431,7 @@ export default function App({ shutdownRef }: AppProps) {
 
   /** Load key store from disk, merge env key, and check unchecked keys. */
   const refreshKeyStore = useCallback(() => {
-    const appDir = getAppDir();
+    const appDir = getConfigDir();
     const stored = loadKeyStore(appDir);
     const effective = buildEffectiveStore(stored);
     setKeyStore(effective);
@@ -447,13 +447,13 @@ export default function App({ shutdownRef }: AppProps) {
         handleCheckHealth(entry.id, entry.key);
       }
     }
-  }, [getAppDir, handleCheckHealth]);
+  }, [getConfigDir, handleCheckHealth]);
 
   /** Handle store updates from the ApiKeysPhase (or anywhere). */
   const handleUpdateKeyStore = useCallback((updated: ApiKeyStore) => {
     setKeyStore(updated);
     try {
-      saveKeyStore(getAppDir(), updated);
+      saveKeyStore(getConfigDir(), updated);
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : "Failed to save API key store");
     }
@@ -461,7 +461,7 @@ export default function App({ shutdownRef }: AppProps) {
     // Sync active key to process.env
     const activeVal = getActiveKeyValue(updated);
     if (activeVal) process.env.ANTHROPIC_API_KEY = activeVal;
-  }, [getAppDir]);
+  }, [getConfigDir]);
 
   /**
    * Gate for API-requiring menu items. Only block when we *know* the key
@@ -515,6 +515,7 @@ export default function App({ shutdownRef }: AppProps) {
     } catch {
       // First launch — create config.json with defaults
       try {
+        mkdirSync(getConfigDir(), { recursive: true });
         writeFileSync(configPath, buildAppConfig(getDefaultHomeDir()));
       } catch (e) {
         setErrorMsg(e instanceof Error ? e.message : "Failed to write config");
@@ -523,7 +524,7 @@ export default function App({ shutdownRef }: AppProps) {
     setPhase("main_menu");
     loadCampaigns();
     refreshKeyStore();
-  }, [phase, getAppDir, getConfigPath, loadCampaigns, refreshKeyStore]);
+  }, [phase, getConfigDir, getConfigPath, loadCampaigns, refreshKeyStore]);
 
   // --- Build game state from config ---
   const buildGameState = useCallback((config: CampaignConfig, campaignRoot: string): GameState => {

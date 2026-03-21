@@ -1,4 +1,5 @@
 import { dirname, join } from "node:path";
+import { defaultConfigDir } from "../tools/filesystem/platform.js";
 
 /** Normalize a path to use forward slashes (cross-platform). */
 export function norm(p: string): string {
@@ -42,4 +43,23 @@ export function assetDir(category: "prompts" | "themes" | "systems"): string {
 
   _cache.set(category, dir);
   return dir;
+}
+
+/**
+ * Resolve the directory for user config files (.env, api-keys.json, config.json).
+ *
+ * Compiled: platform-conventional config dir (e.g. %APPDATA%\MachineViolet).
+ * Dev: process.cwd() (repo root, where .env already lives).
+ */
+let _configDir: string | undefined;
+
+export function configDir(): string {
+  if (_configDir) return _configDir;
+  _configDir = isCompiled() ? defaultConfigDir() : process.cwd();
+  return _configDir;
+}
+
+/** Reset the configDir cache (for tests). */
+export function resetConfigDir(): void {
+  _configDir = undefined;
 }
