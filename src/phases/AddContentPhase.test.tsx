@@ -8,6 +8,8 @@ import { resetPromptCache } from "../prompts/load-prompt.js";
 import type { ValidatedPdf } from "../content/index.js";
 import type { AvailableSystem } from "../config/systems.js";
 
+const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 beforeEach(() => {
   resetPromptCache();
   resetThemeCache();
@@ -69,6 +71,8 @@ describe("AddContentPhase", () => {
 
   it("advances to drop step after selecting a known system", async () => {
     const { stdin, lastFrame } = render(<AddContentPhase {...defaultProps()} />);
+    await vi.waitFor(() => { expect(lastFrame()).toContain("Select a game system"); });
+    await delay(10);
     // First option is already selected, press Enter
     stdin.write("\r");
 
@@ -84,6 +88,7 @@ describe("AddContentPhase", () => {
     const { stdin, lastFrame } = render(
       <AddContentPhase {...defaultProps({ systems: emptySystemsList })} />,
     );
+    await vi.waitFor(() => { expect(lastFrame()).toContain("Select a game system"); });
     // Only option is "Other", already selected — press Enter
     stdin.write("\r");
 
@@ -97,12 +102,14 @@ describe("AddContentPhase", () => {
     const { stdin, lastFrame } = render(
       <AddContentPhase {...defaultProps({ systems: emptySystemsList })} />,
     );
+    await vi.waitFor(() => { expect(lastFrame()).toContain("Select a game system"); });
     // Select Other
     stdin.write("\r");
 
     await vi.waitFor(() => {
       expect(lastFrame()).toContain("Name this system");
     });
+    await delay(10);
 
     // Type a custom name — use a name that doesn't appear in the hint text,
     // then wait for it to render before pressing Enter.
@@ -111,6 +118,7 @@ describe("AddContentPhase", () => {
     await vi.waitFor(() => {
       expect(lastFrame()).toContain("Mork Borg");
     });
+    await delay(10);
 
     stdin.write("\r");
 
@@ -130,6 +138,7 @@ describe("AddContentPhase", () => {
     const { stdin, lastFrame } = render(
       <AddContentPhase {...defaultProps({ validatePdf })} />,
     );
+    await vi.waitFor(() => { expect(lastFrame()).toContain("Select a game system"); });
 
     // Select first system
     stdin.write("\r");
@@ -137,6 +146,7 @@ describe("AddContentPhase", () => {
     await vi.waitFor(() => {
       expect(lastFrame()).toContain("Drop PDF");
     });
+    await delay(10);
 
     // Drop a PDF path — wait for text to render before pressing Enter
     stdin.write("/books/Monster Manual.pdf");
@@ -144,6 +154,7 @@ describe("AddContentPhase", () => {
     await vi.waitFor(() => {
       expect(lastFrame()).toContain("Monster Manual");
     });
+    await delay(10);
 
     stdin.write("\r");
 
@@ -162,6 +173,7 @@ describe("AddContentPhase", () => {
     const { stdin, lastFrame } = render(
       <AddContentPhase {...defaultProps({ validatePdf })} />,
     );
+    await vi.waitFor(() => { expect(lastFrame()).toContain("Select a game system"); });
 
     // Select first system
     stdin.write("\r");
@@ -169,6 +181,7 @@ describe("AddContentPhase", () => {
     await vi.waitFor(() => {
       expect(lastFrame()).toContain("Drop PDF");
     });
+    await delay(10);
 
     // Add a PDF — wait for text to render before pressing Enter
     stdin.write("/test.pdf");
@@ -176,12 +189,16 @@ describe("AddContentPhase", () => {
     await vi.waitFor(() => {
       expect(lastFrame()).toContain("/test.pdf");
     });
+    await delay(10);
 
     stdin.write("\r");
 
     await vi.waitFor(() => {
       expect(lastFrame()).toContain("Test.pdf");
+      // Ensure the input is idle (not validating) before sending next keystroke
+      expect(lastFrame()).toContain("Drop PDF");
     }, { timeout: 2000 });
+    await delay(10);
 
     // Press Enter with no input to finish adding
     stdin.write("\r");
