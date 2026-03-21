@@ -186,8 +186,9 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
       }
     }
 
-    // Fill remaining visible rows with blank lines to make the modal opaque
-    const renderedCount = hasReactChildren ? visibleRows : (wrappedStyled ? wrappedStyled.length : wrappedLines.length);
+    // Fill remaining visible rows with blank lines to make the modal opaque.
+    // For React children, use the explicit contentHeight so blank rows fill any gap.
+    const renderedCount = hasReactChildren ? (contentHeight ?? visibleRows) : (wrappedStyled ? wrappedStyled.length : wrappedLines.length);
     for (let i = renderedCount; i < visibleRows; i++) {
       contentRows.push(
         <Box key={`blank-${i}`}>

@@ -1,8 +1,10 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { useInput, Box, Text } from "ink";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { useInput } from "ink";
 import type { ResolvedTheme } from "../themes/types.js";
+import type { FormattingNode } from "../../types/tui.js";
 import { CenteredModal } from "./CenteredModal.js";
 import { themeColor, deriveModalTheme } from "../themes/color-resolve.js";
+import { parseFormatting } from "../formatting.js";
 import type {
   Compendium,
   CompendiumEntry,
@@ -153,8 +155,8 @@ export function CompendiumModal({
         title={detail.name}
         lines={detailLines}
         minWidth={30}
-        maxWidth={60}
-        widthFraction={0.5}
+        maxWidth={999}
+        widthFraction={0.6}
         topOffset={topOffset}
       />
     );
@@ -172,36 +174,36 @@ export function CompendiumModal({
         title="Compendium"
         lines={["", "  No entries yet.", "", "  The compendium fills as you", "  explore and discover.", "", "  ESC to close"]}
         minWidth={30}
-        maxWidth={50}
-        widthFraction={0.4}
+        maxWidth={999}
+        widthFraction={0.6}
         topOffset={topOffset}
       />
     );
   }
 
-  // Build tree lines as React children for cursor highlighting
-  const treeContent = rows.map((row, i) => {
+  // Build tree lines as styled FormattingNode arrays for cursor highlighting.
+  // Using styledLines instead of React children ensures CenteredModal renders
+  // each row with full-width opaque padding (preventing background bleed-through).
+  const treeStyledLines: FormattingNode[][] = rows.map((row, i) => {
     const selected = i === clampedCursor;
+    const color = selected ? accentColor : textColor;
     if (row.type === "category") {
       const arrow = row.expanded ? "\u25BE" : "\u25B8";
-      const label = `${arrow} ${row.label} (${row.count})`;
-      return (
-        <Text key={`cat-${row.key}`} color={selected ? accentColor : textColor} bold={selected}>
-          {selected ? "\u25C6 " : "  "}{label}
-        </Text>
-      );
+      const prefix = selected ? "\u25C6 " : "  ";
+      const label = `${prefix}${arrow} ${row.label} (${row.count})`;
+      const markup = selected
+        ? `<color=${color}><b>${label}</b></color>`
+        : `<color=${color}>${label}</color>`;
+      return parseFormatting(markup);
     } else {
       const marker = selected ? "\u25C6" : "\u25CB";
-      return (
-        <Text key={`entry-${row.category}-${row.entry.slug}`} color={selected ? accentColor : textColor} bold={selected}>
-          {"    "}{marker} {row.entry.name}
-        </Text>
-      );
+      const label = `    ${marker} ${row.entry.name}`;
+      const markup = selected
+        ? `<color=${color}><b>${label}</b></color>`
+        : `<color=${color}>${label}</color>`;
+      return parseFormatting(markup);
     }
   });
-
-  // Calculate content height for the modal
-  const contentHeight = rows.length;
 
   return (
     <CenteredModal
@@ -210,15 +212,11 @@ export function CompendiumModal({
       height={height}
       title="Compendium"
       footer="Enter: select  ESC: close"
+      styledLines={treeStyledLines}
       minWidth={30}
-      maxWidth={50}
-      widthFraction={0.45}
+      maxWidth={999}
+      widthFraction={0.6}
       topOffset={topOffset}
-      contentHeight={contentHeight}
-    >
-      <Box flexDirection="column">
-        {treeContent}
-      </Box>
-    </CenteredModal>
+    />
   );
 }
