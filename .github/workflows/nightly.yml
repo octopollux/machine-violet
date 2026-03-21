@@ -10,7 +10,23 @@ permissions:
   id-token: write
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      timestamp: ${{ steps.ts.outputs.timestamp }}
+      nightly_version: ${{ steps.ts.outputs.nightly_version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compute nightly version
+        id: ts
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TIMESTAMP=$(date -u +%Y%m%d-%H%M)
+          echo "timestamp=$TIMESTAMP" >> "$GITHUB_OUTPUT"
+          echo "nightly_version=${VERSION}-nightly.${TIMESTAMP}" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: prepare
     strategy:
       matrix:
         include:
@@ -38,10 +54,7 @@ jobs:
       - name: Build distribution
         shell: bash
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          TIMESTAMP=$(date -u +%Y%m%d-%H%M)
-          NIGHTLY_VERSION="${VERSION}-nightly.${TIMESTAMP}"
-          node scripts/build-dist.js --version="$NIGHTLY_VERSION"
+          node scripts/build-dist.js --version="${{ needs.prepare.outputs.nightly_version }}"
 
       - name: Bundle Windows Terminal portable
         if: matrix.os == 'windows-latest'
@@ -99,12 +112,9 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: bash
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          TIMESTAMP=$(date -u +%Y%m%d-%H%M)
-          NIGHTLY_VERSION="${VERSION}-nightly.${TIMESTAMP}"
           vpk pack \
             --packId MachineViolet \
-            --packVersion "$NIGHTLY_VERSION" \
+            --packVersion "${{ needs.prepare.outputs.nightly_version }}" \
             --packTitle "Machine Violet" \
             --packDir dist \
             --mainExe machine-violet.exe \
@@ -135,7 +145,7 @@ jobs:
           path: machine-violet-nightly-*
 
   release:
-    needs: build
+    needs: [prepare, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -150,8 +160,14 @@ jobs:
       - name: Compute nightly tag and find previous
         id: tags
         run: |
-          TIMESTAMP=$(date -u +%Y%m%d-%H%M)
+          TIMESTAMP="${{ needs.prepare.outputs.timestamp }}"
           NIGHTLY_TAG="nightly-${TIMESTAMP}"
+
+          # Guard against tag collision on rerun
+          if git rev-parse "$NIGHTLY_TAG" >/dev/null 2>&1; then
+            NIGHTLY_TAG="${NIGHTLY_TAG}-${{ github.run_id }}"
+          fi
+
           echo "tag=$NIGHTLY_TAG" >> "$GITHUB_OUTPUT"
           echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 
@@ -250,20 +266,19 @@ jobs:
           BODYEOF
           sed -i 's/^          //' nightly-body.md
 
-          # Append the AI-generated release notes (variable, so outside the literal heredoc)
-          cat >> nightly-body.md << NOTESEOF
-
-          ---
-
-          ## What's New
-
-          ${RELEASE_NOTES}
-
-          ---
-
-          Automated nightly build from \`main\` · [\`${NIGHTLY_TAG}\`](https://github.com/octopollux/machine-violet/releases/tag/${NIGHTLY_TAG}). **Not a stable release.**
-          NOTESEOF
-          sed -i 's/^          //' nightly-body.md
+          # Append release notes safely (no shell expansion of AI content)
+          {
+            echo ""
+            echo "---"
+            echo ""
+            echo "## What's New"
+            echo ""
+            printf '%s\n' "$RELEASE_NOTES"
+            echo ""
+            echo "---"
+            echo ""
+            echo "Automated nightly build from \`main\` · [\`${NIGHTLY_TAG}\`](https://github.com/octopollux/machine-violet/releases/tag/${NIGHTLY_TAG}). **Not a stable release.**"
+          } >> nightly-body.md
 
           gh release create nightly \
             --repo ${{ github.repository }} \
@@ -284,11 +299,21 @@ jobs:
           RELEASE_NOTES="${{ steps.changelog.outputs.result }}"
           RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/nightly"
 
-          # Discord webhook payload (max 2000 chars for content)
+          # Build message, truncating to fit Discord's 2000-char limit
+          HEADER="**Machine Violet Nightly** · \`${NIGHTLY_TAG}\`"
+          FOOTER="🔗 ${RELEASE_URL}"
+          # Reserve space for header + footer + newlines
+          MAX_NOTES_LEN=$((2000 - ${#HEADER} - ${#FOOTER} - 10))
+          if [ ${#RELEASE_NOTES} -gt $MAX_NOTES_LEN ]; then
+            RELEASE_NOTES="${RELEASE_NOTES:0:$((MAX_NOTES_LEN - 3))}..."
+          fi
+
+          MSG="$(printf '%s\n\n%s\n\n%s' "$HEADER" "$RELEASE_NOTES" "$FOOTER")"
+
+          # Suppress @everyone/@here/role mentions
           jq -n \
-            --arg content "$(printf '**Machine Violet Nightly** · `%s`\n\n%s\n\n🔗 %s' \
-              "$NIGHTLY_TAG" "$RELEASE_NOTES" "$RELEASE_URL")" \
-            '{content: $content}' > discord-payload.json
+            --arg content "$MSG" \
+            '{content: $content, allowed_mentions: {parse: []}}' > discord-payload.json
 
           curl -fsSL -X POST \
             -H "Content-Type: application/json" \
