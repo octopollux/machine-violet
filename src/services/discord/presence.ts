@@ -3,7 +3,7 @@ import { DiscordIPCClient } from "./ipc-client.js";
 import { Opcode, type DiscordActivity, type PresenceConfig } from "./types.js";
 
 /** Discord application ID registered on the Developer Portal. */
-const DISCORD_CLIENT_ID = "TODO_REGISTER_APP";
+const DISCORD_CLIENT_ID = "1485029427468435646";
 
 const ASSET_KEY_LOGO = "mv-logo";
 
