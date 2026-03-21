@@ -100,7 +100,7 @@ function shouldUpgradeTerminal(): boolean {
  * Find the best available Windows Terminal binary.
  * Returns the path to wt.exe / WindowsTerminal.exe, or null.
  */
-function findWindowsTerminal(): string | null {
+export function findWindowsTerminal(): string | null {
   // 1. System-installed wt.exe (Store, winget, MSIX)
   try {
     const result = execFileSync("where.exe", ["wt.exe"], {
