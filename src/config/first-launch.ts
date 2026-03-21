@@ -1,6 +1,6 @@
 import { defaultCampaignRoot } from "../tools/filesystem/platform.js";
 import { join, dirname } from "node:path";
-import { existsSync, mkdirSync, copyFileSync, readFileSync as fsReadFileSync } from "node:fs";
+import { existsSync, mkdirSync, copyFileSync, chmodSync, readFileSync as fsReadFileSync } from "node:fs";
 import { config as dotenvConfig } from "dotenv";
 import { isCompiled, configDir } from "../utils/paths.js";
 
@@ -75,6 +75,8 @@ export function getConfigPaths(dir?: string) {
  */
 const CONFIG_FILES = [".env", "config.json", "api-keys.json"] as const;
 
+const SECRET_FILES = new Set([".env", "api-keys.json"]);
+
 export function migrateConfigFromExeDir(): void {
   if (!isCompiled()) return;
 
@@ -82,14 +84,22 @@ export function migrateConfigFromExeDir(): void {
   const exeDir = dirname(process.execPath);
   if (cfgDir === exeDir) return;
 
-  mkdirSync(cfgDir, { recursive: true });
+  try {
+    mkdirSync(cfgDir, { recursive: true, mode: 0o700 });
 
-  for (const file of CONFIG_FILES) {
-    const src = join(exeDir, file);
-    const dest = join(cfgDir, file);
-    if (existsSync(src) && !existsSync(dest)) {
-      copyFileSync(src, dest);
+    for (const file of CONFIG_FILES) {
+      const src = join(exeDir, file);
+      const dest = join(cfgDir, file);
+      if (existsSync(src) && !existsSync(dest)) {
+        copyFileSync(src, dest);
+        if (SECRET_FILES.has(file) && process.platform !== "win32") {
+          chmodSync(dest, 0o600);
+        }
+      }
     }
+  } catch {
+    // Best-effort migration — if it fails the legacy exe-local
+    // fallback in loadEnv() will still find the files.
   }
 }
 
