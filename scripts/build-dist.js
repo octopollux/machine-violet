@@ -17,6 +17,7 @@ import {
   readFileSync,
   writeFileSync,
   rmSync,
+  statSync,
 } from "node:fs";
 import { join, dirname } from "node:path";
 import { execSync } from "node:child_process";
@@ -26,7 +27,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
 const DIST = join(ROOT, "dist");
 const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf-8"));
-const version = pkg.version;
+
+// Allow version override via --version=X.Y.Z (used by CI for nightly versions)
+const versionArg = process.argv.find((a) => a.startsWith("--version="));
+const version = versionArg ? versionArg.split("=")[1] : pkg.version;
 
 const isWindows = process.platform === "win32";
 const exeName = isWindows ? "machine-violet.exe" : "machine-violet";
@@ -70,14 +74,16 @@ const seaConfig = {
   mainFormat: "module",
   disableExperimentalSEAWarning: true,
 };
-const seaConfigPath = join(ROOT, "sea-config.json");
+// Write sea-config to dist/ (temp file, cleaned up after build)
+const seaConfigPath = join(DIST, "sea-config.json");
 writeFileSync(seaConfigPath, JSON.stringify(seaConfig, null, 2));
 
 // Remove existing exe to avoid "file busy" errors
 const exePath = join(DIST, exeName);
 if (existsSync(exePath)) rmSync(exePath);
 
-execSync(`node --build-sea sea-config.json`, { stdio: "inherit", cwd: ROOT });
+execSync(`node --build-sea dist/sea-config.json`, { stdio: "inherit", cwd: ROOT });
+rmSync(seaConfigPath, { force: true });
 
 // --- Step 3: Windows metadata via rcedit ---
 if (isWindows) {
@@ -94,11 +100,12 @@ if (isWindows) {
           CompanyName: "Machine Violet",
           LegalCopyright: "MIT License",
         },
-        "file-version": `${version}.0`,
+        // file-version must be numeric (X.Y.Z.W) — strip any prerelease suffix
+        "file-version": `${version.replace(/-.*$/, "")}.0`,
         "product-version": version,
       });
     } catch (err) {
-      console.warn(`  Warning: rcedit failed (${err.message}). Exe will lack icon/metadata.`);
+      console.warn(`  Warning: rcedit failed (${err instanceof Error ? err.message : String(err)}). Exe will lack icon/metadata.`);
     }
   }
 }
@@ -130,5 +137,5 @@ writeFileSync(join(DIST, "version.json"), JSON.stringify({ version }, null, 2));
 rmSync(join(DIST, "bundle.js"), { force: true });
 
 console.log(`\nDone! Distribution in ${DIST}/`);
-console.log(`  Binary: ${exeName} (${(readFileSync(exePath).length / 1024 / 1024).toFixed(1)} MB)`);
+console.log(`  Binary: ${exeName} (${(statSync(exePath).size / 1024 / 1024).toFixed(1)} MB)`);
 console.log(`  Version: ${version}`);
