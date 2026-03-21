@@ -20,7 +20,6 @@ jobs:
         include:
           - os: windows-latest
             target: bun-windows-x64
-            archive: zip
             asset_suffix: windows-x64
           - os: macos-latest
             target: bun-darwin-arm64
@@ -132,33 +131,28 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Sign Windows binary
+      - name: Install Velopack
         if: matrix.os == 'windows-latest'
-        uses: azure/trusted-signing-action@v1
-        with:
-          endpoint: https://wus2.codesigning.azure.net
-          signing-account-name: mvcodesigning
-          certificate-profile-name: mv-public-trust
-          files: ${{ github.workspace }}/dist/machine-violet.exe
-          exclude-environment-credential: true
-          exclude-workload-identity-credential: true
-          exclude-managed-identity-credential: true
-          exclude-shared-token-cache-credential: true
-          exclude-visual-studio-credential: true
-          exclude-visual-studio-code-credential: true
-          exclude-azure-cli-credential: false
-          exclude-azure-powershell-credential: true
-          exclude-azure-developer-cli-credential: true
-          exclude-interactive-browser-credential: true
+        shell: bash
+        run: |
+          dotnet tool install -g vpk
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
 
-      - name: Package (zip)
-        if: matrix.archive == 'zip'
+      - name: Package and sign (Velopack — Windows)
+        if: matrix.os == 'windows-latest'
         shell: bash
         run: |
           TAG="${{ inputs.tag || github.ref_name }}"
           VERSION="${TAG#v}"
-          cd dist
-          7z a "../machine-violet-${VERSION}-${{ matrix.asset_suffix }}.zip" .
+          vpk pack \
+            --packId MachineViolet \
+            --packVersion "$VERSION" \
+            --packTitle "Machine Violet" \
+            --packDir dist \
+            --mainExe machine-violet.exe \
+            --icon assets/machine-violet.ico \
+            --azureTrustedSignFile assets/trusted-signing.json \
+            --outputDir velopack-out
 
       - name: Package (tar.gz)
         if: matrix.archive == 'tar.gz'
@@ -168,7 +162,15 @@ jobs:
           VERSION="${TAG#v}"
           tar -czf "machine-violet-${VERSION}-${{ matrix.asset_suffix }}.tar.gz" -C dist .
 
-      - name: Upload artifact
+      - name: Upload artifact (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: machine-violet-${{ matrix.asset_suffix }}
+          path: velopack-out/*
+
+      - name: Upload artifact (macOS/Linux)
+        if: matrix.os != 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
           name: machine-violet-${{ matrix.asset_suffix }}
@@ -187,5 +189,8 @@ jobs:
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
           generate_release_notes: true
-          files: machine-violet-*
+          files: |
+            MachineViolet-*
+            machine-violet-*
+            releases.win.json
 
