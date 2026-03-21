@@ -229,7 +229,8 @@ jobs:
           CHANGES: ${{ steps.changes.outputs.context }}
           PREV_TAG: ${{ steps.tags.outputs.prev }}
         run: |
-          PROMPT=$(cat <<'PROMPT_EOF'
+          # Write prompt to file (no shell expansion of untrusted content)
+          cat <<'PROMPT_EOF' > /tmp/system-prompt.txt
           Write release notes for a nightly build of Machine Violet, an AI
           Dungeon Master that runs tabletop RPGs in a terminal.
 
@@ -246,18 +247,31 @@ jobs:
 
           Output ONLY the markdown bullet list — nothing else.
           PROMPT_EOF
-          PROMPT=$(echo "$PROMPT" | sed 's/^          //')
+          sed -i 's/^          //' /tmp/system-prompt.txt
 
-          FULL_PROMPT=$(printf '%s\n\nHere are the PRs merged since the last nightly (%s):\n\n%s' "$PROMPT" "$PREV_TAG" "$CHANGES")
+          # Write the full user message to file
+          {
+            cat /tmp/system-prompt.txt
+            printf '\nHere are the PRs merged since the last nightly (%s):\n\n' "$PREV_TAG"
+            printf '%s\n' "$CHANGES"
+          } > /tmp/user-prompt.txt
 
-          NOTES=$(curl -sf https://api.anthropic.com/v1/messages \
+          # Build JSON request body safely via jq (reads file, no shell interpolation)
+          jq -n --rawfile prompt /tmp/user-prompt.txt \
+            '{model:"claude-haiku-4-5-20251001", max_tokens:1024,
+              messages:[{role:"user",content:$prompt}]}' > /tmp/api-request.json
+
+          # Call the API
+          RESPONSE=$(curl -sf https://api.anthropic.com/v1/messages \
             -H "x-api-key: ${ANTHROPIC_API_KEY}" \
             -H "anthropic-version: 2023-06-01" \
             -H "content-type: application/json" \
-            -d "$(jq -n --arg prompt "$FULL_PROMPT" \
-              '{model:"claude-haiku-4-5-20251001", max_tokens:1024,
-                messages:[{role:"user",content:$prompt}]}')" \
-            | jq -r '.content[0].text') || NOTES="Internal improvements and maintenance."
+            -d @/tmp/api-request.json) || RESPONSE=""
+
+          NOTES=$(echo "$RESPONSE" | jq -r '.content[0].text // empty') || NOTES=""
+          if [ -z "$NOTES" ]; then
+            NOTES="Internal improvements and maintenance."
+          fi
 
           echo "notes<<NOTES_EOF" >> "$GITHUB_OUTPUT"
           echo "$NOTES" >> "$GITHUB_OUTPUT"
