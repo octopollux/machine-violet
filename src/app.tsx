@@ -48,6 +48,7 @@ import { SetupPhase } from "./phases/SetupPhase.js";
 import { PlayingPhase } from "./phases/PlayingPhase.js";
 import { AddContentPhase } from "./phases/AddContentPhase.js";
 import { SettingsPhase } from "./phases/SettingsPhase.js";
+import { DiscordSettingsPhase } from "./phases/DiscordSettingsPhase.js";
 import { loadKeyStore, saveKeyStore, buildEffectiveStore, getActiveKeyValue, getActiveKeyEntry } from "./config/api-keys.js";
 import type { ApiKeyStore } from "./config/api-keys.js";
 import { checkKeyHealth, formatHealthStatus } from "./config/api-key-health.js";
@@ -59,6 +60,9 @@ import type { AvailableSystem } from "./config/systems.js";
 import { promoteCharacter } from "./agents/subagents/character-promotion.js";
 import { processingPaths } from "./config/processing-paths.js";
 import { norm, configDir } from "./utils/paths.js";
+import { loadDiscordSettings, saveDiscordSettings } from "./config/discord.js";
+import { DiscordPresence } from "./services/discord/index.js";
+import { generateDiscordStatus } from "./agents/subagents/discord-status.js";
 import { GameProvider } from "./tui/game-context.js";
 import type { GameContextValue } from "./tui/game-context.js";
 
@@ -69,7 +73,9 @@ export type AppPhase =
   | "main_menu"
   | "settings"
   | "settings_api_keys"
+  | "settings_discord"
   | "api_keys"
+  | "discord_settings"
   | "add_content"
   | "setup"
   | "building"
@@ -314,6 +320,11 @@ export default function App({ shutdownRef }: AppProps) {
   // Keep ref in sync for synchronous reads from refreshKeyStore
   useEffect(() => { keyHealthRef.current = keyHealth; }, [keyHealth]);
 
+  // --- Discord Rich Presence ---
+  const [discordEnabled, setDiscordEnabled] = useState<boolean | null>(null);
+  const discordRef = useRef<DiscordPresence | null>(null);
+  const discordTurnCounter = useRef(0);
+
   // --- Modal state (shared with PlayingPhase via props, set by buildCallbacks/dispatchTuiCommand) ---
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [retryOverlay, setRetryOverlay] = useState<RetryOverlay | null>(null);
@@ -463,6 +474,16 @@ export default function App({ shutdownRef }: AppProps) {
     if (activeVal) process.env.ANTHROPIC_API_KEY = activeVal;
   }, [getConfigDir]);
 
+  /** Save Discord opt-in setting and update state. */
+  const handleDiscordSave = useCallback((enabled: boolean) => {
+    setDiscordEnabled(enabled);
+    try {
+      saveDiscordSettings(configDir(), { enabled });
+    } catch {
+      // Best-effort — don't block the UI for a cosmetic setting
+    }
+  }, []);
+
   /**
    * Gate for API-requiring menu items. Only block when we *know* the key
    * is bad: no key at all, or a completed check that returned invalid/error.
@@ -524,6 +545,10 @@ export default function App({ shutdownRef }: AppProps) {
     setPhase("main_menu");
     loadCampaigns();
     refreshKeyStore();
+
+    // Load Discord opt-in setting
+    const ds = loadDiscordSettings(getConfigDir());
+    setDiscordEnabled(ds.enabled);
   }, [phase, getConfigDir, getConfigPath, loadCampaigns, refreshKeyStore]);
 
   // --- Build game state from config ---
@@ -569,6 +594,22 @@ export default function App({ shutdownRef }: AppProps) {
     setActiveSession, setRetryOverlay, setToolGlyphs,
     gameStateRef, clientRef, engineRef, activeModalRef, variantRef, previousVariantRef,
     costTracker, fileIO,
+    onTurnEndExtra: (turn) => {
+      if (!discordRef.current?.active || !clientRef.current) return;
+      if (turn.role !== "dm") return;
+      discordTurnCounter.current++;
+      if (discordTurnCounter.current % 8 !== 0) return;
+
+      const recent = narrativeLines
+        .filter((l) => l.kind === "dm")
+        .slice(-5)
+        .map((l) => l.text)
+        .join(" ")
+        .slice(0, 500);
+      void generateDiscordStatus(clientRef.current, recent).then((status) => {
+        discordRef.current?.updateDetails(status);
+      });
+    },
   });
 
   // --- Start engine for a campaign ---
@@ -642,6 +683,21 @@ export default function App({ shutdownRef }: AppProps) {
       ctx.fileIO = fileIO.current;
       ctx.gitEnabled = config.recovery.enable_git;
       ctx.gitIO = gitIO;
+    }
+
+    // Start Discord Rich Presence (fire-and-forget, silent on failure)
+    if (discordEnabled) {
+      const presence = new DiscordPresence();
+      discordRef.current = presence;
+      discordTurnCounter.current = 0;
+      void presence.start({
+        clientId: "",
+        campaignName: config.name,
+        dmPersona: config.dm_personality.name,
+      });
+      if (shutdownRef) {
+        shutdownRef.current.discordPresence = presence;
+      }
     }
 
     if (isResume) {
@@ -817,6 +873,13 @@ export default function App({ shutdownRef }: AppProps) {
     setPhase("returning_to_menu");
 
     void (async () => {
+      // Disconnect Discord before teardown
+      if (discordRef.current) {
+        void discordRef.current.stop();
+        discordRef.current = null;
+        discordTurnCounter.current = 0;
+      }
+
       try {
         await teardownGameSession({
           engine: engineRef.current ?? undefined,
@@ -858,6 +921,13 @@ export default function App({ shutdownRef }: AppProps) {
     setPhase("returning_to_menu");
 
     void (async () => {
+      // Disconnect Discord before teardown
+      if (discordRef.current) {
+        void discordRef.current.stop();
+        discordRef.current = null;
+        discordTurnCounter.current = 0;
+      }
+
       if (engineRef.current) {
         try {
           const sm = engineRef.current.getSceneManager();
@@ -981,17 +1051,20 @@ export default function App({ shutdownRef }: AppProps) {
         onAddContent={() => setPhase("add_content")}
         onSettings={() => setPhase("settings")}
         onSettingsApiKeys={() => setPhase("settings_api_keys")}
+        discordSettingUnset={discordEnabled === null}
+        onDiscordSettings={() => setPhase("discord_settings")}
         onQuit={doQuit}
       />
     );
   }
 
-  if (phase === "settings" || phase === "settings_api_keys") {
+  if (phase === "settings" || phase === "settings_api_keys" || phase === "settings_discord") {
     return (
       <SettingsPhase
         theme={theme}
-        initialView={phase === "settings_api_keys" ? "api_keys" : undefined}
+        initialView={phase === "settings_api_keys" ? "api_keys" : phase === "settings_discord" ? "discord" : undefined}
         onApiKeys={() => setPhase("api_keys")}
+        onDiscord={() => setPhase("discord_settings")}
         onBack={() => setPhase("main_menu")}
       />
     );
@@ -1006,6 +1079,20 @@ export default function App({ shutdownRef }: AppProps) {
         onUpdateStore={handleUpdateKeyStore}
         onCheckHealth={handleCheckHealth}
         onBack={() => setPhase("settings")}
+      />
+    );
+  }
+
+  if (phase === "discord_settings") {
+    return (
+      <DiscordSettingsPhase
+        theme={theme}
+        currentSetting={discordEnabled}
+        onSave={(enabled) => {
+          handleDiscordSave(enabled);
+          setPhase("main_menu");
+        }}
+        onBack={() => setPhase("main_menu")}
       />
     );
   }

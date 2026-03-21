@@ -13,6 +13,8 @@ export interface ShutdownContext {
   fileIO?: FileIO;
   gitEnabled?: boolean;
   gitIO?: GitIO;
+  /** Discord Rich Presence handle for cleanup on shutdown. */
+  discordPresence?: { stop(): Promise<void> };
 }
 
 /**
@@ -62,5 +64,12 @@ export async function gracefulShutdown(ctx: ShutdownContext): Promise<void> {
     } catch {
       // Best-effort
     }
+  }
+
+  // 3. Disconnect Discord Rich Presence
+  try {
+    await ctx.discordPresence?.stop();
+  } catch {
+    // Best-effort
   }
 }

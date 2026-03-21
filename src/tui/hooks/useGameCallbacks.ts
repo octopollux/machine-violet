@@ -48,6 +48,8 @@ export interface GameCallbackDeps {
   previousVariantRef: React.MutableRefObject<StyleVariant>;
   costTracker: React.RefObject<CostTracker>;
   fileIO: React.RefObject<FileIO>;
+  /** Optional hook called after each turn ends (used by Discord presence). */
+  onTurnEndExtra?: (turn: TurnInfo) => void;
 }
 
 export interface GameCallbackResult {
@@ -298,8 +300,9 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
       }
       // role === "dm" → no-op (onNarrativeDelta handles DM text rendering)
     },
-    onTurnEnd(_turn: TurnInfo) {
+    onTurnEnd(turn: TurnInfo) {
       setNarrativeLines((prev) => [...prev, { kind: "separator", text: "" }]);
+      deps.onTurnEndExtra?.(turn);
     },
   }), [dispatchTuiCommand, setNarrativeLines, setEngineState,
        setErrorMsg, setActiveModal, setChoiceIndex, setRetryOverlay, setToolGlyphs,

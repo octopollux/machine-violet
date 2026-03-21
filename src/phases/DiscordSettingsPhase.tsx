@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import { useInput, Text, Box } from "ink";
 import type { ResolvedTheme } from "../tui/themes/types.js";
 import { ThemedHorizontalBorder, ThemedSideFrame, TerminalTooSmall } from "../tui/components/index.js";
@@ -6,40 +6,23 @@ import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
 
-export interface SettingsPhaseProps {
+export interface DiscordSettingsPhaseProps {
   theme: ResolvedTheme;
-  /** When set, the phase immediately navigates to a sub-screen on mount. */
-  initialView?: "api_keys" | "discord";
-  onApiKeys: () => void;
-  onDiscord: () => void;
+  currentSetting: boolean | null;
+  onSave: (enabled: boolean) => void;
   onBack: () => void;
 }
 
-const MENU_ITEMS = ["API Keys", "Discord"];
+const OPTIONS = ["Enable", "Disable"] as const;
 
-export function SettingsPhase({
+export function DiscordSettingsPhase({
   theme,
-  initialView,
-  onApiKeys,
-  onDiscord,
+  currentSetting,
+  onSave,
   onBack,
-}: SettingsPhaseProps) {
+}: DiscordSettingsPhaseProps) {
   const { columns: cols, rows: termRows } = useTerminalSize();
-  const [menuIndex, setMenuIndex] = useState(0);
-  const navigatedRef = useRef(false);
-
-  // Deep-link: if initialView is set, navigate once on mount
-  useEffect(() => {
-    if (!navigatedRef.current) {
-      if (initialView === "api_keys") {
-        navigatedRef.current = true;
-        onApiKeys();
-      } else if (initialView === "discord") {
-        navigatedRef.current = true;
-        onDiscord();
-      }
-    }
-  }, [initialView, onApiKeys, onDiscord]);
+  const [selectedIndex, setSelectedIndex] = useState(currentSetting === false ? 1 : 0);
 
   useInput((_input, key) => {
     if (key.escape) {
@@ -47,20 +30,15 @@ export function SettingsPhase({
       return;
     }
     if (key.upArrow) {
-      setMenuIndex((i) => Math.max(0, i - 1));
+      setSelectedIndex((i) => Math.max(0, i - 1));
       return;
     }
     if (key.downArrow) {
-      setMenuIndex((i) => Math.min(MENU_ITEMS.length - 1, i + 1));
+      setSelectedIndex((i) => Math.min(OPTIONS.length - 1, i + 1));
       return;
     }
     if (key.return) {
-      const selected = MENU_ITEMS[menuIndex];
-      if (selected === "API Keys") {
-        onApiKeys();
-      } else if (selected === "Discord") {
-        onDiscord();
-      }
+      onSave(selectedIndex === 0);
     }
   });
 
@@ -76,53 +54,60 @@ export function SettingsPhase({
   const contentWidth = cols - sideWidth * 2;
   const contentHeight = termRows - topHeight * 2;
 
-  const menuLines: React.ReactNode[] = [];
-  for (let i = 0; i < MENU_ITEMS.length; i++) {
-    const item = MENU_ITEMS[i];
-    const isSelected = i === menuIndex;
+  const lines: React.ReactNode[] = [];
+
+  lines.push(
+    <Text key="heading" bold>Discord Rich Presence</Text>,
+  );
+  lines.push(
+    <Text key="spacer1">{" "}</Text>,
+  );
+  lines.push(
+    <Text key="desc1" color={dimColor}>Show your current adventure on Discord?</Text>,
+  );
+  lines.push(
+    <Text key="desc2" color={dimColor}>Your campaign name and a brief AI-generated</Text>,
+  );
+  lines.push(
+    <Text key="desc3" color={dimColor}>status will be visible to your Discord friends.</Text>,
+  );
+  lines.push(
+    <Text key="spacer2">{" "}</Text>,
+  );
+
+  for (let i = 0; i < OPTIONS.length; i++) {
+    const isSelected = i === selectedIndex;
     const marker = isSelected ? "◆" : "○";
     const markerColor = isSelected ? borderColor : dimColor;
-
-    menuLines.push(
-      <Text key={item}>
+    lines.push(
+      <Text key={OPTIONS[i]}>
         <Text color={markerColor}>{marker}</Text>
-        <Text>{` ${item}`}</Text>
+        <Text>{` ${OPTIONS[i]}`}</Text>
       </Text>,
     );
   }
 
-  const menuHeight = menuLines.length;
-  const topPad = Math.max(0, Math.floor((contentHeight - menuHeight) / 2));
-  const bottomPad = Math.max(0, contentHeight - menuHeight - topPad);
+  const totalHeight = lines.length;
+  const topPad = Math.max(0, Math.floor((contentHeight - totalHeight) / 2));
+  const bottomPad = Math.max(0, contentHeight - totalHeight - topPad);
 
   return (
     <Box flexDirection="column" width={cols} height={termRows}>
-      <ThemedHorizontalBorder
-        theme={theme}
-        width={cols}
-        position="top"
-        centerText="Settings"
-      />
+      <ThemedHorizontalBorder theme={theme} width={cols} position="top" centerText="Discord" />
 
       <Box flexDirection="row" height={contentHeight}>
         <ThemedSideFrame theme={theme} side="left" height={contentHeight} />
         <Box flexDirection="column" width={contentWidth} alignItems="center">
           {topPad > 0 && <Box height={topPad} />}
-
           <Box flexDirection="column" alignItems="flex-start">
-            {menuLines}
+            {lines}
           </Box>
-
           {bottomPad > 0 && <Box height={bottomPad} />}
         </Box>
         <ThemedSideFrame theme={theme} side="right" height={contentHeight} />
       </Box>
 
-      <ThemedHorizontalBorder
-        theme={theme}
-        width={cols}
-        position="bottom"
-      />
+      <ThemedHorizontalBorder theme={theme} width={cols} position="bottom" />
     </Box>
   );
 }
