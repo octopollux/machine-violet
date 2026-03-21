@@ -9,7 +9,7 @@ import { themeColor } from "../tui/themes/color-resolve.js";
 export interface SettingsPhaseProps {
   theme: ResolvedTheme;
   /** When set, the phase immediately navigates to a sub-screen on mount. */
-  initialView?: "api_keys" | "discord";
+  initialView?: "api_keys";
   onApiKeys: () => void;
   onDiscord: () => void;
   onBack: () => void;
@@ -30,14 +30,9 @@ export function SettingsPhase({
 
   // Deep-link: if initialView is set, navigate once on mount
   useEffect(() => {
-    if (!navigatedRef.current) {
-      if (initialView === "api_keys") {
-        navigatedRef.current = true;
-        onApiKeys();
-      } else if (initialView === "discord") {
-        navigatedRef.current = true;
-        onDiscord();
-      }
+    if (initialView === "api_keys" && !navigatedRef.current) {
+      navigatedRef.current = true;
+      onApiKeys();
     }
   }, [initialView, onApiKeys, onDiscord]);
 

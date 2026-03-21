@@ -73,7 +73,6 @@ export type AppPhase =
   | "main_menu"
   | "settings"
   | "settings_api_keys"
-  | "settings_discord"
   | "api_keys"
   | "discord_settings"
   | "add_content"
@@ -1062,11 +1061,11 @@ export default function App({ shutdownRef }: AppProps) {
     );
   }
 
-  if (phase === "settings" || phase === "settings_api_keys" || phase === "settings_discord") {
+  if (phase === "settings" || phase === "settings_api_keys") {
     return (
       <SettingsPhase
         theme={theme}
-        initialView={phase === "settings_api_keys" ? "api_keys" : phase === "settings_discord" ? "discord" : undefined}
+        initialView={phase === "settings_api_keys" ? "api_keys" : undefined}
         onApiKeys={() => setPhase("api_keys")}
         onDiscord={() => setPhase("discord_settings")}
         onBack={() => setPhase("main_menu")}

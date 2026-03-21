@@ -147,7 +147,11 @@ export class DiscordIPCClient {
 
       // Handle PING with automatic PONG
       if (opcode === Opcode.PING) {
-        void this.send(Opcode.PONG, JSON.parse(json) as object);
+        try {
+          void this.send(Opcode.PONG, JSON.parse(json) as object);
+        } catch {
+          // Malformed PING payload — skip frame
+        }
         continue;
       }
 
