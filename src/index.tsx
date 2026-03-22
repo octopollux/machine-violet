@@ -78,3 +78,7 @@ async function handleShutdownSignal() {
 
 process.on("SIGINT", () => { handleShutdownSignal(); });
 process.on("SIGTERM", () => { handleShutdownSignal(); });
+process.on("unhandledRejection", (reason) => {
+  process.stderr.write(`\nUnhandled rejection: ${reason}\n`);
+  handleShutdownSignal();
+});

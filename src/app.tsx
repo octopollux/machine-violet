@@ -638,10 +638,7 @@ export default function App({ shutdownRef }: AppProps) {
     if (shutdownRef) {
       const ctx = shutdownRef.current;
       ctx.engine = engine;
-      ctx.campaignRoot = campaignRoot;
-      ctx.fileIO = fileIO.current;
-      ctx.gitEnabled = config.recovery.enable_git;
-      ctx.gitIO = gitIO;
+      ctx.repo = engine.getRepo() ?? undefined;
     }
 
     if (isResume) {
@@ -805,10 +802,7 @@ export default function App({ shutdownRef }: AppProps) {
     if (shutdownRef) {
       const ctx = shutdownRef.current;
       ctx.engine = undefined;
-      ctx.campaignRoot = undefined;
-      ctx.fileIO = undefined;
-      ctx.gitEnabled = undefined;
-      ctx.gitIO = undefined;
+      ctx.repo = undefined;
     }
   }, [shutdownRef]);
 
@@ -820,10 +814,7 @@ export default function App({ shutdownRef }: AppProps) {
       try {
         await teardownGameSession({
           engine: engineRef.current ?? undefined,
-          campaignRoot: gameStateRef.current?.campaignRoot,
-          fileIO: fileIO.current,
-          gitEnabled: gameStateRef.current?.config.recovery.enable_git,
-          gitIO: shutdownRef?.current?.gitIO,
+          repo: engineRef.current?.getRepo() ?? undefined,
         });
       } catch {
         // Best-effort — still return to menu
@@ -835,7 +826,7 @@ export default function App({ shutdownRef }: AppProps) {
       refreshKeyStore();
       setPhase("main_menu");
     })();
-  }, [shutdownRef, resetGameState, loadCampaigns, refreshKeyStore]);
+  }, [resetGameState, loadCampaigns, refreshKeyStore]);
 
   // Keep the ref in sync so useGameCallbacks' dispatchTuiCommand always calls the latest version
   returnToMenuRef.current = doSaveAndReturn;
@@ -871,10 +862,7 @@ export default function App({ shutdownRef }: AppProps) {
       try {
         await teardownGameSession({
           engine: engineRef.current ?? undefined,
-          campaignRoot: gameStateRef.current?.campaignRoot,
-          fileIO: fileIO.current,
-          gitEnabled: gameStateRef.current?.config.recovery.enable_git,
-          gitIO: shutdownRef?.current?.gitIO,
+          repo: engineRef.current?.getRepo() ?? undefined,
         });
       } catch {
         // Best-effort — still return to menu
@@ -886,7 +874,7 @@ export default function App({ shutdownRef }: AppProps) {
       refreshKeyStore();
       setPhase("main_menu");
     })();
-  }, [shutdownRef, resetGameState, loadCampaigns, refreshKeyStore]);
+  }, [resetGameState, loadCampaigns, refreshKeyStore]);
 
   // --- Quit: hard exit ---
   const doQuit = useCallback(() => {

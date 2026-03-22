@@ -40,7 +40,7 @@ beforeEach(() => {
 
 describe("teardownGameSession", () => {
   it("calls gracefulShutdown and resets all caches", async () => {
-    const ctx = { campaignRoot: "/tmp/test" };
+    const ctx = {};
     await teardownGameSession(ctx);
 
     expect(gracefulShutdown).toHaveBeenCalledWith(ctx);

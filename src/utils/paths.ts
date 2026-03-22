@@ -6,18 +6,15 @@ export function norm(p: string): string {
   return p.replace(/\\/g, "/");
 }
 
-/** True when running inside a compiled standalone executable (Bun or Node SEA). */
+/** True when running inside a compiled standalone executable (Node SEA). */
 export function isCompiled(): boolean {
-  // Node SEA detection
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const sea = require("node:sea");
     if (sea.isSea()) return true;
-  } catch { /* not in SEA — continue */ }
+  } catch { /* not in SEA */ }
 
-  // Legacy Bun detection
-  const meta = import.meta.dirname;
-  return meta.includes("$bunfs") || meta.includes("~BUN");
+  return false;
 }
 
 /**
