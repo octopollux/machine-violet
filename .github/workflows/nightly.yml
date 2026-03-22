@@ -344,18 +344,15 @@ jobs:
           NIGHTLY_TAG: ${{ steps.tags.outputs.tag }}
           RELEASE_NOTES: ${{ steps.changelog.outputs.notes }}
         run: |
-          RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/nightly"
-
           # Build message, truncating to fit Discord's 2000-char limit
+          # No release link — nightlies post consecutively in the same channel
           HEADER="**Machine Violet Nightly** · \`${NIGHTLY_TAG}\`"
-          FOOTER="🔗 ${RELEASE_URL}"
-          # Reserve space for header + footer + newlines
-          MAX_NOTES_LEN=$((2000 - ${#HEADER} - ${#FOOTER} - 10))
+          MAX_NOTES_LEN=$((2000 - ${#HEADER} - 4))
           if [ ${#RELEASE_NOTES} -gt $MAX_NOTES_LEN ]; then
             RELEASE_NOTES="${RELEASE_NOTES:0:$((MAX_NOTES_LEN - 3))}..."
           fi
 
-          MSG="$(printf '%s\n\n%s\n\n%s' "$HEADER" "$RELEASE_NOTES" "$FOOTER")"
+          MSG="$(printf '%s\n\n%s' "$HEADER" "$RELEASE_NOTES")"
 
           # Suppress @everyone/@here/role mentions
           jq -n \
