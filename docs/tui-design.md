@@ -425,6 +425,7 @@ ESC key opens the game menu modal:
 ║     ◆ Resume         ║
 ║     ○ Character Sheet ║
 ║     ○ Compendium     ║
+║     ○ Player Notes   ║
 ║     ○ OOC Mode       ║
 ║     ○ Settings       ║
 ║     ○ Save & Exit    ║
@@ -433,6 +434,14 @@ ESC key opens the game menu modal:
 ```
 
 Standard navigation (arrow keys + Enter). "Save & Exit" persists state and returns to the main menu. "End Session" runs full session-end housekeeping (transcript, summary, git commit) then returns to menu. Settings covers choice frequency, display preferences, and other player-level configuration. OOC Mode from here is equivalent to the DM detecting an OOC request.
+
+### Player Notes
+
+Player-accessible via ESC menu → Player Notes. Opens a simple multi-line plain-text editor. Saves on ESC close. Persisted to `campaign/player-notes.md`.
+
+The editor handles arrow navigation, home/end (Ctrl+A/E), horizontal scroll for long lines, and vertical scroll within the modal. Uses CenteredModal's `rawRows` mode for custom cursor rendering (inverse video) while reusing the shared modal frame.
+
+**Code:** `src/tui/modals/PlayerNotesModal.tsx`
 
 ### Color Swatch Modal
 
@@ -450,6 +459,25 @@ The `/swatch` command opens a debug modal showing the full harmony swatch grid, 
 - At minimal viewport sizes, modals take the full screen.
 
 **Code:** `deriveModalTheme()` in `src/tui/themes/color-resolve.ts`, applied automatically in `CenteredModal` and `Modal`.
+
+### CenteredModal content modes
+
+`CenteredModal` is the base component for themed, scrollable, centered modals. It supports four content modes (listed by precedence):
+
+| Mode | Prop | Use case |
+|---|---|---|
+| **rawRows** | `rawRows: ReactNode[]` | Pre-rendered row nodes for custom rendering (e.g. cursor, highlighting). Caller pads each row to `innerWidth`; CenteredModal adds side padding. |
+| **children** | `children: ReactNode` | Arbitrary React content (e.g. SwatchModal's color grid). Requires explicit `contentHeight`. |
+| **styledLines** | `styledLines: FormattingNode[][]` | Pre-parsed formatting nodes (e.g. CompendiumModal's tree). Word-wrapped automatically. |
+| **lines** | `lines: string[]` | Plain text. Word-wrapped automatically. |
+
+**Self-handling keyboard input:** Read-only modals set `scrollKeys={true}` and pass an `onDismiss` callback. CenteredModal handles PageUp/PageDown/arrows/+/- for scrolling and ESC/Enter for dismissal internally. Modals with custom input (CompendiumModal, PlayerNotesModal) leave `scrollKeys` off and manage their own `useInput`.
+
+### FullScreenFrame
+
+`FullScreenFrame` is the shared layout shell for out-of-game full-screen pages (MainMenuPhase, SettingsPhase). It renders the themed top/bottom borders, side frames, and vertically centers children within the content area. Callers pass `contentRows` (the number of rows their content occupies) for centering math.
+
+**Code:** `src/tui/components/FullScreenFrame.tsx`
 
 
 ## DM Tool Interface

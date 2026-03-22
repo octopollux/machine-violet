@@ -10,6 +10,8 @@ interface CharacterSheetModalProps {
   width: number;
   height: number;
   content: string;
+  onDismiss?: () => void;
+  /** Ref for external scroll control (e.g. mouse wheel override). */
   scrollRef?: React.Ref<CenteredModalHandle>;
   topOffset?: number;
 }
@@ -29,6 +31,7 @@ export function CharacterSheetModal({
   width,
   height,
   content,
+  onDismiss,
   scrollRef,
   topOffset,
 }: CharacterSheetModalProps) {
@@ -61,6 +64,8 @@ export function CharacterSheetModal({
       maxWidth={999}
       widthFraction={0.7}
       topOffset={topOffset}
+      onDismiss={onDismiss}
+      scrollKeys
     />
   );
 }

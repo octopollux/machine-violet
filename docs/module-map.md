@@ -87,8 +87,8 @@ Ink (React for CLI) components, formatting pipeline, theme system.
 | `responsive.ts` | Terminal size detection and layout tier selection |
 | `activity.ts` | Activity/status bar state management |
 | `game-context.ts` | React context for game engine callbacks |
-| `components/` | Reusable: `Modeline`, `InputLine`, `NarrativeArea`, `PlayerSelector`, `ActivityLine`, `FrameBorder` |
-| `modals/` | `ChoiceModal`, `CharacterSheetModal`, `CompendiumModal`, `DiceRollModal`, `SessionRecapModal`, `GameMenu`, `ApiErrorModal` |
+| `components/` | Reusable: `Modeline`, `InputLine`, `NarrativeArea`, `PlayerSelector`, `ActivityLine`, `FrameBorder`, `FullScreenFrame` |
+| `modals/` | `CenteredModal`, `ChoiceModal`, `CharacterSheetModal`, `CompendiumModal`, `DiceRollModal`, `SessionRecapModal`, `GameMenu`, `ApiErrorModal`, `SwatchModal`, `CampaignSettingsModal`, `RollbackSummaryModal`, `PlayerNotesModal` |
 | `themes/` | Theme parser, loader, resolver. Built-in themes in `themes/assets/` |
 | `color/` | OKLCH color space utilities, gradient generation |
 | `frames/` | Box drawing, styled content lines, string measurement |

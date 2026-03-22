@@ -8,6 +8,8 @@ interface SessionRecapModalProps {
   width: number;
   height: number;
   lines: string[];
+  onDismiss?: () => void;
+  /** Ref for external scroll control (e.g. mouse wheel override). */
   scrollRef?: React.Ref<CenteredModalHandle>;
   topOffset?: number;
 }
@@ -21,6 +23,7 @@ export function SessionRecapModal({
   width,
   height,
   lines,
+  onDismiss,
   scrollRef,
   topOffset,
 }: SessionRecapModalProps) {
@@ -36,6 +39,8 @@ export function SessionRecapModal({
       minWidth={40}
       maxWidth={40}
       topOffset={topOffset}
+      onDismiss={onDismiss}
+      scrollKeys
     />
   );
 }

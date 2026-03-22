@@ -227,49 +227,14 @@ export function PlayingPhase() {
       return;
     }
 
-    // Rollback summary: Enter/ESC dismisses and returns to menu
-    if (activeModal && activeModal.kind === "rollback") {
-      if (key.escape || key.return) {
-        setActiveModal(null);
-        onRollbackReturn();
-      }
-      return;
-    }
-
-    // Compendium modal: handles its own input via useInput
-    if (activeModal && activeModal.kind === "compendium") {
-      return;
-    }
-
-    // Notes modal: handles its own input via useInput
-    if (activeModal && activeModal.kind === "notes") {
-      return;
-    }
-
-    // Scrollable modals (character sheet, recap)
-    if (activeModal && (activeModal.kind === "character_sheet" || activeModal.kind === "recap")) {
-      if (key.escape || key.return) {
-        setActiveModal(null);
-        return;
-      }
-      if (key.pageUp || key.pageDown) {
-        const step = scrollAmount(rows);
-        modalScrollRef.current?.scrollBy(key.pageUp ? -step : step);
-        return;
-      }
-      if (input === "+" || input === "-") {
-        const step = scrollAmount(rows);
-        modalScrollRef.current?.scrollBy(input === "-" ? -step : step);
-        return;
-      }
-      if (key.upArrow) {
-        modalScrollRef.current?.scrollBy(-1);
-        return;
-      }
-      if (key.downArrow) {
-        modalScrollRef.current?.scrollBy(1);
-        return;
-      }
+    // Modals that handle their own input via useInput or CenteredModal scrollKeys
+    if (activeModal && (
+      activeModal.kind === "rollback" ||
+      activeModal.kind === "compendium" ||
+      activeModal.kind === "notes" ||
+      activeModal.kind === "character_sheet" ||
+      activeModal.kind === "recap"
+    )) {
       return;
     }
 
@@ -601,6 +566,7 @@ export function PlayingPhase() {
           width={cols}
           height={narRows}
           summary={activeModal.summary}
+          onDismiss={() => { setActiveModal(null); onRollbackReturn(); }}
           topOffset={conversationPaneTop}
         />
       )}
@@ -610,6 +576,7 @@ export function PlayingPhase() {
           width={cols}
           height={narRows}
           lines={activeModal.lines}
+          onDismiss={() => setActiveModal(null)}
           scrollRef={modalScrollRef}
           topOffset={conversationPaneTop}
         />
@@ -620,6 +587,7 @@ export function PlayingPhase() {
           width={cols}
           height={narRows}
           content={activeModal.content}
+          onDismiss={() => setActiveModal(null)}
           scrollRef={modalScrollRef}
           topOffset={conversationPaneTop}
         />
