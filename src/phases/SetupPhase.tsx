@@ -6,7 +6,6 @@ import type { ResolvedTheme } from "../tui/themes/types.js";
 import { appendDelta } from "../tui/narrative-helpers.js";
 import { Layout } from "../tui/layout.js";
 import { ChoiceOverlay, DESCRIPTION_ROWS } from "../tui/modals/index.js";
-import { stripFormatting, stripLeadingBullet } from "../tui/formatting.js";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
 import { scrollAmount, TerminalTooSmall, buildModelineDisplay, splitModeline } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, choiceRowBudget } from "../tui/responsive.js";
@@ -45,11 +44,6 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
 
   // Choice modal state
   const [activeModal, setActiveModal] = useState<ActiveChoiceModal | null>(null);
-  const [choiceIndex, setChoiceIndex] = useState(0);
-
-  // Custom input state for "Enter your own" in choice modals
-  const [customInputActive, setCustomInputActive] = useState(false);
-  const [customInputResetKey, setCustomInputResetKey] = useState(0);
 
   // Gate: hold finalized result until player presses ENTER
   const [pendingResult, setPendingResult] = useState<SetupResult | null>(null);
@@ -68,11 +62,6 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
     setSetupConvoLines((prev) => [...prev, { kind: "dm", text: "" }]);
 
     if (result.pendingChoices) {
-      // When fewer than 5 options, default focus to "Enter your own" so the user can freely type
-      const customIndex = result.pendingChoices.choices.length;
-      setChoiceIndex(customIndex < 5 ? customIndex : 0);
-      setCustomInputActive(customIndex < 5);
-
       setActiveModal({
         kind: "choice",
         prompt: result.pendingChoices.prompt,
@@ -114,8 +103,6 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
     if (!convo) return;
 
     setActiveModal(null);
-    setChoiceIndex(0);
-    setCustomInputActive(false);
     setSetupConvoLines((prev) => [...prev, { kind: "player", text: `> ${selectedText}` }, { kind: "dm", text: "" }, { kind: "dm", text: "" }]);
     setSetupConvoBusy(true);
 
@@ -128,15 +115,6 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
       onCancel();
     }
   }, [setActiveModal, setupStreamDelta, handleSetupTurnResult, onError, onCancel]);
-
-  // --- Handle custom input submit from "Enter your own" ---
-  const handleCustomInputSubmit = useCallback((value: string) => {
-    if (!value.trim()) return;
-    const text = value.trim();
-    setCustomInputActive(false);
-    setCustomInputResetKey((k) => k + 1);
-    resolveSetupChoice(text);
-  }, [resolveSetupChoice]);
 
   // --- Start setup (once) ---
   const startSetup = useCallback(async () => {
@@ -188,75 +166,14 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
 
     // Conversational mode
     if (setupConvoRef.current) {
-      // Choice modal active during setup
-      if (activeModal && activeModal.kind === "choice") {
-        const totalOptions = activeModal.choices.length + 1; // +1 for "Enter your own"
-
-        if (customInputActive) {
-          if (key.escape) {
-            setCustomInputActive(false);
-            return;
-          }
-          if (key.upArrow) {
-            setCustomInputActive(false);
-            setCustomInputResetKey((k) => k + 1);
-            setChoiceIndex(activeModal.choices.length - 1);
-            return;
-          }
-          if (key.pageUp || key.pageDown) {
-            const step = scrollAmount(rows);
-            narrativeRef.current?.scrollBy(key.pageUp ? -step : step);
-            return;
-          }
-          return;
-        }
-
-        if (key.upArrow) {
-          setChoiceIndex((i) => Math.max(0, i - 1));
-          return;
-        }
-        if (key.downArrow) {
-          setChoiceIndex((i) => {
-            const next = Math.min(totalOptions - 1, i + 1);
-            if (next === activeModal.choices.length) {
-              setCustomInputActive(true);
-            }
-            return next;
-          });
-          return;
-        }
-        if (key.return) {
-          if (choiceIndex === activeModal.choices.length) {
-            setCustomInputActive(true);
-            return;
-          }
-          const chosen = stripLeadingBullet(stripFormatting(activeModal.choices[choiceIndex]));
-          resolveSetupChoice(chosen);
-          return;
-        }
-        if (key.escape) {
-          setActiveModal(null);
-          setChoiceIndex(0);
-          setCustomInputActive(false);
-          return;
-        }
-        if (key.pageUp || key.pageDown) {
-          const step = scrollAmount(rows);
-          narrativeRef.current?.scrollBy(key.pageUp ? -step : step);
-        }
-        if (_input === "+" || _input === "-") {
-          const step = scrollAmount(rows);
-          narrativeRef.current?.scrollBy(_input === "-" ? -step : step);
-        }
-        return;
-      }
+      // Choice modal handles its own input
+      if (activeModal) return;
 
       if (key.escape) {
         setupConvoRef.current = null;
         setSetupConvoLines([]);
         clearInput();
         setActiveModal(null);
-        setCustomInputActive(false);
         onCancel();
         return;
       }
@@ -309,13 +226,15 @@ export function SetupPhase({ theme, costTracker, onComplete, onCancel, onError }
         prompt={activeModal.prompt}
         choices={activeModal.choices}
         descriptions={activeModal.descriptions}
-        selectedIndex={choiceIndex}
         accentColor={theme.keyColor}
         maxChoiceRows={setupMaxChoiceRows}
-        showCustomInput
-        customInputActive={customInputActive}
-        customInputResetKey={customInputResetKey}
-        onCustomInputSubmit={handleCustomInputSubmit}
+        initialIndex={activeModal.choices.length < 5 ? activeModal.choices.length : 0}
+        onSelect={(choice) => resolveSetupChoice(choice)}
+        onDismiss={() => setActiveModal(null)}
+        onNarrativeScroll={(dir) => {
+          const step = scrollAmount(rows);
+          narrativeRef.current?.scrollBy(dir < 0 ? -step : step);
+        }}
       />
     ) : undefined;
 

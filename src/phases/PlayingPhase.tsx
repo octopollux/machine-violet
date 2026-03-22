@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { useInput, Box } from "ink";
 import { appendDelta } from "../tui/narrative-helpers.js";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
@@ -7,8 +7,7 @@ import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, narrativeRo
 import { getActivity } from "../tui/activity.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { Layout } from "../tui/layout.js";
-import { stripFormatting, stripLeadingBullet } from "../tui/formatting.js";
-import { ChoiceOverlay, DESCRIPTION_ROWS, DiceRollModal, SessionRecapModal, RollbackSummaryModal, GameMenu, CharacterSheetModal, CompendiumModal, PlayerNotesModal, ApiErrorModal, SwatchModal, CampaignSettingsModal, getMenuItems } from "../tui/modals/index.js";
+import { ChoiceOverlay, DESCRIPTION_ROWS, DiceRollModal, SessionRecapModal, RollbackSummaryModal, GameMenu, CharacterSheetModal, CompendiumModal, PlayerNotesModal, ApiErrorModal, SwatchModal, CampaignSettingsModal } from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { getActivePlayer, switchToNextPlayer, getPlayerEntries } from "../agents/player-manager.js";
 import { createOOCSession } from "../agents/subagents/ooc-mode.js";
@@ -27,7 +26,6 @@ export function PlayingPhase() {
     campaignName, activePlayerIndex, setActivePlayerIndex,
     engineState, toolGlyphs, resources, modelines,
     activeModal, setActiveModal,
-    choiceIndex, setChoiceIndex,
     activeSession, setActiveSession, previousVariantRef,
     devModeEnabled,
     retryOverlay,
@@ -51,19 +49,8 @@ export function PlayingPhase() {
   // Local state — only used within playing phase input/render
   const [resetKey, setResetKey] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [menuIndex, setMenuIndex] = useState(0);
   const [modeBusy, setModeBusy] = useState(false);
   const [campaignSettingsOpen, setCampaignSettingsOpen] = useState(false);
-  const [customInputMode, setCustomInputMode] = useState(false);
-  const [customInputResetKey, setCustomInputResetKey] = useState(0);
-
-  // When a choice modal appears with <5 options, default focus lands on "Enter your own"
-  // so choiceIndex === choices.length — activate custom input mode to match.
-  useEffect(() => {
-    if (activeModal?.kind === "choice" && choiceIndex === activeModal.choices.length) {
-      setCustomInputMode(true);
-    }
-  }, [activeModal, choiceIndex]);
 
   const clearInput = useCallback(() => {
     setResetKey((k) => k + 1);
@@ -74,11 +61,8 @@ export function PlayingPhase() {
   const escTimestamps = useRef<number[]>([]);
   const oocSummaries = useRef<string[]>([]);
 
-  const menuItems = useMemo(() => getMenuItems(devModeEnabled), [devModeEnabled]);
-
   // Whether TextInput should be disabled
   const textInputDisabled =
-    !!(activeModal && activeModal.kind === "dice") ||
     !!activeModal ||
     !!retryOverlay ||
     menuOpen ||
@@ -182,21 +166,117 @@ export function PlayingPhase() {
     clearInput();
   }, [activeSession, exitActiveSession, clearInput, variant, setActiveSession, setVariant, setNarrativeLines]);
 
-  const handleCustomChoiceSubmit = useCallback((value: string) => {
-    if (!value.trim()) return;
-    const text = value.trim();
+  // --- Menu dispatch: called by GameMenu when a menu item is selected ---
+  const handleMenuSelect = useCallback((item: string) => {
+    setMenuOpen(false);
+    if (item === "Resume") {
+      // just close menu
+    } else if (item === "Save & Exit") {
+      onReturnToMenu();
+    } else if (item === "End Session") {
+      onEndSessionAndReturn();
+    } else if (item === "Character Sheet") {
+      const gs = gameStateRef.current;
+      if (gs) {
+        const active = getActivePlayer(gs);
+        dispatchTuiCommand({ type: "show_character_sheet", character: active.characterName });
+      }
+    } else if (item === "Compendium") {
+      const gs = gameStateRef.current;
+      const io = engineRef.current?.getSceneManager().getFileIO();
+      if (gs && io) {
+        const path = campaignPaths(gs.campaignRoot).compendium;
+        io.readFile(path).then((raw: string) => {
+          const data = parseCompendiumOutput(raw, emptyCompendium());
+          setActiveModal({ kind: "compendium", data });
+        }).catch(() => {
+          setActiveModal({ kind: "compendium", data: emptyCompendium() });
+        });
+      } else {
+        setActiveModal({ kind: "compendium", data: emptyCompendium() });
+      }
+    } else if (item === "Player Notes") {
+      const gs = gameStateRef.current;
+      const io = engineRef.current?.getSceneManager().getFileIO();
+      if (gs && io) {
+        const path = campaignPaths(gs.campaignRoot).playerNotes;
+        io.readFile(path).then((raw: string) => {
+          setActiveModal({ kind: "notes", content: raw });
+        }).catch(() => {
+          setActiveModal({ kind: "notes", content: "" });
+        });
+      } else {
+        setActiveModal({ kind: "notes", content: "" });
+      }
+    } else if (item === "OOC Mode") {
+      if ((activeSession as null | { label: string })?.label === "OOC") {
+        exitActiveSession();
+      } else {
+        if (clientRef.current && gameStateRef.current) {
+          previousVariantRef.current = variant;
+          const gs = gameStateRef.current;
+          const engine = engineRef.current;
+          const sm = engine?.getSceneManager();
+          setActiveSession(createOOCSession(clientRef.current, {
+            campaignName: gs.config.name,
+            previousVariant: variant,
+            config: gs.config,
+            sessionState: sm?.getSessionState(),
+            repo: engine?.getRepo() ?? undefined,
+            fileIO: sm?.getFileIO(),
+            campaignRoot: gs.campaignRoot,
+          }));
+          setVariant("ooc");
+          setNarrativeLines((prev) => [...prev, { kind: "system", text: "[OOC Mode \u2014 type to chat, ESC to exit]" }, { kind: "dm", text: "" }]);
+        }
+      }
+    } else if (item === "Settings") {
+      setCampaignSettingsOpen(true);
+    } else if (item === "Dev Mode") {
+      if ((activeSession as null | { label: string })?.label === "Dev") {
+        exitActiveSession();
+      } else {
+        if (clientRef.current && gameStateRef.current) {
+          previousVariantRef.current = variant;
+          const gs = gameStateRef.current;
+          setActiveSession(createDevSession(clientRef.current, {
+            campaignName: gs.config.name,
+            gameStateSummary: summarizeGameState(gs),
+            gameState: gs,
+            fileIO: engineRef.current?.getSceneManager().getFileIO(),
+            sceneManager: engineRef.current?.getSceneManager(),
+            repo: engineRef.current?.getRepo() ?? undefined,
+            onTuiCommand: (cmd) => dispatchTuiCommand(cmd),
+          }));
+          setVariant("dev");
+          setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Dev Mode \u2014 type to inspect, ESC to exit]" }, { kind: "dm", text: "" }]);
+        }
+      }
+    }
+  }, [activeSession, exitActiveSession, variant, setActiveSession, setVariant, setNarrativeLines,
+    onReturnToMenu, onEndSessionAndReturn, dispatchTuiCommand, setActiveModal,
+    engineRef, gameStateRef, clientRef, previousVariantRef, setCampaignSettingsOpen]);
+
+  // --- Choice overlay callbacks ---
+  const handleChoiceSelect = useCallback((choice: string) => {
     setActiveModal(null);
-    setChoiceIndex(0);
-    setCustomInputMode(false);
-    setCustomInputResetKey((k) => k + 1);
     if (engineRef.current && gameStateRef.current) {
       const active = getActivePlayer(gameStateRef.current);
-      engineRef.current.processInput(active.characterName, text);
+      engineRef.current.processInput(active.characterName, choice);
     }
-  }, []);
+  }, [setActiveModal, engineRef, gameStateRef]);
 
-  // --- Input handling (modals, menus, scroll — TextInput handles text editing) ---
-  useInput((input, key) => {
+  const handleChoiceDismiss = useCallback(() => {
+    setActiveModal(null);
+  }, [setActiveModal]);
+
+  const handleNarrativeScroll = useCallback((direction: number) => {
+    const step = scrollAmount(rows);
+    narrativeRef.current?.scrollBy(direction < 0 ? -step : step);
+  }, [rows]);
+
+  // --- Input handling — only non-modal keys remain here ---
+  useInput((_input, key) => {
     // Triple-ESC reset: 3 ESC presses within 1.5s clears all overlay state
     if (key.escape) {
       const now = Date.now();
@@ -205,11 +285,7 @@ export function PlayingPhase() {
       if (escTimestamps.current.length >= 3) {
         escTimestamps.current = [];
         setActiveModal(null);
-        setChoiceIndex(0);
-        setCustomInputMode(false);
-        setCustomInputResetKey((k) => k + 1);
         setMenuOpen(false);
-        setMenuIndex(0);
         setCampaignSettingsOpen(false);
         if (activeSession) {
           exitActiveSession();
@@ -218,93 +294,13 @@ export function PlayingPhase() {
       }
     }
 
-    // Retry overlay: block all input (triple-ESC above still works)
+    // All overlays handle their own input — block here
     if (retryOverlay) return;
+    if (activeModal) return;
+    if (campaignSettingsOpen) return;
+    if (menuOpen) return;
 
-    // Dice / swatch modal: any key dismisses
-    if (activeModal && (activeModal.kind === "dice" || activeModal.kind === "swatch")) {
-      setActiveModal(null);
-      return;
-    }
-
-    // Modals that handle their own input via useInput or CenteredModal scrollKeys
-    if (activeModal && (
-      activeModal.kind === "rollback" ||
-      activeModal.kind === "compendium" ||
-      activeModal.kind === "notes" ||
-      activeModal.kind === "character_sheet" ||
-      activeModal.kind === "recap"
-    )) {
-      return;
-    }
-
-    // Choice modal
-    if (activeModal && activeModal.kind === "choice") {
-      const step = scrollAmount(rows);
-
-      if (customInputMode) {
-        if (key.escape) {
-          setCustomInputMode(false);
-          return;
-        }
-        if (key.upArrow) {
-          setCustomInputMode(false);
-          setCustomInputResetKey((k) => k + 1);
-          setChoiceIndex(activeModal.choices.length - 1);
-          return;
-        }
-        if (key.pageUp || key.pageDown) {
-          narrativeRef.current?.scrollBy(key.pageUp ? -step : step);
-          return;
-        }
-        return;
-      }
-
-      if (key.escape) {
-        setActiveModal(null);
-        setChoiceIndex(0);
-        setCustomInputMode(false);
-        return;
-      }
-      if (key.upArrow) {
-        setChoiceIndex((i) => Math.max(0, i - 1));
-        return;
-      }
-      if (key.downArrow) {
-        const totalOptions = activeModal.choices.length + 1;
-        setChoiceIndex((i) => {
-          const next = Math.min(totalOptions - 1, i + 1);
-          if (next === activeModal.choices.length) {
-            setCustomInputMode(true);
-          }
-          return next;
-        });
-        return;
-      }
-      if (key.return) {
-        if (choiceIndex === activeModal.choices.length) {
-          setCustomInputMode(true);
-          return;
-        }
-        const chosen = stripLeadingBullet(stripFormatting(activeModal.choices[choiceIndex]));
-        setActiveModal(null);
-        setChoiceIndex(0);
-        setCustomInputMode(false);
-        if (engineRef.current && gameStateRef.current) {
-          const active = getActivePlayer(gameStateRef.current);
-          engineRef.current.processInput(active.characterName, chosen);
-        }
-      }
-      if (key.pageUp || key.pageDown) {
-        narrativeRef.current?.scrollBy(key.pageUp ? -step : step);
-      }
-      if (input === "+" || input === "-") {
-        narrativeRef.current?.scrollBy(input === "-" ? -step : step);
-      }
-      return;
-    }
-
-    // Active session mode (OOC/Dev): ESC exits, busy blocks all keys
+    // Active session mode (OOC/Dev): ESC exits, PageUp/PageDown scrolls
     if (activeSession) {
       if (key.escape) {
         exitActiveSession();
@@ -318,128 +314,9 @@ export function PlayingPhase() {
       return;
     }
 
-    // Campaign settings submenu: ESC returns to game menu
-    if (campaignSettingsOpen) {
-      if (key.escape) {
-        setCampaignSettingsOpen(false);
-        setMenuOpen(true);
-      }
-      return;
-    }
-
-    // ESC toggles game menu
+    // ESC opens game menu
     if (key.escape) {
-      setMenuOpen((v) => !v);
-      setMenuIndex(0);
-      return;
-    }
-
-    // Game menu navigation
-    if (menuOpen) {
-      if (key.upArrow) {
-        setMenuIndex((i) => Math.max(0, i - 1));
-        return;
-      }
-      if (key.downArrow) {
-        setMenuIndex((i) => Math.min(menuItems.length - 1, i + 1));
-        return;
-      }
-      if (key.return) {
-        const item = menuItems[menuIndex];
-        if (item === "Resume") {
-          setMenuOpen(false);
-        } else if (item === "Save & Exit") {
-          setMenuOpen(false);
-          onReturnToMenu();
-        } else if (item === "End Session") {
-          setMenuOpen(false);
-          onEndSessionAndReturn();
-        } else if (item === "Character Sheet") {
-          setMenuOpen(false);
-          const gs = gameStateRef.current;
-          if (gs) {
-            const active = getActivePlayer(gs);
-            dispatchTuiCommand({ type: "show_character_sheet", character: active.characterName });
-          }
-        } else if (item === "Compendium") {
-          setMenuOpen(false);
-          const gs = gameStateRef.current;
-          const io = engineRef.current?.getSceneManager().getFileIO();
-          if (gs && io) {
-            const path = campaignPaths(gs.campaignRoot).compendium;
-            io.readFile(path).then((raw: string) => {
-              const data = parseCompendiumOutput(raw, emptyCompendium());
-              setActiveModal({ kind: "compendium", data });
-            }).catch(() => {
-              setActiveModal({ kind: "compendium", data: emptyCompendium() });
-            });
-          } else {
-            setActiveModal({ kind: "compendium", data: emptyCompendium() });
-          }
-        } else if (item === "Player Notes") {
-          setMenuOpen(false);
-          const gs = gameStateRef.current;
-          const io = engineRef.current?.getSceneManager().getFileIO();
-          if (gs && io) {
-            const path = campaignPaths(gs.campaignRoot).playerNotes;
-            io.readFile(path).then((raw: string) => {
-              setActiveModal({ kind: "notes", content: raw });
-            }).catch(() => {
-              setActiveModal({ kind: "notes", content: "" });
-            });
-          } else {
-            setActiveModal({ kind: "notes", content: "" });
-          }
-        } else if (item === "OOC Mode") {
-          setMenuOpen(false);
-          if ((activeSession as null | { label: string })?.label === "OOC") {
-            exitActiveSession();
-          } else {
-            if (clientRef.current && gameStateRef.current) {
-              previousVariantRef.current = variant;
-              const gs = gameStateRef.current;
-              const engine = engineRef.current;
-              const sm = engine?.getSceneManager();
-              setActiveSession(createOOCSession(clientRef.current, {
-                campaignName: gs.config.name,
-                previousVariant: variant,
-                config: gs.config,
-                sessionState: sm?.getSessionState(),
-                repo: engine?.getRepo() ?? undefined,
-                fileIO: sm?.getFileIO(),
-                campaignRoot: gs.campaignRoot,
-              }));
-              setVariant("ooc");
-              setNarrativeLines((prev) => [...prev, { kind: "system", text: "[OOC Mode \u2014 type to chat, ESC to exit]" }, { kind: "dm", text: "" }]);
-            }
-          }
-        } else if (item === "Settings") {
-          setMenuOpen(false);
-          setCampaignSettingsOpen(true);
-        } else if (item === "Dev Mode") {
-          setMenuOpen(false);
-          if ((activeSession as null | { label: string })?.label === "Dev") {
-            exitActiveSession();
-          } else {
-            if (clientRef.current && gameStateRef.current) {
-              previousVariantRef.current = variant;
-              const gs = gameStateRef.current;
-              setActiveSession(createDevSession(clientRef.current, {
-                campaignName: gs.config.name,
-                gameStateSummary: summarizeGameState(gs),
-                gameState: gs,
-                fileIO: engineRef.current?.getSceneManager().getFileIO(),
-                sceneManager: engineRef.current?.getSceneManager(),
-                repo: engineRef.current?.getRepo() ?? undefined,
-                onTuiCommand: (cmd) => dispatchTuiCommand(cmd),
-              }));
-              setVariant("dev");
-              setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Dev Mode \u2014 type to inspect, ESC to exit]" }, { kind: "dm", text: "" }]);
-            }
-          }
-        }
-        return;
-      }
+      setMenuOpen(true);
       return;
     }
 
@@ -509,13 +386,12 @@ export function PlayingPhase() {
       prompt={activeModal.prompt}
       choices={activeModal.choices}
       descriptions={activeModal.descriptions}
-      selectedIndex={choiceIndex}
       accentColor={gameStateRef.current?.config.players[activePlayerIndex]?.color}
       maxChoiceRows={choiceMaxRows}
-      showCustomInput
-      customInputActive={customInputMode}
-      customInputResetKey={customInputResetKey}
-      onCustomInputSubmit={handleCustomChoiceSubmit}
+      initialIndex={activeModal.choices.length < 5 ? activeModal.choices.length : 0}
+      onSelect={handleChoiceSelect}
+      onDismiss={handleChoiceDismiss}
+      onNarrativeScroll={handleNarrativeScroll}
     />
   ) : undefined;
 
@@ -555,10 +431,11 @@ export function PlayingPhase() {
           kept={activeModal.kept}
           total={activeModal.total}
           reason={activeModal.reason}
+          onDismiss={() => setActiveModal(null)}
         />
       )}
       {activeModal?.kind === "swatch" && (
-        <SwatchModal theme={theme} width={cols} height={narRows} topOffset={conversationPaneTop} />
+        <SwatchModal theme={theme} width={cols} height={narRows} topOffset={conversationPaneTop} onDismiss={() => setActiveModal(null)} />
       )}
       {activeModal?.kind === "rollback" && (
         <RollbackSummaryModal
@@ -634,6 +511,7 @@ export function PlayingPhase() {
           width={cols}
           height={rows}
           config={gameStateRef.current.config}
+          onDismiss={() => { setCampaignSettingsOpen(false); setMenuOpen(true); }}
         />
       )}
       {menuOpen && (
@@ -641,11 +519,12 @@ export function PlayingPhase() {
           theme={theme}
           width={cols}
           height={rows}
-          selectedIndex={menuIndex}
           oocActive={activeSession?.label === "OOC"}
           devModeEnabled={devModeEnabled}
           devActive={activeSession?.label === "Dev"}
           tokenSummary={costTracker.current?.formatTokens() ?? ""}
+          onSelect={handleMenuSelect}
+          onDismiss={() => setMenuOpen(false)}
         />
       )}
     </Box>

@@ -1,5 +1,5 @@
 import React from "react";
-import { Text, Box } from "ink";
+import { useInput, Text, Box } from "ink";
 import type { ResolvedTheme } from "../themes/types.js";
 import { CenteredModal } from "./CenteredModal.js";
 import { stringWidth } from "../frames/index.js";
@@ -9,6 +9,7 @@ interface SwatchModalProps {
   width: number;
   height: number;
   topOffset?: number;
+  onDismiss: () => void;
 }
 
 /** Pad a string to exactly `w` visible characters with trailing spaces. */
@@ -23,7 +24,8 @@ function padTo(text: string, w: number): string {
  * Row labels are hundreds-based (0, 100, 200, ...) so they read directly
  * as ThemeColorMap values.
  */
-export function SwatchModal({ theme, width, height, topOffset }: SwatchModalProps) {
+export function SwatchModal({ theme, width, height, topOffset, onDismiss }: SwatchModalProps) {
+  useInput(() => { onDismiss(); });
   const { harmonySwatch, colorMap, keyColor } = theme;
   const steps = harmonySwatch[0]?.length ?? 0;
 

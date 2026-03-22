@@ -49,8 +49,6 @@ export interface GameContextValue {
   // Modal state
   activeModal: ActiveModal;
   setActiveModal: (m: ActiveModal) => void;
-  choiceIndex: number;
-  setChoiceIndex: React.Dispatch<React.SetStateAction<number>>;
   // Retry overlay (system-driven, separate from activeModal)
   retryOverlay: RetryOverlay | null;
   // Mode session (replaces oocActive/devActive booleans)

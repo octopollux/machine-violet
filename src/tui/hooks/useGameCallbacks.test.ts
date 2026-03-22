@@ -19,7 +19,6 @@ function createDispatch(deps: {
   setModelines: MockFn;
   setVariant: MockFn;
   setResources: MockFn;
-  setChoiceIndex: MockFn;
   setActiveModal: MockFn;
   setActiveSession: MockFn;
   setNarrativeLines: MockFn;
@@ -61,7 +60,6 @@ function createDispatch(deps: {
       case "present_choices": {
         const choices = cmd.choices as string[];
         if (choices && choices.length > 0) {
-          deps.setChoiceIndex(0);
           deps.setActiveModal({ kind: "choice", prompt: (cmd.prompt as string) || "What do you do?", choices });
         }
         break;
@@ -91,7 +89,6 @@ function makeDeps() {
     setModelines: vi.fn(),
     setVariant: vi.fn(),
     setResources: vi.fn(),
-    setChoiceIndex: vi.fn(),
     setActiveModal: vi.fn() as ReturnType<typeof vi.fn> & ((m: ActiveModal) => void),
     setActiveSession: vi.fn(),
     setNarrativeLines: vi.fn(),
@@ -145,7 +142,6 @@ describe("dispatchTuiCommand logic", () => {
     const deps = makeDeps();
     const dispatch = createDispatch(deps);
     dispatch({ type: "present_choices", prompt: "Choose:", choices: ["A", "B"] });
-    expect(deps.setChoiceIndex).toHaveBeenCalledWith(0);
     expect(deps.setActiveModal).toHaveBeenCalledWith({
       kind: "choice", prompt: "Choose:", choices: ["A", "B"],
     });

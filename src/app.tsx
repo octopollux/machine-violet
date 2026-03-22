@@ -332,8 +332,6 @@ export default function App({ shutdownRef }: AppProps) {
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [retryOverlay, setRetryOverlay] = useState<RetryOverlay | null>(null);
   const activeModalRef = useRef<ActiveModal>(null);
-  const [choiceIndex, setChoiceIndex] = useState(0);
-
   // Auto-sync activeModalRef from state (engine callbacks need ref for synchronous reads)
   useEffect(() => { activeModalRef.current = activeModal; }, [activeModal]);
 
@@ -593,7 +591,7 @@ export default function App({ shutdownRef }: AppProps) {
     onReturnToMenu: () => returnToMenuRef.current(),
     setNarrativeLines, setEngineState, setErrorMsg, setModelines,
     setResources, setVariant, setThemeName, setKeyColor,
-    setActiveModal, setChoiceIndex,
+    setActiveModal,
     setActiveSession, setRetryOverlay, setToolGlyphs,
     gameStateRef, clientRef, engineRef, activeModalRef, variantRef, previousVariantRef,
     costTracker, fileIO,
@@ -845,7 +843,6 @@ export default function App({ shutdownRef }: AppProps) {
     setToolGlyphs([]);
     setActiveModal(null);
     setRetryOverlay(null);
-    setChoiceIndex(0);
     setActiveSession(null);
     setResources([]);
     setModelines({});
@@ -1154,7 +1151,6 @@ export default function App({ shutdownRef }: AppProps) {
     campaignName, activePlayerIndex, setActivePlayerIndex,
     engineState, toolGlyphs, resources, modelines,
     activeModal, setActiveModal,
-    choiceIndex, setChoiceIndex,
     retryOverlay,
     activeSession, setActiveSession, previousVariantRef,
     devModeEnabled: isDevMode(),
