@@ -314,7 +314,7 @@ jobs:
             RELEASE_NOTES="${RELEASE_NOTES:0:$((MAX_NOTES_LEN - 3))}..."
           fi
 
-          MSG="$(printf '%s\n\n%s\n\n%s' "$HEADER" "$RELEASE_NOTES" "$FOOTER")"
+          MSG="$(printf '\n%s\n\n%s\n\n%s' "$HEADER" "$RELEASE_NOTES" "$FOOTER")"
 
           jq -n \
             --arg content "$MSG" \
