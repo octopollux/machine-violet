@@ -7,7 +7,7 @@ interface RollbackSummaryModalProps {
   width: number;
   height: number;
   summary: string;
-  onDismiss?: () => void;
+  onDismiss: () => void;
   topOffset?: number;
 }
 

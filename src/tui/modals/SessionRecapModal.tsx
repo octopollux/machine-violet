@@ -8,7 +8,7 @@ interface SessionRecapModalProps {
   width: number;
   height: number;
   lines: string[];
-  onDismiss?: () => void;
+  onDismiss: () => void;
   /** Ref for external scroll control (e.g. mouse wheel override). */
   scrollRef?: React.Ref<CenteredModalHandle>;
   topOffset?: number;
