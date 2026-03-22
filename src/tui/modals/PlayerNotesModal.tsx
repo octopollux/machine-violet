@@ -1,8 +1,8 @@
 import React, { useReducer, useMemo } from "react";
-import { useInput, Box, Text } from "ink";
+import { useInput, Text } from "ink";
 import chalk from "chalk";
 import type { ResolvedTheme } from "../themes/types.js";
-import { ThemedHorizontalBorder, ThemedSideFrame } from "../components/ThemedFrame.js";
+import { CenteredModal } from "./CenteredModal.js";
 import { themeColor, deriveModalTheme } from "../themes/color-resolve.js";
 import { stringWidth } from "../frames/index.js";
 
@@ -196,13 +196,10 @@ export function PlayerNotesModal({
     }
   });
 
-  // Render visible window of lines
+  // Build raw rows for CenteredModal — each padded to innerWidth.
   const visibleLines = lines.slice(scrollOffset, scrollOffset + maxContentRows);
-  const padStr = " ".repeat(sidePadding);
-  const fullRowWidth = innerWidth + 2 * sidePadding;
-  const blankLine = " ".repeat(fullRowWidth);
 
-  const contentRows = visibleLines.map((line, i) => {
+  const editorRows: React.ReactNode[] = visibleLines.map((line, i) => {
     const lineIdx = scrollOffset + i;
     const isCursorLine = lineIdx === row;
 
@@ -225,64 +222,36 @@ export function PlayerNotesModal({
       const before = paddedLine.slice(0, displayCol);
       const cursorCh = paddedLine[displayCol] ?? " ";
       const after = paddedLine.slice(displayCol + 1);
-      return (
-        <Box key={lineIdx}>
-          <Text color={textColor}>{padStr}{before}{chalk.inverse(cursorCh)}{after}{padStr}</Text>
-        </Box>
-      );
+      return <Text key={lineIdx} color={textColor}>{before}{chalk.inverse(cursorCh)}{after}</Text>;
     }
 
-    return (
-      <Box key={lineIdx}>
-        <Text color={textColor}>{padStr}{paddedLine}{padStr}</Text>
-      </Box>
-    );
+    return <Text key={lineIdx} color={textColor}>{paddedLine}</Text>;
   });
 
   // Fill remaining rows with blank lines for opacity
+  const blankLine = " ".repeat(innerWidth);
   for (let i = visibleLines.length; i < maxContentRows; i++) {
-    contentRows.push(
-      <Box key={`blank-${i}`}>
-        <Text>{blankLine}</Text>
-      </Box>,
-    );
+    editorRows.push(<Text key={`blank-${i}`}>{blankLine}</Text>);
   }
 
   const linesBelow = Math.max(0, lines.length - scrollOffset - maxContentRows);
   const footer = linesBelow > 0
     ? `ESC save & close  (${linesBelow} more)`
     : "ESC save & close";
-  const footerColor = themeColor(modalTheme, "title");
-
-  // Render frame directly (not via CenteredModal) so every row is a single
-  // opaque <Text> — no flexbox gaps that let the narrative bleed through.
-  const modalHeight = maxContentRows + 2 * borderHeight;
-  const topMargin = Math.max(0, (topOffset ?? 0) + Math.floor((height - modalHeight) / 2));
-  const leftPad = Math.max(0, Math.floor((width - modalWidth) / 2));
 
   return (
-    <Box position="absolute" flexDirection="column" marginTop={topMargin} marginLeft={leftPad}>
-      <ThemedHorizontalBorder
-        theme={modalTheme}
-        width={modalWidth}
-        position="top"
-        centerText="Player Notes"
-      />
-      <Box height={maxContentRows} flexDirection="row">
-        <ThemedSideFrame theme={modalTheme} side="left" height={maxContentRows} />
-        <Box flexDirection="column" width={fullRowWidth}>
-          {contentRows}
-        </Box>
-        <ThemedSideFrame theme={modalTheme} side="right" height={maxContentRows} />
-      </Box>
-      <ThemedHorizontalBorder
-        theme={modalTheme}
-        width={modalWidth}
-        position="bottom"
-        centerText={footer}
-        centerTextColor={footerColor}
-      />
-    </Box>
+    <CenteredModal
+      theme={theme}
+      width={width}
+      height={height}
+      title="Player Notes"
+      rawRows={editorRows}
+      minWidth={40}
+      maxWidth={999}
+      widthFraction={0.7}
+      footer={footer}
+      topOffset={topOffset}
+    />
   );
 }
 

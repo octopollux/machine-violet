@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState, useCallback, useEffect, forwardRef } from "react";
-import { Box, Text } from "ink";
+import { useInput, Box, Text } from "ink";
 import { ScrollView } from "ink-scroll-view";
 import type { ScrollViewRef } from "ink-scroll-view";
 import type { FormattingNode } from "../../types/tui.js";
@@ -11,6 +11,7 @@ import { wrapNodes, toPlainText } from "../formatting.js";
 import { renderNodes } from "../render-nodes.js";
 import { useScrollHandle } from "../hooks/useScrollHandle.js";
 import type { ScrollHandle } from "../hooks/useScrollHandle.js";
+import { scrollAmount } from "../components/NarrativeArea.js";
 
 export type CenteredModalHandle = ScrollHandle;
 
@@ -43,6 +44,12 @@ interface CenteredModalProps {
   lines?: string[];
   /** Pre-parsed styled content lines (takes precedence over lines) */
   styledLines?: FormattingNode[][];
+  /**
+   * Pre-rendered row nodes — each must be padded to innerWidth by the caller.
+   * CenteredModal adds side padding for opacity but doesn't touch row content.
+   * Takes precedence over children, styledLines, and lines.
+   */
+  rawRows?: React.ReactNode[];
   /** Arbitrary React content (takes precedence over lines and styledLines) */
   children?: React.ReactNode;
   /** Min width of modal content (default 40) */
@@ -59,6 +66,14 @@ interface CenteredModalProps {
   topOffset?: number;
   /** Explicit content height (rows) when using children — sizes modal to fit */
   contentHeight?: number;
+  /** Called when the user presses ESC or Enter to dismiss the modal. */
+  onDismiss?: () => void;
+  /**
+   * When true, CenteredModal handles keyboard input internally:
+   * PageUp/PageDown/arrows/+/- for scrolling, ESC/Enter to call onDismiss.
+   * Use for read-only scrollable modals. Leave false for modals with custom input.
+   */
+  scrollKeys?: boolean;
 }
 
 /**
@@ -74,6 +89,7 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
     title,
     lines,
     styledLines,
+    rawRows,
     children,
     minWidth = 40,
     maxWidth = 60,
@@ -82,6 +98,8 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
     footerColor,
     topOffset = 0,
     contentHeight,
+    onDismiss,
+    scrollKeys = false,
   }, ref) {
     // Derive modal-specific colors: complementary hue + inverted lightness
     const modalTheme = useMemo(() => deriveModalTheme(theme), [theme]);
@@ -103,12 +121,13 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
       [styledLines, innerWidth],
     );
 
+    const hasRawRows = rawRows != null;
     const hasReactChildren = children != null;
-    const lineCount = hasReactChildren ? 0 : (wrappedStyled ? wrappedStyled.length : wrappedLines.length);
+    const lineCount = hasRawRows ? rawRows.length : hasReactChildren ? 0 : (wrappedStyled ? wrappedStyled.length : wrappedLines.length);
 
     // Max content rows = height minus themed borders (2 * borderHeight) minus margin (2)
     const maxContentRows = Math.max(3, height - 2 * borderHeight - 2);
-    const visibleRows = hasReactChildren
+    const visibleRows = (!hasRawRows && hasReactChildren)
       ? Math.min(contentHeight ?? maxContentRows, maxContentRows)
       : Math.min(lineCount, maxContentRows);
 
@@ -138,6 +157,30 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
 
     useScrollHandle(ref, scrollRef);
 
+    // Built-in keyboard handling for read-only scrollable modals.
+    const scrollBy = useCallback((delta: number) => {
+      const sv = scrollRef.current;
+      if (!sv) return;
+      const offset = sv.getScrollOffset();
+      const bottom = sv.getBottomOffset();
+      const target = Math.max(0, Math.min(offset + delta, bottom));
+      sv.scrollTo(target);
+    }, []);
+
+    useInput((input, key) => {
+      if (key.escape || key.return) {
+        onDismiss?.();
+        return;
+      }
+      const step = scrollAmount(visibleRows);
+      if (key.pageUp) { scrollBy(-step); return; }
+      if (key.pageDown) { scrollBy(step); return; }
+      if (input === "-") { scrollBy(-step); return; }
+      if (input === "+") { scrollBy(step); return; }
+      if (key.upArrow) { scrollBy(-1); return; }
+      if (key.downArrow) { scrollBy(1); return; }
+    }, { isActive: scrollKeys });
+
     const textColor = themeColor(modalTheme, "sideFrame");
     const resolvedFooterColor = footerColor ?? themeColor(modalTheme, "title");
 
@@ -155,7 +198,18 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
 
     // Build the full set of visible rows (content + blank fill) so the modal is opaque.
     const contentRows: React.ReactNode[] = [];
-    if (hasReactChildren) {
+    if (hasRawRows) {
+      // Raw rows: caller handles inner content; we add side padding for opacity.
+      for (let i = 0; i < rawRows.length; i++) {
+        contentRows.push(
+          <Box key={i} flexDirection="row">
+            <Text>{padStr}</Text>
+            {rawRows[i]}
+            <Text>{padStr}</Text>
+          </Box>,
+        );
+      }
+    } else if (hasReactChildren) {
       // React children: wrap with padding columns so edges are opaque
       contentRows.push(
         <Box key="children" flexDirection="row">
@@ -188,7 +242,7 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
 
     // Fill remaining visible rows with blank lines to make the modal opaque.
     // For React children, use the explicit contentHeight so blank rows fill any gap.
-    const renderedCount = hasReactChildren ? (contentHeight ?? visibleRows) : (wrappedStyled ? wrappedStyled.length : wrappedLines.length);
+    const renderedCount = hasRawRows ? rawRows.length : hasReactChildren ? (contentHeight ?? visibleRows) : (wrappedStyled ? wrappedStyled.length : wrappedLines.length);
     for (let i = renderedCount; i < visibleRows; i++) {
       contentRows.push(
         <Box key={`blank-${i}`}>

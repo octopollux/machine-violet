@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useInput, Text, Box } from "ink";
 import type { CampaignEntry } from "../config/main-menu.js";
 import type { ResolvedTheme } from "../tui/themes/types.js";
-import { ThemedHorizontalBorder, ThemedSideFrame, TerminalTooSmall } from "../tui/components/index.js";
+import { TerminalTooSmall, FullScreenFrame } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
@@ -130,11 +130,6 @@ export function MainMenuPhase({
 
   const borderColor = themeColor(theme, "border");
   const dimColor = themeColor(theme, "separator") ?? "#666666";
-  const sideWidth = theme.asset.components.edge_left.width;
-  const topHeight = theme.asset.height;
-
-  const contentWidth = cols - sideWidth * 2;
-  const contentHeight = termRows - topHeight * 2;
 
   // Build menu lines
   const menuLines: React.ReactNode[] = [];
@@ -178,52 +173,17 @@ export function MainMenuPhase({
     }
   }
 
-  // Center vertically
-  const menuHeight = menuLines.length;
-  const topPad = Math.max(0, Math.floor((contentHeight - menuHeight) / 2));
-  const bottomPad = Math.max(0, contentHeight - menuHeight - topPad);
+  // +2 for error message (marginTop=1 + text line) when present
+  const totalRows = menuLines.length + (errorMsg ? 2 : 0);
 
   return (
-    <Box flexDirection="column" width={cols} height={termRows}>
-      {/* Top border */}
-      <ThemedHorizontalBorder
-        theme={theme}
-        width={cols}
-        position="top"
-        centerText="Machine Violet"
-      />
-
-      {/* Content area with side frames */}
-      <Box flexDirection="row" height={contentHeight}>
-        <ThemedSideFrame theme={theme} side="left" height={contentHeight} />
-        <Box flexDirection="column" width={contentWidth} alignItems="center">
-          {/* Vertical centering — top padding */}
-          {topPad > 0 && <Box height={topPad} />}
-
-          {/* Menu items */}
-          <Box flexDirection="column" alignItems="flex-start">
-            {menuLines}
-          </Box>
-
-          {/* Error message */}
-          {errorMsg && (
-            <Box marginTop={1}>
-              <Text color="red">{errorMsg}</Text>
-            </Box>
-          )}
-
-          {/* Vertical centering — bottom padding */}
-          {bottomPad > 0 && <Box height={bottomPad} />}
+    <FullScreenFrame theme={theme} columns={cols} rows={termRows} title="Machine Violet" contentRows={totalRows}>
+      {menuLines}
+      {errorMsg && (
+        <Box marginTop={1}>
+          <Text color="red">{errorMsg}</Text>
         </Box>
-        <ThemedSideFrame theme={theme} side="right" height={contentHeight} />
-      </Box>
-
-      {/* Bottom border */}
-      <ThemedHorizontalBorder
-        theme={theme}
-        width={cols}
-        position="bottom"
-      />
-    </Box>
+      )}
+    </FullScreenFrame>
   );
 }

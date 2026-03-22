@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useInput, Text, Box } from "ink";
+import { useInput, Text } from "ink";
 import type { ResolvedTheme } from "../tui/themes/types.js";
-import { ThemedHorizontalBorder, ThemedSideFrame, TerminalTooSmall } from "../tui/components/index.js";
+import { TerminalTooSmall, FullScreenFrame } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
@@ -65,11 +65,6 @@ export function SettingsPhase({
 
   const borderColor = themeColor(theme, "border");
   const dimColor = themeColor(theme, "separator") ?? "#666666";
-  const sideWidth = theme.asset.components.edge_left.width;
-  const topHeight = theme.asset.height;
-
-  const contentWidth = cols - sideWidth * 2;
-  const contentHeight = termRows - topHeight * 2;
 
   const menuLines: React.ReactNode[] = [];
   for (let i = 0; i < MENU_ITEMS.length; i++) {
@@ -86,38 +81,9 @@ export function SettingsPhase({
     );
   }
 
-  const menuHeight = menuLines.length;
-  const topPad = Math.max(0, Math.floor((contentHeight - menuHeight) / 2));
-  const bottomPad = Math.max(0, contentHeight - menuHeight - topPad);
-
   return (
-    <Box flexDirection="column" width={cols} height={termRows}>
-      <ThemedHorizontalBorder
-        theme={theme}
-        width={cols}
-        position="top"
-        centerText="Settings"
-      />
-
-      <Box flexDirection="row" height={contentHeight}>
-        <ThemedSideFrame theme={theme} side="left" height={contentHeight} />
-        <Box flexDirection="column" width={contentWidth} alignItems="center">
-          {topPad > 0 && <Box height={topPad} />}
-
-          <Box flexDirection="column" alignItems="flex-start">
-            {menuLines}
-          </Box>
-
-          {bottomPad > 0 && <Box height={bottomPad} />}
-        </Box>
-        <ThemedSideFrame theme={theme} side="right" height={contentHeight} />
-      </Box>
-
-      <ThemedHorizontalBorder
-        theme={theme}
-        width={cols}
-        position="bottom"
-      />
-    </Box>
+    <FullScreenFrame theme={theme} columns={cols} rows={termRows} title="Settings" contentRows={menuLines.length}>
+      {menuLines}
+    </FullScreenFrame>
   );
 }
