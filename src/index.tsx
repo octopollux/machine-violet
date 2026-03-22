@@ -54,7 +54,7 @@ function ShutdownWrapper() {
 
 const { unmount } = render(<ShutdownWrapper />, { maxFps: 60 });
 
-async function handleShutdownSignal() {
+async function handleShutdownSignal(exitCode = 0) {
   if (shuttingDown) {
     // Second signal — force exit
     process.exit(1);
@@ -73,12 +73,13 @@ async function handleShutdownSignal() {
   unlockRawMode();
   removeCombiner();
   unmount();
-  process.exit(0);
+  process.exit(exitCode);
 }
 
 process.on("SIGINT", () => { handleShutdownSignal(); });
 process.on("SIGTERM", () => { handleShutdownSignal(); });
 process.on("unhandledRejection", (reason) => {
-  process.stderr.write(`\nUnhandled rejection: ${reason}\n`);
-  handleShutdownSignal();
+  const msg = reason instanceof Error && reason.stack ? reason.stack : String(reason);
+  process.stderr.write(`\nUnhandled rejection: ${msg}\n`);
+  handleShutdownSignal(1);
 });

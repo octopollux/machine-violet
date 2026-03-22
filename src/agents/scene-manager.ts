@@ -571,9 +571,9 @@ export class SceneManager {
   // --- Transition step methods ---
 
   /**
-   * Write the current transcript to disk (idempotent, no side effects).
-   * Used by graceful shutdown to persist transcript without triggering
-   * a full scene transition cascade.
+   * Write the current transcript to disk without triggering a scene
+   * transition cascade.  Safe to call repeatedly (skips when empty).
+   * Used by graceful shutdown to persist transcript before exit.
    */
   async flushTranscript(): Promise<void> {
     if (this.scene.transcript.length === 0) return;
