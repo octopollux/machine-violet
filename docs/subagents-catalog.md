@@ -406,4 +406,4 @@ Subagents with heavily dynamic system prompts (e.g. AI Player, whose prompt incl
 
 **Sonnet agents** (OOC, Dev Mode) use structured `TextBlockParam[]` system prompts with breakpoints separating stable (cached) and dynamic (uncached) content — the same pattern as the DM's cached prefix.
 
-**Multi-turn Haiku agents** with tools (scribe, search-campaign, search-content, resolve-action) set `cacheTools: true` so tool definitions are also cached across rounds.
+**Multi-turn Haiku agents** with tools (scribe, search-campaign, search-content) set `cacheTools: true` so tool definitions are also cached across rounds.

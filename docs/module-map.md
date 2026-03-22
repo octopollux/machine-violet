@@ -30,7 +30,7 @@ Each file is an isolated Claude conversation for a specific task. All use `spawn
 | `precis-updater.ts` | Haiku | Dropped exchange → precis append + PlayerRead extraction |
 | `changelog-updater.ts` | Haiku | Scene transcript → entity changelog entries |
 | `compendium-updater.ts` | Haiku | Scene transcript → player-facing compendium update |
-| `resolve-action.ts` | Haiku | Mechanical action resolution (attacks, checks, saves) |
+| `resolve-session.ts` | Sonnet | Persistent combat resolution engine (accumulates context across turns) |
 | `choice-generator.ts` | Haiku | Generate 2-3 player action choices from recent narration |
 | `character-promotion.ts` | Haiku | Expand minimal NPC → full character sheet |
 | `scribe.ts` | Haiku | Autonomous entity file manager (list/read/write tools, 8 rounds) |

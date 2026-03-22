@@ -317,7 +317,7 @@ Tools not in this map (`roll_dice`, all TUI tools, scene/session tools, entity t
 | **Precis updater** | Haiku | No | Dropped exchange text, current precis, open threads, NPC intents, PC identity string | No |
 | **Scene summarizer** | Haiku | No | Scene transcript text | No |
 | **Changelog updater** | Haiku | No | Scene transcript + entity filenames list | No |
-| **Resolution (resolve_action)** | Haiku | No | Actor/target character sheets, rules cards, conditions | No (but calls `roll_dice`) |
+| **Resolution (ResolveSession)** | Sonnet | No | Actor/target character sheets, rules cards, conditions | No (but calls `roll_dice`, `read_character_sheet`, `query_rules`) |
 | **Choice generator** | Haiku | No | Last 3-5 exchanges of DM narration | No |
 | **AI player** | Haiku/Sonnet | No | Character sheet + personality + last 3-5 exchanges | No |
 | **OOC mode** | Sonnet | No | DM's cached prefix + conversation, campaign filesystem (sandboxed read) | No (rollback, config changes) |

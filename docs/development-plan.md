@@ -242,7 +242,7 @@ Connect the agent to the game. The DM can narrate, use tools, and manage scenes.
 - [ ] **Scene summarizer**: Haiku writes campaign log entry from completed transcript
 - [ ] **Precis updater**: Haiku appends terse summary when exchange drops from conversation
 - [ ] **Changelog updater**: Haiku scans transcript, appends entries to entity files
-- [ ] **resolve_action**: Haiku reads character sheet + rules, calls roll_dice, evaluates, returns structured result. Player-facing mode for input prompts.
+- [x] **ResolveSession**: Sonnet-tier persistent combat resolver. Accumulates context across turns, returns structured StateDelta[].
 
 ### 5.4 Wire TUI to agent loop
 - [ ] Player input → tagged message `[CharName] text` → agent loop
@@ -251,7 +251,7 @@ Connect the agent to the game. The DM can narrate, use tools, and manage scenes.
 - [ ] Tool results → modeline updates, style changes, etc.
 - [ ] Modals triggered by tool calls (present_choices, present_roll, show_character_sheet)
 
-**Tests**: Scene transition cascade (mock Haiku, verify all steps fire). Transcript writing format. Pending operation recovery. resolve_action return schema validation.
+**Tests**: Scene transition cascade (mock Haiku, verify all steps fire). Transcript writing format. Pending operation recovery. ResolveSession return schema validation.
 
 **Phase 5 deliverable**: A playable game loop. The DM narrates, the player responds, tools work, scenes transition, context is managed. Single player, no init flow yet — campaign directory is manually created or scaffolded by a test helper.
 

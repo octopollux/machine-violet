@@ -18,7 +18,7 @@ import type { MapData } from "../../types/maps.js";
 import type { ClocksState } from "../../types/clocks.js";
 import { findReferences } from "../../tools/campaign-ops/index.js";
 import { validateCampaign } from "../../tools/validation/index.js";
-import { norm } from "../../utils/paths.js";
+import { resolveCampaignPath } from "../../utils/paths.js";
 import { runScribe } from "./scribe.js";
 import type { ModeSession } from "../../tui/game-context.js";
 
@@ -313,11 +313,12 @@ export function buildOOCToolHandler(
           if (!fileIO || !campaignRoot) {
             return { content: "File I/O not available", is_error: true };
           }
-          const relPath = (input.path as string).replace(/\\/g, "/").replace(/^\/+/, "");
-          if (relPath.split("/").some((p) => p === "..")) {
+          let abs: string;
+          try {
+            abs = resolveCampaignPath(campaignRoot, input.path as string);
+          } catch {
             return { content: "Path traversal not allowed", is_error: true };
           }
-          const abs = norm(campaignRoot) + "/" + relPath;
           const content = await fileIO.readFile(abs);
           return { content };
         }

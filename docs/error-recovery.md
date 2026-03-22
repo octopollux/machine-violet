@@ -82,7 +82,7 @@ The `/retry` command retries the last DM turn at any time — useful for recover
 
 ### Subagent failures
 
-If a Haiku/Sonnet subagent call fails (during `resolve_action`, OOC, chargen, etc.), the engine retries the subagent call. The parent (Opus DM) doesn't see the failure unless retries are exhausted, in which case it receives an error result: "Resolution failed — resolve manually or retry." The DM can narrate around it or ask the player to wait.
+If a Haiku/Sonnet subagent call fails (during resolution, OOC, chargen, etc.), the engine retries the subagent call. The parent (Opus DM) doesn't see the failure unless retries are exhausted, in which case it receives an error result: "Resolution failed — resolve manually or retry." The DM can narrate around it or ask the player to wait.
 
 ## Mid-Cascade Failures
 
@@ -124,7 +124,7 @@ The most common cause: the DM narrates a state change without calling a tool. "T
 A Tier 1 (code) validation check runs at scene transitions, session starts, and on demand (via OOC):
 
 - **Wikilink integrity**: every entity linked in the campaign log — does the file exist?
-- **Character sheet consistency**: do HP/resource values match what `resolve_action` last reported?
+- **Character sheet consistency**: do HP/resource values match what the resolve session last reported?
 - **Map consistency**: does every entity placed on a map have a corresponding character file?
 - **Clock integrity**: are alarm fire times in the future? Is the calendar monotonically increasing?
 - **File format**: are JSON files valid JSON? Do entity files have required front matter?
@@ -132,8 +132,8 @@ A Tier 1 (code) validation check runs at scene transitions, session starts, and 
 Validation **detects** problems and **reports** them — it does not auto-fix. Results go to the DM as a system notification:
 
 ```
-"Inconsistency: Aldric's HP is 42 on character sheet but resolve_action
- last recorded 28. Scene 14 combat may not have been applied."
+"Inconsistency: Aldric's HP is 42 on character sheet but the resolve
+ session last recorded 28. Scene 14 combat may not have been applied."
 ```
 
 The DM (or the OOC agent, if the player asks) resolves it.
