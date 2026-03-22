@@ -157,8 +157,14 @@ jobs:
         id: tags
         run: |
           TAG="${{ inputs.tag || github.ref_name }}"
-          # Find the most recent v* tag before this one
-          PREV_TAG=$(git tag -l 'v*' --sort=-version:refname | grep -v "^${TAG}$" | head -n1 || echo "")
+          # Find the most recent v* tag immediately before this one in version order
+          PREV_TAG=$(
+            git tag -l 'v*' --sort=-version:refname |
+            awk -v current="$TAG" '
+              $0 == current { seen=1; next }
+              seen { print; exit }
+            '
+          )
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "prev=$PREV_TAG" >> "$GITHUB_OUTPUT"
 
