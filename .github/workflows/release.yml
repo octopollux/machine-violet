@@ -143,20 +143,126 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
       - uses: actions/download-artifact@v4
         with:
+          path: artifacts
           merge-multiple: true
+
+      - name: Determine previous tag
+        id: tags
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          # Find the most recent v* tag immediately before this one in version order
+          PREV_TAG=$(
+            git tag -l 'v*' --sort=-version:refname |
+            awk -v current="$TAG" '
+              $0 == current { seen=1; next }
+              seen { print; exit }
+            '
+          )
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "prev=$PREV_TAG" >> "$GITHUB_OUTPUT"
+
+          if [ -n "$PREV_TAG" ]; then
+            echo "Changelog range: ${PREV_TAG}..${TAG}"
+          else
+            echo "No previous tag found — first release"
+          fi
+
+      - name: Collect changelog context
+        id: changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.tags.outputs.tag }}"
+          PREV="${{ steps.tags.outputs.prev }}"
+
+          if [ -n "$PREV" ]; then
+            SINCE=$(git log -1 --format=%cI "$PREV")
+
+            PR_CONTEXT=$(gh pr list \
+              --repo ${{ github.repository }} \
+              --state merged \
+              --base main \
+              --search "merged:>=${SINCE}" \
+              --json number,title,body \
+              --jq '.[] | "## PR #\(.number): \(.title)\n\(.body // "(no description)")\n---"')
+
+            if [ -z "$PR_CONTEXT" ]; then
+              PR_CONTEXT=$(git log --oneline "${PREV}..${TAG}")
+            fi
+          else
+            PR_CONTEXT="First release — no previous tag to compare against."
+          fi
+
+          echo "context<<CONTEXT_EOF" >> "$GITHUB_OUTPUT"
+          echo "$PR_CONTEXT" >> "$GITHUB_OUTPUT"
+          echo "CONTEXT_EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        id: changelog
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.MV_RELEASE_NOTES_ANT_APIKEY }}
+          CHANGES: ${{ steps.changes.outputs.context }}
+          PREV_TAG: ${{ steps.tags.outputs.prev }}
+          TAG: ${{ steps.tags.outputs.tag }}
+        run: |
+          cat <<'PROMPT_EOF' > /tmp/system-prompt.txt
+          Write release notes for a new version of Machine Violet, an AI
+          Dungeon Master that runs tabletop RPGs in a terminal.
+
+          These notes are for PLAYERS, not engineers. Rules:
+          - Omit internal/boring commits: dependency bumps (Dependabot),
+            CI changes, refactoring, docs-only changes.
+          - Collapse multiple performance commits into one
+            "Performance improvements" bullet.
+          - Describe user-facing bug fixes and features in plain,
+            friendly language a player would understand.
+          - A few concise bullet points in markdown. No heading, no preamble.
+          - If there are genuinely no player-facing changes, output exactly:
+            "Internal improvements and maintenance."
+
+          Output ONLY the markdown bullet list — nothing else.
+          PROMPT_EOF
+          sed -i 's/^          //' /tmp/system-prompt.txt
+
+          {
+            cat /tmp/system-prompt.txt
+            printf '\nHere are the PRs merged since the last release (%s):\n\n' "$PREV_TAG"
+            printf '%s\n' "$CHANGES"
+          } > /tmp/user-prompt.txt
+
+          jq -n --rawfile prompt /tmp/user-prompt.txt \
+            '{model:"claude-haiku-4-5-20251001", max_tokens:1024,
+              messages:[{role:"user",content:$prompt}]}' > /tmp/api-request.json
+
+          RESPONSE=$(curl -sf https://api.anthropic.com/v1/messages \
+            -H "x-api-key: ${ANTHROPIC_API_KEY}" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d @/tmp/api-request.json) || RESPONSE=""
+
+          NOTES=$(echo "$RESPONSE" | jq -r '.content[0].text // empty') || NOTES=""
+          if [ -z "$NOTES" ]; then
+            NOTES="Internal improvements and maintenance."
+          fi
+
+          echo "notes<<NOTES_EOF" >> "$GITHUB_OUTPUT"
+          echo "$NOTES" >> "$GITHUB_OUTPUT"
+          echo "NOTES_EOF" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_NOTES: ${{ steps.changelog.outputs.notes }}
         run: |
-          TAG="${{ inputs.tag || github.ref_name }}"
+          TAG="${{ steps.tags.outputs.tag }}"
           VERSION="${TAG#v}"
-
-          # Generate changelog from GitHub
-          CHANGELOG=$(gh api repos/${{ github.repository }}/releases/generate-notes \
-            -f tag_name="$TAG" --jq '.body' 2>/dev/null || echo "")
 
           cat > release-body.md << BODYEOF
           ## Download
@@ -178,17 +284,49 @@ jobs:
           | Tarball | [\`machine-violet-${VERSION}-linux-x64.tar.gz\`](https://github.com/${{ github.repository }}/releases/download/${TAG}/machine-violet-${VERSION}-linux-x64.tar.gz) |
 
           Also available via Homebrew: \`brew install octopollux/mv-tap/machine-violet\`
-
-          ---
-
-          ${CHANGELOG}
           BODYEOF
           sed -i 's/^          //' release-body.md
+
+          {
+            echo ""
+            echo "---"
+            echo ""
+            echo "## What's New"
+            echo ""
+            printf '%s\n' "$RELEASE_NOTES"
+          } >> release-body.md
 
           gh release create "$TAG" \
             --repo ${{ github.repository }} \
             --title "Machine Violet ${VERSION}" \
             --notes-file release-body.md \
-            MachineViolet-* \
-            machine-violet-* \
-            releases.win.json
+            artifacts/MachineViolet-* \
+            artifacts/machine-violet-* \
+            artifacts/releases.win.json
+
+      - name: Post to Discord
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+          RELEASE_NOTES: ${{ steps.changelog.outputs.notes }}
+        run: |
+          TAG="${{ steps.tags.outputs.tag }}"
+          VERSION="${TAG#v}"
+          RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/${TAG}"
+
+          HEADER="**Machine Violet ${VERSION}** 🎉"
+          FOOTER="🔗 ${RELEASE_URL}"
+          MAX_NOTES_LEN=$((2000 - ${#HEADER} - ${#FOOTER} - 10))
+          if [ ${#RELEASE_NOTES} -gt $MAX_NOTES_LEN ]; then
+            RELEASE_NOTES="${RELEASE_NOTES:0:$((MAX_NOTES_LEN - 3))}..."
+          fi
+
+          MSG="$(printf '\n%s\n\n%s\n\n%s' "$HEADER" "$RELEASE_NOTES" "$FOOTER")"
+
+          jq -n \
+            --arg content "$MSG" \
+            '{content: $content, allowed_mentions: {parse: []}}' > discord-payload.json
+
+          curl -fsSL -X POST \
+            -H "Content-Type: application/json" \
+            -d @discord-payload.json \
+            "$DISCORD_WEBHOOK"

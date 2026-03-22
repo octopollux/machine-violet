@@ -181,8 +181,17 @@ jobs:
 
           if [ -n "$PREV_TAG" ]; then
             echo "Changelog range: ${PREV_TAG}..HEAD"
+            COMMIT_COUNT=$(git rev-list --count "${PREV_TAG}..HEAD")
+            if [ "$COMMIT_COUNT" -eq 0 ]; then
+              echo "No new commits since ${PREV_TAG} — skipping release notes and Discord"
+              echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "${COMMIT_COUNT} new commit(s)"
+              echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            fi
           else
             echo "No previous tag found — first nightly"
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Create dated nightly tag
@@ -191,6 +200,7 @@ jobs:
           git push origin "${{ steps.tags.outputs.tag }}"
 
       - name: Collect changelog context
+        if: steps.tags.outputs.has_changes == 'true'
         id: changes
         env:
           GH_TOKEN: ${{ github.token }}
@@ -223,6 +233,7 @@ jobs:
           echo "CONTEXT_EOF" >> "$GITHUB_OUTPUT"
 
       - name: Generate release notes
+        if: steps.tags.outputs.has_changes == 'true'
         id: changelog
         env:
           ANTHROPIC_API_KEY: ${{ secrets.MV_RELEASE_NOTES_ANT_APIKEY }}
@@ -339,23 +350,21 @@ jobs:
             artifacts/assets.nightly.json
 
       - name: Post to Discord
+        if: steps.tags.outputs.has_changes == 'true'
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_NIGHTLY_WEBHOOK }}
           NIGHTLY_TAG: ${{ steps.tags.outputs.tag }}
           RELEASE_NOTES: ${{ steps.changelog.outputs.notes }}
         run: |
-          RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/nightly"
-
           # Build message, truncating to fit Discord's 2000-char limit
+          # No release link — nightlies post consecutively in the same channel
           HEADER="**Machine Violet Nightly** · \`${NIGHTLY_TAG}\`"
-          FOOTER="🔗 ${RELEASE_URL}"
-          # Reserve space for header + footer + newlines
-          MAX_NOTES_LEN=$((2000 - ${#HEADER} - ${#FOOTER} - 10))
+          MAX_NOTES_LEN=$((2000 - ${#HEADER} - 4))
           if [ ${#RELEASE_NOTES} -gt $MAX_NOTES_LEN ]; then
             RELEASE_NOTES="${RELEASE_NOTES:0:$((MAX_NOTES_LEN - 3))}..."
           fi
 
-          MSG="$(printf '%s\n\n%s\n\n%s' "$HEADER" "$RELEASE_NOTES" "$FOOTER")"
+          MSG="$(printf '\n%s\n\n%s' "$HEADER" "$RELEASE_NOTES")"
 
           # Suppress @everyone/@here/role mentions
           jq -n \
