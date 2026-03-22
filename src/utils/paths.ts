@@ -79,9 +79,10 @@ export function resetConfigDir(): void {
  */
 export function resolveCampaignPath(campaignRoot: string, relative: string): string {
   const normalized = relative.replace(/\\/g, "/").replace(/^\/+/, "");
-  const parts = normalized.split("/").filter((p) => p !== ".");
+  const parts = normalized.split("/").filter((p) => p && p !== ".");
   if (parts.some((p) => p === "..")) {
     throw new Error("Path traversal not allowed");
   }
-  return norm(campaignRoot) + "/" + parts.join("/");
+  const root = norm(campaignRoot).replace(/\/+$/, "");
+  return parts.length === 0 ? root : root + "/" + parts.join("/");
 }
