@@ -143,7 +143,7 @@ This also works for:
 
 **`scene_transition`**: Already accepts `time_advance`. After advancing the calendar clock, it checks alarms and includes any fired alarm messages in its return to the DM. No new design needed.
 
-**`resolve_action` hooks**: Dice roll hooks already fire after every roll. If combat round advancement should be triggered automatically (e.g., after all combatants have acted), a hook can call `next_round` internally.
+**Resolution hooks**: Dice roll hooks already fire after every roll. If combat round advancement should be triggered automatically (e.g., after all combatants have acted), a hook can call `next_round` internally.
 
 **Context management**: Alarm notifications are part of tool results, so they follow the standard retention and stubbing policy. An alarm that fired 3 turns ago becomes a one-line stub. The DM already acted on it.
 

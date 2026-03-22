@@ -8,14 +8,12 @@
     "ooc": "high",
     "dev-mode": "high",
     "setup": "high",
-    "setup-gen": "high",
     "ai-player": "low",
     "scene-summarizer": null,
     "precis-updater": null,
     "changelog-updater": null,
     "compendium-updater": null,
     "choice-generator": null,
-    "resolve_action": "medium",
     "promote_character": "medium",
     "repair-state": "medium"
   }

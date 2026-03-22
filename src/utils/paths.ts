@@ -71,3 +71,17 @@ export function configDir(): string {
 export function resetConfigDir(): void {
   _configDir = undefined;
 }
+
+/**
+ * Resolve a relative path within a campaign root, rejecting traversal.
+ * Normalizes backslashes to forward slashes and strips leading slashes.
+ * Throws if any path component is `..`.
+ */
+export function resolveCampaignPath(campaignRoot: string, relative: string): string {
+  const normalized = relative.replace(/\\/g, "/").replace(/^\/+/, "");
+  const parts = normalized.split("/").filter((p) => p !== ".");
+  if (parts.some((p) => p === "..")) {
+    throw new Error("Path traversal not allowed");
+  }
+  return norm(campaignRoot) + "/" + parts.join("/");
+}

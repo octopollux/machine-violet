@@ -93,7 +93,6 @@ The activity line shows what the engine is doing, mapped automatically from in-f
 
 | Engine state | Activity line | Modeline glyph |
 |---|---|---|
-| `resolve_action` in flight | `Resolving...` | `⚔` |
 | `roll_dice` in flight | `Rolling...` | `⚄` |
 | Rule lookup subagent | `Checking rules...` | `📖` |
 | `scene_transition` cascade | `Scene transition...` | `⟳` |
