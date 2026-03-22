@@ -73,7 +73,7 @@ export function getConfigPaths(dir?: string) {
  * Copies files that exist next to the exe but not yet in the config dir.
  * Only runs in compiled mode.
  */
-const CONFIG_FILES = [".env", "config.json", "api-keys.json"] as const;
+const CONFIG_FILES = [".env", "config.json", "api-keys.json", "discord-settings.json"] as const;
 
 const SECRET_FILES = new Set([".env", "api-keys.json"]);
 
