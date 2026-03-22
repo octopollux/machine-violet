@@ -78,7 +78,7 @@ Total input: ~1-2K tokens. Model: Haiku for functional, Sonnet for more personal
 - They **do not narrate outcomes** — "I try to pick the lock" not "I pick the lock and it opens"
 - They **stay in character** — their personality prompt drives their decisions
 - They **can ask questions** — "Is there another exit?" gets handled by the DM like any player question
-- They **participate in player-facing subagents** — if `resolve_action` asks "use Divine Smite?", the AI player's personality prompt informs the choice (a pragmatic character conserves resources, a reckless one always smites)
+- They **participate in player-facing subagents** — if the resolve session asks "use Divine Smite?", the AI player's personality prompt informs the choice (a pragmatic character conserves resources, a reckless one always smites)
 
 ### AI Player Configuration
 
@@ -115,7 +115,7 @@ Initiative tracking manages turn order during combat. It's a Tier 1 (code) syste
 4. **Turns cycle.** Each combatant acts in order:
    - **Human player's turn:** TUI activates that player's input. They type their action.
    - **AI player's turn:** AI player model call generates the action automatically.
-   - **NPC/enemy turn:** The DM narrates their action (silently using `resolve_action` for mechanics).
+   - **NPC/enemy turn:** The DM narrates their action (silently using the resolve session for mechanics).
 5. **Round ends.** `next_round` fires, combat clock ticks, alarms checked.
 6. **Combat ends.** The DM calls `end_combat`. Initiative clears. Player switching returns to free mode.
 

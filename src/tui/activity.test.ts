@@ -3,10 +3,10 @@ import { getActivity, getToolGlyph, ACTIVITY_MAP, parseRetryState, retryLabel } 
 
 describe("activity indicators", () => {
   it("returns indicator for known states", () => {
-    const indicator = getActivity("resolve_action");
+    const indicator = getActivity("roll_dice");
     expect(indicator).toBeDefined();
-    expect(indicator!.label).toBe("Resolving...");
-    expect(indicator!.glyph).toBe("⚔");
+    expect(indicator!.label).toBe("Rolling...");
+    expect(indicator!.glyph).toBe("⚄");
   });
 
   it("returns dm_thinking indicator", () => {
@@ -24,7 +24,6 @@ describe("activity indicators", () => {
   });
 
   it("has all expected activity states", () => {
-    expect(ACTIVITY_MAP.resolve_action).toBeDefined();
     expect(ACTIVITY_MAP.roll_dice).toBeDefined();
     expect(ACTIVITY_MAP.rule_lookup).toBeDefined();
     expect(ACTIVITY_MAP.scene_transition).toBeDefined();

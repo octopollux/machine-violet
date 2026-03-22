@@ -8,3 +8,5 @@ export type { NarrativeAreaHandle } from "./NarrativeArea.js";
 export { HorizontalBorder, SideFrame } from "./FrameBorder.js";
 export { ThemedHorizontalBorder, ThemedSideFrame, SimpleBorder, PlayerPaneSide } from "./ThemedFrame.js";
 export { TerminalTooSmall } from "./TerminalTooSmall.js";
+export { FullScreenFrame } from "./FullScreenFrame.js";
+export type { FullScreenFrameProps } from "./FullScreenFrame.js";

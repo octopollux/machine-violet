@@ -3,7 +3,6 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { summarizeScene, parseSummaryOutput } from "./scene-summarizer.js";
 import { updatePrecis, parsePrecisResult } from "./precis-updater.js";
 import { updateChangelogs } from "./changelog-updater.js";
-import { resolveAction } from "./resolve-action.js";
 
 function mockUsage(): Anthropic.Usage {
   return { input_tokens: 50, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: null, inference_geo: null, server_tool_use: null, service_tier: null };
@@ -17,19 +16,6 @@ function textResponse(text: string): Anthropic.Message {
     model: "claude-haiku-4-5-20251001",
     content: [{ type: "text", text }],
     stop_reason: "end_turn",
-    stop_sequence: null,
-    usage: mockUsage(),
-  } as Anthropic.Message;
-}
-
-function toolUseResponse(name: string, input: Record<string, unknown>): Anthropic.Message {
-  return {
-    id: "msg_test",
-    type: "message",
-    role: "assistant",
-    model: "claude-haiku-4-5-20251001",
-    content: [{ type: "tool_use", id: "toolu_test", name, input }],
-    stop_reason: "tool_use",
     stop_sequence: null,
     usage: mockUsage(),
   } as Anthropic.Message;
@@ -282,58 +268,3 @@ describe("updateChangelogs", () => {
   });
 });
 
-describe("resolveAction", () => {
-  it("resolves an attack with roll_dice", async () => {
-    const client = mockClient([
-      toolUseResponse("roll_dice", { expression: "1d20+5" }),
-      textResponse("Hit (23 vs AC 13). 9 slashing. G1: 3/12 HP."),
-    ]);
-
-    const result = await resolveAction(client, {
-      actor: "Aldric",
-      action: "Longsword attack",
-      target: "G1",
-      actorSheet: "STR +5, Longsword: 1d20+5 to hit, 1d8+3 damage",
-      targetStats: "AC 13, HP 12/12",
-    });
-
-    expect(result.text).toContain("Hit");
-    expect(result.text).toContain("G1");
-  });
-
-  it("works without target", async () => {
-    const client = mockClient([
-      toolUseResponse("roll_dice", { expression: "1d20+3" }),
-      textResponse("Success (18 vs DC 15). Lock picked."),
-    ]);
-
-    const result = await resolveAction(client, {
-      actor: "Aldric",
-      action: "Pick lock",
-      conditions: "Dim light, half cover",
-      actorSheet: "DEX +3, Thieves' tools proficiency",
-    });
-
-    expect(result.text).toContain("Success");
-  });
-
-  it("streams for player-facing mode", async () => {
-    const client = mockClient([
-      textResponse("Use Divine Smite on this hit?"),
-    ]);
-
-    const onStream = vi.fn();
-    await resolveAction(
-      client,
-      {
-        actor: "Aldric",
-        action: "Attack with smite option",
-        actorSheet: "Paladin, 2 spell slots",
-      },
-      onStream,
-    );
-
-    // Should use stream() for player-facing
-    expect(client.messages.stream).toHaveBeenCalled();
-  });
-});

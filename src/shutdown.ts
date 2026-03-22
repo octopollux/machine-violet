@@ -7,6 +7,8 @@ import type { CampaignRepo } from "./tools/git/campaign-repo.js";
 export interface ShutdownContext {
   engine?: GameEngine;
   repo?: CampaignRepo;
+  /** Discord Rich Presence handle for cleanup on shutdown. */
+  discordPresence?: { stop(): Promise<void> };
 }
 
 /**
@@ -40,5 +42,12 @@ export async function gracefulShutdown(ctx: ShutdownContext): Promise<void> {
     } catch {
       // Best-effort
     }
+  }
+
+  // 3. Disconnect Discord Rich Presence
+  try {
+    await ctx.discordPresence?.stop();
+  } catch {
+    // Best-effort
   }
 }

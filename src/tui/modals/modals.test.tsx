@@ -364,7 +364,7 @@ describe("CharacterSheetModal", () => {
 
     const { lastFrame } = render(
       <Box width={50} height={24}>
-        <CharacterSheetModal theme={theme} width={50} height={24} content={content} />
+        <CharacterSheetModal theme={theme} width={50} height={24} content={content} onDismiss={() => {}} />
       </Box>,
     );
     const frame = lastFrame();
@@ -383,7 +383,7 @@ describe("CharacterSheetModal", () => {
 
     const { lastFrame } = render(
       <Box width={50} height={24}>
-        <CharacterSheetModal theme={theme} width={50} height={24} content={content} />
+        <CharacterSheetModal theme={theme} width={50} height={24} content={content} onDismiss={() => {}} />
       </Box>,
     );
     const frame = lastFrame();
@@ -400,7 +400,7 @@ describe("CharacterSheetModal", () => {
 
     const { lastFrame } = render(
       <Box width={50} height={24}>
-        <CharacterSheetModal theme={theme} width={50} height={24} content={content} />
+        <CharacterSheetModal theme={theme} width={50} height={24} content={content} onDismiss={() => {}} />
       </Box>,
     );
     const frame = lastFrame();
@@ -415,6 +415,7 @@ describe("CharacterSheetModal", () => {
           width={50}
           height={24}
           content="Just some text"
+          onDismiss={() => {}}
         />
       </Box>,
     );
@@ -478,6 +479,7 @@ describe("SessionRecapModal", () => {
           theme={theme}
           width={100}
           height={30}
+          onDismiss={() => {}}
           lines={[
             "The party entered the hall.",
             "Aldric confronted the king.",
@@ -498,6 +500,7 @@ describe("SessionRecapModal", () => {
           theme={theme}
           width={100}
           height={30}
+          onDismiss={() => {}}
           lines={[
             "The adventurers ventured deep into the ancient catacombs beneath the city.",
           ]}

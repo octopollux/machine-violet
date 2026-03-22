@@ -30,7 +30,7 @@ Each file is an isolated Claude conversation for a specific task. All use `spawn
 | `precis-updater.ts` | Haiku | Dropped exchange → precis append + PlayerRead extraction |
 | `changelog-updater.ts` | Haiku | Scene transcript → entity changelog entries |
 | `compendium-updater.ts` | Haiku | Scene transcript → player-facing compendium update |
-| `resolve-action.ts` | Haiku | Mechanical action resolution (attacks, checks, saves) |
+| `resolve-session.ts` | Sonnet | Persistent combat resolution engine (accumulates context across turns) |
 | `choice-generator.ts` | Haiku | Generate 2-3 player action choices from recent narration |
 | `character-promotion.ts` | Haiku | Expand minimal NPC → full character sheet |
 | `scribe.ts` | Haiku | Autonomous entity file manager (list/read/write tools, 8 rounds) |
@@ -87,8 +87,8 @@ Ink (React for CLI) components, formatting pipeline, theme system.
 | `responsive.ts` | Terminal size detection and layout tier selection |
 | `activity.ts` | Activity/status bar state management |
 | `game-context.ts` | React context for game engine callbacks |
-| `components/` | Reusable: `Modeline`, `InputLine`, `NarrativeArea`, `PlayerSelector`, `ActivityLine`, `FrameBorder` |
-| `modals/` | `ChoiceModal`, `CharacterSheetModal`, `CompendiumModal`, `DiceRollModal`, `SessionRecapModal`, `GameMenu`, `ApiErrorModal` |
+| `components/` | Reusable: `Modeline`, `InputLine`, `NarrativeArea`, `PlayerSelector`, `ActivityLine`, `FrameBorder`, `FullScreenFrame` |
+| `modals/` | `CenteredModal`, `ChoiceModal`, `CharacterSheetModal`, `CompendiumModal`, `DiceRollModal`, `SessionRecapModal`, `GameMenu`, `ApiErrorModal`, `SwatchModal`, `CampaignSettingsModal`, `RollbackSummaryModal`, `PlayerNotesModal` |
 | `themes/` | Theme parser, loader, resolver. Built-in themes in `themes/assets/` |
 | `color/` | OKLCH color space utilities, gradient generation |
 | `frames/` | Box drawing, styled content lines, string measurement |

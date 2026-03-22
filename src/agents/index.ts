@@ -18,8 +18,6 @@ export type { Injection, InjectionContext, TerminalDims, ResponseInfo } from "./
 export { summarizeScene } from "./subagents/index.js";
 export { updatePrecis } from "./subagents/index.js";
 export { updateChangelogs } from "./subagents/index.js";
-export { resolveAction } from "./subagents/index.js";
-export type { ResolveActionInput } from "./subagents/index.js";
 export { aiPlayerTurn, buildAIPlayerPrompt } from "./subagents/index.js";
 export type { AIPlayerContext, AIPlayerResult } from "./subagents/index.js";
 export { enterOOC, buildOOCPrompt } from "./subagents/index.js";

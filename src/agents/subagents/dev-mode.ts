@@ -9,8 +9,7 @@ import { TOKEN_LIMITS } from "../../config/tokens.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import { validateCampaign } from "../../tools/validation/index.js";
 import { repairState } from "./repair-state.js";
-import { norm } from "../../utils/paths.js";
-import * as path from "node:path";
+import { norm, resolveCampaignPath } from "../../utils/paths.js";
 import type { CampaignRepo } from "../../tools/git/index.js";
 import { queryCommitLog, performRollback } from "../../tools/git/index.js";
 import { RollbackCompleteError } from "../../teardown.js";
@@ -257,14 +256,7 @@ export function buildDevTools(): Anthropic.Tool[] {
  * Returns the absolute path or throws.
  */
 export function resolveDevPath(campaignRoot: string, relative: string): string {
-  // Normalize to forward slashes, strip leading slash
-  const normalized = relative.replace(/\\/g, "/").replace(/^\/+/, "");
-  // Reject .. components
-  const parts = normalized.split("/");
-  if (parts.some((p) => p === "..")) {
-    throw new Error("Path traversal not allowed");
-  }
-  return path.posix.join(campaignRoot, normalized);
+  return resolveCampaignPath(campaignRoot, relative);
 }
 
 /** Build an async tool handler for dev mode tools. */

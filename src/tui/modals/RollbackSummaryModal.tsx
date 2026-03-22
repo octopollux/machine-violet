@@ -7,6 +7,7 @@ interface RollbackSummaryModalProps {
   width: number;
   height: number;
   summary: string;
+  onDismiss: () => void;
   topOffset?: number;
 }
 
@@ -18,6 +19,7 @@ export function RollbackSummaryModal({
   width,
   height,
   summary,
+  onDismiss,
   topOffset,
 }: RollbackSummaryModalProps) {
   const lines = summary.split("\n");
@@ -32,6 +34,8 @@ export function RollbackSummaryModal({
       minWidth={40}
       maxWidth={50}
       topOffset={topOffset}
+      onDismiss={onDismiss}
+      scrollKeys
     />
   );
 }
