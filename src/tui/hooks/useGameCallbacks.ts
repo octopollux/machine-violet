@@ -35,7 +35,6 @@ export interface GameCallbackDeps {
   setThemeName: (name: string) => void;
   setKeyColor: (color: string) => void;
   setActiveModal: (m: ActiveModal) => void;
-  setChoiceIndex: React.Dispatch<React.SetStateAction<number>>;
   setActiveSession: (s: ModeSession | null) => void;
   setRetryOverlay: (o: RetryOverlay | null) => void;
   setToolGlyphs: React.Dispatch<React.SetStateAction<ToolGlyph[]>>;
@@ -75,7 +74,7 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
     onReturnToMenu,
     setNarrativeLines, setEngineState, setErrorMsg, setModelines,
     setResources, setVariant, setThemeName, setKeyColor,
-    setActiveModal, setChoiceIndex,
+    setActiveModal,
     setActiveSession, setRetryOverlay, setToolGlyphs,
     gameStateRef, clientRef, engineRef, activeModalRef, variantRef, previousVariantRef,
     costTracker, fileIO,
@@ -115,8 +114,6 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
           const descriptions = Array.isArray(rawDescs) && rawDescs.length > 0
             ? rawDescs.map((d: unknown) => typeof d === "string" ? d : String(d))
             : undefined;
-          // When fewer than 5 options, default focus to "Enter your own" so the user can freely type
-          setChoiceIndex(choices.length < 5 ? choices.length : 0);
           setActiveModal({ kind: "choice", prompt: (cmd.prompt as string) || "What do you do?", choices, descriptions });
         }
         break;
@@ -176,7 +173,7 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
         break;
       }
     }
-  }, [onReturnToMenu, setModelines, setVariant, setThemeName, setKeyColor, setResources, setChoiceIndex,
+  }, [onReturnToMenu, setModelines, setVariant, setThemeName, setKeyColor, setResources,
       setActiveModal, setActiveSession, setNarrativeLines, gameStateRef, clientRef, engineRef, fileIO,
       previousVariantRef, variantRef]);
 
@@ -200,8 +197,6 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
               setNarrativeLines((prev) => [...prev, { kind: "dev", text: `[dev] subagent:choices \u2192 ${result.choices.length} options generated` }]);
             }
             if (!activeModalRef.current && result.choices.length > 0) {
-              // When fewer than 5 options, default focus to "Enter your own"
-              setChoiceIndex(result.choices.length < 5 ? result.choices.length : 0);
               setActiveModal({ kind: "choice", prompt: "What do you do?", choices: result.choices });
             }
             const ct = costTracker.current;
@@ -305,7 +300,7 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
       deps.onTurnEndExtra?.(turn);
     },
   }), [dispatchTuiCommand, setNarrativeLines, setEngineState,
-       setErrorMsg, setActiveModal, setChoiceIndex, setRetryOverlay, setToolGlyphs,
+       setErrorMsg, setActiveModal, setRetryOverlay, setToolGlyphs,
        gameStateRef, clientRef, activeModalRef, costTracker]);
 
   return { buildCallbacks, dispatchTuiCommand };

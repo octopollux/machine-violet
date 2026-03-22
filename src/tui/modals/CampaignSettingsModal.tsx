@@ -8,6 +8,7 @@ export interface CampaignSettingsModalProps {
   width: number;
   height: number;
   config: CampaignConfig;
+  onDismiss: () => void;
 }
 
 /**
@@ -19,6 +20,7 @@ export function CampaignSettingsModal({
   width,
   height,
   config,
+  onDismiss,
 }: CampaignSettingsModalProps) {
   const lines: string[] = [];
 
@@ -36,6 +38,8 @@ export function CampaignSettingsModal({
       title="Campaign Settings"
       lines={lines}
       footer="ESC to close"
+      onDismiss={onDismiss}
+      scrollKeys
     />
   );
 }

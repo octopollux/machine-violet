@@ -1,9 +1,9 @@
-import React from "react";
-import { Box, Text } from "ink";
+import React, { useState, useEffect } from "react";
+import { useInput, Box, Text } from "ink";
 import type { FrameStyleVariant } from "../../types/tui.js";
 import { renderHorizontalFrame, renderContentLine } from "../frames/index.js";
 import { InlineTextInput } from "../components/InlineTextInput.js";
-import { parseFormatting, wrapNodes, nodeVisibleLength } from "../formatting.js";
+import { parseFormatting, stripFormatting, stripLeadingBullet, wrapNodes, nodeVisibleLength } from "../formatting.js";
 import { renderNodes } from "../render-nodes.js";
 import type { FormattingNode } from "../../types/tui.js";
 
@@ -42,15 +42,18 @@ interface ChoiceOverlayProps {
   choices: string[];
   /** Per-choice descriptions shown in a fixed-height region for the highlighted choice. */
   descriptions?: string[];
-  selectedIndex: number;
   /** Hex color for the selection cursor (">"). Falls back to default text color. */
   accentColor?: string;
   /** Max visual rows for choice items. Defaults to MAX_CHOICE_ROWS (5). */
   maxChoiceRows?: number;
-  showCustomInput?: boolean;
-  customInputActive?: boolean;
-  customInputResetKey?: number;
-  onCustomInputSubmit?: (value: string) => void;
+  /** Initial selection index (e.g. choices.length to start on "Enter your own"). */
+  initialIndex?: number;
+  /** Called when the player selects a choice (text) or submits custom input. */
+  onSelect: (choice: string) => void;
+  /** Called when the player dismisses the overlay (ESC). */
+  onDismiss: () => void;
+  /** Called for PageUp/PageDown to scroll the narrative area behind the overlay. */
+  onNarrativeScroll?: (delta: number) => void;
 }
 
 /** Maximum visual rows available for choice items. */
@@ -79,17 +82,76 @@ export function ChoiceOverlay({
   prompt,
   choices: rawChoices,
   descriptions,
-  selectedIndex,
   accentColor,
   maxChoiceRows: maxChoiceRowsProp,
-  showCustomInput,
-  customInputActive,
-  customInputResetKey,
-  onCustomInputSubmit,
+  initialIndex,
+  onSelect,
+  onDismiss,
+  onNarrativeScroll,
 }: ChoiceOverlayProps) {
   const choices = Array.isArray(rawChoices)
     ? rawChoices.map((c) => (typeof c === "string" ? c : String(c)))
     : [];
+
+  const showCustomInput = true;
+  const totalOptions = choices.length + 1; // +1 for "Enter your own"
+  const defaultIndex = initialIndex ?? (choices.length < 5 ? choices.length : 0);
+  const [selectedIndex, setSelectedIndex] = useState(defaultIndex);
+  const [customInputActive, setCustomInputActive] = useState(defaultIndex === choices.length);
+  const [customInputResetKey, setCustomInputResetKey] = useState(0);
+
+  // Sync customInputActive when selectedIndex lands on the custom row
+  useEffect(() => {
+    if (selectedIndex === choices.length) setCustomInputActive(true);
+  }, [selectedIndex, choices.length]);
+
+  useInput((input, key) => {
+    if (customInputActive) {
+      if (key.escape) { setCustomInputActive(false); return; }
+      if (key.upArrow) {
+        setCustomInputActive(false);
+        setCustomInputResetKey((k) => k + 1);
+        setSelectedIndex(choices.length - 1);
+        return;
+      }
+      if (key.pageUp || key.pageDown) {
+        onNarrativeScroll?.(key.pageUp ? -1 : 1);
+        return;
+      }
+      return;
+    }
+
+    if (key.escape) { onDismiss(); return; }
+    if (key.upArrow) { setSelectedIndex((i) => Math.max(0, i - 1)); return; }
+    if (key.downArrow) {
+      setSelectedIndex((i) => {
+        const next = Math.min(totalOptions - 1, i + 1);
+        if (next === choices.length) setCustomInputActive(true);
+        return next;
+      });
+      return;
+    }
+    if (key.return) {
+      if (selectedIndex === choices.length) {
+        setCustomInputActive(true);
+        return;
+      }
+      const chosen = stripLeadingBullet(stripFormatting(choices[selectedIndex]));
+      onSelect(chosen);
+      return;
+    }
+    if (key.pageUp || key.pageDown) {
+      onNarrativeScroll?.(key.pageUp ? -1 : 1);
+    }
+    if (input === "+" || input === "-") {
+      onNarrativeScroll?.(input === "-" ? -1 : 1);
+    }
+  });
+
+  const handleCustomInputSubmit = (value: string) => {
+    if (!value.trim()) return;
+    onSelect(value.trim());
+  };
 
   const hasDescriptions = descriptions != null && descriptions.length > 0;
   const choiceRows = Math.max(1, maxChoiceRowsProp ?? MAX_CHOICE_ROWS);
@@ -247,7 +309,7 @@ export function ChoiceOverlay({
                 isDisabled={false}
                 availableWidth={customInputWidth}
                 placeholder="Enter your own..."
-                onSubmit={onCustomInputSubmit}
+                onSubmit={handleCustomInputSubmit}
               />
             </Box>
           );

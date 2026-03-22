@@ -124,6 +124,8 @@ describe("ChoiceModal", () => {
   });
 });
 
+const noop = () => {};
+
 describe("ChoiceOverlay", () => {
   it("renders prompt and choices without frame borders", () => {
     const { lastFrame } = render(
@@ -131,7 +133,9 @@ describe("ChoiceOverlay", () => {
         width={60}
         prompt="What do you do?"
         choices={["Attack", "Flee", "Negotiate"]}
-        selectedIndex={0}
+        initialIndex={0}
+        onSelect={noop}
+        onDismiss={noop}
       />,
     );
     const frame = lastFrame()!;
@@ -150,7 +154,9 @@ describe("ChoiceOverlay", () => {
         width={60}
         prompt="Pick one"
         choices={["A", "B", "C", "D", "E", "F", "G"]}
-        selectedIndex={5}
+        initialIndex={5}
+        onSelect={noop}
+        onDismiss={noop}
       />,
     );
     const frame = lastFrame()!;
@@ -164,7 +170,9 @@ describe("ChoiceOverlay", () => {
         width={60}
         prompt="Pick one"
         choices={["A", "B"]}
-        selectedIndex={0}
+        initialIndex={0}
+        onSelect={noop}
+        onDismiss={noop}
       />,
     );
     const frame = lastFrame()!;
@@ -179,36 +187,38 @@ describe("ChoiceOverlay", () => {
         width={60}
         prompt="Pick one"
         choices={["A", "B"]}
-        selectedIndex={0}
+        initialIndex={0}
+        onSelect={noop}
+        onDismiss={noop}
       />,
     );
     expect(lastFrame()!).toContain("ESC dismiss");
   });
 
-  it("shows custom input row when showCustomInput is true", () => {
+  it("always shows Enter your own row", () => {
     const { lastFrame } = render(
       <ChoiceOverlay
         width={60}
         prompt="What do you do?"
         choices={["Attack", "Flee"]}
-        selectedIndex={0}
-        showCustomInput
+        initialIndex={0}
+        onSelect={noop}
+        onDismiss={noop}
       />,
     );
     expect(lastFrame()!).toContain("Enter your own...");
   });
 
   it("shows submit/back help text when custom input is active", () => {
+    // initialIndex = choices.length activates custom input mode
     const { lastFrame } = render(
       <ChoiceOverlay
         width={60}
         prompt="What do you do?"
         choices={["Attack"]}
-        selectedIndex={1}
-        showCustomInput
-        customInputActive
-        customInputResetKey={0}
-        onCustomInputSubmit={() => {}}
+        initialIndex={1}
+        onSelect={noop}
+        onDismiss={noop}
       />,
     );
     const frame = lastFrame()!;
@@ -225,7 +235,9 @@ describe("ChoiceOverlay", () => {
           "<color=#cc4444>Dread and Horror</color> — Slow burn",
           "<b>Grim Survival</b> — Desperate",
         ]}
-        selectedIndex={0}
+        initialIndex={0}
+        onSelect={noop}
+        onDismiss={noop}
       />,
     );
     const frame = lastFrame()!;
@@ -245,8 +257,9 @@ describe("ChoiceOverlay", () => {
         width={60}
         prompt="Pick"
         choices={["A", "B", "C"]}
-        selectedIndex={0}
-        showCustomInput
+        initialIndex={0}
+        onSelect={noop}
+        onDismiss={noop}
       />,
     );
     const lines = lastFrame()!.split("\n");
@@ -263,7 +276,9 @@ describe("ChoiceOverlay", () => {
           "A <b>dark</b> and <color=#22aa44>mossy</color> trail",
           "Echoing <i>whispers</i> from within",
         ]}
-        selectedIndex={0}
+        initialIndex={0}
+        onSelect={noop}
+        onDismiss={noop}
       />,
     );
     const frame = lastFrame()!;
@@ -285,7 +300,9 @@ describe("ChoiceOverlay", () => {
         width={40}
         prompt="What next?"
         choices={[longChoice, "◆ Rest"]}
-        selectedIndex={0}
+        initialIndex={0}
+        onSelect={noop}
+        onDismiss={noop}
       />,
     );
     const frame = lastFrame()!;
@@ -303,7 +320,9 @@ describe("ChoiceOverlay", () => {
         width={30}
         prompt="Pick"
         choices={[longChoice, "◆ Short"]}
-        selectedIndex={0}
+        initialIndex={0}
+        onSelect={noop}
+        onDismiss={noop}
       />,
     );
     const lines = lastFrame()!.split("\n");
@@ -315,7 +334,7 @@ describe("GameMenu", () => {
   it("renders all menu items", () => {
     const { lastFrame } = render(
       <Box width={40} height={24}>
-        <GameMenu theme={theme} width={40} height={24} selectedIndex={0} />
+        <GameMenu theme={theme} width={40} height={24} onSelect={noop} onDismiss={noop} />
       </Box>,
     );
     const frame = lastFrame();
@@ -331,8 +350,9 @@ describe("GameMenu", () => {
           theme={theme}
           width={60}
           height={24}
-          selectedIndex={0}
           tokenSummary="0/0/0 | 2k/0/15k | 5k/200/40k"
+          onSelect={noop}
+          onDismiss={noop}
         />
       </Box>,
     );
@@ -340,15 +360,15 @@ describe("GameMenu", () => {
     expect(frame).toContain("0/0/0 | 2k/0/15k | 5k/200/40k");
   });
 
-  it("highlights selected item", () => {
+  it("highlights first item by default", () => {
     const { lastFrame } = render(
       <Box width={40} height={24}>
-        <GameMenu theme={theme} width={40} height={24} selectedIndex={2} />
+        <GameMenu theme={theme} width={40} height={24} onSelect={noop} onDismiss={noop} />
       </Box>,
     );
     const frame = lastFrame();
-    expect(frame).toContain("◆ Compendium");
-    expect(frame).toContain("○ Resume");
+    expect(frame).toContain("◆ Resume");
+    expect(frame).toContain("○ Character Sheet");
   });
 });
 
@@ -432,6 +452,7 @@ describe("DiceRollModal", () => {
         expression="2d6+3"
         rolls={[4, 5]}
         total={12}
+        onDismiss={noop}
       />,
     );
     const frame = lastFrame();
@@ -449,6 +470,7 @@ describe("DiceRollModal", () => {
         rolls={[3, 5, 1, 6]}
         kept={[3, 5, 6]}
         total={14}
+        onDismiss={noop}
       />,
     );
     const frame = lastFrame();
@@ -465,6 +487,7 @@ describe("DiceRollModal", () => {
         rolls={[17]}
         total={22}
         reason="Attack roll vs. Goblin"
+        onDismiss={noop}
       />,
     );
     expect(lastFrame()).toContain("Attack roll vs. Goblin");
@@ -517,7 +540,7 @@ describe("SwatchModal", () => {
   it("renders the theme title in the frame", () => {
     const { lastFrame } = render(
       <Box width={100} height={30}>
-        <SwatchModal theme={theme} width={100} height={30} />
+        <SwatchModal theme={theme} width={100} height={30} onDismiss={noop} />
       </Box>,
     );
     const frame = lastFrame()!;
@@ -528,7 +551,7 @@ describe("SwatchModal", () => {
   it("renders anchor row labels", () => {
     const { lastFrame } = render(
       <Box width={100} height={30}>
-        <SwatchModal theme={theme} width={100} height={30} />
+        <SwatchModal theme={theme} width={100} height={30} onDismiss={noop} />
       </Box>,
     );
     const frame = lastFrame()!;
@@ -539,7 +562,7 @@ describe("SwatchModal", () => {
   it("renders the dismiss footer", () => {
     const { lastFrame } = render(
       <Box width={100} height={30}>
-        <SwatchModal theme={theme} width={100} height={30} />
+        <SwatchModal theme={theme} width={100} height={30} onDismiss={noop} />
       </Box>,
     );
     expect(lastFrame()).toContain("Press any key to dismiss");
@@ -548,7 +571,7 @@ describe("SwatchModal", () => {
   it("renders colorMap assignment text", () => {
     const { lastFrame } = render(
       <Box width={100} height={30}>
-        <SwatchModal theme={theme} width={100} height={30} />
+        <SwatchModal theme={theme} width={100} height={30} onDismiss={noop} />
       </Box>,
     );
     expect(lastFrame()).toContain("border:");

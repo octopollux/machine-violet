@@ -36,8 +36,6 @@ export function makeTestContext(overrides: Partial<GameContextValue> = {}): Game
     modelines: {},
     activeModal: null,
     setActiveModal: vi.fn(),
-    choiceIndex: 0,
-    setChoiceIndex: vi.fn(),
     activeSession: null,
     setActiveSession: vi.fn(),
     previousVariantRef: { current: "exploration" },

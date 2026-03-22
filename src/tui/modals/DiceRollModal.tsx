@@ -1,4 +1,5 @@
 import React from "react";
+import { useInput } from "ink";
 import type { ResolvedTheme } from "../themes/types.js";
 import { Modal } from "./Modal.js";
 
@@ -10,6 +11,7 @@ interface DiceRollModalProps {
   kept?: number[];
   total: number;
   reason?: string;
+  onDismiss: () => void;
 }
 
 /**
@@ -24,7 +26,9 @@ export function DiceRollModal({
   kept,
   total,
   reason,
+  onDismiss,
 }: DiceRollModalProps) {
+  useInput(() => { onDismiss(); });
   const lines: string[] = [];
 
   if (reason) {

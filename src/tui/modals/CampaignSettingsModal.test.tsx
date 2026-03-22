@@ -34,7 +34,7 @@ function renderModal(config: CampaignConfig) {
   const theme = makeTheme();
   return render(
     <Box width={80} height={30}>
-      <CampaignSettingsModal theme={theme} width={80} height={30} config={config} />
+      <CampaignSettingsModal theme={theme} width={80} height={30} config={config} onDismiss={() => {}} />
     </Box>,
   );
 }
