@@ -100,10 +100,15 @@ export function ChoiceOverlay({
   const [customInputActive, setCustomInputActive] = useState(defaultIndex === choices.length);
   const [customInputResetKey, setCustomInputResetKey] = useState(0);
 
-  // Sync customInputActive when selectedIndex lands on the custom row
+  // Reset state when choices change (e.g. choice-generator replaces DM-provided choices).
+  // Keyed on the serialized choices array so we only reset when actual options change.
+  const choicesKey = rawChoices.join("\0");
   useEffect(() => {
-    if (selectedIndex === choices.length) setCustomInputActive(true);
-  }, [selectedIndex, choices.length]);
+    const idx = initialIndex ?? (choices.length < 5 ? choices.length : 0);
+    setSelectedIndex(idx);
+    setCustomInputActive(idx === choices.length);
+    setCustomInputResetKey((k) => k + 1);
+  }, [choicesKey, initialIndex, choices.length]);
 
   useInput((input, key) => {
     if (customInputActive) {
