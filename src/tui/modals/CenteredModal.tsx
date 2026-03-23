@@ -12,7 +12,6 @@ import { renderNodes } from "../render-nodes.js";
 import { useScrollHandle } from "../hooks/useScrollHandle.js";
 import type { ScrollHandle } from "../hooks/useScrollHandle.js";
 import { scrollAmount } from "../components/NarrativeArea.js";
-import { copyToClipboard } from "../../utils/clipboard.js";
 
 export type CenteredModalHandle = ScrollHandle;
 
@@ -138,13 +137,6 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
 
     const scrollRef = useRef<ScrollViewRef>(null);
     const [linesBelow, setLinesBelow] = useState(0);
-    const [copyFlash, setCopyFlash] = useState(false);
-    const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    // Clean up copy flash timer on unmount.
-    useEffect(() => () => {
-      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
-    }, []);
 
     const updateScrollState = useCallback(() => {
       const sv = scrollRef.current;
@@ -180,20 +172,6 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
         onDismiss?.();
         return;
       }
-      if (input === "c") {
-        // Build plain text from whichever content mode is active.
-        const plainText = wrappedStyled
-          ? wrappedStyled.map((row) => toPlainText(row)).join("\n")
-          : (lines ?? wrappedLines).join("\n");
-        copyToClipboard(plainText).then((ok) => {
-          if (ok) {
-            setCopyFlash(true);
-            if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
-            copyTimerRef.current = setTimeout(() => setCopyFlash(false), 1500);
-          }
-        });
-        return;
-      }
       const step = scrollAmount(visibleRows);
       if (key.pageUp) { scrollBy(-step); return; }
       if (key.pageDown) { scrollBy(step); return; }
@@ -204,8 +182,7 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
     }, { isActive: scrollKeys });
 
     const textColor = themeColor(modalTheme, "sideFrame");
-    const resolvedFooterText = copyFlash ? "Copied to clipboard" : footer;
-    const resolvedFooterColor = copyFlash ? "greenBright" : (footerColor ?? themeColor(modalTheme, "title"));
+    const resolvedFooterColor = footerColor ?? themeColor(modalTheme, "title");
 
     // Build an opaque blank line that fills the full content area (inner + side padding).
     // Every row in the modal must emit real characters to cover what's behind it.
@@ -300,7 +277,7 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
           theme={modalTheme}
           width={modalWidth}
           position="bottom"
-          centerText={resolvedFooterText}
+          centerText={footer}
           centerTextColor={resolvedFooterColor}
         />
       </Box>
