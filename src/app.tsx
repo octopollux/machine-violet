@@ -49,6 +49,7 @@ import { PlayingPhase } from "./phases/PlayingPhase.js";
 import { AddContentPhase } from "./phases/AddContentPhase.js";
 import { SettingsPhase } from "./phases/SettingsPhase.js";
 import { DiscordSettingsPhase } from "./phases/DiscordSettingsPhase.js";
+import { UpdatePhase } from "./phases/UpdatePhase.js";
 import { loadKeyStore, saveKeyStore, buildEffectiveStore, getActiveKeyValue, getActiveKeyEntry } from "./config/api-keys.js";
 import type { ApiKeyStore } from "./config/api-keys.js";
 import { checkKeyHealth, formatHealthStatus } from "./config/api-key-health.js";
@@ -59,8 +60,10 @@ import { listAvailableSystems, readBundledRuleCard } from "./config/systems.js";
 import type { AvailableSystem } from "./config/systems.js";
 import { promoteCharacter } from "./agents/subagents/character-promotion.js";
 import { processingPaths } from "./config/processing-paths.js";
-import { norm, configDir } from "./utils/paths.js";
+import { norm, configDir, isCompiled } from "./utils/paths.js";
 import { loadDiscordSettings, saveDiscordSettings } from "./config/discord.js";
+import { checkForUpdate, performUpdate } from "./config/updater.js";
+import type { UpdateInfo } from "./config/updater.js";
 import { DiscordPresence } from "./services/discord/index.js";
 import { generateDiscordStatus } from "./agents/subagents/discord-status.js";
 import { GameProvider } from "./tui/game-context.js";
@@ -75,6 +78,7 @@ export type AppPhase =
   | "settings_api_keys"
   | "api_keys"
   | "discord_settings"
+  | "update_available"
   | "add_content"
   | "setup"
   | "building"
@@ -328,6 +332,9 @@ export default function App({ shutdownRef }: AppProps) {
   // Keep ref in sync so startEngine always reads the latest value
   useEffect(() => { discordEnabledRef.current = discordEnabled; }, [discordEnabled]);
 
+  // --- Update check ---
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+
   // --- Modal state (shared with PlayingPhase via props, set by buildCallbacks/dispatchTuiCommand) ---
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [retryOverlay, setRetryOverlay] = useState<RetryOverlay | null>(null);
@@ -550,6 +557,13 @@ export default function App({ shutdownRef }: AppProps) {
     // Load Discord opt-in setting
     const ds = loadDiscordSettings(getConfigDir());
     setDiscordEnabled(ds.enabled);
+
+    // Background update check (compiled builds only)
+    if (isCompiled()) {
+      void checkForUpdate().then((info) => {
+        if (info.available) setUpdateInfo(info);
+      });
+    }
   }, [phase, getConfigDir, getConfigPath, loadCampaigns, refreshKeyStore]);
 
   // --- Build game state from config ---
@@ -1039,6 +1053,8 @@ export default function App({ shutdownRef }: AppProps) {
         onAddContent={() => setPhase("add_content")}
         onSettings={() => setPhase("settings")}
         onSettingsApiKeys={() => setPhase("settings_api_keys")}
+        updateInfo={updateInfo}
+        onUpdate={() => setPhase("update_available")}
         discordSettingUnset={discordEnabled === null}
         onDiscordSettings={() => setPhase("discord_settings")}
         onQuit={doQuit}
@@ -1079,6 +1095,20 @@ export default function App({ shutdownRef }: AppProps) {
         onSave={(enabled) => {
           handleDiscordSave(enabled);
           setPhase("main_menu");
+        }}
+        onBack={() => setPhase("main_menu")}
+      />
+    );
+  }
+
+  if (phase === "update_available" && updateInfo) {
+    return (
+      <UpdatePhase
+        theme={theme}
+        updateInfo={updateInfo}
+        onApply={() => {
+          performUpdate(updateInfo.latestVersion);
+          process.exit(0);
         }}
         onBack={() => setPhase("main_menu")}
       />

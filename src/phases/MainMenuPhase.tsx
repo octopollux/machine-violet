@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useInput, Text, Box } from "ink";
 import type { CampaignEntry } from "../config/main-menu.js";
+import type { UpdateInfo } from "../config/updater.js";
 import type { ResolvedTheme } from "../tui/themes/types.js";
 import { TerminalTooSmall, FullScreenFrame } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
@@ -21,6 +22,10 @@ export interface MainMenuPhaseProps {
   onSettings: () => void;
   /** Navigate to Settings with API Keys pre-focused (deep link). */
   onSettingsApiKeys: () => void;
+  /** Update info when a newer version is available. */
+  updateInfo?: UpdateInfo | null;
+  /** Navigate to the update detail screen. */
+  onUpdate?: () => void;
   /** Whether the Discord Rich Presence setting has not been configured yet. */
   discordSettingUnset?: boolean;
   /** Navigate to Discord Rich Presence settings. */
@@ -42,6 +47,8 @@ export function MainMenuPhase({
   onAddContent,
   onSettings,
   onSettingsApiKeys,
+  updateInfo,
+  onUpdate,
   discordSettingUnset,
   onDiscordSettings,
   onQuit,
@@ -52,6 +59,7 @@ export function MainMenuPhase({
   const [campaignSelectIndex, setCampaignSelectIndex] = useState(0);
 
   const mainMenuItems: string[] = [];
+  if (updateInfo?.available) mainMenuItems.push("Update Available");
   mainMenuItems.push("New Campaign");
   if (campaigns.length > 0) mainMenuItems.push("Continue Campaign");
   mainMenuItems.push("Add Content");
@@ -101,7 +109,9 @@ export function MainMenuPhase({
     if (key.return) {
       const selected = mainMenuItems[mainMenuIndex];
       if (isItemDisabled(selected)) return; // blocked
-      if (selected === "New Campaign") {
+      if (selected === "Update Available") {
+        onUpdate?.();
+      } else if (selected === "New Campaign") {
         onNewCampaign();
       } else if (selected === "Continue Campaign") {
         setExpandedCampaigns(true);
@@ -140,19 +150,23 @@ export function MainMenuPhase({
     const marker = isSelected ? "◆" : "○";
     const markerColor = disabled ? "#555555" : isSelected ? borderColor : dimColor;
 
+    const isUpdateItem = item === "Update Available";
     let description = "";
-    if (item === "New Campaign") description = "Start a new adventure";
+    if (isUpdateItem && updateInfo) description = `v${updateInfo.currentVersion} → v${updateInfo.latestVersion}`;
+    else if (item === "New Campaign") description = "Start a new adventure";
     else if (item === "Continue Campaign" && campaigns.length > 0) description = `${campaigns.length} saved`;
     else if (item === "Add Content") description = "Import PDFs for game systems";
     else if (item === "API Keys") description = apiKeyStatus ?? "";
     else if (item === "Discord") description = "Set up Rich Presence";
     else if (item === "Settings") description = "";
 
+    const itemColor = isUpdateItem ? "yellow" : disabled ? "#555555" : undefined;
+    const descColor = isUpdateItem ? "yellow" : disabled ? "#555555" : dimColor;
     menuLines.push(
       <Text key={item}>
-        <Text color={markerColor}>{marker}</Text>
-        <Text color={disabled ? "#555555" : undefined} dimColor={disabled}>{` ${item}`}</Text>
-        {description ? <Text color={disabled ? "#555555" : dimColor} dimColor={disabled}>{` — ${description}`}</Text> : null}
+        <Text color={isUpdateItem ? "yellow" : markerColor}>{marker}</Text>
+        <Text color={itemColor} dimColor={disabled} bold={isUpdateItem}>{` ${item}`}</Text>
+        {description ? <Text color={descColor} dimColor={disabled}>{` — ${description}`}</Text> : null}
       </Text>,
     );
 
