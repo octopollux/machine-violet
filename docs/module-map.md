@@ -172,6 +172,15 @@ Content assets at the repo root (not in `src/`). Each system gets a subdirectory
 
 Currently bundled: `24xx`, `breathless`, `cairn`, `charge`, `dnd-5e`, `fate-accelerated`, `ironsworn`.
 
+## src/utils/ — Utilities
+
+Platform abstractions and helpers that don't belong to any single domain.
+
+| File | Purpose |
+|---|---|
+| `clipboard.ts` | `ClipboardIO` interface, `copyToClipboard()`, `readFromClipboard()` — cross-platform clipboard via `clipboardy`, lazy-loaded. `setClipboardIO()` for test mocking |
+| `paths.ts` | Runtime asset path resolution (prompts, themes, systems relative to executable) |
+
 ## Root Files
 
 | File | Purpose |
