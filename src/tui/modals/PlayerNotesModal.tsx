@@ -200,7 +200,11 @@ export function PlayerNotesModal({
     if (key.ctrl && input === "e") { dispatch({ type: "end" }); return; }
 
     if (input && !key.ctrl && !key.meta) {
-      dispatch({ type: "insert", text: input });
+      // Strip control characters (especially \r from ConPTY cooked-mode
+      // leaks) so they can't be inserted as data and corrupt the file.
+      // eslint-disable-next-line no-control-regex -- intentional: filter ConPTY cooked-mode leak chars
+      const clean = input.replace(/[\x00-\x1f]/g, "");
+      if (clean) dispatch({ type: "insert", text: clean });
     }
   });
 
