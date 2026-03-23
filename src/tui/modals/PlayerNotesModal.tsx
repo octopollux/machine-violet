@@ -3,6 +3,7 @@ import { useInput, Text } from "ink";
 import chalk from "chalk";
 import type { ResolvedTheme } from "../themes/types.js";
 import { CenteredModal } from "./CenteredModal.js";
+import { forceRefreshRawMode } from "../hooks/rawModeGuard.js";
 import { themeColor, deriveModalTheme } from "../themes/color-resolve.js";
 import { stringWidth } from "../frames/index.js";
 
@@ -176,6 +177,13 @@ export function PlayerNotesModal({
   const maxContentRows = Math.max(3, height - 2 * borderHeight - 2);
 
   useInput((input, key) => {
+    // On Windows, ConPTY can silently re-enable ENABLE_PROCESSED_INPUT
+    // between raw-mode guardian polls (500ms). Force-refresh on every
+    // keystroke to prevent corrupted input from reaching the reducer
+    // and persisting to disk. The two SetConsoleMode calls are
+    // sub-microsecond; no-op on non-Windows.
+    forceRefreshRawMode();
+
     if (key.escape) {
       onSave(lines.join("\n"));
       onClose();
