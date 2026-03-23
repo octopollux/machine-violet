@@ -74,12 +74,15 @@ describe("UpdatePhase", () => {
 
   it("calls onBack when Back selected and Enter pressed", async () => {
     const onBack = vi.fn();
-    const { stdin } = render(<UpdatePhase {...defaultProps({ onBack })} />);
-    // Navigate down to "Back" using raw escape sequence for down arrow
+    const { stdin, lastFrame } = render(<UpdatePhase {...defaultProps({ onBack })} />);
+    // Navigate down to "Back"
     stdin.write("\x1B[B");
-    // Small delay to let state update
+    // Wait for the selection to move (Back gets the ◆ marker)
     await vi.waitFor(() => {
-      stdin.write("\r");
+      expect(lastFrame()).toMatch(/◆\s+Back/);
+    });
+    stdin.write("\r");
+    await vi.waitFor(() => {
       expect(onBack).toHaveBeenCalled();
     });
   });

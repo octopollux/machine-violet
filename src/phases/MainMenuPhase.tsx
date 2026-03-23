@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useInput, Text, Box } from "ink";
 import type { CampaignEntry } from "../config/main-menu.js";
 import type { UpdateInfo } from "../config/updater.js";
@@ -58,8 +58,20 @@ export function MainMenuPhase({
   const [expandedCampaigns, setExpandedCampaigns] = useState(false);
   const [campaignSelectIndex, setCampaignSelectIndex] = useState(0);
 
+  // Track whether the update item was present on previous render so we can
+  // adjust mainMenuIndex when it appears asynchronously (avoids highlight jump).
+  const showUpdateItem = !!(updateInfo?.available && onUpdate);
+  const hadUpdateItem = useRef(showUpdateItem);
+  useEffect(() => {
+    if (showUpdateItem && !hadUpdateItem.current) {
+      // Update item just appeared mid-session — bump index so the user's selection stays put
+      setMainMenuIndex((i) => i + 1);
+    }
+    hadUpdateItem.current = showUpdateItem;
+  }, [showUpdateItem]);
+
   const mainMenuItems: string[] = [];
-  if (updateInfo?.available) mainMenuItems.push("Update Available");
+  if (showUpdateItem) mainMenuItems.push("Update Available");
   mainMenuItems.push("New Campaign");
   if (campaigns.length > 0) mainMenuItems.push("Continue Campaign");
   mainMenuItems.push("Add Content");

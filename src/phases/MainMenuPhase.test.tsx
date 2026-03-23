@@ -114,6 +114,7 @@ describe("MainMenuPhase", () => {
   it("renders Update Available when updateInfo is provided", () => {
     const props = defaultProps({
       updateInfo: { available: true, currentVersion: "1.0.0", latestVersion: "1.1.0" },
+      onUpdate: vi.fn(),
     });
     const { lastFrame } = render(<MainMenuPhase {...props} />);
     const frame = lastFrame();
@@ -123,7 +124,7 @@ describe("MainMenuPhase", () => {
   });
 
   it("does not render Update Available when updateInfo is null", () => {
-    const { lastFrame } = render(<MainMenuPhase {...defaultProps()} />);
+    const { lastFrame } = render(<MainMenuPhase {...defaultProps({ updateInfo: null })} />);
     expect(lastFrame()).not.toContain("Update Available");
   });
 

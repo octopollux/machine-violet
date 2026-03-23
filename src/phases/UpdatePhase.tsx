@@ -76,7 +76,7 @@ export function UpdatePhase({
     );
     // Render release notes as simple text lines, capped to fit
     const maxNoteLines = Math.max(1, contentHeight - 10);
-    const noteLines = updateInfo.releaseNotes.split("\n").slice(0, maxNoteLines);
+    const noteLines = updateInfo.releaseNotes.split(/\r?\n/).slice(0, maxNoteLines);
     for (let i = 0; i < noteLines.length; i++) {
       lines.push(
         <Text key={`note-${i}`} color={dimColor} wrap="truncate">{noteLines[i]}</Text>,
