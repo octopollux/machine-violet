@@ -470,7 +470,7 @@ The `/swatch` command opens a debug modal showing the full harmony swatch grid, 
 | **styledLines** | `styledLines: FormattingNode[][]` | Pre-parsed formatting nodes (e.g. CompendiumModal's tree). Word-wrapped automatically. |
 | **lines** | `lines: string[]` | Plain text. Word-wrapped automatically. |
 
-**Self-handling keyboard input:** Read-only modals set `scrollKeys={true}` and pass an `onDismiss` callback. CenteredModal handles PageUp/PageDown/arrows/+/- for scrolling and ESC/Enter for dismissal internally. Modals with custom input (CompendiumModal, PlayerNotesModal) leave `scrollKeys` off and manage their own `useInput`.
+**Self-handling keyboard input:** Read-only modals set `scrollKeys={true}` and pass an `onDismiss` callback. CenteredModal handles PageUp/PageDown/arrows/+/- for scrolling, ESC/Enter for dismissal, and **"c" to copy modal content to the system clipboard** internally. On copy, the footer flashes "Copied to clipboard" for 1.5 seconds. Content is extracted as plain text regardless of which content mode (lines, styledLines, rawRows) is active. Modals with custom input (CompendiumModal, PlayerNotesModal) leave `scrollKeys` off and manage their own `useInput`.
 
 ### FullScreenFrame
 
