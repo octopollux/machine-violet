@@ -19,6 +19,7 @@ export interface UpdateInfo {
   latestVersion: string;
   downloadUrl?: string;
   releaseUrl?: string;
+  releaseNotes?: string;
 }
 
 /**
@@ -39,6 +40,7 @@ export async function checkForUpdate(): Promise<UpdateInfo> {
     const release = (await res.json()) as {
       tag_name: string;
       html_url: string;
+      body?: string;
       assets: { name: string; browser_download_url: string }[];
     };
 
@@ -61,6 +63,7 @@ export async function checkForUpdate(): Promise<UpdateInfo> {
       latestVersion,
       downloadUrl: asset?.browser_download_url,
       releaseUrl: release.html_url,
+      releaseNotes: release.body ?? undefined,
     };
   } catch {
     return { available: false, currentVersion, latestVersion: currentVersion };

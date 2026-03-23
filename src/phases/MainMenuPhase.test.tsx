@@ -110,4 +110,33 @@ describe("MainMenuPhase", () => {
     stdin.write("\r");
     expect(onNewCampaign).not.toHaveBeenCalled();
   });
+
+  it("renders Update Available when updateInfo is provided", () => {
+    const props = defaultProps({
+      updateInfo: { available: true, currentVersion: "1.0.0", latestVersion: "1.1.0" },
+      onUpdate: vi.fn(),
+    });
+    const { lastFrame } = render(<MainMenuPhase {...props} />);
+    const frame = lastFrame();
+    expect(frame).toContain("Update Available");
+    expect(frame).toContain("v1.0.0");
+    expect(frame).toContain("v1.1.0");
+  });
+
+  it("does not render Update Available when updateInfo is null", () => {
+    const { lastFrame } = render(<MainMenuPhase {...defaultProps({ updateInfo: null })} />);
+    expect(lastFrame()).not.toContain("Update Available");
+  });
+
+  it("calls onUpdate when Update Available is selected", () => {
+    const onUpdate = vi.fn();
+    const props = defaultProps({
+      updateInfo: { available: true, currentVersion: "1.0.0", latestVersion: "1.1.0" },
+      onUpdate,
+    });
+    const { stdin } = render(<MainMenuPhase {...props} />);
+    // Update Available is the first item
+    stdin.write("\r");
+    expect(onUpdate).toHaveBeenCalled();
+  });
 });
