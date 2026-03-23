@@ -1,11 +1,23 @@
-import { PDFDocument } from "pdf-lib";
-import { splitPdf, getPdfInfo, DEFAULT_CHUNK_SIZE } from "./pdf-split.js";
 import { writeFile, mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
+let pdfLibAvailable = false;
+try {
+  await import("pdf-lib");
+  pdfLibAvailable = true;
+} catch {
+  // pdf-lib is optional — tests will be skipped
+}
+
+// Lazily imported — pdf-split.ts has a top-level pdf-lib import
+const pdfSplit = pdfLibAvailable
+  ? await import("./pdf-split.js")
+  : (undefined as unknown as typeof import("./pdf-split.js"));
+
 /** Create a minimal PDF with the given number of blank pages. */
 async function createTestPdf(pageCount: number): Promise<Buffer> {
+  const { PDFDocument } = await import("pdf-lib");
   const doc = await PDFDocument.create();
   for (let i = 0; i < pageCount; i++) {
     doc.addPage([200, 200]);
@@ -15,7 +27,7 @@ async function createTestPdf(pageCount: number): Promise<Buffer> {
 }
 
 // PDF processing and filesystem I/O have been flaky in CI under parallel workers
-describe("getPdfInfo", { retry: 2 }, () => {
+describe.skipIf(!pdfLibAvailable)("getPdfInfo", { retry: 2 }, () => {
   let tempDir: string;
   let pdfPath: string;
 
@@ -28,13 +40,13 @@ describe("getPdfInfo", { retry: 2 }, () => {
     const pdf = await createTestPdf(10);
     await writeFile(pdfPath, pdf);
 
-    const info = await getPdfInfo(pdfPath);
+    const info = await pdfSplit.getPdfInfo(pdfPath);
     expect(info.pageCount).toBe(10);
     expect(info.baseName).toBe("Test Book");
   });
 });
 
-describe("splitPdf", { retry: 2 }, () => {
+describe.skipIf(!pdfLibAvailable)("splitPdf", { retry: 2 }, () => {
   let tempDir: string;
   let pdfPath: string;
 
@@ -47,7 +59,7 @@ describe("splitPdf", { retry: 2 }, () => {
     const pdf = await createTestPdf(5);
     await writeFile(pdfPath, pdf);
 
-    const chunks = await splitPdf(pdfPath, 30);
+    const chunks = await pdfSplit.splitPdf(pdfPath, 30);
     expect(chunks).toHaveLength(1);
     expect(chunks[0].index).toBe(0);
     expect(chunks[0].startPage).toBe(1);
@@ -59,7 +71,7 @@ describe("splitPdf", { retry: 2 }, () => {
     const pdf = await createTestPdf(75);
     await writeFile(pdfPath, pdf);
 
-    const chunks = await splitPdf(pdfPath, 30);
+    const chunks = await pdfSplit.splitPdf(pdfPath, 30);
     expect(chunks).toHaveLength(3);
 
     expect(chunks[0].startPage).toBe(1);
@@ -76,10 +88,11 @@ describe("splitPdf", { retry: 2 }, () => {
     const pdf = await createTestPdf(45);
     await writeFile(pdfPath, pdf);
 
-    const chunks = await splitPdf(pdfPath, 30);
+    const chunks = await pdfSplit.splitPdf(pdfPath, 30);
     expect(chunks).toHaveLength(2);
 
     // Verify each chunk is a valid PDF by loading it
+    const { PDFDocument } = await import("pdf-lib");
     for (const chunk of chunks) {
       const bytes = Buffer.from(chunk.pdfBase64, "base64");
       const doc = await PDFDocument.load(bytes);
@@ -92,7 +105,7 @@ describe("splitPdf", { retry: 2 }, () => {
     const pdf = await createTestPdf(60);
     await writeFile(pdfPath, pdf);
 
-    const chunks = await splitPdf(pdfPath, 30);
+    const chunks = await pdfSplit.splitPdf(pdfPath, 30);
     expect(chunks).toHaveLength(2);
     expect(chunks[0].endPage).toBe(30);
     expect(chunks[1].startPage).toBe(31);
@@ -100,6 +113,6 @@ describe("splitPdf", { retry: 2 }, () => {
   });
 
   it("default chunk size is 30", () => {
-    expect(DEFAULT_CHUNK_SIZE).toBe(30);
+    expect(pdfSplit.DEFAULT_CHUNK_SIZE).toBe(30);
   });
 });

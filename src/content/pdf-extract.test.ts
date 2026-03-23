@@ -1,11 +1,19 @@
-import { PDFDocument } from "pdf-lib";
 import { extractTextFromPdf } from "./pdf-extract.js";
 import { writeFile, mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
+let pdfLibAvailable = false;
+try {
+  await import("pdf-lib");
+  pdfLibAvailable = true;
+} catch {
+  // pdf-lib is optional — tests will be skipped
+}
+
 /** Create a PDF with pages containing the given text strings. */
 async function createTextPdf(pageTexts: string[]): Promise<Buffer> {
+  const { PDFDocument } = await import("pdf-lib");
   const doc = await PDFDocument.create();
   const font = await doc.embedFont("Helvetica");
 
@@ -21,7 +29,7 @@ async function createTextPdf(pageTexts: string[]): Promise<Buffer> {
 }
 
 // pdf-parse loads native pdf.js modules that can race under parallel workers
-describe("extractTextFromPdf", { retry: 2 }, () => {
+describe.skipIf(!pdfLibAvailable)("extractTextFromPdf", { retry: 2 }, () => {
   let tempDir: string;
 
   beforeEach(async () => {
