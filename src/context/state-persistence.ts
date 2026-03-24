@@ -128,7 +128,11 @@ export class StatePersister {
       if (!raw) return undefined;
       return JSON.parse(raw) as T;
     } catch (e) {
-      this.onError?.(e instanceof Error ? e : new Error(String(e)));
+      // Missing files are expected (optional state that hasn't been written yet)
+      const code = (e as NodeJS.ErrnoException | null)?.code;
+      if (code !== "ENOENT") {
+        this.onError?.(e instanceof Error ? e : new Error(String(e)));
+      }
       return undefined;
     }
   }

@@ -275,6 +275,19 @@ describe("StatePersister", () => {
     expect(onError).toHaveBeenCalled();
     expect(onError.mock.calls[0][0].message).toBe("permission denied");
   });
+
+  it("silently ignores ENOENT on read (missing optional state files)", async () => {
+    const fio = mockFileIO();
+    const enoent = Object.assign(new Error("ENOENT: no such file or directory"), { code: "ENOENT" });
+    (fio.readFile as ReturnType<typeof vi.fn>).mockRejectedValue(enoent);
+    const onError = vi.fn();
+    const persister = new StatePersister("/tmp/campaign", fio, onError);
+
+    const loaded = await persister.loadAll();
+    expect(loaded.combat).toBeUndefined();
+    expect(loaded.scene).toBeUndefined();
+    expect(onError).not.toHaveBeenCalled();
+  });
 });
 
 describe("display log", () => {
