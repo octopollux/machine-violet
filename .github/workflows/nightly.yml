@@ -296,6 +296,12 @@ jobs:
           RELEASE_NOTES: ${{ steps.changelog.outputs.notes }}
         run: |
           DATE="${{ steps.tags.outputs.date }}"
+          REPO="${{ github.repository }}"
+
+          # Default release notes when has_changes was false and the step was skipped
+          if [ -z "$RELEASE_NOTES" ]; then
+            RELEASE_NOTES="Internal improvements and maintenance."
+          fi
 
           cat > nightly-body.md << 'BODYEOF'
           ## Download
@@ -303,22 +309,24 @@ jobs:
           ### Windows
           | | File |
           |---|---|
-          | **Installer** (recommended) | [`MachineViolet-nightly-Setup.exe`](https://github.com/octopollux/machine-violet/releases/download/nightly/MachineViolet-nightly-Setup.exe) |
-          | Portable (no install) | [`MachineViolet-nightly-Portable.zip`](https://github.com/octopollux/machine-violet/releases/download/nightly/MachineViolet-nightly-Portable.zip) |
+          | **Installer** (recommended) | [`MachineViolet-nightly-Setup.exe`](https://github.com/REPO_PLACEHOLDER/releases/download/TAG_PLACEHOLDER/MachineViolet-nightly-Setup.exe) |
+          | Portable (no install) | [`MachineViolet-nightly-Portable.zip`](https://github.com/REPO_PLACEHOLDER/releases/download/TAG_PLACEHOLDER/MachineViolet-nightly-Portable.zip) |
 
           ### macOS (Apple Silicon)
           | | File |
           |---|---|
-          | Tarball | [`machine-violet-nightly-darwin-arm64.tar.gz`](https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-darwin-arm64.tar.gz) |
+          | Tarball | [`machine-violet-nightly-darwin-arm64.tar.gz`](https://github.com/REPO_PLACEHOLDER/releases/download/TAG_PLACEHOLDER/machine-violet-nightly-darwin-arm64.tar.gz) |
 
           ### Linux (x64)
           | | File |
           |---|---|
-          | Tarball | [`machine-violet-nightly-linux-x64.tar.gz`](https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-linux-x64.tar.gz) |
+          | Tarball | [`machine-violet-nightly-linux-x64.tar.gz`](https://github.com/REPO_PLACEHOLDER/releases/download/TAG_PLACEHOLDER/machine-violet-nightly-linux-x64.tar.gz) |
 
           Also available via Homebrew: `brew install octopollux/mv-tap/machine-violet`
           BODYEOF
           sed -i 's/^          //' nightly-body.md
+          sed -i "s|TAG_PLACEHOLDER|${NIGHTLY_TAG}|g" nightly-body.md
+          sed -i "s|REPO_PLACEHOLDER|${REPO}|g" nightly-body.md
 
           # Append release notes safely (no shell expansion of AI content)
           {
@@ -357,7 +365,7 @@ jobs:
           git push --delete origin nightly 2>/dev/null || true
 
           COMMIT=$(git rev-parse "$NIGHTLY_TAG")
-          git tag nightly "$COMMIT"
+          git tag -f nightly "$COMMIT"
           git push origin nightly
 
           # Clone the dated release body for the rolling release
