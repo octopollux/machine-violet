@@ -9,6 +9,7 @@ import type { CachedPrefixResult } from "../context/index.js";
 import { summarizeScene } from "./subagents/scene-summarizer.js";
 import { generateNarrativeRecap } from "./subagents/narrative-recap.js";
 import { updatePrecis } from "./subagents/precis-updater.js";
+import { trackScene } from "./subagents/scene-tracker.js";
 import type { PlayerRead } from "./subagents/precis-updater.js";
 import { updateChangelogs } from "./subagents/changelog-updater.js";
 import { updateCompendium, emptyCompendium, renderCompendiumForDM } from "./subagents/compendium-updater.js";
@@ -196,6 +197,31 @@ export class SceneManager {
     }
     if (result.playerRead) {
       this.scene.playerReads.push(result.playerRead);
+    }
+    return result.usage;
+  }
+
+  /** Run the scene tracker to update open threads and NPC intents. */
+  async runSceneTracker(client: Anthropic): Promise<UsageStats> {
+    const tail = this.scene.transcript;
+    if (tail.length === 0) {
+      return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 };
+    }
+
+    this.devLog?.("[dev] subagent:scene-tracker starting");
+    const result = await trackScene(
+      client,
+      tail,
+      this.scene.openThreads || undefined,
+      this.scene.npcIntents || undefined,
+    );
+    this.devLog?.("[dev] subagent:scene-tracker done");
+
+    if (result.openThreads !== undefined) {
+      this.scene.openThreads = result.openThreads;
+    }
+    if (result.npcIntents !== undefined) {
+      this.scene.npcIntents = result.npcIntents;
     }
     return result.usage;
   }

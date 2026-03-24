@@ -19,3 +19,5 @@ export { runScribe, buildScribeToolHandler } from "./scribe.js";
 export type { ScribeInput, ScribeResult, ScribeUpdate, ScribeFileIO } from "./scribe.js";
 export { searchCampaign, buildSearchToolHandler } from "./search-campaign.js";
 export type { SearchCampaignInput, SearchCampaignResult } from "./search-campaign.js";
+export { trackScene, SCENE_TRACKER_CADENCE } from "./scene-tracker.js";
+export type { SceneTrackerResult } from "./scene-tracker.js";

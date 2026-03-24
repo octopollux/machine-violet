@@ -33,6 +33,7 @@ import { RollbackCompleteError, ContentRefusalError } from "../teardown.js";
 import type { GitIO } from "../tools/git/index.js";
 import { writeDebugDump } from "../tools/filesystem/debug-dump.js";
 import { styleTheme } from "./subagents/theme-styler.js";
+import { SCENE_TRACKER_CADENCE } from "./subagents/scene-tracker.js";
 import { ResolveSession } from "./resolve-session.js";
 import type { ActionDeclaration, StateDelta } from "../types/resolve-session.js";
 
@@ -568,6 +569,21 @@ export class GameEngine {
 
       // Track exchange for git auto-commit
       await this.repo?.trackExchange();
+
+      // Run scene tracker periodically to maintain open threads / NPC intents
+      if (!opts?.skipTranscript) {
+        const currentScene = this.sceneManager.getScene();
+        const playerExchanges = currentScene.transcript.filter((t) => t.startsWith("**[")).length;
+        if (playerExchanges > 0 && playerExchanges % SCENE_TRACKER_CADENCE === 0) {
+          try {
+            const trackerUsage = await this.sceneManager.runSceneTracker(this.client);
+            accUsage(this.sessionUsage, trackerUsage);
+            this.persistCurrentScene();
+          } catch (e) {
+            this.callbacks.onDevLog?.(`[dev] scene-tracker failed: ${e instanceof Error ? e.message : e}`);
+          }
+        }
+      }
 
       // Handle dropped exchange — update precis, then re-persist scene
       // so the precis written to disk includes the just-dropped content.
