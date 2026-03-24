@@ -81,7 +81,6 @@ export type AppPhase =
   | "update_available"
   | "add_content"
   | "setup"
-  | "building"
   | "playing"
   | "returning_to_menu"
   | "shutting_down";
@@ -217,7 +216,7 @@ async function loadDisplayHistory(
 /**
  * Build an initial character sheet using the promoteCharacter subagent.
  * Called after buildCampaignWorld when we have system + character details.
- * Silently — no streaming (the "building" phase covers this).
+ * Silently — no streaming (the playing-phase narrative area shows a loading message).
  */
 async function buildInitialSheet(
   campaignRoot: string,
@@ -784,7 +783,7 @@ export default function App({ shutdownRef }: AppProps) {
 
   // --- Finalize setup result into a running campaign ---
   const finalizeSetup = useCallback(async (result: SetupResult) => {
-    setPhase("building");
+    setPhase("playing");
     setNarrativeLines([{ kind: "system", text: "The DM is building the game world (this can take a few minutes)." }]);
 
     try {
@@ -816,7 +815,7 @@ export default function App({ shutdownRef }: AppProps) {
 
   // --- Resume a campaign ---
   const resumeCampaign = useCallback(async (entry: CampaignEntry) => {
-    setPhase("building");
+    setPhase("playing");
     setNarrativeLines([{ kind: "system", text: "Loading campaign..." }]);
 
     try {
@@ -1123,14 +1122,6 @@ export default function App({ shutdownRef }: AppProps) {
         onCancel={() => setPhase("main_menu")}
         onError={(msg) => setErrorMsg(msg)}
       />
-    );
-  }
-
-  if (phase === "building") {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Text>The DM is building the game world (this can take a few minutes).</Text>
-      </Box>
     );
   }
 
