@@ -38,6 +38,15 @@ vi.mock("./subagents/character-promotion.js", () => ({
   })),
 }));
 
+vi.mock("./subagents/scene-tracker.js", () => ({
+  SCENE_TRACKER_CADENCE: 4,
+  trackScene: vi.fn(async () => ({
+    text: "THREADS: (none)",
+    usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 },
+    openThreads: "",
+  })),
+}));
+
 import { aiPlayerTurn } from "./subagents/ai-player.js";
 import { runScribe } from "./subagents/scribe.js";
 import { promoteCharacter } from "./subagents/character-promotion.js";

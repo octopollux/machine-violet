@@ -129,6 +129,27 @@ The engine can use PlayerRead signals to adjust choice frequency, pacing hints i
 
 ---
 
+### 5b. Scene Tracker
+
+| Property | Value |
+|---|---|
+| **Model** | Haiku |
+| **Visibility** | Silent |
+| **Trigger** | Every 4 player exchanges (configurable via `SCENE_TRACKER_CADENCE`) |
+| **Source** | `src/agents/subagents/scene-tracker.ts`, `src/prompts/scene-tracker.md` |
+
+Periodic scene housekeeping subagent. Currently maintains open narrative threads and NPC intentions from recent transcript. Designed to be extensible for future housekeeping tasks.
+
+With `max_conversation_tokens` disabled (default), the precis updater never fires, so thread tracking needs an independent trigger. The scene tracker runs every N player exchanges, reading the last 6 transcript entries and the current thread/intent lists, then returning updated lists.
+
+**Context**: Recent transcript tail (~6 entries) + current open threads + current NPC intents. ~200-300 tokens.
+
+**Returns**: `SceneTrackerResult` with `openThreads` (comma-separated wikilinks) and optional `npcIntents` (semicolon-separated).
+
+**Consumed by**: `buildScenePacing()` → `ScenePacingInjection` (advisory nudges about scene length and thread count).
+
+---
+
 ### 6. Changelog Updater
 
 | Property | Value |
