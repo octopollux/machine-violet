@@ -288,18 +288,20 @@ jobs:
           echo "$NOTES" >> "$GITHUB_OUTPUT"
           echo "NOTES_EOF" >> "$GITHUB_OUTPUT"
 
-      - name: Create or update nightly release
+      - name: Create dated nightly release
         env:
           GH_TOKEN: ${{ github.token }}
           NIGHTLY_TAG: ${{ steps.tags.outputs.tag }}
           PREV_TAG: ${{ steps.tags.outputs.prev }}
           RELEASE_NOTES: ${{ steps.changelog.outputs.notes }}
         run: |
-          # Delete existing rolling nightly release (if any)
-          gh release delete nightly --yes --repo ${{ github.repository }} 2>/dev/null || true
-          git push --delete origin nightly 2>/dev/null || true
-
           DATE="${{ steps.tags.outputs.date }}"
+          REPO="${{ github.repository }}"
+
+          # Default release notes when has_changes was false and the step was skipped
+          if [ -z "$RELEASE_NOTES" ]; then
+            RELEASE_NOTES="Internal improvements and maintenance."
+          fi
 
           cat > nightly-body.md << 'BODYEOF'
           ## Download
@@ -307,22 +309,24 @@ jobs:
           ### Windows
           | | File |
           |---|---|
-          | **Installer** (recommended) | [`MachineViolet-nightly-Setup.exe`](https://github.com/octopollux/machine-violet/releases/download/nightly/MachineViolet-nightly-Setup.exe) |
-          | Portable (no install) | [`MachineViolet-nightly-Portable.zip`](https://github.com/octopollux/machine-violet/releases/download/nightly/MachineViolet-nightly-Portable.zip) |
+          | **Installer** (recommended) | [`MachineViolet-nightly-Setup.exe`](https://github.com/REPO_PLACEHOLDER/releases/download/TAG_PLACEHOLDER/MachineViolet-nightly-Setup.exe) |
+          | Portable (no install) | [`MachineViolet-nightly-Portable.zip`](https://github.com/REPO_PLACEHOLDER/releases/download/TAG_PLACEHOLDER/MachineViolet-nightly-Portable.zip) |
 
           ### macOS (Apple Silicon)
           | | File |
           |---|---|
-          | Tarball | [`machine-violet-nightly-darwin-arm64.tar.gz`](https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-darwin-arm64.tar.gz) |
+          | Tarball | [`machine-violet-nightly-darwin-arm64.tar.gz`](https://github.com/REPO_PLACEHOLDER/releases/download/TAG_PLACEHOLDER/machine-violet-nightly-darwin-arm64.tar.gz) |
 
           ### Linux (x64)
           | | File |
           |---|---|
-          | Tarball | [`machine-violet-nightly-linux-x64.tar.gz`](https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-linux-x64.tar.gz) |
+          | Tarball | [`machine-violet-nightly-linux-x64.tar.gz`](https://github.com/REPO_PLACEHOLDER/releases/download/TAG_PLACEHOLDER/machine-violet-nightly-linux-x64.tar.gz) |
 
           Also available via Homebrew: `brew install octopollux/mv-tap/machine-violet`
           BODYEOF
           sed -i 's/^          //' nightly-body.md
+          sed -i "s|TAG_PLACEHOLDER|${NIGHTLY_TAG}|g" nightly-body.md
+          sed -i "s|REPO_PLACEHOLDER|${REPO}|g" nightly-body.md
 
           # Append release notes safely (no shell expansion of AI content)
           {
@@ -335,15 +339,42 @@ jobs:
             echo ""
             echo "---"
             echo ""
-            echo "Automated nightly build from \`main\` · [\`${NIGHTLY_TAG}\`](https://github.com/octopollux/machine-violet/releases/tag/${NIGHTLY_TAG}). **Not a stable release.**"
+            echo "Automated nightly build from \`main\` · \`${NIGHTLY_TAG}\`. **Not a stable release.**"
           } >> nightly-body.md
 
-          gh release create nightly \
+          # Attach artifacts to the dated tag (the real, permanent release)
+          gh release create "$NIGHTLY_TAG" \
             --repo ${{ github.repository }} \
             --title "Nightly ($DATE)" \
             --notes-file nightly-body.md \
             --prerelease \
-            --target main \
+            artifacts/MachineViolet-* \
+            artifacts/machine-violet-nightly-* \
+            artifacts/releases.nightly.json \
+            artifacts/assets.nightly.json
+
+      - name: Update rolling nightly release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NIGHTLY_TAG: ${{ steps.tags.outputs.tag }}
+        run: |
+          # Delete existing rolling release + tag, then recreate pointing
+          # at the same commit as the dated tag. This keeps stable download
+          # URLs (e.g. .../download/nightly/...) working.
+          gh release delete nightly --yes --repo ${{ github.repository }} 2>/dev/null || true
+          git push --delete origin nightly 2>/dev/null || true
+
+          COMMIT=$(git rev-parse "$NIGHTLY_TAG")
+          git tag -f nightly "$COMMIT"
+          git push origin nightly
+
+          # Clone the dated release body for the rolling release
+          gh release create nightly \
+            --repo ${{ github.repository }} \
+            --title "Nightly (latest)" \
+            --notes "See [${NIGHTLY_TAG}](https://github.com/${{ github.repository }}/releases/tag/${NIGHTLY_TAG}) for full release notes." \
+            --prerelease \
+            --target "$COMMIT" \
             artifacts/MachineViolet-* \
             artifacts/machine-violet-nightly-* \
             artifacts/releases.nightly.json \
