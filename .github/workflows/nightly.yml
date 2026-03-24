@@ -391,12 +391,13 @@ jobs:
           done
 
   update-homebrew:
-    needs: release
+    needs: [prepare, release]
     runs-on: ubuntu-latest
     steps:
       - name: Update Homebrew formula
         env:
           TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          NIGHTLY_VERSION: ${{ needs.prepare.outputs.nightly_version }}
         run: |
           DARWIN_URL="https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-darwin-arm64.tar.gz"
           LINUX_URL="https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-linux-x64.tar.gz"
@@ -411,7 +412,7 @@ jobs:
           class MachineViolet < Formula
             desc "AI Dungeon Master for tabletop RPGs"
             homepage "https://github.com/octopollux/machine-violet"
-            version "nightly"
+            version "NIGHTLY_VERSION_PLACEHOLDER"
             license "MIT"
 
             on_macos do
@@ -444,6 +445,7 @@ jobs:
           end
           FORMULA
 
+          sed -i "s/NIGHTLY_VERSION_PLACEHOLDER/${NIGHTLY_VERSION}/g" Formula/machine-violet.rb
           sed -i "s/DARWIN_SHA_PLACEHOLDER/${DARWIN_SHA}/g" Formula/machine-violet.rb
           sed -i "s/LINUX_SHA_PLACEHOLDER/${LINUX_SHA}/g" Formula/machine-violet.rb
           sed -i 's/^          //' Formula/machine-violet.rb
