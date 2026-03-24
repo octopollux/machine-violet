@@ -198,12 +198,7 @@ export class StatePersister {
     try {
       const raw = await this.fileIO.readFile(this.path(STATE_FILES.displayLog));
       if (!raw) return [];
-      const lines = raw.split("\n");
-      // Trim trailing empty lines (same as tailLines)
-      while (lines.length > 0 && lines[lines.length - 1].trim() === "") {
-        lines.pop();
-      }
-      return lines;
+      return tailLines(raw, Infinity);
     } catch (e) {
       const code = (e as NodeJS.ErrnoException | null)?.code;
       if (code !== "ENOENT") {
