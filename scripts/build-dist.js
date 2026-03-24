@@ -146,6 +146,14 @@ execSync(
   { stdio: "inherit", cwd: ROOT },
 );
 
+// Re-sign on macOS — the injected blob invalidates the ad-hoc signature
+// that ships with the node binary. Without this, Apple Silicon kills the
+// binary on launch ("Zsh: Killed").
+if (process.platform === "darwin") {
+  console.log("  Re-signing binary (ad-hoc)...");
+  execSync(`codesign --sign - --force "${exePath}"`, { stdio: "inherit" });
+}
+
 // Clean up blob
 rmSync(blobPath, { force: true });
 rmSync(join(DIST, "bundle.js"), { force: true });
