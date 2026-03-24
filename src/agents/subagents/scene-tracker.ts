@@ -12,14 +12,15 @@ export const SCENE_TRACKER_CADENCE = 4;
 const TRANSCRIPT_TAIL = 6;
 
 export interface SceneTrackerResult extends SubagentResult {
-  openThreads: string;
+  /** Comma-separated wikilinks, "" for explicitly none, undefined if model output was malformed. */
+  openThreads?: string;
   npcIntents?: string;
 }
 
 /**
  * Periodic scene housekeeping subagent.
  * Currently: extracts open narrative threads and NPC intentions from recent transcript.
- * Never throws — returns empty threads on failure.
+ * Never throws — returns undefined fields on failure (callers preserve existing state).
  */
 export async function trackScene(
   client: Anthropic,
@@ -40,14 +41,14 @@ export async function trackScene(
       SYSTEM_PROMPT,
       parts.join("\n"),
       128,
-      "scene_tracker",
+      "scene-tracker",
     );
     return parseSceneTrackerResult(result);
   } catch {
+    // Undefined fields signal "no update" — callers preserve existing state
     return {
       text: "",
       usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 },
-      openThreads: "",
     };
   }
 }
@@ -56,14 +57,12 @@ export async function trackScene(
 export function parseSceneTrackerResult(result: SubagentResult): SceneTrackerResult {
   const lines = result.text.split("\n");
 
-  // Parse THREADS: line
+  // Parse THREADS: line — undefined means "no usable output" (don't clear existing threads)
   const threadsIdx = lines.findIndex((l) => l.trim().startsWith("THREADS:"));
-  let openThreads = "";
+  let openThreads: string | undefined;
   if (threadsIdx !== -1) {
     const raw = lines[threadsIdx].replace(/^.*?THREADS:\s*/, "").trim();
-    if (raw && raw !== "(none)") {
-      openThreads = raw;
-    }
+    openThreads = (raw && raw !== "(none)") ? raw : "";
   }
 
   // Parse NPC_NEXT: lines (may be multiple)

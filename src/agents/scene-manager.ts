@@ -217,7 +217,9 @@ export class SceneManager {
     );
     this.devLog?.("[dev] subagent:scene-tracker done");
 
-    this.scene.openThreads = result.openThreads;
+    if (result.openThreads !== undefined) {
+      this.scene.openThreads = result.openThreads;
+    }
     if (result.npcIntents !== undefined) {
       this.scene.npcIntents = result.npcIntents;
     }

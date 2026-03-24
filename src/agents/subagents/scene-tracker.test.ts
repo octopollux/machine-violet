@@ -59,12 +59,12 @@ describe("parseSceneTrackerResult", () => {
     expect(result.npcIntents).toBe("[[Mira]] intends to flee; [[Corvin]] intends to bargain");
   });
 
-  it("returns empty threads on malformed output", () => {
+  it("returns undefined threads on malformed output (preserves existing)", () => {
     const result = parseSceneTrackerResult({
       text: "I don't understand the format",
       usage: mockUsage,
     });
-    expect(result.openThreads).toBe("");
+    expect(result.openThreads).toBeUndefined();
     expect(result.npcIntents).toBeUndefined();
   });
 
@@ -93,11 +93,11 @@ describe("trackScene", () => {
     expect(result.openThreads).toBe("[[goblin-ambush]], [[missing-merchant]]");
   });
 
-  it("returns empty threads on API failure", async () => {
+  it("returns undefined threads on API failure (preserves existing)", async () => {
     vi.mocked(oneShot).mockRejectedValue(new Error("API error"));
 
     const result = await trackScene(mockClient, ["**[Aldric]:** Hello"]);
-    expect(result.openThreads).toBe("");
+    expect(result.openThreads).toBeUndefined();
     expect(result.usage.inputTokens).toBe(0);
   });
 
@@ -134,7 +134,7 @@ describe("trackScene", () => {
       expect.any(String),
       expect.any(String),
       128,
-      "scene_tracker",
+      "scene-tracker",
     );
   });
 });

@@ -576,8 +576,8 @@ export class GameEngine {
             const trackerUsage = await this.sceneManager.runSceneTracker(this.client);
             accUsage(this.sessionUsage, trackerUsage);
             this.persistCurrentScene();
-          } catch {
-            // Non-critical — thread tracking failure doesn't break gameplay
+          } catch (e) {
+            this.callbacks.onDevLog?.(`[dev] scene-tracker failed: ${e instanceof Error ? e.message : e}`);
           }
         }
       }
