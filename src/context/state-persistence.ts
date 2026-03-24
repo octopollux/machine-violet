@@ -193,6 +193,21 @@ export class StatePersister {
     }
   }
 
+  /** Load the full display log for TUI population on resume (allows full backscroll). */
+  async loadDisplayLogFull(): Promise<string[]> {
+    try {
+      const raw = await this.fileIO.readFile(this.path(STATE_FILES.displayLog));
+      if (!raw) return [];
+      return tailLines(raw, Infinity);
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException | null)?.code;
+      if (code !== "ENOENT") {
+        this.onError?.(e instanceof Error ? e : new Error(String(e)));
+      }
+      return [];
+    }
+  }
+
   /** Load pending operation file (for crash recovery) */
   async loadPendingOp(): Promise<import("../agents/scene-manager.js").PendingOperation | undefined> {
     return this.readJSON<import("../agents/scene-manager.js").PendingOperation>("pending-operation.json");

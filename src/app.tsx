@@ -9,8 +9,8 @@ import type { NarrativeLine, ActiveModal, RetryOverlay } from "./types/tui.js";
 import type { StyleVariant, ResolvedTheme } from "./tui/themes/types.js";
 import { BUILTIN_DEFINITIONS, resolveTheme, resetThemeCache } from "./tui/themes/index.js";
 import type { FileIO, SceneState } from "./agents/scene-manager.js";
-import { detectSceneState, classifyTranscriptEntry } from "./agents/scene-manager.js";
-import { markdownToNarrativeLines, narrativeLinesToMarkdown } from "./context/display-log.js";
+import { detectSceneState } from "./agents/scene-manager.js";
+import { markdownToNarrativeLines } from "./context/display-log.js";
 import type { ConversationExchange } from "./context/conversation.js";
 import { GameEngine } from "./agents/game-engine.js";
 import type { GameState } from "./agents/game-state.js";
@@ -202,28 +202,13 @@ function recoverResourcesFromConversation(
   }
 }
 
-/** Load display-log tail, with compat bridge for pre-display-log campaigns. */
+/** Load the full display-log for TUI population on resume. */
 async function loadDisplayHistory(
   persister: StatePersister,
-  scene: SceneState,
 ): Promise<NarrativeLine[]> {
-  let displayLogTail = await persister.loadDisplayLogTail(200);
-
-  // TODO(compat): Remove after all dev campaigns have been migrated.
-  // Bridge for pre-display-log campaigns: seed display-log.md from scene transcript.
-  if (displayLogTail.length === 0 && scene.transcript.length > 0) {
-    const migrated: NarrativeLine[] = [];
-    for (const entry of scene.transcript) {
-      const { kind, text } = classifyTranscriptEntry(entry);
-      if (kind !== "dev") migrated.push({ kind, text });
-    }
-    const md = narrativeLinesToMarkdown(migrated);
-    persister.appendDisplayLog(md);
-    displayLogTail = md.trimEnd().split("\n");
-  }
-
-  return displayLogTail.length > 0
-    ? markdownToNarrativeLines(displayLogTail)
+  const lines = await persister.loadDisplayLogFull();
+  return lines.length > 0
+    ? markdownToNarrativeLines(lines)
     : [];
 }
 
@@ -766,7 +751,7 @@ export default function App({ shutdownRef }: AppProps) {
     const recap = await engine.resumeSession();
 
     // Load display log tail for TUI — shows the player what happened before
-    const historyLines = await loadDisplayHistory(persister, scene);
+    const historyLines = await loadDisplayHistory(persister);
 
     setNarrativeLines([...historyLines, { kind: "system", text: `Welcome back to ${config.name}.` }, { kind: "dm", text: "" }]);
 
