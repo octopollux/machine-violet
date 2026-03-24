@@ -542,10 +542,13 @@ export class GameEngine {
       // Writes are fire-and-forget for crash resilience; CampaignRepo's
       // preCommitHook flushes them to disk before any git commit.
       if (this.persister) {
-        if (!opts?.skipTranscript) {
-          const logLines: NarrativeLine[] = [
-            { kind: "player", text: `[${characterName}] ${text}` },
-          ];
+        {
+          const logLines: NarrativeLine[] = [];
+          // Skip synthetic player input for system turns (session open/resume)
+          // but always log the DM response so the opening narration is preserved.
+          if (!opts?.skipTranscript) {
+            logLines.push({ kind: "player", text: `[${characterName}] ${text}` });
+          }
           if (result.text) {
             logLines.push({ kind: "dm", text: result.text });
           }
