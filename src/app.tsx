@@ -203,7 +203,7 @@ async function loadDisplayHistory(
   persister: StatePersister,
   scene: SceneState,
 ): Promise<NarrativeLine[]> {
-  let displayLogTail = await persister.loadDisplayLogTail(200);
+  let displayLogTail = await persister.loadDisplayLogFull();
 
   // TODO(compat): Remove after all dev campaigns have been migrated.
   // Bridge for pre-display-log campaigns: seed display-log.md from scene transcript.

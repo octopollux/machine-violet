@@ -317,6 +317,24 @@ describe("display log", () => {
     expect(tail).toEqual([]);
   });
 
+  it("loadDisplayLogFull returns all lines", async () => {
+    const fio = mockFileIO();
+    const persister = new StatePersister("/tmp/campaign", fio);
+
+    files[norm("/tmp/campaign/state/display-log.md")] = "line1\nline2\nline3\nline4\nline5\n";
+
+    const all = await persister.loadDisplayLogFull();
+    expect(all).toEqual(["line1", "line2", "line3", "line4", "line5"]);
+  });
+
+  it("loadDisplayLogFull returns empty for missing file", async () => {
+    const fio = mockFileIO();
+    const persister = new StatePersister("/tmp/campaign", fio);
+
+    const all = await persister.loadDisplayLogFull();
+    expect(all).toEqual([]);
+  });
+
   it("appendDisplayLog swallows errors silently", async () => {
     const fio = mockFileIO();
     (fio.appendFile as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("disk full"));
