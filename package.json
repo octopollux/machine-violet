@@ -37,6 +37,7 @@
     "isomorphic-git": "^1.37.1",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5",
+    "postject": "^1.0.0-alpha.6",
     "react": "^19.0.0"
   },
   "devDependencies": {
