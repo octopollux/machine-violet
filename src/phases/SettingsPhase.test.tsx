@@ -20,6 +20,8 @@ function defaultProps(overrides?: Partial<SettingsPhaseProps>): SettingsPhasePro
   return {
     theme: makeTheme(),
     onApiKeys: vi.fn(),
+    onDiscord: vi.fn(),
+    onArchivedCampaigns: vi.fn(),
     onBack: vi.fn(),
     ...overrides,
   };

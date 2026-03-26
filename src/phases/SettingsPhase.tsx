@@ -12,16 +12,18 @@ export interface SettingsPhaseProps {
   initialView?: "api_keys";
   onApiKeys: () => void;
   onDiscord: () => void;
+  onArchivedCampaigns: () => void;
   onBack: () => void;
 }
 
-const MENU_ITEMS = ["API Keys", "Discord"];
+const MENU_ITEMS = ["API Keys", "Discord", "Archived Campaigns"];
 
 export function SettingsPhase({
   theme,
   initialView,
   onApiKeys,
   onDiscord,
+  onArchivedCampaigns,
   onBack,
 }: SettingsPhaseProps) {
   const { columns: cols, rows: termRows } = useTerminalSize();
@@ -55,6 +57,8 @@ export function SettingsPhase({
         onApiKeys();
       } else if (selected === "Discord") {
         onDiscord();
+      } else if (selected === "Archived Campaigns") {
+        onArchivedCampaigns();
       }
     }
   });

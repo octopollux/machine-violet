@@ -88,7 +88,7 @@ Ink (React for CLI) components, formatting pipeline, theme system.
 | `activity.ts` | Activity/status bar state management |
 | `game-context.ts` | React context for game engine callbacks |
 | `components/` | Reusable: `Modeline`, `InputLine`, `NarrativeArea`, `PlayerSelector`, `ActivityLine`, `FrameBorder`, `FullScreenFrame` |
-| `modals/` | `CenteredModal`, `ChoiceModal`, `CharacterSheetModal`, `CompendiumModal`, `DiceRollModal`, `SessionRecapModal`, `GameMenu`, `ApiErrorModal`, `SwatchModal`, `CampaignSettingsModal`, `RollbackSummaryModal`, `PlayerNotesModal` |
+| `modals/` | `CenteredModal`, `ChoiceModal`, `CharacterSheetModal`, `CompendiumModal`, `DiceRollModal`, `SessionRecapModal`, `GameMenu`, `ApiErrorModal`, `SwatchModal`, `CampaignSettingsModal`, `RollbackSummaryModal`, `PlayerNotesModal`, `DeleteCampaignModal` |
 | `themes/` | Theme parser, loader, resolver. Built-in themes in `themes/assets/` |
 | `color/` | OKLCH color space utilities, gradient generation |
 | `frames/` | Box drawing, styled content lines, string measurement |
@@ -104,6 +104,7 @@ Model selection, campaign init, DM personalities, campaign seeds.
 | `personalities.ts` | `PERSONALITIES`, `getPersonality()` — DM personality definitions |
 | `seeds.ts` | `SEEDS`, `seedsForGenre()` — campaign premise seeds by genre |
 | `first-launch.ts` | `.env` loading, config paths, API key format validation |
+| `campaign-archive.ts` | `archiveCampaign()`, `unarchiveCampaign()`, `deleteCampaign()`, `listArchivedCampaigns()`, `getCampaignDeleteInfo()` — campaign archival, restoration, and deletion with verification |
 | `main-menu.ts` | Campaign listing and selection |
 | `tokens.ts` | `TOKEN_LIMITS` — model token capacity constants |
 | `dev-mode.ts` | Dev override detection, FileIO wrapping for dev logging |
@@ -144,7 +145,8 @@ State machine for the application: main menu → setup / add content → playing
 
 | File | Purpose |
 |---|---|
-| `MainMenuPhase.tsx` | Themed campaign selection screen with New Campaign, Continue, Add Content, Quit |
+| `MainMenuPhase.tsx` | Themed campaign selection screen with New Campaign, Continue (with Archive/Delete columns), Add Content, Quit |
+| `ArchivedCampaignsPhase.tsx` | List archived campaign zips with dates, select to unarchive |
 | `AddContentPhase.tsx` | PDF import flow: name collection → drop files → validate → extract → cache |
 | `SetupPhase.tsx` | Campaign creation/load orchestration |
 | `PlayingPhase.tsx` | Main game loop (hosts GameEngine) |

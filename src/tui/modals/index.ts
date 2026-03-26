@@ -12,3 +12,4 @@ export { SwatchModal } from "./SwatchModal.js";
 export { CampaignSettingsModal } from "./CampaignSettingsModal.js";
 export { RollbackSummaryModal } from "./RollbackSummaryModal.js";
 export { PlayerNotesModal } from "./PlayerNotesModal.js";
+export { DeleteCampaignModal } from "./DeleteCampaignModal.js";
