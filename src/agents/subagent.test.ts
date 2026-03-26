@@ -160,7 +160,7 @@ describe("cacheSystemPrompt", () => {
     expect(blocks).toHaveLength(1);
     expect(blocks[0].type).toBe("text");
     expect(blocks[0].text).toBe("You are a summarizer.");
-    expect((blocks[0] as Record<string, unknown>).cache_control).toEqual({
+    expect((blocks[0] as unknown as Record<string, unknown>).cache_control).toEqual({
       type: "ephemeral",
       ttl: "1h",
     });
@@ -191,7 +191,7 @@ describe("oneShot", () => {
     expect(Array.isArray(call.system)).toBe(true);
     const blocks = call.system as Anthropic.TextBlockParam[];
     expect(blocks[0].text).toBe("Test prompt.");
-    expect((blocks[0] as Record<string, unknown>).cache_control).toEqual({
+    expect((blocks[0] as unknown as Record<string, unknown>).cache_control).toEqual({
       type: "ephemeral",
       ttl: "1h",
     });

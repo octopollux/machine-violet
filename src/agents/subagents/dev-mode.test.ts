@@ -53,7 +53,7 @@ describe("buildDevPrompt", () => {
   it("returns TextBlockParam[] with cache_control on first block", () => {
     const blocks = buildDevPrompt("Test");
     expect(Array.isArray(blocks)).toBe(true);
-    expect((blocks[0] as Record<string, unknown>).cache_control).toEqual({ type: "ephemeral", ttl: "1h" });
+    expect((blocks[0] as unknown as Record<string, unknown>).cache_control).toEqual({ type: "ephemeral", ttl: "1h" });
   });
 
   it("includes campaign name", () => {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Text, Box, useInput } from "ink";
+import type Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "./config/client.js";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { readFile, writeFile, appendFile, mkdir, readdir, stat, unlink, rmdir } from "node:fs/promises";
@@ -260,7 +261,7 @@ async function buildInitialSheet(
       // Mark sheet as complete so the DM doesn't re-promote
       const { frontMatter, body, changelog } = parseFrontMatter(updatedSheet);
       frontMatter.sheet_status = "complete";
-      const title = frontMatter._title ?? result.characterName;
+      const title = String(frontMatter._title ?? result.characterName);
       const tagged = serializeEntity(title, frontMatter, body, changelog);
       await io.writeFile(charPath, tagged);
     }
