@@ -65,6 +65,7 @@ export function DeleteCampaignModal({
       title="Delete Campaign?"
       minWidth={36}
       maxWidth={50}
+      contentHeight={7}
     >
       {contentLines.map((line, i) => (
         <Text key={i} color={line === "This cannot be undone." ? "red" : undefined}>{line || " "}</Text>
