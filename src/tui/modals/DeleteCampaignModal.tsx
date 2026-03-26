@@ -44,8 +44,8 @@ export function DeleteCampaignModal({
 
   const turnLabel = info.dmTurnCount === 1 ? "turn" : "turns";
 
-  const deleteMarker = selectedIndex === 0 ? "◆" : "○";
-  const cancelMarker = selectedIndex === 1 ? "◆" : "○";
+  const deleteLabel = selectedIndex === 0 ? "[Delete]" : " Delete ";
+  const cancelLabel = selectedIndex === 1 ? "[Cancel]" : " Cancel ";
 
   const lines = [
     `Campaign: ${info.campaignName}`,
@@ -54,7 +54,7 @@ export function DeleteCampaignModal({
     "",
     "This cannot be undone.",
     "",
-    `${deleteMarker} Delete   ${cancelMarker} Cancel`,
+    `${deleteLabel}   ${cancelLabel}`,
   ];
 
   return (
