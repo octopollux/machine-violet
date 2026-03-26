@@ -56,7 +56,7 @@ export interface CampaignDeleteInfo {
 
 // --- Helpers ---
 
-const ARCHIVE_DIR = "ArchivedCampaigns";
+const ARCHIVE_DIR = "archivedcampaigns";
 
 /** Resolve the ArchivedCampaigns directory (sibling to campaigns dir). */
 export function archiveDir(campaignsDir: string): string {
