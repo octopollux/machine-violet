@@ -42,7 +42,11 @@ const helpCommand: SlashCommand = {
   description: "List all slash commands",
   execute(_args, ctx) {
     const lines = commands.map((c) => `  ${c.usage.padEnd(20)} ${c.description}`);
-    ctx.appendLine({ kind: "system", text: `[Commands]\n${lines.join("\n")}` });
+    const aliasLines = [...aliasMap.entries()].map(
+      ([alias, target]) => `  ${"/" + alias}${" ".repeat(18 - alias.length)}→ /${target}`,
+    );
+    const all = [...lines, "", ...aliasLines];
+    ctx.appendLine({ kind: "system", text: `[Commands]\n${all.join("\n")}` });
   },
 };
 
@@ -319,6 +323,11 @@ const commandMap = new Map<string, SlashCommand>(
   commands.map((c) => [c.name, c]),
 );
 
+/** Aliases map alternate names → canonical command names. */
+const aliasMap = new Map<string, string>([
+  ["dm", "ooc"],
+]);
+
 /**
  * Try to parse and dispatch a slash command.
  * Returns true if the input was a slash command (handled or errored),
@@ -333,17 +342,26 @@ export function trySlashCommand(input: string, ctx: SlashCommandContext): boolea
 
   if (!name) return false;
 
-  const cmd = commandMap.get(name);
+  // Resolve aliases (e.g. /dm → /ooc)
+  const alias = aliasMap.get(name);
+  const resolvedName = alias ?? name;
+  const echoName = alias ?? name; // echo the canonical name for aliases
+
+  const cmd = commandMap.get(resolvedName);
   if (!cmd) {
     ctx.appendLine({ kind: "system", text: `[Unknown command: /${name} — type /help for available commands]` });
     return true;
   }
 
+  // Echo the command into the narrative pane so players see what was typed
+  const echoText = args ? `/${echoName} ${args}` : `/${echoName}`;
+  ctx.appendLine({ kind: "player", text: `> ${echoText}` });
+
   const result = cmd.execute(args, ctx);
   if (result instanceof Promise) {
     result.catch((err: unknown) => {
       const msg = err instanceof Error ? err.message : String(err);
-      ctx.appendLine({ kind: "system", text: `[/${name} error: ${msg}]` });
+      ctx.appendLine({ kind: "system", text: `[/${resolvedName} error: ${msg}]` });
     });
   }
 

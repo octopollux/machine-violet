@@ -462,4 +462,53 @@ describe("trySlashCommand", () => {
     expect(trySlashCommand("/HELP", ctx)).toBe(true);
     expect(lastAppended(ctx).text).toContain("/help");
   });
+
+  describe("command echo", () => {
+    it("echoes slash commands into the narrative as player lines", () => {
+      const ctx = mockCtx();
+      trySlashCommand("/ooc", ctx);
+      const calls = (ctx.appendLine as ReturnType<typeof vi.fn>).mock.calls;
+      // First call should be the echo
+      expect(calls[0][0]).toEqual({ kind: "player", text: "> /ooc" });
+    });
+
+    it("echoes command with arguments", () => {
+      const ctx = mockCtx();
+      trySlashCommand("/scene The Market", ctx);
+      const calls = (ctx.appendLine as ReturnType<typeof vi.fn>).mock.calls;
+      expect(calls[0][0]).toEqual({ kind: "player", text: "> /scene The Market" });
+    });
+  });
+
+  describe("/dm alias", () => {
+    it("enters OOC mode via /dm", () => {
+      const ctx = mockCtx();
+      trySlashCommand("/dm", ctx);
+      expect(createOOCSession).toHaveBeenCalled();
+      expect(ctx.setActiveSession).toHaveBeenCalled();
+      expect(ctx.setVariant).toHaveBeenCalledWith("ooc");
+    });
+
+    it("echoes /ooc (not /dm) into the narrative", () => {
+      const ctx = mockCtx();
+      trySlashCommand("/dm", ctx);
+      const calls = (ctx.appendLine as ReturnType<typeof vi.fn>).mock.calls;
+      expect(calls[0][0]).toEqual({ kind: "player", text: "> /ooc" });
+    });
+
+    it("exits OOC when already in OOC via /dm", () => {
+      const ctx = mockCtx({
+        activeSession: { send: vi.fn() as never, label: "OOC", tier: "medium" as const },
+      });
+      trySlashCommand("/dm", ctx);
+      expect(ctx.setActiveSession).toHaveBeenCalledWith(null);
+    });
+
+    it("appears in /help output", () => {
+      const ctx = mockCtx();
+      trySlashCommand("/help", ctx);
+      expect(lastAppended(ctx).text).toContain("/dm");
+      expect(lastAppended(ctx).text).toContain("→ /ooc");
+    });
+  });
 });
