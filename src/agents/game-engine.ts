@@ -856,7 +856,7 @@ export class GameEngine {
       const { frontMatter: fm, body: fmBody, changelog: fmChangelog } = parseFrontMatter(currentSheet);
       if (fm.sheet_status === "complete") {
         delete fm.sheet_status;
-        const title = fm._title ?? characterName;
+        const title = String(fm._title ?? characterName);
         await this.fileIO.writeFile(filePath, serializeEntity(title, fm, fmBody, fmChangelog));
         const slug = characterName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
         this.sceneManager.notifyEntityTouched(filePath, slug);
