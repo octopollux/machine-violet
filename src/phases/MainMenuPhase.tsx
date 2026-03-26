@@ -2,11 +2,19 @@ import React, { useState, useRef, useEffect } from "react";
 import { useInput, Text, Box } from "ink";
 import type { CampaignEntry } from "../config/main-menu.js";
 import type { UpdateInfo } from "../config/updater.js";
+import type { CampaignDeleteInfo } from "../config/campaign-archive.js";
 import type { ResolvedTheme } from "../tui/themes/types.js";
 import { TerminalTooSmall, FullScreenFrame } from "../tui/components/index.js";
+import { DeleteCampaignModal } from "../tui/modals/index.js";
 import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
+
+/** Column indices for campaign sub-list navigation. */
+const COL_NAME = 0;
+const COL_ARCHIVE = 1;
+const COL_DELETE = 2;
+const COL_COUNT = 3;
 
 export interface MainMenuPhaseProps {
   theme: ResolvedTheme;
@@ -18,6 +26,12 @@ export interface MainMenuPhaseProps {
   apiKeyStatus?: string;
   onNewCampaign: () => void;
   onResumeCampaign: (entry: CampaignEntry) => void;
+  onArchiveCampaign: (entry: CampaignEntry) => void;
+  onDeleteCampaign: (entry: CampaignEntry) => void;
+  /** When non-null, the delete confirmation modal is shown. */
+  deleteModal: CampaignDeleteInfo | null;
+  onConfirmDelete: () => void;
+  onCancelDelete: () => void;
   onAddContent: () => void;
   onSettings: () => void;
   /** Navigate to Settings with API Keys pre-focused (deep link). */
@@ -44,6 +58,11 @@ export function MainMenuPhase({
   apiKeyStatus,
   onNewCampaign,
   onResumeCampaign,
+  onArchiveCampaign,
+  onDeleteCampaign,
+  deleteModal,
+  onConfirmDelete,
+  onCancelDelete,
   onAddContent,
   onSettings,
   onSettingsApiKeys,
@@ -57,6 +76,8 @@ export function MainMenuPhase({
   const [mainMenuIndex, setMainMenuIndex] = useState(0);
   const [expandedCampaigns, setExpandedCampaigns] = useState(false);
   const [campaignSelectIndex, setCampaignSelectIndex] = useState(0);
+  /** Which column is active: 0=name (resume), 1=archive, 2=delete */
+  const [campaignColumn, setCampaignColumn] = useState(COL_NAME);
 
   // Track whether the update item was present on previous render so we can
   // adjust mainMenuIndex when it appears asynchronously (avoids highlight jump).
@@ -84,11 +105,15 @@ export function MainMenuPhase({
     API_REQUIRED_ITEMS.has(item) && !apiKeyValid;
 
   useInput((input, key) => {
-    // Campaign sub-list navigation
+    // Delete modal is handling its own input — suppress menu navigation
+    if (deleteModal) return;
+
+    // Campaign sub-list navigation (columns: Name | Archive | Delete)
     if (expandedCampaigns && campaigns.length > 0) {
       if (key.upArrow) {
         if (campaignSelectIndex === 0) {
           setExpandedCampaigns(false);
+          setCampaignColumn(COL_NAME);
         } else {
           setCampaignSelectIndex((i) => i - 1);
         }
@@ -98,13 +123,32 @@ export function MainMenuPhase({
         setCampaignSelectIndex((i) => Math.min(campaigns.length - 1, i + 1));
         return;
       }
+      if (key.rightArrow) {
+        setCampaignColumn((c) => Math.min(COL_COUNT - 1, c + 1));
+        return;
+      }
+      if (key.leftArrow) {
+        setCampaignColumn((c) => Math.max(0, c - 1));
+        return;
+      }
       if (key.return) {
-        setExpandedCampaigns(false);
-        onResumeCampaign(campaigns[campaignSelectIndex]);
+        const entry = campaigns[campaignSelectIndex];
+        if (campaignColumn === COL_NAME) {
+          setExpandedCampaigns(false);
+          setCampaignColumn(COL_NAME);
+          onResumeCampaign(entry);
+        } else if (campaignColumn === COL_ARCHIVE) {
+          onArchiveCampaign(entry);
+          setExpandedCampaigns(false);
+          setCampaignColumn(COL_NAME);
+        } else if (campaignColumn === COL_DELETE) {
+          onDeleteCampaign(entry);
+        }
         return;
       }
       if (key.escape) {
         setExpandedCampaigns(false);
+        setCampaignColumn(COL_NAME);
         return;
       }
       return;
@@ -128,6 +172,7 @@ export function MainMenuPhase({
       } else if (selected === "Continue Campaign") {
         setExpandedCampaigns(true);
         setCampaignSelectIndex(0);
+        setCampaignColumn(COL_NAME);
       } else if (selected === "Add Content") {
         onAddContent();
       } else if (selected === "API Keys") {
@@ -182,17 +227,24 @@ export function MainMenuPhase({
       </Text>,
     );
 
-    // Inline campaign sub-list when expanded
+    // Inline campaign sub-list when expanded (columns: Name | Archive | Delete)
     if (item === "Continue Campaign" && expandedCampaigns) {
       for (let j = 0; j < campaigns.length; j++) {
         const cSelected = j === campaignSelectIndex;
-        const cMarker = cSelected ? "◆" : "○";
-        const cColor = cSelected ? borderColor : dimColor;
+        const nameActive = cSelected && campaignColumn === COL_NAME;
+        const archiveActive = cSelected && campaignColumn === COL_ARCHIVE;
+        const deleteActive = cSelected && campaignColumn === COL_DELETE;
+        const cMarker = nameActive ? "◆" : "○";
+        const cColor = nameActive ? borderColor : dimColor;
         menuLines.push(
           <Text key={`c-${campaigns[j].path}`}>
             <Text>{`    `}</Text>
             <Text color={cColor}>{cMarker}</Text>
-            <Text>{` ${campaigns[j].name}`}</Text>
+            <Text bold={nameActive}>{` ${campaigns[j].name}`}</Text>
+            <Text>{`  `}</Text>
+            <Text color="yellow" bold={archiveActive} dimColor={!cSelected}>{archiveActive ? "[Archive]" : " Archive "}</Text>
+            <Text>{` `}</Text>
+            <Text color="red" bold={deleteActive} dimColor={!cSelected}>{deleteActive ? "[Delete]" : " Delete "}</Text>
           </Text>,
         );
       }
@@ -203,13 +255,25 @@ export function MainMenuPhase({
   const totalRows = menuLines.length + (errorMsg ? 2 : 0);
 
   return (
-    <FullScreenFrame theme={theme} columns={cols} rows={termRows} title="Machine Violet" contentRows={totalRows}>
-      {menuLines}
-      {errorMsg && (
-        <Box marginTop={1}>
-          <Text color="red">{errorMsg}</Text>
-        </Box>
+    <>
+      <FullScreenFrame theme={theme} columns={cols} rows={termRows} title="Machine Violet" contentRows={totalRows}>
+        {menuLines}
+        {errorMsg && (
+          <Box marginTop={1}>
+            <Text color="red">{errorMsg}</Text>
+          </Box>
+        )}
+      </FullScreenFrame>
+      {deleteModal && (
+        <DeleteCampaignModal
+          theme={theme}
+          width={cols}
+          height={termRows}
+          info={deleteModal}
+          onConfirm={onConfirmDelete}
+          onCancel={onCancelDelete}
+        />
       )}
-    </FullScreenFrame>
+    </>
   );
 }

@@ -47,6 +47,7 @@ import { ApiKeysPhase } from "./phases/ApiKeysPhase.js";
 import { SetupPhase } from "./phases/SetupPhase.js";
 import { PlayingPhase } from "./phases/PlayingPhase.js";
 import { AddContentPhase } from "./phases/AddContentPhase.js";
+import { ArchivedCampaignsPhase } from "./phases/ArchivedCampaignsPhase.js";
 import { SettingsPhase } from "./phases/SettingsPhase.js";
 import { DiscordSettingsPhase } from "./phases/DiscordSettingsPhase.js";
 import { UpdatePhase } from "./phases/UpdatePhase.js";
@@ -61,6 +62,11 @@ import type { AvailableSystem } from "./config/systems.js";
 import { promoteCharacter } from "./agents/subagents/character-promotion.js";
 import { processingPaths } from "./config/processing-paths.js";
 import { norm, configDir, isCompiled } from "./utils/paths.js";
+import {
+  archiveCampaign, unarchiveCampaign, listArchivedCampaigns,
+  deleteCampaign, getCampaignDeleteInfo,
+} from "./config/campaign-archive.js";
+import type { ArchiveFileIO, CampaignDeleteInfo, ArchivedCampaignEntry } from "./config/campaign-archive.js";
 import { loadDiscordSettings, saveDiscordSettings } from "./config/discord.js";
 import { checkForUpdate, performUpdate } from "./config/updater.js";
 import type { UpdateInfo } from "./config/updater.js";
@@ -80,6 +86,7 @@ export type AppPhase =
   | "discord_settings"
   | "update_available"
   | "add_content"
+  | "archived_campaigns"
   | "setup"
   | "playing"
   | "returning_to_menu"
@@ -136,6 +143,27 @@ function createFileIO(): FileIO {
     async rmdir(path: string) {
       await rmdir(path);
     },
+  };
+}
+
+/** Extend the game FileIO with binary and stat operations for archive use. */
+function createArchiveFileIO(): ArchiveFileIO {
+  return {
+    async readFile(path: string) { return readFile(path, "utf-8"); },
+    async readBinary(path: string) {
+      // readFile without encoding returns Buffer
+      const buf: Buffer = await (readFile as (p: string) => Promise<Buffer>)(path);
+      return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+    },
+    async writeFile(path: string, content: string) { await mkdir(dirname(path), { recursive: true }); await writeFile(path, content, "utf-8"); },
+    async writeBinary(path: string, data: Uint8Array) { await mkdir(dirname(path), { recursive: true }); await writeFile(path, data); },
+    async mkdir(path: string) { await mkdir(path, { recursive: true }); },
+    async exists(path: string) { try { await stat(path); return true; } catch { return false; } },
+    async listDir(path: string) { return readdir(path); },
+    async deleteFile(path: string) { await unlink(path); },
+    async rmdir(path: string) { await rmdir(path); },
+    async fileMtime(path: string) { try { const s = await stat(path); return s.mtime.toISOString(); } catch { return null; } },
+    async isDirectory(path: string) { try { return (await stat(path)).isDirectory(); } catch { return false; } },
   };
 }
 
@@ -295,6 +323,11 @@ export default function App({ shutdownRef }: AppProps) {
   // --- Campaigns ---
   const [campaigns, setCampaigns] = useState<CampaignEntry[]>([]);
 
+  // --- Archive / Delete state ---
+  const [archivedCampaigns, setArchivedCampaigns] = useState<ArchivedCampaignEntry[]>([]);
+  const [deleteModal, setDeleteModal] = useState<{ entry: CampaignEntry; info: CampaignDeleteInfo } | null>(null);
+  const archiveIO = useRef(createArchiveFileIO());
+
   // --- Systems ---
   const [systems, setSystems] = useState<AvailableSystem[]>([]);
 
@@ -421,6 +454,76 @@ export default function App({ shutdownRef }: AppProps) {
       setCampaigns([]);
     }
   }, [getConfigPath]);
+
+  /** Resolve campaignsDir from config. */
+  const getCampaignsDir = useCallback((): string => {
+    try {
+      const raw = readFileSync(getConfigPath(), "utf-8");
+      const config = JSON.parse(raw);
+      return config.campaigns_dir || join(getDefaultHomeDir(), "campaigns");
+    } catch {
+      return join(getDefaultHomeDir(), "campaigns");
+    }
+  }, [getConfigPath]);
+
+  // --- Campaign archive / delete handlers ---
+
+  const handleArchiveCampaign = useCallback((entry: CampaignEntry) => {
+    void (async () => {
+      const campaignsDir = getCampaignsDir();
+      const result = await archiveCampaign(entry.path, campaignsDir, archiveIO.current);
+      if (result.ok) {
+        await loadCampaigns();
+      } else {
+        setErrorMsg(result.error ?? "Archive failed");
+      }
+    })();
+  }, [getCampaignsDir, loadCampaigns]);
+
+  const handleRequestDelete = useCallback((entry: CampaignEntry) => {
+    void (async () => {
+      const info = await getCampaignDeleteInfo(entry.path, archiveIO.current);
+      setDeleteModal({ entry, info });
+    })();
+  }, []);
+
+  const handleConfirmDelete = useCallback(() => {
+    if (!deleteModal) return;
+    const { entry } = deleteModal;
+    setDeleteModal(null);
+    void (async () => {
+      const result = await deleteCampaign(entry.path, archiveIO.current);
+      if (result.ok) {
+        await loadCampaigns();
+      } else {
+        setErrorMsg(result.error ?? "Delete failed");
+      }
+    })();
+  }, [deleteModal, loadCampaigns]);
+
+  const handleCancelDelete = useCallback(() => {
+    setDeleteModal(null);
+  }, []);
+
+  const loadArchivedCampaigns = useCallback(async () => {
+    const campaignsDir = getCampaignsDir();
+    const entries = await listArchivedCampaigns(campaignsDir, archiveIO.current);
+    setArchivedCampaigns(entries);
+  }, [getCampaignsDir]);
+
+  const handleUnarchive = useCallback((entry: ArchivedCampaignEntry) => {
+    void (async () => {
+      const campaignsDir = getCampaignsDir();
+      const result = await unarchiveCampaign(entry.zipPath, campaignsDir, archiveIO.current);
+      if (result.ok) {
+        await loadCampaigns();
+        setPhase("main_menu");
+      } else {
+        setErrorMsg(result.error ?? "Unarchive failed");
+        setPhase("settings");
+      }
+    })();
+  }, [getCampaignsDir, loadCampaigns]);
 
   // --- API key helpers ---
 
@@ -1034,6 +1137,11 @@ export default function App({ shutdownRef }: AppProps) {
         apiKeyStatus={activeKeyStatus}
         onNewCampaign={() => setPhase("setup")}
         onResumeCampaign={resumeCampaign}
+        onArchiveCampaign={handleArchiveCampaign}
+        onDeleteCampaign={handleRequestDelete}
+        deleteModal={deleteModal?.info ?? null}
+        onConfirmDelete={handleConfirmDelete}
+        onCancelDelete={handleCancelDelete}
         onAddContent={() => setPhase("add_content")}
         onSettings={() => setPhase("settings")}
         onSettingsApiKeys={() => setPhase("settings_api_keys")}
@@ -1053,6 +1161,7 @@ export default function App({ shutdownRef }: AppProps) {
         initialView={phase === "settings_api_keys" ? "api_keys" : undefined}
         onApiKeys={() => setPhase("api_keys")}
         onDiscord={() => setPhase("discord_settings")}
+        onArchivedCampaigns={() => { void loadArchivedCampaigns().then(() => setPhase("archived_campaigns")); }}
         onBack={() => setPhase("main_menu")}
       />
     );
@@ -1081,6 +1190,17 @@ export default function App({ shutdownRef }: AppProps) {
           setPhase("main_menu");
         }}
         onBack={() => setPhase("main_menu")}
+      />
+    );
+  }
+
+  if (phase === "archived_campaigns") {
+    return (
+      <ArchivedCampaignsPhase
+        theme={theme}
+        archives={archivedCampaigns}
+        onUnarchive={handleUnarchive}
+        onBack={() => setPhase("settings")}
       />
     );
   }
