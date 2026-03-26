@@ -14,6 +14,9 @@ import { zipSync, unzipSync, strToU8, strFromU8 } from "fflate";
 /** A flat map of relative paths to file contents (UTF-8 strings). */
 export type FileMap = Record<string, string>;
 
+/** A flat map of relative paths to raw binary contents. */
+export type BinaryFileMap = Record<string, Uint8Array>;
+
 export interface ArchiveIO {
   zip(files: FileMap): Uint8Array;
   unzip(data: Uint8Array): FileMap;
@@ -86,6 +89,45 @@ export function zipFiles(files: FileMap): Uint8Array | null {
 export function unzipFiles(data: Uint8Array): FileMap | null {
   try {
     return active.unzip(data);
+  } catch {
+    return null;
+  }
+}
+
+// --- Binary variants (preserve git objects and other non-UTF-8 files) ---
+
+/**
+ * Zip a map of `{ relativePath: Uint8Array }` into a Uint8Array.
+ * Returns `null` on failure. Never throws.
+ */
+export function zipBinaryFiles(files: BinaryFileMap): Uint8Array | null {
+  try {
+    const entries: Record<string, Uint8Array> = {};
+    for (const [path, content] of Object.entries(files)) {
+      const safe = sanitizePath(path);
+      if (safe === null) throw new Error(`Unsafe archive path: ${path}`);
+      entries[safe] = content;
+    }
+    return zipSync(entries);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Unzip a buffer into a map of `{ relativePath: Uint8Array }`.
+ * Returns `null` on failure (e.g. corrupt data). Never throws.
+ */
+export function unzipBinaryFiles(data: Uint8Array): BinaryFileMap | null {
+  try {
+    const entries = unzipSync(data);
+    const files: BinaryFileMap = {};
+    for (const [path, content] of Object.entries(entries)) {
+      const safe = sanitizePath(path);
+      if (safe === null) continue;
+      files[safe] = content;
+    }
+    return files;
   } catch {
     return null;
   }

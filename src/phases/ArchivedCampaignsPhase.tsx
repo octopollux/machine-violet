@@ -37,6 +37,7 @@ export function ArchivedCampaignsPhase({
       onBack();
       return;
     }
+    if (archives.length === 0) return;
     if (key.upArrow) {
       setMenuIndex((i) => Math.max(0, i - 1));
       return;
@@ -82,7 +83,10 @@ export function ArchivedCampaignsPhase({
   }
 
   menuLines.push(
-    <Text key="hint" color={dimColor}>{"\n  Enter to restore  ·  Esc to go back"}</Text>,
+    <Text key="spacer">{" "}</Text>,
+  );
+  menuLines.push(
+    <Text key="hint" color={dimColor}>{"  Enter to restore  ·  Esc to go back"}</Text>,
   );
 
   return (

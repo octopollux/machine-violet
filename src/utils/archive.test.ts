@@ -1,4 +1,4 @@
-import { zipFiles, unzipFiles, setArchiveIO, sanitizePath } from "./archive.js";
+import { zipFiles, unzipFiles, zipBinaryFiles, unzipBinaryFiles, setArchiveIO, sanitizePath } from "./archive.js";
 import type { ArchiveIO, FileMap } from "./archive.js";
 
 afterEach(() => {
@@ -143,6 +143,28 @@ describe("unzip path sanitization (zip-slip protection)", () => {
     expect(output).not.toBeNull();
     expect(output!["campaign/safe.txt"]).toBe("safe");
     expect(Object.keys(output!)).toEqual(["campaign/safe.txt"]);
+  });
+});
+
+describe("zipBinaryFiles / unzipBinaryFiles", () => {
+  it("round-trips binary data preserving exact bytes", () => {
+    const binaryData = new Uint8Array([0x00, 0x78, 0x9c, 0xff, 0xfe, 0x01, 0x80, 0x90]);
+    const input = { "objects/ab/cdef": binaryData, "text.txt": new TextEncoder().encode("hello") };
+    const zipped = zipBinaryFiles(input);
+    expect(zipped).not.toBeNull();
+    const output = unzipBinaryFiles(zipped!);
+    expect(output).not.toBeNull();
+    expect(output!["objects/ab/cdef"]).toEqual(binaryData);
+    expect(new TextDecoder().decode(output!["text.txt"])).toBe("hello");
+  });
+
+  it("rejects traversal paths in binary zip", () => {
+    const input = { "../../evil": new Uint8Array([1]) };
+    expect(zipBinaryFiles(input)).toBeNull();
+  });
+
+  it("returns null on corrupt binary unzip", () => {
+    expect(unzipBinaryFiles(new Uint8Array([0, 1, 2]))).toBeNull();
   });
 });
 

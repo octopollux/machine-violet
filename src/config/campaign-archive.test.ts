@@ -236,6 +236,48 @@ describe("listArchivedCampaigns", () => {
   });
 });
 
+describe("archiveCampaign binary preservation", () => {
+  it("preserves binary git objects through archive round-trip", async () => {
+    const io = createMockIO();
+    const campaignsDir = "/home/user/campaigns";
+    const campaignPath = `${campaignsDir}/test-campaign`;
+    seedCampaign(io, campaignPath);
+
+    // Add a binary git object (not valid UTF-8)
+    const binaryData = new Uint8Array([0x00, 0x78, 0x9c, 0xff, 0xfe, 0x01, 0x80, 0x90]);
+    io.fs[norm(`${campaignPath}/state/.git/objects/ab/cdef`)] = binaryData;
+
+    // Archive
+    const archResult = await archiveCampaign(campaignPath, campaignsDir, io);
+    expect(archResult.ok).toBe(true);
+
+    // Unarchive
+    const unarchResult = await unarchiveCampaign(archResult.zipPath!, campaignsDir, io);
+    expect(unarchResult.ok).toBe(true);
+
+    // Binary object should be byte-identical
+    const restored = await io.readBinary(norm(`${unarchResult.zipPath}/state/.git/objects/ab/cdef`));
+    expect(restored).toEqual(binaryData);
+  });
+});
+
+describe("archiveCampaign filename sanitization", () => {
+  it("sanitizes path separators in campaign names", async () => {
+    const io = createMockIO();
+    const campaignsDir = "/home/user/campaigns";
+    const campaignPath = `${campaignsDir}/evil`;
+    const p = norm(campaignPath);
+    io.fs[`${p}/config.json`] = JSON.stringify({ name: "../../../etc/passwd" });
+    io.fs[`${p}/data.txt`] = "some data";
+
+    const result = await archiveCampaign(campaignPath, campaignsDir, io);
+    expect(result.ok).toBe(true);
+    // Should not contain path traversal in the zip filename
+    expect(result.zipPath).not.toContain("..");
+    expect(result.zipPath).toContain(".zip");
+  });
+});
+
 describe("deleteCampaign", () => {
   it("recursively deletes a campaign folder", async () => {
     const io = createMockIO();

@@ -1,15 +1,17 @@
 /**
  * Campaign archival, unarchival, and deletion operations.
  *
- * Archive zips a campaign folder into ArchivedCampaigns/<CampaignName>.zip,
+ * Archive zips a campaign folder into archivedcampaigns/<CampaignName>.zip,
  * verifies integrity at each step, then removes the original folder.
  * Unarchive reverses the process. Delete removes a campaign after confirmation.
+ *
+ * All file I/O is binary to preserve git objects and other non-UTF-8 data.
  */
 
 import { join, basename } from "node:path";
 import { norm } from "../utils/paths.js";
-import { zipFiles, unzipFiles } from "../utils/archive.js";
-import type { FileMap } from "../utils/archive.js";
+import { zipBinaryFiles, unzipBinaryFiles } from "../utils/archive.js";
+import type { BinaryFileMap } from "../utils/archive.js";
 
 // --- I/O abstraction (superset of game FileIO, adds binary + stat + recursive ops) ---
 
@@ -35,7 +37,7 @@ export interface ArchiveResult {
   ok: boolean;
   /** Human-readable error if ok is false. */
   error?: string;
-  /** Path to the created zip (on success). */
+  /** Path to the created zip or restored campaign dir (on success). */
   zipPath?: string;
 }
 
@@ -58,21 +60,33 @@ export interface CampaignDeleteInfo {
 
 const ARCHIVE_DIR = "archivedcampaigns";
 
-/** Resolve the ArchivedCampaigns directory (sibling to campaigns dir). */
+/** Resolve the archivedcampaigns directory (sibling to campaigns dir). */
 export function archiveDir(campaignsDir: string): string {
   return norm(join(campaignsDir, "..", ARCHIVE_DIR));
 }
 
 /**
- * Recursively walk a directory, returning relative paths and contents.
- * Only reads files (skips subdirectories as entries, but recurses into them).
+ * Sanitize a campaign name for use as a filename component.
+ * Strips path separators, drive letters, control chars, and reserved characters.
  */
-async function walkAll(
+function sanitizeFilename(name: string): string {
+  let safe = basename(name);
+  // eslint-disable-next-line no-control-regex
+  safe = safe.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_");
+  safe = safe.replace(/^\.+/, "").replace(/[ .]+$/g, "");
+  return safe || "campaign";
+}
+
+/**
+ * Recursively walk a directory, returning relative paths and binary contents.
+ * Reads all files as raw bytes to preserve git objects and other binary data.
+ */
+async function walkAllBinary(
   io: ArchiveFileIO,
   root: string,
   prefix: string,
-): Promise<{ relativePath: string; content: string }[]> {
-  const results: { relativePath: string; content: string }[] = [];
+): Promise<{ relativePath: string; content: Uint8Array }[]> {
+  const results: { relativePath: string; content: Uint8Array }[] = [];
   let entries: string[];
   try {
     entries = await io.listDir(root);
@@ -84,11 +98,11 @@ async function walkAll(
     const abs = norm(join(root, entry));
     const rel = prefix ? `${prefix}/${entry}` : entry;
     if (await io.isDirectory(abs)) {
-      const children = await walkAll(io, abs, rel);
+      const children = await walkAllBinary(io, abs, rel);
       results.push(...children);
     } else {
       try {
-        const content = await io.readFile(abs);
+        const content = await io.readBinary(abs);
         results.push({ relativePath: rel, content });
       } catch {
         // Skip unreadable files
@@ -117,6 +131,15 @@ async function rmRecursive(io: ArchiveFileIO, dir: string): Promise<void> {
     }
   }
   await io.rmdir(dir);
+}
+
+/** Compare two Uint8Arrays for byte-level equality. */
+function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
 }
 
 // --- Core operations ---
@@ -161,7 +184,7 @@ export async function getCampaignDeleteInfo(
   } catch { /* best effort */ }
 
   // Count DM turns from display-log.md
-  // A "DM turn" is a group of consecutive DM lines separated by player/system lines.
+  // A "DM turn" is a group of consecutive DM lines separated by any non-DM line.
   let dmTurnCount = 0;
   try {
     const log = await io.readFile(norm(join(campaignPath, "state", "display-log.md")));
@@ -171,8 +194,7 @@ export async function getCampaignDeleteInfo(
       if (isDmLine && !inDmBlock) {
         dmTurnCount++;
         inDmBlock = true;
-      } else if (!isDmLine && line.startsWith("> ")) {
-        // Player line ends the DM block
+      } else if (!isDmLine) {
         inDmBlock = false;
       }
     }
@@ -185,11 +207,11 @@ export async function getCampaignDeleteInfo(
  * Archive a campaign: zip → verify → move → verify → delete source.
  *
  * Steps:
- * 1. Walk all files, record count and total content size
+ * 1. Walk all files as binary, record count and total byte size
  * 2. Zip into memory
  * 3. Unzip in memory and verify file count + total size match
- * 4. Write zip to ArchivedCampaigns/<CampaignName>.zip
- * 5. Read the written zip back and verify it matches the in-memory zip
+ * 4. Write zip to archivedcampaigns/<CampaignName>.zip
+ * 5. Read the written zip back and verify byte-level equality
  * 6. Delete the campaign source folder
  */
 export async function archiveCampaign(
@@ -197,81 +219,75 @@ export async function archiveCampaign(
   campaignsDir: string,
   io: ArchiveFileIO,
 ): Promise<ArchiveResult> {
-  const normalizedPath = norm(campaignPath);
+  try {
+    const normalizedPath = norm(campaignPath);
 
-  // Step 1: Walk all files
-  const files = await walkAll(io, normalizedPath, "");
-  const fileCount = files.length;
-  if (fileCount === 0) {
-    return { ok: false, error: "Campaign folder is empty or unreadable" };
-  }
-  const totalSize = files.reduce((sum, f) => sum + f.content.length, 0);
+    // Step 1: Walk all files as binary
+    const files = await walkAllBinary(io, normalizedPath, "");
+    const fileCount = files.length;
+    if (fileCount === 0) {
+      return { ok: false, error: "Campaign folder is empty or unreadable" };
+    }
+    const totalSize = files.reduce((sum, f) => sum + f.content.length, 0);
 
-  // Build FileMap
-  const fileMap: FileMap = {};
-  for (const f of files) {
-    fileMap[f.relativePath] = f.content;
-  }
+    // Build BinaryFileMap
+    const fileMap: BinaryFileMap = {};
+    for (const f of files) {
+      fileMap[f.relativePath] = f.content;
+    }
 
-  // Step 2: Zip
-  const zipped = zipFiles(fileMap);
-  if (!zipped) {
-    return { ok: false, error: "Failed to create zip archive" };
-  }
+    // Step 2: Zip
+    const zipped = zipBinaryFiles(fileMap);
+    if (!zipped) {
+      return { ok: false, error: "Failed to create zip archive" };
+    }
 
-  // Step 3: Verify by round-tripping in memory
-  const roundTrip = unzipFiles(zipped);
-  if (!roundTrip) {
-    return { ok: false, error: "Zip verification failed: could not unzip in memory" };
-  }
-  const rtCount = Object.keys(roundTrip).length;
-  const rtSize = Object.values(roundTrip).reduce((sum, c) => sum + c.length, 0);
-  if (rtCount !== fileCount) {
-    return { ok: false, error: `Zip verification failed: file count mismatch (expected ${fileCount}, got ${rtCount})` };
-  }
-  if (rtSize !== totalSize) {
-    return { ok: false, error: `Zip verification failed: total size mismatch (expected ${totalSize}, got ${rtSize})` };
-  }
+    // Step 3: Verify by round-tripping in memory
+    const roundTrip = unzipBinaryFiles(zipped);
+    if (!roundTrip) {
+      return { ok: false, error: "Zip verification failed: could not unzip in memory" };
+    }
+    const rtCount = Object.keys(roundTrip).length;
+    const rtSize = Object.values(roundTrip).reduce((sum, c) => sum + c.length, 0);
+    if (rtCount !== fileCount) {
+      return { ok: false, error: `Zip verification failed: file count mismatch (expected ${fileCount}, got ${rtCount})` };
+    }
+    if (rtSize !== totalSize) {
+      return { ok: false, error: `Zip verification failed: total size mismatch (expected ${totalSize}, got ${rtSize})` };
+    }
 
-  // Step 4: Write zip to ArchivedCampaigns/
-  const campaignName = await readCampaignName(normalizedPath, io);
-  const archDir = archiveDir(campaignsDir);
-  await io.mkdir(archDir);
-  const zipPath = norm(join(archDir, `${campaignName}.zip`));
+    // Step 4: Write zip to archivedcampaigns/
+    const campaignName = await readCampaignName(normalizedPath, io);
+    const safeName = sanitizeFilename(campaignName);
+    const archDir = archiveDir(campaignsDir);
+    await io.mkdir(archDir);
 
-  // Avoid overwriting an existing archive
-  if (await io.exists(zipPath)) {
-    // Append a timestamp to disambiguate
-    const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-    const altPath = norm(join(archDir, `${campaignName} (${ts}).zip`));
-    await io.writeBinary(altPath, zipped);
+    let zipPath = norm(join(archDir, `${safeName}.zip`));
 
-    // Step 5: Read back and verify
-    const readBack = await io.readBinary(altPath);
-    if (readBack.length !== zipped.length) {
-      return { ok: false, error: "Write verification failed: zip file size mismatch on disk" };
+    // Avoid overwriting an existing archive
+    if (await io.exists(zipPath)) {
+      const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      zipPath = norm(join(archDir, `${safeName} (${ts}).zip`));
+    }
+
+    await io.writeBinary(zipPath, zipped);
+
+    // Step 5: Read back and verify byte-level equality
+    const readBack = await io.readBinary(zipPath);
+    if (!bytesEqual(readBack, zipped)) {
+      return { ok: false, error: "Write verification failed: zip file contents mismatch on disk" };
     }
 
     // Step 6: Delete source
     await rmRecursive(io, normalizedPath);
-    return { ok: true, zipPath: altPath };
+    return { ok: true, zipPath };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Archive failed" };
   }
-
-  await io.writeBinary(zipPath, zipped);
-
-  // Step 5: Read back and verify
-  const readBack = await io.readBinary(zipPath);
-  if (readBack.length !== zipped.length) {
-    return { ok: false, error: "Write verification failed: zip file size mismatch on disk" };
-  }
-
-  // Step 6: Delete source
-  await rmRecursive(io, normalizedPath);
-  return { ok: true, zipPath };
 }
 
 /**
- * List all archived campaigns (zips in ArchivedCampaigns/).
+ * List all archived campaigns (zips in archivedcampaigns/).
  */
 export async function listArchivedCampaigns(
   campaignsDir: string,
@@ -305,6 +321,7 @@ export async function listArchivedCampaigns(
 
 /**
  * Unarchive a campaign: read zip → unzip → verify → write to campaigns dir.
+ * Cleans up partially written files on failure.
  *
  * The campaign slug is derived from the zip filename. If a campaign with that
  * slug already exists, a numeric suffix is appended.
@@ -322,8 +339,8 @@ export async function unarchiveCampaign(
     return { ok: false, error: "Failed to read archive file" };
   }
 
-  // Unzip
-  const fileMap = unzipFiles(zipData);
+  // Unzip as binary
+  const fileMap = unzipBinaryFiles(zipData);
   if (!fileMap) {
     return { ok: false, error: "Failed to unzip archive (corrupt?)" };
   }
@@ -334,9 +351,10 @@ export async function unarchiveCampaign(
 
   // Determine campaign directory name from config.json in the archive, or from zip filename
   let campaignName: string | null = null;
-  if (fileMap["config.json"]) {
+  const configBytes = fileMap["config.json"];
+  if (configBytes) {
     try {
-      const config = JSON.parse(fileMap["config.json"]);
+      const config = JSON.parse(new TextDecoder().decode(configBytes));
       if (typeof config.name === "string" && config.name) campaignName = config.name;
     } catch { /* fall through */ }
   }
@@ -356,23 +374,28 @@ export async function unarchiveCampaign(
     suffix++;
   }
 
-  // Write all files
-  await io.mkdir(campaignDir);
-  for (const [relativePath, content] of Object.entries(fileMap)) {
-    const absPath = norm(join(campaignDir, relativePath));
-    // Ensure parent directories exist
-    const parts = relativePath.split("/");
-    if (parts.length > 1) {
-      const parentRel = parts.slice(0, -1).join("/");
-      await io.mkdir(norm(join(campaignDir, parentRel)));
+  // Write all files with cleanup on failure
+  try {
+    await io.mkdir(campaignDir);
+    for (const [relativePath, content] of Object.entries(fileMap)) {
+      const absPath = norm(join(campaignDir, relativePath));
+      const parts = relativePath.split("/");
+      if (parts.length > 1) {
+        const parentRel = parts.slice(0, -1).join("/");
+        await io.mkdir(norm(join(campaignDir, parentRel)));
+      }
+      await io.writeBinary(absPath, content);
     }
-    await io.writeFile(absPath, content);
-  }
 
-  // Verify: count files written
-  const written = await walkAll(io, campaignDir, "");
-  if (written.length !== fileCount) {
-    return { ok: false, error: `Unarchive verification failed: wrote ${written.length}/${fileCount} files` };
+    // Verify: count files written
+    const written = await walkAllBinary(io, campaignDir, "");
+    if (written.length !== fileCount) {
+      throw new Error(`Unarchive verification failed: wrote ${written.length}/${fileCount} files`);
+    }
+  } catch (e) {
+    // Clean up partial writes
+    try { await rmRecursive(io, campaignDir); } catch { /* best-effort */ }
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to unarchive campaign" };
   }
 
   return { ok: true, zipPath: campaignDir };
