@@ -1,4 +1,4 @@
-import { zipFiles, unzipFiles, setArchiveIO } from "./archive.js";
+import { zipFiles, unzipFiles, setArchiveIO, sanitizePath } from "./archive.js";
 import type { ArchiveIO, FileMap } from "./archive.js";
 
 afterEach(() => {
@@ -48,6 +48,47 @@ describe("zipFiles / unzipFiles round-trip", () => {
   });
 });
 
+describe("sanitizePath", () => {
+  it("passes through clean relative paths", () => {
+    expect(sanitizePath("campaign/state.json")).toBe("campaign/state.json");
+    expect(sanitizePath("file.txt")).toBe("file.txt");
+  });
+
+  it("normalizes backslashes to forward slashes", () => {
+    expect(sanitizePath("campaign\\entities\\npc.md")).toBe("campaign/entities/npc.md");
+  });
+
+  it("strips leading slashes", () => {
+    expect(sanitizePath("/campaign/file.txt")).toBe("campaign/file.txt");
+    expect(sanitizePath("///deep/path.md")).toBe("deep/path.md");
+  });
+
+  it("collapses . segments", () => {
+    expect(sanitizePath("./campaign/./file.txt")).toBe("campaign/file.txt");
+  });
+
+  it("rejects .. traversal segments", () => {
+    expect(sanitizePath("../etc/passwd")).toBeNull();
+    expect(sanitizePath("campaign/../../secret")).toBeNull();
+    expect(sanitizePath("..")).toBeNull();
+  });
+
+  it("rejects Windows drive letters", () => {
+    expect(sanitizePath("C:/Windows/system32")).toBeNull();
+    expect(sanitizePath("d:\\data\\file.txt")).toBeNull();
+  });
+
+  it("rejects NUL bytes", () => {
+    expect(sanitizePath("file\0.txt")).toBeNull();
+  });
+
+  it("rejects empty paths", () => {
+    expect(sanitizePath("")).toBeNull();
+    expect(sanitizePath("/")).toBeNull();
+    expect(sanitizePath("./")).toBeNull();
+  });
+});
+
 describe("zipFiles error handling", () => {
   it("returns null when zip throws", () => {
     setArchiveIO({
@@ -55,6 +96,21 @@ describe("zipFiles error handling", () => {
       unzip: () => ({}),
     });
     expect(zipFiles({ "a.txt": "a" })).toBeNull();
+  });
+
+  it("returns null when paths contain traversal", () => {
+    expect(zipFiles({ "../../etc/passwd": "root" })).toBeNull();
+  });
+
+  it("normalizes leading slashes on zip (not rejected, just stripped)", () => {
+    const zipped = zipFiles({ "/campaign/file.txt": "data" });
+    expect(zipped).not.toBeNull();
+    const output = unzipFiles(zipped!);
+    expect(output).toEqual({ "campaign/file.txt": "data" });
+  });
+
+  it("returns null for Windows drive paths", () => {
+    expect(zipFiles({ "C:/Windows/system32/config": "data" })).toBeNull();
   });
 });
 
@@ -70,6 +126,23 @@ describe("unzipFiles error handling", () => {
       unzip: () => { throw new Error("boom"); },
     });
     expect(unzipFiles(new Uint8Array())).toBeNull();
+  });
+});
+
+describe("unzip path sanitization (zip-slip protection)", () => {
+  it("silently drops entries with traversal paths from a crafted zip", async () => {
+    // Use fflate directly to create a zip with malicious entry names
+    const { zipSync, strToU8 } = await import("fflate");
+    const malicious = zipSync({
+      "campaign/safe.txt": strToU8("safe"),
+      "../../etc/passwd": strToU8("pwned"),
+      "C:/Windows/evil.dll": strToU8("pwned"),
+    });
+
+    const output = unzipFiles(malicious);
+    expect(output).not.toBeNull();
+    expect(output!["campaign/safe.txt"]).toBe("safe");
+    expect(Object.keys(output!)).toEqual(["campaign/safe.txt"]);
   });
 });
 

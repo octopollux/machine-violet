@@ -19,11 +19,28 @@ export interface ArchiveIO {
   unzip(data: Uint8Array): FileMap;
 }
 
+/**
+ * Normalize and validate an archive entry path. Returns the sanitized path,
+ * or `null` if the path is unsafe (traversal, absolute, NUL bytes).
+ */
+export function sanitizePath(raw: string): string | null {
+  if (raw.includes("\0")) return null;
+  const normalized = raw.replace(/\\/g, "/").replace(/^\/+/, "");
+  // Reject Windows drive letters (e.g. "C:/...")
+  if (/^[A-Za-z]:/.test(normalized)) return null;
+  const parts = normalized.split("/").filter((p) => p && p !== ".");
+  if (parts.length === 0) return null;
+  if (parts.some((p) => p === "..")) return null;
+  return parts.join("/");
+}
+
 const defaultArchiveIO: ArchiveIO = {
   zip(files: FileMap): Uint8Array {
     const entries: Record<string, Uint8Array> = {};
     for (const [path, content] of Object.entries(files)) {
-      entries[path] = strToU8(content);
+      const safe = sanitizePath(path);
+      if (safe === null) throw new Error(`Unsafe archive path: ${path}`);
+      entries[safe] = strToU8(content);
     }
     return zipSync(entries);
   },
@@ -32,7 +49,9 @@ const defaultArchiveIO: ArchiveIO = {
     const entries = unzipSync(data);
     const files: FileMap = {};
     for (const [path, content] of Object.entries(entries)) {
-      files[path] = strFromU8(content);
+      const safe = sanitizePath(path);
+      if (safe === null) continue; // silently skip unsafe entries
+      files[safe] = strFromU8(content);
     }
     return files;
   },
