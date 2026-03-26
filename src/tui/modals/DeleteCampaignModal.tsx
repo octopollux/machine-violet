@@ -1,8 +1,7 @@
 import React, { useState } from "react";
-import { useInput, Text } from "ink";
+import { useInput } from "ink";
 import type { ResolvedTheme } from "../themes/types.js";
 import { CenteredModal } from "./CenteredModal.js";
-import { themeColor } from "../themes/color-resolve.js";
 import type { CampaignDeleteInfo } from "../../config/campaign-archive.js";
 
 export interface DeleteCampaignModalProps {
@@ -23,10 +22,6 @@ export function DeleteCampaignModal({
   onCancel,
 }: DeleteCampaignModalProps) {
   const [selectedIndex, setSelectedIndex] = useState(1); // default to Cancel
-  const borderColor = themeColor(theme, "border");
-  const dimColor = themeColor(theme, "separator") ?? "#666666";
-
-  const options = ["Delete", "Cancel"];
 
   useInput((_input, key) => {
     if (key.leftArrow || key.rightArrow) {
@@ -49,12 +44,17 @@ export function DeleteCampaignModal({
 
   const turnLabel = info.dmTurnCount === 1 ? "turn" : "turns";
 
-  const contentLines = [
+  const deleteMarker = selectedIndex === 0 ? "◆" : "○";
+  const cancelMarker = selectedIndex === 1 ? "◆" : "○";
+
+  const lines = [
     `Campaign: ${info.campaignName}`,
     `Characters: ${characters}`,
     `DM turns: ~${info.dmTurnCount} ${turnLabel}`,
     "",
     "This cannot be undone.",
+    "",
+    `${deleteMarker} Delete   ${cancelMarker} Cancel`,
   ];
 
   return (
@@ -63,28 +63,9 @@ export function DeleteCampaignModal({
       width={width}
       height={height}
       title="Delete Campaign?"
+      lines={lines}
       minWidth={36}
       maxWidth={50}
-      contentHeight={7}
-    >
-      {contentLines.map((line, i) => (
-        <Text key={i} color={line === "This cannot be undone." ? "red" : undefined}>{line || " "}</Text>
-      ))}
-      <Text>{" "}</Text>
-      <Text>
-        {options.map((opt, i) => {
-          const active = i === selectedIndex;
-          const color = opt === "Delete" ? "red" : undefined;
-          const markerColor = active ? borderColor : dimColor;
-          return (
-            <Text key={opt}>
-              <Text color={markerColor}>{active ? "◆" : "○"}</Text>
-              <Text color={color} bold={active}>{` ${opt}`}</Text>
-              {i < options.length - 1 ? <Text>{"   "}</Text> : null}
-            </Text>
-          );
-        })}
-      </Text>
-    </CenteredModal>
+    />
   );
 }
