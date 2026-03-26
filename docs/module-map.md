@@ -178,6 +178,7 @@ Platform abstractions and helpers that don't belong to any single domain.
 
 | File | Purpose |
 |---|---|
+| `archive.ts` | `zipFiles()`, `unzipFiles()` — zip/unzip via `fflate` (pure JS, zero deps). `ArchiveIO` interface, `setArchiveIO()` for test mocking |
 | `clipboard.ts` | `ClipboardIO` interface, `copyToClipboard()`, `readFromClipboard()` — cross-platform clipboard via `clipboardy`, lazy-loaded. `setClipboardIO()` for test mocking |
 | `paths.ts` | Runtime asset path resolution (prompts, themes, systems relative to executable) |
 
