@@ -43,7 +43,7 @@ const helpCommand: SlashCommand = {
   execute(_args, ctx) {
     const lines = commands.map((c) => `  ${c.usage.padEnd(20)} ${c.description}`);
     const aliasLines = [...aliasMap.entries()].map(
-      ([alias, target]) => `  ${"/" + alias}${" ".repeat(18 - alias.length)}→ /${target}`,
+      ([alias, target]) => `  ${("/" + alias).padEnd(20)}→ /${target}`,
     );
     const all = [...lines, "", ...aliasLines];
     ctx.appendLine({ kind: "system", text: `[Commands]\n${all.join("\n")}` });
@@ -342,10 +342,8 @@ export function trySlashCommand(input: string, ctx: SlashCommandContext): boolea
 
   if (!name) return false;
 
-  // Resolve aliases (e.g. /dm → /ooc)
-  const alias = aliasMap.get(name);
-  const resolvedName = alias ?? name;
-  const echoName = alias ?? name; // echo the canonical name for aliases
+  // Resolve aliases (e.g. /dm → /ooc) so the canonical name is used everywhere
+  const resolvedName = aliasMap.get(name) ?? name;
 
   const cmd = commandMap.get(resolvedName);
   if (!cmd) {
@@ -354,7 +352,7 @@ export function trySlashCommand(input: string, ctx: SlashCommandContext): boolea
   }
 
   // Echo the command into the narrative pane so players see what was typed
-  const echoText = args ? `/${echoName} ${args}` : `/${echoName}`;
+  const echoText = args ? `/${resolvedName} ${args}` : `/${resolvedName}`;
   ctx.appendLine({ kind: "player", text: `> ${echoText}` });
 
   const result = cmd.execute(args, ctx);
