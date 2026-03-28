@@ -76,7 +76,7 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
   /** Execute a slash command. */
   server.post<{ Params: { name: string }; Body: CommandRequest }>(
     "/command/:name",
-    async (request, reply) => {
+    async (request, _reply) => {
       const { name } = request.params;
       const { args } = request.body ?? {};
 
@@ -92,7 +92,7 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
   /** Respond to a modal (choice selection, dice acknowledgment, etc.). */
   server.post<{ Params: { id: string }; Body: ModalResponse }>(
     "/modal/:id/respond",
-    async (request, reply) => {
+    async (request, _reply) => {
       const { id } = request.params;
       const { value } = request.body;
 
@@ -106,7 +106,7 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
   );
 
   /** Patch settings directly (temporary — frontend knows the shape). */
-  server.patch("/settings", async (request, reply) => {
+  server.patch("/settings", async (request, _reply) => {
     // TODO: Phase 2a — apply settings patch to CampaignConfig
     server.log.info({ settings: request.body }, "Settings patch received");
     return { ok: true };

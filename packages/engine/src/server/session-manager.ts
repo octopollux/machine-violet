@@ -12,7 +12,6 @@
 import type { WebSocket } from "ws";
 import type {
   ServerEvent,
-  Turn, TurnContribution,
   ConnectionIdentity,
   StateSnapshot,
 } from "@machine-violet/shared";
@@ -25,7 +24,7 @@ export interface ConnectedClient {
 
 export class SessionManager {
   private campaignsDir: string;
-  private clients: Map<WebSocket, ConnectedClient> = new Map();
+  private clients = new Map<WebSocket, ConnectedClient>();
   private turnManager: TurnManager | null = null;
   private active = false;
 

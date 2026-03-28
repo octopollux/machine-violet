@@ -35,7 +35,7 @@ import { getModel } from "../config/models.js";
 import type { ModelTier } from "../config/models.js";
 import { accUsage } from "../context/usage-helpers.js";
 import { TOKEN_LIMITS } from "../config/tokens.js";
-import type { ToolRegistry, ToolResult } from "./tool-registry.js";
+import type { ToolRegistry } from "./tool-registry.js";
 import { isAITurn, getActivePlayer } from "./player-manager.js";
 import { aiPlayerTurn } from "./subagents/ai-player.js";
 import { campaignPaths, parseFrontMatter, serializeEntity, formatChangelogEntry } from "../tools/filesystem/index.js";

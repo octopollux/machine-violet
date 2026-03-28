@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   createEventHandler,
   initialClientState,
-  type ClientState,
   type StateUpdater,
 } from "./event-handler.js";
 import type { ServerEvent } from "@machine-violet/shared";

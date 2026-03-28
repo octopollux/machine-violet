@@ -15,16 +15,11 @@
 import React, { useState, useRef, useCallback } from "react";
 import { useInput, Box } from "ink";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
-import { scrollAmount, TerminalTooSmall, buildModelineDisplay, splitModeline } from "../tui/components/index.js";
-import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, narrativeRows, choiceRowBudget } from "../tui/responsive.js";
-import { getActivity } from "../tui/activity.js";
+import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
+import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, choiceRowBudget } from "../tui/responsive.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { Layout } from "../tui/layout.js";
-import {
-  ChoiceOverlay, DESCRIPTION_ROWS, DiceRollModal, SessionRecapModal,
-  RollbackSummaryModal, GameMenu, CharacterSheetModal, CompendiumModal,
-  PlayerNotesModal, ApiErrorModal, SwatchModal, CampaignSettingsModal,
-} from "../tui/modals/index.js";
+import { ChoiceOverlay, DESCRIPTION_ROWS, GameMenu, ApiErrorModal } from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { useGameContext } from "../tui/game-context.js";
 
@@ -32,11 +27,11 @@ export function PlayingPhase() {
   const {
     apiClient,
     narrativeLines, setNarrativeLines,
-    theme, variant,
-    campaignName, activePlayerIndex, setActivePlayerIndex,
+    theme,
+    campaignName, activePlayerIndex,
     engineState, toolGlyphs, resources, modelines,
     activeModal, setActiveModal,
-    currentTurn, mode, stateSnapshot,
+    mode, stateSnapshot,
     retryOverlay,
     onReturnToMenu,
   } = useGameContext();
@@ -111,7 +106,6 @@ export function PlayingPhase() {
 
   // --- Choice selection ---
   const handleChoiceSelect = useCallback(async (choice: string) => {
-    const modal = activeModal;
     setActiveModal(null);
 
     // Send choice as a turn contribution
@@ -120,7 +114,7 @@ export function PlayingPhase() {
     } catch {
       // Error handling via WS error events
     }
-  }, [apiClient, activeModal, setActiveModal]);
+  }, [apiClient, setActiveModal]);
 
   const handleChoiceDismiss = useCallback(() => setActiveModal(null), [setActiveModal]);
 
@@ -163,7 +157,7 @@ export function PlayingPhase() {
         setActiveModal(null);
         setMenuOpen(false);
         if (mode === "ooc" || mode === "dev") {
-          apiClient.command("exit_mode").catch(() => {});
+          apiClient.command("exit_mode").catch(() => { /* no-op */ });
         }
         return;
       }
@@ -174,7 +168,7 @@ export function PlayingPhase() {
     // In OOC/Dev mode: ESC exits
     if (mode === "ooc" || mode === "dev") {
       if (key.escape) {
-        apiClient.command("exit_mode").catch(() => {});
+        apiClient.command("exit_mode").catch(() => { /* no-op */ });
         return;
       }
     }
@@ -208,9 +202,6 @@ export function PlayingPhase() {
 
   const tier = getViewportTier({ columns: cols, rows: layoutRows });
   const visibleElements = getVisibleElements(tier);
-  const narRows = narrativeRows(layoutRows, visibleElements, false, theme.asset.height, players.length);
-  const conversationPaneTop = visibleElements.topFrame ? theme.asset.height : 0;
-
   // Choice overlay (from either old ActiveModal or new Modal format)
   const isChoice = activeModal &&
     (("kind" in activeModal && activeModal.kind === "choice") ||

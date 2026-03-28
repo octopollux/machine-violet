@@ -38,9 +38,9 @@ export class WsClient {
     this.config = {
       maxReconnectAttempts: 10,
       reconnectBaseDelay: 1000,
-      onConnect: () => {},
-      onDisconnect: () => {},
-      onError: () => {},
+      onConnect: () => { /* default no-op */ },
+      onDisconnect: () => { /* default no-op */ },
+      onError: () => { /* default no-op */ },
       ...config,
     };
   }
