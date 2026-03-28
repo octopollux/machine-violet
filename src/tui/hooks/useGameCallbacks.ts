@@ -239,7 +239,9 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
       }
     },
     onDevLog(msg: string) {
-      setNarrativeLines((prev) => [...prev, { kind: "dev", text: msg }]);
+      if (isDevMode()) {
+        setNarrativeLines((prev) => [...prev, { kind: "dev", text: msg }]);
+      }
     },
     onExchangeDropped() { /* precis update handled internally */ },
     onUsageUpdate(delta, tier) {

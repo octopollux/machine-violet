@@ -10,6 +10,7 @@ import type { ScrollHandle } from "../hooks/useScrollHandle.js";
 import { useMouseScroll } from "../hooks/useMouseScroll.js";
 import { composeTurnSeparator } from "../themes/composer.js";
 import type { ThemeAsset } from "../themes/types.js";
+import { isDevMode } from "../../config/dev-mode.js";
 
 // ---------------------------------------------------------------------------
 // Incremental narrative processing hook
@@ -230,8 +231,13 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
     return () => { process.stdout.off("resize", onResize); };
   }, [updateScrollState]);
 
+  // Filter out dev lines when dev mode is disabled (defensive — sources
+  // should already guard with isDevMode(), but this prevents any leaks).
+  const devMode = isDevMode();
+  const visibleLines = devMode ? lines : lines.filter((l) => l.kind !== "dev");
+
   // Incremental pipeline: frozen prefix cached, only tail reprocessed
-  const processedLines = useProcessedLines(lines, width ?? 0, quoteColor);
+  const processedLines = useProcessedLines(visibleLines, width ?? 0, quoteColor);
 
   return (
     <Box height={maxRows} flexDirection="column">
