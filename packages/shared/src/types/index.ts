@@ -11,3 +11,4 @@ export * from "./objectives.js";
 export * from "./resolve-session.js";
 export * from "./compendium.js";
 export * from "./engine.js";
+export * from "./errors.js";

@@ -1,0 +1,398 @@
+import { describe, it, expect } from "vitest";
+import { createTestRegistry } from "./tool-registry.js";
+import type { GameState } from "./game-state.js";
+import { createClocksState } from "../tools/clocks/index.js";
+import { createCombatState, createDefaultConfig } from "../tools/combat/index.js";
+import { createDecksState } from "../tools/cards/index.js";
+import { createObjectivesState } from "../tools/objectives/index.js";
+import { createMap } from "../tools/maps/index.js";
+
+function mockState(): GameState {
+  return {
+    maps: {},
+    clocks: createClocksState(),
+    combat: createCombatState(),
+    combatConfig: createDefaultConfig(),
+    decks: createDecksState(),
+    objectives: createObjectivesState(),
+    config: {
+      name: "Test Campaign",
+      dm_personality: { name: "test", prompt_fragment: "You are terse." },
+      players: [{ name: "Alice", character: "Aldric", type: "human" }],
+      combat: createDefaultConfig(),
+      context: { retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 },
+      recovery: { auto_commit_interval: 300, max_commits: 100, enable_git: false },
+      choices: { campaign_default: "often", player_overrides: {} },
+    },
+    campaignRoot: "/tmp/test-campaign",
+    homeDir: "/tmp/home",
+    activePlayerIndex: 0,
+    displayResources: {},
+    resourceValues: {},
+  };
+}
+
+describe("ToolRegistry", () => {
+  it("registers all T1 tools", () => {
+    const reg = createTestRegistry();
+    // Map (14) + Dice (1) + Deck (1) + Clocks (5) + Combat (4) + TUI (7) = 32
+    expect(reg.size).toBeGreaterThanOrEqual(30);
+  });
+
+  it("generates API-compatible tool definitions", () => {
+    const reg = createTestRegistry();
+    const defs = reg.getDefinitions();
+    for (const def of defs) {
+      expect(def.name).toBeTruthy();
+      expect(def.input_schema.type).toBe("object");
+    }
+  });
+
+  it("dispatches roll_dice", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "roll_dice", { expression: "1d6" });
+    expect(result.is_error).toBeUndefined();
+    expect(result.content).toContain("1d6");
+    expect(result.content).toContain("→");
+  });
+
+  it("dispatches deck create + draw", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    const create = reg.dispatch(state, "deck", { deck: "test", operation: "create", template: "standard52" });
+    expect(create.is_error).toBeUndefined();
+    const draw = reg.dispatch(state, "deck", { deck: "test", operation: "draw", count: 3 });
+    expect(draw.is_error).toBeUndefined();
+    expect(draw.content).toContain("Drew:");
+  });
+
+  it("dispatches create_map and view_area", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    reg.dispatch(state, "create_map", {
+      id: "dungeon",
+      grid_type: "square",
+      width: 10,
+      height: 10,
+      default_terrain: "stone",
+    });
+    expect(state.maps["dungeon"]).toBeTruthy();
+
+    const view = reg.dispatch(state, "view_area", { map: "dungeon", center: "5,5", radius: 2 });
+    expect(view.is_error).toBeUndefined();
+    expect(view.content).toContain("."); // default terrain shorthand
+  });
+
+  it("dispatches place_entity and move_entity", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    state.maps["m"] = createMap("m", "square", 10, 10, "stone");
+
+    reg.dispatch(state, "place_entity", {
+      map: "m",
+      coord: "3,3",
+      entity: { id: "goblin1", type: "npc" },
+    });
+    expect(state.maps["m"].entities["3,3"]).toHaveLength(1);
+
+    reg.dispatch(state, "move_entity", { map: "m", entity_id: "goblin1", to: "5,5" });
+    expect(state.maps["m"].entities["5,5"]).toHaveLength(1);
+    expect(state.maps["m"].entities["3,3"] ?? []).toHaveLength(0);
+  });
+
+  it("dispatches set_alarm and check_clocks", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "set_alarm", {
+      clock: "calendar",
+      in: "2 days",
+      message: "Orc warband arrives",
+    });
+    expect(result.is_error).toBeUndefined();
+    expect(result.content).toContain("Alarm");
+
+    const check = reg.dispatch(state, "check_clocks", {});
+    expect(check.content).toContain("calendar");
+  });
+
+  it("dispatches combat lifecycle", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    const start = reg.dispatch(state, "start_combat", {
+      combatants: [
+        { id: "Aldric", type: "pc", modifier: 3 },
+        { id: "Goblin", type: "npc", modifier: 1 },
+      ],
+    });
+    expect(start.content).toContain("Combat started");
+    expect(state.combat.active).toBe(true);
+
+    const advance = reg.dispatch(state, "advance_turn", {});
+    expect(advance.content).toContain("turn");
+
+    const end = reg.dispatch(state, "end_combat", {});
+    expect(end.content).toContain("Combat ended");
+    expect(state.combat.active).toBe(false);
+  });
+
+  it("returns TUI commands as JSON (update_modeline defaults character)", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "update_modeline", { text: "HP: 42/42" });
+    const parsed = JSON.parse(result.content);
+    expect(parsed.type).toBe("update_modeline");
+    expect(parsed.text).toBe("HP: 42/42");
+    expect(parsed.character).toBe("Aldric");
+  });
+
+  it("update_modeline uses explicit character param", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "update_modeline", { text: "HP: 30/30", character: "Rook" });
+    const parsed = JSON.parse(result.content);
+    expect(parsed.type).toBe("update_modeline");
+    expect(parsed.text).toBe("HP: 30/30");
+    expect(parsed.character).toBe("Rook");
+  });
+
+  it("returns error for unknown tool", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "nonexistent_tool", {});
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("Unknown tool");
+  });
+
+  it("returns error for missing map", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "view_area", { map: "no_such_map", center: "0,0", radius: 1 });
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("not found");
+  });
+
+  it("catches handler exceptions gracefully", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    // roll_dice with invalid expression
+    const result = reg.dispatch(state, "roll_dice", { expression: "" });
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("Tool error");
+  });
+
+  it("has() returns correct results", () => {
+    const reg = createTestRegistry();
+    expect(reg.has("roll_dice")).toBe(true);
+    expect(reg.has("fake_tool")).toBe(false);
+  });
+
+  it("dispatches define_region and creates region on map", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    state.maps["m"] = createMap("m", "square", 10, 10, "stone");
+
+    const result = reg.dispatch(state, "define_region", {
+      map: "m", x1: 1, y1: 1, x2: 3, y2: 3, terrain: "water",
+    });
+    expect(result.is_error).toBeUndefined();
+    expect(result.content).toContain("water");
+    expect(state.maps["m"].regions).toHaveLength(1);
+    expect(state.maps["m"].regions[0].terrain).toBe("water");
+  });
+
+  it("dispatches set_terrain with region input (regression)", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    state.maps["m"] = createMap("m", "square", 10, 10, "stone");
+
+    const result = reg.dispatch(state, "set_terrain", {
+      map: "m",
+      region: { x1: 0, y1: 0, x2: 2, y2: 2 },
+      terrain: "forest",
+    });
+    expect(result.is_error).toBeUndefined();
+    expect(result.content).toContain("forest");
+    expect(state.maps["m"].regions).toHaveLength(1);
+    expect(state.maps["m"].regions[0].terrain).toBe("forest");
+  });
+
+  // ====== WORLDBUILDING ======
+
+  it("scribe returns terse content and _tui with batched updates", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "scribe", {
+      updates: [
+        { visibility: "private", content: "[[Merchant Voss]] is secretly a vampire thrall" },
+        { visibility: "player-facing", content: "[[Aldric]] took 8 damage, now at 34/42 HP" },
+      ],
+    });
+    expect(result.is_error).toBeUndefined();
+    expect(result.content).toContain("[[Merchant Voss]]");
+    expect(result.content).toContain("[[Aldric]]");
+    expect(result._tui).toBeDefined();
+    expect(result._tui!.type).toBe("scribe");
+    const updates = result._tui!.updates as { visibility: string }[];
+    expect(updates).toHaveLength(2);
+    expect(updates[0].visibility).toBe("private");
+    expect(updates[1].visibility).toBe("player-facing");
+  });
+
+  it("scribe rejects empty updates array", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "scribe", { updates: [] });
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("At least one");
+  });
+
+  it("scribe rejects updates missing required fields", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "scribe", {
+      updates: [{ visibility: "private" }],
+    });
+    expect(result.is_error).toBe(true);
+  });
+
+  // ====== DM NOTES ======
+
+  it("dm_notes write returns terse content and _tui with notes", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "dm_notes", {
+      action: "write",
+      notes: "The innkeeper is secretly a spy for the Red Hand.",
+    });
+    expect(result.is_error).toBeUndefined();
+    expect(result.content).toBe("DM notes saved.");
+    expect(result._tui).toBeDefined();
+    expect(result._tui!.type).toBe("dm_notes");
+    expect(result._tui!.action).toBe("write");
+    expect(result._tui!.notes).toBe("The innkeeper is secretly a spy for the Red Hand.");
+  });
+
+  it("dm_notes read returns TUI command", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "dm_notes", { action: "read" });
+    expect(result.is_error).toBeUndefined();
+    const parsed = JSON.parse(result.content);
+    expect(parsed.type).toBe("dm_notes");
+    expect(parsed.action).toBe("read");
+  });
+
+  it("dm_notes write trims whitespace", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "dm_notes", {
+      action: "write",
+      notes: "  some notes  ",
+    });
+    expect(result._tui!.notes).toBe("some notes");
+  });
+
+  it("dm_notes write rejects empty notes", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "dm_notes", {
+      action: "write",
+      notes: "   ",
+    });
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("empty");
+  });
+
+  it("dm_notes rejects invalid action", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "dm_notes", { action: "delete" });
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("Invalid action");
+  });
+
+  it("getDefinitionsFor returns only requested tools, skips unknown", () => {
+    const reg = createTestRegistry();
+    const defs = reg.getDefinitionsFor(["roll_dice", "nonexistent", "check_clocks"]);
+    expect(defs).toHaveLength(2);
+    expect(defs[0].name).toBe("roll_dice");
+    expect(defs[1].name).toBe("check_clocks");
+  });
+
+  it("getDefinitionsFor returns empty array for all-unknown names", () => {
+    const reg = createTestRegistry();
+    const defs = reg.getDefinitionsFor(["fake1", "fake2"]);
+    expect(defs).toHaveLength(0);
+  });
+
+  it("dispatches context_refresh and returns TUI command JSON", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "context_refresh", {});
+    const parsed = JSON.parse(result.content);
+    expect(parsed.type).toBe("context_refresh");
+  });
+
+  it("dispatches scene_transition and returns TuiCommand JSON", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "scene_transition", { title: "The Dark Forest", time_advance: 60 });
+    expect(result.is_error).toBeUndefined();
+    const parsed = JSON.parse(result.content);
+    expect(parsed.type).toBe("scene_transition");
+    expect(parsed.title).toBe("The Dark Forest");
+    expect(parsed.time_advance).toBe(60);
+  });
+
+  it("set_display_resources stores keys on state", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "set_display_resources", {
+      character: "Aldric",
+      resources: ["HP", "Spell Slots"],
+    });
+    expect(result.is_error).toBeUndefined();
+    expect(state.displayResources["Aldric"]).toEqual(["HP", "Spell Slots"]);
+    const parsed = JSON.parse(result.content);
+    expect(parsed.type).toBe("set_display_resources");
+  });
+
+  it("set_resource_values stores and merges values on state", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    reg.dispatch(state, "set_resource_values", {
+      character: "Aldric",
+      values: { "HP": "24/30" },
+    });
+    expect(state.resourceValues["Aldric"]).toEqual({ "HP": "24/30" });
+
+    // Merge additional values
+    reg.dispatch(state, "set_resource_values", {
+      character: "Aldric",
+      values: { "Spell Slots": "3/4" },
+    });
+    expect(state.resourceValues["Aldric"]).toEqual({ "HP": "24/30", "Spell Slots": "3/4" });
+
+    // Overwrite existing key
+    const result = reg.dispatch(state, "set_resource_values", {
+      character: "Aldric",
+      values: { "HP": "20/30" },
+    });
+    expect(result.is_error).toBeUndefined();
+    expect(state.resourceValues["Aldric"]["HP"]).toBe("20/30");
+    const parsed = JSON.parse(result.content);
+    expect(parsed.type).toBe("set_resource_values");
+  });
+
+  it("dispatches session_end and returns TuiCommand JSON", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "session_end", { title: "End of Session 1" });
+    expect(result.is_error).toBeUndefined();
+    const parsed = JSON.parse(result.content);
+    expect(parsed.type).toBe("session_end");
+    expect(parsed.title).toBe("End of Session 1");
+    expect(parsed.time_advance).toBeUndefined();
+  });
+});

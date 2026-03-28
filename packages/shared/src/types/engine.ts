@@ -128,3 +128,17 @@ export interface GameState {
   /** Per-character resource values: character → key → value */
   resourceValues: Record<string, Record<string, string>>;
 }
+
+// --- From tui/game-context.ts ---
+
+/** Interface for OOC/Dev mode sessions. */
+export interface ModeSession {
+  send(text: string, onDelta: (delta: string) => void): Promise<{
+    usage: UsageStats;
+    summary?: string;
+    endSession?: boolean;
+    playerAction?: string;
+  }>;
+  label: string;    // "OOC" | "Dev"
+  tier: ModelTier;  // for cost tracking
+}
