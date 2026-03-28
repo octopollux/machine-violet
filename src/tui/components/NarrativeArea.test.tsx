@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from "react";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { render } from "ink-testing-library";
 import { Text } from "ink";
 import type { NarrativeLine, ProcessedLine } from "../../types/tui.js";
@@ -130,6 +130,11 @@ describe("useProcessedLines", () => {
 
 describe("NarrativeArea dev-line filtering", () => {
   beforeEach(() => {
+    resetDevMode();
+  });
+
+  afterEach(() => {
+    delete process.env.DEV_MODE;
     resetDevMode();
   });
 
