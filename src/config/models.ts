@@ -29,7 +29,13 @@ const DEFAULTS: ModelConfig = {
   large: "claude-opus-4-6",
   medium: "claude-sonnet-4-6",
   small: "claude-haiku-4-5-20251001",
-  effort: { "default": null, "dev-mode": "high" },
+  effort: {
+    "default": null,
+    "dm": "high",
+    "ooc": "high",
+    "setup": "high",
+    "dev-mode": "high",
+  },
 };
 
 const VALID_MODELS = new Set<string>([
