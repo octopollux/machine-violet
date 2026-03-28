@@ -39,51 +39,8 @@ import type { ActionDeclaration, StateDelta } from "../types/resolve-session.js"
 
 // --- Types ---
 
-export type EngineState =
-  | "idle"
-  | "waiting_input"
-  | "dm_thinking"
-  | "tool_running"
-  | "scene_transition"
-  | "session_ending";
-
-export interface TurnInfo {
-  turnNumber: number;
-  role: "player" | "dm" | "ai";
-  participant: string;   // character name, or "DM"
-  text: string;          // player/AI input text; empty string for DM turns
-}
-
-export interface EngineCallbacks {
-  /** DM text streams in as it generates */
-  onNarrativeDelta: (delta: string) => void;
-  /** DM finished responding — full text available. playerAction is the tagged input that triggered this response. */
-  onNarrativeComplete: (text: string, playerAction?: string) => void;
-  /** Engine state changed (for activity indicators) */
-  onStateChange: (state: EngineState) => void;
-  /** TUI command from a tool call */
-  onTuiCommand: (command: TuiCommand) => void;
-  /** Tool started executing */
-  onToolStart: (name: string) => void;
-  /** Tool finished executing */
-  onToolEnd: (name: string, result?: ToolResult) => void;
-  /** Dev mode log message */
-  onDevLog?: (msg: string) => void;
-  /** Exchange dropped from conversation (precis will update) */
-  onExchangeDropped: () => void;
-  /** Usage stats updated (delta from a single API call, with its model tier) */
-  onUsageUpdate: (delta: UsageStats, tier: ModelTier) => void;
-  /** Content classifier refused the response — clear partial DM output */
-  onRefusal?: () => void;
-  /** Error occurred */
-  onError: (error: Error) => void;
-  /** API call is being retried after a retryable error */
-  onRetry: (status: number, delayMs: number) => void;
-  /** A player turn is starting (before any API work) */
-  onTurnStart: (turn: TurnInfo) => void;
-  /** A participant turn has ended */
-  onTurnEnd: (turn: TurnInfo) => void;
-}
+import type { EngineState, TurnInfo, EngineCallbacks } from "@machine-violet/shared/types/engine.js";
+export type { EngineState, TurnInfo, EngineCallbacks } from "@machine-violet/shared/types/engine.js";
 
 /**
  * Stamp cache_control on the last content block of the last conversation

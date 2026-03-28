@@ -34,18 +34,8 @@ export interface AgentLoopConfig {
   onRetry?: (status: number, delayMs: number) => void;
 }
 
-export interface UsageStats {
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheCreationTokens: number;
-}
-
-/** TUI command emitted by TUI tools (update_modeline, set_ui_style, etc.) */
-export interface TuiCommand {
-  type: string;
-  [key: string]: unknown;
-}
+import type { UsageStats, TuiCommand } from "@machine-violet/shared/types/engine.js";
+export type { UsageStats, TuiCommand } from "@machine-violet/shared/types/engine.js";
 
 export interface AgentLoopResult {
   /** Text content from the assistant's final response */

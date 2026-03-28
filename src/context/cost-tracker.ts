@@ -4,22 +4,8 @@
  * Instead of estimating dollar costs (which are unreliable for new models),
  * we track raw token counts per tier: Large (Opus), Medium (Sonnet), Small (Haiku).
  */
-import type { UsageStats } from "../agents/agent-loop.js";
-import type { ModelTier } from "../config/models.js";
-
-// --- Types ---
-
-export interface TierTokens {
-  input: number;
-  output: number;
-  cached: number;
-}
-
-export interface TokenBreakdown {
-  byTier: Record<ModelTier, TierTokens>;
-  tokens: UsageStats;
-  apiCalls: number;
-}
+import type { UsageStats, ModelTier, TierTokens, TokenBreakdown } from "@machine-violet/shared/types/engine.js";
+export type { TierTokens, TokenBreakdown } from "@machine-violet/shared/types/engine.js";
 
 // --- Formatting helpers ---
 

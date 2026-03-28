@@ -2,7 +2,8 @@ import type { ModelId } from "../agents/agent-loop.js";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-export type ModelTier = "large" | "medium" | "small";
+import type { ModelTier } from "@machine-violet/shared/types/engine.js";
+export type { ModelTier } from "@machine-violet/shared/types/engine.js";
 
 export type EffortLevel = "low" | "medium" | "high" | "max";
 

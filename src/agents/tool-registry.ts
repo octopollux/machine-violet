@@ -11,13 +11,8 @@ export interface RegisteredTool {
   handler: (state: GameState, input: Record<string, unknown>) => ToolResult;
 }
 
-export interface ToolResult {
-  content: string;
-  is_error?: boolean;
-  /** TUI command payload, kept out of conversation. When set, agent-session
-   *  uses this for the TUI command instead of parsing `content`. */
-  _tui?: Record<string, unknown>;
-}
+import type { ToolResult } from "@machine-violet/shared/types/engine.js";
+export type { ToolResult } from "@machine-violet/shared/types/engine.js";
 
 // --- Imports from T1 tools ---
 
