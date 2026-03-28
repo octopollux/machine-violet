@@ -1,283 +1,159 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+/**
+ * PlayingPhase — client-side game interaction.
+ *
+ * In the two-tier architecture, this component is dramatically simpler
+ * than the monolith version. All game logic lives on the server:
+ *
+ * - Player input → POST /session/turn/contribute
+ * - Slash commands → POST /session/command/:name
+ * - Modal responses → POST /session/modal/:id/respond
+ * - OOC/Dev mode → POST /session/command/ooc or /dev (server manages session)
+ * - Narrative, modals, state → arrive via WebSocket events
+ *
+ * The component just renders what the server says and sends what the player types.
+ */
+import React, { useState, useRef, useCallback } from "react";
 import { useInput, Box } from "ink";
-import { appendDelta } from "../tui/narrative-helpers.js";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
 import { scrollAmount, TerminalTooSmall, buildModelineDisplay, splitModeline } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, narrativeRows, choiceRowBudget } from "../tui/responsive.js";
 import { getActivity } from "../tui/activity.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { Layout } from "../tui/layout.js";
-import { ChoiceOverlay, DESCRIPTION_ROWS, DiceRollModal, SessionRecapModal, RollbackSummaryModal, GameMenu, CharacterSheetModal, CompendiumModal, PlayerNotesModal, ApiErrorModal, SwatchModal, CampaignSettingsModal } from "../tui/modals/index.js";
+import {
+  ChoiceOverlay, DESCRIPTION_ROWS, DiceRollModal, SessionRecapModal,
+  RollbackSummaryModal, GameMenu, CharacterSheetModal, CompendiumModal,
+  PlayerNotesModal, ApiErrorModal, SwatchModal, CampaignSettingsModal,
+} from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
-import { getActivePlayer, switchToNextPlayer, getPlayerEntries } from "../agents/player-manager.js";
-import { createOOCSession } from "../agents/subagents/ooc-mode.js";
-import { createDevSession, summarizeGameState } from "../agents/subagents/dev-mode.js";
 import { useGameContext } from "../tui/game-context.js";
-import { campaignPaths } from "../tools/filesystem/index.js";
-import { emptyCompendium, parseCompendiumOutput } from "../agents/subagents/compendium-updater.js";
-import { trySlashCommand } from "../commands/index.js";
-import { RollbackCompleteError } from "../teardown.js";
 
 export function PlayingPhase() {
   const {
-    engineRef, gameStateRef, clientRef, costTracker,
+    apiClient,
     narrativeLines, setNarrativeLines,
-    theme, variant, setVariant,
+    theme, variant,
     campaignName, activePlayerIndex, setActivePlayerIndex,
     engineState, toolGlyphs, resources, modelines,
     activeModal, setActiveModal,
-    activeSession, setActiveSession, previousVariantRef,
-    devModeEnabled,
+    currentTurn, mode, stateSnapshot,
     retryOverlay,
-    dispatchTuiCommand, onReturnToMenu, onRollbackReturn, onEndSessionAndReturn,
+    onReturnToMenu,
   } = useGameContext();
   const { columns: cols, rows } = useTerminalSize();
   const tooSmall = cols < MIN_COLUMNS || rows < MIN_ROWS;
 
-  // Sync terminal dimensions to engine for length steering.
-  // Compute from base rows (no modal subtraction) — this is the steady-state
-  // narrative area the DM should target.
-  useEffect(() => {
-    const engine = engineRef.current;
-    if (!engine) return;
-    const tier = getViewportTier({ columns: cols, rows });
-    const elements = getVisibleElements(tier);
-    const narRows = narrativeRows(rows, elements, false, 2, 2);
-    engine.setTerminalDims({ columns: cols, rows, narrativeRows: narRows });
-  }, [cols, rows, engineRef]);
-
-  // Local state — only used within playing phase input/render
+  // Local state
   const [resetKey, setResetKey] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [modeBusy, setModeBusy] = useState(false);
-  const [campaignSettingsOpen, setCampaignSettingsOpen] = useState(false);
 
-  const clearInput = useCallback(() => {
-    setResetKey((k) => k + 1);
-  }, []);
+  const clearInput = useCallback(() => setResetKey((k) => k + 1), []);
 
   const narrativeRef = useRef<NarrativeAreaHandle>(null);
   const modalScrollRef = useRef<CenteredModalHandle>(null);
   const escTimestamps = useRef<number[]>([]);
-  const oocSummaries = useRef<string[]>([]);
 
   // Whether TextInput should be disabled
   const textInputDisabled =
     !!activeModal ||
     !!retryOverlay ||
     menuOpen ||
-    (!!activeSession && modeBusy);
+    engineState === "dm_thinking" ||
+    engineState === "tool_running";
 
-  // Helper to exit active session mode.
-  // Pass silent=true for agent-initiated exits (END_OOC) to skip the system line.
-  const exitActiveSession = useCallback((silent = false) => {
-    if (!activeSession) return;
-    const label = activeSession.label;
-    // Flush accumulated OOC summaries to the engine for injection into the next DM turn
-    if (label === "OOC" && oocSummaries.current.length > 0) {
-      if (engineRef.current) {
-        engineRef.current.setPendingOOCSummary(
-          oocSummaries.current.join("\n"),
-        );
-      }
-      oocSummaries.current = [];
-    }
-    setActiveSession(null);
-    setVariant(previousVariantRef.current);
-    if (!silent) {
-      setNarrativeLines((prev) => [...prev, { kind: "system", text: `[Exiting ${label} Mode]` }, { kind: "dm", text: "" }]);
-    }
-  }, [activeSession, setActiveSession, setVariant, previousVariantRef, setNarrativeLines, engineRef]);
+  // Resolve player info from state snapshot
+  const players = stateSnapshot?.players?.map((p) => ({
+    name: p.character,
+    isAI: p.type === "ai",
+  })) ?? [{ name: "Player", isAI: false }];
+  const activeChar = players[activePlayerIndex]?.name ?? "Player";
 
-  // --- Submit handler for TextInput ---
-  const handleSubmit = useCallback((value: string) => {
-    // Empty Enter retries the last failed DM turn (if one is pending)
-    if (!value.trim()) {
-      if (engineRef.current?.hasPendingRetry()) {
-        engineRef.current.retryLastTurn();
-        clearInput();
-      }
-      return;
-    }
+  // --- Submit handler ---
+  const handleSubmit = useCallback(async (value: string) => {
     const text = value.trim();
+    if (!text) return;
 
-    if (trySlashCommand(text, {
-      engine: engineRef.current,
-      gameState: gameStateRef.current,
-      client: clientRef.current,
-      appendLine: (line) => setNarrativeLines((prev) => [...prev, line]),
-      activeSession,
-      setActiveSession,
-      variant,
-      setVariant,
-      previousVariant: previousVariantRef.current,
-      setPreviousVariant: (v) => { previousVariantRef.current = v; },
-      dispatchTuiCommand,
-      setActiveModal,
-      onReturnToMenu,
-      onRollbackComplete: (summary: string) => setActiveModal({ kind: "rollback", summary }),
-    })) {
+    // Slash commands → REST
+    if (text.startsWith("/")) {
+      const spaceIdx = text.indexOf(" ");
+      const name = spaceIdx === -1 ? text.slice(1) : text.slice(1, spaceIdx);
+      const args = spaceIdx === -1 ? undefined : text.slice(spaceIdx + 1).trim();
+
+      setNarrativeLines((prev) => [...prev, { kind: "system", text: `/${name}${args ? " " + args : ""}` }]);
+
+      try {
+        await apiClient.command(name, args);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setNarrativeLines((prev) => [...prev, { kind: "system", text: `[Error: ${msg}]` }]);
+      }
       clearInput();
       return;
     }
 
-    if (activeSession) {
-      setNarrativeLines((prev) => [...prev, { kind: "separator", text: "" }, { kind: "player", text: `> ${text}` }, { kind: "dm", text: "" }]);
-      setModeBusy(true);
-      activeSession.send(text, (delta) => {
-        setNarrativeLines((prev) => appendDelta(prev, delta, "dm"));
-      }).then((result) => {
-        setModeBusy(false);
-        setNarrativeLines((prev) => [...prev, { kind: "dm", text: "" }]);
-        const ct = costTracker.current;
-        if (ct) {
-          ct.record(result.usage, activeSession.tier);
-          engineRef.current?.getPersister()?.persistUsage(ct.getBreakdown());
-        }
-        // Accumulate OOC summaries for injection into the next DM turn
-        if (activeSession.label === "OOC" && result.summary) {
-          oocSummaries.current.push(result.summary);
-        }
-        // Auto-exit if the OOC agent signaled END_OOC
-        if (result.endSession) {
-          exitActiveSession(true);
-          // Forward in-character action to DM if provided
-          if (result.playerAction && engineRef.current && gameStateRef.current) {
-            const active = getActivePlayer(gameStateRef.current);
-            engineRef.current.processInput(active.characterName, result.playerAction);
-          }
-        }
-      }).catch((err: unknown) => {
-        setModeBusy(false);
-        if (err instanceof RollbackCompleteError) {
-          setActiveModal({ kind: "rollback", summary: err.summary });
-          return;
-        }
-        const msg = err instanceof Error ? err.message : String(err);
-        setNarrativeLines((prev) => [...prev, { kind: "system", text: `[${activeSession.label} error: ${msg}]` }, { kind: "dm", text: "" }]);
-      });
-    } else {
-      if (engineRef.current && gameStateRef.current) {
-        const active = getActivePlayer(gameStateRef.current);
-        engineRef.current.processInput(active.characterName, text);
-      }
+    // Regular input → contribute to current turn
+    setNarrativeLines((prev) => [
+      ...prev,
+      { kind: "separator", text: "" },
+      { kind: "player", text: `[${activeChar}] ${text}` },
+      { kind: "dm", text: "" },
+    ]);
+
+    try {
+      await apiClient.contribute(text);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setNarrativeLines((prev) => [...prev, { kind: "system", text: `[Error: ${msg}]` }]);
     }
 
     clearInput();
-  }, [activeSession, exitActiveSession, clearInput, variant, setActiveSession, setVariant, setNarrativeLines]);
+  }, [apiClient, activeChar, setNarrativeLines, clearInput]);
 
-  // --- Menu dispatch: called by GameMenu when a menu item is selected ---
-  const handleMenuSelect = useCallback((item: string) => {
-    setMenuOpen(false);
-    if (item === "Resume") {
-      // just close menu
-    } else if (item === "Save & Exit") {
-      onReturnToMenu();
-    } else if (item === "End Session") {
-      onEndSessionAndReturn();
-    } else if (item === "Character Sheet") {
-      const gs = gameStateRef.current;
-      if (gs) {
-        const active = getActivePlayer(gs);
-        dispatchTuiCommand({ type: "show_character_sheet", character: active.characterName });
-      }
-    } else if (item === "Compendium") {
-      const gs = gameStateRef.current;
-      const io = engineRef.current?.getSceneManager().getFileIO();
-      if (gs && io) {
-        const path = campaignPaths(gs.campaignRoot).compendium;
-        io.readFile(path).then((raw: string) => {
-          const data = parseCompendiumOutput(raw, emptyCompendium());
-          setActiveModal({ kind: "compendium", data });
-        }).catch(() => {
-          setActiveModal({ kind: "compendium", data: emptyCompendium() });
-        });
-      } else {
-        setActiveModal({ kind: "compendium", data: emptyCompendium() });
-      }
-    } else if (item === "Player Notes") {
-      const gs = gameStateRef.current;
-      const io = engineRef.current?.getSceneManager().getFileIO();
-      if (gs && io) {
-        const path = campaignPaths(gs.campaignRoot).playerNotes;
-        io.readFile(path).then((raw: string) => {
-          setActiveModal({ kind: "notes", content: raw });
-        }).catch(() => {
-          setActiveModal({ kind: "notes", content: "" });
-        });
-      } else {
-        setActiveModal({ kind: "notes", content: "" });
-      }
-    } else if (item === "OOC Mode") {
-      if ((activeSession as null | { label: string })?.label === "OOC") {
-        exitActiveSession();
-      } else {
-        if (clientRef.current && gameStateRef.current) {
-          previousVariantRef.current = variant;
-          const gs = gameStateRef.current;
-          const engine = engineRef.current;
-          const sm = engine?.getSceneManager();
-          setActiveSession(createOOCSession(clientRef.current, {
-            campaignName: gs.config.name,
-            previousVariant: variant,
-            config: gs.config,
-            sessionState: sm?.getSessionState(),
-            repo: engine?.getRepo() ?? undefined,
-            fileIO: sm?.getFileIO(),
-            campaignRoot: gs.campaignRoot,
-          }));
-          setVariant("ooc");
-          setNarrativeLines((prev) => [...prev, { kind: "system", text: "[OOC Mode \u2014 type to chat, ESC to exit]" }, { kind: "dm", text: "" }]);
-        }
-      }
-    } else if (item === "Settings") {
-      setCampaignSettingsOpen(true);
-    } else if (item === "Dev Mode") {
-      if ((activeSession as null | { label: string })?.label === "Dev") {
-        exitActiveSession();
-      } else {
-        if (clientRef.current && gameStateRef.current) {
-          previousVariantRef.current = variant;
-          const gs = gameStateRef.current;
-          setActiveSession(createDevSession(clientRef.current, {
-            campaignName: gs.config.name,
-            gameStateSummary: summarizeGameState(gs),
-            gameState: gs,
-            fileIO: engineRef.current?.getSceneManager().getFileIO(),
-            sceneManager: engineRef.current?.getSceneManager(),
-            repo: engineRef.current?.getRepo() ?? undefined,
-            onTuiCommand: (cmd) => dispatchTuiCommand(cmd),
-          }));
-          setVariant("dev");
-          setNarrativeLines((prev) => [...prev, { kind: "system", text: "[Dev Mode \u2014 type to inspect, ESC to exit]" }, { kind: "dm", text: "" }]);
-        }
-      }
-    }
-  }, [activeSession, exitActiveSession, variant, setActiveSession, setVariant, setNarrativeLines,
-    onReturnToMenu, onEndSessionAndReturn, dispatchTuiCommand, setActiveModal,
-    engineRef, gameStateRef, clientRef, previousVariantRef, setCampaignSettingsOpen]);
-
-  // --- Choice overlay callbacks ---
-  const handleChoiceSelect = useCallback((choice: string) => {
+  // --- Choice selection ---
+  const handleChoiceSelect = useCallback(async (choice: string) => {
+    const modal = activeModal;
     setActiveModal(null);
-    if (engineRef.current && gameStateRef.current) {
-      const active = getActivePlayer(gameStateRef.current);
-      engineRef.current.processInput(active.characterName, choice);
-    }
-  }, [setActiveModal, engineRef, gameStateRef]);
 
-  const handleChoiceDismiss = useCallback(() => {
-    setActiveModal(null);
-  }, [setActiveModal]);
+    // Send choice as a turn contribution
+    try {
+      await apiClient.contribute(choice);
+    } catch {
+      // Error handling via WS error events
+    }
+  }, [apiClient, activeModal, setActiveModal]);
+
+  const handleChoiceDismiss = useCallback(() => setActiveModal(null), [setActiveModal]);
 
   const handleNarrativeScroll = useCallback((direction: number) => {
     const step = scrollAmount(rows);
     narrativeRef.current?.scrollBy(direction < 0 ? -step : step);
   }, [rows]);
 
-  // --- Input handling — only non-modal keys remain here ---
+  // --- Menu ---
+  const handleMenuSelect = useCallback(async (item: string) => {
+    setMenuOpen(false);
+    if (item === "Resume") return;
+    if (item === "Save & Exit" || item === "End Session") {
+      try {
+        await apiClient.endSession();
+      } catch { /* ignore */ }
+      onReturnToMenu();
+    } else if (item === "OOC Mode") {
+      await apiClient.command("ooc");
+    } else if (item === "Dev Mode") {
+      await apiClient.command("dev");
+    } else if (item === "Character Sheet") {
+      await apiClient.command("sheet");
+    } else if (item === "Compendium") {
+      await apiClient.command("compendium");
+    } else if (item === "Player Notes") {
+      await apiClient.command("notes");
+    }
+  }, [apiClient, onReturnToMenu]);
+
+  // --- Input handling ---
   useInput((_input, key) => {
-    // Triple-ESC reset: 3 ESC presses within 1.5s clears all overlay state
+    // Triple-ESC reset
     if (key.escape) {
       const now = Date.now();
       escTimestamps.current.push(now);
@@ -286,32 +162,21 @@ export function PlayingPhase() {
         escTimestamps.current = [];
         setActiveModal(null);
         setMenuOpen(false);
-        setCampaignSettingsOpen(false);
-        if (activeSession) {
-          exitActiveSession();
+        if (mode === "ooc" || mode === "dev") {
+          apiClient.command("exit_mode").catch(() => {});
         }
         return;
       }
     }
 
-    // All overlays handle their own input — block here
-    if (retryOverlay) return;
-    if (activeModal) return;
-    if (campaignSettingsOpen) return;
-    if (menuOpen) return;
+    if (retryOverlay || activeModal || menuOpen) return;
 
-    // Active session mode (OOC/Dev): ESC exits, PageUp/PageDown scrolls
-    if (activeSession) {
+    // In OOC/Dev mode: ESC exits
+    if (mode === "ooc" || mode === "dev") {
       if (key.escape) {
-        exitActiveSession();
+        apiClient.command("exit_mode").catch(() => {});
         return;
       }
-      if (key.pageUp || key.pageDown) {
-        const step = scrollAmount(rows);
-        narrativeRef.current?.scrollBy(key.pageUp ? -step : step);
-        return;
-      }
-      return;
     }
 
     // ESC opens game menu
@@ -320,18 +185,10 @@ export function PlayingPhase() {
       return;
     }
 
-    // Tab: cycle player
-    if (key.tab && gameStateRef.current) {
-      const next = switchToNextPlayer(gameStateRef.current);
-      setActivePlayerIndex(next.index);
-      return;
-    }
-
     // Scroll keys
     if (key.pageUp || key.pageDown) {
       const step = scrollAmount(rows);
       narrativeRef.current?.scrollBy(key.pageUp ? -step : step);
-      return;
     }
   });
 
@@ -340,55 +197,35 @@ export function PlayingPhase() {
     return <TerminalTooSmall columns={cols} rows={rows} />;
   }
 
-  const gs = gameStateRef.current;
-  const players = gs ? getPlayerEntries(gs) : [{ name: "Player", isAI: false }];
-  const activeChar = gs ? getActivePlayer(gs).characterName : "Player";
-
+  // Modal height calculation
   const modalHeight = (() => {
     if (!activeModal) return 0;
-    switch (activeModal.kind) {
-      case "choice":
-        return 0; // choice overlay lives inside the Player Pane
-      case "dice":
-        return 8 + 2;
-      case "recap":
-        return 0;
-      default:
-        return 0;
-    }
+    if ("kind" in activeModal && activeModal.kind === "dice") return 10;
+    if ("type" in activeModal && activeModal.type === "dice-roll") return 10;
+    return 0;
   })();
   const layoutRows = rows - modalHeight;
 
-  // Compute conversation pane dimensions for modal sizing/centering
   const tier = getViewportTier({ columns: cols, rows: layoutRows });
   const visibleElements = getVisibleElements(tier);
-  const narRows = narrativeRows(layoutRows, visibleElements, activeModal?.kind === "choice", theme.asset.height, players.length);
+  const narRows = narrativeRows(layoutRows, visibleElements, false, theme.asset.height, players.length);
   const conversationPaneTop = visibleElements.topFrame ? theme.asset.height : 0;
 
-  // Build overlay for choice modal (replaces Player Pane content)
-  const choiceHasDescriptions = activeModal?.kind === "choice"
-    && activeModal.descriptions != null && activeModal.descriptions.length > 0;
-  const paneExtraHeight = choiceHasDescriptions ? DESCRIPTION_ROWS : 0;
+  // Choice overlay (from either old ActiveModal or new Modal format)
+  const isChoice = activeModal &&
+    (("kind" in activeModal && activeModal.kind === "choice") ||
+     ("type" in activeModal && activeModal.type === "choice"));
 
-  // Compute dynamic max choice rows to fill available Player Pane space
-  let choiceMaxRows: number | undefined;
-  if (activeModal?.kind === "choice") {
-    const activity = getActivity(engineState);
-    const actGlyph = visibleElements.activityGlyphInModeline ? activity?.glyph : undefined;
-    const mlDisplay = buildModelineDisplay(modelines[activeChar] ?? campaignName, actGlyph);
-    const mlLineCount = splitModeline(mlDisplay, cols).length;
-    choiceMaxRows = choiceRowBudget(visibleElements, mlLineCount, choiceHasDescriptions, DESCRIPTION_ROWS);
-  }
+  const choiceData = isChoice ? activeModal as { prompt?: string; choices?: string[]; descriptions?: string[] } : null;
 
-  const choiceOverlay = activeModal?.kind === "choice" ? (
+  const choiceOverlay = choiceData ? (
     <ChoiceOverlay
       width={cols - 4}
-      prompt={activeModal.prompt}
-      choices={activeModal.choices}
-      descriptions={activeModal.descriptions}
-      accentColor={gameStateRef.current?.config.players[activePlayerIndex]?.color}
-      maxChoiceRows={choiceMaxRows}
-      initialIndex={activeModal.choices.length < 5 ? activeModal.choices.length : 0}
+      prompt={choiceData.prompt ?? ""}
+      choices={choiceData.choices ?? []}
+      descriptions={choiceData.descriptions}
+      maxChoiceRows={choiceRowBudget(visibleElements, 1, false, DESCRIPTION_ROWS)}
+      initialIndex={0}
       onSelect={handleChoiceSelect}
       onDismiss={handleChoiceDismiss}
       onNarrativeScroll={handleNarrativeScroll}
@@ -414,115 +251,23 @@ export function PlayingPhase() {
         engineState={engineState}
         toolGlyphs={toolGlyphs}
         quoteColor="#ffffff"
-        playerColor={gameStateRef.current?.config.players[activePlayerIndex]?.color}
-        turnIndicatorColor={engineState === "waiting_input" ? gameStateRef.current?.config.players[activePlayerIndex]?.color : undefined}
         narrativeRef={narrativeRef}
         mouseScrollOverrideRef={modalScrollRef}
-        hideInputLine={activeModal?.kind === "choice"}
+        hideInputLine={!!isChoice}
         playerPaneOverlay={choiceOverlay}
-        playerPaneExtraHeight={paneExtraHeight}
       />
-      {activeModal?.kind === "dice" && (
-        <DiceRollModal
-          theme={theme}
-          width={cols}
-          expression={activeModal.expression}
-          rolls={activeModal.rolls}
-          kept={activeModal.kept}
-          total={activeModal.total}
-          reason={activeModal.reason}
-          onDismiss={() => setActiveModal(null)}
-        />
-      )}
-      {activeModal?.kind === "swatch" && (
-        <SwatchModal theme={theme} width={cols} height={narRows} topOffset={conversationPaneTop} onDismiss={() => setActiveModal(null)} />
-      )}
-      {activeModal?.kind === "rollback" && (
-        <RollbackSummaryModal
-          theme={theme}
-          width={cols}
-          height={narRows}
-          summary={activeModal.summary}
-          onDismiss={() => { setActiveModal(null); onRollbackReturn(); }}
-          topOffset={conversationPaneTop}
-        />
-      )}
-      {activeModal?.kind === "recap" && (
-        <SessionRecapModal
-          theme={theme}
-          width={cols}
-          height={narRows}
-          lines={activeModal.lines}
-          onDismiss={() => setActiveModal(null)}
-          scrollRef={modalScrollRef}
-          topOffset={conversationPaneTop}
-        />
-      )}
-      {activeModal?.kind === "character_sheet" && (
-        <CharacterSheetModal
-          theme={theme}
-          width={cols}
-          height={narRows}
-          content={activeModal.content}
-          onDismiss={() => setActiveModal(null)}
-          scrollRef={modalScrollRef}
-          topOffset={conversationPaneTop}
-        />
-      )}
-      {activeModal?.kind === "compendium" && (
-        <CompendiumModal
-          theme={theme}
-          width={cols}
-          height={narRows}
-          data={activeModal.data}
-          onClose={() => setActiveModal(null)}
-          topOffset={conversationPaneTop}
-        />
-      )}
-      {activeModal?.kind === "notes" && (
-        <PlayerNotesModal
-          theme={theme}
-          width={cols}
-          height={narRows}
-          initialContent={activeModal.content}
-          onSave={(content) => {
-            const gs = gameStateRef.current;
-            const io = engineRef.current?.getSceneManager().getFileIO();
-            if (gs && io) {
-              const path = campaignPaths(gs.campaignRoot).playerNotes;
-              io.writeFile(path, content);
-            }
-          }}
-          onClose={() => setActiveModal(null)}
-          topOffset={conversationPaneTop}
-        />
-      )}
       {retryOverlay && (
-        <ApiErrorModal
-          theme={theme}
-          width={cols}
-          height={rows}
-          overlay={retryOverlay}
-        />
-      )}
-      {campaignSettingsOpen && gameStateRef.current && (
-        <CampaignSettingsModal
-          theme={theme}
-          width={cols}
-          height={rows}
-          config={gameStateRef.current.config}
-          onDismiss={() => { setCampaignSettingsOpen(false); setMenuOpen(true); }}
-        />
+        <ApiErrorModal theme={theme} width={cols} height={rows} overlay={retryOverlay} />
       )}
       {menuOpen && (
         <GameMenu
           theme={theme}
           width={cols}
           height={rows}
-          oocActive={activeSession?.label === "OOC"}
-          devModeEnabled={devModeEnabled}
-          devActive={activeSession?.label === "Dev"}
-          tokenSummary={costTracker.current?.formatTokens() ?? ""}
+          oocActive={mode === "ooc"}
+          devModeEnabled={true}
+          devActive={mode === "dev"}
+          tokenSummary=""
           onSelect={handleMenuSelect}
           onDismiss={() => setMenuOpen(false)}
         />
