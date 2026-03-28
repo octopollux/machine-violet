@@ -1,0 +1,16 @@
+{
+  "name": "@machine-violet/client-ink",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "dev": "cross-env DEV_MODE=true node --max-semi-space-size=16 --import tsx/esm src/index.tsx"
+  },
+  "dependencies": {
+    "@machine-violet/shared": "*"
+  }
+}

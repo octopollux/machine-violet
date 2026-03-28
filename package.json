@@ -58,6 +58,7 @@
     "vitest": "^4.0.18"
   },
   "workspaces": [
+    "packages/*",
     "tools/campaign-explorer"
   ],
   "engines": {
