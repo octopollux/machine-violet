@@ -1,0 +1,86 @@
+<!-- Gothic Theme
+     Dark, ornate border style for grimdark/horror campaigns.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: gothic
+@genre_tags: grimdark, horror, dark_fantasy
+@height: 2
+
+[colors]
+preset: ember
+harmony: analogous
+gradient: vignette
+border: 2
+corner: 3
+separator: 4
+title: 5
+turn_indicator: 6
+side_frame: 1
+
+[variant_combat]
+<!-- Ominous hue shifting during combat -->
+preset: ember
+border: 6
+corner: 7
+gradient: hueShift
+
+[variant_ooc]
+<!-- Flat, calm for meta discussion -->
+preset: ethereal
+border: 1
+corner: 2
+gradient: none
+
+[corner_tl]
+╔═
+║
+
+[corner_tr]
+═╗
+ ║
+
+[corner_bl]
+║
+╚═
+
+[corner_br]
+ ║
+═╝
+
+[edge_top]
+══
+
+[edge_bottom]
+══
+-
+
+[edge_left]
+║
+║
+
+[edge_right]
+║
+║
+
+[separator_left_top]
+═╡
+
+[separator_right_top]
+╞═
+
+[separator_left_bottom]
+ │
+═╡
+
+[separator_right_bottom]
+│
+╞═
+
+[turn_separator]
+··══───── † ─────══··
