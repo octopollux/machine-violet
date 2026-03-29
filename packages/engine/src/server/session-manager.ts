@@ -149,6 +149,13 @@ export class SessionManager {
     this.currentMode = "setup";
     this.campaignId = "__setup__";
 
+    // Dev mode: context dumps for setup (no campaign root, use home dir)
+    const { isDevMode } = await import("../config/dev-mode.js");
+    if (isDevMode()) {
+      const { setContextDumpDir } = await import("../config/context-dump.js");
+      setContextDumpDir(join(homeDir, ".dev-mode", "setup-context"));
+    }
+
     // Initialize turn manager for setup input
     this.turnManager = new TurnManager((event) => this.broadcast(event));
     this.turnManager.setCommitHandler(async (contributions) => {
@@ -174,11 +181,14 @@ export class SessionManager {
   /** Resolve a choice during setup. */
   async resolveSetupChoice(selectedText: string): Promise<{ finalized?: string }> {
     if (!this.setupSession) throw new Error("No setup session.");
+    console.log(`[setup] resolveSetupChoice: "${selectedText.slice(0, 50)}"`);
     const result = await this.setupSession.resolveChoice(selectedText);
+    console.log(`[setup] resolveChoice returned: finalized=${!!result.finalized}`);
     if (result.finalized) {
       await this.transitionToGame(result.finalized);
       return { finalized: result.finalized };
     }
+    console.log(`[setup] opening next turn after choice resolution`);
     this.openNextTurn();
     return {};
   }

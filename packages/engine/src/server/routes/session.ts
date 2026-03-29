@@ -45,7 +45,8 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
       }
     }
     if (!turn || turn.status !== "open") {
-      return reply.status(400).send({ error: "No open turn." });
+      server.log.warn({ turnStatus: turn?.status ?? "null", turnId: turn?.id ?? "none" }, "Contribution rejected: no open turn");
+      return reply.status(400).send({ error: `No open turn. (status: ${turn?.status ?? "null"})` });
     }
 
     const { text } = request.body;
