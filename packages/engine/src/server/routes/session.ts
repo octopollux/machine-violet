@@ -126,14 +126,12 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
       const { id } = request.params;
       const { value } = request.body ?? {};
 
-      // During setup, resolve choice selections through the setup session
+      // During setup, resolve choice selections through the session manager
+      // (which handles turn lifecycle + game transition)
       const sm = server.sessionManager;
       const setup = sm.getSetupSession();
       if (setup && id === "setup-choice") {
-        const result = await setup.resolveChoice(String(value));
-        if (result.finalized) {
-          // Setup complete — session transitions to game automatically
-        }
+        await sm.resolveSetupChoice(String(value));
         return { ok: true };
       }
 
