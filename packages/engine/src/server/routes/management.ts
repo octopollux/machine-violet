@@ -56,12 +56,12 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
 
   function getConnections(): ConnectionStore {
     const stored = loadConnectionStore(server.configDir);
-    return buildEffectiveConnections(stored);
+    return buildEffectiveConnections(stored, server.configDir);
   }
 
   function persistAndReturn(store: ConnectionStore): ConnectionStore {
     saveConnectionStore(server.configDir, store);
-    return buildEffectiveConnections(loadConnectionStore(server.configDir));
+    return buildEffectiveConnections(loadConnectionStore(server.configDir), server.configDir);
   }
 
   function serializeConnection(c: { id: string; provider: string; label: string; apiKey: string; baseUrl?: string; models: unknown[]; source: string; addedAt: string }) {

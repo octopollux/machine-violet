@@ -137,11 +137,12 @@ export function ConnectionsPhase({
 
     // --- Connections section ---
     if (section === "connections") {
-      if (key.upArrow) setConnIndex((i) => Math.max(0, i - 1));
-      if (key.downArrow) setConnIndex((i) => Math.min(connections.length - 1, i + 1));
+      if (key.upArrow) { setConnIndex((i) => Math.max(0, i - 1)); return; }
+      if (key.downArrow) { setConnIndex((i) => Math.min(connections.length - 1, i + 1)); return; }
       if (input === "r" || input === "R") {
         const conn = connections[connIndex];
         if (conn) onCheckHealth(conn.id);
+        return;
       }
       if (input === "d" || input === "D") {
         const conn = connections[connIndex];
@@ -149,23 +150,26 @@ export function ConnectionsPhase({
           onRemoveConnection(conn.id);
           setConnIndex((i) => Math.max(0, i - 1));
         }
+        return;
       }
       if (key.return) {
-        // Enter on a connection → check health
         const conn = connections[connIndex];
         if (conn) onCheckHealth(conn.id);
+        return;
       }
+      return;
     }
 
     // --- Tiers section ---
     if (section === "tiers") {
       if (!tierEditing) {
-        if (key.upArrow) setTierIndex((i) => Math.max(0, i - 1));
-        if (key.downArrow) setTierIndex((i) => Math.min(2, i + 1));
+        if (key.upArrow) { setTierIndex((i) => Math.max(0, i - 1)); return; }
+        if (key.downArrow) { setTierIndex((i) => Math.min(2, i + 1)); return; }
         if (key.return && allModels.length > 0) {
           setTierEditing(true);
           setTierModelIndex(0);
         }
+        return;
       } else {
         if (key.upArrow) setTierModelIndex((i) => Math.max(0, i - 1));
         if (key.downArrow) setTierModelIndex((i) => Math.min(allModels.length - 1, i + 1));

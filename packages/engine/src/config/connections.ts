@@ -11,6 +11,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
+import { getModelsForProvider, getTierDefaults } from "./model-registry.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -99,18 +100,21 @@ export function saveConnectionStore(appDir: string, store: ConnectionStore): voi
 // Effective store (env + manual)
 // ---------------------------------------------------------------------------
 
-export function buildEffectiveConnections(stored: ConnectionStore): ConnectionStore {
+export function buildEffectiveConnections(stored: ConnectionStore, configDir?: string): ConnectionStore {
   const connections: AIConnection[] = [];
 
   // Environment: Anthropic
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (anthropicKey) {
+    const knownModels = getModelsForProvider("anthropic", configDir);
     connections.push({
       id: ENV_ANTHROPIC_ID,
       provider: "anthropic",
       label: "Anthropic (env)",
       apiKey: anthropicKey,
-      models: [],
+      models: Object.entries(knownModels).map(([id, m]) => ({
+        id, displayName: m.displayName, available: true,
+      })),
       source: "env",
       addedAt: "",
     });
@@ -119,29 +123,51 @@ export function buildEffectiveConnections(stored: ConnectionStore): ConnectionSt
   // Environment: OpenAI
   const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey) {
+    const knownModels = getModelsForProvider("openai", configDir);
     connections.push({
       id: ENV_OPENAI_ID,
       provider: "openai",
       label: "OpenAI (env)",
       apiKey: openaiKey,
-      models: [],
+      models: Object.entries(knownModels).map(([id, m]) => ({
+        id, displayName: m.displayName, available: true,
+      })),
       source: "env",
       addedAt: "",
     });
   }
 
-  // Manual connections
-  connections.push(...stored.connections.filter((c) => c.source !== "env"));
+  // Manual connections — auto-populate models if empty
+  for (const conn of stored.connections.filter((c) => c.source !== "env")) {
+    if (conn.models.length === 0) {
+      const knownModels = getModelsForProvider(conn.provider, configDir);
+      conn.models = Object.entries(knownModels).map(([id, m]) => ({
+        id, displayName: m.displayName, available: true,
+      }));
+    }
+    connections.push(conn);
+  }
 
-  // Resolve tier assignments: keep stored if connection+model still exist, else auto-assign
+  // Resolve tier assignments: keep stored if connection+model still exist
   const tierAssignments = { ...stored.tierAssignments };
   for (const tier of ["large", "medium", "small"] as const) {
     const assignment = tierAssignments[tier];
     if (assignment && connections.find((c) => c.id === assignment.connectionId)) {
       continue; // Valid assignment
     }
-    // Auto-assign: first Anthropic connection gets default Anthropic tiers
+
+    // Auto-assign from first connection that has provider tier defaults
     tierAssignments[tier] = null;
+    for (const conn of connections) {
+      const defaults = getTierDefaults(conn.provider, configDir);
+      if (defaults?.[tier]) {
+        const modelId = defaults[tier];
+        if (conn.models.find((m) => m.id === modelId)) {
+          tierAssignments[tier] = { connectionId: conn.id, modelId };
+          break;
+        }
+      }
+    }
   }
 
   return { connections, tierAssignments };

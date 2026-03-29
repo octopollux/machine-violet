@@ -228,7 +228,7 @@ export class SessionManager {
 
     // --- Resolve provider from connections ---
     const appConfigDir = configDir();
-    const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir));
+    const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
     const largeTier = getTierProvider(connStore, "large");
 
     // Create provider if a connection is assigned to the large tier
