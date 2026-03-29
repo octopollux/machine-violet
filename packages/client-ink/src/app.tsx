@@ -6,7 +6,7 @@
  *   If --campaign is provided, skips menu and goes straight to starting.
  */
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text } from "ink";
 import { useBatchedNarrativeLines } from "./tui/hooks/useBatchedNarrativeLines.js";
 import type { Modal } from "@machine-violet/shared";
 import { ApiClient } from "./api-client.js";
@@ -18,6 +18,8 @@ import {
 } from "./event-handler.js";
 import { GameProvider } from "./tui/game-context.js";
 import { PlayingPhase } from "./phases/PlayingPhase.js";
+import { MainMenuPhase } from "./phases/MainMenuPhase.js";
+import type { CampaignEntry } from "./phases/MainMenuPhase.js";
 import {
   loadThemeDefinition,
   resolveTheme,
@@ -48,86 +50,13 @@ export interface AppProps {
 
 type AppPhase = "connecting" | "menu" | "starting" | "playing" | "disconnected" | "error";
 
-interface CampaignItem {
-  id: string;
-  name: string;
-}
-
-// --- Campaign Menu Component ---
-
-function CampaignMenu({ campaigns, onSelect, onQuit }: {
-  campaigns: CampaignItem[];
-  onSelect: (id: string) => void;
-  onQuit: () => void;
-}) {
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const itemCount = campaigns.length + 1; // campaigns + Quit
-
-  useInput((_input, key) => {
-    if (key.upArrow) {
-      setSelectedIndex((i) => (i - 1 + itemCount) % itemCount);
-    } else if (key.downArrow) {
-      setSelectedIndex((i) => (i + 1) % itemCount);
-    } else if (key.return) {
-      if (selectedIndex < campaigns.length) {
-        onSelect(campaigns[selectedIndex].id);
-      } else {
-        onQuit();
-      }
-    } else if (_input === "q" || _input === "Q") {
-      onQuit();
-    }
-  });
-
-  return (
-    <Box flexDirection="column" paddingX={2} paddingY={1}>
-      <Box marginBottom={1}>
-        <Text bold color="cyan">Machine Violet</Text>
-      </Box>
-
-      {campaigns.length > 0 ? (
-        <>
-          <Box marginBottom={1}>
-            <Text dimColor>Select a campaign to resume:</Text>
-          </Box>
-          {campaigns.map((c, i) => (
-            <Box key={c.id}>
-              <Text
-                color={i === selectedIndex ? "cyan" : undefined}
-                bold={i === selectedIndex}
-              >
-                {i === selectedIndex ? " ▸ " : "   "}
-                {c.name}
-              </Text>
-            </Box>
-          ))}
-        </>
-      ) : (
-        <Box marginBottom={1}>
-          <Text dimColor>No campaigns found. Create one with the monolith first (npm run dev:monolith).</Text>
-        </Box>
-      )}
-
-      <Box marginTop={campaigns.length > 0 ? 1 : 0}>
-        <Text
-          color={selectedIndex === campaigns.length ? "red" : "gray"}
-          bold={selectedIndex === campaigns.length}
-        >
-          {selectedIndex === campaigns.length ? " ▸ " : "   "}
-          Quit
-        </Text>
-      </Box>
-    </Box>
-  );
-}
-
 // --- Main App ---
 
 export function App({ serverUrl, playerId, campaignId }: AppProps) {
   const [phase, setPhase] = useState<AppPhase>("connecting");
   const [errorMessage, setErrorMessage] = useState("");
   const [clientState, setClientState] = useState<ClientState>(initialClientState);
-  const [campaigns, setCampaigns] = useState<CampaignItem[]>([]);
+  const [campaigns, setCampaigns] = useState<CampaignEntry[]>([]);
   const [activeCampaignId, setActiveCampaignId] = useState(campaignId ?? "");
 
   // Theme state
@@ -197,7 +126,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
     setPhase("menu");
     // Refresh campaign list
     apiClientRef.current.listCampaigns().then((resp) => {
-      setCampaigns(resp.campaigns.map((c) => ({ id: c.id ?? c.name, name: c.name })));
+      setCampaigns(resp.campaigns.map((c) => ({ id: c.id ?? c.name, name: c.name, path: c.path ?? "" })));
     }).catch(() => { /* ignore */ });
   }, []);
 
@@ -215,7 +144,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
         } else {
           // Fetch campaigns and show menu
           api.listCampaigns().then((resp) => {
-            setCampaigns(resp.campaigns.map((c) => ({ id: c.id ?? c.name, name: c.name })));
+            setCampaigns(resp.campaigns.map((c) => ({ id: c.id ?? c.name, name: c.name, path: c.path ?? "" })));
             setPhase("menu");
           }).catch((err) => {
             setErrorMessage(err instanceof Error ? err.message : String(err));
@@ -269,9 +198,24 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
 
   if (phase === "menu") {
     return (
-      <CampaignMenu
+      <MainMenuPhase
+        theme={theme}
         campaigns={campaigns}
-        onSelect={startCampaign}
+        errorMsg={errorMessage || null}
+        apiKeyValid={true}
+        onNewCampaign={() => {
+          // TODO: campaign creation flow
+          setErrorMessage("Campaign creation not yet available in two-tier mode. Use npm run dev:monolith.");
+        }}
+        onResumeCampaign={(entry) => startCampaign(entry.id ?? entry.name)}
+        onArchiveCampaign={() => { /* TODO */ }}
+        onDeleteCampaign={() => { /* TODO */ }}
+        deleteModal={null}
+        onConfirmDelete={() => { /* no-op */ }}
+        onCancelDelete={() => { /* no-op */ }}
+        onAddContent={() => { /* TODO */ }}
+        onSettings={() => { /* TODO */ }}
+        onSettingsApiKeys={() => { /* TODO */ }}
         onQuit={() => process.exit(0)}
       />
     );

@@ -18,7 +18,6 @@
     "src/phases/ApiKeysPhase.tsx",
     "src/phases/ArchivedCampaignsPhase.tsx",
     "src/phases/DiscordSettingsPhase.tsx",
-    "src/phases/MainMenuPhase.tsx",
     "src/phases/SettingsPhase.tsx",
     "src/phases/AddContentPhase.tsx",
     "src/phases/UpdatePhase.tsx",

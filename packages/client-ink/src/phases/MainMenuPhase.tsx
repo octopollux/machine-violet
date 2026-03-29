@@ -1,14 +1,25 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useInput, Text, Box } from "ink";
-import type { CampaignEntry } from "../config/main-menu.js";
-import type { UpdateInfo } from "../config/updater.js";
-import type { CampaignDeleteInfo } from "../config/campaign-archive.js";
 import type { ResolvedTheme } from "../tui/themes/types.js";
 import { TerminalTooSmall, FullScreenFrame } from "../tui/components/index.js";
 import { DeleteCampaignModal } from "../tui/modals/index.js";
+import type { CampaignDeleteInfo } from "../tui/modals/DeleteCampaignModal.js";
 import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
+
+// Types inlined to avoid importing from engine config modules
+export interface CampaignEntry {
+  name: string;
+  path: string;
+  id?: string;
+}
+
+export interface UpdateInfo {
+  available: boolean;
+  currentVersion: string;
+  latestVersion: string;
+}
 
 /** Column indices for campaign sub-list navigation. */
 const COL_NAME = 0;

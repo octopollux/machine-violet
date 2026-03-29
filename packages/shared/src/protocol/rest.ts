@@ -11,6 +11,7 @@ import { Type, type Static } from "@sinclair/typebox";
 export const CampaignSummary = Type.Object({
   id: Type.String(),
   name: Type.String(),
+  path: Type.Optional(Type.String()),
   system: Type.Optional(Type.String()),
   genre: Type.Optional(Type.String()),
   createdAt: Type.Optional(Type.String()),
