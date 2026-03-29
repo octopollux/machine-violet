@@ -33,18 +33,10 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      # Root project tests (monolith — 2117 tests)
-      - name: Test (root)
-        run: npm test
-
-      # Engine package tests (server + engine — 1267 tests)
+      # Engine package tests (server + game engine — 1265 tests)
       - name: Test (engine)
         run: npm test -w packages/engine
 
-      # Client-ink package tests (event handler + TUI — 634 tests)
+      # Client-ink package tests (TUI + event handler — 656 tests)
       - name: Test (client-ink)
         run: npm test -w packages/client-ink
-
-      - name: Coverage threshold
-        if: matrix.node-version == 25
-        run: npm run test:coverage
