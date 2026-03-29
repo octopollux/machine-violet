@@ -233,13 +233,11 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
     );
   }
 
-  if (phase === "starting") {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Text>Loading campaign...</Text>
-      </Box>
-    );
-  }
+  // "starting" falls through to playing phase — PlayingPhase renders fine
+  // with empty narrative (themed frame, empty conversation area). No need
+  // for a separate loading screen that causes a visual flash.
+
+  if (phase !== "playing" && phase !== "starting") return null;
 
   // --- Playing phase ---
 
