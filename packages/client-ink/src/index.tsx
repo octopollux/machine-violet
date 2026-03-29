@@ -12,20 +12,7 @@
  *   MV_PLAYER   — Player name (default: "Player")
  *   MV_CAMPAIGN — Campaign ID to auto-start
  */
-import React from "react";
-import { render } from "ink";
-import { App } from "./app.js";
-import { installRawModeGuard } from "./tui/hooks/rawModeGuard.js";
-import { installSyncWriteCombiner } from "./tui/hooks/syncWriteCombiner.js";
-
-// Prevent stdin raw mode from ever being disabled while the TUI is running.
-// On Windows, even a momentary drop to cooked mode (during component unmount/
-// remount cycles) causes the console to stop forwarding keystrokes.
-const unlockRawMode = installRawModeGuard(process.stdin);
-
-// Combine Ink's separate BSU/content/ESU writes into single atomic stdout
-// writes so the terminal never displays intermediate states.
-const removeCombiner = installSyncWriteCombiner(process.stdout);
+import { startClient } from "./start-client.js";
 
 // --- Parse args ---
 function parseArgs(): { server: string; player: string; campaign?: string } {
@@ -51,19 +38,5 @@ function parseArgs(): { server: string; player: string; campaign?: string } {
 }
 
 const { server, player, campaign } = parseArgs();
-
-const { unmount, waitUntilExit } = render(
-  <App serverUrl={server} playerId={player} campaignId={campaign} />,
-  { exitOnCtrlC: true },
-);
-
-// Graceful shutdown
-process.on("SIGINT", () => {
-  unmount();
-});
-
-waitUntilExit().then(() => {
-  unlockRawMode();
-  removeCombiner();
-  process.exit(0);
-});
+const { waitUntilExit } = startClient({ server, player, campaign });
+await waitUntilExit();

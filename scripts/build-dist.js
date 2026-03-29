@@ -39,7 +39,7 @@ const versionArg = process.argv.find((a) => a.startsWith("--version="));
 const version = versionArg ? versionArg.split("=")[1] : pkg.version;
 
 const isWindows = process.platform === "win32";
-const exeName = isWindows ? "machine-violet.exe" : "machine-violet";
+const exeName = isWindows ? "MachineViolet.exe" : "MachineViolet";
 const exePath = join(DIST, exeName);
 
 console.log(`Building Machine Violet v${version}...`);
@@ -51,7 +51,7 @@ mkdirSync(DIST, { recursive: true });
 console.log("  Bundling with esbuild...");
 
 await build({
-  entryPoints: [join(ROOT, "src/index.tsx")],
+  entryPoints: [join(ROOT, "scripts/launcher.ts")],
   bundle: true,
   outfile: join(DIST, "bundle.js"),
   platform: "node",
@@ -180,8 +180,8 @@ rmSync(join(DIST, "bundle.js"), { force: true });
 
 // --- Step 3: Copy assets ---
 const assets = [
-  { src: "src/prompts", dest: "prompts" },
-  { src: "src/tui/themes/assets", dest: "themes" },
+  { src: "packages/engine/src/prompts", dest: "prompts" },
+  { src: "packages/client-ink/src/tui/themes/assets", dest: "themes" },
   { src: "systems", dest: "systems" },
 ];
 

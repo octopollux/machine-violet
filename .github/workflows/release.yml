@@ -111,7 +111,7 @@ jobs:
             --packVersion "$VERSION" \
             --packTitle "Machine Violet" \
             --packDir dist \
-            --mainExe machine-violet.exe \
+            --mainExe MachineViolet.exe \
             --icon assets/machine-violet.ico \
             --shortcuts StartMenuRoot \
             --azureTrustedSignFile assets/trusted-signing.json \
