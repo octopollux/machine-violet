@@ -60,13 +60,12 @@ export function ApiKeysPhase({
   const { handleKey: handleKeyInput } = useTextInput({ value: newKeyInput, onChange: setNewKeyInput });
   const { handleKey: handleLabelInput } = useTextInput({ value: newLabelInput, onChange: setNewLabelInput });
 
-  // Auto-check health for all keys on mount
-  const mountedRef = useRef(false);
+  // Auto-check health for keys without results (fires when store populates)
+  const checkedRef = useRef(new Set<string>());
   useEffect(() => {
-    if (mountedRef.current) return;
-    mountedRef.current = true;
     for (const entry of store.keys) {
-      if (!healthResults[entry.id]) {
+      if (!healthResults[entry.id] && !checkedRef.current.has(entry.id)) {
+        checkedRef.current.add(entry.id);
         onCheckHealth(entry.id, entry.key);
       }
     }
