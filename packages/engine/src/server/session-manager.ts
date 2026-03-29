@@ -159,9 +159,13 @@ export class SessionManager {
       }
     });
 
-    // Start the setup conversation
-    await this.setupSession.start();
-    this.openNextTurn();
+    // Start the setup conversation in the background — the REST response
+    // returns immediately so the client can show the playing UI and start
+    // receiving streamed narrative via WebSocket.
+    const setup = this.setupSession;
+    void setup.start().then(() => {
+      if (this.setupSession === setup) this.openNextTurn();
+    });
   }
 
   /** Resolve a choice during setup. */
