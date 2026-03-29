@@ -270,6 +270,7 @@ export function PlayingPhase() {
         engineState={engineState}
         toolGlyphs={toolGlyphs}
         quoteColor="#ffffff"
+        playerColor={stateSnapshot?.players?.[activePlayerIndex]?.color}
         narrativeRef={narrativeRef}
         mouseScrollOverrideRef={modalScrollRef}
         hideInputLine={!!isChoice}

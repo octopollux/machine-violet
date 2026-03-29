@@ -48,6 +48,7 @@ export class SessionManager {
   private gameState: GameState | null = null;
   private costTracker: CostTracker | null = null;
   private currentMode: "play" | "ooc" | "dev" | "setup" = "play";
+  private persistedUI: { themeName?: string; variant?: string; keyColor?: string; modelines?: Record<string, string> } = {};
 
   /** Campaign ID of the currently active session (null if none). */
   private campaignId: string | null = null;
@@ -297,6 +298,21 @@ export class SessionManager {
       gs.activePlayerIndex = loaded.scene.activePlayerIndex;
     }
 
+    // Capture persisted UI state (theme, modelines) for snapshots
+    if (loaded.ui) {
+      this.persistedUI = {
+        themeName: loaded.ui.styleName,
+        variant: loaded.ui.variant,
+        keyColor: loaded.ui.keyColor,
+        modelines: loaded.ui.modelines,
+      };
+    }
+
+    // Seed cost tracker from persisted usage
+    if (loaded.usage && this.costTracker) {
+      this.costTracker.seed(loaded.usage);
+    }
+
     // Seed conversation history
     if (loaded.conversation) {
       engine.seedConversation(loaded.conversation);
@@ -437,7 +453,10 @@ export class SessionManager {
       activePlayerIndex: gs?.activePlayerIndex ?? 0,
       displayResources: gs?.displayResources ?? {},
       resourceValues: gs?.resourceValues ?? {},
-      modelines: {},
+      modelines: this.persistedUI.modelines ?? {},
+      themeName: this.persistedUI.themeName,
+      variant: this.persistedUI.variant,
+      keyColor: this.persistedUI.keyColor,
       mode: this.currentMode,
     };
   }

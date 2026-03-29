@@ -152,6 +152,12 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
       if (next.narrativeLines !== prev.narrativeLines) setNarrativeLines(next.narrativeLines);
       if (next.activeModal !== prev.activeModal) setActiveModal(next.activeModal);
       if (next.variant !== prev.variant) setVariant(next.variant);
+      // Hydrate theme from state snapshot (persisted UI state from server)
+      if (next.stateSnapshot !== prev.stateSnapshot && next.stateSnapshot) {
+        const snap = next.stateSnapshot;
+        if (snap.keyColor) setKeyColor(snap.keyColor);
+        if (snap.variant) setVariant(snap.variant as StyleVariant);
+      }
       return next;
     });
   }, []);
