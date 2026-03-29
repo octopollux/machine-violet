@@ -35,7 +35,15 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
       return reply.status(400).send({ error: "No turn manager." });
     }
 
-    const turn = tm.getCurrentTurn();
+    // Wait briefly for a turn to be open (previous turn may still be processing)
+    let turn = tm.getCurrentTurn();
+    if (turn && turn.status === "processing") {
+      for (let i = 0; i < 50; i++) {
+        await new Promise((r) => setTimeout(r, 100));
+        turn = tm.getCurrentTurn();
+        if (!turn || turn.status === "open") break;
+      }
+    }
     if (!turn || turn.status !== "open") {
       return reply.status(400).send({ error: "No open turn." });
     }

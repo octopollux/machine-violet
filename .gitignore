@@ -145,3 +145,4 @@ vite.config.ts.timestamp-*
 # Runtime config files
 api-keys.json
 discord-settings.json
+connections.json
