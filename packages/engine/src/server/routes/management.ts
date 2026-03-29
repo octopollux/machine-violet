@@ -1,36 +1,46 @@
 /**
  * Management routes — pre-session operations for app configuration.
  *
- * These don't require an active game session. They manage API keys,
- * campaign archive/delete, and Discord settings.
+ * These don't require an active game session. They manage AI provider
+ * connections, campaign archive/delete, and Discord settings.
  *
  * Prefix: /manage
  *
- * API Keys:
- *   GET    /keys              — list all keys (masked)
- *   POST   /keys              — add a manual key
- *   DELETE /keys/:id          — remove a manual key
- *   POST   /keys/:id/activate — set as active key
- *   POST   /keys/:id/check    — health-check a key
+ * Connections:
+ *   GET    /connections                   — list all connections (masked keys)
+ *   POST   /connections                   — add a connection
+ *   DELETE /connections/:id               — remove a connection
+ *   POST   /connections/:id/check         — health-check a connection
+ *   PUT    /connections/:id/models        — update discovered models
+ *   GET    /tiers                         — get tier assignments
+ *   PUT    /tiers                         — set tier assignments
+ *   GET    /models                        — list all known models
+ *
+ * Legacy (backward compat):
+ *   GET    /keys                          — list connections as keys
+ *   POST   /keys/:id/check               — health-check via connection
  *
  * Campaign Ops:
- *   POST   /campaigns/:id/archive   — archive a campaign to zip
- *   DELETE /campaigns/:id            — permanently delete a campaign
- *   GET    /campaigns/archived       — list archived campaigns
+ *   POST   /campaigns/:id/archive        — archive a campaign to zip
+ *   DELETE /campaigns/:id                 — permanently delete a campaign
+ *   GET    /campaigns/archived            — list archived campaigns
  *   POST   /campaigns/archived/:name/restore — unarchive a campaign
- *   GET    /campaigns/:id/delete-info — get info for delete confirmation
+ *   GET    /campaigns/:id/delete-info     — get info for delete confirmation
  *
  * Discord:
- *   GET    /discord            — get Discord Rich Presence setting
- *   PUT    /discord            — update Discord Rich Presence setting
+ *   GET    /discord                       — get Discord Rich Presence setting
+ *   PUT    /discord                       — update Discord Rich Presence setting
  */
 import { join } from "node:path";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import {
-  loadKeyStore, saveKeyStore, buildEffectiveStore,
-  addKey, removeKey, setActiveKey, maskKey,
-} from "../../config/api-keys.js";
-import { checkKeyHealth, formatHealthStatus, formatRateLimits } from "../../config/api-key-health.js";
+  loadConnectionStore, saveConnectionStore, buildEffectiveConnections,
+  addConnection, removeConnection, setTierAssignment, updateConnectionModels,
+  maskKey,
+} from "../../config/connections.js";
+import type { ConnectionStore, TierAssignment } from "../../config/connections.js";
+import { createProviderFromConnection } from "../../providers/index.js";
+import { loadModelRegistry, getModelsForProvider } from "../../config/model-registry.js";
 import {
   archiveCampaign, deleteCampaign, listArchivedCampaigns,
   unarchiveCampaign, getCampaignDeleteInfo,
@@ -41,107 +51,165 @@ import { createArchiveFileIO } from "../fileio.js";
 export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstance) => {
 
   // -----------------------------------------------------------------------
-  // API Keys
+  // Connections
   // -----------------------------------------------------------------------
 
-  /** Helper: load effective store (env + manual keys). */
-  function getStore() {
-    const stored = loadKeyStore(server.configDir);
-    return buildEffectiveStore(stored);
+  function getConnections(): ConnectionStore {
+    const stored = loadConnectionStore(server.configDir);
+    return buildEffectiveConnections(stored);
   }
 
-  /** Helper: persist store and return effective store. */
-  function persistAndReturn(store: ReturnType<typeof buildEffectiveStore>) {
-    saveKeyStore(server.configDir, store);
-    return buildEffectiveStore(loadKeyStore(server.configDir));
+  function persistAndReturn(store: ConnectionStore): ConnectionStore {
+    saveConnectionStore(server.configDir, store);
+    return buildEffectiveConnections(loadConnectionStore(server.configDir));
   }
 
-  /** List all keys (masked). */
-  server.get("/keys", async () => {
-    const store = getStore();
+  function serializeConnection(c: { id: string; provider: string; label: string; apiKey: string; baseUrl?: string; models: unknown[]; source: string; addedAt: string }) {
     return {
-      keys: store.keys.map((k) => ({
-        id: k.id,
-        label: k.label,
-        masked: maskKey(k.key),
-        source: k.source,
-        addedAt: k.addedAt,
-        tokenBudget: k.tokenBudget,
-        isActive: k.id === store.activeKeyId,
-      })),
-      activeKeyId: store.activeKeyId,
+      id: c.id,
+      provider: c.provider,
+      label: c.label,
+      masked: maskKey(c.apiKey),
+      baseUrl: c.baseUrl,
+      models: c.models,
+      source: c.source,
+      addedAt: c.addedAt,
+    };
+  }
+
+  /** List all connections (masked keys). */
+  server.get("/connections", async () => {
+    const store = getConnections();
+    return {
+      connections: store.connections.map(serializeConnection),
+      tierAssignments: store.tierAssignments,
     };
   });
 
-  /** Add a manual key. */
-  server.post<{ Body: { key: string; label?: string } }>("/keys", async (request, reply) => {
-    const { key, label } = request.body ?? {};
-    if (!key || typeof key !== "string") {
-      return reply.status(400).send({ error: "Missing 'key' field." });
+  /** Add a connection. */
+  server.post<{ Body: { provider: string; apiKey: string; label?: string; baseUrl?: string } }>("/connections", async (request, reply) => {
+    const { provider, apiKey, label, baseUrl } = request.body ?? {};
+    if (!provider || !apiKey) {
+      return reply.status(400).send({ error: "Missing provider or apiKey." });
     }
 
-    let store = getStore();
-    store = addKey(store, key, label ?? "");
-    const effective = persistAndReturn(store);
+    let store = getConnections();
+    store = addConnection(store, provider as "anthropic" | "openai" | "openrouter" | "custom", apiKey, label ?? "", baseUrl);
 
+    // Auto-discover known models for this provider
+    const knownModels = getModelsForProvider(provider, server.configDir);
+    const newConn = store.connections[store.connections.length - 1];
+    store = updateConnectionModels(store, newConn.id, Object.entries(knownModels).map(([id, m]) => ({
+      id, displayName: m.displayName, available: true,
+    })));
+
+    const effective = persistAndReturn(store);
     return reply.status(201).send({
-      keys: effective.keys.map((k) => ({
-        id: k.id,
-        label: k.label,
-        masked: maskKey(k.key),
-        source: k.source,
-        isActive: k.id === effective.activeKeyId,
-      })),
-      activeKeyId: effective.activeKeyId,
+      connections: effective.connections.map(serializeConnection),
+      tierAssignments: effective.tierAssignments,
     });
   });
 
-  /** Remove a manual key. */
-  server.delete<{ Params: { id: string } }>("/keys/:id", async (request, reply) => {
+  /** Remove a connection. */
+  server.delete<{ Params: { id: string } }>("/connections/:id", async (request, reply) => {
     const { id } = request.params;
-    if (id === "env") {
-      return reply.status(400).send({ error: "Cannot remove environment key." });
+    if (id.startsWith("env-")) {
+      return reply.status(400).send({ error: "Cannot remove environment connection." });
     }
 
-    let store = getStore();
-    store = removeKey(store, id);
+    let store = getConnections();
+    store = removeConnection(store, id);
     const effective = persistAndReturn(store);
 
     return {
-      keys: effective.keys.map((k) => ({
-        id: k.id,
-        label: k.label,
-        masked: maskKey(k.key),
-        source: k.source,
-        isActive: k.id === effective.activeKeyId,
-      })),
-      activeKeyId: effective.activeKeyId,
+      connections: effective.connections.map(serializeConnection),
+      tierAssignments: effective.tierAssignments,
     };
   });
 
-  /** Activate a key. */
-  server.post<{ Params: { id: string } }>("/keys/:id/activate", async (request) => {
-    let store = getStore();
-    store = setActiveKey(store, request.params.id);
-    persistAndReturn(store);
-    return { ok: true, activeKeyId: store.activeKeyId };
-  });
-
-  /** Health-check a key. */
-  server.post<{ Params: { id: string } }>("/keys/:id/check", async (request, reply) => {
-    const store = getStore();
-    const entry = store.keys.find((k) => k.id === request.params.id);
-    if (!entry) {
-      return reply.status(404).send({ error: "Key not found." });
+  /** Health-check a connection. */
+  server.post<{ Params: { id: string } }>("/connections/:id/check", async (request, reply) => {
+    const store = getConnections();
+    const conn = store.connections.find((c) => c.id === request.params.id);
+    if (!conn) {
+      return reply.status(404).send({ error: "Connection not found." });
     }
 
-    const result = await checkKeyHealth(entry.key);
+    try {
+      const provider = createProviderFromConnection(conn);
+      const result = await provider.healthCheck();
+      return { id: conn.id, ...result };
+    } catch (err) {
+      return { id: conn.id, status: "error", message: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  /** Update discovered models on a connection. */
+  server.put<{ Params: { id: string }; Body: { models: { id: string; displayName: string; available: boolean }[] } }>("/connections/:id/models", async (request) => {
+    let store = getConnections();
+    store = updateConnectionModels(store, request.params.id, request.body?.models ?? []);
+    persistAndReturn(store);
+    return { ok: true };
+  });
+
+  /** Get tier assignments. */
+  server.get("/tiers", async () => {
+    const store = getConnections();
+    return { tierAssignments: store.tierAssignments };
+  });
+
+  /** Set tier assignments. */
+  server.put<{ Body: { large?: TierAssignment; medium?: TierAssignment; small?: TierAssignment } }>("/tiers", async (request) => {
+    let store = getConnections();
+    const body = request.body ?? {};
+    for (const tier of ["large", "medium", "small"] as const) {
+      const assignment = body[tier];
+      if (assignment) {
+        store = setTierAssignment(store, tier, assignment.connectionId, assignment.modelId);
+      }
+    }
+    persistAndReturn(store);
+    return { tierAssignments: store.tierAssignments };
+  });
+
+  /** List all known models from the registry. */
+  server.get("/models", async () => {
+    const registry = loadModelRegistry(server.configDir);
+    return { models: registry.models };
+  });
+
+  // -----------------------------------------------------------------------
+  // Legacy key endpoints (backward compat for existing client)
+  // -----------------------------------------------------------------------
+
+  server.get("/keys", async () => {
+    const store = getConnections();
     return {
-      id: entry.id,
-      status: result.status,
-      message: formatHealthStatus(result),
-      rateLimits: result.rateLimits ? formatRateLimits(result.rateLimits) : null,
+      keys: store.connections.map((c) => ({
+        id: c.id,
+        label: c.label,
+        masked: maskKey(c.apiKey),
+        source: c.source,
+        addedAt: c.addedAt,
+        isActive: false,
+      })),
+      activeKeyId: store.connections[0]?.id ?? null,
     };
+  });
+
+  server.post<{ Params: { id: string } }>("/keys/:id/check", async (request, reply) => {
+    const store = getConnections();
+    const conn = store.connections.find((c) => c.id === request.params.id);
+    if (!conn) {
+      return reply.status(404).send({ error: "Connection not found." });
+    }
+    try {
+      const provider = createProviderFromConnection(conn);
+      const result = await provider.healthCheck();
+      return { id: conn.id, ...result };
+    } catch (err) {
+      return { id: conn.id, status: "error", message: err instanceof Error ? err.message : String(err) };
+    }
   });
 
   // -----------------------------------------------------------------------
