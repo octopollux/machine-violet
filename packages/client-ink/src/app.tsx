@@ -136,6 +136,24 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
     });
   }, []);
 
+  /** Check active key health + Discord setting for main menu indicators. */
+  const refreshMenuStatus = useCallback(() => {
+    const api = apiClientRef.current;
+    api.listKeys().then((resp) => {
+      if (resp.activeKeyId) {
+        setApiKeyValid(true);
+        api.checkKeyHealth(resp.activeKeyId).then((h) => {
+          setApiKeyValid(h.status === "valid");
+          setApiKeyStatus(h.message);
+        }).catch(() => { /* ignore */ });
+      } else {
+        setApiKeyValid(false);
+        setApiKeyStatus("No API key configured");
+      }
+    }).catch(() => { /* ignore */ });
+    api.getDiscordSettings().then((s) => setDiscordEnabled(s.enabled)).catch(() => { /* ignore */ });
+  }, []);
+
   // Return to menu from playing
   const returnToMenu = useCallback(async () => {
     // Await endSession so the server fully tears down before we can start another
@@ -232,26 +250,6 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
     // Find what changed and make the appropriate REST call
     // For simplicity, refresh from server after any mutation
     setApiKeyStore(store);
-  }, []);
-
-  /** Check active key health + Discord setting for main menu indicators. */
-  const refreshMenuStatus = useCallback(() => {
-    const api = apiClientRef.current;
-    // Check active API key health
-    api.listKeys().then((resp) => {
-      if (resp.activeKeyId) {
-        setApiKeyValid(true); // has a key at least
-        api.checkKeyHealth(resp.activeKeyId).then((h) => {
-          setApiKeyValid(h.status === "valid");
-          setApiKeyStatus(h.message);
-        }).catch(() => { /* ignore */ });
-      } else {
-        setApiKeyValid(false);
-        setApiKeyStatus("No API key configured");
-      }
-    }).catch(() => { /* ignore */ });
-    // Check Discord setting
-    api.getDiscordSettings().then((s) => setDiscordEnabled(s.enabled)).catch(() => { /* ignore */ });
   }, []);
 
   const refreshCampaigns = useCallback(() => {
