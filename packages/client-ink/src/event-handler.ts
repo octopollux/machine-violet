@@ -25,6 +25,7 @@ import type {
   Modal,
 } from "@machine-violet/shared";
 import type { NarrativeLine, StyleVariant } from "@machine-violet/shared/types/tui.js";
+import { appendDelta } from "./tui/narrative-helpers.js";
 
 // --- State types that the handler manages ---
 
@@ -125,28 +126,13 @@ function handleNarrativeChunk(event: NarrativeChunkEvent, update: StateUpdater):
   const { text, kind } = event.data;
   const lineKind = (kind ?? "dm") as NarrativeLine["kind"];
 
-  update((prev) => {
-    const lines = [...prev.narrativeLines];
-    const lastLine = lines[lines.length - 1];
-
-    // Split incoming text on newlines to create proper line structure.
-    // Empty lines (from \n\n) are preserved as empty DM lines — these are
-    // paragraph boundaries that the formatting pipeline needs to reset tags.
-    const parts = text.split("\n");
-
-    for (let i = 0; i < parts.length; i++) {
-      if (i === 0 && lastLine && lastLine.kind === lineKind && lastLine.text !== "") {
-        // First part: append to last NONEMPTY line of same kind.
-        // Never extend an empty line — it's a paragraph boundary.
-        lines[lines.length - 1] = { kind: lineKind, text: lastLine.text + parts[i] };
-      } else {
-        // New line — preserve empty strings as paragraph boundaries
-        lines.push({ kind: lineKind, text: parts[i] });
-      }
-    }
-
-    return { ...prev, narrativeLines: lines };
-  });
+  update((prev) => ({
+    ...prev,
+    // Use the same appendDelta logic as the monolith — handles newline
+    // splitting, spacer insertion between paragraphs, and \n\n paragraph
+    // boundary detection with the tentative-spacer promotion pattern.
+    narrativeLines: appendDelta(prev.narrativeLines, text, lineKind),
+  }));
 }
 
 function handleNarrativeComplete(_event: NarrativeCompleteEvent, update: StateUpdater): void {
@@ -268,6 +254,11 @@ function handleStateSnapshot(event: StateSnapshotEvent, update: StateUpdater): v
     stateSnapshot: snapshot,
     mode: snapshot.mode ?? prev.mode,
     variant: (snapshot.variant as StyleVariant) ?? prev.variant,
+    // Hydrate resources and modelines from snapshot so they're available
+    // immediately, not just after the first TUI command update
+    displayResources: snapshot.displayResources ?? prev.displayResources,
+    resourceValues: snapshot.resourceValues ?? prev.resourceValues,
+    modelines: snapshot.modelines ?? prev.modelines,
   }));
 }
 
