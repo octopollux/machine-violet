@@ -39,6 +39,12 @@ export interface ClientState {
   stateSnapshot: StateSnapshot | null;
   sessionEnded: boolean;
   lastError: { message: string; recoverable: boolean } | null;
+  /** Per-character modeline text (character name → status string). */
+  modelines: Record<string, string>;
+  /** Per-character resource display keys. */
+  displayResources: Record<string, string[]>;
+  /** Per-character resource values: character → key → value. */
+  resourceValues: Record<string, Record<string, string>>;
 }
 
 export function initialClientState(): ClientState {
@@ -53,6 +59,9 @@ export function initialClientState(): ClientState {
     stateSnapshot: null,
     sessionEnded: false,
     lastError: null,
+    modelines: {},
+    displayResources: {},
+    resourceValues: {},
   };
 }
 
@@ -209,21 +218,48 @@ function handleModalDismiss(_event: ModalDismissEvent, update: StateUpdater): vo
 }
 
 function handleActivityUpdate(event: ActivityUpdateEvent, update: StateUpdater): void {
-  const { engineState, toolStarted, toolEnded } = event.data;
+  const data = event.data as Record<string, unknown>;
+  const { engineState, toolStarted, toolEnded } = data;
 
   update((prev) => {
     let tools = prev.activeTools;
     if (toolStarted) {
-      tools = [...tools, toolStarted];
+      tools = [...tools, toolStarted as string];
     }
     if (toolEnded) {
       tools = tools.filter((t) => t !== toolEnded);
     }
-    return {
+
+    let next = {
       ...prev,
-      engineState: engineState ?? prev.engineState,
+      engineState: (engineState as string) ?? prev.engineState,
       activeTools: tools,
     };
+
+    // Handle embedded TUI command payloads
+    const tuiType = typeof engineState === "string" && engineState.startsWith("tui:")
+      ? engineState.slice(4)
+      : null;
+
+    if (tuiType === "update_modeline") {
+      const character = data.character as string | undefined;
+      const text = data.text as string | undefined;
+      if (character && text !== undefined) {
+        next = { ...next, modelines: { ...next.modelines, [character]: text } };
+      }
+    } else if (tuiType === "set_display_resources") {
+      const resources = data.resources as Record<string, string[]> | undefined;
+      if (resources) {
+        next = { ...next, displayResources: resources };
+      }
+    } else if (tuiType === "set_resource_values") {
+      const values = data.values as Record<string, Record<string, string>> | undefined;
+      if (values) {
+        next = { ...next, resourceValues: { ...next.resourceValues, ...values } };
+      }
+    }
+
+    return next;
   });
 }
 

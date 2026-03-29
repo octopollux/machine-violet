@@ -140,6 +140,7 @@ function routeTuiCommand(
   broadcast: (event: ServerEvent) => void,
 ): void {
   switch (command.type) {
+    // --- DM-driven choices (rendered in Player Pane by the client) ---
     case "present_choices":
       broadcast({
         type: "modal:show",
@@ -153,45 +154,42 @@ function routeTuiCommand(
       });
       break;
 
-    case "present_roll":
-      broadcast({
-        type: "modal:show",
-        data: {
-          type: "dice-roll",
-          id: String(command.id ?? crypto.randomUUID()),
-          expression: String(command.expression ?? ""),
-          rolls: (command.rolls as number[]) ?? [],
-          kept: command.kept as number[] | undefined,
-          total: Number(command.total ?? 0),
-          reason: command.reason as string | undefined,
-        },
-      });
-      break;
-
-    case "show_character_sheet":
-      broadcast({
-        type: "modal:show",
-        data: {
-          type: "character-sheet",
-          id: crypto.randomUUID(),
-          content: String(command.content ?? ""),
-        },
-      });
-      break;
-
+    // --- Mode changes ---
     case "style_scene":
+      broadcast({
+        type: "session:mode",
+        data: { mode: "play", variant: command.variant as string | undefined },
+      });
+      break;
+
     case "enter_ooc":
       broadcast({
         type: "session:mode",
-        data: {
-          mode: command.type === "enter_ooc" ? "ooc" : "play",
-          variant: command.variant as string | undefined,
-        },
+        data: { mode: "ooc", variant: "ooc" },
       });
       break;
 
+    // --- State-affecting commands: forward as-is for the client to interpret ---
+    case "update_modeline":
+    case "set_display_resources":
+    case "set_resource_values":
+    case "resource_refresh":
+    case "set_theme":
+      // Forward the full TUI command payload — the client knows how to render each
+      broadcast({
+        type: "activity:update",
+        data: { engineState: `tui:${command.type}`, ...command },
+      });
+      break;
+
+    // --- Commands we can safely ignore ---
+    case "present_roll":
+    case "show_character_sheet":
+    case "dm_notes":
+      // These are either dead code or client-driven — don't forward
+      break;
+
     default:
-      // Forward other TUI commands as generic activity updates
       broadcast({
         type: "activity:update",
         data: { engineState: `tui:${command.type}` },

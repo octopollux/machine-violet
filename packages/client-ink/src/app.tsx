@@ -24,6 +24,22 @@ import {
 } from "./tui/themes/index.js";
 import type { ResolvedTheme, StyleVariant, ThemeDefinition } from "./tui/themes/index.js";
 
+/** Format display resources into "Key Value" strings for the top frame. */
+function formatResources(
+  displayResources: Record<string, string[]>,
+  resourceValues: Record<string, Record<string, string>>,
+): string[] {
+  const result: string[] = [];
+  for (const [char, keys] of Object.entries(displayResources)) {
+    const vals = resourceValues[char] ?? {};
+    for (const key of keys) {
+      const val = vals[key];
+      result.push(val ? `${key} ${val}` : key);
+    }
+  }
+  return result;
+}
+
 export interface AppProps {
   serverUrl: string;
   playerId: string;
@@ -273,8 +289,13 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
       setActivePlayerIndex: () => { /* server manages this */ },
       engineState: clientState.engineState,
       toolGlyphs: clientState.activeTools.map((t) => ({ name: t, glyph: "⚙", label: t })),
-      resources: [],
-      modelines: stateSnapshot?.modelines ?? {},
+      resources: Object.keys(clientState.displayResources).length > 0
+        ? formatResources(clientState.displayResources, clientState.resourceValues)
+        : [],
+      modelines: {
+        ...stateSnapshot?.modelines,
+        ...clientState.modelines,
+      },
       currentTurn: clientState.currentTurn,
       activeModal,
       setActiveModal: (m) => setActiveModal(m as Modal | null),

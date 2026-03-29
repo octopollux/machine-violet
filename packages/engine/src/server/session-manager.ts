@@ -28,6 +28,7 @@ import { createClocksState } from "../tools/clocks/index.js";
 import { createCombatState } from "../tools/combat/index.js";
 import { createDecksState } from "../tools/cards/index.js";
 import { createObjectivesState } from "../tools/objectives/index.js";
+import { markdownToNarrativeLines } from "../context/display-log.js";
 import { TurnManager } from "./turn-manager.js";
 import { createBridge } from "./bridge.js";
 import { createBaseFileIO } from "./fileio.js";
@@ -289,16 +290,37 @@ export class SessionManager {
     // Get session recap
     const recap = await engine.resumeSession();
 
-    // Broadcast session start
+    // Broadcast state snapshot
     this.broadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
+
+    // Send display history (last ~100 lines from previous session)
+    const historyLines = await persister.loadDisplayLogTail(100);
+    if (historyLines.length > 0) {
+      const narrativeLines = markdownToNarrativeLines(historyLines);
+      for (const line of narrativeLines) {
+        // Only send kinds the WS protocol supports
+        const kind = line.kind as string;
+        if (kind === "dm" || kind === "player" || kind === "system" || kind === "dev") {
+          this.broadcast({
+            type: "narrative:chunk",
+            data: { text: line.text, kind },
+          });
+        }
+      }
+      this.broadcast({ type: "narrative:complete", data: { text: "" } });
+    }
+
+    // Welcome message
     this.broadcast({
       type: "narrative:chunk",
       data: { text: `Welcome back to ${config.name}.`, kind: "system" },
     });
+
+    // Session recap as narrative (not a modal — client decides rendering)
     if (recap) {
       this.broadcast({
-        type: "modal:show",
-        data: { type: "recap", id: "session-recap", lines: recap.split("\n") },
+        type: "narrative:chunk",
+        data: { text: recap, kind: "system" },
       });
     }
 
