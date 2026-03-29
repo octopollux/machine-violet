@@ -72,6 +72,8 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
 
   // Settings / management state
   const [apiKeyStore, setApiKeyStore] = useState<ApiKeyStore>({ keys: [], activeKeyId: null });
+  const [apiKeyValid, setApiKeyValid] = useState(true);
+  const [apiKeyStatus, setApiKeyStatus] = useState<string | undefined>(undefined);
   const [healthResults, setHealthResults] = useState<Record<string, KeyHealthResult>>({});
   const [archivedCampaigns, setArchivedCampaigns] = useState<ArchivedCampaignEntry[]>([]);
   const [discordEnabled, setDiscordEnabled] = useState<boolean | null>(null);
@@ -146,11 +148,12 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
     setKeyColor("#8888aa");
     setThemeDef(loadThemeDefinition("gothic"));
     setPhase("menu");
-    // Refresh campaign list
+    // Refresh campaign list and menu status indicators
     apiClientRef.current.listCampaigns().then((resp) => {
       setCampaigns(resp.campaigns.map((c) => ({ id: c.id ?? c.name, name: c.name, path: c.path ?? "" })));
     }).catch(() => { /* ignore */ });
-  }, []);
+    refreshMenuStatus();
+  }, [refreshMenuStatus]);
 
   // Connect to server on mount
   useEffect(() => {
@@ -167,6 +170,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
           // Fetch campaigns and show menu
           api.listCampaigns().then((resp) => {
             setCampaigns(resp.campaigns.map((c) => ({ id: c.id ?? c.name, name: c.name, path: c.path ?? "" })));
+            refreshMenuStatus();
             setPhase("menu");
           }).catch((err) => {
             setErrorMessage(err instanceof Error ? err.message : String(err));
@@ -230,6 +234,26 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
     setApiKeyStore(store);
   }, []);
 
+  /** Check active key health + Discord setting for main menu indicators. */
+  const refreshMenuStatus = useCallback(() => {
+    const api = apiClientRef.current;
+    // Check active API key health
+    api.listKeys().then((resp) => {
+      if (resp.activeKeyId) {
+        setApiKeyValid(true); // has a key at least
+        api.checkKeyHealth(resp.activeKeyId).then((h) => {
+          setApiKeyValid(h.status === "valid");
+          setApiKeyStatus(h.message);
+        }).catch(() => { /* ignore */ });
+      } else {
+        setApiKeyValid(false);
+        setApiKeyStatus("No API key configured");
+      }
+    }).catch(() => { /* ignore */ });
+    // Check Discord setting
+    api.getDiscordSettings().then((s) => setDiscordEnabled(s.enabled)).catch(() => { /* ignore */ });
+  }, []);
+
   const refreshCampaigns = useCallback(() => {
     apiClientRef.current.listCampaigns().then((resp) => {
       setCampaigns(resp.campaigns.map((c) => ({ id: c.id ?? c.name, name: c.name, path: c.path ?? "" })));
@@ -269,7 +293,9 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
         theme={theme}
         campaigns={campaigns}
         errorMsg={errorMessage || null}
-        apiKeyValid={true}
+        apiKeyValid={apiKeyValid}
+        apiKeyStatus={apiKeyStatus}
+        discordSettingUnset={discordEnabled === null}
         onNewCampaign={() => {
           setSessionKey((k) => k + 1);
           setPhase("starting");
