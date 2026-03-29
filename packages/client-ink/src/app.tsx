@@ -174,9 +174,13 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
   // Return to menu from playing
   const returnToMenu = useCallback(() => {
     apiClientRef.current.endSession().catch(() => { /* no-op */ });
-    setPhase("menu");
+    // Full state reset — prevents stale engine state from blocking input
     setNarrativeLines([]);
+    setActiveModal(null);
     setClientState(initialClientState());
+    setVariant("exploration");
+    // Transition to menu AFTER state is cleared
+    setPhase("menu");
     // Refresh campaign list
     apiClientRef.current.listCampaigns().then((resp) => {
       setCampaigns(resp.campaigns.map((c) => ({ id: c.id ?? c.name, name: c.name })));
@@ -306,7 +310,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
       stateSnapshot,
       onReturnToMenu: returnToMenu,
     }}>
-      <PlayingPhase />
+      <PlayingPhase key={activeCampaignId} />
     </GameProvider>
   );
 }

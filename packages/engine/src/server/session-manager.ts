@@ -294,7 +294,7 @@ export class SessionManager {
     this.broadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
 
     // Send display history (last ~100 lines from previous session)
-    const historyLines = await persister.loadDisplayLogTail(100);
+    const historyLines = await persister.loadDisplayLogFull();
     if (historyLines.length > 0) {
       const narrativeLines = markdownToNarrativeLines(historyLines);
       for (const line of narrativeLines) {
