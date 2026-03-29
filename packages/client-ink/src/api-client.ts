@@ -85,9 +85,9 @@ export class ApiClient {
     const url = `${this.baseUrl}${path}`;
     const init: RequestInit = {
       method: opts.method,
-      headers: { "Content-Type": "application/json" },
     };
     if (opts.body !== undefined) {
+      init.headers = { "Content-Type": "application/json" };
       init.body = JSON.stringify(opts.body);
     }
 
