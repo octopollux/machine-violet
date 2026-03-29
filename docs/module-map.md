@@ -1,8 +1,16 @@
 # Module Map
 
-Every `src/` directory, what it contains, and where to find key code. Most directories have `index.ts` barrel exports — check those before reaching into subdirectories.
+The codebase is split across three packages:
 
-## src/agents/ — Orchestration
+- **`packages/engine/`** — Game engine, AI agents, tools, state, prompts, Fastify server
+- **`packages/client-ink/`** — Ink TUI, themes, modals, formatting, phases
+- **`packages/shared/`** — Shared types and protocol schemas
+
+Legacy `src/` only contains `src/content/` (content pipeline) and `src/services/` (Discord).
+
+Most directories have `index.ts` barrel exports — check those before reaching into subdirectories. Paths below are relative to their package root (e.g. `agents/game-engine.ts` = `packages/engine/src/agents/game-engine.ts`).
+
+## Engine: agents/ — Orchestration
 
 The game loop, state management, and AI session handling.
 
@@ -20,7 +28,7 @@ The game loop, state management, and AI session handling.
 | `player-manager.ts` | Turn switching, active player tracking |
 | `subagent.ts` | `spawnSubagent()`, `oneShot()` — subagent spawning infrastructure |
 
-### src/agents/subagents/ — Specialized agents
+### Engine: agents/subagents/ — Specialized agents
 
 Each file is an isolated Claude conversation for a specific task. All use `spawnSubagent()` or `oneShot()` from `subagent.ts`.
 
@@ -43,7 +51,7 @@ Each file is an isolated Claude conversation for a specific task. All use `spawn
 | `setup-conversation.ts` | Sonnet | Interactive campaign setup wizard |
 | `dev-mode.ts` | Sonnet | Developer console (state inspection, file I/O, mutation) |
 
-## src/tools/ — Game Mechanics
+## Engine: tools/ — Game Mechanics
 
 Stateless game rule engines. Each subdirectory is a domain. Tool handlers take `(state, input)` and return `ToolResult`.
 
@@ -60,7 +68,7 @@ Stateless game rule engines. Each subdirectory is a domain. Tool handlers take `
 | `campaign-ops/` | `walkCampaignFiles()`, `findReferences()`, `renameEntity()`, `mergeEntities()`, `resolveDeadLinks()` |
 | `validation/` | `validateCampaign()` |
 
-## src/context/ — Context Window Management
+## Engine: context/ — Context Window Management
 
 Token tracking, conversation window, prompt caching, state persistence.
 
@@ -75,7 +83,7 @@ Token tracking, conversation window, prompt caching, state persistence.
 | `usage-helpers.ts` | `accumulateUsage()` — merge Anthropic Usage objects |
 | `display-log.ts` | Narrative line ↔ markdown conversion |
 
-## src/tui/ — Terminal UI
+## Client: tui/ — Terminal UI
 
 Ink (React for CLI) components, formatting pipeline, theme system.
 
@@ -94,7 +102,7 @@ Ink (React for CLI) components, formatting pipeline, theme system.
 | `frames/` | Box drawing, styled content lines, string measurement |
 | `hooks/` | `useGameCallbacks()`, `useTextInput()`, `useTerminalSize()`, `useScrollHandle()`, `useMouseScroll()` |
 
-## src/config/ — Configuration
+## Engine: config/ — Configuration
 
 Model selection, campaign init, DM personalities, campaign seeds.
 
@@ -109,7 +117,7 @@ Model selection, campaign init, DM personalities, campaign seeds.
 | `tokens.ts` | `TOKEN_LIMITS` — model token capacity constants |
 | `dev-mode.ts` | Dev override detection, FileIO wrapping for dev logging |
 
-## src/types/ — Type Definitions
+## Shared: types/ — Type Definitions
 
 Shared TypeScript interfaces. No implementations. All re-exported from `index.ts`.
 
@@ -125,7 +133,7 @@ Shared TypeScript interfaces. No implementations. All re-exported from `index.ts
 | `tui.ts` | `NarrativeLine`, `FormattingNode`, modal types |
 | `compendium.ts` | `Compendium`, `CompendiumEntry`, `CompendiumCategory` |
 
-## src/content/ — Content Pipeline
+## Root: src/content/ — Content Pipeline
 
 PDF ingestion and content processing. **Completely separate from the game engine** — the only shared interface is the filesystem format. If you delete this module, the game still runs.
 
@@ -139,7 +147,7 @@ PDF ingestion and content processing. **Completely separate from the game engine
 | `ingest.ts` | Top-level orchestrator: validate → extract → cache → report |
 | `types.ts` | Interfaces for jobs, chunks, extraction results |
 
-## src/phases/ — App Lifecycle
+## Client: phases/ — App Lifecycle
 
 State machine for the application: main menu → setup / add content → playing → returning_to_menu → main menu (loop). On first launch, config.json is auto-created with defaults.
 
@@ -151,7 +159,7 @@ State machine for the application: main menu → setup / add content → playing
 | `SetupPhase.tsx` | Campaign creation/load orchestration |
 | `PlayingPhase.tsx` | Main game loop (hosts GameEngine) |
 
-## src/prompts/ — Prompt Templates
+## Engine: prompts/ — Prompt Templates
 
 Markdown files loaded at runtime via `loadPrompt(name)` (sync, cached, CRLF→LF normalized). Template interpolation via `loadTemplate(name, vars)` with `{{placeholder}}` syntax.
 
@@ -159,7 +167,7 @@ Key prompts: `dm-identity.md` (DM behavioral instructions), plus one `.md` per s
 
 Tests must call `resetPromptCache()` in `beforeEach`.
 
-## src/commands/ — Slash Commands
+## Client: commands/ — Slash Commands
 
 Player commands during gameplay. `trySlashCommand()` parses and dispatches.
 
@@ -174,7 +182,7 @@ Content assets at the repo root (not in `src/`). Each system gets a subdirectory
 
 Currently bundled: `24xx`, `breathless`, `cairn`, `charge`, `dnd-5e`, `fate-accelerated`, `ironsworn`.
 
-## src/utils/ — Utilities
+## Engine: utils/ — Utilities
 
 Platform abstractions and helpers that don't belong to any single domain.
 

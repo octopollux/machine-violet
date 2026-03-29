@@ -4,25 +4,30 @@ How the system works, mapped to actual code paths.
 
 ## Core Loop
 
-The game is a single Ink (React for CLI) process. There is no frontend/backend split. The DM agent calls tools that directly manipulate UI state and game state.
+The game uses a two-tier architecture: a Fastify engine server (`packages/engine`) and an Ink TUI client (`packages/client-ink`), communicating via REST + WebSocket on localhost.
 
 ```
-Player input
-  → GameEngine (src/agents/game-engine.ts)
+Player input (client)
+  → POST /session/turn/contribute (REST)
+  → GameEngine (packages/engine/src/agents/game-engine.ts)
     → builds messages: system prompt + conversation history + new input
     → Claude API call (Opus tier)
     → response: text blocks + tool_use blocks
       → ToolRegistry.dispatch() for each tool
       → StatePersister writes changed state slices
-      → UI commands applied to Ink components
+      → Bridge translates EngineCallbacks → WebSocket events
       → if ALL tools are TUI: bail out (skip ack round-trip)
       → else: send tool_results back, loop for next response
     → ConversationManager tracks the exchange
     → if exchange dropped from window: Haiku precis updater runs
-  → DM text rendered to terminal
+  → narrative:chunk / narrative:complete events → client renders to terminal
 ```
 
-**Entry point:** `src/index.tsx` → `src/app.tsx` (phase state machine) → `PlayingPhase` → `GameEngine`
+**Entry points:**
+- **Launcher:** `scripts/launcher.ts` → starts server + client in one process
+- **Engine:** `packages/engine/src/index.ts` → Fastify server
+- **Client:** `packages/client-ink/src/index.tsx` → Ink TUI
+- **Dev:** `scripts/dev-two-tier.js` → two-process dev mode
 
 ## Execution Tiers
 
@@ -30,11 +35,11 @@ Every operation has an explicit cost tier. This is the core economic constraint.
 
 | Tier | Model | Cost | Used for | Code path |
 |---|---|---|---|---|
-| T1 (Code) | None | Zero tokens | Dice, maps, clocks, cards, combat, persistence | `src/tools/` — pure functions |
-| T2 (Subagent) | Haiku or Sonnet | Cheap | Summarization, precis, changelogs, resolution, choices, entity writes | `src/agents/subagents/` — `spawnSubagent()` / `oneShot()` |
-| T3 (DM) | Opus | Expensive | Narration, scene direction, NPC dialogue | `src/agents/agent-loop.ts` — main conversation |
+| T1 (Code) | None | Zero tokens | Dice, maps, clocks, cards, combat, persistence | `packages/engine/src/tools/` — pure functions |
+| T2 (Subagent) | Haiku or Sonnet | Cheap | Summarization, precis, changelogs, resolution, choices, entity writes | `packages/engine/src/agents/subagents/` — `spawnSubagent()` / `oneShot()` |
+| T3 (DM) | Opus | Expensive | Narration, scene direction, NPC dialogue | `packages/engine/src/agents/agent-loop.ts` — main conversation |
 
-Model selection: `src/config/models.ts` — `getModel("large" | "medium" | "small")`. Override via `dev-config.json`.
+Model selection: `packages/engine/src/config/models.ts` — `getModel("large" | "medium" | "small")`. Override via `dev-config.json`.
 
 ## State Architecture
 
@@ -163,21 +168,21 @@ Full catalog: [tools-catalog.md](tools-catalog.md)
 
 ## TUI Rendering
 
-The terminal UI is built with Ink (React for CLI). The main layout (`src/tui/layout.tsx`) composes:
+The terminal UI is built with Ink (React for CLI). The main layout (`packages/client-ink/src/tui/layout.tsx`) composes:
 
 - **Modeline** — status bar (mode, turn, resources, cost)
 - **NarrativeArea** — scrollable DM text with formatting
 - **InputLine** — player text input
 
-DM text goes through a formatting pipeline (`src/tui/formatting.ts`):
+DM text goes through a formatting pipeline (`packages/client-ink/src/tui/formatting.ts`):
 ```
 raw string → heal tags → parse to FormattingNode[] AST → wrap lines → pad alignment → quote highlight
 ```
 
 Tags supported: `<b>`, `<i>`, `<u>`, `<center>`, `<right>`, `<color=#hex>`. All tags persist across source lines; only real paragraph boundaries (blank DM lines) reset the tag stack. Quote state also resets at paragraph boundaries.
 
-**Theme system:** `.theme` asset files in `src/tui/themes/assets/` define color palettes using OKLCH color space. Variants: exploration, combat, ooc, levelup, dev.
+**Theme system:** `.theme` asset files in `packages/client-ink/src/tui/themes/assets/` define color palettes using OKLCH color space. Variants: exploration, combat, ooc, levelup, dev.
 
-**Code:** `src/tui/` (components, formatting, themes, modals, hooks)
+**Code:** `packages/client-ink/src/tui/` (components, formatting, themes, modals, hooks)
 
 Full details: [tui-design.md](tui-design.md)

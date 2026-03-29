@@ -15,13 +15,13 @@ This project maintains a closed loop between code and documentation. When you ch
 
 ### Adding a new tool
 
-1. Register in `src/agents/tool-registry.ts`
+1. Register in `packages/engine/src/agents/tool-registry.ts`
 2. Add entry to [tools-catalog.md](tools-catalog.md) in the appropriate domain section
 3. If the tool reads/writes state, add to `TOOL_STATE_MAP` in `tool-registry.ts` and update the matrix in [state-atlas.md](state-atlas.md)
 
 ### Adding a new subagent
 
-1. Create file in `src/agents/subagents/`
+1. Create file in `packages/engine/src/agents/subagents/`
 2. Add entry to [subagents-catalog.md](subagents-catalog.md) — include model, visibility, trigger, and source
 3. Update the summary table at the bottom of the catalog
 4. Add to the subagents section of [docs/module-map.md](module-map.md)
@@ -35,7 +35,7 @@ This project maintains a closed loop between code and documentation. When you ch
 
 ### Adding a new TUI component
 
-1. Create in `src/tui/components/` or `src/tui/modals/`
+1. Create in `packages/client-ink/src/tui/components/` or `packages/client-ink/src/tui/modals/`
 2. If it's a new modal type, add to [tui-design.md](tui-design.md)
 3. Add to the tui section of [docs/module-map.md](module-map.md)
 
@@ -44,7 +44,7 @@ This project maintains a closed loop between code and documentation. When you ch
 1. Update step list in [state-atlas.md](state-atlas.md) (section 6)
 2. Update the cascade diagram in [docs/architecture.md](architecture.md)
 
-### Adding a new src/ directory or major file
+### Adding a new package directory or major file
 
 1. Add to [docs/module-map.md](module-map.md)
 
@@ -55,7 +55,7 @@ This project maintains a closed loop between code and documentation. When you ch
 
 ### Adding a new config field
 
-1. Update the relevant type in `src/types/config.ts`
+1. Update the relevant type in `packages/shared/src/types/config.ts`
 2. Update [state-atlas.md](state-atlas.md) schema tree
 
 ### Changes that DON'T need doc updates
