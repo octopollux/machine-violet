@@ -34,6 +34,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Build shared package
+        run: npm run build -w packages/shared
+
       - name: Build distribution
         shell: bash
         run: |
@@ -103,6 +106,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Build shared package
+        run: npm run build -w packages/shared
+
       - name: Build distribution
         run: |
           VERSION=$(node -p "require('./package.json').version")
@@ -129,6 +135,9 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      - name: Build shared package
+        run: npm run build -w packages/shared
 
       - name: Build distribution
         run: |

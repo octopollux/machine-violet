@@ -41,6 +41,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Build shared package
+        run: npm run build -w packages/shared
+
       - name: Build distribution
         shell: bash
         run: |
