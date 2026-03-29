@@ -21,11 +21,13 @@ import { PlayingPhase } from "./phases/PlayingPhase.js";
 import { MainMenuPhase } from "./phases/MainMenuPhase.js";
 import type { CampaignEntry } from "./phases/MainMenuPhase.js";
 import { SettingsPhase } from "./phases/SettingsPhase.js";
-import { ApiKeysPhase } from "./phases/ApiKeysPhase.js";
+import { ConnectionsPhase } from "./phases/ConnectionsPhase.js";
 import { ArchivedCampaignsPhase } from "./phases/ArchivedCampaignsPhase.js";
 import { DiscordSettingsPhase } from "./phases/DiscordSettingsPhase.js";
-import type { ApiKeyStore } from "./config/api-keys.js";
-import type { KeyHealthResult } from "./config/api-key-health.js";
+import type {
+  ConnectionInfo, TierAssignmentsResponse, ConnectionHealthResponse,
+  KnownModelInfo,
+} from "./api-client.js";
 import type { ArchivedCampaignEntry, CampaignDeleteInfo } from "./config/campaign-archive.js";
 import {
   loadThemeDefinition,
@@ -71,10 +73,12 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
   const [sessionKey, setSessionKey] = useState(0);
 
   // Settings / management state
-  const [apiKeyStore, setApiKeyStore] = useState<ApiKeyStore>({ keys: [], activeKeyId: null });
+  const [connections, setConnections] = useState<ConnectionInfo[]>([]);
+  const [tierAssignments, setTierAssignments] = useState<TierAssignmentsResponse>({ large: null, medium: null, small: null });
+  const [connHealthResults, setConnHealthResults] = useState<Record<string, ConnectionHealthResponse>>({});
+  const [knownModels, setKnownModels] = useState<Record<string, KnownModelInfo>>({});
   const [apiKeyValid, setApiKeyValid] = useState(true);
   const [apiKeyStatus, setApiKeyStatus] = useState<string | undefined>(undefined);
-  const [healthResults, setHealthResults] = useState<Record<string, KeyHealthResult>>({});
   const [archivedCampaigns, setArchivedCampaigns] = useState<ArchivedCampaignEntry[]>([]);
   const [discordEnabled, setDiscordEnabled] = useState<boolean | null>(null);
   const [deleteModal, setDeleteModal] = useState<CampaignDeleteInfo | null>(null);
@@ -136,19 +140,22 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
     });
   }, []);
 
-  /** Check active key health + Discord setting for main menu indicators. */
+  /** Check connection health + Discord setting for main menu indicators. */
   const refreshMenuStatus = useCallback(() => {
     const api = apiClientRef.current;
-    api.listKeys().then((resp) => {
-      if (resp.activeKeyId) {
+    api.listConnections().then((resp) => {
+      setConnections(resp.connections);
+      setTierAssignments(resp.tierAssignments);
+      if (resp.connections.length > 0) {
         setApiKeyValid(true);
-        api.checkKeyHealth(resp.activeKeyId).then((h) => {
-          setApiKeyValid(h.status === "valid");
+        // Check health of first connection
+        api.checkConnection(resp.connections[0].id).then((h) => {
+          setApiKeyValid(h.status === "valid" || h.status === "rate_limited");
           setApiKeyStatus(h.message);
         }).catch(() => { /* ignore */ });
       } else {
         setApiKeyValid(false);
-        setApiKeyStatus("No API key configured");
+        setApiKeyStatus("No AI connections configured");
       }
     }).catch(() => { /* ignore */ });
     api.getDiscordSettings().then((s) => setDiscordEnabled(s.enabled)).catch(() => { /* ignore */ });
@@ -213,41 +220,27 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
 
   // --- Management helpers ---
 
-  const refreshKeys = useCallback(() => {
-    apiClientRef.current.listKeys().then((resp) => {
-      setApiKeyStore({
-        keys: resp.keys.map((k) => ({
-          id: k.id,
-          label: k.label,
-          key: k.masked, // client only sees masked keys
-          source: k.source,
-          addedAt: k.addedAt ?? "",
-          tokenBudget: k.tokenBudget,
-        })),
-        activeKeyId: resp.activeKeyId,
-      });
+  const refreshConnections = useCallback(() => {
+    const api = apiClientRef.current;
+    api.listConnections().then((resp) => {
+      setConnections(resp.connections);
+      setTierAssignments(resp.tierAssignments);
+    }).catch(() => { /* ignore */ });
+    api.listKnownModels().then((resp) => {
+      setKnownModels(resp.models);
     }).catch(() => { /* ignore */ });
   }, []);
 
-  const handleCheckHealth = useCallback((keyId: string, _apiKey: string) => {
-    setHealthResults((prev) => ({ ...prev, [keyId]: { status: "checking" } }));
-    apiClientRef.current.checkKeyHealth(keyId).then((resp) => {
-      setHealthResults((prev) => ({
-        ...prev,
-        [keyId]: { status: resp.status, message: resp.message },
-      }));
+  const handleCheckConnection = useCallback((connId: string) => {
+    setConnHealthResults((prev) => ({ ...prev, [connId]: { id: connId, status: "valid", message: "Checking..." } }));
+    apiClientRef.current.checkConnection(connId).then((resp) => {
+      setConnHealthResults((prev) => ({ ...prev, [connId]: resp }));
     }).catch(() => {
-      setHealthResults((prev) => ({
+      setConnHealthResults((prev) => ({
         ...prev,
-        [keyId]: { status: "error", message: "Health check failed" },
+        [connId]: { id: connId, status: "error", message: "Health check failed" },
       }));
     });
-  }, []);
-
-  const handleUpdateStore = useCallback((store: ApiKeyStore) => {
-    // Find what changed and make the appropriate REST call
-    // For simplicity, refresh from server after any mutation
-    setApiKeyStore(store);
   }, []);
 
   const refreshCampaigns = useCallback(() => {
@@ -336,7 +329,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
         onCancelDelete={() => { setDeleteModal(null); setPendingDeleteId(null); }}
         onAddContent={() => { /* not yet migrated */ }}
         onSettings={() => setPhase("settings")}
-        onSettingsApiKeys={() => { refreshKeys(); setPhase("settings_apikeys"); }}
+        onSettingsApiKeys={() => { refreshConnections(); setPhase("settings_apikeys"); }}
         onDiscordSettings={() => {
           apiClientRef.current.getDiscordSettings().then((s) => setDiscordEnabled(s.enabled)).catch(() => { /* ignore */ });
           setPhase("discord_settings");
@@ -351,7 +344,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
       <SettingsPhase
         theme={theme}
         initialView={phase === "settings_apikeys" ? "api_keys" : undefined}
-        onApiKeys={() => { refreshKeys(); setPhase("api_keys"); }}
+        onApiKeys={() => { refreshConnections(); setPhase("api_keys"); }}
         onDiscord={() => {
           apiClientRef.current.getDiscordSettings().then((s) => setDiscordEnabled(s.enabled)).catch(() => { /* ignore */ });
           setPhase("discord_settings");
@@ -367,35 +360,30 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
 
   if (phase === "api_keys") {
     return (
-      <ApiKeysPhase
+      <ConnectionsPhase
         theme={theme}
-        store={apiKeyStore}
-        healthResults={healthResults}
-        onUpdateStore={(store) => {
-          handleUpdateStore(store);
-          // Detect what changed: find new keys to add, missing keys to remove
-          const oldIds = new Set(apiKeyStore.keys.map((k) => k.id));
-          const newIds = new Set(store.keys.map((k) => k.id));
-          // New key added?
-          for (const k of store.keys) {
-            if (!oldIds.has(k.id) && k.source === "manual") {
-              apiClientRef.current.addKey(k.key, k.label).then(() => refreshKeys()).catch(() => { /* ignore */ });
-              return;
-            }
-          }
-          // Key removed?
-          for (const id of oldIds) {
-            if (!newIds.has(id)) {
-              apiClientRef.current.removeKey(id).then(() => refreshKeys()).catch(() => { /* ignore */ });
-              return;
-            }
-          }
-          // Active key changed?
-          if (store.activeKeyId !== apiKeyStore.activeKeyId && store.activeKeyId) {
-            apiClientRef.current.activateKey(store.activeKeyId).then(() => refreshKeys()).catch(() => { /* ignore */ });
-          }
+        connections={connections}
+        tierAssignments={tierAssignments}
+        healthResults={connHealthResults}
+        knownModels={knownModels}
+        onAddConnection={(provider, apiKey, label, baseUrl) => {
+          apiClientRef.current.addConnection(provider, apiKey, label, baseUrl).then((resp) => {
+            setConnections(resp.connections);
+            setTierAssignments(resp.tierAssignments);
+          }).catch(() => { /* ignore */ });
         }}
-        onCheckHealth={handleCheckHealth}
+        onRemoveConnection={(id) => {
+          apiClientRef.current.removeConnection(id).then((resp) => {
+            setConnections(resp.connections);
+            setTierAssignments(resp.tierAssignments);
+          }).catch(() => { /* ignore */ });
+        }}
+        onCheckHealth={handleCheckConnection}
+        onSetTier={(tier, assignment) => {
+          apiClientRef.current.setTierAssignments({ [tier]: assignment }).then((resp) => {
+            setTierAssignments(resp.tierAssignments);
+          }).catch(() => { /* ignore */ });
+        }}
         onBack={() => setPhase("settings")}
       />
     );
