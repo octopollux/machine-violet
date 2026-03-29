@@ -175,8 +175,8 @@ export class ApiClient {
     return this.get("/manage/campaigns/archived");
   }
 
-  async restoreArchivedCampaign(name: string): Promise<{ ok: boolean }> {
-    return this.post(`/manage/campaigns/archived/${encodeURIComponent(name)}/restore`);
+  async restoreArchivedCampaign(name: string, zipPath?: string): Promise<{ ok: boolean }> {
+    return this.post(`/manage/campaigns/archived/${encodeURIComponent(name)}/restore`, zipPath ? { zipPath } : undefined);
   }
 
   async getDiscordSettings(): Promise<{ enabled: boolean | null }> {

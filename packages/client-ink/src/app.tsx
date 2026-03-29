@@ -385,7 +385,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
         theme={theme}
         archives={archivedCampaigns}
         onUnarchive={(entry) => {
-          apiClientRef.current.restoreArchivedCampaign(entry.name).then(() => {
+          apiClientRef.current.restoreArchivedCampaign(entry.name, entry.zipPath).then(() => {
             refreshCampaigns();
             // Refresh archive list too
             apiClientRef.current.listArchivedCampaigns().then((resp) => setArchivedCampaigns(resp.archives)).catch(() => { /* ignore */ });

@@ -203,9 +203,11 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     return { archives };
   });
 
-  /** Restore an archived campaign. */
-  server.post<{ Params: { name: string } }>("/campaigns/archived/:name/restore", async (request, reply) => {
-    const zipPath = join(campaignsDir(), "archivedcampaigns", `${request.params.name}.zip`);
+  /** Restore an archived campaign. Body includes zipPath from the list response. */
+  server.post<{ Body: { zipPath?: string }; Params: { name: string } }>("/campaigns/archived/:name/restore", async (request, reply) => {
+    // Prefer explicit zipPath from body; fall back to reconstructing from name
+    const zipPath = request.body?.zipPath
+      ?? join(campaignsDir(), "archivedcampaigns", `${request.params.name}.zip`);
     const io = createArchiveFileIO();
     const result = await unarchiveCampaign(zipPath, campaignsDir(), io);
 
