@@ -118,8 +118,18 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
       const { id } = request.params;
       const { value } = request.body ?? {};
 
-      server.log.info({ modalId: id, value }, "Modal response received");
+      // During setup, resolve choice selections through the setup session
+      const sm = server.sessionManager;
+      const setup = sm.getSetupSession();
+      if (setup && id === "setup-choice") {
+        const result = await setup.resolveChoice(String(value));
+        if (result.finalized) {
+          // Setup complete — session transitions to game automatically
+        }
+        return { ok: true };
+      }
 
+      server.log.info({ modalId: id, value }, "Modal response received");
       return { ok: true };
     },
   );

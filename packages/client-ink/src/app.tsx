@@ -206,8 +206,14 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
         errorMsg={errorMessage || null}
         apiKeyValid={true}
         onNewCampaign={() => {
-          // TODO: campaign creation flow
-          setErrorMessage("Campaign creation not yet available in two-tier mode. Use npm run dev:monolith.");
+          setPhase("starting");
+          setErrorMessage("");
+          apiClientRef.current.createCampaign().then(() => {
+            setPhase("playing");
+          }).catch((err) => {
+            setErrorMessage(err instanceof Error ? err.message : String(err));
+            setPhase("menu");
+          });
         }}
         onResumeCampaign={(entry) => startCampaign(entry.id ?? entry.name)}
         onArchiveCampaign={() => { /* TODO */ }}

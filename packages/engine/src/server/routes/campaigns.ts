@@ -40,8 +40,19 @@ export const campaignRoutes: FastifyPluginAsync = async (server: FastifyInstance
       return reply.status(409).send({ error: "A session is already active." });
     }
 
-    // TODO: setup pseudo-campaign
-    return reply.status(501).send({ error: "Campaign creation not yet implemented. Use the monolith to create campaigns." });
+    try {
+      await sm.startSetup();
+    } catch (err) {
+      return reply.status(500).send({
+        error: `Failed to start setup: ${err instanceof Error ? err.message : err}`,
+      });
+    }
+
+    const response: StartCampaignResponse = {
+      sessionId: "__setup__",
+      wsUrl: "/session/ws",
+    };
+    return reply.status(201).send(response);
   });
 
   /** Start or resume an existing campaign. */

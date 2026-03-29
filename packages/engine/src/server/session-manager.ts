@@ -33,6 +33,7 @@ import { CostTracker } from "../context/cost-tracker.js";
 import { TurnManager } from "./turn-manager.js";
 import { createBridge } from "./bridge.js";
 import { createBaseFileIO } from "./fileio.js";
+import { SetupSession } from "./setup-session.js";
 
 export interface ConnectedClient {
   ws: WebSocket;
@@ -49,6 +50,7 @@ export class SessionManager {
   private costTracker: CostTracker | null = null;
   private currentMode: "play" | "ooc" | "dev" | "setup" = "play";
   private persistedUI: { themeName?: string; variant?: string; keyColor?: string; modelines?: Record<string, string> } = {};
+  private setupSession: SetupSession | null = null;
 
   /** Campaign ID of the currently active session (null if none). */
   private campaignId: string | null = null;
@@ -129,6 +131,65 @@ export class SessionManager {
 
   getCostTracker(): CostTracker | null {
     return this.costTracker;
+  }
+
+  // --- Setup session ---
+
+  /** Start a campaign creation session. */
+  async startSetup(): Promise<void> {
+    if (this.active) throw new Error("A session is already active.");
+    const homeDir = this.campaignsDir.replace(/[/\\]campaigns\/?$/, "");
+    this.setupSession = new SetupSession(
+      this.campaignsDir, homeDir, (event) => this.broadcast(event),
+    );
+    this.active = true;
+    this.currentMode = "setup";
+    this.campaignId = "__setup__";
+
+    // Initialize turn manager for setup input
+    this.turnManager = new TurnManager((event) => this.broadcast(event));
+    this.turnManager.setCommitHandler(async (contributions) => {
+      if (!this.setupSession) return;
+      const text = contributions.map((c) => c.text).join("\n");
+      const result = await this.setupSession.send(text);
+      if (result.finalized) {
+        await this.transitionToGame(result.finalized);
+      } else {
+        this.openNextTurn();
+      }
+    });
+
+    // Start the setup conversation
+    await this.setupSession.start();
+    this.openNextTurn();
+  }
+
+  /** Resolve a choice during setup. */
+  async resolveSetupChoice(selectedText: string): Promise<{ finalized?: string }> {
+    if (!this.setupSession) throw new Error("No setup session.");
+    const result = await this.setupSession.resolveChoice(selectedText);
+    if (result.finalized) {
+      await this.transitionToGame(result.finalized);
+      return { finalized: result.finalized };
+    }
+    this.openNextTurn();
+    return {};
+  }
+
+  getSetupSession(): SetupSession | null {
+    return this.setupSession;
+  }
+
+  /** Transition from setup to a real game session. */
+  private async transitionToGame(campaignId: string): Promise<void> {
+    this.setupSession = null;
+    this.turnManager = null;
+    this.active = false;
+    this.campaignId = null;
+    this.currentMode = "play";
+
+    // Start the newly created campaign
+    await this.startSession(campaignId);
   }
 
   get isActive(): boolean {
@@ -350,14 +411,14 @@ export class SessionManager {
         }
         if (kind !== "dm" && kind !== "player" && kind !== "system" && kind !== "dev") continue;
         if (kind !== currentKind && currentText) {
-          this.broadcast({ type: "narrative:chunk", data: { text: currentText, kind: currentKind } });
+          this.broadcast({ type: "narrative:chunk", data: { text: currentText, kind: currentKind as "dm" | "player" | "system" | "dev" } });
           currentText = "";
         }
         currentKind = kind;
         currentText += (currentText ? "\n" : "") + text;
       }
       if (currentText) {
-        this.broadcast({ type: "narrative:chunk", data: { text: currentText, kind: currentKind } });
+        this.broadcast({ type: "narrative:chunk", data: { text: currentText, kind: currentKind as "dm" | "player" | "system" | "dev" } });
       }
       this.broadcast({ type: "narrative:complete", data: { text: "" } });
     }

@@ -110,15 +110,23 @@ export function PlayingPhase() {
 
   // --- Choice selection ---
   const handleChoiceSelect = useCallback(async (choice: string) => {
+    const modal = activeModal;
     setActiveModal(null);
 
-    // Send choice as a turn contribution
+    // If this is a setup choice, resolve via modal endpoint
+    const modalId = modal && "id" in modal ? (modal as { id?: string }).id : undefined;
+    if (modalId) {
+      try {
+        await apiClient.respondToModal(modalId, choice);
+      } catch { /* no-op */ }
+      return;
+    }
+
+    // Otherwise send as a turn contribution (gameplay choices)
     try {
       await apiClient.contribute(choice);
-    } catch {
-      // Error handling via WS error events
-    }
-  }, [apiClient, setActiveModal]);
+    } catch { /* no-op */ }
+  }, [apiClient, activeModal, setActiveModal]);
 
   const handleChoiceDismiss = useCallback(() => setActiveModal(null), [setActiveModal]);
 
