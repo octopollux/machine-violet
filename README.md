@@ -21,7 +21,7 @@ Machine Violet is an agentic AI storytelling/roleplay engine that runs in your t
 You'll need an [Anthropic API key](https://console.anthropic.com/) — add it from the main menu on first launch.
 
 **Windows**:
-Download the [**nightly release**](https://github.com/octopollux/machine-violet/releases/tag/nightly) and unzip, then run **machine-violet.exe**. Installers coming soon!
+Download the [**nightly release**](https://github.com/octopollux/machine-violet/releases/tag/nightly) and unzip, then run **MachineViolet.exe**.
 
 **Homebrew** (macOS / Linux):
 ```bash
@@ -38,9 +38,9 @@ Then run `machine-violet` in your terminal.
 
 ```bash
 npm install
-npx tsx src/index.tsx          # launch (needs ANTHROPIC_API_KEY in .env)
-npm run check                  # lint + tests + coverage
-npm run dist                   # build standalone binary (requires Bun)
+npm run dev                    # launch (needs ANTHROPIC_API_KEY in .env)
+npm run check                  # lint + tests
+npm run dist                   # build standalone binary
 ```
 
 See [CLAUDE.md](CLAUDE.md) for architecture, conventions, and contribution guidelines. Full documentation lives in [docs/](docs/index.md).

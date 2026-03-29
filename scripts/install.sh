@@ -98,12 +98,13 @@ if [ -n "$ENV_BACKUP" ]; then
   printf "%s" "$ENV_BACKUP" > "$INSTALL_DIR/.env"
 fi
 
-chmod +x "$INSTALL_DIR/machine-violet"
+chmod +x "$INSTALL_DIR/MachineViolet"
 echo " done"
 
 # Symlink to bin
 mkdir -p "$BIN_DIR"
-ln -sf "$INSTALL_DIR/machine-violet" "$BIN_DIR/machine-violet"
+# Expose as lowercase CLI command (Unix convention)
+ln -sf "$INSTALL_DIR/MachineViolet" "$BIN_DIR/machine-violet"
 
 # Check if BIN_DIR is in PATH
 if ! echo "$PATH" | tr ':' '\n' | grep -qx "$BIN_DIR"; then
@@ -116,9 +117,9 @@ if ! echo "$PATH" | tr ':' '\n' | grep -qx "$BIN_DIR"; then
 fi
 
 # Verify
-if [ -x "$INSTALL_DIR/machine-violet" ]; then
+if [ -x "$INSTALL_DIR/MachineViolet" ]; then
   echo ""
-  VERSION_OUTPUT="$("$INSTALL_DIR/machine-violet" --version 2>&1 || true)"
+  VERSION_OUTPUT="$("$INSTALL_DIR/MachineViolet" --version 2>&1 || true)"
   echo "  Installed: $VERSION_OUTPUT"
   echo ""
   echo "  Run 'machine-violet' to start!"
