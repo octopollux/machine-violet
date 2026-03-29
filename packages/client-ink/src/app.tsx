@@ -115,16 +115,16 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
   }, []);
 
   // Return to menu from playing
-  const returnToMenu = useCallback(() => {
-    apiClientRef.current.endSession().catch(() => { /* no-op */ });
-    // Full state reset — prevents stale engine state from blocking input
+  const returnToMenu = useCallback(async () => {
+    // Await endSession so the server fully tears down before we can start another
+    try { await apiClientRef.current.endSession(); } catch { /* no-op */ }
+    // Full state reset
     setNarrativeLines([]);
     setActiveModal(null);
     setClientState(initialClientState());
     setVariant("exploration");
     setKeyColor("#8888aa");
     setThemeDef(loadThemeDefinition("gothic"));
-    // Transition to menu AFTER state is cleared
     setPhase("menu");
     // Refresh campaign list
     apiClientRef.current.listCampaigns().then((resp) => {

@@ -497,6 +497,10 @@ export class SessionManager {
     this.turnManager = null;
     this.engine = null;
     this.gameState = null;
+    this.setupSession = null;
+    this.costTracker = null;
+    this.currentMode = "play";
+    this.persistedUI = {};
 
     this.broadcast({
       type: "session:ended",
