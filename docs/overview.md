@@ -5,12 +5,14 @@ Machine Violet is an agentic DM and game state manager designed to run any table
 
 ## Architecture
 
-Machine Violet is a single Ink (React for CLI) application. The game engine, Claude SDK integration, and TUI are all one process — no abstraction layer between engine and interface. The DM agent has tools that manipulate both game state and the UI directly, so it can do things that weren't anticipated at design time.
+Machine Violet uses a two-tier architecture: a Fastify engine server (`packages/engine`) handles all game logic, AI interaction, and state management, while an Ink TUI client (`packages/client-ink`) renders the terminal interface. They communicate via REST + WebSocket on localhost. Shared types live in `packages/shared`. A single-process launcher bundles both for end users — the split is invisible to the player.
 
-Game state lives on the filesystem as markdown and JSON. Automatic git snapshots (via isomorphic-git, no system dependency) provide rollback and recovery. A web API could be exposed later but is not an architectural prerequisite.
+The DM agent runs on the engine server with tools that manipulate game state. UI updates flow to the client via WebSocket events. `MachineViolet --server` runs the engine headless for network hosting.
+
+Game state lives on the filesystem as markdown and JSON. Automatic git snapshots (via isomorphic-git, no system dependency) provide rollback and recovery.
 
 Tech stack:
-- **Runtime**: Node.js (18+)
+- **Runtime**: Node.js (22+)
 - **Language**: TypeScript
 - **UI**: Ink (React for CLI)
 - **AI**: Anthropic Claude SDK (Opus for DM, Sonnet for setup/OOC, Haiku for mechanical tasks)

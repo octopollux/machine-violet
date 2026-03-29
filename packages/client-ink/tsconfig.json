@@ -1,0 +1,31 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "composite": true,
+    "types": ["node"]
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules", "dist",
+    "src/**/*.test.ts", "src/**/*.test.tsx",
+    "src/phases/index.ts",
+    "src/phases/SetupPhase.tsx",
+    "src/phases/ApiKeysPhase.tsx",
+    "src/phases/ArchivedCampaignsPhase.tsx",
+    "src/phases/DiscordSettingsPhase.tsx",
+    "src/phases/SettingsPhase.tsx",
+    "src/phases/AddContentPhase.tsx",
+    "src/phases/UpdatePhase.tsx",
+    "src/commands/**/*",
+    "src/tui/hooks/useGameCallbacks.ts",
+    "src/tui/game-context.test.tsx"
+  ],
+  "references": [
+    { "path": "../shared" }
+  ]
+}

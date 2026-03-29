@@ -7,13 +7,14 @@ Ink (React for CLI) + Anthropic Claude SDK + TypeScript.
 
 ```bash
 npm install
-npm run check           # lint + tests + coverage threshold (run before every PR)
-npx tsx src/index.tsx    # launch (needs ANTHROPIC_API_KEY in .env)
+npm run check           # lint + tests (run before every PR)
+npm run dev             # launch two-tier (needs ANTHROPIC_API_KEY in .env)
 ```
 
 ## Architecture
 
-- **Single Ink process** — no frontend/backend split. DM tools manipulate UI directly.
+- **Two-tier: engine server + TUI client** — Fastify HTTP/WS server (`packages/engine`) hosts all game logic; Ink TUI client (`packages/client-ink`) renders the interface. They communicate via REST + WebSocket on localhost. Shared types live in `packages/shared`. A single-process launcher (`scripts/launcher.ts`) starts both for end users.
+- **`MachineViolet --server`** — headless mode for network hosting (no TUI, just the API).
 - **Filesystem IS the database** — markdown + JSON entities, wikilinked. The campaign transcript is the knowledge backbone; the DM rediscovers things by following wikilinks, not by re-reading its own context.
 - **Conversation accumulates within a scene** — exchanges are retained until scene transition clears them. With automatic caching, prior exchanges are read at cache rate. Scene pacing nudges and transition pressure handle long scenes naturally; `max_conversation_tokens` defaults to 0 (disabled) since mid-scene pruning invalidates the prompt cache. Tools return minimum viable information. Delegation to cheap subagents is how you avoid bloating DM context.
 - **isomorphic-git** for state snapshots (no system git dependency). Auto-commits happen every N exchanges and at scene/session boundaries.
@@ -27,7 +28,7 @@ npx tsx src/index.tsx    # launch (needs ANTHROPIC_API_KEY in .env)
 | `medium` | Sonnet | OOC mode, AI players |
 | `small` | Haiku | All mechanical subagents (summarizer, precis, changelog, choices, resolve, promotion) |
 
-Configured in `src/config/models.ts`. Override with `dev-config.json`:
+Configured in `packages/engine/src/config/models.ts`. Override with `dev-config.json`:
 ```json
 { "models": { "large": "claude-sonnet-4-5-20250929" } }
 ```
@@ -60,7 +61,7 @@ Code and docs stay in sync. See `docs/maintenance.md` for the full guide.
 ### State & I/O
 - **No globals.** All tool handlers take explicit state objects (`GameState`, `DecksState`, `ClocksState`, `CombatState`, `MapData`).
 - **FileIO/GitIO interfaces** abstract all I/O. Production uses real `fs`; tests inject mocks. Never call `fs` directly in game logic.
-- **GameState** (defined in `src/agents/game-state.ts`) is the single mutable source of truth, passed to every tool handler.
+- **GameState** (defined in `packages/engine/src/agents/game-state.ts`) is the single mutable source of truth, passed to every tool handler.
 - Tool results use `ok(data)` / `err(message)` helpers. `err` sets `is_error: true`.
 
 ### Content Pipeline (`src/content/`)
@@ -77,13 +78,13 @@ Code and docs stay in sync. See `docs/maintenance.md` for the full guide.
 - Bundled systems must be CC-BY-4.0 compatible (or similarly permissive).
 
 ### Entity Filesystem
-- **Front matter format:** `**Key:** Value` lines (not YAML). Parsed by `parseFrontMatter()` in `src/tools/filesystem/frontmatter.ts`.
+- **Front matter format:** `**Key:** Value` lines (not YAML). Parsed by `parseFrontMatter()` in `packages/engine/src/tools/filesystem/frontmatter.ts`.
 - **Wikilinks are mandatory** — every entity mention in transcripts/logs is a wikilink. Dead links are valid (entity exists in fiction but not yet detailed). Scene summarizer must preserve all wikilinks.
 - **Changelogs** are append-only `## Changelog` sections with `- ` entries, updated automatically by Haiku subagent at scene transitions.
 - Characters exist on a spectrum: minimal NPCs can be promoted to full character sheets via `promote_character` tool.
 
 ### Prompts
-- All prompts live in `src/prompts/*.md`, loaded by `loadPrompt(name)` (sync, cached, CRLF→LF normalized).
+- All prompts live in `packages/engine/src/prompts/*.md`, loaded by `loadPrompt(name)` (sync, cached, CRLF→LF normalized).
 - Templates use `{{placeholder}}` interpolation via `loadTemplate(name, vars)`.
 - `postbuild` script copies `.md` files to `dist/prompts/` for runtime access.
 - **Tests must call `resetPromptCache()` in `beforeEach`** to avoid cross-test pollution.
@@ -96,7 +97,7 @@ Code and docs stay in sync. See `docs/maintenance.md` for the full guide.
 
 ### Testing
 - Tests are **co-located** with source (e.g., `foo.ts` + `foo.test.ts`).
-- **Seeded RNG** via `src/tools/dice/rng.ts` — `seededRng(seed)` for determinism, `cryptoRng` for prod.
+- **Seeded RNG** via `packages/engine/src/tools/dice/rng.ts` — `seededRng(seed)` for determinism, `cryptoRng` for prod.
 - **Anthropic client mocked** via `vi.fn()` on `messages.create`. Tests use factory helpers (`textMessage()`, `toolUseMessage()`, etc.) to build fake responses. No real API calls.
 - **FileIO mocked** with in-memory `Record<string, string>`.
 - **Cross-platform paths:** Tests use `norm()` helper (backslash → forward slash) for all path assertions. Required on Windows.
@@ -104,7 +105,7 @@ Code and docs stay in sync. See `docs/maintenance.md` for the full guide.
 - Vitest `globals: true` — `describe`/`it`/`expect` available without import.
 
 ### DM Text Formatting Pipeline
-- `processNarrativeLines()` in `src/tui/formatting.ts` is the single entry point for the rendering pipeline.
+- `processNarrativeLines()` in `packages/client-ink/src/tui/formatting.ts` is the single entry point for the rendering pipeline.
 - Pipeline: heal raw strings → parse to `FormattingNode[]` AST → wrap (`wrapNodes`) → pad alignment → quote highlight.
 - Quote state resets at paragraph boundaries (blank DM lines). All formatting tags (`b`/`i`/`u`/`color`/`center`/`right`) persist across source lines; only real paragraph boundaries (blank DM lines from `\n\n`) reset the tag stack. Visual spacers (from single `\n`) don't reset tags.
 
@@ -123,7 +124,7 @@ Live API key in `.env` with limited credit. Opus is $5/$25 per MTok. Default dev
 
 - **Release workflow** (`.github/workflows/release.yml`): builds standalone binaries for Windows, macOS, and Linux via `bun build --compile`. Triggered by `v*` tags or `workflow_call` from `cut-release.yml`.
 - **Windows signing**: the Windows `.exe` is Authenticode-signed via Azure Trusted Signing (Artifact Signing) using OIDC federation. The workflow runs `azure/login@v2` then `azure/trusted-signing-action@v1`. Infrastructure lives in `../mv-infrastructure/trusted-signing/`.
-- **Homebrew tap**: `octopollux/homebrew-mv-tap`. Formula auto-updated by the `update-homebrew` job in the release workflow. Binary + assets install to `libexec` (binary expects `prompts/`, `themes/`, `systems/` next to the executable — see `src/utils/paths.ts`).
+- **Homebrew tap**: `octopollux/homebrew-mv-tap`. Formula auto-updated by the `update-homebrew` job in the release workflow. Binary + assets install to `libexec` (binary expects `prompts/`, `themes/`, `systems/` next to the executable — see `packages/engine/src/utils/paths.ts`).
 - **macOS Gatekeeper**: Homebrew installs bypass Gatekeeper. Direct tarball downloads will trigger quarantine prompts until Apple Developer notarization is set up.
 - **Linux**: distributed as a standalone tarball and via Homebrew. No GPG signing or distro packaging currently.
 

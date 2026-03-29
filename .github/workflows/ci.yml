@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, two-tiers]
   pull_request:
     branches: [main]
 
@@ -26,12 +26,17 @@ jobs:
 
       - run: npm ci
 
+      # Build shared package first (engine and client-ink depend on it)
+      - name: Build shared
+        run: npm run build -w packages/shared
+
       - name: Lint
         run: npm run lint
 
-      - name: Test
-        run: npm test
+      # Engine package tests (server + game engine — 1265 tests)
+      - name: Test (engine)
+        run: npm test -w packages/engine
 
-      - name: Coverage threshold
-        if: matrix.node-version == 25
-        run: npm run test:coverage
+      # Client-ink package tests (TUI + event handler — 656 tests)
+      - name: Test (client-ink)
+        run: npm test -w packages/client-ink

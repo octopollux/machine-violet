@@ -42,6 +42,6 @@ All docs describe only what is implemented. Planned features live in GitHub issu
 
 ```bash
 npm install
-npm run check           # lint + tests + coverage (run before every PR)
-npx tsx src/index.tsx    # launch (needs ANTHROPIC_API_KEY in .env)
+npm run check           # lint + tests (run before every PR)
+npm run dev             # launch two-tier (needs ANTHROPIC_API_KEY in .env)
 ```

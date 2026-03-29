@@ -141,3 +141,7 @@ vite.config.ts.timestamp-*
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Runtime config files
+api-keys.json
+discord-settings.json
