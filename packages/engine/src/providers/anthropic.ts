@@ -11,6 +11,7 @@ import type {
   NormalizedMessage, NormalizedToolCall,
   NormalizedUsage, ContentPart, StopReason,
 } from "./types.js";
+import { getKnownModel } from "../config/model-registry.js";
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -117,9 +118,19 @@ function toAnthropicParams(params: ChatParams): {
   const output_config: Anthropic.Messages.OutputConfig | undefined =
     effort && isOpus ? { effort } : undefined;
 
+  // When thinking is enabled, max_tokens must cover BOTH thinking and
+  // response tokens. Boost to the model's max output so thinking doesn't
+  // starve the actual response (especially on turn 1 with heavy tool use).
+  let maxTokens = params.maxTokens;
+  if (effort) {
+    const modelInfo = getKnownModel(params.model);
+    const modelMax = modelInfo?.maxOutput ?? 16384;
+    maxTokens = Math.max(maxTokens, modelMax);
+  }
+
   return {
     model: params.model,
-    max_tokens: params.maxTokens,
+    max_tokens: maxTokens,
     system,
     messages,
     ...(tools ? { tools } : {}),

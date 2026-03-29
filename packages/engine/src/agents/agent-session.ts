@@ -226,9 +226,15 @@ export async function runAgentLoop(
   // numbers align with assistant message indices in the context dump viewer.
   const priorAssistantCount = messages.filter((m) => m.role === "assistant").length;
 
+  // When thinking is enabled, max_tokens must cover BOTH thinking and
+  // response tokens. Boost to 16384 so thinking doesn't starve the response.
+  const effectiveMaxTokens = ec.effort
+    ? Math.max(config.maxTokens, 16384)
+    : config.maxTokens;
+
   const buildParams = (): CreateParams => ({
     model: config.model,
-    max_tokens: config.maxTokens,
+    max_tokens: effectiveMaxTokens,
     system: effectiveSystem,
     messages: workingMessages,
     thinking: thinkingParam,
