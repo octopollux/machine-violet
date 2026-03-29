@@ -12,11 +12,8 @@ import { createOOCSession } from "../agents/subagents/ooc-mode.js";
 import { createDevSession, summarizeGameState } from "../agents/subagents/dev-mode.js";
 
 export interface CommandResult {
-  /** Message to show the player. */
   message?: string;
-  /** Whether this is an error. */
   error?: boolean;
-  /** Whether the session should end (e.g. rollback). */
   endSession?: boolean;
 }
 
@@ -40,11 +37,11 @@ export async function handleCommand(
       return handleScene(args, engine);
     case "ooc":
     case "dm":
-      return handleOOC(engine, gameState, broadcast);
+      return handleModeToggle("ooc", engine, gameState, broadcast);
     case "dev":
-      return handleDev(engine, gameState, broadcast);
+      return handleModeToggle("dev", engine, gameState, broadcast);
     case "exit_mode":
-      return { message: "Exited mode." };
+      return handleExitMode(engine, broadcast);
     case "snapshot":
       return handleSnapshot();
     default:
@@ -113,50 +110,89 @@ async function handleScene(args: string, engine: GameEngine): Promise<CommandRes
   return { message: `Transitioning: ${title}` };
 }
 
-async function handleOOC(
+/**
+ * Toggle a mode session (OOC or Dev). If already in that mode, exit it.
+ * If in a different mode, exit first then enter the new one.
+ */
+function handleModeToggle(
+  target: "ooc" | "dev",
   engine: GameEngine,
   gameState: GameState,
   broadcast: (event: ServerEvent) => void,
-): Promise<CommandResult> {
-  // Create OOC session and switch to OOC mode
-  const sm = engine.getSceneManager();
-  const session = createOOCSession(engine.getClient(), {
-    campaignName: gameState.config.name,
-    previousVariant: "exploration",
-    config: gameState.config,
-    sessionState: sm.getSessionState(),
-    repo: engine.getRepo() ?? undefined,
-    fileIO: sm.getFileIO(),
-    campaignRoot: gameState.campaignRoot,
+): CommandResult {
+  const current = engine.getModeSession();
+
+  // If already in the target mode, toggle off
+  if (current && current.label.toLowerCase() === target) {
+    return handleExitMode(engine, broadcast);
+  }
+
+  // If in a different mode, exit first
+  if (current) {
+    handleExitMode(engine, broadcast);
+  }
+
+  // Capture current variant before entering mode
+  const previousVariant = engine.getPreviousVariant() ?? "exploration";
+
+  if (target === "ooc") {
+    const sm = engine.getSceneManager();
+    const session = createOOCSession(engine.getClient(), {
+      campaignName: gameState.config.name,
+      previousVariant,
+      config: gameState.config,
+      sessionState: sm.getSessionState(),
+      repo: engine.getRepo() ?? undefined,
+      fileIO: sm.getFileIO(),
+      campaignRoot: gameState.campaignRoot,
+    });
+    engine.setModeSession(session);
+  } else {
+    const session = createDevSession(engine.getClient(), {
+      campaignName: gameState.config.name,
+      gameStateSummary: summarizeGameState(gameState),
+      gameState,
+      fileIO: engine.getSceneManager().getFileIO(),
+      sceneManager: engine.getSceneManager(),
+      repo: engine.getRepo() ?? undefined,
+    });
+    engine.setModeSession(session);
+  }
+
+  broadcast({
+    type: "session:mode",
+    data: { mode: target, variant: target },
   });
 
-  broadcast({ type: "session:mode", data: { mode: "ooc", variant: "ooc" } });
-
-  // Store the session so future input goes to it
-  engine.setModeSession(session);
-
-  return { message: "OOC Mode — type to chat, ESC to exit" };
+  const label = target === "ooc" ? "OOC" : "Dev";
+  return { message: `${label} Mode — type to chat, ESC to exit` };
 }
 
-async function handleDev(
+/**
+ * Exit the current mode session and return to normal play.
+ */
+function handleExitMode(
   engine: GameEngine,
-  gameState: GameState,
   broadcast: (event: ServerEvent) => void,
-): Promise<CommandResult> {
-  const session = createDevSession(engine.getClient(), {
-    campaignName: gameState.config.name,
-    gameStateSummary: summarizeGameState(gameState),
-    gameState,
-    fileIO: engine.getSceneManager().getFileIO(),
-    sceneManager: engine.getSceneManager(),
-    repo: engine.getRepo() ?? undefined,
+): CommandResult {
+  const current = engine.getModeSession();
+  if (!current) {
+    return { message: "Not in a mode session." };
+  }
+
+  const label = current.label;
+
+  // Clear the mode session
+  engine.setModeSession(null);
+
+  // Restore previous variant
+  const previousVariant = engine.getPreviousVariant() ?? "exploration";
+  broadcast({
+    type: "session:mode",
+    data: { mode: "play", variant: previousVariant },
   });
 
-  broadcast({ type: "session:mode", data: { mode: "dev", variant: "dev" } });
-
-  engine.setModeSession(session);
-
-  return { message: "Dev Mode — type to inspect, ESC to exit" };
+  return { message: `Exiting ${label} Mode` };
 }
 
 async function handleSnapshot(): Promise<CommandResult> {

@@ -47,6 +47,7 @@ export class SessionManager {
   private engine: GameEngine | null = null;
   private gameState: GameState | null = null;
   private costTracker: CostTracker | null = null;
+  private currentMode: "play" | "ooc" | "dev" | "setup" = "play";
 
   /** Campaign ID of the currently active session (null if none). */
   private campaignId: string | null = null;
@@ -81,6 +82,13 @@ export class SessionManager {
   // --- Broadcasting ---
 
   broadcast(event: ServerEvent): void {
+    // Track mode changes for state snapshots
+    if (event.type === "session:mode") {
+      const mode = (event.data as { mode?: string }).mode;
+      if (mode === "play" || mode === "ooc" || mode === "dev" || mode === "setup") {
+        this.currentMode = mode;
+      }
+    }
     const msg = JSON.stringify(event);
     for (const { ws } of this.clients.values()) {
       if (ws.readyState === ws.OPEN) {
@@ -430,7 +438,7 @@ export class SessionManager {
       displayResources: gs?.displayResources ?? {},
       resourceValues: gs?.resourceValues ?? {},
       modelines: {},
-      mode: "play",
+      mode: this.currentMode,
     };
   }
 

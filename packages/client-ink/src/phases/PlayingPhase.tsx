@@ -52,13 +52,13 @@ export function PlayingPhase() {
   const modalScrollRef = useRef<CenteredModalHandle>(null);
   const escTimestamps = useRef<number[]>([]);
 
-  // Whether TextInput should be disabled
+  // Whether TextInput should be disabled.
+  // Never block on engine state — the server rejects input if inappropriate.
+  // This prevents the client from getting permanently wedged.
   const textInputDisabled =
     !!activeModal ||
     !!retryOverlay ||
-    menuOpen ||
-    engineState === "dm_thinking" ||
-    engineState === "tool_running";
+    menuOpen;
 
   // Resolve player info from state snapshot
   const players = stateSnapshot?.players?.map((p) => ({

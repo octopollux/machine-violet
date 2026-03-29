@@ -281,6 +281,8 @@ export class GameEngine {
 
   /** Active mode session (OOC/Dev). Null when in normal play mode. */
   private modeSession: import("@machine-violet/shared/types/engine.js").ModeSession | null = null;
+  /** Variant active before entering a mode session, for restoration on exit. */
+  private previousVariant = "exploration";
 
   setModeSession(session: import("@machine-violet/shared/types/engine.js").ModeSession | null): void {
     this.modeSession = session;
@@ -288,6 +290,14 @@ export class GameEngine {
 
   getModeSession(): import("@machine-violet/shared/types/engine.js").ModeSession | null {
     return this.modeSession;
+  }
+
+  setPreviousVariant(variant: string): void {
+    this.previousVariant = variant;
+  }
+
+  getPreviousVariant(): string {
+    return this.previousVariant;
   }
 
   /** Seed the conversation with previously-persisted exchanges (for resume). */
