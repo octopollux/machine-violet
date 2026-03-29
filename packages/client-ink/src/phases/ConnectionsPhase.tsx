@@ -7,9 +7,9 @@
  * 3. Add new connection
  */
 import React, { useState, useEffect, useRef } from "react";
-import { useInput, Text, Box } from "ink";
+import { useInput, Text } from "ink";
 import type { ResolvedTheme } from "../tui/themes/types.js";
-import { ThemedHorizontalBorder, TerminalTooSmall } from "../tui/components/index.js";
+import { TerminalTooSmall, FullScreenFrame } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { useTextInput } from "../tui/hooks/useTextInput.js";
@@ -227,8 +227,6 @@ export function ConnectionsPhase({
   const fg = themeColor(theme, "fg");
   const dim = themeColor(theme, "dim");
   const accent = themeColor(theme, "accent");
-  // const contentWidth = cols - 4;
-
   // --- Health status icon ---
   const healthIcon = (id: string) => {
     const h = healthResults[id];
@@ -247,97 +245,104 @@ export function ConnectionsPhase({
     return "#cc4444";
   };
 
-  // --- Render ---
-  return (
-    <Box flexDirection="column" width={cols} height={termRows}>
-      <ThemedHorizontalBorder theme={theme} width={cols} position="top" title="AI Connections" />
-      <Box flexDirection="column" paddingX={2} height={termRows - 2}>
+  // --- Build content lines ---
+  const lines: React.ReactNode[] = [];
 
-        {/* Section: Connections */}
-        <Text color={section === "connections" ? accent : dim} bold={section === "connections"}>
-          {section === "connections" ? "\u25B6" : " "} Connections {`(${connections.length})`}
-        </Text>
-        {section === "connections" && connections.map((conn, i) => (
-          <Box key={conn.id}>
-            <Text color={i === connIndex ? accent : fg}>
-              {i === connIndex ? " \u25B8 " : "   "}
-              <Text color={healthColor(conn.id)}>{healthIcon(conn.id)}</Text>
-              {" "}{conn.label}
-              <Text color={dim}> — {conn.provider}{conn.models.length > 0 ? ` \u00b7 ${conn.models.length} models` : ""}</Text>
-            </Text>
-          </Box>
-        ))}
-        {section === "connections" && connections.length === 0 && (
-          <Text color={dim}>   No connections configured. Add one below.</Text>
-        )}
-        {section === "connections" && (
-          <Text color={dim}>   R=recheck  D=delete  Tab=next section  Esc=back</Text>
-        )}
+  // Section: Connections
+  lines.push(
+    <Text key="conn-header" color={section === "connections" ? accent : dim} bold={section === "connections"}>
+      {section === "connections" ? "\u25B6" : " "} Connections {`(${connections.length})`}
+    </Text>,
+  );
+  if (section === "connections") {
+    for (let i = 0; i < connections.length; i++) {
+      const conn = connections[i];
+      lines.push(
+        <Text key={conn.id} color={i === connIndex ? accent : fg}>
+          {i === connIndex ? " \u25B8 " : "   "}
+          <Text color={healthColor(conn.id)}>{healthIcon(conn.id)}</Text>
+          {" "}{conn.label}
+          <Text color={dim}> — {conn.provider}{conn.models.length > 0 ? ` \u00b7 ${conn.models.length} models` : ""}</Text>
+        </Text>,
+      );
+    }
+    if (connections.length === 0) {
+      lines.push(<Text key="conn-empty" color={dim}>   No connections configured. Add one below.</Text>);
+    }
+    lines.push(<Text key="conn-help" color={dim}>   R=recheck  D=delete  Tab=next section  Esc=back</Text>);
+  }
 
-        <Text> </Text>
+  lines.push(<Text key="sep1"> </Text>);
 
-        {/* Section: Tier Assignments */}
-        <Text color={section === "tiers" ? accent : dim} bold={section === "tiers"}>
-          {section === "tiers" ? "\u25B6" : " "} Model Assignments
-        </Text>
-        {section === "tiers" && tiers.map((tier, i) => {
-          const assignment = tierAssignments[tier];
-          const model = assignment ? (knownModels[assignment.modelId]?.displayName ?? assignment.modelId) : "(not set)";
-          const connLabel = assignment ? connections.find((c) => c.id === assignment.connectionId)?.label ?? "" : "";
+  // Section: Tier Assignments
+  lines.push(
+    <Text key="tier-header" color={section === "tiers" ? accent : dim} bold={section === "tiers"}>
+      {section === "tiers" ? "\u25B6" : " "} Model Assignments
+    </Text>,
+  );
+  if (section === "tiers") {
+    for (let i = 0; i < tiers.length; i++) {
+      const tier = tiers[i];
+      const assignment = tierAssignments[tier];
+      const model = assignment ? (knownModels[assignment.modelId]?.displayName ?? assignment.modelId) : "(not set)";
+      const connLabel = assignment ? connections.find((c) => c.id === assignment.connectionId)?.label ?? "" : "";
 
-          if (tierEditing && i === tierIndex) {
-            return (
-              <Box key={tier} flexDirection="column">
-                <Text color={accent}> \u25B8 {TIER_LABELS[tier]}: <Text color={dim}>select model...</Text></Text>
-                {allModels.map((m, mi) => (
-                  <Text key={m.modelId + m.connectionId} color={mi === tierModelIndex ? accent : fg}>
-                    {"     "}{mi === tierModelIndex ? "\u25B8 " : "  "}{m.label}
-                  </Text>
-                ))}
-              </Box>
-            );
-          }
-
-          return (
-            <Text key={tier} color={i === tierIndex && section === "tiers" ? accent : fg}>
-              {i === tierIndex && section === "tiers" ? " \u25B8 " : "   "}
-              {TIER_LABELS[tier]}: {model}
-              {connLabel ? <Text color={dim}> [{connLabel}]</Text> : null}
-            </Text>
+      if (tierEditing && i === tierIndex) {
+        lines.push(<Text key={`tier-${tier}-edit`} color={accent}> \u25B8 {TIER_LABELS[tier]}: <Text color={dim}>select model...</Text></Text>);
+        for (let mi = 0; mi < allModels.length; mi++) {
+          const m = allModels[mi];
+          lines.push(
+            <Text key={`model-${m.modelId}-${m.connectionId}`} color={mi === tierModelIndex ? accent : fg}>
+              {"     "}{mi === tierModelIndex ? "\u25B8 " : "  "}{m.label}
+            </Text>,
           );
-        })}
+        }
+      } else {
+        lines.push(
+          <Text key={`tier-${tier}`} color={i === tierIndex && section === "tiers" ? accent : fg}>
+            {i === tierIndex && section === "tiers" ? " \u25B8 " : "   "}
+            {TIER_LABELS[tier]}: {model}
+            {connLabel ? <Text color={dim}> [{connLabel}]</Text> : null}
+          </Text>,
+        );
+      }
+    }
+  }
 
-        <Text> </Text>
+  lines.push(<Text key="sep2"> </Text>);
 
-        {/* Section: Add Connection */}
-        <Text color={section === "add" ? accent : dim} bold={section === "add"}>
-          {section === "add" ? "\u25B6" : " "} Add Connection
-        </Text>
-        {section === "add" && addStep === "provider" && PROVIDER_OPTIONS.map((p, i) => (
+  // Section: Add Connection
+  lines.push(
+    <Text key="add-header" color={section === "add" ? accent : dim} bold={section === "add"}>
+      {section === "add" ? "\u25B6" : " "} Add Connection
+    </Text>,
+  );
+  if (section === "add") {
+    if (addStep === "provider") {
+      for (let i = 0; i < PROVIDER_OPTIONS.length; i++) {
+        const p = PROVIDER_OPTIONS[i];
+        lines.push(
           <Text key={p.id} color={i === addProviderIndex ? accent : fg}>
             {i === addProviderIndex ? " \u25B8 " : "   "}{p.label}
-          </Text>
-        ))}
-        {section === "add" && addStep === "key" && (
-          <Box flexDirection="column" paddingLeft={3}>
-            <Text color={fg}>API Key: <Text color={accent}>{keyInput || " "}</Text></Text>
-            <Text color={dim}>Paste your {addProvider} API key, then Enter</Text>
-          </Box>
-        )}
-        {section === "add" && addStep === "label" && (
-          <Box flexDirection="column" paddingLeft={3}>
-            <Text color={fg}>Label (optional): <Text color={accent}>{labelInput || " "}</Text></Text>
-            <Text color={dim}>Press Enter to {PROVIDER_OPTIONS.find((p) => p.id === addProvider)?.needsBaseUrl ? "continue" : "add"}</Text>
-          </Box>
-        )}
-        {section === "add" && addStep === "baseUrl" && (
-          <Box flexDirection="column" paddingLeft={3}>
-            <Text color={fg}>Base URL: <Text color={accent}>{baseUrlInput || " "}</Text></Text>
-            <Text color={dim}>e.g. http://localhost:11434/v1 — then Enter to add</Text>
-          </Box>
-        )}
-      </Box>
-      <ThemedHorizontalBorder theme={theme} width={cols} position="bottom" />
-    </Box>
+          </Text>,
+        );
+      }
+    } else if (addStep === "key") {
+      lines.push(<Text key="add-key" color={fg}>   API Key: <Text color={accent}>{keyInput || " "}</Text></Text>);
+      lines.push(<Text key="add-key-hint" color={dim}>   Paste your {addProvider} API key, then Enter</Text>);
+    } else if (addStep === "label") {
+      lines.push(<Text key="add-label" color={fg}>   Label (optional): <Text color={accent}>{labelInput || " "}</Text></Text>);
+      lines.push(<Text key="add-label-hint" color={dim}>   Press Enter to {PROVIDER_OPTIONS.find((p) => p.id === addProvider)?.needsBaseUrl ? "continue" : "add"}</Text>);
+    } else if (addStep === "baseUrl") {
+      lines.push(<Text key="add-url" color={fg}>   Base URL: <Text color={accent}>{baseUrlInput || " "}</Text></Text>);
+      lines.push(<Text key="add-url-hint" color={dim}>   e.g. http://localhost:11434/v1 — then Enter to add</Text>);
+    }
+  }
+
+  // --- Render ---
+  return (
+    <FullScreenFrame theme={theme} columns={cols} rows={termRows} title="AI Connections" contentRows={lines.length}>
+      {lines}
+    </FullScreenFrame>
   );
 }
