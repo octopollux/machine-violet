@@ -122,6 +122,8 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
     setActiveModal(null);
     setClientState(initialClientState());
     setVariant("exploration");
+    setKeyColor("#8888aa");
+    setThemeDef(loadThemeDefinition("gothic"));
     // Transition to menu AFTER state is cleared
     setPhase("menu");
     // Refresh campaign list
