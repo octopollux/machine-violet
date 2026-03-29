@@ -274,6 +274,22 @@ export class GameEngine {
     return this.repo;
   }
 
+  /** Get the Anthropic client (for subagent creation). */
+  getClient(): Anthropic {
+    return this.client;
+  }
+
+  /** Active mode session (OOC/Dev). Null when in normal play mode. */
+  private modeSession: import("@machine-violet/shared/types/engine.js").ModeSession | null = null;
+
+  setModeSession(session: import("@machine-violet/shared/types/engine.js").ModeSession | null): void {
+    this.modeSession = session;
+  }
+
+  getModeSession(): import("@machine-violet/shared/types/engine.js").ModeSession | null {
+    return this.modeSession;
+  }
+
   /** Seed the conversation with previously-persisted exchanges (for resume). */
   seedConversation(exchanges: import("../context/conversation.js").ConversationExchange[]): void {
     this.conversation.seedExchanges(exchanges);

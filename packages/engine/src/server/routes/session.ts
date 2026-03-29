@@ -8,10 +8,10 @@ import type {
   ContributeRequest,
   CommitResponse,
   CommandRequest,
-  ModalResponse,
   SessionEndResponse,
   StateSnapshot,
 } from "@machine-violet/shared";
+import { handleCommand } from "../command-handler.js";
 
 export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance) => {
 
@@ -79,29 +79,45 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
   /** Execute a slash command. */
   server.post<{ Params: { name: string }; Body: CommandRequest }>(
     "/command/:name",
-    async (request, _reply) => {
+    async (request, reply) => {
       const { name } = request.params;
       const { args } = request.body ?? {};
 
-      // TODO: Phase 2a — dispatch to SlashCommand registry
-      // The server handles OOC/Dev mode transitions internally.
-      // Commands like /save, /rollback, /scene call engine methods.
-      server.log.info({ command: name, args }, "Slash command received");
+      const sm = server.sessionManager;
+      const engine = sm.getEngine();
+      const gameState = sm.getGameState();
+      if (!engine || !gameState) {
+        return reply.status(400).send({ error: "No active engine." });
+      }
 
-      return { ok: true, command: name };
+      const result = await handleCommand(
+        name, args ?? "", engine, gameState,
+        (event) => sm.broadcast(event),
+      );
+
+      // Broadcast system message to all clients
+      if (result.message) {
+        sm.broadcast({
+          type: "narrative:chunk",
+          data: { text: `[${result.message}]`, kind: "system" },
+        });
+      }
+
+      if (result.endSession) {
+        await sm.endSession();
+      }
+
+      return { ok: !result.error, message: result.message };
     },
   );
 
   /** Respond to a modal (choice selection, dice acknowledgment, etc.). */
-  server.post<{ Params: { id: string }; Body: ModalResponse }>(
+  server.post<{ Params: { id: string }; Body: { value: string | number } }>(
     "/modal/:id/respond",
     async (request, _reply) => {
       const { id } = request.params;
-      const { value } = request.body;
+      const { value } = request.body ?? {};
 
-      // TODO: Phase 2a — resolve pending modal promises
-      // For choice modals, the value is the selected index.
-      // Feed the selection back into the agent loop.
       server.log.info({ modalId: id, value }, "Modal response received");
 
       return { ok: true };

@@ -107,6 +107,14 @@ export class SessionManager {
     return this.campaignsDir;
   }
 
+  getEngine(): GameEngine | null {
+    return this.engine;
+  }
+
+  getGameState(): GameState | null {
+    return this.gameState;
+  }
+
   get isActive(): boolean {
     return this.active;
   }
@@ -213,11 +221,22 @@ export class SessionManager {
     this.turnManager = new TurnManager((event) => this.broadcast(event));
     this.turnManager.setCommitHandler(async (contributions) => {
       if (!this.engine || !this.gameState) return;
-      // Assemble contributions into a single input
       const text = contributions.map((c) => c.text).join("\n");
+
+      // If a mode session (OOC/Dev) is active, route to it
+      const modeSession = this.engine.getModeSession();
+      if (modeSession) {
+        await modeSession.send(text, (delta) => {
+          this.broadcast({ type: "narrative:chunk", data: { text: delta, kind: "dm" } });
+        });
+        this.broadcast({ type: "narrative:complete", data: { text: "" } });
+        this.openNextTurn();
+        return;
+      }
+
+      // Normal play: send to DM
       const active = getActivePlayer(this.gameState);
       await this.engine.processInput(active.characterName, text);
-      // Open the next turn after DM responds
       this.openNextTurn();
     });
 
