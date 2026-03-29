@@ -135,8 +135,9 @@ function handleNarrativeChunk(event: NarrativeChunkEvent, update: StateUpdater):
     const parts = text.split("\n");
 
     for (let i = 0; i < parts.length; i++) {
-      if (i === 0 && lastLine && lastLine.kind === lineKind) {
-        // First part: append to last line (continuation of buffered chunk)
+      if (i === 0 && lastLine && lastLine.kind === lineKind && lastLine.text !== "") {
+        // First part: append to last NONEMPTY line of same kind.
+        // Never extend an empty line — it's a paragraph boundary.
         lines[lines.length - 1] = { kind: lineKind, text: lastLine.text + parts[i] };
       } else {
         // New line — preserve empty strings as paragraph boundaries
