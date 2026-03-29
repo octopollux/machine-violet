@@ -44,6 +44,7 @@ export function PlayingPhase() {
   // Local state
   const [resetKey, setResetKey] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [tokenSummary, setTokenSummary] = useState("");
 
   const clearInput = useCallback(() => setResetKey((k) => k + 1), []);
 
@@ -190,6 +191,13 @@ export function PlayingPhase() {
     // ESC opens game menu
     if (key.escape) {
       setMenuOpen(true);
+      apiClient.getCost().then(({ formatted }) => setTokenSummary(formatted)).catch(() => { /* no-op */ });
+      return;
+    }
+
+    // Tab: cycle active player
+    if (key.tab) {
+      apiClient.cyclePlayer().catch(() => { /* no-op */ });
       return;
     }
 
@@ -321,7 +329,7 @@ export function PlayingPhase() {
           oocActive={mode === "ooc"}
           devModeEnabled={true}
           devActive={mode === "dev"}
-          tokenSummary=""
+          tokenSummary={tokenSummary}
           onSelect={handleMenuSelect}
           onDismiss={() => setMenuOpen(false)}
         />

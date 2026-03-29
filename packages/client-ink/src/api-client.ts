@@ -87,6 +87,14 @@ export class ApiClient {
     return this.get("/session/settings");
   }
 
+  async cyclePlayer(): Promise<{ activePlayerIndex: number; character: string }> {
+    return this.post("/session/player/cycle");
+  }
+
+  async getCost(): Promise<{ breakdown: unknown; formatted: string }> {
+    return this.get("/session/cost");
+  }
+
   async endSession(): Promise<SessionEndResponse> {
     return this.post("/session/end");
   }

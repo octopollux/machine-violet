@@ -124,11 +124,24 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
     },
   );
 
-  /** Patch settings directly (temporary — frontend knows the shape). */
-  server.patch("/settings", async (request, _reply) => {
-    // TODO: Phase 2a — apply settings patch to CampaignConfig
-    server.log.info({ settings: request.body }, "Settings patch received");
-    return { ok: true };
+  /** Cycle to the next player (Tab key). */
+  server.post("/player/cycle", async (_request, reply) => {
+    const gs = server.sessionManager.getGameState();
+    if (!gs) return reply.status(400).send({ error: "No game state." });
+
+    const playerCount = gs.config.players.length;
+    if (playerCount <= 1) return { activePlayerIndex: 0 };
+
+    gs.activePlayerIndex = (gs.activePlayerIndex + 1) % playerCount;
+    const player = gs.config.players[gs.activePlayerIndex];
+
+    // Broadcast updated state
+    server.sessionManager.broadcast({
+      type: "state:snapshot",
+      data: server.sessionManager.buildStateSnapshot(),
+    });
+
+    return { activePlayerIndex: gs.activePlayerIndex, character: player.character };
   });
 
   /** End the current session. */

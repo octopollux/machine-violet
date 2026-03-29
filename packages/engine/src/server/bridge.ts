@@ -13,13 +13,28 @@ import type {
   UsageStats, ModelTier, ToolResult, TuiCommand,
   ServerEvent,
 } from "@machine-violet/shared";
+import { CostTracker } from "../context/cost-tracker.js";
+import type { StatePersister } from "../context/state-persistence.js";
+import type { StyleVariant } from "@machine-violet/shared/types/tui.js";
 
 /** Buffering config for narrative text. */
 const FLUSH_INTERVAL_MS = 50;
 
+export interface BridgeOptions {
+  broadcast: (event: ServerEvent) => void;
+  /** Cost tracker for accumulating token usage. */
+  costTracker?: CostTracker;
+  /** Persister for saving UI state (theme, modelines) to disk. */
+  persister?: StatePersister | null;
+}
+
 export function createBridge(
-  broadcast: (event: ServerEvent) => void,
+  broadcastOrOpts: ((event: ServerEvent) => void) | BridgeOptions,
 ): EngineCallbacks {
+  const opts: BridgeOptions = typeof broadcastOrOpts === "function"
+    ? { broadcast: broadcastOrOpts }
+    : broadcastOrOpts;
+  const { broadcast, costTracker, persister } = opts;
   // --- Narrative buffering ---
   let buffer = "";
   let flushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -72,8 +87,7 @@ export function createBridge(
     },
 
     onTuiCommand(command: TuiCommand): void {
-      // Route TUI commands to appropriate event types
-      routeTuiCommand(command, broadcast);
+      routeTuiCommand(command, broadcast, persister ?? null);
     },
 
     onToolStart(name: string): void {
@@ -94,8 +108,10 @@ export function createBridge(
       // No client-visible action needed — the engine handles precis updates internally
     },
 
-    onUsageUpdate(_delta: UsageStats, _tier: ModelTier): void {
-      // Cost data is included in state:snapshot, not sent as individual events
+    onUsageUpdate(delta: UsageStats, tier: ModelTier): void {
+      if (costTracker) {
+        costTracker.record(delta, tier);
+      }
     },
 
     onError(error: Error): void {
@@ -138,6 +154,7 @@ export function createBridge(
 function routeTuiCommand(
   command: TuiCommand,
   broadcast: (event: ServerEvent) => void,
+  persister: StatePersister | null,
 ): void {
   switch (command.type) {
     // --- DM-driven choices (rendered in Player Pane by the client) ---
@@ -160,6 +177,10 @@ function routeTuiCommand(
         type: "session:mode",
         data: { mode: "play", variant: command.variant as string | undefined },
       });
+      // Persist variant to disk
+      if (persister && command.variant) {
+        persister.persistUI({ styleName: "clean", variant: command.variant as StyleVariant });
+      }
       break;
 
     case "enter_ooc":
@@ -180,6 +201,11 @@ function routeTuiCommand(
         type: "activity:update",
         data: { engineState: `tui:${command.type}`, ...command },
       });
+      // Persist modeline updates to disk
+      if (persister && command.type === "update_modeline") {
+        // Modeline persistence happens via the engine's tool hooks;
+        // no extra persistence needed here since the engine already calls persistUI
+      }
       break;
 
     // --- Commands we can safely ignore ---

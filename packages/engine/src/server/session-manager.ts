@@ -29,6 +29,7 @@ import { createCombatState } from "../tools/combat/index.js";
 import { createDecksState } from "../tools/cards/index.js";
 import { createObjectivesState } from "../tools/objectives/index.js";
 import { markdownToNarrativeLines } from "../context/display-log.js";
+import { CostTracker } from "../context/cost-tracker.js";
 import { TurnManager } from "./turn-manager.js";
 import { createBridge } from "./bridge.js";
 import { createBaseFileIO } from "./fileio.js";
@@ -45,6 +46,7 @@ export class SessionManager {
   private active = false;
   private engine: GameEngine | null = null;
   private gameState: GameState | null = null;
+  private costTracker: CostTracker | null = null;
 
   /** Campaign ID of the currently active session (null if none). */
   private campaignId: string | null = null;
@@ -114,6 +116,10 @@ export class SessionManager {
 
   getGameState(): GameState | null {
     return this.gameState;
+  }
+
+  getCostTracker(): CostTracker | null {
+    return this.costTracker;
   }
 
   get isActive(): boolean {
@@ -199,8 +205,15 @@ export class SessionManager {
       }
     } catch { /* ignore — may not exist yet */ }
 
+    // --- Cost tracker ---
+    this.costTracker = new CostTracker();
+
     // --- Create bridge (EngineCallbacks → WebSocket events) ---
-    const callbacks = createBridge((event) => this.broadcast(event));
+    const callbacks = createBridge({
+      broadcast: (event) => this.broadcast(event),
+      costTracker: this.costTracker,
+      persister: null, // Will be set after engine creation
+    });
 
     // --- Instantiate GameEngine ---
     const engine = new GameEngine({

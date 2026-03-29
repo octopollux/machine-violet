@@ -140,12 +140,13 @@ export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) =>
   });
 
   /** Get token cost breakdown. */
-  server.get("/cost", async (_request, reply) => {
-    const engine = server.sessionManager.getEngine();
-    if (!engine) return reply.status(400).send({ error: "No active engine." });
+  server.get("/cost", async () => {
+    const ct = server.sessionManager.getCostTracker();
+    if (!ct) return { breakdown: null, formatted: "" };
 
-    // CostTracker is wired into the engine via callbacks
-    // For now return a placeholder — full cost tracking needs CostTracker exposed
-    return { breakdown: null, message: "Cost tracking not yet exposed via API." };
+    return {
+      breakdown: ct.getBreakdown(),
+      formatted: ct.formatTokens(),
+    };
   });
 };
