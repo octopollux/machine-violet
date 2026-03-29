@@ -60,10 +60,10 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
   const [activeCampaignId, setActiveCampaignId] = useState(campaignId ?? "");
 
   // Theme state
-  const [themeDef, setThemeDef] = useState<ThemeDefinition>(() => loadThemeDefinition("clean"));
+  const [themeDef, setThemeDef] = useState<ThemeDefinition>(() => loadThemeDefinition("gothic"));
   const [variant, setVariant] = useState<StyleVariant>("exploration");
   const [keyColor, setKeyColor] = useState("#8888aa");
-  const [theme, setTheme] = useState<ResolvedTheme>(() => resolveTheme(loadThemeDefinition("clean"), "exploration"));
+  const [theme, setTheme] = useState<ResolvedTheme>(() => resolveTheme(loadThemeDefinition("gothic"), "exploration"));
 
   // Batching hook ensures spacer lines survive React reconciliation for paragraph spacing
   const { lines: narrativeLines, setLines: setNarrativeLines } = useBatchedNarrativeLines();
