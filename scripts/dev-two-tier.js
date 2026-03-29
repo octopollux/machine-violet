@@ -11,6 +11,7 @@
  * Environment:
  *   MV_CAMPAIGNS  — Campaign data directory (required)
  *   MV_PORT       — Engine server port (default: 7200)
+ *   MV_CAMPAIGN   — Campaign ID (alternative to positional arg)
  *   ANTHROPIC_API_KEY — Required for the engine
  */
 import { spawn } from "node:child_process";
@@ -58,30 +59,43 @@ const server = spawn(
 );
 
 let serverReady = false;
+let shuttingDown = false;
+const serverLog = [];
 
 server.stdout.on("data", (data) => {
   const line = data.toString().trim();
+  serverLog.push(line);
   if (line.includes("Server listening")) {
     serverReady = true;
   }
-  // Don't echo server logs — they'd corrupt the TUI
 });
 
 server.stderr.on("data", (data) => {
+  const line = data.toString().trim();
+  serverLog.push("[stderr] " + line);
   if (!serverReady) {
-    // Show startup errors
     process.stderr.write(data);
   }
 });
 
 server.on("exit", (code) => {
+  if (shuttingDown) return; // Intentional shutdown — don't print errors
   if (!serverReady) {
     console.error(`Engine server failed to start (exit code ${code}).`);
-    process.exit(1);
+    console.error("Last output:");
+    for (const line of serverLog.slice(-10)) {
+      console.error("  " + line);
+    }
+  } else {
+    console.error(`\nEngine server crashed (exit code ${code}). Last output:`);
+    for (const line of serverLog.slice(-20)) {
+      console.error("  " + line);
+    }
   }
+  process.exit(code ?? 1);
 });
 
-// --- Wait for server to be ready, then launch client ---
+// --- Wait for server to be ready ---
 async function waitForServer(maxAttempts = 30) {
   for (let i = 0; i < maxAttempts; i++) {
     try {
@@ -95,6 +109,18 @@ async function waitForServer(maxAttempts = 30) {
   return false;
 }
 
+// --- Cleanup ---
+function cleanup() {
+  shuttingDown = true;
+  if (!server.killed) {
+    server.kill("SIGTERM");
+    setTimeout(() => {
+      if (!server.killed) server.kill("SIGKILL");
+    }, 2000);
+  }
+}
+
+// --- Main ---
 async function main() {
   const ready = await waitForServer();
   if (!ready) {
@@ -105,7 +131,6 @@ async function main() {
 
   console.log("Engine server ready. Launching TUI client...\n");
 
-  // --- Start client ---
   const clientEnv = {
     ...process.env,
     MV_SERVER: `http://127.0.0.1:${port}`,
@@ -124,42 +149,37 @@ async function main() {
   );
 
   client.on("exit", (code) => {
-    cleanup();
-    process.exit(code ?? 0);
-  });
-
-  // --- Cleanup on signals ---
-  function cleanup() {
-    if (!server.killed) {
-      server.kill("SIGTERM");
-      // Give server a moment to flush state, then force kill
-      setTimeout(() => {
-        if (!server.killed) server.kill("SIGKILL");
-      }, 2000);
+    if (code !== 0) {
+      // Show server logs if client crashed — might be a server-side cause
+      console.error(`\nClient exited with code ${code}.`);
+      const recentErrors = serverLog.filter(l => l.includes("[stderr]") || l.includes("err")).slice(-10);
+      if (recentErrors.length > 0) {
+        console.error("Recent server output:");
+        for (const line of recentErrors) {
+          console.error("  " + line);
+        }
+      }
     }
-  }
+    cleanup();
+    // Give cleanup a moment before exiting
+    setTimeout(() => process.exit(code ?? 0), 500);
+  });
 
   process.on("SIGINT", () => {
     client.kill("SIGINT");
     cleanup();
+    setTimeout(() => process.exit(0), 500);
   });
 
   process.on("SIGTERM", () => {
     client.kill("SIGTERM");
     cleanup();
+    setTimeout(() => process.exit(0), 500);
   });
-
-  // Windows: handle Ctrl+C via SIGINT (Node translates it)
-  if (process.platform === "win32") {
-    process.on("SIGHUP", () => {
-      client.kill("SIGTERM");
-      cleanup();
-    });
-  }
 }
 
 main().catch((err) => {
   console.error("Fatal error:", err);
-  server.kill();
+  cleanup();
   process.exit(1);
 });
