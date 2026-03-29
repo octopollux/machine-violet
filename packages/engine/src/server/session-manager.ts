@@ -330,20 +330,26 @@ export class SessionManager {
     // Broadcast state snapshot
     this.broadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
 
-    // Send display history from previous session.
-    // Each line gets a trailing \n so that appendDelta on the client creates
-    // proper line breaks and spacers between paragraphs.
+    // Send display history from previous session as a single chunk per kind-group.
+    // Joining lines with \n lets appendDelta handle paragraph spacing correctly.
     const historyLines = await persister.loadDisplayLogFull();
     if (historyLines.length > 0) {
       const narrativeLines = markdownToNarrativeLines(historyLines);
+      // Group consecutive same-kind lines and send each group as one chunk
+      let currentKind = "";
+      let currentText = "";
       for (const line of narrativeLines) {
         const kind = line.kind as string;
-        if (kind === "dm" || kind === "player" || kind === "system" || kind === "dev") {
-          this.broadcast({
-            type: "narrative:chunk",
-            data: { text: line.text + "\n", kind },
-          });
+        if (kind !== "dm" && kind !== "player" && kind !== "system" && kind !== "dev") continue;
+        if (kind !== currentKind && currentText) {
+          this.broadcast({ type: "narrative:chunk", data: { text: currentText, kind: currentKind } });
+          currentText = "";
         }
+        currentKind = kind;
+        currentText += (currentText ? "\n" : "") + line.text;
+      }
+      if (currentText) {
+        this.broadcast({ type: "narrative:chunk", data: { text: currentText, kind: currentKind } });
       }
       this.broadcast({ type: "narrative:complete", data: { text: "" } });
     }
