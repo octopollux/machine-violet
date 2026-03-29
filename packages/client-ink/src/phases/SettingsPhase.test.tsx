@@ -4,10 +4,8 @@ import { render } from "ink-testing-library";
 import { SettingsPhase } from "./SettingsPhase.js";
 import type { SettingsPhaseProps } from "./SettingsPhase.js";
 import { resetThemeCache, resolveTheme, BUILTIN_DEFINITIONS } from "../tui/themes/index.js";
-import { resetPromptCache } from "../prompts/load-prompt.js";
 
 beforeEach(() => {
-  resetPromptCache();
   resetThemeCache();
 });
 

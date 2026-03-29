@@ -23,14 +23,18 @@ export function isCompiled(): boolean {
  * Compiled binary layout (next to the exe):
  *   prompts/  themes/  systems/
  *
- * Dev layout (repo root):
- *   src/prompts/  src/tui/themes/assets/  systems/
+ * Dev layout (packages/engine package root):
+ *   src/prompts/           — prompts live inside this package
+ *   ../../systems/         — systems/ is at the monorepo root
+ *   ../../src/tui/themes/assets/ — themes are in the monolith TUI (engine doesn't use this)
  */
 const _cache = new Map<string, string>();
+
+// Paths relative to the *package* root (packages/engine/)
 const DEV_ASSET_DIRS: Record<string, string> = {
   prompts: "src/prompts",
-  themes: "src/tui/themes/assets",
-  systems: "systems",
+  themes: "../../src/tui/themes/assets",
+  systems: "../../systems",
 };
 
 export function assetDir(category: "prompts" | "themes" | "systems"): string {
@@ -41,9 +45,9 @@ export function assetDir(category: "prompts" | "themes" | "systems"): string {
   if (isCompiled()) {
     dir = join(dirname(process.execPath), category);
   } else {
-    // src/utils/paths.ts → repo root is ../..
-    const repoRoot = norm(dirname(dirname(import.meta.dirname)));
-    dir = join(repoRoot, DEV_ASSET_DIRS[category]);
+    // packages/engine/src/utils/paths.ts → package root is ../..
+    const pkgRoot = norm(dirname(dirname(import.meta.dirname)));
+    dir = join(pkgRoot, DEV_ASSET_DIRS[category]);
   }
 
   _cache.set(category, dir);

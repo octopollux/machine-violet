@@ -5,10 +5,8 @@ import { render } from "ink-testing-library";
 import { CampaignSettingsModal } from "./CampaignSettingsModal.js";
 import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
 import { resetThemeCache, resolveTheme, BUILTIN_DEFINITIONS } from "../themes/index.js";
-import { resetPromptCache } from "../../prompts/load-prompt.js";
 
 beforeEach(() => {
-  resetPromptCache();
   resetThemeCache();
 });
 

@@ -4,10 +4,8 @@ import { render } from "ink-testing-library";
 import { Text } from "ink";
 import { FullScreenFrame } from "./FullScreenFrame.js";
 import { resetThemeCache, resolveTheme, BUILTIN_DEFINITIONS } from "../themes/index.js";
-import { resetPromptCache } from "../../prompts/load-prompt.js";
 
 beforeEach(() => {
-  resetPromptCache();
   resetThemeCache();
 });
 

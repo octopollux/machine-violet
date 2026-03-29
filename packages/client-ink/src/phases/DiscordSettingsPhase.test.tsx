@@ -4,10 +4,8 @@ import { render } from "ink-testing-library";
 import { DiscordSettingsPhase } from "./DiscordSettingsPhase.js";
 import type { DiscordSettingsPhaseProps } from "./DiscordSettingsPhase.js";
 import { resetThemeCache, resolveTheme, BUILTIN_DEFINITIONS } from "../tui/themes/index.js";
-import { resetPromptCache } from "../prompts/load-prompt.js";
 
 beforeEach(() => {
-  resetPromptCache();
   resetThemeCache();
 });
 
