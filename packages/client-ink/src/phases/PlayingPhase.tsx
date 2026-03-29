@@ -140,8 +140,7 @@ export function PlayingPhase() {
     setMenuOpen(false);
     if (item === "Resume") return;
     if (item === "Save & Exit" || item === "End Session") {
-      try { await apiClient.endSession(); } catch { /* ignore */ }
-      onReturnToMenu();
+      onReturnToMenu(); // returnToMenu handles endSession + state reset
     } else if (item === "OOC Mode") {
       await apiClient.command("ooc");
     } else if (item === "Dev Mode") {

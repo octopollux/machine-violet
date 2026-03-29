@@ -58,6 +58,8 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
   const [clientState, setClientState] = useState<ClientState>(initialClientState);
   const [campaigns, setCampaigns] = useState<CampaignEntry[]>([]);
   const [activeCampaignId, setActiveCampaignId] = useState(campaignId ?? "");
+  // Session counter forces full PlayingPhase remount on campaign switch
+  const [sessionKey, setSessionKey] = useState(0);
 
   // Theme state
   const [themeDef, setThemeDef] = useState<ThemeDefinition>(() => loadThemeDefinition("gothic"));
@@ -102,6 +104,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
   // Start a campaign (used by both auto-start and menu selection)
   const startCampaign = useCallback((id: string) => {
     setActiveCampaignId(id);
+    setSessionKey((k) => k + 1);
     setPhase("starting");
     setNarrativeLines([]);
     setClientState(initialClientState());
@@ -206,6 +209,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
         errorMsg={errorMessage || null}
         apiKeyValid={true}
         onNewCampaign={() => {
+          setSessionKey((k) => k + 1);
           setPhase("starting");
           setErrorMessage("");
           apiClientRef.current.createCampaign().then(() => {
@@ -276,7 +280,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
       stateSnapshot,
       onReturnToMenu: returnToMenu,
     }}>
-      <PlayingPhase key={activeCampaignId} />
+      <PlayingPhase key={`${activeCampaignId}-${sessionKey}`} />
     </GameProvider>
   );
 }
