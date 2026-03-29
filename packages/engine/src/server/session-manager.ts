@@ -236,6 +236,13 @@ export class SessionManager {
       ? createProviderFromConnection(largeTier.connection)
       : undefined;
 
+    // --- Dev mode: set context dump directory ---
+    const { isDevMode } = await import("../config/dev-mode.js");
+    if (isDevMode()) {
+      const { setContextDumpDir } = await import("../config/context-dump.js");
+      setContextDumpDir(join(campaignRoot, ".dev-mode", "context"));
+    }
+
     // --- Create Anthropic client (legacy fallback) ---
     const client = createClient();
 
