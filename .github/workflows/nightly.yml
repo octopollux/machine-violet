@@ -461,17 +461,18 @@ jobs:
             end
 
             def install
-              libexec.install "machine-violet"
+              libexec.install "MachineViolet"
               libexec.install "prompts" if Dir.exist?("prompts")
               libexec.install "themes" if Dir.exist?("themes")
               libexec.install "systems" if Dir.exist?("systems")
 
-              chmod 0755, libexec/"machine-violet"
-              bin.write_exec_script libexec/"machine-violet"
+              chmod 0755, libexec/"MachineViolet"
+              # Expose as lowercase `machine-violet` for CLI convention
+              (bin/"machine-violet").write_env_script libexec/"MachineViolet"
             end
 
             test do
-              assert_match "machine-violet", shell_output("#{bin}/machine-violet --version")
+              assert_match "MachineViolet", shell_output("#{bin}/machine-violet --version")
             end
           end
           FORMULA
