@@ -5,18 +5,32 @@
  * POST /campaigns           — create new campaign (start setup pseudo-campaign)
  * POST /campaigns/:id/start — start/resume an existing campaign
  */
+import { readdir, readFile, stat } from "node:fs/promises";
+import { basename } from "node:path";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
-import type { ListCampaignsResponse, StartCampaignResponse } from "@machine-violet/shared";
+import type { StartCampaignResponse } from "@machine-violet/shared";
+import { listCampaigns } from "../../config/main-menu.js";
 
 export const campaignRoutes: FastifyPluginAsync = async (server: FastifyInstance) => {
 
   /** List available campaigns. */
-  server.get("/", async (_request, _reply) => {
-    // TODO: Phase 2a — scan campaignsDir for valid campaign directories
-    const response: ListCampaignsResponse = {
-      campaigns: [],
+  server.get("/", async () => {
+    const campaignsDir = server.sessionManager.getCampaignsDir();
+
+    const entries = await listCampaigns(
+      campaignsDir,
+      (p) => readdir(p),
+      async (p) => { try { await stat(p); return true; } catch { return false; } },
+      (p) => readFile(p, "utf-8"),
+    );
+
+    return {
+      campaigns: entries.map((e) => ({
+        id: basename(e.path),
+        name: e.name,
+        path: e.path,
+      })),
     };
-    return response;
   });
 
   /** Create a new campaign (enter setup pseudo-campaign). */
@@ -26,14 +40,8 @@ export const campaignRoutes: FastifyPluginAsync = async (server: FastifyInstance
       return reply.status(409).send({ error: "A session is already active." });
     }
 
-    // TODO: Phase 2c — create SetupSession that wraps SetupConversation
-    // For now, return a stub
-    const sessionId = crypto.randomUUID();
-    const response: StartCampaignResponse = {
-      sessionId,
-      wsUrl: `/session/ws`,
-    };
-    return reply.status(201).send(response);
+    // TODO: setup pseudo-campaign
+    return reply.status(501).send({ error: "Campaign creation not yet implemented. Use the monolith to create campaigns." });
   });
 
   /** Start or resume an existing campaign. */

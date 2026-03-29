@@ -101,7 +101,11 @@ export class SessionManager {
     }
   }
 
-  // --- Session lifecycle ---
+  // --- Accessors ---
+
+  getCampaignsDir(): string {
+    return this.campaignsDir;
+  }
 
   get isActive(): boolean {
     return this.active;

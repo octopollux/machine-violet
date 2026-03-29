@@ -8,8 +8,10 @@
  * Usage:
  *   node scripts/dev-two-tier.js [campaign-id]
  *
+ * With no campaign-id, shows a menu of available campaigns.
+ *
  * Environment:
- *   MV_CAMPAIGNS  — Campaign data directory (required)
+ *   MV_CAMPAIGNS  — Campaign data directory (auto-detected if not set)
  *   MV_PORT       — Engine server port (default: 7200)
  *   MV_CAMPAIGN   — Campaign ID (alternative to positional arg)
  *   ANTHROPIC_API_KEY — Required for the engine
@@ -22,32 +24,15 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = dirname(__dirname);
 
 const port = process.env.MV_PORT || "7200";
-const campaignsDir = process.env.MV_CAMPAIGNS || "";
 const campaignId = process.argv[2] || process.env.MV_CAMPAIGN || "";
 
-if (!campaignsDir) {
-  console.error("Error: MV_CAMPAIGNS environment variable is required.");
-  console.error("  Set it to your campaigns directory, e.g.:");
-  console.error("  $env:MV_CAMPAIGNS = \"$env:APPDATA\\MachineViolet\\campaigns\"");
-  process.exit(1);
-}
-
-if (!campaignId) {
-  console.error("Error: Campaign ID is required.");
-  console.error("  Usage: node scripts/dev-two-tier.js <campaign-id>");
-  console.error("  Or set MV_CAMPAIGN environment variable.");
-  process.exit(1);
-}
-
 console.log(`Starting engine server on port ${port}...`);
-console.log(`  Campaigns dir: ${campaignsDir}`);
-console.log(`  Campaign: ${campaignId}`);
+if (campaignId) console.log(`  Campaign: ${campaignId}`);
 console.log();
 
 // --- Start engine server ---
 const serverEnv = {
   ...process.env,
-  MV_CAMPAIGNS: campaignsDir,
   MV_PORT: port,
   NODE_ENV: "development",
 };
@@ -134,9 +119,9 @@ async function main() {
   const clientEnv = {
     ...process.env,
     MV_SERVER: `http://127.0.0.1:${port}`,
-    MV_CAMPAIGN: campaignId,
     MV_PLAYER: process.env.MV_PLAYER || "Player",
   };
+  if (campaignId) clientEnv.MV_CAMPAIGN = campaignId;
 
   const client = spawn(
     process.execPath,
