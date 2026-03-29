@@ -36,7 +36,7 @@ import {
   unarchiveCampaign, getCampaignDeleteInfo,
 } from "../../config/campaign-archive.js";
 import { loadDiscordSettings, saveDiscordSettings } from "../../config/discord.js";
-import { createBaseFileIO } from "../fileio.js";
+import { createArchiveFileIO } from "../fileio.js";
 
 export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstance) => {
 
@@ -153,7 +153,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   /** Get info for delete confirmation dialog. */
   server.get<{ Params: { id: string } }>("/campaigns/:id/delete-info", async (request, reply) => {
     const campaignPath = join(campaignsDir(), request.params.id);
-    const io = createBaseFileIO();
+    const io = createArchiveFileIO();
     try {
       const info = await getCampaignDeleteInfo(campaignPath, io);
       return info;
@@ -171,7 +171,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     }
 
     const campaignPath = join(campaignsDir(), request.params.id);
-    const io = createBaseFileIO();
+    const io = createArchiveFileIO();
     const result = await archiveCampaign(campaignPath, campaignsDir(), io);
 
     if (!result.ok) {
@@ -187,7 +187,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     }
 
     const campaignPath = join(campaignsDir(), request.params.id);
-    const io = createBaseFileIO();
+    const io = createArchiveFileIO();
     const result = await deleteCampaign(campaignPath, io);
 
     if (!result.ok) {
@@ -198,7 +198,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
 
   /** List archived campaigns. */
   server.get("/campaigns/archived", async () => {
-    const io = createBaseFileIO();
+    const io = createArchiveFileIO();
     const archives = await listArchivedCampaigns(campaignsDir(), io);
     return { archives };
   });
@@ -206,7 +206,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   /** Restore an archived campaign. */
   server.post<{ Params: { name: string } }>("/campaigns/archived/:name/restore", async (request, reply) => {
     const zipPath = join(campaignsDir(), "archivedcampaigns", `${request.params.name}.zip`);
-    const io = createBaseFileIO();
+    const io = createArchiveFileIO();
     const result = await unarchiveCampaign(zipPath, campaignsDir(), io);
 
     if (!result.ok) {
