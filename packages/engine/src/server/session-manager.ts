@@ -508,16 +508,18 @@ export class SessionManager {
 
   /** Open a turn for the current active player(s). */
   private openNextTurn(): void {
-    if (!this.turnManager || !this.gameState) return;
+    if (!this.turnManager) return;
     // Cancel any open turn that was never contributed to (e.g., a choice
     // modal was shown instead of collecting free-text input)
     const current = this.turnManager.getCurrentTurn();
     if (current && current.status === "open") {
       this.turnManager.cancelTurn();
     }
-    const active = getActivePlayer(this.gameState);
-    const humanPlayers = [active.characterName];
-    const aiPlayers: string[] = []; // AI players not yet implemented
+    // During setup there's no GameState — use a default player name
+    const humanPlayers = this.gameState
+      ? [getActivePlayer(this.gameState).characterName]
+      : ["Player"];
+    const aiPlayers: string[] = [];
     this.turnManager.openTurn(humanPlayers, aiPlayers);
   }
 

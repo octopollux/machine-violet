@@ -30,6 +30,7 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
 
   /** Contribute to the current turn. */
   server.post<{ Body: ContributeRequest }>("/turn/contribute", async (request, reply) => {
+    console.log(`[contribute] text="${request.body?.text?.slice(0, 50)}"`);
     const tm = server.sessionManager.getTurnManager();
     if (!tm) {
       return reply.status(400).send({ error: "No turn manager." });
@@ -131,6 +132,7 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
       // (which handles turn lifecycle + game transition)
       const sm = server.sessionManager;
       const setup = sm.getSetupSession();
+      console.log(`[modal] id=${id}, hasSetup=${!!setup}, value=${String(value).slice(0, 50)}`);
       if (setup && id === "setup-choice") {
         await sm.resolveSetupChoice(String(value));
         return { ok: true };
