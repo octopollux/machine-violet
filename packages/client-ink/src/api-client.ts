@@ -15,6 +15,44 @@ import type {
   StateSnapshot,
 } from "@machine-violet/shared";
 
+export interface ApiKeyInfo {
+  id: string;
+  label: string;
+  masked: string;
+  source: "env" | "manual";
+  addedAt?: string;
+  tokenBudget?: number;
+  isActive: boolean;
+}
+
+export interface ApiKeyListResponse {
+  keys: ApiKeyInfo[];
+  activeKeyId: string | null;
+}
+
+export interface KeyHealthResponse {
+  id: string;
+  status: "valid" | "invalid" | "error" | "rate_limited" | "checking";
+  message: string;
+  rateLimits: string | null;
+}
+
+export interface CampaignDeleteInfo {
+  campaignName: string;
+  characterNames: string[];
+  dmTurnCount: number;
+}
+
+export interface ArchivedCampaignEntry {
+  name: string;
+  zipPath: string;
+  archivedDate: string;
+}
+
+export interface ArchivedCampaignsResponse {
+  archives: ArchivedCampaignEntry[];
+}
+
 export class ApiClient {
   private baseUrl: string;
   private playerId: string;
@@ -97,6 +135,56 @@ export class ApiClient {
 
   async endSession(): Promise<SessionEndResponse> {
     return this.post("/session/end");
+  }
+
+  // --- Management (pre-session) ---
+
+  async listKeys(): Promise<ApiKeyListResponse> {
+    return this.get("/manage/keys");
+  }
+
+  async addKey(key: string, label?: string): Promise<ApiKeyListResponse> {
+    return this.post("/manage/keys", { key, label });
+  }
+
+  async removeKey(id: string): Promise<ApiKeyListResponse> {
+    return this.fetch(`/manage/keys/${encodeURIComponent(id)}`, { method: "DELETE" });
+  }
+
+  async activateKey(id: string): Promise<{ ok: boolean; activeKeyId: string }> {
+    return this.post(`/manage/keys/${encodeURIComponent(id)}/activate`);
+  }
+
+  async checkKeyHealth(id: string): Promise<KeyHealthResponse> {
+    return this.post(`/manage/keys/${encodeURIComponent(id)}/check`);
+  }
+
+  async getCampaignDeleteInfo(id: string): Promise<CampaignDeleteInfo> {
+    return this.get(`/manage/campaigns/${encodeURIComponent(id)}/delete-info`);
+  }
+
+  async archiveCampaign(id: string): Promise<{ ok: boolean }> {
+    return this.post(`/manage/campaigns/${encodeURIComponent(id)}/archive`);
+  }
+
+  async deleteCampaign(id: string): Promise<{ ok: boolean }> {
+    return this.fetch(`/manage/campaigns/${encodeURIComponent(id)}`, { method: "DELETE" });
+  }
+
+  async listArchivedCampaigns(): Promise<ArchivedCampaignsResponse> {
+    return this.get("/manage/campaigns/archived");
+  }
+
+  async restoreArchivedCampaign(name: string): Promise<{ ok: boolean }> {
+    return this.post(`/manage/campaigns/archived/${encodeURIComponent(name)}/restore`);
+  }
+
+  async getDiscordSettings(): Promise<{ enabled: boolean | null }> {
+    return this.get("/manage/discord");
+  }
+
+  async setDiscordSettings(enabled: boolean): Promise<{ enabled: boolean }> {
+    return this.fetch("/manage/discord", { method: "PUT", body: { enabled } });
   }
 
   // --- Helpers ---

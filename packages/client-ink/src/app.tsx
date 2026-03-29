@@ -20,6 +20,13 @@ import { GameProvider } from "./tui/game-context.js";
 import { PlayingPhase } from "./phases/PlayingPhase.js";
 import { MainMenuPhase } from "./phases/MainMenuPhase.js";
 import type { CampaignEntry } from "./phases/MainMenuPhase.js";
+import { SettingsPhase } from "./phases/SettingsPhase.js";
+import { ApiKeysPhase } from "./phases/ApiKeysPhase.js";
+import { ArchivedCampaignsPhase } from "./phases/ArchivedCampaignsPhase.js";
+import { DiscordSettingsPhase } from "./phases/DiscordSettingsPhase.js";
+import type { ApiKeyStore } from "./config/api-keys.js";
+import type { KeyHealthResult } from "./config/api-key-health.js";
+import type { ArchivedCampaignEntry, CampaignDeleteInfo } from "./config/campaign-archive.js";
 import {
   loadThemeDefinition,
   resolveTheme,
@@ -48,7 +55,9 @@ export interface AppProps {
   campaignId?: string;
 }
 
-type AppPhase = "connecting" | "menu" | "starting" | "playing" | "disconnected" | "error";
+type AppPhase =
+  | "connecting" | "menu" | "starting" | "playing" | "disconnected" | "error"
+  | "settings" | "settings_apikeys" | "api_keys" | "archived_campaigns" | "discord_settings";
 
 // --- Main App ---
 
@@ -60,6 +69,14 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
   const [activeCampaignId, setActiveCampaignId] = useState(campaignId ?? "");
   // Session counter forces full PlayingPhase remount on campaign switch
   const [sessionKey, setSessionKey] = useState(0);
+
+  // Settings / management state
+  const [apiKeyStore, setApiKeyStore] = useState<ApiKeyStore>({ keys: [], activeKeyId: null });
+  const [healthResults, setHealthResults] = useState<Record<string, KeyHealthResult>>({});
+  const [archivedCampaigns, setArchivedCampaigns] = useState<ArchivedCampaignEntry[]>([]);
+  const [discordEnabled, setDiscordEnabled] = useState<boolean | null>(null);
+  const [deleteModal, setDeleteModal] = useState<CampaignDeleteInfo | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   // Theme state
   const [themeDef, setThemeDef] = useState<ThemeDefinition>(() => loadThemeDefinition("gothic"));
@@ -174,6 +191,51 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
     return () => ws.disconnect();
   }, []); // eslint-disable-line
 
+  // --- Management helpers ---
+
+  const refreshKeys = useCallback(() => {
+    apiClientRef.current.listKeys().then((resp) => {
+      setApiKeyStore({
+        keys: resp.keys.map((k) => ({
+          id: k.id,
+          label: k.label,
+          key: k.masked, // client only sees masked keys
+          source: k.source,
+          addedAt: k.addedAt ?? "",
+          tokenBudget: k.tokenBudget,
+        })),
+        activeKeyId: resp.activeKeyId,
+      });
+    }).catch(() => { /* ignore */ });
+  }, []);
+
+  const handleCheckHealth = useCallback((keyId: string, _apiKey: string) => {
+    setHealthResults((prev) => ({ ...prev, [keyId]: { status: "checking" } }));
+    apiClientRef.current.checkKeyHealth(keyId).then((resp) => {
+      setHealthResults((prev) => ({
+        ...prev,
+        [keyId]: { status: resp.status, message: resp.message },
+      }));
+    }).catch(() => {
+      setHealthResults((prev) => ({
+        ...prev,
+        [keyId]: { status: "error", message: "Health check failed" },
+      }));
+    });
+  }, []);
+
+  const handleUpdateStore = useCallback((store: ApiKeyStore) => {
+    // Find what changed and make the appropriate REST call
+    // For simplicity, refresh from server after any mutation
+    setApiKeyStore(store);
+  }, []);
+
+  const refreshCampaigns = useCallback(() => {
+    apiClientRef.current.listCampaigns().then((resp) => {
+      setCampaigns(resp.campaigns.map((c) => ({ id: c.id ?? c.name, name: c.name, path: c.path ?? "" })));
+    }).catch(() => { /* ignore */ });
+  }, []);
+
   // --- Render by phase ---
 
   if (phase === "connecting") {
@@ -220,15 +282,136 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
           });
         }}
         onResumeCampaign={(entry) => startCampaign(entry.id ?? entry.name)}
-        onArchiveCampaign={() => { /* TODO */ }}
-        onDeleteCampaign={() => { /* TODO */ }}
-        deleteModal={null}
-        onConfirmDelete={() => { /* no-op */ }}
-        onCancelDelete={() => { /* no-op */ }}
-        onAddContent={() => { /* TODO */ }}
-        onSettings={() => { /* TODO */ }}
-        onSettingsApiKeys={() => { /* TODO */ }}
+        onArchiveCampaign={(entry) => {
+          const id = entry.id ?? entry.name;
+          apiClientRef.current.archiveCampaign(id).then(() => {
+            refreshCampaigns();
+          }).catch((err) => {
+            setErrorMessage(err instanceof Error ? err.message : String(err));
+          });
+        }}
+        onDeleteCampaign={(entry) => {
+          const id = entry.id ?? entry.name;
+          setPendingDeleteId(id);
+          apiClientRef.current.getCampaignDeleteInfo(id).then((info) => {
+            setDeleteModal(info);
+          }).catch(() => {
+            setDeleteModal({ campaignName: entry.name, characterNames: [], dmTurnCount: 0 });
+          });
+        }}
+        deleteModal={deleteModal}
+        onConfirmDelete={() => {
+          if (pendingDeleteId) {
+            apiClientRef.current.deleteCampaign(pendingDeleteId).then(() => {
+              refreshCampaigns();
+            }).catch((err) => {
+              setErrorMessage(err instanceof Error ? err.message : String(err));
+            });
+          }
+          setDeleteModal(null);
+          setPendingDeleteId(null);
+        }}
+        onCancelDelete={() => { setDeleteModal(null); setPendingDeleteId(null); }}
+        onAddContent={() => { /* not yet migrated */ }}
+        onSettings={() => setPhase("settings")}
+        onSettingsApiKeys={() => { refreshKeys(); setPhase("settings_apikeys"); }}
+        onDiscordSettings={() => {
+          apiClientRef.current.getDiscordSettings().then((s) => setDiscordEnabled(s.enabled)).catch(() => { /* ignore */ });
+          setPhase("discord_settings");
+        }}
         onQuit={() => process.exit(0)}
+      />
+    );
+  }
+
+  if (phase === "settings" || phase === "settings_apikeys") {
+    return (
+      <SettingsPhase
+        theme={theme}
+        initialView={phase === "settings_apikeys" ? "api_keys" : undefined}
+        onApiKeys={() => { refreshKeys(); setPhase("api_keys"); }}
+        onDiscord={() => {
+          apiClientRef.current.getDiscordSettings().then((s) => setDiscordEnabled(s.enabled)).catch(() => { /* ignore */ });
+          setPhase("discord_settings");
+        }}
+        onArchivedCampaigns={() => {
+          apiClientRef.current.listArchivedCampaigns().then((resp) => setArchivedCampaigns(resp.archives)).catch(() => { /* ignore */ });
+          setPhase("archived_campaigns");
+        }}
+        onBack={() => setPhase("menu")}
+      />
+    );
+  }
+
+  if (phase === "api_keys") {
+    return (
+      <ApiKeysPhase
+        theme={theme}
+        store={apiKeyStore}
+        healthResults={healthResults}
+        onUpdateStore={(store) => {
+          handleUpdateStore(store);
+          // Detect what changed: find new keys to add, missing keys to remove
+          const oldIds = new Set(apiKeyStore.keys.map((k) => k.id));
+          const newIds = new Set(store.keys.map((k) => k.id));
+          // New key added?
+          for (const k of store.keys) {
+            if (!oldIds.has(k.id) && k.source === "manual") {
+              apiClientRef.current.addKey(k.key, k.label).then(() => refreshKeys()).catch(() => { /* ignore */ });
+              return;
+            }
+          }
+          // Key removed?
+          for (const id of oldIds) {
+            if (!newIds.has(id)) {
+              apiClientRef.current.removeKey(id).then(() => refreshKeys()).catch(() => { /* ignore */ });
+              return;
+            }
+          }
+          // Active key changed?
+          if (store.activeKeyId !== apiKeyStore.activeKeyId && store.activeKeyId) {
+            apiClientRef.current.activateKey(store.activeKeyId).then(() => refreshKeys()).catch(() => { /* ignore */ });
+          }
+        }}
+        onCheckHealth={handleCheckHealth}
+        onBack={() => setPhase("settings")}
+      />
+    );
+  }
+
+  if (phase === "archived_campaigns") {
+    return (
+      <ArchivedCampaignsPhase
+        theme={theme}
+        archives={archivedCampaigns}
+        onUnarchive={(entry) => {
+          apiClientRef.current.restoreArchivedCampaign(entry.name).then(() => {
+            refreshCampaigns();
+            // Refresh archive list too
+            apiClientRef.current.listArchivedCampaigns().then((resp) => setArchivedCampaigns(resp.archives)).catch(() => { /* ignore */ });
+          }).catch((err) => {
+            setErrorMessage(err instanceof Error ? err.message : String(err));
+          });
+        }}
+        onBack={() => setPhase("settings")}
+      />
+    );
+  }
+
+  if (phase === "discord_settings") {
+    return (
+      <DiscordSettingsPhase
+        theme={theme}
+        currentSetting={discordEnabled}
+        onSave={(enabled) => {
+          apiClientRef.current.setDiscordSettings(enabled).then(() => {
+            setDiscordEnabled(enabled);
+            setPhase("settings");
+          }).catch(() => {
+            setPhase("settings");
+          });
+        }}
+        onBack={() => setPhase("settings")}
       />
     );
   }

@@ -6,7 +6,7 @@ describe("engine server", () => {
   let server: FastifyInstance;
 
   beforeEach(async () => {
-    server = await createServer({ campaignsDir: "/tmp/test-campaigns" });
+    server = await createServer({ campaignsDir: "/tmp/test-campaigns", configDir: "/tmp/test-config" });
   });
 
   afterEach(async () => {

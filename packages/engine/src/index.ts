@@ -10,6 +10,7 @@
 import { join } from "node:path";
 import { createServer } from "./server/server.js";
 import { defaultCampaignRoot } from "./tools/filesystem/platform.js";
+import { configDir } from "./utils/paths.js";
 import { loadEnv } from "./config/first-launch.js";
 
 // Load .env for API key
@@ -20,9 +21,10 @@ const host = process.env.MV_HOST ?? "127.0.0.1";
 
 // Auto-detect campaigns dir: MV_CAMPAIGNS env > platform default
 const campaignsDir = process.env.MV_CAMPAIGNS ?? join(defaultCampaignRoot(), "campaigns");
+const appConfigDir = configDir();
 
 async function main(): Promise<void> {
-  const server = await createServer({ port, host, campaignsDir });
+  const server = await createServer({ port, host, campaignsDir, configDir: appConfigDir });
 
   try {
     await server.listen({ port, host });
