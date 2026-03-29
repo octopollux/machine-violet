@@ -123,27 +123,24 @@ export function createEventHandler(update: StateUpdater): (event: ServerEvent) =
 
 function handleNarrativeChunk(event: NarrativeChunkEvent, update: StateUpdater): void {
   const { text, kind } = event.data;
-  const lineKind = kind ?? "dm";
+  const lineKind = (kind ?? "dm") as NarrativeLine["kind"];
 
   update((prev) => {
     const lines = [...prev.narrativeLines];
     const lastLine = lines[lines.length - 1];
 
-    // Append to the last line if it's the same kind and doesn't end with newline
-    if (lastLine && lastLine.kind === lineKind && !lastLine.text.endsWith("\n")) {
-      lines[lines.length - 1] = { kind: lineKind, text: lastLine.text + text };
-    } else {
-      // Split on newlines to create separate lines
-      const parts = text.split("\n");
-      for (let i = 0; i < parts.length; i++) {
-        if (i > 0) {
-          // Newline boundary — always start a new line
-          if (parts[i]) {
-            lines.push({ kind: lineKind, text: parts[i] });
-          }
-        } else if (parts[i]) {
-          lines.push({ kind: lineKind, text: parts[i] });
-        }
+    // Split incoming text on newlines to create proper line structure.
+    // Empty lines (from \n\n) are preserved as empty DM lines — these are
+    // paragraph boundaries that the formatting pipeline needs to reset tags.
+    const parts = text.split("\n");
+
+    for (let i = 0; i < parts.length; i++) {
+      if (i === 0 && lastLine && lastLine.kind === lineKind) {
+        // First part: append to last line (continuation of buffered chunk)
+        lines[lines.length - 1] = { kind: lineKind, text: lastLine.text + parts[i] };
+      } else {
+        // New line — preserve empty strings as paragraph boundaries
+        lines.push({ kind: lineKind, text: parts[i] });
       }
     }
 
