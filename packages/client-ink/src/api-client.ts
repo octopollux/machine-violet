@@ -67,6 +67,26 @@ export class ApiClient {
     return this.fetch("/session/settings", { method: "PATCH", body: settings });
   }
 
+  async getCharacterSheet(name: string): Promise<{ name: string; content: string }> {
+    return this.get(`/session/character/${encodeURIComponent(name)}`);
+  }
+
+  async getCompendium(): Promise<{ data: unknown }> {
+    return this.get("/session/compendium");
+  }
+
+  async getNotes(): Promise<{ content: string }> {
+    return this.get("/session/notes");
+  }
+
+  async saveNotes(content: string): Promise<{ ok: boolean }> {
+    return this.fetch("/session/notes", { method: "PUT", body: { content } });
+  }
+
+  async getSettings(): Promise<{ config: unknown }> {
+    return this.get("/session/settings");
+  }
+
   async endSession(): Promise<SessionEndResponse> {
     return this.post("/session/end");
   }

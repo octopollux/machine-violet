@@ -10,6 +10,7 @@ import fastifyWebSocket from "@fastify/websocket";
 import fastifyCors from "@fastify/cors";
 import { campaignRoutes } from "./routes/campaigns.js";
 import { sessionRoutes } from "./routes/session.js";
+import { dataRoutes } from "./routes/data.js";
 import { wsHandler } from "./ws.js";
 import { SessionManager } from "./session-manager.js";
 
@@ -51,6 +52,7 @@ export async function createServer(
 
   await server.register(campaignRoutes, { prefix: "/campaigns" });
   await server.register(sessionRoutes, { prefix: "/session" });
+  await server.register(dataRoutes, { prefix: "/session" });
   await server.register(wsHandler, { prefix: "/session" });
 
   // --- Lifecycle ---

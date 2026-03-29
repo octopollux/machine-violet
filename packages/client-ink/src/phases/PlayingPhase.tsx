@@ -16,10 +16,13 @@ import React, { useState, useRef, useCallback } from "react";
 import { useInput, Box } from "ink";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
 import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
-import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, choiceRowBudget } from "../tui/responsive.js";
+import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, narrativeRows, choiceRowBudget } from "../tui/responsive.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { Layout } from "../tui/layout.js";
-import { ChoiceOverlay, DESCRIPTION_ROWS, GameMenu, ApiErrorModal } from "../tui/modals/index.js";
+import {
+  ChoiceOverlay, DESCRIPTION_ROWS, GameMenu, ApiErrorModal,
+  CharacterSheetModal, CompendiumModal, PlayerNotesModal, SwatchModal,
+} from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { useGameContext } from "../tui/game-context.js";
 
@@ -128,22 +131,33 @@ export function PlayingPhase() {
     setMenuOpen(false);
     if (item === "Resume") return;
     if (item === "Save & Exit" || item === "End Session") {
-      try {
-        await apiClient.endSession();
-      } catch { /* ignore */ }
+      try { await apiClient.endSession(); } catch { /* ignore */ }
       onReturnToMenu();
     } else if (item === "OOC Mode") {
       await apiClient.command("ooc");
     } else if (item === "Dev Mode") {
       await apiClient.command("dev");
     } else if (item === "Character Sheet") {
-      await apiClient.command("sheet");
+      try {
+        const { content } = await apiClient.getCharacterSheet(activeChar);
+        setActiveModal({ kind: "character_sheet", content } as never);
+      } catch { setActiveModal({ kind: "character_sheet", content: "(No character sheet found)" } as never); }
     } else if (item === "Compendium") {
-      await apiClient.command("compendium");
+      try {
+        const { data } = await apiClient.getCompendium();
+        setActiveModal({ kind: "compendium", data } as never);
+      } catch { /* ignore */ }
     } else if (item === "Player Notes") {
-      await apiClient.command("notes");
+      try {
+        const { content } = await apiClient.getNotes();
+        setActiveModal({ kind: "notes", content } as never);
+      } catch { setActiveModal({ kind: "notes", content: "" } as never); }
+    } else if (item === "Color Swatch") {
+      setActiveModal({ kind: "swatch" } as never);
+    } else if (item === "Settings") {
+      // TODO: campaign settings modal
     }
-  }, [apiClient, onReturnToMenu]);
+  }, [apiClient, onReturnToMenu, activeChar, setActiveModal]);
 
   // --- Input handling ---
   useInput((_input, key) => {
@@ -202,6 +216,12 @@ export function PlayingPhase() {
 
   const tier = getViewportTier({ columns: cols, rows: layoutRows });
   const visibleElements = getVisibleElements(tier);
+  const narRows = narrativeRows(layoutRows, visibleElements, false, theme.asset.height, players.length);
+  const conversationPaneTop = visibleElements.topFrame ? theme.asset.height : 0;
+
+  // Active modal data (supports both old ActiveModal and new Modal format)
+  const am = activeModal as Record<string, unknown> | null;
+
   // Choice overlay (from either old ActiveModal or new Modal format)
   const isChoice = activeModal &&
     (("kind" in activeModal && activeModal.kind === "choice") ||
@@ -249,6 +269,49 @@ export function PlayingPhase() {
       />
       {retryOverlay && (
         <ApiErrorModal theme={theme} width={cols} height={rows} overlay={retryOverlay} />
+      )}
+      {am?.kind === "character_sheet" && (
+        <CharacterSheetModal
+          theme={theme}
+          width={cols}
+          height={narRows}
+          content={String(am.content ?? "")}
+          onDismiss={() => setActiveModal(null)}
+          scrollRef={modalScrollRef}
+          topOffset={conversationPaneTop}
+        />
+      )}
+      {am?.kind === "compendium" && (
+        <CompendiumModal
+          theme={theme}
+          width={cols}
+          height={narRows}
+          data={am.data as never}
+          onClose={() => setActiveModal(null)}
+          topOffset={conversationPaneTop}
+        />
+      )}
+      {am?.kind === "notes" && (
+        <PlayerNotesModal
+          theme={theme}
+          width={cols}
+          height={narRows}
+          initialContent={String(am.content ?? "")}
+          onSave={(content) => {
+            apiClient.saveNotes(content).catch(() => { /* no-op */ });
+          }}
+          onClose={() => setActiveModal(null)}
+          topOffset={conversationPaneTop}
+        />
+      )}
+      {am?.kind === "swatch" && (
+        <SwatchModal
+          theme={theme}
+          width={cols}
+          height={narRows}
+          topOffset={conversationPaneTop}
+          onDismiss={() => setActiveModal(null)}
+        />
       )}
       {menuOpen && (
         <GameMenu
