@@ -15,6 +15,17 @@
 import React from "react";
 import { render } from "ink";
 import { App } from "./app.js";
+import { installRawModeGuard } from "./tui/hooks/rawModeGuard.js";
+import { installSyncWriteCombiner } from "./tui/hooks/syncWriteCombiner.js";
+
+// Prevent stdin raw mode from ever being disabled while the TUI is running.
+// On Windows, even a momentary drop to cooked mode (during component unmount/
+// remount cycles) causes the console to stop forwarding keystrokes.
+const unlockRawMode = installRawModeGuard(process.stdin);
+
+// Combine Ink's separate BSU/content/ESU writes into single atomic stdout
+// writes so the terminal never displays intermediate states.
+const removeCombiner = installSyncWriteCombiner(process.stdout);
 
 // --- Parse args ---
 function parseArgs(): { server: string; player: string; campaign?: string } {
@@ -52,5 +63,7 @@ process.on("SIGINT", () => {
 });
 
 waitUntilExit().then(() => {
+  unlockRawMode();
+  removeCombiner();
   process.exit(0);
 });
