@@ -1495,10 +1495,12 @@ describe("GameEngine OOC summary injection", () => {
   });
 });
 
-describe("GameEngine tool ack batching", () => {
-  it("saves API call on TUI-only tool round and keeps history coherent", async () => {
-    // Turn 1: DM responds with text + TUI-only tool call → bail-out
-    const turn1Msg: Anthropic.Message = {
+describe("GameEngine TUI-only tool round (#266)", () => {
+  it("does not bail out on TUI-only rounds — DM gets to continue", async () => {
+    // Turn 1: DM responds with text + TUI-only tool call.
+    // Previously this would bail out; now tool results are sent back and
+    // the DM gets another round to finish its turn.
+    const turn1Round1: Anthropic.Message = {
       id: "msg_1",
       type: "message",
       role: "assistant",
@@ -1512,11 +1514,14 @@ describe("GameEngine tool ack batching", () => {
       usage: mockUsage(),
     } as Anthropic.Message;
 
+    // Turn 1, round 2: DM finishes its turn
+    const turn1Round2 = textMessage("A barkeep polishes a glass.");
+
     // Turn 2: Normal text response
     const turn2Msg = textMessage("The bartender nods.");
 
     let streamCallIdx = 0;
-    const streamResponses = [turn1Msg, turn2Msg];
+    const streamResponses = [turn1Round1, turn1Round2, turn2Msg];
     const streamCalls: unknown[] = [];
 
     const client = {
@@ -1545,18 +1550,18 @@ describe("GameEngine tool ack batching", () => {
       model: "claude-haiku-4-5-20251001",
     });
 
-    // Turn 1: DM bails out — only 1 API call (no ack round-trip)
+    // Turn 1: tool results sent back → 2 API calls (no bail-out)
     await engine.processInput("Aldric", "I enter the tavern.");
-    expect(client.messages.stream).toHaveBeenCalledTimes(1);
+    expect(client.messages.stream).toHaveBeenCalledTimes(2);
 
     // Turn 2: conversation history should include the tool_use/tool_result
     // pair from turn 1 so the DM sees a coherent exchange.
     await engine.processInput("Aldric", "I talk to the bartender.");
-    expect(client.messages.stream).toHaveBeenCalledTimes(2);
+    expect(client.messages.stream).toHaveBeenCalledTimes(3);
 
-    // Verify the second call's messages include the tool_use + tool_result
-    const secondCallParams = streamCalls[1] as { messages: Anthropic.MessageParam[] };
-    const msgs = secondCallParams.messages;
+    // Verify the third call's messages include the tool_use + tool_result
+    const thirdCallParams = streamCalls[2] as { messages: Anthropic.MessageParam[] };
+    const msgs = thirdCallParams.messages;
 
     // Find the assistant message with tool_use from turn 1
     const assistantWithTools = msgs.find((m) =>
@@ -1571,11 +1576,6 @@ describe("GameEngine tool ack batching", () => {
       (m.content as Anthropic.ToolResultBlockParam[]).some((b) => b.type === "tool_result"),
     );
     expect(toolResultMsg).toBeDefined();
-
-    // The new user message should be a plain string (no orphaned tool_results)
-    const userMsgs = msgs.filter((m) => m.role === "user");
-    const lastUserMsg = userMsgs[userMsgs.length - 1];
-    expect(typeof lastUserMsg.content).toBe("string");
   });
 });
 

@@ -86,7 +86,9 @@ describe("model config", () => {
 
   it("defaults effort with dev-mode high", () => {
     const config = loadModelConfig({ cwd: testDir, reset: true });
-    expect(config.effort).toEqual({ "default": null, "dev-mode": "high" });
+    expect(config.effort).toEqual({
+      "default": null, "dm": "high", "ooc": "high", "setup": "high", "dev-mode": "high",
+    });
   });
 
   it("loads per-agent effort map from dev-config.json", () => {
@@ -107,7 +109,7 @@ describe("model config", () => {
       JSON.stringify({ effort: { dm: "turbo", ooc: "low" } }),
     );
     const config = loadModelConfig({ cwd: testDir, reset: true });
-    expect(config.effort.dm).toBeUndefined();
+    expect(config.effort.dm).toBe("high"); // invalid "turbo" rejected, default preserved
     expect(config.effort.ooc).toBe("low");
   });
 
@@ -127,7 +129,9 @@ describe("model config", () => {
       JSON.stringify({ effort: "high" }),
     );
     const config = loadModelConfig({ cwd: testDir, reset: true });
-    expect(config.effort).toEqual({ "default": null, "dev-mode": "high" });
+    expect(config.effort).toEqual({
+      "default": null, "dm": "high", "ooc": "high", "setup": "high", "dev-mode": "high",
+    });
   });
 
   describe("getEffortConfig", () => {

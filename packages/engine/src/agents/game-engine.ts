@@ -83,8 +83,7 @@ function stampConversationCache(messages: Anthropic.MessageParam[]): void {
     };
   } else if (Array.isArray(last.content) && last.content.length > 0) {
     // Find the last non-empty text block to stamp cache_control on.
-    // The API rejects cache_control on empty text blocks (e.g. from
-    // fire-and-forget bail-out where tool_use blocks were stripped).
+    // The API rejects cache_control on empty text blocks.
     const blocks = [...last.content] as unknown as Record<string, unknown>[];
     let stampIdx = blocks.length - 1;
     while (stampIdx >= 0) {

@@ -324,31 +324,6 @@ export async function runAgentLoop(
       break;
     }
 
-    // Fire-and-forget bail-out: if EVERY tool_use in this round was a TUI
-    // tool, skip the next API call. The tool_use/tool_result pair is kept
-    // in conversation history so the DM sees a coherent exchange — we just
-    // don't burn an API call waiting for an acknowledgment.
-    // Only bail out if the DM has already produced text — otherwise the DM
-    // called TUI tools before narrating (e.g. dm_notes on first turn) and
-    // needs another round to actually speak.
-    const toolUseBlocks = assistantContent.filter(
-      (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
-    );
-    const allTui = toolUseBlocks.length > 0 &&
-      toolUseBlocks.every((b) => tuiToolNames.has(b.name));
-
-    if (allTui && fullText.length > 0) {
-      // Keep the assistant message as-is (with tool_use blocks) and push
-      // tool_results so conversation history has the complete exchange.
-      workingMessages.push({ role: "user", content: toolResults });
-
-      dumpContext(config.name, params);
-
-      const roundMessages = workingMessages.slice(loopStartIndex);
-      config.onComplete?.(totalUsage);
-      return { text: fullText, tuiCommands, usage: totalUsage, truncated, roundMessages };
-    }
-
     // Append tool results as user message
     workingMessages.push({ role: "user", content: toolResults });
 

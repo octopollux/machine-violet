@@ -462,11 +462,13 @@ describe("runAgentLoop", () => {
     });
   });
 
-  describe("fire-and-forget TUI bail-out", () => {
-    it("bails out when all tool calls are TUI tools", async () => {
-      // Only one API call — no second round
+  describe("TUI tool handling (no bail-out)", () => {
+    it("continues the loop after TUI-only tool calls", async () => {
+      // Even when all tools are TUI, the loop sends results back for the
+      // next round so the DM can finish its turn properly (#266).
       const client = mockClient([
         textAndToolMessage("The tavern glows warmly.", "update_modeline", { location: "Tavern" }),
+        textMessage("You see a barkeep."),
       ]);
       const toolHandler = vi.fn(() => ({
         content: JSON.stringify({ type: "update_modeline", location: "Tavern" }),
@@ -479,98 +481,34 @@ describe("runAgentLoop", () => {
         baseConfig({ toolHandler, tuiToolNames: new Set(["update_modeline"]) }),
       );
 
-      // Only one API call was made (no round-trip for ack)
-      expect(client.messages.create).toHaveBeenCalledTimes(1);
-      // Text was captured
-      expect(result.text).toBe("The tavern glows warmly.");
-      // TUI command was collected
+      // Two API calls — tool results sent back for the next round
+      expect(client.messages.create).toHaveBeenCalledTimes(2);
+      expect(result.text).toContain("The tavern glows warmly.");
       expect(result.tuiCommands).toHaveLength(1);
     });
 
-    it("keeps tool_use/tool_result pair in roundMessages on bail-out", async () => {
+    it("continues the loop when dm_notes fires with text (#266)", async () => {
+      // Campaign start: DM narrates + writes dm_notes, must continue to
+      // set resources and present choices.
       const client = mockClient([
-        textAndToolMessage("Scene text.", "scribe", { updates: [] }),
-      ]);
-      const toolHandler = vi.fn(() => ({
-        content: JSON.stringify({ type: "scribe", updates: [] }),
-      }));
-
-      const result = await runAgentLoop(
-        client,
-        "System",
-        [{ role: "user", content: "Continue" }],
-        baseConfig({ toolHandler, tuiToolNames: new Set(["scribe"]) }),
-      );
-
-      // roundMessages: assistant(text+tool_use), user(tool_result)
-      expect(result.roundMessages).toHaveLength(2);
-      expect(result.roundMessages[0].role).toBe("assistant");
-      expect(result.roundMessages[1].role).toBe("user");
-
-      // Assistant message retains tool_use blocks
-      const assistantBlocks = result.roundMessages[0].content as Anthropic.ContentBlock[];
-      const types = assistantBlocks.map((b) => b.type);
-      expect(types).toContain("tool_use");
-      expect(types).toContain("text");
-
-      // User message has tool_result
-      const userBlocks = result.roundMessages[1].content as Anthropic.ToolResultBlockParam[];
-      expect(userBlocks[0].type).toBe("tool_result");
-    });
-
-    it("does NOT bail out when some tools are non-TUI", async () => {
-      const msg: Anthropic.Message = {
-        id: "msg_test",
-        type: "message",
-        role: "assistant",
-        model: "claude-haiku-4-5-20251001",
-        content: [
-          { type: "text", text: "Rolling and updating..." },
-          { type: "tool_use", id: "toolu_1", name: "roll_dice", input: { expression: "1d20" } },
-          { type: "tool_use", id: "toolu_2", name: "update_modeline", input: { location: "Arena" } },
-        ],
-        stop_reason: "tool_use",
-        stop_sequence: null,
-        usage: mockUsage(),
-      } as Anthropic.Message;
-
-      const client = mockClient([msg, textMessage("You rolled a 15!")]);
-      const toolHandler = vi.fn((name: string) => {
-        if (name === "roll_dice") return { content: "15" };
-        return { content: JSON.stringify({ type: "update_modeline", location: "Arena" }) };
-      });
-
-      await runAgentLoop(
-        client,
-        "System",
-        [{ role: "user", content: "Attack" }],
-        baseConfig({ toolHandler, tuiToolNames: new Set(["update_modeline"]) }),
-      );
-
-      // Two API calls — results sent back normally
-      expect(client.messages.create).toHaveBeenCalledTimes(2);
-    });
-
-    it("does NOT bail out when TUI tools fire before any text", async () => {
-      // DM calls dm_notes before narrating (e.g. first turn setup).
-      // Should NOT bail out — needs another round to produce text.
-      const client = mockClient([
-        toolUseMessage("dm_notes", { action: "write", notes: "setup" }),
-        textMessage("The rain hammered the window."),
+        textAndToolMessage("Welcome to Warranty Void.", "dm_notes", { action: "write", notes: "secrets" }),
+        textMessage("The neon signs flicker above."),
       ]);
       const toolHandler = vi.fn(() => ({
         content: "DM notes saved.",
+        _tui: { type: "dm_notes", action: "write", notes: "secrets" },
       }));
 
       const result = await runAgentLoop(
         client,
         "System",
-        [{ role: "user", content: "Begin" }],
+        [{ role: "user", content: "[Session begins.]" }],
         baseConfig({ toolHandler, tuiToolNames: new Set(["dm_notes"]) }),
       );
 
       expect(client.messages.create).toHaveBeenCalledTimes(2);
-      expect(result.text).toBe("The rain hammered the window.");
+      expect(result.text).toContain("Welcome to Warranty Void.");
+      expect(result.text).toContain("The neon signs flicker above.");
     });
   });
 });

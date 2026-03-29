@@ -1,10 +1,11 @@
 import React, { useRef, useEffect } from "react";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { render } from "ink-testing-library";
 import { Text } from "ink";
 import type { NarrativeLine, ProcessedLine } from "@machine-violet/shared/types/tui.js";
 import { processNarrativeLines, toPlainText } from "../formatting.js";
-import { useProcessedLines } from "./NarrativeArea.js";
+import { useProcessedLines, NarrativeArea } from "./NarrativeArea.js";
+import { resetDevMode } from "../../config/dev-mode.js";
 
 // ---------------------------------------------------------------------------
 // Test harness: renders the hook result as plain text so we can inspect it
@@ -30,6 +31,7 @@ function HookHarness({
 }
 
 const dm = (text: string): NarrativeLine => ({ kind: "dm", text });
+const dev = (text: string): NarrativeLine => ({ kind: "dev", text });
 
 describe("useProcessedLines", () => {
   it("returns same output as direct processNarrativeLines", () => {
@@ -123,5 +125,55 @@ describe("useProcessedLines", () => {
 
     const expected = processNarrativeLines(lines, 80);
     expect(captured).toEqual(expected);
+  });
+});
+
+describe("NarrativeArea dev-line filtering", () => {
+  beforeEach(() => {
+    resetDevMode();
+  });
+
+  afterEach(() => {
+    delete process.env.DEV_MODE;
+    resetDevMode();
+  });
+
+  it("filters out dev lines when dev mode is disabled", () => {
+    process.env.DEV_MODE = "false";
+    resetDevMode();
+
+    const lines: NarrativeLine[] = [
+      dm("Hello world."),
+      dev("[dev] tool:read → some data"),
+      dm("More narration."),
+    ];
+
+    const { lastFrame } = render(
+      <NarrativeArea lines={lines} maxRows={20} width={80} />,
+    );
+
+    const frame = lastFrame();
+    expect(frame).toContain("Hello world.");
+    expect(frame).toContain("More narration.");
+    expect(frame).not.toContain("[dev]");
+    expect(frame).not.toContain("tool:read");
+  });
+
+  it("shows dev lines when dev mode is enabled", () => {
+    process.env.DEV_MODE = "true";
+    resetDevMode();
+
+    const lines: NarrativeLine[] = [
+      dm("Hello world."),
+      dev("[dev] tool:read → some data"),
+    ];
+
+    const { lastFrame } = render(
+      <NarrativeArea lines={lines} maxRows={20} width={80} />,
+    );
+
+    const frame = lastFrame();
+    expect(frame).toContain("Hello world.");
+    expect(frame).toContain("[dev] tool:read");
   });
 });
