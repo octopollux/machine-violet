@@ -6,7 +6,8 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
+import { appendFileSync, mkdirSync } from "node:fs";
 
 /**
  * Add or remove the app's install directory from the user PATH.
@@ -51,7 +52,25 @@ function updateUserPath(appDir: string, action: "add" | "remove"): void {
 }
 
 /**
+ * Write to a log file next to the executable (for install diagnostics).
+ */
+function hookLog(appDir: string, message: string): void {
+  try {
+    const logDir = join(appDir, "logs");
+    mkdirSync(logDir, { recursive: true });
+    const logPath = join(logDir, "velopack-hooks.log");
+    const timestamp = new Date().toISOString();
+    appendFileSync(logPath, `[${timestamp}] ${message}\n`);
+  } catch {
+    // Can't log — silently continue
+  }
+}
+
+/**
  * Handle Velopack lifecycle hooks.
+ *
+ * MUST call process.exit() after handling — if the process continues
+ * (starts Fastify, renders Ink), Velopack reports the hook as failed.
  */
 export function handleVelopackHook(): void {
   if (process.platform !== "win32") return;
@@ -60,14 +79,21 @@ export function handleVelopackHook(): void {
   if (!hook) return;
 
   const appDir = dirname(process.execPath);
+  hookLog(appDir, `Hook fired: ${hook}`);
 
   try {
     if (hook.startsWith("--veloapp-install") || hook.startsWith("--veloapp-updated")) {
       updateUserPath(appDir, "add");
+      hookLog(appDir, `PATH updated (add): ${appDir}`);
     } else if (hook.startsWith("--veloapp-uninstall")) {
       updateUserPath(appDir, "remove");
+      hookLog(appDir, `PATH updated (remove): ${appDir}`);
     }
-  } catch {
+  } catch (err) {
+    hookLog(appDir, `Hook error: ${err instanceof Error ? err.message : String(err)}`);
     // Best-effort — don't block install/uninstall if PATH update fails
   }
+
+  hookLog(appDir, "Hook complete, exiting.");
+  process.exit(0);
 }
