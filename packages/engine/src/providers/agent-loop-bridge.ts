@@ -16,7 +16,7 @@ import type {
 } from "./types.js";
 import type { ToolResult } from "../agents/tool-registry.js";
 import type { TuiCommand } from "../agents/agent-loop.js";
-import { dumpThinking } from "../config/context-dump.js";
+import { dumpContext, dumpThinking } from "../config/context-dump.js";
 import { ContentRefusalError } from "@machine-violet/shared/types/errors.js";
 import { getEffortConfig } from "../config/models.js";
 import type { EffortLevel } from "../config/models.js";
@@ -113,6 +113,15 @@ export async function runProviderLoop(
       thinking,
       cacheHints: config.cacheHints,
     };
+
+    // Context dump: log params before API call
+    dumpContext(config.name, {
+      model: chatParams.model,
+      max_tokens: chatParams.maxTokens,
+      system: chatParams.systemPrompt,
+      tools: chatParams.tools,
+      messages: chatParams.messages,
+    });
 
     let result: ChatResult;
     if (shouldStream) {
