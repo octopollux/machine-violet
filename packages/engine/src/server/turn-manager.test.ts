@@ -71,7 +71,7 @@ describe("TurnManager", () => {
       tm.contribute("aldric", "I look around");
 
       // Auto-commit happens via setImmediate, so wait a tick
-      await new Promise((r) => setTimeout(r, 10));
+      await new Promise((r) => setImmediate(r));
       const turn = tm.getCurrentTurn()!;
       expect(turn.status).toBe("resolved");
     });
@@ -91,7 +91,7 @@ describe("TurnManager", () => {
       tm.contribute("aldric", "I attack");
       tm.contribute("sable", "I heal");
 
-      await new Promise((r) => setTimeout(r, 10));
+      await new Promise((r) => setImmediate(r));
       const turn = tm.getCurrentTurn()!;
       expect(turn.status).toBe("resolved");
     });

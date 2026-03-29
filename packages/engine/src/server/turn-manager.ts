@@ -20,6 +20,7 @@ export class TurnManager {
   private currentTurn: Turn | null = null;
   private broadcast: (event: ServerEvent) => void;
   private onCommit: ((contributions: TurnContribution[]) => Promise<void>) | null = null;
+  private commitPending = false;
 
   constructor(broadcast: (event: ServerEvent) => void) {
     this.broadcast = broadcast;
@@ -86,9 +87,22 @@ export class TurnManager {
     });
 
     // Auto-commit check
-    if (this.shouldAutoCommit(turn)) {
+    if (this.shouldAutoCommit(turn) && !this.commitPending) {
+      this.commitPending = true;
       // Use setImmediate to avoid blocking the HTTP response
-      setImmediate(() => this.commit());
+      setImmediate(() => {
+        this.commit().catch((err) => {
+          this.broadcast({
+            type: "error",
+            data: {
+              message: err instanceof Error ? err.message : String(err),
+              recoverable: true,
+            },
+          });
+        }).finally(() => {
+          this.commitPending = false;
+        });
+      });
     }
 
     return contribution;

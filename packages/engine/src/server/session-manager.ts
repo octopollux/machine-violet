@@ -94,14 +94,14 @@ export class SessionManager {
     }
     const msg = JSON.stringify(event);
     for (const { ws } of this.clients.values()) {
-      if (ws.readyState === ws.OPEN) {
+      if (ws.readyState === 1 /* WebSocket.OPEN */) {
         ws.send(msg);
       }
     }
   }
 
   sendTo(ws: WebSocket, event: ServerEvent): void {
-    if (ws.readyState === ws.OPEN) {
+    if (ws.readyState === 1 /* WebSocket.OPEN */) {
       ws.send(JSON.stringify(event));
     }
   }
@@ -109,7 +109,7 @@ export class SessionManager {
   broadcastToPlayers(event: ServerEvent): void {
     const msg = JSON.stringify(event);
     for (const { ws, identity } of this.clients.values()) {
-      if (identity.role === "player" && ws.readyState === ws.OPEN) {
+      if (identity.role === "player" && ws.readyState === 1 /* WebSocket.OPEN */) {
         ws.send(msg);
       }
     }

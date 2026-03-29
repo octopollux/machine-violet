@@ -93,7 +93,7 @@ export function PlayingPhase() {
     // Regular input → contribute to current turn
     setNarrativeLines((prev) => [
       ...prev,
-      { kind: "separator", text: "" },
+      { kind: "separator", text: "---" },
       { kind: "player", text: `[${activeChar}] ${text}` },
       { kind: "dm", text: "" },
     ]);

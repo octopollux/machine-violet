@@ -53,13 +53,15 @@ export function startClient(opts: StartClientOptions = {}): ClientHandle {
   );
 
   // Graceful shutdown on SIGINT
-  process.on("SIGINT", () => {
+  const onSigInt = () => {
     unmount();
-  });
+  };
+  process.on("SIGINT", onSigInt);
 
   // Wrap waitUntilExit to clean up guards
   const waitUntilExit = async () => {
     await inkWaitUntilExit();
+    process.removeListener("SIGINT", onSigInt);
     unlockRawMode();
     removeCombiner();
   };

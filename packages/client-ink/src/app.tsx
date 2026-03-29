@@ -197,9 +197,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
         }
       },
       onDisconnect: () => {
-        if (phase !== "error" && phase !== "menu") {
-          setPhase("disconnected");
-        }
+        setPhase((prev) => (prev === "error" || prev === "menu" ? prev : "disconnected"));
       },
       onError: (err) => {
         setErrorMessage(err.message);

@@ -8,6 +8,7 @@
  * Narrative deltas are buffered to word boundaries before broadcasting,
  * reducing WebSocket message volume with no perceptible latency impact.
  */
+import { randomUUID } from "node:crypto";
 import type {
   EngineCallbacks, EngineState, TurnInfo,
   UsageStats, ModelTier, ToolResult, TuiCommand,
@@ -163,7 +164,7 @@ function routeTuiCommand(
         type: "modal:show",
         data: {
           type: "choice",
-          id: String(command.id ?? crypto.randomUUID()),
+          id: String(command.id ?? randomUUID()),
           prompt: String(command.prompt ?? ""),
           choices: (command.choices as string[]) ?? [],
           descriptions: command.descriptions as string[] | undefined,
