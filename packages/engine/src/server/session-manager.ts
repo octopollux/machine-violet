@@ -330,17 +330,18 @@ export class SessionManager {
     // Broadcast state snapshot
     this.broadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
 
-    // Send display history (last ~100 lines from previous session)
+    // Send display history from previous session.
+    // Each line gets a trailing \n so that appendDelta on the client creates
+    // proper line breaks and spacers between paragraphs.
     const historyLines = await persister.loadDisplayLogFull();
     if (historyLines.length > 0) {
       const narrativeLines = markdownToNarrativeLines(historyLines);
       for (const line of narrativeLines) {
-        // Only send kinds the WS protocol supports
         const kind = line.kind as string;
         if (kind === "dm" || kind === "player" || kind === "system" || kind === "dev") {
           this.broadcast({
             type: "narrative:chunk",
-            data: { text: line.text, kind },
+            data: { text: line.text + "\n", kind },
           });
         }
       }
