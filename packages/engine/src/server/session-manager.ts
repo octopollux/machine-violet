@@ -335,18 +335,26 @@ export class SessionManager {
     const historyLines = await persister.loadDisplayLogFull();
     if (historyLines.length > 0) {
       const narrativeLines = markdownToNarrativeLines(historyLines);
-      // Group consecutive same-kind lines and send each group as one chunk
+      // Group consecutive same-kind lines and send each group as one chunk.
+      // Separators (---) are sent as DM lines — the formatting pipeline
+      // converts them to styled horizontal rules during rendering.
       let currentKind = "";
       let currentText = "";
       for (const line of narrativeLines) {
-        const kind = line.kind as string;
+        let kind = line.kind as string;
+        let text = line.text;
+        // Convert separators to DM lines with --- text for the formatting pipeline
+        if (kind === "separator") {
+          kind = "dm";
+          text = "---";
+        }
         if (kind !== "dm" && kind !== "player" && kind !== "system" && kind !== "dev") continue;
         if (kind !== currentKind && currentText) {
           this.broadcast({ type: "narrative:chunk", data: { text: currentText, kind: currentKind } });
           currentText = "";
         }
         currentKind = kind;
-        currentText += (currentText ? "\n" : "") + line.text;
+        currentText += (currentText ? "\n" : "") + text;
       }
       if (currentText) {
         this.broadcast({ type: "narrative:chunk", data: { text: currentText, kind: currentKind } });

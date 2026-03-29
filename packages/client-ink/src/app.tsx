@@ -131,7 +131,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
   const [activeCampaignId, setActiveCampaignId] = useState(campaignId ?? "");
 
   // Theme state
-  const [themeDef] = useState<ThemeDefinition>(() => loadThemeDefinition("clean"));
+  const [themeDef, setThemeDef] = useState<ThemeDefinition>(() => loadThemeDefinition("clean"));
   const [variant, setVariant] = useState<StyleVariant>("exploration");
   const [keyColor, setKeyColor] = useState("#8888aa");
   const [theme, setTheme] = useState<ResolvedTheme>(() => resolveTheme(loadThemeDefinition("clean"), "exploration"));
@@ -158,6 +158,13 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
         const snap = next.stateSnapshot;
         if (snap.keyColor) setKeyColor(snap.keyColor);
         if (snap.variant) setVariant(snap.variant as StyleVariant);
+        // Load the campaign's theme definition (frame assets, gradient config)
+        if (snap.themeName) {
+          try {
+            const def = loadThemeDefinition(snap.themeName);
+            setThemeDef(def);
+          } catch { /* fall back to current theme */ }
+        }
       }
       return next;
     });
