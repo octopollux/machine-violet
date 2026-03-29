@@ -138,10 +138,44 @@ export class SessionManager {
 
   // --- Setup session ---
 
-  /** Start a campaign creation session. */
+  /** Start a campaign creation session with a real temp GameState. */
   async startSetup(): Promise<void> {
     if (this.active) throw new Error("A session is already active.");
     const homeDir = this.campaignsDir.replace(/[/\\]campaigns\/?$/, "");
+
+    // Create a temp campaign directory for setup state.
+    // Clean up any previous setup state first (inspectable between runs).
+    const setupRoot = join(this.campaignsDir, "__setup__");
+    const { mkdir, rm } = await import("node:fs/promises");
+    await rm(setupRoot, { recursive: true, force: true });
+    await mkdir(join(setupRoot, "state"), { recursive: true });
+
+    // Build a minimal GameState so turns, context dumps, etc. work
+    const setupConfig: CampaignConfig = {
+      name: "Setup",
+      dm_personality: { name: "Setup MC", prompt: "" },
+      players: [{ character: "Player", type: "human", color: "#ffffff" }],
+      combat: { system: "theater_of_mind", grid_size: 0, default_initiative: "dex" },
+      context: {},
+      recovery: { auto_commit_interval: 0, max_commits: 0, enable_git: false },
+      choices: { campaign_default: "sometimes", player_overrides: {} },
+    };
+
+    this.gameState = {
+      maps: {},
+      clocks: createClocksState(),
+      combat: createCombatState(),
+      combatConfig: setupConfig.combat,
+      decks: createDecksState(),
+      objectives: createObjectivesState(),
+      config: setupConfig,
+      campaignRoot: setupRoot,
+      homeDir,
+      activePlayerIndex: 0,
+      displayResources: {},
+      resourceValues: {},
+    };
+
     this.setupSession = new SetupSession(
       this.campaignsDir, homeDir, (event) => this.broadcast(event),
     );
@@ -149,11 +183,11 @@ export class SessionManager {
     this.currentMode = "setup";
     this.campaignId = "__setup__";
 
-    // Dev mode: context dumps for setup (no campaign root, use home dir)
+    // Dev mode: context dumps in the temp setup dir
     const { isDevMode } = await import("../config/dev-mode.js");
     if (isDevMode()) {
       const { setContextDumpDir } = await import("../config/context-dump.js");
-      setContextDumpDir(join(homeDir, ".dev-mode", "setup-context"));
+      setContextDumpDir(join(setupRoot, ".dev-mode", "context"));
     }
 
     // Initialize turn manager for setup input
@@ -169,9 +203,7 @@ export class SessionManager {
       }
     });
 
-    // Start the setup conversation in the background — the REST response
-    // returns immediately so the client can show the playing UI and start
-    // receiving streamed narrative via WebSocket.
+    // Start the setup conversation in the background
     const setup = this.setupSession;
     void setup.start().then(() => {
       if (this.setupSession === setup) this.openNextTurn();
@@ -508,17 +540,15 @@ export class SessionManager {
 
   /** Open a turn for the current active player(s). */
   private openNextTurn(): void {
-    if (!this.turnManager) return;
+    if (!this.turnManager || !this.gameState) return;
     // Cancel any open turn that was never contributed to (e.g., a choice
     // modal was shown instead of collecting free-text input)
     const current = this.turnManager.getCurrentTurn();
     if (current && current.status === "open") {
       this.turnManager.cancelTurn();
     }
-    // During setup there's no GameState — use a default player name
-    const humanPlayers = this.gameState
-      ? [getActivePlayer(this.gameState).characterName]
-      : ["Player"];
+    const active = getActivePlayer(this.gameState);
+    const humanPlayers = [active.characterName];
     const aiPlayers: string[] = [];
     this.turnManager.openTurn(humanPlayers, aiPlayers);
   }
