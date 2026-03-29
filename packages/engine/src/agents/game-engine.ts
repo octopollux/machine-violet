@@ -109,6 +109,7 @@ function stampConversationCache(messages: Anthropic.MessageParam[]): void {
  */
 export class GameEngine {
   private client: Anthropic;
+  private provider: import("../providers/types.js").LLMProvider | undefined;
   private registry: ToolRegistry;
   private gameState: GameState;
   private conversation: ConversationManager;
@@ -136,6 +137,7 @@ export class GameEngine {
 
   constructor(params: {
     client: Anthropic;
+    provider?: import("../providers/types.js").LLMProvider;
     gameState: GameState;
     scene: SceneState;
     sessionState: DMSessionState;
@@ -145,6 +147,7 @@ export class GameEngine {
     gitIO?: GitIO;
   }) {
     this.client = params.client;
+    this.provider = params.provider;
     this.registry = singletonRegistry;
     this.gameState = params.gameState;
     this.fileIO = params.fileIO;
@@ -1167,6 +1170,7 @@ export class GameEngine {
   private buildAgentConfig(): AgentLoopConfig {
     return {
       model: this.model,
+      provider: this.provider,
       maxTokens: TOKEN_LIMITS.DM_RESPONSE,
       maxToolRounds: 10,
       asyncToolHandler: (name, input) => this.handleAsyncTool(name, input),

@@ -21,6 +21,9 @@ import type { DMSessionState } from "../agents/dm-prompt.js";
 import { getActivePlayer } from "../agents/player-manager.js";
 import { createClient } from "../config/client.js";
 import { loadEnv } from "../config/first-launch.js";
+import { loadConnectionStore, buildEffectiveConnections, getTierProvider } from "../config/connections.js";
+import { createProviderFromConnection } from "../providers/index.js";
+import { configDir } from "../utils/paths.js";
 import { sandboxFileIO } from "../tools/filesystem/sandbox.js";
 import { campaignPaths } from "../tools/filesystem/scaffold.js";
 import { createGitIO } from "../tools/git/isogit-adapter.js";
@@ -223,7 +226,17 @@ export class SessionManager {
     // --- Ensure API key is loaded ---
     loadEnv();
 
-    // --- Create Anthropic client ---
+    // --- Resolve provider from connections ---
+    const appConfigDir = configDir();
+    const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir));
+    const largeTier = getTierProvider(connStore, "large");
+
+    // Create provider if a connection is assigned to the large tier
+    const provider = largeTier
+      ? createProviderFromConnection(largeTier.connection)
+      : undefined;
+
+    // --- Create Anthropic client (legacy fallback) ---
     const client = createClient();
 
     // --- Create and sandbox FileIO ---
@@ -292,6 +305,7 @@ export class SessionManager {
     // --- Instantiate GameEngine ---
     const engine = new GameEngine({
       client,
+      provider,
       gameState: gs,
       scene,
       sessionState,
