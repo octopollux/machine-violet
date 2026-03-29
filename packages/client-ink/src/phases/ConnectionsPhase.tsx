@@ -115,12 +115,17 @@ export function ConnectionsPhase({
 
   useInput((input, key) => {
     if (key.escape) {
+      if (tierEditing) {
+        setTierEditing(false);
+        return;
+      }
       if (section === "add" && addStep !== "provider") {
         setAddStep("provider");
         return;
       }
-      if (tierEditing) {
-        setTierEditing(false);
+      // From any section, Esc goes back to settings
+      if (section !== "connections") {
+        setSection("connections");
         return;
       }
       onBack();
@@ -138,7 +143,11 @@ export function ConnectionsPhase({
     // --- Connections section ---
     if (section === "connections") {
       if (key.upArrow) { setConnIndex((i) => Math.max(0, i - 1)); return; }
-      if (key.downArrow) { setConnIndex((i) => Math.min(connections.length - 1, i + 1)); return; }
+      if (key.downArrow) {
+        if (connIndex >= connections.length - 1) { setSection("tiers"); return; }
+        setConnIndex((i) => Math.min(connections.length - 1, i + 1));
+        return;
+      }
       if (input === "r" || input === "R") {
         const conn = connections[connIndex];
         if (conn) onCheckHealth(conn.id);
@@ -163,8 +172,16 @@ export function ConnectionsPhase({
     // --- Tiers section ---
     if (section === "tiers") {
       if (!tierEditing) {
-        if (key.upArrow) { setTierIndex((i) => Math.max(0, i - 1)); return; }
-        if (key.downArrow) { setTierIndex((i) => Math.min(2, i + 1)); return; }
+        if (key.upArrow) {
+          if (tierIndex <= 0) { setSection("connections"); return; }
+          setTierIndex((i) => Math.max(0, i - 1));
+          return;
+        }
+        if (key.downArrow) {
+          if (tierIndex >= 2) { setSection("add"); return; }
+          setTierIndex((i) => Math.min(2, i + 1));
+          return;
+        }
         if (key.return && allModels.length > 0) {
           setTierEditing(true);
           setTierModelIndex(0);
@@ -186,7 +203,11 @@ export function ConnectionsPhase({
     // --- Add section ---
     if (section === "add") {
       if (addStep === "provider") {
-        if (key.upArrow) setAddProviderIndex((i) => Math.max(0, i - 1));
+        if (key.upArrow) {
+          if (addProviderIndex <= 0) { setSection("tiers"); return; }
+          setAddProviderIndex((i) => Math.max(0, i - 1));
+          return;
+        }
         if (key.downArrow) setAddProviderIndex((i) => Math.min(PROVIDER_OPTIONS.length - 1, i + 1));
         if (key.return) {
           setAddProvider(PROVIDER_OPTIONS[addProviderIndex].id);
@@ -292,7 +313,7 @@ export function ConnectionsPhase({
       const connLabel = assignment ? connections.find((c) => c.id === assignment.connectionId)?.label ?? "" : "";
 
       if (tierEditing && i === tierIndex) {
-        lines.push(<Text key={`tier-${tier}-edit`} color={accent}> \u25B8 {TIER_LABELS[tier]}: <Text color={dim}>select model...</Text></Text>);
+        lines.push(<Text key={`tier-${tier}-edit`} color={accent}>{" \u25B8 "}{TIER_LABELS[tier]}: <Text color={dim}>select model...</Text></Text>);
         for (let mi = 0; mi < allModels.length; mi++) {
           const m = allModels[mi];
           lines.push(
