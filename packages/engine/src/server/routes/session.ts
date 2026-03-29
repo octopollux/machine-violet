@@ -41,8 +41,11 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
     }
 
     const { text } = request.body;
-    // TODO: resolve playerId from connection identity / query param
-    const playerId = (request.query as Record<string, string>).player ?? turn.activePlayers[0] ?? "player";
+    // Resolve player: use query param if it matches an active player, otherwise default to first active
+    const queryPlayer = (request.query as Record<string, string>).player;
+    const playerId = (queryPlayer && turn.activePlayers.includes(queryPlayer))
+      ? queryPlayer
+      : turn.activePlayers[0] ?? "player";
 
     try {
       const contribution = tm.contribute(playerId, text);
