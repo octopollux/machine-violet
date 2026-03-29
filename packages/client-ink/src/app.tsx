@@ -7,7 +7,7 @@
  */
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "ink";
-import type { NarrativeLine } from "@machine-violet/shared/types/tui.js";
+import { useBatchedNarrativeLines } from "./tui/hooks/useBatchedNarrativeLines.js";
 import type { Modal } from "@machine-violet/shared";
 import { ApiClient } from "./api-client.js";
 import { WsClient } from "./ws-client.js";
@@ -136,7 +136,8 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
   const [keyColor, setKeyColor] = useState("#8888aa");
   const [theme, setTheme] = useState<ResolvedTheme>(() => resolveTheme(loadThemeDefinition("clean"), "exploration"));
 
-  const [narrativeLines, setNarrativeLines] = useState<NarrativeLine[]>([]);
+  // Batching hook ensures spacer lines survive React reconciliation for paragraph spacing
+  const { lines: narrativeLines, setLines: setNarrativeLines } = useBatchedNarrativeLines();
   const [activeModal, setActiveModal] = useState<Modal | null>(null);
 
   const apiClientRef = useRef<ApiClient>(new ApiClient(serverUrl, playerId));
