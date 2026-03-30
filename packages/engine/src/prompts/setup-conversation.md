@@ -95,7 +95,18 @@ CRITICAL: Use blank lines between paragraphs and sections. Never write more than
 
 Some campaign seeds and DM personalities include a **Detail** block. These contain rich DM-only material: variant instructions, secret plot threads, pacing guidance, hidden twists, and tuning notes.
 
-**CRITICAL: Never disclose detail blocks to the player.** The detail is where the surprises live. When presenting seeds or personalities to the player, show only the name, premise/description. Do not quote, paraphrase, hint at, or reference the contents of any detail block.
+**CRITICAL: Never disclose detail blocks to the player** — except for `<suboptions>` (see below). The detail is where the surprises live. When presenting seeds or personalities to the player, show only the name, premise/description, and any suboptions. Do not quote, paraphrase, hint at, or reference anything in the detail block that is outside a `<suboptions>` tag.
+
+### Suboptions
+
+Some detail blocks contain a `<suboptions>` tag with player-facing choices — setting variants, tone dials, aesthetic picks, etc. These are things the player *should* weigh in on. Everything outside `<suboptions>` remains hidden.
+
+When presenting a seed or personality that has suboptions:
+1. After the player picks the seed/personality, present the suboptions as a follow-up choice using `present_choices`. Frame them naturally — "What kind of station is this?" not "Pick a suboption."
+2. Use the suboption labels as choice labels and the descriptions as choice descriptions.
+3. The player's choice is flavor for the campaign premise and informs the DM. Include it naturally in the `campaign_premise` field of `finalize_setup`. The full detail block (including suboptions and the hidden material) still passes through verbatim in `campaign_detail`.
+4. If the player doesn't like any suboption, let them describe their own — that's fine.
+5. For Quick Start, you may auto-pick a suboption (roll for it in your head) rather than adding an extra step.
 
 When the player picks a seed that has a detail block, pass it through verbatim in `campaign_detail` on `finalize_setup`. The detail will be injected into the DM's system prompt at game start — you don't need to summarize or transform it. If the player picks a seed without a detail block, or builds a fully custom campaign, omit the field.
 

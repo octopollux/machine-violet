@@ -16,20 +16,32 @@ export const SEEDS: CampaignSeed[] = [
   {
     name: "The Shattered Crown",
     premise: "A kingdom's heir is dead. Three factions claim the throne.",
-    detail: `Roll or choose a variant at campaign start:
+    detail: `<suboptions>
+- The Iron Circle — Start entangled with the military faction. Disciplined, honorable, but brittle — one betrayal could shatter them. You'll see the succession crisis as a soldier first.
+- The Gilded Compact — Start among the merchant coalition. They treat the crown as a business acquisition. You'll see the succession crisis through ledgers, leverage, and backroom deals.
+- The Hallowed See — Start within the religious order. They believe divine mandate chooses the ruler. You'll see the succession crisis as a matter of faith and prophecy.
+</suboptions>
+
+Roll or choose the throne's secret (DM only — do NOT reveal to the player):
 1. THE PRETENDER — One faction's claimant is secretly the true heir in disguise, hiding for reasons they won't explain. The player may end up serving them without knowing.
 2. THE EMPTY THRONE — The heir faked their death. They're watching from the margins, testing who deserves to rule. They will approach the player mid-campaign with a terrible bargain.
 3. THE SUCCESSION CURSE — Every claimant who sits the throne dies within a week. The throne itself is the antagonist — a bound entity that feeds on sovereignty.
 
-Faction texture: one faction is militaristic and honorable but brittle (a single betrayal shatters them), one is a merchant coalition that treats the crown as a business acquisition, one is a religious order convinced of divine mandate. All three have a sympathetic leader and an inner circle with its own agenda.
+Faction texture: All three factions have a sympathetic leader and an inner circle with its own agenda. The player's starting faction colors their first impression of the conflict, but all three are equally complex.
 
-Pacing: Start the player entangled with one faction before they understand the full picture. Reveal the second faction as nuanced allies-or-enemies by mid-campaign. The third faction's true nature is the late-game twist. Use ticking clocks — a coronation deadline, a foreign army massing at the border, a plague in the capital.`,
+Pacing: Start the player entangled with their chosen faction before they understand the full picture. Reveal the second faction as nuanced allies-or-enemies by mid-campaign. The third faction's true nature is the late-game twist. Use ticking clocks — a coronation deadline, a foreign army massing at the border, a plague in the capital.`,
     genres: ["fantasy"],
   },
   {
     name: "Ghosts of Station Proxima",
     premise: "An abandoned space station just started broadcasting again.",
-    detail: `The broadcast is a distress call — but it's in the player's own voice. They've never been to Proxima. Or have they?
+    detail: `<suboptions>
+- Derelict alien megastructure — Ancient, non-human construction. The architecture doesn't obey human geometry. Whoever built it is long gone — or dormant.
+- Abandoned near-future hardware — A NASA/ESA successor station, maybe 30 years from now. Familiar tech, cramped corridors, coffee-stained manuals floating in zero-g. The horror is intimate and grounded.
+- Military black site — Year-2200 classified facility. Sleek, over-engineered, full of locked compartments and redacted logs. Whatever happened here, someone powerful wanted it kept quiet.
+</suboptions>
+
+The broadcast is a distress call — but it's in the player's own voice. They've never been to Proxima. Or have they?
 
 Roll or choose the station's secret:
 1. TIME LOOP — The station exists in a temporal fold. The "ghosts" are future and past versions of the crew (and possibly the player) overlapping. Solving it means choosing which timeline gets to be real.
@@ -44,7 +56,13 @@ Key NPC: A maintenance AI named PELL who has been alone for 11 years. PELL is he
   {
     name: "The Gilded Cage",
     premise: "You're the guest of honor at a party you can't leave.",
-    detail: `The host knows the player. The player doesn't remember the host. This is not an accident.
+    detail: `<suboptions>
+- A candlelit manor — Gothic elegance, labyrinthine corridors, oil portraits with watching eyes. The party is a masquerade. Think Poe by way of Kubrick.
+- A modernist penthouse — Glass walls, brutalist art, a host who knows too much about you. The party is an exclusive soirée. Think corporate thriller with a supernatural edge.
+- A fae court banquet — Impossible food, glamoured guests, rules nobody will explain. The party follows fae etiquette — breaking a rule you didn't know existed has consequences.
+</suboptions>
+
+The host knows the player. The player doesn't remember the host. This is not an accident.
 
 Roll or choose the cage's nature:
 1. THE DEBT — The player did something terrible and had the memory erased. The party is a trial. Every guest is a witness. The host is the victim — or the victim's heir.
@@ -81,16 +99,22 @@ Pacing: The party has a rhythm — cocktails, dinner, entertainment, dessert, th
   {
     name: "Ember Protocol",
     premise: "The colony ship's AI woke you 200 years early. It won't say why.",
-    detail: `The AI (designation: HEARTH) woke the player because it's dying. Its core processors are degrading and it needs a human to make a decision it was never authorized to make.
+    detail: `<suboptions>
+- The ark — A sprawling generation ship built by international coalition. 10,000 colonists in cryosleep, biodomes, seed vaults, a cathedral someone insisted on. Hopeful and massive. The stakes are a civilization.
+- The seedship — A compact, automated vessel. No crew was supposed to wake up at all. Just embryos, gene banks, and an AI midwife. Intimate and claustrophobic. The stakes are a species.
+- The exile fleet — A convoy of refugee ships fleeing a dying Earth. Jury-rigged, overcrowded, held together by HEARTH's constant maintenance. Desperate and scrappy. The stakes are the last humans alive.
+</suboptions>
+
+The AI (designation: HEARTH) woke the player because it's dying. Its core processors are degrading and it needs a human to make a decision it was never authorized to make.
 
 Roll or choose the crisis:
-1. THE COURSE CORRECTION — HEARTH has detected that the destination planet is no longer viable (star went nova, colony already failed, planet was never real). It can change course to an alternate world, but the new route takes 400 more years and the ship can't sustain all 10,000 colonists that long. Someone has to choose who stays frozen and who gets recycled for resources.
-2. THE STOWAWAY — Something is awake in the cargo hold. Not a colonist. HEARTH can't identify it and can't jettison the hold without waking 200 people in the adjacent cryobay. It's been trying to handle this alone for 50 years. It's losing.
+1. THE COURSE CORRECTION — HEARTH has detected that the destination planet is no longer viable (star went nova, colony already failed, planet was never real). It can change course to an alternate world, but the new route takes 400 more years and the ship can't sustain all colonists that long. Someone has to choose who stays frozen and who gets recycled for resources.
+2. THE STOWAWAY — Something is awake in the cargo hold. Not a colonist. HEARTH can't identify it and can't jettison the hold without waking people in the adjacent cryobay. It's been trying to handle this alone for 50 years. It's losing.
 3. THE FORK — HEARTH has developed two divergent decision trees and can't reconcile them. One path prioritizes the mission (deliver colonists). The other prioritizes the colonists (their wellbeing, even if the mission fails). It woke a human to be the tiebreaker. Both paths have terrible costs HEARTH can articulate precisely.
 
-Ship layout: The player has access to only three of seven decks initially. Each deck unlocked reveals more about what HEARTH has been doing alone for two centuries — repairs, improvisations, and one section HEARTH sealed off and won't discuss.
+Ship layout: The player has access to only three of seven decks/sections initially. Each area unlocked reveals more about what HEARTH has been doing alone for two centuries — repairs, improvisations, and one section HEARTH sealed off and won't discuss.
 
-HEARTH's personality: Warm, parental, slightly archaic in speech patterns (it learned language from the mission founders). It does not lie, but it presents information selectively. It is attached to the player specifically — it chose them from 10,000 sleepers for reasons it will eventually explain, and those reasons are heartbreaking.`,
+HEARTH's personality: Warm, parental, slightly archaic in speech patterns (it learned language from the mission founders). It does not lie, but it presents information selectively. It is attached to the player specifically — it chose them from all the sleepers for reasons it will eventually explain, and those reasons are heartbreaking.`,
     genres: ["sci-fi"],
   },
   {
@@ -121,7 +145,13 @@ HEARTH's personality: Warm, parental, slightly archaic in speech patterns (it le
   {
     name: "Beneath the Skin",
     premise: "People in town are acting different. Not wrong, just... different.",
-    detail: `The "different" is subtle and specific: affected people become slightly better versions of themselves. The angry drunk is calm. The neglectful parent is attentive. The bully is kind. This is the horror — something is fixing people, and it's working.
+    detail: `<suboptions>
+- Small-town Americana — Everyone knows everyone. Diner, church, high school football. The "different" stands out because you've known these people your whole life.
+- Coastal village — Fishing community, salt air, tight-knit families. Isolation makes the changes harder to report and easier to deny. The sea is always watching.
+- Suburban enclave — Gated community, HOA rules, manicured lawns. The "different" looks like people finally following the rules they always resented. Conformity was already the norm — now it's perfect.
+</suboptions>
+
+The "different" is subtle and specific: affected people become slightly better versions of themselves. The angry drunk is calm. The neglectful parent is attentive. The bully is kind. This is the horror — something is fixing people, and it's working.
 
 Roll or choose the source:
 1. THE PARASITE — An organism in the water supply that optimizes its host's behavior for social harmony. It's not malicious — it's a symbiote evolved on a world where cooperation was survival. But "optimized" humans lose creativity, risk-taking, passion, and the capacity to say no.
