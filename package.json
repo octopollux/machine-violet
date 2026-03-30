@@ -16,7 +16,8 @@
     "lint": "eslint packages/shared/src/ packages/engine/src/ packages/client-ink/src/",
     "typecheck": "npm run -w packages/shared build && npm run -w packages/engine typecheck && npm run -w packages/client-ink typecheck",
     "check": "npm run lint && npm run test",
-    "dist": "node scripts/build-dist.js"
+    "dist": "node scripts/build-dist.js",
+    "explorer": "node tools/campaign-explorer/scripts/dev.js"
   },
   "keywords": [
     "rpg",

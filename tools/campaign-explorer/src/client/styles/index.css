@@ -84,6 +84,22 @@ body {
   flex-shrink: 0;
 }
 
+/* Machine-scope section */
+.machine-section {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+
+.machine-section-header {
+  padding: 8px 12px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+}
+
 /* Content */
 .content-pane {
   flex: 1;

@@ -4,6 +4,7 @@ import { JsonViewer } from "./JsonViewer";
 import { ContextDumpViewer } from "./ContextDumpViewer";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import type { FileCategory } from "../../shared/protocol";
+import { MACHINE_SLUG } from "../../shared/protocol";
 
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
@@ -41,7 +42,10 @@ export function ContentPane({
     }
 
     setLoading(true);
-    fetch(`/api/campaigns/${campaignSlug}/file/${selectedFile}`)
+    const url = campaignSlug === MACHINE_SLUG
+      ? `/api/machine/file/${selectedFile}`
+      : `/api/campaigns/${campaignSlug}/file/${selectedFile}`;
+    fetch(url)
       .then((res) => {
         if (!res.ok) throw new Error(`${res.status}`);
         return res.text();

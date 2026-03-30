@@ -3,7 +3,7 @@
  * returns the shape the Campaign Explorer's MarkdownViewer expects.
  */
 import { describe, it, expect } from "vitest";
-import { parseFrontMatter } from "../../../../src/tools/filesystem/frontmatter.js";
+import { parseFrontMatter } from "../../../../packages/engine/src/tools/filesystem/frontmatter.js";
 
 describe("parseFrontMatter contract", () => {
   it("returns { frontMatter, body, changelog }", () => {

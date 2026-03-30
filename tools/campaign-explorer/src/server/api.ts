@@ -1,17 +1,26 @@
 import { Router } from "express";
 import { readdir, readFile, stat } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import type { CampaignInfo, TreeEntry } from "../shared/protocol.js";
-import { classifyPath } from "./watcher.js";
+import { classifyPath, classifyMachinePath } from "./watcher.js";
+
+/** Check that resolved absPath is inside dir (boundary-safe). */
+function isInsideDir(dir: string, absPath: string): boolean {
+  const resolved = resolve(absPath);
+  const base = resolve(dir) + sep;
+  return resolved.startsWith(base);
+}
 
 /**
  * Build the API router.
  * @param getCampaigns Function to get the current campaign list.
  * @param getCampaignPath Function to resolve a slug to its directory.
+ * @param getMachineDir Function to resolve the machine-scope .debug directory (if any).
  */
 export function createApiRouter(
   getCampaigns: () => CampaignInfo[],
   getCampaignPath: (slug: string) => string | undefined,
+  getMachineDir?: () => string | null,
 ): Router {
   const router = Router();
 
@@ -53,8 +62,57 @@ export function createApiRouter(
     }
 
     // Security: prevent path traversal
-    const absPath = join(dir, relPath);
-    if (!absPath.startsWith(dir)) {
+    const absPath = resolve(dir, relPath);
+    if (!isInsideDir(dir, absPath)) {
+      res.status(403).json({ error: "Path traversal not allowed" });
+      return;
+    }
+
+    try {
+      const content = await readFile(absPath, "utf-8");
+      const ext = relPath.split(".").pop()?.toLowerCase();
+      if (ext === "json") {
+        res.type("application/json").send(content);
+      } else {
+        res.type("text/plain").send(content);
+      }
+    } catch {
+      res.status(404).json({ error: "File not found" });
+    }
+  });
+
+  // --- Machine-scope routes ---
+
+  router.get("/machine/tree", async (_req, res) => {
+    const dir = getMachineDir?.();
+    if (!dir) {
+      res.json([]);
+      return;
+    }
+    try {
+      const entries = await walkDir(dir, dir, classifyMachinePath);
+      res.json(entries);
+    } catch {
+      res.json([]);
+    }
+  });
+
+  router.get("/machine/file/*path", async (req, res) => {
+    const dir = getMachineDir?.();
+    if (!dir) {
+      res.status(404).json({ error: "Machine debug directory not available" });
+      return;
+    }
+
+    const pathSegments = req.params.path;
+    const relPath = Array.isArray(pathSegments) ? pathSegments.join("/") : String(pathSegments);
+    if (!relPath) {
+      res.status(400).json({ error: "Missing file path" });
+      return;
+    }
+
+    const absPath = resolve(dir, relPath);
+    if (!isInsideDir(dir, absPath)) {
       res.status(403).json({ error: "Path traversal not allowed" });
       return;
     }
@@ -76,7 +134,11 @@ export function createApiRouter(
 }
 
 /** Recursively walk a directory and return tree entries. */
-async function walkDir(root: string, dir: string): Promise<TreeEntry[]> {
+async function walkDir(
+  root: string,
+  dir: string,
+  classifier: (relPath: string) => import("../shared/protocol.js").FileCategory = classifyPath,
+): Promise<TreeEntry[]> {
   const entries: TreeEntry[] = [];
 
   let items: string[];
@@ -95,13 +157,13 @@ async function walkDir(root: string, dir: string): Promise<TreeEntry[]> {
     try {
       const s = await stat(absPath);
       if (s.isDirectory()) {
-        const subEntries = await walkDir(root, absPath);
+        const subEntries = await walkDir(root, absPath, classifier);
         entries.push(...subEntries);
       } else {
         const relPath = relative(root, absPath).replace(/\\/g, "/");
         entries.push({
           relativePath: relPath,
-          category: classifyPath(relPath),
+          category: classifier(relPath),
           size: s.size,
           mtime: s.mtime.toISOString(),
         });

@@ -22,6 +22,17 @@ export async function scanCampaigns(campaignsDir: string): Promise<CampaignInfo[
       const s = await stat(dirPath);
       if (!s.isDirectory()) continue;
 
+      // __setup__ is a temporary campaign dir used during campaign creation.
+      // It has no config.json but contains useful debug/context data.
+      if (entry === "__setup__") {
+        campaigns.push({
+          slug: "__setup__",
+          name: "Setup (temp)",
+          path: dirPath,
+        });
+        continue;
+      }
+
       const configPath = join(dirPath, "config.json");
       const raw = await readFile(configPath, "utf-8");
       const config = JSON.parse(raw);

@@ -3,7 +3,7 @@
  * returns the directory structure the Campaign Explorer expects.
  */
 import { describe, it, expect } from "vitest";
-import { campaignDirs } from "../../../../src/tools/filesystem/scaffold.js";
+import { campaignDirs } from "../../../../packages/engine/src/tools/filesystem/scaffold.js";
 
 describe("campaignDirs contract", () => {
   it("returns expected directory names", () => {
