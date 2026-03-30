@@ -8,9 +8,9 @@ export function classifyPath(relPath: string): FileCategory {
 
   if (normalized === "config.json") return "config";
   if (normalized.startsWith("state/")) return "state";
-  // Context dumps: .debug/**/context/* or context-dump/*
+  // Context dumps: .debug/**/context/* or context-dump/* (legacy)
   const isContextPath = normalized.includes(".debug/") && normalized.includes("/context/");
-  const isLegacyContextPath = normalized.includes("context-dump/") || (normalized.includes(".dev-mode/") && normalized.includes("/context/"));
+  const isLegacyContextPath = normalized.includes("context-dump/");
   if (normalized.endsWith("-thinking.json") && (isContextPath || isLegacyContextPath))
     return "thinking";
   if (isContextPath || isLegacyContextPath) return "context-dump";

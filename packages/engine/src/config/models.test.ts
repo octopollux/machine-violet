@@ -87,7 +87,7 @@ describe("model config", () => {
   it("defaults effort with dev high", () => {
     const config = loadModelConfig({ cwd: testDir, reset: true });
     expect(config.effort).toEqual({
-      "default": null, "dm": "high", "ooc": "high", "setup": "high", "dev": "high",
+      "default": null, "dm": "high", "ooc": "high", "setup": "high", "dev-mode": "high",
     });
   });
 
@@ -130,7 +130,7 @@ describe("model config", () => {
     );
     const config = loadModelConfig({ cwd: testDir, reset: true });
     expect(config.effort).toEqual({
-      "default": null, "dm": "high", "ooc": "high", "setup": "high", "dev": "high",
+      "default": null, "dm": "high", "ooc": "high", "setup": "high", "dev-mode": "high",
     });
   });
 
@@ -143,7 +143,7 @@ describe("model config", () => {
 
     it("returns high effort for dev by default", () => {
       loadModelConfig({ cwd: testDir, reset: true });
-      const ec = getEffortConfig("dev");
+      const ec = getEffortConfig("dev-mode");
       expect(ec.effort).toBe("high");
     });
 

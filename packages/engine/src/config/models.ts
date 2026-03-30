@@ -35,7 +35,7 @@ const DEFAULTS: ModelConfig = {
     "dm": "high",
     "ooc": "high",
     "setup": "high",
-    "dev": "high",
+    "dev-mode": "high",
   },
 };
 
