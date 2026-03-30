@@ -15,7 +15,7 @@ import { getActivePlayer } from "../../agents/player-manager.js";
 import { shouldGenerateChoices, generateChoices } from "../../agents/subagents/choice-generator.js";
 import { createOOCSession } from "../../agents/subagents/ooc-mode.js";
 import { CostTracker } from "../../context/cost-tracker.js";
-import { isDevMode } from "../../config/dev-mode.js";
+
 import type { ToolResult } from "../../agents/tool-registry.js";
 import { appendDelta } from "../narrative-helpers.js";
 import { getToolGlyph } from "../activity.js";
@@ -189,13 +189,9 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
         const dmProvided = activeModalRef.current?.kind === "choice";
         if (text && shouldGenerateChoices(gs.config.choices.campaign_default, dmProvided)) {
           const activePlayer = getActivePlayer(gs);
-          if (isDevMode()) {
-            setNarrativeLines((prev) => [...prev, { kind: "dev", text: "[dev] subagent:choices starting" }]);
-          }
+          setNarrativeLines((prev) => [...prev, { kind: "dev", text: "[dev] subagent:choices starting" }]);
           generateChoices(clientRef.current, text, activePlayer.characterName, playerAction).then((result) => {
-            if (isDevMode()) {
-              setNarrativeLines((prev) => [...prev, { kind: "dev", text: `[dev] subagent:choices \u2192 ${result.choices.length} options generated` }]);
-            }
+            setNarrativeLines((prev) => [...prev, { kind: "dev", text: `[dev] subagent:choices \u2192 ${result.choices.length} options generated` }]);
             if (!activeModalRef.current && result.choices.length > 0) {
               setActiveModal({ kind: "choice", prompt: "What do you do?", choices: result.choices });
             }
@@ -225,12 +221,10 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
       if (tg) {
         setToolGlyphs((prev) => [...prev, tg]);
       }
-      if (isDevMode()) {
-        setNarrativeLines((prev) => [...prev, { kind: "dev", text: `[dev] tool:${name} ...` }]);
-      }
+      setNarrativeLines((prev) => [...prev, { kind: "dev", text: `[dev] tool:${name} ...` }]);
     },
     onToolEnd(name: string, result?: ToolResult) {
-      if (isDevMode() && result) {
+      if (result) {
         const preview = result.content.length > 80
           ? result.content.slice(0, 77) + "..."
           : result.content;
@@ -239,9 +233,7 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
       }
     },
     onDevLog(msg: string) {
-      if (isDevMode()) {
-        setNarrativeLines((prev) => [...prev, { kind: "dev", text: msg }]);
-      }
+      setNarrativeLines((prev) => [...prev, { kind: "dev", text: msg }]);
     },
     onExchangeDropped() { /* precis update handled internally */ },
     onUsageUpdate(delta, tier) {

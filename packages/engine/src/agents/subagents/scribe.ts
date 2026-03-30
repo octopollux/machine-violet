@@ -8,7 +8,8 @@ import { join, dirname } from "node:path";
 import { campaignPaths } from "../../tools/filesystem/index.js";
 import { parseFrontMatter, serializeEntity } from "../../tools/filesystem/index.js";
 import { formatChangelogEntry } from "../../tools/filesystem/index.js";
-import type { EntityFrontMatter } from "@machine-violet/shared/types/entities.js";
+import type { EntityFrontMatter, EntityTree } from "@machine-violet/shared/types/entities.js";
+import { renderEntityTree } from "../../tools/filesystem/index.js";
 import { norm } from "../../utils/paths.js";
 
 // Re-export slugify from world-builder so the game engine doesn't need a separate import
@@ -26,6 +27,17 @@ export interface ScribeInput {
   updates: ScribeUpdate[];
   campaignRoot: string;
   sceneNumber: number;
+  /** Current entity tree — injected into Scribe context for deduplication. */
+  entityTree?: EntityTree;
+}
+
+/** Delta returned by the Scribe for each entity created or updated. */
+export interface ScribeEntityDelta {
+  slug: string;
+  name: string;
+  aliases: string[];
+  type: string;
+  path: string;
 }
 
 export interface ScribeResult {
@@ -35,6 +47,8 @@ export interface ScribeResult {
   created: string[];
   /** Entities updated (file paths) */
   updated: string[];
+  /** Entity tree deltas — entries to upsert into the entity tree */
+  entityDeltas: ScribeEntityDelta[];
   /** Usage stats */
   usage: UsageStats;
 }
@@ -140,6 +154,7 @@ export function buildScribeToolHandler(
   sceneNumber: number,
   created: string[],
   updated: string[],
+  entityDeltas: ScribeEntityDelta[],
 ) {
   const paths = campaignPaths(campaignRoot);
 
@@ -228,6 +243,10 @@ export function buildScribeToolHandler(
             const content = serializeEntity(entityName, fm, body, changelog);
             await fileIO.writeFile(filePath, content);
             created.push(filePath);
+            const aliasRaw = fm.additional_names as string | undefined;
+            const aliases = aliasRaw ? aliasRaw.split(",").map((a) => a.trim()).filter(Boolean) : [];
+            const relativePath = norm(filePath).replace(norm(campaignRoot) + "/", "");
+            entityDeltas.push({ slug, name: entityName, aliases, type: entityType, path: relativePath });
             return { content: `Created ${entityType} "${entityName}" at ${filePath}` };
           } else {
             // Update mode
@@ -268,6 +287,10 @@ export function buildScribeToolHandler(
             const content = serializeEntity(title, frontMatter, newBody, newChangelog);
             await fileIO.writeFile(filePath, content);
             updated.push(filePath);
+            const aliasRaw = frontMatter.additional_names as string | undefined;
+            const aliases = aliasRaw ? aliasRaw.split(",").map((a) => a.trim()).filter(Boolean) : [];
+            const relativePath = norm(filePath).replace(norm(campaignRoot) + "/", "");
+            entityDeltas.push({ slug, name: title, aliases, type: entityType, path: relativePath });
             return { content: `Updated "${title}" at ${filePath}` };
           }
         } catch (e) {
@@ -296,6 +319,7 @@ export async function runScribe(
   const systemPrompt = cacheSystemPrompt(loadPrompt("scribe"));
   const created: string[] = [];
   const updated: string[] = [];
+  const entityDeltas: ScribeEntityDelta[] = [];
 
   const toolHandler = buildScribeToolHandler(
     fileIO,
@@ -303,6 +327,7 @@ export async function runScribe(
     input.sceneNumber,
     created,
     updated,
+    entityDeltas,
   );
 
   // Format the user message with all updates
@@ -310,7 +335,11 @@ export async function runScribe(
     `[${i + 1}] (${u.visibility}) ${u.content}`,
   ).join("\n\n");
 
-  const userMessage = `Process these updates:\n\n${updateLines}`;
+  // Include entity tree so the Scribe can resolve existing entities before creating
+  const treeRendered = input.entityTree ? renderEntityTree(input.entityTree) : undefined;
+  const treeContext = treeRendered ? `\n\nEntity registry (use to find existing entities before creating):\n${treeRendered}\n` : "";
+
+  const userMessage = `Process these updates:${treeContext}\n\n${updateLines}`;
 
   const result: SubagentResult = await spawnSubagent(provider, {
     name: "scribe",
@@ -328,6 +357,7 @@ export async function runScribe(
     summary: result.text,
     created,
     updated,
+    entityDeltas,
     usage: result.usage,
   };
 }

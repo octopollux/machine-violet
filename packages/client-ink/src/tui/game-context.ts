@@ -58,8 +58,9 @@ export interface GameContextValue {
   // State snapshot (latest from server)
   stateSnapshot: StateSnapshot | null;
 
-  // Dev mode
+  // Settings
   devModeEnabled?: boolean;
+  showVerbose?: boolean;
 
   // Actions
   onReturnToMenu: () => void;

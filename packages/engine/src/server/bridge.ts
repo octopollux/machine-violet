@@ -143,6 +143,10 @@ export function createBridge(
     onTurnEnd(_turn: TurnInfo): void {
       // Turn lifecycle is managed by TurnManager
     },
+
+    onDevLog(msg: string): void {
+      broadcast({ type: "narrative:chunk", data: { text: msg, kind: "dev" } });
+    },
   };
 }
 

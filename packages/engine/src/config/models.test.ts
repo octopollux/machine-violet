@@ -84,7 +84,7 @@ describe("model config", () => {
     expect(getModel("small")).toBe("claude-haiku-4-5-20251001");
   });
 
-  it("defaults effort with dev-mode high", () => {
+  it("defaults effort with dev high", () => {
     const config = loadModelConfig({ cwd: testDir, reset: true });
     expect(config.effort).toEqual({
       "default": null, "dm": "high", "ooc": "high", "setup": "high", "dev-mode": "high",
@@ -141,7 +141,7 @@ describe("model config", () => {
       expect(ec.effort).toBeNull();
     });
 
-    it("returns high effort for dev-mode by default", () => {
+    it("returns high effort for dev by default", () => {
       loadModelConfig({ cwd: testDir, reset: true });
       const ec = getEffortConfig("dev-mode");
       expect(ec.effort).toBe("high");

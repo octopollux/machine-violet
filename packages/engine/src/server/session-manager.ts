@@ -25,6 +25,7 @@ import { createProviderFromConnection } from "../providers/index.js";
 import { configDir } from "../utils/paths.js";
 import { sandboxFileIO } from "../tools/filesystem/sandbox.js";
 import { campaignPaths } from "../tools/filesystem/scaffold.js";
+import { buildEntityTree } from "../tools/filesystem/entity-tree.js";
 import { createGitIO } from "../tools/git/isogit-adapter.js";
 import { createClocksState } from "../tools/clocks/index.js";
 import { createCombatState } from "../tools/combat/index.js";
@@ -203,12 +204,9 @@ export class SessionManager {
     // Start idle timer in case no players are connected yet
     this.checkIdleTimeout();
 
-    // Dev mode: context dumps in the temp setup dir
-    const { isDevMode } = await import("../config/dev-mode.js");
-    if (isDevMode()) {
-      const { setContextDumpDir } = await import("../config/context-dump.js");
-      setContextDumpDir(join(setupRoot, ".dev-mode", "context"));
-    }
+    // Debug: context dumps in the temp setup dir
+    const { setContextDumpDir } = await import("../config/context-dump.js");
+    setContextDumpDir(join(setupRoot, ".debug", "context"));
 
     // Initialize turn manager for setup input
     const setupBroadcast = (event: ServerEvent) => {
@@ -303,12 +301,9 @@ export class SessionManager {
       provider = createAnthropicProvider();
     }
 
-    // --- Dev mode: set context dump directory ---
-    const { isDevMode } = await import("../config/dev-mode.js");
-    if (isDevMode()) {
-      const { setContextDumpDir } = await import("../config/context-dump.js");
-      setContextDumpDir(join(campaignRoot, ".dev-mode", "context"));
-    }
+    // --- Debug: set context dump directory ---
+    const { setContextDumpDir } = await import("../config/context-dump.js");
+    setContextDumpDir(join(campaignRoot, ".debug", "context"));
 
     // --- Create and sandbox FileIO ---
     const baseIO = createBaseFileIO();
@@ -363,6 +358,9 @@ export class SessionManager {
       }
     } catch { /* ignore — may not exist yet */ }
 
+    // --- Build entity tree from disk ---
+    const entityTree = await buildEntityTree(campaignRoot, fileIO);
+
     // --- Cost tracker ---
     this.costTracker = new CostTracker();
 
@@ -391,6 +389,7 @@ export class SessionManager {
       fileIO,
       callbacks,
       gitIO,
+      entityTree,
     });
 
     this.engine = engine;
@@ -437,7 +436,7 @@ export class SessionManager {
     engine: GameEngine,
     config: CampaignConfig,
     gs: GameState,
-    _scene: SceneState,
+    scene: SceneState,
   ): Promise<void> {
     const persister = engine.getPersister();
     if (!persister) return;
@@ -457,6 +456,16 @@ export class SessionManager {
     }
     if (loaded.scene?.activePlayerIndex != null) {
       gs.activePlayerIndex = loaded.scene.activePlayerIndex;
+    }
+
+    // Hydrate scene state fields that detectSceneState() doesn't read.
+    // The scene object is shared by reference with the engine, so mutating
+    // it here updates the engine's copy too.
+    if (loaded.scene) {
+      if (loaded.scene.precis != null) scene.precis = loaded.scene.precis;
+      if (loaded.scene.openThreads != null) scene.openThreads = loaded.scene.openThreads;
+      if (loaded.scene.npcIntents != null) scene.npcIntents = loaded.scene.npcIntents;
+      if (loaded.scene.playerReads != null) scene.playerReads = loaded.scene.playerReads;
     }
 
     // Capture persisted UI state (theme, modelines) for snapshots

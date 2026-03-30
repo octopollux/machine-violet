@@ -493,11 +493,11 @@ describe("buildCachedPrefix", () => {
 
     // Tier 3 is in volatile
     expect(systemText).not.toContain("Current State");
-    expect(systemText).not.toContain("Scene Entities");
+    expect(systemText).not.toContain("Entity Registry");
     expect(systemText).not.toContain("UI State");
     expect(volatile).toContain("Current State");
     expect(volatile).toContain("Location: Tavern");
-    expect(volatile).toContain("Scene Entities");
+    expect(volatile).toContain("Entity Registry");
     expect(volatile).toContain("entity-list");
     expect(volatile).toContain("UI State");
     expect(volatile).toContain("style=classic");

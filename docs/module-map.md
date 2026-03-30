@@ -115,7 +115,7 @@ Model selection, campaign init, DM personalities, campaign seeds.
 | `campaign-archive.ts` | `archiveCampaign()`, `unarchiveCampaign()`, `deleteCampaign()`, `listArchivedCampaigns()`, `getCampaignDeleteInfo()` — campaign archival, restoration, and deletion with verification |
 | `main-menu.ts` | Campaign listing and selection |
 | `tokens.ts` | `TOKEN_LIMITS` — model token capacity constants |
-| `dev-mode.ts` | Dev override detection, FileIO wrapping for dev logging |
+| `file-io-logger.ts` | FileIO wrapper for debug read/write/append logging |
 
 ## Shared: types/ — Type Definitions
 

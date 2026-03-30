@@ -62,6 +62,7 @@ export interface LayoutProps {
   toolGlyphs?: ToolGlyph[];
 
   // Display options
+  showVerbose?: boolean;
   quoteColor?: string;
   playerColor?: string;
   /** Color for the turn indicator text (player color on their turn, theme color on DM turn). */
@@ -106,6 +107,7 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
     turnHolder,
     engineState,
     toolGlyphs,
+    showVerbose,
     quoteColor,
     playerColor,
     turnIndicatorColor,
@@ -218,6 +220,7 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
             width={innerWidth}
             themeAsset={theme.asset}
             separatorColor={separatorColor}
+            showVerbose={showVerbose}
             mouseScrollOverrideRef={mouseScrollOverrideRef}
           />
 

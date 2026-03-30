@@ -10,7 +10,7 @@ import type { ScrollHandle } from "../hooks/useScrollHandle.js";
 import { useMouseScroll } from "../hooks/useMouseScroll.js";
 import { composeTurnSeparator } from "../themes/composer.js";
 import type { ThemeAsset } from "../themes/types.js";
-import { isDevMode } from "../../config/dev-mode.js";
+
 
 // ---------------------------------------------------------------------------
 // Incremental narrative processing hook
@@ -149,6 +149,8 @@ interface NarrativeAreaProps {
    * instead of the narrative. Used to redirect scroll to an overlay modal.
    */
   mouseScrollOverrideRef?: React.RefObject<ScrollHandle | null>;
+  /** When true, dev/debug lines are shown in the narrative. */
+  showVerbose?: boolean;
 }
 
 /** Compute scroll step: 25% of viewport, min 2 if <25, min 1 if <12 */
@@ -164,7 +166,7 @@ export function scrollAmount(viewportRows: number): number {
  * Exposes scrollBy via ref for keyboard scrolling.
  */
 export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>(
-  function NarrativeArea({ lines, maxRows, quoteColor, playerColor, width, themeAsset, separatorColor, mouseScrollOverrideRef }, ref) {
+  function NarrativeArea({ lines, maxRows, quoteColor, playerColor, width, themeAsset, separatorColor, mouseScrollOverrideRef, showVerbose }, ref) {
   const scrollRef = useRef<ScrollViewRef>(null);
   const localHandleRef = useRef<ScrollHandle>(null);
   const [linesBelow, setLinesBelow] = useState(0);
@@ -231,12 +233,10 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
     return () => { process.stdout.off("resize", onResize); };
   }, [updateScrollState]);
 
-  // Filter out dev lines when dev mode is disabled (defensive — sources
-  // should already guard with isDevMode(), but this prevents any leaks).
-  const devMode = isDevMode();
+  // Filter out dev lines when verbose display is disabled.
   const visibleLines = useMemo(
-    () => devMode ? lines : lines.filter((l) => l.kind !== "dev"),
-    [lines, devMode],
+    () => showVerbose ? lines : lines.filter((l) => l.kind !== "dev"),
+    [lines, showVerbose],
   );
 
   // Incremental pipeline: frozen prefix cached, only tail reprocessed

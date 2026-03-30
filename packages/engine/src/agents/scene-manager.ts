@@ -18,8 +18,9 @@ import { advanceCalendar, checkClocks } from "../tools/clocks/index.js";
 import { validateCampaign } from "../tools/validation/index.js";
 import type { ValidationResult } from "../tools/validation/index.js";
 import { join } from "node:path";
-import { sceneDir, campaignPaths, parseFrontMatter } from "../tools/filesystem/index.js";
+import { sceneDir, campaignPaths, parseFrontMatter, renderEntityTree } from "../tools/filesystem/index.js";
 import { formatChangelogEntry, appendChangelog } from "../tools/filesystem/index.js";
+import type { EntityTree, EntityTreeEntry } from "@machine-violet/shared/types/entities.js";
 import { slugify } from "./world-builder.js";
 import type { UsageStats } from "./agent-loop.js";
 import { accUsage } from "../context/usage-helpers.js";
@@ -103,7 +104,9 @@ export class SceneManager {
   private pendingOp: PendingOperation | null = null;
   private pcSummaries: string[];
   private aliasContext = "";
-  private sceneEntityIndex = new Map<string, { name: string; aliases?: string }>();
+  private entityTree: EntityTree;
+  /** Rendered entity tree snapshot — refreshed at session start and scene transitions only. */
+  private entityTreeSnapshot: string | undefined;
 
   /** Optional dev mode log callback. */
   devLog?: (msg: string) => void;
@@ -115,6 +118,7 @@ export class SceneManager {
     sessionState: DMSessionState,
     fileIO: FileIO,
     repo?: CampaignRepo,
+    entityTree?: EntityTree,
   ) {
     this.state = state;
     this.scene = scene;
@@ -122,6 +126,8 @@ export class SceneManager {
     this.sessionState = sessionState;
     this.fileIO = fileIO;
     this.repo = repo ?? null;
+    this.entityTree = entityTree ?? {};
+    this.entityTreeSnapshot = renderEntityTree(this.entityTree);
     this.pcSummaries = state.config.players.map((p) => p.character);
   }
 
@@ -137,7 +143,7 @@ export class SceneManager {
     });
     this.sessionState.scenePrecis = buildScenePrecis(this.scene);
     this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);
-    this.sessionState.entityIndex = this.buildSceneEntityIndex();
+    this.sessionState.entityIndex = this.entityTreeSnapshot;
     return buildDMPrefix(this.state.config, this.sessionState);
   }
 
@@ -545,19 +551,19 @@ export class SceneManager {
     return this.repo;
   }
 
-  /**
-   * Record that an entity was created or updated this scene.
-   * Called by GameEngine after successful entity file writes.
-   */
-  notifyEntityTouched(filePath: string, name: string, aliases?: string): void {
-    // Compute relative path from campaignRoot
-    const normalizedPath = norm(filePath);
-    const normalizedRoot = norm(this.state.campaignRoot);
-    const prefix = normalizedRoot.endsWith("/") ? normalizedRoot : normalizedRoot + "/";
-    const relativePath = normalizedPath.startsWith(prefix)
-      ? normalizedPath.slice(prefix.length)
-      : normalizedPath;
-    this.sceneEntityIndex.set(relativePath, { name, aliases: aliases || undefined });
+  /** Upsert an entry in the entity tree. */
+  upsertEntity(entry: EntityTreeEntry & { slug: string }): void {
+    this.entityTree[entry.slug] = {
+      name: entry.name,
+      aliases: entry.aliases,
+      type: entry.type,
+      path: entry.path,
+    };
+  }
+
+  /** Get the current entity tree (for passing to subagents). */
+  getEntityTree(): EntityTree {
+    return this.entityTree;
   }
 
   // --- Campaign log loading ---
@@ -775,7 +781,8 @@ export class SceneManager {
     this.scene.openThreads = "";
     this.scene.npcIntents = "";
     this.scene.playerReads = [];
-    this.sceneEntityIndex.clear();
+    // Refresh entity tree snapshot for the new scene
+    this.entityTreeSnapshot = renderEntityTree(this.entityTree);
   }
 
   private stepPruneContext(): void {
@@ -896,19 +903,6 @@ export class SceneManager {
       .map((o) => `${o.id}: ${o.title} — ${o.description}`);
   }
 
-  /**
-   * Build a compact entity index string for the DM prefix.
-   * Returns undefined if no entities have been touched this scene.
-   */
-  private buildSceneEntityIndex(): string | undefined {
-    if (this.sceneEntityIndex.size === 0) return undefined;
-    const lines: string[] = ["Entities created/updated this scene — update these, do not create duplicates:"];
-    for (const [path, { name, aliases }] of this.sceneEntityIndex) {
-      const suffix = aliases ? ` (also: ${aliases})` : "";
-      lines.push(`  ${path} — ${name}${suffix}`);
-    }
-    return lines.join("\n");
-  }
 
   private async appendEntityChangelog(
     filename: string,

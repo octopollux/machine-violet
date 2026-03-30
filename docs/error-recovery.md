@@ -78,7 +78,7 @@ The `/retry` command retries the last DM turn at any time — useful for recover
 
 - If there's a pending error retry, `/retry` replays that failed input.
 - Otherwise, it pops the last exchange from conversation history and replays the original player input (with `skipTranscript: true`).
-- Both paths log a `dev` narrative line when dev mode is active.
+- Both paths log a `dev` narrative line (visible when verbose display is enabled in Settings).
 
 ### Subagent failures
 

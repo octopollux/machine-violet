@@ -1,5 +1,6 @@
 import { registry as singletonRegistry } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
+import type { EntityTree } from "@machine-violet/shared/types/entities.js";
 import { agentLoopStreaming } from "./agent-loop.js";
 import type { AgentLoopConfig, TuiCommand, UsageStats } from "./agent-loop.js";
 import type { LLMProvider, NormalizedMessage, ContentPart } from "../providers/types.js";
@@ -98,6 +99,7 @@ export class GameEngine {
     callbacks: EngineCallbacks;
     model?: AgentLoopConfig["model"];
     gitIO?: GitIO;
+    entityTree?: EntityTree;
   }) {
     this.provider = params.provider;
     this.registry = singletonRegistry;
@@ -141,6 +143,7 @@ export class GameEngine {
       params.sessionState,
       params.fileIO,
       this.repo ?? undefined,
+      params.entityTree,
     );
     this.callbacks = params.callbacks;
     this.model = params.model ?? getModel("large");
@@ -151,10 +154,8 @@ export class GameEngine {
     this.injectionRegistry.register(new ScenePacingInjection());
     this.injectionRegistry.register(new LengthSteeringInjection());
 
-    // Wire dev logging to scene manager when available
-    if (params.callbacks.onDevLog) {
-      this.sceneManager.devLog = params.callbacks.onDevLog;
-    }
+    // Wire dev logging to scene manager
+    this.sceneManager.devLog = params.callbacks.onDevLog;
 
     // Wire persistence — fires for any dispatch (engine, OOC, dev mode)
     this.registry.persist = (state, slices) => {
@@ -767,12 +768,14 @@ export class GameEngine {
         })),
         campaignRoot: this.gameState.campaignRoot,
         sceneNumber,
+        entityTree: this.sceneManager.getEntityTree(),
       }, this.fileIO);
 
-      // Notify scene manager about touched entities
-      for (const filePath of [...result.created, ...result.updated]) {
-        const slug = filePath.replace(/.*\//, "").replace(/\.md$/, "").replace(/\/index$/, "");
-        this.sceneManager.notifyEntityTouched(filePath, slug);
+      // Apply entity tree deltas from Scribe
+      if (result.entityDeltas) {
+        for (const delta of result.entityDeltas) {
+          this.sceneManager.upsertEntity(delta);
+        }
       }
 
       accUsage(this.sessionUsage, result.usage);
@@ -811,7 +814,8 @@ export class GameEngine {
         const title = String(fm._title ?? characterName);
         await this.fileIO.writeFile(filePath, serializeEntity(title, fm, fmBody, fmChangelog));
         const slug = characterName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-        this.sceneManager.notifyEntityTouched(filePath, slug);
+        const relativePath = norm(filePath).replace(norm(this.gameState.campaignRoot) + "/", "");
+        this.sceneManager.upsertEntity({ slug, name: characterName, aliases: [], type: "character", path: relativePath });
         this.callbacks.onDevLog?.(`[dev] promote_character: ${characterName} — skipped, sheet already complete`);
         return;
       }
@@ -831,9 +835,10 @@ export class GameEngine {
         await this.fileIO.writeFile(filePath, result.updatedSheet);
       }
 
-      // Notify scene manager
+      // Update entity tree
       const slug = characterName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-      this.sceneManager.notifyEntityTouched(filePath, slug);
+      const relativePath = norm(filePath).replace(norm(this.gameState.campaignRoot) + "/", "");
+      this.sceneManager.upsertEntity({ slug, name: characterName, aliases: [], type: "character", path: relativePath });
 
       accUsage(this.sessionUsage, result.usage);
       this.callbacks.onUsageUpdate(result.usage, "small");

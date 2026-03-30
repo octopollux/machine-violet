@@ -1,11 +1,11 @@
 import React, { useRef, useEffect } from "react";
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
 import { Text } from "ink";
 import type { NarrativeLine, ProcessedLine } from "@machine-violet/shared/types/tui.js";
 import { processNarrativeLines, toPlainText } from "../formatting.js";
 import { useProcessedLines, NarrativeArea } from "./NarrativeArea.js";
-import { resetDevMode } from "../../config/dev-mode.js";
+
 
 // ---------------------------------------------------------------------------
 // Test harness: renders the hook result as plain text so we can inspect it
@@ -129,19 +129,7 @@ describe("useProcessedLines", () => {
 });
 
 describe("NarrativeArea dev-line filtering", () => {
-  beforeEach(() => {
-    resetDevMode();
-  });
-
-  afterEach(() => {
-    delete process.env.DEV_MODE;
-    resetDevMode();
-  });
-
-  it("filters out dev lines when dev mode is disabled", () => {
-    process.env.DEV_MODE = "false";
-    resetDevMode();
-
+  it("filters out dev lines when showVerbose is false", () => {
     const lines: NarrativeLine[] = [
       dm("Hello world."),
       dev("[dev] tool:read → some data"),
@@ -149,7 +137,7 @@ describe("NarrativeArea dev-line filtering", () => {
     ];
 
     const { lastFrame } = render(
-      <NarrativeArea lines={lines} maxRows={20} width={80} />,
+      <NarrativeArea lines={lines} maxRows={20} width={80} showVerbose={false} />,
     );
 
     const frame = lastFrame();
@@ -159,17 +147,14 @@ describe("NarrativeArea dev-line filtering", () => {
     expect(frame).not.toContain("tool:read");
   });
 
-  it("shows dev lines when dev mode is enabled", () => {
-    process.env.DEV_MODE = "true";
-    resetDevMode();
-
+  it("shows dev lines when showVerbose is true", () => {
     const lines: NarrativeLine[] = [
       dm("Hello world."),
       dev("[dev] tool:read → some data"),
     ];
 
     const { lastFrame } = render(
-      <NarrativeArea lines={lines} maxRows={20} width={80} />,
+      <NarrativeArea lines={lines} maxRows={20} width={80} showVerbose={true} />,
     );
 
     const frame = lastFrame();

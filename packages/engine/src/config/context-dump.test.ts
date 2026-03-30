@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   dumpContext,
   dumpThinking,
@@ -6,7 +6,6 @@ import {
   getContextDumpDir,
   resetContextDump,
 } from "./context-dump.js";
-import { resetDevMode } from "./dev-mode.js";
 
 // Mock fs/promises so dumpContext doesn't write to disk
 vi.mock("node:fs/promises", () => ({
@@ -16,38 +15,13 @@ vi.mock("node:fs/promises", () => ({
 
 beforeEach(() => {
   resetContextDump();
-  resetDevMode();
-});
-
-afterEach(() => {
-  delete process.env.DEV_MODE;
-  resetContextDump();
-  resetDevMode();
 });
 
 // --- dumpContext guards ---
 
 describe("dumpContext", () => {
-  it("is a no-op when dev mode is off", async () => {
-    const { writeFile } = await import("node:fs/promises");
-    process.env.DEV_MODE = "false";
-    resetDevMode();
-    setContextDumpDir("/tmp/test-dump");
-
-    dumpContext("dm", {
-      model: "claude-opus-4-6",
-      max_tokens: 4096,
-      system: "sys",
-      messages: [],
-    });
-
-    expect(writeFile).not.toHaveBeenCalled();
-  });
-
   it("is a no-op when dump dir is not set", async () => {
     const { writeFile } = await import("node:fs/promises");
-    process.env.DEV_MODE = "true";
-    resetDevMode();
 
     dumpContext("dm", {
       model: "claude-opus-4-6",
@@ -62,8 +36,6 @@ describe("dumpContext", () => {
   it("writes raw JSON with .json extension", async () => {
     const { writeFile } = await import("node:fs/promises");
     (writeFile as ReturnType<typeof vi.fn>).mockClear();
-    process.env.DEV_MODE = "true";
-    resetDevMode();
     setContextDumpDir("/tmp/test-dump");
 
     dumpContext("dm", {
@@ -94,8 +66,6 @@ describe("dumpContext", () => {
   it("preserves all fields including unknown ones", async () => {
     const { writeFile } = await import("node:fs/promises");
     (writeFile as ReturnType<typeof vi.fn>).mockClear();
-    process.env.DEV_MODE = "true";
-    resetDevMode();
     setContextDumpDir("/tmp/test-dump");
 
     dumpContext("dm", {
@@ -121,23 +91,9 @@ describe("dumpContext", () => {
 // --- dumpThinking ---
 
 describe("dumpThinking", () => {
-  it("is a no-op when dev mode is off", async () => {
-    const { writeFile } = await import("node:fs/promises");
-    (writeFile as ReturnType<typeof vi.fn>).mockClear();
-    process.env.DEV_MODE = "false";
-    resetDevMode();
-    setContextDumpDir("/tmp/test-dump");
-
-    dumpThinking("dm", 0, "Let me think about this...");
-
-    expect(writeFile).not.toHaveBeenCalled();
-  });
-
   it("is a no-op when dump dir is not set", async () => {
     const { writeFile } = await import("node:fs/promises");
     (writeFile as ReturnType<typeof vi.fn>).mockClear();
-    process.env.DEV_MODE = "true";
-    resetDevMode();
 
     dumpThinking("dm", 0, "Let me think about this...");
 
@@ -147,8 +103,6 @@ describe("dumpThinking", () => {
   it("writes thinking to {agent}-thinking.json as full traces array", async () => {
     const { writeFile } = await import("node:fs/promises");
     (writeFile as ReturnType<typeof vi.fn>).mockClear();
-    process.env.DEV_MODE = "true";
-    resetDevMode();
     setContextDumpDir("/tmp/test-dump");
 
     dumpThinking("dm", 2, "The player wants to enter the cave...");
@@ -177,8 +131,6 @@ describe("thinking accumulation into dumpContext", () => {
   it("includes _thinking_trace from prior dumpThinking calls", async () => {
     const { writeFile } = await import("node:fs/promises");
     (writeFile as ReturnType<typeof vi.fn>).mockClear();
-    process.env.DEV_MODE = "true";
-    resetDevMode();
     setContextDumpDir("/tmp/test-dump");
 
     // Simulate: dumpContext(round 1) → API call → dumpThinking(round 1) → dumpContext(round 2)
@@ -209,8 +161,6 @@ describe("thinking accumulation into dumpContext", () => {
   it("accumulates multiple thinking blocks", async () => {
     const { writeFile } = await import("node:fs/promises");
     (writeFile as ReturnType<typeof vi.fn>).mockClear();
-    process.env.DEV_MODE = "true";
-    resetDevMode();
     setContextDumpDir("/tmp/test-dump");
 
     dumpThinking("dm", 1, "First thought");
@@ -231,8 +181,6 @@ describe("thinking accumulation into dumpContext", () => {
   it("preserves traces after dumpContext (no drain)", async () => {
     const { writeFile } = await import("node:fs/promises");
     (writeFile as ReturnType<typeof vi.fn>).mockClear();
-    process.env.DEV_MODE = "true";
-    resetDevMode();
     setContextDumpDir("/tmp/test-dump");
 
     dumpThinking("dm", 1, "Some thought");
@@ -255,8 +203,6 @@ describe("thinking accumulation into dumpContext", () => {
   it("final dumpContext after loop captures all traces", async () => {
     const { writeFile } = await import("node:fs/promises");
     (writeFile as ReturnType<typeof vi.fn>).mockClear();
-    process.env.DEV_MODE = "true";
-    resetDevMode();
     setContextDumpDir("/tmp/test-dump");
 
     // Simulate real flow: dumpContext → API → dumpThinking → dumpContext → API → dumpThinking → final dumpContext
@@ -293,8 +239,6 @@ describe("thinking accumulation into dumpContext", () => {
   it("keeps separate accumulators per agent", async () => {
     const { writeFile } = await import("node:fs/promises");
     (writeFile as ReturnType<typeof vi.fn>).mockClear();
-    process.env.DEV_MODE = "true";
-    resetDevMode();
     setContextDumpDir("/tmp/test-dump");
 
     dumpThinking("dm", 1, "DM thought");
@@ -314,8 +258,6 @@ describe("thinking accumulation into dumpContext", () => {
   it("resetContextDump clears the accumulator", async () => {
     const { writeFile } = await import("node:fs/promises");
     (writeFile as ReturnType<typeof vi.fn>).mockClear();
-    process.env.DEV_MODE = "true";
-    resetDevMode();
     setContextDumpDir("/tmp/test-dump");
 
     dumpThinking("dm", 1, "Some thought");

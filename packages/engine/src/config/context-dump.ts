@@ -1,6 +1,5 @@
 import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { isDevMode } from "./dev-mode.js";
 
 const noop = () => { /* fire-and-forget */ };
 
@@ -41,7 +40,7 @@ export type DumpableParams = Record<string, any>;
 
 /**
  * Dump context to a file as raw JSON. Fire-and-forget, errors swallowed.
- * Only runs when DEV_MODE is active and dumpDir has been set.
+ * Always runs when dumpDir has been set (debug output, always on until 1.0).
  *
  * Structures the envelope with explicit property ordering:
  *   agent, timestamp, model, system, tools, messages, _thinking_trace
@@ -50,7 +49,7 @@ export type DumpableParams = Record<string, any>;
  * Thinking traces are interleaved with messages by round number.
  */
 export function dumpContext(agentName: string, params: DumpableParams): void {
-  if (!isDevMode() || !dumpDir) return;
+  if (!dumpDir) return;
 
   // Snapshot accumulated thinking for this agent (don't drain — traces persist)
   const traces = [...(thinkingAccumulator.get(agentName) ?? [])];
@@ -85,7 +84,7 @@ export function dumpContext(agentName: string, params: DumpableParams): void {
 /**
  * Dump response thinking blocks to a separate file.
  * Writes to `{agentName}-thinking.json`. Fire-and-forget, errors swallowed.
- * Only runs when DEV_MODE is active and dumpDir has been set.
+ * Always runs when dumpDir has been set.
  *
  * Also accumulates the thinking block so the next dumpContext() call
  * for this agent will include it in `_thinking_trace`.
@@ -95,7 +94,7 @@ export function dumpThinking(
   round: number,
   thinkingText: string,
 ): void {
-  if (!isDevMode() || !dumpDir) return;
+  if (!dumpDir) return;
 
   const timestamp = new Date().toISOString();
 

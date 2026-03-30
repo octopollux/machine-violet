@@ -137,7 +137,7 @@ export function buildCachedPrefix(
   }
 
   if (sections.entityIndex) {
-    volatileParts.push(`## Scene Entities\n${sections.entityIndex}`);
+    volatileParts.push(`## Entity Registry\n${sections.entityIndex}`);
   }
 
   if (sections.uiState) {
