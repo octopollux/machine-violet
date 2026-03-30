@@ -33,6 +33,7 @@ export function PlayingPhase() {
     theme,
     campaignName, activePlayerIndex,
     engineState, toolGlyphs, resources, modelines,
+    currentTurn,
     activeChoices, setActiveChoices,
     activeModal, setActiveModal,
     mode, stateSnapshot,
@@ -101,14 +102,17 @@ export function PlayingPhase() {
     ]);
 
     try {
-      await apiClient.contribute(text);
+      await apiClient.contribute(text, {
+        campaignId: currentTurn?.campaignId,
+        turnSeq: currentTurn?.seq,
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setNarrativeLines((prev) => [...prev, { kind: "system", text: `[Error: ${msg}]` }]);
     }
 
     clearInput();
-  }, [apiClient, activeChar, setNarrativeLines, clearInput]);
+  }, [apiClient, activeChar, currentTurn, setNarrativeLines, clearInput]);
 
   // --- Choice selection ---
   const handleChoiceSelect = useCallback(async (choice: string) => {
@@ -125,9 +129,12 @@ export function PlayingPhase() {
 
     // Gameplay choices are sent as a turn contribution
     try {
-      await apiClient.contribute(choice);
+      await apiClient.contribute(choice, {
+        campaignId: currentTurn?.campaignId,
+        turnSeq: currentTurn?.seq,
+      });
     } catch { /* no-op */ }
-  }, [apiClient, activeChoices, setActiveChoices]);
+  }, [apiClient, activeChoices, setActiveChoices, currentTurn]);
 
   const handleChoiceDismiss = useCallback(() => setActiveChoices(null), [setActiveChoices]);
 

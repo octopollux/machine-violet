@@ -21,9 +21,12 @@ export class TurnManager {
   private broadcast: (event: ServerEvent) => void;
   private onCommit: ((contributions: TurnContribution[]) => Promise<void>) | null = null;
   private commitPending = false;
+  private seq = 0;
+  private campaignId: string;
 
-  constructor(broadcast: (event: ServerEvent) => void) {
+  constructor(broadcast: (event: ServerEvent) => void, campaignId: string) {
     this.broadcast = broadcast;
+    this.campaignId = campaignId;
   }
 
   /** Set the callback invoked when a turn is committed. */
@@ -37,8 +40,11 @@ export class TurnManager {
       throw new Error("Cannot open a new turn while one is already open.");
     }
 
+    this.seq++;
     const turn: Turn = {
       id: randomUUID(),
+      seq: this.seq,
+      campaignId: this.campaignId,
       status: "open",
       activePlayers,
       aiPlayers,

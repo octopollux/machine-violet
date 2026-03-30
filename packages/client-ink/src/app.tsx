@@ -126,6 +126,17 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
     });
   }, []);
 
+  // Detect stale session (idle timeout, campaign mismatch) and return to menu
+  useEffect(() => {
+    if (phase !== "playing" && phase !== "starting") return;
+    if (clientState.sessionStale) {
+      setErrorMessage("This session was saved and exited.");
+      returnToMenu();
+    } else if (clientState.sessionEnded) {
+      returnToMenu();
+    }
+  }, [clientState.sessionStale, clientState.sessionEnded, phase]); // eslint-disable-line
+
   // Start a campaign (used by both auto-start and menu selection)
   const startCampaign = useCallback((id: string) => {
     setActiveCampaignId(id);

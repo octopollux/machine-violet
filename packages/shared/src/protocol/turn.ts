@@ -17,6 +17,10 @@ export const TurnContribution = Type.Object({
 
 export const Turn = Type.Object({
   id: Type.String(),
+  /** Sequential turn number within this backend session (1-based). */
+  seq: Type.Number(),
+  /** Campaign this turn belongs to. */
+  campaignId: Type.String(),
   status: Type.Union([
     Type.Literal("open"),
     Type.Literal("committed"),

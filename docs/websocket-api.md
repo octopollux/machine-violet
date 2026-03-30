@@ -73,12 +73,18 @@ A new turn is ready for player contributions.
 
 | Field          | Type     | Description |
 |----------------|----------|-------------|
-| `id`           | string   | Turn identifier. |
+| `id`           | string   | Turn identifier (UUID). |
+| `seq`          | number   | Sequential turn number within this session (1-based). |
+| `campaignId`   | string   | Campaign this turn belongs to. |
 | `status`       | string   | Always `"open"` for this event. |
 | `activePlayers`| string[] | Human players who can contribute. |
 | `aiPlayers`    | string[] | AI players scheduled to run after humans contribute. |
 | `contributions`| array    | Initially empty. See `TurnContribution` below. |
 | `commitPolicy` | string   | `"auto"` (single player, auto-commit) or `"all"` (wait for all). |
+
+Clients should track `campaignId` and `seq` to detect staleness:
+- **Campaign mismatch** (a different `campaignId` than expected) means the backend session changed — return the user to the main menu.
+- **Seq gap** (a `seq` higher than expected by more than 1) means the client missed turns while disconnected — request a full state refresh via `GET /session/state`.
 
 **TurnContribution** (nested in turn events):
 

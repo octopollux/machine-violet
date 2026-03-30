@@ -45,8 +45,8 @@ describe("event-handler", () => {
       h.dispatch({
         type: "turn:opened",
         data: {
-          id: "t1", status: "open", activePlayers: ["aldric"],
-          aiPlayers: [], contributions: [], commitPolicy: "auto",
+          id: "t1", seq: 1, campaignId: "test", status: "open",
+          activePlayers: ["aldric"], aiPlayers: [], contributions: [], commitPolicy: "auto",
         },
       });
 
@@ -74,13 +74,55 @@ describe("event-handler", () => {
       h.dispatch({
         type: "turn:opened",
         data: {
-          id: "t1", status: "open", activePlayers: ["aldric"],
-          aiPlayers: [], contributions: [], commitPolicy: "auto",
+          id: "t1", seq: 1, campaignId: "test", status: "open",
+          activePlayers: ["aldric"], aiPlayers: [], contributions: [], commitPolicy: "auto",
         },
       });
       h.dispatch({ type: "turn:resolved", data: { turnId: "t1" } });
 
       expect(h.state.currentTurn).toBeNull();
+    });
+
+    it("sets sessionStale on campaign mismatch", () => {
+      const h = makeHarness();
+      h.dispatch({
+        type: "turn:opened",
+        data: {
+          id: "t1", seq: 1, campaignId: "campaign-a", status: "open",
+          activePlayers: ["aldric"], aiPlayers: [], contributions: [], commitPolicy: "auto",
+        },
+      });
+      h.dispatch({
+        type: "turn:opened",
+        data: {
+          id: "t2", seq: 1, campaignId: "campaign-b", status: "open",
+          activePlayers: ["aldric"], aiPlayers: [], contributions: [], commitPolicy: "auto",
+        },
+      });
+
+      expect(h.state.sessionStale).toBe(true);
+    });
+
+    it("sets lastError on missed turns (seq gap)", () => {
+      const h = makeHarness();
+      h.dispatch({
+        type: "turn:opened",
+        data: {
+          id: "t1", seq: 1, campaignId: "test", status: "open",
+          activePlayers: ["aldric"], aiPlayers: [], contributions: [], commitPolicy: "auto",
+        },
+      });
+      h.dispatch({
+        type: "turn:opened",
+        data: {
+          id: "t5", seq: 5, campaignId: "test", status: "open",
+          activePlayers: ["aldric"], aiPlayers: [], contributions: [], commitPolicy: "auto",
+        },
+      });
+
+      expect(h.state.sessionStale).toBe(false);
+      expect(h.state.lastError).not.toBeNull();
+      expect(h.state.lastError!.message).toContain("missed");
     });
   });
 

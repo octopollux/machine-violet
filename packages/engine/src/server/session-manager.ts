@@ -201,7 +201,7 @@ export class SessionManager {
     }
 
     // Initialize turn manager for setup input
-    this.turnManager = new TurnManager((event) => this.broadcast(event));
+    this.turnManager = new TurnManager((event) => this.broadcast(event), "__setup__");
     this.turnManager.setCommitHandler(async (contributions) => {
       if (!this.setupSession) return;
       const text = contributions.map((c) => c.text).join("\n");
@@ -376,7 +376,7 @@ export class SessionManager {
     this.active = true;
 
     // --- Initialize turn manager ---
-    this.turnManager = new TurnManager((event) => this.broadcast(event));
+    this.turnManager = new TurnManager((event) => this.broadcast(event), campaignId);
     this.turnManager.setCommitHandler(async (contributions) => {
       if (!this.engine || !this.gameState) return;
       const text = contributions.map((c) => c.text).join("\n");
