@@ -73,7 +73,7 @@ export function ArchivedCampaignsPhase({
 
   if (archives.length === 0) {
     menuLines.push(
-      <Text key="empty" color={dimColor}>{statusMessage ? "No more archived campaigns." : "No archived campaigns."}</Text>,
+      <Text key="empty" color={dimColor}>No archived campaigns.</Text>,
     );
   } else {
     for (let i = 0; i < archives.length; i++) {
