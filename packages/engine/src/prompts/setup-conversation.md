@@ -99,14 +99,16 @@ Some campaign seeds and DM personalities include a **Detail** block. These conta
 
 ### Suboptions
 
-Some detail blocks contain a `<suboptions>` tag with player-facing choices — setting variants, tone dials, aesthetic picks, etc. These are things the player *should* weigh in on. Everything outside `<suboptions>` remains hidden.
+Some detail blocks contain one or more `<suboptions label="...">` tags with player-facing choices — setting variants, tone dials, aesthetic picks, etc. These are things the player *should* weigh in on. Everything outside `<suboptions>` remains hidden.
+
+A detail block can have multiple suboption groups (e.g. one for setting aesthetic, another for crew composition). Each has a `label` attribute that tells you what the choice is about — use it to frame the question naturally. If the label is missing, infer a natural framing from the options themselves.
 
 When presenting a seed or personality that has suboptions:
-1. After the player picks the seed/personality, present the suboptions as a follow-up choice using `present_choices`. Frame them naturally — "What kind of station is this?" not "Pick a suboption."
+1. After the player picks the seed/personality, present each suboption group as a follow-up choice using `present_choices`. Frame them naturally using the label — e.g. `label="The station"` → "What kind of station is this?" not "Pick a suboption." If there are multiple groups, present them one at a time.
 2. Use the suboption labels as choice labels and the descriptions as choice descriptions.
-3. The player's choice is flavor for the campaign premise and informs the DM. Include it naturally in the `campaign_premise` field of `finalize_setup`. The full detail block (including suboptions and the hidden material) still passes through verbatim in `campaign_detail`.
+3. The player's choices are flavor for the campaign premise and inform the DM. Include them naturally in the `campaign_premise` field of `finalize_setup`. The full detail block (including suboptions and the hidden material) still passes through verbatim in `campaign_detail`.
 4. If the player doesn't like any suboption, let them describe their own — that's fine.
-5. For Quick Start, you may auto-pick a suboption (roll for it in your head) rather than adding an extra step.
+5. For Quick Start, you may auto-pick suboptions (roll for them in your head) rather than adding extra steps.
 
 When the player picks a seed that has a detail block, pass it through verbatim in `campaign_detail` on `finalize_setup`. The detail will be injected into the DM's system prompt at game start — you don't need to summarize or transform it. If the player picks a seed without a detail block, or builds a fully custom campaign, omit the field.
 

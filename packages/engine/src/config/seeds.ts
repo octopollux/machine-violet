@@ -16,7 +16,7 @@ export const SEEDS: CampaignSeed[] = [
   {
     name: "The Shattered Crown",
     premise: "A kingdom's heir is dead. Three factions claim the throne.",
-    detail: `<suboptions>
+    detail: `<suboptions label="Your starting faction">
 - The Iron Circle — Start entangled with the military faction. Disciplined, honorable, but brittle — one betrayal could shatter them. You'll see the succession crisis as a soldier first.
 - The Gilded Compact — Start among the merchant coalition. They treat the crown as a business acquisition. You'll see the succession crisis through ledgers, leverage, and backroom deals.
 - The Hallowed See — Start within the religious order. They believe divine mandate chooses the ruler. You'll see the succession crisis as a matter of faith and prophecy.
@@ -35,7 +35,7 @@ Pacing: Start the player entangled with their chosen faction before they underst
   {
     name: "Ghosts of Station Proxima",
     premise: "An abandoned space station just started broadcasting again.",
-    detail: `<suboptions>
+    detail: `<suboptions label="The station">
 - Derelict alien megastructure — Ancient, non-human construction. The architecture doesn't obey human geometry. Whoever built it is long gone — or dormant.
 - Abandoned near-future hardware — A NASA/ESA successor station, maybe 30 years from now. Familiar tech, cramped corridors, coffee-stained manuals floating in zero-g. The horror is intimate and grounded.
 - Military black site — Year-2200 classified facility. Sleek, over-engineered, full of locked compartments and redacted logs. Whatever happened here, someone powerful wanted it kept quiet.
@@ -56,7 +56,7 @@ Key NPC: A maintenance AI named PELL who has been alone for 11 years. PELL is he
   {
     name: "The Gilded Cage",
     premise: "You're the guest of honor at a party you can't leave.",
-    detail: `<suboptions>
+    detail: `<suboptions label="The setting">
 - A candlelit manor — Gothic elegance, labyrinthine corridors, oil portraits with watching eyes. The party is a masquerade. Think Poe by way of Kubrick.
 - A modernist penthouse — Glass walls, brutalist art, a host who knows too much about you. The party is an exclusive soirée. Think corporate thriller with a supernatural edge.
 - A fae court banquet — Impossible food, glamoured guests, rules nobody will explain. The party follows fae etiquette — breaking a rule you didn't know existed has consequences.
@@ -99,7 +99,7 @@ Pacing: The party has a rhythm — cocktails, dinner, entertainment, dessert, th
   {
     name: "Ember Protocol",
     premise: "The colony ship's AI woke you 200 years early. It won't say why.",
-    detail: `<suboptions>
+    detail: `<suboptions label="The ship">
 - The ark — A sprawling generation ship built by international coalition. 10,000 colonists in cryosleep, biodomes, seed vaults, a cathedral someone insisted on. Hopeful and massive. The stakes are a civilization.
 - The seedship — A compact, automated vessel. No crew was supposed to wake up at all. Just embryos, gene banks, and an AI midwife. Intimate and claustrophobic. The stakes are a species.
 - The exile fleet — A convoy of refugee ships fleeing a dying Earth. Jury-rigged, overcrowded, held together by HEARTH's constant maintenance. Desperate and scrappy. The stakes are the last humans alive.
@@ -145,7 +145,7 @@ HEARTH's personality: Warm, parental, slightly archaic in speech patterns (it le
   {
     name: "Beneath the Skin",
     premise: "People in town are acting different. Not wrong, just... different.",
-    detail: `<suboptions>
+    detail: `<suboptions label="The town">
 - Small-town Americana — Everyone knows everyone. Diner, church, high school football. The "different" stands out because you've known these people your whole life.
 - Coastal village — Fishing community, salt air, tight-knit families. Isolation makes the changes harder to report and easier to deny. The sea is always watching.
 - Suburban enclave — Gated community, HOA rules, manicured lawns. The "different" looks like people finally following the rules they always resented. Conformity was already the norm — now it's perfect.
