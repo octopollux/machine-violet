@@ -84,6 +84,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
   const [discordEnabled, setDiscordEnabled] = useState<boolean | null>(null);
   const [devModeEnabled, setDevModeEnabled] = useState(false);
   const [showVerbose, setShowVerbose] = useState(false);
+  const [archiveStatus, setArchiveStatus] = useState("");
   const [deleteModal, setDeleteModal] = useState<CampaignDeleteInfo | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
@@ -414,8 +415,10 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
       <ArchivedCampaignsPhase
         theme={theme}
         archives={archivedCampaigns}
+        statusMessage={archiveStatus}
         onUnarchive={(entry) => {
           apiClientRef.current.restoreArchivedCampaign(entry.name, entry.zipPath).then(() => {
+            setArchiveStatus(`Restored "${entry.name}"`);
             refreshCampaigns();
             // Refresh archive list too
             apiClientRef.current.listArchivedCampaigns().then((resp) => setArchivedCampaigns(resp.archives)).catch(() => { /* ignore */ });
@@ -423,7 +426,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
             setErrorMessage(err instanceof Error ? err.message : String(err));
           });
         }}
-        onBack={() => setPhase("settings")}
+        onBack={() => { setArchiveStatus(""); setPhase("settings"); }}
       />
     );
   }

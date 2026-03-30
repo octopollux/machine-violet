@@ -12,6 +12,7 @@ export interface ArchivedCampaignsPhaseProps {
   archives: ArchivedCampaignEntry[];
   onUnarchive: (entry: ArchivedCampaignEntry) => void;
   onBack: () => void;
+  statusMessage?: string;
 }
 
 function formatDate(iso: string): string {
@@ -28,6 +29,7 @@ export function ArchivedCampaignsPhase({
   archives,
   onUnarchive,
   onBack,
+  statusMessage,
 }: ArchivedCampaignsPhaseProps) {
   const { columns: cols, rows: termRows } = useTerminalSize();
   const [menuIndex, setMenuIndex] = useState(0);
@@ -59,6 +61,15 @@ export function ArchivedCampaignsPhase({
   const dimColor = themeColor(theme, "separator") ?? "#666666";
 
   const menuLines: React.ReactNode[] = [];
+
+  if (statusMessage) {
+    menuLines.push(
+      <Text key="status" color="#66cc66">{statusMessage}</Text>,
+    );
+    menuLines.push(
+      <Text key="status-spacer">{" "}</Text>,
+    );
+  }
 
   if (archives.length === 0) {
     menuLines.push(
