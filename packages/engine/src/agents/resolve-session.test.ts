@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider, ChatResult } from "../providers/types.js";
 import { ResolveSession } from "./resolve-session.js";
 import type { GameState } from "./game-state.js";
 import type { FileIO } from "./scene-manager.js";
@@ -17,63 +17,51 @@ vi.mock("./subagents/search-content.js", () => ({
   })),
 }));
 
-function mockUsage(): Anthropic.Usage {
+function mockUsage() {
   return {
-    input_tokens: 200, output_tokens: 100,
-    cache_creation_input_tokens: 50, cache_read_input_tokens: 150,
-    cache_creation: null, inference_geo: null, server_tool_use: null, service_tier: null,
+    inputTokens: 200, outputTokens: 100,
+    cacheReadTokens: 150, cacheCreationTokens: 50,
+    reasoningTokens: 0,
   };
 }
 
-function textMessage(text: string): Anthropic.Message {
+function textResult(text: string): ChatResult {
   return {
-    id: "msg_test",
-    type: "message",
-    role: "assistant",
-    model: "claude-sonnet-4-6",
-    content: [{ type: "text", text }],
-    stop_reason: "end_turn",
-    stop_sequence: null,
+    text,
+    toolCalls: [],
     usage: mockUsage(),
-  } as Anthropic.Message;
+    stopReason: "end",
+    assistantContent: [{ type: "text", text }],
+  };
 }
 
-function toolAndTextMessages(
+function toolAndTextResults(
   toolName: string,
   toolInput: Record<string, unknown>,
   text: string,
-): Anthropic.Message[] {
+): ChatResult[] {
   return [
     {
-      id: "msg_tool",
-      type: "message",
-      role: "assistant",
-      model: "claude-sonnet-4-6",
-      content: [{ type: "tool_use", id: "toolu_1", name: toolName, input: toolInput }],
-      stop_reason: "tool_use",
-      stop_sequence: null,
+      text: "",
+      toolCalls: [{ id: "toolu_1", name: toolName, input: toolInput }],
       usage: mockUsage(),
-    } as Anthropic.Message,
-    textMessage(text),
+      stopReason: "tool_use",
+      assistantContent: [{ type: "tool_use", id: "toolu_1", name: toolName, input: toolInput }],
+    },
+    textResult(text),
   ];
 }
 
-let clientCallIdx: number;
+let providerCallIdx: number;
 
-function mockClient(responses: Anthropic.Message[]): Anthropic {
-  clientCallIdx = 0;
+function mockProvider(responses: ChatResult[]): LLMProvider {
+  providerCallIdx = 0;
   return {
-    messages: {
-      create: vi.fn(async () => responses[clientCallIdx++]),
-      stream: vi.fn(() => {
-        const response = responses[clientCallIdx++];
-        return {
-          on: vi.fn(),
-          finalMessage: vi.fn(async () => response),
-        };
-      }),
-    },
-  } as unknown as Anthropic;
+    providerId: "mock",
+    chat: vi.fn(async () => responses[providerCallIdx++]),
+    stream: vi.fn(async () => responses[providerCallIdx++]),
+    healthCheck: vi.fn(async () => ({ ok: true })),
+  } as unknown as LLMProvider;
 }
 
 let files: Record<string, string>;
@@ -150,11 +138,11 @@ describe("ResolveSession", () => {
   </deltas>
 </resolution>`;
 
-    const client = mockClient([textMessage(xmlResponse)]);
+    const provider = mockProvider([textResult(xmlResponse)]);
     const fileIO = mockFileIO();
     const state = mockState();
 
-    const session = new ResolveSession(client, fileIO, state);
+    const session = new ResolveSession(provider, fileIO, state);
     await session.initCombat("### Kael\nHP: 35\nSTR: +3", "# Combat\nAttack = d20 + mod");
 
     const result = await session.resolve({
@@ -173,13 +161,13 @@ describe("ResolveSession", () => {
   });
 
   it("falls back to raw text when no XML block present", async () => {
-    const client = mockClient([
-      textMessage("Kael swings but the goblin dodges. Miss!"),
+    const provider = mockProvider([
+      textResult("Kael swings but the goblin dodges. Miss!"),
     ]);
     const fileIO = mockFileIO();
     const state = mockState();
 
-    const session = new ResolveSession(client, fileIO, state);
+    const session = new ResolveSession(provider, fileIO, state);
     await session.initCombat("stats", "rules");
 
     const result = await session.resolve({
@@ -206,11 +194,11 @@ describe("ResolveSession", () => {
   <deltas><delta type="hp_change" target="Kael" amount="-5"/></deltas>
 </resolution>`;
 
-    const client = mockClient([textMessage(xml1), textMessage(xml2)]);
+    const provider = mockProvider([textResult(xml1), textResult(xml2)]);
     const fileIO = mockFileIO();
     const state = mockState();
 
-    const session = new ResolveSession(client, fileIO, state);
+    const session = new ResolveSession(provider, fileIO, state);
     await session.initCombat("stats", "rules");
 
     // First resolve
@@ -231,11 +219,11 @@ describe("ResolveSession", () => {
   <deltas></deltas>
 </resolution>`;
 
-    const client = mockClient([textMessage(xml)]);
+    const provider = mockProvider([textResult(xml)]);
     const fileIO = mockFileIO();
     const state = mockState();
 
-    const session = new ResolveSession(client, fileIO, state);
+    const session = new ResolveSession(provider, fileIO, state);
     await session.initCombat("stats", "rules");
 
     await session.resolve({ actor: "Kael", action: "Attack" });
@@ -252,19 +240,19 @@ describe("ResolveSession", () => {
   });
 
   it("teardown with no turns returns informative message", () => {
-    const client = mockClient([]);
+    const provider = mockProvider([]);
     const fileIO = mockFileIO();
     const state = mockState();
 
-    const session = new ResolveSession(client, fileIO, state);
+    const session = new ResolveSession(provider, fileIO, state);
 
     const summary = session.teardown();
     expect(summary).toBe("Combat ended with no resolved turns.");
   });
 
   it("handles tool use (roll_dice) during resolution", async () => {
-    const client = mockClient([
-      ...toolAndTextMessages(
+    const provider = mockProvider([
+      ...toolAndTextResults(
         "roll_dice",
         { expression: "1d20+5", reason: "Attack" },
         `<resolution>
@@ -277,7 +265,7 @@ describe("ResolveSession", () => {
     const fileIO = mockFileIO();
     const state = mockState();
 
-    const session = new ResolveSession(client, fileIO, state);
+    const session = new ResolveSession(provider, fileIO, state);
     await session.initCombat("stats", "rules");
 
     const result = await session.resolve({ actor: "Kael", action: "Attack" });
@@ -290,8 +278,8 @@ describe("ResolveSession", () => {
   it("handles read_character_sheet tool", async () => {
     files[norm("/tmp/test-campaign/characters/Kael.md")] = "# Kael\nHP: 35\nSTR: +3";
 
-    const client = mockClient([
-      ...toolAndTextMessages(
+    const provider = mockProvider([
+      ...toolAndTextResults(
         "read_character_sheet",
         { character: "Kael" },
         `<resolution>
@@ -304,7 +292,7 @@ describe("ResolveSession", () => {
     const fileIO = mockFileIO();
     const state = mockState();
 
-    const session = new ResolveSession(client, fileIO, state);
+    const session = new ResolveSession(provider, fileIO, state);
     await session.initCombat("stats", "rules");
 
     const result = await session.resolve({ actor: "Kael", action: "Check stats" });

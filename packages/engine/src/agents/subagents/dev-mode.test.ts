@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider, ChatResult, SystemBlock } from "../../providers/types.js";
 import { buildDevPrompt, buildDevTools, buildDevToolHandler, resolveDevPath, enterDevMode, summarizeGameState } from "./dev-mode.js";
 import type { GameState } from "../game-state.js";
 import type { FileIO, SceneState, SceneManager } from "../scene-manager.js";
@@ -14,38 +14,32 @@ beforeEach(() => {
   resetPromptCache();
 });
 
-function mockUsage(): Anthropic.Usage {
-  return { input_tokens: 50, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: null, inference_geo: null, server_tool_use: null, service_tier: null };
+function mockUsage() {
+  return { inputTokens: 50, outputTokens: 20, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 };
 }
 
-function textResponse(text: string): Anthropic.Message {
+function textResponse(text: string): ChatResult {
   return {
-    id: "msg_test",
-    type: "message",
-    role: "assistant",
-    model: "claude-sonnet-4-6",
-    content: [{ type: "text", text }],
-    stop_reason: "end_turn",
-    stop_sequence: null,
+    text,
+    toolCalls: [],
     usage: mockUsage(),
-  } as Anthropic.Message;
+    stopReason: "end",
+    assistantContent: [{ type: "text", text }],
+  };
 }
 
-function mockClient(responses: Anthropic.Message[]): Anthropic {
+function mockProvider(responses: ChatResult[]): LLMProvider {
   let callIdx = 0;
   return {
-    messages: {
-      create: vi.fn(async () => responses[callIdx++]),
-      stream: vi.fn(() => ({
-        on: vi.fn(),
-        finalMessage: vi.fn(async () => responses[callIdx++]),
-      })),
-    },
-  } as unknown as Anthropic;
+    providerId: "mock",
+    chat: vi.fn(async () => responses[callIdx++]),
+    stream: vi.fn(async () => responses[callIdx++]),
+    healthCheck: vi.fn(async () => ({ ok: true })),
+  } as unknown as LLMProvider;
 }
 
-/** Flatten TextBlockParam[] to a single string for assertion convenience. */
-function flattenPrompt(blocks: Anthropic.TextBlockParam[]): string {
+/** Flatten SystemBlock[] to a single string for assertion convenience. */
+function flattenPrompt(blocks: SystemBlock[]): string {
   return blocks.map((b) => b.text).join("");
 }
 
@@ -53,7 +47,7 @@ describe("buildDevPrompt", () => {
   it("returns TextBlockParam[] with cache_control on first block", () => {
     const blocks = buildDevPrompt("Test");
     expect(Array.isArray(blocks)).toBe(true);
-    expect((blocks[0] as unknown as Record<string, unknown>).cache_control).toEqual({ type: "ephemeral", ttl: "1h" });
+    expect(blocks[0].cacheControl).toEqual({ ttl: "1h" });
   });
 
   it("includes campaign name", () => {
@@ -236,12 +230,12 @@ describe("buildDevTools", () => {
     expect(names).toContain("create_map");
   });
 
-  it("each tool has name, description, and input_schema", () => {
+  it("each tool has name, description, and inputSchema", () => {
     for (const tool of buildDevTools()) {
       expect(tool.name).toBeTruthy();
       expect(tool.description).toBeTruthy();
-      expect(tool.input_schema).toBeTruthy();
-      expect(tool.input_schema.type).toBe("object");
+      expect(tool.inputSchema).toBeTruthy();
+      expect(tool.inputSchema.type).toBe("object");
     }
   });
 });
@@ -703,8 +697,8 @@ describe("buildDevToolHandler — get_commit_log", () => {
 
 describe("enterDevMode", () => {
   it("returns summary from first sentence", async () => {
-    const client = mockClient([textResponse("Combat state has 2 active entities. Both are alive.")]);
-    const result = await enterDevMode(client, "show combat state", {
+    const provider = mockProvider([textResponse("Combat state has 2 active entities. Both are alive.")]);
+    const result = await enterDevMode(provider, "show combat state", {
       campaignName: "Test",
     });
     expect(result.summary).toBe("Combat state has 2 active entities.");
@@ -712,8 +706,8 @@ describe("enterDevMode", () => {
 
   it("truncates summary over 100 chars", async () => {
     const longText = "A".repeat(110) + ". More text here.";
-    const client = mockClient([textResponse(longText)]);
-    const result = await enterDevMode(client, "dump everything", {
+    const provider = mockProvider([textResponse(longText)]);
+    const result = await enterDevMode(provider, "dump everything", {
       campaignName: "Test",
     });
     expect(result.summary).toHaveLength(100);
@@ -721,25 +715,25 @@ describe("enterDevMode", () => {
   });
 
   it("defaults summary for empty text", async () => {
-    const client = mockClient([textResponse("")]);
-    const result = await enterDevMode(client, "test", {
+    const provider = mockProvider([textResponse("")]);
+    const result = await enterDevMode(provider, "test", {
       campaignName: "Test",
     });
     expect(result.summary).toBe("Dev mode discussion.");
   });
 
   it("uses stream when onStream callback provided", async () => {
-    const client = mockClient([textResponse("Response.")]);
+    const provider = mockProvider([textResponse("Response.")]);
     const onStream = vi.fn();
-    await enterDevMode(client, "question", {
+    await enterDevMode(provider, "question", {
       campaignName: "Test",
     }, onStream);
-    expect(client.messages.stream).toHaveBeenCalled();
+    expect(provider.stream).toHaveBeenCalled();
   });
 
   it("accumulates usage stats", async () => {
-    const client = mockClient([textResponse("Done.")]);
-    const result = await enterDevMode(client, "test", {
+    const provider = mockProvider([textResponse("Done.")]);
+    const result = await enterDevMode(provider, "test", {
       campaignName: "Test",
     });
     expect(result.usage.inputTokens).toBe(50);
@@ -747,34 +741,34 @@ describe("enterDevMode", () => {
   });
 
   it("passes tools when gameState and fileIO provided", async () => {
-    const client = mockClient([textResponse("Done.")]);
+    const provider = mockProvider([textResponse("Done.")]);
     const gs = makeGameState();
     const fio = mockFileIO();
 
-    await enterDevMode(client, "test", {
+    await enterDevMode(provider, "test", {
       campaignName: "Test",
       gameState: gs,
       fileIO: fio,
     });
 
-    // When tools are provided, the create call should include tools
-    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
-    if (createCall) {
-      expect(createCall.tools.length).toBeGreaterThanOrEqual(15);
-      expect(createCall.max_tokens).toBe(16384); // DEV_MODE
+    // When tools are provided, the chat call should include tools
+    const chatCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    if (chatCall) {
+      expect(chatCall.tools.length).toBeGreaterThanOrEqual(15);
+      expect(chatCall.maxTokens).toBe(16384); // DEV_MODE
     }
   });
 
   it("works without tools when gameState/fileIO not provided", async () => {
-    const client = mockClient([textResponse("Done.")]);
-    await enterDevMode(client, "test", {
+    const provider = mockProvider([textResponse("Done.")]);
+    await enterDevMode(provider, "test", {
       campaignName: "Test",
     });
 
-    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
-    if (createCall) {
-      expect(createCall.tools).toBeUndefined();
-      expect(createCall.max_tokens).toBe(16384); // DEV_MODE
+    const chatCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    if (chatCall) {
+      expect(chatCall.tools).toBeUndefined();
+      expect(chatCall.maxTokens).toBe(16384); // DEV_MODE
     }
   });
 });
