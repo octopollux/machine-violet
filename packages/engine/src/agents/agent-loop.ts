@@ -133,7 +133,7 @@ async function runAgentLoopInternal(
     stream,
     tools: registry.getDefinitions(),
     toolHandler,
-    cacheHints: [{ target: "tools", ttl: "1h" }],
+    cacheHints: [{ target: "tools", ttl: "1h" }, { target: "messages" }],
     tuiToolNames: TUI_TOOLS,
     onTextDelta: config.onTextDelta,
     onToolStart: config.onToolStart,

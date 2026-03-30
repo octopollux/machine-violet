@@ -128,6 +128,35 @@ function toAnthropicParams(params: ChatParams): {
     maxTokens = Math.max(maxTokens, modelMax);
   }
 
+  // Apply cache hint to last conversation message (BP4) if requested
+  const msgCacheHint = params.cacheHints?.find((h) => h.target === "messages");
+  if (msgCacheHint && messages.length > 0) {
+    const last = messages[messages.length - 1];
+    if (typeof last.content === "string") {
+      if (last.content) {
+        messages[messages.length - 1] = {
+          role: last.role,
+          content: [{
+            type: "text" as const,
+            text: last.content,
+            cache_control: { type: "ephemeral" },
+          } as Anthropic.TextBlockParam],
+        };
+      }
+    } else if (Array.isArray(last.content) && last.content.length > 0) {
+      const blocks = [...last.content] as unknown as Record<string, unknown>[];
+      // Find last non-empty text block
+      let stampIdx = blocks.length - 1;
+      while (stampIdx >= 0 && blocks[stampIdx].type === "text" && !(blocks[stampIdx].text as string)) {
+        stampIdx--;
+      }
+      if (stampIdx >= 0) {
+        blocks[stampIdx] = { ...blocks[stampIdx], cache_control: { type: "ephemeral" } };
+        messages[messages.length - 1] = { role: last.role, content: blocks as unknown as Anthropic.MessageParam["content"] };
+      }
+    }
+  }
+
   return {
     model: params.model,
     max_tokens: maxTokens,

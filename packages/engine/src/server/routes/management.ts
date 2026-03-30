@@ -38,7 +38,7 @@ import {
   addConnection, removeConnection, setTierAssignment, updateConnectionModels,
   maskKey,
 } from "../../config/connections.js";
-import type { ConnectionStore, TierAssignment } from "../../config/connections.js";
+import type { ConnectionStore, TierAssignment, ProviderType } from "../../config/connections.js";
 import { createProviderFromConnection } from "../../providers/index.js";
 import { loadModelRegistry, getModelsForProvider } from "../../config/model-registry.js";
 import {
@@ -87,14 +87,19 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   });
 
   /** Add a connection. */
+  const VALID_PROVIDERS = new Set<string>(["anthropic", "openai", "openai-oauth", "openrouter", "custom"]);
+
   server.post<{ Body: { provider: string; apiKey: string; label?: string; baseUrl?: string } }>("/connections", async (request, reply) => {
     const { provider, apiKey, label, baseUrl } = request.body ?? {};
     if (!provider || !apiKey) {
       return reply.status(400).send({ error: "Missing provider or apiKey." });
     }
+    if (!VALID_PROVIDERS.has(provider)) {
+      return reply.status(400).send({ error: `Unknown provider: ${provider}. Valid: ${[...VALID_PROVIDERS].join(", ")}` });
+    }
 
     let store = getConnections();
-    store = addConnection(store, provider as "anthropic" | "openai" | "openrouter" | "custom", apiKey, label ?? "", baseUrl);
+    store = addConnection(store, provider as ProviderType, apiKey, label ?? "", baseUrl);
 
     // Auto-discover known models for this provider
     const knownModels = getModelsForProvider(provider, server.configDir);

@@ -137,8 +137,9 @@ export function buildEffectiveConnections(stored: ConnectionStore, configDir?: s
     });
   }
 
-  // Manual connections — auto-populate models if empty
+  // Manual connections — auto-populate models if empty or missing
   for (const conn of stored.connections.filter((c) => c.source !== "env")) {
+    if (!conn.models) conn.models = [];
     if (conn.models.length === 0) {
       const knownModels = getModelsForProvider(conn.provider, configDir);
       conn.models = Object.entries(knownModels).map(([id, m]) => ({

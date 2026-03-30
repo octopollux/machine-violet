@@ -23,7 +23,7 @@ import type {
 // ---------------------------------------------------------------------------
 
 export interface OpenAIProviderOptions {
-  apiKey: string | (() => Promise<string>);
+  apiKey: string;
   baseURL?: string;
   /** Extra default headers (e.g., OpenRouter's HTTP-Referer, X-Title). */
   defaultHeaders?: Record<string, string>;

@@ -132,7 +132,6 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
       // (which handles turn lifecycle + game transition)
       const sm = server.sessionManager;
       const setup = sm.getSetupSession();
-      console.log(`[modal] id=${id}, hasSetup=${!!setup}, value=${String(value).slice(0, 50)}`);
       if (setup && id === "setup-choice") {
         await sm.resolveSetupChoice(String(value));
         return { ok: true };
