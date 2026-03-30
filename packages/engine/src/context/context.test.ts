@@ -512,6 +512,95 @@ describe("buildCachedPrefix", () => {
     expect(volatile).toBe("");
   });
 
+  it("includes personality detail in personality block", () => {
+    const { system } = buildCachedPrefix(mockConfig, {
+      dmPrompt: "You are the DM.",
+      personality: "Terse.",
+      personalityDetail: "Use weather as mood. Track motifs in DM notes.",
+    });
+
+    const allText = system.map((b) => b.text).join("\n");
+    expect(allText).toContain("Your Personality");
+    expect(allText).toContain("Terse.");
+    expect(allText).toContain("Use weather as mood");
+  });
+
+  it("includes campaign detail in campaign setting block", () => {
+    const { system } = buildCachedPrefix(mockConfig, {
+      dmPrompt: "You are the DM.",
+      personality: "Terse.",
+      campaignDetail: "Roll for variant: 1. THE PRETENDER 2. THE EMPTY THRONE",
+    });
+
+    const allText = system.map((b) => b.text).join("\n");
+    expect(allText).toContain("Campaign Detail");
+    expect(allText).toContain("Roll for variant");
+  });
+
+  it("omits personality detail when undefined", () => {
+    const { system } = buildCachedPrefix(mockConfig, {
+      dmPrompt: "You are the DM.",
+      personality: "Terse.",
+    });
+
+    const personalityBlock = system.find((b) => b.text.includes("Your Personality"));
+    expect(personalityBlock).toBeTruthy();
+    // Should just have the personality text, no extra sections
+    expect(personalityBlock!.text).not.toContain("\n\n\n");
+  });
+
+  it("omits campaign detail when undefined", () => {
+    const { system } = buildCachedPrefix(mockConfig, {
+      dmPrompt: "You are the DM.",
+      personality: "Terse.",
+    });
+
+    const allText = system.map((b) => b.text).join("\n");
+    expect(allText).not.toContain("Campaign Detail");
+  });
+
+  it("omits personality detail when empty string", () => {
+    const { system } = buildCachedPrefix(mockConfig, {
+      dmPrompt: "You are the DM.",
+      personality: "Terse.",
+      personalityDetail: "",
+    });
+
+    const personalityBlock = system.find((b) => b.text.includes("Your Personality"));
+    expect(personalityBlock!.text).not.toContain("\n\n\n");
+  });
+
+  it("omits campaign detail when empty string", () => {
+    const { system } = buildCachedPrefix(mockConfig, {
+      dmPrompt: "You are the DM.",
+      personality: "Terse.",
+      campaignDetail: "",
+    });
+
+    const allText = system.map((b) => b.text).join("\n");
+    expect(allText).not.toContain("Campaign Detail");
+  });
+
+  it("renders campaign detail even without other setting fields", () => {
+    const minimalConfig: CampaignConfig = {
+      ...mockConfig,
+      genre: undefined,
+      mood: undefined,
+      difficulty: undefined,
+      premise: undefined,
+      system: undefined,
+    };
+    const { system } = buildCachedPrefix(minimalConfig, {
+      dmPrompt: "You are the DM.",
+      personality: "Terse.",
+      campaignDetail: "Secret variant instructions.",
+    });
+
+    const allText = system.map((b) => b.text).join("\n");
+    expect(allText).toContain("Campaign Detail");
+    expect(allText).toContain("Secret variant instructions.");
+  });
+
   it("places session recap before campaign summary in Tier 2", () => {
     const { system } = buildCachedPrefix(mockConfig, {
       dmPrompt: "You are the DM.",

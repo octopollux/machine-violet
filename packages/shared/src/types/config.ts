@@ -18,6 +18,8 @@ export interface DMPersonality {
   name: string;
   description?: string;
   prompt_fragment: string;
+  /** Hidden detail block — rich tuning for the DM, not shown to the player during setup. */
+  detail?: string;
 }
 
 export interface ContextConfig {
@@ -54,6 +56,8 @@ export interface CampaignConfig {
   mood?: string;
   difficulty?: string;
   premise?: string;
+  /** Hidden campaign detail — DM-only instructions (variants, secrets, pacing notes). */
+  campaign_detail?: string;
   dm_personality: DMPersonality;
   players: PlayerConfig[];
   combat: CombatConfig;

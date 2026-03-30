@@ -20,6 +20,8 @@ import type { SystemBlock } from "../providers/types.js";
 export interface PrefixSections {
   dmPrompt: string;
   personality: string;
+  personalityDetail?: string;
+  campaignDetail?: string;
   rulesAppendix?: string;
   campaignSummary?: string;
   sessionRecap?: string;
@@ -57,9 +59,13 @@ export function buildCachedPrefix(
   // DM identity
   blocks.push({ text: sections.dmPrompt });
 
-  // DM personality fragment
+  // DM personality fragment + hidden detail
   if (sections.personality) {
-    blocks.push({ text: `\n\n## Your Personality\n${sections.personality}` });
+    let personalityText = `\n\n## Your Personality\n${sections.personality}`;
+    if (sections.personalityDetail) {
+      personalityText += `\n\n${sections.personalityDetail}`;
+    }
+    blocks.push({ text: personalityText });
   }
 
   // Game system
@@ -75,7 +81,13 @@ export function buildCachedPrefix(
     if (config.difficulty) settingLines.push(`Difficulty: ${config.difficulty}`);
     if (config.premise) settingLines.push(`Premise: ${config.premise}`);
     if (settingLines.length > 0) {
-      blocks.push({ text: `\n\n## Campaign Setting\n${settingLines.join("\n")}` });
+      let settingText = `\n\n## Campaign Setting\n${settingLines.join("\n")}`;
+      if (sections.campaignDetail) {
+        settingText += `\n\n### Campaign Detail\n${sections.campaignDetail}`;
+      }
+      blocks.push({ text: settingText });
+    } else if (sections.campaignDetail) {
+      blocks.push({ text: `\n\n## Campaign Detail\n${sections.campaignDetail}` });
     }
   }
 
