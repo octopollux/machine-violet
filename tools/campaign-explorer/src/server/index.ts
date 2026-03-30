@@ -46,7 +46,7 @@ async function main(): Promise<void> {
   console.log(`Campaign Explorer — watching: ${campaignsDir}`);
 
   let campaigns: CampaignInfo[] = await scanCampaigns(campaignsDir);
-  const watchers: FSWatcher[] = [];
+  const campaignWatchers = new Map<string, FSWatcher>();
 
   const getCampaigns = () => campaigns;
   const getCampaignPath = (slug: string) =>
@@ -56,13 +56,13 @@ async function main(): Promise<void> {
   const machineDebugDir = join(dirname(campaignsDir), ".debug");
   const machineDebugAvailable = existsSync(machineDebugDir);
   const getMachineDir = () => machineDebugAvailable ? machineDebugDir : null;
+  let machineWatcher: FSWatcher | null = null;
 
   if (machineDebugAvailable) {
     console.log(`Machine-scope debug dir: ${machineDebugDir}`);
-    const machineWatcher = watchMachineDir(machineDebugDir, {
+    machineWatcher = watchMachineDir(machineDebugDir, {
       onFileChange: (event) => broadcast(event),
     });
-    watchers.push(machineWatcher);
   } else {
     console.log(`Machine-scope debug dir not found: ${machineDebugDir}`);
   }
@@ -72,12 +72,8 @@ async function main(): Promise<void> {
     const watcher = watchCampaign(campaign.slug, campaign.path, {
       onFileChange: (event) => broadcast(event),
     });
-    watchers.push(watcher);
+    campaignWatchers.set(campaign.slug, watcher);
   }
-
-  // Watch the campaigns parent directory for new/removed campaign folders
-  const campaignWatchers = new Map<string, FSWatcher>();
-  for (const c of campaigns) campaignWatchers.set(c.slug, watchers[campaigns.indexOf(c)]);
 
   /** Try to register a new campaign from a directory name. */
   async function tryAddCampaign(dirName: string): Promise<void> {
@@ -104,7 +100,6 @@ async function main(): Promise<void> {
       const watcher = watchCampaign(info.slug, info.path, {
         onFileChange: (event) => broadcast(event),
       });
-      watchers.push(watcher);
       campaignWatchers.set(info.slug, watcher);
       console.log(`[campaigns] added: ${info.name} (${info.slug})`);
       broadcast({ type: "campaign-change", campaignSlug: info.slug, changeType: "add" });
@@ -145,8 +140,6 @@ async function main(): Promise<void> {
     campaigns.splice(idx, 1);
     const w = campaignWatchers.get(slug);
     if (w) { w.close(); campaignWatchers.delete(slug); }
-    const wIdx = watchers.indexOf(w!);
-    if (wIdx !== -1) watchers.splice(wIdx, 1);
     console.log(`[campaigns] removed: ${slug}`);
     broadcast({ type: "campaign-change", campaignSlug: slug, changeType: "remove" });
   });
@@ -163,15 +156,15 @@ async function main(): Promise<void> {
 
   // Refresh campaigns endpoint (manual rescan)
   app.post("/api/refresh", async (_req, res) => {
-    for (const w of watchers) await w.close();
-    watchers.length = 0;
+    for (const w of campaignWatchers.values()) await w.close();
+    campaignWatchers.clear();
 
     campaigns = await scanCampaigns(campaignsDir);
     for (const campaign of campaigns) {
       const watcher = watchCampaign(campaign.slug, campaign.path, {
         onFileChange: (event) => broadcast(event),
       });
-      watchers.push(watcher);
+      campaignWatchers.set(campaign.slug, watcher);
     }
 
     res.json({ campaigns: campaigns.length });
@@ -182,7 +175,7 @@ async function main(): Promise<void> {
     res.json({
       sseClients: clientCount(),
       campaigns: campaigns.length,
-      watchers: watchers.length,
+      watchers: campaignWatchers.size + (machineWatcher ? 1 : 0),
     });
   });
 
