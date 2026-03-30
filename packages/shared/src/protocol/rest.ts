@@ -47,8 +47,8 @@ export const CommandRequest = Type.Object({
 });
 
 export const ChoiceResponseRequest = Type.Object({
-  /** The selected choice text or index. */
-  value: Type.Union([Type.String(), Type.Number()]),
+  /** The selected choice text. */
+  value: Type.String(),
 });
 
 export const SettingsPatch = Type.Object({}, { additionalProperties: true });

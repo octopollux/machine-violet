@@ -66,7 +66,7 @@ export async function createServer(
           "1. **List campaigns** — `GET /campaigns` returns saved campaigns.",
           "2. **Start a session** — `POST /campaigns/:id/start` (resume) or `POST /campaigns` (new). Returns a `sessionId` and `wsUrl`.",
           "3. **Connect via WebSocket** — open `ws://<host>/session/ws?role=player&player=<name>`. The server immediately pushes a `state:snapshot` event with full game state.",
-          "4. **Play** — submit player actions with `POST /session/turn/contribute`, respond to modals with `POST /session/modal/:id/respond`. The DM narrates via WebSocket `narrative:chunk` / `narrative:complete` events.",
+          "4. **Play** — submit player actions (including gameplay choices) with `POST /session/turn/contribute`, and respond to setup choices with `POST /session/choice/respond`. The DM narrates via WebSocket `narrative:chunk` / `narrative:complete` events.",
           "5. **End** — `POST /session/end` tears down the session.",
           "",
           "Starting a session while one is already active returns **409 Conflict**.",
@@ -104,7 +104,7 @@ export async function createServer(
       servers: [{ url: `http://${cfg.host}:${cfg.port}` }],
       tags: [
         { name: "Campaigns", description: "Campaign listing, creation, and launch" },
-        { name: "Session", description: "Gameplay interaction — turns, commands, modals" },
+        { name: "Session", description: "Gameplay interaction — turns, commands, choices" },
         { name: "Data", description: "Session data — characters, compendium, notes, settings, cost" },
         { name: "Management", description: "AI connections, tiers, campaign ops, Discord settings" },
       ],

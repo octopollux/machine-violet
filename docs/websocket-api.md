@@ -19,7 +19,7 @@ No authentication is required (localhost-only). Auth will be added when remote c
 
 ## Communication Direction
 
-All WebSocket messages flow **server to client**. The WebSocket channel is one-way push — clients send commands via REST endpoints (`POST /session/turn/contribute`, `POST /session/modal/:id/respond`, etc.), not over the WebSocket.
+All WebSocket messages flow **server to client**. The WebSocket channel is one-way push — clients send commands via REST endpoints (`POST /session/turn/contribute`, `POST /session/choice/respond`, etc.), not over the WebSocket.
 
 ## Message Format
 

@@ -140,7 +140,7 @@ export class ApiClient {
     return this.post(`/session/command/${encodeURIComponent(name)}`, body);
   }
 
-  async respondToChoice(value: string | number): Promise<{ ok: boolean }> {
+  async respondToChoice(value: string): Promise<{ ok: boolean }> {
     const body: ChoiceResponseRequest = { value };
     return this.post("/session/choice/respond", body);
   }

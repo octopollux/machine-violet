@@ -156,7 +156,7 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
       response: { 200: OkResponse },
     },
   }, async (request, _reply) => {
-    const { value } = (request.body as { value: string | number }) ?? {};
+    const { value } = (request.body as { value: string }) ?? {};
 
     // During setup, resolve choice selections through the session manager
     // (which handles turn lifecycle + game transition)
