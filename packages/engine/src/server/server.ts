@@ -66,7 +66,7 @@ export async function createServer(
   });
   await server.register(scalarReference, {
     routePrefix: "/docs",
-    configuration: { title: "Machine Violet API" },
+    configuration: { title: "Machine Violet API", agent: { disabled: true } },
   });
 
   // --- Session manager (one active session per process) ---
