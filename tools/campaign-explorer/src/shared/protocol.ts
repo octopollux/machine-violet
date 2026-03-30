@@ -12,7 +12,11 @@ export type FileCategory =
   | "thinking"
   | "map"
   | "config"
+  | "logs"
   | "other";
+
+/** Sentinel slug for machine-scope files (not tied to any campaign). */
+export const MACHINE_SLUG = "__machine__";
 
 /** SSE event: a file was created, changed, or deleted. */
 export interface FileChangeEvent {

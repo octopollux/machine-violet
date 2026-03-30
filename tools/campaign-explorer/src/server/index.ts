@@ -1,10 +1,11 @@
 import express from "express";
 import cors from "cors";
 import { readFile, stat } from "node:fs/promises";
-import { join, resolve, basename } from "node:path";
+import { join, resolve, basename, dirname } from "node:path";
+import { existsSync } from "node:fs";
 import { watch, type FSWatcher } from "chokidar";
 import { scanCampaigns } from "./campaign-scanner.js";
-import { watchCampaign } from "./watcher.js";
+import { watchCampaign, watchMachineDir } from "./watcher.js";
 import { sseHandler, broadcast, clientCount } from "./sse.js";
 import { createApiRouter } from "./api.js";
 import type { CampaignInfo } from "../shared/protocol.js";
@@ -50,6 +51,21 @@ async function main(): Promise<void> {
   const getCampaigns = () => campaigns;
   const getCampaignPath = (slug: string) =>
     campaigns.find((c) => c.slug === slug)?.path;
+
+  // Resolve machine-scope .debug/ directory (sibling of campaigns dir)
+  const machineDebugDir = join(dirname(campaignsDir), ".debug");
+  const machineDebugAvailable = existsSync(machineDebugDir);
+  const getMachineDir = () => machineDebugAvailable ? machineDebugDir : null;
+
+  if (machineDebugAvailable) {
+    console.log(`Machine-scope debug dir: ${machineDebugDir}`);
+    const machineWatcher = watchMachineDir(machineDebugDir, {
+      onFileChange: (event) => broadcast(event),
+    });
+    watchers.push(machineWatcher);
+  } else {
+    console.log(`Machine-scope debug dir not found: ${machineDebugDir}`);
+  }
 
   // Set up file watchers for each campaign
   for (const campaign of campaigns) {
@@ -136,7 +152,7 @@ async function main(): Promise<void> {
   app.get("/api/events", sseHandler);
 
   // REST API
-  app.use("/api", createApiRouter(getCampaigns, getCampaignPath));
+  app.use("/api", createApiRouter(getCampaigns, getCampaignPath, getMachineDir));
 
   // Refresh campaigns endpoint (manual rescan)
   app.post("/api/refresh", async (_req, res) => {

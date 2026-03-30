@@ -14,6 +14,7 @@ export const CATEGORY_LABELS: Record<FileCategory, string> = {
   thinking: "Thinking Traces",
   map: "Maps",
   config: "Config",
+  logs: "Logs",
   other: "Other",
 };
 
@@ -31,6 +32,7 @@ export const CATEGORY_ORDER: FileCategory[] = [
   "context-dump",
   "thinking",
   "map",
+  "logs",
   "other",
 ];
 
@@ -48,5 +50,6 @@ export const CATEGORY_COLORS: Record<FileCategory, string> = {
   thinking: "#f48fb1",
   map: "#a1887f",
   config: "#90a4ae",
+  logs: "#ef5350",
   other: "#e0e0e0",
 };
