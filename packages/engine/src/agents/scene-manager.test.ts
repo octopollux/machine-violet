@@ -625,34 +625,42 @@ describe("SceneManager", () => {
     expect(locationContent).toContain("Party entered and caused a brawl");
   });
 
-  it("upsertEntity adds entry and getSystemPrompt includes entity registry", () => {
+  it("entity tree from constructor appears in volatile context", () => {
     const sessionState = mockSessionState();
+    const initialTree = {
+      "phone-booth-man": { name: "Phone Booth Man", aliases: [], type: "character", path: "characters/phone-booth-man.md" },
+    };
     const mgr = new SceneManager(
       mockState(),
       mockScene(),
       new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
       sessionState,
       mockFileIO(),
+      undefined,
+      initialTree,
     );
 
-    mgr.upsertEntity({ slug: "phone-booth-man", name: "Phone Booth Man", aliases: [], type: "character", path: "characters/phone-booth-man.md" });
     const { volatile } = mgr.getSystemPrompt();
     expect(volatile).toContain("Entity Registry");
     expect(volatile).toContain("characters/phone-booth-man.md");
     expect(volatile).toContain("Phone Booth Man");
   });
 
-  it("upsertEntity includes aliases", () => {
+  it("entity tree snapshot includes aliases", () => {
     const sessionState = mockSessionState();
+    const initialTree = {
+      "flood-street-watcher": { name: "Flood Street Watcher", aliases: ["The Watcher"], type: "character", path: "characters/flood-street-watcher.md" },
+    };
     const mgr = new SceneManager(
       mockState(),
       mockScene(),
       new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
       sessionState,
       mockFileIO(),
+      undefined,
+      initialTree,
     );
 
-    mgr.upsertEntity({ slug: "flood-street-watcher", name: "Flood Street Watcher", aliases: ["The Watcher"], type: "character", path: "characters/flood-street-watcher.md" });
     const { volatile } = mgr.getSystemPrompt();
     expect(volatile).toContain("Flood Street Watcher (character) aka The Watcher");
   });
@@ -671,7 +679,26 @@ describe("SceneManager", () => {
     expect(volatile).not.toContain("Entity Registry");
   });
 
-  it("entity tree persists across scene transitions", async () => {
+  it("mid-scene upserts update the tree but not the DM snapshot", () => {
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      mockFileIO(),
+    );
+
+    mgr.upsertEntity({ slug: "grimjaw", name: "Grimjaw", aliases: [], type: "character", path: "characters/grimjaw.md" });
+
+    // In-memory tree has the entry
+    expect(mgr.getEntityTree()["grimjaw"]).toBeDefined();
+    // But the DM snapshot (frozen at construction) does not
+    const { volatile } = mgr.getSystemPrompt();
+    expect(volatile).not.toContain("Grimjaw");
+  });
+
+  it("entity tree snapshot refreshes after scene transition", async () => {
     const provider = transitionProvider([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
@@ -686,18 +713,19 @@ describe("SceneManager", () => {
       mockFileIO(),
     );
 
+    // Upsert mid-scene — not in snapshot yet
     mgr.upsertEntity({ slug: "grimjaw", name: "Grimjaw", aliases: [], type: "character", path: "characters/grimjaw.md" });
     let { volatile } = mgr.getSystemPrompt();
-    expect(volatile).toContain("Grimjaw");
+    expect(volatile).not.toContain("Grimjaw");
 
     await mgr.sceneTransition(provider, "End of scene");
 
-    // Entity tree is campaign-wide — persists across scenes
+    // After transition, snapshot is refreshed — now includes Grimjaw
     ({ volatile } = mgr.getSystemPrompt());
     expect(volatile).toContain("Grimjaw");
   });
 
-  it("upsertEntity upserts — second call updates entry", () => {
+  it("upsertEntity upserts — second call updates in-memory tree", () => {
     const sessionState = mockSessionState();
     const mgr = new SceneManager(
       mockState(),
@@ -710,12 +738,10 @@ describe("SceneManager", () => {
     mgr.upsertEntity({ slug: "grimjaw", name: "Grimjaw", aliases: [], type: "character", path: "characters/grimjaw.md" });
     mgr.upsertEntity({ slug: "grimjaw", name: "Grimjaw", aliases: ["Captain Grimjaw"], type: "character", path: "characters/grimjaw.md" });
 
-    mgr.getSystemPrompt();
-    expect(sessionState.entityIndex).toBeDefined();
-    expect(sessionState.entityIndex).toContain("aka Captain Grimjaw");
-    // Upsert: slug should appear exactly once
-    const matches = sessionState.entityIndex!.match(/characters\/grimjaw\.md/g);
-    expect(matches).toHaveLength(1);
+    const tree = mgr.getEntityTree();
+    expect(tree["grimjaw"].aliases).toEqual(["Captain Grimjaw"]);
+    // Only one entry for the slug
+    expect(Object.keys(tree).filter((k) => k === "grimjaw")).toHaveLength(1);
   });
 
   it("contextRefresh handles missing files gracefully", async () => {

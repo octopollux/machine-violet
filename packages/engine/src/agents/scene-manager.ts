@@ -105,6 +105,8 @@ export class SceneManager {
   private pcSummaries: string[];
   private aliasContext = "";
   private entityTree: EntityTree;
+  /** Rendered entity tree snapshot — refreshed at session start and scene transitions only. */
+  private entityTreeSnapshot: string | undefined;
 
   /** Optional dev mode log callback. */
   devLog?: (msg: string) => void;
@@ -125,6 +127,7 @@ export class SceneManager {
     this.fileIO = fileIO;
     this.repo = repo ?? null;
     this.entityTree = entityTree ?? {};
+    this.entityTreeSnapshot = renderEntityTree(this.entityTree);
     this.pcSummaries = state.config.players.map((p) => p.character);
   }
 
@@ -140,7 +143,7 @@ export class SceneManager {
     });
     this.sessionState.scenePrecis = buildScenePrecis(this.scene);
     this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);
-    this.sessionState.entityIndex = renderEntityTree(this.entityTree);
+    this.sessionState.entityIndex = this.entityTreeSnapshot;
     return buildDMPrefix(this.state.config, this.sessionState);
   }
 
@@ -778,6 +781,8 @@ export class SceneManager {
     this.scene.openThreads = "";
     this.scene.npcIntents = "";
     this.scene.playerReads = [];
+    // Refresh entity tree snapshot for the new scene
+    this.entityTreeSnapshot = renderEntityTree(this.entityTree);
   }
 
   private stepPruneContext(): void {
