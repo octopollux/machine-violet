@@ -86,13 +86,20 @@ async function main(): Promise<void> {
     try {
       const s = await stat(dirPath);
       if (!s.isDirectory()) return;
-      const raw = await readFile(join(dirPath, "config.json"), "utf-8");
-      const config = JSON.parse(raw);
-      const info: CampaignInfo = {
-        slug: basename(dirPath),
-        name: config.name ?? basename(dirPath),
-        path: dirPath,
-      };
+
+      let info: CampaignInfo;
+      if (dirName === "__setup__") {
+        // __setup__ is a temp dir used during campaign creation — no config.json
+        info = { slug: "__setup__", name: "Setup (temp)", path: dirPath };
+      } else {
+        const raw = await readFile(join(dirPath, "config.json"), "utf-8");
+        const config = JSON.parse(raw);
+        info = {
+          slug: basename(dirPath),
+          name: config.name ?? basename(dirPath),
+          path: dirPath,
+        };
+      }
       campaigns.push(info);
       const watcher = watchCampaign(info.slug, info.path, {
         onFileChange: (event) => broadcast(event),
