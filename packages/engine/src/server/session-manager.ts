@@ -437,7 +437,7 @@ export class SessionManager {
     engine: GameEngine,
     config: CampaignConfig,
     gs: GameState,
-    _scene: SceneState,
+    scene: SceneState,
   ): Promise<void> {
     const persister = engine.getPersister();
     if (!persister) return;
@@ -457,6 +457,16 @@ export class SessionManager {
     }
     if (loaded.scene?.activePlayerIndex != null) {
       gs.activePlayerIndex = loaded.scene.activePlayerIndex;
+    }
+
+    // Hydrate scene state fields that detectSceneState() doesn't read.
+    // The scene object is shared by reference with the engine, so mutating
+    // it here updates the engine's copy too.
+    if (loaded.scene) {
+      if (loaded.scene.precis) scene.precis = loaded.scene.precis;
+      if (loaded.scene.openThreads) scene.openThreads = loaded.scene.openThreads;
+      if (loaded.scene.npcIntents) scene.npcIntents = loaded.scene.npcIntents;
+      if (loaded.scene.playerReads) scene.playerReads = loaded.scene.playerReads;
     }
 
     // Capture persisted UI state (theme, modelines) for snapshots

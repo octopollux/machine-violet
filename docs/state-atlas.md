@@ -419,6 +419,17 @@ Key isolation properties:
 
 *Source: `src/agents/tool-registry.ts`*
 
+### Scene & Session Lifecycle
+
+| Rule | Guard | Severity |
+|------|-------|----------|
+| `sceneNumber` must match the highest numbered directory in `campaign/scenes/` that contains a `transcript.md` | `detectSceneState()` scans filesystem on resume | Hard (enforced by detection logic) |
+| `sessionNumber` must equal (highest session recap number + 1) | `detectSceneState()` scans `campaign/session-recaps/` | Hard (enforced by detection logic) |
+| In-memory `SceneState.transcript` must be flushed to `campaign/scenes/NNN-slug/transcript.md` before scene transition | `sceneTransition()` writes transcript as first cascade step | Hard (enforced by cascade ordering) |
+| `state/scene.json` fields (precis, openThreads, npcIntents, playerReads) must be merged back into `SceneState` on resume | `resumeSession()` in session-manager.ts hydrates after `loadAll()` | Hard (enforced by resume flow) |
+
+*Source: `packages/engine/src/agents/scene-manager.ts`, `packages/engine/src/server/session-manager.ts`*
+
 ---
 
 ## 6. State Lifecycle
