@@ -19,8 +19,10 @@ import type { SceneState } from "../agents/scene-manager.js";
 import { detectSceneState } from "../agents/scene-manager.js";
 import type { DMSessionState } from "../agents/dm-prompt.js";
 import { getActivePlayer } from "../agents/player-manager.js";
-import { createClient } from "../config/client.js";
 import { loadEnv } from "../config/first-launch.js";
+import { loadConnectionStore, buildEffectiveConnections, getTierProvider } from "../config/connections.js";
+import { createProviderFromConnection } from "../providers/index.js";
+import { configDir } from "../utils/paths.js";
 import { sandboxFileIO } from "../tools/filesystem/sandbox.js";
 import { campaignPaths } from "../tools/filesystem/scaffold.js";
 import { createGitIO } from "../tools/git/isogit-adapter.js";
@@ -135,16 +137,57 @@ export class SessionManager {
 
   // --- Setup session ---
 
-  /** Start a campaign creation session. */
+  /** Start a campaign creation session with a real temp GameState. */
   async startSetup(): Promise<void> {
     if (this.active) throw new Error("A session is already active.");
     const homeDir = this.campaignsDir.replace(/[/\\]campaigns\/?$/, "");
+
+    // Create a temp campaign directory for setup state.
+    // Clean up any previous setup state first (inspectable between runs).
+    const setupRoot = join(this.campaignsDir, "__setup__");
+    const { mkdir, rm } = await import("node:fs/promises");
+    await rm(setupRoot, { recursive: true, force: true });
+    await mkdir(join(setupRoot, "state"), { recursive: true });
+
+    // Build a minimal GameState so turns, context dumps, etc. work
+    const setupConfig: CampaignConfig = {
+      name: "Setup",
+      dm_personality: { name: "Setup MC", prompt: "" },
+      players: [{ character: "Player", type: "human", color: "#ffffff" }],
+      combat: { system: "theater_of_mind", grid_size: 0, default_initiative: "dex" },
+      context: {},
+      recovery: { auto_commit_interval: 0, max_commits: 0, enable_git: false },
+      choices: { campaign_default: "sometimes", player_overrides: {} },
+    };
+
+    this.gameState = {
+      maps: {},
+      clocks: createClocksState(),
+      combat: createCombatState(),
+      combatConfig: setupConfig.combat,
+      decks: createDecksState(),
+      objectives: createObjectivesState(),
+      config: setupConfig,
+      campaignRoot: setupRoot,
+      homeDir,
+      activePlayerIndex: 0,
+      displayResources: {},
+      resourceValues: {},
+    };
+
     this.setupSession = new SetupSession(
       this.campaignsDir, homeDir, (event) => this.broadcast(event),
     );
     this.active = true;
     this.currentMode = "setup";
     this.campaignId = "__setup__";
+
+    // Dev mode: context dumps in the temp setup dir
+    const { isDevMode } = await import("../config/dev-mode.js");
+    if (isDevMode()) {
+      const { setContextDumpDir } = await import("../config/context-dump.js");
+      setContextDumpDir(join(setupRoot, ".dev-mode", "context"));
+    }
 
     // Initialize turn manager for setup input
     this.turnManager = new TurnManager((event) => this.broadcast(event));
@@ -159,9 +202,7 @@ export class SessionManager {
       }
     });
 
-    // Start the setup conversation in the background — the REST response
-    // returns immediately so the client can show the playing UI and start
-    // receiving streamed narrative via WebSocket.
+    // Start the setup conversation in the background
     const setup = this.setupSession;
     void setup.start().then(() => {
       if (this.setupSession === setup) this.openNextTurn();
@@ -171,11 +212,14 @@ export class SessionManager {
   /** Resolve a choice during setup. */
   async resolveSetupChoice(selectedText: string): Promise<{ finalized?: string }> {
     if (!this.setupSession) throw new Error("No setup session.");
+    console.log(`[setup] resolveSetupChoice: "${selectedText.slice(0, 50)}"`);
     const result = await this.setupSession.resolveChoice(selectedText);
+    console.log(`[setup] resolveChoice returned: finalized=${!!result.finalized}`);
     if (result.finalized) {
       await this.transitionToGame(result.finalized);
       return { finalized: result.finalized };
     }
+    console.log(`[setup] opening next turn after choice resolution`);
     this.openNextTurn();
     return {};
   }
@@ -223,8 +267,26 @@ export class SessionManager {
     // --- Ensure API key is loaded ---
     loadEnv();
 
-    // --- Create Anthropic client ---
-    const client = createClient();
+    // --- Resolve provider from connections ---
+    const appConfigDir = configDir();
+    const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
+    const largeTier = getTierProvider(connStore, "large");
+
+    // Create provider from large tier, or fall back to Anthropic env key
+    let provider;
+    if (largeTier) {
+      provider = createProviderFromConnection(largeTier.connection);
+    } else {
+      const { createAnthropicProvider } = await import("../providers/anthropic.js");
+      provider = createAnthropicProvider();
+    }
+
+    // --- Dev mode: set context dump directory ---
+    const { isDevMode } = await import("../config/dev-mode.js");
+    if (isDevMode()) {
+      const { setContextDumpDir } = await import("../config/context-dump.js");
+      setContextDumpDir(join(campaignRoot, ".dev-mode", "context"));
+    }
 
     // --- Create and sandbox FileIO ---
     const baseIO = createBaseFileIO();
@@ -291,7 +353,7 @@ export class SessionManager {
 
     // --- Instantiate GameEngine ---
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: gs,
       scene,
       sessionState,
@@ -478,9 +540,15 @@ export class SessionManager {
   /** Open a turn for the current active player(s). */
   private openNextTurn(): void {
     if (!this.turnManager || !this.gameState) return;
+    // Cancel any open turn that was never contributed to (e.g., a choice
+    // modal was shown instead of collecting free-text input)
+    const current = this.turnManager.getCurrentTurn();
+    if (current && current.status === "open") {
+      this.turnManager.cancelTurn();
+    }
     const active = getActivePlayer(this.gameState);
     const humanPlayers = [active.characterName];
-    const aiPlayers: string[] = []; // AI players not yet implemented
+    const aiPlayers: string[] = [];
     this.turnManager.openTurn(humanPlayers, aiPlayers);
   }
 

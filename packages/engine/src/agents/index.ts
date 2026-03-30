@@ -3,8 +3,8 @@ export type { ToolRegistry, RegisteredTool, ToolResult } from "./tool-registry.j
 export type { GameState } from "./game-state.js";
 export { agentLoop, agentLoopStreaming } from "./agent-loop.js";
 export type { AgentLoopConfig, AgentLoopResult, UsageStats, TuiCommand, ModelId } from "./agent-loop.js";
-export { runAgentLoop } from "./agent-session.js";
-export type { AgentSessionConfig, AgentSessionResult, ToolHandler } from "./agent-session.js";
+export { extractStatus, retryDelay, RETRYABLE_STATUS, sleep } from "../utils/retry.js";
+export { TUI_TOOLS, isTuiCommand } from "./agent-loop.js";
 export { spawnSubagent, oneShot, cacheSystemPrompt } from "./subagent.js";
 export type { SubagentConfig, SubagentResult, SubagentVisibility, SubagentStreamCallback } from "./subagent.js";
 export { buildDMPrefix, buildActiveState, DM_PROMPT } from "./dm-prompt.js";

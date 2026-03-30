@@ -53,6 +53,50 @@ export interface ArchivedCampaignsResponse {
   archives: ArchivedCampaignEntry[];
 }
 
+export interface ConnectionInfo {
+  id: string;
+  provider: string;
+  label: string;
+  masked: string;
+  baseUrl?: string;
+  models: { id: string; displayName: string; available: boolean }[];
+  source: string;
+  addedAt: string;
+}
+
+export interface ConnectionsResponse {
+  connections: ConnectionInfo[];
+  tierAssignments: TierAssignmentsResponse;
+}
+
+export interface ConnectionHealthResponse {
+  id: string;
+  status: "valid" | "invalid" | "error" | "rate_limited";
+  message: string;
+  rateLimits?: { requestsRemaining: number; requestsLimit: number; tokensRemaining: number; tokensLimit: number };
+}
+
+export interface TierAssignmentEntry {
+  connectionId: string;
+  modelId: string;
+}
+
+export interface TierAssignmentsResponse {
+  large: TierAssignmentEntry | null;
+  medium: TierAssignmentEntry | null;
+  small: TierAssignmentEntry | null;
+}
+
+export interface KnownModelInfo {
+  provider: string;
+  displayName: string;
+  contextWindow: number;
+  maxOutput: number;
+  defaultTier: string;
+  pricing: { input: number; output: number; cacheWrite: number; cacheRead: number };
+  capabilities: { thinking: boolean; tools: boolean; streaming: boolean; caching: boolean };
+}
+
 export class ApiClient {
   private baseUrl: string;
   private playerId: string;
@@ -157,6 +201,36 @@ export class ApiClient {
 
   async checkKeyHealth(id: string): Promise<KeyHealthResponse> {
     return this.post(`/manage/keys/${encodeURIComponent(id)}/check`);
+  }
+
+  // --- Connections (multi-provider) ---
+
+  async listConnections(): Promise<ConnectionsResponse> {
+    return this.get("/manage/connections");
+  }
+
+  async addConnection(provider: string, apiKey: string, label?: string, baseUrl?: string): Promise<ConnectionsResponse> {
+    return this.post("/manage/connections", { provider, apiKey, label, baseUrl });
+  }
+
+  async removeConnection(id: string): Promise<ConnectionsResponse> {
+    return this.fetch(`/manage/connections/${encodeURIComponent(id)}`, { method: "DELETE" });
+  }
+
+  async checkConnection(id: string): Promise<ConnectionHealthResponse> {
+    return this.post(`/manage/connections/${encodeURIComponent(id)}/check`);
+  }
+
+  async getTierAssignments(): Promise<{ tierAssignments: TierAssignmentsResponse }> {
+    return this.get("/manage/tiers");
+  }
+
+  async setTierAssignments(assignments: Partial<TierAssignmentsResponse>): Promise<{ tierAssignments: TierAssignmentsResponse }> {
+    return this.fetch("/manage/tiers", { method: "PUT", body: assignments });
+  }
+
+  async listKnownModels(): Promise<{ models: Record<string, KnownModelInfo> }> {
+    return this.get("/manage/models");
   }
 
   async getCampaignDeleteInfo(id: string): Promise<CampaignDeleteInfo> {

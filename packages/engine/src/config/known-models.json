@@ -1,0 +1,108 @@
+{
+  "models": {
+    "claude-opus-4-6": {
+      "provider": "anthropic",
+      "displayName": "Claude Opus 4.6",
+      "contextWindow": 200000,
+      "maxOutput": 16384,
+      "defaultTier": "large",
+      "compactionThreshold": 160000,
+      "pricing": { "input": 5, "output": 25, "cacheWrite": 6.25, "cacheRead": 0.50 },
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
+    },
+    "claude-sonnet-4-6": {
+      "provider": "anthropic",
+      "displayName": "Claude Sonnet 4.6",
+      "contextWindow": 200000,
+      "maxOutput": 16384,
+      "defaultTier": "medium",
+      "compactionThreshold": 160000,
+      "pricing": { "input": 3, "output": 15, "cacheWrite": 3.75, "cacheRead": 0.30 },
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
+    },
+    "claude-sonnet-4-5-20250929": {
+      "provider": "anthropic",
+      "displayName": "Claude Sonnet 4.5",
+      "contextWindow": 200000,
+      "maxOutput": 8192,
+      "defaultTier": "medium",
+      "compactionThreshold": 160000,
+      "pricing": { "input": 3, "output": 15, "cacheWrite": 3.75, "cacheRead": 0.30 },
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
+    },
+    "claude-haiku-4-5-20251001": {
+      "provider": "anthropic",
+      "displayName": "Claude Haiku 4.5",
+      "contextWindow": 200000,
+      "maxOutput": 8192,
+      "defaultTier": "small",
+      "compactionThreshold": 160000,
+      "pricing": { "input": 1, "output": 5, "cacheWrite": 1.25, "cacheRead": 0.10 },
+      "capabilities": { "thinking": false, "tools": true, "streaming": true, "caching": true }
+    },
+    "gpt-5.4": {
+      "provider": "openai",
+      "displayName": "GPT-5.4",
+      "contextWindow": 128000,
+      "maxOutput": 16384,
+      "defaultTier": "large",
+      "compactionThreshold": 100000,
+      "pricing": { "input": 2.5, "output": 10, "cacheWrite": 0, "cacheRead": 1.25 },
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
+    },
+    "gpt-5.4-pro": {
+      "provider": "openai",
+      "displayName": "GPT-5.4 Pro",
+      "contextWindow": 128000,
+      "maxOutput": 16384,
+      "defaultTier": "large",
+      "compactionThreshold": 100000,
+      "pricing": { "input": 10, "output": 40, "cacheWrite": 0, "cacheRead": 5 },
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
+    },
+    "gpt-5-mini": {
+      "provider": "openai",
+      "displayName": "GPT-5 Mini",
+      "contextWindow": 128000,
+      "maxOutput": 16384,
+      "defaultTier": "medium",
+      "compactionThreshold": 100000,
+      "pricing": { "input": 0.4, "output": 1.6, "cacheWrite": 0, "cacheRead": 0.2 },
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
+    },
+    "gpt-5-nano": {
+      "provider": "openai",
+      "displayName": "GPT-5 Nano",
+      "contextWindow": 128000,
+      "maxOutput": 16384,
+      "defaultTier": "small",
+      "compactionThreshold": 100000,
+      "pricing": { "input": 0.1, "output": 0.4, "cacheWrite": 0, "cacheRead": 0.05 },
+      "capabilities": { "thinking": false, "tools": true, "streaming": true, "caching": true }
+    },
+    "gpt-4o": {
+      "provider": "openai",
+      "displayName": "GPT-4o",
+      "contextWindow": 128000,
+      "maxOutput": 16384,
+      "defaultTier": "medium",
+      "compactionThreshold": 100000,
+      "pricing": { "input": 2.5, "output": 10, "cacheWrite": 0, "cacheRead": 1.25 },
+      "capabilities": { "thinking": false, "tools": true, "streaming": true, "caching": true }
+    },
+    "gpt-4o-mini": {
+      "provider": "openai",
+      "displayName": "GPT-4o Mini",
+      "contextWindow": 128000,
+      "maxOutput": 16384,
+      "defaultTier": "small",
+      "compactionThreshold": 100000,
+      "pricing": { "input": 0.15, "output": 0.6, "cacheWrite": 0, "cacheRead": 0.075 },
+      "capabilities": { "thinking": false, "tools": true, "streaming": true, "caching": true }
+    }
+  },
+  "tierDefaults": {
+    "anthropic": { "large": "claude-opus-4-6", "medium": "claude-sonnet-4-6", "small": "claude-haiku-4-5-20251001" },
+    "openai": { "large": "gpt-5.4", "medium": "gpt-5-mini", "small": "gpt-5-nano" }
+  }
+}

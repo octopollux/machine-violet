@@ -137,7 +137,7 @@ function handleModeToggle(
 
   if (target === "ooc") {
     const sm = engine.getSceneManager();
-    const session = createOOCSession(engine.getClient(), {
+    const session = createOOCSession(engine.getProvider(), {
       campaignName: gameState.config.name,
       previousVariant,
       config: gameState.config,
@@ -148,7 +148,7 @@ function handleModeToggle(
     });
     engine.setModeSession(session);
   } else {
-    const session = createDevSession(engine.getClient(), {
+    const session = createDevSession(engine.getProvider(), {
       campaignName: gameState.config.name,
       gameStateSummary: summarizeGameState(gameState),
       gameState,

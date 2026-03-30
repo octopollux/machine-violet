@@ -1,4 +1,4 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider, NormalizedTool, SystemBlock } from "../../providers/types.js";
 import type { SubagentStreamCallback } from "../subagent.js";
 import { spawnSubagent, cacheSystemPrompt } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
@@ -33,8 +33,8 @@ export interface DevModeResult extends SubagentResult {
 export function buildDevPrompt(
   campaignName: string,
   gameStateSummary?: string,
-): Anthropic.TextBlockParam[] {
-  const blocks: Anthropic.TextBlockParam[] = [
+): SystemBlock[] {
+  const blocks: SystemBlock[] = [
     ...cacheSystemPrompt(loadPrompt("dev-mode")),
   ];
 
@@ -46,7 +46,7 @@ export function buildDevPrompt(
     dynamicParts.push(`Current game state:\n${gameStateSummary}`);
   }
   if (dynamicParts.length > 0) {
-    blocks.push({ type: "text", text: `\n\n${dynamicParts.join("\n\n")}` });
+    blocks.push({ text: `\n\n${dynamicParts.join("\n\n")}` });
   }
 
   return blocks;
@@ -58,12 +58,12 @@ type GameStateSlice = "combat" | "clocks" | "maps" | "decks" | "config" | "all";
 const VALID_SLICES: GameStateSlice[] = ["combat", "clocks", "maps", "decks", "config", "all"];
 
 /** Build dev mode tool definitions: dev-specific tools + all DM tools. */
-export function buildDevTools(): Anthropic.Tool[] {
-  const devTools: Anthropic.Tool[] = [
+export function buildDevTools(): NormalizedTool[] {
+  const devTools: NormalizedTool[] = [
     {
       name: "read_file",
       description: "Read a campaign file by relative path (from campaign root).",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           path: { type: "string", description: "Relative path within the campaign directory" },
@@ -74,7 +74,7 @@ export function buildDevTools(): Anthropic.Tool[] {
     {
       name: "write_file",
       description: "Write/overwrite a campaign file by relative path.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           path: { type: "string", description: "Relative path within the campaign directory" },
@@ -86,7 +86,7 @@ export function buildDevTools(): Anthropic.Tool[] {
     {
       name: "list_dir",
       description: "List contents of a campaign directory by relative path. Use '' or '.' for root.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           path: { type: "string", description: "Relative path within the campaign directory" },
@@ -97,7 +97,7 @@ export function buildDevTools(): Anthropic.Tool[] {
     {
       name: "get_game_state",
       description: "Get a slice of live game state as JSON. Slices: combat, clocks, maps, decks, config, all.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           slice: { type: "string", enum: VALID_SLICES, description: "Which state slice to return" },
@@ -108,7 +108,7 @@ export function buildDevTools(): Anthropic.Tool[] {
     {
       name: "set_game_state",
       description: "Patch a game state slice with a JSON merge. Slices: combat, clocks, maps, decks, config.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           slice: {
@@ -127,7 +127,7 @@ export function buildDevTools(): Anthropic.Tool[] {
     {
       name: "repair_state",
       description: "Scan transcripts for wikilinked entities and generate missing entity files. Use dry_run=true to preview without writing.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           dry_run: { type: "boolean", description: "If true, report what would be generated without writing files. Default: true." },
@@ -138,7 +138,7 @@ export function buildDevTools(): Anthropic.Tool[] {
     {
       name: "get_scene_state",
       description: "Get live scene state: scene number, slug, precis, open threads, exchange count.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {},
         required: [],
@@ -147,7 +147,7 @@ export function buildDevTools(): Anthropic.Tool[] {
     {
       name: "validate_campaign",
       description: "Run the full campaign validation suite: broken links, malformed entities, clock/map issues.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {},
         required: [],
@@ -156,7 +156,7 @@ export function buildDevTools(): Anthropic.Tool[] {
     {
       name: "search_files",
       description: "Search campaign files by regex pattern. Returns matching lines in 'file:line: content' format.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           pattern: { type: "string", description: "Regex pattern to search for" },
@@ -168,7 +168,7 @@ export function buildDevTools(): Anthropic.Tool[] {
     {
       name: "delete_file",
       description: "Delete a campaign file by relative path.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           path: { type: "string", description: "Relative path within the campaign directory" },
@@ -179,7 +179,7 @@ export function buildDevTools(): Anthropic.Tool[] {
     {
       name: "get_commit_log",
       description: "List git snapshot commits for this campaign. Shows commit hash, type, message, and timestamp. Filter by type or search term.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           depth: { type: "number", description: "Number of commits to retrieve (default 20, max 100)" },
@@ -192,7 +192,7 @@ export function buildDevTools(): Anthropic.Tool[] {
     {
       name: "find_references",
       description: "Find all wikilinks pointing to an entity. Returns file, display text, and line number for each reference.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           path: { type: "string", description: "Entity path relative to campaign root (e.g. 'characters/kael.md')" },
@@ -203,7 +203,7 @@ export function buildDevTools(): Anthropic.Tool[] {
     {
       name: "rename_entity",
       description: "Rename an entity file and update all wikilinks across the campaign. Always dry-run first.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           old_path: { type: "string", description: "Current entity path relative to campaign root" },
@@ -216,7 +216,7 @@ export function buildDevTools(): Anthropic.Tool[] {
     {
       name: "merge_entities",
       description: "Merge two entity files into the winner, repoint all loser wikilinks. Always dry-run first.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           winner_path: { type: "string", description: "Entity to keep (receives merged content)" },
@@ -229,7 +229,7 @@ export function buildDevTools(): Anthropic.Tool[] {
     {
       name: "resolve_dead_links",
       description: "Triage dead wikilinks: classify as intentional stubs, broken refs to repoint, or missing entities to generate. Accepts freeform context. Dry-run by default.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           context: { type: "string", description: "Freeform description of the problem (e.g. 'I renamed kael.md to kael-ranger.md')" },
@@ -263,7 +263,7 @@ export function resolveDevPath(campaignRoot: string, relative: string): string {
 export function buildDevToolHandler(
   gameState: GameState,
   fileIO: FileIO,
-  client?: Anthropic,
+  provider?: LLMProvider,
   sceneManager?: SceneManager,
   repo?: CampaignRepo,
   onTuiCommand?: (cmd: TuiCommand) => void,
@@ -322,11 +322,11 @@ export function buildDevToolHandler(
         }
 
         case "repair_state": {
-          if (!client) {
+          if (!provider) {
             return { content: "No API client available for repair", is_error: true };
           }
           const dryRun = input.dry_run !== false; // default true
-          const repairResult = await repairState(client, gameState, fileIO, dryRun);
+          const repairResult = await repairState(provider, gameState, fileIO, dryRun);
           return { content: JSON.stringify(repairResult, null, 2) };
         }
 
@@ -401,19 +401,19 @@ export function buildDevToolHandler(
         }
 
         case "resolve_dead_links": {
-          if (!client) {
+          if (!provider) {
             return { content: "No API client available for dead link resolution", is_error: true };
           }
           const dryRun = input.dry_run !== false;
-          const resolveResult = await resolveDeadLinks(root, fileIO, client, input.context as string, dryRun);
+          const resolveResult = await resolveDeadLinks(root, fileIO, provider, input.context as string, dryRun);
           return { content: JSON.stringify(resolveResult, null, 2) };
         }
 
         case "style_scene": {
           // Handle style_scene with subagent support
           const description = input.description as string | undefined;
-          if (description && client) {
-            const stylerResult = await styleTheme(client, description);
+          if (description && provider) {
+            const stylerResult = await styleTheme(provider, description);
             if (stylerResult.command && onTuiCommand) {
               onTuiCommand(stylerResult.command);
               return { content: `Styled: theme=${stylerResult.command.theme ?? "(unchanged)"} key_color=${stylerResult.command.key_color ?? "(unchanged)"}` };
@@ -527,7 +527,7 @@ async function searchCampaignFiles(
  * Player-facing (streams to TUI).
  */
 export async function enterDevMode(
-  client: Anthropic,
+  provider: LLMProvider,
   playerMessage: string,
   options: {
     campaignName: string;
@@ -548,11 +548,11 @@ export async function enterDevMode(
   const hasTools = !!(options.gameState && options.fileIO);
   const tools = hasTools ? buildDevTools() : undefined;
   const toolHandler = hasTools
-    ? buildDevToolHandler(options.gameState as NonNullable<typeof options.gameState>, options.fileIO as NonNullable<typeof options.fileIO>, client, options.sceneManager, options.repo, options.onTuiCommand)
+    ? buildDevToolHandler(options.gameState as NonNullable<typeof options.gameState>, options.fileIO as NonNullable<typeof options.fileIO>, provider, options.sceneManager, options.repo, options.onTuiCommand)
     : undefined;
 
   const result = await spawnSubagent(
-    client,
+    provider,
     {
       name: "dev-mode",
       model: getModel("medium"),
@@ -651,7 +651,7 @@ function extractSummary(text: string): string {
  * Used by PlayingPhase to unify non-DM mode handling.
  */
 export function createDevSession(
-  client: Anthropic,
+  provider: LLMProvider,
   options: {
     campaignName: string;
     gameStateSummary?: string;
@@ -665,6 +665,6 @@ export function createDevSession(
   return {
     label: "Dev",
     tier: "medium",
-    send: (text, onDelta) => enterDevMode(client, text, options, onDelta),
+    send: (text, onDelta) => enterDevMode(provider, text, options, onDelta),
   };
 }

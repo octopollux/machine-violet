@@ -3,7 +3,7 @@
  * Fires a Haiku subagent with recent context to suggest 3-6 options.
  * Explicit DM choices (via present_choices tool) take precedence.
  */
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider } from "../../providers/types.js";
 import type { ChoiceFrequency } from "@machine-violet/shared/types/config.js";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
@@ -38,7 +38,7 @@ export function shouldGenerateChoices(
  * Generate player choices from recent DM narration.
  */
 export async function generateChoices(
-  client: Anthropic,
+  provider: LLMProvider,
   recentNarration: string,
   characterName: string,
   playerAction?: string,
@@ -47,7 +47,7 @@ export async function generateChoices(
   const userMessage = `Character: ${characterName}${actionContext}\n\nDM narration:\n${recentNarration}`;
 
   const result = await oneShot(
-    client,
+    provider,
     getModel("small"),
     SYSTEM_PROMPT,
     userMessage,

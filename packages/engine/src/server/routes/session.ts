@@ -30,14 +30,24 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
 
   /** Contribute to the current turn. */
   server.post<{ Body: ContributeRequest }>("/turn/contribute", async (request, reply) => {
+    console.log(`[contribute] text="${request.body?.text?.slice(0, 50)}"`);
     const tm = server.sessionManager.getTurnManager();
     if (!tm) {
       return reply.status(400).send({ error: "No turn manager." });
     }
 
-    const turn = tm.getCurrentTurn();
+    // Wait briefly for a turn to be open (previous turn may still be processing)
+    let turn = tm.getCurrentTurn();
+    if (turn && turn.status === "processing") {
+      for (let i = 0; i < 50; i++) {
+        await new Promise((r) => setTimeout(r, 100));
+        turn = tm.getCurrentTurn();
+        if (!turn || turn.status === "open") break;
+      }
+    }
     if (!turn || turn.status !== "open") {
-      return reply.status(400).send({ error: "No open turn." });
+      server.log.warn({ turnStatus: turn?.status ?? "null", turnId: turn?.id ?? "none" }, "Contribution rejected: no open turn");
+      return reply.status(400).send({ error: `No open turn. (status: ${turn?.status ?? "null"})` });
     }
 
     const { text } = request.body;
@@ -118,14 +128,13 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
       const { id } = request.params;
       const { value } = request.body ?? {};
 
-      // During setup, resolve choice selections through the setup session
+      // During setup, resolve choice selections through the session manager
+      // (which handles turn lifecycle + game transition)
       const sm = server.sessionManager;
       const setup = sm.getSetupSession();
+      console.log(`[modal] id=${id}, hasSetup=${!!setup}, value=${String(value).slice(0, 50)}`);
       if (setup && id === "setup-choice") {
-        const result = await setup.resolveChoice(String(value));
-        if (result.finalized) {
-          // Setup complete — session transitions to game automatically
-        }
+        await sm.resolveSetupChoice(String(value));
         return { ok: true };
       }
 

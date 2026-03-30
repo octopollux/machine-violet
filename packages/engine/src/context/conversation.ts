@@ -1,4 +1,4 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import type { NormalizedMessage } from "../providers/types.js";
 import type { ContextConfig } from "@machine-violet/shared/types/config.js";
 import { estimateMessageTokens } from "./token-counter.js";
 
@@ -8,11 +8,11 @@ import { estimateMessageTokens } from "./token-counter.js";
  */
 export interface ConversationExchange {
   /** Player's input message */
-  user: Anthropic.MessageParam;
+  user: NormalizedMessage;
   /** DM's response (may include tool_use blocks) */
-  assistant: Anthropic.MessageParam;
+  assistant: NormalizedMessage;
   /** Tool result messages (if DM used tools) */
-  toolResults: Anthropic.MessageParam[];
+  toolResults: NormalizedMessage[];
   /** Estimated total tokens for this exchange */
   estimatedTokens: number;
   /** @deprecated No longer used. Kept for backward compat with persisted state. */
@@ -33,9 +33,9 @@ export class ConversationManager {
 
   /** Add a complete exchange to the conversation */
   addExchange(
-    user: Anthropic.MessageParam,
-    assistant: Anthropic.MessageParam,
-    toolResults: Anthropic.MessageParam[] = [],
+    user: NormalizedMessage,
+    assistant: NormalizedMessage,
+    toolResults: NormalizedMessage[] = [],
   ): DroppedExchange | null {
     const estimatedTokens =
       estimateMessageTokens(user) +
@@ -49,8 +49,8 @@ export class ConversationManager {
   }
 
   /** Get messages for the API call (flattened from exchanges) */
-  getMessages(): Anthropic.MessageParam[] {
-    const messages: Anthropic.MessageParam[] = [];
+  getMessages(): NormalizedMessage[] {
+    const messages: NormalizedMessage[] = [];
     for (const ex of this.exchanges) {
       messages.push(ex.user);
       messages.push(...ex.toolResults);

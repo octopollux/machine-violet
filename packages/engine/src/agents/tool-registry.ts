@@ -1,9 +1,9 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import type { NormalizedTool } from "../providers/types.js";
 import type { GameState } from "./game-state.js";
 
 // --- Types ---
 
-type Tool = Anthropic.Tool;
+type Tool = NormalizedTool;
 
 /** A registered tool: Claude API schema + handler */
 export interface RegisteredTool {
@@ -78,7 +78,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "roll_dice",
       description: "Roll dice using standard notation. Returns individual rolls, kept dice, modifier, and total.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           expression: { type: "string", description: "Dice notation, e.g. '2d6+3', '4d6kh3', '1d20+5; 2d8+3'" },
@@ -112,7 +112,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "deck",
       description: "Manage card decks: create, shuffle, draw, return, peek, state.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           deck: { type: "string", description: "Deck identifier" },
@@ -140,7 +140,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "view_area",
       description: "View a map area as text grid with legend.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           map: { type: "string", description: "Map ID" },
@@ -161,7 +161,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "distance",
       description: "Get tile distance between two coordinates.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           map: { type: "string" },
@@ -182,7 +182,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "path_between",
       description: "Find shortest path between two coordinates. Returns path + distance.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           map: { type: "string" },
@@ -209,7 +209,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "line_of_sight",
       description: "List tiles along a line between two points.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           map: { type: "string" },
@@ -234,7 +234,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "tiles_in_range",
       description: "All tiles within range of a point, optionally filtered.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           map: { type: "string" },
@@ -256,7 +256,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "find_nearest",
       description: "Find nearest entity or terrain of a given type.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           map: { type: "string" },
@@ -280,7 +280,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "place_entity",
       description: "Place an entity on a map tile.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           map: { type: "string" },
@@ -309,7 +309,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "move_entity",
       description: "Move an entity to a new coordinate.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           map: { type: "string" },
@@ -330,7 +330,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "remove_entity",
       description: "Remove an entity from the map.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           map: { type: "string" },
@@ -350,7 +350,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "set_terrain",
       description: "Set terrain at a coordinate or region.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           map: { type: "string" },
@@ -381,7 +381,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "annotate",
       description: "Add a freeform annotation to a map tile.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           map: { type: "string" },
@@ -403,7 +403,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "define_region",
       description: "Define a rectangular terrain region on a map.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           map: { type: "string" },
@@ -429,7 +429,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "create_map",
       description: "Create a new map.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           id: { type: "string" },
@@ -457,7 +457,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "import_entities",
       description: "Batch-place multiple entities on a map.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           map: { type: "string" },
@@ -489,7 +489,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "set_alarm",
       description: "Set an alarm on the calendar or combat clock.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           clock: { type: "string", enum: ["calendar", "combat"] },
@@ -509,7 +509,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "clear_alarm",
       description: "Remove an alarm by ID.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           id: { type: "string" },
@@ -526,7 +526,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "advance_calendar",
       description: "Advance the calendar clock by a time amount.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           minutes: { type: "number" },
@@ -544,7 +544,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "next_round",
       description: "Advance combat round counter. Fires combat alarms.",
-      input_schema: { type: "object" as const, properties: {} },
+      inputSchema: { type: "object" as const, properties: {} },
     },
     handler: (state) => {
       const result = clockNextRound(state.clocks);
@@ -559,7 +559,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "check_clocks",
       description: "Read current state of all clocks and pending alarms.",
-      input_schema: { type: "object" as const, properties: {} },
+      inputSchema: { type: "object" as const, properties: {} },
     },
     handler: (state) => {
       const result = checkClocks(state.clocks);
@@ -572,7 +572,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "start_combat",
       description: "Roll initiative, set turn order, activate combat.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           combatants: {
@@ -604,7 +604,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "end_combat",
       description: "End combat, clear initiative, reset combat clock.",
-      input_schema: { type: "object" as const, properties: {} },
+      inputSchema: { type: "object" as const, properties: {} },
     },
     handler: (state) => {
       const result = endCombat(state.combat);
@@ -616,7 +616,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "advance_turn",
       description: "Advance to the next combatant's turn.",
-      input_schema: { type: "object" as const, properties: {} },
+      inputSchema: { type: "object" as const, properties: {} },
     },
     handler: (state) => {
       const result = advanceTurn(state.combat);
@@ -628,7 +628,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "modify_initiative",
       description: "Mid-combat initiative changes: add, remove, move, delay.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           action: { type: "string", enum: ["add", "remove", "move", "delay"] },
@@ -650,7 +650,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "update_modeline",
       description: "Set the modeline status text for a character. Defaults to the active character. Supports inline formatting: <b>, <i>, <u>, <color=#hex>.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           text: { type: "string", description: "Status line content. Supports inline formatting tags: <b>, <i>, <u>, <color=#hex>." },
@@ -670,7 +670,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "style_scene",
       description: "Style the UI to match the current scene's mood. Use `description` for natural-language requests (\"make it darker\", \"cyberpunk neon\", \"haunted forest\") — a stylist agent picks the right theme, colors, and effects. Use `key_color` for simple hex-color changes. Use `variant` for mechanical state changes (combat/exploration).",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           description: { type: "string", description: "Natural-language mood/aesthetic request (e.g. 'cyberpunk neon', 'dark forest', 'make it warmer')" },
@@ -689,7 +689,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "set_display_resources",
       description: "Update which resource keys appear in the top frame for a character.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           character: { type: "string" },
@@ -709,7 +709,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "set_resource_values",
       description: "Set current values for a character's tracked resources (e.g. HP=24/30).",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           character: { type: "string", description: "Character name" },
@@ -736,7 +736,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "present_choices",
       description: "Show a choice modal to the player. No params = auto-generate options.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           prompt: { type: "string" },
@@ -753,7 +753,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "present_roll",
       description: "Display a dice roll as a dramatic modal.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           expression: { type: "string" },
@@ -773,7 +773,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "show_character_sheet",
       description: "Open character sheet modal for a character.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           character: { type: "string" },
@@ -791,7 +791,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "enter_ooc",
       description: "Switch to OOC (out-of-character) mode. Use when the player asks a rules question, wants to discuss game meta, or says something clearly out of character.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           reason: { type: "string", description: "Why OOC mode is being entered" },
@@ -809,7 +809,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "switch_player",
       description: "Switch the active player during free play (outside combat). During combat, initiative controls turn order automatically.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           player: { type: "string", description: "Character name of the player to activate" },
@@ -834,7 +834,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "scene_transition",
       description: "Transition to a new scene. Finalizes transcript, writes campaign log, updates changelogs, advances calendar, checks alarms, resets context. Call at natural narrative boundaries.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           title: { type: "string", description: "Title for the new scene" },
@@ -851,7 +851,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "session_end",
       description: "End the current session. Runs scene transition + writes session recap.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           title: { type: "string", description: "Title for the session ending" },
@@ -869,7 +869,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "context_refresh",
       description: "Refresh the DM's context: re-read campaign log, session recap, rebuild active state. Use when context feels stale.",
-      input_schema: { type: "object" as const, properties: {} },
+      inputSchema: { type: "object" as const, properties: {} },
     },
     handler: (_state) => {
       return ok(JSON.stringify({ type: "context_refresh" }));
@@ -881,7 +881,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "rollback",
       description: "Roll back game state to a previous checkpoint. Available in OOC mode. Targets: 'last', 'scene:Title', 'session:N', 'exchanges_ago:N', or a commit hash.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           target: { type: "string", description: "Rollback target: 'last', 'scene:Title', 'session:N', 'exchanges_ago:N', or commit hash" },
@@ -898,7 +898,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "search_campaign",
       description: "Search across all campaign files — entities, scene summaries, transcripts, session recaps, and logs. A search subagent greps, reads, and cross-references results, returning terse excerpts with [[wikilinks]] to sources. Use when you need to recall details that aren't in your current context.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           query: { type: "string", description: "What to search for — entity names, events, plot details, keywords" },
@@ -921,7 +921,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "search_content",
       description: "Search the game system's content library — monsters, spells, equipment, rules, etc. A search subagent queries faceted indexes by mechanical properties (CR, level, type, rarity) and returns matching entities with key stats. Use when you need to find entities by game-mechanical criteria.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           query: { type: "string", description: "What to search for — e.g. 'CR 8-12 dragons', 'level 3 evocation spells', 'heavy weapons'" },
@@ -944,7 +944,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "scribe",
       description: "Record game state changes — entity creation, updates, character sheet changes, changelogs. Batch multiple updates together. Each update is tagged private (DM-only: NPC secrets, plot notes, faction intel) or player-facing (PC sheets, public info the player can see). A subagent handles all entity file mechanics.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           updates: {
@@ -990,7 +990,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "dm_notes",
       description: "Read or write your private campaign-scope DM notes. This is your persistent scratchpad — use it for secrets, plot plans, NPC motivations, player observations, or anything you want to survive across scenes and context windows. Notes are always visible in your prefix.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           action: { type: "string", enum: ["read", "write"], description: "Read current notes or write new ones" },
@@ -1018,7 +1018,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "resolve_turn",
       description: "Resolve a combat action mechanically. Handles multi-step turns (Extra Attack, bonus actions, reactions, conditional abilities like Divine Smite). Returns structured results with dice rolls, damage, HP changes, and conditions. Use for complex combat actions; use roll_dice directly for simple one-off checks.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           actor: { type: "string", description: "Who is acting" },
@@ -1038,7 +1038,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "promote_character",
       description: "Level up or update a character sheet. Use for level-ups, class feature changes, or stat corrections. Spawns a specialist subagent that reads the current sheet and rules, then produces an updated sheet with changelog.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           character: { type: "string", description: "Character name (must match an existing character file, or a new one will be created)" },
@@ -1064,7 +1064,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "manage_objectives",
       description: "Manage long-term objectives (quests, missions, goals that span multiple scenes). Objectives are player-facing — they represent goals the characters are actively pursuing and will appear in game context. Use alarms to set deadlines or trigger events tied to objectives. For hidden DM goals or secrets, use DM notes and alarms instead. Actions: create | update | complete | fail | abandon | list.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           action: { type: "string", enum: ["create", "update", "complete", "fail", "abandon", "list"] },

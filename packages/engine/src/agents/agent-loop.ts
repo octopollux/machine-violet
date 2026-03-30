@@ -1,18 +1,40 @@
-import type Anthropic from "@anthropic-ai/sdk";
 import type { ToolRegistry, ToolResult } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
-import {
-  runAgentLoop,
-  TUI_TOOLS,
-  stampToolsCacheControl,
-} from "./agent-session.js";
+import { runProviderLoop } from "../providers/agent-loop-bridge.js";
+import type { LLMProvider, NormalizedMessage, SystemBlock } from "../providers/types.js";
 
-// --- Types (canonical definitions, re-exported for backward compatibility) ---
+// --- TUI tools ---
 
-export type ModelId = "claude-opus-4-6" | "claude-sonnet-4-6" | "claude-sonnet-4-5-20250929" | "claude-haiku-4-5-20251001";
+export const TUI_TOOLS = new Set([
+  "update_modeline",
+  "set_theme",
+  "style_scene",
+  "set_display_resources",
+  "set_resource_values",
+  "present_choices",
+  "present_roll",
+  "show_character_sheet",
+  "enter_ooc",
+  "scene_transition",
+  "session_end",
+  "context_refresh",
+  "scribe",
+  "dm_notes",
+  "promote_character",
+]);
+
+export function isTuiCommand(toolName: string): boolean {
+  return TUI_TOOLS.has(toolName);
+}
+
+// --- Types (canonical definitions) ---
+
+export type ModelId = string;
 
 export interface AgentLoopConfig {
   model: ModelId;
+  /** LLM provider to use. */
+  provider: LLMProvider;
   maxTokens: number;
   maxToolRounds: number;
   /** Effort level. Omit to auto-resolve from agent name. */
@@ -30,8 +52,6 @@ export interface AgentLoopConfig {
   onComplete?: (usage: UsageStats) => void;
   /** Called on error */
   onError?: (error: Error) => void;
-  /** Called when a retryable error triggers a backoff wait */
-  onRetry?: (status: number, delayMs: number) => void;
 }
 
 import type { UsageStats, TuiCommand } from "@machine-violet/shared/types/engine.js";
@@ -51,11 +71,8 @@ export interface AgentLoopResult {
    * Normally ends with the final assistant message, but when `truncated` is
    * true it may end with a user tool_result instead.
    */
-  roundMessages: Anthropic.MessageParam[];
+  roundMessages: NormalizedMessage[];
 }
-
-// Re-export stampToolsCacheControl from agent-session for backward compatibility
-export { stampToolsCacheControl };
 
 // --- Agent Loop ---
 
@@ -64,35 +81,14 @@ export { stampToolsCacheControl };
  * handle tool_use blocks, loop until end_turn or max rounds.
  */
 export async function agentLoop(
-  client: Anthropic,
-  systemPrompt: string | Anthropic.TextBlockParam[],
-  messages: Anthropic.MessageParam[],
+  provider: LLMProvider,
+  systemPrompt: string | SystemBlock[],
+  messages: NormalizedMessage[],
   registry: ToolRegistry,
   gameState: GameState,
   config: AgentLoopConfig,
 ): Promise<AgentLoopResult> {
-  const asyncHandler = config.asyncToolHandler;
-  return runAgentLoop(client, systemPrompt, messages, {
-    name: "dm",
-    model: config.model,
-    maxTokens: config.maxTokens,
-    maxToolRounds: config.maxToolRounds,
-    effort: config.effort,
-    stream: false,
-    tools: registry.getDefinitions(),
-    toolHandler: asyncHandler
-      ? async (name, input) => (await asyncHandler(name, input)) ?? registry.dispatch(gameState, name, input)
-      : (name, input) => registry.dispatch(gameState, name, input),
-    retry: true,
-    cacheTools: true,
-    tuiToolNames: TUI_TOOLS,
-    onTextDelta: config.onTextDelta,
-    onToolStart: config.onToolStart,
-    onToolEnd: config.onToolEnd,
-    onComplete: config.onComplete,
-    onError: config.onError,
-    onRetry: config.onRetry,
-  });
+  return runAgentLoopInternal(provider, systemPrompt, messages, registry, gameState, config, false);
 }
 
 // --- Streaming variant ---
@@ -102,34 +98,60 @@ export async function agentLoop(
  * Text deltas are emitted via onTextDelta as they arrive.
  */
 export async function agentLoopStreaming(
-  client: Anthropic,
-  systemPrompt: string | Anthropic.TextBlockParam[],
-  messages: Anthropic.MessageParam[],
+  provider: LLMProvider,
+  systemPrompt: string | SystemBlock[],
+  messages: NormalizedMessage[],
   registry: ToolRegistry,
   gameState: GameState,
   config: AgentLoopConfig,
 ): Promise<AgentLoopResult> {
+  return runAgentLoopInternal(provider, systemPrompt, messages, registry, gameState, config, true);
+}
+
+// --- Internal ---
+
+async function runAgentLoopInternal(
+  provider: LLMProvider,
+  systemPrompt: string | SystemBlock[],
+  messages: NormalizedMessage[],
+  registry: ToolRegistry,
+  gameState: GameState,
+  config: AgentLoopConfig,
+  stream: boolean,
+): Promise<AgentLoopResult> {
   const asyncHandler = config.asyncToolHandler;
-  return runAgentLoop(client, systemPrompt, messages, {
+  const toolHandler = asyncHandler
+    ? async (name: string, input: Record<string, unknown>) => (await asyncHandler(name, input)) ?? registry.dispatch(gameState, name, input)
+    : (name: string, input: Record<string, unknown>) => registry.dispatch(gameState, name, input);
+
+  const result = await runProviderLoop(provider, systemPrompt, messages, {
     name: "dm",
     model: config.model,
     maxTokens: config.maxTokens,
     maxToolRounds: config.maxToolRounds,
     effort: config.effort,
-    stream: true,
+    stream,
     tools: registry.getDefinitions(),
-    toolHandler: asyncHandler
-      ? async (name, input) => (await asyncHandler(name, input)) ?? registry.dispatch(gameState, name, input)
-      : (name, input) => registry.dispatch(gameState, name, input),
-    retry: true,
-    cacheTools: true,
+    toolHandler,
+    cacheHints: [{ target: "tools", ttl: "1h" }],
     tuiToolNames: TUI_TOOLS,
     onTextDelta: config.onTextDelta,
     onToolStart: config.onToolStart,
     onToolEnd: config.onToolEnd,
     onComplete: config.onComplete,
     onError: config.onError,
-    onRetry: config.onRetry,
   });
-}
 
+  return {
+    text: result.text,
+    tuiCommands: result.tuiCommands,
+    usage: {
+      inputTokens: result.usage.inputTokens,
+      outputTokens: result.usage.outputTokens,
+      cacheReadTokens: result.usage.cacheReadTokens,
+      cacheCreationTokens: result.usage.cacheCreationTokens,
+    },
+    truncated: result.truncated,
+    roundMessages: result.roundMessages,
+  };
+}

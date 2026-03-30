@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider, NormalizedTool } from "../../providers/types.js";
 import { spawnSubagent, cacheSystemPrompt } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import type { UsageStats } from "../agent-loop.js";
@@ -25,11 +25,11 @@ export interface SearchCampaignResult {
 
 // --- Search tools given to the subagent ---
 
-const SEARCH_TOOLS: Anthropic.Tool[] = [
+const SEARCH_TOOLS: NormalizedTool[] = [
   {
     name: "grep_campaign",
     description: "Search all campaign files for a pattern (case-insensitive). Returns matching lines with file path and line number context. Use this first to find relevant content.",
-    input_schema: {
+    inputSchema: {
       type: "object" as const,
       properties: {
         pattern: {
@@ -48,7 +48,7 @@ const SEARCH_TOOLS: Anthropic.Tool[] = [
   {
     name: "read_campaign_file",
     description: "Read the full content of a specific campaign file by its relative path (as returned by grep_campaign).",
-    input_schema: {
+    inputSchema: {
       type: "object" as const,
       properties: {
         path: {
@@ -190,7 +190,7 @@ export function buildSearchToolHandler(
  * to search and cross-reference.
  */
 export async function searchCampaign(
-  client: Anthropic,
+  provider: LLMProvider,
   input: SearchCampaignInput,
   fileIO: FileIO,
 ): Promise<SearchCampaignResult> {
@@ -205,7 +205,7 @@ export async function searchCampaign(
     input.campaignRoot,
   );
 
-  const result: SubagentResult = await spawnSubagent(client, {
+  const result: SubagentResult = await spawnSubagent(provider, {
     name: "search_campaign",
     model: getModel("small"),
     visibility: "silent",

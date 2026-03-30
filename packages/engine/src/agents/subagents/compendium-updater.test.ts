@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider, ChatResult, NormalizedUsage } from "../../providers/types.js";
 import {
   emptyCompendium,
   filterPlayerTranscript,
@@ -10,34 +10,32 @@ import {
 import { resetPromptCache } from "../../prompts/load-prompt.js";
 import type { Compendium, CompendiumEntry } from "@machine-violet/shared/types/compendium.js";
 
-function mockUsage(): Anthropic.Usage {
-  return { input_tokens: 50, output_tokens: 80, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: null, inference_geo: null, server_tool_use: null, service_tier: null };
+function mockUsage(): NormalizedUsage {
+  return { inputTokens: 50, outputTokens: 80, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 };
 }
 
-function textResponse(text: string): Anthropic.Message {
+function textResult(text: string): ChatResult {
   return {
-    id: "msg_test",
-    type: "message",
-    role: "assistant",
-    model: "claude-haiku-4-5-20251001",
-    content: [{ type: "text", text }],
-    stop_reason: "end_turn",
-    stop_sequence: null,
+    text,
+    toolCalls: [],
     usage: mockUsage(),
-  } as Anthropic.Message;
+    stopReason: "end",
+    assistantContent: [{ type: "text", text }],
+  };
 }
 
-function mockClient(responses: Anthropic.Message[]): Anthropic {
+function mockProvider(responses: ChatResult[]): LLMProvider {
   let callIdx = 0;
   return {
-    messages: {
-      create: vi.fn(async () => responses[callIdx++]),
-      stream: vi.fn(() => ({
-        on: vi.fn(),
-        finalMessage: vi.fn(async () => responses[callIdx++]),
-      })),
-    },
-  } as unknown as Anthropic;
+    providerId: "test",
+    chat: vi.fn(async () => responses[callIdx++]),
+    stream: vi.fn(async (_params, onDelta) => {
+      const result = responses[callIdx++];
+      if (result.text) onDelta(result.text);
+      return result;
+    }),
+    healthCheck: vi.fn(),
+  };
 }
 
 function entry(overrides: Partial<CompendiumEntry> & { name: string; slug: string }): CompendiumEntry {
@@ -205,7 +203,7 @@ describe("renderCompendiumForDM", () => {
   });
 });
 
-// --- updateCompendium (integration with mock client) ---
+// --- updateCompendium (integration with mock provider) ---
 
 describe("updateCompendium", () => {
   it("calls oneShot and parses result", async () => {
@@ -218,9 +216,9 @@ describe("updateCompendium", () => {
       lore: [],
       objectives: [],
     };
-    const client = mockClient([textResponse(JSON.stringify(updated))]);
+    const provider = mockProvider([textResult(JSON.stringify(updated))]);
 
-    const result = await updateCompendium(client, emptyCompendium(), "**DM:** You meet Mira.", 3);
+    const result = await updateCompendium(provider, emptyCompendium(), "**DM:** You meet Mira.", 3);
 
     expect(result.compendium.characters).toHaveLength(1);
     expect(result.compendium.characters[0].name).toBe("Mira");
@@ -230,26 +228,26 @@ describe("updateCompendium", () => {
 
   it("falls back to current compendium on bad output", async () => {
     const current = emptyCompendium();
-    const client = mockClient([textResponse("I don't understand the request")]);
+    const provider = mockProvider([textResult("I don't understand the request")]);
 
-    const result = await updateCompendium(client, current, "**DM:** Hello.", 1);
+    const result = await updateCompendium(provider, current, "**DM:** Hello.", 1);
     expect(result.compendium).toBe(current);
   });
 
   it("passes alias context when provided", async () => {
-    const client = mockClient([textResponse(JSON.stringify(emptyCompendium()))]);
-    await updateCompendium(client, emptyCompendium(), "transcript", 1, "\n\nEntity aliases:\nfoo: Foo");
+    const provider = mockProvider([textResult(JSON.stringify(emptyCompendium()))]);
+    await updateCompendium(provider, emptyCompendium(), "transcript", 1, "\n\nEntity aliases:\nfoo: Foo");
 
-    const call = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const call = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(call.messages[0].content).toContain("Entity aliases");
   });
 
   it("filters tool results from transcript before sending", async () => {
-    const client = mockClient([textResponse(JSON.stringify(emptyCompendium()))]);
+    const provider = mockProvider([textResult(JSON.stringify(emptyCompendium()))]);
     const transcript = '**DM:** Hello.\n> `roll_dice`: 2d6: [3,4]→7\n**Player:** Hi.';
-    await updateCompendium(client, emptyCompendium(), transcript, 1);
+    await updateCompendium(provider, emptyCompendium(), transcript, 1);
 
-    const call = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const call = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(call.messages[0].content).not.toContain("> `roll_dice`");
     expect(call.messages[0].content).toContain("**DM:** Hello.");
   });

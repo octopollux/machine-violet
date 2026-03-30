@@ -51,6 +51,13 @@ export class TurnManager {
     return turn;
   }
 
+  /** Cancel the current open turn (e.g., when a choice modal supersedes it). */
+  cancelTurn(): void {
+    if (this.currentTurn && this.currentTurn.status === "open") {
+      this.currentTurn = null;
+    }
+  }
+
   /** Add a contribution to the current turn. Returns the contribution. */
   contribute(playerId: string, text: string, source: "client" | "engine" = "client"): TurnContribution {
     const turn = this.currentTurn;

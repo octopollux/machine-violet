@@ -1,37 +1,35 @@
 import { describe, it, expect, vi } from "vitest";
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider, ChatResult, NormalizedUsage } from "../../providers/types.js";
 import type { PlayerConfig } from "@machine-violet/shared/types/config.js";
 import { buildAIPlayerPrompt, aiPlayerTurn } from "./ai-player.js";
 import type { AIPlayerContext } from "./ai-player.js";
 
-function mockUsage(): Anthropic.Usage {
-  return { input_tokens: 50, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: null, inference_geo: null, server_tool_use: null, service_tier: null };
+function mockUsage(): NormalizedUsage {
+  return { inputTokens: 50, outputTokens: 20, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 };
 }
 
-function textResponse(text: string): Anthropic.Message {
+function textResult(text: string): ChatResult {
   return {
-    id: "msg_test",
-    type: "message",
-    role: "assistant",
-    model: "claude-haiku-4-5-20251001",
-    content: [{ type: "text", text }],
-    stop_reason: "end_turn",
-    stop_sequence: null,
+    text,
+    toolCalls: [],
     usage: mockUsage(),
-  } as Anthropic.Message;
+    stopReason: "end",
+    assistantContent: [{ type: "text", text }],
+  };
 }
 
-function mockClient(responses: Anthropic.Message[]): Anthropic {
+function mockProvider(responses: ChatResult[]): LLMProvider {
   let callIdx = 0;
   return {
-    messages: {
-      create: vi.fn(async () => responses[callIdx++]),
-      stream: vi.fn(() => ({
-        on: vi.fn(),
-        finalMessage: vi.fn(async () => responses[callIdx++]),
-      })),
-    },
-  } as unknown as Anthropic;
+    providerId: "test",
+    chat: vi.fn(async () => responses[callIdx++]),
+    stream: vi.fn(async (_params, onDelta) => {
+      const result = responses[callIdx++];
+      if (result.text) onDelta(result.text);
+      return result;
+    }),
+    healthCheck: vi.fn(),
+  };
 }
 
 function makePlayer(overrides?: Partial<PlayerConfig>): PlayerConfig {
@@ -80,38 +78,38 @@ describe("buildAIPlayerPrompt", () => {
 
 describe("aiPlayerTurn", () => {
   it("returns trimmed action", async () => {
-    const client = mockClient([textResponse("  I swing my sword at the goblin.  ")]);
-    const result = await aiPlayerTurn(client, makeContext());
+    const provider = mockProvider([textResult("  I swing my sword at the goblin.  ")]);
+    const result = await aiPlayerTurn(provider, makeContext());
     expect(result.action).toBe("I swing my sword at the goblin.");
   });
 
   it("uses fallback when recentNarration is empty", async () => {
-    const client = mockClient([textResponse("I look around.")]);
-    await aiPlayerTurn(client, makeContext({ recentNarration: "" }));
+    const provider = mockProvider([textResult("I look around.")]);
+    await aiPlayerTurn(provider, makeContext({ recentNarration: "" }));
 
-    const call = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const call = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(call.messages[0].content).toBe("It's your turn. What do you do?");
   });
 
   it("defaults to small model (haiku)", async () => {
-    const client = mockClient([textResponse("Action.")]);
-    await aiPlayerTurn(client, makeContext());
+    const provider = mockProvider([textResult("Action.")]);
+    await aiPlayerTurn(provider, makeContext());
 
-    const call = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const call = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(call.model).toContain("haiku");
   });
 
   it("uses medium model for sonnet players", async () => {
-    const client = mockClient([textResponse("Action.")]);
-    await aiPlayerTurn(client, makeContext({ player: makePlayer({ model: "sonnet" }) }));
+    const provider = mockProvider([textResult("Action.")]);
+    await aiPlayerTurn(provider, makeContext({ player: makePlayer({ model: "sonnet" }) }));
 
-    const call = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const call = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(call.model).toContain("sonnet");
   });
 
   it("returns usage stats", async () => {
-    const client = mockClient([textResponse("Done.")]);
-    const result = await aiPlayerTurn(client, makeContext());
+    const provider = mockProvider([textResult("Done.")]);
+    const result = await aiPlayerTurn(provider, makeContext());
     expect(result.usage.inputTokens).toBe(50);
     expect(result.usage.outputTokens).toBe(20);
   });

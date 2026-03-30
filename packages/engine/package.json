@@ -12,15 +12,16 @@
     "start": "node --max-semi-space-size=16 dist/index.js"
   },
   "dependencies": {
-    "@machine-violet/shared": "*",
     "@anthropic-ai/sdk": "^0.79.0",
-    "@sinclair/typebox": "^0.34.0",
     "@fastify/cors": "^11.0.0",
     "@fastify/websocket": "^11.0.0",
+    "@machine-violet/shared": "*",
+    "@sinclair/typebox": "^0.34.0",
     "dotenv": "^16.4.5",
     "fastify": "^5.3.0",
     "fflate": "^0.8.2",
     "isomorphic-git": "^1.37.1",
+    "openai": "^6.33.0",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5"
   },

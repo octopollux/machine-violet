@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { GameState } from "./game-state.js";
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider, ChatResult } from "../providers/types.js";
 import type { CampaignConfig, PlayerConfig } from "@machine-violet/shared/types/config.js";
 import {
   getActivePlayer,
@@ -17,34 +17,28 @@ import { createObjectivesState } from "../tools/objectives/index.js";
 
 // --- Test Helpers ---
 
-function mockUsage(): Anthropic.Usage {
-  return { input_tokens: 50, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: null, inference_geo: null, server_tool_use: null, service_tier: null };
+function mockUsage() {
+  return { inputTokens: 50, outputTokens: 20, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 };
 }
 
-function textResponse(text: string): Anthropic.Message {
+function textResponse(text: string): ChatResult {
   return {
-    id: "msg_test",
-    type: "message",
-    role: "assistant",
-    model: "claude-haiku-4-5-20251001",
-    content: [{ type: "text", text }],
-    stop_reason: "end_turn",
-    stop_sequence: null,
+    text,
+    toolCalls: [],
     usage: mockUsage(),
-  } as Anthropic.Message;
+    stopReason: "end",
+    assistantContent: [{ type: "text", text }],
+  };
 }
 
-function mockClient(responses: Anthropic.Message[]): Anthropic {
+function mockProvider(responses: ChatResult[]): LLMProvider {
   let callIdx = 0;
   return {
-    messages: {
-      create: vi.fn(async () => responses[callIdx++]),
-      stream: vi.fn(() => ({
-        on: vi.fn(),
-        finalMessage: vi.fn(async () => responses[callIdx++]),
-      })),
-    },
-  } as unknown as Anthropic;
+    providerId: "mock",
+    chat: vi.fn(async () => responses[callIdx++]),
+    stream: vi.fn(async () => responses[callIdx++]),
+    healthCheck: vi.fn(async () => ({ ok: true })),
+  } as unknown as LLMProvider;
 }
 
 const humanPlayer: PlayerConfig = {
@@ -287,11 +281,11 @@ describe("buildAIPlayerPrompt", () => {
 
 describe("aiPlayerTurn", () => {
   it("invokes Haiku and returns action text", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       textResponse("I check the shadows near the doorway for traps."),
     ]);
 
-    const result = await aiPlayerTurn(client, {
+    const result = await aiPlayerTurn(provider, {
       player: aiPlayer,
       characterSheet: "Rook - Rogue, DEX +3, Perception +5",
       recentNarration: "The party enters a dusty chamber. Cobwebs hang from the ceiling.",
@@ -303,11 +297,11 @@ describe("aiPlayerTurn", () => {
   });
 
   it("trims whitespace from response", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       textResponse("  I swing my blade.  \n"),
     ]);
 
-    const result = await aiPlayerTurn(client, {
+    const result = await aiPlayerTurn(provider, {
       player: aiPlayer,
       characterSheet: "stats",
       recentNarration: "Your turn.",
@@ -339,13 +333,13 @@ describe("buildOOCPrompt", () => {
 
 describe("enterOOC", () => {
   it("spawns player-facing Sonnet subagent", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       textResponse("Grappling works as a contested Athletics check. The grappler rolls STR(Athletics) against the target's STR(Athletics) or DEX(Acrobatics)."),
     ]);
 
     const onStream = vi.fn();
     const result = await enterOOC(
-      client,
+      provider,
       "How does grappling work?",
       {
         campaignName: "Test Campaign",
@@ -355,17 +349,17 @@ describe("enterOOC", () => {
     );
 
     // Uses stream for player-facing
-    expect(client.messages.stream).toHaveBeenCalled();
+    expect(provider.stream).toHaveBeenCalled();
     expect(result.summary).toBeTruthy();
     expect(result.snapshot.previousVariant).toBe("exploration");
     expect(result.usage.inputTokens).toBe(50);
   });
 
   it("preserves snapshot state", async () => {
-    const client = mockClient([textResponse("Sure thing.")]);
+    const provider = mockProvider([textResponse("Sure thing.")]);
 
     const result = await enterOOC(
-      client,
+      provider,
       "Quick question",
       {
         campaignName: "Test",
@@ -379,11 +373,11 @@ describe("enterOOC", () => {
   });
 
   it("extracts terse summary from response", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       textResponse("The player asked about grappling rules. I explained the contested Athletics check mechanic."),
     ]);
 
-    const result = await enterOOC(client, "grappling?", {
+    const result = await enterOOC(provider, "grappling?", {
       campaignName: "Test",
       previousVariant: "exploration",
     });

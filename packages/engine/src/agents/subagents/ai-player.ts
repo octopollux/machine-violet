@@ -1,4 +1,4 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider } from "../../providers/types.js";
 import type { PlayerConfig } from "@machine-violet/shared/types/config.js";
 import { spawnSubagent } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
@@ -59,7 +59,7 @@ export function buildAIPlayerPrompt(ctx: AIPlayerContext): string {
  * Uses the player's configured model (default: Haiku for cost efficiency).
  */
 export async function aiPlayerTurn(
-  client: Anthropic,
+  provider: LLMProvider,
   ctx: AIPlayerContext,
 ): Promise<AIPlayerResult> {
   const lookup = MODEL_MAP[ctx.player.model ?? "haiku"] ?? MODEL_MAP.haiku;
@@ -70,7 +70,7 @@ export async function aiPlayerTurn(
 
   // AI player prompts are fully dynamic (character sheet + situation change every call),
   // so we skip system prompt caching to avoid paying the cache-write surcharge with no reuse.
-  const result = await spawnSubagent(client, {
+  const result = await spawnSubagent(provider, {
     name: "ai-player",
     model,
     visibility: "silent",

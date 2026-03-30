@@ -1,5 +1,3 @@
-import Anthropic from "@anthropic-ai/sdk";
-import type { UsageStats } from "../agent-loop.js";
 import type { SubagentResult } from "../subagent.js";
 import type { SetupResult } from "../setup-agent.js";
 import { generateThemeColor } from "../setup-agent.js";
@@ -7,8 +5,7 @@ import { PERSONALITIES } from "../../config/personalities.js";
 import { SEEDS } from "../../config/seeds.js";
 import { KNOWN_SYSTEMS, readChargenSection } from "../../config/systems.js";
 import type { SystemComplexity } from "../../config/systems.js";
-import { getModel, getEffortConfig } from "../../config/models.js";
-import { accumulateUsage as accRawUsage } from "../../context/usage-helpers.js";
+import { getEffortConfig } from "../../config/models.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import { dumpContext, dumpThinking } from "../../config/context-dump.js";
@@ -17,7 +14,11 @@ import {
   RETRYABLE_STATUS,
   retryDelay,
   sleep,
-} from "../agent-session.js";
+} from "../../utils/retry.js";
+import type {
+  LLMProvider, ChatParams, ChatResult,
+  NormalizedMessage, NormalizedTool, NormalizedUsage,
+} from "../../providers/types.js";
 
 // --- Types ---
 
@@ -45,12 +46,12 @@ export interface SetupConversation {
 
 // --- Tool definitions ---
 
-const FINALIZE_TOOL: Anthropic.Tool = {
+const FINALIZE_TOOL: NormalizedTool = {
   name: "finalize_setup",
   description:
     "Call this when you have gathered enough information to create the campaign. " +
     "All fields are required. Infer reasonable defaults for anything the player didn't specify.",
-  input_schema: {
+  inputSchema: {
     type: "object" as const,
     properties: {
       genre: { type: "string", description: "Genre (e.g. 'Classic fantasy', 'Sci-fi', 'Modern supernatural')" },
@@ -74,7 +75,7 @@ const FINALIZE_TOOL: Anthropic.Tool = {
   },
 };
 
-const PRESENT_CHOICES_TOOL: Anthropic.Tool = {
+const PRESENT_CHOICES_TOOL: NormalizedTool = {
   name: "present_choices",
   description:
     "Present the player with a set of structured choices in a selection modal. " +
@@ -83,7 +84,7 @@ const PRESENT_CHOICES_TOOL: Anthropic.Tool = {
     "You can include a short text message before calling this tool to give context. " +
     "If a choice needs explanation, provide a descriptions array (same length as choices) — " +
     "the description for the highlighted choice is shown in a preview region.",
-  input_schema: {
+  inputSchema: {
     type: "object" as const,
     properties: {
       prompt: { type: "string", description: "Short prompt shown above the choices (e.g. 'What kind of world?')" },
@@ -167,16 +168,20 @@ const SYSTEM_PROMPT = buildSystemPrompt();
  * Stream an API call with exponential backoff retry on transient errors.
  */
 async function streamWithRetry(
-  client: Anthropic,
-  params: Omit<Anthropic.MessageCreateParams, "stream">,
+  provider: LLMProvider,
+  params: ChatParams,
   onDelta: (delta: string) => void,
-): Promise<Anthropic.Message> {
+): Promise<ChatResult> {
   for (let attempt = 0; ; attempt++) {
     try {
-      dumpContext("setup", params);
-      const stream = client.messages.stream(params);
-      stream.on("text", (delta) => { onDelta(delta); });
-      return await stream.finalMessage();
+      dumpContext("setup", {
+        model: params.model,
+        max_tokens: params.maxTokens,
+        system: params.systemPrompt,
+        tools: params.tools,
+        messages: params.messages,
+      });
+      return await provider.stream(params, onDelta);
     } catch (e) {
       const status = extractStatus(e);
       if (status === null || !RETRYABLE_STATUS.has(status)) {
@@ -209,13 +214,14 @@ export function resolveSystemSlug(raw: string): string {
   return slugified || raw;
 }
 
-export function createSetupConversation(client: Anthropic): SetupConversation {
-  const messages: Anthropic.MessageParam[] = [];
-  const totalUsage: UsageStats = {
+export function createSetupConversation(provider: LLMProvider, model: string): SetupConversation {
+  const messages: NormalizedMessage[] = [];
+  const totalUsage: NormalizedUsage = {
     inputTokens: 0,
     outputTokens: 0,
     cacheReadTokens: 0,
     cacheCreationTokens: 0,
+    reasoningTokens: 0,
   };
 
   let finalized: SetupResult | undefined;
@@ -265,70 +271,61 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
     pendingToolUseId = null;
 
     const ec = getEffortConfig("setup");
-    const model = getModel("medium");
-    const isOpus = model.includes("opus");
-    const thinkingParam = ec.effort
-      ? { type: "adaptive" as const }
-      : { type: "disabled" as const };
-    const outputConfig = ec.effort && isOpus ? { effort: ec.effort } : undefined;
+    const thinking = ec.effort ? { effort: ec.effort } : undefined;
 
-    let lastParams = {
+    let lastParams: ChatParams = {
       model,
-      max_tokens: TOKEN_LIMITS.SUBAGENT_LARGE,
-      system: SYSTEM_PROMPT,
+      maxTokens: TOKEN_LIMITS.SUBAGENT_LARGE,
+      systemPrompt: SYSTEM_PROMPT,
       messages,
       tools: TOOLS,
-      thinking: thinkingParam,
-      ...(outputConfig ? { output_config: outputConfig } : {}),
+      thinking,
     };
 
-    const response = await streamWithRetry(client, lastParams, onDelta);
+    const result = await streamWithRetry(provider, lastParams, onDelta);
 
-    accRawUsage(totalUsage, response.usage);
+    // Accumulate usage
+    totalUsage.inputTokens += result.usage.inputTokens;
+    totalUsage.outputTokens += result.usage.outputTokens;
+    totalUsage.cacheReadTokens += result.usage.cacheReadTokens;
+    totalUsage.cacheCreationTokens += result.usage.cacheCreationTokens;
+    totalUsage.reasoningTokens += result.usage.reasoningTokens;
 
-    // Process content blocks
-    let text = "";
-    const toolResults: Anthropic.ToolResultBlockParam[] = [];
+    // Process tool calls from normalized result
+    let text = result.text;
+    const toolResults: NormalizedMessage["content"] = [];
     let pendingChoices: { prompt: string; choices: string[]; descriptions?: string[] } | undefined;
 
-    for (const block of response.content) {
-      if (block.type === "text") {
-        text += block.text;
-      } else if (block.type === "tool_use") {
-        if (block.name === "present_choices") {
-          // Don't resolve immediately — pause and return to the app for player input
-          const input = block.input as { prompt?: string; choices?: unknown; descriptions?: unknown };
-          const rawChoices = Array.isArray(input.choices) ? input.choices : [];
-          const choices = rawChoices.map((c: unknown) => typeof c === "string" ? c : String(c));
-          const rawDescs = Array.isArray(input.descriptions) ? input.descriptions : [];
-          const descriptions = rawDescs.length > 0
-            ? rawDescs.map((d: unknown) => typeof d === "string" ? d : String(d))
-            : undefined;
-          pendingChoices = { prompt: input.prompt ?? "Choose:", choices, descriptions };
-          pendingToolUseId = block.id;
-        } else if (block.name === "finalize_setup") {
-          handleFinalize(block.input as Record<string, unknown>);
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: block.id,
-            content: "Setup finalized. Say a brief farewell to the player before the adventure begins.",
-          });
-        }
+    for (const tc of result.toolCalls) {
+      if (tc.name === "present_choices") {
+        // Don't resolve immediately — pause and return to the app for player input
+        const input = tc.input as { prompt?: string; choices?: unknown; descriptions?: unknown };
+        const rawChoices = Array.isArray(input.choices) ? input.choices : [];
+        const choices = rawChoices.map((c: unknown) => typeof c === "string" ? c : String(c));
+        const rawDescs = Array.isArray(input.descriptions) ? input.descriptions : [];
+        const descriptions = rawDescs.length > 0
+          ? rawDescs.map((d: unknown) => typeof d === "string" ? d : String(d))
+          : undefined;
+        pendingChoices = { prompt: input.prompt ?? "Choose:", choices, descriptions };
+        pendingToolUseId = tc.id;
+      } else if (tc.name === "finalize_setup") {
+        handleFinalize(tc.input);
+        (toolResults as { type: "tool_result"; tool_use_id: string; content: string }[]).push({
+          type: "tool_result",
+          tool_use_id: tc.id,
+          content: "Setup finalized. Say a brief farewell to the player before the adventure begins.",
+        });
       }
     }
 
-    // Dump + strip thinking blocks — they must not be sent back in conversation history
-    const thinkingText = response.content
-      .filter((b): b is Anthropic.ThinkingBlock => b.type === "thinking")
-      .map((b) => b.thinking)
-      .join("\n");
-    if (thinkingText) dumpThinking("setup", 0, thinkingText);
-    const filtered = response.content.filter((b) => b.type !== "thinking");
-    messages.push({ role: "assistant", content: filtered });
+    // Dump thinking
+    if (result.thinkingText) dumpThinking("setup", 0, result.thinkingText);
+
+    // Append assistant message (thinking already stripped by provider)
+    messages.push({ role: "assistant", content: result.assistantContent });
 
     // If we have pending choices, return now — app will call resolveChoice later
     if (pendingChoices) {
-      dumpContext("setup", lastParams);
       return {
         text,
         usage: { ...totalUsage },
@@ -337,39 +334,29 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
     }
 
     // If finalize was called, send tool result and get farewell text
-    if (toolResults.length > 0) {
+    if ((toolResults as unknown[]).length > 0) {
       messages.push({ role: "user", content: toolResults });
 
       lastParams = {
         model,
-        max_tokens: TOKEN_LIMITS.SUBAGENT_MEDIUM,
-        system: SYSTEM_PROMPT,
+        maxTokens: TOKEN_LIMITS.SUBAGENT_MEDIUM,
+        systemPrompt: SYSTEM_PROMPT,
         messages,
         tools: TOOLS,
-        thinking: thinkingParam,
-        ...(outputConfig ? { output_config: outputConfig } : {}),
+        thinking,
       };
-      const followUpMsg = await streamWithRetry(client, lastParams, onDelta);
+      const followUp = await streamWithRetry(provider, lastParams, onDelta);
 
-      accRawUsage(totalUsage, followUpMsg.usage);
+      totalUsage.inputTokens += followUp.usage.inputTokens;
+      totalUsage.outputTokens += followUp.usage.outputTokens;
+      totalUsage.cacheReadTokens += followUp.usage.cacheReadTokens;
+      totalUsage.cacheCreationTokens += followUp.usage.cacheCreationTokens;
+      totalUsage.reasoningTokens += followUp.usage.reasoningTokens;
 
-      for (const block of followUpMsg.content) {
-        if (block.type === "text") {
-          text += block.text;
-        }
-      }
-
-      const followUpThinking = followUpMsg.content
-        .filter((b): b is Anthropic.ThinkingBlock => b.type === "thinking")
-        .map((b) => b.thinking)
-        .join("\n");
-      if (followUpThinking) dumpThinking("setup", 1, followUpThinking);
-      const filteredFollowUp = followUpMsg.content.filter((b) => b.type !== "thinking");
-      messages.push({ role: "assistant", content: filteredFollowUp });
+      text += followUp.text;
+      if (followUp.thinkingText) dumpThinking("setup", 1, followUp.thinkingText);
+      messages.push({ role: "assistant", content: followUp.assistantContent });
     }
-
-    // Final context dump captures all thinking traces
-    dumpContext("setup", lastParams);
 
     return {
       text,
@@ -391,7 +378,7 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
         messages.push({
           role: "user",
           content: [{
-            type: "tool_result",
+            type: "tool_result" as const,
             tool_use_id: pendingToolUseId,
             content: `The player dismissed the choices and instead wrote: "${text}"`,
           }],
@@ -412,7 +399,7 @@ export function createSetupConversation(client: Anthropic): SetupConversation {
       messages.push({
         role: "user",
         content: [{
-          type: "tool_result",
+          type: "tool_result" as const,
           tool_use_id: pendingToolUseId,
           content: `The player selected: "${selectedText}"`,
         }],

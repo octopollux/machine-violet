@@ -1,4 +1,4 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider } from "../../providers/types.js";
 import type { GameState } from "../game-state.js";
 import type { FileIO } from "../scene-manager.js";
 import type { UsageStats } from "../agent-loop.js";
@@ -159,7 +159,7 @@ export function parseGeneratedEntities(output: string): { filePath: string; cont
  * identifying entities without files, and generating stubs via Haiku.
  */
 export async function repairState(
-  client: Anthropic,
+  provider: LLMProvider,
   gameState: GameState,
   fileIO: FileIO,
   dryRun: boolean,
@@ -230,7 +230,7 @@ export async function repairState(
 
     try {
       const genResult = await oneShot(
-        client,
+        provider,
         getModel("small"),
         systemPrompt,
         lines.join("\n"),

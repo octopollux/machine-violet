@@ -8,27 +8,30 @@
  * When the setup agent calls finalize_setup, the server scaffolds
  * the campaign directory and optionally builds the initial character sheet.
  */
-import Anthropic from "@anthropic-ai/sdk";
 import type { ServerEvent } from "@machine-violet/shared";
 import { createSetupConversation } from "../agents/subagents/setup-conversation.js";
 import type { SetupConversation, SetupTurnResult } from "../agents/subagents/setup-conversation.js";
 import type { SetupResult } from "../agents/setup-agent.js";
 // buildCampaignConfig is used internally by buildCampaignWorld
 import { buildCampaignWorld } from "../agents/world-builder.js";
-import { createClient } from "../config/client.js";
 import { createBaseFileIO } from "./fileio.js";
 import type { FileIO } from "../agents/scene-manager.js";
-import { norm } from "../utils/paths.js";
+import { norm, configDir } from "../utils/paths.js";
 import { slugify } from "../agents/world-builder.js";
 import { campaignPaths } from "../tools/filesystem/scaffold.js";
 import { parseFrontMatter, serializeEntity } from "../tools/filesystem/frontmatter.js";
 import { promoteCharacter } from "../agents/subagents/character-promotion.js";
 import { processingPaths } from "../config/processing-paths.js";
 import { readBundledRuleCard } from "../config/systems.js";
+import { loadConnectionStore, buildEffectiveConnections, getTierProvider } from "../config/connections.js";
+import { createProviderFromConnection, createAnthropicProvider } from "../providers/index.js";
+import type { LLMProvider } from "../providers/types.js";
+import { getModel } from "../config/models.js";
 
 export class SetupSession {
   private conversation: SetupConversation | null = null;
-  private client: Anthropic;
+  private provider: LLMProvider;
+  private model: string;
   private broadcast: (event: ServerEvent) => void;
   private campaignsDir: string;
   private homeDir: string;
@@ -43,13 +46,26 @@ export class SetupSession {
     this.campaignsDir = campaignsDir;
     this.homeDir = homeDir;
     this.broadcast = broadcast;
-    this.client = createClient();
     this.fileIO = createBaseFileIO();
+
+    // Resolve medium tier from connections (same path as gameplay uses for large)
+    const appConfigDir = configDir();
+    const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
+    const mediumTier = getTierProvider(connStore, "medium");
+
+    if (mediumTier) {
+      this.provider = createProviderFromConnection(mediumTier.connection);
+      this.model = mediumTier.modelId;
+    } else {
+      // Fallback: Anthropic from env key with default medium model
+      this.provider = createAnthropicProvider();
+      this.model = getModel("medium");
+    }
   }
 
   /** Start the setup conversation. Streams opening narrative to clients. */
   async start(): Promise<void> {
-    this.conversation = createSetupConversation(this.client);
+    this.conversation = createSetupConversation(this.provider, this.model);
     this.started = true;
 
     const result = await this.conversation.start((delta) => {
@@ -176,7 +192,7 @@ export class SetupSession {
     if (!ruleCard) return;
 
     try {
-      const { updatedSheet } = await promoteCharacter(this.client, {
+      const { updatedSheet } = await promoteCharacter(this.provider, {
         characterSheet: stub,
         systemRules: ruleCard,
         context: `Build initial character sheet: ${result.characterDetails}`,

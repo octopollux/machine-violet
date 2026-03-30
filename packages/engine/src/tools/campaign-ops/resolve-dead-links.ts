@@ -1,4 +1,4 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider } from "../../providers/types.js";
 import type { FileIO } from "../../agents/scene-manager.js";
 import type { UsageStats } from "../../agents/agent-loop.js";
 import { oneShot } from "../../agents/subagent.js";
@@ -171,7 +171,7 @@ export function parseTriageResponse(text: string): TriagedLink[] {
 export async function resolveDeadLinks(
   root: string,
   fileIO: FileIO,
-  client: Anthropic,
+  provider: LLMProvider,
   context: string,
   dryRun = true,
 ): Promise<ResolveDeadLinksResult> {
@@ -262,7 +262,7 @@ export async function resolveDeadLinks(
 
     try {
       const triageResult = await oneShot(
-        client,
+        provider,
         getModel("small"),
         systemPrompt,
         lines.join("\n"),
@@ -346,7 +346,7 @@ export async function resolveDeadLinks(
 
         try {
           const genResult = await oneShot(
-            client,
+            provider,
             getModel("small"),
             genSystemPrompt,
             genLines.join("\n"),

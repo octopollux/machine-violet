@@ -1,4 +1,4 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider } from "../../providers/types.js";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import { getModel } from "../../config/models.js";
@@ -28,12 +28,12 @@ export interface SceneSummaryResult extends SubagentResult {
  * @returns Campaign log entry with full and mini summaries
  */
 export async function summarizeScene(
-  client: Anthropic,
+  provider: LLMProvider,
   transcript: string,
   aliasContext?: string,
 ): Promise<SceneSummaryResult> {
   const result = await oneShot(
-    client,
+    provider,
     getModel("small"),
     SYSTEM_PROMPT,
     `Write a campaign log entry for this scene:\n\n${transcript}${aliasContext ?? ""}`,

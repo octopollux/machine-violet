@@ -1,4 +1,4 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider } from "../../providers/types.js";
 import { oneShot, type SubagentResult } from "../subagent.js";
 import { getModel } from "../../config/models.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
@@ -23,7 +23,7 @@ export interface SceneTrackerResult extends SubagentResult {
  * Never throws — returns undefined fields on failure (callers preserve existing state).
  */
 export async function trackScene(
-  client: Anthropic,
+  provider: LLMProvider,
   recentTranscript: string[],
   currentOpenThreads?: string,
   currentNpcIntents?: string,
@@ -36,7 +36,7 @@ export async function trackScene(
 
   try {
     const result = await oneShot(
-      client,
+      provider,
       getModel("small"),
       SYSTEM_PROMPT,
       parts.join("\n"),

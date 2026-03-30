@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider, ChatResult, SystemBlock } from "../../providers/types.js";
 import { buildOOCPrompt, buildOOCTools, buildOOCToolHandler, enterOOC, parseEndOOCSignal, extractSummary } from "./ooc-mode.js";
 import type { DMSessionState } from "../dm-prompt.js";
 import type { FileIO } from "../scene-manager.js";
@@ -20,34 +20,28 @@ beforeEach(() => {
   resetPromptCache();
 });
 
-function mockUsage(): Anthropic.Usage {
-  return { input_tokens: 50, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: null, inference_geo: null, server_tool_use: null, service_tier: null };
+function mockUsage() {
+  return { inputTokens: 50, outputTokens: 20, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 };
 }
 
-function textResponse(text: string): Anthropic.Message {
+function textResponse(text: string): ChatResult {
   return {
-    id: "msg_test",
-    type: "message",
-    role: "assistant",
-    model: "claude-sonnet-4-6",
-    content: [{ type: "text", text }],
-    stop_reason: "end_turn",
-    stop_sequence: null,
+    text,
+    toolCalls: [],
     usage: mockUsage(),
-  } as Anthropic.Message;
+    stopReason: "end",
+    assistantContent: [{ type: "text", text }],
+  };
 }
 
-function mockClient(responses: Anthropic.Message[]): Anthropic {
+function mockProvider(responses: ChatResult[]): LLMProvider {
   let callIdx = 0;
   return {
-    messages: {
-      create: vi.fn(async () => responses[callIdx++]),
-      stream: vi.fn(() => ({
-        on: vi.fn(),
-        finalMessage: vi.fn(async () => responses[callIdx++]),
-      })),
-    },
-  } as unknown as Anthropic;
+    providerId: "mock",
+    chat: vi.fn(async () => responses[callIdx++]),
+    stream: vi.fn(async () => responses[callIdx++]),
+    healthCheck: vi.fn(async () => ({ ok: true })),
+  } as unknown as LLMProvider;
 }
 
 function mockConfig(overrides?: Partial<CampaignConfig>): CampaignConfig {
@@ -107,9 +101,9 @@ describe("buildOOCPrompt (structured)", () => {
       sessionState: mockSessionState(),
     });
     expect(Array.isArray(result)).toBe(true);
-    const blocks = result as Anthropic.TextBlockParam[];
+    const blocks = result as SystemBlock[];
     expect(blocks.length).toBeGreaterThan(1);
-    expect(blocks.every((b) => b.type === "text")).toBe(true);
+    expect(blocks.every((b) => typeof b.text === "string")).toBe(true);
   });
 
   it("falls back to string when no sessionState", () => {
@@ -131,9 +125,9 @@ describe("buildOOCPrompt (structured)", () => {
       campaignName: "TestCampaign",
       config: mockConfig(),
       sessionState: mockSessionState(),
-    }) as Anthropic.TextBlockParam[];
+    }) as SystemBlock[];
 
-    const cached = result.filter((b) => "cache_control" in b && b.cache_control);
+    const cached = result.filter((b) => "cacheControl" in b && b.cacheControl);
     expect(cached.length).toBe(3); // identity, rules, campaign log
 
     // Identity is first cached block
@@ -153,7 +147,7 @@ describe("buildOOCPrompt (structured)", () => {
       campaignName: "TestCampaign",
       config: mockConfig(),
       sessionState: mockSessionState(),
-    }) as Anthropic.TextBlockParam[];
+    }) as SystemBlock[];
 
     const allText = result.map((b) => b.text).join("\n");
     expect(allText).toContain("Campaign Setting");
@@ -167,7 +161,7 @@ describe("buildOOCPrompt (structured)", () => {
       campaignName: "TestCampaign",
       config: mockConfig(),
       sessionState: mockSessionState(),
-    }) as Anthropic.TextBlockParam[];
+    }) as SystemBlock[];
 
     const allText = result.map((b) => b.text).join("\n");
     expect(allText).toContain("Last Session");
@@ -184,7 +178,7 @@ describe("buildOOCPrompt (structured)", () => {
       config: mockConfig(),
       sessionState: mockSessionState(),
       characterSheet: "# Kael\n**HP:** 10",
-    }) as Anthropic.TextBlockParam[];
+    }) as SystemBlock[];
 
     const allText = result.map((b) => b.text).join("\n");
     expect(allText).toContain("Active Character");
@@ -196,7 +190,7 @@ describe("buildOOCPrompt (structured)", () => {
       campaignName: "TestCampaign",
       config: mockConfig(),
       sessionState: { rulesAppendix: "Some rules" },
-    }) as Anthropic.TextBlockParam[];
+    }) as SystemBlock[];
 
     const allText = result.map((b) => b.text).join("\n");
     // Check for section headings (not inline mentions in the identity prompt)
@@ -215,7 +209,7 @@ describe("buildOOCPrompt (structured)", () => {
         playerRead: "Player seems engaged",
         uiState: "style=classic, variant=exploration",
       },
-    }) as Anthropic.TextBlockParam[];
+    }) as SystemBlock[];
 
     const allText = result.map((b) => b.text).join("\n");
     expect(allText).not.toContain("Player Read");
@@ -225,8 +219,8 @@ describe("buildOOCPrompt (structured)", () => {
 
 describe("enterOOC", () => {
   it("returns summary from first sentence", async () => {
-    const client = mockClient([textResponse("Grappling lets you restrain foes. You need a STR check.")]);
-    const result = await enterOOC(client, "How does grappling work?", {
+    const provider = mockProvider([textResponse("Grappling lets you restrain foes. You need a STR check.")]);
+    const result = await enterOOC(provider, "How does grappling work?", {
       campaignName: "Test",
       previousVariant: "playing",
     });
@@ -235,8 +229,8 @@ describe("enterOOC", () => {
 
   it("truncates summary over 100 chars", async () => {
     const longText = "A".repeat(110) + ". More text here.";
-    const client = mockClient([textResponse(longText)]);
-    const result = await enterOOC(client, "Tell me everything", {
+    const provider = mockProvider([textResponse(longText)]);
+    const result = await enterOOC(provider, "Tell me everything", {
       campaignName: "Test",
       previousVariant: "playing",
     });
@@ -245,8 +239,8 @@ describe("enterOOC", () => {
   });
 
   it("defaults summary for text without sentence boundary", async () => {
-    const client = mockClient([textResponse("")]);
-    const result = await enterOOC(client, "test", {
+    const provider = mockProvider([textResponse("")]);
+    const result = await enterOOC(provider, "test", {
       campaignName: "Test",
       previousVariant: "playing",
     });
@@ -254,8 +248,8 @@ describe("enterOOC", () => {
   });
 
   it("preserves snapshot with previousVariant and wasMidNarration", async () => {
-    const client = mockClient([textResponse("Sure thing.")]);
-    const result = await enterOOC(client, "pause", {
+    const provider = mockProvider([textResponse("Sure thing.")]);
+    const result = await enterOOC(provider, "pause", {
       campaignName: "Test",
       previousVariant: "narrating",
       wasMidNarration: true,
@@ -265,8 +259,8 @@ describe("enterOOC", () => {
   });
 
   it("defaults wasMidNarration to false", async () => {
-    const client = mockClient([textResponse("Ok.")]);
-    const result = await enterOOC(client, "pause", {
+    const provider = mockProvider([textResponse("Ok.")]);
+    const result = await enterOOC(provider, "pause", {
       campaignName: "Test",
       previousVariant: "playing",
     });
@@ -274,18 +268,18 @@ describe("enterOOC", () => {
   });
 
   it("uses stream when onStream callback provided", async () => {
-    const client = mockClient([textResponse("Response.")]);
+    const provider = mockProvider([textResponse("Response.")]);
     const onStream = vi.fn();
-    await enterOOC(client, "question", {
+    await enterOOC(provider, "question", {
       campaignName: "Test",
       previousVariant: "playing",
     }, onStream);
-    expect(client.messages.stream).toHaveBeenCalled();
+    expect(provider.stream).toHaveBeenCalled();
   });
 
   it("accumulates usage stats", async () => {
-    const client = mockClient([textResponse("Done.")]);
-    const result = await enterOOC(client, "test", {
+    const provider = mockProvider([textResponse("Done.")]);
+    const result = await enterOOC(provider, "test", {
       campaignName: "Test",
       previousVariant: "playing",
     });
@@ -296,14 +290,14 @@ describe("enterOOC", () => {
   it("passes tools when repo is provided", async () => {
     const git = mockGitIO();
     const repo = new CampaignRepo({ dir: "/tmp/campaign", git });
-    const client = mockClient([textResponse("Done.")]);
-    await enterOOC(client, "test", {
+    const provider = mockProvider([textResponse("Done.")]);
+    await enterOOC(provider, "test", {
       campaignName: "Test",
       previousVariant: "playing",
       repo,
     });
 
-    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     if (createCall) {
       expect(createCall.tools).toHaveLength(1);
       expect(createCall.tools[0].name).toBe("get_commit_log");
@@ -311,29 +305,29 @@ describe("enterOOC", () => {
   });
 
   it("works without tools when repo not provided", async () => {
-    const client = mockClient([textResponse("Done.")]);
-    await enterOOC(client, "test", {
+    const provider = mockProvider([textResponse("Done.")]);
+    await enterOOC(provider, "test", {
       campaignName: "Test",
       previousVariant: "playing",
     });
 
-    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     if (createCall) {
       expect(createCall.tools).toBeUndefined();
     }
   });
 
   it("passes 4 tools when fileIO and campaignRoot are provided", async () => {
-    const client = mockClient([textResponse("Done.")]);
+    const provider = mockProvider([textResponse("Done.")]);
     const fio = mockFileIO();
-    await enterOOC(client, "test", {
+    await enterOOC(provider, "test", {
       campaignName: "Test",
       previousVariant: "playing",
       fileIO: fio,
       campaignRoot: "/camp",
     });
 
-    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     if (createCall) {
       expect(createCall.tools).toHaveLength(4);
       const names = createCall.tools.map((t: { name: string }) => t.name);
@@ -345,37 +339,37 @@ describe("enterOOC", () => {
   });
 
   it("sends structured system prompt when sessionState and config provided", async () => {
-    const client = mockClient([textResponse("The merchant offered you a quest.")]);
-    await enterOOC(client, "What did the merchant say?", {
+    const provider = mockProvider([textResponse("The merchant offered you a quest.")]);
+    await enterOOC(provider, "What did the merchant say?", {
       campaignName: "TestCampaign",
       previousVariant: "playing",
       config: mockConfig(),
       sessionState: mockSessionState(),
     });
 
-    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     if (createCall) {
       // System prompt should be an array of TextBlockParam
-      expect(Array.isArray(createCall.system)).toBe(true);
-      const blocks = createCall.system as Anthropic.TextBlockParam[];
+      expect(Array.isArray(createCall.systemPrompt)).toBe(true);
+      const blocks = createCall.systemPrompt as SystemBlock[];
       expect(blocks.length).toBeGreaterThan(1);
-      const allText = blocks.map((b: Anthropic.TextBlockParam) => b.text).join("\n");
+      const allText = blocks.map((b: SystemBlock) => b.text).join("\n");
       expect(allText).toContain("Scene So Far");
       expect(allText).toContain("Merchant Giles");
     }
   });
 
   it("sends flat string system prompt without sessionState", async () => {
-    const client = mockClient([textResponse("Done.")]);
-    await enterOOC(client, "test", {
+    const provider = mockProvider([textResponse("Done.")]);
+    await enterOOC(provider, "test", {
       campaignName: "Test",
       previousVariant: "playing",
     });
 
-    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     if (createCall) {
       // System prompt should be a plain string (with terse suffix)
-      expect(typeof createCall.system).toBe("string");
+      expect(typeof createCall.systemPrompt).toBe("string");
     }
   });
 });
@@ -722,8 +716,8 @@ describe("enterOOC with gameState", () => {
   it("passes 17 tools when gameState and fileIO are provided", async () => {
     const gs = mockGameState();
     const fio = mockFileIO();
-    const client = mockClient([textResponse("Done.")]);
-    await enterOOC(client, "test", {
+    const provider = mockProvider([textResponse("Done.")]);
+    await enterOOC(provider, "test", {
       campaignName: "Test",
       previousVariant: "playing",
       fileIO: fio,
@@ -731,7 +725,7 @@ describe("enterOOC with gameState", () => {
       gameState: gs,
     });
 
-    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     if (createCall) {
       expect(createCall.tools).toHaveLength(19);
       const names = createCall.tools.map((t: { name: string }) => t.name);
@@ -744,15 +738,15 @@ describe("enterOOC with gameState", () => {
 
   it("still passes only 4 tools without gameState", async () => {
     const fio = mockFileIO();
-    const client = mockClient([textResponse("Done.")]);
-    await enterOOC(client, "test", {
+    const provider = mockProvider([textResponse("Done.")]);
+    await enterOOC(provider, "test", {
       campaignName: "Test",
       previousVariant: "playing",
       fileIO: fio,
       campaignRoot: "/camp",
     });
 
-    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     if (createCall) {
       expect(createCall.tools).toHaveLength(4);
     }
@@ -761,8 +755,8 @@ describe("enterOOC with gameState", () => {
   it("uses maxToolRounds=8 when tools are available", async () => {
     const gs = mockGameState();
     const fio = mockFileIO();
-    const client = mockClient([textResponse("Done.")]);
-    await enterOOC(client, "test", {
+    const provider = mockProvider([textResponse("Done.")]);
+    await enterOOC(provider, "test", {
       campaignName: "Test",
       previousVariant: "playing",
       fileIO: fio,
@@ -770,7 +764,7 @@ describe("enterOOC with gameState", () => {
       gameState: gs,
     });
 
-    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     if (createCall) {
       // maxToolRounds is passed internally to spawnSubagent, not directly to API
       // We verify tools exist to confirm hasTools path was taken
@@ -834,8 +828,8 @@ describe("parseEndOOCSignal", () => {
 
 describe("enterOOC END_OOC integration", () => {
   it("sets endSession when agent emits END_OOC", async () => {
-    const client = mockClient([textResponse("Grappling uses Athletics.\n<END_OOC />")]);
-    const result = await enterOOC(client, "How does grappling work?", {
+    const provider = mockProvider([textResponse("Grappling uses Athletics.\n<END_OOC />")]);
+    const result = await enterOOC(provider, "How does grappling work?", {
       campaignName: "Test",
       previousVariant: "exploration",
     });
@@ -845,8 +839,8 @@ describe("enterOOC END_OOC integration", () => {
   });
 
   it("captures playerAction from END_OOC payload", async () => {
-    const client = mockClient([textResponse("Back to the game!\n<END_OOC>I grab the guard</END_OOC>")]);
-    const result = await enterOOC(client, "I grab the guard", {
+    const provider = mockProvider([textResponse("Back to the game!\n<END_OOC>I grab the guard</END_OOC>")]);
+    const result = await enterOOC(provider, "I grab the guard", {
       campaignName: "Test",
       previousVariant: "exploration",
     });
@@ -856,8 +850,8 @@ describe("enterOOC END_OOC integration", () => {
   });
 
   it("does not set endSession when no signal", async () => {
-    const client = mockClient([textResponse("Here's how that works...")]);
-    const result = await enterOOC(client, "How does X work?", {
+    const provider = mockProvider([textResponse("Here's how that works...")]);
+    const result = await enterOOC(provider, "How does X work?", {
       campaignName: "Test",
       previousVariant: "exploration",
     });

@@ -1,38 +1,32 @@
 import { describe, it, expect, vi } from "vitest";
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider, ChatResult } from "../../providers/types.js";
 import { generateChoices, shouldGenerateChoices } from "./choice-generator.js";
 import { promoteCharacter } from "./character-promotion.js";
 
 // --- Mock helpers ---
 
-function mockUsage(): Anthropic.Usage {
-  return { input_tokens: 50, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: null, inference_geo: null, server_tool_use: null, service_tier: null };
+function mockUsage() {
+  return { inputTokens: 50, outputTokens: 20, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 };
 }
 
-function textResponse(text: string): Anthropic.Message {
+function textResponse(text: string): ChatResult {
   return {
-    id: "msg_test",
-    type: "message",
-    role: "assistant",
-    model: "claude-haiku-4-5-20251001",
-    content: [{ type: "text", text }],
-    stop_reason: "end_turn",
-    stop_sequence: null,
+    text,
+    toolCalls: [],
     usage: mockUsage(),
-  } as Anthropic.Message;
+    stopReason: "end",
+    assistantContent: [{ type: "text", text }],
+  };
 }
 
-function mockClient(responses: Anthropic.Message[]): Anthropic {
+function mockProvider(responses: ChatResult[]): LLMProvider {
   let callIdx = 0;
   return {
-    messages: {
-      create: vi.fn(async () => responses[callIdx++]),
-      stream: vi.fn(() => ({
-        on: vi.fn(),
-        finalMessage: vi.fn(async () => responses[callIdx++]),
-      })),
-    },
-  } as unknown as Anthropic;
+    providerId: "mock",
+    chat: vi.fn(async () => responses[callIdx++]),
+    stream: vi.fn(async () => responses[callIdx++]),
+    healthCheck: vi.fn(async () => ({ ok: true })),
+  } as unknown as LLMProvider;
 }
 
 // --- Choice generation tests ---
@@ -53,11 +47,11 @@ describe("shouldGenerateChoices", () => {
 
 describe("generateChoices", () => {
   it("parses choices from Haiku response", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       textResponse("Search the room for hidden passages\nSpeak to the old merchant\nLeave through the back door\nExamine the strange symbol on the wall"),
     ]);
 
-    const result = await generateChoices(client, "You enter a dusty shop. An old merchant eyes you warily.", "Aldric");
+    const result = await generateChoices(provider, "You enter a dusty shop. An old merchant eyes you warily.", "Aldric");
 
     expect(result.choices).toHaveLength(4);
     expect(result.choices[0]).toContain("Search");
@@ -65,11 +59,11 @@ describe("generateChoices", () => {
   });
 
   it("strips bullet markers from choices", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       textResponse("- Draw your sword\n• Cast a defensive spell\n1. Try to negotiate"),
     ]);
 
-    const result = await generateChoices(client, "Goblins block the path.", "Aldric");
+    const result = await generateChoices(provider, "Goblins block the path.", "Aldric");
 
     expect(result.choices[0]).toBe("Draw your sword");
     expect(result.choices[1]).toBe("Cast a defensive spell");
@@ -77,11 +71,11 @@ describe("generateChoices", () => {
   });
 
   it("caps at 6 choices", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       textResponse("One\nTwo\nThree\nFour\nFive\nSix\nSeven\nEight"),
     ]);
 
-    const result = await generateChoices(client, "...", "Aldric");
+    const result = await generateChoices(provider, "...", "Aldric");
     expect(result.choices).toHaveLength(6);
   });
 });
@@ -90,7 +84,7 @@ describe("generateChoices", () => {
 
 describe("promoteCharacter", () => {
   it("parses updated sheet and changelog from response", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       textResponse(`# Aldric
 
 **Type:** PC
@@ -103,7 +97,7 @@ A veteran warrior.
 Level 5: +1 STR (16), Extra Attack, +5 HP (max 42)`),
     ]);
 
-    const result = await promoteCharacter(client, {
+    const result = await promoteCharacter(provider, {
       characterSheet: "# Aldric\n\n**Type:** PC\n**Level:** 4\n**HP:** 37/37",
       context: "Reached level 5 after defeating the dragon",
       characterName: "Aldric",
@@ -115,11 +109,11 @@ Level 5: +1 STR (16), Extra Attack, +5 HP (max 42)`),
   });
 
   it("handles response without changelog separator", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       textResponse("# Aldric\n\n**Type:** PC\n**Level:** 5\n\nUpdated warrior."),
     ]);
 
-    const result = await promoteCharacter(client, {
+    const result = await promoteCharacter(provider, {
       characterSheet: "# Aldric\n\n**Type:** PC\n**Level:** 4",
       context: "Level up",
       characterName: "Aldric",
@@ -130,13 +124,13 @@ Level 5: +1 STR (16), Extra Attack, +5 HP (max 42)`),
   });
 
   it("uses player-facing mode when onStream provided", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       textResponse("# Rook\n\n**Level:** 4\n---CHANGELOG---\nLevel 4: +1 DEX"),
     ]);
 
     const onStream = vi.fn();
     await promoteCharacter(
-      client,
+      provider,
       {
         characterSheet: "# Rook",
         context: "Level up",
@@ -145,6 +139,6 @@ Level 5: +1 STR (16), Extra Attack, +5 HP (max 42)`),
       onStream,
     );
 
-    expect(client.messages.stream).toHaveBeenCalled();
+    expect(provider.stream).toHaveBeenCalled();
   });
 });

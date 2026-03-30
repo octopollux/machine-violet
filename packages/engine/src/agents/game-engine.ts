@@ -1,8 +1,8 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { registry as singletonRegistry } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
 import { agentLoopStreaming } from "./agent-loop.js";
 import type { AgentLoopConfig, TuiCommand, UsageStats } from "./agent-loop.js";
+import type { LLMProvider, NormalizedMessage, ContentPart } from "../providers/types.js";
 import { ConversationManager } from "../context/conversation.js";
 import type { DroppedExchange } from "../context/conversation.js";
 import { narrativeLinesToMarkdown } from "../context/display-log.js";
@@ -59,56 +59,11 @@ import type { EngineState, TurnInfo, EngineCallbacks } from "@machine-violet/sha
 export type { EngineState, TurnInfo, EngineCallbacks } from "@machine-violet/shared/types/engine.js";
 
 /**
- * Stamp cache_control on the last content block of the last conversation
- * message (BP4). This lets the API cache the entire conversation prefix
- * so only the new user input is uncached.
- *
- * Intentionally omits `ttl` — the API default is 5 minutes, which is
- * appropriate since conversation changes every turn (unlike system/tools
- * which use 1h TTL).
- */
-function stampConversationCache(messages: Anthropic.MessageParam[]): void {
-  if (messages.length === 0) return;
-  const last = messages[messages.length - 1];
-  if (typeof last.content === "string") {
-    if (!last.content) return; // API rejects cache_control on empty text
-    // Convert string to block array so we can attach cache_control
-    messages[messages.length - 1] = {
-      role: last.role,
-      content: [{
-        type: "text" as const,
-        text: last.content,
-        cache_control: { type: "ephemeral" },
-      } as Anthropic.TextBlockParam],
-    };
-  } else if (Array.isArray(last.content) && last.content.length > 0) {
-    // Find the last non-empty text block to stamp cache_control on.
-    // The API rejects cache_control on empty text blocks.
-    const blocks = [...last.content] as unknown as Record<string, unknown>[];
-    let stampIdx = blocks.length - 1;
-    while (stampIdx >= 0) {
-      const b = blocks[stampIdx];
-      if (b.type === "text" && !(b.text as string)) {
-        stampIdx--;
-        continue;
-      }
-      break;
-    }
-    if (stampIdx < 0) return; // All blocks are empty text — nothing to stamp
-    blocks[stampIdx] = {
-      ...blocks[stampIdx],
-      cache_control: { type: "ephemeral" },
-    };
-    messages[messages.length - 1] = { role: last.role, content: blocks as unknown as Anthropic.ContentBlockParam[] };
-  }
-}
-
-/**
  * The game engine — orchestrates the DM agent, tools, TUI, and scene management.
  * This is the master state machine that drives gameplay.
  */
 export class GameEngine {
-  private client: Anthropic;
+  private provider: LLMProvider;
   private registry: ToolRegistry;
   private gameState: GameState;
   private conversation: ConversationManager;
@@ -135,7 +90,7 @@ export class GameEngine {
   private lastFailedInput: { characterName: string; text: string; opts?: { fromAI?: boolean; skipTranscript?: boolean } } | null = null;
 
   constructor(params: {
-    client: Anthropic;
+    provider: LLMProvider;
     gameState: GameState;
     scene: SceneState;
     sessionState: DMSessionState;
@@ -144,7 +99,7 @@ export class GameEngine {
     model?: AgentLoopConfig["model"];
     gitIO?: GitIO;
   }) {
-    this.client = params.client;
+    this.provider = params.provider;
     this.registry = singletonRegistry;
     this.gameState = params.gameState;
     this.fileIO = params.fileIO;
@@ -273,9 +228,9 @@ export class GameEngine {
     return this.repo;
   }
 
-  /** Get the Anthropic client (for subagent creation). */
-  getClient(): Anthropic {
-    return this.client;
+  /** Get the LLM provider (for subagent creation). */
+  getProvider(): LLMProvider {
+    return this.provider;
   }
 
   /** Active mode session (OOC/Dev). Null when in normal play mode. */
@@ -343,8 +298,8 @@ export class GameEngine {
     // Extract character name and text from the stored user message
     const content = typeof popped.user.content === "string"
       ? popped.user.content
-      : (popped.user.content as Anthropic.TextBlock[])
-          .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      : (popped.user.content as ContentPart[])
+          .filter((b): b is ContentPart & { type: "text" } => b.type === "text")
           .map((b) => b.text)
           .join("");
     // Tagged format is "[CharName] text" — optionally with OOC prefix
@@ -421,9 +376,8 @@ export class GameEngine {
     // Get system prompt (cached Tier 1+2) and volatile context (Tier 3)
     const { system: systemPrompt, volatile: volatileContext } = this.sceneManager.getSystemPrompt();
 
-    // Build message list; stamp conversation cache before new input
-    const messages = [...this.conversation.getMessages()];
-    stampConversationCache(messages);
+    // Build message list
+    const messages: NormalizedMessage[] = [...this.conversation.getMessages()];
 
     // Build the user message: player input with system-generated preamble.
     // All injections (volatile context, behavioral reminders, scene pacing,
@@ -452,11 +406,11 @@ export class GameEngine {
     // The API message includes the preamble; the stored exchange does not.
     // Volatile context and reminders are ephemeral per-turn injections that
     // should not persist in conversation history.
-    const apiUserMessage: Anthropic.MessageParam = {
+    const apiUserMessage: NormalizedMessage = {
       role: "user",
       content: `${preamble}${taggedInput}`,
     };
-    const storedUserMessage: Anthropic.MessageParam = {
+    const storedUserMessage: NormalizedMessage = {
       role: "user",
       content: taggedInput,
     };
@@ -476,7 +430,7 @@ export class GameEngine {
     try {
       // Run the agent loop with streaming
       const result = await agentLoopStreaming(
-        this.client,
+        this.provider,
         systemPrompt,
         messages,
         this.registry,
@@ -509,7 +463,7 @@ export class GameEngine {
       // Split round messages into tool interactions and final assistant.
       // When truncated, roundMessages may end with a user tool_result (no final assistant).
       const roundMsgs = result.roundMessages;
-      let toolMessages: Anthropic.MessageParam[] = [];
+      let toolMessages: NormalizedMessage[] = [];
       let finalAssistantText = result.text;
       if (roundMsgs.length > 0) {
         const lastMsg = roundMsgs[roundMsgs.length - 1];
@@ -519,8 +473,8 @@ export class GameEngine {
           // text that appeared in intermediate tool-use rounds
           finalAssistantText = typeof lastMsg.content === "string"
             ? lastMsg.content
-            : (lastMsg.content as Anthropic.ContentBlock[])
-                .filter((b): b is Anthropic.TextBlock => b.type === "text")
+            : (lastMsg.content as ContentPart[])
+                .filter((b): b is ContentPart & { type: "text" } => b.type === "text")
                 .map((b) => b.text)
                 .join("");
         } else {
@@ -531,7 +485,7 @@ export class GameEngine {
       }
 
       // Add exchange to conversation manager (assistant kept as string for handleDroppedExchange compat)
-      const assistantMessage: Anthropic.MessageParam = {
+      const assistantMessage: NormalizedMessage = {
         role: "assistant",
         content: finalAssistantText || result.text,
       };
@@ -574,7 +528,7 @@ export class GameEngine {
         const playerExchanges = currentScene.transcript.filter((t) => t.startsWith("**[")).length;
         if (playerExchanges > 0 && playerExchanges % SCENE_TRACKER_CADENCE === 0) {
           try {
-            const trackerUsage = await this.sceneManager.runSceneTracker(this.client);
+            const trackerUsage = await this.sceneManager.runSceneTracker(this.provider);
             accUsage(this.sessionUsage, trackerUsage);
             this.persistCurrentScene();
           } catch (e) {
@@ -680,7 +634,7 @@ export class GameEngine {
 
     try {
       const result = await this.sceneManager.sceneTransition(
-        this.client,
+        this.provider,
         title,
         timeAdvance,
       );
@@ -715,7 +669,7 @@ export class GameEngine {
 
     try {
       const result = await this.sceneManager.sessionEnd(
-        this.client,
+        this.provider,
         title,
         timeAdvance,
       );
@@ -752,7 +706,7 @@ export class GameEngine {
 
     try {
       const result = await this.sceneManager.resumePendingTransition(
-        this.client,
+        this.provider,
         pendingOp,
       );
 
@@ -806,7 +760,7 @@ export class GameEngine {
 
     try {
       const sceneNumber = this.sceneManager.getScene().sceneNumber;
-      const result = await runScribe(this.client, {
+      const result = await runScribe(this.provider, {
         updates: updates.map(u => ({
           visibility: u.visibility as "private" | "player-facing",
           content: u.content,
@@ -865,7 +819,7 @@ export class GameEngine {
       // Load system rules if available
       const ruleCard = await this.loadRuleCardCombat();
 
-      const result = await promoteCharacter(this.client, {
+      const result = await promoteCharacter(this.provider, {
         characterName,
         characterSheet: currentSheet,
         context,
@@ -934,7 +888,7 @@ export class GameEngine {
       this.callbacks.onDevLog?.(`[dev] style_scene: spawning theme-styler for "${description}"`);
       try {
         const result = await styleTheme(
-          this.client,
+          this.provider,
           description,
           undefined, // current theme name not easily accessible here
           undefined, // current key color not easily accessible here
@@ -1103,7 +1057,7 @@ export class GameEngine {
       .join("\n");
 
     try {
-      const result = await aiPlayerTurn(this.client, {
+      const result = await aiPlayerTurn(this.provider, {
         player: active.player,
         characterSheet,
         recentNarration: recentAssistant || "It's your turn. What do you do?",
@@ -1167,6 +1121,7 @@ export class GameEngine {
   private buildAgentConfig(): AgentLoopConfig {
     return {
       model: this.model,
+      provider: this.provider,
       maxTokens: TOKEN_LIMITS.DM_RESPONSE,
       maxToolRounds: 10,
       asyncToolHandler: (name, input) => this.handleAsyncTool(name, input),
@@ -1178,9 +1133,6 @@ export class GameEngine {
       onToolEnd: (name, result) => {
         this.setState("dm_thinking");
         this.callbacks.onToolEnd(name, result);
-      },
-      onRetry: (status, delayMs) => {
-        this.callbacks.onRetry(status, delayMs);
       },
     };
   }
@@ -1233,7 +1185,7 @@ export class GameEngine {
       }
 
       try {
-        const result = await searchCampaign(this.client, {
+        const result = await searchCampaign(this.provider, {
           query,
           campaignRoot: this.gameState.campaignRoot,
         }, this.fileIO);
@@ -1261,7 +1213,7 @@ export class GameEngine {
       }
 
       try {
-        const result = await searchContent(this.client, {
+        const result = await searchContent(this.provider, {
           query,
           systemSlug,
           homeDir: this.gameState.homeDir,
@@ -1291,7 +1243,7 @@ export class GameEngine {
       const ruleCard = await this.loadRuleCardCombat();
       const mapSnapshot = this.buildMapSnapshot();
 
-      this.resolveSession = new ResolveSession(this.client, this.fileIO, this.gameState);
+      this.resolveSession = new ResolveSession(this.provider, this.fileIO, this.gameState);
       await this.resolveSession.initCombat(sheets, ruleCard, mapSnapshot || undefined);
       this.callbacks.onDevLog?.(`[dev] resolve_session: initialized for ${state.combat.order.length} combatants`);
     } catch (e) {
@@ -1493,7 +1445,7 @@ export class GameEngine {
   private async handleDroppedExchange(dropped: DroppedExchange): Promise<void> {
     try {
       const usage = await this.sceneManager.handleDroppedExchange(
-        this.client,
+        this.provider,
         dropped,
       );
       accUsage(this.sessionUsage, usage);

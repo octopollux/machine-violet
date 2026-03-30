@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider, NormalizedTool } from "../../providers/types.js";
 import { spawnSubagent, cacheSystemPrompt } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import type { UsageStats } from "../agent-loop.js";
@@ -50,11 +50,11 @@ export interface ScribeFileIO {
 
 // --- Scribe Tools (given to the subagent) ---
 
-const SCRIBE_TOOLS: Anthropic.Tool[] = [
+const SCRIBE_TOOLS: NormalizedTool[] = [
   {
     name: "list_entities",
     description: "List all entity files of a given type. Returns filenames (without extension).",
-    input_schema: {
+    inputSchema: {
       type: "object" as const,
       properties: {
         entity_type: {
@@ -69,7 +69,7 @@ const SCRIBE_TOOLS: Anthropic.Tool[] = [
   {
     name: "read_entity",
     description: "Read an entity file's current contents. Returns the full markdown.",
-    input_schema: {
+    inputSchema: {
       type: "object" as const,
       properties: {
         entity_type: {
@@ -88,7 +88,7 @@ const SCRIBE_TOOLS: Anthropic.Tool[] = [
   {
     name: "write_entity",
     description: "Create or update an entity file.",
-    input_schema: {
+    inputSchema: {
       type: "object" as const,
       properties: {
         mode: {
@@ -289,7 +289,7 @@ export function buildScribeToolHandler(
  * The scribe has tools to list, read, and write entity files.
  */
 export async function runScribe(
-  client: Anthropic,
+  provider: LLMProvider,
   input: ScribeInput,
   fileIO: ScribeFileIO,
 ): Promise<ScribeResult> {
@@ -312,7 +312,7 @@ export async function runScribe(
 
   const userMessage = `Process these updates:\n\n${updateLines}`;
 
-  const result: SubagentResult = await spawnSubagent(client, {
+  const result: SubagentResult = await spawnSubagent(provider, {
     name: "scribe",
     model: getModel("small"),
     visibility: "silent",

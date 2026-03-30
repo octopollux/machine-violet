@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider, ChatResult, NormalizedUsage } from "../../providers/types.js";
 import type { FileIO } from "../../agents/scene-manager.js";
 import { loadModelConfig } from "../../config/models.js";
 import { resetPromptCache } from "../../prompts/load-prompt.js";
@@ -38,30 +38,32 @@ function mockFileIO(
   };
 }
 
-function mockUsage(): Anthropic.Usage {
-  return { input_tokens: 10, output_tokens: 5, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: null, inference_geo: null, server_tool_use: null, service_tier: null };
+function mockUsage(): NormalizedUsage {
+  return { inputTokens: 10, outputTokens: 5, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 };
 }
 
-function textResponse(text: string): Anthropic.Message {
+function textResult(text: string): ChatResult {
   return {
-    id: "msg_test",
-    type: "message",
-    role: "assistant",
-    model: "claude-haiku-4-5-20251001",
-    content: [{ type: "text", text }],
-    stop_reason: "end_turn",
-    stop_sequence: null,
+    text,
+    toolCalls: [],
     usage: mockUsage(),
-  } as Anthropic.Message;
+    stopReason: "end",
+    assistantContent: [{ type: "text", text }],
+  };
 }
 
-function mockClient(responses: Anthropic.Message[]): Anthropic {
+function mockProvider(responses: ChatResult[]): LLMProvider {
   let callIdx = 0;
   return {
-    messages: {
-      create: vi.fn(async () => responses[callIdx++] ?? responses[responses.length - 1]),
-    },
-  } as unknown as Anthropic;
+    providerId: "test",
+    chat: vi.fn(async () => responses[callIdx++] ?? responses[responses.length - 1]),
+    stream: vi.fn(async (_params, onDelta) => {
+      const result = responses[callIdx++] ?? responses[responses.length - 1];
+      if (result.text) onDelta(result.text);
+      return result;
+    }),
+    healthCheck: vi.fn(),
+  };
 }
 
 // --- Unit tests: levenshtein ---
@@ -230,14 +232,14 @@ describe("resolveDeadLinks", () => {
     const triageResponse = JSON.stringify([
       { path: "characters/goblin.md", category: "stub", reason: "Mentioned in passing." },
     ]);
-    const client = mockClient([textResponse(triageResponse)]);
+    const provider = mockProvider([textResult(triageResponse)]);
 
-    const result = await resolveDeadLinks(ROOT, fio, client, "Just checking", true);
+    const result = await resolveDeadLinks(ROOT, fio, provider, "Just checking", true);
 
     expect(result.deadLinks).toHaveLength(1);
     expect(result.deadLinks[0].resolvedPath).toBe("characters/goblin.md");
     expect(result.triaged.stubs).toHaveLength(1);
-    expect(client.messages.create).toHaveBeenCalled();
+    expect(provider.chat).toHaveBeenCalled();
   });
 
   it("dry-run returns report without writing", async () => {
@@ -257,9 +259,9 @@ describe("resolveDeadLinks", () => {
     const triageResponse = JSON.stringify([
       { path: "characters/ghost.md", category: "missing", reason: "Discussed enough." },
     ]);
-    const client = mockClient([textResponse(triageResponse)]);
+    const provider = mockProvider([textResult(triageResponse)]);
 
-    const result = await resolveDeadLinks(ROOT, fio, client, "Check it", true);
+    const result = await resolveDeadLinks(ROOT, fio, provider, "Check it", true);
 
     expect(result.dryRun).toBe(true);
     expect(result.filesUpdated).toEqual([]);
@@ -285,9 +287,9 @@ describe("resolveDeadLinks", () => {
     const triageResponse = JSON.stringify([
       { path: "characters/kael.md", raw_target: "../characters/kael.md", category: "repoint", reason: "Renamed.", repoint_target: "characters/kael-ranger.md" },
     ]);
-    const client = mockClient([textResponse(triageResponse)]);
+    const provider = mockProvider([textResult(triageResponse)]);
 
-    const result = await resolveDeadLinks(ROOT, fio, client, "Renamed kael to kael-ranger", false);
+    const result = await resolveDeadLinks(ROOT, fio, provider, "Renamed kael to kael-ranger", false);
 
     expect(result.dryRun).toBe(false);
     expect(result.triaged.repoints).toHaveLength(1);
@@ -313,9 +315,9 @@ describe("resolveDeadLinks", () => {
       { path: "locations/tavern/index.md", category: "missing", reason: "Major location." },
     ]);
     const genResponse = "===locations/tavern/index.md===\n# The Tavern\n**Type:** Location\n";
-    const client = mockClient([textResponse(triageResponse), textResponse(genResponse)]);
+    const provider = mockProvider([textResult(triageResponse), textResult(genResponse)]);
 
-    const result = await resolveDeadLinks(ROOT, fio, client, "Need tavern", false);
+    const result = await resolveDeadLinks(ROOT, fio, provider, "Need tavern", false);
 
     expect(result.triaged.missing).toHaveLength(1);
     expect(result.filesGenerated).toContain("locations/tavern/index.md");
@@ -340,9 +342,9 @@ describe("resolveDeadLinks", () => {
     const triageResponse = JSON.stringify([
       { path: "characters/bob.md", category: "stub", reason: "Mentioned once." },
     ]);
-    const client = mockClient([textResponse(triageResponse)]);
+    const provider = mockProvider([textResult(triageResponse)]);
 
-    const result = await resolveDeadLinks(ROOT, fio, client, "Check", true);
+    const result = await resolveDeadLinks(ROOT, fio, provider, "Check", true);
 
     expect(result.triaged.stubs).toHaveLength(1);
     expect(result.filesUpdated).toEqual([]);
@@ -362,16 +364,16 @@ describe("resolveDeadLinks", () => {
       },
     );
 
-    const client = mockClient([]);
+    const provider = mockProvider([]);
 
-    const result = await resolveDeadLinks(ROOT, fio, client, "Nothing here");
+    const result = await resolveDeadLinks(ROOT, fio, provider, "Nothing here");
 
     expect(result.deadLinks).toEqual([]);
     expect(result.triaged.stubs).toEqual([]);
     expect(result.triaged.repoints).toEqual([]);
     expect(result.triaged.missing).toEqual([]);
     // Haiku should not be called
-    expect(client.messages.create).not.toHaveBeenCalled();
+    expect(provider.chat).not.toHaveBeenCalled();
   });
 
   it("Haiku error in one batch does not block others", async () => {
@@ -403,16 +405,17 @@ describe("resolveDeadLinks", () => {
     ]);
 
     let callIdx = 0;
-    const client = {
-      messages: {
-        create: vi.fn(async () => {
-          if (callIdx++ === 0) throw error;
-          return textResponse(successResponse);
-        }),
-      },
-    } as unknown as Anthropic;
+    const provider: LLMProvider = {
+      providerId: "test",
+      chat: vi.fn(async () => {
+        if (callIdx++ === 0) throw error;
+        return textResult(successResponse);
+      }),
+      stream: vi.fn(),
+      healthCheck: vi.fn(),
+    };
 
-    const result = await resolveDeadLinks(ROOT, fio, client, "Check all");
+    const result = await resolveDeadLinks(ROOT, fio, provider, "Check all");
 
     expect(result.errors.length).toBeGreaterThanOrEqual(1);
     expect(result.errors[0]).toContain("Triage failed");
@@ -438,9 +441,9 @@ describe("resolveDeadLinks", () => {
       { path: "locations/tavern/index.md", category: "missing", reason: "Needed." },
     ]);
     const genResponse = "===locations/tavern/index.md===\n# Tavern\n**Type:** Location\n";
-    const client = mockClient([textResponse(triageResponse), textResponse(genResponse)]);
+    const provider = mockProvider([textResult(triageResponse), textResult(genResponse)]);
 
-    const result = await resolveDeadLinks(ROOT, fio, client, "Generate", false);
+    const result = await resolveDeadLinks(ROOT, fio, provider, "Generate", false);
 
     // Two API calls: triage + generation, each with 10 input + 5 output
     expect(result.usage.inputTokens).toBe(20);
@@ -464,13 +467,13 @@ describe("resolveDeadLinks", () => {
     const triageResponse = JSON.stringify([
       { path: "characters/ghost.md", category: "stub", reason: "Minor mention." },
     ]);
-    const client = mockClient([textResponse(triageResponse)]);
+    const provider = mockProvider([textResult(triageResponse)]);
 
-    await resolveDeadLinks(ROOT, fio, client, "I renamed ghost to specter");
+    await resolveDeadLinks(ROOT, fio, provider, "I renamed ghost to specter");
 
-    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const chatCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
     // The user message should contain the freeform context
-    const userMsg = createCall.messages[0].content;
+    const userMsg = chatCall.messages[0].content;
     expect(userMsg).toContain("I renamed ghost to specter");
   });
 });

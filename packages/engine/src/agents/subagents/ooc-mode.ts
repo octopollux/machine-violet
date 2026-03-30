@@ -1,4 +1,4 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider, NormalizedTool, SystemBlock } from "../../providers/types.js";
 import type { SubagentStreamCallback } from "../subagent.js";
 import { spawnSubagent } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
@@ -88,7 +88,7 @@ export interface OOCPromptOptions {
  * When only `campaignName` is provided (pre-game-start / backward compat),
  * returns a flat string.
  */
-export function buildOOCPrompt(options: OOCPromptOptions): string | Anthropic.TextBlockParam[];
+export function buildOOCPrompt(options: OOCPromptOptions): string | SystemBlock[];
 
 /** @deprecated Legacy overload — use options object form. */
 export function buildOOCPrompt(
@@ -101,7 +101,7 @@ export function buildOOCPrompt(
   optionsOrName: OOCPromptOptions | string,
   systemRules?: string,
   characterSheet?: string,
-): string | Anthropic.TextBlockParam[] {
+): string | SystemBlock[] {
   // Legacy call: buildOOCPrompt("name", rules?, sheet?)
   if (typeof optionsOrName === "string") {
     return buildOOCPromptLegacy(optionsOrName, systemRules, characterSheet);
@@ -142,17 +142,16 @@ function buildOOCPromptLegacy(
 }
 
 /** Structured cached-prefix builder — mirrors DM prefix layout minus DM-internal sections. */
-function buildOOCPromptCached(opts: Required<Pick<OOCPromptOptions, "config" | "sessionState">> & OOCPromptOptions): Anthropic.TextBlockParam[] {
-  const blocks: Anthropic.TextBlockParam[] = [];
+function buildOOCPromptCached(opts: Required<Pick<OOCPromptOptions, "config" | "sessionState">> & OOCPromptOptions): SystemBlock[] {
+  const blocks: SystemBlock[] = [];
   const config = opts.config;
   const ss = opts.sessionState;
 
   // OOC identity prompt (stable — cached)
   blocks.push({
-    type: "text",
     text: loadPrompt("ooc-mode"),
-    cache_control: { type: "ephemeral", ttl: "1h" },
-  } as Anthropic.TextBlockParam);
+    cacheControl: { ttl: "1h" },
+  });
 
   // Campaign setting
   {
@@ -163,7 +162,6 @@ function buildOOCPromptCached(opts: Required<Pick<OOCPromptOptions, "config" | "
     if (config.difficulty) settingLines.push(`Difficulty: ${config.difficulty}`);
     if (config.premise) settingLines.push(`Premise: ${config.premise}`);
     blocks.push({
-      type: "text",
       text: `\n\n## Campaign Setting\n${settingLines.join("\n")}`,
     });
   }
@@ -171,25 +169,22 @@ function buildOOCPromptCached(opts: Required<Pick<OOCPromptOptions, "config" | "
   // Rules appendix (stable — cached)
   if (ss.rulesAppendix || opts.systemRules) {
     blocks.push({
-      type: "text",
       text: `\n\n## Rules Reference\n${ss.rulesAppendix ?? opts.systemRules}`,
-      cache_control: { type: "ephemeral", ttl: "1h" },
-    } as Anthropic.TextBlockParam);
+      cacheControl: { ttl: "1h" },
+    });
   }
 
   // Campaign log (stable within a scene — cached)
   if (ss.campaignSummary) {
     blocks.push({
-      type: "text",
       text: `\n\n## Campaign Log\n${ss.campaignSummary}`,
-      cache_control: { type: "ephemeral", ttl: "1h" },
-    } as Anthropic.TextBlockParam);
+      cacheControl: { ttl: "1h" },
+    });
   }
 
   // Session recap (changes once at session start)
   if (ss.sessionRecap) {
     blocks.push({
-      type: "text",
       text: `\n\n## Last Session\n${ss.sessionRecap}`,
     });
   }
@@ -197,7 +192,6 @@ function buildOOCPromptCached(opts: Required<Pick<OOCPromptOptions, "config" | "
   // Active state (location, PCs, alarms — changes during play)
   if (ss.activeState) {
     blocks.push({
-      type: "text",
       text: `\n\n## Current State\n${ss.activeState}`,
     });
   }
@@ -205,7 +199,6 @@ function buildOOCPromptCached(opts: Required<Pick<OOCPromptOptions, "config" | "
   // Scene precis (changes as exchanges are pruned)
   if (ss.scenePrecis) {
     blocks.push({
-      type: "text",
       text: `\n\n## Scene So Far\n${ss.scenePrecis}`,
     });
   }
@@ -213,7 +206,6 @@ function buildOOCPromptCached(opts: Required<Pick<OOCPromptOptions, "config" | "
   // Active character sheet (player-specific, uncached)
   if (opts.characterSheet) {
     blocks.push({
-      type: "text",
       text: `\n\n## Active Character\n${opts.characterSheet}`,
     });
   }
@@ -222,12 +214,12 @@ function buildOOCPromptCached(opts: Required<Pick<OOCPromptOptions, "config" | "
 }
 
 /** Build OOC tool definitions (available when repo or fileIO is provided). */
-export function buildOOCTools(hasFileIO: boolean, hasGameState: boolean): Anthropic.Tool[] {
-  const tools: Anthropic.Tool[] = [
+export function buildOOCTools(hasFileIO: boolean, hasGameState: boolean): NormalizedTool[] {
+  const tools: NormalizedTool[] = [
     {
       name: "get_commit_log",
       description: "List git snapshot commits for this campaign. Shows commit hash, type, message, and timestamp. Use to review game history for rollback or debugging.",
-      input_schema: {
+      inputSchema: {
         type: "object" as const,
         properties: {
           depth: { type: "number", description: "Number of commits to retrieve (default 20, max 100)" },
@@ -244,7 +236,7 @@ export function buildOOCTools(hasFileIO: boolean, hasGameState: boolean): Anthro
       {
         name: "read_file",
         description: "Read a campaign file by relative path (e.g. 'characters/kael.md').",
-        input_schema: {
+        inputSchema: {
           type: "object" as const,
           properties: {
             path: { type: "string", description: "Relative path within the campaign directory" },
@@ -255,7 +247,7 @@ export function buildOOCTools(hasFileIO: boolean, hasGameState: boolean): Anthro
       {
         name: "find_references",
         description: "Find all wikilinks pointing to an entity. Returns file, display text, and line number for each reference.",
-        input_schema: {
+        inputSchema: {
           type: "object" as const,
           properties: {
             path: { type: "string", description: "Entity path relative to campaign root (e.g. 'characters/kael.md')" },
@@ -266,7 +258,7 @@ export function buildOOCTools(hasFileIO: boolean, hasGameState: boolean): Anthro
       {
         name: "validate_campaign",
         description: "Run the full campaign validation suite: broken links, malformed entities, clock/map issues.",
-        input_schema: {
+        inputSchema: {
           type: "object" as const,
           properties: {},
           required: [],
@@ -285,7 +277,7 @@ export function buildOOCTools(hasFileIO: boolean, hasGameState: boolean): Anthro
 
 /** Build OOC tool handler. */
 export function buildOOCToolHandler(
-  client: Anthropic | undefined,
+  provider: LLMProvider | undefined,
   repo?: CampaignRepo,
   campaignRoot?: string,
   fileIO?: FileIO,
@@ -345,7 +337,7 @@ export function buildOOCToolHandler(
         default:
           // DM tool dispatch
           if (OOC_DM_TOOL_SET.has(name) && gameState) {
-            return await dispatchDMTool(name, input, gameState, client, repo, fileIO, campaignRoot, onTuiCommand);
+            return await dispatchDMTool(name, input, gameState, provider, repo, fileIO, campaignRoot, onTuiCommand);
           }
           return { content: `Unknown tool: ${name}`, is_error: true };
       }
@@ -362,7 +354,7 @@ async function dispatchDMTool(
   name: string,
   input: Record<string, unknown>,
   gameState: GameState,
-  client?: Anthropic,
+  provider?: LLMProvider,
   repo?: CampaignRepo,
   fileIO?: FileIO,
   campaignRoot?: string,
@@ -387,13 +379,13 @@ async function dispatchDMTool(
 
   // Scribe — spawn subagent to handle entity operations
   if (name === "scribe") {
-    if (!client || !fileIO || !campaignRoot) {
+    if (!provider || !fileIO || !campaignRoot) {
       return { content: "Client and file I/O required for scribe", is_error: true };
     }
     const result = registry.dispatch(gameState, name, input);
     if (result.is_error) return result;
     const cmd = result._tui ?? JSON.parse(result.content);
-    const scribeResult = await runScribe(client, {
+    const scribeResult = await runScribe(provider, {
       updates: (cmd as Record<string, unknown>).updates as import("./scribe.js").ScribeUpdate[],
       campaignRoot,
       sceneNumber: 0, // OOC has no scene number
@@ -403,7 +395,7 @@ async function dispatchDMTool(
 
   // Promote character — read sheet, spawn subagent, write back
   if (name === "promote_character") {
-    if (!client || !fileIO || !campaignRoot) {
+    if (!provider || !fileIO || !campaignRoot) {
       return { content: "Client and file I/O required for promote_character", is_error: true };
     }
     const result = registry.dispatch(gameState, name, input);
@@ -425,7 +417,7 @@ async function dispatchDMTool(
     }
 
     const { promoteCharacter } = await import("./character-promotion.js");
-    const promoResult = await promoteCharacter(client, {
+    const promoResult = await promoteCharacter(provider, {
       characterName,
       characterSheet: currentSheet,
       context,
@@ -471,7 +463,7 @@ async function executeRollback(
  * Returns a terse summary for the DM when OOC ends.
  */
 export async function enterOOC(
-  client: Anthropic,
+  provider: LLMProvider,
   playerMessage: string,
   options: {
     campaignName: string;
@@ -509,11 +501,11 @@ export async function enterOOC(
   const hasTools = !!options.repo || hasFileIO || hasGameState;
   const tools = hasTools ? buildOOCTools(hasFileIO, hasGameState) : undefined;
   const toolHandler = hasTools
-    ? buildOOCToolHandler(client, options.repo, options.campaignRoot, options.fileIO, options.maps, options.clocks, options.gameState, options.onTuiCommand)
+    ? buildOOCToolHandler(provider, options.repo, options.campaignRoot, options.fileIO, options.maps, options.clocks, options.gameState, options.onTuiCommand)
     : undefined;
 
   const result = await spawnSubagent(
-    client,
+    provider,
     {
       name: "ooc",
       model: getModel("medium"),
@@ -610,7 +602,7 @@ export function extractSummary(text: string): string {
  * Used by PlayingPhase to unify non-DM mode handling.
  */
 export function createOOCSession(
-  client: Anthropic,
+  provider: LLMProvider,
   options: {
     campaignName: string;
     previousVariant: string;
@@ -629,6 +621,6 @@ export function createOOCSession(
   return {
     label: "OOC",
     tier: "medium",
-    send: (text, onDelta) => enterOOC(client, text, options, onDelta),
+    send: (text, onDelta) => enterOOC(provider, text, options, onDelta),
   };
 }

@@ -1,7 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { ToolResult } from "./tool-registry.js";
 import type { UsageStats, TuiCommand, ModelId } from "./agent-loop.js";
-import { accumulateUsage } from "../context/usage-helpers.js";
+// Legacy: convert Anthropic.Usage → UsageStats accumulation
+function accumulateUsage(total: UsageStats, usage: Anthropic.Usage): void {
+  total.inputTokens += usage.input_tokens;
+  total.outputTokens += usage.output_tokens;
+  total.cacheReadTokens += usage.cache_read_input_tokens ?? 0;
+  total.cacheCreationTokens += usage.cache_creation_input_tokens ?? 0;
+}
 import { dumpContext, dumpThinking } from "../config/context-dump.js";
 import { ContentRefusalError } from "@machine-violet/shared/types/errors.js";
 import { getEffortConfig } from "../config/models.js";
@@ -226,9 +232,15 @@ export async function runAgentLoop(
   // numbers align with assistant message indices in the context dump viewer.
   const priorAssistantCount = messages.filter((m) => m.role === "assistant").length;
 
+  // When thinking is enabled, max_tokens must cover BOTH thinking and
+  // response tokens. Boost to 16384 so thinking doesn't starve the response.
+  const effectiveMaxTokens = ec.effort
+    ? Math.max(config.maxTokens, 16384)
+    : config.maxTokens;
+
   const buildParams = (): CreateParams => ({
     model: config.model,
-    max_tokens: config.maxTokens,
+    max_tokens: effectiveMaxTokens,
     system: effectiveSystem,
     messages: workingMessages,
     thinking: thinkingParam,

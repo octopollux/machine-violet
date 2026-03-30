@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node --max-semi-space-size=16 dist/index.js",
-    "dev": "node --import tsx/esm scripts/dev-two-tier.js",
+    "dev": "npm run build -w packages/shared && node --import tsx/esm scripts/dev-two-tier.js",
     "dev:launcher": "node --max-semi-space-size=16 --import tsx/esm scripts/launcher.ts",
     "build": "tsc",
     "build:all": "npm run build -w packages/shared && npm run build -w packages/engine && npm run build -w packages/client-ink",

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider, ChatResult } from "../providers/types.js";
 import { SceneManager, parseTranscriptEntries, classifyTranscriptEntry, buildScenePrecis, buildScenePacing, buildSceneAnchor, detectSceneState } from "./scene-manager.js";
 import type { SceneState, FileIO } from "./scene-manager.js";
 import type { CampaignRepo } from "../tools/git/index.js";
@@ -12,21 +12,18 @@ import { createDecksState } from "../tools/cards/index.js";
 import { createObjectivesState } from "../tools/objectives/index.js";
 import { norm } from "../utils/paths.js";
 
-function mockUsage(): Anthropic.Usage {
-  return { input_tokens: 50, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: null, inference_geo: null, server_tool_use: null, service_tier: null };
+function mockUsage() {
+  return { inputTokens: 50, outputTokens: 20, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 };
 }
 
-function textResponse(text: string): Anthropic.Message {
+function textResponse(text: string): ChatResult {
   return {
-    id: "msg_test",
-    type: "message",
-    role: "assistant",
-    model: "claude-haiku-4-5-20251001",
-    content: [{ type: "text", text }],
-    stop_reason: "end_turn",
-    stop_sequence: null,
+    text,
+    toolCalls: [],
     usage: mockUsage(),
-  } as Anthropic.Message;
+    stopReason: "end",
+    assistantContent: [{ type: "text", text }],
+  };
 }
 
 /** Empty compendium JSON response for the compendium updater subagent */
@@ -35,30 +32,32 @@ const EMPTY_COMPENDIUM_RESPONSE = textResponse(
 );
 
 /**
- * Mock Anthropic client. Responses are consumed in order.
+ * Mock LLMProvider. Responses are consumed in order.
  * Pass `fallback` to handle extra calls (e.g. from parallel compendium subagent)
  * instead of crashing on exhaustion.
  */
-function mockClient(
-  responses: Anthropic.Message[],
-  opts?: { fallback?: Anthropic.Message },
-): Anthropic {
+function mockProvider(
+  responses: ChatResult[],
+  opts?: { fallback?: ChatResult },
+): LLMProvider {
   let callIdx = 0;
+  const next = async () => {
+    const resp = responses[callIdx++];
+    if (resp) return resp;
+    if (opts?.fallback) return opts.fallback;
+    throw new Error(`mockProvider: no response at index ${callIdx - 1}`);
+  };
   return {
-    messages: {
-      create: vi.fn(async () => {
-        const resp = responses[callIdx++];
-        if (resp) return resp;
-        if (opts?.fallback) return opts.fallback;
-        throw new Error(`mockClient: no response at index ${callIdx - 1}`);
-      }),
-    },
-  } as unknown as Anthropic;
+    providerId: "mock",
+    chat: vi.fn(next),
+    stream: vi.fn(next),
+    healthCheck: vi.fn(async () => ({ ok: true })),
+  } as unknown as LLMProvider;
 }
 
-/** Shorthand: mockClient with compendium fallback for tests that run scene transitions. */
-function transitionClient(responses: Anthropic.Message[]): Anthropic {
-  return mockClient(responses, { fallback: EMPTY_COMPENDIUM_RESPONSE });
+/** Shorthand: mockProvider with compendium fallback for tests that run scene transitions. */
+function transitionProvider(responses: ChatResult[]): LLMProvider {
+  return mockProvider(responses, { fallback: EMPTY_COMPENDIUM_RESPONSE });
 }
 
 function mockState(): GameState {
@@ -168,7 +167,7 @@ describe("SceneManager", () => {
   });
 
   it("handles dropped exchange by updating precis", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       textResponse("Aldric entered the tavern. Warm, dimly lit."),
     ]);
 
@@ -180,7 +179,7 @@ describe("SceneManager", () => {
       mockFileIO(),
     );
 
-    const usage = await mgr.handleDroppedExchange(client, {
+    const usage = await mgr.handleDroppedExchange(provider, {
       exchange: {
         user: { role: "user", content: "I enter the tavern." },
         assistant: { role: "assistant", content: "The tavern is warm." },
@@ -196,7 +195,7 @@ describe("SceneManager", () => {
   });
 
   it("passes PC identification to precis updater", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       textResponse("Aldric entered the tavern."),
     ]);
 
@@ -214,7 +213,7 @@ describe("SceneManager", () => {
       mockFileIO(),
     );
 
-    await mgr.handleDroppedExchange(client, {
+    await mgr.handleDroppedExchange(provider, {
       exchange: {
         user: { role: "user", content: "I enter the tavern." },
         assistant: { role: "assistant", content: "The tavern is warm." },
@@ -225,7 +224,7 @@ describe("SceneManager", () => {
       reason: "exchange_count",
     });
 
-    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
     const userMessage = createCall.messages[0].content;
     expect(userMessage).toContain("[[Aldric]] (Alice)");
     expect(userMessage).toContain("[[Brin]] (Bob)");
@@ -233,7 +232,7 @@ describe("SceneManager", () => {
   });
 
   it("accumulates player reads from dropped exchanges", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       textResponse('Aldric entered the tavern.\nPLAYER_READ: {"engagement":"high","focus":["exploration"],"tone":"curious","pacing":"exploratory","offScript":true}'),
     ]);
 
@@ -245,7 +244,7 @@ describe("SceneManager", () => {
       mockFileIO(),
     );
 
-    await mgr.handleDroppedExchange(client, {
+    await mgr.handleDroppedExchange(provider, {
       exchange: {
         user: { role: "user", content: "I enter the tavern." },
         assistant: { role: "assistant", content: "The tavern is warm." },
@@ -262,7 +261,7 @@ describe("SceneManager", () => {
   });
 
   it("clears player reads on scene transition", async () => {
-    const client = transitionClient([
+    const provider = transitionProvider([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
@@ -280,13 +279,13 @@ describe("SceneManager", () => {
       mockFileIO(),
     );
 
-    await mgr.sceneTransition(client, "End of fight");
+    await mgr.sceneTransition(provider, "End of fight");
     expect(mgr.getScene().playerReads).toHaveLength(0);
   });
 
   it("executes scene_transition cascade", async () => {
-    // Mock client: first call = scene summary (with ---MINI---), second call = changelog
-    const client = transitionClient([
+    // Mock provider: first call = scene summary (with ---MINI---), second call = changelog
+    const provider = transitionProvider([
       textResponse("- Aldric entered tavern\n- Met innkeeper\n---MINI---\nAldric entered tavern and met the innkeeper."),
       textResponse("aldric.md: Entered tavern in Scene 1"),
     ]);
@@ -302,7 +301,7 @@ describe("SceneManager", () => {
       fileIO,
     );
 
-    const result = await mgr.sceneTransition(client, "Tavern Meeting");
+    const result = await mgr.sceneTransition(provider, "Tavern Meeting");
 
     // Transcript was written
     expect(fileIO.writeFile).toHaveBeenCalled();
@@ -338,7 +337,7 @@ describe("SceneManager", () => {
   });
 
   it("writes pending-operation.json during cascade", async () => {
-    const client = transitionClient([
+    const provider = transitionProvider([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
@@ -352,7 +351,7 @@ describe("SceneManager", () => {
       fileIO,
     );
 
-    await mgr.sceneTransition(client, "Test");
+    await mgr.sceneTransition(provider, "Test");
 
     // pending-operation.json was written multiple times during cascade
     const pendingOpCalls = (fileIO.writeFile as ReturnType<typeof vi.fn>).mock.calls
@@ -361,7 +360,7 @@ describe("SceneManager", () => {
   });
 
   it("advances calendar during scene transition", async () => {
-    const client = transitionClient([
+    const provider = transitionProvider([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
@@ -377,13 +376,13 @@ describe("SceneManager", () => {
       mockFileIO(),
     );
 
-    await mgr.sceneTransition(client, "Test", 120); // 120 minutes
+    await mgr.sceneTransition(provider, "Test", 120); // 120 minutes
 
     expect(state.clocks.calendar.current).toBe(initialCalendar + 120);
   });
 
   it("sessionEnd writes recap file", async () => {
-    const client = transitionClient([
+    const provider = transitionProvider([
       textResponse("- Session summary\n---MINI---\nSession summary."),
       textResponse(""),
     ]);
@@ -397,7 +396,7 @@ describe("SceneManager", () => {
       fileIO,
     );
 
-    await mgr.sessionEnd(client, "End of session");
+    await mgr.sessionEnd(provider, "End of session");
 
     // Session recap file was written
     const recapCalls = (fileIO.writeFile as ReturnType<typeof vi.fn>).mock.calls
@@ -543,12 +542,12 @@ describe("SceneManager", () => {
     await mgr.contextRefresh();
     // The alias context is private, but we can verify it's passed to subagents
     // by checking the summarizer call in a transition
-    const client = transitionClient([
+    const provider = transitionProvider([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
-    await mgr.sceneTransition(client, "Test");
-    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    await mgr.sceneTransition(provider, "Test");
+    const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(createCall.messages[0].content).toContain("Entity aliases");
     expect(createCall.messages[0].content).toContain("mysterious-stranger.md: also known as Grimjaw, Captain Grimjaw");
     expect(createCall.messages[0].content).toContain("old-tower/index.md: also known as Malachar's Prison");
@@ -577,12 +576,12 @@ describe("SceneManager", () => {
 
     await mgr.contextRefresh();
     // Verify no alias context in subagent calls
-    const client = transitionClient([
+    const provider = transitionProvider([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
-    await mgr.sceneTransition(client, "Test");
-    const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    await mgr.sceneTransition(provider, "Test");
+    const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(createCall.messages[0].content).not.toContain("Entity aliases");
   });
 
@@ -602,8 +601,8 @@ describe("SceneManager", () => {
       return [];
     });
 
-    // Mock client: summarizer + compendium (resolves before changelog due to fewer awaits) + changelog
-    const client = transitionClient([
+    // Mock provider: summarizer + compendium (resolves before changelog due to fewer awaits) + changelog
+    const provider = transitionProvider([
       textResponse("- Scene summary\n---MINI---\nScene summary."),
       EMPTY_COMPENDIUM_RESPONSE,
       textResponse("tavern/index.md: Party entered and caused a brawl"),
@@ -617,7 +616,7 @@ describe("SceneManager", () => {
       fileIO,
     );
 
-    const result = await mgr.sceneTransition(client, "Tavern Brawl");
+    const result = await mgr.sceneTransition(provider, "Tavern Brawl");
     expect(result.changelogEntries).toHaveLength(1);
 
     // Verify changelog was written to the location's index.md
@@ -678,7 +677,7 @@ describe("SceneManager", () => {
   });
 
   it("sceneEntityIndex is cleared on scene transition", async () => {
-    const client = transitionClient([
+    const provider = transitionProvider([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
@@ -697,7 +696,7 @@ describe("SceneManager", () => {
     let { volatile } = mgr.getSystemPrompt();
     expect(volatile).toContain("Grimjaw");
 
-    await mgr.sceneTransition(client, "End of scene");
+    await mgr.sceneTransition(provider, "End of scene");
 
     // After transition, entity index should be cleared
     ({ volatile } = mgr.getSystemPrompt());
@@ -745,7 +744,7 @@ describe("SceneManager", () => {
   });
 
   it("sceneTransition populates validationIssues in result", async () => {
-    const client = transitionClient([
+    const provider = transitionProvider([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
@@ -762,13 +761,13 @@ describe("SceneManager", () => {
       fileIO,
     );
 
-    const result = await mgr.sceneTransition(client, "Test Scene");
+    const result = await mgr.sceneTransition(provider, "Test Scene");
     expect(result.validationIssues).toBeDefined();
     expect(result.validationIssues!.filesChecked).toBeGreaterThanOrEqual(1);
   });
 
   it("validation failure does not block scene transition", async () => {
-    const client = transitionClient([
+    const provider = transitionProvider([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
@@ -787,7 +786,7 @@ describe("SceneManager", () => {
     mgr.devLog = (msg: string) => devLogs.push(msg);
 
     // Should complete without throwing — missing config.json is a validation error but non-blocking
-    const result = await mgr.sceneTransition(client, "Test Scene");
+    const result = await mgr.sceneTransition(provider, "Test Scene");
     expect(result.campaignLogEntry).toBeTruthy();
     expect(mgr.getScene().sceneNumber).toBe(2);
     // Validation ran and found issues (missing config.json)
@@ -796,7 +795,7 @@ describe("SceneManager", () => {
   });
 
   it("stepCheckpoint commits via CampaignRepo during scene transition", async () => {
-    const client = transitionClient([
+    const provider = transitionProvider([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
@@ -818,13 +817,13 @@ describe("SceneManager", () => {
       mockRepo as unknown as CampaignRepo,
     );
 
-    await mgr.sceneTransition(client, "Tavern Meeting");
+    await mgr.sceneTransition(provider, "Tavern Meeting");
 
     expect(mockRepo.sceneCommit).toHaveBeenCalledWith("Tavern Meeting");
   });
 
   it("sessionEnd calls sessionCommit on CampaignRepo", async () => {
-    const client = transitionClient([
+    const provider = transitionProvider([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
@@ -846,7 +845,7 @@ describe("SceneManager", () => {
       mockRepo as unknown as CampaignRepo,
     );
 
-    await mgr.sessionEnd(client, "End of session");
+    await mgr.sessionEnd(provider, "End of session");
 
     // sceneCommit from the transition cascade, sessionCommit from sessionEnd
     expect(mockRepo.sceneCommit).toHaveBeenCalled();
@@ -874,8 +873,8 @@ describe("SceneManager", () => {
   // --- resumePendingTransition tests ---
 
   it("resumePendingTransition resumes from subagent_updates step", async () => {
-    // Mock client: first call = scene summary, second call = changelog
-    const client = transitionClient([
+    // Mock provider: first call = scene summary, second call = changelog
+    const provider = transitionProvider([
       textResponse("- Resumed summary\n---MINI---\nResumed summary."),
       textResponse(""),
     ]);
@@ -891,7 +890,7 @@ describe("SceneManager", () => {
       fileIO,
     );
 
-    const result = await mgr.resumePendingTransition(client, {
+    const result = await mgr.resumePendingTransition(provider, {
       type: "scene_transition",
       step: "subagent_updates" as import("./scene-manager.js").PendingStep,
       sceneNumber: 1,
@@ -911,7 +910,7 @@ describe("SceneManager", () => {
   });
 
   it("resumePendingTransition clears pending-operation.json after success", async () => {
-    const client = transitionClient([
+    const provider = transitionProvider([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
@@ -925,7 +924,7 @@ describe("SceneManager", () => {
       fileIO,
     );
 
-    await mgr.resumePendingTransition(client, {
+    await mgr.resumePendingTransition(provider, {
       type: "scene_transition",
       step: "validate",
       sceneNumber: 1,
@@ -940,7 +939,7 @@ describe("SceneManager", () => {
   });
 
   it("resumePendingTransition no-ops when step is done", async () => {
-    const client = mockClient([]);
+    const provider = mockProvider([]);
     const fileIO = mockFileIO();
 
     const mgr = new SceneManager(
@@ -951,7 +950,7 @@ describe("SceneManager", () => {
       fileIO,
     );
 
-    const result = await mgr.resumePendingTransition(client, {
+    const result = await mgr.resumePendingTransition(provider, {
       type: "scene_transition",
       step: "done",
       sceneNumber: 1,
@@ -964,7 +963,7 @@ describe("SceneManager", () => {
   });
 
   it("resumePendingTransition advances scene number", async () => {
-    const client = mockClient([]);
+    const provider = mockProvider([]);
     const fileIO = mockFileIO();
 
     const scene = mockScene();
@@ -979,7 +978,7 @@ describe("SceneManager", () => {
     );
 
     // Resume from checkpoint (last real step — quick, no API calls)
-    await mgr.resumePendingTransition(client, {
+    await mgr.resumePendingTransition(provider, {
       type: "scene_transition",
       step: "checkpoint",
       sceneNumber: 1,
@@ -992,12 +991,13 @@ describe("SceneManager", () => {
   });
 
   it("resumePendingTransition preserves pending-op on error", async () => {
-    // Mock client that throws on first call (subagent_updates step)
-    const client = {
-      messages: {
-        create: vi.fn(async () => { throw new Error("API down"); }),
-      },
-    } as unknown as Anthropic;
+    // Mock provider that throws on first call (subagent_updates step)
+    const errorProvider: LLMProvider = {
+      providerId: "mock",
+      chat: vi.fn(async () => { throw new Error("API down"); }),
+      stream: vi.fn(async () => { throw new Error("API down"); }),
+      healthCheck: vi.fn(async () => ({ ok: true })),
+    } as unknown as LLMProvider;
 
     const fileIO = mockFileIO();
     const mgr = new SceneManager(
@@ -1008,7 +1008,7 @@ describe("SceneManager", () => {
       fileIO,
     );
 
-    await expect(mgr.resumePendingTransition(client, {
+    await expect(mgr.resumePendingTransition(errorProvider, {
       type: "scene_transition",
       step: "subagent_updates" as import("./scene-manager.js").PendingStep,
       sceneNumber: 1,
@@ -1025,7 +1025,7 @@ describe("SceneManager", () => {
   });
 
   it("legacy pending-op step 'campaign_log' normalizes to subagent_updates", async () => {
-    const client = transitionClient([
+    const provider = transitionProvider([
       textResponse("- Resumed summary\n---MINI---\nResumed summary."),
       textResponse(""),
     ]);
@@ -1042,7 +1042,7 @@ describe("SceneManager", () => {
     );
 
     // Pass legacy step name — should normalize and resume from subagent_updates
-    const result = await mgr.resumePendingTransition(client, {
+    const result = await mgr.resumePendingTransition(provider, {
       type: "scene_transition",
       step: "campaign_log" as import("./scene-manager.js").PendingStep,
       sceneNumber: 1,
@@ -1054,7 +1054,7 @@ describe("SceneManager", () => {
   });
 
   it("legacy pending-op step 'changelog_updates' normalizes to subagent_updates", async () => {
-    const client = transitionClient([
+    const provider = transitionProvider([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
@@ -1070,7 +1070,7 @@ describe("SceneManager", () => {
       fileIO,
     );
 
-    const result = await mgr.resumePendingTransition(client, {
+    const result = await mgr.resumePendingTransition(provider, {
       type: "scene_transition",
       step: "changelog_updates" as import("./scene-manager.js").PendingStep,
       sceneNumber: 1,
@@ -1092,8 +1092,8 @@ describe("SceneManager", () => {
       return [];
     });
 
-    // Mock client: summarizer (with ---MINI---) + changelog that returns an entry for aldric scene 1
-    const client = transitionClient([
+    // Mock provider: summarizer (with ---MINI---) + changelog that returns an entry for aldric scene 1
+    const provider = transitionProvider([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse("aldric.md: Entered tavern in Scene 1"),
     ]);
@@ -1106,7 +1106,7 @@ describe("SceneManager", () => {
       fileIO,
     );
 
-    await mgr.sceneTransition(client, "Tavern Meeting");
+    await mgr.sceneTransition(provider, "Tavern Meeting");
 
     // File should NOT have a duplicate entry
     const content = files["/tmp/test-campaign/characters/aldric.md"];
@@ -1370,7 +1370,7 @@ describe("buildSceneAnchor", () => {
 
 describe("scene transition seeds precis", () => {
   it("sceneTransition seeds precis with campaign log anchor", async () => {
-    const client = transitionClient([
+    const provider = transitionProvider([
       textResponse("- Aldric entered the tavern\n- Met the innkeeper\n- Ordered a drink\n- Heard a rumor"),
       textResponse(""),
     ]);
@@ -1386,7 +1386,7 @@ describe("scene transition seeds precis", () => {
       fileIO,
     );
 
-    await mgr.sceneTransition(client, "Tavern Meeting");
+    await mgr.sceneTransition(provider, "Tavern Meeting");
 
     const scene = mgr.getScene();
     expect(scene.precis).toContain("Previous scene (Tavern Meeting):");
@@ -1396,7 +1396,7 @@ describe("scene transition seeds precis", () => {
   });
 
   it("resumePendingTransition seeds precis with campaign log anchor", async () => {
-    const client = transitionClient([
+    const provider = transitionProvider([
       textResponse("- Explored the dungeon\n- Found a key"),
       textResponse(""),
     ]);
@@ -1412,7 +1412,7 @@ describe("scene transition seeds precis", () => {
       fileIO,
     );
 
-    await mgr.resumePendingTransition(client, {
+    await mgr.resumePendingTransition(provider, {
       type: "scene_transition",
       step: "subagent_updates" as import("./scene-manager.js").PendingStep,
       sceneNumber: 1,

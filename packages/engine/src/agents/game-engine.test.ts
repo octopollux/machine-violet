@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider, ChatResult } from "../providers/types.js";
 import { GameEngine } from "./game-engine.js";
 import { pruneEmptyDirs } from "../tools/git/index.js";
 import type { EngineCallbacks, EngineState, TurnInfo } from "./game-engine.js";
@@ -51,59 +51,47 @@ import { aiPlayerTurn } from "./subagents/ai-player.js";
 import { runScribe } from "./subagents/scribe.js";
 import { promoteCharacter } from "./subagents/character-promotion.js";
 
-function mockUsage(): Anthropic.Usage {
-  return { input_tokens: 100, output_tokens: 50, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: null, inference_geo: null, server_tool_use: null, service_tier: null };
+function mockUsage() {
+  return { inputTokens: 100, outputTokens: 50, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 };
 }
 
-function textMessage(text: string): Anthropic.Message {
+function textMessage(text: string): ChatResult {
   return {
-    id: "msg_test",
-    type: "message",
-    role: "assistant",
-    model: "claude-opus-4-6",
-    content: [{ type: "text", text }],
-    stop_reason: "end_turn",
-    stop_sequence: null,
+    text,
+    toolCalls: [],
     usage: mockUsage(),
-  } as Anthropic.Message;
+    stopReason: "end",
+    assistantContent: [{ type: "text", text }],
+  };
 }
 
 function toolAndTextMessages(
   toolName: string,
   toolInput: Record<string, unknown>,
   text: string,
-): Anthropic.Message[] {
+): ChatResult[] {
   return [
     {
-      id: "msg_tool",
-      type: "message",
-      role: "assistant",
-      model: "claude-opus-4-6",
-      content: [{ type: "tool_use", id: "toolu_1", name: toolName, input: toolInput }],
-      stop_reason: "tool_use",
-      stop_sequence: null,
+      text: "",
+      toolCalls: [{ id: "toolu_1", name: toolName, input: toolInput }],
       usage: mockUsage(),
-    } as Anthropic.Message,
+      stopReason: "tool_use",
+      assistantContent: [{ type: "tool_use", id: "toolu_1", name: toolName, input: toolInput }],
+    },
     textMessage(text),
   ];
 }
 
-let clientCallIdx: number;
+let providerCallIdx: number;
 
-function mockClient(responses: Anthropic.Message[]): Anthropic {
-  clientCallIdx = 0;
+function mockProvider(responses: ChatResult[]): LLMProvider {
+  providerCallIdx = 0;
   return {
-    messages: {
-      create: vi.fn(async () => responses[clientCallIdx++]),
-      stream: vi.fn(() => {
-        const response = responses[clientCallIdx++];
-        return {
-          on: vi.fn(),
-          finalMessage: vi.fn(async () => response),
-        };
-      }),
-    },
-  } as unknown as Anthropic;
+    providerId: "mock",
+    chat: vi.fn(async () => responses[providerCallIdx++]),
+    stream: vi.fn(async (_params: unknown, _onDelta?: unknown) => responses[providerCallIdx++]),
+    healthCheck: vi.fn(async () => ({ ok: true })),
+  } as unknown as LLMProvider;
 }
 
 function mockState(): GameState {
@@ -222,11 +210,11 @@ beforeEach(() => {
 
 describe("GameEngine", () => {
   it("processes player input and returns DM response", async () => {
-    const client = mockClient([textMessage("The door creaks open.")]);
+    const provider = mockProvider([textMessage("The door creaks open.")]);
     const { callbacks, log } = mockCallbacks();
 
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: mockState(),
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -244,13 +232,13 @@ describe("GameEngine", () => {
   });
 
   it("handles tool calls and collects TUI commands", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       ...toolAndTextMessages("style_scene", { key_color: "#cc4444" }, "The mood shifts."),
     ]);
     const { callbacks, log } = mockCallbacks();
 
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: mockState(),
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -268,11 +256,11 @@ describe("GameEngine", () => {
   });
 
   it("tracks session usage", async () => {
-    const client = mockClient([textMessage("Hello.")]);
+    const provider = mockProvider([textMessage("Hello.")]);
     const { callbacks, log } = mockCallbacks();
 
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: mockState(),
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -289,12 +277,12 @@ describe("GameEngine", () => {
   });
 
   it("appends to scene transcript", async () => {
-    const client = mockClient([textMessage("The tavern is warm.")]);
+    const provider = mockProvider([textMessage("The tavern is warm.")]);
     const { callbacks } = mockCallbacks();
     const scene = mockScene();
 
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: mockState(),
       scene,
       sessionState: mockSessionState(),
@@ -311,13 +299,13 @@ describe("GameEngine", () => {
   });
 
   it("threads tool messages through addExchange", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       ...toolAndTextMessages("roll_dice", { expression: "1d20" }, "You rolled a 15!"),
     ]);
     const { callbacks, log } = mockCallbacks();
 
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: mockState(),
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -337,18 +325,17 @@ describe("GameEngine", () => {
   });
 
   it("handles errors gracefully", async () => {
-    const client = {
-      messages: {
-        stream: vi.fn(() => {
-          throw new Error("API down");
-        }),
-      },
-    } as unknown as Anthropic;
+    const errorProvider: LLMProvider = {
+      providerId: "mock",
+      chat: vi.fn(async () => { throw new Error("API down"); }),
+      stream: vi.fn(async () => { throw new Error("API down"); }),
+      healthCheck: vi.fn(async () => ({ ok: true })),
+    } as unknown as LLMProvider;
 
     const { callbacks, log } = mockCallbacks();
 
     const engine = new GameEngine({
-      client,
+      provider: errorProvider,
       gameState: mockState(),
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -366,12 +353,12 @@ describe("GameEngine", () => {
 
   it("transitions scenes", async () => {
     // Scene summarizer response
-    const client = mockClient([textMessage("- Party met in tavern")]);
+    const provider = mockProvider([textMessage("- Party met in tavern")]);
     const { callbacks, log } = mockCallbacks();
     const scene = mockScene();
 
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: mockState(),
       scene,
       sessionState: mockSessionState(),
@@ -388,14 +375,14 @@ describe("GameEngine", () => {
   });
 
   it("refreshes context after scene transition", async () => {
-    const client = mockClient([textMessage("- Party met in tavern\n---MINI---\nParty met in tavern.")]);
+    const provider = mockProvider([textMessage("- Party met in tavern\n---MINI---\nParty met in tavern.")]);
     const { callbacks } = mockCallbacks();
     const fileIO = mockFileIO();
     const state = mockState();
 
     const sessionState = mockSessionState();
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: state,
       scene: mockScene(),
       sessionState,
@@ -417,14 +404,14 @@ describe("GameEngine", () => {
   });
 
   it("refreshes context after resumePendingTransition", async () => {
-    const client = mockClient([textMessage("- Resumed summary\n---MINI---\nResumed summary.")]);
+    const provider = mockProvider([textMessage("- Resumed summary\n---MINI---\nResumed summary.")]);
     const { callbacks } = mockCallbacks();
     const fileIO = mockFileIO();
     const state = mockState();
 
     const sessionState = mockSessionState();
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: state,
       scene: mockScene(),
       sessionState,
@@ -447,11 +434,11 @@ describe("GameEngine", () => {
   });
 
   it("ends session", async () => {
-    const client = mockClient([textMessage("- Session summary")]);
+    const provider = mockProvider([textMessage("- Session summary")]);
     const { callbacks, log } = mockCallbacks();
 
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: mockState(),
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -468,11 +455,11 @@ describe("GameEngine", () => {
 
   it("ignores input while already processing", async () => {
     // This test verifies the guard against double-processing
-    const client = mockClient([textMessage("Response 1")]);
+    const provider = mockProvider([textMessage("Response 1")]);
     const { callbacks } = mockCallbacks();
 
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: mockState(),
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -489,18 +476,18 @@ describe("GameEngine", () => {
     await Promise.all([p1, p2]);
 
     // Only one API call should have been made
-    expect(client.messages.stream).toHaveBeenCalledTimes(1);
+    expect(provider.stream).toHaveBeenCalledTimes(1);
   });
 
   it("intercepts scene_transition TUI command and calls transitionScene", async () => {
     // DM calls scene_transition tool → returns TUI command JSON → engine intercepts
-    const client = mockClient([
+    const provider = mockProvider([
       ...toolAndTextMessages("scene_transition", { title: "The Dark Forest" }, "You enter the forest."),
     ]);
     const { callbacks, log } = mockCallbacks();
 
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: mockState(),
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -518,13 +505,13 @@ describe("GameEngine", () => {
   });
 
   it("intercepts session_end TUI command and calls endSession", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       ...toolAndTextMessages("session_end", { title: "End of Session 1" }, "That's all for today."),
     ]);
     const { callbacks, log } = mockCallbacks();
 
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: mockState(),
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -540,13 +527,13 @@ describe("GameEngine", () => {
   });
 
   it("intercepts context_refresh TUI command (not forwarded to TUI)", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       ...toolAndTextMessages("context_refresh", {}, "Context refreshed."),
     ]);
     const { callbacks, log } = mockCallbacks();
 
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: mockState(),
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -564,7 +551,7 @@ describe("GameEngine", () => {
 
 describe("GameEngine Scribe Integration", () => {
   it("scribe tool spawns subagent and logs summary", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       ...toolAndTextMessages("scribe", {
         updates: [
           { visibility: "private", content: "Grimjaw is a scarred orc chieftain" },
@@ -577,7 +564,7 @@ describe("GameEngine Scribe Integration", () => {
     callbacks.onDevLog = (msg) => devLogs.push(msg);
 
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: mockState(),
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -597,7 +584,7 @@ describe("GameEngine Scribe Integration", () => {
   });
 
   it("scribe notifies scene manager about created entities", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       ...toolAndTextMessages("scribe", {
         updates: [
           { visibility: "private", content: "Grimjaw is a scarred orc" },
@@ -608,7 +595,7 @@ describe("GameEngine Scribe Integration", () => {
     const fio = mockFileIO();
 
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: mockState(),
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -651,14 +638,14 @@ describe("GameEngine Git Auto-Commit", () => {
     state.config.recovery.auto_commit_interval = 2;
 
     // Need 2 responses (one per processInput call)
-    const client = mockClient([
+    const provider = mockProvider([
       textMessage("Response 1."),
       textMessage("Response 2."),
     ]);
     const { callbacks } = mockCallbacks();
 
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: state,
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -681,11 +668,11 @@ describe("GameEngine Git Auto-Commit", () => {
   });
 
   it("no git errors when gitIO not provided", async () => {
-    const client = mockClient([textMessage("Response.")]);
+    const provider = mockProvider([textMessage("Response.")]);
     const { callbacks, log } = mockCallbacks();
 
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: mockState(),
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -707,7 +694,7 @@ describe("GameEngine Git Auto-Commit", () => {
 
     const { callbacks } = mockCallbacks();
     const engine = new GameEngine({
-      client: mockClient([]),
+      provider: mockProvider([]),
       gameState: state,
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -763,14 +750,14 @@ describe("GameEngine AI Auto-Turn", () => {
     state.activePlayerIndex = 1;
 
     // Two responses: first for the initial processInput, second for the AI-triggered processInput
-    const client = mockClient([
+    const provider = mockProvider([
       textMessage("The goblin attacks!"),
       textMessage("Zara swings her sword."),
     ]);
     const { callbacks, log } = mockCallbacks();
 
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: state,
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -804,11 +791,11 @@ describe("GameEngine AI Auto-Turn", () => {
     const state = mockStateWithAI();
     state.activePlayerIndex = 1; // AI player
 
-    const client = mockClient([textMessage("Response.")]);
+    const provider = mockProvider([textMessage("Response.")]);
     const { callbacks, log } = mockCallbacks();
 
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: state,
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -853,14 +840,14 @@ describe("GameEngine AI Auto-Turn", () => {
     const state = mockStateWithAI();
     state.activePlayerIndex = 0; // human player
 
-    const client = mockClient([
+    const provider = mockProvider([
       textMessage("Response 1."),
       textMessage("Response 2."),
     ]);
     const { callbacks } = mockCallbacks();
 
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: state,
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -886,11 +873,11 @@ describe("GameEngine AI Auto-Turn", () => {
     const fio = mockFileIO();
     vi.mocked(fio.readFile).mockRejectedValue(new Error("ENOENT"));
 
-    const client = mockClient([textMessage("DM responds.")]);
+    const provider = mockProvider([textMessage("DM responds.")]);
     const { callbacks } = mockCallbacks();
 
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: state,
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -922,11 +909,11 @@ describe("GameEngine AI Auto-Turn", () => {
       usage: { inputTokens: 75, outputTokens: 25, cacheReadTokens: 10, cacheCreationTokens: 0 },
     });
 
-    const client = mockClient([textMessage("The goblin falls!")]);
+    const provider = mockProvider([textMessage("The goblin falls!")]);
     const { callbacks, log } = mockCallbacks();
 
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: state,
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -949,20 +936,20 @@ describe("GameEngine AI Auto-Turn", () => {
 
 describe("GameEngine Behavioral Reminder", () => {
   /** Extract the messages array from the Nth stream() call (0-indexed). */
-  function sentMessages(client: Anthropic, callIdx: number): Anthropic.MessageParam[] {
-    const streamFn = client.messages.stream as ReturnType<typeof vi.fn>;
-    return (streamFn.mock.calls[callIdx][0] as { messages: Anthropic.MessageParam[] }).messages;
+  function sentMessages(prov: LLMProvider, callIdx: number): { role: string; content: string | unknown[] }[] {
+    const streamFn = prov.stream as ReturnType<typeof vi.fn>;
+    return (streamFn.mock.calls[callIdx][0] as { messages: { role: string; content: string | unknown[] }[] }).messages;
   }
 
   it("no reminder injected during first 3 turns even without tools or entity formatting", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       textMessage("Turn 1."),
       textMessage("Turn 2."),
       textMessage("Turn 3."),
     ]);
     const { callbacks } = mockCallbacks();
     const engine = new GameEngine({
-      client, gameState: mockState(), scene: mockScene(),
+      provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
     });
@@ -972,13 +959,13 @@ describe("GameEngine Behavioral Reminder", () => {
     await engine.processInput("Aldric", "Three.");
 
     for (let i = 0; i < 3; i++) {
-      const msgs = sentMessages(client, i);
+      const msgs = sentMessages(provider, i);
       expect(msgs.every((m) => typeof m.content !== "string" || !m.content.includes("[dm-note]"))).toBe(true);
     }
   });
 
   it("injects tool reminder on 4th turn after 3 turns without tools", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       textMessage("One."),
       textMessage("Two."),
       textMessage("Three."),
@@ -986,7 +973,7 @@ describe("GameEngine Behavioral Reminder", () => {
     ]);
     const { callbacks } = mockCallbacks();
     const engine = new GameEngine({
-      client, gameState: mockState(), scene: mockScene(),
+      provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
     });
@@ -996,7 +983,7 @@ describe("GameEngine Behavioral Reminder", () => {
     await engine.processInput("Aldric", "Three.");
     await engine.processInput("Aldric", "Four.");
 
-    const msgs = sentMessages(client, 3);
+    const msgs = sentMessages(provider, 3);
     const dmNote = msgs.find((m) => typeof m.content === "string" && m.content.includes("[dm-note]"));
     expect(dmNote).toBeDefined();
     expect(dmNote!.content).toContain("use your tools");
@@ -1005,7 +992,7 @@ describe("GameEngine Behavioral Reminder", () => {
   it("tool use resets the tool counter and suppresses the tool reminder", async () => {
     // Turn 4 uses a non-TUI tool → 2 stream calls (one per agent loop round).
     // So turn 5 lands at stream-call index 5, not 4.
-    const client = mockClient([
+    const provider = mockProvider([
       textMessage("One."),            // turn 1 → stream[0]
       textMessage("Two."),            // turn 2 → stream[1]
       textMessage("Three."),          // turn 3 → stream[2]
@@ -1014,7 +1001,7 @@ describe("GameEngine Behavioral Reminder", () => {
     ]);
     const { callbacks } = mockCallbacks();
     const engine = new GameEngine({
-      client, gameState: mockState(), scene: mockScene(),
+      provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
     });
@@ -1027,13 +1014,13 @@ describe("GameEngine Behavioral Reminder", () => {
 
     // After the tool turn (counter reset to 0), only 1 turn has passed without tools.
     // Tool reminder should be absent; entity reminder may appear independently.
-    const msgs = sentMessages(client, 5);
+    const msgs = sentMessages(provider, 5);
     const dmNote = msgs.find((m) => typeof m.content === "string" && m.content.includes("[dm-note]"));
     expect(dmNote?.content ?? "").not.toContain("use your tools");
   });
 
   it("injects entity reminder after 3 turns without color-coded entities", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       textMessage("One."),
       textMessage("Two."),
       textMessage("Three."),
@@ -1041,7 +1028,7 @@ describe("GameEngine Behavioral Reminder", () => {
     ]);
     const { callbacks } = mockCallbacks();
     const engine = new GameEngine({
-      client, gameState: mockState(), scene: mockScene(),
+      provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
     });
@@ -1051,14 +1038,14 @@ describe("GameEngine Behavioral Reminder", () => {
     await engine.processInput("Aldric", "Three.");
     await engine.processInput("Aldric", "Four.");
 
-    const msgs = sentMessages(client, 3);
+    const msgs = sentMessages(provider, 3);
     const dmNote = msgs.find((m) => typeof m.content === "string" && m.content.includes("[dm-note]"));
     expect(dmNote).toBeDefined();
     expect(dmNote!.content).toContain("color-code entity names");
   });
 
   it("color-coded entity in DM response resets the entity counter", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       textMessage("One."),
       textMessage("Two."),
       // Turn 3 — response contains a color-coded entity
@@ -1068,7 +1055,7 @@ describe("GameEngine Behavioral Reminder", () => {
     ]);
     const { callbacks } = mockCallbacks();
     const engine = new GameEngine({
-      client, gameState: mockState(), scene: mockScene(),
+      provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
     });
@@ -1081,13 +1068,13 @@ describe("GameEngine Behavioral Reminder", () => {
 
     // After the color-coded entity on turn 3, the counter resets.
     // Turn 4 is only 1 turn after the reset, so no entity reminder on turn 5 (index 4).
-    const msgs = sentMessages(client, 4);
+    const msgs = sentMessages(provider, 4);
     const dmNote = msgs.find((m) => typeof m.content === "string" && m.content.includes("[dm-note]"));
     expect(dmNote?.content ?? "").not.toContain("color-code entity names");
   });
 
   it("reminder is skipped for skipTranscript turns (session open/resume)", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       textMessage("One."),
       textMessage("Two."),
       textMessage("Three."),
@@ -1096,7 +1083,7 @@ describe("GameEngine Behavioral Reminder", () => {
     ]);
     const { callbacks } = mockCallbacks();
     const engine = new GameEngine({
-      client, gameState: mockState(), scene: mockScene(),
+      provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
     });
@@ -1106,12 +1093,12 @@ describe("GameEngine Behavioral Reminder", () => {
     await engine.processInput("Aldric", "Three.");
     await engine.processInput("Aldric", "[session-open]", { skipTranscript: true });
 
-    const msgs = sentMessages(client, 3);
+    const msgs = sentMessages(provider, 3);
     expect(msgs.every((m) => typeof m.content !== "string" || !m.content.includes("[dm-note]"))).toBe(true);
   });
 
   it("emits devLog when behavioral reminder is injected", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       textMessage("One."),
       textMessage("Two."),
       textMessage("Three."),
@@ -1119,7 +1106,7 @@ describe("GameEngine Behavioral Reminder", () => {
     ]);
     const { callbacks, log } = mockCallbacks();
     const engine = new GameEngine({
-      client, gameState: mockState(), scene: mockScene(),
+      provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
     });
@@ -1144,7 +1131,7 @@ describe("GameEngine Turn Lifecycle", () => {
   });
 
   it("fires player turn, then DM turn with onNarrativeComplete inside", async () => {
-    const client = mockClient([textMessage("The door opens.")]);
+    const provider = mockProvider([textMessage("The door opens.")]);
     const { callbacks } = mockCallbacks();
     const events: string[] = [];
 
@@ -1157,7 +1144,7 @@ describe("GameEngine Turn Lifecycle", () => {
     callbacks.onTurnEnd = (turn) => { events.push(`turnEnd:${turn.role}`); origEnd(turn); };
 
     const engine = new GameEngine({
-      client, gameState: mockState(), scene: mockScene(),
+      provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
     });
@@ -1174,14 +1161,14 @@ describe("GameEngine Turn Lifecycle", () => {
   });
 
   it("turnNumber increments across calls (player + DM per input)", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       textMessage("One."),
       textMessage("Two."),
     ]);
     const { callbacks, log } = mockCallbacks();
 
     const engine = new GameEngine({
-      client, gameState: mockState(), scene: mockScene(),
+      provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
     });
@@ -1198,14 +1185,14 @@ describe("GameEngine Turn Lifecycle", () => {
   });
 
   it("human input fires player+dm roles; fromAI fires only dm role", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       textMessage("Response to human."),
       textMessage("Response to AI."),
     ]);
     const { callbacks, log } = mockCallbacks();
 
     const engine = new GameEngine({
-      client, gameState: mockState(), scene: mockScene(),
+      provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
     });
@@ -1251,11 +1238,11 @@ describe("GameEngine Turn Lifecycle", () => {
       resourceValues: {},
     } satisfies GameState;
 
-    const client = mockClient([textMessage("DM responds to AI.")]);
+    const provider = mockProvider([textMessage("DM responds to AI.")]);
     const { callbacks, log } = mockCallbacks();
 
     const engine = new GameEngine({
-      client, gameState: state, scene: mockScene(),
+      provider, gameState: state, scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
     });
@@ -1279,7 +1266,7 @@ describe("GameEngine Turn Lifecycle", () => {
   });
 
   it("behavioral counters only increment on human turns", async () => {
-    const client = mockClient([
+    const provider = mockProvider([
       textMessage("One."),
       textMessage("Two."),
       textMessage("Three."),
@@ -1289,7 +1276,7 @@ describe("GameEngine Turn Lifecycle", () => {
     const { callbacks } = mockCallbacks();
 
     const engine = new GameEngine({
-      client, gameState: mockState(), scene: mockScene(),
+      provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
     });
@@ -1306,8 +1293,8 @@ describe("GameEngine Turn Lifecycle", () => {
     await engine.processInput("Aldric", "Four.");
 
     // Extract messages from the 5th stream call (index 4)
-    const streamFn = client.messages.stream as ReturnType<typeof vi.fn>;
-    const msgs = (streamFn.mock.calls[4][0] as { messages: Anthropic.MessageParam[] }).messages;
+    const streamFn = provider.stream as ReturnType<typeof vi.fn>;
+    const msgs = (streamFn.mock.calls[4][0] as { messages: { role: string; content: string | unknown[] }[] }).messages;
     const dmNote = msgs.find((m) => typeof m.content === "string" && m.content.includes("[dm-note]"));
     // Should have the reminder because human turns 1-3 are toolless, then AI doesn't count,
     // then human turn 4 — conversation.size is now ≥3 and turnsWithoutTools is 3+
@@ -1407,23 +1394,19 @@ describe("GameEngine OOC summary injection", () => {
     let streamCallIdx = 0;
     const responses = [textMessage("Welcome back."), textMessage("You look around.")];
 
-    const client = {
-      messages: {
-        create: vi.fn(async () => textMessage("fallback")),
-        stream: vi.fn((...args: unknown[]) => {
-          streamCalls.push(args[0]);
-          const response = responses[streamCallIdx++];
-          return {
-            on: vi.fn(),
-            finalMessage: vi.fn(async () => response),
-          };
-        }),
-      },
-    } as unknown as Anthropic;
+    const spyProvider: LLMProvider = {
+      providerId: "mock",
+      chat: vi.fn(async () => textMessage("fallback")),
+      stream: vi.fn(async (params: unknown, _onDelta?: unknown) => {
+        streamCalls.push(params);
+        return responses[streamCallIdx++];
+      }),
+      healthCheck: vi.fn(async () => ({ ok: true })),
+    } as unknown as LLMProvider;
 
     const { callbacks } = mockCallbacks();
     const engine = new GameEngine({
-      client,
+      provider: spyProvider,
       gameState: mockState(),
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -1437,7 +1420,7 @@ describe("GameEngine OOC summary injection", () => {
 
     // First processInput — should inject the OOC summary
     await engine.processInput("Aldric", "I look around.");
-    const firstCall = streamCalls[0] as { messages: Anthropic.MessageParam[] };
+    const firstCall = streamCalls[0] as { messages: { role: string; content: string | unknown[] }[] };
     const userMsgs = firstCall.messages.filter((m) => m.role === "user");
     const lastUserContent = userMsgs[userMsgs.length - 1].content as string;
     expect(lastUserContent).toContain("<ooc_summary>");
@@ -1449,7 +1432,7 @@ describe("GameEngine OOC summary injection", () => {
     // Second processInput — OOC summary should be cleared from new input,
     // but the prior stored exchange should still contain it in conversation history
     await engine.processInput("Aldric", "I check the door.");
-    const secondCall = streamCalls[1] as { messages: Anthropic.MessageParam[] };
+    const secondCall = streamCalls[1] as { messages: { role: string; content: string | unknown[] }[] };
     const allMsgs = secondCall.messages;
     // The new user message should NOT have OOC summary
     const newUserContent = allMsgs[allMsgs.length - 1].content as string;
@@ -1463,22 +1446,19 @@ describe("GameEngine OOC summary injection", () => {
   it("does not inject when no OOC summary is pending", async () => {
     const streamCalls: unknown[] = [];
 
-    const client = {
-      messages: {
-        create: vi.fn(async () => textMessage("fallback")),
-        stream: vi.fn((...args: unknown[]) => {
-          streamCalls.push(args[0]);
-          return {
-            on: vi.fn(),
-            finalMessage: vi.fn(async () => textMessage("Hello.")),
-          };
-        }),
-      },
-    } as unknown as Anthropic;
+    const spyProvider: LLMProvider = {
+      providerId: "mock",
+      chat: vi.fn(async () => textMessage("fallback")),
+      stream: vi.fn(async (params: unknown, _onDelta?: unknown) => {
+        streamCalls.push(params);
+        return textMessage("Hello.");
+      }),
+      healthCheck: vi.fn(async () => ({ ok: true })),
+    } as unknown as LLMProvider;
 
     const { callbacks } = mockCallbacks();
     const engine = new GameEngine({
-      client,
+      provider: spyProvider,
       gameState: mockState(),
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -1488,7 +1468,7 @@ describe("GameEngine OOC summary injection", () => {
     });
 
     await engine.processInput("Aldric", "I open the door.");
-    const call = streamCalls[0] as { messages: Anthropic.MessageParam[] };
+    const call = streamCalls[0] as { messages: { role: string; content: string | unknown[] }[] };
     const userMsgs = call.messages.filter((m) => m.role === "user");
     const content = userMsgs[userMsgs.length - 1].content as string;
     expect(content).not.toContain("<ooc_summary>");
@@ -1500,19 +1480,16 @@ describe("GameEngine TUI-only tool round (#266)", () => {
     // Turn 1: DM responds with text + TUI-only tool call.
     // Previously this would bail out; now tool results are sent back and
     // the DM gets another round to finish its turn.
-    const turn1Round1: Anthropic.Message = {
-      id: "msg_1",
-      type: "message",
-      role: "assistant",
-      model: "claude-opus-4-6",
-      content: [
+    const turn1Round1: ChatResult = {
+      text: "You enter the tavern.",
+      toolCalls: [{ id: "toolu_ml", name: "update_modeline", input: { location: "Tavern" } }],
+      usage: mockUsage(),
+      stopReason: "tool_use",
+      assistantContent: [
         { type: "text", text: "You enter the tavern." },
         { type: "tool_use", id: "toolu_ml", name: "update_modeline", input: { location: "Tavern" } },
       ],
-      stop_reason: "tool_use",
-      stop_sequence: null,
-      usage: mockUsage(),
-    } as Anthropic.Message;
+    };
 
     // Turn 1, round 2: DM finishes its turn
     const turn1Round2 = textMessage("A barkeep polishes a glass.");
@@ -1524,24 +1501,20 @@ describe("GameEngine TUI-only tool round (#266)", () => {
     const streamResponses = [turn1Round1, turn1Round2, turn2Msg];
     const streamCalls: unknown[] = [];
 
-    const client = {
-      messages: {
-        create: vi.fn(async () => textMessage("fallback")),
-        stream: vi.fn((...args: unknown[]) => {
-          streamCalls.push(args[0]);
-          const response = streamResponses[streamCallIdx++];
-          return {
-            on: vi.fn(),
-            finalMessage: vi.fn(async () => response),
-          };
-        }),
-      },
-    } as unknown as Anthropic;
+    const spyProvider: LLMProvider = {
+      providerId: "mock",
+      chat: vi.fn(async () => textMessage("fallback")),
+      stream: vi.fn(async (params: unknown, _onDelta?: unknown) => {
+        streamCalls.push(params);
+        return streamResponses[streamCallIdx++];
+      }),
+      healthCheck: vi.fn(async () => ({ ok: true })),
+    } as unknown as LLMProvider;
 
     const { callbacks } = mockCallbacks();
 
     const engine = new GameEngine({
-      client,
+      provider: spyProvider,
       gameState: mockState(),
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -1552,28 +1525,28 @@ describe("GameEngine TUI-only tool round (#266)", () => {
 
     // Turn 1: tool results sent back → 2 API calls (no bail-out)
     await engine.processInput("Aldric", "I enter the tavern.");
-    expect(client.messages.stream).toHaveBeenCalledTimes(2);
+    expect(spyProvider.stream).toHaveBeenCalledTimes(2);
 
     // Turn 2: conversation history should include the tool_use/tool_result
     // pair from turn 1 so the DM sees a coherent exchange.
     await engine.processInput("Aldric", "I talk to the bartender.");
-    expect(client.messages.stream).toHaveBeenCalledTimes(3);
+    expect(spyProvider.stream).toHaveBeenCalledTimes(3);
 
     // Verify the third call's messages include the tool_use + tool_result
-    const thirdCallParams = streamCalls[2] as { messages: Anthropic.MessageParam[] };
+    const thirdCallParams = streamCalls[2] as { messages: { role: string; content: string | unknown[] }[] };
     const msgs = thirdCallParams.messages;
 
     // Find the assistant message with tool_use from turn 1
     const assistantWithTools = msgs.find((m) =>
       m.role === "assistant" && Array.isArray(m.content) &&
-      (m.content as Anthropic.ContentBlock[]).some((b) => b.type === "tool_use"),
+      (m.content as { type: string }[]).some((b) => b.type === "tool_use"),
     );
     expect(assistantWithTools).toBeDefined();
 
     // Find the matching tool_result
     const toolResultMsg = msgs.find((m) =>
       m.role === "user" && Array.isArray(m.content) &&
-      (m.content as Anthropic.ToolResultBlockParam[]).some((b) => b.type === "tool_result"),
+      (m.content as { type: string }[]).some((b) => b.type === "tool_result"),
     );
     expect(toolResultMsg).toBeDefined();
   });
@@ -1582,7 +1555,7 @@ describe("GameEngine TUI-only tool round (#266)", () => {
 describe("GameEngine resolve_turn routing", () => {
   it("returns error when no combat session is active", async () => {
     // DM calls resolve_turn without start_combat
-    const client = mockClient([
+    const provider = mockProvider([
       ...toolAndTextMessages("resolve_turn", {
         actor: "Kael",
         action: "Attack goblin",
@@ -1591,7 +1564,7 @@ describe("GameEngine resolve_turn routing", () => {
     const { callbacks, log } = mockCallbacks();
 
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: mockState(),
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -1613,12 +1586,12 @@ describe("cross-mode resource dispatch: Engine + Dev Mode share singleton", () =
   it("Dev Mode tool dispatch mutates GameState and forwards TUI command", async () => {
     const fio = mockFileIO();
     const state = mockState();
-    const client = mockClient([textMessage("ok")]);
+    const provider = mockProvider([textMessage("ok")]);
     const { callbacks } = mockCallbacks();
 
     // Construct engine (production code wires callbacks on singleton)
     new GameEngine({
-      client,
+      provider,
       gameState: state,
       scene: mockScene(),
       sessionState: mockSessionState(),
@@ -1652,10 +1625,10 @@ describe("applyResolutionDeltas — system-agnostic hp_change", () => {
     state.displayResources["Goblin"] = ["Hull Integrity"];
     state.resourceValues["Goblin"] = { "Hull Integrity": "50" };
 
-    const client = mockClient([textMessage("ok")]);
+    const provider = mockProvider([textMessage("ok")]);
     const { callbacks } = mockCallbacks();
     const engine = new GameEngine({
-      client, gameState: state, scene: mockScene(),
+      provider, gameState: state, scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
     });
 
@@ -1670,10 +1643,10 @@ describe("applyResolutionDeltas — system-agnostic hp_change", () => {
     state.displayResources["Kael"] = ["Vitality", "Mana"];
     state.resourceValues["Kael"] = { Vitality: "100", Mana: "50" };
 
-    const client = mockClient([textMessage("ok")]);
+    const provider = mockProvider([textMessage("ok")]);
     const { callbacks } = mockCallbacks();
     const engine = new GameEngine({
-      client, gameState: state, scene: mockScene(),
+      provider, gameState: state, scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
     });
 
@@ -1686,10 +1659,10 @@ describe("applyResolutionDeltas — system-agnostic hp_change", () => {
 
   it("falls back to 'hp' when no displayResources and no resource in delta", async () => {
     const state = mockState();
-    const client = mockClient([textMessage("ok")]);
+    const provider = mockProvider([textMessage("ok")]);
     const { callbacks } = mockCallbacks();
     const engine = new GameEngine({
-      client, gameState: state, scene: mockScene(),
+      provider, gameState: state, scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
     });
 
@@ -1702,27 +1675,24 @@ describe("applyResolutionDeltas — system-agnostic hp_change", () => {
 });
 
 describe("content classifier refusal", () => {
-  function refusalMessage(): Anthropic.Message {
+  function refusalMessage(): ChatResult {
     return {
-      id: "msg_test",
-      type: "message",
-      role: "assistant",
-      model: "claude-opus-4-6",
-      content: [],
-      stop_reason: "refusal",
-      stop_sequence: null,
+      text: "",
+      toolCalls: [],
       usage: mockUsage(),
-    } as unknown as Anthropic.Message;
+      stopReason: "refusal",
+      assistantContent: [],
+    };
   }
 
   it("fires onRefusal and does not persist exchange", async () => {
-    const client = mockClient([refusalMessage()]);
+    const provider = mockProvider([refusalMessage()]);
     const { callbacks, log } = mockCallbacks();
     let refusalFired = false;
     callbacks.onRefusal = () => { refusalFired = true; };
 
     const engine = new GameEngine({
-      client, gameState: mockState(), scene: mockScene(),
+      provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
     });
 
@@ -1734,12 +1704,12 @@ describe("content classifier refusal", () => {
   });
 
   it("fires onTurnEnd after refusal", async () => {
-    const client = mockClient([refusalMessage()]);
+    const provider = mockProvider([refusalMessage()]);
     const { callbacks, log } = mockCallbacks();
     callbacks.onRefusal = () => {};
 
     const engine = new GameEngine({
-      client, gameState: mockState(), scene: mockScene(),
+      provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
     });
 
@@ -1751,12 +1721,12 @@ describe("content classifier refusal", () => {
   });
 
   it("does not include refusal in narrative completions", async () => {
-    const client = mockClient([refusalMessage()]);
+    const provider = mockProvider([refusalMessage()]);
     const { callbacks, log } = mockCallbacks();
     callbacks.onRefusal = () => {};
 
     const engine = new GameEngine({
-      client, gameState: mockState(), scene: mockScene(),
+      provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
     });
 
@@ -1766,12 +1736,12 @@ describe("content classifier refusal", () => {
   });
 
   it("still tracks usage on refusal", async () => {
-    const client = mockClient([refusalMessage()]);
+    const provider = mockProvider([refusalMessage()]);
     const { callbacks, log } = mockCallbacks();
     callbacks.onRefusal = () => {};
 
     const engine = new GameEngine({
-      client, gameState: mockState(), scene: mockScene(),
+      provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
     });
 
@@ -1786,7 +1756,7 @@ describe("content classifier refusal", () => {
     const charPath = norm("/tmp/test-campaign/characters/storm.md");
     files[charPath] = "# Storm\n\n**Type:** PC\n**Sheet Status:** complete\n\n## Skills\n- Hack (d8)\n";
 
-    const client = mockClient([
+    const provider = mockProvider([
       ...toolAndTextMessages(
         "promote_character",
         { character: "storm", context: "Build initial sheet" },
@@ -1797,7 +1767,7 @@ describe("content classifier refusal", () => {
     const io = mockFileIO();
 
     const engine = new GameEngine({
-      client,
+      provider,
       gameState: mockState(),
       scene: mockScene(),
       sessionState: mockSessionState(),

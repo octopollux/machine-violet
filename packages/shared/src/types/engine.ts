@@ -20,6 +20,8 @@ export interface UsageStats {
   outputTokens: number;
   cacheReadTokens: number;
   cacheCreationTokens: number;
+  /** Reasoning/thinking tokens (counted separately from output). */
+  reasoningTokens?: number;
 }
 
 /** TUI command emitted by TUI tools (update_modeline, set_ui_style, etc.) */

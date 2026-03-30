@@ -1,4 +1,9 @@
-import Anthropic from "@anthropic-ai/sdk";
+import type {
+  LLMProvider,
+  NormalizedTool,
+  NormalizedMessage,
+  SystemBlock,
+} from "../providers/types.js";
 import type { GameState } from "./game-state.js";
 import type { FileIO } from "./scene-manager.js";
 import type {
@@ -7,7 +12,7 @@ import type {
   RollRecord,
   TurnSummary,
 } from "@machine-violet/shared/types/resolve-session.js";
-import { runAgentLoop, stampToolsCacheControl } from "./agent-session.js";
+import { runProviderLoop } from "../providers/agent-loop-bridge.js";
 import { parseResolutionXml } from "./resolve-xml.js";
 import { rollDice } from "../tools/dice/index.js";
 import type { RollDiceInput } from "@machine-violet/shared/types/dice.js";
@@ -21,11 +26,11 @@ import { campaignPaths } from "../tools/filesystem/index.js";
 
 // --- Session tools ---
 
-const SESSION_TOOLS: Anthropic.Tool[] = [
+const SESSION_TOOLS: NormalizedTool[] = [
   {
     name: "roll_dice",
     description: "Roll dice using standard notation. Returns individual rolls and total.",
-    input_schema: {
+    inputSchema: {
       type: "object" as const,
       properties: {
         expression: { type: "string", description: "Dice notation, e.g. '1d20+5; 2d6+3'" },
@@ -37,7 +42,7 @@ const SESSION_TOOLS: Anthropic.Tool[] = [
   {
     name: "read_character_sheet",
     description: "Read a PC's character sheet file (modifiers, features, spell slots, HP).",
-    input_schema: {
+    inputSchema: {
       type: "object" as const,
       properties: {
         character: { type: "string", description: "Character name" },
@@ -48,7 +53,7 @@ const SESSION_TOOLS: Anthropic.Tool[] = [
   {
     name: "read_stat_block",
     description: "Read a monster/NPC stat block from the game system content library.",
-    input_schema: {
+    inputSchema: {
       type: "object" as const,
       properties: {
         category: { type: "string", description: "Entity category (e.g. 'monsters', 'npcs')" },
@@ -60,7 +65,7 @@ const SESSION_TOOLS: Anthropic.Tool[] = [
   {
     name: "query_rules",
     description: "Look up a specific rule or section from the game system's rule card.",
-    input_schema: {
+    inputSchema: {
       type: "object" as const,
       properties: {
         section: { type: "string", description: "Keyword or section heading to search for" },
@@ -71,7 +76,7 @@ const SESSION_TOOLS: Anthropic.Tool[] = [
   {
     name: "search_content",
     description: "LAST RESORT. Search the full content library using a subagent. Prefer the above tools.",
-    input_schema: {
+    inputSchema: {
       type: "object" as const,
       properties: {
         query: { type: "string", description: "Natural language search query" },
@@ -89,17 +94,17 @@ const SESSION_TOOLS: Anthropic.Tool[] = [
  * Runs at Sonnet tier for complex multi-step mechanical resolution.
  */
 export class ResolveSession {
-  private client: Anthropic;
+  private provider: LLMProvider;
   private fileIO: FileIO;
   private gameState: GameState;
-  private systemPrompt: Anthropic.TextBlockParam[] = [];
-  private messages: Anthropic.MessageParam[] = [];
+  private systemPrompt: SystemBlock[] = [];
+  private messages: NormalizedMessage[] = [];
   private turnHistory: TurnSummary[] = [];
   private ruleCardContent = "";
   private currentRound = 1;
 
-  constructor(client: Anthropic, fileIO: FileIO, gameState: GameState) {
-    this.client = client;
+  constructor(provider: LLMProvider, fileIO: FileIO, gameState: GameState) {
+    this.provider = provider;
     this.fileIO = fileIO;
     this.gameState = gameState;
   }
@@ -117,19 +122,17 @@ export class ResolveSession {
 
     const basePrompt = loadPrompt("resolve-session");
 
-    // Build system prompt as TextBlockParam[] for cache breakpoint stamping
+    // Build system prompt as SystemBlock[] for cache breakpoint stamping
     // Block 1: Session identity + output format (stable)
-    const block1: Anthropic.TextBlockParam = {
-      type: "text",
+    const block1: SystemBlock = {
       text: basePrompt,
-      cache_control: { type: "ephemeral" },
+      cacheControl: { ttl: "5m" },
     };
 
     // Block 2: Rule card combat section (stable for campaign duration)
-    const block2: Anthropic.TextBlockParam = {
-      type: "text",
+    const block2: SystemBlock = {
       text: `\n\n## Game Rules (Combat)\n\n${ruleCardCombat}`,
-      cache_control: { type: "ephemeral" },
+      cacheControl: { ttl: "5m" },
     };
 
     // Block 3: Combatant stat blocks (stable for combat duration)
@@ -137,10 +140,9 @@ export class ResolveSession {
     if (mapState) {
       block3Text += `\n\n## Map State\n\n${mapState}`;
     }
-    const block3: Anthropic.TextBlockParam = {
-      type: "text",
+    const block3: SystemBlock = {
       text: block3Text,
-      cache_control: { type: "ephemeral" },
+      cacheControl: { ttl: "5m" },
     };
 
     this.systemPrompt = [block1, block2, block3];
@@ -169,8 +171,8 @@ export class ResolveSession {
     const toolHandler = this.buildToolHandler();
 
     // Run the agent loop with accumulated messages
-    const result = await runAgentLoop(
-      this.client,
+    const result = await runProviderLoop(
+      this.provider,
       this.systemPrompt,
       this.messages,
       {
@@ -179,10 +181,9 @@ export class ResolveSession {
         maxTokens: TOKEN_LIMITS.RESOLVE_SESSION,
         maxToolRounds: 8,
         stream: false,
-        tools: stampToolsCacheControl([...SESSION_TOOLS]),
+        tools: [...SESSION_TOOLS],
         toolHandler,
-        cacheTools: false, // already stamped
-        retry: true,
+        cacheHints: [{ target: "tools" }],
         effort: null,
       },
     );
@@ -372,7 +373,7 @@ export class ResolveSession {
             return { content: "No game system configured.", is_error: true };
           }
           try {
-            const result = await searchContent(this.client, {
+            const result = await searchContent(this.provider, {
               query,
               systemSlug,
               homeDir: this.gameState.homeDir,

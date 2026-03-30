@@ -1,4 +1,4 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider } from "../providers/types.js";
 import type { GameState } from "./game-state.js";
 import type { ConversationManager, DroppedExchange } from "../context/index.js";
 import { renderCampaignLog, parseLegacyLog } from "../context/index.js";
@@ -163,7 +163,7 @@ export class SceneManager {
 
   /** Handle a dropped exchange — trigger precis update */
   async handleDroppedExchange(
-    client: Anthropic,
+    provider: LLMProvider,
     dropped: DroppedExchange,
   ): Promise<UsageStats> {
     // Format the dropped exchange as text
@@ -181,7 +181,7 @@ export class SceneManager {
 
     this.devLog?.("[dev] subagent:precis-updater starting");
     const result = await updatePrecis(
-      client, this.scene.precis, exchangeText,
+      provider, this.scene.precis, exchangeText,
       this.scene.openThreads || undefined,
       pcIdent,
       this.aliasContext || undefined,
@@ -202,7 +202,7 @@ export class SceneManager {
   }
 
   /** Run the scene tracker to update open threads and NPC intents. */
-  async runSceneTracker(client: Anthropic): Promise<UsageStats> {
+  async runSceneTracker(provider: LLMProvider): Promise<UsageStats> {
     const tail = this.scene.transcript;
     if (tail.length === 0) {
       return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 };
@@ -210,7 +210,7 @@ export class SceneManager {
 
     this.devLog?.("[dev] subagent:scene-tracker starting");
     const result = await trackScene(
-      client,
+      provider,
       tail,
       this.scene.openThreads || undefined,
       this.scene.npcIntents || undefined,
@@ -231,7 +231,7 @@ export class SceneManager {
    * Each step is tracked in pendingOp for idempotent recovery.
    */
   async sceneTransition(
-    client: Anthropic,
+    provider: LLMProvider,
     title: string,
     timeAdvance?: number,
   ): Promise<TransitionResult> {
@@ -261,7 +261,7 @@ export class SceneManager {
     // Step 2: Parallel subagent updates (campaign log + entity changelogs)
     this.pendingOp.step = "subagent_updates";
     await this.savePendingOp();
-    await this.stepSubagentUpdates(client, title, result);
+    await this.stepSubagentUpdates(provider, title, result);
 
     // Step 4: Advance calendar
     this.pendingOp.step = "advance_calendar";
@@ -308,11 +308,11 @@ export class SceneManager {
 
   /** End the session: final scene transition + session recap */
   async sessionEnd(
-    client: Anthropic,
+    provider: LLMProvider,
     title: string,
     timeAdvance?: number,
   ): Promise<TransitionResult> {
-    const result = await this.sceneTransition(client, title, timeAdvance);
+    const result = await this.sceneTransition(provider, title, timeAdvance);
 
     // Write session recap
     const paths = campaignPaths(this.state.campaignRoot);
@@ -322,7 +322,7 @@ export class SceneManager {
     // Generate narrative recap for the "Previously on..." modal
     try {
       const narrativeResult = await generateNarrativeRecap(
-        client,
+        provider,
         result.campaignLogEntry,
         this.state.config.name,
       );
@@ -347,7 +347,7 @@ export class SceneManager {
    * Returns null if the pending op is already done or has an unknown step.
    */
   async resumePendingTransition(
-    client: Anthropic,
+    provider: LLMProvider,
     pendingOp: PendingOperation,
   ): Promise<TransitionResult | null> {
     // Normalize legacy step names from before subagent parallelization
@@ -384,7 +384,7 @@ export class SceneManager {
 
       switch (step) {
         case "finalize_transcript": await this.stepFinalizeTranscript(); break;
-        case "subagent_updates": await this.stepSubagentUpdates(client, pendingOp.title, result); break;
+        case "subagent_updates": await this.stepSubagentUpdates(provider, pendingOp.title, result); break;
         case "advance_calendar": this.stepAdvanceCalendar(pendingOp.timeAdvance, result); break;
         case "check_alarms": this.stepCheckAlarms(); break;
         case "validate": result.validationIssues = await this.stepValidate(); break;
@@ -611,27 +611,27 @@ export class SceneManager {
   }
 
   private async stepSubagentUpdates(
-    client: Anthropic,
+    provider: LLMProvider,
     title: string,
     result: TransitionResult,
   ): Promise<void> {
     await Promise.all([
-      this.stepCampaignLog(client, title, result),
-      this.stepChangelogUpdates(client, result),
-      this.stepCompendiumUpdate(client, result).catch((e) => {
+      this.stepCampaignLog(provider, title, result),
+      this.stepChangelogUpdates(provider, result),
+      this.stepCompendiumUpdate(provider, result).catch((e) => {
         this.devLog?.(`[dev] compendium update failed (non-critical): ${e instanceof Error ? e.message : String(e)}`);
       }),
     ]);
   }
 
   private async stepCampaignLog(
-    client: Anthropic,
+    provider: LLMProvider,
     title: string,
     result: TransitionResult,
   ): Promise<void> {
     const transcript = this.scene.transcript.join("\n");
     this.devLog?.("[dev] subagent:summarizer starting");
-    const summaryResult = await summarizeScene(client, transcript, this.aliasContext || undefined);
+    const summaryResult = await summarizeScene(provider, transcript, this.aliasContext || undefined);
     this.devLog?.("[dev] subagent:summarizer done");
     // campaignLogEntry stays as full text for buildSceneAnchor, session recaps, etc.
     result.campaignLogEntry = summaryResult.full;
@@ -672,7 +672,7 @@ export class SceneManager {
   }
 
   private async stepChangelogUpdates(
-    client: Anthropic,
+    provider: LLMProvider,
     result: TransitionResult,
   ): Promise<void> {
     const entityFiles = await this.listEntityFiles();
@@ -681,7 +681,7 @@ export class SceneManager {
     const transcript = this.scene.transcript.join("\n");
     this.devLog?.(`[dev] subagent:changelog starting (${entityFiles.length} entities)`);
     const changelogResult = await updateChangelogs(
-      client,
+      provider,
       transcript,
       this.scene.sceneNumber,
       entityFiles,
@@ -705,7 +705,7 @@ export class SceneManager {
   }
 
   private async stepCompendiumUpdate(
-    client: Anthropic,
+    provider: LLMProvider,
     result: TransitionResult,
   ): Promise<void> {
     const paths = campaignPaths(this.state.campaignRoot);
@@ -723,7 +723,7 @@ export class SceneManager {
     const transcript = this.scene.transcript.join("\n");
     this.devLog?.("[dev] subagent:compendium starting");
     const { compendium, usage } = await updateCompendium(
-      client,
+      provider,
       current,
       transcript,
       this.scene.sceneNumber,

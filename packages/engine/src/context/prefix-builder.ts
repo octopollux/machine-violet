@@ -1,5 +1,5 @@
-import type Anthropic from "@anthropic-ai/sdk";
 import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
+import type { SystemBlock } from "../providers/types.js";
 
 /**
  * Build the cached prefix (system prompt) for the DM agent.
@@ -34,13 +34,13 @@ export interface PrefixSections {
 
 export interface CachedPrefixResult {
   /** System prompt blocks (Tier 1 + Tier 2, cache-stable). */
-  system: Anthropic.TextBlockParam[];
+  system: SystemBlock[];
   /** Volatile context string (Tier 3). Inject into conversation, not system prompt. */
   volatile: string;
 }
 
 /**
- * Build the system prompt as an array of TextBlockParam.
+ * Build the system prompt as an array of SystemBlock.
  * Using array format allows the API to cache the stable prefix
  * and only pay full price for the changing parts.
  *
@@ -50,30 +50,21 @@ export function buildCachedPrefix(
   config: CampaignConfig,
   sections: PrefixSections,
 ): CachedPrefixResult {
-  const blocks: Anthropic.TextBlockParam[] = [];
+  const blocks: SystemBlock[] = [];
 
   // ── Tier 1: Campaign-stable (never invalidated) ──
 
   // DM identity
-  blocks.push({
-    type: "text",
-    text: sections.dmPrompt,
-  });
+  blocks.push({ text: sections.dmPrompt });
 
   // DM personality fragment
   if (sections.personality) {
-    blocks.push({
-      type: "text",
-      text: `\n\n## Your Personality\n${sections.personality}`,
-    });
+    blocks.push({ text: `\n\n## Your Personality\n${sections.personality}` });
   }
 
   // Game system
   if (config.system) {
-    blocks.push({
-      type: "text",
-      text: `\n\n## Game System\nYou are running: ${config.system}`,
-    });
+    blocks.push({ text: `\n\n## Game System\nYou are running: ${config.system}` });
   }
 
   // Campaign setting (genre, mood, difficulty, premise)
@@ -84,26 +75,18 @@ export function buildCachedPrefix(
     if (config.difficulty) settingLines.push(`Difficulty: ${config.difficulty}`);
     if (config.premise) settingLines.push(`Premise: ${config.premise}`);
     if (settingLines.length > 0) {
-      blocks.push({
-        type: "text",
-        text: `\n\n## Campaign Setting\n${settingLines.join("\n")}`,
-      });
+      blocks.push({ text: `\n\n## Campaign Setting\n${settingLines.join("\n")}` });
     }
   }
 
   // Rules appendix
   if (sections.rulesAppendix) {
-    blocks.push({
-      type: "text",
-      text: `\n\n## Rules Reference\n${sections.rulesAppendix}`,
-    });
+    blocks.push({ text: `\n\n## Rules Reference\n${sections.rulesAppendix}` });
   }
 
   // BP1 — stamp on last Tier 1 block (1h, covers all campaign-stable content)
-  // Falls back to DM prompt/personality/setting when rulesAppendix is absent
   if (blocks.length > 0) {
-    (blocks[blocks.length - 1] as unknown as Record<string, unknown>).cache_control =
-      { type: "ephemeral", ttl: "1h" };
+    blocks[blocks.length - 1] = { ...blocks[blocks.length - 1], cacheControl: { ttl: "1h" } };
   }
 
   // ── Tier 2: Session/scene-stable (invalidated at scene transitions) ──
@@ -112,56 +95,37 @@ export function buildCachedPrefix(
 
   // Session recap
   if (sections.sessionRecap) {
-    blocks.push({
-      type: "text",
-      text: `\n\n## Last Session\n${sections.sessionRecap}`,
-    });
+    blocks.push({ text: `\n\n## Last Session\n${sections.sessionRecap}` });
   }
 
   // Campaign summary
   if (sections.campaignSummary) {
-    blocks.push({
-      type: "text",
-      text: `\n\n## Campaign Log\n${sections.campaignSummary}`,
-    });
+    blocks.push({ text: `\n\n## Campaign Log\n${sections.campaignSummary}` });
   }
 
   // Scene precis
   if (sections.scenePrecis) {
-    blocks.push({
-      type: "text",
-      text: `\n\n## Scene So Far\n${sections.scenePrecis}`,
-    });
+    blocks.push({ text: `\n\n## Scene So Far\n${sections.scenePrecis}` });
   }
 
   // Player read (sentiment signals)
   if (sections.playerRead) {
-    blocks.push({
-      type: "text",
-      text: `\n\n## Player Read\n${sections.playerRead}`,
-    });
+    blocks.push({ text: `\n\n## Player Read\n${sections.playerRead}` });
   }
 
   // DM notes (campaign-scope scratchpad)
   if (sections.dmNotes) {
-    blocks.push({
-      type: "text",
-      text: `\n\n## DM Notes\n${sections.dmNotes}`,
-    });
+    blocks.push({ text: `\n\n## DM Notes\n${sections.dmNotes}` });
   }
 
   // Player knowledge (compendium summary)
   if (sections.compendiumSummary) {
-    blocks.push({
-      type: "text",
-      text: `\n\n## Player Knowledge\nThe player currently knows about:\n${sections.compendiumSummary}`,
-    });
+    blocks.push({ text: `\n\n## Player Knowledge\nThe player currently knows about:\n${sections.compendiumSummary}` });
   }
 
   // BP2 — stamp on last emitted Tier 2 block (1h)
   if (blocks.length > tier2Start) {
-    (blocks[blocks.length - 1] as unknown as Record<string, unknown>).cache_control =
-      { type: "ephemeral", ttl: "1h" };
+    blocks[blocks.length - 1] = { ...blocks[blocks.length - 1], cacheControl: { ttl: "1h" } };
   }
 
   // ── Tier 3: Volatile — returned separately for conversation injection ──

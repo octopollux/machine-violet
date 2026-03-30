@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider, ChatResult, NormalizedUsage } from "../../providers/types.js";
 import { repairState, parseGeneratedEntities } from "./repair-state.js";
 import type { GameState } from "../game-state.js";
 import type { FileIO } from "../scene-manager.js";
@@ -58,21 +58,31 @@ function mockFileIO(files: Record<string, string> = {}, dirs: Record<string, str
   };
 }
 
-function mockClient(text: string): Anthropic {
+function mockUsage(): NormalizedUsage {
+  return { inputTokens: 100, outputTokens: 50, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 };
+}
+
+function textResult(text: string): ChatResult {
   return {
-    messages: {
-      create: vi.fn(async () => ({
-        id: "msg_test",
-        type: "message",
-        role: "assistant",
-        model: "claude-haiku-4-5-20251001",
-        content: [{ type: "text", text }],
-        stop_reason: "end_turn",
-        stop_sequence: null,
-        usage: { input_tokens: 100, output_tokens: 50 },
-      })),
-    },
-  } as unknown as Anthropic;
+    text,
+    toolCalls: [],
+    usage: mockUsage(),
+    stopReason: "end",
+    assistantContent: [{ type: "text", text }],
+  };
+}
+
+function mockProvider(text: string): LLMProvider {
+  return {
+    providerId: "test",
+    chat: vi.fn(async () => textResult(text)),
+    stream: vi.fn(async (_params, onDelta) => {
+      const result = textResult(text);
+      if (result.text) onDelta(result.text);
+      return result;
+    }),
+    healthCheck: vi.fn(),
+  };
 }
 
 describe("parseGeneratedEntities", () => {
@@ -131,7 +141,7 @@ describe("repairState", () => {
       },
     );
 
-    const client = mockClient(
+    const provider = mockProvider(
       `===characters/kael.md===
 # Kael
 
@@ -147,7 +157,7 @@ A mysterious figure.
 A dark forest.`,
     );
 
-    const result = await repairState(client, makeGameState(), fio, true);
+    const result = await repairState(provider, makeGameState(), fio, true);
 
     expect(result.missing).toContain("characters/kael.md");
     expect(result.missing).toContain("locations/thornwood/index.md");
@@ -172,14 +182,14 @@ A dark forest.`,
       },
     );
 
-    const client = mockClient(
+    const provider = mockProvider(
       `===characters/goblin.md===
 # Goblin
 
 A hostile creature.`,
     );
 
-    const result = await repairState(client, makeGameState(), fio, true);
+    const result = await repairState(provider, makeGameState(), fio, true);
 
     expect(result.existing).toContain("characters/kael.md");
     expect(result.missing).toContain("characters/goblin.md");
@@ -200,14 +210,14 @@ A hostile creature.`,
       },
     );
 
-    const client = mockClient(
+    const provider = mockProvider(
       `===characters/kael.md===
 # Kael
 
 A fighter.`,
     );
 
-    await repairState(client, makeGameState(), fio, true);
+    await repairState(provider, makeGameState(), fio, true);
 
     expect(fio.writeFile).not.toHaveBeenCalled();
   });
@@ -226,14 +236,14 @@ A fighter.`,
       },
     );
 
-    const client = mockClient(
+    const provider = mockProvider(
       `===characters/kael.md===
 # Kael
 
 A fighter.`,
     );
 
-    const result = await repairState(client, makeGameState(), fio, false);
+    const result = await repairState(provider, makeGameState(), fio, false);
 
     expect(fio.writeFile).toHaveBeenCalledWith(
       "/campaigns/test/characters/kael.md",
@@ -255,9 +265,9 @@ A fighter.`,
       },
     );
 
-    const client = mockClient("");
+    const provider = mockProvider("");
 
-    const result = await repairState(client, makeGameState(), fio, true);
+    const result = await repairState(provider, makeGameState(), fio, true);
 
     expect(result.found).toHaveLength(0);
     expect(result.missing).toHaveLength(0);
@@ -276,9 +286,9 @@ A fighter.`,
       },
     );
 
-    const client = mockClient("");
+    const provider = mockProvider("");
 
-    const result = await repairState(client, makeGameState(), fio, true);
+    const result = await repairState(provider, makeGameState(), fio, true);
 
     expect(result.found).toHaveLength(0);
     expect(result.missing).toHaveLength(0);
@@ -298,14 +308,14 @@ A fighter.`,
       },
     );
 
-    const client = mockClient(
+    const provider = mockProvider(
       `===characters/kael.md===
 # Kael
 
 A character.`,
     );
 
-    const result = await repairState(client, makeGameState(), fio, true);
+    const result = await repairState(provider, makeGameState(), fio, true);
 
     expect(result.usage.inputTokens).toBe(100);
     expect(result.usage.outputTokens).toBe(50);
