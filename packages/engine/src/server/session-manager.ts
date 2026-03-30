@@ -166,12 +166,12 @@ export class SessionManager {
     // Build a minimal GameState so turns, context dumps, etc. work
     const setupConfig: CampaignConfig = {
       name: "Setup",
-      dm_personality: { name: "Setup MC", prompt: "" },
-      players: [{ character: "Player", type: "human", color: "#ffffff" }],
-      combat: { system: "theater_of_mind", grid_size: 0, default_initiative: "dex" },
-      context: {},
+      dm_personality: { name: "Setup MC", prompt_fragment: "" },
+      players: [{ name: "Player", character: "Player", type: "human", color: "#ffffff" }],
+      combat: { initiative_method: "fiction_first", round_structure: "individual", surprise_rules: false },
+      context: { retention_exchanges: 0, max_conversation_tokens: 0 },
       recovery: { auto_commit_interval: 0, max_commits: 0, enable_git: false },
-      choices: { campaign_default: "sometimes", player_overrides: {} },
+      choices: { campaign_default: "none", player_overrides: {} },
     };
 
     this.gameState = {

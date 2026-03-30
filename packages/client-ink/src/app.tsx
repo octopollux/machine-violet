@@ -137,7 +137,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
     } else if (clientState.sessionEnded) {
       returnToMenu();
     }
-  }, [clientState.sessionStale, clientState.sessionEnded, phase]); // eslint-disable-line
+  }, [clientState.sessionStale, clientState.sessionEnded, phase]);
 
   // Start a campaign (used by both auto-start and menu selection)
   const startCampaign = useCallback((id: string) => {
@@ -232,7 +232,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
     ws.connect();
 
     return () => ws.disconnect();
-  }, []); // eslint-disable-line
+  }, []);
 
   // --- Management helpers ---
 

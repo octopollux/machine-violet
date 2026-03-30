@@ -120,15 +120,15 @@ export function ConnectionsPhase({
   };
   const healthColor = (id: string) => {
     const h = healthResults[id];
-    if (!h) return themeColor(theme, "dim");
+    if (!h) return "#666666";
     if (h.status === "valid") return "#88cc88";
     if (h.status === "rate_limited") return "#cccc44";
     return "#cc4444";
   };
 
-  const fg = themeColor(theme, "fg");
-  const dim = themeColor(theme, "dim");
-  const accent = themeColor(theme, "accent");
+  const fg = "#cccccc";
+  const dim = "#666666";
+  const accent = themeColor(theme, "title") ?? "#ffffff";
   const border = themeColor(theme, "border");
 
   // --- Input ---
