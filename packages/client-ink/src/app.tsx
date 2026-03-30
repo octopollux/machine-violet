@@ -82,6 +82,8 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
   const [apiKeyStatus, setApiKeyStatus] = useState<string | undefined>(undefined);
   const [archivedCampaigns, setArchivedCampaigns] = useState<ArchivedCampaignEntry[]>([]);
   const [discordEnabled, setDiscordEnabled] = useState<boolean | null>(null);
+  const [devModeEnabled, setDevModeEnabled] = useState(false);
+  const [showVerbose, setShowVerbose] = useState(false);
   const [deleteModal, setDeleteModal] = useState<CampaignDeleteInfo | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
@@ -358,6 +360,10 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
       <SettingsPhase
         theme={theme}
         initialView={phase === "settings_apikeys" ? "api_keys" : undefined}
+        devModeEnabled={devModeEnabled}
+        onToggleDevMode={() => setDevModeEnabled((v) => !v)}
+        showVerbose={showVerbose}
+        onToggleVerbose={() => setShowVerbose((v) => !v)}
         onApiKeys={() => { refreshConnections(); setPhase("api_keys"); }}
         onDiscord={() => {
           apiClientRef.current.getDiscordSettings().then((s) => setDiscordEnabled(s.enabled)).catch(() => { /* ignore */ });
@@ -485,6 +491,8 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
         : null,
       mode: clientState.mode,
       stateSnapshot,
+      devModeEnabled,
+      showVerbose,
       onReturnToMenu: returnToMenu,
     }}>
       <PlayingPhase key={`${activeCampaignId}-${sessionKey}`} />

@@ -37,6 +37,8 @@ export function PlayingPhase() {
     activeChoices, setActiveChoices,
     activeModal, setActiveModal,
     mode, stateSnapshot,
+    devModeEnabled,
+    showVerbose,
     retryOverlay,
     onReturnToMenu,
   } = useGameContext();
@@ -280,6 +282,7 @@ export function PlayingPhase() {
         toolGlyphs={toolGlyphs}
         quoteColor="#ffffff"
         playerColor={stateSnapshot?.players?.[activePlayerIndex]?.color}
+        showVerbose={showVerbose}
         narrativeRef={narrativeRef}
         mouseScrollOverrideRef={modalScrollRef}
         hideInputLine={!!activeChoices}
@@ -337,7 +340,7 @@ export function PlayingPhase() {
           width={cols}
           height={rows}
           oocActive={mode === "ooc"}
-          devModeEnabled={true}
+          devModeEnabled={devModeEnabled}
           devActive={mode === "dev"}
           tokenSummary={tokenSummary}
           onSelect={handleMenuSelect}
