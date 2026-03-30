@@ -39,6 +39,26 @@ describe("buildCampaignConfig", () => {
     expect(config.recovery.enable_git).toBe(true);
   });
 
+  it("passes campaign_detail through to config", () => {
+    const result = makeSetupResult({ campaignDetail: "Roll for variant: THE PRETENDER" });
+    const config = buildCampaignConfig(result);
+    expect(config.campaign_detail).toBe("Roll for variant: THE PRETENDER");
+  });
+
+  it("omits campaign_detail when null", () => {
+    const result = makeSetupResult({ campaignDetail: null });
+    const config = buildCampaignConfig(result);
+    expect(config.campaign_detail).toBeUndefined();
+  });
+
+  it("passes personality detail through to config", () => {
+    const result = makeSetupResult({
+      personality: { name: "Test", prompt_fragment: "Terse.", detail: "Use callbacks." },
+    });
+    const config = buildCampaignConfig(result);
+    expect(config.dm_personality.detail).toBe("Use callbacks.");
+  });
+
   it("includes version and createdAt", () => {
     const result = makeSetupResult();
     const config = buildCampaignConfig(result);
