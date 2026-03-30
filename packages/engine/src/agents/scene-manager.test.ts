@@ -625,7 +625,7 @@ describe("SceneManager", () => {
     expect(locationContent).toContain("Party entered and caused a brawl");
   });
 
-  it("notifyEntityTouched adds entry and getSystemPrompt includes entity index", () => {
+  it("upsertEntity adds entry and getSystemPrompt includes entity registry", () => {
     const sessionState = mockSessionState();
     const mgr = new SceneManager(
       mockState(),
@@ -635,15 +635,14 @@ describe("SceneManager", () => {
       mockFileIO(),
     );
 
-    mgr.notifyEntityTouched("/tmp/test-campaign/characters/phone-booth-man.md", "Phone Booth Man");
+    mgr.upsertEntity({ slug: "phone-booth-man", name: "Phone Booth Man", aliases: [], type: "character", path: "characters/phone-booth-man.md" });
     const { volatile } = mgr.getSystemPrompt();
-    expect(volatile).toContain("Scene Entities");
+    expect(volatile).toContain("Entity Registry");
     expect(volatile).toContain("characters/phone-booth-man.md");
     expect(volatile).toContain("Phone Booth Man");
-    expect(volatile).toContain("do not create duplicates");
   });
 
-  it("notifyEntityTouched includes aliases when provided", () => {
+  it("upsertEntity includes aliases", () => {
     const sessionState = mockSessionState();
     const mgr = new SceneManager(
       mockState(),
@@ -653,16 +652,12 @@ describe("SceneManager", () => {
       mockFileIO(),
     );
 
-    mgr.notifyEntityTouched(
-      "/tmp/test-campaign/characters/flood-street-watcher.md",
-      "Flood Street Watcher",
-      "The Watcher",
-    );
+    mgr.upsertEntity({ slug: "flood-street-watcher", name: "Flood Street Watcher", aliases: ["The Watcher"], type: "character", path: "characters/flood-street-watcher.md" });
     const { volatile } = mgr.getSystemPrompt();
-    expect(volatile).toContain("Flood Street Watcher (also: The Watcher)");
+    expect(volatile).toContain("Flood Street Watcher (character) aka The Watcher");
   });
 
-  it("getSystemPrompt omits entity index when no entities touched", () => {
+  it("getSystemPrompt omits entity registry when tree is empty", () => {
     const sessionState = mockSessionState();
     const mgr = new SceneManager(
       mockState(),
@@ -673,10 +668,10 @@ describe("SceneManager", () => {
     );
 
     const { volatile } = mgr.getSystemPrompt();
-    expect(volatile).not.toContain("Scene Entities");
+    expect(volatile).not.toContain("Entity Registry");
   });
 
-  it("sceneEntityIndex is cleared on scene transition", async () => {
+  it("entity tree persists across scene transitions", async () => {
     const provider = transitionProvider([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
@@ -691,19 +686,18 @@ describe("SceneManager", () => {
       mockFileIO(),
     );
 
-    mgr.notifyEntityTouched("/tmp/test-campaign/characters/grimjaw.md", "Grimjaw");
-    // Verify it was added
+    mgr.upsertEntity({ slug: "grimjaw", name: "Grimjaw", aliases: [], type: "character", path: "characters/grimjaw.md" });
     let { volatile } = mgr.getSystemPrompt();
     expect(volatile).toContain("Grimjaw");
 
     await mgr.sceneTransition(provider, "End of scene");
 
-    // After transition, entity index should be cleared
+    // Entity tree is campaign-wide — persists across scenes
     ({ volatile } = mgr.getSystemPrompt());
-    expect(volatile).not.toContain("Scene Entities");
+    expect(volatile).toContain("Grimjaw");
   });
 
-  it("notifyEntityTouched upserts — second call updates entry", () => {
+  it("upsertEntity upserts — second call updates entry", () => {
     const sessionState = mockSessionState();
     const mgr = new SceneManager(
       mockState(),
@@ -713,14 +707,13 @@ describe("SceneManager", () => {
       mockFileIO(),
     );
 
-    mgr.notifyEntityTouched("/tmp/test-campaign/characters/grimjaw.md", "Grimjaw");
-    mgr.notifyEntityTouched("/tmp/test-campaign/characters/grimjaw.md", "Grimjaw", "Captain Grimjaw");
+    mgr.upsertEntity({ slug: "grimjaw", name: "Grimjaw", aliases: [], type: "character", path: "characters/grimjaw.md" });
+    mgr.upsertEntity({ slug: "grimjaw", name: "Grimjaw", aliases: ["Captain Grimjaw"], type: "character", path: "characters/grimjaw.md" });
 
     mgr.getSystemPrompt();
-    // Check the entityIndex on sessionState directly — one entry, with aliases
     expect(sessionState.entityIndex).toBeDefined();
-    expect(sessionState.entityIndex).toContain("Grimjaw (also: Captain Grimjaw)");
-    // Map upsert: path should appear exactly once in the entity index
+    expect(sessionState.entityIndex).toContain("aka Captain Grimjaw");
+    // Upsert: slug should appear exactly once
     const matches = sessionState.entityIndex!.match(/characters\/grimjaw\.md/g);
     expect(matches).toHaveLength(1);
   });

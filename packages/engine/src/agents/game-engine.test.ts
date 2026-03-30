@@ -25,6 +25,7 @@ vi.mock("./subagents/scribe.js", () => ({
     summary: "Created [[Grimjaw]] (character, private)",
     created: ["/tmp/test-campaign/characters/grimjaw.md"],
     updated: [],
+    entityDeltas: [{ slug: "grimjaw", name: "Grimjaw", aliases: [], type: "character", path: "characters/grimjaw.md" }],
     usage: { inputTokens: 30, outputTokens: 15, cacheReadTokens: 0, cacheCreationTokens: 0 },
   })),
 }));
@@ -606,10 +607,10 @@ describe("GameEngine Scribe Integration", () => {
 
     await engine.processInput("Aldric", "I look around.");
 
-    // The mock runScribe returns created: ["/tmp/test-campaign/characters/grimjaw.md"]
+    // The mock runScribe returns entityDeltas with grimjaw
     const sm = engine.getSceneManager();
     const { volatile } = sm.getSystemPrompt();
-    expect(volatile).toContain("Scene Entities");
+    expect(volatile).toContain("Entity Registry");
     expect(volatile).toContain("grimjaw");
   });
 });

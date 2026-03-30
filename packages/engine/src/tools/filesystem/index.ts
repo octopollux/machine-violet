@@ -14,6 +14,7 @@ export {
   resolveRelativePath,
 } from "./validation.js";
 export type { ValidationError } from "./validation.js";
+export { buildEntityTree, renderEntityTree } from "./entity-tree.js";
 export { writeDebugDump } from "./debug-dump.js";
 export type { DebugDumpData } from "./debug-dump.js";
 export { sandboxFileIO } from "./sandbox.js";

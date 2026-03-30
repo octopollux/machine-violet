@@ -25,6 +25,7 @@ import { createProviderFromConnection } from "../providers/index.js";
 import { configDir } from "../utils/paths.js";
 import { sandboxFileIO } from "../tools/filesystem/sandbox.js";
 import { campaignPaths } from "../tools/filesystem/scaffold.js";
+import { buildEntityTree } from "../tools/filesystem/entity-tree.js";
 import { createGitIO } from "../tools/git/isogit-adapter.js";
 import { createClocksState } from "../tools/clocks/index.js";
 import { createCombatState } from "../tools/combat/index.js";
@@ -363,6 +364,9 @@ export class SessionManager {
       }
     } catch { /* ignore — may not exist yet */ }
 
+    // --- Build entity tree from disk ---
+    const entityTree = await buildEntityTree(campaignRoot, fileIO);
+
     // --- Cost tracker ---
     this.costTracker = new CostTracker();
 
@@ -391,6 +395,7 @@ export class SessionManager {
       fileIO,
       callbacks,
       gitIO,
+      entityTree,
     });
 
     this.engine = engine;

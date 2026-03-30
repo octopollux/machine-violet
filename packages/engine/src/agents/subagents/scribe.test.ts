@@ -46,7 +46,7 @@ describe("buildScribeToolHandler", () => {
         "/camp/characters/grimjaw.md": "# Grimjaw",
         "/camp/characters/kael.md": "# Kael",
       });
-      const handler = buildScribeToolHandler(fio, "/camp", 1, [], []);
+      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
       const result = await handler("list_entities", { entity_type: "character" });
       expect(result.content).toContain("grimjaw");
       expect(result.content).toContain("kael");
@@ -57,7 +57,7 @@ describe("buildScribeToolHandler", () => {
         "/camp/locations/iron-forge/index.md": "# Iron Forge",
         "/camp/locations/dark-forest/index.md": "# Dark Forest",
       });
-      const handler = buildScribeToolHandler(fio, "/camp", 1, [], []);
+      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
       const result = await handler("list_entities", { entity_type: "location" });
       expect(result.content).toContain("iron-forge");
       expect(result.content).toContain("dark-forest");
@@ -65,7 +65,7 @@ describe("buildScribeToolHandler", () => {
 
     it("returns (none) for empty directories", async () => {
       const fio = mockFileIO();
-      const handler = buildScribeToolHandler(fio, "/camp", 1, [], []);
+      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
       const result = await handler("list_entities", { entity_type: "faction" });
       expect(result.content).toContain("no entities");
     });
@@ -76,7 +76,7 @@ describe("buildScribeToolHandler", () => {
       const fio = mockFileIO({
         "/camp/characters/grimjaw.md": "# Grimjaw\n\n**Type:** character\n\nA scarred orc.\n",
       });
-      const handler = buildScribeToolHandler(fio, "/camp", 1, [], []);
+      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
       const result = await handler("read_entity", { entity_type: "character", slug: "grimjaw" });
       expect(result.content).toContain("# Grimjaw");
       expect(result.content).toContain("scarred orc");
@@ -84,7 +84,7 @@ describe("buildScribeToolHandler", () => {
 
     it("returns error for missing entity", async () => {
       const fio = mockFileIO();
-      const handler = buildScribeToolHandler(fio, "/camp", 1, [], []);
+      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
       const result = await handler("read_entity", { entity_type: "character", slug: "nobody" });
       expect(result.is_error).toBe(true);
       expect(result.content).toContain("not found");
@@ -95,7 +95,7 @@ describe("buildScribeToolHandler", () => {
     it("creates a new character entity", async () => {
       const fio = mockFileIO();
       const created: string[] = [];
-      const handler = buildScribeToolHandler(fio, "/camp", 3, created, []);
+      const handler = buildScribeToolHandler(fio, "/camp", 3, created, [], []);
 
       const result = await handler("write_entity", {
         mode: "create",
@@ -124,7 +124,7 @@ describe("buildScribeToolHandler", () => {
     it("creates a location with parent directory", async () => {
       const fio = mockFileIO();
       const created: string[] = [];
-      const handler = buildScribeToolHandler(fio, "/camp", 1, created, []);
+      const handler = buildScribeToolHandler(fio, "/camp", 1, created, [], []);
 
       await handler("write_entity", {
         mode: "create",
@@ -140,7 +140,7 @@ describe("buildScribeToolHandler", () => {
       const fio = mockFileIO({
         "/camp/characters/grimjaw.md": "# Grimjaw\n",
       });
-      const handler = buildScribeToolHandler(fio, "/camp", 1, [], []);
+      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
 
       const result = await handler("write_entity", {
         mode: "create",
@@ -159,7 +159,7 @@ describe("buildScribeToolHandler", () => {
         "/camp/characters/grimjaw.md": "# Grimjaw\n\n**Type:** character\n**Disposition:** hostile\n\nA scarred orc.\n",
       });
       const updated: string[] = [];
-      const handler = buildScribeToolHandler(fio, "/camp", 5, [], updated);
+      const handler = buildScribeToolHandler(fio, "/camp", 5, [], updated, []);
 
       const result = await handler("write_entity", {
         mode: "update",
@@ -185,7 +185,7 @@ describe("buildScribeToolHandler", () => {
       const fio = mockFileIO({
         "/camp/characters/grimjaw.md": "# Grimjaw\n\n**Type:** character\n**Disposition:** hostile\n\nOrc.\n",
       });
-      const handler = buildScribeToolHandler(fio, "/camp", 1, [], []);
+      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
 
       await handler("write_entity", {
         mode: "update",
@@ -200,7 +200,7 @@ describe("buildScribeToolHandler", () => {
 
     it("returns error when entity does not exist", async () => {
       const fio = mockFileIO();
-      const handler = buildScribeToolHandler(fio, "/camp", 1, [], []);
+      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
 
       const result = await handler("write_entity", {
         mode: "update",
@@ -216,7 +216,7 @@ describe("buildScribeToolHandler", () => {
 
   it("unescapes literal \\n in body and changelog", async () => {
     const fio = mockFileIO();
-    const handler = buildScribeToolHandler(fio, "/camp", 1, [], []);
+    const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
 
     await handler("write_entity", {
       mode: "create",
@@ -234,7 +234,7 @@ describe("buildScribeToolHandler", () => {
 
   it("returns error when write_entity is called without name", async () => {
     const fio = mockFileIO();
-    const handler = buildScribeToolHandler(fio, "/camp", 1, [], []);
+    const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
 
     const result = await handler("write_entity", {
       mode: "create",
@@ -248,7 +248,7 @@ describe("buildScribeToolHandler", () => {
 
   it("returns error for unknown tool", async () => {
     const fio = mockFileIO();
-    const handler = buildScribeToolHandler(fio, "/camp", 1, [], []);
+    const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
     const result = await handler("unknown_tool", {});
     expect(result.is_error).toBe(true);
   });

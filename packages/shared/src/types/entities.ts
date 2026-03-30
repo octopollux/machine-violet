@@ -29,6 +29,23 @@ export interface EntityFile {
   changelog: string[];
 }
 
+// --- Entity Tree (campaign-wide registry) ---
+
+/** A single entry in the campaign entity tree. */
+export interface EntityTreeEntry {
+  /** Canonical display name (from H1 heading). */
+  name: string;
+  /** Alternative names (from "Additional Names" front matter). */
+  aliases: string[];
+  /** Entity type (character, location, faction, lore). */
+  type: string;
+  /** Relative path from campaign root (e.g. "characters/marta-voss.md"). */
+  path: string;
+}
+
+/** Campaign-wide entity registry, keyed by slug. */
+export type EntityTree = Record<string, EntityTreeEntry>;
+
 export interface PromoteCharacterInput {
   name: string;
   file?: string;

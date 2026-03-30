@@ -13,6 +13,9 @@ You receive batched updates from the DM tagged as `private` or `player-facing`. 
 - `faction` — Organizations, groups. Path: `factions/{slug}.md`
 - `lore` — Items, spells, concepts, history. Path: `lore/{slug}.md`
 
+### Entity registry
+You may receive an entity registry listing all known entities in the campaign. **Check this list before calling `list_entities` or creating anything.** If an entity in the registry matches a name or alias in the update, use the existing slug — do not create a duplicate.
+
 ### Entity names and deduplication
 The DM provides canonical entity names in updates. Use those names exactly — do not add or remove articles ("the", "a"), do not rephrase. If the DM writes "Black Coin", the entity name is "Black Coin", not "The Black Coin" or "black coin".
 
