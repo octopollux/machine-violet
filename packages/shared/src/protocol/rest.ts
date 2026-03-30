@@ -36,6 +36,10 @@ export const ContributeRequest = Type.Object({
     Type.Literal("dialogue"),
     Type.Literal("ooc"),
   ])),
+  /** Campaign ID the client believes it is playing. Rejected on mismatch. */
+  campaignId: Type.Optional(Type.String()),
+  /** Turn sequence number the client believes is current. Rejected on mismatch. */
+  turnSeq: Type.Optional(Type.Number()),
 });
 
 export const CommitResponse = Type.Object({

@@ -33,6 +33,7 @@ export function PlayingPhase() {
     theme,
     campaignName, activePlayerIndex,
     engineState, toolGlyphs, resources, modelines,
+    currentTurn,
     activeChoices, setActiveChoices,
     activeModal, setActiveModal,
     mode, stateSnapshot,
@@ -44,10 +45,13 @@ export function PlayingPhase() {
 
   // Local state
   const [resetKey, setResetKey] = useState(0);
+  const [pendingInput, setPendingInput] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [tokenSummary, setTokenSummary] = useState("");
 
-  const clearInput = useCallback(() => setResetKey((k) => k + 1), []);
+  const clearInput = useCallback(() => { setPendingInput(""); setResetKey((k) => k + 1); }, []);
+  /** Reset the input but pre-fill it with text (e.g. after a rejected contribution). */
+  const restoreInput = useCallback((text: string) => { setPendingInput(text); setResetKey((k) => k + 1); }, []);
 
   const narrativeRef = useRef<NarrativeAreaHandle>(null);
   const modalScrollRef = useRef<CenteredModalHandle>(null);
@@ -92,23 +96,30 @@ export function PlayingPhase() {
       return;
     }
 
-    // Regular input → contribute to current turn
+    // Regular input → contribute to current turn.
+    // Tag optimistic lines so we can remove exactly these on rejection,
+    // even if other lines (WS events, other players) arrived in between.
+    const tag = `optimistic-${Date.now()}`;
     setNarrativeLines((prev) => [
       ...prev,
-      { kind: "separator", text: "---" },
-      { kind: "player", text: `[${activeChar}] ${text}` },
-      { kind: "dm", text: "" },
+      { kind: "separator", text: "---", tag },
+      { kind: "player", text: `[${activeChar}] ${text}`, tag },
+      { kind: "dm", text: "", tag },
     ]);
 
     try {
-      await apiClient.contribute(text);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setNarrativeLines((prev) => [...prev, { kind: "system", text: `[Error: ${msg}]` }]);
+      await apiClient.contribute(text, {
+        campaignId: currentTurn?.campaignId,
+        turnSeq: currentTurn?.seq,
+      });
+      clearInput();
+    } catch {
+      // Contribution rejected — remove only our optimistic lines
+      // and restore the player's text to the input box so they can resend.
+      setNarrativeLines((prev) => prev.filter((l) => l.tag !== tag));
+      restoreInput(text);
     }
-
-    clearInput();
-  }, [apiClient, activeChar, setNarrativeLines, clearInput]);
+  }, [apiClient, activeChar, currentTurn, setNarrativeLines, clearInput, restoreInput]);
 
   // --- Choice selection ---
   const handleChoiceSelect = useCallback(async (choice: string) => {
@@ -125,9 +136,12 @@ export function PlayingPhase() {
 
     // Gameplay choices are sent as a turn contribution
     try {
-      await apiClient.contribute(choice);
+      await apiClient.contribute(choice, {
+        campaignId: currentTurn?.campaignId,
+        turnSeq: currentTurn?.seq,
+      });
     } catch { /* no-op */ }
-  }, [apiClient, activeChoices, setActiveChoices]);
+  }, [apiClient, activeChoices, setActiveChoices, currentTurn]);
 
   const handleChoiceDismiss = useCallback(() => setActiveChoices(null), [setActiveChoices]);
 
@@ -254,6 +268,7 @@ export function PlayingPhase() {
         modelineText={modelines[activeChar] ?? campaignName}
         activeCharacterName={activeChar}
         inputIsDisabled={textInputDisabled}
+        inputDefaultValue={pendingInput}
         inputResetKey={resetKey}
         onInputSubmit={handleSubmit}
         players={players}

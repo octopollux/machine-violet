@@ -126,8 +126,11 @@ export class ApiClient {
     return this.get("/session/state");
   }
 
-  async contribute(text: string, type?: "action" | "dialogue" | "ooc"): Promise<{ turnId: string; contributionId: string }> {
-    const body: ContributeRequest = { text, type };
+  async contribute(
+    text: string,
+    opts?: { type?: "action" | "dialogue" | "ooc"; campaignId?: string; turnSeq?: number },
+  ): Promise<{ turnId: string; contributionId: string }> {
+    const body: ContributeRequest = { text, type: opts?.type, campaignId: opts?.campaignId, turnSeq: opts?.turnSeq };
     return this.post(`/session/turn/contribute?player=${encodeURIComponent(this.playerId)}`, body);
   }
 

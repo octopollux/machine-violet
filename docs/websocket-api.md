@@ -37,6 +37,7 @@ The `type` field is a string discriminant. The `data` field varies by event type
 2. Server immediately sends a `state:snapshot` event with the full current game state
 3. Server pushes events as gameplay proceeds
 4. On unexpected disconnect, clients should reconnect with exponential backoff
+5. If all **player** connections drop for 5 minutes, the server auto-saves and ends the session (spectator connections are excluded from this check). If a client reconnects after the session has ended, no `state:snapshot` is sent (the server only sends snapshots for active sessions). Clients should treat the absence of a snapshot on connect as "no active session" and return the user to the main menu
 
 ## Events
 
@@ -73,12 +74,20 @@ A new turn is ready for player contributions.
 
 | Field          | Type     | Description |
 |----------------|----------|-------------|
-| `id`           | string   | Turn identifier. |
+| `id`           | string   | Turn identifier (UUID). |
+| `seq`          | number   | Sequential turn number within this session (1-based). |
+| `campaignId`   | string   | Campaign this turn belongs to. |
 | `status`       | string   | Always `"open"` for this event. |
 | `activePlayers`| string[] | Human players who can contribute. |
 | `aiPlayers`    | string[] | AI players scheduled to run after humans contribute. |
 | `contributions`| array    | Initially empty. See `TurnContribution` below. |
 | `commitPolicy` | string   | `"auto"` (single player, auto-commit) or `"all"` (wait for all). |
+
+Clients should track `campaignId` and `seq` to detect staleness:
+- **Campaign mismatch** (a different `campaignId` than expected) means the backend session changed — return the user to the main menu.
+- **Seq gap** (a `seq` higher than expected by more than 1) means the client missed turns while disconnected. The state snapshot received on reconnect already hydrates the client, so no special action is needed — just accept the new turn and continue.
+
+Clients may also include `campaignId` and `turnSeq` in `POST /session/turn/contribute` requests. The server returns **409 Conflict** on mismatch, allowing the client to silently discard the stale contribution and restore the player's input for resubmission.
 
 **TurnContribution** (nested in turn events):
 

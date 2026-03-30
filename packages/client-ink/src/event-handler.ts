@@ -39,6 +39,10 @@ export interface ClientState {
   mode: "play" | "ooc" | "dev" | "setup";
   stateSnapshot: StateSnapshot | null;
   sessionEnded: boolean;
+  /** Set when the client detects it is out of sync with the backend
+   *  (campaign changed, session ended while disconnected, etc.).
+   *  The UI should show a message and return the user to the main menu. */
+  sessionStale: boolean;
   lastError: { message: string; recoverable: boolean } | null;
   /** Per-character modeline text (character name → status string). */
   modelines: Record<string, string>;
@@ -59,6 +63,7 @@ export function initialClientState(): ClientState {
     mode: "play",
     stateSnapshot: null,
     sessionEnded: false,
+    sessionStale: false,
     lastError: null,
     modelines: {},
     displayResources: {},
@@ -145,11 +150,21 @@ function handleNarrativeComplete(_event: NarrativeCompleteEvent, update: StateUp
 }
 
 function handleTurnOpened(event: TurnOpenedEvent, update: StateUpdater): void {
-  update((prev) => ({
-    ...prev,
-    currentTurn: event.data,
-    lastError: null,
-  }));
+  update((prev) => {
+    const incoming = event.data;
+    const prevTurn = prev.currentTurn;
+
+    // Detect campaign mismatch (backend switched to a different session)
+    if (prevTurn && incoming.campaignId !== prevTurn.campaignId) {
+      return { ...prev, sessionStale: true };
+    }
+
+    return {
+      ...prev,
+      currentTurn: incoming,
+      lastError: null,
+    };
+  });
 }
 
 function handleTurnUpdated(event: TurnUpdatedEvent, update: StateUpdater): void {
@@ -249,17 +264,25 @@ function handleActivityUpdate(event: ActivityUpdateEvent, update: StateUpdater):
 
 function handleStateSnapshot(event: StateSnapshotEvent, update: StateUpdater): void {
   const snapshot = event.data as StateSnapshot;
-  update((prev) => ({
-    ...prev,
-    stateSnapshot: snapshot,
-    mode: snapshot.mode ?? prev.mode,
-    variant: (snapshot.variant as StyleVariant) ?? prev.variant,
-    // Hydrate resources and modelines from snapshot so they're available
-    // immediately, not just after the first TUI command update
-    displayResources: snapshot.displayResources ?? prev.displayResources,
-    resourceValues: snapshot.resourceValues ?? prev.resourceValues,
-    modelines: snapshot.modelines ?? prev.modelines,
-  }));
+  update((prev) => {
+    // Detect campaign mismatch on reconnect
+    const prevId = prev.stateSnapshot?.campaignId;
+    if (prevId && snapshot.campaignId && prevId !== snapshot.campaignId) {
+      return { ...prev, sessionStale: true };
+    }
+
+    return {
+      ...prev,
+      stateSnapshot: snapshot,
+      mode: snapshot.mode ?? prev.mode,
+      variant: (snapshot.variant as StyleVariant) ?? prev.variant,
+      // Hydrate resources and modelines from snapshot so they're available
+      // immediately, not just after the first TUI command update
+      displayResources: snapshot.displayResources ?? prev.displayResources,
+      resourceValues: snapshot.resourceValues ?? prev.resourceValues,
+      modelines: snapshot.modelines ?? prev.modelines,
+    };
+  });
 }
 
 function handleSessionMode(event: SessionModeEvent, update: StateUpdater): void {

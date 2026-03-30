@@ -40,6 +40,7 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
       response: {
         200: ContributeResponse,
         400: ErrorResponse,
+        409: ErrorResponse,
       },
     },
   }, async (request, reply) => {
@@ -63,7 +64,17 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
       return reply.status(400).send({ error: `No open turn. (status: ${turn?.status ?? "null"})` });
     }
 
-    const { text } = request.body as { text: string };
+    const body = request.body as ContributeRequest;
+    const { text } = body;
+
+    // Reject stale clients: campaign or turn mismatch
+    if (body.campaignId != null && body.campaignId !== turn.campaignId) {
+      return reply.status(409).send({ error: "Campaign mismatch — session has changed." });
+    }
+    if (body.turnSeq != null && body.turnSeq !== turn.seq) {
+      return reply.status(409).send({ error: `Turn mismatch — expected seq ${turn.seq}, got ${body.turnSeq}.` });
+    }
+
     // Resolve player: use query param if it matches an active player, otherwise default to first active
     const queryPlayer = (request.query as Record<string, string>).player;
     const playerId = (queryPlayer && turn.activePlayers.includes(queryPlayer))

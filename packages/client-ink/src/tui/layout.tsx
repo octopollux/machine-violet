@@ -43,6 +43,7 @@ export interface LayoutProps {
 
   // Text input
   inputIsDisabled?: boolean;
+  inputDefaultValue?: string;
   inputResetKey?: number;
   onInputChange?: (value: string) => void;
   onInputSubmit?: (value: string) => void;
@@ -94,6 +95,7 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
     modelineText,
     activeCharacterName,
     inputIsDisabled,
+    inputDefaultValue,
     inputResetKey,
     onInputChange,
     onInputSubmit,
@@ -257,6 +259,7 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
                     playerName={players[activePlayerIndex]?.name}
                     width={width - 4}
                     isDisabled={inputIsDisabled}
+                    defaultValue={inputDefaultValue}
                     onChange={onInputChange}
                     onSubmit={onInputSubmit}
                     resetKey={inputResetKey}
