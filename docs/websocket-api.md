@@ -37,6 +37,7 @@ The `type` field is a string discriminant. The `data` field varies by event type
 2. Server immediately sends a `state:snapshot` event with the full current game state
 3. Server pushes events as gameplay proceeds
 4. On unexpected disconnect, clients should reconnect with exponential backoff
+5. If all **player** connections drop for 5 minutes, the server auto-saves and ends the session (spectator connections are excluded from this check). Reconnecting clients will receive a `session:ended` event or an empty state snapshot, and should return the user to the main menu
 
 ## Events
 
@@ -84,7 +85,9 @@ A new turn is ready for player contributions.
 
 Clients should track `campaignId` and `seq` to detect staleness:
 - **Campaign mismatch** (a different `campaignId` than expected) means the backend session changed — return the user to the main menu.
-- **Seq gap** (a `seq` higher than expected by more than 1) means the client missed turns while disconnected — request a full state refresh via `GET /session/state`.
+- **Seq gap** (a `seq` higher than expected by more than 1) means the client missed turns while disconnected. The state snapshot received on reconnect already hydrates the client, so no special action is needed — just accept the new turn and continue.
+
+Clients may also include `campaignId` and `turnSeq` in `POST /session/turn/contribute` requests. The server returns **409 Conflict** on mismatch, allowing the client to silently discard the stale contribution and restore the player's input for resubmission.
 
 **TurnContribution** (nested in turn events):
 
