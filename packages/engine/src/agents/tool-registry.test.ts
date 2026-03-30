@@ -44,7 +44,7 @@ describe("ToolRegistry", () => {
     const defs = reg.getDefinitions();
     for (const def of defs) {
       expect(def.name).toBeTruthy();
-      expect(def.input_schema.type).toBe("object");
+      expect(def.inputSchema.type).toBe("object");
     }
   });
 

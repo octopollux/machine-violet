@@ -1,4 +1,4 @@
-import type { NormalizedMessage, LLMProvider } from "../providers/types.js";
+import type { LLMProvider } from "../providers/types.js";
 import type { GameState } from "./game-state.js";
 import type { ConversationManager, DroppedExchange } from "../context/index.js";
 import { renderCampaignLog, parseLegacyLog } from "../context/index.js";

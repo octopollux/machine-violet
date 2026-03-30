@@ -346,7 +346,7 @@ describe("buildCachedPrefix", () => {
 
     // Rules appendix (last Tier 1 block) should have cache_control (BP1)
     const rulesBlock = system.find((b) => b.text.includes("Rules Reference")) as unknown as Record<string, unknown>;
-    expect(rulesBlock["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
+    expect(rulesBlock["cacheControl"]).toEqual({ ttl: "1h" });
   });
 
   it("falls back BP1 to last Tier 1 block when rulesAppendix is absent", () => {
@@ -357,7 +357,7 @@ describe("buildCachedPrefix", () => {
 
     // Without rules, BP1 falls back to the personality block (last Tier 1)
     const lastTier1 = system[system.length - 1] as unknown as Record<string, unknown>;
-    expect(lastTier1["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
+    expect(lastTier1["cacheControl"]).toEqual({ ttl: "1h" });
   });
 
   it("places BP2 on last Tier 2 block", () => {
@@ -374,11 +374,11 @@ describe("buildCachedPrefix", () => {
 
     // playerRead is the last Tier 2 block — should have cache_control
     const playerReadBlock = system.find((b) => b.text.includes("Player Read")) as unknown as Record<string, unknown>;
-    expect(playerReadBlock["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
+    expect(playerReadBlock["cacheControl"]).toEqual({ ttl: "1h" });
 
     // Campaign summary should NOT have its own cache_control (BP2 is on playerRead)
     const summaryBlock = system.find((b) => b.text.includes("Campaign Log")) as unknown as Record<string, unknown>;
-    expect(summaryBlock["cache_control"]).toBeUndefined();
+    expect(summaryBlock["cacheControl"]).toBeUndefined();
 
     // activeState (Tier 3) should be in volatile, not in system blocks
     expect(system.find((b) => b.text.includes("Current State"))).toBeUndefined();
@@ -394,7 +394,7 @@ describe("buildCachedPrefix", () => {
     });
 
     const summaryBlock = system.find((b) => b.text.includes("Campaign Log")) as unknown as Record<string, unknown>;
-    expect(summaryBlock["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
+    expect(summaryBlock["cacheControl"]).toEqual({ ttl: "1h" });
   });
 
   it("includes Player Read block when provided", () => {
@@ -452,11 +452,11 @@ describe("buildCachedPrefix", () => {
     });
 
     const dmNotesBlock = system.find((b) => b.text.includes("DM Notes")) as unknown as Record<string, unknown>;
-    expect(dmNotesBlock["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
+    expect(dmNotesBlock["cacheControl"]).toEqual({ ttl: "1h" });
 
     // playerRead should NOT have cache_control since dmNotes comes after
     const playerReadBlock = system.find((b) => b.text.includes("Player Read")) as unknown as Record<string, unknown>;
-    expect(playerReadBlock["cache_control"]).toBeUndefined();
+    expect(playerReadBlock["cacheControl"]).toBeUndefined();
   });
 
   it("does not include Scene Pacing block (removed from prefix)", () => {
@@ -529,6 +529,6 @@ describe("buildCachedPrefix", () => {
 
     // BP2 should be on the last Tier 2 block (campaign summary in this case)
     const lastTier2 = system[summaryIndex] as unknown as Record<string, unknown>;
-    expect(lastTier2["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
+    expect(lastTier2["cacheControl"]).toEqual({ ttl: "1h" });
   });
 });

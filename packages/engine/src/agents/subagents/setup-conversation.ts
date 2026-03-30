@@ -310,7 +310,7 @@ export function createSetupConversation(provider: LLMProvider, model: string): S
         pendingToolUseId = tc.id;
       } else if (tc.name === "finalize_setup") {
         handleFinalize(tc.input);
-        (toolResults as Array<{ type: "tool_result"; tool_use_id: string; content: string }>).push({
+        (toolResults as { type: "tool_result"; tool_use_id: string; content: string }[]).push({
           type: "tool_result",
           tool_use_id: tc.id,
           content: "Setup finalized. Say a brief farewell to the player before the adventure begins.",
