@@ -244,10 +244,14 @@ export function createSetupConversation(provider: LLMProvider, model: string): S
     const rawSystem = (input.system as string) || null;
     const resolvedSystem = rawSystem ? resolveSystemSlug(rawSystem) : null;
 
-    // Resolve campaign detail: prefer the agent's passthrough, fall back to seed lookup
+    // Resolve campaign detail: prefer the agent's passthrough, fall back to seed lookup.
+    // Only fall back when the field is truly absent (undefined/null) — an explicit
+    // empty string means the agent intentionally omitted it.
     const campaignName = (input.campaign_name as string) || "A New Story";
-    let campaignDetail = (input.campaign_detail as string) || null;
-    if (!campaignDetail) {
+    const rawDetail = input.campaign_detail;
+    let campaignDetail: string | null = typeof rawDetail === "string" && rawDetail.trim()
+      ? rawDetail : null;
+    if (rawDetail === undefined || rawDetail === null) {
       const matchedSeed = SEEDS.find((s) => s.name === campaignName);
       if (matchedSeed?.detail) campaignDetail = matchedSeed.detail;
     }
