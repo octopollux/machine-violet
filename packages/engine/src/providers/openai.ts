@@ -293,6 +293,7 @@ function fromOpenAIResponse(response: OpenAI.ChatCompletion): ChatResult {
 
   if (choice?.message?.tool_calls) {
     for (const tc of choice.message.tool_calls) {
+      if (!("function" in tc)) continue;
       let input: Record<string, unknown>;
       try {
         input = JSON.parse(tc.function.arguments);

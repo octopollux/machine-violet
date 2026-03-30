@@ -77,7 +77,7 @@ function toAnthropicParams(params: ChatParams): {
     system = params.systemPrompt.map((block) => {
       const tb: Anthropic.TextBlockParam = { type: "text", text: block.text };
       if (block.cacheControl) {
-        (tb as Record<string, unknown>).cache_control = {
+        (tb as unknown as Record<string, unknown>).cache_control = {
           type: "ephemeral",
           ttl: block.cacheControl.ttl,
         };
@@ -244,8 +244,8 @@ function fromAnthropicResponse(
   const usage: NormalizedUsage = {
     inputTokens: response.usage.input_tokens,
     outputTokens: response.usage.output_tokens,
-    cacheReadTokens: (response.usage as Record<string, number>).cache_read_input_tokens ?? 0,
-    cacheCreationTokens: (response.usage as Record<string, number>).cache_creation_input_tokens ?? 0,
+    cacheReadTokens: (response.usage as unknown as Record<string, number>).cache_read_input_tokens ?? 0,
+    cacheCreationTokens: (response.usage as unknown as Record<string, number>).cache_creation_input_tokens ?? 0,
     reasoningTokens: 0,
   };
 
