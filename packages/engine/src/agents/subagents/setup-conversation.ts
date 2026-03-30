@@ -66,6 +66,7 @@ const FINALIZE_TOOL: NormalizedTool = {
       character_name: { type: "string", description: "Player character's name" },
       character_description: { type: "string", description: "One-sentence character concept" },
       character_details: { type: "string", description: "Mechanical character details gathered during setup (class, skills, approaches, etc). Free-form text. Omit or null for pure narrative.", nullable: true },
+      campaign_detail: { type: "string", description: "The seed's hidden detail block, passed through verbatim for the DM. Omit if the chosen seed has no detail block or the campaign is fully custom.", nullable: true },
     },
     required: [
       "genre", "campaign_name", "campaign_premise", "mood",
@@ -127,11 +128,13 @@ function buildSystemPrompt(): string {
   const base = loadPrompt("setup-conversation");
   const seedList = SEEDS.map((s) => {
     const desc = s.description ? ` | Description: ${s.description}` : "";
-    return `- **${s.name}** — ${s.premise} (${s.genres.join(", ")})${desc}`;
+    const detail = s.detail ? `\n  Detail: ${s.detail.replace(/\n/g, "\n  ")}` : "";
+    return `- **${s.name}** — ${s.premise} (${s.genres.join(", ")})${desc}${detail}`;
   }).join("\n");
   const personalityList = PERSONALITIES.map((p) => {
     const desc = p.description ? `: ${p.description}` : "";
-    return `- **${p.name}**${desc}`;
+    const detail = p.detail ? `\n  Detail: ${p.detail.replace(/\n/g, "\n  ")}` : "";
+    return `- **${p.name}**${desc}${detail}`;
   }).join("\n");
 
   const { light, crunchy } = groupByTier(KNOWN_SYSTEMS);
@@ -241,11 +244,20 @@ export function createSetupConversation(provider: LLMProvider, model: string): S
     const rawSystem = (input.system as string) || null;
     const resolvedSystem = rawSystem ? resolveSystemSlug(rawSystem) : null;
 
+    // Resolve campaign detail: prefer the agent's passthrough, fall back to seed lookup
+    const campaignName = (input.campaign_name as string) || "A New Story";
+    let campaignDetail = (input.campaign_detail as string) || null;
+    if (!campaignDetail) {
+      const matchedSeed = SEEDS.find((s) => s.name === campaignName);
+      if (matchedSeed?.detail) campaignDetail = matchedSeed.detail;
+    }
+
     finalized = {
       genre: (input.genre as string) || "Classic fantasy",
       system: resolvedSystem,
-      campaignName: (input.campaign_name as string) || "A New Story",
+      campaignName,
       campaignPremise: (input.campaign_premise as string) || "An adventure awaits.",
+      campaignDetail,
       mood: (input.mood as string) || "Balanced",
       difficulty: (input.difficulty as string) || "Balanced",
       personality,

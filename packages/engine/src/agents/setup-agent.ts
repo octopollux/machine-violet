@@ -15,6 +15,8 @@ export interface SetupResult {
   system: string | null;
   campaignName: string;
   campaignPremise: string;
+  /** Hidden campaign detail — DM-only instructions from the seed's detail block. */
+  campaignDetail: string | null;
   mood: string;
   difficulty: string;
   personality: DMPersonality;
@@ -45,6 +47,7 @@ export function buildCampaignConfig(result: SetupResult): CampaignConfig {
     mood: result.mood,
     difficulty: result.difficulty,
     premise: result.campaignPremise,
+    campaign_detail: result.campaignDetail ?? undefined,
     dm_personality: result.personality,
     players: [player],
     combat: defaultCombatConfig(),

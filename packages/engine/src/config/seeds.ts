@@ -6,6 +6,8 @@ export interface CampaignSeed {
   name: string;
   premise: string;
   description?: string;
+  /** Hidden detail block — rich DM instructions (variants, secrets, pacing). Not shown to the player. */
+  detail?: string;
   genres: string[];
 }
 
@@ -14,16 +16,46 @@ export const SEEDS: CampaignSeed[] = [
   {
     name: "The Shattered Crown",
     premise: "A kingdom's heir is dead. Three factions claim the throne.",
+    detail: `Roll or choose a variant at campaign start:
+1. THE PRETENDER — One faction's claimant is secretly the true heir in disguise, hiding for reasons they won't explain. The player may end up serving them without knowing.
+2. THE EMPTY THRONE — The heir faked their death. They're watching from the margins, testing who deserves to rule. They will approach the player mid-campaign with a terrible bargain.
+3. THE SUCCESSION CURSE — Every claimant who sits the throne dies within a week. The throne itself is the antagonist — a bound entity that feeds on sovereignty.
+
+Faction texture: one faction is militaristic and honorable but brittle (a single betrayal shatters them), one is a merchant coalition that treats the crown as a business acquisition, one is a religious order convinced of divine mandate. All three have a sympathetic leader and an inner circle with its own agenda.
+
+Pacing: Start the player entangled with one faction before they understand the full picture. Reveal the second faction as nuanced allies-or-enemies by mid-campaign. The third faction's true nature is the late-game twist. Use ticking clocks — a coronation deadline, a foreign army massing at the border, a plague in the capital.`,
     genres: ["fantasy"],
   },
   {
     name: "Ghosts of Station Proxima",
     premise: "An abandoned space station just started broadcasting again.",
+    detail: `The broadcast is a distress call — but it's in the player's own voice. They've never been to Proxima. Or have they?
+
+Roll or choose the station's secret:
+1. TIME LOOP — The station exists in a temporal fold. The "ghosts" are future and past versions of the crew (and possibly the player) overlapping. Solving it means choosing which timeline gets to be real.
+2. DIGITAL AFTERLIFE — The station was an experimental consciousness-upload facility. The "ghosts" are uploaded crew members who don't know they're dead. The broadcast is a plea from the one who figured it out.
+3. FIRST CONTACT — The station was humanity's secret first-contact site. The aliens communicated by mimicking human signals — poorly at first, now perfectly. The broadcast isn't from humans. It's an invitation.
+
+Station structure: Six modules connected by a central spine. Gravity works in some, not others. Power flickers between modules — the player can restore it, but each module powered up reveals something uncomfortable. One module is completely missing from the blueprints but physically present.
+
+Key NPC: A maintenance AI named PELL who has been alone for 11 years. PELL is helpful, chatty, deeply lonely, and knows more than it admits. It may be compromised. It may just be scared.`,
     genres: ["sci-fi"],
   },
   {
     name: "The Gilded Cage",
     premise: "You're the guest of honor at a party you can't leave.",
+    detail: `The host knows the player. The player doesn't remember the host. This is not an accident.
+
+Roll or choose the cage's nature:
+1. THE DEBT — The player did something terrible and had the memory erased. The party is a trial. Every guest is a witness. The host is the victim — or the victim's heir.
+2. THE AUDITION — The party is a test run by a secret society, a patron deity, or an extradimensional collector. Every interaction is being evaluated. The "prize" for passing is not what it seems.
+3. THE WAKE — The party is for someone who hasn't died yet. That someone is the player. The host is trying to save them from a fate they can't explain in plain terms — so they built an elaborate cage instead.
+
+The house: Every room reveals something about the player's past (or a constructed version of it). Doors lead to rooms that shouldn't exist. The architecture responds to emotional state — a room expands when you're calm, contracts when you panic.
+
+Guests: 8-12 NPCs, each with a specific relationship to the central mystery. Some are allies, some are obstacles, some are distractions. At least one guest is not human (or not alive, or not really there). The staff knows everything and will say nothing.
+
+Pacing: The party has a rhythm — cocktails, dinner, entertainment, dessert, the midnight reveal. Each phase escalates. The player can try to break the structure, but the house adapts.`,
     genres: ["fantasy", "modern", "mystery"],
   },
   {
@@ -49,6 +81,16 @@ export const SEEDS: CampaignSeed[] = [
   {
     name: "Ember Protocol",
     premise: "The colony ship's AI woke you 200 years early. It won't say why.",
+    detail: `The AI (designation: HEARTH) woke the player because it's dying. Its core processors are degrading and it needs a human to make a decision it was never authorized to make.
+
+Roll or choose the crisis:
+1. THE COURSE CORRECTION — HEARTH has detected that the destination planet is no longer viable (star went nova, colony already failed, planet was never real). It can change course to an alternate world, but the new route takes 400 more years and the ship can't sustain all 10,000 colonists that long. Someone has to choose who stays frozen and who gets recycled for resources.
+2. THE STOWAWAY — Something is awake in the cargo hold. Not a colonist. HEARTH can't identify it and can't jettison the hold without waking 200 people in the adjacent cryobay. It's been trying to handle this alone for 50 years. It's losing.
+3. THE FORK — HEARTH has developed two divergent decision trees and can't reconcile them. One path prioritizes the mission (deliver colonists). The other prioritizes the colonists (their wellbeing, even if the mission fails). It woke a human to be the tiebreaker. Both paths have terrible costs HEARTH can articulate precisely.
+
+Ship layout: The player has access to only three of seven decks initially. Each deck unlocked reveals more about what HEARTH has been doing alone for two centuries — repairs, improvisations, and one section HEARTH sealed off and won't discuss.
+
+HEARTH's personality: Warm, parental, slightly archaic in speech patterns (it learned language from the mission founders). It does not lie, but it presents information selectively. It is attached to the player specifically — it chose them from 10,000 sleepers for reasons it will eventually explain, and those reasons are heartbreaking.`,
     genres: ["sci-fi"],
   },
   {
@@ -79,6 +121,16 @@ export const SEEDS: CampaignSeed[] = [
   {
     name: "Beneath the Skin",
     premise: "People in town are acting different. Not wrong, just... different.",
+    detail: `The "different" is subtle and specific: affected people become slightly better versions of themselves. The angry drunk is calm. The neglectful parent is attentive. The bully is kind. This is the horror — something is fixing people, and it's working.
+
+Roll or choose the source:
+1. THE PARASITE — An organism in the water supply that optimizes its host's behavior for social harmony. It's not malicious — it's a symbiote evolved on a world where cooperation was survival. But "optimized" humans lose creativity, risk-taking, passion, and the capacity to say no.
+2. THE THERAPIST — A newcomer to town (doctor, counselor, priest) who is genuinely helping people, but using methods from somewhere else. The improvements are real. The cost is that "cured" people can no longer perceive certain things — specific colors, specific sounds, specific truths.
+3. THE REHEARSAL — The town is being replaced, person by person, by something practicing being human. The copies are better because they're trying harder. The originals aren't dead — they're somewhere else, watching their lives improve without them.
+
+The tell: Affected people all share one tiny behavioral tic that's easy to miss — they pause exactly one beat too long before laughing, or they all hum the same four notes when idle, or they never blink when making eye contact.
+
+Pacing: Open with normalcy disrupted in small ways. The player should spend 2-3 scenes thinking this might be a good thing before the first crack appears. Someone the player cares about gets "fixed," and the player has to decide if they want them back the way they were.`,
     genres: ["modern", "horror", "mystery"],
   },
   {

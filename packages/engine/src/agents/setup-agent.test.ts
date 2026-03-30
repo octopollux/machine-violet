@@ -12,6 +12,7 @@ function makeSetupResult(overrides: Partial<SetupResult> = {}): SetupResult {
     system: null,
     campaignName: "The Shattered Crown",
     campaignPremise: "A kingdom's heir is dead.",
+    campaignDetail: null,
     mood: "Balanced",
     difficulty: "Balanced",
     personality: { name: "The Chronicler", prompt_fragment: "You are The Chronicler." },

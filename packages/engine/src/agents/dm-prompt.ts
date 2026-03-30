@@ -38,6 +38,8 @@ export function buildDMPrefix(
   const sections: PrefixSections = {
     dmPrompt: DM_PROMPT,
     personality: config.dm_personality.prompt_fragment,
+    personalityDetail: config.dm_personality.detail,
+    campaignDetail: config.campaign_detail,
     ...sessionState,
   };
 
