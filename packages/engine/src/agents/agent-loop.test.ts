@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type Anthropic from "@anthropic-ai/sdk";
-import { agentLoop, stampToolsCacheControl } from "./agent-loop.js";
+import { describe, it, expect, vi } from "vitest";
+import type { LLMProvider, ChatResult, ContentPart, NormalizedUsage } from "../providers/types.js";
+import { agentLoop } from "./agent-loop.js";
 import { extractStatus, retryDelay } from "./agent-session.js";
 import type { AgentLoopConfig } from "./agent-loop.js";
 import { createTestRegistry } from "./tool-registry.js";
@@ -35,90 +35,85 @@ function mockState(): GameState {
   };
 }
 
+function mockUsage(): NormalizedUsage {
+  return { inputTokens: 100, outputTokens: 50, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 };
+}
+
+function textResult(text: string): ChatResult {
+  return {
+    text,
+    toolCalls: [],
+    usage: mockUsage(),
+    stopReason: "end",
+    assistantContent: [{ type: "text", text }],
+  };
+}
+
+function toolUseResult(
+  toolName: string,
+  input: Record<string, unknown>,
+  toolId = "toolu_test",
+): ChatResult {
+  return {
+    text: "",
+    toolCalls: [{ id: toolId, name: toolName, input }],
+    usage: mockUsage(),
+    stopReason: "tool_use",
+    assistantContent: [{ type: "tool_use", id: toolId, name: toolName, input }],
+  };
+}
+
+function textAndToolResult(
+  text: string,
+  toolName: string,
+  input: Record<string, unknown>,
+): ChatResult {
+  return {
+    text,
+    toolCalls: [{ id: "toolu_test", name: toolName, input }],
+    usage: mockUsage(),
+    stopReason: "tool_use",
+    assistantContent: [
+      { type: "text", text },
+      { type: "tool_use", id: "toolu_test", name: toolName, input },
+    ],
+  };
+}
+
+function mockProvider(responses: ChatResult[]): LLMProvider {
+  let callIdx = 0;
+  return {
+    providerId: "test",
+    chat: vi.fn(async () => responses[callIdx++]),
+    stream: vi.fn(async (_params, onDelta) => {
+      const result = responses[callIdx++];
+      if (result.text) onDelta(result.text);
+      return result;
+    }),
+    healthCheck: vi.fn(),
+  };
+}
+
 function mockConfig(overrides?: Partial<AgentLoopConfig>): AgentLoopConfig {
   return {
     model: "claude-haiku-4-5-20251001",
+    provider: mockProvider([]),
     maxTokens: 1024,
     maxToolRounds: 5,
     ...overrides,
   };
 }
 
-function mockUsage(): Anthropic.Usage {
-  return { input_tokens: 100, output_tokens: 50, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, cache_creation: null, inference_geo: null, server_tool_use: null, service_tier: null };
-}
-
-function textMessage(text: string): Anthropic.Message {
-  return {
-    id: "msg_test",
-    type: "message",
-    role: "assistant",
-    model: "claude-haiku-4-5-20251001",
-    content: [{ type: "text", text }],
-    stop_reason: "end_turn",
-    stop_sequence: null,
-    usage: mockUsage(),
-  } as Anthropic.Message;
-}
-
-function toolUseMessage(
-  toolName: string,
-  input: Record<string, unknown>,
-  toolId = "toolu_test",
-): Anthropic.Message {
-  return {
-    id: "msg_test",
-    type: "message",
-    role: "assistant",
-    model: "claude-haiku-4-5-20251001",
-    content: [{ type: "tool_use", id: toolId, name: toolName, input }],
-    stop_reason: "tool_use",
-    stop_sequence: null,
-    usage: mockUsage(),
-  } as Anthropic.Message;
-}
-
-function textAndToolMessage(
-  text: string,
-  toolName: string,
-  input: Record<string, unknown>,
-): Anthropic.Message {
-  return {
-    id: "msg_test",
-    type: "message",
-    role: "assistant",
-    model: "claude-haiku-4-5-20251001",
-    content: [
-      { type: "text", text },
-      { type: "tool_use", id: "toolu_test", name: toolName, input },
-    ],
-    stop_reason: "tool_use",
-    stop_sequence: null,
-    usage: mockUsage(),
-  } as Anthropic.Message;
-}
-
-function mockClient(responses: Anthropic.Message[]): Anthropic {
-  let callIdx = 0;
-  return {
-    messages: {
-      create: vi.fn(async () => {
-        return responses[callIdx++];
-      }),
-    },
-  } as unknown as Anthropic;
-}
-
 describe("agentLoop", () => {
   it("returns text from a simple response", async () => {
-    const client = mockClient([textMessage("The door creaks open.")]);
+    const provider = mockProvider([textResult("The door creaks open.")]);
     const result = await agentLoop(
-      client,
+      provider,
       "You are a DM.",
       [{ role: "user", content: "I open the door." }],
       createTestRegistry(),
       mockState(),
-      mockConfig(),
+      mockConfig({ provider }),
     );
     expect(result.text).toBe("The door creaks open.");
     expect(result.tuiCommands).toHaveLength(0);
@@ -126,20 +121,20 @@ describe("agentLoop", () => {
   });
 
   it("handles tool_use → tool_result → text loop", async () => {
-    const client = mockClient([
-      toolUseMessage("roll_dice", { expression: "1d20+5" }),
-      textMessage("You rolled a 17. The attack hits!"),
+    const provider = mockProvider([
+      toolUseResult("roll_dice", { expression: "1d20+5" }),
+      textResult("You rolled a 17. The attack hits!"),
     ]);
     const onToolStart = vi.fn();
     const onToolEnd = vi.fn();
 
     const result = await agentLoop(
-      client,
+      provider,
       "You are a DM.",
       [{ role: "user", content: "I attack the goblin." }],
       createTestRegistry(),
       mockState(),
-      mockConfig({ onToolStart, onToolEnd }),
+      mockConfig({ provider, onToolStart, onToolEnd }),
     );
 
     expect(onToolStart).toHaveBeenCalledWith("roll_dice");
@@ -148,18 +143,18 @@ describe("agentLoop", () => {
   });
 
   it("collects TUI commands from tool calls", async () => {
-    const client = mockClient([
-      toolUseMessage("style_scene", { key_color: "#cc4444" }),
-      textMessage("The mood darkens."),
+    const provider = mockProvider([
+      toolUseResult("style_scene", { key_color: "#cc4444" }),
+      textResult("The mood darkens."),
     ]);
 
     const result = await agentLoop(
-      client,
+      provider,
       "You are a DM.",
       [{ role: "user", content: "I attack!" }],
       createTestRegistry(),
       mockState(),
-      mockConfig(),
+      mockConfig({ provider }),
     );
 
     expect(result.tuiCommands).toHaveLength(1);
@@ -168,36 +163,36 @@ describe("agentLoop", () => {
   });
 
   it("handles text + tool_use in same response", async () => {
-    const client = mockClient([
-      textAndToolMessage("Let me roll for you... ", "roll_dice", { expression: "1d20" }),
-      textMessage("A natural 20!"),
+    const provider = mockProvider([
+      textAndToolResult("Let me roll for you... ", "roll_dice", { expression: "1d20" }),
+      textResult("A natural 20!"),
     ]);
 
     const result = await agentLoop(
-      client,
+      provider,
       "You are a DM.",
       [{ role: "user", content: "I try to pick the lock." }],
       createTestRegistry(),
       mockState(),
-      mockConfig(),
+      mockConfig({ provider }),
     );
 
     expect(result.text).toBe("Let me roll for you... A natural 20!");
   });
 
   it("accumulates usage across rounds", async () => {
-    const client = mockClient([
-      toolUseMessage("roll_dice", { expression: "1d6" }),
-      textMessage("Done."),
+    const provider = mockProvider([
+      toolUseResult("roll_dice", { expression: "1d6" }),
+      textResult("Done."),
     ]);
 
     const result = await agentLoop(
-      client,
+      provider,
       "System",
       [{ role: "user", content: "Roll" }],
       createTestRegistry(),
       mockState(),
-      mockConfig(),
+      mockConfig({ provider }),
     );
 
     // Two API calls × 100 input + 50 output each
@@ -208,49 +203,57 @@ describe("agentLoop", () => {
   it("truncates at maxToolRounds", async () => {
     // Always returns tool_use, never ends
     const infiniteTools = Array.from({ length: 3 }, () =>
-      toolUseMessage("roll_dice", { expression: "1d6" }),
+      toolUseResult("roll_dice", { expression: "1d6" }),
     );
-    const client = mockClient(infiniteTools);
+    const provider = mockProvider(infiniteTools);
 
     const result = await agentLoop(
-      client,
+      provider,
       "System",
       [{ role: "user", content: "Roll a lot" }],
       createTestRegistry(),
       mockState(),
-      mockConfig({ maxToolRounds: 3 }),
+      mockConfig({ provider, maxToolRounds: 3 }),
     );
 
     expect(result.truncated).toBe(true);
   });
 
   it("calls onTextDelta for text blocks", async () => {
-    const client = mockClient([textMessage("Hello world")]);
     const onTextDelta = vi.fn();
+    const provider: LLMProvider = {
+      providerId: "test",
+      chat: vi.fn(async () => textResult("Hello world")),
+      stream: vi.fn(async (_params, onDelta) => {
+        onDelta("Hello world");
+        return textResult("Hello world");
+      }),
+      healthCheck: vi.fn(),
+    };
 
     await agentLoop(
-      client,
+      provider,
       "System",
       [{ role: "user", content: "Hi" }],
       createTestRegistry(),
       mockState(),
-      mockConfig({ onTextDelta }),
+      mockConfig({ provider, onTextDelta }),
     );
 
     expect(onTextDelta).toHaveBeenCalledWith("Hello world");
   });
 
   it("calls onComplete with usage stats", async () => {
-    const client = mockClient([textMessage("Done.")]);
+    const provider = mockProvider([textResult("Done.")]);
     const onComplete = vi.fn();
 
     await agentLoop(
-      client,
+      provider,
       "System",
       [{ role: "user", content: "Go" }],
       createTestRegistry(),
       mockState(),
-      mockConfig({ onComplete }),
+      mockConfig({ provider, onComplete }),
     );
 
     expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({
@@ -260,18 +263,18 @@ describe("agentLoop", () => {
   });
 
   it("passes through roundMessages from agent session", async () => {
-    const client = mockClient([
-      toolUseMessage("roll_dice", { expression: "1d20" }),
-      textMessage("You rolled a 15!"),
+    const provider = mockProvider([
+      toolUseResult("roll_dice", { expression: "1d20" }),
+      textResult("You rolled a 15!"),
     ]);
 
     const result = await agentLoop(
-      client,
+      provider,
       "System",
       [{ role: "user", content: "Roll" }],
       createTestRegistry(),
       mockState(),
-      mockConfig(),
+      mockConfig({ provider }),
     );
 
     // Should have: assistant(tool_use), user(tool_result), assistant(text)
@@ -282,19 +285,19 @@ describe("agentLoop", () => {
   });
 
   it("handles tool errors gracefully", async () => {
-    const client = mockClient([
-      toolUseMessage("view_area", { map: "nonexistent", center: "0,0", radius: 1 }),
-      textMessage("I couldn't find that map."),
+    const provider = mockProvider([
+      toolUseResult("view_area", { map: "nonexistent", center: "0,0", radius: 1 }),
+      textResult("I couldn't find that map."),
     ]);
 
     const onToolEnd = vi.fn();
     const result = await agentLoop(
-      client,
+      provider,
       "System",
       [{ role: "user", content: "Show map" }],
       createTestRegistry(),
       mockState(),
-      mockConfig({ onToolEnd }),
+      mockConfig({ provider, onToolEnd }),
     );
 
     expect(onToolEnd).toHaveBeenCalledWith(
@@ -307,82 +310,50 @@ describe("agentLoop", () => {
 
 describe("thinking block filtering", () => {
   it("strips thinking blocks from conversation history", async () => {
-    // First response has a thinking block + tool_use, second is text-only
-    const thinkingPlusToolMsg: Anthropic.Message = {
-      id: "msg_test",
-      type: "message",
-      role: "assistant",
-      model: "claude-haiku-4-5-20251001",
-      content: [
-        { type: "thinking", thinking: "Let me consider...", signature: "sig" } as unknown as Anthropic.ContentBlock,
-        { type: "tool_use", id: "toolu_1", name: "roll_dice", input: { notation: "1d20" } },
-      ] as Anthropic.ContentBlock[],
-      stop_reason: "tool_use",
-      stop_sequence: null,
+    // First response has thinking + tool_use, second is text-only
+    const thinkingPlusToolResult: ChatResult = {
+      text: "",
+      toolCalls: [{ id: "toolu_1", name: "roll_dice", input: { notation: "1d20" } }],
       usage: mockUsage(),
-    } as Anthropic.Message;
+      stopReason: "tool_use",
+      thinkingText: "Let me consider...",
+      // assistantContent should NOT include thinking (per spec: "Thinking blocks are excluded")
+      assistantContent: [
+        { type: "tool_use", id: "toolu_1", name: "roll_dice", input: { notation: "1d20" } },
+      ],
+    };
 
-    const createFn = vi.fn()
-      .mockResolvedValueOnce(thinkingPlusToolMsg)
-      .mockResolvedValueOnce(textMessage("You rolled a 15!"));
+    const chatFn = vi.fn()
+      .mockResolvedValueOnce(thinkingPlusToolResult)
+      .mockResolvedValueOnce(textResult("You rolled a 15!"));
 
-    const client = { messages: { create: createFn } } as unknown as Anthropic;
+    const provider: LLMProvider = {
+      providerId: "test",
+      chat: chatFn,
+      stream: vi.fn(),
+      healthCheck: vi.fn(),
+    };
 
     await agentLoop(
-      client,
+      provider,
       "System",
       [{ role: "user", content: "Roll a d20" }],
       createTestRegistry(),
       mockState(),
-      mockConfig(),
+      mockConfig({ provider }),
     );
 
     // Second call should have the assistant message WITHOUT the thinking block
-    const secondCallArgs = createFn.mock.calls[1][0] as { messages: Anthropic.MessageParam[] };
-    const assistantMsg = secondCallArgs.messages.find(
-      (m: Anthropic.MessageParam) => m.role === "assistant",
+    const secondCallParams = chatFn.mock.calls[1][0];
+    const assistantMsg = secondCallParams.messages.find(
+      (m: { role: string }) => m.role === "assistant",
     );
     expect(assistantMsg).toBeDefined();
-    const blockTypes = (assistantMsg!.content as Anthropic.ContentBlock[]).map(
-      (b: Anthropic.ContentBlock) => b.type,
+    const blockTypes = (assistantMsg!.content as ContentPart[]).map(
+      (b: ContentPart) => b.type,
     );
     expect(blockTypes).not.toContain("thinking");
     expect(blockTypes).toContain("tool_use");
-  });
-});
-
-describe("stampToolsCacheControl", () => {
-  it("stamps cache_control on the last tool", () => {
-    const tools: Anthropic.Tool[] = [
-      { name: "roll_dice", description: "Roll dice.", input_schema: { type: "object", properties: {} } },
-      { name: "draw_card", description: "Draw a card.", input_schema: { type: "object", properties: {} } },
-    ];
-
-    const result = stampToolsCacheControl(tools);
-    const last = result[result.length - 1] as unknown as Record<string, unknown>;
-    expect(last["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
-    // First tool should NOT have cache_control
-    const first = result[0] as unknown as Record<string, unknown>;
-    expect(first["cache_control"]).toBeUndefined();
-  });
-
-  it("does not mutate the input array or tools", () => {
-    const tools: Anthropic.Tool[] = [
-      { name: "roll_dice", description: "Roll dice.", input_schema: { type: "object", properties: {} } },
-    ];
-
-    const result = stampToolsCacheControl(tools);
-    // Input array not mutated
-    expect(tools).not.toBe(result);
-    // Input tool object not mutated
-    expect((tools[0] as unknown as Record<string, unknown>)["cache_control"]).toBeUndefined();
-    // Output has cache_control
-    expect((result[0] as unknown as Record<string, unknown>)["cache_control"]).toEqual({ type: "ephemeral", ttl: "1h" });
-  });
-
-  it("returns empty array unchanged", () => {
-    const result = stampToolsCacheControl([]);
-    expect(result).toEqual([]);
   });
 });
 
@@ -428,95 +399,5 @@ describe("retryDelay", () => {
     expect(retryDelay(4)).toBe(12000);
     expect(retryDelay(5)).toBe(12000);
     expect(retryDelay(100)).toBe(12000);
-  });
-});
-
-describe("retry behavior via agentLoop", () => {
-  beforeEach(() => { vi.useFakeTimers(); });
-  afterEach(() => { vi.useRealTimers(); });
-
-  it("retries on 529 and eventually succeeds", async () => {
-    const overloadedError = Object.assign(new Error("overloaded"), { status: 529 });
-    let callCount = 0;
-    const client = {
-      messages: {
-        create: vi.fn(async () => {
-          callCount++;
-          if (callCount <= 2) throw overloadedError;
-          return textMessage("Success after retries");
-        }),
-      },
-    } as unknown as Anthropic;
-
-    const onRetry = vi.fn();
-    const promise = agentLoop(
-      client,
-      "System",
-      [{ role: "user", content: "Hi" }],
-      createTestRegistry(),
-      mockState(),
-      mockConfig({ onRetry }),
-    );
-
-    // Advance through both retry delays
-    await vi.advanceTimersByTimeAsync(1000); // attempt 0 backoff
-    await vi.advanceTimersByTimeAsync(2000); // attempt 1 backoff
-
-    const result = await promise;
-    expect(result.text).toBe("Success after retries");
-    expect(onRetry).toHaveBeenCalledTimes(2);
-    expect(onRetry).toHaveBeenCalledWith(529, expect.any(Number));
-  });
-
-  it("retries on network errors (ECONNRESET)", async () => {
-    let callCount = 0;
-    const client = {
-      messages: {
-        create: vi.fn(async () => {
-          callCount++;
-          if (callCount === 1) throw new Error("connect ECONNRESET");
-          return textMessage("Reconnected");
-        }),
-      },
-    } as unknown as Anthropic;
-
-    const onRetry = vi.fn();
-    const promise = agentLoop(
-      client,
-      "System",
-      [{ role: "user", content: "Hi" }],
-      createTestRegistry(),
-      mockState(),
-      mockConfig({ onRetry }),
-    );
-
-    await vi.advanceTimersByTimeAsync(1000);
-
-    const result = await promise;
-    expect(result.text).toBe("Reconnected");
-    expect(onRetry).toHaveBeenCalledWith(0, 1000);
-  });
-
-  it("throws immediately on non-retryable errors", async () => {
-    const client = {
-      messages: {
-        create: vi.fn(async () => {
-          throw Object.assign(new Error("bad request"), { status: 400 });
-        }),
-      },
-    } as unknown as Anthropic;
-
-    const onError = vi.fn();
-    await expect(
-      agentLoop(
-        client,
-        "System",
-        [{ role: "user", content: "Hi" }],
-        createTestRegistry(),
-        mockState(),
-        mockConfig({ onError }),
-      ),
-    ).rejects.toThrow("bad request");
-    expect(onError).toHaveBeenCalled();
   });
 });
