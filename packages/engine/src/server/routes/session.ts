@@ -4,12 +4,11 @@
  * All routes require an active session (enforced via preHandler).
  */
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
-import type {
-  ContributeRequest,
-  CommitResponse,
-  CommandRequest,
-  SessionEndResponse,
-  StateSnapshot,
+import {
+  ContributeRequest, ContributeResponse, ContributeQuery,
+  CommitResponse, CommandRequest, CommandParams, CommandResponse,
+  IdParams, ModalResponse, OkResponse, CyclePlayerResponse,
+  SessionEndResponse, ErrorResponse, StateSnapshot,
 } from "@machine-violet/shared";
 import { handleCommand } from "../command-handler.js";
 
@@ -23,14 +22,28 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
   });
 
   /** Get full state snapshot (for reconnect / initial load). */
-  server.get("/state", async () => {
-    const snapshot: StateSnapshot = server.sessionManager.buildStateSnapshot();
-    return snapshot;
+  server.get("/state", {
+    schema: {
+      tags: ["Session"],
+      response: { 200: StateSnapshot },
+    },
+  }, async () => {
+    return server.sessionManager.buildStateSnapshot();
   });
 
   /** Contribute to the current turn. */
-  server.post<{ Body: ContributeRequest }>("/turn/contribute", async (request, reply) => {
-    console.log(`[contribute] text="${request.body?.text?.slice(0, 50)}"`);
+  server.post("/turn/contribute", {
+    schema: {
+      tags: ["Session"],
+      body: ContributeRequest,
+      querystring: ContributeQuery,
+      response: {
+        200: ContributeResponse,
+        400: ErrorResponse,
+      },
+    },
+  }, async (request, reply) => {
+    console.log(`[contribute] text="${(request.body as ContributeRequest)?.text?.slice(0, 50)}"`);
     const tm = server.sessionManager.getTurnManager();
     if (!tm) {
       return reply.status(400).send({ error: "No turn manager." });
@@ -50,7 +63,7 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
       return reply.status(400).send({ error: `No open turn. (status: ${turn?.status ?? "null"})` });
     }
 
-    const { text } = request.body;
+    const { text } = request.body as { text: string };
     // Resolve player: use query param if it matches an active player, otherwise default to first active
     const queryPlayer = (request.query as Record<string, string>).player;
     const playerId = (queryPlayer && turn.activePlayers.includes(queryPlayer))
@@ -68,7 +81,15 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
   });
 
   /** Explicitly commit the current turn. */
-  server.post("/turn/commit", async (_request, reply) => {
+  server.post("/turn/commit", {
+    schema: {
+      tags: ["Session"],
+      response: {
+        200: CommitResponse,
+        400: ErrorResponse,
+      },
+    },
+  }, async (_request, reply) => {
     const tm = server.sessionManager.getTurnManager();
     if (!tm) {
       return reply.status(400).send({ error: "No turn manager." });
@@ -77,8 +98,7 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
     try {
       await tm.commit();
       const turn = tm.getCurrentTurn();
-      const response: CommitResponse = { turnId: turn?.id ?? "" };
-      return response;
+      return { turnId: turn?.id ?? "" };
     } catch (err) {
       return reply.status(400).send({
         error: err instanceof Error ? err.message : "Failed to commit turn.",
@@ -87,63 +107,82 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
   });
 
   /** Execute a slash command. */
-  server.post<{ Params: { name: string }; Body: CommandRequest }>(
-    "/command/:name",
-    async (request, reply) => {
-      const { name } = request.params;
-      const { args } = request.body ?? {};
-
-      const sm = server.sessionManager;
-      const engine = sm.getEngine();
-      const gameState = sm.getGameState();
-      if (!engine || !gameState) {
-        return reply.status(400).send({ error: "No active engine." });
-      }
-
-      const result = await handleCommand(
-        name, args ?? "", engine, gameState,
-        (event) => sm.broadcast(event),
-      );
-
-      // Broadcast system message to all clients
-      if (result.message) {
-        sm.broadcast({
-          type: "narrative:chunk",
-          data: { text: `[${result.message}]`, kind: "system" },
-        });
-      }
-
-      if (result.endSession) {
-        await sm.endSession();
-      }
-
-      return { ok: !result.error, message: result.message };
+  server.post("/command/:name", {
+    schema: {
+      tags: ["Session"],
+      params: CommandParams,
+      body: CommandRequest,
+      response: {
+        200: CommandResponse,
+        400: ErrorResponse,
+      },
     },
-  );
+  }, async (request, reply) => {
+    const { name } = request.params as { name: string };
+    const { args } = (request.body as { args?: string }) ?? {};
+
+    const sm = server.sessionManager;
+    const engine = sm.getEngine();
+    const gameState = sm.getGameState();
+    if (!engine || !gameState) {
+      return reply.status(400).send({ error: "No active engine." });
+    }
+
+    const result = await handleCommand(
+      name, args ?? "", engine, gameState,
+      (event) => sm.broadcast(event),
+    );
+
+    // Broadcast system message to all clients
+    if (result.message) {
+      sm.broadcast({
+        type: "narrative:chunk",
+        data: { text: `[${result.message}]`, kind: "system" },
+      });
+    }
+
+    if (result.endSession) {
+      await sm.endSession();
+    }
+
+    return { ok: !result.error, message: result.message };
+  });
 
   /** Respond to a modal (choice selection, dice acknowledgment, etc.). */
-  server.post<{ Params: { id: string }; Body: { value: string | number } }>(
-    "/modal/:id/respond",
-    async (request, _reply) => {
-      const { id } = request.params;
-      const { value } = request.body ?? {};
-
-      // During setup, resolve choice selections through the session manager
-      // (which handles turn lifecycle + game transition)
-      const sm = server.sessionManager;
-      const setup = sm.getSetupSession();
-      if (setup && id === "setup-choice") {
-        await sm.resolveSetupChoice(String(value));
-        return { ok: true };
-      }
-
-      server.log.info({ modalId: id, value }, "Modal response received");
-      return { ok: true };
+  server.post("/modal/:id/respond", {
+    schema: {
+      tags: ["Session"],
+      params: IdParams,
+      body: ModalResponse,
+      response: { 200: OkResponse },
     },
-  );
+  }, async (request, _reply) => {
+    const { id } = request.params as { id: string };
+    const { value } = (request.body as { value: string | number }) ?? {};
+
+    // During setup, resolve choice selections through the session manager
+    // (which handles turn lifecycle + game transition)
+    const sm = server.sessionManager;
+    const setup = sm.getSetupSession();
+    if (setup && id === "setup-choice") {
+      await sm.resolveSetupChoice(String(value));
+      return { ok: true };
+    }
+
+    server.log.info({ modalId: id, value }, "Modal response received");
+    return { ok: true };
+  });
 
   /** Cycle to the next player (Tab key). */
-  server.post("/player/cycle", async (_request, reply) => {
+  server.post("/player/cycle", {
+    schema: {
+      tags: ["Session"],
+      response: {
+        200: CyclePlayerResponse,
+        400: ErrorResponse,
+      },
+    },
+  }, async (_request, reply) => {
     const gs = server.sessionManager.getGameState();
     if (!gs) return reply.status(400).send({ error: "No game state." });
 
@@ -163,9 +202,14 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
   });
 
   /** End the current session. */
-  server.post("/end", async () => {
+  server.post("/end", {
+    schema: {
+      tags: ["Session"],
+      response: { 200: SessionEndResponse },
+    },
+  }, async () => {
     await server.sessionManager.endSession();
-    const response: SessionEndResponse = { summary: "Session ended." };
-    return response;
+    return { summary: "Session ended." };
   });
 };
+

@@ -8,13 +8,20 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { basename } from "node:path";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
-import type { StartCampaignResponse } from "@machine-violet/shared";
+import {
+  IdParams, ListCampaignsResponse, StartCampaignResponse, ErrorResponse,
+} from "@machine-violet/shared";
 import { listCampaigns } from "../../config/main-menu.js";
 
 export const campaignRoutes: FastifyPluginAsync = async (server: FastifyInstance) => {
 
   /** List available campaigns. */
-  server.get("/", async () => {
+  server.get("/", {
+    schema: {
+      tags: ["Campaigns"],
+      response: { 200: ListCampaignsResponse },
+    },
+  }, async () => {
     const campaignsDir = server.sessionManager.getCampaignsDir();
 
     const entries = await listCampaigns(
@@ -34,7 +41,16 @@ export const campaignRoutes: FastifyPluginAsync = async (server: FastifyInstance
   });
 
   /** Create a new campaign (enter setup pseudo-campaign). */
-  server.post("/", async (_request, reply) => {
+  server.post("/", {
+    schema: {
+      tags: ["Campaigns"],
+      response: {
+        201: StartCampaignResponse,
+        409: ErrorResponse,
+        500: ErrorResponse,
+      },
+    },
+  }, async (_request, reply) => {
     const sm = server.sessionManager;
     if (sm.isActive) {
       return reply.status(409).send({ error: "A session is already active." });
@@ -48,21 +64,30 @@ export const campaignRoutes: FastifyPluginAsync = async (server: FastifyInstance
       });
     }
 
-    const response: StartCampaignResponse = {
+    return reply.status(201).send({
       sessionId: "__setup__",
       wsUrl: "/session/ws",
-    };
-    return reply.status(201).send(response);
+    });
   });
 
   /** Start or resume an existing campaign. */
-  server.post<{ Params: { id: string } }>("/:id/start", async (request, reply) => {
+  server.post("/:id/start", {
+    schema: {
+      tags: ["Campaigns"],
+      params: IdParams,
+      response: {
+        200: StartCampaignResponse,
+        400: ErrorResponse,
+        409: ErrorResponse,
+      },
+    },
+  }, async (request, reply) => {
     const sm = server.sessionManager;
     if (sm.isActive) {
       return reply.status(409).send({ error: "A session is already active." });
     }
 
-    const campaignId = request.params.id;
+    const campaignId = (request.params as { id: string }).id;
     try {
       await sm.startSession(campaignId);
     } catch (err) {
@@ -71,10 +96,9 @@ export const campaignRoutes: FastifyPluginAsync = async (server: FastifyInstance
       });
     }
 
-    const response: StartCampaignResponse = {
+    return {
       sessionId: campaignId,
       wsUrl: `/session/ws`,
     };
-    return response;
   });
 };

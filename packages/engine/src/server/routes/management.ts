@@ -5,31 +5,6 @@
  * connections, campaign archive/delete, and Discord settings.
  *
  * Prefix: /manage
- *
- * Connections:
- *   GET    /connections                   — list all connections (masked keys)
- *   POST   /connections                   — add a connection
- *   DELETE /connections/:id               — remove a connection
- *   POST   /connections/:id/check         — health-check a connection
- *   PUT    /connections/:id/models        — update discovered models
- *   GET    /tiers                         — get tier assignments
- *   PUT    /tiers                         — set tier assignments
- *   GET    /models                        — list all known models
- *
- * Legacy (backward compat):
- *   GET    /keys                          — list connections as keys
- *   POST   /keys/:id/check               — health-check via connection
- *
- * Campaign Ops:
- *   POST   /campaigns/:id/archive        — archive a campaign to zip
- *   DELETE /campaigns/:id                 — permanently delete a campaign
- *   GET    /campaigns/archived            — list archived campaigns
- *   POST   /campaigns/archived/:name/restore — unarchive a campaign
- *   GET    /campaigns/:id/delete-info     — get info for delete confirmation
- *
- * Discord:
- *   GET    /discord                       — get Discord Rich Presence setting
- *   PUT    /discord                       — update Discord Rich Presence setting
  */
 import { join } from "node:path";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
@@ -47,6 +22,13 @@ import {
 } from "../../config/campaign-archive.js";
 import { loadDiscordSettings, saveDiscordSettings } from "../../config/discord.js";
 import { createArchiveFileIO } from "../fileio.js";
+import {
+  IdParams, NameParams,
+  AddConnectionRequest, ConnectionsListResponse, HealthCheckResponse,
+  UpdateModelsRequest, OkResponse, TiersResponse, SetTiersRequest,
+  ModelsResponse, ArchiveResponse, ArchivedListResponse, RestoreRequest,
+  DiscordSettings, KeysListResponse, DeleteInfoResponse, ErrorResponse,
+} from "@machine-violet/shared";
 
 export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstance) => {
 
@@ -78,7 +60,12 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   }
 
   /** List all connections (masked keys). */
-  server.get("/connections", async () => {
+  server.get("/connections", {
+    schema: {
+      tags: ["Management"],
+      response: { 200: ConnectionsListResponse },
+    },
+  }, async () => {
     const store = getConnections();
     return {
       connections: store.connections.map(serializeConnection),
@@ -89,8 +76,19 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   /** Add a connection. */
   const VALID_PROVIDERS = new Set<string>(["anthropic", "openai", "openai-oauth", "openrouter", "custom"]);
 
-  server.post<{ Body: { provider: string; apiKey: string; label?: string; baseUrl?: string } }>("/connections", async (request, reply) => {
-    const { provider, apiKey, label, baseUrl } = request.body ?? {};
+  server.post("/connections", {
+    schema: {
+      tags: ["Management"],
+      body: AddConnectionRequest,
+      response: {
+        201: ConnectionsListResponse,
+        400: ErrorResponse,
+      },
+    },
+  }, async (request, reply) => {
+    const { provider, apiKey, label, baseUrl } = request.body as {
+      provider: string; apiKey: string; label?: string; baseUrl?: string;
+    };
     if (!provider || !apiKey) {
       return reply.status(400).send({ error: "Missing provider or apiKey." });
     }
@@ -116,8 +114,14 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   });
 
   /** Remove a connection. */
-  server.delete<{ Params: { id: string } }>("/connections/:id", async (request, reply) => {
-    const { id } = request.params;
+  server.delete("/connections/:id", {
+    schema: {
+      tags: ["Management"],
+      params: IdParams,
+      response: { 200: ConnectionsListResponse, 400: ErrorResponse },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
     if (id.startsWith("env-")) {
       return reply.status(400).send({ error: "Cannot remove environment connection." });
     }
@@ -133,9 +137,15 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   });
 
   /** Health-check a connection. */
-  server.post<{ Params: { id: string } }>("/connections/:id/check", async (request, reply) => {
+  server.post("/connections/:id/check", {
+    schema: {
+      tags: ["Management"],
+      params: IdParams,
+      response: { 200: HealthCheckResponse, 404: ErrorResponse },
+    },
+  }, async (request, reply) => {
     const store = getConnections();
-    const conn = store.connections.find((c) => c.id === request.params.id);
+    const conn = store.connections.find((c) => c.id === (request.params as { id: string }).id);
     if (!conn) {
       return reply.status(404).send({ error: "Connection not found." });
     }
@@ -145,28 +155,46 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
       const result = await provider.healthCheck();
       return { id: conn.id, ...result };
     } catch (err) {
-      return { id: conn.id, status: "error", message: err instanceof Error ? err.message : String(err) };
+      return { id: conn.id, status: "error" as const, message: err instanceof Error ? err.message : String(err) };
     }
   });
 
   /** Update discovered models on a connection. */
-  server.put<{ Params: { id: string }; Body: { models: { id: string; displayName: string; available: boolean }[] } }>("/connections/:id/models", async (request) => {
+  server.put("/connections/:id/models", {
+    schema: {
+      tags: ["Management"],
+      params: IdParams,
+      body: UpdateModelsRequest,
+      response: { 200: OkResponse },
+    },
+  }, async (request) => {
     let store = getConnections();
-    store = updateConnectionModels(store, request.params.id, request.body?.models ?? []);
+    store = updateConnectionModels(store, (request.params as { id: string }).id, (request.body as { models: { id: string; displayName: string; available: boolean }[] })?.models ?? []);
     persistAndReturn(store);
     return { ok: true };
   });
 
   /** Get tier assignments. */
-  server.get("/tiers", async () => {
+  server.get("/tiers", {
+    schema: {
+      tags: ["Management"],
+      response: { 200: TiersResponse },
+    },
+  }, async () => {
     const store = getConnections();
     return { tierAssignments: store.tierAssignments };
   });
 
   /** Set tier assignments. */
-  server.put<{ Body: { large?: TierAssignment; medium?: TierAssignment; small?: TierAssignment } }>("/tiers", async (request) => {
+  server.put("/tiers", {
+    schema: {
+      tags: ["Management"],
+      body: SetTiersRequest,
+      response: { 200: TiersResponse },
+    },
+  }, async (request) => {
     let store = getConnections();
-    const body = request.body ?? {};
+    const body = (request.body as { large?: TierAssignment; medium?: TierAssignment; small?: TierAssignment }) ?? {};
     for (const tier of ["large", "medium", "small"] as const) {
       const assignment = body[tier];
       if (assignment) {
@@ -178,7 +206,12 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   });
 
   /** List all known models from the registry. */
-  server.get("/models", async () => {
+  server.get("/models", {
+    schema: {
+      tags: ["Management"],
+      response: { 200: ModelsResponse },
+    },
+  }, async () => {
     const registry = loadModelRegistry(server.configDir);
     return { models: registry.models };
   });
@@ -187,7 +220,12 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   // Legacy key endpoints (backward compat for existing client)
   // -----------------------------------------------------------------------
 
-  server.get("/keys", async () => {
+  server.get("/keys", {
+    schema: {
+      tags: ["Management"],
+      response: { 200: KeysListResponse },
+    },
+  }, async () => {
     const store = getConnections();
     return {
       keys: store.connections.map((c) => ({
@@ -202,9 +240,15 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     };
   });
 
-  server.post<{ Params: { id: string } }>("/keys/:id/check", async (request, reply) => {
+  server.post("/keys/:id/check", {
+    schema: {
+      tags: ["Management"],
+      params: IdParams,
+      response: { 200: HealthCheckResponse, 404: ErrorResponse },
+    },
+  }, async (request, reply) => {
     const store = getConnections();
-    const conn = store.connections.find((c) => c.id === request.params.id);
+    const conn = store.connections.find((c) => c.id === (request.params as { id: string }).id);
     if (!conn) {
       return reply.status(404).send({ error: "Connection not found." });
     }
@@ -213,7 +257,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
       const result = await provider.healthCheck();
       return { id: conn.id, ...result };
     } catch (err) {
-      return { id: conn.id, status: "error", message: err instanceof Error ? err.message : String(err) };
+      return { id: conn.id, status: "error" as const, message: err instanceof Error ? err.message : String(err) };
     }
   });
 
@@ -224,8 +268,14 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   const campaignsDir = () => server.sessionManager.getCampaignsDir();
 
   /** Get info for delete confirmation dialog. */
-  server.get<{ Params: { id: string } }>("/campaigns/:id/delete-info", async (request, reply) => {
-    const campaignPath = join(campaignsDir(), request.params.id);
+  server.get("/campaigns/:id/delete-info", {
+    schema: {
+      tags: ["Management"],
+      params: IdParams,
+      response: { 200: DeleteInfoResponse, 404: ErrorResponse },
+    },
+  }, async (request, reply) => {
+    const campaignPath = join(campaignsDir(), (request.params as { id: string }).id);
     const io = createArchiveFileIO();
     try {
       const info = await getCampaignDeleteInfo(campaignPath, io);
@@ -238,12 +288,18 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   });
 
   /** Archive a campaign to zip. */
-  server.post<{ Params: { id: string } }>("/campaigns/:id/archive", async (request, reply) => {
+  server.post("/campaigns/:id/archive", {
+    schema: {
+      tags: ["Management"],
+      params: IdParams,
+      response: { 200: ArchiveResponse, 409: ErrorResponse, 500: ErrorResponse },
+    },
+  }, async (request, reply) => {
     if (server.sessionManager.isActive) {
       return reply.status(409).send({ error: "Cannot archive while a session is active." });
     }
 
-    const campaignPath = join(campaignsDir(), request.params.id);
+    const campaignPath = join(campaignsDir(), (request.params as { id: string }).id);
     const io = createArchiveFileIO();
     const result = await archiveCampaign(campaignPath, campaignsDir(), io);
 
@@ -254,12 +310,18 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   });
 
   /** Permanently delete a campaign. */
-  server.delete<{ Params: { id: string } }>("/campaigns/:id", async (request, reply) => {
+  server.delete("/campaigns/:id", {
+    schema: {
+      tags: ["Management"],
+      params: IdParams,
+      response: { 200: OkResponse, 409: ErrorResponse, 500: ErrorResponse },
+    },
+  }, async (request, reply) => {
     if (server.sessionManager.isActive) {
       return reply.status(409).send({ error: "Cannot delete while a session is active." });
     }
 
-    const campaignPath = join(campaignsDir(), request.params.id);
+    const campaignPath = join(campaignsDir(), (request.params as { id: string }).id);
     const io = createArchiveFileIO();
     const result = await deleteCampaign(campaignPath, io);
 
@@ -270,17 +332,29 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   });
 
   /** List archived campaigns. */
-  server.get("/campaigns/archived", async () => {
+  server.get("/campaigns/archived", {
+    schema: {
+      tags: ["Management"],
+      response: { 200: ArchivedListResponse },
+    },
+  }, async () => {
     const io = createArchiveFileIO();
     const archives = await listArchivedCampaigns(campaignsDir(), io);
     return { archives };
   });
 
   /** Restore an archived campaign. Body includes zipPath from the list response. */
-  server.post<{ Body: { zipPath?: string }; Params: { name: string } }>("/campaigns/archived/:name/restore", async (request, reply) => {
+  server.post("/campaigns/archived/:name/restore", {
+    schema: {
+      tags: ["Management"],
+      params: NameParams,
+      body: RestoreRequest,
+      response: { 200: OkResponse, 500: ErrorResponse },
+    },
+  }, async (request, reply) => {
     // Prefer explicit zipPath from body; fall back to reconstructing from name
-    const zipPath = request.body?.zipPath
-      ?? join(campaignsDir(), "archivedcampaigns", `${request.params.name}.zip`);
+    const zipPath = (request.body as { zipPath?: string })?.zipPath
+      ?? join(campaignsDir(), "archivedcampaigns", `${(request.params as { name: string }).name}.zip`);
     const io = createArchiveFileIO();
     const result = await unarchiveCampaign(zipPath, campaignsDir(), io);
 
@@ -295,13 +369,24 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   // -----------------------------------------------------------------------
 
   /** Get Discord Rich Presence setting. */
-  server.get("/discord", async () => {
+  server.get("/discord", {
+    schema: {
+      tags: ["Management"],
+      response: { 200: DiscordSettings },
+    },
+  }, async () => {
     return loadDiscordSettings(server.configDir);
   });
 
   /** Update Discord Rich Presence setting. */
-  server.put<{ Body: { enabled: boolean } }>("/discord", async (request) => {
-    const { enabled } = request.body ?? {};
+  server.put("/discord", {
+    schema: {
+      tags: ["Management"],
+      body: DiscordSettings,
+      response: { 200: DiscordSettings },
+    },
+  }, async (request) => {
+    const { enabled } = (request.body as { enabled: boolean }) ?? {};
     const settings = { enabled: enabled === true };
     saveDiscordSettings(server.configDir, settings);
     return settings;

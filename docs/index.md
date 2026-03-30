@@ -24,6 +24,8 @@ Ink (React for CLI) + Anthropic Claude SDK + TypeScript.
 | Understand game systems and rule cards | [rules-systems.md](rules-systems.md) |
 | Understand PDF import and content processing | [document-ingestion.md](document-ingestion.md) |
 | Understand error recovery and git | [error-recovery.md](error-recovery.md) |
+| Look up REST API contracts (auto-generated) | `/docs` endpoint (Scalar UI) or `/docs/json` (OpenAPI spec) |
+| Look up WebSocket event contracts | [websocket-api.md](websocket-api.md) |
 | Update documentation after a code change | [maintenance.md](maintenance.md) |
 
 ## Document Layers

@@ -6,6 +6,11 @@
  * these — the server just provides the data.
  */
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
+import {
+  NameParams, CharacterResponse, CompendiumResponse,
+  NotesResponse, NotesUpdateRequest, OkResponse,
+  SettingsResponse, SettingsPatch, CostResponse, ErrorResponse,
+} from "@machine-violet/shared";
 import { campaignPaths } from "../../tools/filesystem/scaffold.js";
 
 export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) => {
@@ -18,7 +23,17 @@ export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) =>
   });
 
   /** Get a character sheet by name. */
-  server.get<{ Params: { name: string } }>("/character/:name", async (request, reply) => {
+  server.get("/character/:name", {
+    schema: {
+      tags: ["Data"],
+      params: NameParams,
+      response: {
+        200: CharacterResponse,
+        400: ErrorResponse,
+        404: ErrorResponse,
+      },
+    },
+  }, async (request, reply) => {
     const engine = server.sessionManager.getEngine();
     if (!engine) return reply.status(400).send({ error: "No active engine." });
 
@@ -26,7 +41,7 @@ export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) =>
     if (!gs) return reply.status(400).send({ error: "No game state." });
 
     const fileIO = engine.getSceneManager().getFileIO();
-    const name = request.params.name;
+    const name = (request.params as { name: string }).name;
 
     // Try characters/<name>.md first, then players/<name>.md
     const paths = campaignPaths(gs.campaignRoot);
@@ -44,7 +59,12 @@ export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) =>
   });
 
   /** Get the campaign compendium. */
-  server.get("/compendium", async (_request, reply) => {
+  server.get("/compendium", {
+    schema: {
+      tags: ["Data"],
+      response: { 200: CompendiumResponse, 400: ErrorResponse },
+    },
+  }, async (_request, reply) => {
     const engine = server.sessionManager.getEngine();
     const gs = server.sessionManager.getGameState();
     if (!engine || !gs) return reply.status(400).send({ error: "No active engine." });
@@ -73,7 +93,12 @@ export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) =>
   });
 
   /** Get player notes. */
-  server.get("/notes", async (_request, reply) => {
+  server.get("/notes", {
+    schema: {
+      tags: ["Data"],
+      response: { 200: NotesResponse, 400: ErrorResponse },
+    },
+  }, async (_request, reply) => {
     const engine = server.sessionManager.getEngine();
     const gs = server.sessionManager.getGameState();
     if (!engine || !gs) return reply.status(400).send({ error: "No active engine." });
@@ -90,14 +115,20 @@ export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) =>
   });
 
   /** Save player notes. */
-  server.put<{ Body: { content: string } }>("/notes", async (request, reply) => {
+  server.put("/notes", {
+    schema: {
+      tags: ["Data"],
+      body: NotesUpdateRequest,
+      response: { 200: OkResponse, 400: ErrorResponse, 500: ErrorResponse },
+    },
+  }, async (request, reply) => {
     const engine = server.sessionManager.getEngine();
     const gs = server.sessionManager.getGameState();
     if (!engine || !gs) return reply.status(400).send({ error: "No active engine." });
 
     const fileIO = engine.getSceneManager().getFileIO();
     const path = campaignPaths(gs.campaignRoot).playerNotes;
-    const { content } = request.body ?? {};
+    const { content } = (request.body as { content: string }) ?? {};
 
     try {
       await fileIO.writeFile(path, content ?? "");
@@ -110,20 +141,31 @@ export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) =>
   });
 
   /** Get campaign settings. */
-  server.get("/settings", async (_request, reply) => {
+  server.get("/settings", {
+    schema: {
+      tags: ["Data"],
+      response: { 200: SettingsResponse, 400: ErrorResponse },
+    },
+  }, async (_request, reply) => {
     const gs = server.sessionManager.getGameState();
     if (!gs) return reply.status(400).send({ error: "No game state." });
     return { config: gs.config };
   });
 
   /** Patch campaign settings. */
-  server.patch<{ Body: Record<string, unknown> }>("/settings", async (request, reply) => {
+  server.patch("/settings", {
+    schema: {
+      tags: ["Data"],
+      body: SettingsPatch,
+      response: { 200: OkResponse, 400: ErrorResponse, 500: ErrorResponse },
+    },
+  }, async (request, reply) => {
     const engine = server.sessionManager.getEngine();
     const gs = server.sessionManager.getGameState();
     if (!engine || !gs) return reply.status(400).send({ error: "No active engine." });
 
     // Apply patch to in-memory config
-    const patch = request.body ?? {};
+    const patch = (request.body as Record<string, unknown>) ?? {};
     Object.assign(gs.config, patch);
 
     // Persist to disk
@@ -140,7 +182,12 @@ export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) =>
   });
 
   /** Get token cost breakdown. */
-  server.get("/cost", async () => {
+  server.get("/cost", {
+    schema: {
+      tags: ["Data"],
+      response: { 200: CostResponse },
+    },
+  }, async () => {
     const ct = server.sessionManager.getCostTracker();
     if (!ct) return { breakdown: null, formatted: "" };
 

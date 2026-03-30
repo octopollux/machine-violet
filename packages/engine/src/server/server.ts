@@ -8,6 +8,8 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import fastifyWebSocket from "@fastify/websocket";
 import fastifyCors from "@fastify/cors";
+import fastifySwagger from "@fastify/swagger";
+import scalarReference from "@scalar/fastify-api-reference";
 import { campaignRoutes } from "./routes/campaigns.js";
 import { sessionRoutes } from "./routes/session.js";
 import { dataRoutes } from "./routes/data.js";
@@ -46,6 +48,26 @@ export async function createServer(
 
   await server.register(fastifyCors, { origin: true });
   await server.register(fastifyWebSocket);
+  await server.register(fastifySwagger, {
+    openapi: {
+      info: {
+        title: "Machine Violet Engine API",
+        description: "REST API for the Machine Violet game engine. WebSocket events are documented separately in docs/websocket-api.md.",
+        version: "0.1.0",
+      },
+      servers: [{ url: `http://${cfg.host}:${cfg.port}` }],
+      tags: [
+        { name: "Campaigns", description: "Campaign listing, creation, and launch" },
+        { name: "Session", description: "Gameplay interaction — turns, commands, modals" },
+        { name: "Data", description: "Session data — characters, compendium, notes, settings, cost" },
+        { name: "Management", description: "AI connections, tiers, campaign ops, Discord settings" },
+      ],
+    },
+  });
+  await server.register(scalarReference, {
+    routePrefix: "/docs",
+    configuration: { title: "Machine Violet API" },
+  });
 
   // --- Session manager (one active session per process) ---
 

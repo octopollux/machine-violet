@@ -49,6 +49,7 @@ Code and docs stay in sync. See `docs/maintenance.md` for the full guide.
 2. **After changing code:** update any docs affected by the change. See `docs/maintenance.md` for what to update when.
 3. **Same commit:** code changes and doc updates go together.
 4. **Docs describe what exists.** Planned features go in GitHub issues, not docs. No derived counts.
+5. **API schemas stay in sync.** When adding or changing REST endpoints, update the TypeBox schemas in `packages/shared/src/protocol/rest.ts` and wire them into the route's `schema` option — OpenAPI docs are auto-generated from these. When adding or changing WebSocket events, update both `packages/shared/src/protocol/events.ts` and `docs/websocket-api.md`.
 
 ## Conventions
 
