@@ -7,7 +7,7 @@
  */
 import { createContext, useContext } from "react";
 import type { NarrativeLine, ActiveModal, RetryOverlay } from "@machine-violet/shared/types/tui.js";
-import type { Modal, Turn, StateSnapshot } from "@machine-violet/shared";
+import type { ChoicesData, Turn, StateSnapshot } from "@machine-violet/shared";
 import type { ToolGlyph } from "./activity.js";
 import type { ResolvedTheme, StyleVariant } from "./themes/types.js";
 import type { ApiClient } from "../api-client.js";
@@ -41,9 +41,13 @@ export interface GameContextValue {
   // Turns
   currentTurn: Turn | null;
 
-  // Modal state
-  activeModal: Modal | ActiveModal | null;
-  setActiveModal: (m: Modal | ActiveModal | null) => void;
+  // Server-driven choices (rendered inline in Player Pane, not as modals)
+  activeChoices: ChoicesData | null;
+  setActiveChoices: (c: ChoicesData | null) => void;
+
+  // Client-driven modals (character sheet, compendium, notes, swatch — opened from menu)
+  activeModal: ActiveModal | null;
+  setActiveModal: (m: ActiveModal | null) => void;
 
   // Retry overlay (system-driven, separate from activeModal)
   retryOverlay: RetryOverlay | null;

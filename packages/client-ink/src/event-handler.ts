@@ -13,8 +13,9 @@ import type {
   TurnUpdatedEvent,
   TurnCommittedEvent,
   TurnResolvedEvent,
-  ModalShowEvent,
-  ModalDismissEvent,
+  ChoicesPresentedEvent,
+  ChoicesClearedEvent,
+  ChoicesData,
   ActivityUpdateEvent,
   StateSnapshotEvent,
   SessionModeEvent,
@@ -22,7 +23,6 @@ import type {
   ErrorEvent,
   Turn,
   StateSnapshot,
-  Modal,
 } from "@machine-violet/shared";
 import type { NarrativeLine, StyleVariant } from "@machine-violet/shared/types/tui.js";
 import { appendDelta } from "./tui/narrative-helpers.js";
@@ -32,7 +32,7 @@ import { appendDelta } from "./tui/narrative-helpers.js";
 export interface ClientState {
   narrativeLines: NarrativeLine[];
   currentTurn: Turn | null;
-  activeModal: Modal | null;
+  activeChoices: ChoicesData | null;
   engineState: string | null;
   activeTools: string[];
   variant: StyleVariant;
@@ -52,7 +52,7 @@ export function initialClientState(): ClientState {
   return {
     narrativeLines: [],
     currentTurn: null,
-    activeModal: null,
+    activeChoices: null,
     engineState: null,
     activeTools: [],
     variant: "exploration",
@@ -95,11 +95,11 @@ export function createEventHandler(update: StateUpdater): (event: ServerEvent) =
       case "turn:resolved":
         handleTurnResolved(event, update);
         break;
-      case "modal:show":
-        handleModalShow(event, update);
+      case "choices:presented":
+        handleChoicesPresented(event, update);
         break;
-      case "modal:dismiss":
-        handleModalDismiss(event, update);
+      case "choices:cleared":
+        handleChoicesCleared(event, update);
         break;
       case "activity:update":
         handleActivityUpdate(event, update);
@@ -187,17 +187,17 @@ function handleTurnResolved(_event: TurnResolvedEvent, update: StateUpdater): vo
   }));
 }
 
-function handleModalShow(event: ModalShowEvent, update: StateUpdater): void {
+function handleChoicesPresented(event: ChoicesPresentedEvent, update: StateUpdater): void {
   update((prev) => ({
     ...prev,
-    activeModal: event.data,
+    activeChoices: event.data,
   }));
 }
 
-function handleModalDismiss(_event: ModalDismissEvent, update: StateUpdater): void {
+function handleChoicesCleared(_event: ChoicesClearedEvent, update: StateUpdater): void {
   update((prev) => ({
     ...prev,
-    activeModal: null,
+    activeChoices: null,
   }));
 }
 
@@ -276,7 +276,7 @@ function handleSessionEnded(_event: SessionEndedEvent, update: StateUpdater): vo
     ...prev,
     sessionEnded: true,
     currentTurn: null,
-    activeModal: null,
+    activeChoices: null,
     engineState: null,
     activeTools: [],
   }));

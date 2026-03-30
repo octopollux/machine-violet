@@ -118,9 +118,8 @@ export class SetupSession {
     // Present choices to the client
     if (result.pendingChoices) {
       this.broadcast({
-        type: "modal:show",
+        type: "choices:presented",
         data: {
-          type: "choice",
           id: "setup-choice",
           prompt: result.pendingChoices.prompt,
           choices: result.pendingChoices.choices,

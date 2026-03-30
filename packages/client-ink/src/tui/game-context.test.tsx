@@ -34,6 +34,8 @@ export function makeTestContext(overrides: Partial<GameContextValue> = {}): Game
     toolGlyphs: [],
     resources: [],
     modelines: {},
+    activeChoices: null,
+    setActiveChoices: vi.fn(),
     activeModal: null,
     setActiveModal: vi.fn(),
     activeSession: null,

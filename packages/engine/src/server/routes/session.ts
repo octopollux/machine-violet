@@ -7,7 +7,7 @@ import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import {
   ContributeRequest, ContributeResponse, ContributeQuery,
   CommitResponse, CommandRequest, CommandParams, CommandResponse,
-  IdParams, ModalResponse, OkResponse, CyclePlayerResponse,
+  ChoiceResponseRequest, OkResponse, CyclePlayerResponse,
   SessionEndResponse, ErrorResponse, StateSnapshot,
 } from "@machine-violet/shared";
 import { handleCommand } from "../command-handler.js";
@@ -148,28 +148,26 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
     return { ok: !result.error, message: result.message };
   });
 
-  /** Respond to a modal (choice selection, dice acknowledgment, etc.). */
-  server.post("/modal/:id/respond", {
+  /** Respond to a choice presented by the DM or setup agent. */
+  server.post("/choice/respond", {
     schema: {
       tags: ["Session"],
-      params: IdParams,
-      body: ModalResponse,
+      body: ChoiceResponseRequest,
       response: { 200: OkResponse },
     },
   }, async (request, _reply) => {
-    const { id } = request.params as { id: string };
     const { value } = (request.body as { value: string | number }) ?? {};
 
     // During setup, resolve choice selections through the session manager
     // (which handles turn lifecycle + game transition)
     const sm = server.sessionManager;
     const setup = sm.getSetupSession();
-    if (setup && id === "setup-choice") {
+    if (setup) {
       await sm.resolveSetupChoice(String(value));
       return { ok: true };
     }
 
-    server.log.info({ modalId: id, value }, "Modal response received");
+    server.log.info({ value }, "Choice response received");
     return { ok: true };
   });
 

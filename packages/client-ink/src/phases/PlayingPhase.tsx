@@ -6,9 +6,9 @@
  *
  * - Player input → POST /session/turn/contribute
  * - Slash commands → POST /session/command/:name
- * - Modal responses → POST /session/modal/:id/respond
+ * - Choice responses → POST /session/choice/respond
  * - OOC/Dev mode → POST /session/command/ooc or /dev (server manages session)
- * - Narrative, modals, state → arrive via WebSocket events
+ * - Narrative, choices, state → arrive via WebSocket events
  *
  * The component just renders what the server says and sends what the player types.
  */
@@ -33,6 +33,7 @@ export function PlayingPhase() {
     theme,
     campaignName, activePlayerIndex,
     engineState, toolGlyphs, resources, modelines,
+    activeChoices, setActiveChoices,
     activeModal, setActiveModal,
     mode, stateSnapshot,
     retryOverlay,
@@ -56,6 +57,7 @@ export function PlayingPhase() {
   // Never block on engine state — the server rejects input if inappropriate.
   // This prevents the client from getting permanently wedged.
   const textInputDisabled =
+    !!activeChoices ||
     !!activeModal ||
     !!retryOverlay ||
     menuOpen;
@@ -110,25 +112,24 @@ export function PlayingPhase() {
 
   // --- Choice selection ---
   const handleChoiceSelect = useCallback(async (choice: string) => {
-    const modal = activeModal;
-    setActiveModal(null);
+    const choices = activeChoices;
+    setActiveChoices(null);
 
-    // If this is a setup choice, resolve via modal endpoint
-    const modalId = modal && "id" in modal ? (modal as { id?: string }).id : undefined;
-    if (modalId) {
+    // Setup choices are resolved via the choice respond endpoint
+    if (choices?.id === "setup-choice") {
       try {
-        await apiClient.respondToModal(modalId, choice);
+        await apiClient.respondToChoice(choice);
       } catch { /* no-op */ }
       return;
     }
 
-    // Otherwise send as a turn contribution (gameplay choices)
+    // Gameplay choices are sent as a turn contribution
     try {
       await apiClient.contribute(choice);
     } catch { /* no-op */ }
-  }, [apiClient, activeModal, setActiveModal]);
+  }, [apiClient, activeChoices, setActiveChoices]);
 
-  const handleChoiceDismiss = useCallback(() => setActiveModal(null), [setActiveModal]);
+  const handleChoiceDismiss = useCallback(() => setActiveChoices(null), [setActiveChoices]);
 
   const handleNarrativeScroll = useCallback((direction: number) => {
     const step = scrollAmount(rows);
@@ -176,6 +177,7 @@ export function PlayingPhase() {
       escTimestamps.current = escTimestamps.current.filter((t) => now - t <= 1500);
       if (escTimestamps.current.length >= 3) {
         escTimestamps.current = [];
+        setActiveChoices(null);
         setActiveModal(null);
         setMenuOpen(false);
         if (mode === "ooc" || mode === "dev") {
@@ -185,7 +187,7 @@ export function PlayingPhase() {
       }
     }
 
-    if (retryOverlay || activeModal || menuOpen) return;
+    if (retryOverlay || activeChoices || activeModal || menuOpen) return;
 
     // In OOC/Dev mode: ESC exits
     if (mode === "ooc" || mode === "dev") {
@@ -220,36 +222,21 @@ export function PlayingPhase() {
     return <TerminalTooSmall columns={cols} rows={rows} />;
   }
 
-  // Modal height calculation
-  const modalHeight = (() => {
-    if (!activeModal) return 0;
-    if ("kind" in activeModal && activeModal.kind === "dice") return 10;
-    if ("type" in activeModal && activeModal.type === "dice-roll") return 10;
-    return 0;
-  })();
-  const layoutRows = rows - modalHeight;
-
-  const tier = getViewportTier({ columns: cols, rows: layoutRows });
+  const tier = getViewportTier({ columns: cols, rows });
   const visibleElements = getVisibleElements(tier);
-  const narRows = narrativeRows(layoutRows, visibleElements, false, theme.asset.height, players.length);
+  const narRows = narrativeRows(rows, visibleElements, false, theme.asset.height, players.length);
   const conversationPaneTop = visibleElements.topFrame ? theme.asset.height : 0;
 
-  // Active modal data (supports both old ActiveModal and new Modal format)
+  // Active client-driven modal data (character sheet, compendium, notes, swatch)
   const am = activeModal as Record<string, unknown> | null;
 
-  // Choice overlay (from either old ActiveModal or new Modal format)
-  const isChoice = activeModal &&
-    (("kind" in activeModal && activeModal.kind === "choice") ||
-     ("type" in activeModal && activeModal.type === "choice"));
-
-  const choiceData = isChoice ? activeModal as { prompt?: string; choices?: string[]; descriptions?: string[] } : null;
-
-  const choiceOverlay = choiceData ? (
+  // Server-driven choices (rendered inline in Player Pane, not as a modal)
+  const choiceOverlay = activeChoices ? (
     <ChoiceOverlay
       width={cols - 4}
-      prompt={choiceData.prompt ?? ""}
-      choices={choiceData.choices ?? []}
-      descriptions={choiceData.descriptions}
+      prompt={activeChoices.prompt ?? ""}
+      choices={activeChoices.choices ?? []}
+      descriptions={activeChoices.descriptions}
       maxChoiceRows={choiceRowBudget(visibleElements, 1, false, DESCRIPTION_ROWS)}
       initialIndex={0}
       onSelect={handleChoiceSelect}
@@ -261,7 +248,7 @@ export function PlayingPhase() {
   return (
     <Box flexDirection="column" width={cols} height={rows}>
       <Layout
-        dimensions={{ columns: cols, rows: layoutRows }}
+        dimensions={{ columns: cols, rows }}
         theme={theme}
         narrativeLines={narrativeLines}
         modelineText={modelines[activeChar] ?? campaignName}
@@ -280,7 +267,7 @@ export function PlayingPhase() {
         playerColor={stateSnapshot?.players?.[activePlayerIndex]?.color}
         narrativeRef={narrativeRef}
         mouseScrollOverrideRef={modalScrollRef}
-        hideInputLine={!!isChoice}
+        hideInputLine={!!activeChoices}
         playerPaneOverlay={choiceOverlay}
       />
       {retryOverlay && (

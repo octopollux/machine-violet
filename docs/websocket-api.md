@@ -117,35 +117,30 @@ Turn processing is complete. The next `turn:opened` will follow shortly.
 
 ---
 
-### Modals
+### Choices
 
-Server-driven prompts that require client-side UI. The client fetches any additional data it needs via REST.
+Structured choice data sent when the DM or setup agent presents options to the player. These are **not modals** — the reference TUI renders them inline in the Player Pane. Frontends can present them however they like (inline list, dropdown, buttons, etc.).
 
-#### `modal:show`
+#### `choices:presented`
 
-Display a modal. The `type` field within `data` determines the modal variant:
+The DM or setup agent is offering the player a set of choices.
 
-| Modal type       | Key fields | Description |
-|------------------|------------|-------------|
-| `choice`         | `prompt`, `choices[]`, `descriptions[]?` | Present a list of choices to the player. |
-| `dice-roll`      | `expression`, `rolls[]`, `kept[]?`, `total`, `reason?` | Show a dice roll result. |
-| `character-sheet` | `content` | Display a character sheet (markdown). |
-| `recap`          | `lines[]` | Show scene recap text. |
-| `compendium`     | `data` | Show campaign compendium. |
-| `rollback`       | `summary` | Confirm a state rollback. |
-| `notes`          | `content` | Show player notes for editing. |
-| `cost-summary`   | `breakdown` | Show token cost breakdown. |
-| `swatch`         | *(none)* | Show color swatch picker. |
+| Field          | Type     | Description |
+|----------------|----------|-------------|
+| `id`           | string   | Choice set identifier. |
+| `prompt`       | string   | Question or prompt text. |
+| `choices`      | string[] | Available options. |
+| `descriptions` | string[]?| Optional per-choice descriptions. |
 
-All modals include `id` (string) for responding via `POST /session/modal/:id/respond`.
+The player responds by sending the selected text as a turn contribution (`POST /session/turn/contribute`) during gameplay, or via `POST /session/choice/respond` during setup.
 
-#### `modal:dismiss`
+#### `choices:cleared`
 
-Close a previously shown modal.
+The active choice set has been dismissed (player selected, or context changed).
 
 | Field | Type   | Description |
 |-------|--------|-------------|
-| `id`  | string | Modal identifier to dismiss. |
+| *(empty object)* | | |
 
 ---
 
@@ -244,9 +239,8 @@ Error or retry notification.
 
 All event schemas are defined as TypeBox objects in:
 
-- `packages/shared/src/protocol/events.ts` — event types and `ServerEvent` union
+- `packages/shared/src/protocol/events.ts` — event types, `ChoicesData`, and `ServerEvent` union
 - `packages/shared/src/protocol/turn.ts` — `Turn` and `TurnContribution`
-- `packages/shared/src/protocol/modals.ts` — modal variant schemas
 - `packages/shared/src/protocol/state.ts` — `StateSnapshot`
 - `packages/shared/src/protocol/connection.ts` — `ConnectionIdentity`
 

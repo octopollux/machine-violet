@@ -46,8 +46,8 @@ export const CommandRequest = Type.Object({
   args: Type.Optional(Type.String()),
 });
 
-export const ModalResponse = Type.Object({
-  /** For choice modals: the selected option index. For others: acknowledgment. */
+export const ChoiceResponseRequest = Type.Object({
+  /** The selected choice text or index. */
   value: Type.Union([Type.String(), Type.Number()]),
 });
 
@@ -221,7 +221,7 @@ export type StartCampaignResponse = Static<typeof StartCampaignResponse>;
 export type ContributeRequest = Static<typeof ContributeRequest>;
 export type CommitResponse = Static<typeof CommitResponse>;
 export type CommandRequest = Static<typeof CommandRequest>;
-export type ModalResponse = Static<typeof ModalResponse>;
+export type ChoiceResponseRequest = Static<typeof ChoiceResponseRequest>;
 export type SettingsPatch = Static<typeof SettingsPatch>;
 export type SessionEndResponse = Static<typeof SessionEndResponse>;
 export type ErrorResponse = Static<typeof ErrorResponse>;
