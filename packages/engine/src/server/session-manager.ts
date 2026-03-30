@@ -204,12 +204,9 @@ export class SessionManager {
     // Start idle timer in case no players are connected yet
     this.checkIdleTimeout();
 
-    // Dev mode: context dumps in the temp setup dir
-    const { isDevMode } = await import("../config/dev-mode.js");
-    if (isDevMode()) {
-      const { setContextDumpDir } = await import("../config/context-dump.js");
-      setContextDumpDir(join(setupRoot, ".dev-mode", "context"));
-    }
+    // Debug: context dumps in the temp setup dir
+    const { setContextDumpDir } = await import("../config/context-dump.js");
+    setContextDumpDir(join(setupRoot, ".debug", "context"));
 
     // Initialize turn manager for setup input
     const setupBroadcast = (event: ServerEvent) => {
@@ -304,12 +301,9 @@ export class SessionManager {
       provider = createAnthropicProvider();
     }
 
-    // --- Dev mode: set context dump directory ---
-    const { isDevMode } = await import("../config/dev-mode.js");
-    if (isDevMode()) {
-      const { setContextDumpDir } = await import("../config/context-dump.js");
-      setContextDumpDir(join(campaignRoot, ".dev-mode", "context"));
-    }
+    // --- Debug: set context dump directory ---
+    const { setContextDumpDir } = await import("../config/context-dump.js");
+    setContextDumpDir(join(campaignRoot, ".debug", "context"));
 
     // --- Create and sandbox FileIO ---
     const baseIO = createBaseFileIO();

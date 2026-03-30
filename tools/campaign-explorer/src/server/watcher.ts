@@ -8,9 +8,9 @@ export function classifyPath(relPath: string): FileCategory {
 
   if (normalized === "config.json") return "config";
   if (normalized.startsWith("state/")) return "state";
-  // Context dumps: .dev-mode/**/context/* or context-dump/*
-  const isContextPath = normalized.includes(".dev-mode/") && normalized.includes("/context/");
-  const isLegacyContextPath = normalized.includes("context-dump/");
+  // Context dumps: .debug/**/context/* or context-dump/*
+  const isContextPath = normalized.includes(".debug/") && normalized.includes("/context/");
+  const isLegacyContextPath = normalized.includes("context-dump/") || (normalized.includes(".dev-mode/") && normalized.includes("/context/"));
   if (normalized.endsWith("-thinking.json") && (isContextPath || isLegacyContextPath))
     return "thinking";
   if (isContextPath || isLegacyContextPath) return "context-dump";
@@ -55,8 +55,8 @@ export function watchCampaign(
     ignored: (path: string) => {
       const basename = path.split(/[/\\]/).pop() ?? "";
       if (basename === "node_modules") return true;
-      // Allow .dev-mode and .debug through; block all other dotfiles/dirs
-      if (basename.startsWith(".") && basename !== ".dev-mode" && basename !== ".debug") return true;
+      // Allow .debug through; block all other dotfiles/dirs
+      if (basename.startsWith(".") && basename !== ".debug") return true;
       return false;
     },
   });

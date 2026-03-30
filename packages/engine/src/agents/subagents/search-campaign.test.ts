@@ -183,12 +183,12 @@ describe("buildSearchToolHandler", () => {
       expect(result.content).toContain("Access denied");
     });
 
-    it("blocks access to .dev-mode/ directory", async () => {
+    it("blocks access to .debug/ directory", async () => {
       const fio = mockFileIO({
-        "/camp/.dev-mode/campaigns/context/dm.json": "{}",
+        "/camp/.debug/campaigns/context/dm.json": "{}",
       });
       const handler = buildSearchToolHandler(SAMPLE_FILES, fio, "/camp");
-      const result = await handler("read_campaign_file", { path: ".dev-mode/campaigns/context/dm.json" });
+      const result = await handler("read_campaign_file", { path: ".debug/campaigns/context/dm.json" });
 
       expect(result.is_error).toBe(true);
       expect(result.content).toContain("Access denied");
