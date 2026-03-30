@@ -57,6 +57,10 @@ export class SessionManager {
   /** Campaign ID of the currently active session (null if none). */
   private campaignId: string | null = null;
 
+  /** Timer that fires when no players have been connected for IDLE_TIMEOUT_MS. */
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  private static readonly IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
   constructor(campaignsDir: string) {
     this.campaignsDir = campaignsDir;
   }
@@ -66,8 +70,14 @@ export class SessionManager {
   addClient(ws: WebSocket, identity: ConnectionIdentity): void {
     this.clients.set(ws, { ws, identity });
 
+    // A player connected — cancel any pending idle timeout
+    if (identity.role === "player") {
+      this.clearIdleTimer();
+    }
+
     ws.on("close", () => {
       this.clients.delete(ws);
+      this.checkIdleTimeout();
     });
 
     // Send current state snapshot on connect
@@ -82,6 +92,7 @@ export class SessionManager {
 
   removeClient(ws: WebSocket): void {
     this.clients.delete(ws);
+    this.checkIdleTimeout();
   }
 
   // --- Broadcasting ---
@@ -549,9 +560,41 @@ export class SessionManager {
     this.turnManager.openTurn(humanPlayers, aiPlayers);
   }
 
+  // --- Idle timeout ---
+
+  /** Returns true if no player-role clients are connected. */
+  private hasNoPlayers(): boolean {
+    for (const { identity } of this.clients.values()) {
+      if (identity.role === "player") return false;
+    }
+    return true;
+  }
+
+  /** Start the idle timer if there's an active session with no players. */
+  private checkIdleTimeout(): void {
+    if (!this.active || !this.hasNoPlayers()) return;
+    if (this.idleTimer) return; // already ticking
+
+    this.idleTimer = setTimeout(() => {
+      this.idleTimer = null;
+      if (this.active && this.hasNoPlayers()) {
+        console.log("[SessionManager] No players for 5 minutes — saving and ending session");
+        void this.endSession();
+      }
+    }, SessionManager.IDLE_TIMEOUT_MS);
+  }
+
+  private clearIdleTimer(): void {
+    if (this.idleTimer) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = null;
+    }
+  }
+
   /** End the current session gracefully. */
   async endSession(): Promise<void> {
     if (!this.active) return;
+    this.clearIdleTimer();
 
     // Flush any pending state
     if (this.engine) {
