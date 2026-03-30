@@ -10,7 +10,7 @@ import type {
   ContributeRequest,
   CommitResponse,
   CommandRequest,
-  ModalResponse as ModalResponseBody,
+  ChoiceResponseRequest,
   SessionEndResponse,
   StateSnapshot,
 } from "@machine-violet/shared";
@@ -140,9 +140,9 @@ export class ApiClient {
     return this.post(`/session/command/${encodeURIComponent(name)}`, body);
   }
 
-  async respondToModal(id: string, value: string | number): Promise<{ ok: boolean }> {
-    const body: ModalResponseBody = { value };
-    return this.post(`/session/modal/${encodeURIComponent(id)}/respond`, body);
+  async respondToChoice(value: string): Promise<{ ok: boolean }> {
+    const body: ChoiceResponseRequest = { value };
+    return this.post("/session/choice/respond", body);
   }
 
   async patchSettings(settings: Record<string, unknown>): Promise<{ ok: boolean }> {

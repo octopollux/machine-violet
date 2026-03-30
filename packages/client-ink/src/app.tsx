@@ -8,7 +8,8 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { Box, Text } from "ink";
 import { useBatchedNarrativeLines } from "./tui/hooks/useBatchedNarrativeLines.js";
-import type { Modal } from "@machine-violet/shared";
+import type { ChoicesData } from "@machine-violet/shared";
+import type { ActiveModal } from "@machine-violet/shared/types/tui.js";
 import { ApiClient } from "./api-client.js";
 import { WsClient } from "./ws-client.js";
 import {
@@ -92,7 +93,8 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
 
   // Batching hook ensures spacer lines survive React reconciliation for paragraph spacing
   const { lines: narrativeLines, setLines: setNarrativeLines } = useBatchedNarrativeLines();
-  const [activeModal, setActiveModal] = useState<Modal | null>(null);
+  const [activeChoices, setActiveChoices] = useState<ChoicesData | null>(null);
+  const [activeModal, setActiveModal] = useState<ActiveModal | null>(null);
 
   const apiClientRef = useRef<ApiClient>(new ApiClient(serverUrl, playerId));
   const wsClientRef = useRef<WsClient | null>(null);
@@ -105,7 +107,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
     setClientState((prev) => {
       const next = fn(prev);
       if (next.narrativeLines !== prev.narrativeLines) setNarrativeLines(next.narrativeLines);
-      if (next.activeModal !== prev.activeModal) setActiveModal(next.activeModal);
+      if (next.activeChoices !== prev.activeChoices) setActiveChoices(next.activeChoices);
       if (next.variant !== prev.variant) setVariant(next.variant);
       // Hydrate theme from state snapshot (persisted UI state from server)
       if (next.stateSnapshot !== prev.stateSnapshot && next.stateSnapshot) {
@@ -167,6 +169,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
     try { await apiClientRef.current.endSession(); } catch { /* no-op */ }
     // Full state reset
     setNarrativeLines([]);
+    setActiveChoices(null);
     setActiveModal(null);
     setClientState(initialClientState());
     setVariant("exploration");
@@ -462,8 +465,10 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
         ...clientState.modelines,
       },
       currentTurn: clientState.currentTurn,
+      activeChoices,
+      setActiveChoices,
       activeModal,
-      setActiveModal: (m) => setActiveModal(m as Modal | null),
+      setActiveModal,
       retryOverlay: clientState.lastError?.recoverable
         ? { status: 0, delaySec: 5 }
         : null,

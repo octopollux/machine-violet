@@ -84,27 +84,27 @@ describe("event-handler", () => {
     });
   });
 
-  describe("modals", () => {
-    it("sets activeModal on modal:show", () => {
+  describe("choices", () => {
+    it("sets activeChoices on choices:presented", () => {
       const h = makeHarness();
       h.dispatch({
-        type: "modal:show",
-        data: { type: "choice", id: "m1", prompt: "Pick one", choices: ["A", "B"] },
+        type: "choices:presented",
+        data: { id: "c1", prompt: "Pick one", choices: ["A", "B"] },
       });
 
-      expect(h.state.activeModal).not.toBeNull();
-      expect(h.state.activeModal!.type).toBe("choice");
+      expect(h.state.activeChoices).not.toBeNull();
+      expect(h.state.activeChoices!.prompt).toBe("Pick one");
     });
 
-    it("clears activeModal on modal:dismiss", () => {
+    it("clears activeChoices on choices:cleared", () => {
       const h = makeHarness();
       h.dispatch({
-        type: "modal:show",
-        data: { type: "choice", id: "m1", prompt: "Pick", choices: ["A"] },
+        type: "choices:presented",
+        data: { id: "c1", prompt: "Pick", choices: ["A"] },
       });
-      h.dispatch({ type: "modal:dismiss", data: { id: "m1" } });
+      h.dispatch({ type: "choices:cleared", data: {} });
 
-      expect(h.state.activeModal).toBeNull();
+      expect(h.state.activeChoices).toBeNull();
     });
   });
 

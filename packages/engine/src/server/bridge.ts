@@ -150,7 +150,7 @@ export function createBridge(
  * Route a TUI command to the appropriate WebSocket event type.
  *
  * TUI commands are the engine's way of sending structured UI updates.
- * Some map to modal:show events, others to session:mode changes, etc.
+ * Some map to choices:presented events, others to session:mode changes, etc.
  */
 function routeTuiCommand(
   command: TuiCommand,
@@ -161,9 +161,8 @@ function routeTuiCommand(
     // --- DM-driven choices (rendered in Player Pane by the client) ---
     case "present_choices":
       broadcast({
-        type: "modal:show",
+        type: "choices:presented",
         data: {
-          type: "choice",
           id: String(command.id ?? randomUUID()),
           prompt: String(command.prompt ?? ""),
           choices: (command.choices as string[]) ?? [],

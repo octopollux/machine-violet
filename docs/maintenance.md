@@ -58,6 +58,18 @@ This project maintains a closed loop between code and documentation. When you ch
 1. Update the relevant type in `packages/shared/src/types/config.ts`
 2. Update [state-atlas.md](state-atlas.md) schema tree
 
+### Adding or changing a REST endpoint
+
+1. Define request/response TypeBox schemas in `packages/shared/src/protocol/rest.ts`
+2. Wire schemas into the Fastify route's `schema` option (`body`, `params`, `querystring`, `response`)
+3. OpenAPI docs update automatically via `@fastify/swagger` — no manual doc edit needed
+
+### Adding or changing a WebSocket event
+
+1. Define the event schema in `packages/shared/src/protocol/events.ts`
+2. Add to the `ServerEvent` union type
+3. Update [websocket-api.md](websocket-api.md) with the new event type, payload fields, and when it fires
+
 ### Changes that DON'T need doc updates
 
 - Bug fixes that don't change interfaces or behavior
@@ -77,6 +89,8 @@ This project maintains a closed loop between code and documentation. When you ch
 | Context management | [context-management.md](context-management.md) | Token economics, retention, caching |
 | Entity filesystem | [entity-filesystem.md](entity-filesystem.md) | Entity format, wikilinks, changelogs |
 | TUI design | [tui-design.md](tui-design.md) | Layout, themes, formatting |
+| WebSocket API | [websocket-api.md](websocket-api.md) | WS event types, payloads, connection protocol |
+| REST API (auto-generated) | `/docs` endpoint | OpenAPI spec from TypeBox route schemas |
 | Conventions | [CLAUDE.md](../CLAUDE.md) | Code style, testing, imports |
 
 ## Principles

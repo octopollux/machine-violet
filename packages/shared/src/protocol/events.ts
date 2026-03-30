@@ -6,7 +6,6 @@
  */
 import { Type, type Static } from "@sinclair/typebox";
 import { TurnContribution, Turn } from "./turn.js";
-import { Modal } from "./modals.js";
 
 // --- Narrative ---
 
@@ -61,18 +60,23 @@ export const TurnResolvedEvent = Type.Object({
   }),
 });
 
-// --- Modals ---
+// --- Choices ---
 
-export const ModalShowEvent = Type.Object({
-  type: Type.Literal("modal:show"),
-  data: Modal,
+export const ChoicesData = Type.Object({
+  id: Type.String(),
+  prompt: Type.String(),
+  choices: Type.Array(Type.String()),
+  descriptions: Type.Optional(Type.Array(Type.String())),
 });
 
-export const ModalDismissEvent = Type.Object({
-  type: Type.Literal("modal:dismiss"),
-  data: Type.Object({
-    id: Type.String(),
-  }),
+export const ChoicesPresentedEvent = Type.Object({
+  type: Type.Literal("choices:presented"),
+  data: ChoicesData,
+});
+
+export const ChoicesClearedEvent = Type.Object({
+  type: Type.Literal("choices:cleared"),
+  data: Type.Object({}),
 });
 
 // --- Activity / tool tracking ---
@@ -140,8 +144,8 @@ export const ServerEvent = Type.Union([
   TurnUpdatedEvent,
   TurnCommittedEvent,
   TurnResolvedEvent,
-  ModalShowEvent,
-  ModalDismissEvent,
+  ChoicesPresentedEvent,
+  ChoicesClearedEvent,
   ActivityUpdateEvent,
   StateSnapshotEvent,
   SessionModeEvent,
@@ -155,8 +159,9 @@ export type TurnOpenedEvent = Static<typeof TurnOpenedEvent>;
 export type TurnUpdatedEvent = Static<typeof TurnUpdatedEvent>;
 export type TurnCommittedEvent = Static<typeof TurnCommittedEvent>;
 export type TurnResolvedEvent = Static<typeof TurnResolvedEvent>;
-export type ModalShowEvent = Static<typeof ModalShowEvent>;
-export type ModalDismissEvent = Static<typeof ModalDismissEvent>;
+export type ChoicesData = Static<typeof ChoicesData>;
+export type ChoicesPresentedEvent = Static<typeof ChoicesPresentedEvent>;
+export type ChoicesClearedEvent = Static<typeof ChoicesClearedEvent>;
 export type ActivityUpdateEvent = Static<typeof ActivityUpdateEvent>;
 export type StateSnapshotEvent = Static<typeof StateSnapshotEvent>;
 export type SessionModeEvent = Static<typeof SessionModeEvent>;
