@@ -8,7 +8,7 @@ describe("TurnManager", () => {
 
   beforeEach(() => {
     events = [];
-    tm = new TurnManager((event) => events.push(event));
+    tm = new TurnManager((event) => events.push(event), "test-campaign");
   });
 
   describe("openTurn", () => {
