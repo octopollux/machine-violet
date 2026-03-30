@@ -285,8 +285,8 @@ export class SessionManager {
       setContextDumpDir(join(campaignRoot, ".dev-mode", "context"));
     }
 
-    // --- Create Anthropic client (legacy fallback) ---
-    const client = createClient();
+    // TODO: Phase 6 — remove createClient() once all consumers use LLMProvider
+    const _client = createClient();
 
     // --- Create and sandbox FileIO ---
     const baseIO = createBaseFileIO();
@@ -353,7 +353,6 @@ export class SessionManager {
 
     // --- Instantiate GameEngine ---
     const engine = new GameEngine({
-      client,
       provider,
       gameState: gs,
       scene,
