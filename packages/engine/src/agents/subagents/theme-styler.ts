@@ -6,7 +6,7 @@
  * or "make it darker". This subagent picks the right theme, key_color,
  * preset, and gradient, returning a TuiCommand for the engine to dispatch.
  */
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider } from "../../providers/types.js";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import type { TuiCommand } from "../agent-loop.js";
@@ -29,7 +29,7 @@ export interface ThemeStylerResult extends SubagentResult {
  * @param currentKeyColor - Current key color hex (for context)
  */
 export async function styleTheme(
-  client: Anthropic,
+  provider: LLMProvider,
   description: string,
   currentTheme?: string,
   currentKeyColor?: string,
@@ -42,7 +42,7 @@ export async function styleTheme(
   const userMessage = `${context}Request: ${description}`;
 
   const result = await oneShot(
-    client,
+    provider,
     getModel("small"),
     SYSTEM_PROMPT,
     userMessage,

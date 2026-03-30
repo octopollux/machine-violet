@@ -1,4 +1,4 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import type { NormalizedMessage } from "../providers/types.js";
 
 /**
  * Estimate token count for a string.
@@ -11,7 +11,7 @@ export function estimateTokens(text: string): number {
 }
 
 /** Estimate tokens for a message content block */
-export function estimateContentTokens(content: Anthropic.MessageParam["content"]): number {
+export function estimateContentTokens(content: NormalizedMessage["content"]): number {
   if (typeof content === "string") {
     return estimateTokens(content);
   }
@@ -22,22 +22,13 @@ export function estimateContentTokens(content: Anthropic.MessageParam["content"]
     } else if (block.type === "tool_use") {
       total += estimateTokens(block.name) + estimateTokens(JSON.stringify(block.input));
     } else if (block.type === "tool_result") {
-      const resultBlock = block as Anthropic.ToolResultBlockParam;
-      if (typeof resultBlock.content === "string") {
-        total += estimateTokens(resultBlock.content);
-      } else if (Array.isArray(resultBlock.content)) {
-        for (const sub of resultBlock.content) {
-          if (sub.type === "text") {
-            total += estimateTokens(sub.text);
-          }
-        }
-      }
+      total += estimateTokens(block.content);
     }
   }
   return total;
 }
 
 /** Estimate total tokens for a message */
-export function estimateMessageTokens(msg: Anthropic.MessageParam): number {
+export function estimateMessageTokens(msg: NormalizedMessage): number {
   return estimateContentTokens(msg.content) + 4; // role overhead
 }

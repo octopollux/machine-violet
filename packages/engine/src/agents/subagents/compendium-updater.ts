@@ -1,4 +1,4 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider } from "../../providers/types.js";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import { getModel } from "../../config/models.js";
@@ -39,7 +39,7 @@ export function filterPlayerTranscript(transcript: string): string {
  * returns an updated compendium reflecting new player knowledge.
  */
 export async function updateCompendium(
-  client: Anthropic,
+  provider: LLMProvider,
   current: Compendium,
   transcript: string,
   sceneNumber: number,
@@ -54,7 +54,7 @@ export async function updateCompendium(
   ].join("");
 
   const result = await oneShot(
-    client,
+    provider,
     getModel("small"),
     SYSTEM_PROMPT,
     userMessage,

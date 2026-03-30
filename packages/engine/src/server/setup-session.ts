@@ -192,11 +192,7 @@ export class SetupSession {
     if (!ruleCard) return;
 
     try {
-      // promoteCharacter uses spawnSubagent (Anthropic SDK) — legacy path
-      // TODO: migrate subagent infrastructure to provider abstraction
-      const { createClient } = await import("../config/client.js");
-      const client = createClient();
-      const { updatedSheet } = await promoteCharacter(client, {
+      const { updatedSheet } = await promoteCharacter(this.provider, {
         characterSheet: stub,
         systemRules: ruleCard,
         context: `Build initial character sheet: ${result.characterDetails}`,

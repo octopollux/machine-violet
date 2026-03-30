@@ -3,7 +3,7 @@
  * Reads character sheet + rules, generates updated character file.
  * Preserves changelog. Player-facing for interactive decisions.
  */
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider, SystemBlock } from "../../providers/types.js";
 import type { SubagentStreamCallback } from "../subagent.js";
 import { spawnSubagent, cacheSystemPrompt } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
@@ -36,14 +36,14 @@ const BASE_PROMPT = loadPrompt("character-promotion");
  * Player-facing so the player can see and interact with choices.
  */
 export async function promoteCharacter(
-  client: Anthropic,
+  provider: LLMProvider,
   input: PromotionInput,
   onStream?: SubagentStreamCallback,
 ): Promise<PromotionResult> {
-  const systemPrompt: Anthropic.TextBlockParam[] = [
+  const systemPrompt: SystemBlock[] = [
     ...cacheSystemPrompt(BASE_PROMPT),
     ...(input.systemRules
-      ? [{ type: "text" as const, text: `\n\nGame system rules:\n${input.systemRules}` }]
+      ? [{ text: `\n\nGame system rules:\n${input.systemRules}` }]
       : []),
   ];
 
@@ -54,7 +54,7 @@ Current character sheet:
 ${input.characterSheet}`;
 
   const result = await spawnSubagent(
-    client,
+    provider,
     {
       name: "promote_character",
       model: getModel("small"),

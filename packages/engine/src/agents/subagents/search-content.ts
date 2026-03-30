@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider, NormalizedTool } from "../../providers/types.js";
 import { spawnSubagent, cacheSystemPrompt } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import type { UsageStats } from "../agent-loop.js";
@@ -93,11 +93,11 @@ function applyFilters(
 
 // --- Search tools given to the subagent ---
 
-const SEARCH_TOOLS: Anthropic.Tool[] = [
+const SEARCH_TOOLS: NormalizedTool[] = [
   {
     name: "list_categories",
     description: "List available entity categories in the game system content library.",
-    input_schema: {
+    inputSchema: {
       type: "object" as const,
       properties: {},
     },
@@ -105,7 +105,7 @@ const SEARCH_TOOLS: Anthropic.Tool[] = [
   {
     name: "search_facets",
     description: "Search a category's faceted index. Filters support substring match on any field, and min_/max_ prefixes for numeric ranges (handles fractional CR like '1/4'). Returns matching entities with their key stats.",
-    input_schema: {
+    inputSchema: {
       type: "object" as const,
       properties: {
         category: {
@@ -128,7 +128,7 @@ const SEARCH_TOOLS: Anthropic.Tool[] = [
   {
     name: "read_entity",
     description: "Read the full markdown content of a specific entity.",
-    input_schema: {
+    inputSchema: {
       type: "object" as const,
       properties: {
         category: {
@@ -249,7 +249,7 @@ export function buildContentSearchToolHandler(
  * Spawn a search subagent to find entities in a processed game system's content library.
  */
 export async function searchContent(
-  client: Anthropic,
+  provider: LLMProvider,
   input: SearchContentInput,
   fileIO: FileIO,
 ): Promise<SearchContentResult> {
@@ -261,7 +261,7 @@ export async function searchContent(
     input.systemSlug,
   );
 
-  const result: SubagentResult = await spawnSubagent(client, {
+  const result: SubagentResult = await spawnSubagent(provider, {
     name: "search_content",
     model: getModel("small"),
     visibility: "silent",

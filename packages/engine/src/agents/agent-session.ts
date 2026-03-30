@@ -1,7 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { ToolResult } from "./tool-registry.js";
 import type { UsageStats, TuiCommand, ModelId } from "./agent-loop.js";
-import { accumulateUsage } from "../context/usage-helpers.js";
+// Legacy: convert Anthropic.Usage → UsageStats accumulation
+function accumulateUsage(total: UsageStats, usage: Anthropic.Usage): void {
+  total.inputTokens += usage.input_tokens;
+  total.outputTokens += usage.output_tokens;
+  total.cacheReadTokens += usage.cache_read_input_tokens ?? 0;
+  total.cacheCreationTokens += usage.cache_creation_input_tokens ?? 0;
+}
 import { dumpContext, dumpThinking } from "../config/context-dump.js";
 import { ContentRefusalError } from "@machine-violet/shared/types/errors.js";
 import { getEffortConfig } from "../config/models.js";

@@ -19,7 +19,6 @@ import type { SceneState } from "../agents/scene-manager.js";
 import { detectSceneState } from "../agents/scene-manager.js";
 import type { DMSessionState } from "../agents/dm-prompt.js";
 import { getActivePlayer } from "../agents/player-manager.js";
-import { createClient } from "../config/client.js";
 import { loadEnv } from "../config/first-launch.js";
 import { loadConnectionStore, buildEffectiveConnections, getTierProvider } from "../config/connections.js";
 import { createProviderFromConnection } from "../providers/index.js";
@@ -273,10 +272,14 @@ export class SessionManager {
     const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
     const largeTier = getTierProvider(connStore, "large");
 
-    // Create provider if a connection is assigned to the large tier
-    const provider = largeTier
-      ? createProviderFromConnection(largeTier.connection)
-      : undefined;
+    // Create provider from large tier, or fall back to Anthropic env key
+    let provider;
+    if (largeTier) {
+      provider = createProviderFromConnection(largeTier.connection);
+    } else {
+      const { createAnthropicProvider } = await import("../providers/anthropic.js");
+      provider = createAnthropicProvider();
+    }
 
     // --- Dev mode: set context dump directory ---
     const { isDevMode } = await import("../config/dev-mode.js");
@@ -284,9 +287,6 @@ export class SessionManager {
       const { setContextDumpDir } = await import("../config/context-dump.js");
       setContextDumpDir(join(campaignRoot, ".dev-mode", "context"));
     }
-
-    // TODO: Phase 6 — remove createClient() once all consumers use LLMProvider
-    const _client = createClient();
 
     // --- Create and sandbox FileIO ---
     const baseIO = createBaseFileIO();

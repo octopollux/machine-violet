@@ -1,4 +1,4 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider } from "../../providers/types.js";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import { getModel } from "../../config/models.js";
@@ -16,13 +16,13 @@ import { loadTemplate } from "../../prompts/load-prompt.js";
  * @returns Narrative prose recap (~100 words)
  */
 export async function generateNarrativeRecap(
-  client: Anthropic,
+  provider: LLMProvider,
   bulletRecap: string,
   campaignName: string,
 ): Promise<SubagentResult> {
   const systemPrompt = loadTemplate("narrative-recap", { campaign_name: campaignName });
   return oneShot(
-    client,
+    provider,
     getModel("small"),
     systemPrompt,
     `Convert this session recap into narrative prose:\n\n${bulletRecap}`,

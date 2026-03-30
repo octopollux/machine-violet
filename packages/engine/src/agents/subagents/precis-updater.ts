@@ -1,4 +1,4 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider } from "../../providers/types.js";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import { getModel } from "../../config/models.js";
@@ -37,7 +37,7 @@ const SYSTEM_PROMPT = loadPrompt("precis-updater");
  * @returns Updated precis text, open threads, and optional player read
  */
 export async function updatePrecis(
-  client: Anthropic,
+  provider: LLMProvider,
   currentPrecis: string,
   droppedExchange: string,
   currentOpenThreads?: string,
@@ -60,7 +60,7 @@ export async function updatePrecis(
   const prompt = `Current precis:\n${currentPrecis}\n\n${openThreadsLine}${npcIntentsLine}${pcLine}${aliasContext ?? ""}\n\nDropped exchange:\n${droppedExchange}\n\nAppend a terse summary of the dropped exchange to the precis, then add NPC_NEXT: lines (if any NPCs have active intentions), then the OPEN: line (if any threads are open), then the PLAYER_READ: JSON line.`;
 
   const result = await oneShot(
-    client,
+    provider,
     getModel("small"),
     SYSTEM_PROMPT,
     prompt,

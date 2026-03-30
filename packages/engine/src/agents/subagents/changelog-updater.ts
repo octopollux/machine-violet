@@ -1,4 +1,4 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider } from "../../providers/types.js";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import { getModel } from "../../config/models.js";
@@ -17,7 +17,7 @@ const SYSTEM_PROMPT = loadPrompt("changelog-updater");
  * @returns Lines of "filename: changelog entry" (~50-200 tokens)
  */
 export async function updateChangelogs(
-  client: Anthropic,
+  provider: LLMProvider,
   transcript: string,
   sceneNumber: number,
   entityFiles: string[],
@@ -26,7 +26,7 @@ export async function updateChangelogs(
   const prompt = `Scene ${sceneNumber} transcript:\n${transcript}\n\nKnown entity files:\n${entityFiles.join("\n")}${aliasContext ?? ""}\n\nList changelog entries for entities meaningfully involved.`;
 
   return oneShot(
-    client,
+    provider,
     getModel("small"),
     SYSTEM_PROMPT,
     prompt,

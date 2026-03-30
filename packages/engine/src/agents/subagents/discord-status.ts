@@ -1,4 +1,4 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider } from "../../providers/types.js";
 import { oneShot } from "../subagent.js";
 import { getModel } from "../../config/models.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
@@ -12,12 +12,12 @@ const MAX_LENGTH = 40;
  * Never throws — degrades to a generic fallback.
  */
 export async function generateDiscordStatus(
-  client: Anthropic,
+  provider: LLMProvider,
   recentContext: string,
 ): Promise<string> {
   try {
     const result = await oneShot(
-      client,
+      provider,
       getModel("small"),
       SYSTEM_PROMPT,
       recentContext,
