@@ -200,6 +200,9 @@ export class SessionManager {
     this.currentMode = "setup";
     this.campaignId = "__setup__";
 
+    // Start idle timer in case no players are connected yet
+    this.checkIdleTimeout();
+
     // Dev mode: context dumps in the temp setup dir
     const { isDevMode } = await import("../config/dev-mode.js");
     if (isDevMode()) {
@@ -394,6 +397,9 @@ export class SessionManager {
     this.gameState = gs;
     this.campaignId = campaignId;
     this.active = true;
+
+    // Start idle timer in case no players are connected yet
+    this.checkIdleTimeout();
 
     // --- Initialize turn manager ---
     this.turnManager = new TurnManager(scopedBroadcast, campaignId);

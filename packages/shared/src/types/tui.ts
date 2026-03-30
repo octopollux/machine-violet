@@ -43,12 +43,12 @@ export type FormattingNode = string | FormattingTag;
 
 /** Typed narrative line — only "dm" lines enter the formatting/heal/quote pipeline. */
 export type NarrativeLine =
-  | { kind: "dm"; text: string }
-  | { kind: "player"; text: string }
-  | { kind: "dev"; text: string }
-  | { kind: "system"; text: string }
-  | { kind: "separator"; text: string }
-  | { kind: "spacer"; text: string };
+  | { kind: "dm"; text: string; tag?: string }
+  | { kind: "player"; text: string; tag?: string }
+  | { kind: "dev"; text: string; tag?: string }
+  | { kind: "system"; text: string; tag?: string }
+  | { kind: "separator"; text: string; tag?: string }
+  | { kind: "spacer"; text: string; tag?: string };
 
 /** A fully processed line ready for rendering — nodes are pre-parsed, healed, wrapped, and quote-highlighted. */
 export interface ProcessedLine {

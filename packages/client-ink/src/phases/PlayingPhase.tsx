@@ -96,13 +96,15 @@ export function PlayingPhase() {
       return;
     }
 
-    // Regular input → contribute to current turn
-    const linesBefore = narrativeLines.length;
+    // Regular input → contribute to current turn.
+    // Tag optimistic lines so we can remove exactly these on rejection,
+    // even if other lines (WS events, other players) arrived in between.
+    const tag = `optimistic-${Date.now()}`;
     setNarrativeLines((prev) => [
       ...prev,
-      { kind: "separator", text: "---" },
-      { kind: "player", text: `[${activeChar}] ${text}` },
-      { kind: "dm", text: "" },
+      { kind: "separator", text: "---", tag },
+      { kind: "player", text: `[${activeChar}] ${text}`, tag },
+      { kind: "dm", text: "", tag },
     ]);
 
     try {
@@ -112,12 +114,12 @@ export function PlayingPhase() {
       });
       clearInput();
     } catch {
-      // Contribution rejected — roll back the optimistic narrative lines
+      // Contribution rejected — remove only our optimistic lines
       // and restore the player's text to the input box so they can resend.
-      setNarrativeLines((prev) => prev.slice(0, linesBefore));
+      setNarrativeLines((prev) => prev.filter((l) => l.tag !== tag));
       restoreInput(text);
     }
-  }, [apiClient, activeChar, currentTurn, narrativeLines.length, setNarrativeLines, clearInput, restoreInput]);
+  }, [apiClient, activeChar, currentTurn, setNarrativeLines, clearInput, restoreInput]);
 
   // --- Choice selection ---
   const handleChoiceSelect = useCallback(async (choice: string) => {

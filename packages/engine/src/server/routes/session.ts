@@ -68,7 +68,7 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
     const { text } = body;
 
     // Reject stale clients: campaign or turn mismatch
-    if (body.campaignId && body.campaignId !== turn.campaignId) {
+    if (body.campaignId != null && body.campaignId !== turn.campaignId) {
       return reply.status(409).send({ error: "Campaign mismatch — session has changed." });
     }
     if (body.turnSeq != null && body.turnSeq !== turn.seq) {

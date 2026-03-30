@@ -37,7 +37,7 @@ The `type` field is a string discriminant. The `data` field varies by event type
 2. Server immediately sends a `state:snapshot` event with the full current game state
 3. Server pushes events as gameplay proceeds
 4. On unexpected disconnect, clients should reconnect with exponential backoff
-5. If all **player** connections drop for 5 minutes, the server auto-saves and ends the session (spectator connections are excluded from this check). Reconnecting clients will receive a `session:ended` event or an empty state snapshot, and should return the user to the main menu
+5. If all **player** connections drop for 5 minutes, the server auto-saves and ends the session (spectator connections are excluded from this check). If a client reconnects after the session has ended, no `state:snapshot` is sent (the server only sends snapshots for active sessions). Clients should treat the absence of a snapshot on connect as "no active session" and return the user to the main menu
 
 ## Events
 
