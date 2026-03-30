@@ -212,14 +212,11 @@ export class SessionManager {
   /** Resolve a choice during setup. */
   async resolveSetupChoice(selectedText: string): Promise<{ finalized?: string }> {
     if (!this.setupSession) throw new Error("No setup session.");
-    console.log(`[setup] resolveSetupChoice: "${selectedText.slice(0, 50)}"`);
     const result = await this.setupSession.resolveChoice(selectedText);
-    console.log(`[setup] resolveChoice returned: finalized=${!!result.finalized}`);
     if (result.finalized) {
       await this.transitionToGame(result.finalized);
       return { finalized: result.finalized };
     }
-    console.log(`[setup] opening next turn after choice resolution`);
     this.openNextTurn();
     return {};
   }
