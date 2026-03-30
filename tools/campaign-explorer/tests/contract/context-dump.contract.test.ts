@@ -8,7 +8,7 @@ import {
   dumpThinking,
   setContextDumpDir,
   resetContextDump,
-} from "../../../../src/config/context-dump.js";
+} from "../../../../packages/engine/src/config/context-dump.js";
 vi.mock("node:fs/promises", () => ({
   writeFile: vi.fn(async () => {}),
   mkdir: vi.fn(async () => {}),

@@ -5,7 +5,7 @@
  * If this test breaks, the explorer's file categorization needs updating.
  */
 import { describe, it, expect } from "vitest";
-import { STATE_FILES } from "../../../../src/context/state-persistence.js";
+import { STATE_FILES } from "../../../../packages/engine/src/context/state-persistence.js";
 
 describe("STATE_FILES contract", () => {
   it("exports the expected state file paths", () => {
@@ -14,8 +14,12 @@ describe("STATE_FILES contract", () => {
       clocks: "state/clocks.json",
       maps: "state/maps.json",
       decks: "state/decks.json",
+      objectives: "state/objectives.json",
       scene: "state/scene.json",
+      conversation: "state/conversation.json",
       ui: "state/ui.json",
+      usage: "state/usage.json",
+      resources: "state/resources.json",
       displayLog: "state/display-log.md",
     });
   });
