@@ -5,6 +5,8 @@
  * over REST (commands, turns, settings) and WebSocket (streaming
  * narrative, state snapshots, turn lifecycle events).
  */
+import { createWriteStream, mkdirSync } from "node:fs";
+import { join, dirname } from "node:path";
 import Fastify, { type FastifyInstance } from "fastify";
 import fastifyWebSocket from "@fastify/websocket";
 import fastifyCors from "@fastify/cors";
@@ -39,6 +41,25 @@ export async function createServer(
   config: Partial<ServerConfig> = {},
 ): Promise<FastifyInstance> {
   const cfg = { ...DEFAULTS, ...config };
+
+  // Mirror stdout/stderr to .debug/server.log (not in test mode)
+  if (process.env.NODE_ENV !== "test" && cfg.campaignsDir) {
+    try {
+      const logDir = join(dirname(cfg.campaignsDir), ".debug");
+      mkdirSync(logDir, { recursive: true });
+      const logStream = createWriteStream(join(logDir, "server.log"), { flags: "a" });
+      const origStdoutWrite = process.stdout.write.bind(process.stdout);
+      const origStderrWrite = process.stderr.write.bind(process.stderr);
+      process.stdout.write = ((chunk: string | Uint8Array, ...args: unknown[]) => {
+        logStream.write(chunk);
+        return (origStdoutWrite as (...a: unknown[]) => boolean)(chunk, ...args);
+      }) as typeof process.stdout.write;
+      process.stderr.write = ((chunk: string | Uint8Array, ...args: unknown[]) => {
+        logStream.write(chunk);
+        return (origStderrWrite as (...a: unknown[]) => boolean)(chunk, ...args);
+      }) as typeof process.stderr.write;
+    } catch { /* best-effort */ }
+  }
 
   const server = Fastify({
     logger: process.env.NODE_ENV === "test" ? false : { level: "info" },

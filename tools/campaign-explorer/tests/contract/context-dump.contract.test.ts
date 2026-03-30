@@ -9,8 +9,6 @@ import {
   setContextDumpDir,
   resetContextDump,
 } from "../../../../src/config/context-dump.js";
-import { resetDevMode } from "../../../../src/config/dev-mode.js";
-
 vi.mock("node:fs/promises", () => ({
   writeFile: vi.fn(async () => {}),
   mkdir: vi.fn(async () => {}),
@@ -18,16 +16,11 @@ vi.mock("node:fs/promises", () => ({
 
 beforeEach(() => {
   resetContextDump();
-  resetDevMode();
-  process.env.DEV_MODE = "true";
-  resetDevMode();
   setContextDumpDir("/tmp/contract-test");
 });
 
 afterEach(() => {
-  delete process.env.DEV_MODE;
   resetContextDump();
-  resetDevMode();
 });
 
 describe("context dump envelope contract", () => {

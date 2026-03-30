@@ -154,10 +154,8 @@ export class GameEngine {
     this.injectionRegistry.register(new ScenePacingInjection());
     this.injectionRegistry.register(new LengthSteeringInjection());
 
-    // Wire dev logging to scene manager when available
-    if (params.callbacks.onDevLog) {
-      this.sceneManager.devLog = params.callbacks.onDevLog;
-    }
+    // Wire dev logging to scene manager
+    this.sceneManager.devLog = params.callbacks.onDevLog;
 
     // Wire persistence — fires for any dispatch (engine, OOC, dev mode)
     this.registry.persist = (state, slices) => {
