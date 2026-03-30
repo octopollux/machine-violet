@@ -45,10 +45,13 @@ export function PlayingPhase() {
 
   // Local state
   const [resetKey, setResetKey] = useState(0);
+  const [pendingInput, setPendingInput] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [tokenSummary, setTokenSummary] = useState("");
 
-  const clearInput = useCallback(() => setResetKey((k) => k + 1), []);
+  const clearInput = useCallback(() => { setPendingInput(""); setResetKey((k) => k + 1); }, []);
+  /** Reset the input but pre-fill it with text (e.g. after a rejected contribution). */
+  const restoreInput = useCallback((text: string) => { setPendingInput(text); setResetKey((k) => k + 1); }, []);
 
   const narrativeRef = useRef<NarrativeAreaHandle>(null);
   const modalScrollRef = useRef<CenteredModalHandle>(null);
@@ -94,6 +97,7 @@ export function PlayingPhase() {
     }
 
     // Regular input → contribute to current turn
+    const linesBefore = narrativeLines.length;
     setNarrativeLines((prev) => [
       ...prev,
       { kind: "separator", text: "---" },
@@ -106,13 +110,14 @@ export function PlayingPhase() {
         campaignId: currentTurn?.campaignId,
         turnSeq: currentTurn?.seq,
       });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setNarrativeLines((prev) => [...prev, { kind: "system", text: `[Error: ${msg}]` }]);
+      clearInput();
+    } catch {
+      // Contribution rejected — roll back the optimistic narrative lines
+      // and restore the player's text to the input box so they can resend.
+      setNarrativeLines((prev) => prev.slice(0, linesBefore));
+      restoreInput(text);
     }
-
-    clearInput();
-  }, [apiClient, activeChar, currentTurn, setNarrativeLines, clearInput]);
+  }, [apiClient, activeChar, currentTurn, narrativeLines.length, setNarrativeLines, clearInput, restoreInput]);
 
   // --- Choice selection ---
   const handleChoiceSelect = useCallback(async (choice: string) => {
@@ -261,6 +266,7 @@ export function PlayingPhase() {
         modelineText={modelines[activeChar] ?? campaignName}
         activeCharacterName={activeChar}
         inputIsDisabled={textInputDisabled}
+        inputDefaultValue={pendingInput}
         inputResetKey={resetKey}
         onInputSubmit={handleSubmit}
         players={players}

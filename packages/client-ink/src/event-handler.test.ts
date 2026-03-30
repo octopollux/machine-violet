@@ -103,7 +103,7 @@ describe("event-handler", () => {
       expect(h.state.sessionStale).toBe(true);
     });
 
-    it("sets lastError on missed turns (seq gap)", () => {
+    it("silently accepts seq gaps (missed turns)", () => {
       const h = makeHarness();
       h.dispatch({
         type: "turn:opened",
@@ -121,8 +121,8 @@ describe("event-handler", () => {
       });
 
       expect(h.state.sessionStale).toBe(false);
-      expect(h.state.lastError).not.toBeNull();
-      expect(h.state.lastError!.message).toContain("missed");
+      expect(h.state.currentTurn!.seq).toBe(5);
+      expect(h.state.lastError).toBeNull();
     });
   });
 

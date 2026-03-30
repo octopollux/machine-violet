@@ -159,16 +159,10 @@ function handleTurnOpened(event: TurnOpenedEvent, update: StateUpdater): void {
       return { ...prev, sessionStale: true };
     }
 
-    // Detect missed turns (seq gap > 1 means we missed at least one full turn)
-    const expectedSeq = prevTurn ? prevTurn.seq + 1 : incoming.seq;
-    const missed = incoming.seq > expectedSeq;
-
     return {
       ...prev,
       currentTurn: incoming,
-      lastError: missed
-        ? { message: "Reconnected — some turns were missed.", recoverable: true }
-        : null,
+      lastError: null,
     };
   });
 }

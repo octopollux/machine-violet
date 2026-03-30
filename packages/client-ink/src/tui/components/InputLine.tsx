@@ -8,6 +8,7 @@ interface InputLineProps {
   playerName?: string;
   width?: number;
   isDisabled?: boolean;
+  defaultValue?: string;
   onChange?: (value: string) => void;
   onSubmit?: (value: string) => void;
   resetKey?: number;
@@ -23,6 +24,7 @@ export const InputLine = React.memo(function InputLine({
   playerName,
   width,
   isDisabled,
+  defaultValue,
   onChange,
   onSubmit,
   resetKey,
@@ -42,6 +44,7 @@ export const InputLine = React.memo(function InputLine({
       <InlineTextInput
         key={resetKey}
         isDisabled={isDisabled}
+        defaultValue={defaultValue}
         availableWidth={inputWidth}
         onChange={onChange}
         onSubmit={onSubmit}
