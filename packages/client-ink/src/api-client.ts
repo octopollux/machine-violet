@@ -120,6 +120,25 @@ export class ApiClient {
     return this.post(`/campaigns/${encodeURIComponent(id)}/start`);
   }
 
+  async getSessionStatus(): Promise<{ status: string }> {
+    return this.get("/campaigns/session-status");
+  }
+
+  /**
+   * Poll until the server session status is "idle".
+   * Returns immediately if already idle; otherwise retries with backoff.
+   */
+  async waitForIdle(maxWaitMs = 10_000): Promise<void> {
+    const start = Date.now();
+    let delay = 100;
+    while (Date.now() - start < maxWaitMs) {
+      const { status } = await this.getSessionStatus();
+      if (status === "idle") return;
+      await new Promise((r) => setTimeout(r, delay));
+      delay = Math.min(delay * 1.5, 500);
+    }
+  }
+
   // --- Session ---
 
   async getState(): Promise<StateSnapshot> {

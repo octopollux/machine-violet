@@ -27,6 +27,15 @@ export const StartCampaignResponse = Type.Object({
   wsUrl: Type.String(),
 });
 
+export const SessionStatusResponse = Type.Object({
+  status: Type.Union([
+    Type.Literal("idle"),
+    Type.Literal("starting"),
+    Type.Literal("active"),
+    Type.Literal("stopping"),
+  ]),
+});
+
 // --- Session ---
 
 export const ContributeRequest = Type.Object({

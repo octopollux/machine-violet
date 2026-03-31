@@ -9,7 +9,7 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { basename } from "node:path";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import {
-  IdParams, ListCampaignsResponse, StartCampaignResponse, ErrorResponse,
+  IdParams, ListCampaignsResponse, StartCampaignResponse, SessionStatusResponse, ErrorResponse,
 } from "@machine-violet/shared";
 import { listCampaigns } from "../../config/main-menu.js";
 
@@ -68,6 +68,16 @@ export const campaignRoutes: FastifyPluginAsync = async (server: FastifyInstance
       sessionId: "__setup__",
       wsUrl: "/session/ws",
     });
+  });
+
+  /** Check whether a session is currently active (for poll-and-wait on exit). */
+  server.get("/session-status", {
+    schema: {
+      tags: ["Campaigns"],
+      response: { 200: SessionStatusResponse },
+    },
+  }, async () => {
+    return { status: server.sessionManager.sessionStatus };
   });
 
   /** Start or resume an existing campaign. */
