@@ -76,4 +76,5 @@ export type ActiveModal =
   | { kind: "swatch" }
   | { kind: "rollback"; summary: string }
   | { kind: "notes"; content: string }
+  | { kind: "saving" }
   | null;

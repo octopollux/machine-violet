@@ -272,7 +272,13 @@ export class SessionManager {
     await this.startSession(campaignId);
   }
 
+  /** True when the session is fully running and safe to route gameplay requests to. */
   get isActive(): boolean {
+    return this.status === "active";
+  }
+
+  /** True when any session operation is in progress (blocks new starts). */
+  get isBusy(): boolean {
     return this.status !== "idle";
   }
 

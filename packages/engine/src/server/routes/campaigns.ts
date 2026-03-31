@@ -52,7 +52,7 @@ export const campaignRoutes: FastifyPluginAsync = async (server: FastifyInstance
     },
   }, async (_request, reply) => {
     const sm = server.sessionManager;
-    if (sm.isActive) {
+    if (sm.isBusy) {
       return reply.status(409).send({ error: "A session is already active." });
     }
 
@@ -93,7 +93,7 @@ export const campaignRoutes: FastifyPluginAsync = async (server: FastifyInstance
     },
   }, async (request, reply) => {
     const sm = server.sessionManager;
-    if (sm.isActive) {
+    if (sm.isBusy) {
       return reply.status(409).send({ error: "A session is already active." });
     }
 

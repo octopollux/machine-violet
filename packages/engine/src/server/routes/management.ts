@@ -295,7 +295,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
       response: { 200: ArchiveResponse, 409: ErrorResponse, 500: ErrorResponse },
     },
   }, async (request, reply) => {
-    if (server.sessionManager.isActive) {
+    if (server.sessionManager.isBusy) {
       return reply.status(409).send({ error: "Cannot archive while a session is active." });
     }
 
@@ -317,7 +317,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
       response: { 200: OkResponse, 409: ErrorResponse, 500: ErrorResponse },
     },
   }, async (request, reply) => {
-    if (server.sessionManager.isActive) {
+    if (server.sessionManager.isBusy) {
       return reply.status(409).send({ error: "Cannot delete while a session is active." });
     }
 

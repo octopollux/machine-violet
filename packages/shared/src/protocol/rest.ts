@@ -256,6 +256,7 @@ export type ContributeQuery = Static<typeof ContributeQuery>;
 export type CommandParams = Static<typeof CommandParams>;
 export type CommandResponse = Static<typeof CommandResponse>;
 export type OkResponse = Static<typeof OkResponse>;
+export type SessionStatusResponse = Static<typeof SessionStatusResponse>;
 export type CyclePlayerResponse = Static<typeof CyclePlayerResponse>;
 export type CharacterResponse = Static<typeof CharacterResponse>;
 export type CompendiumResponse = Static<typeof CompendiumResponse>;

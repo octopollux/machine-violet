@@ -7,6 +7,7 @@
 import type {
   ListCampaignsResponse,
   StartCampaignResponse,
+  SessionStatusResponse,
   ContributeRequest,
   CommitResponse,
   CommandRequest,
@@ -120,7 +121,7 @@ export class ApiClient {
     return this.post(`/campaigns/${encodeURIComponent(id)}/start`);
   }
 
-  async getSessionStatus(): Promise<{ status: string }> {
+  async getSessionStatus(): Promise<SessionStatusResponse> {
     return this.get("/campaigns/session-status");
   }
 

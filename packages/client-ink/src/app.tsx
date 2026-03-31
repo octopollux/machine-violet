@@ -198,7 +198,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
   // Return to menu from playing
   const returnToMenu = useCallback(async () => {
     // Show a saving overlay on top of PlayingPhase while the server tears down
-    setActiveModal({ kind: "saving" } as never);
+    setActiveModal({ kind: "saving" });
     // End the session and poll until the server confirms it is fully idle.
     // This prevents the race where a quick exit+re-enter outruns the backend.
     try { await apiClientRef.current.endSession(); } catch { /* no-op */ }
