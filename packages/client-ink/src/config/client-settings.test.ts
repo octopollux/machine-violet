@@ -11,11 +11,12 @@ vi.mock("../utils/paths.js", () => ({
   configDir: () => "/tmp/test-config",
 }));
 
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { loadClientSettings, saveClientSettings } from "./client-settings.js";
 
 const mockReadFile = vi.mocked(readFile);
 const mockWriteFile = vi.mocked(writeFile);
+const mockMkdir = vi.mocked(mkdir);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -45,11 +46,18 @@ describe("loadClientSettings", () => {
     const settings = await loadClientSettings();
     expect(settings).toEqual({ devModeEnabled: true, showVerbose: false });
   });
+
+  it("rejects non-boolean values and falls back to defaults", async () => {
+    mockReadFile.mockResolvedValue(JSON.stringify({ devModeEnabled: "yes", showVerbose: 1 }) as never);
+    const settings = await loadClientSettings();
+    expect(settings).toEqual({ devModeEnabled: false, showVerbose: false });
+  });
 });
 
 describe("saveClientSettings", () => {
-  it("writes JSON to the config directory", async () => {
+  it("creates config directory and writes JSON", async () => {
     await saveClientSettings({ devModeEnabled: true, showVerbose: false });
+    expect(mockMkdir).toHaveBeenCalledWith("/tmp/test-config", { recursive: true });
     expect(mockWriteFile).toHaveBeenCalledWith(
       expect.stringContaining("client-settings.json"),
       expect.stringContaining('"devModeEnabled": true'),

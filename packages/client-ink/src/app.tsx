@@ -103,14 +103,22 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
   const [discordEnabled, setDiscordEnabled] = useState<boolean | null>(null);
   const [devModeEnabled, setDevModeEnabled] = useState(false);
   const [showVerbose, setShowVerbose] = useState(false);
+  const settingsLoaded = useRef(false);
 
   // Load persisted client settings on mount
   useEffect(() => {
     loadClientSettings().then((s) => {
       setDevModeEnabled(s.devModeEnabled);
       setShowVerbose(s.showVerbose);
-    }).catch(() => { /* use defaults */ });
+      settingsLoaded.current = true;
+    });
   }, []);
+
+  // Persist whenever either setting changes (skip the initial load)
+  useEffect(() => {
+    if (!settingsLoaded.current) return;
+    saveClientSettings({ devModeEnabled, showVerbose }).catch(() => { /* best-effort */ });
+  }, [devModeEnabled, showVerbose]);
   const [archiveStatus, setArchiveStatus] = useState("");
   const [deleteModal, setDeleteModal] = useState<CampaignDeleteInfo | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -400,17 +408,9 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
         theme={theme}
         initialView={phase === "settings_apikeys" ? "api_keys" : undefined}
         devModeEnabled={devModeEnabled}
-        onToggleDevMode={() => setDevModeEnabled((v) => {
-          const next = !v;
-          saveClientSettings({ devModeEnabled: next, showVerbose }).catch(() => { /* best-effort */ });
-          return next;
-        })}
+        onToggleDevMode={() => setDevModeEnabled((v) => !v)}
         showVerbose={showVerbose}
-        onToggleVerbose={() => setShowVerbose((v) => {
-          const next = !v;
-          saveClientSettings({ devModeEnabled, showVerbose: next }).catch(() => { /* best-effort */ });
-          return next;
-        })}
+        onToggleVerbose={() => setShowVerbose((v) => !v)}
         onApiKeys={() => { refreshConnections(); setPhase("api_keys"); }}
         onDiscord={() => {
           apiClientRef.current.getDiscordSettings().then((s) => setDiscordEnabled(s.enabled)).catch(() => { /* ignore */ });

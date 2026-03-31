@@ -1,7 +1,9 @@
 /**
  * Lightweight client-side settings persistence.
  *
- * Reads/writes ~/.machine-violet/client-settings.json (or platform equivalent).
+ * Reads/writes client-settings.json under the client config directory
+ * returned by configDir() (platform config dir in production, or
+ * process.cwd() in dev/non-compiled mode).
  * No server round-trip — these are per-machine preferences.
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
@@ -24,12 +26,22 @@ function settingsPath(): string {
   return join(configDir(), FILENAME);
 }
 
+/** Coerce parsed JSON to valid ClientSettings, falling back to defaults. */
+function sanitize(input: unknown): ClientSettings {
+  const result: ClientSettings = { ...DEFAULTS };
+  if (input && typeof input === "object") {
+    const obj = input as Record<string, unknown>;
+    if (typeof obj.devModeEnabled === "boolean") result.devModeEnabled = obj.devModeEnabled;
+    if (typeof obj.showVerbose === "boolean") result.showVerbose = obj.showVerbose;
+  }
+  return result;
+}
+
 /** Load client settings from disk. Returns defaults for missing/corrupt file. */
 export async function loadClientSettings(): Promise<ClientSettings> {
   try {
     const raw = await readFile(settingsPath(), "utf-8");
-    const parsed = JSON.parse(raw) as Partial<ClientSettings>;
-    return { ...DEFAULTS, ...parsed };
+    return sanitize(JSON.parse(raw));
   } catch {
     return { ...DEFAULTS };
   }
