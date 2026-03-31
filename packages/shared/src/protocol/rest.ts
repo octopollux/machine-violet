@@ -167,8 +167,19 @@ export const AddConnectionRequest = Type.Object({
 
 export const HealthCheckResponse = Type.Object({
   id: Type.String(),
-  status: Type.Union([Type.Literal("ok"), Type.Literal("error")]),
-  message: Type.Optional(Type.String()),
+  status: Type.Union([
+    Type.Literal("valid"),
+    Type.Literal("invalid"),
+    Type.Literal("error"),
+    Type.Literal("rate_limited"),
+  ]),
+  message: Type.String(),
+  rateLimits: Type.Optional(Type.Object({
+    requestsRemaining: Type.Number(),
+    requestsLimit: Type.Number(),
+    tokensRemaining: Type.Number(),
+    tokensLimit: Type.Number(),
+  })),
 });
 
 export const UpdateModelsRequest = Type.Object({
@@ -212,9 +223,9 @@ export const KeysListResponse = Type.Object({
 });
 
 export const DeleteInfoResponse = Type.Object({
-  name: Type.String(),
-  sceneCount: Type.Optional(Type.Number()),
-  lastPlayed: Type.Optional(Type.String()),
+  campaignName: Type.String(),
+  characterNames: Type.Array(Type.String()),
+  dmTurnCount: Type.Number(),
 });
 
 // --- Static types ---
