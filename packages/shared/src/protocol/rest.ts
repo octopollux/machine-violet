@@ -27,6 +27,15 @@ export const StartCampaignResponse = Type.Object({
   wsUrl: Type.String(),
 });
 
+export const SessionStatusResponse = Type.Object({
+  status: Type.Union([
+    Type.Literal("idle"),
+    Type.Literal("starting"),
+    Type.Literal("active"),
+    Type.Literal("stopping"),
+  ]),
+});
+
 // --- Session ---
 
 export const ContributeRequest = Type.Object({
@@ -247,6 +256,7 @@ export type ContributeQuery = Static<typeof ContributeQuery>;
 export type CommandParams = Static<typeof CommandParams>;
 export type CommandResponse = Static<typeof CommandResponse>;
 export type OkResponse = Static<typeof OkResponse>;
+export type SessionStatusResponse = Static<typeof SessionStatusResponse>;
 export type CyclePlayerResponse = Static<typeof CyclePlayerResponse>;
 export type CharacterResponse = Static<typeof CharacterResponse>;
 export type CompendiumResponse = Static<typeof CompendiumResponse>;

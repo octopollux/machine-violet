@@ -43,11 +43,13 @@ export interface ConnectedClient {
   identity: ConnectionIdentity;
 }
 
+export type SessionStatus = "idle" | "starting" | "active" | "stopping";
+
 export class SessionManager {
   private campaignsDir: string;
   private clients = new Map<WebSocket, ConnectedClient>();
   private turnManager: TurnManager | null = null;
-  private active = false;
+  private status: SessionStatus = "idle";
   /** Incremented on each session start; stale callbacks check this to avoid leaking events. */
   private sessionGeneration = 0;
   private engine: GameEngine | null = null;
@@ -84,7 +86,7 @@ export class SessionManager {
     });
 
     // Send current state snapshot on connect
-    if (this.active) {
+    if (this.status === "active") {
       const snapshot = this.buildStateSnapshot();
       this.sendTo(ws, {
         type: "state:snapshot",
@@ -153,7 +155,17 @@ export class SessionManager {
 
   /** Start a campaign creation session with a real temp GameState. */
   async startSetup(): Promise<void> {
-    if (this.active) throw new Error("A session is already active.");
+    if (this.status !== "idle") throw new Error("A session is already active.");
+    this.status = "starting";
+    try {
+      await this.doStartSetup();
+    } catch (err) {
+      this.status = "idle";
+      throw err;
+    }
+  }
+
+  private async doStartSetup(): Promise<void> {
     const homeDir = this.campaignsDir.replace(/[/\\]campaigns\/?$/, "");
 
     // Create a temp campaign directory for setup state.
@@ -197,7 +209,7 @@ export class SessionManager {
         this.broadcast(event);
       },
     );
-    this.active = true;
+    this.status = "active";
     this.currentMode = "setup";
     this.campaignId = "__setup__";
 
@@ -252,7 +264,7 @@ export class SessionManager {
   private async transitionToGame(campaignId: string): Promise<void> {
     this.setupSession = null;
     this.turnManager = null;
-    this.active = false;
+    this.status = "idle";
     this.campaignId = null;
     this.currentMode = "play";
 
@@ -260,8 +272,18 @@ export class SessionManager {
     await this.startSession(campaignId);
   }
 
+  /** True when the session is fully running and safe to route gameplay requests to. */
   get isActive(): boolean {
-    return this.active;
+    return this.status === "active";
+  }
+
+  /** True when any session operation is in progress (blocks new starts). */
+  get isBusy(): boolean {
+    return this.status !== "idle";
+  }
+
+  get sessionStatus(): SessionStatus {
+    return this.status;
   }
 
   get currentCampaignId(): string | null {
@@ -270,10 +292,21 @@ export class SessionManager {
 
   /** Start a game session for the given campaign. */
   async startSession(campaignId: string): Promise<void> {
-    if (this.active) {
+    if (this.status !== "idle") {
       throw new Error("A session is already active. End it before starting a new one.");
     }
+    this.status = "starting";
 
+    try {
+      await this.doStartSession(campaignId);
+    } catch (err) {
+      // Reset to idle so subsequent starts aren't blocked
+      this.status = "idle";
+      throw err;
+    }
+  }
+
+  private async doStartSession(campaignId: string): Promise<void> {
     // --- Load campaign config ---
     const campaignRoot = join(this.campaignsDir, campaignId);
     const configPath = join(campaignRoot, "config.json");
@@ -395,7 +428,7 @@ export class SessionManager {
     this.engine = engine;
     this.gameState = gs;
     this.campaignId = campaignId;
-    this.active = true;
+    this.status = "active";
 
     // Start idle timer in case no players are connected yet
     this.checkIdleTimeout();
@@ -607,12 +640,12 @@ export class SessionManager {
 
   /** Start the idle timer if there's an active session with no players. */
   private checkIdleTimeout(): void {
-    if (!this.active || !this.hasNoPlayers()) return;
+    if (this.status !== "active" || !this.hasNoPlayers()) return;
     if (this.idleTimer) return; // already ticking
 
     this.idleTimer = setTimeout(() => {
       this.idleTimer = null;
-      if (this.active && this.hasNoPlayers()) {
+      if (this.status === "active" && this.hasNoPlayers()) {
         console.log("[SessionManager] No players for 5 minutes — saving and ending session");
         void this.endSession();
       }
@@ -628,18 +661,41 @@ export class SessionManager {
 
   /** End the current session gracefully. */
   async endSession(): Promise<void> {
-    if (!this.active) return;
-    this.clearIdleTimer();
+    if (this.status === "idle" || this.status === "stopping") return;
 
-    // Flush any pending state
-    if (this.engine) {
-      const persister = this.engine.getPersister();
-      if (persister) await persister.flush();
-      const repo = this.engine.getRepo();
-      if (repo) await repo.checkpoint("Session end");
+    // If a start is still in progress, wait for it to finish so we can
+    // cleanly tear down the fully-initialised session.
+    if (this.status === "starting") {
+      while (this.status === "starting") {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      // Re-check: may have become idle via another path (e.g. setup error)
+      if (this.status === "idle") return;
     }
 
-    this.active = false;
+    this.status = "stopping";
+    this.clearIdleTimer();
+
+    // Stop the context dump writer so fire-and-forget writes don't hold
+    // file locks while git's statusMatrix walks the campaign tree.
+    const { resetContextDump } = await import("../config/context-dump.js");
+    resetContextDump();
+
+    try {
+      // Flush any pending state, with a timeout so a hanging flush
+      // can never permanently brick the session lifecycle.
+      if (this.engine) {
+        const timeout = (ms: number) => new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error("endSession flush timeout")), ms));
+        const persister = this.engine.getPersister();
+        if (persister) await Promise.race([persister.flush(), timeout(10_000)]);
+        const repo = this.engine.getRepo();
+        if (repo) await Promise.race([repo.checkpoint("Session end"), timeout(10_000)]);
+      }
+    } catch (err) {
+      console.error("[SessionManager] endSession cleanup error:", err);
+    }
+
     this.campaignId = null;
     this.turnManager = null;
     this.engine = null;
@@ -648,6 +704,7 @@ export class SessionManager {
     this.costTracker = null;
     this.currentMode = "play";
     this.persistedUI = {};
+    this.status = "idle";
 
     this.broadcast({
       type: "session:ended",
@@ -690,7 +747,7 @@ export class SessionManager {
 
   /** Teardown on server shutdown. */
   async teardown(): Promise<void> {
-    if (this.active) {
+    if (this.status !== "idle") {
       await this.endSession();
     }
     for (const { ws } of this.clients.values()) {

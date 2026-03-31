@@ -22,6 +22,7 @@ import { Layout } from "../tui/layout.js";
 import {
   ChoiceOverlay, DESCRIPTION_ROWS, GameMenu, ApiErrorModal,
   CharacterSheetModal, CompendiumModal, PlayerNotesModal, SwatchModal,
+  CenteredModal,
 } from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { useGameContext } from "../tui/game-context.js";
@@ -332,6 +333,18 @@ export function PlayingPhase() {
           height={narRows}
           topOffset={conversationPaneTop}
           onDismiss={() => setActiveModal(null)}
+        />
+      )}
+      {am?.kind === "saving" && (
+        <CenteredModal
+          theme={theme}
+          width={cols}
+          height={rows}
+          title="Saving"
+          minWidth={30}
+          maxWidth={40}
+          lines={["", "  Saving session...", ""]}
+          topOffset={conversationPaneTop}
         />
       )}
       {menuOpen && (

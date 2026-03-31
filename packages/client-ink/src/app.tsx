@@ -6,7 +6,7 @@
  *   If --campaign is provided, skips menu and goes straight to starting.
  */
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import { Box, Text } from "ink";
+import { Box, Text, useInput } from "ink";
 import { useBatchedNarrativeLines } from "./tui/hooks/useBatchedNarrativeLines.js";
 import type { ChoicesData } from "@machine-violet/shared";
 import type { ActiveModal } from "@machine-violet/shared/types/tui.js";
@@ -61,6 +61,24 @@ export interface AppProps {
 type AppPhase =
   | "connecting" | "menu" | "starting" | "playing" | "disconnected" | "error"
   | "settings" | "settings_apikeys" | "api_keys" | "archived_campaigns" | "discord_settings";
+
+/** Error screen with keyboard input — press Enter to return to menu or q to quit. */
+function ErrorScreen({ message, onReturnToMenu }: { message: string; onReturnToMenu: () => void }) {
+  useInput((input, key) => {
+    if (key.return || key.escape) {
+      onReturnToMenu();
+    } else if (input === "q") {
+      process.exit(0);
+    }
+  });
+
+  return (
+    <Box flexDirection="column" padding={1}>
+      <Text color="red">Error: {message}</Text>
+      <Text dimColor>Press Enter to return to menu, or q to quit.</Text>
+    </Box>
+  );
+}
 
 // --- Main App ---
 
@@ -179,8 +197,12 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
 
   // Return to menu from playing
   const returnToMenu = useCallback(async () => {
-    // Await endSession so the server fully tears down before we can start another
+    // Show a saving overlay on top of PlayingPhase while the server tears down
+    setActiveModal({ kind: "saving" });
+    // End the session and poll until the server confirms it is fully idle.
+    // This prevents the race where a quick exit+re-enter outruns the backend.
     try { await apiClientRef.current.endSession(); } catch { /* no-op */ }
+    try { await apiClientRef.current.waitForIdle(); } catch { /* timeout is best-effort */ }
     // Full state reset
     setNarrativeLines([]);
     setActiveChoices(null);
@@ -286,10 +308,17 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
 
   if (phase === "error") {
     return (
-      <Box flexDirection="column" padding={1}>
-        <Text color="red">Error: {errorMessage}</Text>
-        <Text dimColor>Press Ctrl+C to exit.</Text>
-      </Box>
+      <ErrorScreen
+        message={errorMessage}
+        onReturnToMenu={() => {
+          setErrorMessage("");
+          setPhase("menu");
+          refreshMenuStatus();
+          apiClientRef.current.listCampaigns().then((resp) => {
+            setCampaigns(resp.campaigns.map((c) => ({ id: c.id ?? c.name, name: c.name, path: c.path ?? "" })));
+          }).catch(() => { /* ignore */ });
+        }}
+      />
     );
   }
 
