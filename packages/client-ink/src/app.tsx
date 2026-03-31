@@ -30,6 +30,7 @@ import type {
   KnownModelInfo,
 } from "./api-client.js";
 import type { ArchivedCampaignEntry, CampaignDeleteInfo } from "./config/campaign-archive.js";
+import { loadClientSettings, saveClientSettings } from "./config/client-settings.js";
 import {
   loadThemeDefinition,
   resolveTheme,
@@ -102,6 +103,22 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
   const [discordEnabled, setDiscordEnabled] = useState<boolean | null>(null);
   const [devModeEnabled, setDevModeEnabled] = useState(false);
   const [showVerbose, setShowVerbose] = useState(false);
+  const settingsLoaded = useRef(false);
+
+  // Load persisted client settings on mount
+  useEffect(() => {
+    loadClientSettings().then((s) => {
+      setDevModeEnabled(s.devModeEnabled);
+      setShowVerbose(s.showVerbose);
+      settingsLoaded.current = true;
+    });
+  }, []);
+
+  // Persist whenever either setting changes (skip the initial load)
+  useEffect(() => {
+    if (!settingsLoaded.current) return;
+    saveClientSettings({ devModeEnabled, showVerbose }).catch(() => { /* best-effort */ });
+  }, [devModeEnabled, showVerbose]);
   const [archiveStatus, setArchiveStatus] = useState("");
   const [deleteModal, setDeleteModal] = useState<CampaignDeleteInfo | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
