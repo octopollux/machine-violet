@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useInput } from "ink";
 import type { ResolvedTheme } from "../themes/types.js";
 import type { FormattingNode } from "@machine-violet/shared/types/tui.js";
