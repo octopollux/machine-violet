@@ -27,13 +27,5 @@ jobs:
       - name: Build shared
         run: npm run build -w packages/shared
 
-      - name: Lint
-        run: npm run lint
-
-      # Engine package tests (server + game engine — 1265 tests)
-      - name: Test (engine)
-        run: npm test -w packages/engine
-
-      # Client-ink package tests (TUI + event handler — 656 tests)
-      - name: Test (client-ink)
-        run: npm test -w packages/client-ink
+      - name: Lint + Test
+        run: npm run check
