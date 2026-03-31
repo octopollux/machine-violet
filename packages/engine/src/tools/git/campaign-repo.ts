@@ -233,6 +233,8 @@ export class CampaignRepo {
     await this.preCommitHook?.();
     const matrix = await this.git.statusMatrix(this.dir);
     for (const [filepath, head, workdir, stage] of matrix) {
+      // Skip .debug/ — context dumps are diagnostic and may be locked
+      if (filepath.startsWith(".debug/") || filepath.startsWith(".debug\\")) continue;
       if (workdir === 0 && head !== 0) {
         // File deleted from workdir — stage the removal
         await this.git.remove(this.dir, filepath);

@@ -670,6 +670,11 @@ export class SessionManager {
     this.status = "stopping";
     this.clearIdleTimer();
 
+    // Stop the context dump writer so fire-and-forget writes don't hold
+    // file locks while git's statusMatrix walks the campaign tree.
+    const { resetContextDump } = await import("../config/context-dump.js");
+    resetContextDump();
+
     try {
       // Flush any pending state, with a timeout so a hanging flush
       // can never permanently brick the session lifecycle.
