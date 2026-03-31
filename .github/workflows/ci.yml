@@ -13,15 +13,12 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [24, 25]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 25
           cache: npm
 
       - run: npm ci
@@ -30,13 +27,5 @@ jobs:
       - name: Build shared
         run: npm run build -w packages/shared
 
-      - name: Lint
-        run: npm run lint
-
-      # Engine package tests (server + game engine — 1265 tests)
-      - name: Test (engine)
-        run: npm test -w packages/engine
-
-      # Client-ink package tests (TUI + event handler — 656 tests)
-      - name: Test (client-ink)
-        run: npm test -w packages/client-ink
+      - name: Lint + Test
+        run: npm run check
