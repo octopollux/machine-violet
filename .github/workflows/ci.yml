@@ -13,15 +13,12 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [24, 25]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 25
           cache: npm
 
       - run: npm ci
