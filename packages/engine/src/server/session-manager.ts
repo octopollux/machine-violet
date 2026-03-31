@@ -241,6 +241,9 @@ export class SessionManager {
     const setup = this.setupSession;
     void setup.start().then(() => {
       if (this.setupSession === setup) this.openNextTurn();
+    }).catch((err) => {
+      console.error("[SessionManager] Setup start failed:", err instanceof Error ? err.message : err);
+      this.broadcast({ type: "error", data: { message: err instanceof Error ? err.message : String(err), recoverable: false } });
     });
   }
 

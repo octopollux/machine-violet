@@ -163,7 +163,7 @@ interface OpenAIChatParams {
   tools?: OpenAI.ChatCompletionTool[];
   max_tokens?: number;
   max_completion_tokens?: number;
-  reasoning?: { effort: string; summary?: string };
+  reasoning_effort?: string;
 }
 
 function toOpenAIParams(params: ChatParams): OpenAIChatParams {
@@ -196,8 +196,9 @@ function toOpenAIParams(params: ChatParams): OpenAIChatParams {
     }));
   }
 
-  // Reasoning/thinking config
-  let reasoning: { effort: string; summary?: string } | undefined;
+  // Reasoning effort: OpenAI uses a flat reasoning_effort string parameter,
+  // not an object. Map from our normalized effort levels.
+  let reasoningEffort: string | undefined;
   if (params.thinking?.effort) {
     const effortMap: Record<string, string> = {
       low: "low",
@@ -205,20 +206,17 @@ function toOpenAIParams(params: ChatParams): OpenAIChatParams {
       high: "high",
       max: "xhigh",
     };
-    reasoning = {
-      effort: effortMap[params.thinking.effort] ?? "medium",
-      summary: "concise",
-    };
+    reasoningEffort = effortMap[params.thinking.effort] ?? "medium";
   }
 
   return {
     model: params.model,
     messages,
     ...(tools ? { tools } : {}),
-    // Use max_completion_tokens for reasoning models, max_tokens for others
-    ...(reasoning
-      ? { max_completion_tokens: params.maxTokens, reasoning }
-      : { max_tokens: params.maxTokens }),
+    // All current OpenAI models accept max_completion_tokens;
+    // max_tokens is deprecated and incompatible with o-series.
+    max_completion_tokens: params.maxTokens,
+    ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
   };
 }
 
