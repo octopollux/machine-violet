@@ -30,6 +30,7 @@ import type {
   KnownModelInfo,
 } from "./api-client.js";
 import type { ArchivedCampaignEntry, CampaignDeleteInfo } from "./config/campaign-archive.js";
+import { loadClientSettings, saveClientSettings } from "./config/client-settings.js";
 import {
   loadThemeDefinition,
   resolveTheme,
@@ -102,6 +103,14 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
   const [discordEnabled, setDiscordEnabled] = useState<boolean | null>(null);
   const [devModeEnabled, setDevModeEnabled] = useState(false);
   const [showVerbose, setShowVerbose] = useState(false);
+
+  // Load persisted client settings on mount
+  useEffect(() => {
+    loadClientSettings().then((s) => {
+      setDevModeEnabled(s.devModeEnabled);
+      setShowVerbose(s.showVerbose);
+    }).catch(() => { /* use defaults */ });
+  }, []);
   const [archiveStatus, setArchiveStatus] = useState("");
   const [deleteModal, setDeleteModal] = useState<CampaignDeleteInfo | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -391,9 +400,17 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
         theme={theme}
         initialView={phase === "settings_apikeys" ? "api_keys" : undefined}
         devModeEnabled={devModeEnabled}
-        onToggleDevMode={() => setDevModeEnabled((v) => !v)}
+        onToggleDevMode={() => setDevModeEnabled((v) => {
+          const next = !v;
+          saveClientSettings({ devModeEnabled: next, showVerbose }).catch(() => { /* best-effort */ });
+          return next;
+        })}
         showVerbose={showVerbose}
-        onToggleVerbose={() => setShowVerbose((v) => !v)}
+        onToggleVerbose={() => setShowVerbose((v) => {
+          const next = !v;
+          saveClientSettings({ devModeEnabled, showVerbose: next }).catch(() => { /* best-effort */ });
+          return next;
+        })}
         onApiKeys={() => { refreshConnections(); setPhase("api_keys"); }}
         onDiscord={() => {
           apiClientRef.current.getDiscordSettings().then((s) => setDiscordEnabled(s.enabled)).catch(() => { /* ignore */ });
