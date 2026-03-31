@@ -128,9 +128,10 @@ export class GameEngine {
     if (this.repo) {
       const persister = this.persister;
       this.repo.preCommitHook = async () => {
-        // Snapshot current scene to disk so the commit captures the
-        // true in-memory state. Display log is already append-flushed.
+        // Snapshot current scene + transcript to disk so the commit
+        // captures the true in-memory state.
         this.persistCurrentScene();
+        await this.sceneManager.flushTranscript();
         await persister.flush();
       };
     }
@@ -519,6 +520,11 @@ export class GameEngine {
         });
         this.persister.persistConversation(this.conversation.getExchanges());
       }
+
+      // Write transcript to disk so on-disk state always reflects the
+      // completed DM turn. Without this, transcript.md is only written
+      // during scene transitions, leaving it stale during normal play.
+      await this.sceneManager.flushTranscript();
 
       // Track exchange for git auto-commit
       await this.repo?.trackExchange();
