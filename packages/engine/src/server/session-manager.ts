@@ -670,12 +670,19 @@ export class SessionManager {
     this.status = "stopping";
     this.clearIdleTimer();
 
-    // Flush any pending state
-    if (this.engine) {
-      const persister = this.engine.getPersister();
-      if (persister) await persister.flush();
-      const repo = this.engine.getRepo();
-      if (repo) await repo.checkpoint("Session end");
+    try {
+      // Flush any pending state, with a timeout so a hanging flush
+      // can never permanently brick the session lifecycle.
+      if (this.engine) {
+        const timeout = (ms: number) => new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error("endSession flush timeout")), ms));
+        const persister = this.engine.getPersister();
+        if (persister) await Promise.race([persister.flush(), timeout(10_000)]);
+        const repo = this.engine.getRepo();
+        if (repo) await Promise.race([repo.checkpoint("Session end"), timeout(10_000)]);
+      }
+    } catch (err) {
+      console.error("[SessionManager] endSession cleanup error:", err);
     }
 
     this.campaignId = null;
