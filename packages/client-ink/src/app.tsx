@@ -59,7 +59,7 @@ export interface AppProps {
 }
 
 type AppPhase =
-  | "connecting" | "menu" | "starting" | "playing" | "disconnected" | "error" | "saving"
+  | "connecting" | "menu" | "starting" | "playing" | "disconnected" | "error"
   | "settings" | "settings_apikeys" | "api_keys" | "archived_campaigns" | "discord_settings";
 
 /** Error screen with keyboard input — press Enter to return to menu or q to quit. */
@@ -197,7 +197,8 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
 
   // Return to menu from playing
   const returnToMenu = useCallback(async () => {
-    setPhase("saving");
+    // Show a saving overlay on top of PlayingPhase while the server tears down
+    setActiveModal({ kind: "saving" } as never);
     // End the session and poll until the server confirms it is fully idle.
     // This prevents the race where a quick exit+re-enter outruns the backend.
     try { await apiClientRef.current.endSession(); } catch { /* no-op */ }
@@ -293,14 +294,6 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
     return (
       <Box flexDirection="column" padding={1}>
         <Text dimColor>Connecting to engine server...</Text>
-      </Box>
-    );
-  }
-
-  if (phase === "saving") {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Text dimColor>Saving session...</Text>
       </Box>
     );
   }
