@@ -69,7 +69,6 @@ export interface RetryOverlay {
 
 export type ActiveModal =
   | { kind: "choice"; prompt: string; choices: string[]; descriptions?: string[] }
-  | { kind: "dice"; expression: string; rolls: number[]; kept?: number[]; total: number; reason?: string }
   | { kind: "character_sheet"; content: string }
   | { kind: "recap"; lines: string[] }
   | { kind: "compendium"; data: import("./compendium.js").Compendium }

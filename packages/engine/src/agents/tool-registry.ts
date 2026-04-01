@@ -751,26 +751,6 @@ const TOOL_DEFS: RegisteredTool[] = [
   },
   {
     definition: {
-      name: "present_roll",
-      description: "Display a dice roll as a dramatic modal.",
-      inputSchema: {
-        type: "object" as const,
-        properties: {
-          expression: { type: "string" },
-          rolls: { type: "array", items: { type: "number" } },
-          kept: { type: "array", items: { type: "number" } },
-          total: { type: "number" },
-          label: { type: "string" },
-        },
-        required: ["expression", "rolls", "total"],
-      },
-    },
-    handler: (_state, input) => {
-      return ok(JSON.stringify({ type: "present_roll", ...input }));
-    },
-  },
-  {
-    definition: {
       name: "show_character_sheet",
       description: "Open character sheet modal for a character.",
       inputSchema: {
@@ -862,17 +842,6 @@ const TOOL_DEFS: RegisteredTool[] = [
     },
     handler: (_state, input) => {
       return ok(JSON.stringify({ type: "session_end", title: input.title, time_advance: input.time_advance }));
-    },
-  },
-
-  {
-    definition: {
-      name: "context_refresh",
-      description: "Refresh the DM's context: re-read campaign log, session recap, rebuild active state. Use when context feels stale.",
-      inputSchema: { type: "object" as const, properties: {} },
-    },
-    handler: (_state) => {
-      return ok(JSON.stringify({ type: "context_refresh" }));
     },
   },
 
@@ -1146,9 +1115,16 @@ class ToolRegistry {
     }
   }
 
-  /** Get all tool definitions for the Claude API */
-  getDefinitions(): Tool[] {
-    return [...this.tools.values()].map((t) => t.definition);
+  /** Get all tool definitions for the Claude API.
+   *  Pass `exclude` to omit specific tools (e.g. tools only for OOC/Dev mode). */
+  getDefinitions(exclude?: Set<string>): Tool[] {
+    const defs: Tool[] = [];
+    for (const t of this.tools.values()) {
+      if (!exclude || !exclude.has(t.definition.name)) {
+        defs.push(t.definition);
+      }
+    }
+    return defs;
   }
 
   /** Get tool definitions for a specific subset of tool names (skips unknown names) */

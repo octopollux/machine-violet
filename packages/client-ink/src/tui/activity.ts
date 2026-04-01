@@ -54,14 +54,12 @@ const TOOL_GLYPH_MAP: Record<string, ToolGlyph> = {
   style_scene:        { glyph: "◆", color: "magenta" },
   set_display_resources: { glyph: "◆", color: "magenta" },
   present_choices:    { glyph: "◆", color: "magenta" },
-  present_roll:       { glyph: "◆", color: "magenta" },
   show_character_sheet: { glyph: "◆", color: "magenta" },
   enter_ooc:          { glyph: "◆", color: "magenta" },
   switch_player:      { glyph: "◆", color: "magenta" },
   // Scene / session lifecycle
   scene_transition:   { glyph: "⟳", color: "yellow" },
   session_end:        { glyph: "⟳", color: "yellow" },
-  context_refresh:    { glyph: "⟳", color: "yellow" },
   rollback:           { glyph: "⟳", color: "yellow" },
 };
 

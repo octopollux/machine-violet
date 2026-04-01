@@ -389,16 +389,6 @@ Set at campaign level during init, with a player-level override:
 
 When auto-generation is active, the engine detects "it's the player's turn" and fires a Haiku subagent with the last few exchanges to generate options. If the DM also explicitly called `present_choices` on that turn, the explicit choices take precedence.
 
-### Dice Roll Display
-
-Optional, DM-triggered. For big dramatic moments — a death save, a critical hit, a skill check that determines the fate of a kingdom — the DM can display the roll result as a modal rather than inline text.
-
-```
-present_roll({ result: "Rolled d20+3: [17] → 20", label: "Death Save" })
-```
-
-This is cosmetic — the same information would appear inline otherwise. The DM uses it for pacing and emphasis.
-
 ### Compendium Browser
 
 Player-accessible via ESC menu → Compendium. Displays a navigable tree of everything the player has learned, organized into five categories: Characters, Places, Storyline, Lore, Objectives.
@@ -511,12 +501,7 @@ present_choices({})
 present_choices({ prompt: "The passage forks.", choices: ["Left", "Right", "Listen"] })
 ```
 
-**`present_roll`** — Display a dice roll as a dramatic modal instead of inline text.
-```
-present_roll({ result: "Rolled d20+3: [17] → 20", label: "Death Save" })
-```
-
-**`show_character_sheet`** — Open the character sheet modal for a character.
+**`show_character_sheet`** — Open the character sheet modal for a character (OOC/Dev Mode only).
 ```
 show_character_sheet({ character: "aldric" })
 ```

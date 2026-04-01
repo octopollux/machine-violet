@@ -97,8 +97,6 @@ All T1 (initiative rolling may delegate to T2 for complex systems). Called by DM
 |---|---|---|---|---|
 | `scene_transition` | T1 + T2 | DM | `({ title, time_advance })` | Cascade: finalize transcript, run subagent updates (campaign log + changelogs in parallel), advance calendar, check alarms, validate, reset precis, prune context, checkpoint. |
 | `session_end` | T1 + T2 | DM | `({ title, time_advance? })` | Final scene transition + Haiku writes session recap. Saves state. |
-| `context_refresh` | T1 + T2 | DM | `({})` | Mid-scene reorientation: regenerate scene precis from transcript on disk, re-read active state, refresh cached prefix. Conversation retained as-is. |
-
 Note: Session resume is an engine operation, not a callable tool. It runs automatically on app launch when a campaign exists.
 
 ---
@@ -125,8 +123,7 @@ TUI tools are **fire-and-forget**: their results drive engine/UI state but the D
 | `set_display_resources` | T1 | DM, Setup | `({ character, resources[] })` | Update which resource keys appear in the top frame for a character. Also stores keys on `GameState.displayResources`. |
 | `set_resource_values` | T1 | DM | `({ character, values: Record<string,string> })` | Set current values for a character's tracked resources (e.g. `{ "HP": "24/30" }`). Merges into `GameState.resourceValues`. |
 | `present_choices` | T1 + T2 | DM, Engine | `({ prompt?, choices[]?, descriptions[]? })` | Show choice modal. No params = Haiku subagent generates options. Explicit params = DM's choices. Labels and descriptions support formatting tags; labels are bullet-prefixed. |
-| `present_roll` | T1 | DM | `({ expression, rolls, total, kept?, label? })` | Display a dice roll as a dramatic modal. |
-| `show_character_sheet` | T1 | DM, Player | `({ character })` | Open character sheet modal. |
+| `show_character_sheet` | T1 | OOC, Dev | `({ character })` | Open character sheet modal. Available in OOC and Dev Mode only. |
 
 ---
 

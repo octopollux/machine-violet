@@ -213,10 +213,9 @@ function routeTuiCommand(
       break;
 
     // --- Commands we can safely ignore ---
-    case "present_roll":
     case "show_character_sheet":
     case "dm_notes":
-      // These are either dead code or client-driven — don't forward
+      // Client-driven — don't forward
       break;
 
     default:

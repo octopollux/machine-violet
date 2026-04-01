@@ -235,7 +235,6 @@ Connect the agent to the game. The DM can narrate, use tools, and manage scenes.
 - [ ] Idempotent step tracking: `pending-operation.json` marker for mid-cascade recovery
 - [ ] `session_end`: final scene transition + session recap (Haiku)
 - [ ] `session_resume`: load campaign state, build prefix, display recap modal, start DM
-- [ ] `context_refresh`: regenerate precis, re-read active state, refresh cached prefix
 - [ ] Transcript writing: append player input + DM response + tool results to scene transcript file, wikilinked
 
 ### 5.3 First subagents
@@ -249,7 +248,7 @@ Connect the agent to the game. The DM can narrate, use tools, and manage scenes.
 - [ ] DM response → formatting parser → narrative area
 - [ ] Tool calls → activity indicators
 - [ ] Tool results → modeline updates, style changes, etc.
-- [ ] Modals triggered by tool calls (present_choices, present_roll, show_character_sheet)
+- [ ] Modals triggered by tool calls (present_choices, show_character_sheet)
 
 **Tests**: Scene transition cascade (mock Haiku, verify all steps fire). Transcript writing format. Pending operation recovery. ResolveSession return schema validation.
 

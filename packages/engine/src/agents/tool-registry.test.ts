@@ -326,14 +326,6 @@ describe("ToolRegistry", () => {
     expect(defs).toHaveLength(0);
   });
 
-  it("dispatches context_refresh and returns TUI command JSON", () => {
-    const reg = createTestRegistry();
-    const state = mockState();
-    const result = reg.dispatch(state, "context_refresh", {});
-    const parsed = JSON.parse(result.content);
-    expect(parsed.type).toBe("context_refresh");
-  });
-
   it("dispatches scene_transition and returns TuiCommand JSON", () => {
     const reg = createTestRegistry();
     const state = mockState();

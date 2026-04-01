@@ -77,9 +77,9 @@ The cached prefix includes a "current scene summary" — a running precis of the
 
 The precis is updated when:
 - An exchange is dropped due to `max_conversation_tokens` (if enabled) — a Haiku subagent appends a terse summary and extracts a **PlayerRead** (engagement level, focus tags, tone, pacing, off-script detection). See [subagents-catalog.md](subagents-catalog.md) §5 for the full PlayerRead interface.
-- On `context_refresh`, the full precis is regenerated from the scene transcript on disk
+- On scene transition, the full precis is regenerated from the scene transcript on disk
 
-**PlayerRead note:** With `max_conversation_tokens` disabled by default, the precis updater and PlayerRead extraction only fire on `context_refresh`. If finer-grained PlayerRead data is needed, a periodic extraction trigger could be added (see issue #73).
+**PlayerRead note:** With `max_conversation_tokens` disabled by default, the precis updater and PlayerRead extraction only fire on scene transition. If finer-grained PlayerRead data is needed, a periodic extraction trigger could be added (see issue #73).
 
 Example precis:
 ```

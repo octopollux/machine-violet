@@ -244,8 +244,7 @@ Legend: **R** = reads, **W** = writes (triggers persistence), **UI** = returns T
 | `set_display_resources` | | | | | | | W `displayResources`. Returns **UI**. |
 | `set_resource_values` | | | | | | | W `resourceValues`. Returns **UI**. |
 | `present_choices` | | | | | | | Returns **UI**. |
-| `present_roll` | | | | | | | Returns **UI**. |
-| `show_character_sheet` | | | | | | | Returns **UI**. |
+| `show_character_sheet` | | | | | | | Returns **UI**. OOC/Dev only. |
 
 ### Player Management
 
@@ -259,7 +258,6 @@ Legend: **R** = reads, **W** = writes (triggers persistence), **UI** = returns T
 |------|------|--------|--------|-------|--------|-------------------|-------|
 | `scene_transition` | | | | | | | Returns **E**. Full cascade handled by SceneManager. |
 | `session_end` | | | | | | | Returns **E**. |
-| `context_refresh` | | | | | | | Returns **E**. |
 
 ### Entity (Worldbuilding)
 
