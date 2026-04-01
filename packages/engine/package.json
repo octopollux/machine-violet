@@ -12,7 +12,7 @@
     "start": "node --max-semi-space-size=16 dist/index.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.79.0",
+    "@anthropic-ai/sdk": "^0.82.0",
     "@fastify/cors": "^11.0.0",
     "@fastify/swagger": "^9.7.0",
     "@fastify/websocket": "^11.0.0",
