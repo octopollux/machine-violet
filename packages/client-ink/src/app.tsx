@@ -175,7 +175,9 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
     }
   }, [clientState.sessionStale, clientState.sessionEnded, phase]);
 
-  // Handle setup → game transition: reconnect WebSocket to pick up new session
+  // Handle setup → game transition: reset client state for new session.
+  // The WebSocket stays connected — transitionToGame() broadcasts a fresh
+  // state:snapshot to all connected clients after starting the new session.
   useEffect(() => {
     const newId = clientState.transitionCampaignId;
     if (!newId) return;
@@ -183,12 +185,6 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
     setSessionKey((k) => k + 1); // remount PlayingPhase
     setNarrativeLines([]);
     setClientState(initialClientState());
-    // Reconnect WebSocket so the new session's state:snapshot is received
-    const ws = wsClientRef.current;
-    if (ws) {
-      ws.disconnect();
-      ws.connect();
-    }
   }, [clientState.transitionCampaignId]);
 
   // Start a campaign (used by both auto-start and menu selection)
