@@ -75,43 +75,39 @@ Simple rectangles only. If the fiction requires organic cave boundaries or windi
 
 The DM interacts with maps through tools. The tools handle spatial computation; the DM handles game-rule adjudication.
 
-### Viewport
-The critical tool. Renders a local slice of the map as a compact text grid + legend for the DM to read.
+Three consolidated tools cover all map operations. Each uses an `operation` discriminator.
 
-- **`view_area(map, center, radius)`** — returns a text rendering of the area (e.g., 15x15) around a point, with a legend of all entities/annotations in view.
-- Square grids render as aligned columns; hex grids use offset-row indentation to make adjacency visually implicit.
-- This is the only time the grid+legend text format appears; it's a rendered view, not the storage format.
+### `map` — the board itself
+Create, view, modify terrain and annotations.
 
-### Spatial Queries
+- **`create`** — initialize a new map with grid type, bounds, and default terrain.
+- **`view`** — render a local viewport as a text grid + legend (the DM's primary spatial read). Square grids render as aligned columns; hex grids use offset-row indentation.
+- **`set_terrain`** — update terrain at a single coordinate or a rectangular region.
+- **`annotate`** — add or update a freeform annotation on a tile.
+- **`define_region`** — set terrain for a rectangular area.
+
+### `map_entity` — things on the map
+Place, move, remove tokens; batch import; find nearest.
+
+- **`place`** — add an entity to a tile.
+- **`move`** — relocate an entity by ID.
+- **`remove`** — remove from the map entirely.
+- **`import`** — batch-place multiple entities.
+- **`find_nearest`** — nearest entity or terrain of a given type. Returns coordinate + distance.
+
+### `map_query` — spatial questions
 Software does the math, returns facts. The DM adjudicates.
 
-- **`distance(map, from, to)`** — tile count between two coordinates, respecting grid type (hex vs square).
-- **`path_between(map, from, to, options?)`** — shortest path, optionally respecting terrain costs or impassable tiles. Returns the path and its length.
-- **`line_of_sight(map, from, to)`** — returns a list of tiles and their contents along the line between two points. Does **not** adjudicate whether vision is blocked; the DM decides that based on game-system rules and the reported tile contents.
-- **`tiles_in_range(map, center, range, filter?)`** — all tiles within N steps, optionally filtered (e.g., "entities only" or "terrain type = lava"). Returns coordinates + contents.
-- **`find_nearest(map, from, type)`** — nearest entity or terrain of a given type. Returns coordinate + distance.
-
-### Mutations
-The DM describes intent; the tool does bookkeeping.
-
-- **`place_entity(map, coord, entity)`** — add an entity to a tile.
-- **`move_entity(map, entity_id, to)`** — relocate an entity. The tool updates coordinates.
-- **`remove_entity(map, entity_id)`** — remove from the map entirely.
-- **`set_terrain(map, coord_or_region, terrain)`** — update terrain at a point or define a new region.
-- **`annotate(map, coord, text)`** — add or update a freeform annotation.
-
-### Bulk Setup
-For building maps during campaign initialization or when importing from source materials.
-
-- **`create_map(id, gridType, bounds, defaultTerrain)`** — initialize a new map file.
-- **`define_region(map, bounds, terrain)`** — set terrain for a rectangular area.
-- **`import_entities(map, entities[])`** — batch-place multiple entities.
+- **`distance`** — tile count between two coordinates, respecting grid type (hex vs square).
+- **`path`** — shortest path, optionally respecting terrain costs or impassable tiles. Returns the path and its length.
+- **`line_of_sight`** — tiles and contents along the line between two points. Does **not** adjudicate vision — the DM decides.
+- **`tiles_in_range`** — all tiles within N steps, optionally filtered (e.g., "entities only" or "terrain type = lava").
 
 ## Token Economics
 
 A 50x50 map stored as JSON might be several KB, but the DM rarely needs the whole thing. The typical interaction pattern:
 
-1. DM calls `view_area` centered on the action — costs ~200-300 tokens for a 15x15 viewport.
+1. DM calls `map` with `view` centered on the action — costs ~200-300 tokens for a 15x15 viewport.
 2. DM calls spatial queries as needed — each returns a short factual answer.
 3. DM narrates to the player using the results.
 

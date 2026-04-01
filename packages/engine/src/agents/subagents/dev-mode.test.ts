@@ -227,7 +227,7 @@ describe("buildDevTools", () => {
     expect(names).toContain("scribe");
     expect(names).toContain("start_combat");
     expect(names).toContain("set_alarm");
-    expect(names).toContain("create_map");
+    expect(names).toContain("map");
   });
 
   it("each tool has name, description, and inputSchema", () => {

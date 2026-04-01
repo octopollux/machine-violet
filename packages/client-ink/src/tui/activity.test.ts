@@ -80,9 +80,9 @@ describe("getToolGlyph", () => {
   });
 
   it("returns glyph for map tools", () => {
-    expect(getToolGlyph("move_entity")!.glyph).toBe("◈");
-    expect(getToolGlyph("view_area")!.glyph).toBe("◈");
-    expect(getToolGlyph("create_map")!.glyph).toBe("◈");
+    expect(getToolGlyph("map")!.glyph).toBe("◈");
+    expect(getToolGlyph("map_entity")!.glyph).toBe("◈");
+    expect(getToolGlyph("map_query")!.glyph).toBe("◈");
   });
 
   it("returns glyph for entity/scribe tools", () => {

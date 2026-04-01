@@ -103,7 +103,7 @@ Tool implementations return the minimum useful information. Examples:
 | Tool | Verbose (avoid) | Terse (target) |
 |---|---|---|
 | `resolve_turn` | Full breakdown with explanations, 200t | `"Hit (23 vs AC 13). 9 slash. G1: 3/12 HP."` 20t |
-| `view_area` | 15x15 grid + full legend, 400t | Smallest relevant viewport + active entities only, 150t |
+| `map` (view) | 15x15 grid + full legend, 400t | Smallest relevant viewport + active entities only, 150t |
 | `scene_transition` | Paragraph about what happened, 200t | `"Scene closed. Alarm: orc warband 2 days out."` 15t |
 | `roll_dice` | Full explanation of the roll, 100t | `"2d20kh1+5: [18,7]→23"` 15t |
 

@@ -12,34 +12,11 @@ Every tool specified across the design docs, organized by domain. Each entry inc
 
 All T1. All called by DM (or setup agent during init).
 
-### Queries
-
-| Tool | Signature | Returns |
+| Tool | Operations | Description |
 |---|---|---|
-| `view_area` | `(map, center, radius)` | Text grid + legend of the area around a point. The DM's primary spatial read. |
-| `distance` | `(map, from, to)` | Tile count between two coordinates, respecting grid type. |
-| `path_between` | `(map, from, to, options?)` | Shortest path + length. Options: terrain costs, impassable tiles. |
-| `line_of_sight` | `(map, from, to)` | List of tiles and contents along the line. Does NOT adjudicate vision — DM decides. |
-| `tiles_in_range` | `(map, center, range, filter?)` | All tiles within N steps, optionally filtered (entities only, terrain type, etc.). |
-| `find_nearest` | `(map, from, type)` | Nearest entity or terrain of a given type. Returns coordinate + distance. |
-
-### Mutations
-
-| Tool | Signature | Effect |
-|---|---|---|
-| `place_entity` | `(map, coord, entity)` | Add an entity to a tile. |
-| `move_entity` | `(map, entity_id, to)` | Relocate an entity. Updates coordinates. |
-| `remove_entity` | `(map, entity_id)` | Remove an entity from the map entirely. |
-| `set_terrain` | `(map, coord_or_region, terrain)` | Update terrain at a point or define a new region. |
-| `annotate` | `(map, coord, text)` | Add or update a freeform annotation on a tile. |
-
-### Bulk Setup
-
-| Tool | Signature | Effect |
-|---|---|---|
-| `create_map` | `({ id, grid_type, width, height, default_terrain })` | Initialize a new map JSON file. |
-| `define_region` | `({ map, x1, y1, x2, y2, terrain })` | Set terrain for a rectangular area. |
-| `import_entities` | `(map, entities[])` | Batch-place multiple entities. |
+| `map` | `create`, `view`, `set_terrain`, `annotate`, `define_region` | The board itself: create maps, view as text grid, modify terrain and annotations. |
+| `map_entity` | `place`, `move`, `remove`, `import`, `find_nearest` | Things on the map: place/move/remove tokens, batch import, find nearest entity or terrain. |
+| `map_query` | `distance`, `path`, `line_of_sight`, `tiles_in_range` | Spatial questions between two points: distance, pathfinding, line of sight, area scan. |
 
 ---
 

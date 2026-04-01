@@ -73,10 +73,10 @@ All deterministic, zero AI. The foundation everything else builds on. Each tool 
 ### 2.3 Map system (`src/tools/maps/`)
 - [ ] Map data model: sparse coordinate-keyed JSON, regions, entities, annotations, links
 - [ ] Terrain resolution: coordinate override → region (last match) → default
-- [ ] Queries: `view_area`, `distance`, `path_between`, `line_of_sight`, `tiles_in_range`, `find_nearest`
-- [ ] Mutations: `place_entity`, `move_entity`, `remove_entity`, `set_terrain`, `annotate`
-- [ ] Bulk: `create_map`, `define_region`, `import_entities`
-- [ ] Viewport renderer: text grid + legend output for `view_area`
+- [ ] `map` tool: `create`, `view`, `set_terrain`, `annotate`, `define_region`
+- [ ] `map_entity` tool: `place`, `move`, `remove`, `import`, `find_nearest`
+- [ ] `map_query` tool: `distance`, `path`, `line_of_sight`, `tiles_in_range`
+- [ ] Viewport renderer: text grid + legend output for `map` view
 - [ ] Hex grid support (offset coordinates, hex distance, hex adjacency)
 
 **Tests**: Distance calculations (square and hex). Pathfinding (open terrain, obstacles, terrain costs). Line of sight (clear and obstructed). Region overlap resolution. Viewport rendering output. Entity placement/movement/removal. Large map performance (200×200).

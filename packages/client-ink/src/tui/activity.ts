@@ -21,20 +21,9 @@ const TOOL_GLYPH_MAP: Record<string, ToolGlyph> = {
   // Cards
   deck:               { glyph: "♠", color: "cyan" },
   // Map / spatial
-  view_area:          { glyph: "◈", color: "blue" },
-  distance:           { glyph: "◈", color: "blue" },
-  path_between:       { glyph: "◈", color: "blue" },
-  line_of_sight:      { glyph: "◈", color: "blue" },
-  tiles_in_range:     { glyph: "◈", color: "blue" },
-  find_nearest:       { glyph: "◈", color: "blue" },
-  place_entity:       { glyph: "◈", color: "blue" },
-  move_entity:        { glyph: "◈", color: "blue" },
-  remove_entity:      { glyph: "◈", color: "blue" },
-  set_terrain:        { glyph: "◈", color: "blue" },
-  annotate:           { glyph: "◈", color: "blue" },
-  define_region:      { glyph: "◈", color: "blue" },
-  create_map:         { glyph: "◈", color: "blue" },
-  import_entities:    { glyph: "◈", color: "blue" },
+  map:                { glyph: "◈", color: "blue" },
+  map_entity:         { glyph: "◈", color: "blue" },
+  map_query:          { glyph: "◈", color: "blue" },
   // Clocks / time
   set_alarm:          { glyph: "⏲" },
   clear_alarm:        { glyph: "⏲" },

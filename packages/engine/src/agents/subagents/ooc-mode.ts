@@ -25,8 +25,7 @@ import type { ModeSession } from "@machine-violet/shared/types/engine.js";
 // --- DM tool categories available in OOC mode ---
 
 const OOC_READONLY_TOOLS = [
-  "roll_dice", "view_area", "distance", "path_between",
-  "line_of_sight", "tiles_in_range", "find_nearest", "check_clocks",
+  "roll_dice", "map", "map_entity", "map_query", "check_clocks",
 ];
 
 const OOC_ENTITY_TOOLS = ["scribe", "promote_character"];

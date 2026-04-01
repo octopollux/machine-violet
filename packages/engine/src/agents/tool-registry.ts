@@ -135,158 +135,101 @@ const TOOL_DEFS: RegisteredTool[] = [
     },
   },
 
-  // ====== MAP QUERIES ======
+  // ====== MAP — the board: create, view, terrain, annotations ======
   {
     definition: {
-      name: "view_area",
-      description: "View a map area as text grid with legend.",
+      name: "map",
+      description: "Manage the map itself: create, view, set terrain, annotate, define regions. Operations: create | view | set_terrain | annotate | define_region.",
       inputSchema: {
         type: "object" as const,
         properties: {
+          operation: { type: "string", enum: ["create", "view", "set_terrain", "annotate", "define_region"] },
           map: { type: "string", description: "Map ID" },
+          // create
+          grid_type: { type: "string", enum: ["square", "hex"] },
+          width: { type: "number" },
+          height: { type: "number" },
+          default_terrain: { type: "string" },
+          // view
           center: { type: "string", description: "Center coordinate 'x,y'" },
           radius: { type: "number", description: "View radius in tiles" },
+          // set_terrain
+          coord: { type: "string", description: "Single coordinate 'x,y'" },
+          region: {
+            type: "object",
+            description: "Rectangular region (alternative to coord)",
+            properties: { x1: { type: "number" }, y1: { type: "number" }, x2: { type: "number" }, y2: { type: "number" } },
+          },
+          terrain: { type: "string" },
+          // annotate
+          text: { type: "string" },
+          // define_region
+          x1: { type: "number", description: "Left column" },
+          y1: { type: "number", description: "Top row" },
+          x2: { type: "number", description: "Right column" },
+          y2: { type: "number", description: "Bottom row" },
         },
-        required: ["map", "center", "radius"],
+        required: ["operation", "map"],
       },
     },
     handler: (state, input) => {
+      const op = input.operation as string;
+      if (op === "create") {
+        const map = createMap(
+          input.map as string,
+          input.grid_type as "square" | "hex",
+          input.width as number,
+          input.height as number,
+          input.default_terrain as string,
+        );
+        state.maps[map.id] = map;
+        return ok(`Map '${map.id}' created (${input.width}×${input.height} ${input.grid_type})`);
+      }
       const r = requireMap(state, input);
       if ("content" in r) return r;
-      const result = viewArea(r.map, input.center as string, input.radius as number);
-      return ok(`${result.grid}\n${result.legend.join("\n")}`);
-    },
-  },
-  {
-    definition: {
-      name: "distance",
-      description: "Get tile distance between two coordinates.",
-      inputSchema: {
-        type: "object" as const,
-        properties: {
-          map: { type: "string" },
-          from: { type: "string", description: "Coordinate 'x,y'" },
-          to: { type: "string", description: "Coordinate 'x,y'" },
-        },
-        required: ["map", "from", "to"],
-      },
-    },
-    handler: (state, input) => {
-      const r = requireMap(state, input);
-      if ("content" in r) return r;
-      const d = distance(r.map, input.from as string, input.to as string);
-      return ok(`${d} tiles`);
-    },
-  },
-  {
-    definition: {
-      name: "path_between",
-      description: "Find shortest path between two coordinates. Returns path + distance.",
-      inputSchema: {
-        type: "object" as const,
-        properties: {
-          map: { type: "string" },
-          from: { type: "string" },
-          to: { type: "string" },
-          terrain_costs: { type: "object", description: "Custom terrain movement costs" },
-          impassable: { type: "array", items: { type: "string" }, description: "Terrain types that block movement" },
-        },
-        required: ["map", "from", "to"],
-      },
-    },
-    handler: (state, input) => {
-      const r = requireMap(state, input);
-      if ("content" in r) return r;
-      const result = pathBetween(r.map, input.from as string, input.to as string, {
-        terrainCosts: input.terrain_costs as Record<string, number> | undefined,
-        impassable: input.impassable as string[] | undefined,
-      });
-      if (!result) return err("No path found.");
-      return ok(`Path (${result.distance} tiles): ${result.path.join(" → ")}`);
-    },
-  },
-  {
-    definition: {
-      name: "line_of_sight",
-      description: "List tiles along a line between two points.",
-      inputSchema: {
-        type: "object" as const,
-        properties: {
-          map: { type: "string" },
-          from: { type: "string" },
-          to: { type: "string" },
-        },
-        required: ["map", "from", "to"],
-      },
-    },
-    handler: (state, input) => {
-      const r = requireMap(state, input);
-      if ("content" in r) return r;
-      const result = lineOfSight(r.map, input.from as string, input.to as string);
-      const tiles = result.tiles.map((t) => {
-        const ents = t.entities.length ? ` [${t.entities.map((e) => e.id).join(",")}]` : "";
-        return `${t.coord}:${t.terrain}${ents}`;
-      });
-      return ok(tiles.join(" → "));
-    },
-  },
-  {
-    definition: {
-      name: "tiles_in_range",
-      description: "All tiles within range of a point, optionally filtered.",
-      inputSchema: {
-        type: "object" as const,
-        properties: {
-          map: { type: "string" },
-          center: { type: "string" },
-          range: { type: "number" },
-          filter: { type: "string", description: "'entities' or a terrain type" },
-        },
-        required: ["map", "center", "range"],
-      },
-    },
-    handler: (state, input) => {
-      const r = requireMap(state, input);
-      if ("content" in r) return r;
-      const results = tilesInRange(r.map, input.center as string, input.range as number, input.filter as string | undefined);
-      return ok(JSON.stringify(results));
-    },
-  },
-  {
-    definition: {
-      name: "find_nearest",
-      description: "Find nearest entity or terrain of a given type.",
-      inputSchema: {
-        type: "object" as const,
-        properties: {
-          map: { type: "string" },
-          from: { type: "string" },
-          type: { type: "string", description: "Entity type or terrain type to find" },
-        },
-        required: ["map", "from", "type"],
-      },
-    },
-    handler: (state, input) => {
-      const r = requireMap(state, input);
-      if ("content" in r) return r;
-      const result = findNearest(r.map, input.from as string, input.type as string);
-      if (!result) return ok("Nothing found.");
-      return ok(`'${input.type as string}' at ${result.coord} (${result.distance} tiles)`);
+      switch (op) {
+        case "view": {
+          const result = viewArea(r.map, input.center as string, input.radius as number);
+          return ok(`${result.grid}\n${result.legend.join("\n")}`);
+        }
+        case "set_terrain": {
+          if (input.region) {
+            const reg = input.region as { x1: number; y1: number; x2: number; y2: number };
+            setTerrain(r.map, reg, input.terrain as string);
+            return ok(`Region set to ${input.terrain}`);
+          }
+          setTerrain(r.map, input.coord as string, input.terrain as string);
+          return ok(`${input.coord} → ${input.terrain}`);
+        }
+        case "annotate": {
+          annotate(r.map, input.coord as string, input.text as string);
+          return ok(`Annotated ${input.coord}`);
+        }
+        case "define_region": {
+          defineRegion(r.map, input.x1 as number, input.y1 as number, input.x2 as number, input.y2 as number, input.terrain as string);
+          return ok(`Region (${input.x1},${input.y1})-(${input.x2},${input.y2}) → ${input.terrain}`);
+        }
+        default:
+          return err(`Unknown map operation: ${op}`);
+      }
     },
   },
 
-  // ====== MAP MUTATIONS ======
+  // ====== MAP_ENTITY — things on the map: place, move, remove, import, find ======
   {
     definition: {
-      name: "place_entity",
-      description: "Place an entity on a map tile.",
+      name: "map_entity",
+      description: "Manage entities on the map: place, move, remove, batch import, find nearest. Operations: place | move | remove | import | find_nearest.",
       inputSchema: {
         type: "object" as const,
         properties: {
-          map: { type: "string" },
-          coord: { type: "string" },
+          operation: { type: "string", enum: ["place", "move", "remove", "import", "find_nearest"] },
+          map: { type: "string", description: "Map ID" },
+          // place
+          coord: { type: "string", description: "Coordinate 'x,y'" },
           entity: {
             type: "object",
+            description: "Entity to place",
             properties: {
               id: { type: "string" },
               type: { type: "string" },
@@ -294,175 +237,13 @@ const TOOL_DEFS: RegisteredTool[] = [
             },
             required: ["id", "type"],
           },
-        },
-        required: ["map", "coord", "entity"],
-      },
-    },
-    handler: (state, input) => {
-      const r = requireMap(state, input);
-      if ("content" in r) return r;
-      placeEntity(r.map, input.coord as string, input.entity as Parameters<typeof placeEntity>[2]);
-      return ok(`Placed ${(input.entity as { id: string }).id} at ${input.coord}`);
-    },
-  },
-  {
-    definition: {
-      name: "move_entity",
-      description: "Move an entity to a new coordinate.",
-      inputSchema: {
-        type: "object" as const,
-        properties: {
-          map: { type: "string" },
-          entity_id: { type: "string" },
-          to: { type: "string" },
-        },
-        required: ["map", "entity_id", "to"],
-      },
-    },
-    handler: (state, input) => {
-      const r = requireMap(state, input);
-      if ("content" in r) return r;
-      moveEntity(r.map, input.entity_id as string, input.to as string);
-      return ok(`Moved ${input.entity_id} → ${input.to}`);
-    },
-  },
-  {
-    definition: {
-      name: "remove_entity",
-      description: "Remove an entity from the map.",
-      inputSchema: {
-        type: "object" as const,
-        properties: {
-          map: { type: "string" },
-          entity_id: { type: "string" },
-        },
-        required: ["map", "entity_id"],
-      },
-    },
-    handler: (state, input) => {
-      const r = requireMap(state, input);
-      if ("content" in r) return r;
-      removeEntity(r.map, input.entity_id as string);
-      return ok(`Removed ${input.entity_id}`);
-    },
-  },
-  {
-    definition: {
-      name: "set_terrain",
-      description: "Set terrain at a coordinate or region.",
-      inputSchema: {
-        type: "object" as const,
-        properties: {
-          map: { type: "string" },
-          coord: { type: "string", description: "Single coordinate 'x,y'" },
-          region: {
-            type: "object",
-            description: "Rectangular region",
-            properties: { x1: { type: "number" }, y1: { type: "number" }, x2: { type: "number" }, y2: { type: "number" } },
-          },
-          terrain: { type: "string" },
-        },
-        required: ["map", "terrain"],
-      },
-    },
-    handler: (state, input) => {
-      const r = requireMap(state, input);
-      if ("content" in r) return r;
-      if (input.region) {
-        const reg = input.region as { x1: number; y1: number; x2: number; y2: number };
-        setTerrain(r.map, reg, input.terrain as string);
-        return ok(`Region set to ${input.terrain}`);
-      }
-      setTerrain(r.map, input.coord as string, input.terrain as string);
-      return ok(`${input.coord} → ${input.terrain}`);
-    },
-  },
-  {
-    definition: {
-      name: "annotate",
-      description: "Add a freeform annotation to a map tile.",
-      inputSchema: {
-        type: "object" as const,
-        properties: {
-          map: { type: "string" },
-          coord: { type: "string" },
-          text: { type: "string" },
-        },
-        required: ["map", "coord", "text"],
-      },
-    },
-    handler: (state, input) => {
-      const r = requireMap(state, input);
-      if ("content" in r) return r;
-      annotate(r.map, input.coord as string, input.text as string);
-      return ok(`Annotated ${input.coord}`);
-    },
-  },
-
-  {
-    definition: {
-      name: "define_region",
-      description: "Define a rectangular terrain region on a map.",
-      inputSchema: {
-        type: "object" as const,
-        properties: {
-          map: { type: "string" },
-          x1: { type: "number", description: "Left column" },
-          y1: { type: "number", description: "Top row" },
-          x2: { type: "number", description: "Right column" },
-          y2: { type: "number", description: "Bottom row" },
-          terrain: { type: "string", description: "Terrain type for the region" },
-        },
-        required: ["map", "x1", "y1", "x2", "y2", "terrain"],
-      },
-    },
-    handler: (state, input) => {
-      const r = requireMap(state, input);
-      if ("content" in r) return r;
-      defineRegion(r.map, input.x1 as number, input.y1 as number, input.x2 as number, input.y2 as number, input.terrain as string);
-      return ok(`Region (${input.x1},${input.y1})-(${input.x2},${input.y2}) → ${input.terrain}`);
-    },
-  },
-
-  // ====== MAP BULK ======
-  {
-    definition: {
-      name: "create_map",
-      description: "Create a new map.",
-      inputSchema: {
-        type: "object" as const,
-        properties: {
-          id: { type: "string" },
-          grid_type: { type: "string", enum: ["square", "hex"] },
-          width: { type: "number" },
-          height: { type: "number" },
-          default_terrain: { type: "string" },
-        },
-        required: ["id", "grid_type", "width", "height", "default_terrain"],
-      },
-    },
-    handler: (state, input) => {
-      const map = createMap(
-        input.id as string,
-        input.grid_type as "square" | "hex",
-        input.width as number,
-        input.height as number,
-        input.default_terrain as string,
-      );
-      state.maps[map.id] = map;
-      return ok(`Map '${map.id}' created (${input.width}×${input.height} ${input.grid_type})`);
-    },
-  },
-  {
-    definition: {
-      name: "import_entities",
-      description: "Batch-place multiple entities on a map.",
-      inputSchema: {
-        type: "object" as const,
-        properties: {
-          map: { type: "string" },
+          // move / remove
+          entity_id: { type: "string", description: "Entity ID to move or remove" },
+          to: { type: "string", description: "Destination coordinate for move" },
+          // import
           entities: {
             type: "array",
+            description: "Batch entity list for import",
             items: {
               type: "object",
               properties: {
@@ -471,16 +252,100 @@ const TOOL_DEFS: RegisteredTool[] = [
               },
             },
           },
+          // find_nearest
+          from: { type: "string", description: "Starting coordinate for find_nearest" },
+          type: { type: "string", description: "Entity type or terrain type to find" },
         },
-        required: ["map", "entities"],
+        required: ["operation", "map"],
       },
     },
     handler: (state, input) => {
       const r = requireMap(state, input);
       if ("content" in r) return r;
-      const ents = input.entities as { coord: string; entity: Parameters<typeof placeEntity>[2] }[];
-      importEntities(r.map, ents);
-      return ok(`Placed ${ents.length} entities`);
+      const op = input.operation as string;
+      switch (op) {
+        case "place": {
+          placeEntity(r.map, input.coord as string, input.entity as Parameters<typeof placeEntity>[2]);
+          return ok(`Placed ${(input.entity as { id: string }).id} at ${input.coord}`);
+        }
+        case "move": {
+          moveEntity(r.map, input.entity_id as string, input.to as string);
+          return ok(`Moved ${input.entity_id} → ${input.to}`);
+        }
+        case "remove": {
+          removeEntity(r.map, input.entity_id as string);
+          return ok(`Removed ${input.entity_id}`);
+        }
+        case "import": {
+          importEntities(r.map, input.entities as Parameters<typeof importEntities>[1]);
+          return ok(`Imported ${(input.entities as unknown[]).length} entities`);
+        }
+        case "find_nearest": {
+          const result = findNearest(r.map, input.from as string, input.type as string);
+          if (!result) return ok("Nothing found.");
+          return ok(`'${input.type as string}' at ${result.coord} (${result.distance} tiles)`);
+        }
+        default:
+          return err(`Unknown map_entity operation: ${op}`);
+      }
+    },
+  },
+
+  // ====== MAP_QUERY — spatial questions: distance, path, line of sight, area scan ======
+  {
+    definition: {
+      name: "map_query",
+      description: "Spatial queries on the map: distance, pathfinding, line of sight, area scan. Operations: distance | path | line_of_sight | tiles_in_range.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          operation: { type: "string", enum: ["distance", "path", "line_of_sight", "tiles_in_range"] },
+          map: { type: "string", description: "Map ID" },
+          from: { type: "string", description: "Start coordinate 'x,y'" },
+          to: { type: "string", description: "End coordinate 'x,y'" },
+          // path
+          terrain_costs: { type: "object", description: "Custom terrain movement costs" },
+          impassable: { type: "array", items: { type: "string" }, description: "Terrain types that block movement" },
+          // tiles_in_range
+          center: { type: "string", description: "Center coordinate for area scan" },
+          range: { type: "number", description: "Range in tiles" },
+          filter: { type: "string", description: "'entities' or a terrain type" },
+        },
+        required: ["operation", "map"],
+      },
+    },
+    handler: (state, input) => {
+      const r = requireMap(state, input);
+      if ("content" in r) return r;
+      const op = input.operation as string;
+      switch (op) {
+        case "distance": {
+          const d = distance(r.map, input.from as string, input.to as string);
+          return ok(`${d} tiles`);
+        }
+        case "path": {
+          const result = pathBetween(r.map, input.from as string, input.to as string, {
+            terrainCosts: input.terrain_costs as Record<string, number> | undefined,
+            impassable: input.impassable as string[] | undefined,
+          });
+          if (!result) return err("No path found.");
+          return ok(`Path (${result.distance} tiles): ${result.path.join(" → ")}`);
+        }
+        case "line_of_sight": {
+          const result = lineOfSight(r.map, input.from as string, input.to as string);
+          const tiles = result.tiles.map((t) => {
+            const ents = t.entities.length ? ` [${t.entities.map((e) => e.id).join(",")}]` : "";
+            return `${t.coord}:${t.terrain}${ents}`;
+          });
+          return ok(tiles.join(" → "));
+        }
+        case "tiles_in_range": {
+          const results = tilesInRange(r.map, input.center as string, input.range as number, input.filter as string | undefined);
+          return ok(JSON.stringify(results));
+        }
+        default:
+          return err(`Unknown map_query operation: ${op}`);
+      }
     },
   },
 
@@ -1066,14 +931,8 @@ export const TOOL_STATE_MAP: Record<string, StateSlice[]> = {
   clear_alarm: ["clocks"],
   advance_calendar: ["clocks"],
   next_round: ["clocks"],
-  create_map: ["maps"],
-  place_entity: ["maps"],
-  move_entity: ["maps"],
-  remove_entity: ["maps"],
-  set_terrain: ["maps"],
-  annotate: ["maps"],
-  import_entities: ["maps"],
-  define_region: ["maps"],
+  map: ["maps"],
+  map_entity: ["maps"],
   deck: ["decks"],
   manage_objectives: ["objectives"],
   switch_player: [],

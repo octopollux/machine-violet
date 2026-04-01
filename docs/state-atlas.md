@@ -20,10 +20,10 @@ GameState
 │       ├── gridType: "square" | "hex"     const
 │       ├── bounds: { width, height }      const
 │       ├── defaultTerrain: string         const
-│       ├── regions: MapRegion[]           mut   (define_region, set_terrain)
-│       ├── terrain: Record<coord, string> mut   (set_terrain)
-│       ├── entities: Record<coord, MapEntity[]> mut (place/move/remove_entity)
-│       ├── annotations: Record<coord, string>   mut (annotate)
+│       ├── regions: MapRegion[]           mut   (map: define_region, set_terrain)
+│       ├── terrain: Record<coord, string> mut   (map: set_terrain)
+│       ├── entities: Record<coord, MapEntity[]> mut (map_entity: place/move/remove)
+│       ├── annotations: Record<coord, string>   mut (map: annotate)
 │       ├── links: MapLink[]               mut
 │       └── meta: Record<string, string>   mut
 │
@@ -192,29 +192,13 @@ Legend: **R** = reads, **W** = writes (triggers persistence), **UI** = returns T
 |------|------|--------|--------|-------|--------|-------------------|-------|
 | `deck` | | | | **W** | | | All 6 deck operations mutate DecksState. |
 
-### Map Queries
+### Map Tools
 
 | Tool | maps | clocks | combat | decks | config | activePlayerIndex | Notes |
 |------|------|--------|--------|-------|--------|-------------------|-------|
-| `view_area` | R | | | | | | |
-| `distance` | R | | | | | | |
-| `path_between` | R | | | | | | |
-| `line_of_sight` | R | | | | | | |
-| `tiles_in_range` | R | | | | | | |
-| `find_nearest` | R | | | | | | |
-
-### Map Mutations
-
-| Tool | maps | clocks | combat | decks | config | activePlayerIndex | Notes |
-|------|------|--------|--------|-------|--------|-------------------|-------|
-| `create_map` | **W** | | | | | | Creates new entry in `state.maps`. |
-| `place_entity` | **W** | | | | | | |
-| `move_entity` | **W** | | | | | | |
-| `remove_entity` | **W** | | | | | | |
-| `set_terrain` | **W** | | | | | | Single coord or region. |
-| `define_region` | **W** | | | | | | |
-| `annotate` | **W** | | | | | | |
-| `import_entities` | **W** | | | | | | Batch place. |
+| `map` | R/**W** | | | | | | `create` writes; `view` reads; `set_terrain`/`annotate`/`define_region` write. |
+| `map_entity` | R/**W** | | | | | | `place`/`move`/`remove`/`import` write; `find_nearest` reads. |
+| `map_query` | R | | | | | | Pure reads: `distance`, `path`, `line_of_sight`, `tiles_in_range`. |
 
 ### Clocks
 
@@ -290,14 +274,8 @@ set_alarm       → ["clocks"]
 clear_alarm     → ["clocks"]
 advance_calendar → ["clocks"]
 next_round      → ["clocks"]
-create_map      → ["maps"]
-place_entity    → ["maps"]
-move_entity     → ["maps"]
-remove_entity   → ["maps"]
-set_terrain     → ["maps"]
-annotate        → ["maps"]
-import_entities → ["maps"]
-define_region   → ["maps"]
+map             → ["maps"]
+map_entity      → ["maps"]
 deck            → ["decks"]
 manage_objectives → ["objectives"]
 switch_player   → []  (empty — activePlayerIndex persisted via scene state)
