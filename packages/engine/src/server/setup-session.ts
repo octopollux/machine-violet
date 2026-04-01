@@ -87,12 +87,21 @@ export class SetupSession {
     }
   }
 
+  private emitThinking(): void {
+    this.broadcast({ type: "activity:update", data: { engineState: "dm_thinking" } });
+  }
+
+  private emitIdle(): void {
+    this.broadcast({ type: "activity:update", data: { engineState: "waiting_input" } });
+  }
+
   /** Start the setup conversation. Streams opening narrative to clients. */
   async start(): Promise<void> {
     const knownPlayers = await this.scanKnownPlayers();
     this.conversation = createSetupConversation(this.provider, this.model, knownPlayers);
     this.started = true;
 
+    this.emitThinking();
     const result = await this.conversation.start((delta) => {
       this.broadcast({
         type: "narrative:chunk",
@@ -101,12 +110,14 @@ export class SetupSession {
     });
 
     await this.handleResult(result);
+    this.emitIdle();
   }
 
   /** Send player input to the setup conversation. */
   async send(text: string): Promise<{ finalized?: string }> {
     if (!this.conversation) throw new Error("Setup not started");
 
+    this.emitThinking();
     const result = await this.conversation.send(text, (delta) => {
       this.broadcast({
         type: "narrative:chunk",
@@ -114,13 +125,16 @@ export class SetupSession {
       });
     });
 
-    return this.handleResult(result);
+    const out = await this.handleResult(result);
+    this.emitIdle();
+    return out;
   }
 
   /** Resolve a choice selection. */
   async resolveChoice(selectedText: string): Promise<{ finalized?: string }> {
     if (!this.conversation) throw new Error("Setup not started");
 
+    this.emitThinking();
     const result = await this.conversation.resolveChoice(selectedText, (delta) => {
       this.broadcast({
         type: "narrative:chunk",
@@ -128,7 +142,9 @@ export class SetupSession {
       });
     });
 
-    return this.handleResult(result);
+    const out = await this.handleResult(result);
+    this.emitIdle();
+    return out;
   }
 
   get isStarted(): boolean {

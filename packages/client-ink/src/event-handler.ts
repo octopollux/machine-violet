@@ -5,6 +5,7 @@
  * The engine translates EngineCallbacks → ServerEvents, and this
  * module translates ServerEvents → React state updates.
  */
+import { getToolGlyph, type ToolGlyph } from "./tui/activity.js";
 import type {
   ServerEvent,
   NarrativeChunkEvent,
@@ -34,7 +35,8 @@ export interface ClientState {
   currentTurn: Turn | null;
   activeChoices: ChoicesData | null;
   engineState: string | null;
-  activeTools: string[];
+  /** Accumulated tool glyphs for the current DM turn. Cleared on new turn. */
+  toolGlyphs: ToolGlyph[];
   variant: StyleVariant;
   mode: "play" | "ooc" | "dev" | "setup";
   stateSnapshot: StateSnapshot | null;
@@ -58,7 +60,7 @@ export function initialClientState(): ClientState {
     currentTurn: null,
     activeChoices: null,
     engineState: null,
-    activeTools: [],
+    toolGlyphs: [],
     variant: "exploration",
     mode: "play",
     stateSnapshot: null,
@@ -218,21 +220,26 @@ function handleChoicesCleared(_event: ChoicesClearedEvent, update: StateUpdater)
 
 function handleActivityUpdate(event: ActivityUpdateEvent, update: StateUpdater): void {
   const data = event.data as Record<string, unknown>;
-  const { engineState, toolStarted, toolEnded } = data;
+  const { engineState, toolStarted } = data;
 
   update((prev) => {
-    let tools = prev.activeTools;
+    // Accumulate tool glyphs for the turn (don't remove on end — they persist visually)
+    let glyphs = prev.toolGlyphs;
     if (toolStarted) {
-      tools = [...tools, toolStarted as string];
+      const tg = getToolGlyph(toolStarted as string);
+      if (tg) glyphs = [...glyphs, tg];
     }
-    if (toolEnded) {
-      tools = tools.filter((t) => t !== toolEnded);
+
+    // Clear glyphs when a new DM turn starts
+    const newState = (engineState as string) ?? prev.engineState;
+    if (engineState === "dm_thinking" && prev.engineState !== "dm_thinking") {
+      glyphs = [];
     }
 
     let next = {
       ...prev,
-      engineState: (engineState as string) ?? prev.engineState,
-      activeTools: tools,
+      engineState: newState,
+      toolGlyphs: glyphs,
     };
 
     // Handle embedded TUI command payloads
@@ -301,7 +308,7 @@ function handleSessionEnded(_event: SessionEndedEvent, update: StateUpdater): vo
     currentTurn: null,
     activeChoices: null,
     engineState: null,
-    activeTools: [],
+    toolGlyphs: [],
   }));
 }
 

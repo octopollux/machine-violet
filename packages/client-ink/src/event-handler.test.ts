@@ -151,13 +151,24 @@ describe("event-handler", () => {
   });
 
   describe("activity", () => {
-    it("tracks active tools", () => {
+    it("accumulates tool glyphs on start (persists after end)", () => {
       const h = makeHarness();
       h.dispatch({ type: "activity:update", data: { toolStarted: "roll_dice" } });
-      expect(h.state.activeTools).toEqual(["roll_dice"]);
+      expect(h.state.toolGlyphs).toEqual([{ glyph: "⚄", color: "yellow" }]);
 
       h.dispatch({ type: "activity:update", data: { toolEnded: "roll_dice" } });
-      expect(h.state.activeTools).toEqual([]);
+      // Glyphs persist — they accumulate for the whole turn
+      expect(h.state.toolGlyphs).toEqual([{ glyph: "⚄", color: "yellow" }]);
+    });
+
+    it("clears tool glyphs when dm_thinking starts", () => {
+      const h = makeHarness();
+      h.dispatch({ type: "activity:update", data: { toolStarted: "roll_dice" } });
+      expect(h.state.toolGlyphs.length).toBe(1);
+
+      // New DM turn starts — glyphs reset
+      h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
+      expect(h.state.toolGlyphs).toEqual([]);
     });
 
     it("updates engine state", () => {
