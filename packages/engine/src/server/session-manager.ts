@@ -7,6 +7,7 @@
 import { join, dirname } from "node:path";
 import { readFileSync, createWriteStream, type WriteStream } from "node:fs";
 import type { WebSocket } from "ws";
+import { logEvent } from "../context/engine-log.js";
 import type {
   ServerEvent,
   ConnectionIdentity,
@@ -274,7 +275,7 @@ export class SessionManager {
       // Only handle errors for the current setup session / generation
       if (this.setupSession !== setup || this.sessionGeneration !== gen) return;
 
-      console.error("[SessionManager] Setup start failed:", err);
+      logEvent("session:error", { phase: "setup", message: err instanceof Error ? err.message : String(err) });
 
       // Tear down setup state so a new setup can be started
       this.setupSession = null;
@@ -483,6 +484,13 @@ export class SessionManager {
     this.gameState = gs;
     this.campaignId = campaignId;
     this.status = "active";
+
+    logEvent("session:start", {
+      campaignId,
+      isResume,
+      provider: provider.providerId,
+      scene: scene.sceneNumber,
+    });
 
     // Start idle timer in case no players are connected yet
     this.checkIdleTimeout();
@@ -700,7 +708,7 @@ export class SessionManager {
     this.idleTimer = setTimeout(() => {
       this.idleTimer = null;
       if (this.status === "active" && this.hasNoPlayers()) {
-        console.log("[SessionManager] No players for 5 minutes — saving and ending session");
+        logEvent("session:end", { reason: "idle_timeout" });
         void this.endSession();
       }
     }, SessionManager.IDLE_TIMEOUT_MS);
@@ -729,6 +737,10 @@ export class SessionManager {
 
     this.status = "stopping";
     this.clearIdleTimer();
+    // Log unless already logged by idle timeout
+    if (this.campaignId) {
+      logEvent("session:end", { reason: "explicit", campaignId: this.campaignId });
+    }
 
     // Stop the context dump writer so fire-and-forget writes don't hold
     // file locks while git's statusMatrix walks the campaign tree.
@@ -747,7 +759,7 @@ export class SessionManager {
         if (repo) await Promise.race([repo.checkpoint("Session end"), timeout(10_000)]);
       }
     } catch (err) {
-      console.error("[SessionManager] endSession cleanup error:", err);
+      logEvent("session:error", { phase: "cleanup", message: err instanceof Error ? err.message : String(err) });
     }
 
     this.campaignId = null;

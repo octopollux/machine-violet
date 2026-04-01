@@ -17,6 +17,7 @@ import type {
 import type { ToolResult } from "../agents/tool-registry.js";
 import type { TuiCommand } from "../agents/agent-loop.js";
 import { dumpContext, dumpThinking } from "../config/context-dump.js";
+import { logEvent } from "../context/engine-log.js";
 import { ContentRefusalError } from "@machine-violet/shared/types/errors.js";
 import { getEffortConfig } from "../config/models.js";
 import type { EffortLevel } from "../config/models.js";
@@ -124,13 +125,36 @@ export async function runProviderLoop(
     });
 
     let result: ChatResult;
-    if (shouldStream) {
-      result = await provider.stream(chatParams, (delta) => config.onTextDelta?.(delta));
-    } else {
-      result = await provider.chat(chatParams);
-      // In non-streaming mode, emit the full text
-      if (result.text) config.onTextDelta?.(result.text);
+    const apiStart = Date.now();
+    try {
+      if (shouldStream) {
+        result = await provider.stream(chatParams, (delta) => config.onTextDelta?.(delta));
+      } else {
+        result = await provider.chat(chatParams);
+        // In non-streaming mode, emit the full text
+        if (result.text) config.onTextDelta?.(result.text);
+      }
+    } catch (apiErr) {
+      logEvent("api:error", {
+        agent: config.name,
+        model: config.model,
+        durationMs: Date.now() - apiStart,
+        message: apiErr instanceof Error ? apiErr.message : String(apiErr),
+      });
+      throw apiErr;
     }
+
+    logEvent("api:call", {
+      agent: config.name,
+      model: config.model,
+      durationMs: Date.now() - apiStart,
+      inputTokens: result.usage.inputTokens,
+      outputTokens: result.usage.outputTokens,
+      cacheRead: result.usage.cacheReadTokens,
+      reasoningTokens: result.usage.reasoningTokens,
+      toolCalls: result.toolCalls.length,
+      stopReason: result.stopReason,
+    });
 
     // Accumulate usage
     totalUsage.inputTokens += result.usage.inputTokens;

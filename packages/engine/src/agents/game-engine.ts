@@ -35,6 +35,7 @@ import type { DMSessionState } from "./dm-prompt.js";
 import { getModel } from "../config/models.js";
 import type { ModelTier } from "../config/models.js";
 import { accUsage } from "../context/usage-helpers.js";
+import { logEvent } from "../context/engine-log.js";
 import { TOKEN_LIMITS } from "../config/tokens.js";
 import type { ToolRegistry } from "./tool-registry.js";
 import { isAITurn, getActivePlayer } from "./player-manager.js";
@@ -360,6 +361,8 @@ export class GameEngine {
     this.callbacks.onTurnStart(dmTurn);
 
     this.setState("dm_thinking");
+    const turnStartTime = Date.now();
+    logEvent("turn:player_input", { character: characterName, textLength: text.length });
 
     // Tag the input with character name; prepend OOC summary if pending
     // (persisted in conversation history so the DM retains OOC context)
@@ -593,6 +596,13 @@ export class GameEngine {
       accUsage(this.sessionUsage, result.usage);
       this.callbacks.onUsageUpdate(result.usage, "large");
 
+      logEvent("turn:dm_complete", {
+        textLength: result.text.length,
+        toolCalls: result.tuiCommands.length,
+        rounds: result.roundMessages.filter((m) => m.role === "assistant").length,
+        durationMs: Date.now() - turnStartTime,
+      });
+
       // Notify completion — pass player action for context-aware choice generation
       this.callbacks.onNarrativeComplete(result.text, text || undefined);
       this.callbacks.onTurnEnd(dmTurn);
@@ -623,6 +633,12 @@ export class GameEngine {
         // Store the failed input so the player can press Enter to retry
         this.lastFailedInput = { characterName, text, opts };
         const error = e instanceof Error ? e : new Error(String(e));
+        logEvent("turn:error", {
+          message: error.message,
+          engineState: this.engineState,
+          scene: this.sceneManager.getScene().sceneNumber,
+          durationMs: Date.now() - turnStartTime,
+        });
         await this.dumpDebugInfo(error);
         this.callbacks.onError(error);
       }
@@ -758,6 +774,8 @@ export class GameEngine {
     const updates = cmd.updates as { visibility: string; content: string }[];
     if (!updates || updates.length === 0) return;
 
+    const subStart = Date.now();
+    logEvent("subagent:start", { name: "scribe" });
     try {
       const sceneNumber = this.sceneManager.getScene().sceneNumber;
       const result = await runScribe(this.provider, {
@@ -778,11 +796,13 @@ export class GameEngine {
         }
       }
 
+      logEvent("subagent:end", { name: "scribe", durationMs: Date.now() - subStart });
       accUsage(this.sessionUsage, result.usage);
       this.callbacks.onUsageUpdate(result.usage, "small");
       this.callbacks.onDevLog?.(`[dev] scribe: ${result.summary}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      logEvent("subagent:error", { name: "scribe", message: msg, durationMs: Date.now() - subStart });
       this.callbacks.onDevLog?.(`[dev] scribe: failed — ${msg}`);
     }
   }
@@ -795,6 +815,8 @@ export class GameEngine {
 
     const paths = campaignPaths(this.gameState.campaignRoot);
     const filePath = norm(paths.character(characterName));
+    const subStart = Date.now();
+    logEvent("subagent:start", { name: "promote_character", character: characterName });
 
     try {
       // Read current sheet (may not exist for initial creation)
@@ -840,11 +862,13 @@ export class GameEngine {
       const relativePath = norm(filePath).replace(norm(this.gameState.campaignRoot) + "/", "");
       this.sceneManager.upsertEntity({ slug, name: characterName, aliases: [], type: "character", path: relativePath });
 
+      logEvent("subagent:end", { name: "promote_character", durationMs: Date.now() - subStart });
       accUsage(this.sessionUsage, result.usage);
       this.callbacks.onUsageUpdate(result.usage, "small");
       this.callbacks.onDevLog?.(`[dev] promote_character: ${characterName} — ${result.changelogEntry}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      logEvent("subagent:error", { name: "promote_character", message: msg, durationMs: Date.now() - subStart });
       this.callbacks.onDevLog?.(`[dev] promote_character: failed — ${msg}`);
     }
   }
