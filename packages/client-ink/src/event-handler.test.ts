@@ -161,14 +161,29 @@ describe("event-handler", () => {
       expect(h.state.toolGlyphs).toEqual([{ glyph: "⚄", color: "yellow" }]);
     });
 
-    it("clears tool glyphs when dm_thinking starts", () => {
+    it("clears tool glyphs when dm_thinking starts from idle", () => {
       const h = makeHarness();
       h.dispatch({ type: "activity:update", data: { toolStarted: "roll_dice" } });
       expect(h.state.toolGlyphs.length).toBe(1);
 
-      // New DM turn starts — glyphs reset
+      // Simulate end of turn (idle), then new DM turn
+      h.dispatch({ type: "activity:update", data: { engineState: "waiting_input" } });
       h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
       expect(h.state.toolGlyphs).toEqual([]);
+    });
+
+    it("preserves tool glyphs on tool_running → dm_thinking within a turn", () => {
+      const h = makeHarness();
+      // DM starts thinking
+      h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
+      // Tool runs
+      h.dispatch({ type: "activity:update", data: { toolStarted: "roll_dice" } });
+      h.dispatch({ type: "activity:update", data: { engineState: "tool_running" } });
+      expect(h.state.toolGlyphs.length).toBe(1);
+
+      // DM resumes thinking after tool — glyphs should persist
+      h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
+      expect(h.state.toolGlyphs.length).toBe(1);
     });
 
     it("updates engine state", () => {

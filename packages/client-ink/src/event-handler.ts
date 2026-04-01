@@ -230,9 +230,11 @@ function handleActivityUpdate(event: ActivityUpdateEvent, update: StateUpdater):
       if (tg) glyphs = [...glyphs, tg];
     }
 
-    // Clear glyphs when a new DM turn starts
+    // Clear glyphs only when entering dm_thinking from idle (new turn),
+    // not on tool_running → dm_thinking transitions within a turn.
     const newState = (engineState as string) ?? prev.engineState;
-    if (engineState === "dm_thinking" && prev.engineState !== "dm_thinking") {
+    const wasIdle = !prev.engineState || prev.engineState === "waiting_input";
+    if (engineState === "dm_thinking" && wasIdle) {
       glyphs = [];
     }
 

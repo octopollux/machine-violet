@@ -102,15 +102,18 @@ export class SetupSession {
     this.started = true;
 
     this.emitThinking();
-    const result = await this.conversation.start((delta) => {
-      this.broadcast({
-        type: "narrative:chunk",
-        data: { text: delta, kind: "dm" },
+    try {
+      const result = await this.conversation.start((delta) => {
+        this.broadcast({
+          type: "narrative:chunk",
+          data: { text: delta, kind: "dm" },
+        });
       });
-    });
 
-    await this.handleResult(result);
-    this.emitIdle();
+      await this.handleResult(result);
+    } finally {
+      this.emitIdle();
+    }
   }
 
   /** Send player input to the setup conversation. */
@@ -118,16 +121,18 @@ export class SetupSession {
     if (!this.conversation) throw new Error("Setup not started");
 
     this.emitThinking();
-    const result = await this.conversation.send(text, (delta) => {
-      this.broadcast({
-        type: "narrative:chunk",
-        data: { text: delta, kind: "dm" },
+    try {
+      const result = await this.conversation.send(text, (delta) => {
+        this.broadcast({
+          type: "narrative:chunk",
+          data: { text: delta, kind: "dm" },
+        });
       });
-    });
 
-    const out = await this.handleResult(result);
-    this.emitIdle();
-    return out;
+      return await this.handleResult(result);
+    } finally {
+      this.emitIdle();
+    }
   }
 
   /** Resolve a choice selection. */
@@ -135,16 +140,18 @@ export class SetupSession {
     if (!this.conversation) throw new Error("Setup not started");
 
     this.emitThinking();
-    const result = await this.conversation.resolveChoice(selectedText, (delta) => {
-      this.broadcast({
-        type: "narrative:chunk",
-        data: { text: delta, kind: "dm" },
+    try {
+      const result = await this.conversation.resolveChoice(selectedText, (delta) => {
+        this.broadcast({
+          type: "narrative:chunk",
+          data: { text: delta, kind: "dm" },
+        });
       });
-    });
 
-    const out = await this.handleResult(result);
-    this.emitIdle();
-    return out;
+      return await this.handleResult(result);
+    } finally {
+      this.emitIdle();
+    }
   }
 
   get isStarted(): boolean {
