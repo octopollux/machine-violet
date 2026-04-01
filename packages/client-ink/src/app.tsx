@@ -180,9 +180,15 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
     const newId = clientState.transitionCampaignId;
     if (!newId) return;
     setActiveCampaignId(newId);
-    setSessionKey((k) => k + 1); // triggers WS reconnect
+    setSessionKey((k) => k + 1); // remount PlayingPhase
     setNarrativeLines([]);
     setClientState(initialClientState());
+    // Reconnect WebSocket so the new session's state:snapshot is received
+    const ws = wsClientRef.current;
+    if (ws) {
+      ws.disconnect();
+      ws.connect();
+    }
   }, [clientState.transitionCampaignId]);
 
   // Start a campaign (used by both auto-start and menu selection)

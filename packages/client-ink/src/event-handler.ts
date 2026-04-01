@@ -125,9 +125,16 @@ export function createEventHandler(update: StateUpdater): (event: ServerEvent) =
         handleSessionEnded(event, update);
         break;
       case "session:transition":
+        // Clear state that could trigger stale detection before the
+        // app's useEffect runs and reconnects the WebSocket.
         update((prev) => ({
           ...prev,
           transitionCampaignId: (event.data as { campaignId: string }).campaignId,
+          stateSnapshot: null,
+          currentTurn: null,
+          activeChoices: null,
+          engineState: null,
+          toolGlyphs: [],
         }));
         break;
       case "error":

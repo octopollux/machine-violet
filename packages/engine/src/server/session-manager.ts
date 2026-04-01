@@ -320,6 +320,7 @@ export class SessionManager {
     this.turnManager = null;
     this.engine = null;
     this.gameState = null;
+    this.clearIdleTimer();
     this.status = "idle";
     this.campaignId = null;
     this.currentMode = "play";
