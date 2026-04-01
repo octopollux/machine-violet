@@ -10,6 +10,7 @@
  *   MachineViolet                     # full game (server + client)
  *   MachineViolet --server            # headless server only
  *   MachineViolet --campaign ID       # auto-start a campaign
+ *   MachineViolet --ws-log FILE       # append WS events as JSONL to FILE
  *
  * Environment:
  *   MV_PORT       — HTTP port (default 7200)
