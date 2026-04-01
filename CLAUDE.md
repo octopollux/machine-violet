@@ -132,3 +132,7 @@ Live API key in `.env` with limited credit. Opus is $5/$25 per MTok. Default dev
 ## Commit Hygeine
 
 After completing a coding task, make a detailed commit; you'll need this history later! In your final summary, mention that you have made a commit.
+
+## Code Review
+
+After creating a PR, poll for Copilot code review comments every two minutes for up to ten minutes. Review the feedback and address any issues you judge worthwhile — use your own judgement on what to fix vs skip.
