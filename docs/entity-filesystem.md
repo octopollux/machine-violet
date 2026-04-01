@@ -14,7 +14,7 @@ The game world is stored as a filesystem structure optimized for tool and agent 
 
 | Type | Directory | What it stores |
 |---|---|---|
-| **players** | `players/` | Real humans. Preferences, play style, meta-observations, triggers to avoid. |
+| **players** | `~/.machine-violet/players/` | Real humans (machine-scope, persists across campaigns). Age group, content boundaries, play style, meta-observations. |
 | **characters** | `characters/` | Anyone inhabiting the world — PCs, NPCs, monsters, gods. No hard distinction between subtypes. Any character can be handed to a player to inhabit. |
 | **locations** | `locations/` | Places. Description, connections to other locations, associated tile maps. Locations get subdirectories (may contain maps, sub-location files). |
 | **factions** | `factions/` | Organizations, groups, armies. Goals, resources, members, relationships. |
@@ -43,8 +43,6 @@ campaign-root/
 │       └── 002-road-to-caves/
 │           ├── transcript.md
 │           └── dm-notes.md
-├── players/
-│   └── alex.md
 ├── characters/
 │   ├── aldric.md                       # PC, full character sheet
 │   ├── mayor-graves.md                 # significant NPC, personality + stats

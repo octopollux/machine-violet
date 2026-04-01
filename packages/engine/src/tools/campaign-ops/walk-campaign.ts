@@ -69,7 +69,7 @@ export async function walkCampaignFiles(
   }
 
   // Top-level entity dirs (flat .md files)
-  for (const dir of ["characters", "factions", "lore", "items", "players"]) {
+  for (const dir of ["characters", "factions", "lore", "items"]) {
     await walkFlat(normalizedRoot + "/" + dir, dir);
   }
 

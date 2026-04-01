@@ -25,6 +25,9 @@ export interface SetupResult {
   characterDescription: string;
   characterDetails: string | null;
   themeColor: string;
+  ageGroup?: "child" | "teenager" | "adult";
+  /** Freeform content preferences captured during setup (one per line). */
+  contentPreferences?: string;
 }
 
 /**
@@ -36,6 +39,7 @@ export function buildCampaignConfig(result: SetupResult): CampaignConfig {
     character: result.characterName,
     type: "human",
     color: result.themeColor,
+    age_group: result.ageGroup,
   };
 
   return {

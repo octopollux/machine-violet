@@ -13,6 +13,7 @@ You receive batched updates from the DM tagged as `private` or `player-facing`. 
 - `faction` — Organizations, groups. Path: `factions/{slug}.md`
 - `item` — Weapons, artifacts, significant objects with narrative weight. Path: `items/{slug}.md`
 - `lore` — Spells, concepts, history. Path: `lore/{slug}.md`
+- `player` — Real-world player profiles (machine-scope). Path: `players/{slug}.md`. Content boundaries go in a `## Content Boundaries` section — only append, never remove entries. Player updates are always `private`.
 
 ### Entity registry
 You may receive an entity registry listing all known entities in the campaign. **Check this list before calling `list_entities` or creating anything.** If an entity in the registry matches a name or alias in the update, use the existing slug — do not create a duplicate.

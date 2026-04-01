@@ -41,13 +41,11 @@ describe("walkCampaignFiles", () => {
         "/camp/characters/kael.md": "# Kael",
         "/camp/factions/guild.md": "# Guild",
         "/camp/lore/history.md": "# History",
-        "/camp/players/alice.md": "# Alice",
       },
       {
         "/camp/characters": ["kael.md"],
         "/camp/factions": ["guild.md"],
         "/camp/lore": ["history.md"],
-        "/camp/players": ["alice.md"],
       },
     );
     const result = await walkCampaignFiles("/camp", fio);
@@ -56,7 +54,6 @@ describe("walkCampaignFiles", () => {
       "characters/kael.md",
       "factions/guild.md",
       "lore/history.md",
-      "players/alice.md",
     ]);
   });
 

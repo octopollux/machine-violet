@@ -10,7 +10,6 @@ export function campaignDirs(root: string): string[] {
     join(root, "campaign"),
     join(root, "campaign", "scenes"),
     join(root, "campaign", "session-recaps"),
-    join(root, "players"),
     join(root, "characters"),
     join(root, "locations"),
     join(root, "factions"),
@@ -45,7 +44,6 @@ export function campaignPaths(root: string) {
     sceneSummary: (n: number, slug: string) =>
       join(sceneDir(root, n, slug), "summary.md"),
     character: (name: string) => join(root, "characters", `${name}.md`),
-    player: (name: string) => join(root, "players", `${name}.md`),
     location: (name: string) => join(root, "locations", name, "index.md"),
     locationMap: (name: string, mapId: string) =>
       join(root, "locations", name, `${mapId}.json`),
@@ -64,6 +62,24 @@ export function campaignPaths(root: string) {
       join(sceneDir(root, n, slug), "dm-notes.md"),
     dmNotes: join(root, "campaign", "dm-notes.md"),
     compendium: join(root, "campaign", "compendium.json"),
-    playerNotes: join(root, "players", "notes.md"),
+    playerNotes: join(root, "campaign", "player-notes.md"),
+  };
+}
+
+/**
+ * Directories that should exist at the machine-scope root (~/.machine-violet).
+ */
+export function machineDirs(homeDir: string): string[] {
+  return [join(homeDir, "players")];
+}
+
+/**
+ * File paths within the machine-scope root (~/.machine-violet).
+ * These persist across campaigns.
+ */
+export function machinePaths(homeDir: string) {
+  return {
+    player: (name: string) => join(homeDir, "players", `${name}.md`),
+    playersDir: join(homeDir, "players"),
   };
 }

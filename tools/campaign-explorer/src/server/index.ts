@@ -52,11 +52,15 @@ async function main(): Promise<void> {
   const getCampaignPath = (slug: string) =>
     campaigns.find((c) => c.slug === slug)?.path;
 
-  // Resolve machine-scope .debug/ directory (sibling of campaigns dir)
-  const machineDebugDir = join(dirname(campaignsDir), ".debug");
+  // Resolve machine-scope directories (siblings of campaigns dir)
+  const machineRoot = dirname(campaignsDir);
+  const machineDebugDir = join(machineRoot, ".debug");
+  const machinePlayersDir = join(machineRoot, "players");
   const machineDebugAvailable = existsSync(machineDebugDir);
+  const machinePlayersAvailable = existsSync(machinePlayersDir);
   const getMachineDir = () => machineDebugAvailable ? machineDebugDir : null;
   let machineWatcher: FSWatcher | null = null;
+  let machinePlayersWatcher: FSWatcher | null = null;
 
   if (machineDebugAvailable) {
     console.log(`Machine-scope debug dir: ${machineDebugDir}`);
@@ -65,6 +69,17 @@ async function main(): Promise<void> {
     });
   } else {
     console.log(`Machine-scope debug dir not found: ${machineDebugDir}`);
+  }
+
+  if (machinePlayersAvailable) {
+    console.log(`Machine-scope players dir: ${machinePlayersDir}`);
+    machinePlayersWatcher = watchMachineDir(machinePlayersDir, {
+      onFileChange: (event) => broadcast({
+        ...event,
+        relativePath: `players/${event.relativePath}`,
+        category: "players",
+      }),
+    });
   }
 
   // Set up file watchers for each campaign

@@ -32,6 +32,7 @@ export interface PrefixSections {
   entityIndex?: string;
   uiState?: string;
   compendiumSummary?: string;
+  contentBoundaries?: string;
 }
 
 export interface CachedPrefixResult {
@@ -154,6 +155,10 @@ export function buildCachedPrefix(
 
   if (sections.uiState) {
     volatileParts.push(`## UI State\n${sections.uiState}`);
+  }
+
+  if (sections.contentBoundaries) {
+    volatileParts.push(`## Content Boundaries\nHonor these absolutely — no exceptions, no references to them in narration.\n${sections.contentBoundaries}`);
   }
 
   return { system: blocks, volatile: volatileParts.join("\n\n") };

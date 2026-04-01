@@ -18,7 +18,7 @@ import { advanceCalendar, checkClocks } from "../tools/clocks/index.js";
 import { validateCampaign } from "../tools/validation/index.js";
 import type { ValidationResult } from "../tools/validation/index.js";
 import { join } from "node:path";
-import { sceneDir, campaignPaths, parseFrontMatter, renderEntityTree } from "../tools/filesystem/index.js";
+import { sceneDir, campaignPaths, machinePaths, parseFrontMatter, extractSection, renderEntityTree } from "../tools/filesystem/index.js";
 import { formatChangelogEntry, appendChangelog } from "../tools/filesystem/index.js";
 import type { EntityTree, EntityTreeEntry } from "@machine-violet/shared/types/entities.js";
 import { slugify } from "./world-builder.js";
@@ -107,6 +107,8 @@ export class SceneManager {
   private entityTree: EntityTree;
   /** Rendered entity tree snapshot — refreshed at session start and scene transitions only. */
   private entityTreeSnapshot: string | undefined;
+  /** Content boundaries snapshot — refreshed at scene transitions only. */
+  private contentBoundariesSnapshot: string | undefined;
 
   /** Optional dev mode log callback. */
   devLog?: (msg: string) => void;
@@ -128,6 +130,7 @@ export class SceneManager {
     this.repo = repo ?? null;
     this.entityTree = entityTree ?? {};
     this.entityTreeSnapshot = renderEntityTree(this.entityTree);
+    this.contentBoundariesSnapshot = sessionState.contentBoundaries;
     this.pcSummaries = state.config.players.map((p) => p.character);
   }
 
@@ -144,6 +147,7 @@ export class SceneManager {
     this.sessionState.scenePrecis = buildScenePrecis(this.scene);
     this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);
     this.sessionState.entityIndex = this.entityTreeSnapshot;
+    this.sessionState.contentBoundaries = this.contentBoundariesSnapshot;
     return buildDMPrefix(this.state.config, this.sessionState);
   }
 
@@ -286,7 +290,7 @@ export class SceneManager {
 
     // Step 6: Reset precis and player reads
     this.pendingOp.step = "reset_precis";
-    this.stepResetPrecis();
+    await this.stepResetPrecis();
 
     // Step 7: Prune context
     this.pendingOp.step = "prune_context";
@@ -394,7 +398,7 @@ export class SceneManager {
         case "advance_calendar": this.stepAdvanceCalendar(pendingOp.timeAdvance, result); break;
         case "check_alarms": this.stepCheckAlarms(); break;
         case "validate": result.validationIssues = await this.stepValidate(); break;
-        case "reset_precis": this.stepResetPrecis(); break;
+        case "reset_precis": await this.stepResetPrecis(); break;
         case "prune_context": this.stepPruneContext(); break;
         case "checkpoint": await this.stepCheckpoint(); break;
       }
@@ -776,13 +780,24 @@ export class SceneManager {
     }
   }
 
-  private stepResetPrecis(): void {
+  private async stepResetPrecis(): Promise<void> {
     this.scene.precis = "";
     this.scene.openThreads = "";
     this.scene.npcIntents = "";
     this.scene.playerReads = [];
     // Refresh entity tree snapshot for the new scene
     this.entityTreeSnapshot = renderEntityTree(this.entityTree);
+    // Refresh content boundaries snapshot (picks up any Scribe updates)
+    await this.refreshContentBoundaries();
+  }
+
+  /** Re-read machine-scope player files and rebuild content boundaries snapshot. */
+  async refreshContentBoundaries(): Promise<void> {
+    this.contentBoundariesSnapshot = await loadContentBoundaries(
+      this.state.config.players,
+      this.state.homeDir,
+      this.fileIO,
+    );
   }
 
   private stepPruneContext(): void {
@@ -1139,4 +1154,30 @@ function synthesizePlayerRead(reads: PlayerRead[]): string | undefined {
   if (reads.length === 0) return undefined;
   const latest = reads[reads.length - 1];
   return `Engagement: ${latest.engagement} | Focus: ${latest.focus.join(", ")} | Tone: ${latest.tone} | Pacing: ${latest.pacing} | Off-script: ${latest.offScript ? "yes" : "no"}`;
+}
+
+/**
+ * Read machine-scope player files and aggregate content boundaries.
+ * Returns combined boundaries for all active players, or undefined if none.
+ */
+export async function loadContentBoundaries(
+  players: { name: string }[],
+  homeDir: string,
+  fileIO: FileIO,
+): Promise<string | undefined> {
+  const mPaths = machinePaths(homeDir);
+  const parts: string[] = [];
+  for (const player of players) {
+    const slug = slugify(player.name);
+    const path = norm(mPaths.player(slug));
+    try {
+      const content = await fileIO.readFile(path);
+      const { body } = parseFrontMatter(content);
+      const section = extractSection(body, "Content Boundaries");
+      if (section) {
+        parts.push(players.length > 1 ? `${player.name}:\n${section}` : section);
+      }
+    } catch { /* player file doesn't exist yet */ }
+  }
+  return parts.length > 0 ? parts.join("\n\n") : undefined;
 }

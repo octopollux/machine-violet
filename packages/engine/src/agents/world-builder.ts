@@ -1,8 +1,8 @@
 import type { FileIO } from "./scene-manager.js";
 import type { SetupResult } from "./setup-agent.js";
 import { buildCampaignConfig } from "./setup-agent.js";
-import { campaignDirs, campaignPaths } from "../tools/filesystem/index.js";
-import { serializeEntity } from "../tools/filesystem/index.js";
+import { campaignDirs, campaignPaths, machineDirs, machinePaths } from "../tools/filesystem/index.js";
+import { serializeEntity, parseFrontMatter, extractSection } from "../tools/filesystem/index.js";
 import { norm } from "../utils/paths.js";
 import { findSystem, readBundledRuleCard } from "../config/systems.js";
 import { processingPaths } from "../config/processing-paths.js";
@@ -70,15 +70,24 @@ export async function buildCampaignWorld(
   );
   await fileIO.writeFile(norm(paths.party), partyContent);
 
-  // 5. Write player file
-  const playerPath = norm(paths.player(slugify(result.playerName)));
-  const playerContent = serializeEntity(
-    result.playerName,
-    { type: "Player" },
-    "",
-    [],
-  );
-  await fileIO.writeFile(playerPath, playerContent);
+  // 5. Write player file (machine-scope — persists across campaigns)
+  if (homeDir) {
+    for (const dir of machineDirs(homeDir)) {
+      await fileIO.mkdir(norm(dir));
+    }
+    const playerSlug = slugify(result.playerName);
+    const playerPath = norm(machinePaths(homeDir).player(playerSlug));
+    if (!(await fileIO.exists(playerPath))) {
+      const fm: Record<string, unknown> = { type: "Player" };
+      if (result.ageGroup) fm.age_group = result.ageGroup;
+      const body = buildInitialContentBoundaries(result.ageGroup, result.contentPreferences);
+      const playerContent = serializeEntity(result.playerName, fm, body, []);
+      await fileIO.writeFile(playerPath, playerContent);
+    } else {
+      // Returning player — update with any newly captured metadata
+      await updateReturningPlayer(playerPath, result, fileIO);
+    }
+  }
 
   // 6. Write campaign log (empty JSON)
   const logPath = norm(paths.log);
@@ -116,6 +125,68 @@ export async function buildCampaignWorld(
   }
 
   return root;
+}
+
+/**
+ * Update an existing returning player file with newly captured metadata.
+ * Only sets age_group if missing, and appends content boundaries if none exist.
+ */
+async function updateReturningPlayer(
+  playerPath: string,
+  result: SetupResult,
+  fileIO: FileIO,
+): Promise<void> {
+  const raw = await fileIO.readFile(playerPath);
+  const { frontMatter, body, changelog } = parseFrontMatter(raw);
+  const title = (frontMatter._title as string) || result.playerName;
+  let changed = false;
+
+  // Set age_group if missing and newly provided
+  if (result.ageGroup && !frontMatter.age_group) {
+    frontMatter.age_group = result.ageGroup;
+    changed = true;
+  }
+
+  // Append initial content boundaries if none exist and we have new data
+  let newBody = body;
+  const hasSection = extractSection(body, "Content Boundaries") !== undefined;
+  if (!hasSection && (result.contentPreferences || result.ageGroup)) {
+    const section = buildInitialContentBoundaries(result.ageGroup, result.contentPreferences);
+    if (section) {
+      newBody = body ? `${body}\n\n${section}` : section;
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    await fileIO.writeFile(playerPath, serializeEntity(title, frontMatter, newBody, changelog));
+  }
+}
+
+/**
+ * Build the initial body for a new player entity based on age group and
+ * any content preferences captured during setup.
+ */
+function buildInitialContentBoundaries(
+  ageGroup?: string,
+  contentPreferences?: string,
+): string {
+  const lines: string[] = [];
+
+  if (ageGroup === "child") {
+    lines.push("- No profanity", "- No sexual content", "- No graphic violence");
+  } else if (ageGroup === "teenager") {
+    lines.push("- Discretion cuts on sexual content");
+  }
+
+  if (contentPreferences) {
+    for (const line of contentPreferences.split("\n").map(l => l.trim()).filter(Boolean)) {
+      lines.push(line.startsWith("- ") ? line : `- ${line}`);
+    }
+  }
+
+  if (lines.length === 0) return "";
+  return `## Content Boundaries\n${lines.join("\n")}`;
 }
 
 /**

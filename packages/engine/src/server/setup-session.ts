@@ -10,7 +10,7 @@
  */
 import type { ServerEvent } from "@machine-violet/shared";
 import { createSetupConversation } from "../agents/subagents/setup-conversation.js";
-import type { SetupConversation, SetupTurnResult } from "../agents/subagents/setup-conversation.js";
+import type { SetupConversation, SetupTurnResult, KnownPlayer } from "../agents/subagents/setup-conversation.js";
 import type { SetupResult } from "../agents/setup-agent.js";
 // buildCampaignConfig is used internally by buildCampaignWorld
 import { buildCampaignWorld } from "../agents/world-builder.js";
@@ -18,7 +18,7 @@ import { createBaseFileIO } from "./fileio.js";
 import type { FileIO } from "../agents/scene-manager.js";
 import { norm, configDir } from "../utils/paths.js";
 import { slugify } from "../agents/world-builder.js";
-import { campaignPaths } from "../tools/filesystem/scaffold.js";
+import { campaignPaths, machinePaths } from "../tools/filesystem/scaffold.js";
 import { parseFrontMatter, serializeEntity } from "../tools/filesystem/frontmatter.js";
 import { promoteCharacter } from "../agents/subagents/character-promotion.js";
 import { processingPaths } from "../config/processing-paths.js";
@@ -63,9 +63,34 @@ export class SetupSession {
     }
   }
 
+  /** Scan machine-scope players directory for returning player recognition. */
+  private async scanKnownPlayers(): Promise<KnownPlayer[]> {
+    const playersDir = machinePaths(this.homeDir).playersDir;
+    try {
+      const entries = await this.fileIO.listDir(playersDir);
+      const players: KnownPlayer[] = [];
+      for (const entry of entries) {
+        if (!entry.endsWith(".md")) continue;
+        try {
+          const content = await this.fileIO.readFile(norm(playersDir + "/" + entry));
+          const { frontMatter } = parseFrontMatter(content);
+          const name = (frontMatter._title as string) || entry.replace(/\.md$/, "");
+          players.push({
+            name,
+            ageGroup: frontMatter.age_group as string | undefined,
+          });
+        } catch { /* skip unreadable files */ }
+      }
+      return players;
+    } catch {
+      return []; // Directory doesn't exist yet
+    }
+  }
+
   /** Start the setup conversation. Streams opening narrative to clients. */
   async start(): Promise<void> {
-    this.conversation = createSetupConversation(this.provider, this.model);
+    const knownPlayers = await this.scanKnownPlayers();
+    this.conversation = createSetupConversation(this.provider, this.model, knownPlayers);
     this.started = true;
 
     const result = await this.conversation.start((delta) => {

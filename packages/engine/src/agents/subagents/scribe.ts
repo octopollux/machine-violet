@@ -5,7 +5,7 @@ import type { UsageStats } from "../agent-loop.js";
 import { getModel } from "../../config/models.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import { join, dirname } from "node:path";
-import { campaignPaths } from "../../tools/filesystem/index.js";
+import { campaignPaths, machinePaths } from "../../tools/filesystem/index.js";
 import { parseFrontMatter, serializeEntity } from "../../tools/filesystem/index.js";
 import { formatChangelogEntry } from "../../tools/filesystem/index.js";
 import type { EntityFrontMatter, EntityTree } from "@machine-violet/shared/types/entities.js";
@@ -29,6 +29,8 @@ export interface ScribeInput {
   sceneNumber: number;
   /** Current entity tree — injected into Scribe context for deduplication. */
   entityTree?: EntityTree;
+  /** Machine-scope home dir (~/.machine-violet) for player entity paths. */
+  homeDir: string;
 }
 
 /** Delta returned by the Scribe for each entity created or updated. */
@@ -73,7 +75,7 @@ const SCRIBE_TOOLS: NormalizedTool[] = [
       properties: {
         entity_type: {
           type: "string",
-          enum: ["character", "location", "faction", "lore", "item"],
+          enum: ["character", "location", "faction", "lore", "item", "player"],
           description: "Entity type to list",
         },
       },
@@ -88,7 +90,7 @@ const SCRIBE_TOOLS: NormalizedTool[] = [
       properties: {
         entity_type: {
           type: "string",
-          enum: ["character", "location", "faction", "lore", "item"],
+          enum: ["character", "location", "faction", "lore", "item", "player"],
           description: "Entity type",
         },
         slug: {
@@ -112,7 +114,7 @@ const SCRIBE_TOOLS: NormalizedTool[] = [
         },
         entity_type: {
           type: "string",
-          enum: ["character", "location", "faction", "lore", "item"],
+          enum: ["character", "location", "faction", "lore", "item", "player"],
           description: "Entity type",
         },
         name: {
@@ -155,8 +157,10 @@ export function buildScribeToolHandler(
   created: string[],
   updated: string[],
   entityDeltas: ScribeEntityDelta[],
+  homeDir?: string,
 ) {
   const paths = campaignPaths(campaignRoot);
+  const mPaths = homeDir ? machinePaths(homeDir) : undefined;
 
   function entityPath(entityType: string, slug: string): string {
     switch (entityType) {
@@ -165,6 +169,9 @@ export function buildScribeToolHandler(
       case "faction": return paths.faction(slug);
       case "lore": return paths.lore(slug);
       case "item": return paths.item(slug);
+      case "player":
+        if (!mPaths) throw new Error("player entity type requires homeDir");
+        return mPaths.player(slug);
       default: return paths.lore(slug);
     }
   }
@@ -176,6 +183,9 @@ export function buildScribeToolHandler(
       case "faction": return join(campaignRoot, "factions");
       case "lore": return join(campaignRoot, "lore");
       case "item": return join(campaignRoot, "items");
+      case "player":
+        if (!mPaths) throw new Error("player entity type requires homeDir");
+        return mPaths.playersDir;
       default: return join(campaignRoot, "lore");
     }
   }
@@ -330,6 +340,7 @@ export async function runScribe(
     created,
     updated,
     entityDeltas,
+    input.homeDir,
   );
 
   // Format the user message with all updates

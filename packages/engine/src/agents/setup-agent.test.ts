@@ -164,7 +164,7 @@ describe("buildCampaignWorld", () => {
     };
 
     const result = makeSetupResult();
-    const root = await buildCampaignWorld("/tmp/campaigns", result, fileIO);
+    const root = await buildCampaignWorld("/tmp/campaigns", result, fileIO, "/tmp/home");
 
     // Directory was created
     expect(root).toContain("/tmp/campaigns/");
@@ -197,8 +197,8 @@ describe("buildCampaignWorld", () => {
     expect(files[partyFile!]).toContain("The Party");
     expect(files[partyFile!]).toContain("[[");
 
-    // Player file was written
-    const playerFile = Object.keys(files).find((p) => p.includes("/players/"));
+    // Player file was written to machine-scope
+    const playerFile = Object.keys(files).find((p) => p.includes("/tmp/home/players/"));
     expect(playerFile).toBeTruthy();
 
     // Standard directories were created

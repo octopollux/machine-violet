@@ -768,6 +768,7 @@ export class GameEngine {
         campaignRoot: this.gameState.campaignRoot,
         sceneNumber,
         entityTree: this.sceneManager.getEntityTree(),
+        homeDir: this.gameState.homeDir,
       }, this.fileIO);
 
       // Apply entity tree deltas from Scribe

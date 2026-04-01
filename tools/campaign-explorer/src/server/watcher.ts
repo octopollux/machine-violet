@@ -25,7 +25,6 @@ export function classifyPath(relPath: string): FileCategory {
   if (normalized.startsWith("campaign/")) return "transcript";
   if (normalized.endsWith(".json") && normalized.includes("map")) return "map";
   if (normalized.startsWith("characters/")) return "characters";
-  if (normalized.startsWith("players/")) return "players";
   if (normalized.startsWith("locations/")) return "locations";
   if (normalized.startsWith("factions/")) return "factions";
   if (normalized.startsWith("lore/")) return "lore";
@@ -99,9 +98,10 @@ export function watchCampaign(
   return watcher;
 }
 
-/** Classify a file inside the machine-scope .debug/ directory. */
+/** Classify a file inside the machine-scope directory (~/.machine-violet). */
 export function classifyMachinePath(relPath: string): FileCategory {
   const normalized = relPath.replace(/\\/g, "/");
+  if (normalized.startsWith("players/")) return "players";
   if (normalized.endsWith(".log") || normalized.endsWith(".txt")) return "logs";
   if (normalized.endsWith("-thinking.json") && normalized.includes("/context/"))
     return "thinking";
