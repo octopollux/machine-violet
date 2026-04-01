@@ -6,6 +6,7 @@ export type FileCategory =
   | "locations"
   | "factions"
   | "lore"
+  | "items"
   | "rules"
   | "transcript"
   | "context-dump"
