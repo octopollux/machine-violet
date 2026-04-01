@@ -438,8 +438,8 @@ describe("new Phase 8 tools", () => {
     expect(registry.has("promote_character")).toBe(true);
   });
 
-  it("registry has 45 tools total", () => {
+  it("registry has 29 tools total", () => {
     const registry = createTestRegistry();
-    expect(registry.size).toBe(45);
+    expect(registry.size).toBe(29);
   });
 });

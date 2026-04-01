@@ -36,7 +36,7 @@ describe("ToolRegistry", () => {
   it("registers all T1 tools", () => {
     const reg = createTestRegistry();
     // Map (3) + Dice (1) + Deck (1) + Clocks (2) + Combat (4) + TUI (6) + Scene (3) + Entity (5) + Objectives (1) + Search (2) + Player (1) = 29
-    expect(reg.size).toBeGreaterThanOrEqual(25);
+    expect(reg.size).toBe(29);
   });
 
   it("generates API-compatible tool definitions", () => {

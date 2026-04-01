@@ -915,6 +915,14 @@ const TOOL_DEFS: RegisteredTool[] = [
 
 import type { StateSlice } from "../context/state-persistence.js";
 
+/** Operations that are read-only for consolidated tools (skip persistence). */
+const READ_ONLY_OPS: Record<string, Set<string>> = {
+  map: new Set(["view"]),
+  map_entity: new Set(["find_nearest"]),
+  map_query: new Set(["distance", "path", "line_of_sight", "tiles_in_range"]),
+  alarm: new Set(["check"]),
+};
+
 /** Maps tool names to which state slices they mutate */
 export const TOOL_STATE_MAP: Record<string, StateSlice[]> = {
   start_combat: ["combat", "clocks"],
@@ -996,7 +1004,9 @@ class ToolRegistry {
       const result = tool.handler(state, input);
       if (!result.is_error) {
         const slices = TOOL_STATE_MAP[name];
-        if (this.persist && slices && slices.length > 0) {
+        const readOps = READ_ONLY_OPS[name];
+        const isReadOnly = readOps && readOps.has(input.operation as string);
+        if (this.persist && slices && slices.length > 0 && !isReadOnly) {
           this.persist(state, slices);
         }
         this.onToolSuccess?.(name, state);
