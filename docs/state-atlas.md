@@ -29,13 +29,13 @@ GameState
 │
 ├── clocks: ClocksState                    mut   → state/clocks.json     Engine + DM
 │   ├── calendar: CalendarClock
-│   │   ├── current: number (minutes)      mut   (advance_calendar, scene_transition)
-│   │   ├── alarms: Alarm[]                mut   (set_alarm, clear_alarm, fireAlarms)
+│   │   ├── current: number (minutes)      mut   (time: advance, scene_transition)
+│   │   ├── alarms: Alarm[]                mut   (alarm: set/clear, fireAlarms)
 │   │   ├── epoch: string                  const (set at campaign init)
 │   │   └── display_format: string         const
 │   └── combat: CombatClock
-│       ├── current: number (rounds)       mut   (next_round)
-│       ├── alarms: Alarm[]                mut   (set_alarm, clear_alarm, fireAlarms)
+│       ├── current: number (rounds)       mut   (time: next_round)
+│       ├── alarms: Alarm[]                mut   (alarm: set/clear, fireAlarms)
 │       └── active: boolean                mut   (start_combat ↔ end_combat)
 │
 ├── combat: CombatState                    mut   → state/combat.json     DM via tools
@@ -204,11 +204,8 @@ Legend: **R** = reads, **W** = writes (triggers persistence), **UI** = returns T
 
 | Tool | maps | clocks | combat | decks | config | activePlayerIndex | Notes |
 |------|------|--------|--------|-------|--------|-------------------|-------|
-| `set_alarm` | | **W** | | | | | Calendar or combat clock. |
-| `clear_alarm` | | **W** | | | | | Searches both clocks. |
-| `advance_calendar` | | **W** | | | | | Fires triggered alarms. |
-| `next_round` | | **W** | | | | | Throws if combat not active. |
-| `check_clocks` | | R | | | | | Read-only status of both clocks. |
+| `alarm` | | R/**W** | | | | | `set`/`clear` write; `check` reads both clocks. |
+| `time` | | **W** | | | | | `advance` moves calendar; `next_round` advances combat round. Both fire alarms. |
 
 ### Combat
 
@@ -270,10 +267,8 @@ start_combat    → ["combat", "clocks"]
 end_combat      → ["combat", "clocks"]
 advance_turn    → ["combat"]
 modify_initiative → ["combat"]
-set_alarm       → ["clocks"]
-clear_alarm     → ["clocks"]
-advance_calendar → ["clocks"]
-next_round      → ["clocks"]
+alarm           → ["clocks"]
+time            → ["clocks"]
 map             → ["maps"]
 map_entity      → ["maps"]
 deck            → ["decks"]

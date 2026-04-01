@@ -349,86 +349,80 @@ const TOOL_DEFS: RegisteredTool[] = [
     },
   },
 
-  // ====== CLOCKS ======
+  // ====== ALARMS — schedule future events on calendar or combat clock ======
   {
     definition: {
-      name: "set_alarm",
-      description: "Set an alarm on the calendar or combat clock.",
+      name: "alarm",
+      description: "Manage alarms (scheduled future events). Works on both the calendar clock (narrative time) and combat clock (round-based). Operations: set | clear | check.",
       inputSchema: {
         type: "object" as const,
         properties: {
-          clock: { type: "string", enum: ["calendar", "combat"] },
+          operation: { type: "string", enum: ["set", "clear", "check"] },
+          // set
+          clock: { type: "string", enum: ["calendar", "combat"], description: "Which clock to set the alarm on" },
           in: { type: ["number", "string"], description: "Rounds (combat) or time string like '3 days' (calendar)" },
-          message: { type: "string" },
+          message: { type: "string", description: "What happens when the alarm fires" },
           repeating: { type: "number", description: "Repeat interval" },
+          // clear
+          id: { type: "string", description: "Alarm ID to clear" },
         },
-        required: ["clock", "in", "message"],
+        required: ["operation"],
       },
     },
     handler: (state, input) => {
-      const result = setAlarm(state.clocks, input as unknown as Parameters<typeof setAlarm>[1]);
-      return ok(`Alarm ${result.id}: fires at ${result.fires_at}${result.display ? ` (${result.display})` : ""}`);
-    },
-  },
-  {
-    definition: {
-      name: "clear_alarm",
-      description: "Remove an alarm by ID.",
-      inputSchema: {
-        type: "object" as const,
-        properties: {
-          id: { type: "string" },
-        },
-        required: ["id"],
-      },
-    },
-    handler: (state, input) => {
-      clearAlarm(state.clocks, input.id as string);
-      return ok(`Alarm ${input.id} cleared`);
-    },
-  },
-  {
-    definition: {
-      name: "advance_calendar",
-      description: "Advance the calendar clock by a time amount.",
-      inputSchema: {
-        type: "object" as const,
-        properties: {
-          minutes: { type: "number" },
-        },
-        required: ["minutes"],
-      },
-    },
-    handler: (state, input) => {
-      const fired = advanceCalendar(state.clocks, input.minutes as number);
-      if (fired.length === 0) return ok("Calendar advanced.");
-      return ok(`Calendar advanced. Alarms fired: ${fired.map((a) => a.message).join("; ")}`);
-    },
-  },
-  {
-    definition: {
-      name: "next_round",
-      description: "Advance combat round counter. Fires combat alarms.",
-      inputSchema: { type: "object" as const, properties: {} },
-    },
-    handler: (state) => {
-      const result = clockNextRound(state.clocks);
-      const msg = `Round ${result.round}`;
-      if (result.alarms_fired.length) {
-        return ok(`${msg}. Alarms: ${result.alarms_fired.map((a) => a.message).join("; ")}`);
+      const op = input.operation as string;
+      switch (op) {
+        case "set": {
+          const result = setAlarm(state.clocks, input as unknown as Parameters<typeof setAlarm>[1]);
+          return ok(`Alarm ${result.id}: fires at ${result.fires_at}${result.display ? ` (${result.display})` : ""}`);
+        }
+        case "clear": {
+          clearAlarm(state.clocks, input.id as string);
+          return ok(`Alarm ${input.id} cleared`);
+        }
+        case "check": {
+          const result = checkClocks(state.clocks);
+          return ok(JSON.stringify(result));
+        }
+        default:
+          return err(`Unknown alarm operation: ${op}`);
       }
-      return ok(msg);
     },
   },
+
+  // ====== TIME — advance narrative or combat time ======
   {
     definition: {
-      name: "check_clocks",
-      description: "Read current state of all clocks and pending alarms.",
-      inputSchema: { type: "object" as const, properties: {} },
+      name: "time",
+      description: "Advance time. Use `advance` to move the calendar forward (narrative time between scenes or during downtime). Use `next_round` to advance the combat round counter. Both fire any triggered alarms. Operations: advance | next_round.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          operation: { type: "string", enum: ["advance", "next_round"] },
+          minutes: { type: "number", description: "Minutes to advance (for advance operation)" },
+        },
+        required: ["operation"],
+      },
     },
-    handler: (state) => {
-      const result = checkClocks(state.clocks);
-      return ok(JSON.stringify(result));
+    handler: (state, input) => {
+      const op = input.operation as string;
+      switch (op) {
+        case "advance": {
+          const fired = advanceCalendar(state.clocks, input.minutes as number);
+          if (fired.length === 0) return ok("Calendar advanced.");
+          return ok(`Calendar advanced. Alarms fired: ${fired.map((a) => a.message).join("; ")}`);
+        }
+        case "next_round": {
+          const result = clockNextRound(state.clocks);
+          const msg = `Round ${result.round}`;
+          if (result.alarms_fired.length) {
+            return ok(`${msg}. Alarms: ${result.alarms_fired.map((a) => a.message).join("; ")}`);
+          }
+          return ok(msg);
+        }
+        default:
+          return err(`Unknown time operation: ${op}`);
+      }
     },
   },
 
@@ -927,10 +921,8 @@ export const TOOL_STATE_MAP: Record<string, StateSlice[]> = {
   end_combat: ["combat", "clocks"],
   advance_turn: ["combat"],
   modify_initiative: ["combat"],
-  set_alarm: ["clocks"],
-  clear_alarm: ["clocks"],
-  advance_calendar: ["clocks"],
-  next_round: ["clocks"],
+  alarm: ["clocks"],
+  time: ["clocks"],
   map: ["maps"],
   map_entity: ["maps"],
   deck: ["decks"],

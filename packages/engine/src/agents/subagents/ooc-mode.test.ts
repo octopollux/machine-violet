@@ -462,7 +462,7 @@ describe("buildOOCTools", () => {
     expect(tools).toHaveLength(16);
     const names = tools.map((t) => t.name);
     expect(names).toContain("roll_dice");
-    expect(names).toContain("check_clocks");
+    expect(names).toContain("alarm");
     expect(names).toContain("scribe");
     expect(names).toContain("style_scene");
     expect(names).toContain("show_character_sheet");
@@ -621,10 +621,10 @@ describe("buildOOCToolHandler (DM tools)", () => {
     expect(result.content).toContain("→");
   });
 
-  it("check_clocks dispatches and returns result directly", async () => {
+  it("alarm check dispatches and returns result directly", async () => {
     const gs = mockGameState();
     const handler = buildOOCToolHandler(undefined, undefined, "/camp", undefined, undefined, undefined, gs);
-    const result = await handler("check_clocks", {});
+    const result = await handler("alarm", { operation: "check" });
     expect(result.is_error).toBeUndefined();
     expect(result.content).toContain("calendar");
   });

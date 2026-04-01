@@ -116,7 +116,7 @@ Initiative tracking manages turn order during combat. It's a Tier 1 (code) syste
    - **Human player's turn:** TUI activates that player's input. They type their action.
    - **AI player's turn:** AI player model call generates the action automatically.
    - **NPC/enemy turn:** The DM narrates their action (silently using the resolve session for mechanics).
-5. **Round ends.** `next_round` fires, combat clock ticks, alarms checked.
+5. **Round ends.** `time` next_round fires, combat clock ticks, alarms checked.
 6. **Combat ends.** The DM calls `end_combat`. Initiative clears. Player switching returns to free mode.
 
 ### Tools

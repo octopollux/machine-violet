@@ -25,11 +25,8 @@ const TOOL_GLYPH_MAP: Record<string, ToolGlyph> = {
   map_entity:         { glyph: "◈", color: "blue" },
   map_query:          { glyph: "◈", color: "blue" },
   // Clocks / time
-  set_alarm:          { glyph: "⏲" },
-  clear_alarm:        { glyph: "⏲" },
-  advance_calendar:   { glyph: "⏲" },
-  next_round:         { glyph: "⏲" },
-  check_clocks:       { glyph: "⏲" },
+  alarm:              { glyph: "⏲" },
+  time:               { glyph: "⏲" },
   // Combat
   start_combat:       { glyph: "⚔", color: "red" },
   end_combat:         { glyph: "⚔", color: "red" },

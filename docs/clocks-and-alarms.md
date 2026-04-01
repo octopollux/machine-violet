@@ -17,7 +17,7 @@ Use cases:
 
 ### Round counter (tactical time)
 
-Tracks combat rounds. Increments each combat round. Scoped to the current combat — resets when combat ends. The DM calls `next_round()` when a combat round ends, or the engine increments automatically if combat round structure is formalized.
+Tracks combat rounds. Increments each combat round. Scoped to the current combat — resets when combat ends. The DM calls `time({ operation: "next_round" })` when a combat round ends, or the engine increments automatically if combat round structure is formalized.
 
 Use cases:
 - "The bridge collapses in 10 rounds"
@@ -47,79 +47,61 @@ Both clocks use the same structure. The only difference is what ticks them and w
 
 ## Tools
 
-### `set_alarm`
+Two consolidated tools cover all clock and alarm operations.
 
-The DM sets alarms on either clock.
+### `alarm` — schedule future events
+
+Operations: `set`, `clear`, `check`.
 
 ```
-set_alarm({
+alarm({
+  operation: "set",
   clock: "calendar",
   in: "3 days",
   message: "The orc warband reaches Thornfield. See lore/orc-invasion-plan.md"
 })
-→ { id: "alarm-017", fires_at: 14400, display: "Day 8, morning" }
+→ "Alarm alarm-017: fires at 14400 (Day 8, morning)"
 
-set_alarm({
+alarm({
+  operation: "set",
   clock: "combat",
   in: 10,
   message: "The bridge collapses. All entities on bridge tiles fall (3d6, DEX DC 14)."
 })
-→ { id: "alarm-018", fires_at: 16 }
+→ "Alarm alarm-018: fires at 16"
 
-set_alarm({
+alarm({
+  operation: "set",
   clock: "combat",
   in: 3,
   repeating: 3,
   message: "Poison: Aldric takes 1d4 poison damage (CON save DC 12 to end)."
 })
-→ { id: "alarm-019", fires_at: 9, repeats_every: 3 }
+→ "Alarm alarm-019: fires at 9"
+
+alarm({ operation: "clear", id: "alarm-019" })
+→ "Alarm alarm-019 cleared"
+
+alarm({ operation: "check" })
+→ { calendar: { current: "Day 5, afternoon", next_alarm: { ... } },
+     combat: { active: true, round: 9, next_alarm: { ... } } }
 ```
 
-### `clear_alarm`
+### `time` — advance narrative or combat time
 
-Remove an alarm by ID (spell ended early, threat neutralized).
-
-```
-clear_alarm({ id: "alarm-019" })
-→ { cleared: "alarm-019", was: "Poison: Aldric takes 1d4 poison damage..." }
-```
-
-### `next_round`
-
-Advance the combat round counter. Check and fire any combat alarms.
+Operations: `advance`, `next_round`. Both fire any triggered alarms.
 
 ```
-next_round({})
-→ {
-    round: 10,
-    alarms_fired: [
-      { id: "alarm-018", message: "The bridge collapses. All entities on bridge tiles fall (3d6, DEX DC 14)." }
-    ]
-  }
-```
+time({ operation: "advance", minutes: 480 })
+→ "Calendar advanced. Alarms fired: The orc warband reaches Thornfield."
 
-### `check_clocks`
-
-Read current state of both clocks and pending alarms. For DM situational awareness.
-
-```
-check_clocks({})
-→ {
-    calendar: {
-      current: "Day 5, afternoon",
-      next_alarm: { id: "orc-arrival", fires: "Day 8, morning", message: "..." }
-    },
-    combat: {
-      active: true,
-      round: 9,
-      next_alarm: { id: "bridge-collapse", fires: "Round 10", message: "..." }
-    }
-  }
+time({ operation: "next_round" })
+→ "Round 10. Alarms: The bridge collapses."
 ```
 
 ## How Alarms Fire
 
-When a clock ticks (calendar via `scene_transition`, combat via `next_round`), the engine checks all alarms on that clock:
+When a clock ticks (calendar via `scene_transition`, combat via `time` next_round), the engine checks all alarms on that clock:
 
 1. Any alarm where `fires_at <= current` fires
 2. The alarm's message is returned in the tool result — it enters the DM's context as part of the current exchange
@@ -130,7 +112,7 @@ Alarm messages are **invisible to the player**. They appear only in the DM's con
 
 ## Spell and Effect Duration Tracking
 
-The round counter's biggest win: the DM never has to manually count spell durations. Cast Hold Person → `set_alarm({ clock: "combat", in: 10, message: "Hold Person on G3 expires." })`. The engine counts. The DM gets notified.
+The round counter's biggest win: the DM never has to manually count spell durations. Cast Hold Person → `alarm({ operation: "set", clock: "combat", in: 10, message: "Hold Person on G3 expires." })`. The engine counts. The DM gets notified.
 
 This also works for:
 - Concentration tracking (alarm fires → "Concentration check needed or [spell] drops")
@@ -143,7 +125,7 @@ This also works for:
 
 **`scene_transition`**: Already accepts `time_advance`. After advancing the calendar clock, it checks alarms and includes any fired alarm messages in its return to the DM. No new design needed.
 
-**Resolution hooks**: Dice roll hooks already fire after every roll. If combat round advancement should be triggered automatically (e.g., after all combatants have acted), a hook can call `next_round` internally.
+**Resolution hooks**: Dice roll hooks already fire after every roll. If combat round advancement should be triggered automatically (e.g., after all combatants have acted), a hook can call `time` next_round internally.
 
 **Context management**: Alarm notifications are part of tool results, so they follow the standard retention and stubbing policy. An alarm that fired 3 turns ago becomes a one-line stub. The DM already acted on it.
 

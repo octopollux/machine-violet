@@ -35,8 +35,8 @@ function mockState(): GameState {
 describe("ToolRegistry", () => {
   it("registers all T1 tools", () => {
     const reg = createTestRegistry();
-    // Map (14) + Dice (1) + Deck (1) + Clocks (5) + Combat (4) + TUI (7) = 32
-    expect(reg.size).toBeGreaterThanOrEqual(30);
+    // Map (3) + Dice (1) + Deck (1) + Clocks (2) + Combat (4) + TUI (6) + Scene (3) + Entity (5) + Objectives (1) + Search (2) + Player (1) = 29
+    expect(reg.size).toBeGreaterThanOrEqual(25);
   });
 
   it("generates API-compatible tool definitions", () => {
@@ -106,7 +106,8 @@ describe("ToolRegistry", () => {
   it("dispatches set_alarm and check_clocks", () => {
     const reg = createTestRegistry();
     const state = mockState();
-    const result = reg.dispatch(state, "set_alarm", {
+    const result = reg.dispatch(state, "alarm", {
+      operation: "set",
       clock: "calendar",
       in: "2 days",
       message: "Orc warband arrives",
@@ -114,7 +115,7 @@ describe("ToolRegistry", () => {
     expect(result.is_error).toBeUndefined();
     expect(result.content).toContain("Alarm");
 
-    const check = reg.dispatch(state, "check_clocks", {});
+    const check = reg.dispatch(state, "alarm", { operation: "check" });
     expect(check.content).toContain("calendar");
   });
 
@@ -318,10 +319,10 @@ describe("ToolRegistry", () => {
 
   it("getDefinitionsFor returns only requested tools, skips unknown", () => {
     const reg = createTestRegistry();
-    const defs = reg.getDefinitionsFor(["roll_dice", "nonexistent", "check_clocks"]);
+    const defs = reg.getDefinitionsFor(["roll_dice", "nonexistent", "alarm"]);
     expect(defs).toHaveLength(2);
     expect(defs[0].name).toBe("roll_dice");
-    expect(defs[1].name).toBe("check_clocks");
+    expect(defs[1].name).toBe("alarm");
   });
 
   it("getDefinitionsFor returns empty array for all-unknown names", () => {

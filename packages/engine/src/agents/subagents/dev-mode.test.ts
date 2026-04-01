@@ -226,7 +226,7 @@ describe("buildDevTools", () => {
     expect(names).toContain("rollback");
     expect(names).toContain("scribe");
     expect(names).toContain("start_combat");
-    expect(names).toContain("set_alarm");
+    expect(names).toContain("alarm");
     expect(names).toContain("map");
   });
 

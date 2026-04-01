@@ -45,13 +45,10 @@ Requires active combat (`start_combat` must have been called). The persistent re
 
 All T1. All called by DM.
 
-| Tool | Signature | Effect |
+| Tool | Operations | Effect |
 |---|---|---|
-| `set_alarm` | `({ clock, in, message, repeating? })` | Set an alarm on calendar or combat clock. Returns alarm ID + fire time. |
-| `clear_alarm` | `({ id })` | Remove an alarm by ID. |
-| `advance_calendar` | `({ minutes })` | Advance calendar clock by minutes. Fires triggered alarms. |
-| `next_round` | `({})` | Advance combat round counter. Checks and fires combat alarms. Returns round number + any fired alarms. |
-| `check_clocks` | `({})` | Read current state of both clocks and pending alarms. |
+| `alarm` | `set`, `clear`, `check` | Schedule future events on calendar or combat clock, clear by ID, or read current state of both clocks and pending alarms. |
+| `time` | `advance`, `next_round` | Advance narrative time (calendar by minutes) or combat time (next round). Both fire triggered alarms. |
 
 ---
 
@@ -62,7 +59,7 @@ All T1 (initiative rolling may delegate to T2 for complex systems). Called by DM
 | Tool | Signature | Effect |
 |---|---|---|
 | `start_combat` | `({ combatants[] })` | Roll initiative, set turn order, activate combat clock and UI variant. Returns sorted order + round 1. |
-| `advance_turn` | `({})` | Advance to the next combatant's turn. Tracks individual turns within a round and auto-detects round boundaries. More granular than `next_round` (which advances the round-level combat clock). |
+| `advance_turn` | `({})` | Advance to the next combatant's turn. Tracks individual turns within a round and auto-detects round boundaries. More granular than `time` next_round (which advances the round-level combat clock). |
 | `modify_initiative` | `({ action, combatant, position? })` | Mid-combat changes: add, remove, move, delay a combatant. |
 | `end_combat` | `({})` | Clear initiative, reset combat clock, clear combat alarms, return to free player switching. |
 
