@@ -2,21 +2,34 @@
  * OpenAI-compatible provider adapter.
  *
  * Wraps the official OpenAI SDK. Works with:
- * - OpenAI API (api.openai.com)
- * - OpenAI OAuth tokens (ChatGPT accounts)
- * - OpenRouter (openrouter.ai/api)
- * - Any OpenAI-compatible endpoint (Ollama, vLLM, llama.cpp, etc.)
+ * - OpenAI API (api.openai.com) — uses Responses API
+ * - OpenAI OAuth tokens (ChatGPT accounts) — uses Responses API
+ * - OpenRouter (openrouter.ai/api) — uses Responses API
+ * - Any OpenAI-compatible endpoint (Ollama, vLLM, llama.cpp, etc.) — uses Chat Completions API
  *
  * Handles format translation: OpenAI tool_calls use function.arguments
  * as a JSON string (vs Anthropic's parsed object), different streaming
  * events, reasoning tokens, and automatic prompt caching.
  */
 import OpenAI from "openai";
+import type { Response as OAIResponse } from "openai/resources/responses/responses.js";
+import type { Reasoning, ReasoningEffort } from "openai/resources/shared.js";
 import type {
   LLMProvider, ChatParams, ChatResult, HealthCheckResult,
   NormalizedMessage, NormalizedToolCall,
   NormalizedUsage, ContentPart, StopReason,
 } from "./types.js";
+
+// ---------------------------------------------------------------------------
+// Routing
+// ---------------------------------------------------------------------------
+
+/** Provider IDs that use the Responses API instead of Chat Completions. */
+const RESPONSES_API_PROVIDERS = new Set(["openai", "openai-oauth", "openrouter"]);
+
+function useResponsesAPI(providerId: string): boolean {
+  return RESPONSES_API_PROVIDERS.has(providerId);
+}
 
 // ---------------------------------------------------------------------------
 // Options
@@ -46,17 +59,273 @@ export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
 
   return {
     providerId,
-    chat: (params) => openaiChat(client, params, false),
-    stream: (params, onDelta) => openaiChat(client, params, true, onDelta),
-    healthCheck: (model) => openaiHealthCheck(client, model),
+    chat: (params) => openaiChat(client, providerId, params, false),
+    stream: (params, onDelta) => openaiChat(client, providerId, params, true, onDelta),
+    healthCheck: (model) => openaiHealthCheck(client, providerId, model),
   };
 }
 
 // ---------------------------------------------------------------------------
-// Chat
+// Chat (dispatch)
 // ---------------------------------------------------------------------------
 
 async function openaiChat(
+  client: OpenAI,
+  providerId: string,
+  params: ChatParams,
+  streaming: boolean,
+  onDelta?: (text: string) => void,
+): Promise<ChatResult> {
+  if (useResponsesAPI(providerId)) {
+    return responsesChat(client, params, streaming, onDelta);
+  }
+  return completionsChat(client, params, streaming, onDelta);
+}
+
+// =========================================================================
+// Responses API path
+// =========================================================================
+
+// ---------------------------------------------------------------------------
+// Non-streaming / streaming dispatch
+// ---------------------------------------------------------------------------
+
+async function responsesChat(
+  client: OpenAI,
+  params: ChatParams,
+  streaming: boolean,
+  onDelta?: (text: string) => void,
+): Promise<ChatResult> {
+  const apiParams = toResponsesParams(params);
+
+  if (streaming && onDelta) {
+    return responsesStream(client, apiParams, onDelta);
+  }
+
+  const response = await client.responses.create({
+    ...apiParams,
+    stream: false,
+  });
+
+  return fromResponsesResponse(response);
+}
+
+// ---------------------------------------------------------------------------
+// Streaming (Responses API)
+// ---------------------------------------------------------------------------
+
+async function responsesStream(
+  client: OpenAI,
+  apiParams: ResponsesParams,
+  onDelta: (text: string) => void,
+): Promise<ChatResult> {
+  const stream = client.responses.stream(apiParams);
+
+  for await (const event of stream) {
+    if (event.type === "response.output_text.delta") {
+      onDelta(event.delta);
+    }
+  }
+
+  const response = await stream.finalResponse();
+  return fromResponsesResponse(response);
+}
+
+// ---------------------------------------------------------------------------
+// Parameter mapping: normalized → Responses API
+// ---------------------------------------------------------------------------
+
+interface ResponsesParams {
+  model: string;
+  input: OpenAI.Responses.ResponseInput;
+  instructions?: string;
+  tools?: OpenAI.Responses.Tool[];
+  max_output_tokens?: number;
+  reasoning?: Reasoning;
+  store?: boolean;
+}
+
+function toResponsesParams(params: ChatParams): ResponsesParams {
+  // System prompt → instructions
+  let instructions: string | undefined;
+  if (typeof params.systemPrompt === "string") {
+    instructions = params.systemPrompt;
+  } else {
+    instructions = params.systemPrompt.map((b) => b.text).join("\n\n");
+  }
+
+  // Conversation messages → input items
+  const input: OpenAI.Responses.ResponseInputItem[] = [];
+  for (const msg of params.messages) {
+    input.push(...toResponsesInput(msg));
+  }
+
+  // Tools
+  let tools: OpenAI.Responses.Tool[] | undefined;
+  if (params.tools?.length) {
+    tools = params.tools.map((t) => ({
+      type: "function" as const,
+      name: t.name,
+      description: t.description ?? undefined,
+      parameters: t.inputSchema as Record<string, unknown>,
+      strict: false,
+    }));
+  }
+
+  // Reasoning config
+  let reasoning: Reasoning | undefined;
+  if (params.thinking?.effort) {
+    const effortMap: Record<string, ReasoningEffort> = {
+      low: "low",
+      medium: "medium",
+      high: "high",
+      max: "xhigh",
+    };
+    reasoning = {
+      effort: effortMap[params.thinking.effort] ?? "medium",
+      summary: "concise",
+    };
+  }
+
+  return {
+    model: params.model,
+    input,
+    instructions,
+    ...(tools ? { tools } : {}),
+    max_output_tokens: params.maxTokens,
+    ...(reasoning ? { reasoning } : {}),
+    store: false,
+  };
+}
+
+/**
+ * Convert a single normalized message to one or more Responses API input items.
+ *
+ * Key differences from Chat Completions:
+ * - Tool results are top-level `function_call_output` items (not nested in a user message)
+ * - Tool calls are top-level `function_call` items (not nested in an assistant message)
+ * - Assistant text uses `output_text` content type
+ */
+function toResponsesInput(msg: NormalizedMessage): OpenAI.Responses.ResponseInputItem[] {
+  // Simple string content
+  if (typeof msg.content === "string") {
+    return [{ type: "message", role: msg.role, content: msg.content }];
+  }
+
+  if (msg.role === "assistant") {
+    const items: OpenAI.Responses.ResponseInputItem[] = [];
+
+    // Collect text parts for a message item
+    const textParts = msg.content.filter((p) => p.type === "text");
+    if (textParts.length > 0) {
+      const text = textParts.map((p) => (p as { text: string }).text).join("");
+      items.push({ type: "message", role: "assistant", content: text });
+    }
+
+    // Each tool_use becomes a top-level function_call item
+    for (const part of msg.content) {
+      if (part.type === "tool_use") {
+        items.push({
+          type: "function_call",
+          call_id: part.id,
+          name: part.name,
+          arguments: JSON.stringify(part.input),
+        });
+      }
+    }
+
+    return items;
+  }
+
+  // User messages: check for tool results
+  const toolResults = msg.content.filter((p) => p.type === "tool_result");
+  if (toolResults.length > 0) {
+    return toolResults.map((tr) => {
+      if (tr.type !== "tool_result") throw new Error("unreachable");
+      return {
+        type: "function_call_output" as const,
+        call_id: tr.tool_use_id,
+        output: tr.content,
+      };
+    });
+  }
+
+  // Regular user text
+  const text = msg.content
+    .filter((p) => p.type === "text")
+    .map((p) => (p as { text: string }).text)
+    .join("");
+  return [{ type: "message", role: "user", content: text }];
+}
+
+// ---------------------------------------------------------------------------
+// Response mapping: Responses API → normalized
+// ---------------------------------------------------------------------------
+
+function fromResponsesResponse(response: OAIResponse): ChatResult {
+  const text = response.output_text;
+  const toolCalls: NormalizedToolCall[] = [];
+  const assistantContent: ContentPart[] = [];
+
+  if (text) {
+    assistantContent.push({ type: "text", text });
+  }
+
+  for (const item of response.output) {
+    if (item.type === "function_call") {
+      let input: Record<string, unknown>;
+      try {
+        input = JSON.parse(item.arguments);
+      } catch {
+        input = { _parse_error: `Malformed JSON in tool arguments: ${item.arguments.slice(0, 200)}` };
+      }
+      toolCalls.push({ id: item.call_id, name: item.name, input });
+      assistantContent.push({ type: "tool_use", id: item.call_id, name: item.name, input });
+    }
+  }
+
+  const stopReason = mapResponsesStatus(response, toolCalls.length > 0);
+  const usage = mapResponsesUsage(response.usage);
+
+  return { text, toolCalls, usage, stopReason, assistantContent };
+}
+
+// ---------------------------------------------------------------------------
+// Helpers (Responses API)
+// ---------------------------------------------------------------------------
+
+function mapResponsesStatus(response: OAIResponse, hasToolCalls: boolean): StopReason {
+  if (hasToolCalls) return "tool_use";
+  if (response.status === "incomplete") {
+    const reason = response.incomplete_details?.reason;
+    if (reason === "max_output_tokens") return "length";
+    if (reason === "content_filter") return "refusal";
+  }
+  return "end";
+}
+
+function mapResponsesUsage(usage?: OAIResponse["usage"]): NormalizedUsage {
+  if (!usage) {
+    return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 };
+  }
+  return {
+    inputTokens: usage.input_tokens,
+    outputTokens: usage.output_tokens,
+    cacheReadTokens: usage.input_tokens_details?.cached_tokens ?? 0,
+    cacheCreationTokens: 0,
+    reasoningTokens: usage.output_tokens_details?.reasoning_tokens ?? 0,
+  };
+}
+
+// =========================================================================
+// Chat Completions path (for custom / OpenAI-compatible endpoints)
+// =========================================================================
+
+// ---------------------------------------------------------------------------
+// Non-streaming / streaming dispatch
+// ---------------------------------------------------------------------------
+
+async function completionsChat(
   client: OpenAI,
   params: ChatParams,
   streaming: boolean,
@@ -65,7 +334,7 @@ async function openaiChat(
   const apiParams = toOpenAIParams(params);
 
   if (streaming && onDelta) {
-    return openaiStream(client, apiParams, onDelta);
+    return completionsStream(client, apiParams, onDelta);
   }
 
   const response = await client.chat.completions.create({
@@ -77,10 +346,10 @@ async function openaiChat(
 }
 
 // ---------------------------------------------------------------------------
-// Streaming
+// Streaming (Chat Completions)
 // ---------------------------------------------------------------------------
 
-async function openaiStream(
+async function completionsStream(
   client: OpenAI,
   apiParams: OpenAIChatParams,
   onDelta: (text: string) => void,
@@ -154,7 +423,7 @@ async function openaiStream(
 }
 
 // ---------------------------------------------------------------------------
-// Parameter mapping: normalized → OpenAI
+// Parameter mapping: normalized → Chat Completions
 // ---------------------------------------------------------------------------
 
 interface OpenAIChatParams {
@@ -223,7 +492,7 @@ function toOpenAIParams(params: ChatParams): OpenAIChatParams {
 }
 
 /**
- * Convert a single normalized message to one or more OpenAI messages.
+ * Convert a single normalized message to one or more Chat Completions messages.
  *
  * Anthropic groups tool results in one user message with multiple tool_result
  * blocks. OpenAI requires each tool result as a separate "tool" role message.
@@ -278,7 +547,7 @@ function toOpenAIMessages(msg: NormalizedMessage): OpenAI.ChatCompletionMessageP
 }
 
 // ---------------------------------------------------------------------------
-// Response mapping: OpenAI → normalized
+// Response mapping: Chat Completions → normalized
 // ---------------------------------------------------------------------------
 
 function fromOpenAIResponse(response: OpenAI.ChatCompletion): ChatResult {
@@ -312,7 +581,7 @@ function fromOpenAIResponse(response: OpenAI.ChatCompletion): ChatResult {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Helpers (Chat Completions)
 // ---------------------------------------------------------------------------
 
 function mapFinishReason(reason: string | null): StopReason {
@@ -341,17 +610,26 @@ function mapUsage(usage?: OpenAI.CompletionUsage): NormalizedUsage {
   };
 }
 
-// ---------------------------------------------------------------------------
+// =========================================================================
 // Health check
-// ---------------------------------------------------------------------------
+// =========================================================================
 
-async function openaiHealthCheck(client: OpenAI, model?: string): Promise<HealthCheckResult> {
+async function openaiHealthCheck(client: OpenAI, providerId: string, model?: string): Promise<HealthCheckResult> {
   try {
-    await client.chat.completions.create({
-      model: model ?? "gpt-4o-mini",
-      max_tokens: 1,
-      messages: [{ role: "user", content: "." }],
-    });
+    if (useResponsesAPI(providerId)) {
+      await client.responses.create({
+        model: model ?? "gpt-4o-mini",
+        input: ".",
+        max_output_tokens: 1,
+        store: false,
+      });
+    } else {
+      await client.chat.completions.create({
+        model: model ?? "gpt-4o-mini",
+        max_tokens: 1,
+        messages: [{ role: "user", content: "." }],
+      });
+    }
 
     return { status: "valid", message: "Valid" };
   } catch (e) {
