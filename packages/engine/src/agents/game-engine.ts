@@ -421,13 +421,13 @@ export class GameEngine {
     };
     messages.push(apiUserMessage);
 
-    // Wrap config to track whether any tool was called this turn
-    let toolUsedThisTurn = false;
+    // Wrap config to track tool calls this turn
+    let toolCallCount = 0;
     const baseConfig = this.buildAgentConfig();
     const config: AgentLoopConfig = {
       ...baseConfig,
       onToolEnd: (name, result) => {
-        toolUsedThisTurn = true;
+        toolCallCount++;
         baseConfig.onToolEnd?.(name, result);
       },
     };
@@ -455,7 +455,7 @@ export class GameEngine {
       }
       this.injectionRegistry.afterResponse({
         text: result.text,
-        toolUsed: toolUsedThisTurn,
+        toolUsed: toolCallCount > 0,
         fromAI: !!opts?.fromAI,
         wrappedLineCount,
       });
@@ -598,7 +598,7 @@ export class GameEngine {
 
       logEvent("turn:dm_complete", {
         textLength: result.text.length,
-        toolCalls: result.tuiCommands.length,
+        toolCalls: toolCallCount,
         rounds: result.roundMessages.filter((m) => m.role === "assistant").length,
         durationMs: Date.now() - turnStartTime,
       });

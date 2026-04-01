@@ -16,7 +16,7 @@ let stream: WriteStream | null = null;
 
 /**
  * Initialize the engine log. Called once at server creation.
- * @param campaignsDir — the campaigns root; log goes to `../. debug/engine.jsonl`
+ * @param campaignsDir — the campaigns root; log goes to `../.debug/engine.jsonl`
  */
 export function initEngineLog(campaignsDir: string): void {
   if (stream) return; // already initialized
@@ -36,20 +36,22 @@ export function initEngineLog(campaignsDir: string): void {
 export function logEvent(event: string, data?: Record<string, unknown>): void {
   if (!stream) return;
   try {
-    const line = JSON.stringify({ t: Date.now(), event, ...data });
+    const line = JSON.stringify({ ...data, t: Date.now(), event });
     stream.write(line + "\n");
   } catch { /* never break the game */ }
 }
 
-/** Close the log stream. Called on server shutdown. */
-export function closeEngineLog(): void {
-  if (stream) {
-    stream.end();
-    stream = null;
-  }
+/** Close the log stream. Called on server shutdown. Awaits flush. */
+export async function closeEngineLog(): Promise<void> {
+  if (!stream) return;
+  const s = stream;
+  stream = null;
+  await new Promise<void>((resolve) => {
+    s.end(() => resolve());
+  });
 }
 
 /** Reset state (for tests). */
-export function resetEngineLog(): void {
-  closeEngineLog();
+export async function resetEngineLog(): Promise<void> {
+  await closeEngineLog();
 }

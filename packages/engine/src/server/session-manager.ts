@@ -275,7 +275,11 @@ export class SessionManager {
       // Only handle errors for the current setup session / generation
       if (this.setupSession !== setup || this.sessionGeneration !== gen) return;
 
-      logEvent("session:error", { phase: "setup", message: err instanceof Error ? err.message : String(err) });
+      logEvent("session:error", {
+        phase: "setup",
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
 
       // Tear down setup state so a new setup can be started
       this.setupSession = null;
@@ -708,8 +712,7 @@ export class SessionManager {
     this.idleTimer = setTimeout(() => {
       this.idleTimer = null;
       if (this.status === "active" && this.hasNoPlayers()) {
-        logEvent("session:end", { reason: "idle_timeout" });
-        void this.endSession();
+        void this.endSession("idle_timeout");
       }
     }, SessionManager.IDLE_TIMEOUT_MS);
   }
@@ -722,7 +725,7 @@ export class SessionManager {
   }
 
   /** End the current session gracefully. */
-  async endSession(): Promise<void> {
+  async endSession(reason = "explicit"): Promise<void> {
     if (this.status === "idle" || this.status === "stopping") return;
 
     // If a start is still in progress, wait for it to finish so we can
@@ -737,9 +740,8 @@ export class SessionManager {
 
     this.status = "stopping";
     this.clearIdleTimer();
-    // Log unless already logged by idle timeout
     if (this.campaignId) {
-      logEvent("session:end", { reason: "explicit", campaignId: this.campaignId });
+      logEvent("session:end", { reason, campaignId: this.campaignId });
     }
 
     // Stop the context dump writer so fire-and-forget writes don't hold
@@ -759,7 +761,11 @@ export class SessionManager {
         if (repo) await Promise.race([repo.checkpoint("Session end"), timeout(10_000)]);
       }
     } catch (err) {
-      logEvent("session:error", { phase: "cleanup", message: err instanceof Error ? err.message : String(err) });
+      logEvent("session:error", {
+        phase: "cleanup",
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
     }
 
     this.campaignId = null;
