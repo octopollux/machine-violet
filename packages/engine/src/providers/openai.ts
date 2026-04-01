@@ -483,7 +483,7 @@ interface OpenAIChatParams {
   tools?: OpenAI.ChatCompletionTool[];
   max_tokens?: number;
   max_completion_tokens?: number;
-  reasoning_effort?: string;
+  reasoning_effort?: ReasoningEffort;
 }
 
 function toOpenAIParams(params: ChatParams): OpenAIChatParams {
@@ -518,9 +518,9 @@ function toOpenAIParams(params: ChatParams): OpenAIChatParams {
 
   // Reasoning effort: OpenAI uses a flat reasoning_effort string parameter,
   // not an object. Map from our normalized effort levels.
-  let reasoningEffort: string | undefined;
+  let reasoningEffort: ReasoningEffort | undefined;
   if (params.thinking?.effort) {
-    const effortMap: Record<string, string> = {
+    const effortMap: Record<string, ReasoningEffort> = {
       low: "low",
       medium: "medium",
       high: "high",
