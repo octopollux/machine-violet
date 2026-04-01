@@ -79,6 +79,33 @@ describe("markdownToNarrativeLines", () => {
     const parsed = markdownToNarrativeLines(md.split("\n").slice(0, -1)); // trim trailing empty from split
     expect(parsed).toEqual(original);
   });
+
+  it("round-trips turn separator before player input", () => {
+    // Mirrors the display log format produced by processInput:
+    // separator → player line → DM response → blank paragraph break
+    const original: NarrativeLine[] = [
+      { kind: "separator", text: "---" },
+      { kind: "player", text: "[Velvet] I open the door." },
+      { kind: "dm", text: "The door creaks open." },
+      { kind: "dm", text: "" },
+    ];
+    const md = narrativeLinesToMarkdown(original);
+    expect(md).toBe("---\n> [Velvet] I open the door.\nThe door creaks open.\n\n");
+    const parsed = markdownToNarrativeLines(md.split("\n").slice(0, -1));
+    expect(parsed).toEqual(original);
+  });
+
+  it("skipTranscript turns omit separator and player line", () => {
+    // Session open/resume: only the DM response is logged
+    const original: NarrativeLine[] = [
+      { kind: "dm", text: "Welcome to the adventure." },
+      { kind: "dm", text: "" },
+    ];
+    const md = narrativeLinesToMarkdown(original);
+    expect(md).toBe("Welcome to the adventure.\n\n");
+    const parsed = markdownToNarrativeLines(md.split("\n").slice(0, -1));
+    expect(parsed).toEqual(original);
+  });
 });
 
 describe("tailLines", () => {

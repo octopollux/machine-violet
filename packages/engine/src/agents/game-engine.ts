@@ -502,6 +502,10 @@ export class GameEngine {
           // Skip synthetic player input for system turns (session open/resume)
           // but always log the DM response so the opening narration is preserved.
           if (!opts?.skipTranscript) {
+            // Turn separator before player input — restored as a styled
+            // divider on session resume (matches the optimistic separator
+            // the client injects during live play).
+            logLines.push({ kind: "separator", text: "---" });
             logLines.push({ kind: "player", text: `[${characterName}] ${text}` });
           }
           if (result.text) {
