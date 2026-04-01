@@ -14,6 +14,7 @@ import type {
   UsageStats, ModelTier, ToolResult, TuiCommand,
   ServerEvent,
 } from "@machine-violet/shared";
+import { logEvent } from "../context/engine-log.js";
 import { CostTracker } from "../context/cost-tracker.js";
 import type { StatePersister } from "../context/state-persistence.js";
 import type { StyleVariant } from "@machine-violet/shared/types/tui.js";
@@ -116,6 +117,7 @@ export function createBridge(
     },
 
     onError(error: Error): void {
+      logEvent("engine:error", { message: error.message });
       broadcast({
         type: "error",
         data: { message: error.message, recoverable: false },
@@ -123,6 +125,7 @@ export function createBridge(
     },
 
     onRetry(status: number, delayMs: number): void {
+      logEvent("api:retry", { status, delayMs });
       broadcast({
         type: "error",
         data: { message: `API retry (status ${status})`, recoverable: true, status, delayMs },
@@ -130,6 +133,7 @@ export function createBridge(
     },
 
     onRefusal(): void {
+      logEvent("api:refusal");
       broadcast({
         type: "error",
         data: { message: "Content classifier refused the response.", recoverable: false },

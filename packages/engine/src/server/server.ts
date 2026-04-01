@@ -18,6 +18,7 @@ import { dataRoutes } from "./routes/data.js";
 import { managementRoutes } from "./routes/management.js";
 import { wsHandler } from "./ws.js";
 import { SessionManager } from "./session-manager.js";
+import { initEngineLog, logEvent, closeEngineLog } from "../context/engine-log.js";
 
 export interface ServerConfig {
   /** Port to listen on. Default 7200. */
@@ -59,6 +60,19 @@ export async function createServer(
         return (origStderrWrite as (...a: unknown[]) => boolean)(chunk, ...args);
       }) as typeof process.stderr.write;
     } catch { /* best-effort */ }
+  }
+
+  // --- Engine event log ---
+  if (process.env.NODE_ENV !== "test" && cfg.campaignsDir) {
+    initEngineLog(cfg.campaignsDir);
+    logEvent("server:start", {
+      version: process.env.npm_package_version ?? "dev",
+      port: cfg.port,
+      host: cfg.host,
+      campaignsDir: cfg.campaignsDir,
+      node: process.version,
+      platform: process.platform,
+    });
   }
 
   const server = Fastify({
@@ -154,6 +168,7 @@ export async function createServer(
 
   server.addHook("onClose", async () => {
     await sessionManager.teardown();
+    closeEngineLog();
   });
 
   return server;

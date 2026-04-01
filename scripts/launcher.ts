@@ -77,7 +77,11 @@ if (wsLogPath) {
 
 try {
   await server.listen({ port, host });
+  const { logEvent } = await import("../packages/engine/src/context/engine-log.js");
+  logEvent("server:listen", { address: `${host}:${port}` });
 } catch (err) {
+  const { logEvent } = await import("../packages/engine/src/context/engine-log.js");
+  logEvent("server:error", { message: err instanceof Error ? err.message : String(err) });
   if (serverOnly) {
     console.error("Failed to start server:", err instanceof Error ? err.message : err);
   } else {
