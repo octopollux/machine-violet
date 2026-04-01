@@ -104,6 +104,8 @@ export interface EngineCallbacks {
   onTurnStart: (turn: TurnInfo) => void;
   /** A participant turn has ended */
   onTurnEnd: (turn: TurnInfo) => void;
+  /** Setup agent finalized — transition to real campaign session. */
+  onSetupFinalized?: (campaignId: string) => void;
 }
 
 // --- From game-state.ts ---

@@ -311,11 +311,20 @@ export class SessionManager {
 
   /** Transition from setup to a real game session. */
   private async transitionToGame(campaignId: string): Promise<void> {
+    // Tell clients to reconnect — the campaign ID is about to change.
+    // Clients that handle session:transition will disconnect, then
+    // reconnect after the new session is ready.
+    this.broadcast({ type: "session:transition", data: { campaignId } });
+
     this.setupSession = null;
     this.turnManager = null;
+    this.engine = null;
+    this.gameState = null;
     this.status = "idle";
     this.campaignId = null;
     this.currentMode = "play";
+
+    logEvent("session:end", { reason: "setup_transition", campaignId });
 
     // Start the newly created campaign
     await this.startSession(campaignId);

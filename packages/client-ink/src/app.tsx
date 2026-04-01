@@ -175,6 +175,16 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
     }
   }, [clientState.sessionStale, clientState.sessionEnded, phase]);
 
+  // Handle setup → game transition: reconnect WebSocket to pick up new session
+  useEffect(() => {
+    const newId = clientState.transitionCampaignId;
+    if (!newId) return;
+    setActiveCampaignId(newId);
+    setSessionKey((k) => k + 1); // triggers WS reconnect
+    setNarrativeLines([]);
+    setClientState(initialClientState());
+  }, [clientState.transitionCampaignId]);
+
   // Start a campaign (used by both auto-start and menu selection)
   const startCampaign = useCallback((id: string) => {
     setActiveCampaignId(id);
