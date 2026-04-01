@@ -73,7 +73,7 @@ const SCRIBE_TOOLS: NormalizedTool[] = [
       properties: {
         entity_type: {
           type: "string",
-          enum: ["character", "location", "faction", "lore"],
+          enum: ["character", "location", "faction", "lore", "item"],
           description: "Entity type to list",
         },
       },
@@ -88,7 +88,7 @@ const SCRIBE_TOOLS: NormalizedTool[] = [
       properties: {
         entity_type: {
           type: "string",
-          enum: ["character", "location", "faction", "lore"],
+          enum: ["character", "location", "faction", "lore", "item"],
           description: "Entity type",
         },
         slug: {
@@ -112,7 +112,7 @@ const SCRIBE_TOOLS: NormalizedTool[] = [
         },
         entity_type: {
           type: "string",
-          enum: ["character", "location", "faction", "lore"],
+          enum: ["character", "location", "faction", "lore", "item"],
           description: "Entity type",
         },
         name: {
@@ -164,6 +164,7 @@ export function buildScribeToolHandler(
       case "location": return paths.location(slug);
       case "faction": return paths.faction(slug);
       case "lore": return paths.lore(slug);
+      case "item": return paths.item(slug);
       default: return paths.lore(slug);
     }
   }
@@ -174,6 +175,7 @@ export function buildScribeToolHandler(
       case "location": return join(campaignRoot, "locations");
       case "faction": return join(campaignRoot, "factions");
       case "lore": return join(campaignRoot, "lore");
+      case "item": return join(campaignRoot, "items");
       default: return join(campaignRoot, "lore");
     }
   }

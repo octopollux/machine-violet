@@ -614,7 +614,7 @@ Canonical directory tree for a campaign. Machine-managed files are marked with t
 
 **DM-managed** = written by the DM agent via the `scribe` subagent or file I/O. The machine only appends changelog entries.
 
-**Dual** = characters, locations, factions, lore files are DM-created but have machine-appended changelog sections.
+**Dual** = characters, locations, factions, items, lore files are DM-created but have machine-appended changelog sections.
 
 ---
 

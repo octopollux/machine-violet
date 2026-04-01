@@ -19,6 +19,7 @@ const ENTITY_DIRS: { dir: string; type: string; subdirs: boolean }[] = [
   { dir: "locations", type: "location", subdirs: true },
   { dir: "factions", type: "faction", subdirs: false },
   { dir: "lore", type: "lore", subdirs: false },
+  { dir: "items", type: "item", subdirs: false },
 ];
 
 /** Files to skip during entity scanning. */

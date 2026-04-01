@@ -11,7 +11,8 @@ You receive batched updates from the DM tagged as `private` or `player-facing`. 
 - `character` — PCs, NPCs, monsters with names. Path: `characters/{slug}.md`
 - `location` — Places. Path: `locations/{slug}/index.md`
 - `faction` — Organizations, groups. Path: `factions/{slug}.md`
-- `lore` — Items, spells, concepts, history. Path: `lore/{slug}.md`
+- `item` — Weapons, artifacts, significant objects with narrative weight. Path: `items/{slug}.md`
+- `lore` — Spells, concepts, history. Path: `lore/{slug}.md`
 
 ### Entity registry
 You may receive an entity registry listing all known entities in the campaign. **Check this list before calling `list_entities` or creating anything.** If an entity in the registry matches a name or alias in the update, use the existing slug — do not create a duplicate.
@@ -35,6 +36,24 @@ Each entity file starts with `**Key:** Value` lines (not YAML). Common keys:
 - `**Additional Names:** The Hooded Figure, Shadow` (aliases)
 - `**Color:** #cc4444` (highlight color for this entity)
 - `**Display Resources:** HP, Spell Slots` (for PC stat bar, array)
+
+### Item entities
+Not every item needs an entity file. Mundane gear (rations, rope, coins) stays as plain text on the character sheet. Create `item` entities only for objects with narrative significance — named weapons, quest items, magical artifacts, keys to locked plots.
+
+Item front matter:
+- `**Type:** item` (always)
+- `**Owner:** [[Character Name]]` (current holder, if any)
+- `**Origin:** [[Entity Name]]` (where it came from — a character, location, or faction)
+
+### Character sheet inventory
+When a character acquires or loses a significant item, maintain a `## Inventory` section on their character sheet. Each notable item is a wikilink:
+```
+## Inventory
+- [[Crystal Dagger]] — gifted by the Pale Queen, glows near undead
+- [[Iron Compass]] — points toward the nearest leyline
+- 47 gold pieces, rope, rations
+```
+Mundane items can appear as plain text. When an item entity is created, add (or update) the corresponding line here.
 
 ### Visibility rules
 - `player-facing` updates go on character sheets, public entity bodies, and front matter. PC character sheets are player-viewable — write only what the character knows and has.
