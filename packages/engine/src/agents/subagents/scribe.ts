@@ -169,7 +169,9 @@ export function buildScribeToolHandler(
       case "faction": return paths.faction(slug);
       case "lore": return paths.lore(slug);
       case "item": return paths.item(slug);
-      case "player": return mPaths ? mPaths.player(slug) : paths.lore(slug);
+      case "player":
+        if (!mPaths) throw new Error("player entity type requires homeDir");
+        return mPaths.player(slug);
       default: return paths.lore(slug);
     }
   }
@@ -181,7 +183,9 @@ export function buildScribeToolHandler(
       case "faction": return join(campaignRoot, "factions");
       case "lore": return join(campaignRoot, "lore");
       case "item": return join(campaignRoot, "items");
-      case "player": return mPaths ? mPaths.playersDir : join(campaignRoot, "lore");
+      case "player":
+        if (!mPaths) throw new Error("player entity type requires homeDir");
+        return mPaths.playersDir;
       default: return join(campaignRoot, "lore");
     }
   }

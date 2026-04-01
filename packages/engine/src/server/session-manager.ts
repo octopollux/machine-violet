@@ -356,7 +356,7 @@ export class SessionManager {
     // --- Create and sandbox FileIO ---
     const baseIO = createBaseFileIO();
     const campaignsDir = dirname(campaignRoot);
-    const homeDir = this.campaignsDir.replace(/[/\\]campaigns\/?$/, "");
+    const homeDir = dirname(this.campaignsDir);
     const fileIO = sandboxFileIO(baseIO, [campaignRoot, campaignsDir, homeDir]);
 
     // --- Create GitIO (if enabled) ---

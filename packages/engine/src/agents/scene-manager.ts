@@ -290,7 +290,7 @@ export class SceneManager {
 
     // Step 6: Reset precis and player reads
     this.pendingOp.step = "reset_precis";
-    this.stepResetPrecis();
+    await this.stepResetPrecis();
 
     // Step 7: Prune context
     this.pendingOp.step = "prune_context";
@@ -398,7 +398,7 @@ export class SceneManager {
         case "advance_calendar": this.stepAdvanceCalendar(pendingOp.timeAdvance, result); break;
         case "check_alarms": this.stepCheckAlarms(); break;
         case "validate": result.validationIssues = await this.stepValidate(); break;
-        case "reset_precis": this.stepResetPrecis(); break;
+        case "reset_precis": await this.stepResetPrecis(); break;
         case "prune_context": this.stepPruneContext(); break;
         case "checkpoint": await this.stepCheckpoint(); break;
       }
@@ -780,7 +780,7 @@ export class SceneManager {
     }
   }
 
-  private stepResetPrecis(): void {
+  private async stepResetPrecis(): Promise<void> {
     this.scene.precis = "";
     this.scene.openThreads = "";
     this.scene.npcIntents = "";
@@ -788,8 +788,7 @@ export class SceneManager {
     // Refresh entity tree snapshot for the new scene
     this.entityTreeSnapshot = renderEntityTree(this.entityTree);
     // Refresh content boundaries snapshot (picks up any Scribe updates)
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    this.refreshContentBoundaries().catch(() => {});
+    await this.refreshContentBoundaries();
   }
 
   /** Re-read machine-scope player files and rebuild content boundaries snapshot. */
@@ -1169,7 +1168,7 @@ export async function loadContentBoundaries(
   const mPaths = machinePaths(homeDir);
   const parts: string[] = [];
   for (const player of players) {
-    const slug = player.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const slug = slugify(player.name);
     const path = norm(mPaths.player(slug));
     try {
       const content = await fileIO.readFile(path);

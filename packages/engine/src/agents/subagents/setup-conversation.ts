@@ -67,7 +67,7 @@ const FINALIZE_TOOL: NormalizedTool = {
       character_description: { type: "string", description: "One-sentence character concept" },
       character_details: { type: "string", description: "Mechanical character details gathered during setup (class, skills, approaches, etc). Free-form text. Omit or null for pure narrative.", nullable: true },
       campaign_detail: { type: "string", description: "The seed's hidden detail block, passed through verbatim for the DM. Omit if the chosen seed has no detail block or the campaign is fully custom.", nullable: true },
-      age_group: { type: "string", enum: ["child", "teenager", "adult"], description: "Player's age group. Only include if asked and answered. Omit if unknown or not asked." },
+      age_group: { type: "string", enum: ["child", "teenager", "adult"], description: "Player's age group. Set to 'child' or 'teenager' if the player clearly indicates so. Otherwise — including when age is not discussed or the player declines — set to 'adult'. Always include this field." },
       content_preferences: { type: "string", description: "Any content preferences or sensitivities the player mentioned during setup (one per line). Only include if the player volunteered them — never prompt for these.", nullable: true },
     },
     required: [
