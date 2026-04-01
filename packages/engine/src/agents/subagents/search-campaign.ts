@@ -70,7 +70,6 @@ const ALLOWED_PREFIXES = [
   "factions/",
   "lore/",
   "items/",
-  "players/",
   "campaign/",
   "rules/",
 ];
@@ -85,7 +84,7 @@ function isAllowedPath(relativePath: string): boolean {
 function matchesFilter(relativePath: string, filter: string): boolean {
   switch (filter) {
     case "entities":
-      return /^(characters|locations|factions|lore|items|players)\//.test(relativePath);
+      return /^(characters|locations|factions|lore|items)\//.test(relativePath);
     case "scenes":
       return relativePath.startsWith("campaign/scenes/");
     case "recaps":

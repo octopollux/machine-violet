@@ -16,7 +16,7 @@ import type {
 } from "@machine-violet/shared";
 import { GameEngine } from "../agents/game-engine.js";
 import type { SceneState } from "../agents/scene-manager.js";
-import { detectSceneState } from "../agents/scene-manager.js";
+import { detectSceneState, loadContentBoundaries } from "../agents/scene-manager.js";
 import type { DMSessionState } from "../agents/dm-prompt.js";
 import { getActivePlayer } from "../agents/player-manager.js";
 import { loadEnv } from "../config/first-launch.js";
@@ -356,7 +356,8 @@ export class SessionManager {
     // --- Create and sandbox FileIO ---
     const baseIO = createBaseFileIO();
     const campaignsDir = dirname(campaignRoot);
-    const fileIO = sandboxFileIO(baseIO, [campaignRoot, campaignsDir]);
+    const homeDir = this.campaignsDir.replace(/[/\\]campaigns\/?$/, "");
+    const fileIO = sandboxFileIO(baseIO, [campaignRoot, campaignsDir, homeDir]);
 
     // --- Create GitIO (if enabled) ---
     const gitIO = config.recovery.enable_git ? createGitIO() : undefined;
@@ -408,6 +409,15 @@ export class SessionManager {
 
     // --- Build entity tree from disk ---
     const entityTree = await buildEntityTree(campaignRoot, fileIO);
+
+    // --- Load content boundaries from machine-scope player files ---
+    try {
+      sessionState.contentBoundaries = await loadContentBoundaries(
+        config.players,
+        homeDir,
+        fileIO,
+      );
+    } catch { /* ignore — players dir may not exist yet */ }
 
     // --- Cost tracker ---
     this.costTracker = new CostTracker();

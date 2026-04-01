@@ -12,6 +12,7 @@ export interface PlayerConfig {
   model?: "haiku" | "sonnet";
   personality?: string;
   color?: string;
+  age_group?: "child" | "teenager" | "adult";
 }
 
 export interface DMPersonality {

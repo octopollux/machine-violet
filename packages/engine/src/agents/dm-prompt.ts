@@ -23,6 +23,7 @@ export interface DMSessionState {
   entityIndex?: string;
   uiState?: string;
   compendiumSummary?: string;
+  contentBoundaries?: string;
 }
 
 /**

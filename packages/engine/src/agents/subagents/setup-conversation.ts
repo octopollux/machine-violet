@@ -67,6 +67,8 @@ const FINALIZE_TOOL: NormalizedTool = {
       character_description: { type: "string", description: "One-sentence character concept" },
       character_details: { type: "string", description: "Mechanical character details gathered during setup (class, skills, approaches, etc). Free-form text. Omit or null for pure narrative.", nullable: true },
       campaign_detail: { type: "string", description: "The seed's hidden detail block, passed through verbatim for the DM. Omit if the chosen seed has no detail block or the campaign is fully custom.", nullable: true },
+      age_group: { type: "string", enum: ["child", "teenager", "adult"], description: "Player's age group. Only include if asked and answered. Omit if unknown or not asked." },
+      content_preferences: { type: "string", description: "Any content preferences or sensitivities the player mentioned during setup (one per line). Only include if the player volunteered them — never prompt for these.", nullable: true },
     },
     required: [
       "genre", "campaign_name", "campaign_premise", "mood",
@@ -217,7 +219,27 @@ export function resolveSystemSlug(raw: string): string {
   return slugified || raw;
 }
 
-export function createSetupConversation(provider: LLMProvider, model: string): SetupConversation {
+/** Known player info passed from the machine-scope players directory. */
+export interface KnownPlayer {
+  name: string;
+  ageGroup?: string;
+}
+
+export function createSetupConversation(
+  provider: LLMProvider,
+  model: string,
+  existingPlayers?: KnownPlayer[],
+): SetupConversation {
+  // Build per-session system prompt with known players appended
+  let systemPrompt = SYSTEM_PROMPT;
+  if (existingPlayers && existingPlayers.length > 0) {
+    const playerLines = existingPlayers.map((p) => {
+      const age = p.ageGroup ? ` (age group: ${p.ageGroup})` : " (age group: unknown)";
+      return `- ${p.name}${age}`;
+    });
+    systemPrompt += "\n\n## Known Players\n\nThese players have played before. When the player gives their name, check this list. If they match a known player, welcome them back warmly — no need to re-ask information you already have. If their age group is unknown, ask once casually.\n\n" + playerLines.join("\n");
+  }
+
   const messages: NormalizedMessage[] = [];
   const totalUsage: NormalizedUsage = {
     inputTokens: 0,
@@ -270,6 +292,8 @@ export function createSetupConversation(provider: LLMProvider, model: string): S
       characterDescription: (input.character_description as string) || "",
       characterDetails: (input.character_details as string) || null,
       themeColor: generateThemeColor(characterName),
+      ageGroup: (input.age_group as "child" | "teenager" | "adult" | undefined) ?? undefined,
+      contentPreferences: (input.content_preferences as string) || undefined,
     };
   }
 
@@ -292,7 +316,7 @@ export function createSetupConversation(provider: LLMProvider, model: string): S
     let lastParams: ChatParams = {
       model,
       maxTokens: TOKEN_LIMITS.SUBAGENT_LARGE,
-      systemPrompt: SYSTEM_PROMPT,
+      systemPrompt,
       messages,
       tools: TOOLS,
       thinking,
@@ -356,7 +380,7 @@ export function createSetupConversation(provider: LLMProvider, model: string): S
       lastParams = {
         model,
         maxTokens: TOKEN_LIMITS.SUBAGENT_MEDIUM,
-        systemPrompt: SYSTEM_PROMPT,
+        systemPrompt,
         messages,
         tools: TOOLS,
         thinking,

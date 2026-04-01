@@ -234,7 +234,6 @@ describe("campaignDirs", () => {
     expect(dirs).toContain("/root/campaign");
     expect(dirs).toContain("/root/campaign/scenes");
     expect(dirs).toContain("/root/campaign/session-recaps");
-    expect(dirs).toContain("/root/players");
     expect(dirs).toContain("/root/characters");
     expect(dirs).toContain("/root/locations");
     expect(dirs).toContain("/root/factions");
@@ -242,7 +241,8 @@ describe("campaignDirs", () => {
     expect(dirs).toContain("/root/items");
     expect(dirs).toContain("/root/rules");
     expect(dirs).toContain("/root/state");
-    expect(dirs).toHaveLength(12);
+    expect(dirs).not.toContain("/root/players");
+    expect(dirs).toHaveLength(11);
   });
 });
 
@@ -266,7 +266,6 @@ describe("campaignPaths", () => {
     expect(norm(paths.legacyLog)).toContain("campaign/log.md");
     expect(norm(paths.sceneSummary(1, "tavern"))).toContain("campaign/scenes/001-tavern/summary.md");
     expect(norm(paths.character("aldric"))).toContain("characters/aldric.md");
-    expect(norm(paths.player("alex"))).toContain("players/alex.md");
     expect(norm(paths.location("caves"))).toContain("locations/caves/index.md");
     expect(norm(paths.locationMap("caves", "level-1"))).toContain("locations/caves/level-1.json");
     expect(norm(paths.faction("guild"))).toContain("factions/guild.md");

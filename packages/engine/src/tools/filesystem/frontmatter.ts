@@ -107,6 +107,20 @@ export function serializeEntity(
   return lines.join("\n");
 }
 
+/**
+ * Extract a named ## section from a markdown body.
+ * Returns the text between `## heading` and the next `##` or EOF, trimmed.
+ */
+export function extractSection(body: string, heading: string): string | undefined {
+  const pattern = new RegExp(`^## ${heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "m");
+  const match = pattern.exec(body);
+  if (!match) return undefined;
+  const start = match.index + match[0].length;
+  const nextHeading = body.indexOf("\n## ", start);
+  const section = (nextHeading === -1 ? body.slice(start) : body.slice(start, nextHeading)).trim();
+  return section || undefined;
+}
+
 /** Convert display key to storage key: "Display Resources" -> "display_resources" */
 function normalizeKey(key: string): string {
   return key.toLowerCase().replace(/\s+/g, "_");

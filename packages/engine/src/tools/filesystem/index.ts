@@ -1,7 +1,7 @@
-export { parseFrontMatter, serializeEntity } from "./frontmatter.js";
+export { parseFrontMatter, serializeEntity, extractSection } from "./frontmatter.js";
 export { extractWikilinks, uniqueTargets } from "./wikilinks.js";
 export type { WikiLink } from "./wikilinks.js";
-export { campaignDirs, sceneDir, campaignPaths } from "./scaffold.js";
+export { campaignDirs, sceneDir, campaignPaths, machineDirs, machinePaths } from "./scaffold.js";
 export { formatChangelogEntry, appendChangelog } from "./changelog.js";
 export { defaultCampaignRoot, defaultConfigDir } from "./platform.js";
 export { validateConfig, createDefaultCampaignConfig } from "./config.js";

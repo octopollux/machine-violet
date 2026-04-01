@@ -388,6 +388,7 @@ async function dispatchDMTool(
       updates: (cmd as Record<string, unknown>).updates as import("./scribe.js").ScribeUpdate[],
       campaignRoot,
       sceneNumber: 0, // OOC has no scene number
+      homeDir: gameState.homeDir,
     }, fileIO);
     return { content: scribeResult.summary };
   }
