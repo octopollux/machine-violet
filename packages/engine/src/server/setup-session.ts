@@ -87,48 +87,71 @@ export class SetupSession {
     }
   }
 
+  private emitThinking(): void {
+    this.broadcast({ type: "activity:update", data: { engineState: "dm_thinking" } });
+  }
+
+  private emitIdle(): void {
+    this.broadcast({ type: "activity:update", data: { engineState: "waiting_input" } });
+  }
+
   /** Start the setup conversation. Streams opening narrative to clients. */
   async start(): Promise<void> {
     const knownPlayers = await this.scanKnownPlayers();
     this.conversation = createSetupConversation(this.provider, this.model, knownPlayers);
     this.started = true;
 
-    const result = await this.conversation.start((delta) => {
-      this.broadcast({
-        type: "narrative:chunk",
-        data: { text: delta, kind: "dm" },
+    this.emitThinking();
+    try {
+      const result = await this.conversation.start((delta) => {
+        this.broadcast({
+          type: "narrative:chunk",
+          data: { text: delta, kind: "dm" },
+        });
       });
-    });
 
-    await this.handleResult(result);
+      await this.handleResult(result);
+    } finally {
+      this.emitIdle();
+    }
   }
 
   /** Send player input to the setup conversation. */
   async send(text: string): Promise<{ finalized?: string }> {
     if (!this.conversation) throw new Error("Setup not started");
 
-    const result = await this.conversation.send(text, (delta) => {
-      this.broadcast({
-        type: "narrative:chunk",
-        data: { text: delta, kind: "dm" },
+    this.emitThinking();
+    try {
+      const result = await this.conversation.send(text, (delta) => {
+        this.broadcast({
+          type: "narrative:chunk",
+          data: { text: delta, kind: "dm" },
+        });
       });
-    });
 
-    return this.handleResult(result);
+      return await this.handleResult(result);
+    } finally {
+      this.emitIdle();
+    }
   }
 
   /** Resolve a choice selection. */
   async resolveChoice(selectedText: string): Promise<{ finalized?: string }> {
     if (!this.conversation) throw new Error("Setup not started");
 
-    const result = await this.conversation.resolveChoice(selectedText, (delta) => {
-      this.broadcast({
-        type: "narrative:chunk",
-        data: { text: delta, kind: "dm" },
+    this.emitThinking();
+    try {
+      const result = await this.conversation.resolveChoice(selectedText, (delta) => {
+        this.broadcast({
+          type: "narrative:chunk",
+          data: { text: delta, kind: "dm" },
+        });
       });
-    });
 
-    return this.handleResult(result);
+      return await this.handleResult(result);
+    } finally {
+      this.emitIdle();
+    }
   }
 
   get isStarted(): boolean {

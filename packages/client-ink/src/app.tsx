@@ -522,7 +522,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
       activePlayerIndex: stateSnapshot?.activePlayerIndex ?? 0,
       setActivePlayerIndex: () => { /* server manages this */ },
       engineState: clientState.engineState,
-      toolGlyphs: clientState.activeTools.map((t) => ({ name: t, glyph: "⚙", label: t })),
+      toolGlyphs: clientState.toolGlyphs,
       resources: Object.keys(clientState.displayResources).length > 0
         ? formatResources(clientState.displayResources, clientState.resourceValues)
         : [],
