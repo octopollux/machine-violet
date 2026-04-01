@@ -156,10 +156,13 @@ describe("buildScribeToolHandler", () => {
       expect(norm(created[0])).toContain("items/crystal-dagger.md");
 
       const writeCall = vi.mocked(fio.writeFile).mock.calls[0];
+      const writtenPath = writeCall[0] as string;
       const content = writeCall[1] as string;
+      expect(norm(writtenPath)).toContain("items/crystal-dagger.md");
       expect(content).toContain("# Crystal Dagger");
       expect(content).toContain("**Type:** item");
       expect(content).toContain("**Owner:** [[Aldric]]");
+      expect(content).toContain("**Origin:** [[The Pale Queen]]");
       expect(content).toContain("translucent crystal");
       expect(content).toContain("Scene 004");
 

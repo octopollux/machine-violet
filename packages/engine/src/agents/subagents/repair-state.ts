@@ -28,7 +28,7 @@ function classifyTarget(target: string): { type: string; name: string; filePath:
   const normalized = target.replace(/\\/g, "/").replace(/^\.\//, "");
 
   // Direct paths like "characters/kael.md"
-  const directMatch = normalized.match(/^(characters|locations|factions|lore)\/(.+)$/);
+  const directMatch = normalized.match(/^(characters|locations|factions|lore|items)\/(.+)$/);
   if (directMatch) {
     const type = directMatch[1];
     let name = directMatch[2];
@@ -38,7 +38,7 @@ function classifyTarget(target: string): { type: string; name: string; filePath:
   }
 
   // Relative paths from within scenes like "../characters/kael.md"
-  const relMatch = normalized.match(/(?:\.\.\/)+?(characters|locations|factions|lore)\/(.+)$/);
+  const relMatch = normalized.match(/(?:\.\.\/)+?(characters|locations|factions|lore|items)\/(.+)$/);
   if (relMatch) {
     const type = relMatch[1];
     let name = relMatch[2];
@@ -108,7 +108,7 @@ async function inventoryEntities(
   fileIO: FileIO,
 ): Promise<Set<string>> {
   const existing = new Set<string>();
-  const dirs = ["characters", "locations", "factions", "lore"];
+  const dirs = ["characters", "locations", "factions", "lore", "items"];
 
   for (const dir of dirs) {
     const dirPath = norm(root) + "/" + dir;

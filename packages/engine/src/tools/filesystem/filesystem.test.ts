@@ -239,9 +239,10 @@ describe("campaignDirs", () => {
     expect(dirs).toContain("/root/locations");
     expect(dirs).toContain("/root/factions");
     expect(dirs).toContain("/root/lore");
+    expect(dirs).toContain("/root/items");
     expect(dirs).toContain("/root/rules");
     expect(dirs).toContain("/root/state");
-    expect(dirs).toHaveLength(11);
+    expect(dirs).toHaveLength(12);
   });
 });
 
