@@ -212,11 +212,17 @@ function routeTuiCommand(
       }
       break;
 
-    // --- Commands we can safely ignore ---
-    case "present_roll":
+    // --- Client-rendered modals (forwarded for OOC/Dev Mode) ---
     case "show_character_sheet":
+      broadcast({
+        type: "activity:update",
+        data: { engineState: `tui:${command.type}`, ...command },
+      });
+      break;
+
+    // --- Commands we can safely ignore ---
     case "dm_notes":
-      // These are either dead code or client-driven — don't forward
+      // Engine-internal — don't forward
       break;
 
     default:

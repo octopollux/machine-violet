@@ -332,7 +332,7 @@ describe("agentLoop", () => {
 
   it("handles tool errors gracefully", async () => {
     const provider = mockProvider([
-      toolUseResult("view_area", { map: "nonexistent", center: "0,0", radius: 1 }),
+      toolUseResult("map", { operation: "view", map: "nonexistent", center: "0,0", radius: 1 }),
       textResult("I couldn't find that map."),
     ]);
 
@@ -347,7 +347,7 @@ describe("agentLoop", () => {
     );
 
     expect(onToolEnd).toHaveBeenCalledWith(
-      "view_area",
+      "map",
       expect.objectContaining({ is_error: true }),
     );
     expect(result.text).toBe("I couldn't find that map.");

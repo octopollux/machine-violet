@@ -12,16 +12,17 @@ export const TUI_TOOLS = new Set([
   "set_display_resources",
   "set_resource_values",
   "present_choices",
-  "present_roll",
   "show_character_sheet",
   "enter_ooc",
   "scene_transition",
   "session_end",
-  "context_refresh",
   "scribe",
   "dm_notes",
   "promote_character",
 ]);
+
+/** Tools registered in the ToolRegistry but only exposed to OOC / Dev Mode agents. */
+const DM_EXCLUDED_TOOLS = new Set(["show_character_sheet", "rollback"]);
 
 export function isTuiCommand(toolName: string): boolean {
   return TUI_TOOLS.has(toolName);
@@ -131,7 +132,7 @@ async function runAgentLoopInternal(
     maxToolRounds: config.maxToolRounds,
     effort: config.effort,
     stream,
-    tools: registry.getDefinitions(),
+    tools: registry.getDefinitions(DM_EXCLUDED_TOOLS),
     toolHandler,
     cacheHints: [{ target: "tools", ttl: "1h" }, { target: "messages" }],
     tuiToolNames: TUI_TOOLS,

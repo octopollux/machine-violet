@@ -527,27 +527,6 @@ describe("GameEngine", () => {
     expect(log.states).toContain("session_ending");
   });
 
-  it("intercepts context_refresh TUI command (not forwarded to TUI)", async () => {
-    const provider = mockProvider([
-      ...toolAndTextMessages("context_refresh", {}, "Context refreshed."),
-    ]);
-    const { callbacks, log } = mockCallbacks();
-
-    const engine = new GameEngine({
-      provider,
-      gameState: mockState(),
-      scene: mockScene(),
-      sessionState: mockSessionState(),
-      fileIO: mockFileIO(),
-      callbacks,
-      model: "claude-haiku-4-5-20251001",
-    });
-
-    await engine.processInput("Aldric", "Refresh context please.");
-
-    expect(log.tuiCommands.filter((c) => c.type === "context_refresh")).toHaveLength(0);
-  });
-
 });
 
 describe("GameEngine Scribe Integration", () => {

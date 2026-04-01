@@ -21,26 +21,12 @@ const TOOL_GLYPH_MAP: Record<string, ToolGlyph> = {
   // Cards
   deck:               { glyph: "♠", color: "cyan" },
   // Map / spatial
-  view_area:          { glyph: "◈", color: "blue" },
-  distance:           { glyph: "◈", color: "blue" },
-  path_between:       { glyph: "◈", color: "blue" },
-  line_of_sight:      { glyph: "◈", color: "blue" },
-  tiles_in_range:     { glyph: "◈", color: "blue" },
-  find_nearest:       { glyph: "◈", color: "blue" },
-  place_entity:       { glyph: "◈", color: "blue" },
-  move_entity:        { glyph: "◈", color: "blue" },
-  remove_entity:      { glyph: "◈", color: "blue" },
-  set_terrain:        { glyph: "◈", color: "blue" },
-  annotate:           { glyph: "◈", color: "blue" },
-  define_region:      { glyph: "◈", color: "blue" },
-  create_map:         { glyph: "◈", color: "blue" },
-  import_entities:    { glyph: "◈", color: "blue" },
+  map:                { glyph: "◈", color: "blue" },
+  map_entity:         { glyph: "◈", color: "blue" },
+  map_query:          { glyph: "◈", color: "blue" },
   // Clocks / time
-  set_alarm:          { glyph: "⏲" },
-  clear_alarm:        { glyph: "⏲" },
-  advance_calendar:   { glyph: "⏲" },
-  next_round:         { glyph: "⏲" },
-  check_clocks:       { glyph: "⏲" },
+  alarm:              { glyph: "⏲" },
+  time:               { glyph: "⏲" },
   // Combat
   start_combat:       { glyph: "⚔", color: "red" },
   end_combat:         { glyph: "⚔", color: "red" },
@@ -54,14 +40,12 @@ const TOOL_GLYPH_MAP: Record<string, ToolGlyph> = {
   style_scene:        { glyph: "◆", color: "magenta" },
   set_display_resources: { glyph: "◆", color: "magenta" },
   present_choices:    { glyph: "◆", color: "magenta" },
-  present_roll:       { glyph: "◆", color: "magenta" },
   show_character_sheet: { glyph: "◆", color: "magenta" },
   enter_ooc:          { glyph: "◆", color: "magenta" },
   switch_player:      { glyph: "◆", color: "magenta" },
   // Scene / session lifecycle
   scene_transition:   { glyph: "⟳", color: "yellow" },
   session_end:        { glyph: "⟳", color: "yellow" },
-  context_refresh:    { glyph: "⟳", color: "yellow" },
   rollback:           { glyph: "⟳", color: "yellow" },
 };
 

@@ -570,8 +570,6 @@ export class GameEngine {
           );
         } else if (cmd.type === "rollback") {
           await this.rollbackAndExit(cmd.target as string);
-        } else if (cmd.type === "context_refresh") {
-          await this.refreshContext();
         } else if (cmd.type === "scribe") {
           await this.handleScribe(cmd);
         } else if (cmd.type === "promote_character") {
@@ -735,15 +733,6 @@ export class GameEngine {
     }
 
     this.setState("waiting_input");
-  }
-
-  // --- Context Refresh ---
-
-  /** Refresh the DM's context from disk */
-  private async refreshContext(): Promise<void> {
-    this.callbacks.onDevLog?.("[dev] context_refresh: refreshing context from disk");
-    await this.sceneManager.contextRefresh();
-    this.callbacks.onDevLog?.("[dev] context_refresh: done");
   }
 
   // --- Rollback ---

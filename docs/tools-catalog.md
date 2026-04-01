@@ -12,34 +12,11 @@ Every tool specified across the design docs, organized by domain. Each entry inc
 
 All T1. All called by DM (or setup agent during init).
 
-### Queries
-
-| Tool | Signature | Returns |
+| Tool | Operations | Description |
 |---|---|---|
-| `view_area` | `(map, center, radius)` | Text grid + legend of the area around a point. The DM's primary spatial read. |
-| `distance` | `(map, from, to)` | Tile count between two coordinates, respecting grid type. |
-| `path_between` | `(map, from, to, options?)` | Shortest path + length. Options: terrain costs, impassable tiles. |
-| `line_of_sight` | `(map, from, to)` | List of tiles and contents along the line. Does NOT adjudicate vision — DM decides. |
-| `tiles_in_range` | `(map, center, range, filter?)` | All tiles within N steps, optionally filtered (entities only, terrain type, etc.). |
-| `find_nearest` | `(map, from, type)` | Nearest entity or terrain of a given type. Returns coordinate + distance. |
-
-### Mutations
-
-| Tool | Signature | Effect |
-|---|---|---|
-| `place_entity` | `(map, coord, entity)` | Add an entity to a tile. |
-| `move_entity` | `(map, entity_id, to)` | Relocate an entity. Updates coordinates. |
-| `remove_entity` | `(map, entity_id)` | Remove an entity from the map entirely. |
-| `set_terrain` | `(map, coord_or_region, terrain)` | Update terrain at a point or define a new region. |
-| `annotate` | `(map, coord, text)` | Add or update a freeform annotation on a tile. |
-
-### Bulk Setup
-
-| Tool | Signature | Effect |
-|---|---|---|
-| `create_map` | `({ id, grid_type, width, height, default_terrain })` | Initialize a new map JSON file. |
-| `define_region` | `({ map, x1, y1, x2, y2, terrain })` | Set terrain for a rectangular area. |
-| `import_entities` | `(map, entities[])` | Batch-place multiple entities. |
+| `map` | `create`, `view`, `set_terrain`, `annotate`, `define_region` | The board itself: create maps, view as text grid, modify terrain and annotations. |
+| `map_entity` | `place`, `move`, `remove`, `import`, `find_nearest` | Things on the map: place/move/remove tokens, batch import, find nearest entity or terrain. |
+| `map_query` | `distance`, `path`, `line_of_sight`, `tiles_in_range` | Spatial questions between two points: distance, pathfinding, line of sight, area scan. |
 
 ---
 
@@ -68,13 +45,10 @@ Requires active combat (`start_combat` must have been called). The persistent re
 
 All T1. All called by DM.
 
-| Tool | Signature | Effect |
+| Tool | Operations | Effect |
 |---|---|---|
-| `set_alarm` | `({ clock, in, message, repeating? })` | Set an alarm on calendar or combat clock. Returns alarm ID + fire time. |
-| `clear_alarm` | `({ id })` | Remove an alarm by ID. |
-| `advance_calendar` | `({ minutes })` | Advance calendar clock by minutes. Fires triggered alarms. |
-| `next_round` | `({})` | Advance combat round counter. Checks and fires combat alarms. Returns round number + any fired alarms. |
-| `check_clocks` | `({})` | Read current state of both clocks and pending alarms. |
+| `alarm` | `set`, `clear`, `check` | Schedule future events on calendar or combat clock, clear by ID, or read current state of both clocks and pending alarms. |
+| `time` | `advance`, `next_round` | Advance narrative time (calendar by minutes) or combat time (next round). Both fire triggered alarms. |
 
 ---
 
@@ -85,7 +59,7 @@ All T1 (initiative rolling may delegate to T2 for complex systems). Called by DM
 | Tool | Signature | Effect |
 |---|---|---|
 | `start_combat` | `({ combatants[] })` | Roll initiative, set turn order, activate combat clock and UI variant. Returns sorted order + round 1. |
-| `advance_turn` | `({})` | Advance to the next combatant's turn. Tracks individual turns within a round and auto-detects round boundaries. More granular than `next_round` (which advances the round-level combat clock). |
+| `advance_turn` | `({})` | Advance to the next combatant's turn. Tracks individual turns within a round and auto-detects round boundaries. More granular than `time` next_round (which advances the round-level combat clock). |
 | `modify_initiative` | `({ action, combatant, position? })` | Mid-combat changes: add, remove, move, delay a combatant. |
 | `end_combat` | `({})` | Clear initiative, reset combat clock, clear combat alarms, return to free player switching. |
 
@@ -97,8 +71,6 @@ All T1 (initiative rolling may delegate to T2 for complex systems). Called by DM
 |---|---|---|---|---|
 | `scene_transition` | T1 + T2 | DM | `({ title, time_advance })` | Cascade: finalize transcript, run subagent updates (campaign log + changelogs in parallel), advance calendar, check alarms, validate, reset precis, prune context, checkpoint. |
 | `session_end` | T1 + T2 | DM | `({ title, time_advance? })` | Final scene transition + Haiku writes session recap. Saves state. |
-| `context_refresh` | T1 + T2 | DM | `({})` | Mid-scene reorientation: regenerate scene precis from transcript on disk, re-read active state, refresh cached prefix. Conversation retained as-is. |
-
 Note: Session resume is an engine operation, not a callable tool. It runs automatically on app launch when a campaign exists.
 
 ---
@@ -125,8 +97,7 @@ TUI tools are **fire-and-forget**: their results drive engine/UI state but the D
 | `set_display_resources` | T1 | DM, Setup | `({ character, resources[] })` | Update which resource keys appear in the top frame for a character. Also stores keys on `GameState.displayResources`. |
 | `set_resource_values` | T1 | DM | `({ character, values: Record<string,string> })` | Set current values for a character's tracked resources (e.g. `{ "HP": "24/30" }`). Merges into `GameState.resourceValues`. |
 | `present_choices` | T1 + T2 | DM, Engine | `({ prompt?, choices[]?, descriptions[]? })` | Show choice modal. No params = Haiku subagent generates options. Explicit params = DM's choices. Labels and descriptions support formatting tags; labels are bullet-prefixed. |
-| `present_roll` | T1 | DM | `({ expression, rolls, total, kept?, label? })` | Display a dice roll as a dramatic modal. |
-| `show_character_sheet` | T1 | DM, Player | `({ character })` | Open character sheet modal. |
+| `show_character_sheet` | T1 | OOC, Dev | `({ character })` | Open character sheet modal. Available in OOC and Dev Mode only. |
 
 ---
 

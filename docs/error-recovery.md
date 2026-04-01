@@ -117,7 +117,7 @@ On next app launch, if `pending-operation.json` exists, the engine resumes the c
 
 ### Sources of drift
 
-The most common cause: the DM narrates a state change without calling a tool. "The goblin moves to the doorway" but `move_entity` was never called. The DM prompt reinforces "call the tool when state changes," but this will fail sometimes — it's an LLM.
+The most common cause: the DM narrates a state change without calling a tool. "The goblin moves to the doorway" but `map_entity` move was never called. The DM prompt reinforces "call the tool when state changes," but this will fail sometimes — it's an LLM.
 
 ### Periodic validation
 

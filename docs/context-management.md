@@ -77,9 +77,9 @@ The cached prefix includes a "current scene summary" — a running precis of the
 
 The precis is updated when:
 - An exchange is dropped due to `max_conversation_tokens` (if enabled) — a Haiku subagent appends a terse summary and extracts a **PlayerRead** (engagement level, focus tags, tone, pacing, off-script detection). See [subagents-catalog.md](subagents-catalog.md) §5 for the full PlayerRead interface.
-- On `context_refresh`, the full precis is regenerated from the scene transcript on disk
+- On scene transition, the full precis is regenerated from the scene transcript on disk
 
-**PlayerRead note:** With `max_conversation_tokens` disabled by default, the precis updater and PlayerRead extraction only fire on `context_refresh`. If finer-grained PlayerRead data is needed, a periodic extraction trigger could be added (see issue #73).
+**PlayerRead note:** With `max_conversation_tokens` disabled by default, the precis updater and PlayerRead extraction only fire on scene transition. If finer-grained PlayerRead data is needed, a periodic extraction trigger could be added (see issue #73).
 
 Example precis:
 ```
@@ -103,7 +103,7 @@ Tool implementations return the minimum useful information. Examples:
 | Tool | Verbose (avoid) | Terse (target) |
 |---|---|---|
 | `resolve_turn` | Full breakdown with explanations, 200t | `"Hit (23 vs AC 13). 9 slash. G1: 3/12 HP."` 20t |
-| `view_area` | 15x15 grid + full legend, 400t | Smallest relevant viewport + active entities only, 150t |
+| `map` (view) | 15x15 grid + full legend, 400t | Smallest relevant viewport + active entities only, 150t |
 | `scene_transition` | Paragraph about what happened, 200t | `"Scene closed. Alarm: orc warband 2 days out."` 15t |
 | `roll_dice` | Full explanation of the roll, 100t | `"2d20kh1+5: [18,7]→23"` 15t |
 

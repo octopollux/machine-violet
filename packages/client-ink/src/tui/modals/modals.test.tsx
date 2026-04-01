@@ -6,7 +6,6 @@ import { Modal } from "./Modal.js";
 import { ChoiceModal, ChoiceOverlay } from "./ChoiceModal.js";
 import { GameMenu, getMenuItems } from "./GameMenu.js";
 import { CharacterSheetModal } from "./CharacterSheetModal.js";
-import { DiceRollModal } from "./DiceRollModal.js";
 import { SessionRecapModal } from "./SessionRecapModal.js";
 import { SwatchModal } from "./SwatchModal.js";
 import { resolveTheme } from "../themes/resolver.js";
@@ -440,57 +439,6 @@ describe("CharacterSheetModal", () => {
       </Box>,
     );
     expect(lastFrame()).toContain("Character Sheet");
-  });
-});
-
-describe("DiceRollModal", () => {
-  it("renders expression and total", () => {
-    const { lastFrame } = render(
-      <DiceRollModal
-        theme={theme}
-        width={50}
-        expression="2d6+3"
-        rolls={[4, 5]}
-        total={12}
-        onDismiss={noop}
-      />,
-    );
-    const frame = lastFrame();
-    expect(frame).toContain("Rolling: 2d6+3");
-    expect(frame).toContain("4  5");
-    expect(frame).toContain("Total: 12");
-  });
-
-  it("shows kept dice when different from rolls", () => {
-    const { lastFrame } = render(
-      <DiceRollModal
-        theme={theme}
-        width={50}
-        expression="4d6kh3"
-        rolls={[3, 5, 1, 6]}
-        kept={[3, 5, 6]}
-        total={14}
-        onDismiss={noop}
-      />,
-    );
-    const frame = lastFrame();
-    expect(frame).toContain("Dice: [ 3  5  1  6 ]");
-    expect(frame).toContain("Kept: [ 3  5  6 ]");
-  });
-
-  it("shows reason when provided", () => {
-    const { lastFrame } = render(
-      <DiceRollModal
-        theme={theme}
-        width={50}
-        expression="1d20+5"
-        rolls={[17]}
-        total={22}
-        reason="Attack roll vs. Goblin"
-        onDismiss={noop}
-      />,
-    );
-    expect(lastFrame()).toContain("Attack roll vs. Goblin");
   });
 });
 

@@ -83,7 +83,6 @@ Scenes are an engine concept, not a game-system concept. A scene transition is a
 - **`scene_transition`**: natural narrative boundary. Fires Tier 1 bookkeeping + Tier 2 summarization. Returns alarm notifications and a clean slate.
 - **`session_end`**: saves a session recap for next time.
 - **`session_resume`**: "previously on..." — loads campaign state into the DM's fresh context.
-- **`context_refresh`**: mid-scene reorientation without a full scene break.
 
 → [Context Management Design](context-management.md)
 

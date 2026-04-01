@@ -64,16 +64,6 @@ function createDispatch(deps: {
         }
         break;
       }
-      case "present_roll":
-        deps.setActiveModal({
-          kind: "dice",
-          expression: cmd.expression as string,
-          rolls: cmd.rolls as number[],
-          kept: cmd.kept as number[] | undefined,
-          total: cmd.total as number,
-          reason: cmd.reason as string | undefined,
-        });
-        break;
       case "enter_ooc":
         deps.previousVariantRef.current = deps.variantRef.current;
         deps.setActiveSession(expect.anything());
@@ -152,15 +142,6 @@ describe("dispatchTuiCommand logic", () => {
     const dispatch = createDispatch(deps);
     dispatch({ type: "present_choices", prompt: "Choose:", choices: [] });
     expect(deps.setActiveModal).not.toHaveBeenCalled();
-  });
-
-  it("handles present_roll", () => {
-    const deps = makeDeps();
-    const dispatch = createDispatch(deps);
-    dispatch({ type: "present_roll", expression: "2d6", rolls: [3, 4], total: 7 } as TuiCommand);
-    expect(deps.setActiveModal).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: "dice", expression: "2d6", total: 7 }),
-    );
   });
 
   it("handles enter_ooc — saves previous variant", () => {

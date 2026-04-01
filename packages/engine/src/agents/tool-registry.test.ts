@@ -35,8 +35,8 @@ function mockState(): GameState {
 describe("ToolRegistry", () => {
   it("registers all T1 tools", () => {
     const reg = createTestRegistry();
-    // Map (14) + Dice (1) + Deck (1) + Clocks (5) + Combat (4) + TUI (7) = 32
-    expect(reg.size).toBeGreaterThanOrEqual(30);
+    // Map (3) + Dice (1) + Deck (1) + Clocks (2) + Combat (4) + TUI (6) + Scene (3) + Entity (5) + Objectives (1) + Search (2) + Player (1) = 29
+    expect(reg.size).toBe(29);
   });
 
   it("generates API-compatible tool definitions", () => {
@@ -67,11 +67,12 @@ describe("ToolRegistry", () => {
     expect(draw.content).toContain("Drew:");
   });
 
-  it("dispatches create_map and view_area", () => {
+  it("dispatches map create and view", () => {
     const reg = createTestRegistry();
     const state = mockState();
-    reg.dispatch(state, "create_map", {
-      id: "dungeon",
+    reg.dispatch(state, "map", {
+      operation: "create",
+      map: "dungeon",
       grid_type: "square",
       width: 10,
       height: 10,
@@ -79,24 +80,25 @@ describe("ToolRegistry", () => {
     });
     expect(state.maps["dungeon"]).toBeTruthy();
 
-    const view = reg.dispatch(state, "view_area", { map: "dungeon", center: "5,5", radius: 2 });
+    const view = reg.dispatch(state, "map", { operation: "view", map: "dungeon", center: "5,5", radius: 2 });
     expect(view.is_error).toBeUndefined();
     expect(view.content).toContain("."); // default terrain shorthand
   });
 
-  it("dispatches place_entity and move_entity", () => {
+  it("dispatches map_entity place and move", () => {
     const reg = createTestRegistry();
     const state = mockState();
     state.maps["m"] = createMap("m", "square", 10, 10, "stone");
 
-    reg.dispatch(state, "place_entity", {
+    reg.dispatch(state, "map_entity", {
+      operation: "place",
       map: "m",
       coord: "3,3",
       entity: { id: "goblin1", type: "npc" },
     });
     expect(state.maps["m"].entities["3,3"]).toHaveLength(1);
 
-    reg.dispatch(state, "move_entity", { map: "m", entity_id: "goblin1", to: "5,5" });
+    reg.dispatch(state, "map_entity", { operation: "move", map: "m", entity_id: "goblin1", to: "5,5" });
     expect(state.maps["m"].entities["5,5"]).toHaveLength(1);
     expect(state.maps["m"].entities["3,3"] ?? []).toHaveLength(0);
   });
@@ -104,7 +106,8 @@ describe("ToolRegistry", () => {
   it("dispatches set_alarm and check_clocks", () => {
     const reg = createTestRegistry();
     const state = mockState();
-    const result = reg.dispatch(state, "set_alarm", {
+    const result = reg.dispatch(state, "alarm", {
+      operation: "set",
       clock: "calendar",
       in: "2 days",
       message: "Orc warband arrives",
@@ -112,7 +115,7 @@ describe("ToolRegistry", () => {
     expect(result.is_error).toBeUndefined();
     expect(result.content).toContain("Alarm");
 
-    const check = reg.dispatch(state, "check_clocks", {});
+    const check = reg.dispatch(state, "alarm", { operation: "check" });
     expect(check.content).toContain("calendar");
   });
 
@@ -167,7 +170,7 @@ describe("ToolRegistry", () => {
   it("returns error for missing map", () => {
     const reg = createTestRegistry();
     const state = mockState();
-    const result = reg.dispatch(state, "view_area", { map: "no_such_map", center: "0,0", radius: 1 });
+    const result = reg.dispatch(state, "map", { operation: "view", map: "no_such_map", center: "0,0", radius: 1 });
     expect(result.is_error).toBe(true);
     expect(result.content).toContain("not found");
   });
@@ -187,12 +190,13 @@ describe("ToolRegistry", () => {
     expect(reg.has("fake_tool")).toBe(false);
   });
 
-  it("dispatches define_region and creates region on map", () => {
+  it("dispatches map define_region and creates region on map", () => {
     const reg = createTestRegistry();
     const state = mockState();
     state.maps["m"] = createMap("m", "square", 10, 10, "stone");
 
-    const result = reg.dispatch(state, "define_region", {
+    const result = reg.dispatch(state, "map", {
+      operation: "define_region",
       map: "m", x1: 1, y1: 1, x2: 3, y2: 3, terrain: "water",
     });
     expect(result.is_error).toBeUndefined();
@@ -201,12 +205,13 @@ describe("ToolRegistry", () => {
     expect(state.maps["m"].regions[0].terrain).toBe("water");
   });
 
-  it("dispatches set_terrain with region input (regression)", () => {
+  it("dispatches map set_terrain with region input (regression)", () => {
     const reg = createTestRegistry();
     const state = mockState();
     state.maps["m"] = createMap("m", "square", 10, 10, "stone");
 
-    const result = reg.dispatch(state, "set_terrain", {
+    const result = reg.dispatch(state, "map", {
+      operation: "set_terrain",
       map: "m",
       region: { x1: 0, y1: 0, x2: 2, y2: 2 },
       terrain: "forest",
@@ -314,24 +319,16 @@ describe("ToolRegistry", () => {
 
   it("getDefinitionsFor returns only requested tools, skips unknown", () => {
     const reg = createTestRegistry();
-    const defs = reg.getDefinitionsFor(["roll_dice", "nonexistent", "check_clocks"]);
+    const defs = reg.getDefinitionsFor(["roll_dice", "nonexistent", "alarm"]);
     expect(defs).toHaveLength(2);
     expect(defs[0].name).toBe("roll_dice");
-    expect(defs[1].name).toBe("check_clocks");
+    expect(defs[1].name).toBe("alarm");
   });
 
   it("getDefinitionsFor returns empty array for all-unknown names", () => {
     const reg = createTestRegistry();
     const defs = reg.getDefinitionsFor(["fake1", "fake2"]);
     expect(defs).toHaveLength(0);
-  });
-
-  it("dispatches context_refresh and returns TUI command JSON", () => {
-    const reg = createTestRegistry();
-    const state = mockState();
-    const result = reg.dispatch(state, "context_refresh", {});
-    const parsed = JSON.parse(result.content);
-    expect(parsed.type).toBe("context_refresh");
   });
 
   it("dispatches scene_transition and returns TuiCommand JSON", () => {

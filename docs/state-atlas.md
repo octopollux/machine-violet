@@ -20,22 +20,22 @@ GameState
 │       ├── gridType: "square" | "hex"     const
 │       ├── bounds: { width, height }      const
 │       ├── defaultTerrain: string         const
-│       ├── regions: MapRegion[]           mut   (define_region, set_terrain)
-│       ├── terrain: Record<coord, string> mut   (set_terrain)
-│       ├── entities: Record<coord, MapEntity[]> mut (place/move/remove_entity)
-│       ├── annotations: Record<coord, string>   mut (annotate)
+│       ├── regions: MapRegion[]           mut   (map: define_region, set_terrain)
+│       ├── terrain: Record<coord, string> mut   (map: set_terrain)
+│       ├── entities: Record<coord, MapEntity[]> mut (map_entity: place/move/remove)
+│       ├── annotations: Record<coord, string>   mut (map: annotate)
 │       ├── links: MapLink[]               mut
 │       └── meta: Record<string, string>   mut
 │
 ├── clocks: ClocksState                    mut   → state/clocks.json     Engine + DM
 │   ├── calendar: CalendarClock
-│   │   ├── current: number (minutes)      mut   (advance_calendar, scene_transition)
-│   │   ├── alarms: Alarm[]                mut   (set_alarm, clear_alarm, fireAlarms)
+│   │   ├── current: number (minutes)      mut   (time: advance, scene_transition)
+│   │   ├── alarms: Alarm[]                mut   (alarm: set/clear, fireAlarms)
 │   │   ├── epoch: string                  const (set at campaign init)
 │   │   └── display_format: string         const
 │   └── combat: CombatClock
-│       ├── current: number (rounds)       mut   (next_round)
-│       ├── alarms: Alarm[]                mut   (set_alarm, clear_alarm, fireAlarms)
+│       ├── current: number (rounds)       mut   (time: next_round)
+│       ├── alarms: Alarm[]                mut   (alarm: set/clear, fireAlarms)
 │       └── active: boolean                mut   (start_combat ↔ end_combat)
 │
 ├── combat: CombatState                    mut   → state/combat.json     DM via tools
@@ -192,39 +192,20 @@ Legend: **R** = reads, **W** = writes (triggers persistence), **UI** = returns T
 |------|------|--------|--------|-------|--------|-------------------|-------|
 | `deck` | | | | **W** | | | All 6 deck operations mutate DecksState. |
 
-### Map Queries
+### Map Tools
 
 | Tool | maps | clocks | combat | decks | config | activePlayerIndex | Notes |
 |------|------|--------|--------|-------|--------|-------------------|-------|
-| `view_area` | R | | | | | | |
-| `distance` | R | | | | | | |
-| `path_between` | R | | | | | | |
-| `line_of_sight` | R | | | | | | |
-| `tiles_in_range` | R | | | | | | |
-| `find_nearest` | R | | | | | | |
-
-### Map Mutations
-
-| Tool | maps | clocks | combat | decks | config | activePlayerIndex | Notes |
-|------|------|--------|--------|-------|--------|-------------------|-------|
-| `create_map` | **W** | | | | | | Creates new entry in `state.maps`. |
-| `place_entity` | **W** | | | | | | |
-| `move_entity` | **W** | | | | | | |
-| `remove_entity` | **W** | | | | | | |
-| `set_terrain` | **W** | | | | | | Single coord or region. |
-| `define_region` | **W** | | | | | | |
-| `annotate` | **W** | | | | | | |
-| `import_entities` | **W** | | | | | | Batch place. |
+| `map` | R/**W** | | | | | | `create` writes; `view` reads; `set_terrain`/`annotate`/`define_region` write. |
+| `map_entity` | R/**W** | | | | | | `place`/`move`/`remove`/`import` write; `find_nearest` reads. |
+| `map_query` | R | | | | | | Pure reads: `distance`, `path`, `line_of_sight`, `tiles_in_range`. |
 
 ### Clocks
 
 | Tool | maps | clocks | combat | decks | config | activePlayerIndex | Notes |
 |------|------|--------|--------|-------|--------|-------------------|-------|
-| `set_alarm` | | **W** | | | | | Calendar or combat clock. |
-| `clear_alarm` | | **W** | | | | | Searches both clocks. |
-| `advance_calendar` | | **W** | | | | | Fires triggered alarms. |
-| `next_round` | | **W** | | | | | Throws if combat not active. |
-| `check_clocks` | | R | | | | | Read-only status of both clocks. |
+| `alarm` | | R/**W** | | | | | `set`/`clear` write; `check` reads both clocks. |
+| `time` | | **W** | | | | | `advance` moves calendar; `next_round` advances combat round. Both fire alarms. |
 
 ### Combat
 
@@ -244,8 +225,7 @@ Legend: **R** = reads, **W** = writes (triggers persistence), **UI** = returns T
 | `set_display_resources` | | | | | | | W `displayResources`. Returns **UI**. |
 | `set_resource_values` | | | | | | | W `resourceValues`. Returns **UI**. |
 | `present_choices` | | | | | | | Returns **UI**. |
-| `present_roll` | | | | | | | Returns **UI**. |
-| `show_character_sheet` | | | | | | | Returns **UI**. |
+| `show_character_sheet` | | | | | | | Returns **UI**. OOC/Dev only. |
 
 ### Player Management
 
@@ -259,7 +239,6 @@ Legend: **R** = reads, **W** = writes (triggers persistence), **UI** = returns T
 |------|------|--------|--------|-------|--------|-------------------|-------|
 | `scene_transition` | | | | | | | Returns **E**. Full cascade handled by SceneManager. |
 | `session_end` | | | | | | | Returns **E**. |
-| `context_refresh` | | | | | | | Returns **E**. |
 
 ### Entity (Worldbuilding)
 
@@ -288,18 +267,10 @@ start_combat    → ["combat", "clocks"]
 end_combat      → ["combat", "clocks"]
 advance_turn    → ["combat"]
 modify_initiative → ["combat"]
-set_alarm       → ["clocks"]
-clear_alarm     → ["clocks"]
-advance_calendar → ["clocks"]
-next_round      → ["clocks"]
-create_map      → ["maps"]
-place_entity    → ["maps"]
-move_entity     → ["maps"]
-remove_entity   → ["maps"]
-set_terrain     → ["maps"]
-annotate        → ["maps"]
-import_entities → ["maps"]
-define_region   → ["maps"]
+alarm           → ["clocks"]
+time            → ["clocks"]
+map             → ["maps"]
+map_entity      → ["maps"]
 deck            → ["decks"]
 manage_objectives → ["objectives"]
 switch_player   → []  (empty — activePlayerIndex persisted via scene state)

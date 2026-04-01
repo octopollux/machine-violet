@@ -118,16 +118,6 @@ export function useGameCallbacks(deps: GameCallbackDeps): GameCallbackResult {
         }
         break;
       }
-      case "present_roll":
-        setActiveModal({
-          kind: "dice",
-          expression: cmd.expression as string,
-          rolls: cmd.rolls as number[],
-          kept: cmd.kept as number[] | undefined,
-          total: cmd.total as number,
-          reason: cmd.reason as string | undefined,
-        });
-        break;
       case "show_character_sheet": {
         const charName = cmd.character as string;
         const gs = gameStateRef.current;
