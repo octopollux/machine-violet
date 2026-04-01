@@ -241,6 +241,21 @@ export class SessionManager {
     const setup = this.setupSession;
     void setup.start().then(() => {
       if (this.setupSession === setup) this.openNextTurn();
+    }).catch((err) => {
+      // Only handle errors for the current setup session / generation
+      if (this.setupSession !== setup || this.sessionGeneration !== gen) return;
+
+      console.error("[SessionManager] Setup start failed:", err);
+
+      // Tear down setup state so a new setup can be started
+      this.setupSession = null;
+      this.turnManager = null;
+      this.status = "idle";
+
+      this.broadcast({
+        type: "error",
+        data: { message: err instanceof Error ? err.message : String(err), recoverable: false },
+      });
     });
   }
 
