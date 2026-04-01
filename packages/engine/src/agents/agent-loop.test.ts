@@ -284,6 +284,52 @@ describe("agentLoop", () => {
     expect(result.roundMessages[2].role).toBe("assistant");
   });
 
+  it("executes multiple tool calls from a single response", async () => {
+    const multiToolResult: ChatResult = {
+      text: "",
+      toolCalls: [
+        { id: "toolu_1", name: "roll_dice", input: { expression: "1d20" } },
+        { id: "toolu_2", name: "roll_dice", input: { expression: "1d6" } },
+      ],
+      usage: mockUsage(),
+      stopReason: "tool_use",
+      assistantContent: [
+        { type: "tool_use", id: "toolu_1", name: "roll_dice", input: { expression: "1d20" } },
+        { type: "tool_use", id: "toolu_2", name: "roll_dice", input: { expression: "1d6" } },
+      ],
+    };
+
+    const provider = mockProvider([multiToolResult, textResult("Two rolls done!")]);
+    const onToolStart = vi.fn();
+    const onToolEnd = vi.fn();
+
+    const result = await agentLoop(
+      provider,
+      "System",
+      [{ role: "user", content: "Roll two dice" }],
+      createTestRegistry(),
+      mockState(),
+      mockConfig({ provider, onToolStart, onToolEnd }),
+    );
+
+    expect(onToolStart).toHaveBeenCalledTimes(2);
+    expect(onToolEnd).toHaveBeenCalledTimes(2);
+    expect(result.text).toBe("Two rolls done!");
+
+    // Verify both tool results were sent back in one user message
+    const chatCalls = (provider.chat as ReturnType<typeof vi.fn>).mock.calls;
+    const secondCallMsgs = chatCalls[1][0].messages;
+    const toolResultMsg = secondCallMsgs.find(
+      (m: { role: string; content: unknown }) =>
+        m.role === "user" && Array.isArray(m.content),
+    );
+    expect(toolResultMsg).toBeDefined();
+    const results = (toolResultMsg.content as ContentPart[]).filter((p) => p.type === "tool_result");
+    expect(results).toHaveLength(2);
+    expect(results[0].tool_use_id).toBe("toolu_1");
+    expect(results[1].tool_use_id).toBe("toolu_2");
+  });
+
   it("handles tool errors gracefully", async () => {
     const provider = mockProvider([
       toolUseResult("view_area", { map: "nonexistent", center: "0,0", radius: 1 }),

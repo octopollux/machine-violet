@@ -158,51 +158,53 @@ export async function runProviderLoop(
 
     fullText += result.text;
 
-    // Process tool calls
-    const toolResults: ContentPart[] = [];
+    // Process tool calls concurrently. Sync handlers still run sequentially
+    // on the JS event loop; async handlers (subagent spawns, search) genuinely
+    // overlap. The model can batch independent calls in one response to save
+    // API round-trips.
+    const toolResults: ContentPart[] = await Promise.all(
+      result.toolCalls.map(async (tc): Promise<ContentPart> => {
+        config.onToolStart?.(tc.name);
 
-    for (const tc of result.toolCalls) {
-      config.onToolStart?.(tc.name);
+        // Check for parse errors from strict JSON parsing
+        if (tc.input._parse_error) {
+          const parseResult: ToolResult = {
+            content: String(tc.input._parse_error),
+            is_error: true,
+          };
+          config.onToolEnd?.(tc.name, parseResult);
+          return {
+            type: "tool_result",
+            tool_use_id: tc.id,
+            content: parseResult.content,
+            is_error: true,
+          };
+        }
 
-      // Check for parse errors from strict JSON parsing
-      if (tc.input._parse_error) {
-        const parseResult: ToolResult = {
-          content: String(tc.input._parse_error),
-          is_error: true,
-        };
-        config.onToolEnd?.(tc.name, parseResult);
-        toolResults.push({
+        let toolResult: ToolResult;
+        if (config.toolHandler) {
+          toolResult = await config.toolHandler(tc.name, tc.input);
+        } else {
+          toolResult = { content: `No handler for tool: ${tc.name}`, is_error: true };
+        }
+
+        config.onToolEnd?.(tc.name, toolResult);
+
+        if (tuiToolNames.has(tc.name)) {
+          try {
+            const tui = toolResult._tui ?? JSON.parse(toolResult.content);
+            tuiCommands.push(tui as TuiCommand);
+          } catch { /* not a TUI command */ }
+        }
+
+        return {
           type: "tool_result",
           tool_use_id: tc.id,
-          content: parseResult.content,
-          is_error: true,
-        });
-        continue;
-      }
-
-      let toolResult: ToolResult;
-      if (config.toolHandler) {
-        toolResult = await config.toolHandler(tc.name, tc.input);
-      } else {
-        toolResult = { content: `No handler for tool: ${tc.name}`, is_error: true };
-      }
-
-      config.onToolEnd?.(tc.name, toolResult);
-
-      if (tuiToolNames.has(tc.name)) {
-        try {
-          const tui = toolResult._tui ?? JSON.parse(toolResult.content);
-          tuiCommands.push(tui as TuiCommand);
-        } catch { /* not a TUI command */ }
-      }
-
-      toolResults.push({
-        type: "tool_result",
-        tool_use_id: tc.id,
-        content: toolResult.content,
-        is_error: toolResult.is_error,
-      });
-    }
+          content: toolResult.content,
+          is_error: toolResult.is_error,
+        };
+      }),
+    );
 
     // Append assistant message (without thinking blocks)
     workingMessages.push({ role: "assistant", content: result.assistantContent });
