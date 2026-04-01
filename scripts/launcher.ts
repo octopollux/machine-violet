@@ -36,11 +36,14 @@ loadEnv();
 // --- Parse args ---
 const serverOnly = process.argv.includes("--server");
 let campaign = process.env.MV_CAMPAIGN;
+let wsLogPath: string | undefined;
 
 for (let i = 2; i < process.argv.length; i++) {
   const arg = process.argv[i];
   if ((arg === "--campaign" || arg === "-c") && process.argv[i + 1]) {
     campaign = process.argv[++i];
+  } else if (arg === "--ws-log" && process.argv[i + 1]) {
+    wsLogPath = process.argv[++i];
   } else if (!arg.startsWith("-")) {
     campaign = arg;
   }
@@ -63,6 +66,12 @@ const server = await createServer({
 // Suppress Fastify request logging in launcher mode (player doesn't need it)
 if (!serverOnly) {
   server.log.level = "error";
+}
+
+// Enable WS event logging if requested
+if (wsLogPath) {
+  server.sessionManager.setWsLog(wsLogPath);
+  console.log(`WS event log: ${wsLogPath}`);
 }
 
 try {

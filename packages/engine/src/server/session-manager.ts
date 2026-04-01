@@ -5,7 +5,7 @@
  * the GameEngine lifecycle, and routes messages between engine and clients.
  */
 import { join, dirname } from "node:path";
-import { readFileSync } from "node:fs";
+import { readFileSync, appendFileSync } from "node:fs";
 import type { WebSocket } from "ws";
 import type {
   ServerEvent,
@@ -66,8 +66,16 @@ export class SessionManager {
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   private static readonly IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
+  /** Optional file path for appending WS event logs (--ws-log). */
+  private wsLogPath: string | null = null;
+
   constructor(campaignsDir: string) {
     this.campaignsDir = campaignsDir;
+  }
+
+  /** Enable WebSocket event logging to a file. */
+  setWsLog(filePath: string): void {
+    this.wsLogPath = filePath;
   }
 
   // --- Connection management ---
@@ -111,6 +119,27 @@ export class SessionManager {
       }
     }
     const msg = JSON.stringify(event);
+
+    // WS event log (--ws-log)
+    if (this.wsLogPath) {
+      try {
+        // Truncate narrative:chunk text to keep log readable
+        let logLine: string;
+        if (event.type === "narrative:chunk") {
+          const d = event.data as { text?: string; kind?: string };
+          const text = d.text ?? "";
+          logLine = JSON.stringify({
+            t: Date.now(), type: event.type,
+            kind: d.kind, len: text.length,
+            preview: text.slice(0, 120) + (text.length > 120 ? "…" : ""),
+          });
+        } else {
+          logLine = JSON.stringify({ t: Date.now(), ...event });
+        }
+        appendFileSync(this.wsLogPath, logLine + "\n");
+      } catch { /* don't break broadcast on log failure */ }
+    }
+
     for (const { ws } of this.clients.values()) {
       if (ws.readyState === 1 /* WebSocket.OPEN */) {
         ws.send(msg);

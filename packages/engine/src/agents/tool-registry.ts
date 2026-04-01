@@ -121,7 +121,7 @@ const TOOL_DEFS: RegisteredTool[] = [
           from: { type: "string", enum: ["top", "random", "bottom"] },
           cards: { type: "array", items: { type: "string" }, description: "Card IDs to return" },
           template: { type: "string", enum: ["standard52", "tarot", "custom"] },
-          custom_cards: { type: "array", description: "Custom card definitions for 'custom' template" },
+          custom_cards: { type: "array", items: { type: "string" }, description: "Custom card definitions for 'custom' template" },
         },
         required: ["deck", "operation"],
       },
