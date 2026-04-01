@@ -121,14 +121,19 @@ async function responsesStream(
 ): Promise<ChatResult> {
   const stream = client.responses.stream(apiParams);
 
+  let text = "";
   for await (const event of stream) {
     if (event.type === "response.output_text.delta") {
+      text += event.delta;
       onDelta(event.delta);
     }
   }
 
   const response = await stream.finalResponse();
-  return fromResponsesResponse(response);
+  // finalResponse() returns ParsedResponse which lacks the output_text
+  // convenience property, so we build the result from the accumulated text
+  // and parse tool calls from the output items directly.
+  return fromResponsesResponseWithText(response, text);
 }
 
 // ---------------------------------------------------------------------------
@@ -263,9 +268,42 @@ function toResponsesInput(msg: NormalizedMessage): OpenAI.Responses.ResponseInpu
 // ---------------------------------------------------------------------------
 
 function fromResponsesResponse(response: OAIResponse): ChatResult {
-  const text = response.output_text;
+  return fromResponsesResponseWithText(response);
+}
+
+/**
+ * Build a ChatResult from a Responses API response.
+ *
+ * When called from the streaming path, `accumulatedText` is supplied because
+ * `ParsedResponse.output_text` is undefined on streamed responses.
+ * For non-streaming, we extract text from the output items.
+ */
+function fromResponsesResponseWithText(
+  response: OAIResponse,
+  accumulatedText?: string,
+): ChatResult {
   const toolCalls: NormalizedToolCall[] = [];
   const assistantContent: ContentPart[] = [];
+
+  // Extract text from output items if not provided
+  let text = accumulatedText;
+  if (text === undefined) {
+    // Prefer the convenience property; fall back to iterating output
+    text = response.output_text ?? "";
+    if (!text) {
+      const textParts: string[] = [];
+      for (const item of response.output) {
+        if (item.type === "message") {
+          for (const part of item.content) {
+            if (part.type === "output_text") {
+              textParts.push(part.text);
+            }
+          }
+        }
+      }
+      text = textParts.join("");
+    }
+  }
 
   if (text) {
     assistantContent.push({ type: "text", text });
@@ -620,7 +658,7 @@ async function openaiHealthCheck(client: OpenAI, providerId: string, model?: str
       await client.responses.create({
         model: model ?? "gpt-4o-mini",
         input: ".",
-        max_output_tokens: 1,
+        max_output_tokens: 16,
         store: false,
       });
     } else {

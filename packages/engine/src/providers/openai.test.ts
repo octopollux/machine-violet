@@ -480,7 +480,7 @@ describe("health check", () => {
     expect(mockResponses.create).toHaveBeenCalled();
     const callArgs = mockResponses.create.mock.calls[0][0];
     expect(callArgs.input).toBe(".");
-    expect(callArgs.max_output_tokens).toBe(1);
+    expect(callArgs.max_output_tokens).toBe(16);
     expect(callArgs.store).toBe(false);
   });
 
