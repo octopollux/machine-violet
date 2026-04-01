@@ -30,7 +30,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.79.0",
+    "@anthropic-ai/sdk": "^0.82.0",
     "clipboardy": "^5.3.1",
     "dotenv": "^16.4.5",
     "fflate": "^0.8.2",
