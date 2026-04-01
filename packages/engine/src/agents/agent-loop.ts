@@ -22,7 +22,7 @@ export const TUI_TOOLS = new Set([
 ]);
 
 /** Tools registered in the ToolRegistry but only exposed to OOC / Dev Mode agents. */
-const DM_EXCLUDED_TOOLS = new Set(["show_character_sheet"]);
+const DM_EXCLUDED_TOOLS = new Set(["show_character_sheet", "rollback"]);
 
 export function isTuiCommand(toolName: string): boolean {
   return TUI_TOOLS.has(toolName);
