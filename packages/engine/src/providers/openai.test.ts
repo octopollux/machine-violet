@@ -358,6 +358,44 @@ describe("Responses API integration", () => {
     });
   });
 
+  it("preserves ordering for interleaved assistant text and tool_use content", async () => {
+    mockResponses.create.mockResolvedValue(fakeResponse());
+
+    const messages: NormalizedMessage[] = [
+      { role: "user", content: "What's the weather and time?" },
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "Checking weather." },
+          { type: "tool_use", id: "call_1", name: "weather", input: { city: "NYC" } },
+          { type: "text", text: "Now checking time." },
+          { type: "tool_use", id: "call_2", name: "time", input: { timezone: "EST" } },
+        ],
+      },
+      {
+        role: "user",
+        content: [
+          { type: "tool_result", tool_use_id: "call_1", content: "72°F and sunny" },
+          { type: "tool_result", tool_use_id: "call_2", content: "3:00 PM" },
+        ],
+      },
+    ];
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+    await provider.chat(baseChatParams({ messages }));
+
+    const callArgs = mockResponses.create.mock.calls[0][0];
+    const input = callArgs.input;
+
+    expect(input[0]).toEqual({ type: "message", role: "user", content: "What's the weather and time?" });
+    expect(input[1]).toEqual({ type: "message", role: "assistant", content: "Checking weather." });
+    expect(input[2]).toEqual({ type: "function_call", call_id: "call_1", name: "weather", arguments: '{"city":"NYC"}' });
+    expect(input[3]).toEqual({ type: "message", role: "assistant", content: "Now checking time." });
+    expect(input[4]).toEqual({ type: "function_call", call_id: "call_2", name: "time", arguments: '{"timezone":"EST"}' });
+    expect(input[5]).toEqual({ type: "function_call_output", call_id: "call_1", output: "72°F and sunny" });
+    expect(input[6]).toEqual({ type: "function_call_output", call_id: "call_2", output: "3:00 PM" });
+  });
+
   it("sets store: false and max_output_tokens", async () => {
     mockResponses.create.mockResolvedValue(fakeResponse());
 

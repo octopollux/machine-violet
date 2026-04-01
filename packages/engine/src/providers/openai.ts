@@ -219,17 +219,18 @@ function toResponsesInput(msg: NormalizedMessage): OpenAI.Responses.ResponseInpu
 
   if (msg.role === "assistant") {
     const items: OpenAI.Responses.ResponseInputItem[] = [];
+    let pendingText = "";
 
-    // Collect text parts for a message item
-    const textParts = msg.content.filter((p) => p.type === "text");
-    if (textParts.length > 0) {
-      const text = textParts.map((p) => (p as { text: string }).text).join("");
-      items.push({ type: "message", role: "assistant", content: text });
-    }
-
-    // Each tool_use becomes a top-level function_call item
+    // Iterate in order to preserve text ↔ tool_use interleaving
     for (const part of msg.content) {
-      if (part.type === "tool_use") {
+      if (part.type === "text") {
+        pendingText += part.text;
+      } else if (part.type === "tool_use") {
+        // Flush accumulated text before the function_call
+        if (pendingText) {
+          items.push({ type: "message", role: "assistant", content: pendingText });
+          pendingText = "";
+        }
         items.push({
           type: "function_call",
           call_id: part.id,
@@ -237,6 +238,10 @@ function toResponsesInput(msg: NormalizedMessage): OpenAI.Responses.ResponseInpu
           arguments: JSON.stringify(part.input),
         });
       }
+    }
+    // Flush trailing text
+    if (pendingText) {
+      items.push({ type: "message", role: "assistant", content: pendingText });
     }
 
     return items;
@@ -285,42 +290,42 @@ function fromResponsesResponseWithText(
   const toolCalls: NormalizedToolCall[] = [];
   const assistantContent: ContentPart[] = [];
 
-  // Extract text from output items if not provided
-  let text = accumulatedText;
-  if (text === undefined) {
-    // Prefer the convenience property; fall back to iterating output
-    text = response.output_text ?? "";
-    if (!text) {
-      const textParts: string[] = [];
-      for (const item of response.output) {
-        if (item.type === "message") {
-          for (const part of item.content) {
-            if (part.type === "output_text") {
-              textParts.push(part.text);
-            }
+  // Build text and assistantContent in output order to preserve interleaving
+  const textParts: string[] = [];
+
+  if (accumulatedText !== undefined) {
+    // Streaming path: text was accumulated from deltas, just use it
+    if (accumulatedText) {
+      textParts.push(accumulatedText);
+      assistantContent.push({ type: "text", text: accumulatedText });
+    }
+    // Still need to extract tool calls from output
+    for (const item of response.output) {
+      if (item.type === "function_call") {
+        const input = parseToolArgs(item.arguments);
+        toolCalls.push({ id: item.call_id, name: item.name, input });
+        assistantContent.push({ type: "tool_use", id: item.call_id, name: item.name, input });
+      }
+    }
+  } else {
+    // Non-streaming: iterate output in order to preserve text ↔ tool_call interleaving
+    for (const item of response.output) {
+      if (item.type === "message") {
+        for (const part of item.content) {
+          if (part.type === "output_text" && part.text) {
+            textParts.push(part.text);
+            assistantContent.push({ type: "text", text: part.text });
           }
         }
+      } else if (item.type === "function_call") {
+        const input = parseToolArgs(item.arguments);
+        toolCalls.push({ id: item.call_id, name: item.name, input });
+        assistantContent.push({ type: "tool_use", id: item.call_id, name: item.name, input });
       }
-      text = textParts.join("");
     }
   }
 
-  if (text) {
-    assistantContent.push({ type: "text", text });
-  }
-
-  for (const item of response.output) {
-    if (item.type === "function_call") {
-      let input: Record<string, unknown>;
-      try {
-        input = JSON.parse(item.arguments);
-      } catch {
-        input = { _parse_error: `Malformed JSON in tool arguments: ${item.arguments.slice(0, 200)}` };
-      }
-      toolCalls.push({ id: item.call_id, name: item.name, input });
-      assistantContent.push({ type: "tool_use", id: item.call_id, name: item.name, input });
-    }
-  }
+  const text = textParts.join("");
 
   const stopReason = mapResponsesStatus(response, toolCalls.length > 0);
   const usage = mapResponsesUsage(response.usage);
@@ -331,6 +336,14 @@ function fromResponsesResponseWithText(
 // ---------------------------------------------------------------------------
 // Helpers (Responses API)
 // ---------------------------------------------------------------------------
+
+function parseToolArgs(args: string): Record<string, unknown> {
+  try {
+    return JSON.parse(args);
+  } catch {
+    return { _parse_error: `Malformed JSON in tool arguments: ${args.slice(0, 200)}` };
+  }
+}
 
 function mapResponsesStatus(response: OAIResponse, hasToolCalls: boolean): StopReason {
   if (hasToolCalls) return "tool_use";
