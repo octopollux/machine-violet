@@ -22,6 +22,7 @@ describe("campaignDirs contract", () => {
     expect(relDirs).toContain("locations");
     expect(relDirs).toContain("factions");
     expect(relDirs).toContain("lore");
+    expect(relDirs).toContain("items");
     expect(relDirs).toContain("rules");
     expect(relDirs).toContain("state");
   });

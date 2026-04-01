@@ -802,7 +802,7 @@ export class SceneManager {
    * Returns entries as `{ dir, file, fullPath }`.
    */
   private async collectEntityFiles(): Promise<{ dir: string; file: string; fullPath: string }[]> {
-    const dirs = ["characters", "locations", "factions", "lore"];
+    const dirs = ["characters", "locations", "factions", "lore", "items"];
     const results: { dir: string; file: string; fullPath: string }[] = [];
     for (const dir of dirs) {
       const dirPath = `${this.state.campaignRoot}/${dir}`;
@@ -910,7 +910,7 @@ export class SceneManager {
     description: string,
   ): Promise<void> {
     // Find the entity file — check both flat path and subdirectory index.md
-    const dirs = ["characters", "locations", "factions", "lore"];
+    const dirs = ["characters", "locations", "factions", "lore", "items"];
     for (const dir of dirs) {
       const sceneTag = `Scene ${String(sceneNumber).padStart(3, "0")}`;
       const flatPath = `${this.state.campaignRoot}/${dir}/${filename}`;

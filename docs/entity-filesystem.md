@@ -18,7 +18,8 @@ The game world is stored as a filesystem structure optimized for tool and agent 
 | **characters** | `characters/` | Anyone inhabiting the world — PCs, NPCs, monsters, gods. No hard distinction between subtypes. Any character can be handed to a player to inhabit. |
 | **locations** | `locations/` | Places. Description, connections to other locations, associated tile maps. Locations get subdirectories (may contain maps, sub-location files). |
 | **factions** | `factions/` | Organizations, groups, armies. Goals, resources, members, relationships. |
-| **lore** | `lore/` | The grab-bag. Items, history, prophecies, cultural notes, magic systems, recurring dreams, anything worth tracking that isn't a character, location, faction, or rules reference. |
+| **items** | `items/` | Weapons, artifacts, significant objects with narrative weight. Things characters carry, trade, or quest for. Mundane gear stays on the character sheet as plain text. |
+| **lore** | `lore/` | The grab-bag. History, prophecies, cultural notes, magic systems, recurring dreams, anything worth tracking that isn't a character, location, faction, item, or rules reference. |
 | **rules** | `rules/` | Game-system mechanics extracted from source materials during initialization. Feeds adjudication, not narration. |
 | **campaign** | `campaign/` | The running record. Campaign log, scene transcripts, session recaps. The knowledge backbone. |
 
@@ -58,8 +59,9 @@ campaign-root/
 │       └── level-2.json
 ├── factions/
 │   └── iron-crown-guild.md
+├── items/
+│   └── staff-of-echoes.md              # notable item — owner, origin, properties
 ├── lore/
-│   ├── staff-of-echoes.md              # notable item
 │   ├── prophecy-of-the-black-sun.md    # plot thread
 │   └── history-of-the-empire.md        # world-building
 ├── rules/

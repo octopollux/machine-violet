@@ -15,6 +15,7 @@ export function campaignDirs(root: string): string[] {
     join(root, "locations"),
     join(root, "factions"),
     join(root, "lore"),
+    join(root, "items"),
     join(root, "rules"),
     join(root, "state"),
   ];
@@ -51,6 +52,7 @@ export function campaignPaths(root: string) {
     party: join(root, "characters", "party.md"),
     faction: (name: string) => join(root, "factions", `${name}.md`),
     lore: (name: string) => join(root, "lore", `${name}.md`),
+    item: (name: string) => join(root, "items", `${name}.md`),
     rule: (name: string) => join(root, "rules", `${name}.md`),
     sessionRecap: (n: number) =>
       join(root, "campaign", "session-recaps", `session-${String(n).padStart(3, "0")}.md`),

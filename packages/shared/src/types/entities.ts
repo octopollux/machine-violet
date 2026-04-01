@@ -4,6 +4,7 @@ export type EntityType =
   | "location"
   | "faction"
   | "lore"
+  | "item"
   | "rules"
   | "campaign";
 

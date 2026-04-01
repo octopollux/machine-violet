@@ -389,7 +389,7 @@ export async function pruneEmptyDirs(root: string, io: PruneFileIO): Promise<num
   // Only walk known campaign subdirectories — never arbitrary paths
   const campaignSubdirs = [
     "campaign/scenes", "campaign/session-recaps",
-    "characters", "locations", "factions", "lore", "players",
+    "characters", "locations", "factions", "lore", "items", "players",
   ];
   for (const sub of campaignSubdirs) {
     const subPath = normalizedRoot + "/" + sub;

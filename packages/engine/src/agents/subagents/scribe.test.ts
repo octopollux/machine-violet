@@ -136,6 +136,43 @@ describe("buildScribeToolHandler", () => {
       expect(created).toHaveLength(1);
     });
 
+    it("creates an item entity in items/ directory", async () => {
+      const fio = mockFileIO();
+      const created: string[] = [];
+      const deltas: { slug: string; name: string; aliases: string[]; type: string; path: string }[] = [];
+      const handler = buildScribeToolHandler(fio, "/camp", 4, created, [], deltas);
+
+      const result = await handler("write_entity", {
+        mode: "create",
+        entity_type: "item",
+        name: "Crystal Dagger",
+        front_matter: { owner: "[[Aldric]]", origin: "[[The Pale Queen]]" },
+        body: "A slender blade of translucent crystal.",
+        changelog_entry: "Found in the Pale Queen's reliquary",
+      });
+
+      expect(result.content).toContain("Created");
+      expect(created).toHaveLength(1);
+      expect(norm(created[0])).toContain("items/crystal-dagger.md");
+
+      const writeCall = vi.mocked(fio.writeFile).mock.calls[0];
+      const writtenPath = writeCall[0] as string;
+      const content = writeCall[1] as string;
+      expect(norm(writtenPath)).toContain("items/crystal-dagger.md");
+      expect(content).toContain("# Crystal Dagger");
+      expect(content).toContain("**Type:** item");
+      expect(content).toContain("**Owner:** [[Aldric]]");
+      expect(content).toContain("**Origin:** [[The Pale Queen]]");
+      expect(content).toContain("translucent crystal");
+      expect(content).toContain("Scene 004");
+
+      // Verify entity delta
+      expect(deltas).toHaveLength(1);
+      expect(deltas[0].type).toBe("item");
+      expect(deltas[0].name).toBe("Crystal Dagger");
+      expect(norm(deltas[0].path)).toContain("items/crystal-dagger.md");
+    });
+
     it("rejects duplicate creation", async () => {
       const fio = mockFileIO({
         "/camp/characters/grimjaw.md": "# Grimjaw\n",

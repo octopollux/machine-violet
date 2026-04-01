@@ -36,7 +36,7 @@ A tool is worth building if it saves significant tokens or if the model would be
 ## The Game World
 
 ### Filesystem as Database
-The campaign directory is the database. The campaign transcript is the knowledge backbone — dense with wikilinks to entity files, serving as both narrative record and the DM's index into the game world. Entity types: players, characters, locations, factions, lore (grab-bag), rules, and the campaign log. Every entity reference in a transcript is a wikilink. PC character sheets are the one piece of state the player may see. → [Entity Filesystem Design](entity-filesystem.md)
+The campaign directory is the database. The campaign transcript is the knowledge backbone — dense with wikilinks to entity files, serving as both narrative record and the DM's index into the game world. Entity types: players, characters, locations, factions, items, lore (grab-bag), rules, and the campaign log. Every entity reference in a transcript is a wikilink. PC character sheets are the one piece of state the player may see. → [Entity Filesystem Design](entity-filesystem.md)
 
 ### Tile Maps
 Locations can have tile maps — sparse JSON structures with a tool layer for spatial queries, viewport rendering, and entity management. Supports square and hex grids. The DM sees small rendered viewports, not raw data. → [Map System Design](map-system.md)

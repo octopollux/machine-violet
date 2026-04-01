@@ -29,6 +29,7 @@ export function classifyPath(relPath: string): FileCategory {
   if (normalized.startsWith("locations/")) return "locations";
   if (normalized.startsWith("factions/")) return "factions";
   if (normalized.startsWith("lore/")) return "lore";
+  if (normalized.startsWith("items/")) return "items";
   if (normalized.startsWith("rules/")) return "rules";
 
   return "other";
