@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useInput, Box, Text } from "ink";
 import type { FrameStyleVariant } from "@machine-violet/shared/types/tui.js";
 import { renderHorizontalFrame, renderContentLine } from "../frames/index.js";
@@ -99,7 +99,7 @@ export function ChoiceOverlay({
   const [selectedIndex, setSelectedIndex] = useState(defaultIndex);
   const [customInputActive, setCustomInputActive] = useState(defaultIndex === choices.length);
   const [customInputResetKey, setCustomInputResetKey] = useState(0);
-  const [scrollStart, setScrollStart] = useState(0);
+  const scrollStartRef = useRef(0);
 
   // Reset state when choices change (e.g. choice-generator replaces DM-provided choices).
   // Keyed on the serialized choices array so we only reset when actual options change.
@@ -109,7 +109,7 @@ export function ChoiceOverlay({
     setSelectedIndex(idx);
     setCustomInputActive(idx === choices.length);
     setCustomInputResetKey((k) => k + 1);
-    setScrollStart(0);
+    scrollStartRef.current = 0;
   }, [choicesKey, initialIndex, choices.length]);
 
   useInput((input, key) => {
@@ -206,7 +206,10 @@ export function ChoiceOverlay({
   // Adjust scrollStart only when selectedIndex falls outside the visible window.
   // This keeps the viewport stable — pressing UP moves the cursor up through
   // visible items before scrolling, and vice versa for DOWN.
-  let adjustedStart = scrollStart;
+  // Uses a ref (not state) since scrollStart is a display detail derived from
+  // selectedIndex — no extra re-render needed; the current render already uses
+  // the adjusted value.
+  let adjustedStart = scrollStartRef.current;
   // Clamp to valid range (choices may have changed)
   if (adjustedStart >= allItems.length) adjustedStart = Math.max(0, allItems.length - 1);
   // If selected item is before the window, scroll up to it
@@ -217,9 +220,7 @@ export function ChoiceOverlay({
   while (adjustedStart < allItems.length && getVisibleEnd(adjustedStart) <= selectedIndex) {
     adjustedStart++;
   }
-  if (adjustedStart !== scrollStart) {
-    setScrollStart(adjustedStart);
-  }
+  scrollStartRef.current = adjustedStart;
 
   const scrollEnd = getVisibleEnd(adjustedStart);
   const canScrollUp = adjustedStart > 0;

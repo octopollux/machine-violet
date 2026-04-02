@@ -1,6 +1,6 @@
 import React from "react";
 import { Box } from "ink";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render } from "ink-testing-library";
 import { Modal } from "./Modal.js";
 import { ChoiceModal, ChoiceOverlay } from "./ChoiceModal.js";
@@ -163,27 +163,45 @@ describe("ChoiceOverlay", () => {
     expect(frame).toContain("▼");
   });
 
-  it("moves cursor within visible window without scrolling", () => {
+  it("moves cursor within visible window without scrolling", async () => {
     // 7 choices + custom = 8 items, choiceRows=5.
-    // Start at index 5: visible window should contain items scrolled to show index 5.
-    // Pressing UP should move cursor within the visible set, not re-scroll the whole list.
-    const { lastFrame } = render(
+    // Press UP from the bottom — cursor should move up through visible
+    // items and the viewport should remain stable (no re-scroll).
+    const { lastFrame, stdin } = render(
       <ChoiceOverlay
         width={60}
         prompt="Pick one"
         choices={["A", "B", "C", "D", "E", "F", "G"]}
-        initialIndex={3}
+        initialIndex={6}
         onSelect={noop}
         onDismiss={noop}
       />,
     );
-    const frame = lastFrame()!;
-    // With initialIndex=3, scroll starts at 0 so all of A-E visible (5 rows).
-    // The cursor should be on D (index 3), and items above (A,B,C) should be visible.
-    expect(frame).toContain("> D");
-    expect(frame).toContain("  A");
-    expect(frame).toContain("  B");
-    expect(frame).toContain("  C");
+
+    // Press UP to move cursor to F
+    stdin.write("\x1b[A"); // UP arrow
+    await vi.waitFor(() => {
+      expect(lastFrame()!).toContain("> F");
+    });
+
+    // Press UP again — cursor moves to E; the visible window must NOT change
+    // (items above and below the cursor should stay the same)
+    stdin.write("\x1b[A");
+    await vi.waitFor(() => {
+      const frame = lastFrame()!;
+      expect(frame).toContain("> E");
+      // F should still be visible (cursor moved within window, no scroll)
+      expect(frame).toContain("  F");
+    });
+
+    // Press UP again — cursor to D, window still stable
+    stdin.write("\x1b[A");
+    await vi.waitFor(() => {
+      const frame = lastFrame()!;
+      expect(frame).toContain("> D");
+      expect(frame).toContain("  E");
+      expect(frame).toContain("  F");
+    });
   });
 
   it("shows dimmed scroll arrows when all choices fit", () => {

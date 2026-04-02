@@ -290,7 +290,7 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
   }, [isDisabled, renderState.value, renderState.cursorOffset, availableWidth, needsViewport, placeholder]);
 
   // Wrap mode: render text across multiple lines instead of horizontal scrolling
-  const useWrap = wrap && availableWidth != null && availableWidth > 0;
+  const useWrap = wrap && availableWidth != null && Number.isFinite(availableWidth) && availableWidth > 0;
   const wrappedLines = useMemo(() => {
     if (!useWrap) return null;
     const w = availableWidth!;
