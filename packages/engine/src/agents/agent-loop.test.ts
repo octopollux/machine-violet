@@ -142,11 +142,12 @@ describe("agentLoop", () => {
     expect(result.text).toBe("You rolled a 17. The attack hits!");
   });
 
-  it("collects TUI commands from tool calls", async () => {
+  it("broadcasts style_scene immediately (no longer deferred)", async () => {
     const provider = mockProvider([
       toolUseResult("style_scene", { key_color: "#cc4444" }),
       textResult("The mood darkens."),
     ]);
+    const onTuiCommand = vi.fn();
 
     const result = await agentLoop(
       provider,
@@ -154,12 +155,15 @@ describe("agentLoop", () => {
       [{ role: "user", content: "I attack!" }],
       createTestRegistry(),
       mockState(),
-      mockConfig({ provider }),
+      mockConfig({ provider, onTuiCommand }),
     );
 
-    expect(result.tuiCommands).toHaveLength(1);
-    expect(result.tuiCommands[0].type).toBe("style_scene");
-    expect(result.tuiCommands[0].key_color).toBe("#cc4444");
+    // style_scene is now immediate — broadcast via callback, not collected
+    expect(onTuiCommand).toHaveBeenCalledOnce();
+    expect(onTuiCommand).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "style_scene", key_color: "#cc4444" }),
+    );
+    expect(result.tuiCommands).toHaveLength(0);
   });
 
   it("broadcasts non-deferred TUI commands immediately via onTuiCommand", async () => {
@@ -188,15 +192,15 @@ describe("agentLoop", () => {
 
   it("deferred TUI commands are collected, not broadcast immediately", async () => {
     const provider = mockProvider([
-      toolUseResult("style_scene", { key_color: "#cc4444" }),
-      textResult("The mood darkens."),
+      toolUseResult("scene_transition", { title: "Chapter 2" }),
+      textResult("A new chapter begins."),
     ]);
     const onTuiCommand = vi.fn();
 
     const result = await agentLoop(
       provider,
       "You are a DM.",
-      [{ role: "user", content: "I attack!" }],
+      [{ role: "user", content: "Move on" }],
       createTestRegistry(),
       mockState(),
       mockConfig({ provider, onTuiCommand }),
@@ -205,7 +209,7 @@ describe("agentLoop", () => {
     // Deferred commands stay in tuiCommands for engine processing
     expect(onTuiCommand).not.toHaveBeenCalled();
     expect(result.tuiCommands).toHaveLength(1);
-    expect(result.tuiCommands[0].type).toBe("style_scene");
+    expect(result.tuiCommands[0].type).toBe("scene_transition");
   });
 
   it("handles text + tool_use in same response", async () => {

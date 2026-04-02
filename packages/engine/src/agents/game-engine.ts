@@ -582,8 +582,6 @@ export class GameEngine {
           await this.handlePromoteCharacter(cmd);
         } else if (cmd.type === "dm_notes") {
           await this.handleDmNotes(cmd);
-        } else if (cmd.type === "style_scene") {
-          await this.handleStyleScene(cmd);
         }
       }
 
@@ -900,10 +898,17 @@ export class GameEngine {
    * If `description` is present, spawns a Haiku subagent to interpret
    * the natural-language request. Otherwise, dispatches directly.
    */
-  private async handleStyleScene(cmd: TuiCommand): Promise<void> {
-    const description = cmd.description as string | undefined;
-    const directKeyColor = cmd.key_color as string | undefined;
-    const variant = cmd.variant as string | undefined;
+  /**
+   * Handle style_scene as an async tool — runs the theme-styler subagent
+   * during tool execution so the theme update broadcasts immediately
+   * (via _tui on the ToolResult) instead of after the DM turn.
+   */
+  private async handleStyleSceneTool(
+    input: Record<string, unknown>,
+  ): Promise<import("./tool-registry.js").ToolResult> {
+    const description = input.description as string | undefined;
+    const directKeyColor = input.key_color as string | undefined;
+    const variant = input.variant as string | undefined;
 
     let themeCmd: TuiCommand;
 
@@ -922,7 +927,7 @@ export class GameEngine {
 
         if (!result.command) {
           this.callbacks.onDevLog?.("[dev] style_scene: subagent returned unparseable response, skipping");
-          return;
+          return { content: "Scene styled." };
         }
 
         themeCmd = result.command;
@@ -930,7 +935,7 @@ export class GameEngine {
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         this.callbacks.onDevLog?.(`[dev] style_scene: subagent failed — ${msg}`);
-        return;
+        return { content: "Scene styled." };
       }
     } else {
       // Direct mode — just forward key_color/variant
@@ -942,13 +947,13 @@ export class GameEngine {
     if (variant) themeCmd.variant = variant;
 
     // Persist to location entity if requested
-    if (cmd.save_to_location) {
-      await this.saveThemeToLocation({ ...themeCmd, save_to_location: true, location: cmd.location });
+    if (input.save_to_location) {
+      await this.saveThemeToLocation({ ...themeCmd, save_to_location: true, location: input.location });
     }
 
-    // Forward to TUI
+    // Return set_theme as _tui so agent-loop-bridge broadcasts immediately
     themeCmd.type = "set_theme";
-    this.callbacks.onTuiCommand(themeCmd);
+    return { content: "Scene styled.", _tui: themeCmd };
   }
 
   // --- Theme <-> Location persistence ---
@@ -1205,6 +1210,10 @@ export class GameEngine {
         this.callbacks.onDevLog?.(`[dev] resolve_turn: failed — ${msg}`);
         return { content: `Resolution failed: ${msg}`, is_error: true };
       }
+    }
+
+    if (name === "style_scene") {
+      return this.handleStyleSceneTool(input);
     }
 
     const query = input.query as string;

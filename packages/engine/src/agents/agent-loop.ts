@@ -37,7 +37,6 @@ export const DEFERRED_TUI_TYPES = new Set([
   "scribe",
   "dm_notes",
   "promote_character",
-  "style_scene",   // spawns theme-styler subagent
 ]);
 
 export function isTuiCommand(toolName: string): boolean {
