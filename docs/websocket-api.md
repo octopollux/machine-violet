@@ -220,6 +220,14 @@ The session mode has changed.
 | `mode`    | string  | `"play"`, `"ooc"`, `"dev"`, or `"setup"`. |
 | `variant` | string? | Style variant (e.g. `"tense"`, `"mysterious"`). |
 
+#### `session:transition`
+
+The server is transitioning from the setup session to a newly created campaign. Clients should reset their state (clear stateSnapshot, currentTurn, etc.) — the new session will broadcast a fresh `state:snapshot` over the existing WebSocket connection.
+
+| Field        | Type   | Description |
+|--------------|--------|-------------|
+| `campaignId` | string | The campaign ID of the newly created campaign. |
+
 #### `session:ended`
 
 The campaign session has ended.

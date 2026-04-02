@@ -156,8 +156,7 @@ State machine for the application: main menu → setup / add content → playing
 | `MainMenuPhase.tsx` | Themed campaign selection screen with New Campaign, Continue (with Archive/Delete columns), Add Content, Quit |
 | `ArchivedCampaignsPhase.tsx` | List archived campaign zips with dates, select to unarchive |
 | `AddContentPhase.tsx` | PDF import flow: name collection → drop files → validate → extract → cache |
-| `SetupPhase.tsx` | Campaign creation/load orchestration |
-| `PlayingPhase.tsx` | Main game loop (hosts GameEngine) |
+| `PlayingPhase.tsx` | Main game loop — handles both gameplay and setup (setup runs as a pseudo-campaign session) |
 
 ## Engine: prompts/ — Prompt Templates
 

@@ -66,7 +66,7 @@ When an API call fails with an error that exhausts automatic retries or isn't in
 
 ```
 [Error: 401 Unauthorized]
-[Debug info saved to .debug/ folder]
+[Debug info saved to .debug/ folder — see engine.jsonl for structured event log]
 [Press Enter to retry]
 ```
 

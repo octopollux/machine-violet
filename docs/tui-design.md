@@ -294,9 +294,9 @@ The TUI targets **80×25 minimum**, with **80×40 for the full experience**. Two
 | **Full** | ≥80 cols, ≥40 rows | All elements visible. Side frames, top frame, activity line, lower frame. |
 | **Standard** | Everything else | Top frame and activity line dropped. Activity glyph moves to modeline. |
 
-Below 80×25, the game replaces the entire UI with a fullscreen `TerminalTooSmall` blocker showing the current dimensions, the minimum required (80×25), and "Resize your terminal to continue." The blocker clears automatically when the terminal is resized above the minimum. Both `PlayingPhase` and `SetupPhase` enforce this.
+Below 80×25, the game replaces the entire UI with a fullscreen `TerminalTooSmall` blocker showing the current dimensions, the minimum required (80×25), and "Resize your terminal to continue." The blocker clears automatically when the terminal is resized above the minimum.
 
-**Code:** `src/tui/components/TerminalTooSmall.tsx`, checked in `src/phases/PlayingPhase.tsx` and `src/phases/SetupPhase.tsx`
+**Code:** `src/tui/components/TerminalTooSmall.tsx`, checked in `src/phases/PlayingPhase.tsx`
 
 ### Drop order (full → standard)
 
