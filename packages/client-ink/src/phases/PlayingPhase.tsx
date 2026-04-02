@@ -137,14 +137,25 @@ export function PlayingPhase() {
       return;
     }
 
-    // Gameplay choices are sent as a turn contribution
+    // Gameplay choices — optimistic separator + player echo, same as typed input
+    const tag = `optimistic-${Date.now()}`;
+    setNarrativeLines((prev) => [
+      ...prev,
+      { kind: "separator", text: "---", tag },
+      { kind: "player", text: `[${activeChar}] ${choice}`, tag },
+      { kind: "dm", text: "", tag },
+    ]);
+
     try {
       await apiClient.contribute(choice, {
         campaignId: currentTurn?.campaignId,
         turnSeq: currentTurn?.seq,
       });
-    } catch { /* no-op */ }
-  }, [apiClient, activeChoices, setActiveChoices, currentTurn]);
+    } catch {
+      // Contribution rejected — remove optimistic lines
+      setNarrativeLines((prev) => prev.filter((l) => l.tag !== tag));
+    }
+  }, [apiClient, activeChoices, setActiveChoices, activeChar, currentTurn, setNarrativeLines]);
 
   const handleChoiceDismiss = useCallback(() => setActiveChoices(null), [setActiveChoices]);
 
