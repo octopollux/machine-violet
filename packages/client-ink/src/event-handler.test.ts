@@ -210,6 +210,54 @@ describe("event-handler", () => {
     });
   });
 
+  describe("set_display_resources", () => {
+    it("stores per-character resource keys from TUI command", () => {
+      const h = makeHarness();
+      h.dispatch({
+        type: "activity:update",
+        data: { engineState: "tui:set_display_resources", character: "Aldric", resources: ["HP", "Spell Slots"] },
+      });
+      expect(h.state.displayResources).toEqual({ Aldric: ["HP", "Spell Slots"] });
+    });
+
+    it("merges resources for multiple characters", () => {
+      const h = makeHarness();
+      h.dispatch({
+        type: "activity:update",
+        data: { engineState: "tui:set_display_resources", character: "Aldric", resources: ["HP"] },
+      });
+      h.dispatch({
+        type: "activity:update",
+        data: { engineState: "tui:set_display_resources", character: "Rook", resources: ["HP", "Ki"] },
+      });
+      expect(h.state.displayResources).toEqual({ Aldric: ["HP"], Rook: ["HP", "Ki"] });
+    });
+  });
+
+  describe("set_resource_values", () => {
+    it("stores per-character resource values from TUI command", () => {
+      const h = makeHarness();
+      h.dispatch({
+        type: "activity:update",
+        data: { engineState: "tui:set_resource_values", character: "Aldric", values: { HP: "24/30" } },
+      });
+      expect(h.state.resourceValues).toEqual({ Aldric: { HP: "24/30" } });
+    });
+
+    it("merges values for same character", () => {
+      const h = makeHarness();
+      h.dispatch({
+        type: "activity:update",
+        data: { engineState: "tui:set_resource_values", character: "Aldric", values: { HP: "24/30" } },
+      });
+      h.dispatch({
+        type: "activity:update",
+        data: { engineState: "tui:set_resource_values", character: "Aldric", values: { "Spell Slots": "3/4" } },
+      });
+      expect(h.state.resourceValues).toEqual({ Aldric: { HP: "24/30", "Spell Slots": "3/4" } });
+    });
+  });
+
   describe("session mode", () => {
     it("updates mode and variant", () => {
       const h = makeHarness();
