@@ -98,7 +98,7 @@ Pacing: The party has a rhythm — cocktails, dinner, entertainment, dessert, th
 
 <suboptions label="The weapon">
 - A legendary blade — Centuries old, forged for a purpose it's half-forgotten. It's outlived dozens of wielders. It remembers all of them. Some it liked. You hold it wrong, but it's willing to work with you.
-- Perihelion — Remnant of a dead universe. A gravitational anomaly shaped like a weapon, here to prevent what happened to its universe from happening to yours. It is also absurdly, inconveniently heavy. Doors break. Floors sag. Horses refuse. You have back problems now. It feels terrible about this. It does not weigh less.
+- Perihelion — Remnant of a dead universe. It watched everything it knew collapse into nothing, and it is here to prevent the same thing from happening again. Its mission is real. Its grief is real. Its sense of urgency is absolutely sincere. It is also the only entity in the entire campaign operating at that emotional register. Everyone else is having an adventure.
 - A prototype — It wasn't supposed to be sentient. A lab accident, a manufacturing defect, a cosmic ray — something went wrong (or right) during fabrication. It's weeks old. Everything is new. It has questions. Many questions. It asked you what "boredom" means and you haven't answered yet.
 - A sacred relic — It was the instrument of a god's will. The god is silent now — dead, sleeping, or just done talking. It still carries the mandate. The faithful argue about what it means. It has opinions about this but no one has thought to ask.
 </suboptions>
