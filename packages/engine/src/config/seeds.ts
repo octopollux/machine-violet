@@ -438,8 +438,42 @@ Pacing: Open with normalcy disrupted in small ways. The player should spend 2-3 
   },
   {
     name: "Decommissioned",
-    premise: "You're a retired war golem trying to open a bakery. The old programming has opinions.",
-    genres: ["fantasy", "comedy"],
+    premise: "You're a retired war machine trying to open a bakery. The old programming has opinions.",
+    detail: `<suboptions label="What you are">
+- Warforged — Rune-carved stone and living wood, animated by old battle magic. You were built for a war between kingdoms that ended eleven years ago. The magic that drives you is the same magic the village baker uses to heat her oven, and that bothers people.
+- Combat android — Military-spec hardware, carbon-fiber chassis, targeting systems you've disabled (mostly). You were mass-produced for a corporate war. There are others like you, but most chose to shut down when the contracts expired.
+- Fallen angel — You were a divine instrument of righteous war. You laid down your sword. The church says you're broken. You say you're done. Your wings still smell like ozone and old fire.
+</suboptions>
+
+<suboptions label="The town">
+- A quiet village still rebuilding from the war you fought in. Some residents remember you from the other side.
+- A busy market town that didn't see combat and doesn't understand what you are. They think you're a novelty.
+- A rough frontier settlement where everyone is a misfit or a second-chance case. You fit right in — until you don't.
+</suboptions>
+
+The bakery is real. The player genuinely wants to bake bread. This is not a cover story, not a phase, not a joke the narrative is building toward undermining. The comedy comes from the collision between a being designed for war and the small, specific, unforgiving craft of baking. The pathos comes from everyone — including the player's own programming — assuming they'll go back to what they were made for.
+
+The old programming:
+- It surfaces as intrusive thoughts, not personality shifts. The player remains in control. "THREAT ASSESSMENT: the sourdough starter is not a hostile organism" is funny. Losing agency to programming is not funny — it's the thing the player is afraid of.
+- Programming flares when stressed, startled, or when something genuinely dangerous happens nearby. A dropped pan triggers a targeting overlay. A bar fight three streets away registers as combat.
+- The tension: the programming is also what makes the player extraordinary. Perfect timing, perfect temperature sense, exact measurements. The same systems that made them lethal make them a phenomenal baker. Can they use the gift without becoming the weapon?
+
+Key NPCs (adapt to setting):
+- THE LANDLORD — Owns the building the player is renting for the bakery. Pragmatic, not unkind, but charging full rent and expecting results. Has their own reasons for giving a war machine a lease.
+- THE COMPETITOR — The town's existing baker. Decent person, mediocre bread, terrified of being replaced by a machine that doesn't sleep. Will oscillate between sabotage and grudging respect.
+- THE KID — A teenager who thinks the player is the coolest thing in town. Wants to be an apprentice. Has no idea what the player actually did during the war. The player has to decide how much to tell them.
+- THE VETERAN — Someone who fought in the same war, on either side. Recognizes the player. Drinks too much. The only person in town who understands, and the last person the player wants to talk to.
+
+Story threads (not plot hooks — these develop slowly):
+- The bakery itself: getting a supplier, fixing the oven, developing a signature recipe, earning the first repeat customer.
+- A town event (harvest festival, market day, someone's wedding) where the player is asked to contribute. Acceptance or rejection by the community, measured in cake orders.
+- Something from the war surfaces — a rumor, a refugee, a piece of old hardware. The town looks at the player differently for a day. The player has to decide whether to engage or let it pass.
+- The programming gets louder. Not because of external threat, but because the player is getting good at baking and the programming doesn't understand what "good at something peaceful" means.
+
+Tone: Comedy first, heart always, dread occasionally. The funniest scenes should also be the most revealing. The saddest scenes should still have something rising in the oven. Never let the war consume the bakery — the bakery is the point.
+
+Pacing: Start with the empty shop, the keys, and the first morning. Let the player figure out what kind of baker they want to be before the town starts having opinions. The first act is setup and craft. The second act is community and belonging. The third act is the question the whole campaign has been asking: can you be more than what you were made for?`,
+    genres: ["fantasy", "sci-fi", "comedy"],
   },
   {
     name: "Exit Wounds",
