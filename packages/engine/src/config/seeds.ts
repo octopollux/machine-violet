@@ -370,7 +370,29 @@ Pacing: Open with normalcy disrupted in small ways. The player should spend 2-3 
   {
     name: "Cold Open",
     premise: "You wake up in a stranger's apartment with a note in your handwriting: 'Don't trust the police.'",
-    genres: ["mystery", "modern"],
+    detail: `The player has no memory of how they got here. The apartment belongs to someone they've never met. The note is definitely in their handwriting. The campaign is a mystery told backwards — the player is reconstructing what happened to them by following the trail their past self left, while whatever they were running from is still looking.
+
+<suboptions label="The city">
+- Present day — A real city, recognizable and mundane. The apartment is a walk-up in a neighborhood the player has no reason to be in. The police are real police. The danger is ordinary and human-scale — corruption, cover-ups, someone powerful who needs the player to stay lost. The tone is paranoid thriller. Trust nothing.
+- Near future — A surveilled city. Predictive policing, biometric checkpoints, social credit scores. The player's face is flagged. Their past self didn't just write a note — they scrubbed their own biometrics, wiped their transit history, and somehow moved through a city that tracks everything without being tracked. Whatever they were running from has access to the system. The note isn't paranoia. It's engineering.
+- Dickensian England — A cramped garret above a chandler's shop in a city of soot and fog. The note is in the player's hand on good paper — too good for this address. The "police" are the newly formed Metropolitan Police, or the private thief-takers who preceded them, or both. The streets are a maze of class, debt, and obligation. Someone has gone to great trouble to hide the player among the poor, and the poor have noticed.
+- 1950s America — A motel room off a state highway, curtains drawn. The note is on the back of a diner receipt. The "police" could mean the FBI, HUAC, or a local sheriff who answers to someone other than the law. The player's past self was afraid of something bigger than crime — blacklists, loyalty oaths, the machinery of suspicion. Everyone is an informant or afraid of informants. Paranoia isn't a symptom. It's a survival skill.
+</suboptions>
+
+What the player did (DM only — roll or choose, reveal through play):
+1. THE WITNESS — The player saw something they shouldn't have. They knew they'd be silenced, so they hid themselves first and left a trail only they could follow back to the evidence. The people looking for them need to know what the player knows — or need to make sure no one ever does.
+2. THE DEAL — The player made a bargain with someone dangerous and then broke it. The memory wipe was the price of a head start. The note is the one thing they negotiated keeping. The person they betrayed is methodical and patient.
+3. THE FRAME — The player didn't do anything. Someone else did, and built a perfect case pointing at the player. The past self figured it out just in time to disappear, but not in time to prove innocence. The note means: the people who should help you are the people who were given the frame.
+
+The trail: The past self left breadcrumbs — but carefully, because whoever they're hiding from is smart. Clues are embedded in mundane objects: a library book with a due date that matters, a coffee shop loyalty card with too many stamps, a coat with someone else's keys in the pocket. Each clue leads to a person or place that reveals one piece of the story. Not every piece is flattering. The player may not like who they were yesterday.
+
+Key tensions:
+- The player must trust their past self's judgment without knowing the reasoning. The note says don't trust the police. Maybe past-self was right. Maybe past-self was wrong. Maybe past-self was the problem.
+- The stranger whose apartment this is — they're involved. They agreed to this. Why? Finding them is an early thread; understanding their role is a mid-game reveal.
+- The player's identity is a weapon. In the present day, it's a name that draws attention. In the near future, it's a biometric profile. In Dickensian England, it's a class position. In 1950s America, it's an association. Someone is using who the player is against them.
+
+Pacing: Start in the apartment. Let the player search it. The note, the unfamiliar room, the sounds of an unfamiliar neighborhood — this is the cold open. The first act is the immediate aftermath: where am I, what do I have, who's looking? The second act is the trail: following breadcrumbs, meeting people who know more than the player does about the player's own life. The third act is the confrontation with whatever the past self was running from — and the choice of whether to keep running, fight, or expose the truth.`,
+    genres: ["mystery", "modern", "sci-fi"],
   },
 
   // --- Truly weird / genre-bending ---
