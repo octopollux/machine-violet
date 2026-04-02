@@ -482,6 +482,37 @@ Motifs: Light with no source. Lists as coping. Elevation as distance from the pr
 Pacing: Start in a break room / common area / nave alcove. Let the player absorb the wrongness before anyone asks them to lead. The first act is social — keeping people from falling apart. The second act is exploration — what's on each floor? The third act is confrontation — the Architect, the device, the choice.`,
     genres: ["modern", "sci-fi", "fantasy"],
   },
+  {
+    name: "The Coffee Shop",
+    premise:
+      "You work at a coffee shop. The regulars have stories. The drinks need making. Nothing is on fire.",
+    detail: `<suboptions label="The shop">
+- The Grindstone — A cozy artsy nook in a college town. Mismatched furniture, a community corkboard, someone's watercolors on the wall. The wifi password is a pun. Regulars include students, professors, a local poet who's been "almost finished" with their chapbook for three years.
+- The Night Dock — A combination coffee shop and bar on a busy waterfront pier. Never closes. Fishers at dawn, tourists at noon, dockworkers at dusk, insomniacs at midnight. Salt air, string lights, a jukebox that skips. The menu is written on a surfboard.
+- Neon Drip — A retro-futuristic joint in a rain-slicked cyberpunk city. Holographic menu, synth-coffee blends, a bathroom mirror that runs ads. Regulars include off-duty couriers, a corpo who pretends she isn't one, and a street kid who only orders water but nobody charges her.
+- The Last Stop — A cafe in a busy spaceport terminal. Ships dock and depart overhead. The crowd is transient — pilots, merchants, refugees, tourists — but a few faces keep coming back between runs. The espresso machine is older than the station.
+- The Familiar Grounds — A magical coffee shop in a world of castles and elves. The mugs refill themselves (sometimes with the wrong drink). A enchanted chalkboard argues with customers about their orders. Regulars include an off-duty knight, a hedge witch who reads tea leaves, and a goblin who insists on paying in riddles.
+</suboptions>
+
+<suboptions label="Your role">
+- The barista — You make the drinks, you hear the stories, you remember everyone's order. You're the background character in a dozen other people's lives — except you're not background to us.
+- The new owner — You just took over. The previous owner left abruptly and the regulars are wary. You're learning names, fixing the plumbing, finding strange notes in the back office. The shop has a history you're inheriting.
+- The regular — You come here every day. Same seat, same order. You know the staff, you know the other regulars, you have your rituals. Something small is about to change one of them.
+</suboptions>
+
+Tone: This is a SLOW campaign. Warm, character-driven, slice-of-life. There is no apocalypse, no villain, no ticking clock. Drama comes from people — a regular who stops showing up, a love note left on a napkin, a disagreement about the playlist, a stranger who doesn't fit the usual crowd.
+
+DM approach:
+- Let scenes breathe. A five-minute conversation about nothing is not wasted time — it's the point.
+- Build a cast of 6-8 regulars with small, evolving lives. Give each a habit, a want, and a thing they haven't told anyone.
+- Introduce gentle story threads, not plot hooks. A "thread" is: someone starts learning guitar, two regulars might be falling for each other, a handwritten sign appears on the corkboard, a stray cat adopts the shop.
+- Conflict is interpersonal and low-stakes. The worst thing that happens is someone's feelings get hurt. The best thing is a small kindness.
+- Seasons should change. Weather matters. Holidays matter. The menu changes.
+- If the player tries to escalate into adventure/combat territory, the world gently doesn't cooperate. The suspicious package is someone's forgotten lunch. The "mysterious stranger" just moved to town and is shy.
+
+Pacing: Each scene is roughly one shift or one visit. Time skips between scenes are fine — days, even weeks. The rhythm is the rhythm of a real place: open, rush, lull, rush, close. Let the player find their favorite part of the day.`,
+    genres: ["modern", "sci-fi", "fantasy", "comedy"],
+  },
 
   // ── Developer test seeds ────────────────────────────────────────────
   {
