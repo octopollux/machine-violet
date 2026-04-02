@@ -263,8 +263,12 @@ export function createSetupConversation(
 
     // Resolve system to a known slug — the agent should pass a slug, but
     // if it passes a display name (e.g. "D&D 5e") we map it to the slug.
-    const rawSystem = (input.system as string) || null;
-    const resolvedSystem = rawSystem ? resolveSystemSlug(rawSystem) : null;
+    // Guard against the LLM returning the literal string "null" / "none",
+    // possibly with whitespace padding.
+    const rawSystem = typeof input.system === "string" ? input.system.trim() : "";
+    const normalized = rawSystem.toLowerCase();
+    const isNullish = !rawSystem || normalized === "null" || normalized === "none";
+    const resolvedSystem = isNullish ? null : resolveSystemSlug(rawSystem);
 
     // Resolve campaign detail: prefer the agent's passthrough, fall back to seed lookup.
     // Only fall back when the field is truly absent (undefined/null) — an explicit

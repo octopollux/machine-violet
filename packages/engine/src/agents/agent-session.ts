@@ -12,6 +12,7 @@ import { dumpContext, dumpThinking } from "../config/context-dump.js";
 import { ContentRefusalError } from "@machine-violet/shared/types/errors.js";
 import { getEffortConfig } from "../config/models.js";
 import type { EffortLevel } from "../config/models.js";
+import { getKnownModel } from "../config/model-registry.js";
 
 // --- Types ---
 
@@ -189,12 +190,12 @@ export async function runAgentLoop(
   const shouldRetry = config.retry ?? false;
 
   // Resolve effort config from agent name if not explicitly provided.
+  // Only enable thinking for models that support it (per model registry).
+  const supportsThinking = getKnownModel(config.model)?.capabilities?.thinking ?? false;
   const ec = config.effort !== undefined
-    ? { effort: config.effort }
-    : getEffortConfig(config.name);
+    ? { effort: supportsThinking ? config.effort : null }
+    : (supportsThinking ? getEffortConfig(config.name) : { effort: null });
 
-  // effort + adaptive thinking is the recommended combo for Opus 4.6.
-  // For other models, effort is not supported — use thinking: disabled.
   const isOpus = config.model.includes("opus");
   const thinkingParam: Anthropic.Messages.ThinkingConfigParam =
     ec.effort ? { type: "adaptive" } : { type: "disabled" };

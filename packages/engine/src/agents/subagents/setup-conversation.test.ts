@@ -219,6 +219,32 @@ describe("createSetupConversation", () => {
     expect(systemPrompt).toContain("Choose race");    // from D&D
   });
 
+  it("finalize_setup treats literal string 'null' system as null", async () => {
+    const input = { ...FINALIZE_INPUT, system: "null" };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Adventure awaits!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.system).toBeNull();
+  });
+
+  it("finalize_setup treats literal string 'none' system as null", async () => {
+    const input = { ...FINALIZE_INPUT, system: "None" };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Adventure awaits!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.system).toBeNull();
+  });
+
   it("usage accumulates across turns", async () => {
     const provider = mockProvider([
       textResponse("Welcome!", mockUsage(100, 30)),

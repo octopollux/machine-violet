@@ -89,6 +89,8 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
   const [clientState, setClientState] = useState<ClientState>(initialClientState);
   const [campaigns, setCampaigns] = useState<CampaignEntry[]>([]);
   const [activeCampaignId, setActiveCampaignId] = useState(campaignId ?? "");
+  // Human-readable name set during setup→game transition; cleared when state:snapshot arrives.
+  const [transitionName, setTransitionName] = useState("");
   // Session counter forces full PlayingPhase remount on campaign switch
   const [sessionKey, setSessionKey] = useState(0);
 
@@ -182,6 +184,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
     const newId = clientState.transitionCampaignId;
     if (!newId) return;
     setActiveCampaignId(newId);
+    setTransitionName(clientState.transitionCampaignName ?? "");
     setSessionKey((k) => k + 1); // remount PlayingPhase
     // Keep narrativeLines — the setup conversation stays visible as the
     // game session starts and the DM's opening narration streams in.
@@ -531,7 +534,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
       setTheme,
       keyColor,
       setKeyColor,
-      campaignName: stateSnapshot?.campaignName ?? activeCampaignId,
+      campaignName: stateSnapshot?.campaignName ?? (transitionName || activeCampaignId),
       activePlayerIndex: stateSnapshot?.activePlayerIndex ?? 0,
       setActivePlayerIndex: () => { /* server manages this */ },
       engineState: clientState.engineState,

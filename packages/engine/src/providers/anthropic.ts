@@ -110,9 +110,11 @@ function toAnthropicParams(params: ChatParams): {
     }
   }
 
-  // Thinking config
+  // Thinking config — only enable for models that support it.
+  const modelInfo = getKnownModel(params.model);
+  const supportsThinking = modelInfo?.capabilities?.thinking ?? false;
   const isOpus = params.model.includes("opus");
-  const effort = params.thinking?.effort ?? null;
+  const effort = supportsThinking ? (params.thinking?.effort ?? null) : null;
   const thinking: Anthropic.Messages.ThinkingConfigParam =
     effort ? { type: "adaptive" } : { type: "disabled" };
   const output_config: Anthropic.Messages.OutputConfig | undefined =
@@ -123,7 +125,6 @@ function toAnthropicParams(params: ChatParams): {
   // starve the actual response (especially on turn 1 with heavy tool use).
   let maxTokens = params.maxTokens;
   if (effort) {
-    const modelInfo = getKnownModel(params.model);
     const modelMax = modelInfo?.maxOutput ?? 16384;
     maxTokens = Math.max(maxTokens, modelMax);
   }

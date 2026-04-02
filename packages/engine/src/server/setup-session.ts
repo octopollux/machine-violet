@@ -117,7 +117,7 @@ export class SetupSession {
   }
 
   /** Send player input to the setup conversation. */
-  async send(text: string): Promise<{ finalized?: string }> {
+  async send(text: string): Promise<{ finalized?: string; campaignName?: string }> {
     if (!this.conversation) throw new Error("Setup not started");
 
     this.emitThinking();
@@ -136,7 +136,7 @@ export class SetupSession {
   }
 
   /** Resolve a choice selection. */
-  async resolveChoice(selectedText: string): Promise<{ finalized?: string }> {
+  async resolveChoice(selectedText: string): Promise<{ finalized?: string; campaignName?: string }> {
     if (!this.conversation) throw new Error("Setup not started");
 
     this.emitThinking();
@@ -160,7 +160,7 @@ export class SetupSession {
 
   // --- Private ---
 
-  private async handleResult(result: SetupTurnResult): Promise<{ finalized?: string }> {
+  private async handleResult(result: SetupTurnResult): Promise<{ finalized?: string; campaignName?: string }> {
     this.broadcast({ type: "narrative:complete", data: { text: result.text } });
 
     // Present choices to the client
@@ -179,7 +179,7 @@ export class SetupSession {
     // Campaign finalized — scaffold and return campaign ID
     if (result.finalized) {
       const campaignId = await this.finalizeCampaign(result.finalized);
-      return { finalized: campaignId };
+      return { finalized: campaignId, campaignName: result.finalized.campaignName };
     }
 
     return {};

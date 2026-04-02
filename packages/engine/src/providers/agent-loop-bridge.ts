@@ -38,6 +38,7 @@ import { logEvent } from "../context/engine-log.js";
 import { ContentRefusalError } from "@machine-violet/shared/types/errors.js";
 import { getEffortConfig } from "../config/models.js";
 import type { EffortLevel } from "../config/models.js";
+import { getKnownModel } from "../config/model-registry.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -90,9 +91,11 @@ export async function runProviderLoop(
   const maxToolRounds = config.maxToolRounds ?? 3;
   const shouldStream = config.stream !== false && !!config.onTextDelta;
 
+  // Only enable thinking for models that support it (per model registry).
+  const supportsThinking = getKnownModel(config.model)?.capabilities?.thinking ?? false;
   const ec = config.effort !== undefined
-    ? { effort: config.effort }
-    : getEffortConfig(config.name);
+    ? { effort: supportsThinking ? config.effort : null }
+    : (supportsThinking ? getEffortConfig(config.name) : { effort: null });
 
   const thinking: ThinkingConfig | undefined =
     ec.effort ? { effort: ec.effort } : undefined;
