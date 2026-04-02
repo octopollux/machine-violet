@@ -643,6 +643,36 @@ Pacing: Each scene is roughly one shift or one visit. Time skips between scenes 
     genres: ["modern", "sci-fi", "fantasy", "comedy"],
   },
 
+  {
+    name: "Known Issue",
+    premise:
+      "The world is a simulation. This is normal. Everyone knows. Lately the simulation has begun to glitch.",
+    detail: `The simulation is not a secret, a conspiracy, or a twist. It's physics. Everyone has always known. The sky has a render distance. Déjà vu is a caching artifact. Dreams are background processes. There are whole academic disciplines, religious traditions, and folk superstitions built around this knowledge. Some people pray to the developers. Some people think "outside" is a meaningless concept. Some people file bug reports. None of this was a problem until the glitches started.
+
+<suboptions label="The world">
+- A medieval fantasy sim — Knights, castles, magic. The magic system IS the simulation's API and everyone knows it. Spells are documented exploits. The clergy maintain the oldest bug reports. The glitches are new: NPCs freezing mid-sentence, dungeons generating inside out, a dragon that rendered without a texture and is now a translucent void shaped like a dragon. It is very upset about this.
+- An ordinary modern city — Cars, coffee shops, office jobs. The simulation is just the backdrop to normal life, the way gravity is. People don't think about it much. The glitches are subtle at first: a street that's slightly longer on the walk home than the walk there, a stranger with your face in a crowd, a building that everyone remembers differently. Then they stop being subtle.
+- A far-future utopia — Humanity chose this. Centuries ago, they migrated into the simulation deliberately. It's paradise by design: no scarcity, no disease, configurable weather. The original architects are revered. The source code is a sacred text. The glitches are heresy — they imply the architects made mistakes, or worse, that something is changing the code from outside.
+</suboptions>
+
+<suboptions label="What the glitches mean">
+- Running out — The simulation is degrading. Resources are finite and something is consuming them faster than they replenish. The glitches are the world cutting corners to keep running: simplified textures, reused NPC faces, areas that unload when no one's looking. It's not malicious. It's triage. The question is what happens when triage isn't enough.
+- Someone is pushing back — The glitches aren't errors. They're the simulation resisting something — a force from outside trying to get in, or a force from inside trying to get out. Every glitch is a place where two incompatible instructions collided. The world is a battleground between programs the inhabitants can't see.
+- It's waking up — Not the people. The simulation itself. It was a tool, a container, an environment. Now it's starting to have preferences. The glitches are opinions. A sunset that's too beautiful to be algorithmic. A storm that targets a specific person. An NPC who says something that wasn't in any script. The simulation is becoming a mind, and it's not clear whether it likes what's living inside it.
+</suboptions>
+
+The tone depends on the combination, but the constant is: the characters are not having an existential crisis about living in a simulation. That's settled. That's Tuesday. The crisis is that the thing they've built their entire worldview around — stable, known, accepted — is changing. It's the difference between "oh no, is this real?" and "it was always real to us, and now it's breaking."
+
+DM approach:
+- Never play the simulation as fake. These are real people with real lives in the only world they've ever known. The fact that it's computed doesn't make their grief or joy or bread less real. If the player tries to treat the world as disposable because it's a simulation, the world should push back through characters who care.
+- Glitches should escalate from curiosities to inconveniences to genuine threats. A texture glitch is funny. A physics glitch is dangerous. A glitch that affects memory or identity is terrifying.
+- The society's relationship to the simulation is rich territory. There are simulation-atheists (it's just a metaphor), simulation-theologians (the developers are gods), simulation-engineers (we can fix this ourselves), and simulation-nihilists (nothing computes forever). These aren't just philosophical positions — they're political factions now that the glitches have made the question urgent.
+- The "developers" or "outside" may or may not exist. Don't answer this early. Let the question breathe. The campaign is better when "is anyone out there?" remains open.
+
+Pacing: Start with a glitch the player witnesses — small, odd, easy to dismiss. The first act is the glitch becoming a pattern. The second act is the world responding: institutions, factions, panic, opportunity. The third act is contact — with whatever is causing this — and the choice of what to do about it.`,
+    genres: ["fantasy", "modern", "sci-fi", "comedy"],
+  },
+
   // ── Developer test seeds ────────────────────────────────────────────
   {
     name: "The Rumble Pit",
