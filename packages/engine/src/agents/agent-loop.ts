@@ -45,6 +45,8 @@ export interface AgentLoopConfig {
   asyncToolHandler?: (name: string, input: Record<string, unknown>) => Promise<ToolResult | null>;
   /** Called when DM text streams in */
   onTextDelta?: (delta: string) => void;
+  /** Called immediately when a non-deferred TUI command is extracted from a tool result */
+  onTuiCommand?: (cmd: TuiCommand) => void;
   /** Called when a tool call starts */
   onToolStart?: (name: string) => void;
   /** Called when a tool call completes */
@@ -136,6 +138,7 @@ async function runAgentLoopInternal(
     toolHandler,
     cacheHints: [{ target: "tools", ttl: "1h" }, { target: "messages" }],
     tuiToolNames: TUI_TOOLS,
+    onTuiCommand: config.onTuiCommand,
     onTextDelta: config.onTextDelta,
     onToolStart: config.onToolStart,
     onToolEnd: config.onToolEnd,

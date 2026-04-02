@@ -16,6 +16,23 @@ import type {
 } from "./types.js";
 import type { ToolResult } from "../agents/tool-registry.js";
 import type { TuiCommand } from "../agents/agent-loop.js";
+
+/**
+ * TUI command types that require engine-side processing (scene transitions,
+ * file I/O, etc.) and must be deferred until after the agent loop finishes.
+ * Everything else is a visual-only update broadcast to the client immediately.
+ *
+ * Defined here (not in agent-loop.ts) to avoid a runtime circular dependency
+ * (agent-loop → agent-loop-bridge → agent-loop).
+ */
+const DEFERRED_TUI_TYPES = new Set([
+  "scene_transition",
+  "session_end",
+  "rollback",
+  "scribe",
+  "dm_notes",
+  "promote_character",
+]);
 import { dumpContext, dumpThinking } from "../config/context-dump.js";
 import { logEvent } from "../context/engine-log.js";
 import { ContentRefusalError } from "@machine-violet/shared/types/errors.js";
@@ -42,6 +59,8 @@ export interface ProviderLoopConfig {
   toolHandler?: ToolHandler;
   cacheHints?: CacheHint[];
   tuiToolNames?: Set<string>;
+  /** Called immediately when a non-deferred TUI command is extracted. */
+  onTuiCommand?: (cmd: TuiCommand) => void;
   terseSuffix?: boolean;
   onTextDelta?: (delta: string) => void;
   onToolStart?: (name: string) => void;
@@ -243,11 +262,20 @@ export async function runProviderLoop(
       }),
     );
 
-    // Collect results and TUI commands in call-order (not completion-order)
+    // Collect results and TUI commands in call-order (not completion-order).
+    // Non-deferred (visual) commands are broadcast immediately so the client
+    // sees updates as tools fire; deferred commands are collected for
+    // post-loop engine processing.
     const toolResults: ContentPart[] = [];
     for (const s of settled) {
       toolResults.push(s.result);
-      if (s.tui) tuiCommands.push(s.tui);
+      if (s.tui) {
+        if (DEFERRED_TUI_TYPES.has(s.tui.type)) {
+          tuiCommands.push(s.tui);
+        } else {
+          config.onTuiCommand?.(s.tui);
+        }
+      }
     }
 
     // Append assistant message (without thinking blocks)

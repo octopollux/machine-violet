@@ -559,7 +559,10 @@ export class GameEngine {
         this.persistCurrentScene();
       }
 
-      // Process TUI commands — intercept engine commands
+      // Process deferred TUI commands — only commands that need engine-side
+      // work (scene transitions, subagent spawns, file I/O) remain here.
+      // Visual-only commands (modeline, resources, choices, theme) were
+      // already broadcast to the client immediately when the tool fired.
       for (const cmd of result.tuiCommands) {
         if (cmd.type === "scene_transition") {
           await this.transitionScene(
@@ -579,16 +582,6 @@ export class GameEngine {
           await this.handlePromoteCharacter(cmd);
         } else if (cmd.type === "dm_notes") {
           await this.handleDmNotes(cmd);
-        } else if (cmd.type === "style_scene") {
-          await this.handleStyleScene(cmd);
-        } else if (cmd.type === "set_theme") {
-          // Direct theme command (from location auto-apply, OOC, etc.)
-          if (cmd.save_to_location) {
-            await this.saveThemeToLocation(cmd);
-          }
-          this.callbacks.onTuiCommand(cmd);
-        } else {
-          this.callbacks.onTuiCommand(cmd);
         }
       }
 
@@ -905,10 +898,17 @@ export class GameEngine {
    * If `description` is present, spawns a Haiku subagent to interpret
    * the natural-language request. Otherwise, dispatches directly.
    */
-  private async handleStyleScene(cmd: TuiCommand): Promise<void> {
-    const description = cmd.description as string | undefined;
-    const directKeyColor = cmd.key_color as string | undefined;
-    const variant = cmd.variant as string | undefined;
+  /**
+   * Handle style_scene as an async tool — runs the theme-styler subagent
+   * during tool execution so the theme update broadcasts immediately
+   * (via _tui on the ToolResult) instead of after the DM turn.
+   */
+  private async handleStyleSceneTool(
+    input: Record<string, unknown>,
+  ): Promise<import("./tool-registry.js").ToolResult> {
+    const description = input.description as string | undefined;
+    const directKeyColor = input.key_color as string | undefined;
+    const variant = input.variant as string | undefined;
 
     let themeCmd: TuiCommand;
 
@@ -927,7 +927,7 @@ export class GameEngine {
 
         if (!result.command) {
           this.callbacks.onDevLog?.("[dev] style_scene: subagent returned unparseable response, skipping");
-          return;
+          return { content: "Scene styled." };
         }
 
         themeCmd = result.command;
@@ -935,7 +935,7 @@ export class GameEngine {
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         this.callbacks.onDevLog?.(`[dev] style_scene: subagent failed — ${msg}`);
-        return;
+        return { content: "Scene styled." };
       }
     } else {
       // Direct mode — just forward key_color/variant
@@ -947,13 +947,13 @@ export class GameEngine {
     if (variant) themeCmd.variant = variant;
 
     // Persist to location entity if requested
-    if (cmd.save_to_location) {
-      await this.saveThemeToLocation({ ...themeCmd, save_to_location: true, location: cmd.location });
+    if (input.save_to_location) {
+      await this.saveThemeToLocation({ ...themeCmd, save_to_location: true, location: input.location });
     }
 
-    // Forward to TUI
+    // Return set_theme as _tui so agent-loop-bridge broadcasts immediately
     themeCmd.type = "set_theme";
-    this.callbacks.onTuiCommand(themeCmd);
+    return { content: "Scene styled.", _tui: themeCmd };
   }
 
   // --- Theme <-> Location persistence ---
@@ -1163,6 +1163,12 @@ export class GameEngine {
         this.setState("dm_thinking");
         this.callbacks.onToolEnd(name, result);
       },
+      onTuiCommand: (cmd) => {
+        // Immediate TUI commands (modeline, resources, choices, etc.)
+        // are broadcast to the client as soon as the tool fires, so
+        // visual updates appear mid-narration instead of after the turn.
+        this.callbacks.onTuiCommand(cmd);
+      },
     };
   }
 
@@ -1204,6 +1210,10 @@ export class GameEngine {
         this.callbacks.onDevLog?.(`[dev] resolve_turn: failed — ${msg}`);
         return { content: `Resolution failed: ${msg}`, is_error: true };
       }
+    }
+
+    if (name === "style_scene") {
+      return this.handleStyleSceneTool(input);
     }
 
     const query = input.query as string;
