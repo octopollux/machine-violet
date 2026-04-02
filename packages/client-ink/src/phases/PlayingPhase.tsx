@@ -252,7 +252,9 @@ export function PlayingPhase() {
 
   const tier = getViewportTier({ columns: cols, rows });
   const visibleElements = getVisibleElements(tier);
-  const narRows = narrativeRows(rows, visibleElements, false, theme.asset.height, players.length);
+  const hasDescriptions = (activeChoices?.descriptions?.length ?? 0) > 0;
+  const descExtraHeight = hasDescriptions ? DESCRIPTION_ROWS : 0;
+  const narRows = narrativeRows(rows, visibleElements, false, theme.asset.height, players.length, descExtraHeight);
   const conversationPaneTop = visibleElements.topFrame ? theme.asset.height : 0;
 
   // Active client-driven modal data (character sheet, compendium, notes, swatch)
@@ -265,7 +267,7 @@ export function PlayingPhase() {
       prompt={activeChoices.prompt ?? ""}
       choices={activeChoices.choices ?? []}
       descriptions={activeChoices.descriptions}
-      maxChoiceRows={choiceRowBudget(visibleElements, 1, false, DESCRIPTION_ROWS)}
+      maxChoiceRows={choiceRowBudget(visibleElements, 1, hasDescriptions, DESCRIPTION_ROWS)}
       initialIndex={0}
       onSelect={handleChoiceSelect}
       onDismiss={handleChoiceDismiss}
@@ -299,6 +301,7 @@ export function PlayingPhase() {
         mouseScrollOverrideRef={modalScrollRef}
         hideInputLine={!!activeChoices}
         playerPaneOverlay={choiceOverlay}
+        playerPaneExtraHeight={hasDescriptions ? DESCRIPTION_ROWS : 0}
       />
       {retryOverlay && (
         <ApiErrorModal theme={theme} width={cols} height={rows} overlay={retryOverlay} />
