@@ -129,6 +129,15 @@ export function PlayingPhase() {
     const choices = activeChoices;
     setActiveChoices(null);
 
+    // Echo the player's choice into the narrative (separator + player line)
+    const tag = `optimistic-${Date.now()}`;
+    setNarrativeLines((prev) => [
+      ...prev,
+      { kind: "separator", text: "---", tag },
+      { kind: "player", text: `[${activeChar}] ${choice}`, tag },
+      { kind: "dm", text: "", tag },
+    ]);
+
     // Setup choices are resolved via the choice respond endpoint
     if (choices?.id === "setup-choice") {
       try {
@@ -137,14 +146,17 @@ export function PlayingPhase() {
       return;
     }
 
-    // Gameplay choices are sent as a turn contribution
+    // Gameplay choices — contribute to the current turn
     try {
       await apiClient.contribute(choice, {
         campaignId: currentTurn?.campaignId,
         turnSeq: currentTurn?.seq,
       });
-    } catch { /* no-op */ }
-  }, [apiClient, activeChoices, setActiveChoices, currentTurn]);
+    } catch {
+      // Contribution rejected — remove optimistic lines
+      setNarrativeLines((prev) => prev.filter((l) => l.tag !== tag));
+    }
+  }, [apiClient, activeChoices, setActiveChoices, activeChar, currentTurn, setNarrativeLines]);
 
   const handleChoiceDismiss = useCallback(() => setActiveChoices(null), [setActiveChoices]);
 
@@ -241,7 +253,9 @@ export function PlayingPhase() {
 
   const tier = getViewportTier({ columns: cols, rows });
   const visibleElements = getVisibleElements(tier);
-  const narRows = narrativeRows(rows, visibleElements, false, theme.asset.height, players.length);
+  const hasDescriptions = (activeChoices?.descriptions?.length ?? 0) > 0;
+  const descExtraHeight = hasDescriptions ? DESCRIPTION_ROWS : 0;
+  const narRows = narrativeRows(rows, visibleElements, false, theme.asset.height, players.length, descExtraHeight);
   const conversationPaneTop = visibleElements.topFrame ? theme.asset.height : 0;
 
   // Active client-driven modal data (character sheet, compendium, notes, swatch)
@@ -254,7 +268,7 @@ export function PlayingPhase() {
       prompt={activeChoices.prompt ?? ""}
       choices={activeChoices.choices ?? []}
       descriptions={activeChoices.descriptions}
-      maxChoiceRows={choiceRowBudget(visibleElements, 1, false, DESCRIPTION_ROWS)}
+      maxChoiceRows={choiceRowBudget(visibleElements, 1, hasDescriptions, DESCRIPTION_ROWS)}
       initialIndex={0}
       onSelect={handleChoiceSelect}
       onDismiss={handleChoiceDismiss}
@@ -288,6 +302,7 @@ export function PlayingPhase() {
         mouseScrollOverrideRef={modalScrollRef}
         hideInputLine={!!activeChoices}
         playerPaneOverlay={choiceOverlay}
+        playerPaneExtraHeight={hasDescriptions ? DESCRIPTION_ROWS : 0}
       />
       {retryOverlay && (
         <ApiErrorModal theme={theme} width={cols} height={rows} overlay={retryOverlay} />

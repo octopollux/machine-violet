@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useInput, Box, Text } from "ink";
 import type { FrameStyleVariant } from "@machine-violet/shared/types/tui.js";
 import { renderHorizontalFrame, renderContentLine } from "../frames/index.js";
@@ -99,6 +99,7 @@ export function ChoiceOverlay({
   const [selectedIndex, setSelectedIndex] = useState(defaultIndex);
   const [customInputActive, setCustomInputActive] = useState(defaultIndex === choices.length);
   const [customInputResetKey, setCustomInputResetKey] = useState(0);
+  const scrollStartRef = useRef(0);
 
   // Reset state when choices change (e.g. choice-generator replaces DM-provided choices).
   // Keyed on the serialized choices array so we only reset when actual options change.
@@ -108,6 +109,7 @@ export function ChoiceOverlay({
     setSelectedIndex(idx);
     setCustomInputActive(idx === choices.length);
     setCustomInputResetKey((k) => k + 1);
+    scrollStartRef.current = 0;
   }, [choicesKey, initialIndex, choices.length]);
 
   useInput((input, key) => {
@@ -201,21 +203,30 @@ export function ChoiceOverlay({
     return end;
   };
 
-  let scrollStart = 0;
-  // Push scrollStart forward until selectedIndex is visible
-  while (scrollStart < allItems.length && getVisibleEnd(scrollStart) <= selectedIndex) {
-    scrollStart++;
+  // Adjust scrollStart only when selectedIndex falls outside the visible window.
+  // This keeps the viewport stable — pressing UP moves the cursor up through
+  // visible items before scrolling, and vice versa for DOWN.
+  // Uses a ref (not state) since scrollStart is a display detail derived from
+  // selectedIndex — no extra re-render needed; the current render already uses
+  // the adjusted value.
+  let adjustedStart = scrollStartRef.current;
+  // Clamp to valid range (choices may have changed)
+  if (adjustedStart >= allItems.length) adjustedStart = Math.max(0, allItems.length - 1);
+  // If selected item is before the window, scroll up to it
+  if (selectedIndex < adjustedStart) {
+    adjustedStart = selectedIndex;
   }
-  // Pull scrollStart back to show more context above when possible
-  while (scrollStart > 0 && getVisibleEnd(scrollStart - 1) > selectedIndex) {
-    scrollStart--;
+  // If selected item is at or past the window end, push forward
+  while (adjustedStart < allItems.length && getVisibleEnd(adjustedStart) <= selectedIndex) {
+    adjustedStart++;
   }
+  scrollStartRef.current = adjustedStart;
 
-  const scrollEnd = getVisibleEnd(scrollStart);
-  const canScrollUp = scrollStart > 0;
+  const scrollEnd = getVisibleEnd(adjustedStart);
+  const canScrollUp = adjustedStart > 0;
   const canScrollDown = scrollEnd < allItems.length;
 
-  const visibleItems = allItems.slice(scrollStart, scrollEnd);
+  const visibleItems = allItems.slice(adjustedStart, scrollEnd);
 
   // Flatten visible items into visual rows for arrow placement
   interface VisualRow {
@@ -304,7 +315,7 @@ export function ChoiceOverlay({
           ? <Text color={accentColor}>{" " + cursorStr + " "}</Text>
           : <Text>{" " + cursorStr + " "}</Text>;
 
-        // Special rendering for active custom input
+        // Special rendering for active custom input — wraps to multiple lines
         if (row.isCustom && customInputActive && row.isItemFirstLine) {
           return (
             <Box key="custom-active">
@@ -313,6 +324,7 @@ export function ChoiceOverlay({
                 key={customInputResetKey}
                 isDisabled={false}
                 availableWidth={customInputWidth}
+                wrap
                 placeholder="Enter your own..."
                 onSubmit={handleCustomInputSubmit}
               />
