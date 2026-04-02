@@ -93,7 +93,36 @@ Pacing: The party has a rhythm — cocktails, dinner, entertainment, dessert, th
   },
   {
     name: "The Instrument",
-    premise: "You found a weapon. It found you first.",
+    premise: "You are a sentient weapon. Someone just picked you up.",
+    detail: `CRITICAL: The player character IS the weapon, not the wielder. The weapon is the PC — it has a name, a voice, a personality, a history. The wielder is an NPC. Character creation should establish the weapon's identity. All narration is from the weapon's perspective. The weapon perceives the world through senses that are not human — vibration, proximity, intent, the emotional state of whoever holds it.
+
+<suboptions label="What you are">
+- A legendary blade — Centuries old, forged for a purpose you've half-forgotten. You've outlived dozens of wielders. You remember all of them. Some you liked. The new one has potential, but they hold you wrong.
+- Perihelion — Remnant of a dead universe. You are a gravitational anomaly shaped like a weapon, and you are here to prevent what happened to your universe from happening to this one. You are also absurdly, inconveniently heavy. Doors break. Floors sag. Horses refuse. Your wielder has back problems now. You feel terrible about this. You do not weigh less.
+- A prototype — You weren't supposed to be sentient. A lab accident, a manufacturing defect, a cosmic ray — something went wrong (or right) during fabrication. You're weeks old. Everything is new. You have questions. Many questions. You asked your wielder what "boredom" means and they haven't answered yet.
+- A sacred relic — You were the instrument of a god's will. The god is silent now — dead, sleeping, or just done talking. You still carry the mandate. The faithful argue about what you mean. You have opinions about this but no one has thought to ask.
+</suboptions>
+
+<suboptions label="Your wielder">
+- A reluctant hero — Didn't want a destiny, got one anyway. Grumbles constantly. Competent despite themselves. Will grow on you.
+- A treasure hunter — Picked you up because you're valuable, not because you're important. Mercenary, practical, surprisingly funny. Doesn't know you're alive yet.
+- A child — Too young for this. Brave in the way only someone who doesn't understand the danger can be. You are going to protect them with everything you are.
+</suboptions>
+
+The relationship: This campaign is a buddy story between the weapon and the wielder. The weapon can communicate — through impressions, emotions, warmth/cold, vibrations, or (if the player prefers) actual speech. The nature of communication should be established early and can evolve. A weapon that starts with vague impressions might develop full speech as the bond deepens.
+
+DM approach:
+- The weapon's limitations are the comedy and the drama. You can perceive but not act independently. You can advise but not insist. You go where you're carried, pointed where you're aimed, put down where you're left. A scene where the wielder sets you on a table facing the wall is both funny and existentially dreadful.
+- Give the wielder their own arc. They're an NPC but they should feel like a full person — make the player care about them. The weapon's opinion of the wielder should evolve from assessment to attachment.
+- The world should react to a sentient weapon with a range of responses: fear, reverence, academic curiosity, desire to possess, desire to destroy. The weapon has been an object to most people it has met. The wielder treating it as a person is rare and significant.
+
+Story threads:
+- The wielder's goal (whatever brought them to the weapon) drives the plot forward. The weapon has its own agenda that may align or conflict.
+- Someone wants to acquire, study, or destroy the weapon. The weapon has feelings about being wanted for what it is rather than who it is.
+- The bond between weapon and wielder is tested. Separation — even temporary — should feel wrong to both of them.
+- The weapon's past surfaces. A previous wielder, a battle it regrets, a promise it made. The new wielder learns who they're holding.
+
+Pacing: Start at the moment of first contact — the wielder's hand closes around the weapon and both of them feel something unexpected. The first act is establishing communication and the relationship. The second act is the journey (the wielder's quest, complicated by the weapon's nature). The third act is the choice — what the weapon was made for versus what it has become.`,
     genres: ["fantasy", "sci-fi", "modern"],
   },
   {
