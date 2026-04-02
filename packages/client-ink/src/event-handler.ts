@@ -273,14 +273,17 @@ function handleActivityUpdate(event: ActivityUpdateEvent, update: StateUpdater):
         next = { ...next, modelines: { ...next.modelines, [character]: text } };
       }
     } else if (tuiType === "set_display_resources") {
-      const resources = data.resources as Record<string, string[]> | undefined;
-      if (resources) {
-        next = { ...next, displayResources: resources };
+      const character = data.character as string | undefined;
+      const resources = data.resources as string[] | undefined;
+      if (character && resources) {
+        next = { ...next, displayResources: { ...next.displayResources, [character]: resources } };
       }
     } else if (tuiType === "set_resource_values") {
-      const values = data.values as Record<string, Record<string, string>> | undefined;
-      if (values) {
-        next = { ...next, resourceValues: { ...next.resourceValues, ...values } };
+      const character = data.character as string | undefined;
+      const values = data.values as Record<string, string> | undefined;
+      if (character && values) {
+        const prevValues = next.resourceValues[character] ?? {};
+        next = { ...next, resourceValues: { ...next.resourceValues, [character]: { ...prevValues, ...values } } };
       }
     }
 
