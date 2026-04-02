@@ -129,15 +129,7 @@ export function PlayingPhase() {
     const choices = activeChoices;
     setActiveChoices(null);
 
-    // Setup choices are resolved via the choice respond endpoint
-    if (choices?.id === "setup-choice") {
-      try {
-        await apiClient.respondToChoice(choice);
-      } catch { /* no-op */ }
-      return;
-    }
-
-    // Gameplay choices — optimistic separator + player echo, same as typed input
+    // Echo the player's choice into the narrative (separator + player line)
     const tag = `optimistic-${Date.now()}`;
     setNarrativeLines((prev) => [
       ...prev,
@@ -146,6 +138,15 @@ export function PlayingPhase() {
       { kind: "dm", text: "", tag },
     ]);
 
+    // Setup choices are resolved via the choice respond endpoint
+    if (choices?.id === "setup-choice") {
+      try {
+        await apiClient.respondToChoice(choice);
+      } catch { /* no-op */ }
+      return;
+    }
+
+    // Gameplay choices — contribute to the current turn
     try {
       await apiClient.contribute(choice, {
         campaignId: currentTurn?.campaignId,
