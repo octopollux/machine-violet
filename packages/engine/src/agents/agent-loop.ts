@@ -24,6 +24,22 @@ export const TUI_TOOLS = new Set([
 /** Tools registered in the ToolRegistry but only exposed to OOC / Dev Mode agents. */
 const DM_EXCLUDED_TOOLS = new Set(["show_character_sheet", "rollback"]);
 
+/**
+ * TUI command types that require engine-side processing (scene transitions,
+ * subagent spawns, file I/O, etc.) and MUST be deferred until after the
+ * agent loop finishes.  Everything else is a visual-only update that can
+ * be broadcast to the client immediately when the tool fires.
+ */
+export const DEFERRED_TUI_TYPES = new Set([
+  "scene_transition",
+  "session_end",
+  "rollback",
+  "scribe",
+  "dm_notes",
+  "promote_character",
+  "style_scene",   // spawns theme-styler subagent
+]);
+
 export function isTuiCommand(toolName: string): boolean {
   return TUI_TOOLS.has(toolName);
 }
@@ -45,6 +61,8 @@ export interface AgentLoopConfig {
   asyncToolHandler?: (name: string, input: Record<string, unknown>) => Promise<ToolResult | null>;
   /** Called when DM text streams in */
   onTextDelta?: (delta: string) => void;
+  /** Called immediately when a non-deferred TUI command is extracted from a tool result */
+  onTuiCommand?: (cmd: TuiCommand) => void;
   /** Called when a tool call starts */
   onToolStart?: (name: string) => void;
   /** Called when a tool call completes */
@@ -136,6 +154,7 @@ async function runAgentLoopInternal(
     toolHandler,
     cacheHints: [{ target: "tools", ttl: "1h" }, { target: "messages" }],
     tuiToolNames: TUI_TOOLS,
+    onTuiCommand: config.onTuiCommand,
     onTextDelta: config.onTextDelta,
     onToolStart: config.onToolStart,
     onToolEnd: config.onToolEnd,

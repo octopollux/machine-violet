@@ -16,6 +16,7 @@ import type {
 } from "./types.js";
 import type { ToolResult } from "../agents/tool-registry.js";
 import type { TuiCommand } from "../agents/agent-loop.js";
+import { DEFERRED_TUI_TYPES } from "../agents/agent-loop.js";
 import { dumpContext, dumpThinking } from "../config/context-dump.js";
 import { logEvent } from "../context/engine-log.js";
 import { ContentRefusalError } from "@machine-violet/shared/types/errors.js";
@@ -42,6 +43,8 @@ export interface ProviderLoopConfig {
   toolHandler?: ToolHandler;
   cacheHints?: CacheHint[];
   tuiToolNames?: Set<string>;
+  /** Called immediately when a non-deferred TUI command is extracted. */
+  onTuiCommand?: (cmd: TuiCommand) => void;
   terseSuffix?: boolean;
   onTextDelta?: (delta: string) => void;
   onToolStart?: (name: string) => void;
@@ -231,6 +234,13 @@ export async function runProviderLoop(
           } catch { /* not a TUI command */ }
         }
 
+        // Broadcast non-deferred TUI commands immediately so the client
+        // sees visual updates (modeline, resources, theme) as tools fire,
+        // not after the entire agent loop finishes.
+        if (tui && !DEFERRED_TUI_TYPES.has(tui.type)) {
+          config.onTuiCommand?.(tui);
+        }
+
         return {
           result: {
             type: "tool_result",
@@ -238,7 +248,8 @@ export async function runProviderLoop(
             content: toolResult.content,
             is_error: toolResult.is_error,
           },
-          tui,
+          // Only collect deferred commands for post-loop engine processing.
+          tui: tui && DEFERRED_TUI_TYPES.has(tui.type) ? tui : undefined,
         };
       }),
     );

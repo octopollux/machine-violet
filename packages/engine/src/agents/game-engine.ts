@@ -559,7 +559,10 @@ export class GameEngine {
         this.persistCurrentScene();
       }
 
-      // Process TUI commands — intercept engine commands
+      // Process deferred TUI commands — only commands that need engine-side
+      // work (scene transitions, subagent spawns, file I/O) remain here.
+      // Visual-only commands (modeline, resources, choices, theme) were
+      // already broadcast to the client immediately when the tool fired.
       for (const cmd of result.tuiCommands) {
         if (cmd.type === "scene_transition") {
           await this.transitionScene(
@@ -581,14 +584,6 @@ export class GameEngine {
           await this.handleDmNotes(cmd);
         } else if (cmd.type === "style_scene") {
           await this.handleStyleScene(cmd);
-        } else if (cmd.type === "set_theme") {
-          // Direct theme command (from location auto-apply, OOC, etc.)
-          if (cmd.save_to_location) {
-            await this.saveThemeToLocation(cmd);
-          }
-          this.callbacks.onTuiCommand(cmd);
-        } else {
-          this.callbacks.onTuiCommand(cmd);
         }
       }
 
@@ -1162,6 +1157,12 @@ export class GameEngine {
       onToolEnd: (name, result) => {
         this.setState("dm_thinking");
         this.callbacks.onToolEnd(name, result);
+      },
+      onTuiCommand: (cmd) => {
+        // Immediate TUI commands (modeline, resources, choices, etc.)
+        // are broadcast to the client as soon as the tool fires, so
+        // visual updates appear mid-narration instead of after the turn.
+        this.callbacks.onTuiCommand(cmd);
       },
     };
   }
