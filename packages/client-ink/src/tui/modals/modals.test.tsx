@@ -163,6 +163,29 @@ describe("ChoiceOverlay", () => {
     expect(frame).toContain("▼");
   });
 
+  it("moves cursor within visible window without scrolling", () => {
+    // 7 choices + custom = 8 items, choiceRows=5.
+    // Start at index 5: visible window should contain items scrolled to show index 5.
+    // Pressing UP should move cursor within the visible set, not re-scroll the whole list.
+    const { lastFrame } = render(
+      <ChoiceOverlay
+        width={60}
+        prompt="Pick one"
+        choices={["A", "B", "C", "D", "E", "F", "G"]}
+        initialIndex={3}
+        onSelect={noop}
+        onDismiss={noop}
+      />,
+    );
+    const frame = lastFrame()!;
+    // With initialIndex=3, scroll starts at 0 so all of A-E visible (5 rows).
+    // The cursor should be on D (index 3), and items above (A,B,C) should be visible.
+    expect(frame).toContain("> D");
+    expect(frame).toContain("  A");
+    expect(frame).toContain("  B");
+    expect(frame).toContain("  C");
+  });
+
   it("shows dimmed scroll arrows when all choices fit", () => {
     const { lastFrame } = render(
       <ChoiceOverlay

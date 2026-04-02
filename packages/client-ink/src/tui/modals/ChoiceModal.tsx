@@ -99,6 +99,7 @@ export function ChoiceOverlay({
   const [selectedIndex, setSelectedIndex] = useState(defaultIndex);
   const [customInputActive, setCustomInputActive] = useState(defaultIndex === choices.length);
   const [customInputResetKey, setCustomInputResetKey] = useState(0);
+  const [scrollStart, setScrollStart] = useState(0);
 
   // Reset state when choices change (e.g. choice-generator replaces DM-provided choices).
   // Keyed on the serialized choices array so we only reset when actual options change.
@@ -108,6 +109,7 @@ export function ChoiceOverlay({
     setSelectedIndex(idx);
     setCustomInputActive(idx === choices.length);
     setCustomInputResetKey((k) => k + 1);
+    setScrollStart(0);
   }, [choicesKey, initialIndex, choices.length]);
 
   useInput((input, key) => {
@@ -201,21 +203,29 @@ export function ChoiceOverlay({
     return end;
   };
 
-  let scrollStart = 0;
-  // Push scrollStart forward until selectedIndex is visible
-  while (scrollStart < allItems.length && getVisibleEnd(scrollStart) <= selectedIndex) {
-    scrollStart++;
+  // Adjust scrollStart only when selectedIndex falls outside the visible window.
+  // This keeps the viewport stable — pressing UP moves the cursor up through
+  // visible items before scrolling, and vice versa for DOWN.
+  let adjustedStart = scrollStart;
+  // Clamp to valid range (choices may have changed)
+  if (adjustedStart >= allItems.length) adjustedStart = Math.max(0, allItems.length - 1);
+  // If selected item is before the window, scroll up to it
+  if (selectedIndex < adjustedStart) {
+    adjustedStart = selectedIndex;
   }
-  // Pull scrollStart back to show more context above when possible
-  while (scrollStart > 0 && getVisibleEnd(scrollStart - 1) > selectedIndex) {
-    scrollStart--;
+  // If selected item is at or past the window end, push forward
+  while (adjustedStart < allItems.length && getVisibleEnd(adjustedStart) <= selectedIndex) {
+    adjustedStart++;
+  }
+  if (adjustedStart !== scrollStart) {
+    setScrollStart(adjustedStart);
   }
 
-  const scrollEnd = getVisibleEnd(scrollStart);
-  const canScrollUp = scrollStart > 0;
+  const scrollEnd = getVisibleEnd(adjustedStart);
+  const canScrollUp = adjustedStart > 0;
   const canScrollDown = scrollEnd < allItems.length;
 
-  const visibleItems = allItems.slice(scrollStart, scrollEnd);
+  const visibleItems = allItems.slice(adjustedStart, scrollEnd);
 
   // Flatten visible items into visual rows for arrow placement
   interface VisualRow {
