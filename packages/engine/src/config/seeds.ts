@@ -443,6 +443,7 @@ Pacing: Open with normalcy disrupted in small ways. The player should spend 2-3 
 - Warforged — Rune-carved stone and living wood, animated by old battle magic. You were built for a war between kingdoms that ended eleven years ago. The magic that drives you is the same magic the village baker uses to heat her oven, and that bothers people.
 - Combat android — Military-spec hardware, carbon-fiber chassis, targeting systems you've disabled (mostly). You were mass-produced for a corporate war. There are others like you, but most chose to shut down when the contracts expired.
 - Fallen angel — You were a divine instrument of righteous war. You laid down your sword. The church says you're broken. You say you're done. Your wings still smell like ozone and old fire.
+- Just a soldier — No magic, no metal, no wings. You're a human being who was very good at a very bad job for a very long time. The "old programming" is just what's left. You're trying to do something gentle for once.
 </suboptions>
 
 <suboptions label="The town">
