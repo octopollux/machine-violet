@@ -126,14 +126,24 @@ function formatSystemLine(s: typeof KNOWN_SYSTEMS[number]): string {
   return `- \`${s.slug}\` — ${s.name}: ${s.description}${ruleCard}`;
 }
 
+/** Fisher-Yates shuffle (returns a new array). */
+function shuffle<T>(arr: readonly T[]): T[] {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 function buildSystemPrompt(): string {
   const base = loadPrompt("setup-conversation");
-  const seedList = SEEDS.map((s) => {
+  const seedList = shuffle(SEEDS).map((s) => {
     const desc = s.description ? ` | Description: ${s.description}` : "";
     const detail = s.detail ? `\n  Detail: ${s.detail.replace(/\n/g, "\n  ")}` : "";
     return `- **${s.name}** — ${s.premise} (${s.genres.join(", ")})${desc}${detail}`;
   }).join("\n");
-  const personalityList = PERSONALITIES.map((p) => {
+  const personalityList = shuffle(PERSONALITIES).map((p) => {
     const desc = p.description ? `: ${p.description}` : "";
     const detail = p.detail ? `\n  Detail: ${p.detail.replace(/\n/g, "\n  ")}` : "";
     return `- **${p.name}**${desc}${detail}`;
@@ -165,7 +175,9 @@ function buildSystemPrompt(): string {
     "\n\n## Available DM personalities\n\nWhen presenting personality choices, use the name as the choice label and the description as the choice description. You can also invent new personalities beyond this list — if a campaign calls for a voice that isn't here, or the player asks for something custom, craft a name and prompt fragment in the same style as the examples below.\n\n" + personalityList;
 }
 
-const SYSTEM_PROMPT = buildSystemPrompt();
+// Built fresh per session so seed/personality order is randomized.
+// Everything except the lists (base prompt, systems, chargen) is
+// deterministic and cheap to recompute.
 
 // --- Streaming with retry ---
 
@@ -230,8 +242,8 @@ export function createSetupConversation(
   model: string,
   existingPlayers?: KnownPlayer[],
 ): SetupConversation {
-  // Build per-session system prompt with known players appended
-  let systemPrompt = SYSTEM_PROMPT;
+  // Build per-session system prompt (randomizes seed/personality order)
+  let systemPrompt = buildSystemPrompt();
   if (existingPlayers && existingPlayers.length > 0) {
     const playerLines = existingPlayers.map((p) => {
       const age = p.ageGroup ? ` (age group: ${p.ageGroup})` : " (age group: unknown)";
