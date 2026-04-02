@@ -379,6 +379,38 @@ describe("runAgentLoop", () => {
     });
   });
 
+  describe("thinking capability guard", () => {
+    it("disables thinking for non-thinking models even with effort configured", async () => {
+      const client = mockClient([textMessage("Done.")]);
+
+      await runAgentLoop(
+        client,
+        "System",
+        [{ role: "user", content: "Hi" }],
+        baseConfig({ name: "promote_character", model: "claude-haiku-4-5-20251001", effort: "medium" }),
+      );
+
+      const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      // Haiku does not support thinking — effort should be ignored
+      expect(createCall.thinking).toEqual({ type: "disabled" });
+      expect(createCall.output_config).toBeUndefined();
+    });
+
+    it("enables thinking for thinking-capable models with effort", async () => {
+      const client = mockClient([textMessage("Done.")]);
+
+      await runAgentLoop(
+        client,
+        "System",
+        [{ role: "user", content: "Hi" }],
+        baseConfig({ name: "dm", model: "claude-sonnet-4-6", effort: "high" }),
+      );
+
+      const createCall = (client.messages.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(createCall.thinking).toEqual({ type: "adaptive" });
+    });
+  });
+
   describe("terseSuffix", () => {
     it("appends terse instruction to string system prompt", async () => {
       const client = mockClient([textMessage("Done.")]);
