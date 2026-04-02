@@ -282,8 +282,8 @@ function handleActivityUpdate(event: ActivityUpdateEvent, update: StateUpdater):
       const character = data.character as string | undefined;
       const values = data.values as Record<string, string> | undefined;
       if (character && values) {
-        const prev = next.resourceValues[character] ?? {};
-        next = { ...next, resourceValues: { ...next.resourceValues, [character]: { ...prev, ...values } } };
+        const prevValues = next.resourceValues[character] ?? {};
+        next = { ...next, resourceValues: { ...next.resourceValues, [character]: { ...prevValues, ...values } } };
       }
     }
 
