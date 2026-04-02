@@ -452,9 +452,9 @@ Pacing: Open with normalcy disrupted in small ways. The player should spend 2-3 
     premise:
       "A downtown skyscraper just lost its first floor. Every window shows open sky — no street, no city, no ground.",
     detail: `<suboptions label="The building">
-- Corporate tower — A glass-and-steel office building, mid-week, mid-afternoon. Forty survivors across 26 floors, mostly cubicle workers, a security guard, and one physicist who knows more than she's saying. The horror is mundane people in an impossible situation.
-- Orbital habitat ring — A rotating station module that just detached from the superstructure. The "sky" is naked vacuum behind failing radiation shielding. Forty crew, a malfunctioning AI, and a research lab that was running an unauthorized experiment. The horror is engineering and time pressure.
-- Cathedral spire — A mile-high temple to a god of boundaries, mid-festival, mid-prayer. The nave floor dissolved into luminous void. Forty pilgrims, a heretic scholar, and a liturgy that might be an instruction manual. The horror is faith tested by the literal.
+- Corporate tower — A glass-and-steel office building, mid-week, mid-afternoon. Forty survivors across 26 floors, mostly cubicle workers, a security guard, and a physicist on-site. The horror is mundane people in an impossible situation.
+- Orbital habitat ring — A rotating station module that just detached from the superstructure. The "sky" is naked vacuum behind failing radiation shielding. Forty crew, a malfunctioning AI, and a cutting-edge research lab. The horror is engineering and time pressure.
+- Cathedral spire — A mile-high temple to a god of boundaries, mid-festival, mid-prayer. The nave floor dissolved into luminous void. Forty pilgrims, a heretic scholar, and a central liturgy of the faith. The horror is faith tested by the literal.
 </suboptions>
 
 The core mystery: The ground floor didn't vanish — the building was pulled INTO something. A pocket of collapsed geometry (a Fold, a phase-slip, a doctrinal paradox, depending on the setting). The person responsible is inside the building. They meant to run a small test. They were wrong about the scale.
@@ -464,7 +464,7 @@ Roll or choose the architect's motive (DM only — do NOT reveal):
 2. ESCAPE — They created the Fold deliberately to hide from something on the outside. Returning the building means exposing everyone to whatever they're running from. The Fold is a lifeboat, not a trap.
 3. ACCIDENT — They genuinely don't understand what happened. They're as scared as everyone else but hiding it behind authority and jargon. The device is running on its own now and they have no idea how to stop it.
 
-The fold is UNSTABLE. It will collapse in approximately 12 hours. Collapse either returns the building to real space (best case) or compresses — geometry folds inward, catastrophic structural failure.
+The Fold is UNSTABLE. It will collapse in approximately 12 hours. Collapse either returns the building to real space (best case) or compresses — geometry folds inward, catastrophic structural failure.
 
 Key NPCs (adapt names and roles to setting):
 - THE ARCHITECT — The person who caused this. Mid-50s, brilliant, evasive. Always touches their left temple when lying. Barricaded near the device.
