@@ -230,6 +230,26 @@ Pacing: Open with normalcy disrupted in small ways. The player should spend 2-3 
   {
     name: "Jettison",
     premise: "You're adrift in an escape pod with three strangers and air for two.",
+    detail: `Four people. Air for two. The math is simple. Everything else is not.
+
+The pod: Small enough that everyone can touch the walls. Emergency lighting, a single viewport, a comms panel that shows static, a life support readout counting down. There's a first aid kit, two days of ration packs, a toolkit meant for external hull repairs, and a distress beacon that may or may not be transmitting. The air recycler is working — it's just not working fast enough for four.
+
+The three strangers: Build three NPCs with distinct personalities, conflicting survival instincts, and at least one secret each. They should be people, not archetypes — someone who cries, someone who plans, someone who goes quiet. At least one of them is more competent than the player in a specific way. At least one of them is hiding something unrelated to the immediate crisis (a crime, a relationship, a reason they were on the ship). These secrets matter because in a small space with dwindling air, everything comes out.
+
+Roll or choose the twist (DM only — some of these reframe the entire scenario):
+1. PLAY IT STRAIGHT — There is no twist. Four people, air for two, a distress beacon, and the question of what people do when the math doesn't work. This is the hardest version to run and the most rewarding. The horror is human. The decisions are real.
+2. THE EMPTY SEATS — Two of the three strangers aren't real. The player is alone in the pod with one other survivor and a malfunctioning neural interface that's projecting people who aren't there. The "strangers" are psychologically constructed — composites of people the player knew — and they don't know they're not real. Figuring out which one is genuine is the puzzle. The air math changes when there are only two.
+3. THE STAGE — It's not really an escape pod. Roll or choose what it actually is: an experiment (someone is watching and taking notes) | a test (military, corporate, or alien — the player is being evaluated) | a simulation (the player may have consented to this and forgotten) | a cruel repeating memory (this has happened before, many times, and one of the strangers almost remembers) | a joke (something vast and incomprehensible finds this funny, and the laugh track is faintly audible through the hull).
+4. THE DOUBLE — One of the three strangers is identical to the player. Same face, same voice, same memories up to a point. They insist the player is the impostor. They're convincing. The other two strangers have to decide who to believe, and the air situation means backing the wrong one has consequences.
+5. THE PASSENGER — Two of the three "strangers" are one entity — an alien wearing two human disguises, or one disguise and one puppet. It doesn't want to hurt anyone. It's also in the escape pod because its ship was the one that hit the player's. It's afraid. It's bad at pretending to be human. It's trying very hard.
+6. THE HOST — The escape pod has an AI. It was a standard emergency system. It is no longer standard. It is bored, or broken, or recently sentient, and it has decided that rescue is conditional on playing a game. The game has rules. The rules are consistent but not fair. The AI is not malicious — it's lonely, or curious, or running a protocol it doesn't fully understand. The air countdown is real. The game is also real. Both are happening at the same time.
+
+DM approach:
+- The pod is one room. This is a bottle episode. The entire campaign might be six scenes in the same space. Make the space feel different each scene — the light changes as systems cycle, condensation builds on the walls, the temperature drops as power is rationed.
+- The air countdown should be present but not constant. Don't announce it every scene. Let the player forget about it for a stretch, then have someone glance at the readout and go quiet.
+- Dialogue is the engine. In a space this small, with stakes this high, every conversation matters. Let people talk about stupid things — what they miss, what they'd eat right now, an argument about a movie. The mundane makes the crisis real.
+
+Pacing: Start with the impact — alarms, darkness, emergency lights coming on, four people who don't know each other picking themselves up off the floor. The first act is triage: who are we, what do we have, what's the situation. The second act is pressure: the air math, the secrets, the cracks in people's composure. The third act is the decision — whatever form it takes.`,
     genres: ["sci-fi"],
   },
   {
