@@ -175,6 +175,19 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
     }
   }, [clientState.sessionStale, clientState.sessionEnded, phase]);
 
+  // Handle setup → game transition: reset client state for new session.
+  // The WebSocket stays connected — transitionToGame() broadcasts a fresh
+  // state:snapshot to all connected clients after starting the new session.
+  useEffect(() => {
+    const newId = clientState.transitionCampaignId;
+    if (!newId) return;
+    setActiveCampaignId(newId);
+    setSessionKey((k) => k + 1); // remount PlayingPhase
+    // Keep narrativeLines — the setup conversation stays visible as the
+    // game session starts and the DM's opening narration streams in.
+    setClientState(initialClientState());
+  }, [clientState.transitionCampaignId]);
+
   // Start a campaign (used by both auto-start and menu selection)
   const startCampaign = useCallback((id: string) => {
     setActiveCampaignId(id);

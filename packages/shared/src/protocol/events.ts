@@ -123,6 +123,14 @@ export const SessionEndedEvent = Type.Object({
   }),
 });
 
+export const SessionTransitionEvent = Type.Object({
+  type: Type.Literal("session:transition"),
+  data: Type.Object({
+    /** The campaign ID of the newly created campaign to transition into. */
+    campaignId: Type.String(),
+  }),
+});
+
 // --- Error ---
 
 export const ErrorEvent = Type.Object({
@@ -150,6 +158,7 @@ export const ServerEvent = Type.Union([
   StateSnapshotEvent,
   SessionModeEvent,
   SessionEndedEvent,
+  SessionTransitionEvent,
   ErrorEvent,
 ]);
 
@@ -166,5 +175,6 @@ export type ActivityUpdateEvent = Static<typeof ActivityUpdateEvent>;
 export type StateSnapshotEvent = Static<typeof StateSnapshotEvent>;
 export type SessionModeEvent = Static<typeof SessionModeEvent>;
 export type SessionEndedEvent = Static<typeof SessionEndedEvent>;
+export type SessionTransitionEvent = Static<typeof SessionTransitionEvent>;
 export type ErrorEvent = Static<typeof ErrorEvent>;
 export type ServerEvent = Static<typeof ServerEvent>;
