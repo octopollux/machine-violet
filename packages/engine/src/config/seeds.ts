@@ -447,6 +447,41 @@ Pacing: Open with normalcy disrupted in small ways. The player should spend 2-3 
       "A support group for people who survived encounters with the supernatural. Someone's lying about theirs.",
     genres: ["modern", "horror", "mystery"],
   },
+  {
+    name: "Sky Below",
+    premise:
+      "A downtown skyscraper just lost its first floor. Every window shows open sky — no street, no city, no ground.",
+    detail: `<suboptions label="The building">
+- Corporate tower — A glass-and-steel office building, mid-week, mid-afternoon. Forty survivors across 26 floors, mostly cubicle workers, a security guard, and one physicist who knows more than she's saying. The horror is mundane people in an impossible situation.
+- Orbital habitat ring — A rotating station module that just detached from the superstructure. The "sky" is naked vacuum behind failing radiation shielding. Forty crew, a malfunctioning AI, and a research lab that was running an unauthorized experiment. The horror is engineering and time pressure.
+- Cathedral spire — A mile-high temple to a god of boundaries, mid-festival, mid-prayer. The nave floor dissolved into luminous void. Forty pilgrims, a heretic scholar, and a liturgy that might be an instruction manual. The horror is faith tested by the literal.
+</suboptions>
+
+The core mystery: The ground floor didn't vanish — the building was pulled INTO something. A pocket of collapsed geometry (a Fold, a phase-slip, a doctrinal paradox, depending on the setting). The person responsible is inside the building. They meant to run a small test. They were wrong about the scale.
+
+Roll or choose the architect's motive (DM only — do NOT reveal):
+1. VALIDATION — They need the world to acknowledge their work. They'll protect the device because shutting it down means admitting it was a mistake. They're wrong, and increasingly unhinged, but not evil — just desperate.
+2. ESCAPE — They created the Fold deliberately to hide from something on the outside. Returning the building means exposing everyone to whatever they're running from. The Fold is a lifeboat, not a trap.
+3. ACCIDENT — They genuinely don't understand what happened. They're as scared as everyone else but hiding it behind authority and jargon. The device is running on its own now and they have no idea how to stop it.
+
+The fold is UNSTABLE. It will collapse in approximately 12 hours. Collapse either returns the building to real space (best case) or compresses — geometry folds inward, catastrophic structural failure.
+
+Key NPCs (adapt names and roles to setting):
+- THE ARCHITECT — The person who caused this. Mid-50s, brilliant, evasive. Always touches their left temple when lying. Barricaded near the device.
+- THE ENFORCER — Security/military/temple guard. Bulky, keeps reaching for a weapon that isn't there. Wants order. Fears there's no order left to restore.
+- THE ORGANIZER — Sharp, mid-30s, compulsive list-maker. Wants actionable information. The player's best ally — if given tasks.
+- THE LOUDMOUTH — Young, charismatic, wrong about everything. Already rallying a group toward a dangerous plan. Will force a crisis if no one steps up.
+
+Ticking clocks:
+- FOLD COLLAPSE: 12 hours. Non-negotiable.
+- The Architect attempts full lockdown of their floor within 1 hour of first contact.
+- The Loudmouth's group attempts something reckless within 2 hours if no leader emerges.
+
+Motifs: Light with no source. Lists as coping. Elevation as distance from the problem. An elevator that works when it shouldn't.
+
+Pacing: Start in a break room / common area / nave alcove. Let the player absorb the wrongness before anyone asks them to lead. The first act is social — keeping people from falling apart. The second act is exploration — what's on each floor? The third act is confrontation — the Architect, the device, the choice.`,
+    genres: ["modern", "sci-fi", "fantasy"],
+  },
 
   // ── Developer test seeds ────────────────────────────────────────────
   {
