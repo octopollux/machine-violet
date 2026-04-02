@@ -330,7 +330,7 @@ Roll or choose the house's secret (DM only — do NOT reveal, let the player dis
 7. THE HOUSE — The house is bigger on the inside. Not charmingly, not magically — pathologically. Hallways that shouldn't exist. Rooms that appear between visits. A staircase that goes down further than the foundation allows. The locked room is the only room that stays where it is. Grandma mapped the house obsessively — her notes are everywhere, contradictory, increasingly frantic. The house is growing. It has been growing since before grandma bought it. The fortune was what she spent trying to understand it.
 
 DM approach:
-- Don't reveal the secret immediately. The first session should be the player arriving, meeting the lawyer, walking through a house that feels slightly wrong in ways they can't articulate. Let them find the edges of the mystery before they find the center.
+- Don't reveal the secret immediately. The first scene should be the player arriving, meeting the lawyer, walking through a house that feels slightly wrong in ways they can't articulate. Let them find the edges of the mystery before they find the center.
 - The locked room should be accessible by mid-campaign, not before. Build anticipation. The player should want to get in there, and the delay should feel motivated (lost key, strange lock, a condition in the will, something the lawyer won't explain).
 - Grandma should emerge as a character through what she left behind: her books, her taste, her habits, the wear patterns in the floorboards, the neighbors' stories. By the time the player opens the locked room, they should feel like they know her — and then be surprised.
 
