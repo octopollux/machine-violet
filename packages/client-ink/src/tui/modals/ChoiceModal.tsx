@@ -314,7 +314,7 @@ export function ChoiceOverlay({
           ? <Text color={accentColor}>{" " + cursorStr + " "}</Text>
           : <Text>{" " + cursorStr + " "}</Text>;
 
-        // Special rendering for active custom input
+        // Special rendering for active custom input — wraps to multiple lines
         if (row.isCustom && customInputActive && row.isItemFirstLine) {
           return (
             <Box key="custom-active">
@@ -323,6 +323,7 @@ export function ChoiceOverlay({
                 key={customInputResetKey}
                 isDisabled={false}
                 availableWidth={customInputWidth}
+                wrap
                 placeholder="Enter your own..."
                 onSubmit={handleCustomInputSubmit}
               />

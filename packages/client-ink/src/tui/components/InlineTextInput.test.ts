@@ -256,3 +256,60 @@ describe("InlineTextInput component", () => {
     });
   });
 });
+
+describe("InlineTextInput wrap mode", () => {
+  it("wraps text across multiple lines", async () => {
+    const onChange = vi.fn();
+    const { lastFrame, stdin } = render(
+      React.createElement(InlineTextInput, {
+        availableWidth: 10,
+        wrap: true,
+        onChange,
+      }),
+    );
+    // Type 15 characters — should wrap to 2 lines
+    stdin.write("abcdefghijklmno");
+    await vi.waitFor(() => {
+      expect(onChange).toHaveBeenLastCalledWith("abcdefghijklmno");
+    });
+    const frame = lastFrame()!;
+    const lines = frame.split("\n");
+    expect(lines.length).toBe(2);
+    expect(lines[0]).toContain("abcdefghij");
+    expect(lines[1]).toContain("klmno");
+  });
+
+  it("shrinks back to single line after deleting", async () => {
+    const onChange = vi.fn();
+    const { lastFrame, stdin } = render(
+      React.createElement(InlineTextInput, {
+        defaultValue: "abcdefghijklmno",
+        availableWidth: 10,
+        wrap: true,
+        onChange,
+      }),
+    );
+    // Delete 6 chars to fit within one line (10 chars + cursor)
+    for (let i = 0; i < 6; i++) stdin.write("\x7f");
+    await vi.waitFor(() => {
+      expect(onChange).toHaveBeenLastCalledWith("abcdefghi");
+    });
+    const frame = lastFrame()!;
+    const lines = frame.split("\n");
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toContain("abcdefghi");
+  });
+
+  it("shows placeholder on single line in wrap mode", () => {
+    const { lastFrame } = render(
+      React.createElement(InlineTextInput, {
+        availableWidth: 20,
+        wrap: true,
+        placeholder: "Type here...",
+      }),
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("Type here...");
+    expect(frame.split("\n").length).toBe(1);
+  });
+});

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Text, useInput, useStdin } from "ink";
+import { Box, Text, useInput, useStdin } from "ink";
 import chalk from "chalk";
 
 interface State {
@@ -118,6 +118,8 @@ export interface InlineTextInputProps {
   availableWidth?: number;
   /** Dim hint text shown when the input is empty. Clears on first keystroke. */
   placeholder?: string;
+  /** When true, text wraps to multiple lines instead of scrolling horizontally. Requires availableWidth. */
+  wrap?: boolean;
   onChange?: (value: string) => void;
   onSubmit?: (value: string) => void;
 }
@@ -127,7 +129,7 @@ export interface InlineTextInputProps {
  * Supports: left/right arrows, Home/End, Ctrl+A/E, backspace.
  * Clear by changing the React `key` prop.
  */
-export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled = false, defaultValue = "", availableWidth, placeholder, onChange, onSubmit }: InlineTextInputProps) {
+export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled = false, defaultValue = "", availableWidth, placeholder, wrap, onChange, onSubmit }: InlineTextInputProps) {
   const initialState: State = {
     value: defaultValue,
     cursorOffset: defaultValue.length,
@@ -286,6 +288,67 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
 
     return result;
   }, [isDisabled, renderState.value, renderState.cursorOffset, availableWidth, needsViewport, placeholder]);
+
+  // Wrap mode: render text across multiple lines instead of horizontal scrolling
+  const useWrap = wrap && availableWidth != null && availableWidth > 0;
+  const wrappedLines = useMemo(() => {
+    if (!useWrap) return null;
+    const w = availableWidth!;
+    const { value, cursorOffset } = renderState;
+
+    if (isDisabled) {
+      const lines: string[] = [];
+      for (let i = 0; i < value.length; i += w) lines.push(value.slice(i, i + w));
+      if (lines.length === 0) lines.push("");
+      return lines.map((l) => l + " ".repeat(Math.max(0, w - l.length)));
+    }
+
+    if (value.length === 0) {
+      if (placeholder) {
+        const ph = placeholder.length > w - 1 ? placeholder.slice(0, w - 1) : placeholder;
+        const line = cursorChar + chalk.dim(ph);
+        return [line + " ".repeat(Math.max(0, w - 1 - ph.length))];
+      }
+      return [cursorChar + " ".repeat(Math.max(0, w - 1))];
+    }
+
+    // Split value into character-level wrapped lines
+    const textLines: string[] = [];
+    for (let i = 0; i < value.length; i += w) {
+      textLines.push(value.slice(i, i + w));
+    }
+    // Cursor at end on a full line boundary needs a new line
+    const atEnd = cursorOffset === value.length;
+    if (atEnd && value.length % w === 0) {
+      textLines.push("");
+    }
+
+    const cursorLine = Math.floor(cursorOffset / w);
+    const cursorCol = cursorOffset % w;
+
+    return textLines.map((line, lineIdx) => {
+      let styled: string;
+      if (lineIdx === cursorLine) {
+        if (cursorCol >= line.length) {
+          // Cursor at end of this line
+          styled = line + cursorChar;
+          return styled + " ".repeat(Math.max(0, w - line.length - 1));
+        }
+        styled = styleSegments(line, cursorCol);
+      } else {
+        styled = line;
+      }
+      return styled + " ".repeat(Math.max(0, w - line.length));
+    });
+  }, [useWrap, isDisabled, renderState.value, renderState.cursorOffset, availableWidth, placeholder]);
+
+  if (wrappedLines) {
+    return (
+      <Box flexDirection="column">
+        {wrappedLines.map((line, i) => <Text key={i}>{line}</Text>)}
+      </Box>
+    );
+  }
 
   return <Text>{rendered}</Text>;
 });
