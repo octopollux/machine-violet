@@ -183,7 +183,8 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
     if (!newId) return;
     setActiveCampaignId(newId);
     setSessionKey((k) => k + 1); // remount PlayingPhase
-    setNarrativeLines([]);
+    // Keep narrativeLines — the setup conversation stays visible as the
+    // game session starts and the DM's opening narration streams in.
     setClientState(initialClientState());
   }, [clientState.transitionCampaignId]);
 
