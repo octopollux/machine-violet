@@ -406,8 +406,30 @@ Pacing: Open with normalcy disrupted in small ways. The player should spend 2-3 
   },
   {
     name: "The Understudies",
-    premise: "The Chosen Ones all died in Act One. You're the backup cast.",
-    genres: ["fantasy", "comedy"],
+    premise: "The main characters all died in Act One. You're the backup cast.",
+    detail: `<suboptions label="The story you've inherited">
+- Space opera — The bridge crew of a flagship is dead. All of them — captain, first officer, science lead, the one who was definitely going to betray everyone in episode 7. You're the B-shift. The ensigns, the cargo handlers, the person who fixes the coffee machine. The galaxy-ending threat is still out there and it does not care about your qualifications.
+- Sitcom — A literal three-camera television show. The laugh track is real. The set walls wobble if you lean on them. The main cast — the wacky neighbor, the will-they-won't-they couple, the sarcastic best friend — are dead. The network needs a new cast by Monday or the show gets cancelled. You're the extras who just got promoted. The audience can see you. You can hear them.
+- Gothic horror — The monster hunters are dead. The Van Helsing, the psychic, the one with the family curse and the silver bullets — all gone, taken by the thing in the manor on the hill. The village hired them. The village paid in advance. The village would like a refund or a replacement. You are the replacement. You are not qualified.
+</suboptions>
+
+<suboptions label="The twist">
+- The guilty party — You killed the main characters. It might have been an accident. It might not have been. Either way, you can't let anyone find out, and filling their shoes is the only way to stay above suspicion. Every success makes the lie bigger.
+- The narrator — There is a voice. Everyone can hear it. It speaks in third person, describes what you're doing as you do it, and it is clearly, gleefully setting up your downfall. It knows things it shouldn't. It has opinions. It is not on your side. It cannot be found, silenced, or reasoned with. It can, occasionally, be argued with.
+- The rivals — There is ANOTHER backup cast, and they showed up at the same time you did. They're slightly more qualified, slightly better-looking, and they think they're the protagonists now. You disagree. The original threat is still out there, but first you have to prove you're the real replacement heroes. This is petty and urgent and neither side will back down.
+</suboptions>
+
+Tone: This is a comedy, but the threat is real. The main characters are genuinely dead. The danger that killed them is genuinely dangerous. The comedy comes from underqualified people rising (or failing to rise) to the occasion — not from the stakes being fake. The funniest version of this campaign is the one where the B-team wins by being resourceful, stubborn, and too dumb to know they should be scared.
+
+The dead main characters:
+- They should feel like real people who mattered. Don't mock them. The comedy isn't that they were silly — it's that they were competent, and now the incompetent people have to fill their shoes.
+- Their gear, their plans, their unfinished business are all still here. The player inherits fragments: a half-decoded star chart, a script with notes in the margins, a journal that stops mid-sentence. Figuring out what the main characters were doing is part of the campaign.
+- At least one NPC loved one of the main characters and is deeply unimpressed by the replacement.
+
+The player's arc: Start incompetent. Not useless — they have skills, just the wrong ones for this job. A cargo handler who knows every corridor of the ship. An extra who understands the rhythm of the show better than any writer. A village apothecary who knows poisons, not monsters. Let them MacGyver their way through with lateral thinking. By the end, they should have earned the role — not by becoming the main characters, but by proving the B-team was always the real story.
+
+Pacing: Start in the aftermath — the main characters are already dead when the campaign opens. The player is thrust into the role immediately, no training montage. The first act is chaos and improvisation. The second act is finding their footing and uncovering what the main characters knew. The third act is the confrontation the main characters were preparing for, fought on the B-team's terms.`,
+    genres: ["sci-fi", "comedy", "horror", "meta"],
   },
   {
     name: "Palimpsest",
