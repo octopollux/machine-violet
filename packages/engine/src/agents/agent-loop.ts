@@ -24,21 +24,6 @@ export const TUI_TOOLS = new Set([
 /** Tools registered in the ToolRegistry but only exposed to OOC / Dev Mode agents. */
 const DM_EXCLUDED_TOOLS = new Set(["show_character_sheet", "rollback"]);
 
-/**
- * TUI command types that require engine-side processing (scene transitions,
- * subagent spawns, file I/O, etc.) and MUST be deferred until after the
- * agent loop finishes.  Everything else is a visual-only update that can
- * be broadcast to the client immediately when the tool fires.
- */
-export const DEFERRED_TUI_TYPES = new Set([
-  "scene_transition",
-  "session_end",
-  "rollback",
-  "scribe",
-  "dm_notes",
-  "promote_character",
-]);
-
 export function isTuiCommand(toolName: string): boolean {
   return TUI_TOOLS.has(toolName);
 }
