@@ -261,7 +261,7 @@ export class SessionManager {
       const text = contributions.map((c) => c.text).join("\n");
       const result = await this.setupSession.send(text);
       if (result.finalized) {
-        await this.transitionToGame(result.finalized);
+        await this.transitionToGame(result.finalized, result.campaignName);
       } else {
         this.openNextTurn();
       }
@@ -298,7 +298,7 @@ export class SessionManager {
     if (!this.setupSession) throw new Error("No setup session.");
     const result = await this.setupSession.resolveChoice(selectedText);
     if (result.finalized) {
-      await this.transitionToGame(result.finalized);
+      await this.transitionToGame(result.finalized, result.campaignName);
       return { finalized: result.finalized };
     }
     this.openNextTurn();
@@ -310,11 +310,11 @@ export class SessionManager {
   }
 
   /** Transition from setup to a real game session. */
-  private async transitionToGame(campaignId: string): Promise<void> {
+  private async transitionToGame(campaignId: string, campaignName?: string): Promise<void> {
     // Tell clients to reconnect — the campaign ID is about to change.
     // Clients that handle session:transition will disconnect, then
     // reconnect after the new session is ready.
-    this.broadcast({ type: "session:transition", data: { campaignId } });
+    this.broadcast({ type: "session:transition", data: { campaignId, campaignName: campaignName ?? campaignId } });
 
     this.setupSession = null;
     this.turnManager = null;

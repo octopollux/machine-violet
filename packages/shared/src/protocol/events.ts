@@ -128,6 +128,8 @@ export const SessionTransitionEvent = Type.Object({
   data: Type.Object({
     /** The campaign ID of the newly created campaign to transition into. */
     campaignId: Type.String(),
+    /** Human-readable campaign name for immediate display. */
+    campaignName: Type.Optional(Type.String()),
   }),
 });
 

@@ -224,9 +224,10 @@ The session mode has changed.
 
 The server is transitioning from the setup session to a newly created campaign. Clients should reset their state (clear stateSnapshot, currentTurn, etc.) — the new session will broadcast a fresh `state:snapshot` over the existing WebSocket connection.
 
-| Field        | Type   | Description |
-|--------------|--------|-------------|
-| `campaignId` | string | The campaign ID of the newly created campaign. |
+| Field          | Type    | Description |
+|----------------|---------|-------------|
+| `campaignId`   | string  | The campaign ID of the newly created campaign. |
+| `campaignName` | string? | Human-readable campaign name for immediate display. |
 
 #### `session:ended`
 

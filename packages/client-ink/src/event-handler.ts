@@ -48,6 +48,8 @@ export interface ClientState {
   /** Set when the server transitions from setup to a real campaign.
    *  The client should reconnect to pick up the new session. */
   transitionCampaignId: string | null;
+  /** Human-readable campaign name from the transition event. */
+  transitionCampaignName: string | null;
   lastError: { message: string; recoverable: boolean } | null;
   /** Per-character modeline text (character name → status string). */
   modelines: Record<string, string>;
@@ -70,6 +72,7 @@ export function initialClientState(): ClientState {
     sessionEnded: false,
     sessionStale: false,
     transitionCampaignId: null,
+    transitionCampaignName: null,
     lastError: null,
     modelines: {},
     displayResources: {},
@@ -124,12 +127,14 @@ export function createEventHandler(update: StateUpdater): (event: ServerEvent) =
       case "session:ended":
         handleSessionEnded(event, update);
         break;
-      case "session:transition":
+      case "session:transition": {
         // Clear state that could trigger stale detection before the
         // app's useEffect runs and reconnects the WebSocket.
+        const transition = event.data as { campaignId: string; campaignName?: string };
         update((prev) => ({
           ...prev,
-          transitionCampaignId: (event.data as { campaignId: string }).campaignId,
+          transitionCampaignId: transition.campaignId,
+          transitionCampaignName: transition.campaignName ?? null,
           stateSnapshot: null,
           currentTurn: null,
           activeChoices: null,
@@ -137,6 +142,7 @@ export function createEventHandler(update: StateUpdater): (event: ServerEvent) =
           toolGlyphs: [],
         }));
         break;
+      }
       case "error":
         handleError(event, update);
         break;
