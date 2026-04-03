@@ -204,11 +204,6 @@ export class SetupSession {
       await this.buildInitialSheet(campaignRoot, result);
     }
 
-    this.broadcast({
-      type: "narrative:chunk",
-      data: { text: "\nYour campaign is ready.", kind: "system" },
-    });
-
     // Return the campaign directory name as the ID
     const parts = norm(campaignRoot).split("/");
     return parts[parts.length - 1];
