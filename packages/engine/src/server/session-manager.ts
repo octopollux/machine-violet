@@ -484,8 +484,11 @@ export class SessionManager {
 
     // Intercept TUI commands so persistedUI stays in sync — ensures
     // buildStateSnapshot() returns accurate theme/modeline data at any time.
+    // Apply the same generation guard used by scopedBroadcast so late
+    // callbacks from a previous session cannot mutate persistedUI.
     const originalOnTui = callbacks.onTuiCommand;
     callbacks.onTuiCommand = (cmd) => {
+      if (this.sessionGeneration !== gen) return;
       this.trackTuiState(cmd);
       originalOnTui(cmd);
     };
