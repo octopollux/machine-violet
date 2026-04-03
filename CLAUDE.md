@@ -107,6 +107,7 @@ Code and docs stay in sync. See `docs/maintenance.md` for the full guide.
 
 ### Agent Sidecar (Dev Only)
 - **Activation:** `--agent-port <port>` flag or `MV_AGENT_PORT` env var. Excluded from release builds.
+- **Headless mode:** When no TTY is available (e.g. agent-spawned background process), a mock TTY stdin is created automatically so Ink runs without a real terminal. Default virtual terminal size: 120×40.
 - **Endpoints:** `GET /screen`, `GET /screen?ansi=true`, `GET /state`, `POST /input`, `POST /input/key`
 - **Implementation:** `packages/client-ink/src/agent-sidecar.ts`. Uses `@xterm/headless` (dev dependency) as virtual VT100 terminal.
 - **Dev launcher:** `MV_AGENT_PORT=7201 npm run dev`

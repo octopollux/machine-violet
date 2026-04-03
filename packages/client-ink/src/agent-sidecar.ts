@@ -3,7 +3,9 @@
  *
  * Embeds in the TUI client process to let agents observe the rendered
  * terminal screen (via @xterm/headless virtual terminal) and inject
- * keystrokes (via process.stdin.unshift).
+ * keystrokes. When a real TTY is present, input goes via
+ * process.stdin.unshift(); in headless mode (no TTY), start-client
+ * creates a mock TTY stream and passes it here for direct push().
  *
  * Activated by `--agent-port <port>` or `MV_AGENT_PORT` env var.
  * Excluded from release builds: this module is only reached via a
@@ -70,10 +72,20 @@ export interface SidecarHandle {
 export async function startAgentSidecar(
   port: number,
   getClientState: () => ClientState,
+  inputStream?: NodeJS.ReadStream,
 ): Promise<SidecarHandle> {
   // Dynamic imports — keeps @xterm/headless out of the static import graph.
   const { Terminal } = await import("@xterm/headless");
   const { SerializeAddon } = await import("@xterm/addon-serialize");
+
+  // Keystroke injection: use the mock stream if provided, else process.stdin.
+  const pushInput = (data: Buffer) => {
+    if (inputStream) {
+      inputStream.push(data);
+    } else {
+      process.stdin.unshift(data);
+    }
+  };
 
   const cols = process.stdout.columns || 80;
   const rows = process.stdout.rows || 24;
@@ -136,7 +148,7 @@ export async function startAgentSidecar(
 
       if (req.method === "POST" && path === "/input") {
         const body = await readBody(req);
-        process.stdin.unshift(Buffer.from(body));
+        pushInput(Buffer.from(body));
         res.writeHead(204);
         res.end();
         return;

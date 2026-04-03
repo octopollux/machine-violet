@@ -6,7 +6,8 @@
  * to work as a standalone CLI entry point.
  */
 import React from "react";
-import { render } from "ink";
+import { Readable } from "node:stream";
+import { render, type RenderOptions } from "ink";
 import { App } from "./app.js";
 import { installRawModeGuard } from "./tui/hooks/rawModeGuard.js";
 import { installSyncWriteCombiner } from "./tui/hooks/syncWriteCombiner.js";
@@ -47,27 +48,54 @@ export function startClient(opts: StartClientOptions = {}): ClientHandle {
   const serverUrl = opts.server ?? "http://127.0.0.1:7200";
   const playerId = opts.player ?? "Player";
   const campaignId = opts.campaign;
+  const agentPort = opts.agentPort;
+
+  // Headless mode: when --agent-port is set but there's no TTY (e.g. agent
+  // spawned the process in the background), create a mock TTY stdin so Ink
+  // can enable raw mode without a real terminal.
+  let mockStdin: NodeJS.ReadStream | undefined;
+  if (agentPort && !process.stdin.isTTY) {
+    // Set stdout dimensions if missing (non-TTY) so Ink and the vterm agree.
+    if (!process.stdout.columns) process.stdout.columns = 120;
+    if (!process.stdout.rows) process.stdout.rows = 40;
+
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- Readable requires read(); data arrives via push()
+    const stream = new Readable({ read() {} }) as NodeJS.ReadStream;
+    stream.isTTY = true;
+    stream.isRaw = false;
+    stream.setRawMode = function (mode: boolean) {
+      stream.isRaw = mode;
+      return stream;
+    };
+    // Ink calls ref()/unref() to manage the event loop — no-ops for a mock.
+    stream.ref = () => stream;
+    stream.unref = () => stream;
+    mockStdin = stream;
+  }
+  const activeStdin = mockStdin ?? process.stdin;
 
   // Prevent stdin raw mode from ever being disabled while the TUI is running.
   // On Windows, even a momentary drop to cooked mode (during component unmount/
   // remount cycles) causes the console to stop forwarding keystrokes.
-  const unlockRawMode = installRawModeGuard(process.stdin);
+  const unlockRawMode = installRawModeGuard(activeStdin);
 
   // Combine Ink's separate BSU/content/ESU writes into single atomic stdout
   // writes so the terminal never displays intermediate states.
   const removeCombiner = installSyncWriteCombiner(process.stdout);
 
+  const renderOpts: RenderOptions = { exitOnCtrlC: !mockStdin };
+  if (mockStdin) renderOpts.stdin = mockStdin;
+
   const { unmount, waitUntilExit: inkWaitUntilExit } = render(
     React.createElement(App, { serverUrl, playerId, campaignId }),
-    { exitOnCtrlC: true },
+    renderOpts,
   );
 
   // Agent sidecar: dynamic import keeps @xterm/headless out of the bundle.
   let sidecarClose: (() => Promise<void>) | undefined;
-  const agentPort = opts.agentPort;
   if (agentPort) {
     import("./agent-sidecar.js")
-      .then(({ startAgentSidecar }) => startAgentSidecar(agentPort, _getClientState))
+      .then(({ startAgentSidecar }) => startAgentSidecar(agentPort, _getClientState, mockStdin))
       .then((h) => { sidecarClose = h.close; })
       .catch((err) => { process.stderr.write(`Agent sidecar failed: ${err}\n`); });
   }
