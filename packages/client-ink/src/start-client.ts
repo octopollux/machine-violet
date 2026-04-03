@@ -11,14 +11,7 @@ import { render, type RenderOptions } from "ink";
 import { App } from "./app.js";
 import { installRawModeGuard } from "./tui/hooks/rawModeGuard.js";
 import { installSyncWriteCombiner } from "./tui/hooks/syncWriteCombiner.js";
-import { initialClientState, type ClientState } from "./event-handler.js";
-
-// --- Agent sidecar state bridge ---
-// Module-level ref updated synchronously by App's handleStateUpdate.
-// The sidecar reads it on HTTP request — zero overhead when unused.
-let _clientState: ClientState = initialClientState();
-export function _setClientState(s: ClientState): void { _clientState = s; }
-export function _getClientState(): ClientState { return _clientState; }
+import { getAgentClientState } from "./agent-state-ref.js";
 
 export interface StartClientOptions {
   /** Engine server URL (default: http://127.0.0.1:7200). */
@@ -95,7 +88,7 @@ export function startClient(opts: StartClientOptions = {}): ClientHandle {
   let sidecarClose: (() => Promise<void>) | undefined;
   if (agentPort) {
     import("./agent-sidecar.js")
-      .then(({ startAgentSidecar }) => startAgentSidecar(agentPort, _getClientState, mockStdin))
+      .then(({ startAgentSidecar }) => startAgentSidecar(agentPort, getAgentClientState, mockStdin))
       .then((h) => { sidecarClose = h.close; })
       .catch((err) => { process.stderr.write(`Agent sidecar failed: ${err}\n`); });
   }

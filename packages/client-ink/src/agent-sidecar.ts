@@ -51,12 +51,12 @@ export const KEY_MAP: Record<string, string> = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Read the full body of an incoming HTTP request as a string. */
-function readBody(req: IncomingMessage): Promise<string> {
+/** Read the full body of an incoming HTTP request as a Buffer. */
+function readBody(req: IncomingMessage): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    let data = "";
-    req.on("data", (c: Buffer | string) => (data += c));
-    req.on("end", () => resolve(data));
+    const chunks: Buffer[] = [];
+    req.on("data", (c: Buffer) => chunks.push(c));
+    req.on("end", () => resolve(Buffer.concat(chunks)));
     req.on("error", reject);
   });
 }
@@ -105,7 +105,7 @@ export async function startAgentSidecar(
     encodingOrCb?: BufferEncoding | ((err?: Error | null) => void),
     cb?: (err?: Error | null) => void,
   ): boolean {
-    const str = typeof chunk === "string" ? chunk : String(chunk);
+    const str = typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf-8");
     term.write(str);
     return originalWrite.call(process.stdout, chunk, encodingOrCb as BufferEncoding, cb) as boolean;
   } as NodeJS.WriteStream["write"];
@@ -148,7 +148,7 @@ export async function startAgentSidecar(
 
       if (req.method === "POST" && path === "/input") {
         const body = await readBody(req);
-        pushInput(Buffer.from(body));
+        pushInput(body);
         res.writeHead(204);
         res.end();
         return;
@@ -158,7 +158,7 @@ export async function startAgentSidecar(
         const body = await readBody(req);
         let parsed: { key?: string };
         try {
-          parsed = JSON.parse(body);
+          parsed = JSON.parse(body.toString("utf-8"));
         } catch {
           res.writeHead(400, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: "Invalid JSON" }));
@@ -171,7 +171,7 @@ export async function startAgentSidecar(
           res.end(JSON.stringify({ error: `Unknown key: ${parsed.key}`, known: Object.keys(KEY_MAP) }));
           return;
         }
-        process.stdin.unshift(Buffer.from(seq));
+        pushInput(Buffer.from(seq));
         res.writeHead(204);
         res.end();
         return;
@@ -185,8 +185,12 @@ export async function startAgentSidecar(
     }
   });
 
-  await new Promise<void>((resolve) => {
-    server.listen(port, "127.0.0.1", () => resolve());
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, "127.0.0.1", () => {
+      server.removeListener("error", reject);
+      resolve();
+    });
   });
 
   const addr = server.address();
