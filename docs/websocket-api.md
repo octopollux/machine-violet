@@ -177,7 +177,7 @@ The `data` payload may also include TUI command fields (forwarded from the engin
 
 #### `state:snapshot`
 
-Full game state. Sent on initial connect, after scene transitions, and after player cycling. This is everything the frontend needs to render.
+Full game state. Sent on initial connect, after every DM turn completes, after scene transitions, and after player cycling. The post-turn snapshot is authoritative — it overwrites any incremental `activity:update` patches the client assembled during the turn, making the system self-healing if any individual event is missed.
 
 | Field              | Type     | Description |
 |--------------------|----------|-------------|

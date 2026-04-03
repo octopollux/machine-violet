@@ -16,9 +16,6 @@ import type {
 } from "@machine-violet/shared";
 import { logEvent } from "../context/engine-log.js";
 import { CostTracker } from "../context/cost-tracker.js";
-import type { StatePersister } from "../context/state-persistence.js";
-import type { StyleVariant } from "@machine-violet/shared/types/tui.js";
-
 /** Buffering config for narrative text. */
 const FLUSH_INTERVAL_MS = 50;
 
@@ -26,8 +23,6 @@ export interface BridgeOptions {
   broadcast: (event: ServerEvent) => void;
   /** Cost tracker for accumulating token usage. */
   costTracker?: CostTracker;
-  /** Persister for saving UI state (theme, modelines) to disk. */
-  persister?: StatePersister | null;
 }
 
 export function createBridge(
@@ -36,7 +31,7 @@ export function createBridge(
   const opts: BridgeOptions = typeof broadcastOrOpts === "function"
     ? { broadcast: broadcastOrOpts }
     : broadcastOrOpts;
-  const { broadcast, costTracker, persister } = opts;
+  const { broadcast, costTracker } = opts;
   // --- Narrative buffering ---
   let buffer = "";
   let flushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -89,7 +84,7 @@ export function createBridge(
     },
 
     onTuiCommand(command: TuiCommand): void {
-      routeTuiCommand(command, broadcast, persister ?? null);
+      routeTuiCommand(command, broadcast);
     },
 
     onToolStart(name: string): void {
@@ -157,13 +152,12 @@ export function createBridge(
 /**
  * Route a TUI command to the appropriate WebSocket event type.
  *
- * TUI commands are the engine's way of sending structured UI updates.
- * Some map to choices:presented events, others to session:mode changes, etc.
+ * Persistence (resources, UI state) is handled by the session-manager
+ * after each DM turn completes — not inline here.
  */
 function routeTuiCommand(
   command: TuiCommand,
   broadcast: (event: ServerEvent) => void,
-  persister: StatePersister | null,
 ): void {
   switch (command.type) {
     // --- DM-driven choices (rendered in Player Pane by the client) ---
@@ -185,10 +179,6 @@ function routeTuiCommand(
         type: "session:mode",
         data: { mode: "play", variant: command.variant as string | undefined },
       });
-      // Persist variant to disk
-      if (persister && command.variant) {
-        persister.persistUI({ styleName: "clean", variant: command.variant as StyleVariant });
-      }
       break;
 
     case "enter_ooc":
@@ -204,16 +194,10 @@ function routeTuiCommand(
     case "set_resource_values":
     case "resource_refresh":
     case "set_theme":
-      // Forward the full TUI command payload — the client knows how to render each
       broadcast({
         type: "activity:update",
         data: { engineState: `tui:${command.type}`, ...command },
       });
-      // Persist modeline updates to disk
-      if (persister && command.type === "update_modeline") {
-        // Modeline persistence happens via the engine's tool hooks;
-        // no extra persistence needed here since the engine already calls persistUI
-      }
       break;
 
     // --- Client-rendered modals (forwarded for OOC/Dev Mode) ---

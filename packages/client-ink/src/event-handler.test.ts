@@ -289,4 +289,66 @@ describe("event-handler", () => {
       expect(h.state.lastError).toEqual({ message: "API retry", recoverable: true });
     });
   });
+
+  describe("post-turn snapshot self-healing", () => {
+    it("snapshot overwrites incremental resource patches", () => {
+      const h = makeHarness();
+
+      // Incremental patches arrive during DM turn
+      h.dispatch({
+        type: "activity:update",
+        data: { engineState: "tui:set_display_resources", character: "Aldric", resources: ["HP"] },
+      });
+      h.dispatch({
+        type: "activity:update",
+        data: { engineState: "tui:set_resource_values", character: "Aldric", values: { HP: "24/30" } },
+      });
+      expect(h.state.resourceValues).toEqual({ Aldric: { HP: "24/30" } });
+
+      // Post-turn snapshot arrives with authoritative state
+      h.dispatch({
+        type: "state:snapshot",
+        data: {
+          campaignId: "c1", campaignName: "Test",
+          players: [{ name: "Player1", character: "Aldric", type: "human", color: "#ff0000" }],
+          activePlayerIndex: 0,
+          displayResources: { Aldric: ["HP", "MP"] },
+          resourceValues: { Aldric: { HP: "30/30", MP: "10/10" } },
+          modelines: { Aldric: "Level 5 Fighter" },
+          mode: "play",
+        },
+      });
+
+      // Snapshot values win
+      expect(h.state.displayResources).toEqual({ Aldric: ["HP", "MP"] });
+      expect(h.state.resourceValues).toEqual({ Aldric: { HP: "30/30", MP: "10/10" } });
+      expect(h.state.modelines).toEqual({ Aldric: "Level 5 Fighter" });
+    });
+
+    it("snapshot heals missed incremental patches", () => {
+      const h = makeHarness();
+
+      // No incremental patches received (simulating missed events)
+      expect(h.state.displayResources).toEqual({});
+      expect(h.state.resourceValues).toEqual({});
+
+      // Post-turn snapshot provides full state anyway
+      h.dispatch({
+        type: "state:snapshot",
+        data: {
+          campaignId: "c1", campaignName: "Test",
+          players: [{ name: "Player1", character: "Wilson", type: "human", color: "#ae28f0" }],
+          activePlayerIndex: 0,
+          displayResources: { Wilson: ["Fate Points", "Stress"] },
+          resourceValues: { Wilson: { "Fate Points": "2/2", Stress: "0/3" } },
+          modelines: {},
+          mode: "play",
+        },
+      });
+
+      expect(h.state.displayResources).toEqual({ Wilson: ["Fate Points", "Stress"] });
+      expect(h.state.resourceValues).toEqual({ Wilson: { "Fate Points": "2/2", Stress: "0/3" } });
+      expect(h.state.stateSnapshot!.players[0].color).toBe("#ae28f0");
+    });
+  });
 });
