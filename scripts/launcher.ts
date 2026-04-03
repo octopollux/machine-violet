@@ -11,6 +11,7 @@
  *   MachineViolet --server            # headless server only
  *   MachineViolet --campaign ID       # auto-start a campaign
  *   MachineViolet --ws-log FILE       # append WS events as JSONL to FILE
+ *   MachineViolet --agent-port PORT   # start dev agent sidecar on PORT
  *
  * Environment:
  *   MV_PORT       — HTTP port (default 7200)
@@ -18,6 +19,7 @@
  *   MV_CAMPAIGNS  — Campaign data directory (auto-detected if not set)
  *   MV_PLAYER     — Player name (default "Player")
  *   MV_CAMPAIGN   — Campaign ID to auto-start
+ *   MV_AGENT_PORT — Port for the dev-only agent sidecar
  *   ANTHROPIC_API_KEY — Required for the engine
  */
 import { join } from "node:path";
@@ -38,6 +40,7 @@ loadEnv();
 const serverOnly = process.argv.includes("--server");
 let campaign = process.env.MV_CAMPAIGN;
 let wsLogPath: string | undefined;
+let agentPort: number | undefined;
 
 for (let i = 2; i < process.argv.length; i++) {
   const arg = process.argv[i];
@@ -45,9 +48,14 @@ for (let i = 2; i < process.argv.length; i++) {
     campaign = process.argv[++i];
   } else if (arg === "--ws-log" && process.argv[i + 1]) {
     wsLogPath = process.argv[++i];
+  } else if (arg === "--agent-port" && process.argv[i + 1]) {
+    agentPort = Number(process.argv[++i]);
   } else if (!arg.startsWith("-")) {
     campaign = arg;
   }
+}
+if (!agentPort && process.env.MV_AGENT_PORT) {
+  agentPort = Number(process.env.MV_AGENT_PORT);
 }
 
 // --- Server config ---
@@ -104,6 +112,7 @@ if (serverOnly) {
     server: `http://127.0.0.1:${port}`,
     player: process.env.MV_PLAYER ?? "Player",
     campaign,
+    agentPort,
   });
 
   await waitUntilExit();

@@ -30,6 +30,7 @@ import type {
   KnownModelInfo,
 } from "./api-client.js";
 import type { ArchivedCampaignEntry, CampaignDeleteInfo } from "./config/campaign-archive.js";
+import { _setClientState } from "./start-client.js";
 import { loadClientSettings, saveClientSettings } from "./config/client-settings.js";
 import {
   loadThemeDefinition,
@@ -162,6 +163,7 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
           } catch { /* fall back to current theme */ }
         }
       }
+      _setClientState(next);
       return next;
     });
   }, []);

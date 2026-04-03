@@ -10,6 +10,14 @@ import { render } from "ink";
 import { App } from "./app.js";
 import { installRawModeGuard } from "./tui/hooks/rawModeGuard.js";
 import { installSyncWriteCombiner } from "./tui/hooks/syncWriteCombiner.js";
+import { initialClientState, type ClientState } from "./event-handler.js";
+
+// --- Agent sidecar state bridge ---
+// Module-level ref updated synchronously by App's handleStateUpdate.
+// The sidecar reads it on HTTP request — zero overhead when unused.
+let _clientState: ClientState = initialClientState();
+export function _setClientState(s: ClientState): void { _clientState = s; }
+export function _getClientState(): ClientState { return _clientState; }
 
 export interface StartClientOptions {
   /** Engine server URL (default: http://127.0.0.1:7200). */
@@ -18,6 +26,8 @@ export interface StartClientOptions {
   player?: string;
   /** Campaign ID to auto-start (shows menu if omitted). */
   campaign?: string;
+  /** Port for the dev-only agent sidecar HTTP server. */
+  agentPort?: number;
 }
 
 export interface ClientHandle {
@@ -52,6 +62,16 @@ export function startClient(opts: StartClientOptions = {}): ClientHandle {
     { exitOnCtrlC: true },
   );
 
+  // Agent sidecar: dynamic import keeps @xterm/headless out of the bundle.
+  let sidecarClose: (() => Promise<void>) | undefined;
+  const agentPort = opts.agentPort;
+  if (agentPort) {
+    import("./agent-sidecar.js")
+      .then(({ startAgentSidecar }) => startAgentSidecar(agentPort, _getClientState))
+      .then((h) => { sidecarClose = h.close; })
+      .catch((err) => { process.stderr.write(`Agent sidecar failed: ${err}\n`); });
+  }
+
   // Graceful shutdown on SIGINT
   const onSigInt = () => {
     unmount();
@@ -62,6 +82,7 @@ export function startClient(opts: StartClientOptions = {}): ClientHandle {
   const waitUntilExit = async () => {
     await inkWaitUntilExit();
     process.removeListener("SIGINT", onSigInt);
+    if (sidecarClose) await sidecarClose();
     unlockRawMode();
     removeCombiner();
   };

@@ -105,6 +105,12 @@ Code and docs stay in sync. See `docs/maintenance.md` for the full guide.
 - **Ink components** tested via `ink-testing-library`: `render(<C />)` → `lastFrame().toContain(...)` (string inspection, no DOM).
 - Vitest `globals: true` — `describe`/`it`/`expect` available without import.
 
+### Agent Sidecar (Dev Only)
+- **Activation:** `--agent-port <port>` flag or `MV_AGENT_PORT` env var. Excluded from release builds.
+- **Endpoints:** `GET /screen`, `GET /screen?ansi=true`, `GET /state`, `POST /input`, `POST /input/key`
+- **Implementation:** `packages/client-ink/src/agent-sidecar.ts`. Uses `@xterm/headless` (dev dependency) as virtual VT100 terminal.
+- **Dev launcher:** `MV_AGENT_PORT=7201 npm run dev`
+
 ### DM Text Formatting Pipeline
 - `processNarrativeLines()` in `packages/client-ink/src/tui/formatting.ts` is the single entry point for the rendering pipeline.
 - Pipeline: heal raw strings → parse to `FormattingNode[]` AST → wrap (`wrapNodes`) → pad alignment → quote highlight.
@@ -123,7 +129,7 @@ Live API key in `.env` with limited credit. Opus is $5/$25 per MTok. Default dev
 
 ## Release & Distribution
 
-- **Release workflow** (`.github/workflows/release.yml`): builds standalone binaries for Windows, macOS, and Linux via `bun build --compile`. Triggered by `v*` tags or `workflow_call` from `cut-release.yml`.
+- **Release workflow** (`.github/workflows/release.yml`): builds standalone binaries for Windows, macOS, and Linux via esbuild bundling + Node SEA (`scripts/build-dist.js`). Triggered by `v*` tags or `workflow_call` from `cut-release.yml`.
 - **Windows signing**: the Windows `.exe` is Authenticode-signed via Azure Trusted Signing (Artifact Signing) using OIDC federation. The workflow runs `azure/login@v2` then `azure/trusted-signing-action@v1`. Infrastructure lives in `../mv-infrastructure/trusted-signing/`.
 - **Homebrew tap**: `octopollux/homebrew-mv-tap`. Formula auto-updated by the `update-homebrew` job in the release workflow. Binary + assets install to `libexec` (binary expects `prompts/`, `themes/`, `systems/` next to the executable — see `packages/engine/src/utils/paths.ts`).
 - **macOS Gatekeeper**: Homebrew installs bypass Gatekeeper. Direct tarball downloads will trigger quarantine prompts until Apple Developer notarization is set up.

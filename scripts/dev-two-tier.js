@@ -122,6 +122,7 @@ async function main() {
     MV_PLAYER: process.env.MV_PLAYER || "Player",
   };
   if (campaignId) clientEnv.MV_CAMPAIGN = campaignId;
+  if (process.env.MV_AGENT_PORT) clientEnv.MV_AGENT_PORT = process.env.MV_AGENT_PORT;
 
   const client = spawn(
     process.execPath,
