@@ -37,6 +37,65 @@ describe("event-handler", () => {
       expect(h.state.narrativeLines).toHaveLength(2);
       expect(h.state.narrativeLines[1].kind).toBe("spacer");
     });
+
+    it("injects separator before first DM chunk after player line", () => {
+      const h = makeHarness();
+      // Simulate what the client does: player line followed by empty dm (optimistic insert)
+      h.state.narrativeLines = [
+        { kind: "separator", text: "---" },
+        { kind: "player", text: "[Wilson] I open the door" },
+        { kind: "dm", text: "" },
+      ];
+
+      h.dispatch({ type: "narrative:chunk", data: { text: "The door creaks open.", kind: "dm" } });
+
+      // Should have: separator, player, dm(""), separator, dm("The door creaks open.")
+      const kinds = h.state.narrativeLines.map((l) => l.kind);
+      expect(kinds).toEqual(["separator", "player", "dm", "separator", "dm"]);
+      expect(h.state.narrativeLines[4].text).toBe("The door creaks open.");
+    });
+
+    it("does not inject duplicate separator on subsequent DM chunks", () => {
+      const h = makeHarness();
+      h.state.narrativeLines = [
+        { kind: "separator", text: "---" },
+        { kind: "player", text: "[Wilson] I open the door" },
+        { kind: "dm", text: "" },
+      ];
+
+      h.dispatch({ type: "narrative:chunk", data: { text: "The door ", kind: "dm" } });
+      h.dispatch({ type: "narrative:chunk", data: { text: "creaks open.", kind: "dm" } });
+
+      // Only one DM separator should be present
+      const separators = h.state.narrativeLines.filter((l) => l.kind === "separator");
+      expect(separators).toHaveLength(2); // one before player, one before DM
+    });
+
+    it("injects separator even when dev/system lines appear after player line", () => {
+      const h = makeHarness();
+      h.state.narrativeLines = [
+        { kind: "separator", text: "---" },
+        { kind: "player", text: "[Wilson] I attack" },
+        { kind: "dev", text: "[dev] tool: roll_dice" },
+        { kind: "dm", text: "" },
+      ];
+
+      h.dispatch({ type: "narrative:chunk", data: { text: "You swing your sword.", kind: "dm" } });
+
+      const kinds = h.state.narrativeLines.map((l) => l.kind);
+      expect(kinds).toContain("separator");
+      // Should have two separators: one before player, one before DM
+      expect(kinds.filter((k) => k === "separator")).toHaveLength(2);
+    });
+
+    it("does not inject separator for opening DM narration (no player line)", () => {
+      const h = makeHarness();
+      // Fresh game — no player line yet
+      h.dispatch({ type: "narrative:chunk", data: { text: "Welcome to the adventure.", kind: "dm" } });
+
+      const kinds = h.state.narrativeLines.map((l) => l.kind);
+      expect(kinds).toEqual(["dm"]);
+    });
   });
 
   describe("turn lifecycle", () => {

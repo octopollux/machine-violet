@@ -152,17 +152,46 @@ export function createEventHandler(update: StateUpdater): (event: ServerEvent) =
 
 // --- Individual handlers ---
 
+/**
+ * Check whether the first DM chunk after player input needs a turn separator.
+ * Walks backwards through narrative lines, skipping spacers and empty DM lines
+ * (from the optimistic insert). Returns true if the last substantive line is a
+ * player line with no separator already between it and the current position.
+ */
+function shouldInjectDmSeparator(lines: NarrativeLine[]): boolean {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    if (line.kind === "spacer") continue;
+    if (line.kind === "dm" && line.text === "") continue;
+    // Skip dev/system lines (e.g. verbose tool logs) — they can appear
+    // between the player line and the first DM chunk without invalidating
+    // the need for a separator.
+    if (line.kind === "dev" || line.kind === "system") continue;
+    return line.kind === "player";
+  }
+  return false;
+}
+
 function handleNarrativeChunk(event: NarrativeChunkEvent, update: StateUpdater): void {
   const { text, kind } = event.data;
   const lineKind = (kind ?? "dm") as NarrativeLine["kind"];
 
-  update((prev) => ({
-    ...prev,
-    // Use the same appendDelta logic as the monolith — handles newline
-    // splitting, spacer insertion between paragraphs, and \n\n paragraph
-    // boundary detection with the tentative-spacer promotion pattern.
-    narrativeLines: appendDelta(prev.narrativeLines, text, lineKind),
-  }));
+  update((prev) => {
+    let lines = prev.narrativeLines;
+
+    // Inject a turn separator before the first DM chunk after player input
+    if (lineKind === "dm" && shouldInjectDmSeparator(lines)) {
+      lines = [
+        ...lines,
+        { kind: "separator" as const, text: "---" },
+      ];
+    }
+
+    return {
+      ...prev,
+      narrativeLines: appendDelta(lines, text, lineKind),
+    };
+  });
 }
 
 function handleNarrativeComplete(_event: NarrativeCompleteEvent, update: StateUpdater): void {

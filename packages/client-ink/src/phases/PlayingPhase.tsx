@@ -292,7 +292,7 @@ export function PlayingPhase() {
         activePlayerIndex={activePlayerIndex}
         campaignName={campaignName}
         resources={resources}
-        turnHolder={activeChar}
+        turnHolder={engineState === "waiting_input" ? activeChar : "DM"}
         engineState={engineState}
         toolGlyphs={toolGlyphs}
         quoteColor="#ffffff"

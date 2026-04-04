@@ -283,17 +283,19 @@ const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
     return <Text>{" "}</Text>;
   }
 
-  // Separator lines always render the turn separator pattern
+  // Separator lines render with built-in blank lines above and below,
+  // so callers never need to inject spacers around them.
   if (line.kind === "separator") {
-    if (themeAsset && width && width > 0) {
-      const text = composeTurnSeparator(themeAsset, width);
-      return <Text wrap="truncate" color={separatorColor} dimColor>{text}</Text>;
-    }
-    // Fallback: simple dashes
-    const fallback = width && width > 4
-      ? "─".repeat(width)
-      : "────";
-    return <Text wrap="truncate" dimColor>{fallback}</Text>;
+    const inner = (themeAsset && width && width > 0)
+      ? <Text wrap="truncate" color={separatorColor} dimColor>{composeTurnSeparator(themeAsset, width)}</Text>
+      : <Text wrap="truncate" dimColor>{width && width > 4 ? "─".repeat(width) : "────"}</Text>;
+    return (
+      <Box flexDirection="column">
+        <Text>{" "}</Text>
+        {inner}
+        <Text>{" "}</Text>
+      </Box>
+    );
   }
 
   // Empty nodes (paragraph breaks) need a space to
