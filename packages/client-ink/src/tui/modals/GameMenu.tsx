@@ -20,6 +20,7 @@ const BASE_MENU_ITEMS = [
   "Character Sheet",
   "Compendium",
   "Player Notes",
+  "Save Transcript",
   "OOC Mode",
   "Settings",
   "Save & Exit",
