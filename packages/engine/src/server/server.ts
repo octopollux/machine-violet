@@ -11,7 +11,6 @@ import Fastify, { type FastifyInstance } from "fastify";
 import fastifyWebSocket from "@fastify/websocket";
 import fastifyCors from "@fastify/cors";
 import fastifySwagger from "@fastify/swagger";
-import scalarReference from "@scalar/fastify-api-reference";
 import { campaignRoutes } from "./routes/campaigns.js";
 import { sessionRoutes } from "./routes/session.js";
 import { dataRoutes } from "./routes/data.js";
@@ -19,6 +18,7 @@ import { managementRoutes } from "./routes/management.js";
 import { wsHandler } from "./ws.js";
 import { SessionManager } from "./session-manager.js";
 import { initEngineLog, logEvent, closeEngineLog } from "../context/engine-log.js";
+import { isCompiled } from "../utils/paths.js";
 
 export interface ServerConfig {
   /** Port to listen on. Default 7200. */
@@ -145,10 +145,15 @@ export async function createServer(
       ],
     },
   });
-  await server.register(scalarReference, {
-    routePrefix: "/docs",
-    configuration: { title: "Machine Violet API", agent: { disabled: true } },
-  });
+  // Scalar API docs — dev only. The plugin serves a static JS file from
+  // node_modules which doesn't exist inside a compiled SEA binary.
+  if (!isCompiled()) {
+    const { default: scalarReference } = await import("@scalar/fastify-api-reference");
+    await server.register(scalarReference, {
+      routePrefix: "/docs",
+      configuration: { title: "Machine Violet API", agent: { disabled: true } },
+    });
+  }
 
   // --- Session manager (one active session per process) ---
 
