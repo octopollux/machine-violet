@@ -35,6 +35,7 @@ import { createObjectivesState } from "../tools/objectives/index.js";
 import { markdownToNarrativeLines } from "../context/display-log.js";
 import { CostTracker } from "../context/cost-tracker.js";
 import { TurnManager } from "./turn-manager.js";
+import type { StyleVariant } from "@machine-violet/shared/types/tui.js";
 import { createBridge } from "./bridge.js";
 import { createBaseFileIO } from "./fileio.js";
 import { SetupSession } from "./setup-session.js";
@@ -479,8 +480,18 @@ export class SessionManager {
     const callbacks = createBridge({
       broadcast: scopedBroadcast,
       costTracker: this.costTracker,
-      persister: null, // Will be set after engine creation
     });
+
+    // Intercept TUI commands so persistedUI stays in sync — ensures
+    // buildStateSnapshot() returns accurate theme/modeline data at any time.
+    // Apply the same generation guard used by scopedBroadcast so late
+    // callbacks from a previous session cannot mutate persistedUI.
+    const originalOnTui = callbacks.onTuiCommand;
+    callbacks.onTuiCommand = (cmd) => {
+      if (this.sessionGeneration !== gen) return;
+      this.trackTuiState(cmd);
+      originalOnTui(cmd);
+    };
 
     // --- Instantiate GameEngine ---
     const engine = new GameEngine({
@@ -522,6 +533,8 @@ export class SessionManager {
           scopedBroadcast({ type: "narrative:chunk", data: { text: delta, kind: "dm" } });
         });
         scopedBroadcast({ type: "narrative:complete", data: { text: "" } });
+        this.persistTurnState();
+        scopedBroadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
         this.openNextTurn();
         return;
       }
@@ -529,6 +542,8 @@ export class SessionManager {
       // Normal play: send to DM
       const active = getActivePlayer(this.gameState);
       await this.engine.processInput(active.characterName, text);
+      this.persistTurnState();
+      scopedBroadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
       this.openNextTurn();
     });
 
@@ -665,14 +680,14 @@ export class SessionManager {
     config: CampaignConfig,
     gs: GameState,
   ): Promise<void> {
-    // Broadcast session start
-    this.broadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
+    // Welcome message gives the client immediate feedback while the DM works.
     this.broadcast({
       type: "narrative:chunk",
       data: { text: `Welcome to ${config.name}. The story begins...`, kind: "system" },
     });
 
-    // Trigger opening scene
+    // Trigger opening scene — TUI commands (theme, resources, modelines)
+    // stream live to the client as activity:update events during this call.
     const active = getActivePlayer(gs);
     const openingParts = ["[Session begins. Set the scene."];
     if (config.premise) openingParts.push(`Campaign premise: ${config.premise}`);
@@ -684,6 +699,15 @@ export class SessionManager {
       openingParts.join(" ") + "]",
       { skipTranscript: true },
     );
+
+    // Persist resources and UI state set during the opening turn.
+    this.persistTurnState();
+
+    // Authoritative snapshot — sent AFTER the DM's opening turn so it
+    // contains fully populated resources, theme, modelines, and player data.
+    // The client treats this as the definitive state, overwriting any
+    // incremental patches it assembled from activity:update events.
+    this.broadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
 
     // Open first turn after DM narrates
     this.openNextTurn();
@@ -801,6 +825,48 @@ export class SessionManager {
   }
 
   // --- State ---
+
+  /** Persist resources and UI state after a DM turn completes. */
+  private persistTurnState(): void {
+    const persister = this.engine?.getPersister();
+    if (!persister || !this.gameState) return;
+
+    persister.persistResources({
+      displayResources: this.gameState.displayResources,
+      resourceValues: this.gameState.resourceValues,
+    });
+    persister.persistUI({
+      styleName: this.persistedUI.themeName ?? "clean",
+      variant: (this.persistedUI.variant as StyleVariant) ?? "exploration",
+      keyColor: this.persistedUI.keyColor,
+      modelines: this.persistedUI.modelines,
+    });
+  }
+
+  /** Keep persistedUI in sync with TUI commands so snapshots are always accurate. */
+  private trackTuiState(cmd: { type: string; [key: string]: unknown }): void {
+    switch (cmd.type) {
+      case "set_theme":
+        if (cmd.theme) this.persistedUI.themeName = cmd.theme as string;
+        if (cmd.key_color) this.persistedUI.keyColor = cmd.key_color as string;
+        if (cmd.variant) this.persistedUI.variant = cmd.variant as string;
+        break;
+      case "style_scene":
+        // style_scene carries a variant; theme/key_color are resolved by the
+        // set_theme command that follows (emitted by handleStyleSceneTool).
+        if (cmd.variant) this.persistedUI.variant = cmd.variant as string;
+        break;
+      case "update_modeline": {
+        const character = cmd.character as string | undefined;
+        const text = cmd.text as string | undefined;
+        if (character && text !== undefined) {
+          if (!this.persistedUI.modelines) this.persistedUI.modelines = {};
+          this.persistedUI.modelines[character] = text;
+        }
+        break;
+      }
+    }
+  }
 
   buildStateSnapshot(): StateSnapshot {
     const gs = this.gameState;
