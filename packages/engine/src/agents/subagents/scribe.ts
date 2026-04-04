@@ -149,7 +149,7 @@ function unescapeNewlines(s: string): string {
 }
 
 /** Heading pattern: a `## ` at the start of a line (not `###` or deeper). */
-const H2_RE = /^## /m;
+const H2_RE = /^## (?!#)/m;
 
 /**
  * Split a markdown body into sections keyed by `## Heading`.

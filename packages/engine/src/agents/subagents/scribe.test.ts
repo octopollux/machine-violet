@@ -451,4 +451,13 @@ describe("mergeSectionBodies", () => {
     const result = mergeSectionBodies(existing, incoming);
     expect(result).toContain("Original description.");
   });
+
+  it("appends incoming body that only has ### headings (no ## sections)", () => {
+    const existing = "## Stats\nHP: 42";
+    const incoming = "### Substats\nSTR: 10";
+    const result = mergeSectionBodies(existing, incoming);
+    expect(result).toContain("## Stats");
+    expect(result).toContain("### Substats");
+    expect(result).toContain("STR: 10");
+  });
 });
