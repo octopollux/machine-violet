@@ -58,6 +58,10 @@ export interface AppProps {
   serverUrl: string;
   playerId: string;
   campaignId?: string;
+  /** Whether the Kitty keyboard protocol is active. */
+  hasKittyProtocol?: boolean;
+  /** Stdin filter chain for registering/unregistering input filters. */
+  stdinFilterChain?: import("./tui/hooks/stdinFilterChain.js").StdinFilterChain | null;
 }
 
 type AppPhase =
@@ -84,7 +88,7 @@ function ErrorScreen({ message, onReturnToMenu }: { message: string; onReturnToM
 
 // --- Main App ---
 
-export function App({ serverUrl, playerId, campaignId }: AppProps) {
+export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFilterChain }: AppProps) {
   const [phase, setPhase] = useState<AppPhase>("connecting");
   const [errorMessage, setErrorMessage] = useState("");
   const [clientState, setClientState] = useState<ClientState>(initialClientState);
@@ -558,6 +562,8 @@ export function App({ serverUrl, playerId, campaignId }: AppProps) {
         : null,
       mode: clientState.mode,
       stateSnapshot,
+      hasKittyProtocol,
+      stdinFilterChain,
       devModeEnabled,
       showVerbose,
       onReturnToMenu: returnToMenu,

@@ -11,6 +11,7 @@ import type { ChoicesData, Turn, StateSnapshot } from "@machine-violet/shared";
 import type { ToolGlyph } from "./activity.js";
 import type { ResolvedTheme, StyleVariant } from "./themes/types.js";
 import type { ApiClient } from "../api-client.js";
+import type { StdinFilterChain } from "./hooks/stdinFilterChain.js";
 
 export interface GameContextValue {
   // Connection
@@ -58,6 +59,12 @@ export interface GameContextValue {
   // State snapshot (latest from server)
   stateSnapshot: StateSnapshot | null;
 
+  // Terminal capabilities
+  /** Whether the Kitty keyboard protocol is active (affects raw mode guardian). */
+  hasKittyProtocol?: boolean;
+  /** Stdin filter chain for registering/unregistering input filters. */
+  stdinFilterChain?: StdinFilterChain | null;
+
   // Settings
   devModeEnabled?: boolean;
   showVerbose?: boolean;
@@ -76,4 +83,9 @@ export function useGameContext(): GameContextValue {
     throw new Error("useGameContext must be used within a <GameProvider>");
   }
   return ctx;
+}
+
+/** Like useGameContext but returns null instead of throwing when outside a GameProvider. */
+export function useOptionalGameContext(): GameContextValue | null {
+  return useContext(GameContext);
 }

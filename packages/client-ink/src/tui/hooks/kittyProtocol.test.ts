@@ -6,7 +6,7 @@ import {
   detectKittySupport,
   enableKittyProtocol,
   disableKittyProtocol,
-  installKittyFilter,
+  createKittyFilter,
   type KittyKey,
 } from "./kittyProtocol.js";
 
@@ -330,19 +330,15 @@ describe("enableKittyProtocol / disableKittyProtocol", () => {
 });
 
 // ---------------------------------------------------------------------------
-// installKittyFilter
+// createKittyFilter
 // ---------------------------------------------------------------------------
 
-describe("installKittyFilter", () => {
+describe("createKittyFilter", () => {
   it("strips CSI-u sequences and dispatches keys via nextTick", async () => {
     const keys: KittyKey[] = [];
-    const input = {
-      read: vi.fn(() => "\x1b[127uhello"),
-    };
+    const filter = createKittyFilter((k) => keys.push(k));
 
-    const remove = installKittyFilter(input, (k) => keys.push(k));
-
-    const result = input.read();
+    const result = filter.process("\x1b[127uhello");
     expect(result).toBe("hello");
     expect(keys).toHaveLength(0); // deferred
 
@@ -350,67 +346,21 @@ describe("installKittyFilter", () => {
     await new Promise((r) => process.nextTick(r));
     expect(keys).toHaveLength(1);
     expect(keys[0].key).toBe("backspace");
-
-    remove();
   });
 
-  it("returns empty string when chunk is entirely CSI-u", () => {
-    const input = {
-      read: vi.fn(() => "\x1b[127u"),
-    };
-
-    const remove = installKittyFilter(input, () => {});
-    const result = input.read();
-    expect(result).toBe("");
-    remove();
-  });
-
-  it("returns empty Buffer when chunk type is Buffer and fully consumed", () => {
-    const input = {
-      read: vi.fn(() => Buffer.from("\x1b[127u")),
-    };
-
-    const remove = installKittyFilter(input, () => {});
-    const result = input.read();
-    expect(Buffer.isBuffer(result)).toBe(true);
-    expect((result as Buffer).length).toBe(0);
-    remove();
+  it("returns null when chunk is entirely CSI-u", () => {
+    const filter = createKittyFilter(() => {});
+    expect(filter.process("\x1b[127u")).toBeNull();
   });
 
   it("passes through chunks with no CSI-u sequences", () => {
-    const input = {
-      read: vi.fn(() => "hello"),
-    };
-
-    const remove = installKittyFilter(input, () => {});
-    const result = input.read();
-    expect(result).toBe("hello");
-    remove();
+    const filter = createKittyFilter(() => {});
+    const input = "hello";
+    expect(filter.process(input)).toBe(input);
   });
 
-  it("returns null when original read returns null", () => {
-    const input = {
-      read: vi.fn(() => null),
-    };
-
-    const remove = installKittyFilter(input, () => {});
-    const result = input.read();
-    expect(result).toBeNull();
-    remove();
-  });
-
-  it("restores original read on teardown", () => {
-    const originalRead = vi.fn(() => "test");
-    const input = { read: originalRead };
-
-    const remove = installKittyFilter(input, () => {});
-    // Filter wraps read — the current function should differ
-    const filteredRead = input.read;
-    expect(filteredRead).not.toBe(originalRead);
-
-    remove();
-    // After teardown, calling read should hit the original mock
-    input.read(undefined);
-    expect(originalRead).toHaveBeenCalled();
+  it("has name 'kitty'", () => {
+    const filter = createKittyFilter(() => {});
+    expect(filter.name).toBe("kitty");
   });
 });
