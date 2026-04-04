@@ -78,6 +78,20 @@ campaign-root/
 
 Every entity file follows the same pattern: a front-matter block, a core description, optional structured sections, and a changelog at the bottom.
 
+### Canonical character sheet sections
+
+Character sheets (PCs and NPCs) use only these `##` headings, in this order:
+
+1. `## Relationships` — links to other entities, disposition
+2. `## Stats` — ability scores, HP, AC, combat stats
+3. `## Skills` — proficiencies, special abilities, spells
+4. `## Inventory` — carried items (significant items as wikilinks, mundane as plain text)
+5. `## Conditions` — active status effects, injuries, curses
+6. `## Notes` — miscellaneous character notes
+7. `## Changelog` — append-only scene-referenced history
+
+Not every section is required — include only what's relevant. But all agents (DM, scribe, character promotion) must use these exact headings. Never substitute alternatives like `## Abilities`, `## Equipment`, or `## Status`. The character pane and other downstream consumers extract sections by heading name.
+
 ### Minimal file (newly created minor NPC)
 
 ```markdown
