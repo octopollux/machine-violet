@@ -82,7 +82,7 @@ Token tracking, conversation window, prompt caching, state persistence.
 | `token-counter.ts` | `estimateTokens()` — tiktoken-based estimation |
 | `usage-helpers.ts` | `accumulateUsage()` — merge Anthropic Usage objects |
 | `display-log.ts` | Narrative line ↔ markdown conversion |
-| `engine-log.ts` | Structured append-only JSONL event log at `.debug/engine.jsonl`: server/session/turn lifecycle, API calls, errors. Non-blocking fire-and-forget |
+| `engine-log.ts` | Structured append-only JSONL event log at `../.debug/engine.jsonl` (relative to campaigns dir): server/session/turn lifecycle, API calls, errors. Non-blocking fire-and-forget |
 
 ## Client: agent-sidecar.ts — Dev-only Agent API
 

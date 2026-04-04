@@ -597,15 +597,16 @@ In addition to campaign-scoped state, Machine Violet maintains machine-scoped co
 <appDir>/
 ├── .env                      API keys (ANTHROPIC_API_KEY, etc.). Loaded at startup via first-launch.ts.
 ├── config.json               App-level config (home directory path, defaults).
+├── api-keys.json             Manually added API keys (treated as secret, like .env).
 ├── connections.json           AI provider connections: Anthropic, OpenAI, OpenRouter, custom.
 │                              Each connection: id, provider, label, apiKey, baseUrl, discovered models, source (env/manual/oauth).
 │                              Tier assignments (large/medium/small → connectionId + modelId).
 ├── discord-settings.json      Discord integration: enabled (true), disabled (false), or not-yet-asked (null).
-├── machine-settings.json      Machine-level feature flags and preferences.
-├── model-overrides.json       User overrides merged on top of shipped known-models.json.
-│                              Per-model: pricing, capabilities, context window, tier defaults.
-└── dev-config.json            Dev-only model overrides (e.g. use Sonnet for DM tier to save costs).
+└── model-overrides.json       User overrides merged on top of shipped known-models.json.
+                               Per-model: pricing, capabilities, context window, tier defaults.
 ```
+
+Additionally, `dev-config.json` (read from the process working directory, not the app config directory) provides dev-only model overrides (e.g. use Sonnet for DM tier to save costs).
 
 **Code:** `packages/engine/src/config/connections.ts`, `packages/engine/src/config/discord.ts`, `packages/engine/src/config/model-registry.ts`, `packages/engine/src/config/first-launch.ts`
 
@@ -613,7 +614,7 @@ In addition to campaign-scoped state, Machine Violet maintains machine-scoped co
 
 ### Structured Engine Log (`engine.jsonl`)
 
-The engine writes a structured, append-only JSONL event log to `.debug/engine.jsonl` (relative to the campaigns root directory). Each line is a JSON object with `{ t, event, ...data }` where `t` is a Unix timestamp.
+The engine writes a structured, append-only JSONL event log to `../.debug/engine.jsonl` relative to the campaigns directory (i.e. a sibling `.debug/` directory next to the campaigns root). Each line is a JSON object with `{ t, event, ...data }` where `t` is a Unix timestamp.
 
 **Event categories:**
 - **Server lifecycle:** startup, shutdown

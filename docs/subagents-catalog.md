@@ -62,11 +62,11 @@ Sandboxed conversation for out-of-character discussion. Receives the DM's curren
 
 **DM injection (player-initiated only)**: When OOC is entered from the game menu or `/ooc` slash command (not via DM's `enter_ooc` tool), accumulated summaries are injected as an `<ooc_summary>` XML tag prepended to the next player message. This persists in conversation history so the DM retains OOC context across turns. The DM-initiated path does not need this because the DM already sees the tool result.
 
-**Tools available**: `read_file`, `find_references`, `scribe`, `promote_character`, `style_scene`, `set_display_resources`, `show_character_sheet`, `map`, `map_entity`, `map_query`, `alarm`, `get_commit_log`. Cannot call DM-only narrative tools.
+**Tools available**: `read_file`, `find_references`, `scribe`, `promote_character`, `style_scene`, `set_display_resources`, `show_character_sheet`, `map`, `map_entity`, `map_query`, `alarm`, `get_commit_log`, `roll_dice`; when file I/O and/or live game state are available, may also use `validate_campaign`, `set_resource_values`, and `rollback`. Cannot call DM-only narrative tools.
 
-**In scope**: Rules questions, character corrections, entity file reads, UI customization, dice rolls, map/clock queries, git history, rollback.
+**In scope**: Rules questions, character corrections, entity file reads, UI customization, dice rolls, map/clock queries, git history, campaign validation, resource adjustments via supported tools, and rollback.
 
-**Out of scope**: Bulk file operations, direct game state JSON patching, engine internals, campaign validation.
+**Out of scope**: Bulk file operations, arbitrary direct game state JSON patching, engine internals, and DM-only narrative actions.
 
 ---
 
@@ -285,7 +285,7 @@ Developer console for power users — inspects and manipulates the running game.
 
 **Out of scope**: Narrative/in-character content, rules adjudication, campaign log context.
 
-**Tools available**: File read/write within the campaign directory, state inspection (combat, clocks, maps, decks, config), state mutation. Cannot call DM-only narrative tools. Style: direct, technical, short answers, shows raw data.
+**Tools available**: File read/write within the campaign directory, state inspection (combat, clocks, maps, decks, config), state mutation, and other DM tools. Intended for technical/diagnostic use rather than narrative content. Style: direct, technical, short answers, shows raw data.
 
 ---
 

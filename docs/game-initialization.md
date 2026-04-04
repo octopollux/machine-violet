@@ -126,7 +126,7 @@ Seeds are injected into the setup conversation's system prompt so the agent can 
 Each seed has a public face (name, premise, genres) and an optional `detail` field containing DM-only instructions hidden from the player:
 
 - **`<suboptions label="...">`** — Labeled choice groups within a seed. Each group offers 3-5 bullet options (name + em-dash + description). Multiple suboption groups per seed are supported. Example: a seed might offer both a starting faction and a starting location.
-- **`<detail>` blocks** — Hidden DM-only instructions: suboptions, secret rolls, texture/pacing guidance. Never shown to the player.
+- **The `detail` field** — Hidden DM-only instructions such as secret rolls, texture, and pacing guidance, plus optional `<suboptions>` groups. DM-only instructions are never shown to the player; only `<suboptions>` content may be presented as structured choices during setup.
 
 ```markdown
 <suboptions label="Your starting faction">
