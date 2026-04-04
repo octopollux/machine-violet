@@ -55,11 +55,12 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: bash
         run: |
-          # Download Windows Terminal portable ZIP from GitHub releases.
-          # Pin to a known stable version; update periodically.
-          WT_VERSION="1.24.10621.0"
+          # Download Windows Terminal Preview portable ZIP from GitHub releases.
+          # Preview 1.25+ adds Kitty keyboard protocol support, which fixes
+          # Backspace/Home/End input corruption on Windows (ConPTY bug).
+          WT_VERSION="1.25.622.0"
           WT_TAG="v${WT_VERSION}"
-          WT_ZIP="Microsoft.WindowsTerminal_${WT_VERSION}_x64.zip"
+          WT_ZIP="Microsoft.WindowsTerminalPreview_${WT_VERSION}_x64.zip"
           WT_URL="https://github.com/microsoft/terminal/releases/download/${WT_TAG}/${WT_ZIP}"
 
           echo "Downloading Windows Terminal portable ${WT_VERSION}..."

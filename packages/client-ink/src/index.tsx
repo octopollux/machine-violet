@@ -44,5 +44,5 @@ function parseArgs(): { server: string; player: string; campaign?: string; agent
 }
 
 const { server, player, campaign, agentPort } = parseArgs();
-const { waitUntilExit } = startClient({ server, player, campaign, agentPort });
+const { waitUntilExit } = await startClient({ server, player, campaign, agentPort });
 await waitUntilExit();
