@@ -46,9 +46,9 @@ jobs:
       - name: Bundle Windows Terminal portable
         shell: bash
         run: |
-          WT_VERSION="1.24.10621.0"
+          WT_VERSION="1.25.622.0"
           WT_TAG="v${WT_VERSION}"
-          WT_ZIP="Microsoft.WindowsTerminal_${WT_VERSION}_x64.zip"
+          WT_ZIP="Microsoft.WindowsTerminalPreview_${WT_VERSION}_x64.zip"
           WT_URL="https://github.com/microsoft/terminal/releases/download/${WT_TAG}/${WT_ZIP}"
           curl -fSL -o wt-portable.zip "$WT_URL"
           mkdir -p dist/terminal

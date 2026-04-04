@@ -108,7 +108,7 @@ if (serverOnly) {
   // (not critical for SEA size, but keeps the import graph clean)
   const { startClient } = await import("../packages/client-ink/src/start-client.js");
 
-  const { waitUntilExit } = startClient({
+  const { waitUntilExit } = await startClient({
     server: `http://127.0.0.1:${port}`,
     player: process.env.MV_PLAYER ?? "Player",
     campaign,

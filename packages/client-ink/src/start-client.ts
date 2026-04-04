@@ -11,6 +11,13 @@ import { render, type RenderOptions } from "ink";
 import { App } from "./app.js";
 import { installRawModeGuard } from "./tui/hooks/rawModeGuard.js";
 import { installSyncWriteCombiner } from "./tui/hooks/syncWriteCombiner.js";
+import {
+  detectKittySupport,
+  enableKittyProtocol,
+  disableKittyProtocol,
+  installKittyFilter,
+  kittyKeyToLegacy,
+} from "./tui/hooks/kittyProtocol.js";
 import { getAgentClientState } from "./agent-state-ref.js";
 
 export interface StartClientOptions {
@@ -34,10 +41,11 @@ export interface ClientHandle {
 /**
  * Start the Ink TUI client.
  *
- * Installs the raw mode guard and sync write combiner, renders the
- * App component, and returns a handle for lifecycle control.
+ * Installs the raw mode guard and sync write combiner, probes for Kitty
+ * keyboard protocol support, renders the App component, and returns a
+ * handle for lifecycle control.
  */
-export function startClient(opts: StartClientOptions = {}): ClientHandle {
+export async function startClient(opts: StartClientOptions = {}): Promise<ClientHandle> {
   const serverUrl = opts.server ?? "http://127.0.0.1:7200";
   const playerId = opts.player ?? "Player";
   const campaignId = opts.campaign;
@@ -76,6 +84,22 @@ export function startClient(opts: StartClientOptions = {}): ClientHandle {
   // writes so the terminal never displays intermediate states.
   const removeCombiner = installSyncWriteCombiner(process.stdout);
 
+  // Probe for Kitty keyboard protocol support. When available, CSI-u
+  // encoding makes every keystroke unambiguous — Backspace can never be
+  // confused or dropped, even when ConPTY corrupts console mode flags.
+  let removeKittyFilter: (() => void) | undefined;
+  const hasKitty = !mockStdin && activeStdin.isTTY
+    ? await detectKittySupport({ stdin: activeStdin, stdout: process.stdout })
+    : false;
+  if (hasKitty) {
+    enableKittyProtocol(process.stdout);
+    removeKittyFilter = installKittyFilter(activeStdin, (key) => {
+      // Re-emit as legacy bytes so Ink's useInput picks them up.
+      const legacy = kittyKeyToLegacy(key);
+      if (legacy !== null) activeStdin.push(legacy);
+    });
+  }
+
   const renderOpts: RenderOptions = { exitOnCtrlC: !mockStdin };
   if (mockStdin) renderOpts.stdin = mockStdin;
 
@@ -99,13 +123,19 @@ export function startClient(opts: StartClientOptions = {}): ClientHandle {
   };
   process.on("SIGINT", onSigInt);
 
-  // Wrap waitUntilExit to clean up guards
+  // Wrap waitUntilExit to clean up guards. try/finally ensures terminal
+  // mode is always restored even if inkWaitUntilExit or sidecar throws.
   const waitUntilExit = async () => {
-    await inkWaitUntilExit();
-    process.removeListener("SIGINT", onSigInt);
-    if (sidecarClose) await sidecarClose();
-    unlockRawMode();
-    removeCombiner();
+    try {
+      await inkWaitUntilExit();
+      process.removeListener("SIGINT", onSigInt);
+      if (sidecarClose) await sidecarClose();
+    } finally {
+      if (removeKittyFilter) removeKittyFilter();
+      if (hasKitty) disableKittyProtocol(process.stdout);
+      unlockRawMode();
+      removeCombiner();
+    }
   };
 
   return { unmount, waitUntilExit };
