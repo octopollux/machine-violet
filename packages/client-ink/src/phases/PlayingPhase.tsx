@@ -22,7 +22,7 @@ import { Layout } from "../tui/layout.js";
 import {
   ChoiceOverlay, DESCRIPTION_ROWS, GameMenu, ApiErrorModal,
   CharacterSheetModal, CompendiumModal, PlayerNotesModal, SwatchModal,
-  CenteredModal,
+  CenteredModal, CharacterPane,
 } from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { useGameContext } from "../tui/game-context.js";
@@ -51,6 +51,7 @@ export function PlayingPhase() {
   const [pendingInput, setPendingInput] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [tokenSummary, setTokenSummary] = useState("");
+  const [characterPaneOpen, setCharacterPaneOpen] = useState(false);
 
   const clearInput = useCallback(() => { setPendingInput(""); setResetKey((k) => k + 1); }, []);
   /** Reset the input but pre-fill it with text (e.g. after a rejected contribution). */
@@ -209,6 +210,7 @@ export function PlayingPhase() {
         setActiveChoices(null);
         setActiveModal(null);
         setMenuOpen(false);
+        setCharacterPaneOpen(false);
         if (mode === "ooc" || mode === "dev") {
           apiClient.command("exit_mode").catch(() => { /* no-op */ });
         }
@@ -218,6 +220,12 @@ export function PlayingPhase() {
 
     if (retryOverlay || activeChoices || activeModal || menuOpen) return;
 
+    // Tab: toggle character pane
+    if (key.tab) {
+      setCharacterPaneOpen((prev) => !prev);
+      return;
+    }
+
     // In OOC/Dev mode: ESC exits
     if (mode === "ooc" || mode === "dev") {
       if (key.escape) {
@@ -226,16 +234,14 @@ export function PlayingPhase() {
       }
     }
 
-    // ESC opens game menu
+    // ESC: dismiss character pane first, then open menu
     if (key.escape) {
+      if (characterPaneOpen) {
+        setCharacterPaneOpen(false);
+        return;
+      }
       setMenuOpen(true);
       apiClient.getCost().then(({ formatted }) => setTokenSummary(formatted)).catch(() => { /* no-op */ });
-      return;
-    }
-
-    // Tab: cycle active player
-    if (key.tab) {
-      apiClient.cyclePlayer().catch(() => { /* no-op */ });
       return;
     }
 
@@ -305,6 +311,16 @@ export function PlayingPhase() {
         playerPaneOverlay={choiceOverlay}
         playerPaneExtraHeight={hasDescriptions ? DESCRIPTION_ROWS : 0}
       />
+      {characterPaneOpen && (
+        <CharacterPane
+          theme={theme}
+          characterName={activeChar}
+          apiClient={apiClient}
+          narrativeWidth={cols}
+          narrativeHeight={narRows}
+          topOffset={conversationPaneTop}
+        />
+      )}
       {retryOverlay && (
         <ApiErrorModal theme={theme} width={cols} height={rows} overlay={retryOverlay} />
       )}
