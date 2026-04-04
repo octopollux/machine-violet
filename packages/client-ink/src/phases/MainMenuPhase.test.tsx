@@ -106,6 +106,16 @@ describe("MainMenuPhase", () => {
     expect(lastFrame()).toContain("Settings");
   });
 
+  it("hides Add Content when devModeEnabled is false", () => {
+    const { lastFrame } = render(<MainMenuPhase {...defaultProps({ devModeEnabled: false })} />);
+    expect(lastFrame()).not.toContain("Add Content");
+  });
+
+  it("shows Add Content when devModeEnabled is true", () => {
+    const { lastFrame } = render(<MainMenuPhase {...defaultProps({ devModeEnabled: true })} />);
+    expect(lastFrame()).toContain("Add Content");
+  });
+
   it("blocks New Campaign when apiKeyValid is false", () => {
     const onNewCampaign = vi.fn();
     const { stdin } = render(<MainMenuPhase {...defaultProps({ apiKeyValid: false, onNewCampaign })} />);

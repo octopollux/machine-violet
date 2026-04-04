@@ -226,6 +226,10 @@ export const DiscordSettings = Type.Object({
   enabled: Type.Boolean(),
 });
 
+export const MachineSettingsResponse = Type.Object({
+  devModeEnabled: Type.Boolean(),
+});
+
 export const KeysListResponse = Type.Object({
   keys: Type.Array(Type.Unknown()),
   activeKeyId: Type.Union([Type.String(), Type.Null()]),
@@ -278,5 +282,6 @@ export type ArchiveResponse = Static<typeof ArchiveResponse>;
 export type ArchivedListResponse = Static<typeof ArchivedListResponse>;
 export type RestoreRequest = Static<typeof RestoreRequest>;
 export type DiscordSettings = Static<typeof DiscordSettings>;
+export type MachineSettingsResponse = Static<typeof MachineSettingsResponse>;
 export type KeysListResponse = Static<typeof KeysListResponse>;
 export type DeleteInfoResponse = Static<typeof DeleteInfoResponse>;

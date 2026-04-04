@@ -21,13 +21,14 @@ import {
   unarchiveCampaign, getCampaignDeleteInfo,
 } from "../../config/campaign-archive.js";
 import { loadDiscordSettings, saveDiscordSettings } from "../../config/discord.js";
+import { loadMachineSettings, saveMachineSettings } from "../../config/machine-settings.js";
 import { createArchiveFileIO } from "../fileio.js";
 import {
   IdParams, NameParams,
   AddConnectionRequest, ConnectionsListResponse, HealthCheckResponse,
   UpdateModelsRequest, OkResponse, TiersResponse, SetTiersRequest,
   ModelsResponse, ArchiveResponse, ArchivedListResponse, RestoreRequest,
-  DiscordSettings, KeysListResponse, DeleteInfoResponse, ErrorResponse,
+  DiscordSettings, MachineSettingsResponse, KeysListResponse, DeleteInfoResponse, ErrorResponse,
 } from "@machine-violet/shared";
 
 export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstance) => {
@@ -362,6 +363,38 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
       return reply.status(500).send({ error: result.error ?? "Restore failed." });
     }
     return { ok: true };
+  });
+
+  // -----------------------------------------------------------------------
+  // Machine Settings (feature flags)
+  // -----------------------------------------------------------------------
+
+  /** Get machine-scoped settings (dev mode, etc.). */
+  server.get("/settings", {
+    schema: {
+      tags: ["Management"],
+      response: { 200: MachineSettingsResponse },
+    },
+  }, async () => {
+    return loadMachineSettings(server.configDir);
+  });
+
+  /** Update machine-scoped settings. */
+  server.put("/settings", {
+    schema: {
+      tags: ["Management"],
+      body: MachineSettingsResponse,
+      response: { 200: MachineSettingsResponse },
+    },
+  }, async (request) => {
+    const body = request.body as { devModeEnabled?: boolean };
+    const current = loadMachineSettings(server.configDir);
+    const updated = {
+      ...current,
+      ...(typeof body.devModeEnabled === "boolean" ? { devModeEnabled: body.devModeEnabled } : {}),
+    };
+    saveMachineSettings(server.configDir, updated);
+    return updated;
   });
 
   // -----------------------------------------------------------------------

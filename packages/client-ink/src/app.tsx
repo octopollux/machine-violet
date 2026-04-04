@@ -115,17 +115,19 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
   // Load persisted client settings on mount
   useEffect(() => {
     loadClientSettings().then((s) => {
-      setDevModeEnabled(s.devModeEnabled);
       setShowVerbose(s.showVerbose);
       settingsLoaded.current = true;
     });
+    apiClientRef.current.getMachineSettings().then((s) => {
+      setDevModeEnabled(s.devModeEnabled);
+    }).catch(() => { /* best-effort — keep default */ });
   }, []);
 
-  // Persist whenever either setting changes (skip the initial load)
+  // Persist client-only settings whenever they change (skip the initial load)
   useEffect(() => {
     if (!settingsLoaded.current) return;
-    saveClientSettings({ devModeEnabled, showVerbose }).catch(() => { /* best-effort */ });
-  }, [devModeEnabled, showVerbose]);
+    saveClientSettings({ showVerbose }).catch(() => { /* best-effort */ });
+  }, [showVerbose]);
   const [archiveStatus, setArchiveStatus] = useState("");
   const [deleteModal, setDeleteModal] = useState<CampaignDeleteInfo | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -370,6 +372,7 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
         apiKeyValid={apiKeyValid}
         apiKeyStatus={apiKeyStatus}
         discordSettingUnset={discordEnabled === null}
+        devModeEnabled={devModeEnabled}
         onNewCampaign={() => {
           setSessionKey((k) => k + 1);
           setPhase("starting");
@@ -430,7 +433,11 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
         theme={theme}
         initialView={phase === "settings_apikeys" ? "api_keys" : undefined}
         devModeEnabled={devModeEnabled}
-        onToggleDevMode={() => setDevModeEnabled((v) => !v)}
+        onToggleDevMode={() => {
+          const next = !devModeEnabled;
+          setDevModeEnabled(next);
+          apiClientRef.current.setMachineSettings({ devModeEnabled: next }).catch(() => { /* best-effort */ });
+        }}
         showVerbose={showVerbose}
         onToggleVerbose={() => setShowVerbose((v) => !v)}
         onApiKeys={() => { refreshConnections(); setPhase("api_keys"); }}

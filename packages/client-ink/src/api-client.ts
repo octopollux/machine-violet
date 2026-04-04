@@ -276,6 +276,14 @@ export class ApiClient {
     return this.post(`/manage/campaigns/archived/${encodeURIComponent(name)}/restore`, zipPath ? { zipPath } : undefined);
   }
 
+  async getMachineSettings(): Promise<{ devModeEnabled: boolean }> {
+    return this.get("/manage/settings");
+  }
+
+  async setMachineSettings(settings: { devModeEnabled: boolean }): Promise<{ devModeEnabled: boolean }> {
+    return this.fetch("/manage/settings", { method: "PUT", body: settings });
+  }
+
   async getDiscordSettings(): Promise<{ enabled: boolean | null }> {
     return this.get("/manage/discord");
   }
