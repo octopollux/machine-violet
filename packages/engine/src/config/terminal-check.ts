@@ -168,7 +168,8 @@ export function checkTerminal(): void {
       // The spawned WT process opens its own window; we detach so the
       // original conhost can close.
       try {
-        const args = ["--title", "Machine Violet", "--", process.execPath, ...process.argv.slice(1)];
+        const forwardedArgv = isCompiled() ? process.argv.slice(2) : process.argv.slice(1);
+        const args = ["--title", "Machine Violet", "--", process.execPath, ...forwardedArgv];
         const child = spawn(wt, args, { detached: true, stdio: "ignore" });
         child.unref();
         process.exit(0);
