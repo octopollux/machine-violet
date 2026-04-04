@@ -14,7 +14,9 @@ import {
   PlayerSelector,
   ActivityLine,
   NarrativeArea,
+  KeyHints,
 } from "./components/index.js";
+import type { KeyHint } from "./components/index.js";
 import {
   ThemedHorizontalBorder,
   ThemedSideFrame,
@@ -84,6 +86,9 @@ export interface LayoutProps {
 
   /** Extra rows to add to the Player Pane (e.g. 3 for a description region in rich choices) */
   playerPaneExtraHeight?: number;
+
+  /** Key hints displayed in the top-right of the Player Pane. */
+  keyHints?: KeyHint[];
 }
 
 /**
@@ -119,6 +124,7 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
     hideInputLine,
     playerPaneOverlay,
     playerPaneExtraHeight = 0,
+    keyHints,
   } = props;
 
   const tier = getViewportTier(dimensions);
@@ -247,6 +253,11 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
         <Box flexDirection="row" height={playerPaneContentHeight}>
           <PlayerPaneSide theme={theme} side="left" color={playerFrameColor} height={playerPaneContentHeight} />
           <Box flexDirection="column" width={width - 2} paddingLeft={1} paddingRight={1}>
+            {keyHints && keyHints.length > 0 && (
+              <Box position="absolute" width={width - 4} justifyContent="flex-end">
+                <KeyHints hints={keyHints} />
+              </Box>
+            )}
             {playerPaneOverlay ? (
               elements.playerPaneExtraRows > 0 ? (
                 <>

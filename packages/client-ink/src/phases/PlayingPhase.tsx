@@ -12,9 +12,10 @@
  *
  * The component just renders what the server says and sends what the player types.
  */
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useMemo } from "react";
 import { useInput, Box } from "ink";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
+import type { KeyHint } from "../tui/components/index.js";
 import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, narrativeRows, choiceRowBudget } from "../tui/responsive.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
@@ -23,7 +24,7 @@ import { Layout } from "../tui/layout.js";
 import {
   ChoiceOverlay, DESCRIPTION_ROWS, GameMenu, ApiErrorModal,
   CharacterSheetModal, CompendiumModal, PlayerNotesModal, SwatchModal,
-  CenteredModal,
+  CenteredModal, CharacterPane,
 } from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { useGameContext } from "../tui/game-context.js";
@@ -59,6 +60,9 @@ export function PlayingPhase() {
   const [pendingInput, setPendingInput] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [tokenSummary, setTokenSummary] = useState("");
+  const [characterPaneOpen, setCharacterPaneOpen] = useState(false);
+  const [characterSheetCache, setCharacterSheetCache] = useState<string | null>(null);
+  const characterSheetCacheCharRef = useRef<string>("");
 
   const clearInput = useCallback(() => { setPendingInput(""); setResetKey((k) => k + 1); }, []);
   /** Reset the input but pre-fill it with text (e.g. after a rejected contribution). */
@@ -83,6 +87,15 @@ export function PlayingPhase() {
     isAI: p.type === "ai",
   })) ?? [{ name: "Player", isAI: false }];
   const activeChar = players[activePlayerIndex]?.name ?? "Player";
+
+  // Clear character sheet cache when active character changes
+  if (activeChar !== characterSheetCacheCharRef.current) {
+    characterSheetCacheCharRef.current = activeChar;
+    setCharacterSheetCache(null);
+  }
+  const handleCharacterSheetLoaded = useCallback((content: string | null) => {
+    setCharacterSheetCache(content);
+  }, []);
 
   // --- Submit handler ---
   const handleSubmit = useCallback(async (value: string) => {
@@ -217,6 +230,7 @@ export function PlayingPhase() {
         setActiveChoices(null);
         setActiveModal(null);
         setMenuOpen(false);
+        setCharacterPaneOpen(false);
         if (mode === "ooc" || mode === "dev") {
           apiClient.command("exit_mode").catch(() => { /* no-op */ });
         }
@@ -226,6 +240,12 @@ export function PlayingPhase() {
 
     if (retryOverlay || activeChoices || activeModal || menuOpen) return;
 
+    // Tab: toggle character pane
+    if (key.tab) {
+      setCharacterPaneOpen((prev) => !prev);
+      return;
+    }
+
     // In OOC/Dev mode: ESC exits
     if (mode === "ooc" || mode === "dev") {
       if (key.escape) {
@@ -234,23 +254,22 @@ export function PlayingPhase() {
       }
     }
 
-    // ESC opens game menu
+    // ESC: dismiss character pane first, then open menu
     if (key.escape) {
+      if (characterPaneOpen) {
+        setCharacterPaneOpen(false);
+        return;
+      }
       setMenuOpen(true);
       apiClient.getCost().then(({ formatted }) => setTokenSummary(formatted)).catch(() => { /* no-op */ });
       return;
     }
 
-    // Tab: cycle active player
-    if (key.tab) {
-      apiClient.cyclePlayer().catch(() => { /* no-op */ });
-      return;
-    }
-
-    // Scroll keys
+    // Scroll keys — target character pane when open, else narrative
     if (key.pageUp || key.pageDown) {
       const step = scrollAmount(rows);
-      narrativeRef.current?.scrollBy(key.pageUp ? -step : step);
+      const target = characterPaneOpen ? modalScrollRef.current : narrativeRef.current;
+      target?.scrollBy(key.pageUp ? -step : step);
     }
   });
 
@@ -265,6 +284,10 @@ export function PlayingPhase() {
   const descExtraHeight = hasDescriptions ? DESCRIPTION_ROWS : 0;
   const narRows = narrativeRows(rows, visibleElements, false, theme.asset.height, players.length, descExtraHeight);
   const conversationPaneTop = visibleElements.topFrame ? theme.asset.height : 0;
+
+  const keyHints: KeyHint[] = useMemo(() => [
+    { label: "\u21E5", active: characterPaneOpen },
+  ], [characterPaneOpen]);
 
   // Active client-driven modal data (character sheet, compendium, notes, swatch)
   const am = activeModal as Record<string, unknown> | null;
@@ -312,7 +335,21 @@ export function PlayingPhase() {
         hideInputLine={!!activeChoices}
         playerPaneOverlay={choiceOverlay}
         playerPaneExtraHeight={hasDescriptions ? DESCRIPTION_ROWS : 0}
+        keyHints={keyHints}
       />
+      {characterPaneOpen && (
+        <CharacterPane
+          ref={modalScrollRef}
+          theme={theme}
+          characterName={activeChar}
+          apiClient={apiClient}
+          narrativeWidth={cols}
+          narrativeHeight={narRows}
+          topOffset={conversationPaneTop}
+          cachedContent={characterSheetCache}
+          onContentLoaded={handleCharacterSheetLoaded}
+        />
+      )}
       {retryOverlay && (
         <ApiErrorModal theme={theme} width={cols} height={rows} overlay={retryOverlay} />
       )}

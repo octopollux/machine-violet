@@ -1,0 +1,146 @@
+/**
+ * CharacterPane — right-side overlay showing active character stats & inventory.
+ *
+ * Appears inside the narrative pane while Tab is toggled.
+ * Lazy-fetches the character sheet on first open and caches it until
+ * the active player changes. Cache is owned by the caller via
+ * cachedContent/onContentLoaded props so it persists across toggles.
+ */
+import React, { useEffect, useRef, useMemo, forwardRef } from "react";
+import type { FormattingNode } from "@machine-violet/shared/types/tui.js";
+import type { ResolvedTheme } from "../themes/types.js";
+import type { ApiClient } from "../../api-client.js";
+import { markdownToTags, parseFormatting } from "../formatting.js";
+import { OverlayPane } from "./OverlayPane.js";
+import type { OverlayPaneHandle } from "./OverlayPane.js";
+
+export type CharacterPaneHandle = OverlayPaneHandle;
+
+/** Default pane width in columns. */
+export const CHARACTER_PANE_WIDTH = 35;
+
+/**
+ * Extract named sections from a character sheet markdown string.
+ * Returns lines between `## <heading>` and the next `##` or EOF.
+ * The heading line itself is included (will render bold via markdownToTags).
+ */
+export function extractSections(
+  markdown: string,
+  headings: string[],
+): string[] {
+  const lines = markdown.split("\n");
+  const lowerHeadings = new Set(headings.map((h) => h.toLowerCase()));
+  const result: string[] = [];
+  let capturing = false;
+
+  for (const line of lines) {
+    const headingMatch = line.match(/^##\s+(.+)$/);
+    if (headingMatch) {
+      const name = headingMatch[1].trim().toLowerCase();
+      if (lowerHeadings.has(name)) {
+        if (result.length > 0) result.push(""); // blank line between sections
+        capturing = true;
+        result.push(line);
+        continue;
+      } else {
+        capturing = false;
+        continue;
+      }
+    }
+    if (capturing) {
+      result.push(line);
+    }
+  }
+
+  return result;
+}
+
+/** Strip wikilink brackets: [[Name]] → Name */
+function stripWikilinks(line: string): string {
+  return line.replace(/\[\[([^\]]+)\]\]/g, "$1");
+}
+
+interface CharacterPaneProps {
+  theme: ResolvedTheme;
+  /** Character name (display name, not slug). */
+  characterName: string;
+  /** API client for fetching character sheet. */
+  apiClient: ApiClient;
+  /** Width of the narrative area in columns. */
+  narrativeWidth: number;
+  /** Height of the narrative area in rows. */
+  narrativeHeight: number;
+  /** Vertical offset (e.g. top frame height). */
+  topOffset?: number;
+  /** Cached sheet content (owned by caller for persistence across toggles). */
+  cachedContent?: string | null;
+  /** Called when sheet content is fetched. Caller should store it for cachedContent. */
+  onContentLoaded?: (content: string | null) => void;
+}
+
+export const CharacterPane = forwardRef<CharacterPaneHandle, CharacterPaneProps>(
+  function CharacterPane({
+    theme,
+    characterName,
+    apiClient,
+    narrativeWidth,
+    narrativeHeight,
+    topOffset = 0,
+    cachedContent,
+    onContentLoaded,
+  }, ref) {
+  const lastFetchedName = useRef<string>("");
+
+  // Lazy-fetch character sheet; re-fetch when character changes.
+  // Stale flag prevents race conditions from overlapping requests.
+  useEffect(() => {
+    if (characterName === lastFetchedName.current && cachedContent != null) return;
+    lastFetchedName.current = characterName;
+
+    let isStale = false;
+    apiClient.getCharacterSheet(characterName)
+      .then(({ content }: { content: string }) => {
+        if (!isStale) onContentLoaded?.(content);
+      })
+      .catch(() => {
+        if (!isStale) onContentLoaded?.("");
+      });
+
+    return () => { isStale = true; };
+  }, [characterName, apiClient, cachedContent, onContentLoaded]);
+
+  const sheetContent = cachedContent ?? null;
+
+  // Parse Stats + Inventory sections
+  const styledLines = useMemo((): FormattingNode[][] | undefined => {
+    if (!sheetContent) return undefined;
+    const sectionLines = extractSections(sheetContent, ["Stats", "Inventory"]);
+    if (sectionLines.length === 0) return undefined;
+    return sectionLines.map(
+      (line) => parseFormatting(markdownToTags(stripWikilinks(line))),
+    );
+  }, [sheetContent]);
+
+  // Show a placeholder while loading, an error message on failure, or nothing
+  const placeholderLines = sheetContent == null
+    ? ["", "  Loading..."]
+    : sheetContent === ""
+      ? ["", "  Could not load", "  character sheet."]
+      : !styledLines
+        ? ["", "  No stats or", "  inventory found."]
+        : undefined;
+
+  return (
+    <OverlayPane
+      ref={ref}
+      theme={theme}
+      narrativeWidth={narrativeWidth}
+      narrativeHeight={narrativeHeight}
+      paneWidth={CHARACTER_PANE_WIDTH}
+      title={characterName}
+      lines={placeholderLines}
+      styledLines={placeholderLines ? undefined : styledLines}
+      topOffset={topOffset}
+    />
+  );
+});
