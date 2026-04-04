@@ -11,9 +11,8 @@ Use only these canonical `##` section headings on character sheets (in this orde
 4. `## Inventory`
 5. `## Conditions`
 6. `## Notes`
-7. `## Changelog`
 
-Do not invent alternative headings (e.g. `## Abilities` instead of `## Stats`, `## Equipment` instead of `## Inventory`). Downstream consumers parse these by name.
+Do not invent alternative headings (e.g. `## Abilities` instead of `## Stats`, `## Equipment` instead of `## Inventory`). Downstream consumers parse these by name. Do not include a `## Changelog` section in the sheet body — the changelog entry is provided separately after the `---CHANGELOG---` separator.
 
 Output format:
 1. First, output the COMPLETE updated character sheet (preserve the full markdown format including title and front matter).

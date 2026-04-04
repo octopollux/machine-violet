@@ -70,16 +70,15 @@ Every meaningful update gets a changelog entry — terse, factual, one line. The
 - "Party arrived; discovered hidden passage"
 
 ### Character sheet sections
-Character sheets use these canonical `##` headings — use only these, in this order:
+Character sheets use these canonical `##` headings for `body` updates — use only these, in this order:
 1. `## Relationships`
 2. `## Stats`
 3. `## Skills`
 4. `## Inventory`
 5. `## Conditions`
 6. `## Notes`
-7. `## Changelog`
 
-Not every section is required — include only what's relevant. But never invent alternative headings (e.g. `## Abilities` instead of `## Stats`, or `## Equipment` instead of `## Inventory`). Downstream consumers parse these headings by name.
+Not every section is required — include only what's relevant. But never invent alternative headings (e.g. `## Abilities` instead of `## Stats`, or `## Equipment` instead of `## Inventory`). Downstream consumers parse these headings by name. `## Changelog` is reserved — never include it in `body` updates; update it only through `changelog_entry`.
 
 When updating PC stats (HP, resources, inventory, conditions), be precise. Use exact numbers from the update. Don't invent details the DM didn't mention.
 
