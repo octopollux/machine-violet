@@ -106,6 +106,7 @@ export function PlayingPhase() {
     setNarrativeLines((prev) => [
       ...prev,
       { kind: "separator", text: "---", tag },
+      { kind: "spacer", text: "", tag },
       { kind: "player", text: `[${activeChar}] ${text}`, tag },
       { kind: "dm", text: "", tag },
     ]);
@@ -134,6 +135,7 @@ export function PlayingPhase() {
     setNarrativeLines((prev) => [
       ...prev,
       { kind: "separator", text: "---", tag },
+      { kind: "spacer", text: "", tag },
       { kind: "player", text: `[${activeChar}] ${choice}`, tag },
       { kind: "dm", text: "", tag },
     ]);
@@ -292,7 +294,7 @@ export function PlayingPhase() {
         activePlayerIndex={activePlayerIndex}
         campaignName={campaignName}
         resources={resources}
-        turnHolder={activeChar}
+        turnHolder={engineState === "waiting_input" ? activeChar : "DM"}
         engineState={engineState}
         toolGlyphs={toolGlyphs}
         quoteColor="#ffffff"

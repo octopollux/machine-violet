@@ -512,6 +512,11 @@ export class GameEngine {
             logLines.push({ kind: "player", text: `[${characterName}] ${text}` });
           }
           if (result.text) {
+            // Turn separator before DM narration (matches the client-side
+            // separator injected on the first narrative:chunk after player input).
+            if (!opts?.skipTranscript) {
+              logLines.push({ kind: "separator", text: "---" });
+            }
             logLines.push({ kind: "dm", text: result.text });
           }
           logLines.push({ kind: "dm", text: "" }); // paragraph separator

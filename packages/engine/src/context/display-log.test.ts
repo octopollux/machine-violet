@@ -80,17 +80,18 @@ describe("markdownToNarrativeLines", () => {
     expect(parsed).toEqual(original);
   });
 
-  it("round-trips turn separator before player input", () => {
+  it("round-trips turn separators before player and DM", () => {
     // Mirrors the display log format produced by processInput:
-    // separator → player line → DM response → blank paragraph break
+    // separator → player line → separator → DM response → blank paragraph break
     const original: NarrativeLine[] = [
       { kind: "separator", text: "---" },
       { kind: "player", text: "[Velvet] I open the door." },
+      { kind: "separator", text: "---" },
       { kind: "dm", text: "The door creaks open." },
       { kind: "dm", text: "" },
     ];
     const md = narrativeLinesToMarkdown(original);
-    expect(md).toBe("---\n> [Velvet] I open the door.\nThe door creaks open.\n\n");
+    expect(md).toBe("---\n> [Velvet] I open the door.\n---\nThe door creaks open.\n\n");
     const parsed = markdownToNarrativeLines(md.split("\n").slice(0, -1));
     expect(parsed).toEqual(original);
   });
