@@ -14,6 +14,7 @@ import type {
   ChoiceResponseRequest,
   SessionEndResponse,
   StateSnapshot,
+  MachineSettingsResponse,
 } from "@machine-violet/shared";
 
 export interface ApiKeyInfo {
@@ -276,11 +277,11 @@ export class ApiClient {
     return this.post(`/manage/campaigns/archived/${encodeURIComponent(name)}/restore`, zipPath ? { zipPath } : undefined);
   }
 
-  async getMachineSettings(): Promise<{ devModeEnabled: boolean }> {
+  async getMachineSettings(): Promise<MachineSettingsResponse> {
     return this.get("/manage/settings");
   }
 
-  async setMachineSettings(settings: { devModeEnabled: boolean }): Promise<{ devModeEnabled: boolean }> {
+  async setMachineSettings(settings: MachineSettingsResponse): Promise<MachineSettingsResponse> {
     return this.fetch("/manage/settings", { method: "PUT", body: settings });
   }
 

@@ -115,6 +115,11 @@ export function MainMenuPhase({
   mainMenuItems.push("Settings");
   mainMenuItems.push("Quit");
 
+  // Clamp selection when the menu shrinks (e.g. devModeEnabled toggled off async)
+  useEffect(() => {
+    setMainMenuIndex((i) => Math.min(i, mainMenuItems.length - 1));
+  }, [mainMenuItems.length]);
+
   const isItemDisabled = (item: string): boolean =>
     API_REQUIRED_ITEMS.has(item) && !apiKeyValid;
 

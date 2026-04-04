@@ -387,14 +387,10 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
       response: { 200: MachineSettingsResponse },
     },
   }, async (request) => {
-    const body = request.body as { devModeEnabled?: boolean };
-    const current = loadMachineSettings(server.configDir);
-    const updated = {
-      ...current,
-      ...(typeof body.devModeEnabled === "boolean" ? { devModeEnabled: body.devModeEnabled } : {}),
-    };
-    saveMachineSettings(server.configDir, updated);
-    return updated;
+    const { devModeEnabled } = request.body as { devModeEnabled: boolean };
+    const settings = { devModeEnabled };
+    saveMachineSettings(server.configDir, settings);
+    return settings;
   });
 
   // -----------------------------------------------------------------------
