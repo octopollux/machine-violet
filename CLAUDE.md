@@ -111,6 +111,9 @@ Code and docs stay in sync. See `docs/maintenance.md` for the full guide.
 - **Endpoints:** `GET /screen`, `GET /screen?ansi=true`, `GET /state`, `POST /input`, `POST /input/key`
 - **Implementation:** `packages/client-ink/src/agent-sidecar.ts`. Uses `@xterm/headless` (dev dependency) as virtual VT100 terminal.
 - **Dev launcher:** `MV_AGENT_PORT=7201 npm run dev`
+- **Round-trip testing workflow:** Launch headlessly, poll `GET /state` to inspect `activeChoices`, `narrativeLines`, `mode`, `engineState`. Use `POST /input/key` with `{"key":"return"}`, `{"key":"up"}`, etc. to navigate menus. Use `GET /screen` to see rendered output. Kill with `npx kill-port 7200 7201`.
+- **Key state fields:** `activeChoices` (non-null when a choice modal is showing — has `prompt`, `choices`, `descriptions`), `engineState` (`"waiting_input"` when ready for interaction, `"dm_thinking"` when processing), `mode` (`"play"`, `"setup"`, `"ooc"`).
+- **Machine-scope data** (players, processed systems) lives under `defaultCampaignRoot()` — on Windows that's `~/Documents/.machine-violet/`, NOT `~/.machine-violet/`. Use `machinePaths(homeDir).playersDir` for the correct path.
 
 ### DM Text Formatting Pipeline
 - `processNarrativeLines()` in `packages/client-ink/src/tui/formatting.ts` is the single entry point for the rendering pipeline.
@@ -142,4 +145,4 @@ After completing a coding task, make a detailed commit; you'll need this history
 
 ## Code Review
 
-After creating a PR, poll for Copilot code review comments every two minutes for up to ten minutes. Review the feedback and address any issues you judge worthwhile — use your own judgement on what to fix vs skip.
+After creating a PR, poll for Copilot code review comments every two minutes for up to ten minutes. Review the feedback and address any issues you judge worthwhile — use your own judgement on what to fix vs skip. **Polling must be sequential** — run one check, wait for the result, then sleep and check again. Do NOT launch multiple background sleeps in parallel (e.g. `sleep 120`, `sleep 240`, `sleep 360` all at once) because they all start counting from the same moment and finish concurrently, defeating the purpose.

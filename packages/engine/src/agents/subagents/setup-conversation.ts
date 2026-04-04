@@ -95,7 +95,7 @@ const PRESENT_CHOICES_TOOL: NormalizedTool = {
         type: "array",
         items: { type: "string" },
         description: "2-10 short option labels for the player to choose from",
-        minItems: 2,
+        minItems: 1,
         maxItems: 10,
       },
       descriptions: {
@@ -126,6 +126,12 @@ function formatSystemLine(s: typeof KNOWN_SYSTEMS[number]): string {
   return `- \`${s.slug}\` — ${s.name}: ${s.description}${ruleCard}`;
 }
 
+/** Known player info passed from the machine-scope players directory. */
+export interface KnownPlayer {
+  name: string;
+  ageGroup?: string;
+}
+
 /** Fisher-Yates shuffle (returns a new array). */
 function shuffle<T>(arr: readonly T[]): T[] {
   const out = [...arr];
@@ -136,8 +142,25 @@ function shuffle<T>(arr: readonly T[]): T[] {
   return out;
 }
 
-function buildSystemPrompt(): string {
-  const base = loadPrompt("setup-conversation");
+function buildSystemPrompt(existingPlayers?: KnownPlayer[]): string {
+  let base = loadPrompt("setup-conversation");
+
+  // Inject Known Players immediately after the base prompt (before the large
+  // data sections) so the model sees them close to the Start/flow instructions.
+  if (existingPlayers && existingPlayers.length > 0) {
+    // Sanitize names: single line, no control chars or markup
+    const sanitize = (s: string) => s.replace(/[\r\n]+/g, " ").replace(/[<>`]/g, "").trim();
+    // Cap at 9 to stay within present_choices maxItems (10) with room for edge cases
+    const players = existingPlayers.slice(0, 9);
+    const playerLines = players.map((p) => {
+      const name = sanitize(p.name);
+      const age = p.ageGroup ? ` (age group: ${p.ageGroup})` : " (age group: unknown)";
+      return `- ${name}${age}`;
+    });
+    const instruction = "These players have played before. Use `present_choices` at the start to let the player pick their name from this list (the app auto-appends an \"Enter your own\" option for new players). If they match a known player, welcome them back warmly — no need to re-ask information you already have. If their age group is unknown, ask once casually.";
+    base += "\n\n## Known Players\n\n" + instruction + "\n\n" + playerLines.join("\n");
+  }
+
   const seedList = shuffle(SEEDS).map((s) => {
     const desc = s.description ? ` | Description: ${s.description}` : "";
     const detail = s.detail ? `\n  Detail: ${s.detail.replace(/\n/g, "\n  ")}` : "";
@@ -231,26 +254,15 @@ export function resolveSystemSlug(raw: string): string {
   return slugified || raw;
 }
 
-/** Known player info passed from the machine-scope players directory. */
-export interface KnownPlayer {
-  name: string;
-  ageGroup?: string;
-}
-
 export function createSetupConversation(
   provider: LLMProvider,
   model: string,
   existingPlayers?: KnownPlayer[],
 ): SetupConversation {
-  // Build per-session system prompt (randomizes seed/personality order)
-  let systemPrompt = buildSystemPrompt();
-  if (existingPlayers && existingPlayers.length > 0) {
-    const playerLines = existingPlayers.map((p) => {
-      const age = p.ageGroup ? ` (age group: ${p.ageGroup})` : " (age group: unknown)";
-      return `- ${p.name}${age}`;
-    });
-    systemPrompt += "\n\n## Known Players\n\nThese players have played before. When the player gives their name, check this list. If they match a known player, welcome them back warmly — no need to re-ask information you already have. If their age group is unknown, ask once casually.\n\n" + playerLines.join("\n");
-  }
+  // Build per-session system prompt (randomizes seed/personality order).
+  // Known players are injected right after the base prompt (before seeds/personalities)
+  // so the model sees them close to the flow instructions that reference them.
+  const systemPrompt = buildSystemPrompt(existingPlayers);
 
   const messages: NormalizedMessage[] = [];
   const totalUsage: NormalizedUsage = {
