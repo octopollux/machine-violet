@@ -212,17 +212,40 @@ jobs:
           PREV="${{ steps.tags.outputs.prev }}"
 
           if [ -n "$PREV" ]; then
-            # Get the timestamp of the previous tag's commit (by committer date)
-            SINCE=$(git log -1 --format=%cI "$PREV")
+            # Extract PR numbers from merge commits in the range.
+            # This is deterministic — a commit is in the range or it isn't —
+            # unlike the old timestamp-based gh pr list search which was
+            # off-by-one due to >= and git/GitHub timestamp mismatches.
+            PR_NUMBERS=$(git log --oneline "${PREV}..HEAD" \
+              | grep -oP 'Merge pull request #\K[0-9]+' || true)
 
-            # Fetch PRs merged since that timestamp
-            PR_CONTEXT=$(gh pr list \
-              --repo ${{ github.repository }} \
-              --state merged \
-              --base main \
-              --search "merged:>=${SINCE}" \
-              --json number,title,body \
-              --jq '.[] | "## PR #\(.number): \(.title)\n\(.body // "(no description)")\n---"')
+            PR_CONTEXT=""
+            if [ -n "$PR_NUMBERS" ]; then
+              PR_NUMBERS=$(printf '%s\n' $PR_NUMBERS | sort -n | uniq)
+              REPO_FULL="${{ github.repository }}"
+              REPO_OWNER="${REPO_FULL%/*}"
+              REPO_NAME="${REPO_FULL#*/}"
+
+              QUERY_FIELDS=""
+              for pr in $PR_NUMBERS; do
+                QUERY_FIELDS="${QUERY_FIELDS}
+                  pr_${pr}: pullRequest(number: ${pr}) { number title body }"
+              done
+
+              PR_CONTEXT=$(gh api graphql \
+                --raw-field query="query {
+                  repository(owner: \"${REPO_OWNER}\", name: \"${REPO_NAME}\") {${QUERY_FIELDS}
+                  }
+                }" \
+                --jq '
+                  .data.repository
+                  | to_entries
+                  | map(select(.value != null) | .value)
+                  | sort_by(.number)
+                  | map("## PR #\(.number): \(.title)\n\(.body // "(no description)")\n---")
+                  | join("\n")
+                ')
+            fi
 
             # Fall back to commit log if no PRs found (direct pushes)
             if [ -z "$PR_CONTEXT" ]; then
