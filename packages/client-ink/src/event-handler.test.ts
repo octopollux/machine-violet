@@ -71,6 +71,23 @@ describe("event-handler", () => {
       expect(separators).toHaveLength(2); // one before player, one before DM
     });
 
+    it("injects separator even when dev/system lines appear after player line", () => {
+      const h = makeHarness();
+      h.state.narrativeLines = [
+        { kind: "separator", text: "---" },
+        { kind: "player", text: "[Wilson] I attack" },
+        { kind: "dev", text: "[dev] tool: roll_dice" },
+        { kind: "dm", text: "" },
+      ];
+
+      h.dispatch({ type: "narrative:chunk", data: { text: "You swing your sword.", kind: "dm" } });
+
+      const kinds = h.state.narrativeLines.map((l) => l.kind);
+      expect(kinds).toContain("separator");
+      // Should have two separators: one before player, one before DM
+      expect(kinds.filter((k) => k === "separator")).toHaveLength(2);
+    });
+
     it("does not inject separator for opening DM narration (no player line)", () => {
       const h = makeHarness();
       // Fresh game — no player line yet

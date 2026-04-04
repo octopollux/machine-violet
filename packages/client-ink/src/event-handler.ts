@@ -163,6 +163,10 @@ function shouldInjectDmSeparator(lines: NarrativeLine[]): boolean {
     const line = lines[i];
     if (line.kind === "spacer") continue;
     if (line.kind === "dm" && line.text === "") continue;
+    // Skip dev/system lines (e.g. verbose tool logs) — they can appear
+    // between the player line and the first DM chunk without invalidating
+    // the need for a separator.
+    if (line.kind === "dev" || line.kind === "system") continue;
     return line.kind === "player";
   }
   return false;
