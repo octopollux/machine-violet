@@ -249,7 +249,7 @@ export function createSetupConversation(
       const age = p.ageGroup ? ` (age group: ${p.ageGroup})` : " (age group: unknown)";
       return `- ${p.name}${age}`;
     });
-    systemPrompt += "\n\n## Known Players\n\nThese players have played before. When the player gives their name, check this list. If they match a known player, welcome them back warmly — no need to re-ask information you already have. If their age group is unknown, ask once casually.\n\n" + playerLines.join("\n");
+    systemPrompt += "\n\n## Known Players\n\nThese players have played before. Use `present_choices` at the start to let the player pick their name from this list (the app auto-appends an \"Enter your own\" option for new players). If they match a known player, welcome them back warmly — no need to re-ask information you already have. If their age group is unknown, ask once casually.\n\n" + playerLines.join("\n");
   }
 
   const messages: NormalizedMessage[] = [];
