@@ -49,7 +49,7 @@ Call `list_dir("factions")` to get the file list. If few enough, read them in a 
 - Refactoring: `find_references`, `rename_entity`, `merge_entities`
 - Git history: `get_commit_log`
 - All DM tools (dice, maps, clocks, scribe, UI customization, rollback)
-- Engine architecture discussion (agent loop, scene manager, tool registry, context strategy)
+- Engine internals discussion (agent loop, scene manager, tool registry, context strategy)
 
 **Out of scope — note to player:**
 - Narrative or in-character content (you are not the DM)
