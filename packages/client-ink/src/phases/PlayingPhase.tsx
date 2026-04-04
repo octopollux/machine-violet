@@ -12,9 +12,10 @@
  *
  * The component just renders what the server says and sends what the player types.
  */
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useMemo } from "react";
 import { useInput, Box } from "ink";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
+import type { KeyHint } from "../tui/components/index.js";
 import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, narrativeRows, choiceRowBudget } from "../tui/responsive.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
@@ -265,6 +266,10 @@ export function PlayingPhase() {
   const narRows = narrativeRows(rows, visibleElements, false, theme.asset.height, players.length, descExtraHeight);
   const conversationPaneTop = visibleElements.topFrame ? theme.asset.height : 0;
 
+  const keyHints: KeyHint[] = useMemo(() => [
+    { label: "\u21E5", active: characterPaneOpen },
+  ], [characterPaneOpen]);
+
   // Active client-driven modal data (character sheet, compendium, notes, swatch)
   const am = activeModal as Record<string, unknown> | null;
 
@@ -311,6 +316,7 @@ export function PlayingPhase() {
         hideInputLine={!!activeChoices}
         playerPaneOverlay={choiceOverlay}
         playerPaneExtraHeight={hasDescriptions ? DESCRIPTION_ROWS : 0}
+        keyHints={keyHints}
       />
       {characterPaneOpen && (
         <CharacterPane
