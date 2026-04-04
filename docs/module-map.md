@@ -115,6 +115,7 @@ Model selection, campaign init, DM personalities, campaign seeds.
 | `campaign-archive.ts` | `archiveCampaign()`, `unarchiveCampaign()`, `deleteCampaign()`, `listArchivedCampaigns()`, `getCampaignDeleteInfo()` — campaign archival, restoration, and deletion with verification |
 | `main-menu.ts` | Campaign listing and selection |
 | `tokens.ts` | `TOKEN_LIMITS` — model token capacity constants |
+| `machine-settings.ts` | Machine-scoped settings persistence (`machine-settings.json`) — feature flags like `devModeEnabled` |
 | `file-io-logger.ts` | FileIO wrapper for debug read/write/append logging |
 
 ## Shared: types/ — Type Definitions
@@ -153,7 +154,7 @@ State machine for the application: main menu → setup / add content → playing
 
 | File | Purpose |
 |---|---|
-| `MainMenuPhase.tsx` | Themed campaign selection screen with New Campaign, Continue (with Archive/Delete columns), Add Content, Quit |
+| `MainMenuPhase.tsx` | Themed campaign selection screen with New Campaign, Continue (with Archive/Delete columns), Add Content (Dev Mode only), Quit |
 | `ArchivedCampaignsPhase.tsx` | List archived campaign zips with dates, select to unarchive |
 | `AddContentPhase.tsx` | PDF import flow: name collection → drop files → validate → extract → cache |
 | `PlayingPhase.tsx` | Main game loop — handles both gameplay and setup (setup runs as a pseudo-campaign session) |

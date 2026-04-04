@@ -55,6 +55,8 @@ export interface MainMenuPhaseProps {
   discordSettingUnset?: boolean;
   /** Navigate to Discord Rich Presence settings. */
   onDiscordSettings?: () => void;
+  /** Whether Dev Mode is enabled (gates advanced features like content ingest). */
+  devModeEnabled?: boolean;
   onQuit: () => void;
 }
 
@@ -81,6 +83,7 @@ export function MainMenuPhase({
   onUpdate,
   discordSettingUnset,
   onDiscordSettings,
+  devModeEnabled,
   onQuit,
 }: MainMenuPhaseProps) {
   const { columns: cols, rows: termRows } = useTerminalSize();
@@ -106,11 +109,16 @@ export function MainMenuPhase({
   if (showUpdateItem) mainMenuItems.push("Update Available");
   mainMenuItems.push("New Campaign");
   if (campaigns.length > 0) mainMenuItems.push("Continue Campaign");
-  mainMenuItems.push("Add Content");
+  if (devModeEnabled) mainMenuItems.push("Add Content");
   if (!apiKeyValid) mainMenuItems.push("API Keys");
   if (discordSettingUnset) mainMenuItems.push("Discord");
   mainMenuItems.push("Settings");
   mainMenuItems.push("Quit");
+
+  // Clamp selection when the menu shrinks (e.g. devModeEnabled toggled off async)
+  useEffect(() => {
+    setMainMenuIndex((i) => Math.min(i, mainMenuItems.length - 1));
+  }, [mainMenuItems.length]);
 
   const isItemDisabled = (item: string): boolean =>
     API_REQUIRED_ITEMS.has(item) && !apiKeyValid;

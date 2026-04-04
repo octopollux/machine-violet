@@ -11,12 +11,10 @@ import { join } from "node:path";
 import { configDir } from "../utils/paths.js";
 
 export interface ClientSettings {
-  devModeEnabled: boolean;
   showVerbose: boolean;
 }
 
 const DEFAULTS: ClientSettings = {
-  devModeEnabled: false,
   showVerbose: false,
 };
 
@@ -31,7 +29,6 @@ function sanitize(input: unknown): ClientSettings {
   const result: ClientSettings = { ...DEFAULTS };
   if (input && typeof input === "object") {
     const obj = input as Record<string, unknown>;
-    if (typeof obj.devModeEnabled === "boolean") result.devModeEnabled = obj.devModeEnabled;
     if (typeof obj.showVerbose === "boolean") result.showVerbose = obj.showVerbose;
   }
   return result;
