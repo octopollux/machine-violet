@@ -245,6 +245,97 @@ describe("createSetupConversation", () => {
     expect(result.finalized!.system).toBeNull();
   });
 
+  it("system prompt includes Known Players section when players provided", async () => {
+    const provider = mockProvider([textResponse("Welcome!")]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6", [
+      { name: "Alice", ageGroup: "adult" },
+      { name: "Bob", ageGroup: "teenager" },
+    ]);
+    await conv.start(noop);
+
+    const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
+    const systemPrompt = streamCalls[0][0].systemPrompt as string;
+
+    expect(systemPrompt).toContain("## Known Players");
+    expect(systemPrompt).toContain("Alice (age group: adult)");
+    expect(systemPrompt).toContain("Bob (age group: teenager)");
+    expect(systemPrompt).toContain("present_choices");
+  });
+
+  it("Known Players section appears before campaign seeds", async () => {
+    const provider = mockProvider([textResponse("Welcome!")]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6", [
+      { name: "Alice", ageGroup: "adult" },
+    ]);
+    await conv.start(noop);
+
+    const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
+    const systemPrompt = streamCalls[0][0].systemPrompt as string;
+
+    const knownIdx = systemPrompt.indexOf("## Known Players");
+    const seedsIdx = systemPrompt.indexOf("## Available campaign seeds");
+    expect(knownIdx).toBeGreaterThan(-1);
+    expect(seedsIdx).toBeGreaterThan(-1);
+    expect(knownIdx).toBeLessThan(seedsIdx);
+  });
+
+  it("single known player uses freeform instruction, not present_choices", async () => {
+    const provider = mockProvider([textResponse("Welcome!")]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6", [
+      { name: "Alice", ageGroup: "adult" },
+    ]);
+    await conv.start(noop);
+
+    const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
+    const systemPrompt = streamCalls[0][0].systemPrompt as string;
+
+    const section = systemPrompt.slice(systemPrompt.indexOf("## Known Players"));
+    expect(section).toContain("one returning player");
+    expect(section).toContain("Ask freeform");
+  });
+
+  it("system prompt omits Known Players section when no players provided", async () => {
+    const provider = mockProvider([textResponse("Welcome!")]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    await conv.start(noop);
+
+    const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
+    const systemPrompt = streamCalls[0][0].systemPrompt as string;
+
+    expect(systemPrompt).not.toContain("## Known Players");
+  });
+
+  it("player names are sanitized in Known Players section", async () => {
+    const provider = mockProvider([textResponse("Welcome!")]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6", [
+      { name: "Alice<script>", ageGroup: "adult" },
+      { name: "Bob\nEvil", ageGroup: "teenager" },
+    ]);
+    await conv.start(noop);
+
+    const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
+    const systemPrompt = streamCalls[0][0].systemPrompt as string;
+
+    expect(systemPrompt).toContain("Alicescript");
+    expect(systemPrompt).toContain("Bob Evil");
+    expect(systemPrompt).not.toContain("<script>");
+    expect(systemPrompt).not.toContain("\n- Bob\n");
+  });
+
+  it("caps known players at 9", async () => {
+    const players = Array.from({ length: 12 }, (_, i) => ({ name: `Player${i}` }));
+    const provider = mockProvider([textResponse("Welcome!")]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6", players);
+    await conv.start(noop);
+
+    const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
+    const systemPrompt = streamCalls[0][0].systemPrompt as string;
+
+    expect(systemPrompt).toContain("Player0");
+    expect(systemPrompt).toContain("Player8");
+    expect(systemPrompt).not.toContain("Player9");
+  });
+
   it("usage accumulates across turns", async () => {
     const provider = mockProvider([
       textResponse("Welcome!", mockUsage(100, 30)),

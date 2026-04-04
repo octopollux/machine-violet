@@ -148,11 +148,19 @@ function buildSystemPrompt(existingPlayers?: KnownPlayer[]): string {
   // Inject Known Players immediately after the base prompt (before the large
   // data sections) so the model sees them close to the Start/flow instructions.
   if (existingPlayers && existingPlayers.length > 0) {
-    const playerLines = existingPlayers.map((p) => {
+    // Sanitize names: single line, no control chars or markup
+    const sanitize = (s: string) => s.replace(/[\r\n]+/g, " ").replace(/[<>`]/g, "").trim();
+    // Cap at 9 to stay within present_choices maxItems (10) with room for edge cases
+    const players = existingPlayers.slice(0, 9);
+    const playerLines = players.map((p) => {
+      const name = sanitize(p.name);
       const age = p.ageGroup ? ` (age group: ${p.ageGroup})` : " (age group: unknown)";
-      return `- ${p.name}${age}`;
+      return `- ${name}${age}`;
     });
-    base += "\n\n## Known Players\n\nThese players have played before. Use `present_choices` at the start to let the player pick their name from this list (the app auto-appends an \"Enter your own\" option for new players). If they match a known player, welcome them back warmly — no need to re-ask information you already have. If their age group is unknown, ask once casually.\n\n" + playerLines.join("\n");
+    const instruction = players.length === 1
+      ? "There is one returning player. Ask freeform for the player's name — if they match, welcome them back warmly. No need to re-ask information you already have. If their age group is unknown, ask once casually."
+      : "These players have played before. Use `present_choices` at the start to let the player pick their name from this list (the app auto-appends an \"Enter your own\" option for new players). If they match a known player, welcome them back warmly — no need to re-ask information you already have. If their age group is unknown, ask once casually.";
+    base += "\n\n## Known Players\n\n" + instruction + "\n\n" + playerLines.join("\n");
   }
 
   const seedList = shuffle(SEEDS).map((s) => {
