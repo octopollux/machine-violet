@@ -11,7 +11,7 @@ import {
   NotesResponse, NotesUpdateRequest, OkResponse,
   SettingsResponse, SettingsPatch, CostResponse, ErrorResponse,
 } from "@machine-violet/shared";
-import { campaignPaths } from "../../tools/filesystem/scaffold.js";
+import { campaignPaths, machinePaths } from "../../tools/filesystem/scaffold.js";
 
 export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) => {
 
@@ -45,7 +45,8 @@ export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) =>
 
     // Try characters/<name>.md first, then players/<name>.md
     const paths = campaignPaths(gs.campaignRoot);
-    for (const pathFn of [paths.character, paths.player]) {
+    const mPaths = machinePaths(gs.homeDir);
+    for (const pathFn of [paths.character, mPaths.player]) {
       const path = pathFn(name);
       try {
         if (await fileIO.exists(path)) {

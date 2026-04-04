@@ -7,7 +7,8 @@
   "types": "dist/index.d.ts",
   "exports": {
     ".": "./dist/index.js",
-    "./*.js": "./dist/*.js"
+    "./*.js": "./dist/*.js",
+    "./types/*.js": "./dist/types/*.js"
   },
   "scripts": {
     "build": "tsc",
