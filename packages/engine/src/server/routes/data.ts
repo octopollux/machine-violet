@@ -10,6 +10,7 @@ import {
   NameParams, CharacterResponse, CompendiumResponse,
   NotesResponse, NotesUpdateRequest, OkResponse,
   SettingsResponse, SettingsPatch, CostResponse, ErrorResponse,
+  TranscriptSaveRequest, TranscriptSaveResponse,
 } from "@machine-violet/shared";
 import { campaignPaths, machinePaths } from "../../tools/filesystem/scaffold.js";
 
@@ -179,6 +180,33 @@ export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) =>
     } catch (err) {
       return reply.status(500).send({
         error: `Failed to save settings: ${err instanceof Error ? err.message : err}`,
+      });
+    }
+  });
+
+  /** Save HTML transcript to campaign root. */
+  server.put("/transcript", {
+    schema: {
+      tags: ["Data"],
+      body: TranscriptSaveRequest,
+      response: { 200: TranscriptSaveResponse, 400: ErrorResponse, 500: ErrorResponse },
+    },
+  }, async (request, reply) => {
+    const engine = server.sessionManager.getEngine();
+    const gs = server.sessionManager.getGameState();
+    if (!engine || !gs) return reply.status(400).send({ error: "No active engine." });
+
+    const { join } = await import("node:path");
+    const filePath = join(gs.campaignRoot, "game-transcript.html");
+    const { html } = (request.body as { html: string }) ?? {};
+
+    try {
+      const fileIO = engine.getSceneManager().getFileIO();
+      await fileIO.writeFile(filePath, html ?? "");
+      return { ok: true, path: filePath };
+    } catch (err) {
+      return reply.status(500).send({
+        error: `Failed to save transcript: ${err instanceof Error ? err.message : err}`,
       });
     }
   });

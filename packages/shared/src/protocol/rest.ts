@@ -123,6 +123,15 @@ export const NotesUpdateRequest = Type.Object({
   content: Type.String(),
 });
 
+export const TranscriptSaveRequest = Type.Object({
+  html: Type.String(),
+});
+
+export const TranscriptSaveResponse = Type.Object({
+  ok: Type.Boolean(),
+  path: Type.String(),
+});
+
 export const SettingsResponse = Type.Object({
   config: Type.Unknown(),
 });
@@ -266,6 +275,8 @@ export type CharacterResponse = Static<typeof CharacterResponse>;
 export type CompendiumResponse = Static<typeof CompendiumResponse>;
 export type NotesResponse = Static<typeof NotesResponse>;
 export type NotesUpdateRequest = Static<typeof NotesUpdateRequest>;
+export type TranscriptSaveRequest = Static<typeof TranscriptSaveRequest>;
+export type TranscriptSaveResponse = Static<typeof TranscriptSaveResponse>;
 export type SettingsResponse = Static<typeof SettingsResponse>;
 export type CostResponse = Static<typeof CostResponse>;
 export type ConnectionModel = Static<typeof ConnectionModel>;

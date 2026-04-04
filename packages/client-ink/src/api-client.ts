@@ -189,6 +189,10 @@ export class ApiClient {
     return this.fetch("/session/notes", { method: "PUT", body: { content } });
   }
 
+  async saveTranscript(html: string): Promise<{ ok: boolean; path: string }> {
+    return this.fetch("/session/transcript", { method: "PUT", body: { html } });
+  }
+
   async getSettings(): Promise<{ config: unknown }> {
     return this.get("/session/settings");
   }

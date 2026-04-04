@@ -28,6 +28,9 @@ import {
 } from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { useGameContext } from "../tui/game-context.js";
+import { themeColor } from "../tui/themes/color-resolve.js";
+import { buildTranscriptHtml } from "../commands/transcript.js";
+import { openPath } from "../commands/open-path.js";
 
 export function PlayingPhase() {
   const {
@@ -97,6 +100,29 @@ export function PlayingPhase() {
     setCharacterSheetCache(content);
   }, []);
 
+  // --- Save transcript handler ---
+  const saveTranscript = useCallback(async () => {
+    const playerColor = stateSnapshot?.players?.[activePlayerIndex]?.color ?? "#55ff55";
+    const separatorColor = themeColor(theme, "separator") ?? "#666666";
+    const html = buildTranscriptHtml({
+      narrativeLines,
+      width: cols,
+      campaignName,
+      themeAsset: theme.asset,
+      separatorColor,
+      playerColor,
+      quoteColor: "#ffffff",
+    });
+    try {
+      const { path } = await apiClient.saveTranscript(html);
+      setNarrativeLines((prev) => [...prev, { kind: "system", text: `[Transcript saved: ${path}]` }]);
+      openPath(path);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setNarrativeLines((prev) => [...prev, { kind: "system", text: `[Transcript save failed: ${msg}]` }]);
+    }
+  }, [apiClient, narrativeLines, cols, campaignName, theme, stateSnapshot, activePlayerIndex, setNarrativeLines]);
+
   // --- Submit handler ---
   const handleSubmit = useCallback(async (value: string) => {
     const text = value.trim();
@@ -109,6 +135,13 @@ export function PlayingPhase() {
       const args = spaceIdx === -1 ? undefined : text.slice(spaceIdx + 1).trim();
 
       setNarrativeLines((prev) => [...prev, { kind: "system", text: `/${name}${args ? " " + args : ""}` }]);
+
+      // Client-side commands (need access to TUI state)
+      if (name === "transcript") {
+        await saveTranscript();
+        clearInput();
+        return;
+      }
 
       try {
         await apiClient.command(name, args);
@@ -143,7 +176,7 @@ export function PlayingPhase() {
       setNarrativeLines((prev) => prev.filter((l) => l.tag !== tag));
       restoreInput(text);
     }
-  }, [apiClient, activeChar, currentTurn, setNarrativeLines, clearInput, restoreInput]);
+  }, [apiClient, activeChar, currentTurn, setNarrativeLines, clearInput, restoreInput, saveTranscript]);
 
   // --- Choice selection ---
   const handleChoiceSelect = useCallback(async (choice: string) => {
@@ -211,12 +244,14 @@ export function PlayingPhase() {
         const { content } = await apiClient.getNotes();
         setActiveModal({ kind: "notes", content } as never);
       } catch { setActiveModal({ kind: "notes", content: "" } as never); }
+    } else if (item === "Save Transcript") {
+      await saveTranscript();
     } else if (item === "Color Swatch") {
       setActiveModal({ kind: "swatch" } as never);
     } else if (item === "Settings") {
       // TODO: campaign settings modal
     }
-  }, [apiClient, onReturnToMenu, activeChar, setActiveModal]);
+  }, [apiClient, onReturnToMenu, activeChar, setActiveModal, saveTranscript]);
 
   // --- Input handling ---
   useInput((_input, key) => {

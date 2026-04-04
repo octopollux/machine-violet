@@ -1,0 +1,20 @@
+/**
+ * Open a file path using the OS default application.
+ * Fire-and-forget — errors are silently ignored.
+ *
+ * Uses spawn with argument arrays (no shell) to avoid command injection.
+ */
+import { spawn } from "node:child_process";
+
+export function openPath(filePath: string): void {
+  const opts = { detached: true, stdio: "ignore" as const };
+  const child =
+    process.platform === "win32"
+      ? spawn("cmd.exe", ["/d", "/s", "/c", "start", '""', filePath], opts)
+      : process.platform === "darwin"
+        ? spawn("open", [filePath], opts)
+        : spawn("xdg-open", [filePath], opts);
+
+  child.on("error", () => { /* ignore errors */ });
+  child.unref();
+}
