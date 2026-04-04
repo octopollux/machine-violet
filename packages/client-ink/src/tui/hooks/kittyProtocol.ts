@@ -189,6 +189,7 @@ export function detectKittySupport(opts: DetectOptions): Promise<boolean> {
 
   return new Promise<boolean>((resolve) => {
     let settled = false;
+    let buf = "";
 
     const timer = setTimeout(() => {
       if (settled) return;
@@ -197,22 +198,28 @@ export function detectKittySupport(opts: DetectOptions): Promise<boolean> {
       resolve(false);
     }, timeoutMs);
 
-    const onData = (chunk: Buffer) => {
+    // Use 'readable' + read() to stay in paused mode — consistent with
+    // the rest of the stdin pipeline (Ink uses readable, not 'data').
+    const onReadable = () => {
       if (settled) return;
-      const str = chunk.toString("utf8");
-      if (QUERY_RESPONSE_RE.test(str)) {
-        settled = true;
-        cleanup();
-        resolve(true);
+      let chunk: Buffer | string | null;
+      while ((chunk = stdin.read()) !== null) {
+        buf += typeof chunk === "string" ? chunk : chunk.toString("utf8");
+        if (QUERY_RESPONSE_RE.test(buf)) {
+          settled = true;
+          cleanup();
+          resolve(true);
+          return;
+        }
       }
     };
 
     const cleanup = () => {
       clearTimeout(timer);
-      stdin.removeListener("data", onData);
+      stdin.removeListener("readable", onReadable);
     };
 
-    stdin.on("data", onData);
+    stdin.on("readable", onReadable);
     stdout.write(QUERY);
   });
 }
@@ -227,14 +234,15 @@ let _exitCleanup: (() => void) | null = null;
  * Enable Kitty keyboard protocol (push flag 1 = disambiguate).
  * Registers exit handlers to pop the flag on shutdown, preventing the
  * terminal from being left in enhanced mode after the process exits.
+ * Idempotent — calling when already enabled is a no-op.
  */
 export function enableKittyProtocol(stdout: { write(s: string): boolean }): void {
+  if (_exitCleanup) return; // already enabled
+
   stdout.write(PUSH_DISAMBIGUATE);
 
-  const pop = () => { stdout.write(POP); };
-
   // Safety net: pop on exit (covers SIGINT, uncaught exceptions, etc.)
-  const onExit = () => { pop(); };
+  const onExit = () => { stdout.write(POP); };
   process.on("exit", onExit);
 
   _exitCleanup = () => {

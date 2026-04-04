@@ -223,16 +223,25 @@ describe("extractKittyKeys", () => {
 
 describe("detectKittySupport", () => {
   it("returns true when terminal responds with CSI ? flags u", async () => {
+    const { EventEmitter } = await import("node:events");
     const stdout = { write: vi.fn(() => true) };
-    const stdin = Object.assign(new (await import("node:events")).EventEmitter(), {
+    // Mock a readable stream that returns data on read() after 'readable'
+    const responseData = Buffer.from("\x1b[?1u");
+    let consumed = false;
+    const stdin = Object.assign(new EventEmitter(), {
       isTTY: true as const,
       isRaw: true,
+      read: () => {
+        if (consumed) return null;
+        consumed = true;
+        return responseData;
+      },
     }) as unknown as NodeJS.ReadStream;
 
     const promise = detectKittySupport({ stdin, stdout, timeoutMs: 50 });
 
-    // Simulate terminal response
-    stdin.emit("data", Buffer.from("\x1b[?1u"));
+    // Simulate terminal responding via readable event
+    stdin.emit("readable");
 
     const result = await promise;
     expect(result).toBe(true);
@@ -240,14 +249,41 @@ describe("detectKittySupport", () => {
   });
 
   it("returns false on timeout", async () => {
+    const { EventEmitter } = await import("node:events");
     const stdout = { write: vi.fn(() => true) };
-    const stdin = Object.assign(new (await import("node:events")).EventEmitter(), {
+    const stdin = Object.assign(new EventEmitter(), {
       isTTY: true as const,
       isRaw: true,
+      read: () => null,
     }) as unknown as NodeJS.ReadStream;
 
     const result = await detectKittySupport({ stdin, stdout, timeoutMs: 10 });
     expect(result).toBe(false);
+  });
+
+  it("handles response split across multiple readable events", async () => {
+    const { EventEmitter } = await import("node:events");
+    const stdout = { write: vi.fn(() => true) };
+    const chunks = [Buffer.from("\x1b[?"), Buffer.from("1u")];
+    let idx = 0;
+    const stdin = Object.assign(new EventEmitter(), {
+      isTTY: true as const,
+      isRaw: true,
+      read: () => {
+        if (idx >= chunks.length) return null;
+        return chunks[idx++];
+      },
+    }) as unknown as NodeJS.ReadStream;
+
+    const promise = detectKittySupport({ stdin, stdout, timeoutMs: 50 });
+
+    // First chunk — partial response
+    stdin.emit("readable");
+    // Second chunk — completes the response
+    stdin.emit("readable");
+
+    const result = await promise;
+    expect(result).toBe(true);
   });
 });
 

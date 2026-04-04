@@ -123,15 +123,19 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
   };
   process.on("SIGINT", onSigInt);
 
-  // Wrap waitUntilExit to clean up guards
+  // Wrap waitUntilExit to clean up guards. try/finally ensures terminal
+  // mode is always restored even if inkWaitUntilExit or sidecar throws.
   const waitUntilExit = async () => {
-    await inkWaitUntilExit();
-    process.removeListener("SIGINT", onSigInt);
-    if (sidecarClose) await sidecarClose();
-    if (removeKittyFilter) removeKittyFilter();
-    if (hasKitty) disableKittyProtocol(process.stdout);
-    unlockRawMode();
-    removeCombiner();
+    try {
+      await inkWaitUntilExit();
+      process.removeListener("SIGINT", onSigInt);
+      if (sidecarClose) await sidecarClose();
+    } finally {
+      if (removeKittyFilter) removeKittyFilter();
+      if (hasKitty) disableKittyProtocol(process.stdout);
+      unlockRawMode();
+      removeCombiner();
+    }
   };
 
   return { unmount, waitUntilExit };
