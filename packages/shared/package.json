@@ -6,9 +6,18 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./*.js": "./dist/*.js",
-    "./types/*.js": "./dist/types/*.js"
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./*.js": {
+      "source": "./src/*.ts",
+      "default": "./dist/*.js"
+    },
+    "./types/*.js": {
+      "source": "./src/types/*.ts",
+      "default": "./dist/types/*.js"
+    }
   },
   "scripts": {
     "build": "tsc",
