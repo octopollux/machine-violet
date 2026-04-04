@@ -16,6 +16,7 @@ export function emptyCompendium(): Compendium {
     lastUpdatedScene: 0,
     characters: [],
     places: [],
+    items: [],
     storyline: [],
     lore: [],
     objectives: [],
@@ -98,6 +99,9 @@ export function parseCompendiumOutput(
       return fallback;
     }
 
+    // Backfill items array for compendiums created before this category existed
+    if (!Array.isArray(parsed.items)) parsed.items = [];
+
     // Ensure version field
     parsed.version = 1;
     return parsed;
@@ -126,6 +130,7 @@ export function renderCompendiumForDM(compendium: Compendium): string {
 
   renderCategory("Characters", compendium.characters);
   renderCategory("Places", compendium.places);
+  renderCategory("Items", compendium.items);
   renderCategory("Storyline", compendium.storyline);
   renderCategory("Lore", compendium.lore);
   renderCategory("Objectives", compendium.objectives);

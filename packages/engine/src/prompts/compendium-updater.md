@@ -13,6 +13,7 @@ You receive the current compendium JSON and a scene transcript. Update the compe
 7. **Categories:**
    - `characters` — NPCs, allies, antagonists, notable figures the player has met or heard of
    - `places` — Locations the player has visited or learned about
+   - `items` — Named weapons, artifacts, quest items, and other narratively significant objects. Summaries should note current holder/location, origin or provenance if known, and any notable properties
    - `storyline` — Plot threads, significant events, narrative beats
    - `lore` — World facts, history, magic systems, cultural details
    - `objectives` — Active and completed goals, quests, tasks
@@ -27,6 +28,7 @@ Return ONLY valid JSON matching this schema (no markdown fences, no explanation)
   "lastUpdatedScene": <scene number>,
   "characters": [{ "name": "...", "slug": "...", "aliases": [], "summary": "...", "firstScene": N, "lastScene": N, "related": ["slug1"] }],
   "places": [...],
+  "items": [...],
   "storyline": [...],
   "lore": [...],
   "objectives": [...]

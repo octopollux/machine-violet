@@ -36,6 +36,9 @@ function sampleCompendium(): Compendium {
     places: [
       entry({ name: "The Undercroft", slug: "the-undercroft", summary: "Hidden tunnel network." }),
     ],
+    items: [
+      entry({ name: "Crystal Dagger", slug: "crystal-dagger", summary: "A dagger of translucent crystal." }),
+    ],
     storyline: [],
     lore: [
       entry({ name: "The Crystal Prophecy", slug: "crystal-prophecy", summary: "An ancient prophecy about the return of the crystal." }),
@@ -52,6 +55,7 @@ function emptyCompendium(): Compendium {
     lastUpdatedScene: 0,
     characters: [],
     places: [],
+    items: [],
     storyline: [],
     lore: [],
     objectives: [],
@@ -91,6 +95,7 @@ describe("CompendiumModal", () => {
     const frame = lastFrame()!;
     expect(frame).toContain("Characters (2)");
     expect(frame).toContain("Places (1)");
+    expect(frame).toContain("Items (1)");
     expect(frame).toContain("Storyline (0)");
     expect(frame).toContain("Lore (1)");
     expect(frame).toContain("Objectives (1)");

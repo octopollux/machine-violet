@@ -84,6 +84,7 @@ export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) =>
           lastUpdatedScene: 0,
           characters: [],
           places: [],
+          items: [],
           storyline: [],
           lore: [],
           objectives: [],

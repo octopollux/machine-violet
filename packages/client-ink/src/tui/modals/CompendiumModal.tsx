@@ -15,6 +15,7 @@ import { COMPENDIUM_CATEGORIES } from "@machine-violet/shared/types/compendium.j
 const CATEGORY_LABELS: Record<CompendiumCategory, string> = {
   characters: "Characters",
   places: "Places",
+  items: "Items",
   storyline: "Storyline",
   lore: "Lore",
   objectives: "Objectives",

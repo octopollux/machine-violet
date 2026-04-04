@@ -61,6 +61,7 @@ describe("emptyCompendium", () => {
     expect(c.lastUpdatedScene).toBe(0);
     expect(c.characters).toEqual([]);
     expect(c.places).toEqual([]);
+    expect(c.items).toEqual([]);
     expect(c.storyline).toEqual([]);
     expect(c.lore).toEqual([]);
     expect(c.objectives).toEqual([]);
@@ -102,6 +103,7 @@ describe("parseCompendiumOutput", () => {
       lastUpdatedScene: 3,
       characters: [entry({ name: "Mira", slug: "mira", summary: "A smuggler." })],
       places: [],
+      items: [],
       storyline: [],
       lore: [],
       objectives: [],
@@ -168,6 +170,7 @@ describe("renderCompendiumForDM", () => {
         entry({ name: "Captain Voss", slug: "captain-voss", summary: "Corrupt guard captain" }),
       ],
       places: [entry({ name: "The Undercroft", slug: "the-undercroft", summary: "Hidden tunnel network" })],
+      items: [entry({ name: "Crystal Dagger", slug: "crystal-dagger", summary: "Held by Aldric, gifted by the Pale Queen" })],
       storyline: [],
       lore: [],
       objectives: [entry({ name: "Find the Artifact", slug: "find-the-artifact", summary: "Locate the missing relic in the caves" })],
@@ -176,6 +179,7 @@ describe("renderCompendiumForDM", () => {
     const rendered = renderCompendiumForDM(compendium);
     expect(rendered).toContain("Characters: [[Mira]] (ally smuggler), [[Captain Voss]] (corrupt guard captain)");
     expect(rendered).toContain("Places: [[The Undercroft]] (hidden tunnel network)");
+    expect(rendered).toContain("Items: [[Crystal Dagger]] (held by aldric, gifted by the pale queen)");
     expect(rendered).not.toContain("Storyline:");
     expect(rendered).not.toContain("Lore:");
     expect(rendered).toContain("Objectives: [[Find the Artifact]] (locate the missing relic in the caves)");
@@ -212,6 +216,7 @@ describe("updateCompendium", () => {
       lastUpdatedScene: 3,
       characters: [entry({ name: "Mira", slug: "mira", summary: "A smuggler." })],
       places: [],
+      items: [],
       storyline: [],
       lore: [],
       objectives: [],
