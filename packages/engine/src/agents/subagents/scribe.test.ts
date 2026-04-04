@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { buildScribeToolHandler } from "./scribe.js";
+import { buildScribeToolHandler, splitSections, mergeSectionBodies } from "./scribe.js";
 import type { ScribeFileIO } from "./scribe.js";
 import { resetPromptCache } from "../../prompts/load-prompt.js";
 import { norm } from "../../utils/paths.js";
@@ -191,7 +191,7 @@ describe("buildScribeToolHandler", () => {
   });
 
   describe("write_entity (update)", () => {
-    it("updates front matter, appends body, adds changelog", async () => {
+    it("updates front matter, appends plain body, adds changelog", async () => {
       const fio = mockFileIO({
         "/camp/characters/grimjaw.md": "# Grimjaw\n\n**Type:** character\n**Disposition:** hostile\n\nA scarred orc.\n",
       });
@@ -216,6 +216,108 @@ describe("buildScribeToolHandler", () => {
       expect(content).toContain("Now an ally.");
       expect(content).toContain("Scene 005");
       expect(content).toContain("Befriended by Kael");
+    });
+
+    it("replaces existing ## sections instead of appending duplicates", async () => {
+      const existing = [
+        "# Aldric",
+        "",
+        "**Type:** character",
+        "",
+        "A brave knight.",
+        "",
+        "## Inventory",
+        "- [[Rusty Sword]]",
+        "",
+        "## Notes",
+        "Prefers diplomacy.",
+      ].join("\n");
+
+      const fio = mockFileIO({ "/camp/characters/aldric.md": existing });
+      const handler = buildScribeToolHandler(fio, "/camp", 5, [], [], []);
+
+      await handler("write_entity", {
+        mode: "update",
+        entity_type: "character",
+        name: "Aldric",
+        body: "## Inventory\n- [[Rusty Sword]]\n- [[Crystal Dagger]] — gifted by the Pale Queen",
+      });
+
+      const content = vi.mocked(fio.writeFile).mock.calls[0][1] as string;
+      // Should have exactly one ## Inventory
+      const inventoryCount = (content.match(/## Inventory/g) || []).length;
+      expect(inventoryCount).toBe(1);
+      // Should contain the updated inventory
+      expect(content).toContain("Crystal Dagger");
+      // Should preserve the untouched ## Notes section
+      expect(content).toContain("## Notes");
+      expect(content).toContain("Prefers diplomacy.");
+      // Should preserve the preamble
+      expect(content).toContain("A brave knight.");
+    });
+
+    it("appends genuinely new sections", async () => {
+      const existing = [
+        "# Aldric",
+        "",
+        "**Type:** character",
+        "",
+        "A brave knight.",
+        "",
+        "## Inventory",
+        "- [[Rusty Sword]]",
+      ].join("\n");
+
+      const fio = mockFileIO({ "/camp/characters/aldric.md": existing });
+      const handler = buildScribeToolHandler(fio, "/camp", 5, [], [], []);
+
+      await handler("write_entity", {
+        mode: "update",
+        entity_type: "character",
+        name: "Aldric",
+        body: "## Conditions\n- Poisoned (2 rounds remaining)",
+      });
+
+      const content = vi.mocked(fio.writeFile).mock.calls[0][1] as string;
+      expect(content).toContain("## Inventory");
+      expect(content).toContain("## Conditions");
+      expect(content).toContain("Poisoned");
+      // Inventory should be unchanged
+      expect(content).toContain("[[Rusty Sword]]");
+    });
+
+    it("handles mixed replace and append in one update", async () => {
+      const existing = [
+        "# Aldric",
+        "",
+        "**Type:** character",
+        "",
+        "A brave knight.",
+        "",
+        "## Inventory",
+        "- [[Rusty Sword]]",
+        "",
+        "## Notes",
+        "Prefers diplomacy.",
+      ].join("\n");
+
+      const fio = mockFileIO({ "/camp/characters/aldric.md": existing });
+      const handler = buildScribeToolHandler(fio, "/camp", 5, [], [], []);
+
+      await handler("write_entity", {
+        mode: "update",
+        entity_type: "character",
+        name: "Aldric",
+        body: "## Inventory\n- [[Rusty Sword]]\n- [[Crystal Dagger]]\n\n## Conditions\n- Blessed",
+      });
+
+      const content = vi.mocked(fio.writeFile).mock.calls[0][1] as string;
+      const inventoryCount = (content.match(/## Inventory/g) || []).length;
+      expect(inventoryCount).toBe(1);
+      expect(content).toContain("Crystal Dagger");
+      expect(content).toContain("## Notes");
+      expect(content).toContain("## Conditions");
+      expect(content).toContain("Blessed");
     });
 
     it("deletes front matter keys with null value", async () => {
@@ -288,5 +390,74 @@ describe("buildScribeToolHandler", () => {
     const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
     const result = await handler("unknown_tool", {});
     expect(result.is_error).toBe(true);
+  });
+});
+
+describe("splitSections", () => {
+  it("returns single entry for body with no headings", () => {
+    const result = splitSections("Just plain text.\n\nAnother paragraph.");
+    expect(result).toHaveLength(1);
+    expect(result[0].heading).toBe("");
+    expect(result[0].content).toContain("Just plain text.");
+  });
+
+  it("splits on ## headings", () => {
+    const body = "Preamble.\n\n## Stats\nHP: 42\n\n## Inventory\n- Sword";
+    const result = splitSections(body);
+    expect(result).toHaveLength(3);
+    expect(result[0].heading).toBe("");
+    expect(result[0].content).toBe("Preamble.\n");
+    expect(result[1].heading).toBe("## Stats");
+    expect(result[2].heading).toBe("## Inventory");
+  });
+
+  it("does not split on ### headings", () => {
+    const body = "## Stats\nHP: 42\n### Substats\nSTR: 10";
+    const result = splitSections(body);
+    expect(result).toHaveLength(1);
+    expect(result[0].heading).toBe("## Stats");
+    expect(result[0].content).toContain("### Substats");
+  });
+});
+
+describe("mergeSectionBodies", () => {
+  it("appends plain text (no headings) for backward compat", () => {
+    const result = mergeSectionBodies("Existing text.", "New text.");
+    expect(result).toBe("Existing text.\n\nNew text.");
+  });
+
+  it("replaces matching section in-place", () => {
+    const existing = "## Inventory\n- Sword\n\n## Notes\nBrave.";
+    const incoming = "## Inventory\n- Sword\n- Dagger";
+    const result = mergeSectionBodies(existing, incoming);
+    expect((result.match(/## Inventory/g) || []).length).toBe(1);
+    expect(result).toContain("Dagger");
+    expect(result).toContain("## Notes");
+    expect(result).toContain("Brave.");
+  });
+
+  it("preserves preamble text before first heading", () => {
+    const existing = "A brave knight.\n\n## Inventory\n- Sword";
+    const incoming = "## Inventory\n- Sword\n- Shield";
+    const result = mergeSectionBodies(existing, incoming);
+    expect(result).toContain("A brave knight.");
+    expect(result).toContain("Shield");
+    expect((result.match(/## Inventory/g) || []).length).toBe(1);
+  });
+
+  it("does not overwrite preamble with incoming preamble", () => {
+    const existing = "Original description.\n\n## Stats\nHP: 42";
+    const incoming = "## Stats\nHP: 30";
+    const result = mergeSectionBodies(existing, incoming);
+    expect(result).toContain("Original description.");
+  });
+
+  it("appends incoming body that only has ### headings (no ## sections)", () => {
+    const existing = "## Stats\nHP: 42";
+    const incoming = "### Substats\nSTR: 10";
+    const result = mergeSectionBodies(existing, incoming);
+    expect(result).toContain("## Stats");
+    expect(result).toContain("### Substats");
+    expect(result).toContain("STR: 10");
   });
 });

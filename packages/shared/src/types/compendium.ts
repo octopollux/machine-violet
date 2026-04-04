@@ -20,6 +20,7 @@ export interface CompendiumEntry {
 export type CompendiumCategory =
   | "characters"
   | "places"
+  | "items"
   | "storyline"
   | "lore"
   | "objectives";
@@ -27,6 +28,7 @@ export type CompendiumCategory =
 export const COMPENDIUM_CATEGORIES: CompendiumCategory[] = [
   "characters",
   "places",
+  "items",
   "storyline",
   "lore",
   "objectives",
@@ -37,6 +39,7 @@ export interface Compendium {
   lastUpdatedScene: number;
   characters: CompendiumEntry[];
   places: CompendiumEntry[];
+  items: CompendiumEntry[];
   storyline: CompendiumEntry[];
   lore: CompendiumEntry[];
   objectives: CompendiumEntry[];

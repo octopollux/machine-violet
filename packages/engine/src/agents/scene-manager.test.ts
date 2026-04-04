@@ -28,7 +28,7 @@ function textResponse(text: string): ChatResult {
 
 /** Empty compendium JSON response for the compendium updater subagent */
 const EMPTY_COMPENDIUM_RESPONSE = textResponse(
-  JSON.stringify({ version: 1, lastUpdatedScene: 1, characters: [], places: [], storyline: [], lore: [], objectives: [] }),
+  JSON.stringify({ version: 1, lastUpdatedScene: 1, characters: [], places: [], items: [], storyline: [], lore: [], objectives: [] }),
 );
 
 /**
