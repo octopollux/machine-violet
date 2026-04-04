@@ -15,9 +15,10 @@ import {
   detectKittySupport,
   enableKittyProtocol,
   disableKittyProtocol,
-  installKittyFilter,
+  createKittyFilter,
   kittyKeyToLegacy,
 } from "./tui/hooks/kittyProtocol.js";
+import { installStdinFilterChain } from "./tui/hooks/stdinFilterChain.js";
 import { getAgentClientState } from "./agent-state-ref.js";
 
 export interface StartClientOptions {
@@ -84,27 +85,30 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
   // writes so the terminal never displays intermediate states.
   const removeCombiner = installSyncWriteCombiner(process.stdout);
 
+  // Install the stdin filter chain — a single read() wrapper that runs
+  // all registered filters (kitty, mouse) in order.
+  const filterChain = installStdinFilterChain(activeStdin);
+
   // Probe for Kitty keyboard protocol support. When available, CSI-u
   // encoding makes every keystroke unambiguous — Backspace can never be
   // confused or dropped, even when ConPTY corrupts console mode flags.
-  let removeKittyFilter: (() => void) | undefined;
   const hasKitty = !mockStdin && activeStdin.isTTY
     ? await detectKittySupport({ stdin: activeStdin, stdout: process.stdout })
     : false;
   if (hasKitty) {
     enableKittyProtocol(process.stdout);
-    removeKittyFilter = installKittyFilter(activeStdin, (key) => {
+    filterChain.add(createKittyFilter((key) => {
       // Re-emit as legacy bytes so Ink's useInput picks them up.
       const legacy = kittyKeyToLegacy(key);
       if (legacy !== null) activeStdin.push(legacy);
-    });
+    }));
   }
 
   const renderOpts: RenderOptions = { exitOnCtrlC: !mockStdin };
   if (mockStdin) renderOpts.stdin = mockStdin;
 
   const { unmount, waitUntilExit: inkWaitUntilExit } = render(
-    React.createElement(App, { serverUrl, playerId, campaignId }),
+    React.createElement(App, { serverUrl, playerId, campaignId, hasKittyProtocol: hasKitty, stdinFilterChain: filterChain }),
     renderOpts,
   );
 
@@ -131,8 +135,8 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
       process.removeListener("SIGINT", onSigInt);
       if (sidecarClose) await sidecarClose();
     } finally {
-      if (removeKittyFilter) removeKittyFilter();
       if (hasKitty) disableKittyProtocol(process.stdout);
+      filterChain.teardown();
       unlockRawMode();
       removeCombiner();
     }

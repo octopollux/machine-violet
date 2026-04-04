@@ -8,6 +8,7 @@ import { renderNodes } from "../render-nodes.js";
 import { useScrollHandle } from "../hooks/useScrollHandle.js";
 import type { ScrollHandle } from "../hooks/useScrollHandle.js";
 import { useMouseScroll } from "../hooks/useMouseScroll.js";
+import { useOptionalGameContext } from "../game-context.js";
 import { composeTurnSeparator } from "../themes/composer.js";
 import type { ThemeAsset } from "../themes/types.js";
 
@@ -191,7 +192,8 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
       },
     };
   }
-  useMouseScroll(mouseTargetRef);
+  const gameCtx = useOptionalGameContext();
+  useMouseScroll(mouseTargetRef, gameCtx?.stdinFilterChain ?? null);
 
   // Track scroll position
   const updateScrollState = useCallback(() => {

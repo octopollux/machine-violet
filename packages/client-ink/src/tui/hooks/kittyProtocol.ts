@@ -14,7 +14,7 @@
  * @see https://sw.kovidgoyal.net/kitty/keyboard-protocol/
  */
 
-import type { ReadableStdin } from "./useMouseScroll.js";
+import type { StdinFilter } from "./stdinFilterChain.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -289,41 +289,23 @@ export function extractKittyKeys(data: string): { keys: KittyKey[]; remainder: s
 }
 
 /**
- * Install a stdin filter that intercepts CSI-u sequences before Ink
- * processes them. Parsed keys are dispatched via `onKey`, deferred with
- * process.nextTick so read() returns before any re-rendering.
- *
- * Follows the same pattern as installMouseFilter in useMouseScroll.ts.
+ * Create a StdinFilter that intercepts CSI-u sequences. Parsed keys
+ * are dispatched via `onKey`, deferred with process.nextTick so the
+ * chain's read() returns before any React re-rendering.
  */
-export function installKittyFilter(
-  input: ReadableStdin,
-  onKey: (key: KittyKey) => void,
-): () => void {
-  const originalRead = input.read.bind(input);
-
-  input.read = function filteredRead(size?: number): Buffer | string | null {
-    const chunk = originalRead(size);
-    if (chunk === null) return null;
-
-    const str = typeof chunk === "string" ? chunk : chunk.toString("utf8");
-    const { keys, remainder } = extractKittyKeys(str);
-
-    if (keys.length > 0) {
-      process.nextTick(() => {
-        for (const key of keys) {
-          onKey(key);
-        }
-      });
-    }
-
-    // Return empty string (not null) when fully consumed — null would
-    // signal "no data available" and desync the stream's buffer state.
-    if (remainder === null) return typeof chunk === "string" ? "" : Buffer.alloc(0);
-    if (typeof chunk === "string") return remainder;
-    return Buffer.from(remainder, "utf8");
-  };
-
-  return () => {
-    input.read = originalRead;
+export function createKittyFilter(onKey: (key: KittyKey) => void): StdinFilter {
+  return {
+    name: "kitty",
+    process(data: string): string | null {
+      const { keys, remainder } = extractKittyKeys(data);
+      if (keys.length > 0) {
+        process.nextTick(() => {
+          for (const key of keys) {
+            onKey(key);
+          }
+        });
+      }
+      return remainder;
+    },
   };
 }

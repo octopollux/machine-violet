@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import type { StdinFilter, StdinFilterChain } from "./stdinFilterChain.js";
 
 /** Anything with a scrollBy method (ScrollHandle, ScrollViewRef, etc.). */
 interface Scrollable {
@@ -72,66 +73,30 @@ export function stripMouseSequences(data: string): string | null {
 }
 
 // ---------------------------------------------------------------------------
-// stdin filter — intercepts read() to strip mouse sequences before
-// Ink's input handler sees them.
-//
-// Ink uses the readable stream protocol: it listens for 'readable' events
-// then pulls chunks via stdin.read(). Intercepting emit('data') does nothing
-// because Ink never uses 'data' events. We monkey-patch read() instead.
+// stdin filter — strips mouse sequences from input chunks before Ink
+// processes them. Registered on the StdinFilterChain (see stdinFilterChain.ts).
 // ---------------------------------------------------------------------------
 
-export interface ReadableStdin {
-  read(size?: number): Buffer | string | null;
-}
-
 /**
- * Install a stdin filter that wraps read() to strip SGR mouse sequences
- * from chunks before Ink processes them. Calls `onScroll` for each scroll
- * event found, deferred via process.nextTick so the read() call completes
- * before any React re-rendering occurs. If a chunk is entirely mouse data,
- * read() returns an empty string so the stream's readable state stays
- * consistent (returning null would signal "no data" and can desync the
- * stream's internal buffer tracking).
- *
- * Returns a teardown function that restores the original read.
+ * Create a StdinFilter that strips SGR mouse sequences and dispatches
+ * scroll events via process.nextTick.
  */
-export function installMouseFilter(
-  input: ReadableStdin,
+export function createMouseFilter(
   onScroll: (delta: number) => void,
-): () => void {
-  const originalRead = input.read.bind(input);
-
-  input.read = function filteredRead(size?: number): Buffer | string | null {
-    const chunk = originalRead(size);
-    if (chunk === null) return null;
-
-    const str = typeof chunk === "string" ? chunk : chunk.toString("utf8");
-
-    // Extract scroll events — defer dispatch so read() returns before
-    // any React/Ink re-rendering is triggered by scrollBy().
-    const scrolls = parseScrollEvents(str);
-    if (scrolls.length > 0) {
-      process.nextTick(() => {
-        for (const delta of scrolls) {
-          onScroll(delta);
-        }
-      });
-    }
-
-    // Strip all mouse sequences; pass remainder to Ink.
-    // Return empty string (not null) when fully consumed — null would
-    // signal "no data available" and can desync the stream's internal
-    // buffer state since originalRead() already consumed the bytes.
-    const remainder = stripMouseSequences(str);
-    if (remainder === null) return typeof chunk === "string" ? "" : Buffer.alloc(0);
-
-    // Preserve the original type (Ink sets encoding to utf8, so string)
-    if (typeof chunk === "string") return remainder;
-    return Buffer.from(remainder, "utf8");
-  };
-
-  return () => {
-    input.read = originalRead;
+): StdinFilter {
+  return {
+    name: "mouse",
+    process(data: string): string | null {
+      const scrolls = parseScrollEvents(data);
+      if (scrolls.length > 0) {
+        process.nextTick(() => {
+          for (const delta of scrolls) {
+            onScroll(delta);
+          }
+        });
+      }
+      return stripMouseSequences(data);
+    },
   };
 }
 
@@ -146,26 +111,28 @@ export const LINES_PER_TICK = 2;
  * Enable terminal mouse reporting and scroll the narrative area on wheel
  * events. Each wheel tick scrolls by {@link LINES_PER_TICK} lines.
  *
- * Wraps stdin.read() to intercept mouse sequences before Ink processes
- * them (preventing garbage in the text input). Enables reporting on mount,
- * disables on unmount. A process 'exit' listener acts as a safety net so
- * a crash doesn't leave the terminal in mouse mode.
+ * Registers a mouse filter on the stdin filter chain to intercept mouse
+ * sequences before Ink processes them (preventing garbage in the text
+ * input). Enables reporting on mount, disables on unmount. A process
+ * 'exit' listener acts as a safety net so a crash doesn't leave the
+ * terminal in mouse mode.
  */
 export function useMouseScroll(
   scrollRef: React.RefObject<Scrollable | null>,
+  filterChain: StdinFilterChain | null,
 ): void {
   useEffect(() => {
     const output = process.stdout;
-    const input = process.stdin;
 
     // Skip in non-TTY environments (tests, piped input/output).
-    if (!output.isTTY || !input.isTTY) return;
+    if (!output.isTTY || !process.stdin.isTTY || !filterChain) return;
 
     enableMouseReporting(output);
 
-    const removeFilter = installMouseFilter(
-      input as ReadableStdin,
-      (delta) => { scrollRef.current?.scrollBy(delta * LINES_PER_TICK); },
+    const removeFilter = filterChain.add(
+      createMouseFilter(
+        (delta) => { scrollRef.current?.scrollBy(delta * LINES_PER_TICK); },
+      ),
     );
 
     // Safety net: disable mouse reporting on process exit even if unmount
@@ -178,5 +145,5 @@ export function useMouseScroll(
       process.off("exit", onExit);
       disableMouseReporting(output);
     };
-  }, [scrollRef]);
+  }, [scrollRef, filterChain]);
 }

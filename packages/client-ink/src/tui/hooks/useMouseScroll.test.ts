@@ -1,12 +1,11 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   parseScrollEvents,
   stripMouseSequences,
   enableMouseReporting,
   disableMouseReporting,
-  installMouseFilter,
+  createMouseFilter,
 } from "./useMouseScroll.js";
-import type { ReadableStdin } from "./useMouseScroll.js";
 
 // ---------------------------------------------------------------------------
 // parseScrollEvents
@@ -86,130 +85,47 @@ describe("stripMouseSequences", () => {
 });
 
 // ---------------------------------------------------------------------------
-// installMouseFilter
+// createMouseFilter
 // ---------------------------------------------------------------------------
 
-describe("installMouseFilter", () => {
-  function makeFakeStdin(chunks: (string | null)[]): ReadableStdin {
-    let i = 0;
-    return {
-      read(_size?: number) {
-        if (i >= chunks.length) return null;
-        return chunks[i++];
-      },
-    };
-  }
-
+describe("createMouseFilter", () => {
   /** Flush process.nextTick queue so deferred onScroll calls execute. */
   function flushNextTick(): Promise<void> {
     return new Promise((resolve) => process.nextTick(resolve));
   }
 
-  it("returns empty string for fully-consumed chunk and defers onScroll", async () => {
-    const stdin = makeFakeStdin(["\x1b[<64;10;20M"]);
+  it("returns null for fully-consumed chunk and defers onScroll", async () => {
     const scrolls: number[] = [];
+    const filter = createMouseFilter((d) => scrolls.push(d));
 
-    const remove = installMouseFilter(stdin, (d) => scrolls.push(d));
-
-    const result = stdin.read();
-    expect(result).toBe(""); // fully consumed → empty string, not null
-    expect(scrolls).toEqual([]); // not yet — deferred
+    const result = filter.process("\x1b[<64;10;20M");
+    expect(result).toBeNull(); // fully consumed
+    expect(scrolls).toEqual([]); // deferred
 
     await flushNextTick();
     expect(scrolls).toEqual([-1]);
-
-    remove();
   });
 
   it("passes non-mouse data through unchanged", () => {
-    const stdin = makeFakeStdin(["hello"]);
-
-    const remove = installMouseFilter(stdin, () => {});
-
-    const result = stdin.read();
-    expect(result).toBe("hello");
-
-    remove();
+    const filter = createMouseFilter(() => {});
+    const input = "hello";
+    expect(filter.process(input)).toBe(input);
   });
 
   it("strips mouse sequences from mixed data and passes remainder", async () => {
-    const stdin = makeFakeStdin(["key\x1b[<65;1;1Mpress"]);
     const scrolls: number[] = [];
+    const filter = createMouseFilter((d) => scrolls.push(d));
 
-    const remove = installMouseFilter(stdin, (d) => scrolls.push(d));
-
-    const result = stdin.read();
+    const result = filter.process("key\x1b[<65;1;1Mpress");
     expect(result).toBe("keypress");
 
     await flushNextTick();
     expect(scrolls).toEqual([1]);
-
-    remove();
   });
 
-  it("returns null when original read returns null", () => {
-    const stdin = makeFakeStdin([null]);
-
-    const remove = installMouseFilter(stdin, () => {});
-
-    expect(stdin.read()).toBeNull();
-
-    remove();
-  });
-
-  it("restores original read on teardown", async () => {
-    const stdin = makeFakeStdin([
-      "\x1b[<64;1;1M",  // consumed by filter
-      "\x1b[<64;1;1M",  // after teardown, passes through
-    ]);
-    const scrolls: number[] = [];
-
-    const remove = installMouseFilter(stdin, (d) => scrolls.push(d));
-
-    stdin.read(); // filtered
-    await flushNextTick();
-    expect(scrolls).toEqual([-1]);
-
-    remove();
-
-    // After teardown, mouse sequences pass through as-is
-    const result = stdin.read();
-    expect(result).toBe("\x1b[<64;1;1M");
-    expect(scrolls).toEqual([-1]); // no new scroll events
-  });
-
-  it("handles Buffer chunks and returns Buffer", async () => {
-    const buf = Buffer.from("abc\x1b[<65;1;1Mdef");
-    const stdin: ReadableStdin = {
-      read: vi.fn().mockReturnValueOnce(buf),
-    };
-    const scrolls: number[] = [];
-
-    const remove = installMouseFilter(stdin, (d) => scrolls.push(d));
-
-    const result = stdin.read();
-    expect(Buffer.isBuffer(result)).toBe(true);
-    expect((result as Buffer).toString("utf8")).toBe("abcdef");
-
-    await flushNextTick();
-    expect(scrolls).toEqual([1]);
-
-    remove();
-  });
-
-  it("returns empty Buffer for fully-consumed Buffer chunk", () => {
-    const buf = Buffer.from("\x1b[<64;10;20M");
-    const stdin: ReadableStdin = {
-      read: vi.fn().mockReturnValueOnce(buf),
-    };
-
-    const remove = installMouseFilter(stdin, () => {});
-
-    const result = stdin.read();
-    expect(Buffer.isBuffer(result)).toBe(true);
-    expect((result as Buffer).length).toBe(0);
-
-    remove();
+  it("has name 'mouse'", () => {
+    const filter = createMouseFilter(() => {});
+    expect(filter.name).toBe("mouse");
   });
 });
 

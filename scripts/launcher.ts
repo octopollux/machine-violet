@@ -28,6 +28,7 @@ import { createServer } from "../packages/engine/src/server/server.js";
 import { defaultCampaignRoot } from "../packages/engine/src/tools/filesystem/platform.js";
 import { configDir } from "../packages/engine/src/utils/paths.js";
 import { loadEnv } from "../packages/engine/src/config/first-launch.js";
+import { checkTerminal } from "../packages/engine/src/config/terminal-check.js";
 
 // --- Velopack lifecycle hooks (Windows install/update/uninstall) ---
 // Must run before any server/client startup. Exits the process if a hook fires.
@@ -56,6 +57,16 @@ for (let i = 2; i < process.argv.length; i++) {
 }
 if (!agentPort && process.env.MV_AGENT_PORT) {
   agentPort = Number(process.env.MV_AGENT_PORT);
+}
+
+// --- Terminal check (TUI mode only) ---
+// On Windows, if we're in bare conhost, relaunch inside Windows Terminal
+// (system-installed or bundled portable) and exit. Must run before server
+// startup to avoid wasting time on a server that'll be abandoned.
+// Skip in agent/headless mode — start-client bootstraps a mock TTY when
+// --agent-port is set, so checkTerminal's TTY requirement doesn't apply.
+if (!serverOnly && !agentPort) {
+  checkTerminal();
 }
 
 // --- Server config ---

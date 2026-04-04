@@ -18,6 +18,7 @@ import type { NarrativeAreaHandle } from "../tui/components/index.js";
 import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, narrativeRows, choiceRowBudget } from "../tui/responsive.js";
 import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
+import { useRawModeGuardian } from "../tui/hooks/useRawModeGuardian.js";
 import { Layout } from "../tui/layout.js";
 import {
   ChoiceOverlay, DESCRIPTION_ROWS, GameMenu, ApiErrorModal,
@@ -38,12 +39,19 @@ export function PlayingPhase() {
     activeChoices, setActiveChoices,
     activeModal, setActiveModal,
     mode, stateSnapshot,
+    hasKittyProtocol,
     devModeEnabled,
     showVerbose,
     retryOverlay,
     onReturnToMenu,
   } = useGameContext();
   const { columns: cols, rows } = useTerminalSize();
+
+  // On Windows without Kitty protocol, periodically refresh raw mode to
+  // recover from ConPTY silently corrupting console mode flags.
+  // When Kitty is active, CSI-u encoding is unambiguous regardless of
+  // console mode, so the guardian is unnecessary.
+  useRawModeGuardian({ enabled: !hasKittyProtocol });
   const tooSmall = cols < MIN_COLUMNS || rows < MIN_ROWS;
 
   // Local state
