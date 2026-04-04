@@ -196,13 +196,30 @@ jobs:
 
             PR_CONTEXT=""
             if [ -n "$PR_NUMBERS" ]; then
+              PR_NUMBERS=$(printf '%s\n' $PR_NUMBERS | sort -n | uniq)
+              REPO_FULL="${{ github.repository }}"
+              REPO_OWNER="${REPO_FULL%/*}"
+              REPO_NAME="${REPO_FULL#*/}"
+
+              QUERY_FIELDS=""
               for pr in $PR_NUMBERS; do
-                PR_DATA=$(gh pr view "$pr" \
-                  --repo ${{ github.repository }} \
-                  --json number,title,body \
-                  --jq '"## PR #\(.number): \(.title)\n\(.body // "(no description)")\n---"')
-                PR_CONTEXT="${PR_CONTEXT}${PR_DATA}"$'\n'
+                QUERY_FIELDS="${QUERY_FIELDS}
+                  pr_${pr}: pullRequest(number: ${pr}) { number title body }"
               done
+
+              PR_CONTEXT=$(gh api graphql \
+                --raw-field query="query {
+                  repository(owner: \"${REPO_OWNER}\", name: \"${REPO_NAME}\") {${QUERY_FIELDS}
+                  }
+                }" \
+                --jq '
+                  .data.repository
+                  | to_entries
+                  | map(select(.value != null) | .value)
+                  | sort_by(.number)
+                  | map("## PR #\(.number): \(.title)\n\(.body // "(no description)")\n---")
+                  | join("\n")
+                ')
             fi
 
             if [ -z "$PR_CONTEXT" ]; then
