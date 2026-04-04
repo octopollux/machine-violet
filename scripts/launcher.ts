@@ -63,7 +63,9 @@ if (!agentPort && process.env.MV_AGENT_PORT) {
 // On Windows, if we're in bare conhost, relaunch inside Windows Terminal
 // (system-installed or bundled portable) and exit. Must run before server
 // startup to avoid wasting time on a server that'll be abandoned.
-if (!serverOnly) {
+// Skip in agent/headless mode — start-client bootstraps a mock TTY when
+// --agent-port is set, so checkTerminal's TTY requirement doesn't apply.
+if (!serverOnly && !agentPort) {
   checkTerminal();
 }
 
