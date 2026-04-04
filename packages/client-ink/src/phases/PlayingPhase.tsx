@@ -106,7 +106,6 @@ export function PlayingPhase() {
     setNarrativeLines((prev) => [
       ...prev,
       { kind: "separator", text: "---", tag },
-      { kind: "spacer", text: "", tag },
       { kind: "player", text: `[${activeChar}] ${text}`, tag },
       { kind: "dm", text: "", tag },
     ]);
@@ -135,7 +134,6 @@ export function PlayingPhase() {
     setNarrativeLines((prev) => [
       ...prev,
       { kind: "separator", text: "---", tag },
-      { kind: "spacer", text: "", tag },
       { kind: "player", text: `[${activeChar}] ${choice}`, tag },
       { kind: "dm", text: "", tag },
     ]);

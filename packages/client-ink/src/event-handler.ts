@@ -184,7 +184,6 @@ function handleNarrativeChunk(event: NarrativeChunkEvent, update: StateUpdater):
       lines = [
         ...lines,
         { kind: "separator" as const, text: "---" },
-        { kind: "spacer" as const, text: "" },
       ];
     }
 

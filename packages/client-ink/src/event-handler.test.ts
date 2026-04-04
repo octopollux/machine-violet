@@ -49,10 +49,10 @@ describe("event-handler", () => {
 
       h.dispatch({ type: "narrative:chunk", data: { text: "The door creaks open.", kind: "dm" } });
 
-      // Should have: separator, player, dm(""), separator, spacer, dm("The door creaks open.")
+      // Should have: separator, player, dm(""), separator, dm("The door creaks open.")
       const kinds = h.state.narrativeLines.map((l) => l.kind);
-      expect(kinds).toEqual(["separator", "player", "dm", "separator", "spacer", "dm"]);
-      expect(h.state.narrativeLines[5].text).toBe("The door creaks open.");
+      expect(kinds).toEqual(["separator", "player", "dm", "separator", "dm"]);
+      expect(h.state.narrativeLines[4].text).toBe("The door creaks open.");
     });
 
     it("does not inject duplicate separator on subsequent DM chunks", () => {
