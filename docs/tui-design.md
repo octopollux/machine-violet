@@ -469,6 +469,51 @@ The `/swatch` command opens a debug modal showing the full harmony swatch grid, 
 **Code:** `src/tui/components/FullScreenFrame.tsx`
 
 
+## Character Pane
+
+The character pane is a right-side overlay (Tab toggle) that shows the active character's stats and inventory inside the narrative area. It uses `OverlayPane` — a reusable right-aligned overlay component with themed borders in the complementary (modal) color scheme.
+
+**Behavior:**
+- Toggled with Tab (or via key hints indicator in the Player Pane top-right)
+- 35-column fixed-width panel, right-aligned over the narrative area
+- Lazy-fetches the character sheet on first open via `GET /session/character/:name` (returns `{ name, content }`)
+- Caches content across toggles; cache invalidates when the active player changes
+- Extracts "Stats" and "Inventory" sections from the character's markdown sheet
+- Shows a loading placeholder while fetching, error message on failure, "no stats found" if sections are empty
+
+**OverlayPane** is the base component: themed multi-line borders, word-wrapping, scrolling with scroll indicator, and opacity (paints over narrative text with spaces for full coverage).
+
+**Code:** `packages/client-ink/src/tui/modals/CharacterPane.tsx`, `packages/client-ink/src/tui/modals/OverlayPane.tsx`
+
+
+## Keyboard Input
+
+### Kitty Keyboard Protocol
+
+On terminals that support it, Machine Violet enables the [Kitty keyboard protocol](https://sw.re/kitty/keyboard-protocol/) for unambiguous key identification. This eliminates key corruption on Windows ConPTY, where Backspace, Home, and End are misidentified under legacy escape sequences.
+
+**Detection:** On startup, the TUI probes the terminal with a Kitty `QUERY` escape (`\x1b[?u`). If the terminal responds, Kitty mode is enabled by pushing the disambiguation flag. Detection runs with a timeout — unsupported terminals simply don't respond and the probe is silently abandoned.
+
+**Runtime:** When enabled, every keypress arrives as a CSI-u escape sequence. A stdin filter intercepts these before Ink sees them, parses them via `parseKittyKey()`, and re-emits legacy byte sequences via `kittyKeyToLegacy()` that Ink's input system understands. This is transparent to all other TUI code.
+
+**Cleanup:** Protocol flags are popped on exit, including the explicit SIGINT path and normal teardown/exit handling, to restore the terminal to its original state.
+
+**Code:** `packages/client-ink/src/tui/hooks/kittyProtocol.ts`
+
+### Stdin Filter Chain
+
+Multiple input preprocessors (Kitty protocol, mouse scroll) need to intercept raw stdin data before Ink processes it. The **stdin filter chain** (`installStdinFilterChain`) wraps `stdin.read()` once and runs registered filters in order. Each filter processes its sequences, strips matched bytes, and returns the remainder. This avoids fragile monkey-patching of stdin by multiple independent handlers.
+
+**Code:** `packages/client-ink/src/tui/hooks/stdinFilterChain.ts`
+
+
+## Phase Lifecycle
+
+The app phase state machine: main menu → playing → returning_to_menu → main menu (loop). Setup runs as a pseudo-campaign session inside `PlayingPhase` — there is no separate `SetupPhase` component. The engine sends a `session:transition` event when setup completes and the real campaign session begins, prompting the client to reset state and continue on the existing WebSocket connection.
+
+**Code:** `packages/client-ink/src/phases/PlayingPhase.tsx`
+
+
 ## DM Tool Interface
 
 The DM controls the UI through these tools:

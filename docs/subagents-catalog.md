@@ -62,7 +62,11 @@ Sandboxed conversation for out-of-character discussion. Receives the DM's curren
 
 **DM injection (player-initiated only)**: When OOC is entered from the game menu or `/ooc` slash command (not via DM's `enter_ooc` tool), accumulated summaries are injected as an `<ooc_summary>` XML tag prepended to the next player message. This persists in conversation history so the DM retains OOC context across turns. The DM-initiated path does not need this because the DM already sees the tool result.
 
-**Tools available**: `rollback`, filesystem reads, validation suite, config updates. Cannot call DM-only tools.
+**Tools available**: `read_file`, `find_references`, `scribe`, `promote_character`, `style_scene`, `set_display_resources`, `show_character_sheet`, `map`, `map_entity`, `map_query`, `alarm`, `get_commit_log`, `roll_dice`; when file I/O and/or live game state are available, may also use `validate_campaign`, `set_resource_values`, and `rollback`. Cannot call DM-only narrative tools.
+
+**In scope**: Rules questions, character corrections, entity file reads, UI customization, dice rolls, map/clock queries, git history, campaign validation, resource adjustments via supported tools, and rollback.
+
+**Out of scope**: Bulk file operations, arbitrary direct game state JSON patching, engine internals, and DM-only narrative actions.
 
 ---
 
@@ -269,13 +273,19 @@ Replaces human input for an AI-controlled character. Responds in character, conc
 | **Trigger** | Toggled from game menu |
 | **Source doc** | Implementation-only (`src/agents/subagents/dev-mode.ts`) |
 
-Developer console for inspecting and manipulating the running game. Has its own tool suite: `read_file`, `write_file`, `inspect_state`, `mutate_state`, `summarize_state`. Uses the dedicated "dev" frame variant.
+Developer console for power users — inspects and manipulates the running game. Uses the dedicated "dev" frame variant. Workflow is read-before-write: always inspect current state and show findings before mutating.
 
 **Context**: Campaign name + game state summary + dev system prompt. ~2-4K tokens.
 
-**Returns**: Terse summary to the DM when dev mode ends — what was inspected or changed.
+**Returns**: Terse summary to the DM when dev mode ends — what was inspected or changed. First sentence is auto-extracted for DM context.
 
-**Tools available**: File read/write within the campaign directory, state inspection (combat, clocks, maps, decks, config), state mutation. Cannot call DM-only tools.
+**Dry-run by default**: Always calls diagnostic tools with `dry_run: true` first before applying mutations.
+
+**In scope**: File CRUD (read/write/list/delete/search), live game state (combat, clocks, maps, decks, config), diagnostics, refactoring, git history, all DM tools, engine internals discussion.
+
+**Out of scope**: Narrative/in-character content, rules adjudication, campaign log context.
+
+**Tools available**: File read/write within the campaign directory, state inspection (combat, clocks, maps, decks, config), state mutation, and other DM tools. Intended for technical/diagnostic use rather than narrative content. Style: direct, technical, short answers, shows raw data.
 
 ---
 

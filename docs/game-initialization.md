@@ -117,9 +117,26 @@ The DM's first message is the opening narration. The game begins.
 
 ## Campaign Seeds
 
-Seeds are minimal — just evocative names and a one-sentence premise. They're "names from a hat" that the DM expands into a full world. Shipped with the app in `src/config/seeds.ts`, numerous enough that players see fresh options. Genre-tagged so the setup agent can filter by player choice.
+Seeds are evocative names with a one-sentence premise. Shipped with the app in `src/config/seeds.ts`, numerous enough that players see fresh options. Genre-tagged so the setup agent can filter by player choice.
 
 Seeds are injected into the setup conversation's system prompt so the agent can present them as game ideas during Quick Start.
+
+### Seed format
+
+Each seed has a public face (name, premise, genres) and an optional `detail` field containing DM-only instructions hidden from the player:
+
+- **`<suboptions label="...">`** — Labeled choice groups within a seed. Each group offers 3-5 bullet options (name + em-dash + description). Multiple suboption groups per seed are supported. Example: a seed might offer both a starting faction and a starting location.
+- **The `detail` field** — Hidden DM-only instructions such as secret rolls, texture, and pacing guidance, plus optional `<suboptions>` groups. DM-only instructions are never shown to the player; only `<suboptions>` content may be presented as structured choices during setup.
+
+```markdown
+<suboptions label="Your starting faction">
+- Iron Circle — Mercenary order. Direct, brutal, effective.
+- Gilded Compact — Merchant house. Money talks, silence is expensive.
+- Hallowed See — Religious authority. Faith is power.
+</suboptions>
+```
+
+The setup agent presents suboptions as structured choices during campaign creation. The player's selection shapes the initial world state.
 
 ## DM Personalities
 

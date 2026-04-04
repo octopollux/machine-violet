@@ -186,3 +186,18 @@ Tags supported: `<b>`, `<i>`, `<u>`, `<center>`, `<right>`, `<color=#hex>`. All 
 **Code:** `packages/client-ink/src/tui/` (components, formatting, themes, modals, hooks)
 
 Full details: [tui-design.md](tui-design.md)
+
+## Agent Sidecar (Dev Only)
+
+A dev-only HTTP server that embeds in the TUI client for AI agent integration testing. Activated by `--agent-port <port>` or `MV_AGENT_PORT` env var. Excluded from release builds.
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/screen` | GET | Rendered terminal screen as plain text. `?ansi=true` for ANSI escape codes. |
+| `/state` | GET | Client state as JSON (campaign, players, theme, mode, etc.). |
+| `/input` | POST | Inject raw keystroke bytes. |
+| `/input/key` | POST | Inject named key (JSON `{"key": "enter"}`). Maps to escape sequences via KEY_MAP (arrows, function keys, ctrl modifiers, etc.). |
+
+Uses `@xterm/headless` as a virtual VT100 terminal for screen capture. When no TTY is available (e.g. agent-spawned background process), a mock stdin is created automatically so Ink runs without a real terminal (default virtual size: 120x40).
+
+**Code:** `packages/client-ink/src/agent-sidecar.ts`
