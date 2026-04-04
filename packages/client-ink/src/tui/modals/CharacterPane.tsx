@@ -1,11 +1,12 @@
 /**
  * CharacterPane — right-side overlay showing active character stats & inventory.
  *
- * Appears inside the narrative pane while Tab is held / toggled.
+ * Appears inside the narrative pane while Tab is toggled.
  * Lazy-fetches the character sheet on first open and caches it until
- * the active player changes.
+ * the active player changes. Cache is owned by the caller via
+ * cachedContent/onContentLoaded props so it persists across toggles.
  */
-import React, { useState, useEffect, useRef, useMemo, forwardRef } from "react";
+import React, { useEffect, useRef, useMemo, forwardRef } from "react";
 import type { FormattingNode } from "@machine-violet/shared/types/tui.js";
 import type { ResolvedTheme } from "../themes/types.js";
 import type { ApiClient } from "../../api-client.js";
@@ -71,6 +72,10 @@ interface CharacterPaneProps {
   narrativeHeight: number;
   /** Vertical offset (e.g. top frame height). */
   topOffset?: number;
+  /** Cached sheet content (owned by caller for persistence across toggles). */
+  cachedContent?: string | null;
+  /** Called when sheet content is fetched. Caller should store it for cachedContent. */
+  onContentLoaded?: (content: string | null) => void;
 }
 
 export const CharacterPane = forwardRef<CharacterPaneHandle, CharacterPaneProps>(
@@ -81,19 +86,30 @@ export const CharacterPane = forwardRef<CharacterPaneHandle, CharacterPaneProps>
     narrativeWidth,
     narrativeHeight,
     topOffset = 0,
+    cachedContent,
+    onContentLoaded,
   }, ref) {
-  const [sheetContent, setSheetContent] = useState<string | null>(null);
   const lastFetchedName = useRef<string>("");
 
-  // Lazy-fetch character sheet; re-fetch when character changes
+  // Lazy-fetch character sheet; re-fetch when character changes.
+  // Stale flag prevents race conditions from overlapping requests.
   useEffect(() => {
-    if (characterName === lastFetchedName.current) return;
+    if (characterName === lastFetchedName.current && cachedContent != null) return;
     lastFetchedName.current = characterName;
-    setSheetContent(null);
+
+    let isStale = false;
     apiClient.getCharacterSheet(characterName)
-      .then(({ content }: { content: string }) => setSheetContent(content))
-      .catch(() => setSheetContent(null));
-  }, [characterName, apiClient]);
+      .then(({ content }: { content: string }) => {
+        if (!isStale) onContentLoaded?.(content);
+      })
+      .catch(() => {
+        if (!isStale) onContentLoaded?.("");
+      });
+
+    return () => { isStale = true; };
+  }, [characterName, apiClient, cachedContent, onContentLoaded]);
+
+  const sheetContent = cachedContent ?? null;
 
   // Parse Stats + Inventory sections
   const styledLines = useMemo((): FormattingNode[][] | undefined => {
@@ -105,12 +121,14 @@ export const CharacterPane = forwardRef<CharacterPaneHandle, CharacterPaneProps>
     );
   }, [sheetContent]);
 
-  // Show a placeholder while loading or if no data
-  const placeholderLines = !sheetContent
+  // Show a placeholder while loading, an error message on failure, or nothing
+  const placeholderLines = sheetContent == null
     ? ["", "  Loading..."]
-    : !styledLines
-      ? ["", "  No stats or", "  inventory found."]
-      : undefined;
+    : sheetContent === ""
+      ? ["", "  Could not load", "  character sheet."]
+      : !styledLines
+        ? ["", "  No stats or", "  inventory found."]
+        : undefined;
 
   return (
     <OverlayPane

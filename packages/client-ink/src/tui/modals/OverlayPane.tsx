@@ -85,8 +85,9 @@ export const OverlayPane = forwardRef<OverlayPaneHandle, OverlayPaneProps>(
   const borderHeight = theme.asset.height;
   const sidePadding = 1;
 
-  const clampedWidth = Math.min(paneWidth, narrativeWidth);
-  const innerWidth = clampedWidth - 2 * sideWidth - 2 * sidePadding;
+  const chromeWidth = 2 * sideWidth + 2 * sidePadding;
+  const clampedWidth = Math.max(chromeWidth, Math.min(paneWidth, narrativeWidth));
+  const innerWidth = Math.max(0, clampedWidth - chromeWidth);
 
   // Word-wrap content
   const wrappedLines = useMemo(
@@ -147,7 +148,7 @@ export const OverlayPane = forwardRef<OverlayPaneHandle, OverlayPaneProps>(
       contentRows.push(
         <Box key={i}>
           <Text>{padStr}</Text>
-          <Text>{...renderNodes(wrappedStyled[i])}</Text>
+          <Text>{renderNodes(wrappedStyled[i])}</Text>
           <Text>{" ".repeat(styledPad)}{padStr}</Text>
         </Box>,
       );

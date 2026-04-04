@@ -53,6 +53,8 @@ export function PlayingPhase() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [tokenSummary, setTokenSummary] = useState("");
   const [characterPaneOpen, setCharacterPaneOpen] = useState(false);
+  const [characterSheetCache, setCharacterSheetCache] = useState<string | null>(null);
+  const characterSheetCacheCharRef = useRef<string>("");
 
   const clearInput = useCallback(() => { setPendingInput(""); setResetKey((k) => k + 1); }, []);
   /** Reset the input but pre-fill it with text (e.g. after a rejected contribution). */
@@ -77,6 +79,15 @@ export function PlayingPhase() {
     isAI: p.type === "ai",
   })) ?? [{ name: "Player", isAI: false }];
   const activeChar = players[activePlayerIndex]?.name ?? "Player";
+
+  // Clear character sheet cache when active character changes
+  if (activeChar !== characterSheetCacheCharRef.current) {
+    characterSheetCacheCharRef.current = activeChar;
+    setCharacterSheetCache(null);
+  }
+  const handleCharacterSheetLoaded = useCallback((content: string | null) => {
+    setCharacterSheetCache(content);
+  }, []);
 
   // --- Submit handler ---
   const handleSubmit = useCallback(async (value: string) => {
@@ -327,6 +338,8 @@ export function PlayingPhase() {
           narrativeWidth={cols}
           narrativeHeight={narRows}
           topOffset={conversationPaneTop}
+          cachedContent={characterSheetCache}
+          onContentLoaded={handleCharacterSheetLoaded}
         />
       )}
       {retryOverlay && (
