@@ -154,7 +154,7 @@ div {
   min-height: 1.4em;
 }
 .spacer { min-height: 1.4em; }
-.separator { text-align: center; opacity: 0.6; }
+.separator { text-align: center; opacity: 0.6; margin: 1.4em 0; }
 .system { color: #ffff55; }
 .player .prompt { color: inherit; }
 b { font-weight: bold; }
