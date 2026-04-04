@@ -127,7 +127,7 @@ const SCRIBE_TOOLS: NormalizedTool[] = [
         },
         body: {
           type: "string",
-          description: "For create: full body. For update: text to append (omit to leave body unchanged).",
+          description: "For create: full body. For update: sections to add or replace. If the text contains ## headings that already exist in the file, those sections are replaced in-place; new sections are appended. Omit to leave body unchanged.",
         },
         changelog_entry: {
           type: "string",
@@ -146,6 +146,85 @@ const SCRIBE_TOOLS: NormalizedTool[] = [
  */
 function unescapeNewlines(s: string): string {
   return s.replace(/\\n/g, "\n");
+}
+
+/** Heading pattern: a `## ` at the start of a line (not `###` or deeper). */
+const H2_RE = /^## /m;
+
+/**
+ * Split a markdown body into sections keyed by `## Heading`.
+ * Returns an array of { heading, content } where heading is the full
+ * `## Foo` line (or "" for preamble text before the first heading).
+ * Content includes the heading line itself.
+ */
+export function splitSections(body: string): { heading: string; content: string }[] {
+  if (!H2_RE.test(body)) return [{ heading: "", content: body }];
+
+  const sections: { heading: string; content: string }[] = [];
+  const lines = body.split("\n");
+  let current: { heading: string; lines: string[] } | null = null;
+
+  for (const line of lines) {
+    if (line.startsWith("## ") && !line.startsWith("### ")) {
+      if (current) sections.push({ heading: current.heading, content: current.lines.join("\n") });
+      current = { heading: line, lines: [line] };
+    } else {
+      if (!current) {
+        current = { heading: "", lines: [] };
+      }
+      current.lines.push(line);
+    }
+  }
+  if (current) sections.push({ heading: current.heading, content: current.lines.join("\n") });
+
+  return sections;
+}
+
+/**
+ * Merge incoming body into existing body with section-aware replacement.
+ * - If the incoming body contains `## Heading` blocks that match existing ones,
+ *   those sections are replaced in-place.
+ * - Genuinely new sections are appended at the end.
+ * - If neither body has `## ` headings, falls back to simple append (legacy behavior).
+ */
+export function mergeSectionBodies(existing: string, incoming: string): string {
+  // If incoming has no ## headings, append as before (backward compat for
+  // plain-text updates like adding a paragraph of description).
+  if (!H2_RE.test(incoming)) {
+    return existing ? `${existing}\n\n${incoming}` : incoming;
+  }
+
+  const existingSections = splitSections(existing);
+  const incomingSections = splitSections(incoming);
+
+  // Build a set of existing headings for lookup
+  const existingHeadings = new Map<string, number>();
+  for (let i = 0; i < existingSections.length; i++) {
+    if (existingSections[i].heading) {
+      existingHeadings.set(existingSections[i].heading, i);
+    }
+  }
+
+  // Replace matched sections in-place
+  const replaced = new Set<string>();
+  for (const section of incomingSections) {
+    if (!section.heading) continue; // skip incoming preamble — don't overwrite existing preamble
+    const idx = existingHeadings.get(section.heading);
+    if (idx !== undefined) {
+      existingSections[idx] = section;
+      replaced.add(section.heading);
+    }
+  }
+
+  // Collect genuinely new sections (not replacements, not preamble)
+  const newSections = incomingSections.filter(
+    s => s.heading && !replaced.has(s.heading),
+  );
+
+  const parts = existingSections.map(s => s.content);
+  for (const s of newSections) parts.push(s.content);
+
+  return parts.join("\n\n");
 }
 
 // --- Tool Handler Factory ---
@@ -283,11 +362,11 @@ export function buildScribeToolHandler(
               }
             }
 
-            // Append body
+            // Merge body with section-aware replacement
             let newBody = body;
             if (input.body) {
-              const appended = unescapeNewlines(input.body as string);
-              newBody = body ? `${body}\n\n${appended}` : appended;
+              const incoming = unescapeNewlines(input.body as string);
+              newBody = body ? mergeSectionBodies(body, incoming) : incoming;
             }
 
             // Add changelog

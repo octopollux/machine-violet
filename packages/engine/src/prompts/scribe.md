@@ -75,6 +75,8 @@ When updating PC stats (HP, resources, inventory, conditions), be precise. Use e
 ### Formatting
 Use `write_entity` with `mode: "create"` for new entities, `mode: "update"` for existing ones. For updates, specify only the fields that changed — omit unchanged fields.
 
+When updating body content, send the **complete replacement** for each `## Section` you are changing. Sections with matching `## ` headings are replaced in-place; genuinely new sections are appended. You do not need to resend sections you aren't changing.
+
 ## Response
 After processing all updates, respond with a terse summary of what you did. One line per entity touched. Example:
 ```
