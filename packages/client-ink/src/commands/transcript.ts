@@ -156,7 +156,7 @@ div {
 .spacer { min-height: 1.4em; }
 .separator { text-align: center; opacity: 0.6; }
 .system { color: #ffff55; }
-.player .prompt { color: #55ff55; }
+.player .prompt { color: inherit; }
 b { font-weight: bold; }
 i { font-style: italic; }
 u { text-decoration: underline; }
