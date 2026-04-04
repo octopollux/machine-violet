@@ -296,7 +296,7 @@ export function PlayingPhase() {
         engineState={engineState}
         toolGlyphs={toolGlyphs}
         quoteColor="#ffffff"
-        playerColor={stateSnapshot?.players?.[activePlayerIndex]?.color}
+        playerColor={engineState === "waiting_input" ? stateSnapshot?.players?.[activePlayerIndex]?.color : "#808080"}
         showVerbose={showVerbose}
         narrativeRef={narrativeRef}
         mouseScrollOverrideRef={modalScrollRef}
