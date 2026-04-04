@@ -183,13 +183,18 @@ const assets = [
   { src: "packages/engine/src/prompts", dest: "prompts" },
   { src: "packages/client-ink/src/tui/themes/assets", dest: "themes" },
   { src: "systems", dest: "systems" },
+  { src: "packages/engine/src/config", dest: "config", filter: /\.json$/ },
 ];
 
-for (const { src, dest } of assets) {
+for (const { src, dest, filter } of assets) {
   const srcDir = join(ROOT, src);
   const destDir = join(DIST, dest);
   console.log(`  Copying ${dest}/...`);
-  cpSync(srcDir, destDir, { recursive: true });
+  if (filter) {
+    cpSync(srcDir, destDir, { recursive: true, filter: (s) => statSync(s).isDirectory() || filter.test(s) });
+  } else {
+    cpSync(srcDir, destDir, { recursive: true });
+  }
 }
 
 // Copy license
