@@ -279,7 +279,7 @@ describe("createSetupConversation", () => {
     expect(knownIdx).toBeLessThan(seedsIdx);
   });
 
-  it("single known player uses freeform instruction, not present_choices", async () => {
+  it("single known player still uses present_choices instruction", async () => {
     const provider = mockProvider([textResponse("Welcome!")]);
     const conv = createSetupConversation(provider, "claude-sonnet-4-6", [
       { name: "Alice", ageGroup: "adult" },
@@ -289,9 +289,9 @@ describe("createSetupConversation", () => {
     const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
     const systemPrompt = streamCalls[0][0].systemPrompt as string;
 
-    const section = systemPrompt.slice(systemPrompt.indexOf("## Known Players"));
-    expect(section).toContain("one returning player");
-    expect(section).toContain("Ask freeform");
+    expect(systemPrompt).toContain("## Known Players");
+    expect(systemPrompt).toContain("present_choices");
+    expect(systemPrompt).toContain("Alice (age group: adult)");
   });
 
   it("system prompt omits Known Players section when no players provided", async () => {

@@ -95,7 +95,7 @@ const PRESENT_CHOICES_TOOL: NormalizedTool = {
         type: "array",
         items: { type: "string" },
         description: "2-10 short option labels for the player to choose from",
-        minItems: 2,
+        minItems: 1,
         maxItems: 10,
       },
       descriptions: {
@@ -157,9 +157,7 @@ function buildSystemPrompt(existingPlayers?: KnownPlayer[]): string {
       const age = p.ageGroup ? ` (age group: ${p.ageGroup})` : " (age group: unknown)";
       return `- ${name}${age}`;
     });
-    const instruction = players.length === 1
-      ? "There is one returning player. Ask freeform for the player's name — if they match, welcome them back warmly. No need to re-ask information you already have. If their age group is unknown, ask once casually."
-      : "These players have played before. Use `present_choices` at the start to let the player pick their name from this list (the app auto-appends an \"Enter your own\" option for new players). If they match a known player, welcome them back warmly — no need to re-ask information you already have. If their age group is unknown, ask once casually.";
+    const instruction = "These players have played before. Use `present_choices` at the start to let the player pick their name from this list (the app auto-appends an \"Enter your own\" option for new players). If they match a known player, welcome them back warmly — no need to re-ask information you already have. If their age group is unknown, ask once casually.";
     base += "\n\n## Known Players\n\n" + instruction + "\n\n" + playerLines.join("\n");
   }
 
