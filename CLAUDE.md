@@ -145,4 +145,4 @@ After completing a coding task, make a detailed commit; you'll need this history
 
 ## Code Review
 
-After creating a PR, poll for Copilot code review comments every two minutes for up to ten minutes. Review the feedback and address any issues you judge worthwhile — use your own judgement on what to fix vs skip.
+After creating a PR, poll for Copilot code review comments every two minutes for up to ten minutes. Review the feedback and address any issues you judge worthwhile — use your own judgement on what to fix vs skip. **Polling must be sequential** — run one check, wait for the result, then sleep and check again. Do NOT launch multiple background sleeps in parallel (e.g. `sleep 120`, `sleep 240`, `sleep 360` all at once) because they all start counting from the same moment and finish concurrently, defeating the purpose.
