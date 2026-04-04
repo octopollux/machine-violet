@@ -65,6 +65,8 @@ export interface LayoutProps {
   showVerbose?: boolean;
   quoteColor?: string;
   playerColor?: string;
+  /** Color for the player pane frame/borders (dims on DM turn). Defaults to playerColor. */
+  playerFrameColor?: string;
   /** Color for the turn indicator text (player color on their turn, theme color on DM turn). */
   turnIndicatorColor?: string;
 
@@ -110,6 +112,7 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
     showVerbose,
     quoteColor,
     playerColor,
+    playerFrameColor = playerColor,
     turnIndicatorColor,
     narrativeRef,
     mouseScrollOverrideRef,
@@ -189,13 +192,13 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
   const separatorColor = useMemo(() => themeColor(theme, "separator"), [theme]);
 
   const playerPaneTopBorder = useMemo(
-    () => elements.modeline ? <SimpleBorder theme={theme} width={width} position="top" color={playerColor} /> : null,
-    [elements.modeline, theme, width, playerColor],
+    () => elements.modeline ? <SimpleBorder theme={theme} width={width} position="top" color={playerFrameColor} /> : null,
+    [elements.modeline, theme, width, playerFrameColor],
   );
 
   const playerPaneBottomBorder = useMemo(
-    () => elements.modeline ? <SimpleBorder theme={theme} width={width} position="bottom" color={playerColor} /> : null,
-    [elements.modeline, theme, width, playerColor],
+    () => elements.modeline ? <SimpleBorder theme={theme} width={width} position="bottom" color={playerFrameColor} /> : null,
+    [elements.modeline, theme, width, playerFrameColor],
   );
 
   return (
@@ -242,7 +245,7 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
       {/* Player Pane content: side edges + modeline + input (fixed height) */}
       {elements.modeline && (
         <Box flexDirection="row" height={playerPaneContentHeight}>
-          <PlayerPaneSide theme={theme} side="left" color={playerColor} height={playerPaneContentHeight} />
+          <PlayerPaneSide theme={theme} side="left" color={playerFrameColor} height={playerPaneContentHeight} />
           <Box flexDirection="column" width={width - 2} paddingLeft={1} paddingRight={1}>
             {playerPaneOverlay ? (
               elements.playerPaneExtraRows > 0 ? (
@@ -272,7 +275,7 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
               </>
             )}
           </Box>
-          <PlayerPaneSide theme={theme} side="right" color={playerColor} height={playerPaneContentHeight} />
+          <PlayerPaneSide theme={theme} side="right" color={playerFrameColor} height={playerPaneContentHeight} />
         </Box>
       )}
 
