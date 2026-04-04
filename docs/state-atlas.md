@@ -589,7 +589,45 @@ Canonical directory tree for a campaign. Machine-managed files are marked with t
 
 ---
 
-## 8. Evolution Notes
+## 8. Machine-Scoped Configuration
+
+In addition to campaign-scoped state, Machine Violet maintains machine-scoped configuration files in a platform-specific app directory (e.g. `~/Documents/MachineViolet/` or equivalent). These files are shared across all campaigns.
+
+```
+<appDir>/
+├── .env                      API keys (ANTHROPIC_API_KEY, etc.). Loaded at startup via first-launch.ts.
+├── config.json               App-level config (home directory path, defaults).
+├── connections.json           AI provider connections: Anthropic, OpenAI, OpenRouter, custom.
+│                              Each connection: id, provider, label, apiKey, baseUrl, discovered models, source (env/manual/oauth).
+│                              Tier assignments (large/medium/small → connectionId + modelId).
+├── discord-settings.json      Discord integration: enabled (true), disabled (false), or not-yet-asked (null).
+├── machine-settings.json      Machine-level feature flags and preferences.
+├── model-overrides.json       User overrides merged on top of shipped known-models.json.
+│                              Per-model: pricing, capabilities, context window, tier defaults.
+└── dev-config.json            Dev-only model overrides (e.g. use Sonnet for DM tier to save costs).
+```
+
+**Code:** `packages/engine/src/config/connections.ts`, `packages/engine/src/config/discord.ts`, `packages/engine/src/config/model-registry.ts`, `packages/engine/src/config/first-launch.ts`
+
+## 9. Debug Output
+
+### Structured Engine Log (`engine.jsonl`)
+
+The engine writes a structured, append-only JSONL event log to `.debug/engine.jsonl` (relative to the campaigns root directory). Each line is a JSON object with `{ t, event, ...data }` where `t` is a Unix timestamp.
+
+**Event categories:**
+- **Server lifecycle:** startup, shutdown
+- **Session lifecycle:** session start, session end, campaign load
+- **Turn lifecycle:** turn open, turn commit, turn resolve
+- **API calls:** model, tier, token counts, latency
+- **Subagent lifecycle:** spawn, complete, usage
+- **Errors:** unhandled exceptions, API failures
+
+The log is non-blocking (fire-and-forget via a WriteStream) and never throws. It is initialized once at server creation via `initEngineLog(campaignsDir)` and closed on shutdown via `closeEngineLog()`.
+
+**Code:** `packages/engine/src/context/engine-log.ts`
+
+## 10. Evolution Notes
 
 This document is a living reference. During gameplay testing:
 

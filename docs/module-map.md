@@ -82,6 +82,11 @@ Token tracking, conversation window, prompt caching, state persistence.
 | `token-counter.ts` | `estimateTokens()` — tiktoken-based estimation |
 | `usage-helpers.ts` | `accumulateUsage()` — merge Anthropic Usage objects |
 | `display-log.ts` | Narrative line ↔ markdown conversion |
+| `engine-log.ts` | Structured append-only JSONL event log at `.debug/engine.jsonl`: server/session/turn lifecycle, API calls, errors. Non-blocking fire-and-forget |
+
+## Client: agent-sidecar.ts — Dev-only Agent API
+
+Dev-only HTTP server for AI agent integration testing (`--agent-port` or `MV_AGENT_PORT`). Embeds in the TUI client, provides screen capture via `@xterm/headless`, state inspection, and keystroke injection. Endpoints: `GET /screen` (plain text or `?ansi=true`), `GET /state` (JSON), `POST /input` (raw bytes), `POST /input/key` (named key via KEY_MAP). Excluded from release builds.
 
 ## Client: tui/ — Terminal UI
 
@@ -96,11 +101,11 @@ Ink (React for CLI) components, formatting pipeline, theme system.
 | `activity.ts` | Activity/status bar state management |
 | `game-context.ts` | React context for game engine callbacks |
 | `components/` | Reusable: `Modeline`, `InputLine`, `NarrativeArea`, `PlayerSelector`, `ActivityLine`, `FrameBorder`, `FullScreenFrame` |
-| `modals/` | `CenteredModal`, `ChoiceModal`, `CharacterSheetModal`, `CompendiumModal`, `DiceRollModal`, `SessionRecapModal`, `GameMenu`, `ApiErrorModal`, `SwatchModal`, `CampaignSettingsModal`, `RollbackSummaryModal`, `PlayerNotesModal`, `DeleteCampaignModal` |
+| `modals/` | `CenteredModal`, `ChoiceModal`, `CharacterSheetModal`, `CompendiumModal`, `DiceRollModal`, `SessionRecapModal`, `GameMenu`, `ApiErrorModal`, `SwatchModal`, `CampaignSettingsModal`, `RollbackSummaryModal`, `PlayerNotesModal`, `DeleteCampaignModal`, `CharacterPane` (right-side overlay for active character stats/inventory, lazy-fetched), `OverlayPane` (reusable right-aligned overlay base with themed borders, scrolling, word-wrap) |
 | `themes/` | Theme parser, loader, resolver. Built-in themes in `themes/assets/` |
 | `color/` | OKLCH color space utilities, gradient generation |
 | `frames/` | Box drawing, styled content lines, string measurement |
-| `hooks/` | `useGameCallbacks()`, `useTextInput()`, `useTerminalSize()`, `useScrollHandle()`, `useMouseScroll()` |
+| `hooks/` | `useGameCallbacks()`, `useTextInput()`, `useTerminalSize()`, `useScrollHandle()`, `useMouseScroll()`, `kittyProtocol.ts` (Kitty keyboard protocol detection, CSI-u parsing, legacy re-emission), `stdinFilterChain.ts` (managed stdin filter pipeline for Kitty + mouse scroll interception) |
 
 ## Engine: config/ — Configuration
 
@@ -109,6 +114,9 @@ Model selection, campaign init, DM personalities, campaign seeds.
 | File | Purpose |
 |---|---|
 | `models.ts` | `getModel("large" \| "medium" \| "small")` — tier model selection (cached; tests need `loadModelConfig({ reset: true })`) |
+| `connections.ts` | Multi-provider connection management: load/save/add/remove connections, tier assignments. Supports Anthropic, OpenAI, OpenRouter, custom providers. Persists to `connections.json` |
+| `discord.ts` | Discord integration settings: opt-in/opt-out state persisted to `discord-settings.json` |
+| `model-registry.ts` | Dynamic model registry: shipped `known-models.json` merged with user `model-overrides.json`. Pricing, capabilities, context windows, tier defaults per provider |
 | `personalities.ts` | `PERSONALITIES`, `getPersonality()` — DM personality definitions |
 | `seeds.ts` | `SEEDS`, `seedsForGenre()` — campaign premise seeds by genre |
 | `first-launch.ts` | `.env` loading, config paths, API key format validation |
@@ -149,7 +157,7 @@ PDF ingestion and content processing. **Completely separate from the game engine
 
 ## Client: phases/ — App Lifecycle
 
-State machine for the application: main menu → setup / add content → playing → returning_to_menu → main menu (loop). On first launch, config.json is auto-created with defaults.
+State machine for the application: main menu → playing (setup or gameplay) / add content → returning_to_menu → main menu (loop). On first launch, config.json is auto-created with defaults. Setup runs as a pseudo-campaign session inside PlayingPhase (SetupPhase was removed in #311).
 
 | File | Purpose |
 |---|---|
