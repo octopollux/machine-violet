@@ -9,7 +9,7 @@
  * text behind it. Text does not reflow; the pane simply paints over the
  * rightmost columns.
  */
-import React, { useMemo, useRef, useState, useCallback, useEffect } from "react";
+import React, { useMemo, useRef, useState, useCallback, useEffect, forwardRef } from "react";
 import { Box, Text } from "ink";
 import { ScrollView } from "ink-scroll-view";
 import type { ScrollViewRef } from "ink-scroll-view";
@@ -20,6 +20,10 @@ import { themeColor, deriveModalTheme } from "../themes/color-resolve.js";
 import { stringWidth } from "../frames/index.js";
 import { wrapNodes, toPlainText } from "../formatting.js";
 import { renderNodes } from "../render-nodes.js";
+import { useScrollHandle } from "../hooks/useScrollHandle.js";
+import type { ScrollHandle } from "../hooks/useScrollHandle.js";
+
+export type OverlayPaneHandle = ScrollHandle;
 
 export interface OverlayPaneProps {
   theme: ResolvedTheme;
@@ -62,17 +66,19 @@ function wrapPlainLine(text: string, width: number): string[] {
 /**
  * A right-aligned overlay pane with themed multi-line borders.
  * Renders on top of the narrative area content using absolute positioning.
+ * Exposes a ScrollHandle via ref for external scroll control.
  */
-export function OverlayPane({
-  theme,
-  narrativeWidth,
-  narrativeHeight,
-  paneWidth,
-  title,
-  lines,
-  styledLines,
-  topOffset = 0,
-}: OverlayPaneProps) {
+export const OverlayPane = forwardRef<OverlayPaneHandle, OverlayPaneProps>(
+  function OverlayPane({
+    theme,
+    narrativeWidth,
+    narrativeHeight,
+    paneWidth,
+    title,
+    lines,
+    styledLines,
+    topOffset = 0,
+  }, ref) {
   const modalTheme = useMemo(() => deriveModalTheme(theme), [theme]);
 
   const sideWidth = theme.asset.components.edge_left.width;
@@ -102,6 +108,7 @@ export function OverlayPane({
   const leftMargin = Math.max(0, narrativeWidth - clampedWidth);
 
   const scrollRef = useRef<ScrollViewRef>(null);
+  useScrollHandle(ref, scrollRef);
   const [linesBelow, setLinesBelow] = useState(0);
 
   const updateScrollState = useCallback(() => {
@@ -194,4 +201,4 @@ export function OverlayPane({
       />
     </Box>
   );
-}
+});

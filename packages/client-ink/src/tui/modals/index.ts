@@ -13,5 +13,6 @@ export { RollbackSummaryModal } from "./RollbackSummaryModal.js";
 export { PlayerNotesModal } from "./PlayerNotesModal.js";
 export { DeleteCampaignModal } from "./DeleteCampaignModal.js";
 export { OverlayPane } from "./OverlayPane.js";
-export type { OverlayPaneProps } from "./OverlayPane.js";
+export type { OverlayPaneProps, OverlayPaneHandle } from "./OverlayPane.js";
 export { CharacterPane, CHARACTER_PANE_WIDTH } from "./CharacterPane.js";
+export type { CharacterPaneHandle } from "./CharacterPane.js";

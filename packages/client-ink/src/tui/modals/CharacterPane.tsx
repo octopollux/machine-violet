@@ -5,15 +5,18 @@
  * Lazy-fetches the character sheet on first open and caches it until
  * the active player changes.
  */
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, forwardRef } from "react";
 import type { FormattingNode } from "@machine-violet/shared/types/tui.js";
 import type { ResolvedTheme } from "../themes/types.js";
 import type { ApiClient } from "../../api-client.js";
 import { markdownToTags, parseFormatting } from "../formatting.js";
 import { OverlayPane } from "./OverlayPane.js";
+import type { OverlayPaneHandle } from "./OverlayPane.js";
+
+export type CharacterPaneHandle = OverlayPaneHandle;
 
 /** Default pane width in columns. */
-export const CHARACTER_PANE_WIDTH = 25;
+export const CHARACTER_PANE_WIDTH = 35;
 
 /**
  * Extract named sections from a character sheet markdown string.
@@ -70,14 +73,15 @@ interface CharacterPaneProps {
   topOffset?: number;
 }
 
-export function CharacterPane({
-  theme,
-  characterName,
-  apiClient,
-  narrativeWidth,
-  narrativeHeight,
-  topOffset = 0,
-}: CharacterPaneProps) {
+export const CharacterPane = forwardRef<CharacterPaneHandle, CharacterPaneProps>(
+  function CharacterPane({
+    theme,
+    characterName,
+    apiClient,
+    narrativeWidth,
+    narrativeHeight,
+    topOffset = 0,
+  }, ref) {
   const [sheetContent, setSheetContent] = useState<string | null>(null);
   const lastFetchedName = useRef<string>("");
 
@@ -110,6 +114,7 @@ export function CharacterPane({
 
   return (
     <OverlayPane
+      ref={ref}
       theme={theme}
       narrativeWidth={narrativeWidth}
       narrativeHeight={narrativeHeight}
@@ -120,4 +125,4 @@ export function CharacterPane({
       topOffset={topOffset}
     />
   );
-}
+});

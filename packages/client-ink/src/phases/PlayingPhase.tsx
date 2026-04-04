@@ -245,10 +245,11 @@ export function PlayingPhase() {
       return;
     }
 
-    // Scroll keys
+    // Scroll keys — target character pane when open, else narrative
     if (key.pageUp || key.pageDown) {
       const step = scrollAmount(rows);
-      narrativeRef.current?.scrollBy(key.pageUp ? -step : step);
+      const target = characterPaneOpen ? modalScrollRef.current : narrativeRef.current;
+      target?.scrollBy(key.pageUp ? -step : step);
     }
   });
 
@@ -313,6 +314,7 @@ export function PlayingPhase() {
       />
       {characterPaneOpen && (
         <CharacterPane
+          ref={modalScrollRef}
           theme={theme}
           characterName={activeChar}
           apiClient={apiClient}
