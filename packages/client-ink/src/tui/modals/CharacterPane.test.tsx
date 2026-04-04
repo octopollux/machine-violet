@@ -2,7 +2,7 @@ import React from "react";
 import { Box } from "ink";
 import { describe, it, expect, beforeEach } from "vitest";
 import { render } from "ink-testing-library";
-import { extractSections, CharacterPane } from "./CharacterPane.js";
+import { extractSections } from "./CharacterPane.js";
 import { OverlayPane } from "./OverlayPane.js";
 import { resolveTheme } from "../themes/resolver.js";
 import { resetThemeCache } from "../themes/loader.js";
