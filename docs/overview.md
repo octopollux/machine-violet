@@ -151,3 +151,4 @@ Agent-facing documents should be written densely, using shorthand and cultural/l
 | [Subagents Catalog](subagents-catalog.md) | All 14 subagent patterns, models, visibility |
 | [Development Plan](development-plan.md) | 10-phase implementation roadmap, dependency graph, testing strategy |
 | [State Atlas](state-atlas.md) | Runtime state schema, tool×state matrix, invariants, lifecycle |
+| [Campaign Format Spec](format-spec.md) | On-disk format for campaigns: directory layout, file schemas, entity format |

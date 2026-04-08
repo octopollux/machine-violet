@@ -123,6 +123,7 @@ function mockFileIO(): FileIO {
     mkdir: vi.fn(async (path: string) => { dirs.add(norm(path)); }),
     exists: vi.fn(async (path: string) => norm(path) in files || dirs.has(norm(path))),
     listDir: vi.fn(async () => []),
+    deleteFile: vi.fn(async (path: string) => { files[norm(path)] = undefined as unknown as string; }),
   };
 }
 
@@ -185,7 +186,6 @@ describe("SceneManager", () => {
         assistant: { role: "assistant", content: "The tavern is warm." },
         toolResults: [],
         estimatedTokens: 20,
-        stubbed: false,
       },
       reason: "exchange_count",
     });
@@ -219,7 +219,6 @@ describe("SceneManager", () => {
         assistant: { role: "assistant", content: "The tavern is warm." },
         toolResults: [],
         estimatedTokens: 20,
-        stubbed: false,
       },
       reason: "exchange_count",
     });
@@ -250,7 +249,6 @@ describe("SceneManager", () => {
         assistant: { role: "assistant", content: "The tavern is warm." },
         toolResults: [],
         estimatedTokens: 20,
-        stubbed: false,
       },
       reason: "exchange_count",
     });
@@ -950,7 +948,34 @@ describe("SceneManager", () => {
       title: "Test",
     });
 
-    // Pending op file should be cleared (written as empty string)
+    // Pending op file should be deleted
+    const deleteFileCalls = (fileIO.deleteFile as ReturnType<typeof vi.fn>).mock.calls
+      .filter(([path]: unknown[]) => (path as string).includes("pending-operation"));
+    expect(deleteFileCalls.length).toBeGreaterThan(0);
+  });
+
+  it("clearPendingOp falls back to writeFile when deleteFile is unavailable", async () => {
+    const provider = mockProvider([]);
+    const fileIO = mockFileIO();
+    // Remove deleteFile to simulate a FileIO without it
+    fileIO.deleteFile = undefined;
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    await mgr.resumePendingTransition(provider, {
+      type: "scene_transition",
+      step: "validate",
+      sceneNumber: 1,
+      title: "Test",
+    });
+
+    // Should have written empty string since deleteFile was unavailable
     const pendingOpCalls = (fileIO.writeFile as ReturnType<typeof vi.fn>).mock.calls
       .filter(([path]: unknown[]) => (path as string).includes("pending-operation"));
     const lastCall = pendingOpCalls[pendingOpCalls.length - 1];
