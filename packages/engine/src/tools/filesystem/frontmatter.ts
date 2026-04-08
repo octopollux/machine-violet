@@ -11,7 +11,7 @@ export function parseFrontMatter(markdown: string): {
   changelog: string[];
 } {
   const lines = markdown.split("\n");
-  const frontMatter: EntityFrontMatter = {};
+  const frontMatter: EntityFrontMatter = Object.create(null) as EntityFrontMatter;
 
   // Skip leading blank lines and the H1 heading
   let i = 0;
