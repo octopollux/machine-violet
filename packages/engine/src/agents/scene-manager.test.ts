@@ -954,6 +954,34 @@ describe("SceneManager", () => {
     expect(deleteFileCalls.length).toBeGreaterThan(0);
   });
 
+  it("clearPendingOp falls back to writeFile when deleteFile is unavailable", async () => {
+    const provider = mockProvider([]);
+    const fileIO = mockFileIO();
+    // Remove deleteFile to simulate a FileIO without it
+    fileIO.deleteFile = undefined;
+
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    await mgr.resumePendingTransition(provider, {
+      type: "scene_transition",
+      step: "validate",
+      sceneNumber: 1,
+      title: "Test",
+    });
+
+    // Should have written empty string since deleteFile was unavailable
+    const pendingOpCalls = (fileIO.writeFile as ReturnType<typeof vi.fn>).mock.calls
+      .filter(([path]: unknown[]) => (path as string).includes("pending-operation"));
+    const lastCall = pendingOpCalls[pendingOpCalls.length - 1];
+    expect(lastCall[1]).toBe("");
+  });
+
   it("resumePendingTransition no-ops when step is done", async () => {
     const provider = mockProvider([]);
     const fileIO = mockFileIO();

@@ -755,12 +755,8 @@ This section documents known code behaviors that deviate from this spec. Each is
 
 1. **Front matter display key round-trip:** `normalizeKey` lowercases and replaces spaces with underscores. `displayKeyName` title-cases each word. This is lossy for acronyms: `"HP"` → `"hp"` → `"Hp"`. Fix: canonical display name map for known keys.
 
-2. **Pending operation cleanup:** `clearPendingOp()` writes an empty string to the file instead of deleting it. Fix: delete the file (fall back to empty write if `deleteFile` unavailable).
+2. **`display_resources` type mismatch:** `EntityFrontMatter` declares `display_resources` as `string[]`, but `parseFrontMatter` stores it as a plain string. The array type is aspirational — the parser doesn't split comma-separated values. Fix: either split on parse or correct the type.
 
-3. **`display_resources` type mismatch:** `EntityFrontMatter` declares `display_resources` as `string[]`, but `parseFrontMatter` stores it as a plain string. The array type is aspirational — the parser doesn't split comma-separated values. Fix: either split on parse or correct the type.
+3. **Front matter `null`/`<none>` support:** Not yet implemented. `parseFrontMatter` does not recognize `<none>` as a sentinel. `serializeEntity` skips `null` values instead of writing `<none>`. This spec defines the target behavior.
 
-4. **Conversation `stubbed` field:** Deprecated field on `ConversationExchange`, referenced nowhere. Should be removed.
-
-5. **Front matter `null`/`<none>` support:** Not yet implemented. `parseFrontMatter` does not recognize `<none>` as a sentinel. `serializeEntity` skips `null` values instead of writing `<none>`. This spec defines the target behavior.
-
-6. **State file null semantics:** State files do not yet distinguish `null` from absent keys. This spec defines the target behavior; implementation should follow.
+4. **State file null semantics:** State files do not yet distinguish `null` from absent keys. This spec defines the target behavior; implementation should follow.

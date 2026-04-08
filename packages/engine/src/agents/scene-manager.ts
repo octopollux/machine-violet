@@ -904,7 +904,12 @@ export class SceneManager {
     this.pendingOp = null;
     const path = norm(this.state.campaignRoot) + "/pending-operation.json";
     if (this.fileIO.deleteFile) {
-      await this.fileIO.deleteFile(path);
+      try {
+        await this.fileIO.deleteFile(path);
+      } catch (e) {
+        const code = (e as NodeJS.ErrnoException | null)?.code;
+        if (code !== "ENOENT") throw e;
+      }
     } else {
       await this.fileIO.writeFile(path, "");
     }
