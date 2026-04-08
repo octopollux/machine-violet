@@ -11,7 +11,7 @@ export function parseFrontMatter(markdown: string): {
   changelog: string[];
 } {
   const lines = markdown.split("\n");
-  const frontMatter: EntityFrontMatter = {};
+  const frontMatter: EntityFrontMatter = Object.create(null) as EntityFrontMatter;
 
   // Skip leading blank lines and the H1 heading
   let i = 0;
@@ -30,8 +30,8 @@ export function parseFrontMatter(markdown: string): {
     const match = lines[i].match(fmPattern);
     if (match) {
       const key = normalizeKey(match[1].trim());
-      const value = match[2].trim();
-      frontMatter[key] = value;
+      const raw = match[2].trim();
+      frontMatter[key] = raw === "<none>" ? null : raw;
       i++;
     } else {
       break;
@@ -84,10 +84,14 @@ export function serializeEntity(
 
   // Write front matter (skip internal keys starting with _)
   for (const [key, value] of Object.entries(frontMatter)) {
-    if (key.startsWith("_") || value === undefined || value === null) continue;
+    if (key.startsWith("_") || value === undefined) continue;
     const displayKey = displayKeyName(key);
-    const displayValue = Array.isArray(value) ? value.join(", ") : String(value);
-    lines.push(`**${displayKey}:** ${displayValue}`);
+    if (value === null) {
+      lines.push(`**${displayKey}:** <none>`);
+    } else {
+      const displayValue = Array.isArray(value) ? value.join(", ") : String(value);
+      lines.push(`**${displayKey}:** ${displayValue}`);
+    }
   }
 
   if (body) {
@@ -149,7 +153,8 @@ const DISPLAY_NAMES: Record<string, string> = Object.assign(Object.create(null),
 
 /** Convert storage key to display key: "display_resources" -> "Display Resources" */
 export function displayKeyName(key: string): string {
-  if (key in DISPLAY_NAMES) return DISPLAY_NAMES[key]!;
+  const canonical = DISPLAY_NAMES[key];
+  if (canonical) return canonical;
   // Fallback: algorithmic title-case for unknown keys
   return key
     .split("_")

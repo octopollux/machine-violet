@@ -168,6 +168,54 @@ describe("serializeEntity", () => {
     expect(md).toContain("**Type:** NPC");
     expect(md).not.toContain("## Changelog");
   });
+
+  it("serializes null values as <none>", () => {
+    const md = serializeEntity("Test", { type: "NPC", disposition: null }, "", []);
+    expect(md).toContain("**Disposition:** <none>");
+  });
+
+  it("skips undefined values but keeps null", () => {
+    const md = serializeEntity("Test", { type: "NPC", disposition: null, location: undefined }, "", []);
+    expect(md).toContain("**Disposition:** <none>");
+    expect(md).not.toContain("Location");
+  });
+});
+
+describe("parseFrontMatter <none> sentinel", () => {
+  it("parses <none> as null", () => {
+    const md = `# Test
+
+**Type:** NPC
+**Disposition:** <none>
+
+Body text.
+`;
+    const { frontMatter } = parseFrontMatter(md);
+    expect(frontMatter.disposition).toBeNull();
+    expect(frontMatter.type).toBe("NPC");
+  });
+
+  it("distinguishes null from absent", () => {
+    const md = `# Test
+
+**Type:** NPC
+**Disposition:** <none>
+
+Body text.
+`;
+    const { frontMatter } = parseFrontMatter(md);
+    expect(frontMatter.disposition).toBeNull();         // explicitly empty
+    expect(frontMatter.location).toBeUndefined();       // missing
+  });
+
+  it("round-trips <none> through serialize → parse", () => {
+    const fm = { type: "NPC", disposition: null, location: "Tavern" };
+    const md = serializeEntity("Test", fm, "Body.", []);
+    const { frontMatter } = parseFrontMatter(md);
+    expect(frontMatter.disposition).toBeNull();
+    expect(frontMatter.location).toBe("Tavern");
+    expect(frontMatter.theme).toBeUndefined();
+  });
 });
 
 // --- Display Key Round-Trip ---

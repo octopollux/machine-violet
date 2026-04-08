@@ -8,18 +8,25 @@ export type EntityType =
   | "rules"
   | "campaign";
 
-/** Front matter extracted from an entity markdown file */
+/**
+ * Front matter extracted from an entity markdown file.
+ *
+ * Null semantics (format-spec.md §1.1):
+ * - `string` = has a value
+ * - `null` = explicitly empty (`**Key:** <none>` on disk)
+ * - `undefined` / absent = never set, may need repair
+ */
 export interface EntityFrontMatter {
-  type?: string;
-  player?: string;
-  class?: string;
-  location?: string;
-  color?: string;
-  disposition?: string;
-  additional_names?: string;
-  display_resources?: string[];
-  theme?: string;
-  key_color?: string;
+  type?: string | null;
+  player?: string | null;
+  class?: string | null;
+  location?: string | null;
+  color?: string | null;
+  disposition?: string | null;
+  additional_names?: string | null;
+  display_resources?: string | null;
+  theme?: string | null;
+  key_color?: string | null;
   [key: string]: unknown;
 }
 
