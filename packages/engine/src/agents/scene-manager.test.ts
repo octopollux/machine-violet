@@ -123,7 +123,7 @@ function mockFileIO(): FileIO {
     mkdir: vi.fn(async (path: string) => { dirs.add(norm(path)); }),
     exists: vi.fn(async (path: string) => norm(path) in files || dirs.has(norm(path))),
     listDir: vi.fn(async () => []),
-    deleteFile: vi.fn(async (path: string) => { delete files[norm(path)]; }),
+    deleteFile: vi.fn(async (path: string) => { files[norm(path)] = undefined as unknown as string; }),
   };
 }
 
