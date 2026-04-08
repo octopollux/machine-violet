@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { LLMProvider, ChatResult, NormalizedUsage } from "../../providers/types.js";
 import {
   emptyCompendium,
-  filterPlayerTranscript,
   parseCompendiumOutput,
   renderCompendiumForDM,
   updateCompendium,
@@ -65,30 +64,6 @@ describe("emptyCompendium", () => {
     expect(c.storyline).toEqual([]);
     expect(c.lore).toEqual([]);
     expect(c.objectives).toEqual([]);
-  });
-});
-
-// --- filterPlayerTranscript ---
-
-describe("filterPlayerTranscript", () => {
-  it("removes tool result lines", () => {
-    const transcript = [
-      "**DM:** You enter the tavern.",
-      "**Aldric:** I look around.",
-      "> `roll_dice`: 2d20kh1+5: [18,7]→23",
-      "**DM:** You spot a cloaked figure.",
-    ].join("\n");
-
-    const filtered = filterPlayerTranscript(transcript);
-    expect(filtered).not.toContain("> `roll_dice`");
-    expect(filtered).toContain("**DM:** You enter the tavern.");
-    expect(filtered).toContain("**Aldric:** I look around.");
-    expect(filtered).toContain("**DM:** You spot a cloaked figure.");
-  });
-
-  it("preserves transcript with no tool lines", () => {
-    const transcript = "**DM:** Hello.\n**Player:** Hi.";
-    expect(filterPlayerTranscript(transcript)).toBe(transcript);
   });
 });
 
@@ -223,7 +198,9 @@ describe("updateCompendium", () => {
     };
     const provider = mockProvider([textResult(JSON.stringify(updated))]);
 
-    const result = await updateCompendium(provider, emptyCompendium(), "**DM:** You meet Mira.", 3);
+    const result = await updateCompendium(
+      provider, emptyCompendium(), "- The party met Mira, a smuggler.", 3,
+    );
 
     expect(result.compendium.characters).toHaveLength(1);
     expect(result.compendium.characters[0].name).toBe("Mira");
@@ -235,25 +212,27 @@ describe("updateCompendium", () => {
     const current = emptyCompendium();
     const provider = mockProvider([textResult("I don't understand the request")]);
 
-    const result = await updateCompendium(provider, current, "**DM:** Hello.", 1);
+    const result = await updateCompendium(provider, current, "- Nothing happened.", 1);
     expect(result.compendium).toBe(current);
   });
 
   it("passes alias context when provided", async () => {
     const provider = mockProvider([textResult(JSON.stringify(emptyCompendium()))]);
-    await updateCompendium(provider, emptyCompendium(), "transcript", 1, "\n\nEntity aliases:\nfoo: Foo");
+    await updateCompendium(
+      provider, emptyCompendium(), "- Scene summary.", 1, "\n\nEntity aliases:\nfoo: Foo",
+    );
 
     const call = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(call.messages[0].content).toContain("Entity aliases");
   });
 
-  it("filters tool results from transcript before sending", async () => {
+  it("sends scene summary, not raw transcript", async () => {
     const provider = mockProvider([textResult(JSON.stringify(emptyCompendium()))]);
-    const transcript = '**DM:** Hello.\n> `roll_dice`: 2d6: [3,4]→7\n**Player:** Hi.';
-    await updateCompendium(provider, emptyCompendium(), transcript, 1);
+    const summary = "- The party explored the tavern and met a cloaked stranger.";
+    await updateCompendium(provider, emptyCompendium(), summary, 1);
 
     const call = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call.messages[0].content).not.toContain("> `roll_dice`");
-    expect(call.messages[0].content).toContain("**DM:** Hello.");
+    expect(call.messages[0].content).toContain("Scene 1 summary:");
+    expect(call.messages[0].content).toContain(summary);
   });
 });

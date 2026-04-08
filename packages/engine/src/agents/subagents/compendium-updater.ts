@@ -24,32 +24,22 @@ export function emptyCompendium(): Compendium {
 }
 
 /**
- * Filter a transcript to player-facing lines only.
- * Removes tool result lines (> `tool`: ...) which are mechanical/DM-only.
- */
-export function filterPlayerTranscript(transcript: string): string {
-  return transcript
-    .split("\n")
-    .filter((line) => !line.startsWith("> `"))
-    .join("\n");
-}
-
-/**
  * Compendium updater subagent.
- * Reads the current compendium and a scene transcript,
+ * Reads the current compendium and a player-safe scene summary,
  * returns an updated compendium reflecting new player knowledge.
+ *
+ * @param sceneSummary - Player-safe summary from the scene summarizer (campaign log `full` field).
+ *                       Never pass the raw transcript — it may contain DM secrets.
  */
 export async function updateCompendium(
   provider: LLMProvider,
   current: Compendium,
-  transcript: string,
+  sceneSummary: string,
   sceneNumber: number,
   aliasContext?: string,
 ): Promise<{ compendium: Compendium; usage: SubagentResult["usage"] }> {
-  const playerTranscript = filterPlayerTranscript(transcript);
-
   const userMessage = [
-    `Scene ${sceneNumber} transcript:\n\n${playerTranscript}`,
+    `Scene ${sceneNumber} summary:\n\n${sceneSummary}`,
     aliasContext ? `\n\n${aliasContext}` : "",
     `\n\nCurrent compendium:\n${JSON.stringify(current, null, 2)}`,
   ].join("");
