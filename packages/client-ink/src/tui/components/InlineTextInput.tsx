@@ -214,9 +214,7 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
       processAction({ type: "move-cursor-left" });
     } else if (key.rightArrow) {
       processAction({ type: "move-cursor-right" });
-    } else if (key.backspace || key.delete) {
-      // Ink maps the physical Backspace key (\x7f) to key.delete, not
-      // key.backspace (\x08). We must catch both.
+    } else if (key.backspace) {
       processAction({ type: "delete" });
     } else if (input && !key.ctrl && !key.meta) {
       processAction({ type: "insert", text: input });

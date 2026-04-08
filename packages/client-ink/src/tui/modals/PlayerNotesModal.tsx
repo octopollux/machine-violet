@@ -195,7 +195,7 @@ export function PlayerNotesModal({
     if (key.leftArrow) { dispatch({ type: "left", maxRows: maxContentRows }); return; }
     if (key.rightArrow) { dispatch({ type: "right", maxRows: maxContentRows }); return; }
     if (key.return) { dispatch({ type: "enter", maxRows: maxContentRows }); return; }
-    if (key.backspace || key.delete) { dispatch({ type: "backspace", maxRows: maxContentRows }); return; }
+    if (key.backspace) { dispatch({ type: "backspace", maxRows: maxContentRows }); return; }
     if (key.ctrl && input === "a") { dispatch({ type: "home" }); return; }
     if (key.ctrl && input === "e") { dispatch({ type: "end" }); return; }
 

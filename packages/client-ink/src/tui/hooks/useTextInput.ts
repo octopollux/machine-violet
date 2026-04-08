@@ -22,7 +22,7 @@ export function useTextInput({ onChange, disabled }: UseTextInputOptions): TextI
   const handleKey = useCallback((input: string, key: InkKey): boolean => {
     if (disabled) return false;
 
-    if (key.backspace || key.delete) {
+    if (key.backspace) {
       onChange((v) => v.slice(0, -1));
       return true;
     }
