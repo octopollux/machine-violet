@@ -122,12 +122,32 @@ export function extractSection(body: string, heading: string): string | undefine
 }
 
 /** Convert display key to storage key: "Display Resources" -> "display_resources" */
-function normalizeKey(key: string): string {
+export function normalizeKey(key: string): string {
   return key.toLowerCase().replace(/\s+/g, "_");
 }
 
+/**
+ * Canonical display names for known front matter keys.
+ * Used to avoid lossy round-trips (e.g., "HP" → "hp" → "Hp").
+ */
+const DISPLAY_NAMES: Record<string, string> = {
+  type: "Type",
+  player: "Player",
+  class: "Class",
+  location: "Location",
+  color: "Color",
+  disposition: "Disposition",
+  additional_names: "Additional Names",
+  display_resources: "Display Resources",
+  theme: "Theme",
+  key_color: "Key Color",
+  sheet_status: "Sheet Status",
+};
+
 /** Convert storage key to display key: "display_resources" -> "Display Resources" */
-function displayKeyName(key: string): string {
+export function displayKeyName(key: string): string {
+  if (key in DISPLAY_NAMES) return DISPLAY_NAMES[key];
+  // Fallback: algorithmic title-case for unknown keys
   return key
     .split("_")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))

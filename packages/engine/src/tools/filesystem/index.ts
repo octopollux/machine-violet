@@ -1,4 +1,4 @@
-export { parseFrontMatter, serializeEntity, extractSection } from "./frontmatter.js";
+export { parseFrontMatter, serializeEntity, extractSection, normalizeKey, displayKeyName } from "./frontmatter.js";
 export { extractWikilinks, uniqueTargets } from "./wikilinks.js";
 export type { WikiLink } from "./wikilinks.js";
 export { campaignDirs, sceneDir, campaignPaths, machineDirs, machinePaths } from "./scaffold.js";
