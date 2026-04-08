@@ -123,6 +123,7 @@ function mockFileIO(): FileIO {
     mkdir: vi.fn(async (path: string) => { dirs.add(norm(path)); }),
     exists: vi.fn(async (path: string) => norm(path) in files || dirs.has(norm(path))),
     listDir: vi.fn(async () => []),
+    deleteFile: vi.fn(async (path: string) => { delete files[norm(path)]; }),
   };
 }
 
@@ -185,7 +186,6 @@ describe("SceneManager", () => {
         assistant: { role: "assistant", content: "The tavern is warm." },
         toolResults: [],
         estimatedTokens: 20,
-        stubbed: false,
       },
       reason: "exchange_count",
     });
@@ -219,7 +219,6 @@ describe("SceneManager", () => {
         assistant: { role: "assistant", content: "The tavern is warm." },
         toolResults: [],
         estimatedTokens: 20,
-        stubbed: false,
       },
       reason: "exchange_count",
     });
@@ -250,7 +249,6 @@ describe("SceneManager", () => {
         assistant: { role: "assistant", content: "The tavern is warm." },
         toolResults: [],
         estimatedTokens: 20,
-        stubbed: false,
       },
       reason: "exchange_count",
     });
@@ -950,11 +948,10 @@ describe("SceneManager", () => {
       title: "Test",
     });
 
-    // Pending op file should be cleared (written as empty string)
-    const pendingOpCalls = (fileIO.writeFile as ReturnType<typeof vi.fn>).mock.calls
+    // Pending op file should be deleted
+    const deleteFileCalls = (fileIO.deleteFile as ReturnType<typeof vi.fn>).mock.calls
       .filter(([path]: unknown[]) => (path as string).includes("pending-operation"));
-    const lastCall = pendingOpCalls[pendingOpCalls.length - 1];
-    expect(lastCall[1]).toBe("");
+    expect(deleteFileCalls.length).toBeGreaterThan(0);
   });
 
   it("resumePendingTransition no-ops when step is done", async () => {

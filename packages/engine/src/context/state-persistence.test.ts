@@ -122,14 +122,14 @@ describe("StatePersister", () => {
         assistant: { role: "assistant" as const, content: "You find a dusty chest." },
         toolResults: [],
         estimatedTokens: 50,
-        stubbed: false,
+
       },
       {
         user: { role: "user" as const, content: "I open it." },
         assistant: { role: "assistant" as const, content: "Inside is a golden key." },
         toolResults: [],
         estimatedTokens: 40,
-        stubbed: false,
+
       },
     ];
 

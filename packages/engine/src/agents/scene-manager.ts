@@ -903,7 +903,11 @@ export class SceneManager {
   private async clearPendingOp(): Promise<void> {
     this.pendingOp = null;
     const path = norm(this.state.campaignRoot) + "/pending-operation.json";
-    await this.fileIO.writeFile(path, "");
+    if (this.fileIO.deleteFile) {
+      await this.fileIO.deleteFile(path);
+    } else {
+      await this.fileIO.writeFile(path, "");
+    }
   }
 
   private async listEntityFiles(): Promise<string[]> {

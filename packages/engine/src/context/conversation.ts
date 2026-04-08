@@ -15,8 +15,6 @@ export interface ConversationExchange {
   toolResults: NormalizedMessage[];
   /** Estimated total tokens for this exchange */
   estimatedTokens: number;
-  /** @deprecated No longer used. Kept for backward compat with persisted state. */
-  stubbed?: boolean;
 }
 
 /**

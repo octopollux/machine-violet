@@ -213,7 +213,7 @@ describe("ConversationManager", () => {
         assistant: assistantMsg("You find a chest."),
         toolResults: [],
         estimatedTokens: 0, // intentionally wrong — should be recomputed
-        stubbed: false,
+
       },
     ]);
 
@@ -233,7 +233,7 @@ describe("ConversationManager", () => {
         assistant: assistantMsg("You rolled 15"),
         toolResults: [toolResultMsg("toolu_1", "1d20: [15]→20")],
         estimatedTokens: 0,
-        stubbed: false,
+
       },
     ]);
 
@@ -275,7 +275,7 @@ describe("ConversationManager", () => {
         assistant: assistantMsg("Old response"),
         toolResults: [],
         estimatedTokens: 0,
-        stubbed: false,
+
       },
     ]);
 
