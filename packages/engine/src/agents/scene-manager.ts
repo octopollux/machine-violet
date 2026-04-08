@@ -625,19 +625,34 @@ export class SceneManager {
     title: string,
     result: TransitionResult,
   ): Promise<void> {
-    // Run the scene summarizer first — its player-safe output feeds both
-    // the campaign log and the compendium updater (which must never see
-    // the raw transcript to avoid leaking DM secrets).
     const transcript = this.scene.transcript.join("\n");
+
+    // Strip tool-result lines (mechanical / DM-internal data) so
+    // player-facing subagents (summarizer, compendium) never see them.
+    const playerTranscript = transcript
+      .split("\n")
+      .filter((line) => !line.startsWith("> `"))
+      .join("\n");
+
+    // Kick off the summarizer and changelog updater in parallel —
+    // changelog uses the full transcript (DM-facing), while the
+    // summarizer uses the filtered player transcript.
     this.devLog?.("[dev] subagent:summarizer starting");
-    const summaryResult = await summarizeScene(provider, transcript, this.aliasContext || undefined);
+    const summaryPromise = summarizeScene(
+      provider, playerTranscript, this.aliasContext || undefined,
+    );
+    const changelogPromise = this.stepChangelogUpdates(provider, result);
+
+    const summaryResult = await summaryPromise;
     this.devLog?.("[dev] subagent:summarizer done");
     result.campaignLogEntry = summaryResult.full;
     accUsage(result.usage, summaryResult.usage);
 
+    // Campaign log and compendium both depend on the summary;
+    // changelog may still be running — await everything.
     await Promise.all([
+      changelogPromise,
       this.stepCampaignLog(title, summaryResult),
-      this.stepChangelogUpdates(provider, result),
       this.stepCompendiumUpdate(provider, summaryResult.full, result).catch((e) => {
         this.devLog?.(`[dev] compendium update failed (non-critical): ${e instanceof Error ? e.message : String(e)}`);
       }),
