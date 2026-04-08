@@ -625,28 +625,29 @@ export class SceneManager {
     title: string,
     result: TransitionResult,
   ): Promise<void> {
+    // Run the scene summarizer first — its player-safe output feeds both
+    // the campaign log and the compendium updater (which must never see
+    // the raw transcript to avoid leaking DM secrets).
+    const transcript = this.scene.transcript.join("\n");
+    this.devLog?.("[dev] subagent:summarizer starting");
+    const summaryResult = await summarizeScene(provider, transcript, this.aliasContext || undefined);
+    this.devLog?.("[dev] subagent:summarizer done");
+    result.campaignLogEntry = summaryResult.full;
+    accUsage(result.usage, summaryResult.usage);
+
     await Promise.all([
-      this.stepCampaignLog(provider, title, result),
+      this.stepCampaignLog(title, summaryResult),
       this.stepChangelogUpdates(provider, result),
-      this.stepCompendiumUpdate(provider, result).catch((e) => {
+      this.stepCompendiumUpdate(provider, summaryResult.full, result).catch((e) => {
         this.devLog?.(`[dev] compendium update failed (non-critical): ${e instanceof Error ? e.message : String(e)}`);
       }),
     ]);
   }
 
   private async stepCampaignLog(
-    provider: LLMProvider,
     title: string,
-    result: TransitionResult,
+    summaryResult: { full: string; mini: string },
   ): Promise<void> {
-    const transcript = this.scene.transcript.join("\n");
-    this.devLog?.("[dev] subagent:summarizer starting");
-    const summaryResult = await summarizeScene(provider, transcript, this.aliasContext || undefined);
-    this.devLog?.("[dev] subagent:summarizer done");
-    // campaignLogEntry stays as full text for buildSceneAnchor, session recaps, etc.
-    result.campaignLogEntry = summaryResult.full;
-    accUsage(result.usage, summaryResult.usage);
-
     const paths = campaignPaths(this.state.campaignRoot);
 
     // Read existing log.json or create empty
@@ -716,6 +717,7 @@ export class SceneManager {
 
   private async stepCompendiumUpdate(
     provider: LLMProvider,
+    sceneSummary: string,
     result: TransitionResult,
   ): Promise<void> {
     const paths = campaignPaths(this.state.campaignRoot);
@@ -730,12 +732,11 @@ export class SceneManager {
       current = emptyCompendium();
     }
 
-    const transcript = this.scene.transcript.join("\n");
     this.devLog?.("[dev] subagent:compendium starting");
     const { compendium, usage } = await updateCompendium(
       provider,
       current,
-      transcript,
+      sceneSummary,
       this.scene.sceneNumber,
       this.aliasContext || undefined,
     );
