@@ -197,8 +197,8 @@ export class GameEngine {
     const scene = this.sceneManager.getScene();
     this.persister.persistScene({
       precis: scene.precis,
-      openThreads: scene.openThreads || undefined,
-      npcIntents: scene.npcIntents || undefined,
+      openThreads: scene.openThreads || null,
+      npcIntents: scene.npcIntents || null,
 
       playerReads: scene.playerReads,
       activePlayerIndex: this.gameState.activePlayerIndex,
@@ -525,8 +525,8 @@ export class GameEngine {
         const scene = this.sceneManager.getScene();
         this.persister.persistScene({
           precis: scene.precis,
-          openThreads: scene.openThreads || undefined,
-          npcIntents: scene.npcIntents || undefined,
+          openThreads: scene.openThreads || null,
+          npcIntents: scene.npcIntents || null,
           playerReads: scene.playerReads,
           activePlayerIndex: this.gameState.activePlayerIndex,
         });

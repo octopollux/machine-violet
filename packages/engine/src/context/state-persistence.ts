@@ -29,21 +29,27 @@ export const STATE_FILES = {
 
 export type StateSlice = "combat" | "clocks" | "maps" | "decks" | "objectives";
 
-/** Scene state subset that gets persisted */
+/** Scene state subset that gets persisted.
+ * Null semantics (format-spec §1.1):
+ *   value = present, null = explicitly empty/cleared, undefined = never set.
+ */
 export interface PersistedSceneState {
-  precis: string;
-  openThreads?: string;
-  npcIntents?: string;
+  precis: string | null;
+  openThreads?: string | null;
+  npcIntents?: string | null;
   playerReads: SceneState["playerReads"];
   activePlayerIndex: number;
 }
 
-/** UI theme state that gets persisted */
+/** UI theme state that gets persisted.
+ * Null semantics (format-spec §1.1):
+ *   value = present, null = use default / explicitly none, undefined = never configured.
+ */
 export interface PersistedUIState {
   styleName: string;
   variant: StyleVariant;
-  keyColor?: string;
-  modelines?: Record<string, string>;
+  keyColor?: string | null;
+  modelines?: Record<string, string> | null;
 }
 
 /** Persisted resource display + values */

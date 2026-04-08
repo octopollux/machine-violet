@@ -762,4 +762,4 @@ This section documents known code behaviors that deviate from this spec. Each is
 
 3. **Front matter `null`/`<none>` support:** Not yet implemented. `parseFrontMatter` does not recognize `<none>` as a sentinel. `serializeEntity` skips `null` values instead of writing `<none>`. This spec defines the target behavior.
 
-4. **State file null semantics:** State files do not yet distinguish `null` from absent keys. This spec defines the target behavior; implementation should follow.
+4. ~~**State file null semantics:**~~ Resolved. `Persisted*` types use `T | null` for explicit-empty; serialization and hydration distinguish `null` from absent keys.
