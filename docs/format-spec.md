@@ -613,6 +613,9 @@ Front matter lines appear immediately after the H1 heading and before the body. 
 | `theme` | Theme | Locations | Theme name to auto-apply |
 | `key_color` | Key Color | Locations | `#8844cc` (hex) |
 | `sheet_status` | Sheet Status | Characters | `minimal`, `full` |
+| `hp` | HP | Characters | `28/35` |
+| `ac` | AC | Characters | `16` |
+| `xp` | XP | Characters | `1200` |
 
 The `_title` key is internal (extracted from the H1 heading) and never serialized.
 

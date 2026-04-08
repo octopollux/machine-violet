@@ -130,7 +130,7 @@ export function normalizeKey(key: string): string {
  * Canonical display names for known front matter keys.
  * Used to avoid lossy round-trips (e.g., "HP" → "hp" → "Hp").
  */
-const DISPLAY_NAMES: Record<string, string> = {
+const DISPLAY_NAMES: Record<string, string> = Object.assign(Object.create(null), {
   type: "Type",
   player: "Player",
   class: "Class",
@@ -142,11 +142,14 @@ const DISPLAY_NAMES: Record<string, string> = {
   theme: "Theme",
   key_color: "Key Color",
   sheet_status: "Sheet Status",
-};
+  hp: "HP",
+  ac: "AC",
+  xp: "XP",
+});
 
 /** Convert storage key to display key: "display_resources" -> "Display Resources" */
 export function displayKeyName(key: string): string {
-  if (key in DISPLAY_NAMES) return DISPLAY_NAMES[key];
+  if (key in DISPLAY_NAMES) return DISPLAY_NAMES[key]!;
   // Fallback: algorithmic title-case for unknown keys
   return key
     .split("_")

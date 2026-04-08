@@ -45,4 +45,4 @@ After completing a coding task, make a detailed commit; you'll need this history
 
 ## Code Review
 
-After creating a PR, wait two minutes then check for Copilot code review comments (it reviews once, not on subsequent pushes). Address any issues you judge worthwhile — use your own judgement on what to fix vs skip.
+After creating a PR, poll for Copilot code review comments every two minutes for up to ten minutes (it reviews once but takes 2-10 minutes to arrive). Address any issues you judge worthwhile — use your own judgement on what to fix vs skip.

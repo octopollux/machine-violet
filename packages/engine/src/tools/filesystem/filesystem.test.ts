@@ -189,6 +189,12 @@ describe("displayKeyName", () => {
     expect(displayKeyName("sheet_status")).toBe("Sheet Status");
   });
 
+  it("preserves acronym keys", () => {
+    expect(displayKeyName("hp")).toBe("HP");
+    expect(displayKeyName("ac")).toBe("AC");
+    expect(displayKeyName("xp")).toBe("XP");
+  });
+
   it("falls back to algorithmic title-case for unknown keys", () => {
     expect(displayKeyName("custom_field")).toBe("Custom Field");
     expect(displayKeyName("some_long_key")).toBe("Some Long Key");
@@ -216,6 +222,15 @@ describe("front matter key round-trip", () => {
     for (const [key, value] of Object.entries(fm)) {
       expect(frontMatter[key]).toBe(value);
     }
+  });
+
+  it("round-trips acronym keys through serialize → parse", () => {
+    const md = serializeEntity("Hero", { type: "PC", hp: "28/35", ac: "16" }, "", []);
+    expect(md).toContain("**HP:** 28/35");
+    expect(md).toContain("**AC:** 16");
+    const { frontMatter } = parseFrontMatter(md);
+    expect(frontMatter.hp).toBe("28/35");
+    expect(frontMatter.ac).toBe("16");
   });
 
   it("serializes known keys with correct display names", () => {
