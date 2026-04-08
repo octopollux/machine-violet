@@ -13,6 +13,8 @@ import {
   defaultConfigDir,
   validateConfig,
   createDefaultCampaignConfig,
+  normalizeKey,
+  displayKeyName,
 } from "./index.js";
 
 // --- Front Matter ---
@@ -165,6 +167,81 @@ describe("serializeEntity", () => {
     expect(md).toContain("# Empty");
     expect(md).toContain("**Type:** NPC");
     expect(md).not.toContain("## Changelog");
+  });
+});
+
+// --- Display Key Round-Trip ---
+
+describe("normalizeKey", () => {
+  it("lowercases and replaces spaces with underscores", () => {
+    expect(normalizeKey("Display Resources")).toBe("display_resources");
+    expect(normalizeKey("Key Color")).toBe("key_color");
+    expect(normalizeKey("Type")).toBe("type");
+  });
+});
+
+describe("displayKeyName", () => {
+  it("uses canonical names for known keys", () => {
+    expect(displayKeyName("type")).toBe("Type");
+    expect(displayKeyName("display_resources")).toBe("Display Resources");
+    expect(displayKeyName("key_color")).toBe("Key Color");
+    expect(displayKeyName("additional_names")).toBe("Additional Names");
+    expect(displayKeyName("sheet_status")).toBe("Sheet Status");
+  });
+
+  it("preserves acronym keys", () => {
+    expect(displayKeyName("hp")).toBe("HP");
+    expect(displayKeyName("ac")).toBe("AC");
+    expect(displayKeyName("xp")).toBe("XP");
+  });
+
+  it("falls back to algorithmic title-case for unknown keys", () => {
+    expect(displayKeyName("custom_field")).toBe("Custom Field");
+    expect(displayKeyName("some_long_key")).toBe("Some Long Key");
+  });
+});
+
+describe("front matter key round-trip", () => {
+  it("round-trips all known keys through serialize → parse", () => {
+    const fm = {
+      type: "PC",
+      player: "Alex",
+      class: "Paladin 5",
+      location: "Thornfield",
+      color: "#4488ff",
+      disposition: "friendly",
+      additional_names: "Grimjaw, Captain",
+      display_resources: "HP, Spell Slots",
+      theme: "gothic",
+      key_color: "#8844cc",
+      sheet_status: "full",
+    };
+    const md = serializeEntity("Test", fm, "Body.", []);
+    const { frontMatter } = parseFrontMatter(md);
+
+    for (const [key, value] of Object.entries(fm)) {
+      expect(frontMatter[key]).toBe(value);
+    }
+  });
+
+  it("round-trips acronym keys through serialize → parse", () => {
+    const md = serializeEntity("Hero", { type: "PC", hp: "28/35", ac: "16" }, "", []);
+    expect(md).toContain("**HP:** 28/35");
+    expect(md).toContain("**AC:** 16");
+    const { frontMatter } = parseFrontMatter(md);
+    expect(frontMatter.hp).toBe("28/35");
+    expect(frontMatter.ac).toBe("16");
+  });
+
+  it("serializes known keys with correct display names", () => {
+    const md = serializeEntity("Test", {
+      display_resources: "HP",
+      key_color: "#fff",
+      sheet_status: "minimal",
+    }, "", []);
+    expect(md).toContain("**Display Resources:** HP");
+    expect(md).toContain("**Key Color:** #fff");
+    expect(md).toContain("**Sheet Status:** minimal");
   });
 });
 
