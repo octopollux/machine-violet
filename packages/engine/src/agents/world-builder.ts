@@ -52,7 +52,7 @@ export async function buildCampaignWorld(
     {
       type: "PC",
       player: result.playerName,
-      display_resources: ["HP"],
+      display_resources: "HP",
       theme_color: result.themeColor,
     },
     charBody,
