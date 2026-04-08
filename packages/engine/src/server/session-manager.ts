@@ -58,7 +58,7 @@ export class SessionManager {
   private gameState: GameState | null = null;
   private costTracker: CostTracker | null = null;
   private currentMode: "play" | "ooc" | "dev" | "setup" = "play";
-  private persistedUI: { themeName?: string; variant?: string; keyColor?: string; modelines?: Record<string, string> } = {};
+  private persistedUI: { themeName?: string; variant?: string; keyColor?: string | null; modelines?: Record<string, string> | null } = {};
   private setupSession: SetupSession | null = null;
 
   /** Campaign ID of the currently active session (null if none). */
@@ -586,9 +586,9 @@ export class SessionManager {
     // The scene object is shared by reference with the engine, so mutating
     // it here updates the engine's copy too.
     if (loaded.scene) {
-      if (loaded.scene.precis != null) scene.precis = loaded.scene.precis;
-      if (loaded.scene.openThreads != null) scene.openThreads = loaded.scene.openThreads;
-      if (loaded.scene.npcIntents != null) scene.npcIntents = loaded.scene.npcIntents;
+      if (loaded.scene.precis !== undefined) scene.precis = loaded.scene.precis ?? "";
+      if (loaded.scene.openThreads !== undefined) scene.openThreads = loaded.scene.openThreads ?? "";
+      if (loaded.scene.npcIntents !== undefined) scene.npcIntents = loaded.scene.npcIntents ?? "";
       if (loaded.scene.playerReads != null) scene.playerReads = loaded.scene.playerReads;
     }
 

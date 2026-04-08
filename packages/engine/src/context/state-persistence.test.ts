@@ -220,6 +220,86 @@ describe("StatePersister", () => {
     expect(loaded.ui!.modelines).toEqual({ Aldric: "HP 45/50 | Blessed", Rook: "HP 28/30 | Poisoned" });
   });
 
+  it("round-trips scene state with null fields (explicit-empty)", async () => {
+    const fio = mockFileIO();
+    const persister = new StatePersister("/tmp/campaign", fio);
+    const scene = {
+      precis: "The party rests.",
+      openThreads: null,
+      npcIntents: null,
+      playerReads: [{ engagement: "high" as const, focus: ["combat"], tone: "aggressive" as const, pacing: "pushing_forward" as const, offScript: false }],
+      activePlayerIndex: 0,
+    };
+
+    persister.persistScene(scene);
+    await vi.waitFor(() => expect(fio.writeFile).toHaveBeenCalled());
+
+    const loaded = await persister.loadAll();
+    expect(loaded.scene).toBeDefined();
+    expect(loaded.scene!.precis).toBe("The party rests.");
+    expect(loaded.scene!.openThreads).toBeNull();
+    expect(loaded.scene!.npcIntents).toBeNull();
+  });
+
+  it("distinguishes null from absent in scene state", async () => {
+    const fio = mockFileIO();
+    const persister = new StatePersister("/tmp/campaign", fio);
+    // Scene with no openThreads/npcIntents keys at all (absent = never assessed)
+    const minimal = { precis: "test", playerReads: [], activePlayerIndex: 0 };
+    files[norm("/tmp/campaign/state/scene.json")] = JSON.stringify(minimal);
+
+    const loaded = await persister.loadAll();
+    expect(loaded.scene!.openThreads).toBeUndefined();
+    expect(loaded.scene!.npcIntents).toBeUndefined();
+
+    // Now set them to null (explicitly cleared)
+    const cleared = { ...minimal, openThreads: null, npcIntents: null };
+    files[norm("/tmp/campaign/state/scene.json")] = JSON.stringify(cleared);
+
+    const loaded2 = await persister.loadAll();
+    expect(loaded2.scene!.openThreads).toBeNull();
+    expect(loaded2.scene!.npcIntents).toBeNull();
+  });
+
+  it("round-trips UI state with null keyColor and modelines", async () => {
+    const fio = mockFileIO();
+    const persister = new StatePersister("/tmp/campaign", fio);
+    const ui = {
+      styleName: "gothic",
+      variant: "exploration" as const,
+      keyColor: null,
+      modelines: null,
+    };
+
+    persister.persistUI(ui);
+    await vi.waitFor(() => expect(fio.writeFile).toHaveBeenCalled());
+
+    const loaded = await persister.loadAll();
+    expect(loaded.ui).toBeDefined();
+    expect(loaded.ui!.keyColor).toBeNull();
+    expect(loaded.ui!.modelines).toBeNull();
+  });
+
+  it("distinguishes null from absent in UI state", async () => {
+    const fio = mockFileIO();
+    const persister = new StatePersister("/tmp/campaign", fio);
+    // UI with no keyColor/modelines keys (absent = never configured)
+    const minimal = { styleName: "clean", variant: "exploration" };
+    files[norm("/tmp/campaign/state/ui.json")] = JSON.stringify(minimal);
+
+    const loaded = await persister.loadAll();
+    expect(loaded.ui!.keyColor).toBeUndefined();
+    expect(loaded.ui!.modelines).toBeUndefined();
+
+    // Now set them to null (explicitly none)
+    const cleared = { ...minimal, keyColor: null, modelines: null };
+    files[norm("/tmp/campaign/state/ui.json")] = JSON.stringify(cleared);
+
+    const loaded2 = await persister.loadAll();
+    expect(loaded2.ui!.keyColor).toBeNull();
+    expect(loaded2.ui!.modelines).toBeNull();
+  });
+
   it("loads old UI state without modelines (backward compat)", async () => {
     const fio = mockFileIO();
     const persister = new StatePersister("/tmp/campaign", fio);

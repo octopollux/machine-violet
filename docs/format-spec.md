@@ -756,4 +756,4 @@ The engine's `StatePersister.flush()` is called before every commit to ensure al
 
 This section documents known code behaviors that deviate from this spec. Each is a bug to be fixed.
 
-1. **State file null semantics:** State files do not yet distinguish `null` from absent keys. This spec defines the target behavior; implementation should follow.
+1. ~~**State file null semantics:**~~ Resolved. `Persisted*` types use `T | null` for explicit-empty; serialization and hydration distinguish `null` from absent keys.
