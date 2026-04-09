@@ -277,6 +277,18 @@ export function buildGrid(
 }
 
 // ---------------------------------------------------------------------------
+// Module-level cache so the starfield survives mount/unmount cycles
+// (e.g. navigating to Settings and back).
+// ---------------------------------------------------------------------------
+
+const stateCache = new Map<string, SimState>();
+
+/** Clear the cached starfield (useful in tests). */
+export function resetStarfieldCache(): void {
+  stateCache.clear();
+}
+
+// ---------------------------------------------------------------------------
 // Hook: useStarfield
 // ---------------------------------------------------------------------------
 
@@ -294,21 +306,31 @@ export function useStarfield(
   const { frame } = useAnimation({ interval, isActive });
 
   const stateRef = useRef<SimState | null>(null);
+  const frameOffsetRef = useRef(0);
 
   const dimKey = `${width}x${height}`;
   const area = width * height;
   const targetCount = Math.max(1, Math.round(area * density));
 
-  // (Re-)initialize when dimensions change — start empty and let stars
-  // fade in gradually via the per-frame spawn cap in advanceFrame.
+  // (Re-)initialize when dimensions change.
+  // Check module-level cache first so stars survive mount/unmount.
   if (!stateRef.current || stateRef.current.dimKey !== dimKey) {
-    stateRef.current = { stars: [], rng: createRng(42), lastFrame: -1, dimKey };
+    const cached = stateCache.get(dimKey);
+    if (cached) {
+      stateRef.current = cached;
+      // Resume: map animation frame 0 → the simulation frame after where we paused
+      frameOffsetRef.current = cached.lastFrame + 1;
+    } else {
+      stateRef.current = { stars: [], rng: createRng(42), lastFrame: -1, dimKey };
+      frameOffsetRef.current = 0;
+    }
   }
 
   const state = stateRef.current;
+  const simFrame = frame + frameOffsetRef.current;
 
   // Advance simulation to current frame (idempotent for same frame)
-  while (state.lastFrame < frame) {
+  while (state.lastFrame < simFrame) {
     state.lastFrame++;
     advanceFrame(
       state,
@@ -321,7 +343,10 @@ export function useStarfield(
     );
   }
 
-  return buildGrid(state.stars, width, height, frame);
+  // Persist to cache so state survives unmount
+  stateCache.set(dimKey, state);
+
+  return buildGrid(state.stars, width, height, simFrame);
 }
 
 // ---------------------------------------------------------------------------
