@@ -839,7 +839,7 @@ The setup agent receives world summaries (name, summary, genres, slug) in its sy
 
 ---
 
-## 9. Known Deviations from Spec (Bugs)
+## 11. Known Deviations from Spec (Bugs)
 
 This section documents known code behaviors that deviate from this spec. Each is a bug to be fixed.
 

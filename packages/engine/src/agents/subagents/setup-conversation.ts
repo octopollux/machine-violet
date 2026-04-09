@@ -112,7 +112,7 @@ const LOAD_WORLD_TOOL: NormalizedTool = {
   name: "load_world",
   description:
     "Load the full detail and suboptions for a world file by slug. " +
-    "Use this when you want to learn more about a specific campaign seed " +
+    "Use this when you want to learn more about a specific campaign world " +
     "(e.g., after the player picks one, or to preview its options). " +
     "Returns the world's detail block, suboptions, and any config hints.",
   inputSchema: {
@@ -180,7 +180,7 @@ function buildSystemPrompt(existingPlayers?: KnownPlayer[]): string {
   const worlds = worldSummaries(loadAllWorlds());
   const seedList = shuffle(worlds).map((s) => {
     const desc = s.description ? ` | Description: ${s.description}` : "";
-    const extra = s.hasDetail ? " [has detail — use load_world]" : "";
+    const extra = s.hasDetail ? " [has detail]" : "";
     return `- **${s.name}** (slug: \`${s.slug}\`) — ${s.summary} (${s.genres.join(", ")})${desc}${extra}`;
   }).join("\n");
   const personalityList = shuffle(PERSONALITIES).map((p) => {

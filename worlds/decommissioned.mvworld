@@ -35,8 +35,16 @@
       "label": "The town",
       "choices": [
         {
-          "name": "A rough frontier settlement where everyone is a misfit or a second-chance case. You fit right in",
-          "description": "until you don't."
+          "name": "Quiet rebuilding village",
+          "description": "A quiet village still rebuilding from the war you fought in. Some residents remember you from the other side."
+        },
+        {
+          "name": "Busy market town",
+          "description": "A busy market town that didn't see combat and doesn't understand what you are. They think you're a novelty."
+        },
+        {
+          "name": "Rough frontier settlement",
+          "description": "Everyone is a misfit or a second-chance case. You fit right in — until you don't."
         }
       ]
     }

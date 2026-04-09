@@ -43,13 +43,17 @@ interface LoadedWorld {
  *               If false, logs a warning and skips bad files (for user worlds).
  */
 function scanDir(dir: string, strict: boolean): LoadedWorld[] {
-  if (!existsSync(dir)) return [];
+  if (!existsSync(dir)) {
+    if (strict) throw new Error(`Bundled worlds directory not found: ${dir}`);
+    return [];
+  }
 
   const results: LoadedWorld[] = [];
   let entries: string[];
   try {
     entries = readdirSync(dir).filter((f) => f.endsWith(".mvworld"));
-  } catch {
+  } catch (e) {
+    if (strict) throw e;
     return [];
   }
 
@@ -118,8 +122,10 @@ export function loadWorldBySlug(slug: string, userWorldsDir?: string): WorldFile
 
   const bundledPath = join(assetDir("worlds"), `${slug}.mvworld`);
   if (existsSync(bundledPath)) {
-    const data: unknown = JSON.parse(readFileSync(bundledPath, "utf-8"));
-    if (isValidWorldFile(data)) return data;
+    try {
+      const data: unknown = JSON.parse(readFileSync(bundledPath, "utf-8"));
+      if (isValidWorldFile(data)) return data;
+    } catch { /* corrupted file — fall through to undefined */ }
   }
 
   return undefined;
