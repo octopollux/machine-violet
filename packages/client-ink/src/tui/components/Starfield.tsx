@@ -48,7 +48,7 @@ const PALETTE: StarPalette[] = [
   { peakL: 0.30, C: 0,    H: 0,   weight: 3 },   // dark/black
   { peakL: 0.90, C: 0,    H: 0,   weight: 4 },   // white
   { peakL: 0.75, C: 0.14, H: 65,  weight: 0.4 }, // orange (rare)
-  { peakL: 0.55, C: 0.18, H: 25,  weight: 3 },   // red
+  { peakL: 0.55, C: 0.18, H: 25,  weight: 0.4 }, // red (rare)
   { peakL: 0.65, C: 0.18, H: 300, weight: 2 },   // violet
 ];
 
