@@ -533,7 +533,7 @@ function scanTagChanges(line: string): TagChange[] {
  *  - **bold** → <b>bold</b>
  *  - *italic* → <i>italic</i>  (but not **)
  *  - [text](url) → text  (strip to display text)
- *  - - list item → ·  list item  (visual bullet)
+ *  - - list item → · list item  (visual bullet)
  *  - Everything else → pass through
  */
 export function markdownToTags(line: string): string {
@@ -543,11 +543,11 @@ export function markdownToTags(line: string): string {
     return `<b>${headingMatch[2]}</b>`;
   }
 
-  // List items: - item → ·  item (with indent)
+  // List items: - item → · item (preserve nesting indent only)
   const listMatch = line.match(/^(\s*)-\s+(.+)$/);
   if (listMatch) {
     const indent = listMatch[1];
-    line = `${indent}  · ${listMatch[2]}`;
+    line = `${indent}· ${listMatch[2]}`;
   }
 
   // Links: [text](url) → text

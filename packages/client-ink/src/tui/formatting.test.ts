@@ -282,11 +282,11 @@ describe("markdownToTags", () => {
   });
 
   it("converts list items to visual bullets", () => {
-    expect(markdownToTags("- Sword of Light")).toBe("  · Sword of Light");
+    expect(markdownToTags("- Sword of Light")).toBe("· Sword of Light");
   });
 
   it("preserves indented list items", () => {
-    expect(markdownToTags("  - Sub item")).toBe("    · Sub item");
+    expect(markdownToTags("  - Sub item")).toBe("  · Sub item");
   });
 
   it("passes plain text through unchanged", () => {

@@ -2,7 +2,7 @@ import React from "react";
 import { Box } from "ink";
 import { describe, it, expect, beforeEach } from "vitest";
 import { render } from "ink-testing-library";
-import { extractSections } from "./CharacterPane.js";
+import { extractSections, renderMarkdownTables } from "./CharacterPane.js";
 import { OverlayPane } from "./OverlayPane.js";
 import { resolveTheme } from "../themes/resolver.js";
 import { resetThemeCache } from "../themes/loader.js";
@@ -81,6 +81,71 @@ describe("extractSections", () => {
     expect(result).toContain("- [[Brass Brooch]]");
     const joined = result.join("\n");
     expect(joined).not.toContain("Stats");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// renderMarkdownTables — table block conversion
+// ---------------------------------------------------------------------------
+
+describe("renderMarkdownTables", () => {
+  it("converts a two-column table to bold key-value lines", () => {
+    const lines = [
+      "| Stat | Value |",
+      "|------|-------|",
+      "| HP | 10/10 |",
+      "| Stress | 0/5 |",
+    ];
+    expect(renderMarkdownTables(lines)).toEqual([
+      "**HP:** 10/10",
+      "**Stress:** 0/5",
+    ]);
+  });
+
+  it("passes non-table lines through unchanged", () => {
+    const lines = ["## Stats", "STR 14 / DEX 12", "- Sword"];
+    expect(renderMarkdownTables(lines)).toEqual(lines);
+  });
+
+  it("handles table mixed with other content", () => {
+    const lines = [
+      "## Stats",
+      "| Stat | Value |",
+      "|------|-------|",
+      "| HP | 5/5 |",
+      "",
+      "## Inventory",
+      "- Rope",
+    ];
+    expect(renderMarkdownTables(lines)).toEqual([
+      "## Stats",
+      "**HP:** 5/5",
+      "",
+      "## Inventory",
+      "- Rope",
+    ]);
+  });
+
+  it("renders wider tables with aligned columns", () => {
+    const lines = [
+      "| Name | Level | HP |",
+      "|------|-------|----|",
+      "| Mira | 3 | 240/240 |",
+    ];
+    const result = renderMarkdownTables(lines);
+    // Headers padded based on raw cell width, bold applied after padding
+    expect(result[0]).toBe("**Name**  **Level**  **HP**     ");
+    expect(result[1]).toBe("Mira  3      240/240");
+  });
+
+  it("handles header-only table (no data rows)", () => {
+    const lines = [
+      "| Stat | Value |",
+      "|------|-------|",
+    ];
+    const result = renderMarkdownTables(lines);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toContain("**Stat**");
   });
 });
 

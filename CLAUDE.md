@@ -39,6 +39,10 @@ All documentation lives in `docs/`. Start at `docs/index.md` for navigation, `do
 
 Live API key in `.env` with limited credit. Default dev override uses Sonnet for DM. Don't make unnecessary API calls in manual testing.
 
+## Worktrees
+
+**Always use a worktree for code changes.** Multiple Claude instances may run concurrently against this repo. Working directly on `main` risks branch collisions and lost commits. Use `EnterWorktree` at the start of every task and `ExitWorktree` when done.
+
 ## Commit Hygiene
 
 After completing a coding task, make a detailed commit; you'll need this history later.

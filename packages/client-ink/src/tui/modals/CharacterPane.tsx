@@ -60,6 +60,80 @@ function stripWikilinks(line: string): string {
   return line.replace(/\[\[([^\]]+)\]\]/g, "$1");
 }
 
+/**
+ * Convert markdown table blocks into formatted key–value lines.
+ *
+ * A table block is a contiguous run of lines starting with `|`.
+ * Two-column tables become `**key:** value` lines (compact for narrow panes).
+ * Wider tables are rendered as aligned columns separated by `  `.
+ * Separator rows (`|---|---|`) are dropped.
+ */
+export function renderMarkdownTables(lines: string[]): string[] {
+  const result: string[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    if (!lines[i].trimStart().startsWith("|")) {
+      result.push(lines[i]);
+      i++;
+      continue;
+    }
+
+    // Collect contiguous table rows
+    const tableLines: string[] = [];
+    while (i < lines.length && lines[i].trimStart().startsWith("|")) {
+      tableLines.push(lines[i]);
+      i++;
+    }
+
+    // Parse cells: split on | and trim, skip separator rows
+    const rows: string[][] = [];
+    for (const tl of tableLines) {
+      if (/^\s*\|(?:\s*:?-+:?\s*\|)+\s*$/.test(tl)) continue; // separator row
+      const trimmed = tl.trim();
+      const cells = trimmed.split("|").map((c) => c.trim());
+      // Strip outer empty entries from leading/trailing pipes
+      if (trimmed.startsWith("|") && cells[0] === "") cells.shift();
+      if (trimmed.endsWith("|") && cells.length > 0 && cells[cells.length - 1] === "") cells.pop();
+      if (cells.length > 0) rows.push(cells);
+    }
+
+    if (rows.length === 0) continue;
+
+    const header = rows[0];
+    const dataRows = rows.slice(1);
+
+    if (header.length === 2 && dataRows.length > 0) {
+      // Two-column table → bold key: value
+      for (const row of dataRows) {
+        result.push(`**${row[0] ?? ""}:** ${row[1] ?? ""}`);
+      }
+    } else {
+      // General table — compute column widths and render aligned
+      const colCount = Math.max(...rows.map((r) => r.length));
+      const widths: number[] = Array.from({ length: colCount }, () => 0);
+      for (const row of rows) {
+        for (let c = 0; c < row.length; c++) {
+          widths[c] = Math.max(widths[c], row[c].length);
+        }
+      }
+
+      for (let r = 0; r < rows.length; r++) {
+        const cells = rows[r];
+        const formatted = cells
+          .map((cell, c) => {
+            const pad = " ".repeat(Math.max(widths[c] - cell.length, 0));
+            return r === 0 ? `**${cell}**${pad}` : `${cell}${pad}`;
+          })
+          .join("  ");
+        result.push(formatted);
+      }
+    }
+  }
+
+  return result;
+}
+
 interface CharacterPaneProps {
   theme: ResolvedTheme;
   /** Character name (display name, not slug). */
@@ -116,7 +190,8 @@ export const CharacterPane = forwardRef<CharacterPaneHandle, CharacterPaneProps>
     if (!sheetContent) return undefined;
     const sectionLines = extractSections(sheetContent, ["Stats", "Inventory"]);
     if (sectionLines.length === 0) return undefined;
-    return sectionLines.map(
+    const processed = renderMarkdownTables(sectionLines);
+    return processed.map(
       (line) => parseFormatting(markdownToTags(stripWikilinks(line))),
     );
   }, [sheetContent]);
