@@ -18,6 +18,7 @@ import {
 import type {
   LLMProvider, ChatParams, ChatResult,
   NormalizedMessage, NormalizedTool, NormalizedUsage,
+  SystemBlock,
 } from "../../providers/types.js";
 
 // --- Types ---
@@ -158,11 +159,55 @@ function shuffle<T>(arr: readonly T[]): T[] {
   return out;
 }
 
-function buildSystemPrompt(existingPlayers?: KnownPlayer[]): string {
-  let base = loadPrompt("setup-conversation");
+/**
+ * Build the setup system prompt as SystemBlock[] with cache breakpoints.
+ *
+ * Three stability tiers mirror the playing-phase prefix-builder pattern:
+ *
+ *   Tier 1 (global-stable): base instructions, game systems, chargen rules  [BP1 — 1h]
+ *   Tier 2 (session-stable): known players (varies by returning-player set)  [BP2 — 1h]
+ *   Tier 3 (randomized per session): shuffled campaign seeds + personalities  [no BP]
+ *
+ * Tier 3 is intentionally randomized to vary presentation order — we pay
+ * fresh input tokens for it, but it's stable across all turns within a
+ * single session so the provider's auto-caching still helps after turn 1.
+ *
+ * BP3 (tools) and BP4 (last message) are stamped via cacheHints in runTurn.
+ */
+function buildSystemPrompt(existingPlayers?: KnownPlayer[]): SystemBlock[] {
+  const blocks: SystemBlock[] = [];
 
-  // Inject Known Players immediately after the base prompt (before the large
-  // data sections) so the model sees them close to the Start/flow instructions.
+  // ── Tier 1: Global-stable (identical across all sessions) ──
+
+  const base = loadPrompt("setup-conversation");
+  blocks.push({ text: base });
+
+  const { light, crunchy } = groupByTier(KNOWN_SYSTEMS);
+  const lightList = light.map(formatSystemLine).join("\n");
+  const crunchyList = crunchy.map(formatSystemLine).join("\n");
+
+  let systemSection = "\n\n## Available game systems\n\nUse the **slug** (e.g. `dnd-5e`) in `finalize_setup`, not the display name. For pure narrative (no mechanics), pass `null` for system.\n\n";
+  systemSection += "### Light systems (simple rules, fast play)\n" + lightList + "\n\n";
+  if (crunchy.length > 0) {
+    systemSection += "### Crunchy systems (detailed mechanics)\n" + crunchyList + "\n\n";
+  }
+
+  // Chargen rules for all systems that have them
+  let chargenSection = "## Character creation rules by system\n\nAfter the player picks a system, use the matching section below to ask smart character questions.\n\n";
+  for (const sys of KNOWN_SYSTEMS) {
+    const section = readChargenSection(sys.slug);
+    if (section) {
+      chargenSection += `### ${sys.name} (\`${sys.slug}\`)\n${section}\n\n`;
+    }
+  }
+
+  blocks.push({ text: systemSection + chargenSection });
+
+  // BP1 — stamp on last Tier 1 block (1h, covers base + systems + chargen)
+  blocks[blocks.length - 1] = { ...blocks[blocks.length - 1], cacheControl: { ttl: "1h" } };
+
+  // ── Tier 2: Session-stable (varies by returning-player set) ──
+
   if (existingPlayers && existingPlayers.length > 0) {
     // Sanitize names: single line, no control chars or markup
     const sanitize = (s: string) => s.replace(/[\r\n]+/g, " ").replace(/[<>`]/g, "").trim();
@@ -174,8 +219,13 @@ function buildSystemPrompt(existingPlayers?: KnownPlayer[]): string {
       return `- ${name}${age}`;
     });
     const instruction = "These players have played before. Use `present_choices` at the start to let the player pick their name from this list (the app auto-appends an \"Enter your own\" option for new players). If they match a known player, welcome them back warmly — no need to re-ask information you already have. If their age group is unknown, ask once casually.";
-    base += "\n\n## Known Players\n\n" + instruction + "\n\n" + playerLines.join("\n");
+    blocks.push({
+      text: "\n\n## Known Players\n\n" + instruction + "\n\n" + playerLines.join("\n"),
+      cacheControl: { ttl: "1h" },
+    });
   }
+
+  // ── Tier 3: Randomized per session (stable across turns within session) ──
 
   const worlds = worldSummaries(loadAllWorlds());
   const seedList = shuffle(worlds).map((s) => {
@@ -189,35 +239,18 @@ function buildSystemPrompt(existingPlayers?: KnownPlayer[]): string {
     return `- **${p.name}**${desc}${detail}`;
   }).join("\n");
 
-  const { light, crunchy } = groupByTier(KNOWN_SYSTEMS);
-  const lightList = light.map(formatSystemLine).join("\n");
-  const crunchyList = crunchy.map(formatSystemLine).join("\n");
+  blocks.push({
+    text: "\n\n## Available campaign worlds\n\nUse these when presenting Quick Start options or campaign ideas. Pick worlds that match the player's genre if known. When presenting worlds as choices, use the name as the choice label and the summary (or description if available) as the choice description. For worlds marked [has detail], call `load_world` with the slug to get the full DM detail and any suboptions to present to the player.\n\n" + seedList +
+      "\n\n## Available DM personalities\n\nWhen presenting personality choices, use the name as the choice label and the description as the choice description. You can also invent new personalities beyond this list — if a campaign calls for a voice that isn't here, or the player asks for something custom, craft a name and prompt fragment in the same style as the examples below.\n\n" + personalityList,
+  });
 
-  let systemSection = "## Available game systems\n\nUse the **slug** (e.g. `dnd-5e`) in `finalize_setup`, not the display name. For pure narrative (no mechanics), pass `null` for system.\n\n";
-  systemSection += "### Light systems (simple rules, fast play)\n" + lightList + "\n\n";
-  if (crunchy.length > 0) {
-    systemSection += "### Crunchy systems (detailed mechanics)\n" + crunchyList + "\n\n";
-  }
-
-  // Inject chargen rules for all systems that have them
-  let chargenSection = "## Character creation rules by system\n\nAfter the player picks a system, use the matching section below to ask smart character questions.\n\n";
-  for (const sys of KNOWN_SYSTEMS) {
-    const section = readChargenSection(sys.slug);
-    if (section) {
-      chargenSection += `### ${sys.name} (\`${sys.slug}\`)\n${section}\n\n`;
-    }
-  }
-
-  return base +
-    "\n\n" + systemSection +
-    chargenSection +
-    "## Available campaign worlds\n\nUse these when presenting Quick Start options or campaign ideas. Pick worlds that match the player's genre if known. When presenting worlds as choices, use the name as the choice label and the summary (or description if available) as the choice description. For worlds marked [has detail], call `load_world` with the slug to get the full DM detail and any suboptions to present to the player.\n\n" + seedList +
-    "\n\n## Available DM personalities\n\nWhen presenting personality choices, use the name as the choice label and the description as the choice description. You can also invent new personalities beyond this list — if a campaign calls for a voice that isn't here, or the player asks for something custom, craft a name and prompt fragment in the same style as the examples below.\n\n" + personalityList;
+  return blocks;
 }
 
 // Built fresh per session so seed/personality order is randomized.
-// Everything except the lists (base prompt, systems, chargen) is
-// deterministic and cheap to recompute.
+// Tier 1+2 (base prompt, systems, chargen, known players) are cache-
+// stable across turns; Tier 3 (shuffled seeds/personalities) pays fresh
+// input tokens on turn 1 but benefits from provider auto-caching after.
 
 // --- Streaming with retry ---
 
@@ -360,6 +393,14 @@ export function createSetupConversation(
     const ec = getEffortConfig("setup");
     const thinking = ec.effort ? { effort: ec.effort } : undefined;
 
+    // Cache hints: BP3 on tools (1h — stable tool definitions), BP4 on last
+    // message (ephemeral — advances each turn). System prompt BPs are stamped
+    // directly on the SystemBlock[] returned by buildSystemPrompt.
+    const cacheHints = [
+      { target: "tools" as const, ttl: "1h" as const },
+      { target: "messages" as const },
+    ];
+
     let lastParams: ChatParams = {
       model,
       maxTokens: TOKEN_LIMITS.SUBAGENT_LARGE,
@@ -367,6 +408,7 @@ export function createSetupConversation(
       messages,
       tools: TOOLS,
       thinking,
+      cacheHints,
     };
 
     const result = await streamWithRetry(provider, lastParams, onDelta);
@@ -456,6 +498,7 @@ export function createSetupConversation(
         messages,
         tools: TOOLS,
         thinking,
+        cacheHints,
       };
       const followUp = await streamWithRetry(provider, lastParams, onDelta);
 
