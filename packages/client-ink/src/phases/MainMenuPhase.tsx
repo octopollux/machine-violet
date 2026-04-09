@@ -275,7 +275,7 @@ export function MainMenuPhase({
 
   return (
     <>
-      <FullScreenFrame theme={theme} columns={cols} rows={termRows} title="Machine Violet" contentRows={totalRows}>
+      <FullScreenFrame theme={theme} columns={cols} rows={termRows} title="Machine Violet" contentRows={totalRows} starfield>
         {menuLines}
         {errorMsg && (
           <Box marginTop={1}>
