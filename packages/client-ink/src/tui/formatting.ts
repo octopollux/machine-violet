@@ -543,11 +543,11 @@ export function markdownToTags(line: string): string {
     return `<b>${headingMatch[2]}</b>`;
   }
 
-  // List items: - item → ·  item (with indent)
+  // List items: - item → · item (preserve nesting indent only)
   const listMatch = line.match(/^(\s*)-\s+(.+)$/);
   if (listMatch) {
     const indent = listMatch[1];
-    line = `${indent}  · ${listMatch[2]}`;
+    line = `${indent}· ${listMatch[2]}`;
   }
 
   // Links: [text](url) → text
