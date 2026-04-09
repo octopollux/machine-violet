@@ -186,11 +186,6 @@ export class SetupSession {
   }
 
   private async finalizeCampaign(result: SetupResult): Promise<string> {
-    this.broadcast({
-      type: "narrative:chunk",
-      data: { text: "\nBuilding your world...", kind: "system" },
-    });
-
     // Scaffold campaign directory
     const campaignRoot = await buildCampaignWorld(
       this.campaignsDir,

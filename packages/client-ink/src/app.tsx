@@ -194,9 +194,16 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
     setActiveCampaignId(newId);
     setTransitionName(clientState.transitionCampaignName ?? "");
     setSessionKey((k) => k + 1); // remount PlayingPhase
-    // Keep narrativeLines — the setup conversation stays visible as the
-    // game session starts and the DM's opening narration streams in.
-    setClientState(initialClientState());
+    // Preserve live UI state through the handoff so the transition is seamless:
+    // - narrativeLines: setup conversation stays visible as the DM's opening streams in
+    // - engineState: "DM is thinking..." indicator survives (first turn is already in progress)
+    // - toolGlyphs: early tool activity stays visible until replaced
+    setClientState((prev) => ({
+      ...initialClientState(),
+      narrativeLines: prev.narrativeLines,
+      engineState: prev.engineState,
+      toolGlyphs: prev.toolGlyphs,
+    }));
   }, [clientState.transitionCampaignId]);
 
   // Start a campaign (used by both auto-start and menu selection)
