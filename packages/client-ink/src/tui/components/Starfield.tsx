@@ -48,6 +48,7 @@ const PALETTE: StarPalette[] = [
   { peakL: 0.30, C: 0,    H: 0,   weight: 3 },   // dark/black
   { peakL: 0.90, C: 0,    H: 0,   weight: 4 },   // white
   { peakL: 0.75, C: 0.14, H: 65,  weight: 0.4 }, // orange (rare)
+  { peakL: 0.55, C: 0.18, H: 25,  weight: 3 },   // red
   { peakL: 0.65, C: 0.18, H: 300, weight: 2 },   // violet
 ];
 
@@ -210,9 +211,12 @@ function advanceFrame(
     (s) => frame - s.birthFrame < s.lifetime,
   );
 
-  // Spawn new stars to maintain target density
+  // Spawn new stars toward target density, capped at the steady-state
+  // replacement rate so the field fills in gradually from empty.
+  const maxSpawnsPerFrame = Math.max(1, Math.ceil(targetCount / lifetime));
   const deficit = targetCount - state.stars.length;
-  for (let i = 0; i < deficit; i++) {
+  const toSpawn = Math.min(deficit, maxSpawnsPerFrame);
+  for (let i = 0; i < toSpawn; i++) {
     state.stars.push(
       spawnStar(state.rng, frame, width, height, lifetime, quasarChance),
     );
@@ -295,18 +299,10 @@ export function useStarfield(
   const area = width * height;
   const targetCount = Math.max(1, Math.round(area * density));
 
-  // (Re-)initialize when dimensions change
+  // (Re-)initialize when dimensions change — start empty and let stars
+  // fade in gradually via the per-frame spawn cap in advanceFrame.
   if (!stateRef.current || stateRef.current.dimKey !== dimKey) {
-    const rng = createRng(42);
-    const stars: Star[] = [];
-    // Pre-seed stars at random lifecycle phases so the field isn't empty at start
-    for (let i = 0; i < targetCount; i++) {
-      const s = spawnStar(rng, 0, width, height, lifetime, quasarChance);
-      // Backdate birth so stars are at various ages on frame 0
-      s.birthFrame = -Math.floor(rng() * s.lifetime);
-      stars.push(s);
-    }
-    stateRef.current = { stars, rng, lastFrame: -1, dimKey };
+    stateRef.current = { stars: [], rng: createRng(42), lastFrame: -1, dimKey };
   }
 
   const state = stateRef.current;
