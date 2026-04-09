@@ -16,7 +16,7 @@ import { oklchToHex } from "../color/oklch.js";
 // ---------------------------------------------------------------------------
 
 export interface StarfieldConfig {
-  /** Stars per addressable cell (0–1). Default 0.05 */
+  /** Stars per addressable cell (0–1). Default 0.025 */
   density?: number;
   /** Frames for a full fade-in + fade-out cycle. Default 60 */
   lifetime?: number;
@@ -37,7 +37,7 @@ const DEFAULT_INTERVAL = 1000;
 // Star color palette (OKLCH)
 // ---------------------------------------------------------------------------
 
-interface StarPalette {
+export interface StarPalette {
   peakL: number;
   C: number;
   H: number;
@@ -114,14 +114,14 @@ const QUASAR_SHAPE: QuasarArm[] = [
 // Star data
 // ---------------------------------------------------------------------------
 
-interface Star {
+export interface Star {
   x: number;
   y: number;
   birthFrame: number;
   lifetime: number;
   palette: StarPalette;
   isQuasar: boolean;
-  /** Highest glyph tier this star can reach (0=·, 1=∗, 2=✦, 3=★). */
+  /** Highest glyph tier this star can reach (1=∗, 2=✦, 3=★). */
   maxGlyphTier: number;
 }
 
@@ -158,6 +158,12 @@ export function fadeCurve(age: number, lifetime: number): number {
 // Cell grid
 // ---------------------------------------------------------------------------
 
+function emptyGrid(width: number, height: number): (StarfieldCell | null)[][] {
+  return Array.from({ length: height }, () =>
+    Array.from<StarfieldCell | null>({ length: width }).fill(null),
+  );
+}
+
 export interface StarfieldCell {
   glyph: string;
   color: string; // hex
@@ -182,7 +188,7 @@ function spawnStar(
   lifetime: number,
   quasarChance: number,
 ): Star {
-  // 60% of stars cap at tier 0–2 (never reach ★), 40% can reach tier 3
+  // 60% of stars cap at tier 1–2 (never reach ★), 40% can reach tier 3
   const tierRoll = rng();
   const maxGlyphTier = tierRoll < 0.25 ? 1 : tierRoll < 0.60 ? 2 : 3;
 
@@ -311,6 +317,12 @@ export function useStarfield(
   const dimKey = `${width}x${height}`;
   const area = width * height;
   const targetCount = Math.max(1, Math.round(area * density));
+
+  // When inactive (starfield disabled), skip simulation and cache entirely.
+  // Return an empty grid so other screens don't seed/pollute the cache.
+  if (!isActive) {
+    return emptyGrid(width, height);
+  }
 
   // (Re-)initialize when dimensions change.
   // Check module-level cache first so stars survive mount/unmount.
