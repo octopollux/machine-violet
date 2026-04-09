@@ -130,13 +130,12 @@ describe("renderMarkdownTables", () => {
     const lines = [
       "| Name | Level | HP |",
       "|------|-------|----|",
-      "| Mira | 3 | 24 |",
+      "| Mira | 3 | 240/240 |",
     ];
     const result = renderMarkdownTables(lines);
-    expect(result[0]).toContain("**Name**");
-    expect(result[0]).toContain("**Level**");
-    expect(result[0]).toContain("**HP**");
-    expect(result[1]).toContain("Mira");
+    // Headers padded based on raw cell width, bold applied after padding
+    expect(result[0]).toBe("**Name**  **Level**  **HP**     ");
+    expect(result[1]).toBe("Mira  3      240/240");
   });
 
   it("handles header-only table (no data rows)", () => {

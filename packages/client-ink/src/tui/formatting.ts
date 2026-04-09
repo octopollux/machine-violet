@@ -533,7 +533,7 @@ function scanTagChanges(line: string): TagChange[] {
  *  - **bold** → <b>bold</b>
  *  - *italic* → <i>italic</i>  (but not **)
  *  - [text](url) → text  (strip to display text)
- *  - - list item → ·  list item  (visual bullet)
+ *  - - list item → · list item  (visual bullet)
  *  - Everything else → pass through
  */
 export function markdownToTags(line: string): string {

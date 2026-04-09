@@ -64,7 +64,7 @@ function stripWikilinks(line: string): string {
  * Convert markdown table blocks into formatted key–value lines.
  *
  * A table block is a contiguous run of lines starting with `|`.
- * Two-column tables become `**key**  value` lines (compact for narrow panes).
+ * Two-column tables become `**key:** value` lines (compact for narrow panes).
  * Wider tables are rendered as aligned columns separated by `  `.
  * Separator rows (`|---|---|`) are dropped.
  */
@@ -89,8 +89,12 @@ export function renderMarkdownTables(lines: string[]): string[] {
     // Parse cells: split on | and trim, skip separator rows
     const rows: string[][] = [];
     for (const tl of tableLines) {
-      if (/^\s*\|[\s:]*-+/.test(tl)) continue; // separator row
-      const cells = tl.split("|").map((c) => c.trim()).filter((c) => c !== "");
+      if (/^\s*\|(?:\s*:?-+:?\s*\|)+\s*$/.test(tl)) continue; // separator row
+      const trimmed = tl.trim();
+      const cells = trimmed.split("|").map((c) => c.trim());
+      // Strip outer empty entries from leading/trailing pipes
+      if (trimmed.startsWith("|") && cells[0] === "") cells.shift();
+      if (trimmed.endsWith("|") && cells.length > 0 && cells[cells.length - 1] === "") cells.pop();
       if (cells.length > 0) rows.push(cells);
     }
 
@@ -117,7 +121,10 @@ export function renderMarkdownTables(lines: string[]): string[] {
       for (let r = 0; r < rows.length; r++) {
         const cells = rows[r];
         const formatted = cells
-          .map((cell, c) => (r === 0 ? `**${cell}**` : cell).padEnd(widths[c]))
+          .map((cell, c) => {
+            const pad = " ".repeat(Math.max(widths[c] - cell.length, 0));
+            return r === 0 ? `**${cell}**${pad}` : `${cell}${pad}`;
+          })
           .join("  ");
         result.push(formatted);
       }
