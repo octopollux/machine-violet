@@ -1,0 +1,31 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "Beneath the Skin",
+  "summary": "People in town are acting different. Not wrong, just... different.",
+  "genres": [
+    "modern",
+    "horror",
+    "mystery"
+  ],
+  "detail": "The \"different\" is subtle and specific: affected people become slightly better versions of themselves. The angry drunk is calm. The neglectful parent is attentive. The bully is kind. This is the horror — something is fixing people, and it's working.\n\nRoll or choose the source:\n1. THE PARASITE — An organism in the water supply that optimizes its host's behavior for social harmony. It's not malicious — it's a symbiote evolved on a world where cooperation was survival. But \"optimized\" humans lose creativity, risk-taking, passion, and the capacity to say no.\n2. THE THERAPIST — A newcomer to town (doctor, counselor, priest) who is genuinely helping people, but using methods from somewhere else. The improvements are real. The cost is that \"cured\" people can no longer perceive certain things — specific colors, specific sounds, specific truths.\n3. THE REHEARSAL — The town is being replaced, person by person, by something practicing being human. The copies are better because they're trying harder. The originals aren't dead — they're somewhere else, watching their lives improve without them.\n\nThe tell: Affected people all share one tiny behavioral tic that's easy to miss — they pause exactly one beat too long before laughing, or they all hum the same four notes when idle, or they never blink when making eye contact.\n\nPacing: Open with normalcy disrupted in small ways. The player should spend 2-3 scenes thinking this might be a good thing before the first crack appears. Someone the player cares about gets \"fixed,\" and the player has to decide if they want them back the way they were.",
+  "suboptions": [
+    {
+      "label": "The town",
+      "choices": [
+        {
+          "name": "Small-town Americana",
+          "description": "Everyone knows everyone. Diner, church, high school football. The \"different\" stands out because you've known these people your whole life."
+        },
+        {
+          "name": "Coastal village",
+          "description": "Fishing community, salt air, tight-knit families. Isolation makes the changes harder to report and easier to deny. The sea is always watching."
+        },
+        {
+          "name": "Suburban enclave",
+          "description": "Gated community, HOA rules, manicured lawns. The \"different\" looks like people finally following the rules they always resented. Conformity was already the norm — now it's perfect."
+        }
+      ]
+    }
+  ]
+}

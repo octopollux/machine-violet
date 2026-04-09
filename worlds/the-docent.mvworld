@@ -1,0 +1,11 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "The Docent",
+  "summary": "A guided tour through the afterlife. Tips are appreciated. Exits are not guaranteed.",
+  "genres": [
+    "fantasy",
+    "comedy",
+    "horror"
+  ]
+}

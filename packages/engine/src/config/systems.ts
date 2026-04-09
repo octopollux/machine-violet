@@ -1,7 +1,7 @@
 /**
  * System catalog — known game systems and runtime discovery.
  *
- * Static typed array following the seeds.ts / personalities.ts pattern.
+ * Static typed array following the personalities.ts pattern.
  * Discovery merges bundled systems with user-processed systems at ~/.machine-violet/systems/.
  */
 

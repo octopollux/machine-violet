@@ -2,7 +2,7 @@ import type { SubagentResult } from "../subagent.js";
 import type { SetupResult } from "../setup-agent.js";
 import { generateThemeColor } from "../setup-agent.js";
 import { PERSONALITIES } from "../../config/personalities.js";
-import { SEEDS } from "../../config/seeds.js";
+import { loadAllWorlds, worldSummaries, loadWorldBySlug } from "../../config/world-loader.js";
 import { KNOWN_SYSTEMS, readChargenSection } from "../../config/systems.js";
 import type { SystemComplexity } from "../../config/systems.js";
 import { getEffortConfig } from "../../config/models.js";
@@ -66,7 +66,7 @@ const FINALIZE_TOOL: NormalizedTool = {
       character_name: { type: "string", description: "Player character's name" },
       character_description: { type: "string", description: "One-sentence character concept" },
       character_details: { type: "string", description: "Mechanical character details gathered during setup (class, skills, approaches, etc). Free-form text. Omit or null for pure narrative.", nullable: true },
-      campaign_detail: { type: "string", description: "The seed's hidden detail block, passed through verbatim for the DM. Omit if the chosen seed has no detail block or the campaign is fully custom.", nullable: true },
+      campaign_detail: { type: "string", description: "The world's hidden detail block (from load_world), passed through verbatim for the DM. Omit if the chosen world has no detail or the campaign is fully custom.", nullable: true },
       age_group: { type: "string", enum: ["child", "teenager", "adult"], description: "Player's age group. Set to 'child' or 'teenager' if the player clearly indicates so. Otherwise — including when age is not discussed or the player declines — set to 'adult'. Always include this field." },
       content_preferences: { type: "string", description: "Any content preferences or sensitivities the player mentioned during setup (one per line). Only include if the player volunteered them — never prompt for these.", nullable: true },
     },
@@ -108,7 +108,23 @@ const PRESENT_CHOICES_TOOL: NormalizedTool = {
   },
 };
 
-const TOOLS = [FINALIZE_TOOL, PRESENT_CHOICES_TOOL];
+const LOAD_WORLD_TOOL: NormalizedTool = {
+  name: "load_world",
+  description:
+    "Load the full detail and suboptions for a world file by slug. " +
+    "Use this when you want to learn more about a specific campaign world " +
+    "(e.g., after the player picks one, or to preview its options). " +
+    "Returns the world's detail block, suboptions, and any config hints.",
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      slug: { type: "string", description: "The world slug (e.g. 'the-shattered-crown')" },
+    },
+    required: ["slug"],
+  },
+};
+
+const TOOLS = [FINALIZE_TOOL, PRESENT_CHOICES_TOOL, LOAD_WORLD_TOOL];
 
 // --- System prompt ---
 
@@ -161,10 +177,11 @@ function buildSystemPrompt(existingPlayers?: KnownPlayer[]): string {
     base += "\n\n## Known Players\n\n" + instruction + "\n\n" + playerLines.join("\n");
   }
 
-  const seedList = shuffle(SEEDS).map((s) => {
+  const worlds = worldSummaries(loadAllWorlds());
+  const seedList = shuffle(worlds).map((s) => {
     const desc = s.description ? ` | Description: ${s.description}` : "";
-    const detail = s.detail ? `\n  Detail: ${s.detail.replace(/\n/g, "\n  ")}` : "";
-    return `- **${s.name}** — ${s.premise} (${s.genres.join(", ")})${desc}${detail}`;
+    const extra = s.hasDetail ? " [has detail]" : "";
+    return `- **${s.name}** (slug: \`${s.slug}\`) — ${s.summary} (${s.genres.join(", ")})${desc}${extra}`;
   }).join("\n");
   const personalityList = shuffle(PERSONALITIES).map((p) => {
     const desc = p.description ? `: ${p.description}` : "";
@@ -194,7 +211,7 @@ function buildSystemPrompt(existingPlayers?: KnownPlayer[]): string {
   return base +
     "\n\n" + systemSection +
     chargenSection +
-    "## Available campaign seeds\n\nUse these when presenting Quick Start options or campaign ideas. Pick seeds that match the player's genre if known. When presenting seeds as choices, use the seed name as the choice label and the premise (or description if available) as the choice description.\n\n" + seedList +
+    "## Available campaign worlds\n\nUse these when presenting Quick Start options or campaign ideas. Pick worlds that match the player's genre if known. When presenting worlds as choices, use the name as the choice label and the summary (or description if available) as the choice description. For worlds marked [has detail], call `load_world` with the slug to get the full DM detail and any suboptions to present to the player.\n\n" + seedList +
     "\n\n## Available DM personalities\n\nWhen presenting personality choices, use the name as the choice label and the description as the choice description. You can also invent new personalities beyond this list — if a campaign calls for a voice that isn't here, or the player asks for something custom, craft a name and prompt fragment in the same style as the examples below.\n\n" + personalityList;
 }
 
@@ -294,7 +311,7 @@ export function createSetupConversation(
     const isNullish = !rawSystem || normalized === "null" || normalized === "none";
     const resolvedSystem = isNullish ? null : resolveSystemSlug(rawSystem);
 
-    // Resolve campaign detail: prefer the agent's passthrough, fall back to seed lookup.
+    // Resolve campaign detail: prefer the agent's passthrough, fall back to world file lookup.
     // Only fall back when the field is truly absent (undefined/null) — an explicit
     // empty string means the agent intentionally omitted it.
     const campaignName = (input.campaign_name as string) || "A New Story";
@@ -302,8 +319,10 @@ export function createSetupConversation(
     let campaignDetail: string | null = typeof rawDetail === "string" && rawDetail.trim()
       ? rawDetail : null;
     if (rawDetail === undefined || rawDetail === null) {
-      const matchedSeed = SEEDS.find((s) => s.name === campaignName);
-      if (matchedSeed?.detail) campaignDetail = matchedSeed.detail;
+      // Try to find matching world by slug derived from campaign name
+      const slug = campaignName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+      const world = loadWorldBySlug(slug);
+      if (world?.detail) campaignDetail = world.detail;
     }
 
     finalized = {
@@ -376,6 +395,31 @@ export function createSetupConversation(
           : undefined;
         pendingChoices = { prompt: input.prompt ?? "Choose:", choices, descriptions };
         pendingToolUseId = tc.id;
+      } else if (tc.name === "load_world") {
+        const slug = (tc.input as { slug?: string }).slug ?? "";
+        const world = loadWorldBySlug(slug);
+        let content: string;
+        if (world) {
+          const parts: string[] = [];
+          if (world.detail) parts.push(`## Detail\n${world.detail}`);
+          if (world.suboptions?.length) {
+            for (const sub of world.suboptions) {
+              parts.push(`## Suboption: ${sub.label}\n` +
+                sub.choices.map((c: { name: string; description: string }) => `- **${c.name}** — ${c.description}`).join("\n"));
+            }
+          }
+          if (world.system) parts.push(`Suggested system: ${world.system}`);
+          if (world.mood) parts.push(`Suggested mood: ${world.mood}`);
+          if (world.difficulty) parts.push(`Suggested difficulty: ${world.difficulty}`);
+          content = parts.length > 0 ? parts.join("\n\n") : "World loaded but has no additional detail.";
+        } else {
+          content = `No world found with slug "${slug}".`;
+        }
+        (toolResults as { type: "tool_result"; tool_use_id: string; content: string }[]).push({
+          type: "tool_result",
+          tool_use_id: tc.id,
+          content,
+        });
       } else if (tc.name === "finalize_setup") {
         handleFinalize(tc.input);
         (toolResults as { type: "tool_result"; tool_use_id: string; content: string }[]).push({
@@ -401,7 +445,7 @@ export function createSetupConversation(
       };
     }
 
-    // If finalize was called, send tool result and get farewell text
+    // If any tool produced results, send them back and get the agent's continuation
     if ((toolResults as unknown[]).length > 0) {
       messages.push({ role: "user", content: toolResults });
 

@@ -1,0 +1,29 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "The Shattered Crown",
+  "summary": "A kingdom's heir is dead. Three factions claim the throne.",
+  "genres": [
+    "fantasy"
+  ],
+  "detail": "Roll or choose the throne's secret (DM only — do NOT reveal to the player):\n1. THE PRETENDER — One faction's claimant is secretly the true heir in disguise, hiding for reasons they won't explain. The player may end up serving them without knowing.\n2. THE EMPTY THRONE — The heir faked their death. They're watching from the margins, testing who deserves to rule. They will approach the player mid-campaign with a terrible bargain.\n3. THE SUCCESSION CURSE — Every claimant who sits the throne dies within a week. The throne itself is the antagonist — a bound entity that feeds on sovereignty.\n\nFaction texture: All three factions have a sympathetic leader and an inner circle with its own agenda. The player's starting faction colors their first impression of the conflict, but all three are equally complex.\n\nPacing: Start the player entangled with their chosen faction before they understand the full picture. Reveal the second faction as nuanced allies-or-enemies by mid-campaign. The third faction's true nature is the late-game twist. Use ticking clocks — a coronation deadline, a foreign army massing at the border, a plague in the capital.",
+  "suboptions": [
+    {
+      "label": "Your starting faction",
+      "choices": [
+        {
+          "name": "The Iron Circle",
+          "description": "Start entangled with the military faction. Disciplined, honorable, but brittle — one betrayal could shatter them. You'll see the succession crisis as a soldier first."
+        },
+        {
+          "name": "The Gilded Compact",
+          "description": "Start among the merchant coalition. They treat the crown as a business acquisition. You'll see the succession crisis through ledgers, leverage, and backroom deals."
+        },
+        {
+          "name": "The Hallowed See",
+          "description": "Start within the religious order. They believe divine mandate chooses the ruler. You'll see the succession crisis as a matter of faith and prophecy."
+        }
+      ]
+    }
+  ]
+}
