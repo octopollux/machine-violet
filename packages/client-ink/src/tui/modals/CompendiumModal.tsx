@@ -55,7 +55,7 @@ export function CompendiumModal({
   const rows: TreeRow[] = useMemo(() => {
     const result: TreeRow[] = [];
     for (const cat of COMPENDIUM_CATEGORIES) {
-      const entries = data[cat];
+      const entries = data[cat] ?? [];
       const isExpanded = expanded.has(cat);
       result.push({
         type: "category",
@@ -164,7 +164,7 @@ export function CompendiumModal({
   }
 
   // --- Tree view ---
-  const isEmpty = COMPENDIUM_CATEGORIES.every((cat) => data[cat].length === 0);
+  const isEmpty = COMPENDIUM_CATEGORIES.every((cat) => (data[cat] ?? []).length === 0);
 
   if (isEmpty) {
     return (
