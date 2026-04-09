@@ -26,6 +26,7 @@ export interface EntityFrontMatter {
   additional_names?: string | null;
   display_resources?: string | null;
   theme?: string | null;
+  theme_color?: string | null;
   key_color?: string | null;
   [key: string]: unknown;
 }
