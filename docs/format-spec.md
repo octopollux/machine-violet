@@ -315,8 +315,8 @@ All maps, keyed by map ID. Also written individually to `locations/<slug>/<mapId
       "title": "Find the missing scout",
       "description": "Ranger Eldan went into the Thornwood three days ago and hasn't returned.",
       "status": "active",                 // "active" | "completed" | "failed" | "abandoned"
-      "created_scene": 2,
-      "resolved_scene": null              // null until resolved. Explicit-empty = resolved with no scene.
+      "created_scene": 2
+      // "resolved_scene": 5              // Absent until resolved. Present = scene number when resolved.
     }
   },
   "next_id": 2,                           // Auto-incrementing ID counter.

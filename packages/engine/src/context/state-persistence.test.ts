@@ -575,13 +575,13 @@ describe("format spec compliance: field names (§4)", () => {
         active: true,
         order: [{ id: "Aldric", initiative: 18, type: "pc" }],
         round: 3,
-        currentTurn: 1,
+        currentTurn: 0,
       }),
       STATE_FILES.combat,
     );
     expect(Object.keys(json).sort()).toEqual(["active", "currentTurn", "order", "round"]);
     expect(json.active).toBe(true);
-    expect(json.currentTurn).toBe(1);
+    expect(json.currentTurn).toBe(0);
     const entry = (json.order as Record<string, unknown>[])[0];
     expect(Object.keys(entry).sort()).toEqual(["id", "initiative", "type"]);
   });
