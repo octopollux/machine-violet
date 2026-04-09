@@ -1,0 +1,35 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "The Instrument",
+  "summary": "You found a weapon. It found you first.",
+  "genres": [
+    "fantasy",
+    "sci-fi",
+    "modern"
+  ],
+  "detail": "IMPORTANT: The sentient weapon is a CHARACTER — create it as an NPC entity with a name, personality, and changelog, not just an item. It has opinions, a history, and emotional responses. It communicates with the player (through impressions, warmth/cold, vibrations, or speech depending on the weapon). Treat it as a companion with its own arc, not a stat block.\n\n\n\nThe relationship: This campaign is a buddy story. The weapon can communicate — through impressions, emotions, warmth/cold, vibrations, or actual speech. The nature of communication should be established early and can evolve. A weapon that starts with vague impressions might develop full speech as the bond deepens.\n\nDM approach:\n- The weapon is a full character with wants, fears, and a voice. Give it a name (it may or may not share it immediately). Give it a personality that complements or clashes with the player's.\n- The weapon's limitations are comedy and drama. It can perceive but not act independently. It can advise but not insist. It goes where it's carried, pointed where it's aimed, put down where it's left. A scene where the player sets it on a table facing the wall is both funny and existentially dreadful for the weapon.\n- The world should react to a sentient weapon with a range of responses: fear, reverence, academic curiosity, desire to possess, desire to destroy. Most people treat it as an object. The player treating it as a person is rare and significant.\n\nStory threads:\n- The player's goal drives the plot forward. The weapon has its own agenda that may align or conflict.\n- Someone wants to acquire, study, or destroy the weapon. The weapon has feelings about being wanted for what it is rather than who it is.\n- The bond is tested. Separation — even temporary — should feel wrong to both of them.\n- The weapon's past surfaces. A previous wielder, a battle it regrets, a promise it made. The player learns what they're holding.\n\nPacing: Start at the moment of first contact — the player's hand closes around the weapon and both of them feel something unexpected. The first act is establishing communication and the relationship. The second act is the journey, complicated by the weapon's nature. The third act is the choice — what the weapon was made for versus what it has become.",
+  "suboptions": [
+    {
+      "label": "The weapon",
+      "choices": [
+        {
+          "name": "A legendary blade",
+          "description": "Centuries old, forged for a purpose it's half-forgotten. It's outlived dozens of wielders. It remembers all of them. Some it liked. You hold it wrong, but it's willing to work with you."
+        },
+        {
+          "name": "Perihelion",
+          "description": "Remnant of a dead universe. It watched everything it knew collapse into nothing, and it is here to prevent the same thing from happening again. Its mission is real. Its grief is real. Its sense of urgency is absolutely sincere. It is also the only entity in the entire campaign operating at that emotional register. Everyone else is having an adventure."
+        },
+        {
+          "name": "A prototype",
+          "description": "It wasn't supposed to be sentient. A lab accident, a manufacturing defect, a cosmic ray — something went wrong (or right) during fabrication. It's weeks old. Everything is new. It has questions. Many questions. It asked you what \"boredom\" means and you haven't answered yet."
+        },
+        {
+          "name": "A sacred relic",
+          "description": "It was the instrument of a god's will. The god is silent now — dead, sleeping, or just done talking. It still carries the mandate. The faithful argue about what it means. It has opinions about this but no one has thought to ask."
+        }
+      ]
+    }
+  ]
+}

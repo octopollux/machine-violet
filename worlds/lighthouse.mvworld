@@ -1,0 +1,10 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "Lighthouse",
+  "summary": "You maintain a beacon at the edge of known space. A ship is coming from the wrong direction.",
+  "genres": [
+    "sci-fi",
+    "horror"
+  ]
+}

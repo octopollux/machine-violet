@@ -1,0 +1,10 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "Congregation",
+  "summary": "A new church appeared in town last week. Nobody can remember what was there before.",
+  "genres": [
+    "horror",
+    "mystery"
+  ]
+}

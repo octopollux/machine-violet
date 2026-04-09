@@ -1,0 +1,10 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "The Cartographer's Error",
+  "summary": "The map shows a city where there shouldn't be one.",
+  "genres": [
+    "fantasy",
+    "sci-fi"
+  ]
+}

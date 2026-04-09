@@ -1,0 +1,11 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "Blackwater Bay",
+  "summary": "A port town where everyone's running from something.",
+  "genres": [
+    "fantasy",
+    "modern",
+    "mystery"
+  ]
+}

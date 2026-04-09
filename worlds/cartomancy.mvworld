@@ -1,0 +1,11 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "Cartomancy",
+  "summary": "You're a character in a card game. The players keep making bad decisions.",
+  "genres": [
+    "fantasy",
+    "comedy",
+    "meta"
+  ]
+}

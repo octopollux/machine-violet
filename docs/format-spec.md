@@ -778,7 +778,94 @@ The engine's `StatePersister.flush()` is called before every commit to ensure al
 
 ---
 
-## 9. Known Deviations from Spec (Bugs)
+## 10. World Files (`.mvworld`)
+
+**Runtime type:** `WorldFile` (`shared/types/world.ts`)
+
+World files are portable campaign seeds or world exports. A single `.mvworld` file contains world metadata and optional inline content. Campaign seeds and exported worlds share the same format — seeds are sparse world files with only identity and detail fields.
+
+### 10.1 Discovery
+
+The engine loads worlds from two directories:
+- **Bundled**: `assetDir("worlds")` — shipped with the binary (copied from `worlds/` at build time)
+- **User**: `~/.machine-violet/worlds/` — player-created or imported
+
+Bundled seeds are validated strictly (malformed files fail the build). User worlds are validated leniently (bad files are skipped).
+
+### 10.2 Schema
+
+```jsonc
+{
+  // --- Header (required) ---
+  "format": "machine-violet-world",     // Must be this exact string.
+  "version": 1,                          // Schema version.
+
+  // --- Identity (required) ---
+  "name": "The Shattered Crown",
+  "summary": "A kingdom's heir is dead. Three factions claim the throne.",
+  "genres": ["fantasy"],
+
+  // --- Optional campaign config ---
+  "description": "...",                  // Short description alongside the summary.
+  "system": "dnd-5e",                   // Game system slug.
+  "mood": "gritty",
+  "difficulty": "hard",
+  "dm_personality": { "name": "...", "prompt_fragment": "..." },
+  "calendar_display_format": "fantasy",
+
+  // --- DM-only content ---
+  "detail": "Roll the throne's secret: ...",   // Never shown to the player.
+
+  // --- Player-facing choices ---
+  "suboptions": [                        // Structured choice groups.
+    {
+      "label": "Your starting faction",
+      "choices": [
+        { "name": "The Iron Circle", "description": "Start entangled with the military..." },
+        { "name": "The Gilded Compact", "description": "Start among the merchants..." }
+      ]
+    }
+  ],
+
+  // --- Inline content (optional — empty for seeds, rich for exports) ---
+  "entities": {                          // Keyed by category, then slug.
+    "characters": {},
+    "locations": {},
+    "factions": {},
+    "items": {},
+    "lore": {}
+  },
+  "maps": {},                            // Same schema as state/maps.json values.
+  "rules": {},                           // Rule card content keyed by slug.
+  "calendar": {                          // World time (no alarms).
+    "current": 14400,
+    "epoch": "The founding of Valdris",
+    "display_format": "fantasy"
+  }
+}
+```
+
+### 10.3 Minimal seed
+
+A campaign seed is a world file with only the identity and DM-only fields:
+
+```json
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "Hollowdeep",
+  "summary": "A mining town's deepest shaft broke into something old.",
+  "genres": ["fantasy", "horror"]
+}
+```
+
+### 10.4 Setup agent integration
+
+The setup agent receives world summaries (name, summary, genres, slug) in its system prompt. It uses the `load_world` tool to fetch the full detail and suboptions for a specific world by slug. Suboptions are presented to the player as structured choices. The detail block passes through to `campaign_detail` in config.json.
+
+---
+
+## 11. Known Deviations from Spec (Bugs)
 
 This section documents known code behaviors that deviate from this spec. Each is a bug to be fixed.
 

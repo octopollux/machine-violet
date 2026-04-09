@@ -1,0 +1,31 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "Palimpsest",
+  "summary": "The city rebuilds itself every night from memories. Yours are leaking in.",
+  "genres": [
+    "fantasy",
+    "horror",
+    "sci-fi"
+  ],
+  "detail": "Inspired by Lovecraft's Dream-Quest of Unknown Kadath — the revelation that the city the dreamer has been searching for was built from his own memories all along. But where Lovecraft treated that as a twist ending, this campaign starts there and asks: what happens next?\n\n\n\nThe player's memories are leaking in — and they shouldn't be. Most inhabitants contribute fragments unconsciously: a door here, a window there, nothing recognizable. The player's memories are arriving whole. A street from their childhood. Their mother's kitchen, perfect down to the chip in the counter tile. A place they've never told anyone about, suddenly a public landmark. This is conspicuous. Other inhabitants are noticing. Some are curious. Some are hungry for it.\n\nThe rules of the city (DM only — reveal gradually through play):\n- The city rebuilds at a fixed time (dawn, midnight, or tidal — depending on the setting). Inhabitants learn the rhythm and shelter during reconstruction. Being caught in the open during a rebuild is disorienting and dangerous — you might end up inside a wall that wasn't there before.\n- Memory is currency. Vivid, specific memories are valuable. People trade them. Some people are memory-poor — gray figures, half-formed, living in blurry architecture. Some are memory-rich and live in palaces of perfect recall.\n- The city has a will — or at least a preference. It arranges itself toward coherence. It wants to be a real place, not a collage. The player's memories are attractive to it because they're detailed and complete. The city is pulling at the player, trying to integrate them.\n- Forgetting is loss. If you trade a memory, you lose it. If someone steals a memory, you lose it. The architecture it built persists, but you no longer recognize it as yours. People who've been here too long are hollow — they walk through buildings made of experiences they can no longer feel.\n\nKey NPCs:\n- THE CARTOGRAPHER — Maps the city after every rebuild. Their maps are the closest thing to institutional memory. They've noticed the player's contribution and want to understand it. Helpful, meticulous, quietly desperate — they've been here long enough to have traded away most of their own past.\n- THE COLLECTOR — Acquires memories by any means. Charming, generous with favors, never quite honest about the price. Lives in the most beautiful building in the city, assembled from other people's best moments.\n- THE REMNANT — A gray figure, nearly featureless, who remembers exactly one thing: the player's name. They shouldn't exist yet. They're from a future rebuild.\n\nStory threads:\n- The player's memories keep appearing, and each one reveals something about the player they might not have wanted public. The city is reading them, and it's not subtle.\n- The city is converging. Each rebuild, it looks a little more like one coherent place and a little less like a collage. The inhabitants disagree about whether this is good.\n- Something lives at the city's center — in the oldest layer, the memory that was here before anyone arrived. It may be the dreamer whose dream this originally was. It may be the dream itself.\n\nPacing: Start with the player waking in the city for the first time, disoriented, surrounded by impossible architecture. Let them explore and learn the rules through experience, not exposition. The first rebuild they witness should be awe and terror in equal measure. The first time they recognize their own memory in the cityscape should be a quiet, creeping violation.",
+  "suboptions": [
+    {
+      "label": "The city",
+      "choices": [
+        {
+          "name": "The Dreaming Souk",
+          "description": "A vast, warm, lamp-lit bazaar that reassembles itself from the memories of everyone who sleeps within its walls. Architecture is layered — a Roman aqueduct feeds into an Art Deco fountain; a medieval gate opens onto a neon-lit alley. The mood is wonder first, unease second. The city is beautiful and wrong."
+        },
+        {
+          "name": "The Recursion",
+          "description": "A noir metropolis of rain-slicked streets and impossible architecture, rebuilt each cycle by unseen hands. Nobody remembers yesterday clearly. Identities shift — you were a detective last week, a doctor the week before. The mood is paranoid and noir. Someone designed this, and they're still tuning it."
+        },
+        {
+          "name": "The Silt City",
+          "description": "A half-drowned ruin that rises from a shallow sea at dusk and sinks again at dawn. Built from the memories of everyone who ever drowned here. Barnacled stone, waterlogged wood, the sound of bells beneath the waves. The mood is melancholy and maritime. The city remembers drowning the way you remember breathing."
+        }
+      ]
+    }
+  ]
+}

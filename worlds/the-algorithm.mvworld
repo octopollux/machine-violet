@@ -1,0 +1,11 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "The Algorithm",
+  "summary": "A social media feed is predicting events before they happen. It just tagged you.",
+  "genres": [
+    "modern",
+    "mystery",
+    "horror"
+  ]
+}

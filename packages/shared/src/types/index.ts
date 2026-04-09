@@ -12,3 +12,4 @@ export * from "./resolve-session.js";
 export * from "./compendium.js";
 export * from "./engine.js";
 export * from "./errors.js";
+export * from "./world.js";

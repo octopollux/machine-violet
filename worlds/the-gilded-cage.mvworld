@@ -1,0 +1,31 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "The Gilded Cage",
+  "summary": "You're the guest of honor at a party you can't leave.",
+  "genres": [
+    "fantasy",
+    "modern",
+    "mystery"
+  ],
+  "detail": "The host knows the player. The player doesn't remember the host. This is not an accident.\n\nRoll or choose the cage's nature:\n1. THE DEBT — The player did something terrible and had the memory erased. The party is a trial. Every guest is a witness. The host is the victim — or the victim's heir.\n2. THE AUDITION — The party is a test run by a secret society, a patron deity, or an extradimensional collector. Every interaction is being evaluated. The \"prize\" for passing is not what it seems.\n3. THE WAKE — The party is for someone who hasn't died yet. That someone is the player. The host is trying to save them from a fate they can't explain in plain terms — so they built an elaborate cage instead.\n\nThe house: Every room reveals something about the player's past (or a constructed version of it). Doors lead to rooms that shouldn't exist. The architecture responds to emotional state — a room expands when you're calm, contracts when you panic.\n\nGuests: 8-12 NPCs, each with a specific relationship to the central mystery. Some are allies, some are obstacles, some are distractions. At least one guest is not human (or not alive, or not really there). The staff knows everything and will say nothing.\n\nPacing: The party has a rhythm — cocktails, dinner, entertainment, dessert, the midnight reveal. Each phase escalates. The player can try to break the structure, but the house adapts.",
+  "suboptions": [
+    {
+      "label": "The setting",
+      "choices": [
+        {
+          "name": "A candlelit manor",
+          "description": "Gothic elegance, labyrinthine corridors, oil portraits with watching eyes. The party is a masquerade. Think Poe by way of Kubrick."
+        },
+        {
+          "name": "A modernist penthouse",
+          "description": "Glass walls, brutalist art, a host who knows too much about you. The party is an exclusive soirée. Think corporate thriller with a supernatural edge."
+        },
+        {
+          "name": "A fae court banquet",
+          "description": "Impossible food, glamoured guests, rules nobody will explain. The party follows fae etiquette — breaking a rule you didn't know existed has consequences."
+        }
+      ]
+    }
+  ]
+}

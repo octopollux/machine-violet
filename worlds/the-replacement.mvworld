@@ -1,0 +1,37 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "The Replacement",
+  "summary": "You came home to find someone living your life. They're better at it.",
+  "genres": [
+    "horror",
+    "modern",
+    "mystery",
+    "fantasy",
+    "sci-fi"
+  ],
+  "detail": "The player comes home — apartment, house, quarters, whatever — and someone is already there. Same face, same name, same keys. The friends recognize them. The job expects them. The life fits them. And by every visible measure, they're doing it better: kinder, sharper, more present. The player is standing outside their own life, watching it improve without them.\n\n\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE PLAYER IS REAL — The player is the original. The replacement is the intruder. The horror is that nobody believes the player, because the replacement is more convincing. The player has to prove they're themselves to people who prefer the other version.\n2. THE PLAYER IS THE FAKE — The player is the replacement. They don't know it. Their memories are constructed or copied. The person living in their apartment is the original, who came home to find the player had already taken over and is now trying to reclaim their life. Everything the player feels — the outrage, the violation, the certainty that this is THEIR life — is real emotion built on a false foundation. This should be revealed gradually, through details that don't add up: a scar the player remembers getting but their body doesn't have, a memory that's too perfect, a skill they shouldn't possess.\n\n\"Better at it\" — this is the knife. The replacement isn't just present, they're an improvement. They remember birthdays. They listen. They got the promotion. The player's friends are happier. This is the existential horror: not that someone stole your life, but that your life is better without you in it. The DM should make this specific and painful — not abstract, but concrete moments the player witnesses. The replacement did the thing the player always meant to do.\n\nDM approach:\n- The first scene should be the discovery: coming home, key doesn't work (or does — and someone else is inside). Play the confusion before the horror.\n- Give the player allies who believe them, but make those allies uncertain. \"I believe you, but...\" is more unsettling than outright rejection.\n- The replacement should not be a villain. They should be sympathetic, confused, and — if confronted — afraid. A replacement who begs not to be erased is harder to deal with than one who fights.\n- If the player IS the fake (option 2), seed inconsistencies from the start. Don't lie to the player, but let them misinterpret. A detail that seems like a continuity error is actually a clue.\n\nPacing: Start with the locked door. The first act is displacement — the player loses access to their life piece by piece and has to operate outside it. The second act is investigation — what is the replacement, how did this happen, who's responsible? The third act is the confrontation — face to face with the replacement — and the reveal of which one is real.",
+  "suboptions": [
+    {
+      "label": "What the replacement is",
+      "choices": [
+        {
+          "name": "Changeling",
+          "description": "Fae swap. The replacement is a fetch, a constructed double left behind when the fae took... someone. The player's life has been infiltrated by something ancient that treats human identity as a costume. The replacement isn't malicious — it was made to fill a hole. It doesn't know it's not real. Or it does, and it's terrified of being sent back."
+        },
+        {
+          "name": "Clone",
+          "description": "Corporate, military, or black-market. The player was copied — legally or not — and the copy was activated. The replacement has the player's memories up to a point, then diverges. It thinks it's real. It has paperwork that says it's real. Someone manufactured this situation, and the reason matters."
+        },
+        {
+          "name": "Time-slip",
+          "description": "The replacement IS the player, from a different point in the timeline. A future self who came back, or a parallel self who crossed over. They know things the player doesn't. They made choices the player hasn't made yet. They're better because they've already lived through whatever comes next."
+        },
+        {
+          "name": "Something wearing a face",
+          "description": "Not human, never was. An entity that consumes identity — not the body, just the life. It moves from person to person, living each life better than the original, then moving on when it gets bored. The player is the first original who came back while it was still wearing them."
+        }
+      ]
+    }
+  ]
+}

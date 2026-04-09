@@ -1,0 +1,9 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "The Gravity Tax",
+  "summary": "A megacorp owns the local gravity well. Rent is due.",
+  "genres": [
+    "sci-fi"
+  ]
+}

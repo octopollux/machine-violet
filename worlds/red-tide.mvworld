@@ -1,0 +1,11 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "Red Tide",
+  "summary": "The fishing village's catch is rotting before it reaches shore.",
+  "genres": [
+    "fantasy",
+    "horror",
+    "mystery"
+  ]
+}
