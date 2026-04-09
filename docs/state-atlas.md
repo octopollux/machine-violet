@@ -2,7 +2,7 @@
 
 Single source of truth for runtime state design: types, ownership, persistence, invariants, and lifecycle.
 
-Cross-references: [tools-catalog.md](tools-catalog.md), [subagents-catalog.md](subagents-catalog.md), [context-management.md](context-management.md), [entity-filesystem.md](entity-filesystem.md).
+Cross-references: [tools-catalog.md](tools-catalog.md), [subagents-catalog.md](subagents-catalog.md), [context-management.md](context-management.md), [entity-filesystem.md](entity-filesystem.md), [format-spec.md](format-spec.md) (on-disk JSON schemas, null semantics, field name conventions).
 
 ---
 
@@ -148,8 +148,8 @@ ConversationManager
 PersistedUIState                                  → state/ui.json
 ├── styleName: string                             Theme/style name (e.g. "gothic")
 ├── variant: StyleVariant
-├── keyColor?: string                             OKLCH key color override
-└── modelines?: Record<string, string>
+├── keyColor?: string | null                      null = use theme default; absent = never configured
+└── modelines?: Record<string, string> | null     null = explicitly none; absent = never configured
 ```
 
 ---
@@ -158,19 +158,19 @@ PersistedUIState                                  → state/ui.json
 
 All state files live under `<campaignRoot>/state/`.
 
-| File | Type | Written by | On |
-|------|------|-----------|-----|
-| `state/combat.json` | `CombatState` | `StatePersister.persistCombat` | After any tool in `TOOL_STATE_MAP` with `"combat"` |
-| `state/clocks.json` | `ClocksState` | `StatePersister.persistClocks` | After any tool with `"clocks"` |
-| `state/maps.json` | `Record<string, MapData>` | `StatePersister.persistMaps` | After any tool with `"maps"` |
-| `state/decks.json` | `DecksState` | `StatePersister.persistDecks` | After any tool with `"decks"` |
-| `state/objectives.json` | `ObjectivesState` | `StatePersister.persistObjectives` | After any tool with `"objectives"` |
-| `state/scene.json` | `PersistedSceneState` | `StatePersister.persistScene` | After precis update, scene transition |
-| `state/conversation.json` | `SerializedExchange[]` | `StatePersister.persistConversation` | After each exchange |
-| `state/resources.json` | `PersistedResourceState` | `StatePersister.persistResources` | React effect on `resources` state change (same pattern as modelines in `ui.json`) |
-| `state/ui.json` | `PersistedUIState` | `StatePersister.persistUI` | After theme/style/modeline changes |
-| `config.json` | `CampaignConfig` | `buildCampaignConfig` / `createDefaultCampaignConfig` | Campaign creation only. Read-only during play. Includes `version` (`CAMPAIGN_FORMAT_VERSION`) and `createdAt` (ISO 8601) manifest fields. |
-| `pending-operation.json` | `PendingOperation` | `SceneManager` | During scene transition cascade steps |
+| File | Type | Written by | On | Spec |
+|------|------|-----------|-----|------|
+| `state/combat.json` | `CombatState` | `StatePersister.persistCombat` | After any tool in `TOOL_STATE_MAP` with `"combat"` | [§4.1](format-spec.md#41-combat-statecombatjson) |
+| `state/clocks.json` | `ClocksState` | `StatePersister.persistClocks` | After any tool with `"clocks"` | [§4.2](format-spec.md#42-clocks-stateclocksjson) |
+| `state/maps.json` | `Record<string, MapData>` | `StatePersister.persistMaps` | After any tool with `"maps"` | [§4.3](format-spec.md#43-maps-statemapsjson) |
+| `state/decks.json` | `DecksState` | `StatePersister.persistDecks` | After any tool with `"decks"` | [§4.4](format-spec.md#44-decks-statedecksjson) |
+| `state/objectives.json` | `ObjectivesState` | `StatePersister.persistObjectives` | After any tool with `"objectives"` | [§4.5](format-spec.md#45-objectives-stateobjectivesjson) |
+| `state/scene.json` | `PersistedSceneState` | `StatePersister.persistScene` | After precis update, scene transition | [§4.6](format-spec.md#46-scene-statescenejson) |
+| `state/conversation.json` | `ConversationExchange[]` | `StatePersister.persistConversation` | After each exchange | [§4.7](format-spec.md#47-conversation-stateconversationjson) |
+| `state/resources.json` | `PersistedResourceState` | `StatePersister.persistResources` | React effect on `resources` state change (same pattern as modelines in `ui.json`) | [§4.10](format-spec.md#410-resources-stateresourcesjson) |
+| `state/ui.json` | `PersistedUIState` | `StatePersister.persistUI` | After theme/style/modeline changes | [§4.8](format-spec.md#48-ui-stateuijson) |
+| `config.json` | `CampaignConfig` | `buildCampaignConfig` / `createDefaultCampaignConfig` | Campaign creation only. Read-only during play. Includes `version` (`CAMPAIGN_FORMAT_VERSION`) and `createdAt` (ISO 8601) manifest fields. | |
+| `pending-operation.json` | `PendingOperation` | `SceneManager` | During scene transition cascade steps | [§4.11](format-spec.md#411-pending-operation-pending-operationjson) |
 
 `StatePersister` uses write-through: each `persist*` call is fire-and-forget with error swallowing. Recovery on next session load reads `loadAll()` and hydrates `GameState`.
 
