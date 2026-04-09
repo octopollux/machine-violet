@@ -389,11 +389,11 @@ Array of exchanges. Compact JSON (no indentation) since this file can grow large
     "medium": { "input": 20000, "output": 5000, "cached": 8000 },
     "large": { "input": 150000, "output": 30000, "cached": 90000 }
   },
-  "tokens": {                             // Aggregate totals.
-    "input_tokens": 215000,
-    "output_tokens": 43000,
-    "cache_creation_input_tokens": 0,
-    "cache_read_input_tokens": 110000
+  "tokens": {                             // Aggregate totals (camelCase, not Anthropic API snake_case).
+    "inputTokens": 215000,
+    "outputTokens": 43000,
+    "cacheCreationTokens": 0,
+    "cacheReadTokens": 110000
   },
   "apiCalls": 87
 }

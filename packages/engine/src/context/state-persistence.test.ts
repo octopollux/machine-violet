@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { StatePersister } from "./state-persistence.js";
+import { StatePersister, STATE_FILES } from "./state-persistence.js";
 import type { FileIO } from "../agents/scene-manager.js";
 import type { CombatState } from "@machine-violet/shared/types/combat.js";
 import type { MapData } from "@machine-violet/shared/types/maps.js";
 import { createClocksState } from "../tools/clocks/index.js";
 import { createCombatState } from "../tools/combat/index.js";
 import { createDecksState } from "../tools/cards/index.js";
+import { createObjectivesState } from "../tools/objectives/index.js";
 import { norm } from "../utils/paths.js";
 let files: Record<string, string>;
 
@@ -95,6 +96,27 @@ describe("StatePersister", () => {
 
     const loaded = await persister.loadAll();
     expect(loaded.decks).toEqual(decks);
+  });
+
+  it("round-trips objectives state", async () => {
+    const fio = mockFileIO();
+    const persister = new StatePersister("/tmp/campaign", fio);
+    const objectives = createObjectivesState();
+    objectives.objectives["1"] = {
+      id: "1",
+      title: "Find the missing scout",
+      description: "Ranger Eldan went into the Thornwood.",
+      status: "active",
+      created_scene: 2,
+    };
+    objectives.next_id = 2;
+    objectives.current_scene = 5;
+
+    persister.persistObjectives(objectives);
+    await vi.waitFor(() => expect(fio.writeFile).toHaveBeenCalled());
+
+    const loaded = await persister.loadAll();
+    expect(loaded.objectives).toEqual(objectives);
   });
 
   it("round-trips scene state", async () => {
@@ -525,5 +547,299 @@ describe("write serialization", () => {
     expect(loaded.combat).toBeDefined();
     expect(loaded.clocks).toBeDefined();
     expect(loaded.scene).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Format spec compliance (§4) — assert on raw JSON, not round-trip equality.
+// These tests catch field renames and structural changes that round-trip tests miss.
+// ---------------------------------------------------------------------------
+
+/** Helper: persist, flush, return parsed JSON from the in-memory file store. */
+async function persistAndParse<T>(
+  persist: (p: StatePersister) => void,
+  stateFile: string,
+): Promise<{ json: T; raw: string }> {
+  const fio = mockFileIO();
+  const persister = new StatePersister("/tmp/campaign", fio);
+  persist(persister);
+  await persister.flush();
+  const raw = files[norm(`/tmp/campaign/${stateFile}`)];
+  return { json: JSON.parse(raw) as T, raw };
+}
+
+describe("format spec compliance: field names (§4)", () => {
+  it("combat.json uses spec field names (§4.1)", async () => {
+    const { json } = await persistAndParse<Record<string, unknown>>(
+      (p) => p.persistCombat({
+        active: true,
+        order: [{ id: "Aldric", initiative: 18, type: "pc" }],
+        round: 3,
+        currentTurn: 1,
+      }),
+      STATE_FILES.combat,
+    );
+    expect(Object.keys(json).sort()).toEqual(["active", "currentTurn", "order", "round"]);
+    expect(json.active).toBe(true);
+    expect(json.currentTurn).toBe(1);
+    const entry = (json.order as Record<string, unknown>[])[0];
+    expect(Object.keys(entry).sort()).toEqual(["id", "initiative", "type"]);
+  });
+
+  it("clocks.json uses spec field names including snake_case (§4.2)", async () => {
+    const clocks = createClocksState();
+    clocks.calendar.epoch = "Dawn of the First Age";
+    clocks.calendar.display_format = "fantasy";
+    clocks.calendar.alarms = [{
+      id: "caravan",
+      fires_at: 1440,
+      message: "The caravan arrives.",
+      repeating: 10080,
+    }];
+    const { json } = await persistAndParse<Record<string, unknown>>(
+      (p) => p.persistClocks(clocks),
+      STATE_FILES.clocks,
+    );
+    expect(Object.keys(json).sort()).toEqual(["calendar", "combat"]);
+    const cal = json.calendar as Record<string, unknown>;
+    expect(cal).toHaveProperty("display_format", "fantasy");
+    expect(cal).toHaveProperty("epoch");
+    expect(cal).toHaveProperty("current");
+    const alarm = (cal.alarms as Record<string, unknown>[])[0];
+    expect(alarm).toHaveProperty("fires_at", 1440);
+    expect(alarm).toHaveProperty("repeating", 10080);
+  });
+
+  it("maps.json uses spec field names (§4.3)", async () => {
+    const { json } = await persistAndParse<Record<string, Record<string, unknown>>>(
+      (p) => p.persistMaps({
+        tavern: {
+          id: "tavern",
+          gridType: "square",
+          bounds: { width: 10, height: 10 },
+          defaultTerrain: "stone",
+          regions: [{ x1: 0, y1: 0, x2: 5, y2: 3, terrain: "bar" }],
+          terrain: { "10,7": "firepit" },
+          entities: { "3,2": [{ id: "Hilde", type: "npc" }] },
+          annotations: { "10,7": "A warm fire." },
+          links: [{ coord: "19,7", target: "upstairs", targetCoord: "0,7", description: "Stairs up" }],
+          meta: { lighting: "dim" },
+        },
+      }),
+      STATE_FILES.maps,
+    );
+    const map = json["tavern"];
+    expect(Object.keys(map).sort()).toEqual([
+      "annotations", "bounds", "defaultTerrain", "entities",
+      "gridType", "id", "links", "meta", "regions", "terrain",
+    ]);
+    expect(map.gridType).toBe("square");
+    expect(map.defaultTerrain).toBe("stone");
+  });
+
+  it("decks.json uses spec field names (§4.4)", async () => {
+    const decks = createDecksState();
+    const { json } = await persistAndParse<Record<string, unknown>>(
+      (p) => p.persistDecks(decks),
+      STATE_FILES.decks,
+    );
+    expect(json).toHaveProperty("decks");
+  });
+
+  it("objectives.json uses snake_case field names (§4.5)", async () => {
+    const objectives = createObjectivesState();
+    objectives.objectives["1"] = {
+      id: "1",
+      title: "Find the scout",
+      description: "Ranger Eldan is missing.",
+      status: "active",
+      created_scene: 2,
+    };
+    objectives.next_id = 2;
+    objectives.current_scene = 5;
+
+    const { json } = await persistAndParse<Record<string, unknown>>(
+      (p) => p.persistObjectives(objectives),
+      STATE_FILES.objectives,
+    );
+    // Top-level snake_case keys
+    expect(json).toHaveProperty("next_id", 2);
+    expect(json).toHaveProperty("current_scene", 5);
+    // Objective entry snake_case keys
+    const obj = (json as { objectives: Record<string, Record<string, unknown>> }).objectives["1"];
+    expect(obj).toHaveProperty("created_scene", 2);
+    expect(Object.keys(obj).sort()).toEqual([
+      "created_scene", "description", "id", "status", "title",
+    ]);
+  });
+
+  it("scene.json uses spec field names (§4.6)", async () => {
+    const { json } = await persistAndParse<Record<string, unknown>>(
+      (p) => p.persistScene({
+        precis: "The party rests.",
+        openThreads: "Who poisoned the well?",
+        npcIntents: null,
+        playerReads: [{ engagement: "high" as const, focus: ["combat"], tone: "aggressive" as const, pacing: "pushing_forward" as const, offScript: false }],
+        activePlayerIndex: 0,
+      }),
+      STATE_FILES.scene,
+    );
+    expect(Object.keys(json).sort()).toEqual([
+      "activePlayerIndex", "npcIntents", "openThreads", "playerReads", "precis",
+    ]);
+    expect(json.openThreads).toBe("Who poisoned the well?");
+    expect(json.npcIntents).toBeNull();
+  });
+
+  it("scene.json omits absent optional fields (§4.6)", async () => {
+    const { json } = await persistAndParse<Record<string, unknown>>(
+      (p) => p.persistScene({
+        precis: "test",
+        playerReads: [],
+        activePlayerIndex: 0,
+      }),
+      STATE_FILES.scene,
+    );
+    expect("openThreads" in json).toBe(false);
+    expect("npcIntents" in json).toBe(false);
+  });
+
+  it("conversation.json uses spec field names (§4.7)", async () => {
+    const { json } = await persistAndParse<Record<string, unknown>[]>(
+      (p) => p.persistConversation([{
+        user: { role: "user" as const, content: "Hello" },
+        assistant: { role: "assistant" as const, content: "Hi" },
+        toolResults: [],
+        estimatedTokens: 50,
+      }]),
+      STATE_FILES.conversation,
+    );
+    const exchange = json[0];
+    expect(exchange).toHaveProperty("user");
+    expect(exchange).toHaveProperty("assistant");
+    expect(exchange).toHaveProperty("toolResults");
+    expect(exchange).toHaveProperty("estimatedTokens");
+  });
+
+  it("ui.json uses spec field names (§4.8)", async () => {
+    const { json } = await persistAndParse<Record<string, unknown>>(
+      (p) => p.persistUI({
+        styleName: "gothic",
+        variant: "combat",
+        keyColor: "#8844cc",
+        modelines: { left: "The Sunken Citadel" },
+      }),
+      STATE_FILES.ui,
+    );
+    expect(Object.keys(json).sort()).toEqual(["keyColor", "modelines", "styleName", "variant"]);
+  });
+
+  it("usage.json uses spec field names (§4.9)", async () => {
+    const { json } = await persistAndParse<Record<string, unknown>>(
+      (p) => p.persistUsage({
+        byTier: {
+          large: { input: 1200, output: 200, cached: 5000 },
+          medium: { input: 0, output: 0, cached: 0 },
+          small: { input: 800, output: 100, cached: 3000 },
+        },
+        tokens: { inputTokens: 1500, outputTokens: 300, cacheReadTokens: 8000, cacheCreationTokens: 0 },
+        apiCalls: 5,
+      }),
+      STATE_FILES.usage,
+    );
+    expect(json).toHaveProperty("byTier");
+    expect(json).toHaveProperty("tokens");
+    expect(json).toHaveProperty("apiCalls");
+    const tier = (json.byTier as Record<string, Record<string, unknown>>).large;
+    expect(Object.keys(tier).sort()).toEqual(["cached", "input", "output"]);
+    // Token aggregate field names — code uses camelCase (spec updated to match)
+    const tokens = json.tokens as Record<string, unknown>;
+    expect(tokens).toHaveProperty("inputTokens");
+    expect(tokens).toHaveProperty("outputTokens");
+    expect(tokens).toHaveProperty("cacheReadTokens");
+    expect(tokens).toHaveProperty("cacheCreationTokens");
+  });
+
+  it("resources.json uses spec field names (§4.10)", async () => {
+    const { json } = await persistAndParse<Record<string, unknown>>(
+      (p) => p.persistResources({
+        displayResources: { Aldric: ["HP"] },
+        resourceValues: { Aldric: { HP: "24/30" } },
+      }),
+      STATE_FILES.resources,
+    );
+    expect(Object.keys(json).sort()).toEqual(["displayResources", "resourceValues"]);
+  });
+});
+
+describe("format spec compliance: null semantics in JSON (§1.1)", () => {
+  it("null scene fields write JSON null, not absent key", async () => {
+    const { json } = await persistAndParse<Record<string, unknown>>(
+      (p) => p.persistScene({
+        precis: null,
+        openThreads: null,
+        npcIntents: null,
+        playerReads: [],
+        activePlayerIndex: 0,
+      }),
+      STATE_FILES.scene,
+    );
+    expect("precis" in json).toBe(true);
+    expect(json.precis).toBeNull();
+    expect("openThreads" in json).toBe(true);
+    expect(json.openThreads).toBeNull();
+    expect("npcIntents" in json).toBe(true);
+    expect(json.npcIntents).toBeNull();
+  });
+
+  it("null UI fields write JSON null, not absent key", async () => {
+    const { json } = await persistAndParse<Record<string, unknown>>(
+      (p) => p.persistUI({
+        styleName: "gothic",
+        variant: "exploration",
+        keyColor: null,
+        modelines: null,
+      }),
+      STATE_FILES.ui,
+    );
+    expect("keyColor" in json).toBe(true);
+    expect(json.keyColor).toBeNull();
+    expect("modelines" in json).toBe(true);
+    expect(json.modelines).toBeNull();
+  });
+});
+
+describe("format spec compliance: JSON formatting (§4)", () => {
+  it("state files use 2-space indentation", async () => {
+    const fio = mockFileIO();
+    const persister = new StatePersister("/tmp/campaign", fio);
+    persister.persistCombat({ active: false, order: [], round: 0, currentTurn: 0 });
+    persister.persistScene({ precis: "test", playerReads: [], activePlayerIndex: 0 });
+    persister.persistUI({ styleName: "clean", variant: "exploration" });
+    await persister.flush();
+
+    // All pretty-printed files should start with 2-space indent on the first key
+    for (const file of [STATE_FILES.combat, STATE_FILES.scene, STATE_FILES.ui]) {
+      const raw = files[norm(`/tmp/campaign/${file}`)];
+      const lines = raw.split("\n");
+      // Second line should start with exactly 2 spaces (first indented key)
+      expect(lines[1]).toMatch(/^ {2}"/);
+    }
+  });
+
+  it("conversation.json uses compact format (no indentation)", async () => {
+    const fio = mockFileIO();
+    const persister = new StatePersister("/tmp/campaign", fio);
+    persister.persistConversation([{
+      user: { role: "user" as const, content: "Hello" },
+      assistant: { role: "assistant" as const, content: "Hi" },
+      toolResults: [],
+      estimatedTokens: 50,
+    }]);
+    await persister.flush();
+
+    const raw = files[norm(`/tmp/campaign/${STATE_FILES.conversation}`)];
+    // Compact JSON has no newlines (single line)
+    expect(raw.split("\n")).toHaveLength(1);
   });
 });
