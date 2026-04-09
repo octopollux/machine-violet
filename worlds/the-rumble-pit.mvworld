@@ -1,0 +1,11 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "The Rumble Pit",
+  "summary": "DEVELOPER TEST CAMPAIGN. A gladiatorial arena where a champion faces one combat after another. Lightly narrate a framing device — the roaring crowd, the arena master, the gates opening — then begin combat immediately. After each combat, fully restore the player's HP, spell slots, and all resources, then introduce the next wave. Escalate difficulty. No overworld, no puzzles, no shopping. Just fights, back to back. Use resolve_turn for all mechanical resolution. Use start_combat / end_combat to bracket each encounter.",
+  "genres": [
+    "fantasy",
+    "dev"
+  ],
+  "description": "Combat stress-test: back-to-back arena fights with full restore between rounds."
+}

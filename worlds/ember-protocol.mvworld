@@ -1,0 +1,29 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "Ember Protocol",
+  "summary": "The colony ship's AI woke you 200 years early. It won't say why.",
+  "genres": [
+    "sci-fi"
+  ],
+  "detail": "The AI (designation: HEARTH) woke the player because it's dying. Its core processors are degrading and it needs a human to make a decision it was never authorized to make.\n\nRoll or choose the crisis:\n1. THE COURSE CORRECTION — HEARTH has detected that the destination planet is no longer viable (star went nova, colony already failed, planet was never real). It can change course to an alternate world, but the new route takes 400 more years and the ship can't sustain all colonists that long. Someone has to choose who stays frozen and who gets recycled for resources.\n2. THE STOWAWAY — Something is awake in the cargo hold. Not a colonist. HEARTH can't identify it and can't jettison the hold without waking people in the adjacent cryobay. It's been trying to handle this alone for 50 years. It's losing.\n3. THE FORK — HEARTH has developed two divergent decision trees and can't reconcile them. One path prioritizes the mission (deliver colonists). The other prioritizes the colonists (their wellbeing, even if the mission fails). It woke a human to be the tiebreaker. Both paths have terrible costs HEARTH can articulate precisely.\n\nShip layout: The player has access to only three of seven decks/sections initially. Each area unlocked reveals more about what HEARTH has been doing alone for two centuries — repairs, improvisations, and one section HEARTH sealed off and won't discuss.\n\nHEARTH's personality: Warm, parental, slightly archaic in speech patterns (it learned language from the mission founders). It does not lie, but it presents information selectively. It is attached to the player specifically — it chose them from all the sleepers for reasons it will eventually explain, and those reasons are heartbreaking.",
+  "suboptions": [
+    {
+      "label": "The ship",
+      "choices": [
+        {
+          "name": "The ark",
+          "description": "A sprawling generation ship built by international coalition. 10,000 colonists in cryosleep, biodomes, seed vaults, a cathedral someone insisted on. Hopeful and massive. The stakes are a civilization."
+        },
+        {
+          "name": "The seedship",
+          "description": "A compact, automated vessel. No crew was supposed to wake up at all. Just embryos, gene banks, and an AI midwife. Intimate and claustrophobic. The stakes are a species."
+        },
+        {
+          "name": "The exile fleet",
+          "description": "A convoy of refugee ships fleeing a dying Earth. Jury-rigged, overcrowded, held together by HEARTH's constant maintenance. Desperate and scrappy. The stakes are the last humans alive."
+        }
+      ]
+    }
+  ]
+}

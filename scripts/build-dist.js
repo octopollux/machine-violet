@@ -183,6 +183,7 @@ const assets = [
   { src: "packages/engine/src/prompts", dest: "prompts" },
   { src: "packages/client-ink/src/tui/themes/assets", dest: "themes" },
   { src: "systems", dest: "systems" },
+  { src: "worlds", dest: "worlds", filter: /\.mvworld$/ },
   { src: "packages/engine/src/config", dest: "config", filter: /\.json$/ },
 ];
 

@@ -10,7 +10,7 @@ export {
 } from "./first-launch.js";
 export type { AppSettings } from "./first-launch.js";
 export { PERSONALITIES, getPersonality, randomPersonality } from "./personalities.js";
-export { SEEDS, seedsForGenre, randomSeeds } from "./seeds.js";
-export type { CampaignSeed } from "./seeds.js";
+export { loadAllWorlds, worldSummaries, loadWorldBySlug } from "./world-loader.js";
+export type { WorldSummary } from "./world-loader.js";
 export { KNOWN_SYSTEMS, findSystem, listAvailableSystems } from "./systems.js";
 export type { SystemEntry, AvailableSystem } from "./systems.js";

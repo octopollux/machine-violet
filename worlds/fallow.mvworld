@@ -1,0 +1,33 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "Fallow",
+  "summary": "Magic left the world a century ago. It's trickling back. The old rules don't apply.",
+  "genres": [
+    "fantasy"
+  ],
+  "detail": "Two kinds of magic, and they don't get along:\n\nTHE OLD MAGIC (gone for a century, now returning): Deep, intuitive, dangerous. It answered to will and sacrifice and metaphor. It didn't have equations — it had prices. The people who practiced it are dead or legendary. The texts that survive are more poetry than procedure. It shaped the landscape: standing stones, ley lines, forests that don't obey geography. When it left, nobody knows why. Now it's seeping back — a field that won't stay plowed, a river running uphill, a child born who can hear the stones.\n\nTHE NEW MAGIC (developed in the century since): Mathematical. Rigorous. Reproducible. Discovered roughly forty years after the old magic vanished, when a physicist noticed certain equations had too many solutions. Now taught in engineering departments, published in peer-reviewed journals, practiced with precision instruments and careful notation. It powers infrastructure — transit, communication, medicine, manufacturing. It is the foundation of modern civilization. It follows rules. It is safe. It is, compared to what's coming back, very small.\n\nThe tension: Old magic doesn't follow new magic's rules. It breaks equations, destabilizes infrastructure, produces results that can't be reproduced. New magic practitioners see it as a contaminant — noise in the signal, an engineering problem to be solved. But old magic is orders of magnitude more powerful, and it's accelerating. The question isn't whether the old magic will overwhelm the new. It's what happens to a civilization built on precision when the foundations start being poetic.\n\n\n\nKey tensions (DM only):\n- The institutions built on new magic have every reason to suppress or control the return of old magic. It threatens their authority, their economy, their worldview. Not everyone in these institutions is cynical — many genuinely believe old magic is dangerous (and they're not wrong).\n- Old magic is not benevolent. It's not evil either. It's deep and indifferent and it responds to intent in ways that are intimate and uncomfortable. The first person to practice old magic in a century is going to make mistakes that can't be contained by safety protocols because the protocols don't apply.\n- Some people remember. Old families, rural communities, oral traditions dismissed as folklore. They've been waiting. They may not all be waiting for the same thing.\n- The two magics can potentially be combined. Nobody has done it. The results would be unprecedented and unpredictable. This is the late-game possibility the campaign builds toward.\n\nPacing: Start with small anomalies — things that are wrong in ways the player's training can almost explain. Escalate through encounters that force the player to choose between the framework they know and the evidence of their senses. The first act is denial and investigation. The second act is contact — the player encounters old magic directly and has to decide how to respond. The third act is the collision: old and new magic are both accelerating and the player is one of very few people who understands both.",
+  "suboptions": [
+    {
+      "label": "The scenario",
+      "choices": [
+        {
+          "name": "The student",
+          "description": "You're in your final year of thaumic engineering at a university that didn't exist fifty years ago. Your thesis project just produced an anomalous result: an equation that solves itself differently depending on who's holding the chalk. Your advisor wants to publish. The department wants it buried. The old stones on the campus quad — decorative, everyone thought — are warm to the touch for the first time in living memory."
+        },
+        {
+          "name": "The field engineer",
+          "description": "You maintain the magical infrastructure for a rural district: ley-grid relays, ward pylons, a municipal water purification circle. Routine work. Except the relays are drifting out of calibration faster than you can fix them, the wards are responding to stimuli that aren't in the manual, and the farmers are telling you the old wells are flowing again — the ones that were sealed because of what the water used to do."
+        },
+        {
+          "name": "The antiquarian",
+          "description": "You study the Old Magic period. Dead languages, ruined temples, oral histories from communities that remember. It's been a purely academic field — there was nothing left to practice. Until your translations started working. You read an incantation for the first time in a century and something answered. You haven't told anyone yet."
+        },
+        {
+          "name": "The regulator",
+          "description": "You work for the Bureau of Thaumic Standards, the agency that certifies all legal magic use. Your job is ensuring compliance, investigating anomalies, and shutting down unlicensed practice. The anomaly reports on your desk have tripled this quarter. Half of them describe phenomena that don't match any known new-magic signatures. Your superiors say it's instrument error. You've been in the field. It's not instrument error."
+        }
+      ]
+    }
+  ]
+}

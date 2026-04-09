@@ -36,10 +36,11 @@ const DEV_ASSET_DIRS: Record<string, string> = {
   prompts: "src/prompts",
   themes: "../../src/tui/themes/assets",
   systems: "../../systems",
+  worlds: "../../worlds",
   config: "src/config",
 };
 
-export function assetDir(category: "prompts" | "themes" | "systems" | "config"): string {
+export function assetDir(category: "prompts" | "themes" | "systems" | "worlds" | "config"): string {
   const cached = _cache.get(category);
   if (cached) return cached;
 

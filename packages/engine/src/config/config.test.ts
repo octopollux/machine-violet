@@ -7,7 +7,6 @@ import {
   validateApiKeyFormat,
 } from "./first-launch.js";
 import { PERSONALITIES, getPersonality, randomPersonality } from "./personalities.js";
-import { SEEDS, seedsForGenre, randomSeeds } from "./seeds.js";
 
 describe("first-launch", () => {
   it("detects unconfigured state", () => {
@@ -76,46 +75,4 @@ describe("personalities", () => {
   });
 });
 
-describe("seeds", () => {
-  it("ships at least 10 seeds", () => {
-    expect(SEEDS.length).toBeGreaterThanOrEqual(10);
-  });
-
-  it("each seed has name, premise, and genres", () => {
-    for (const s of SEEDS) {
-      expect(s.name).toBeTruthy();
-      expect(s.premise).toBeTruthy();
-      expect(s.genres.length).toBeGreaterThan(0);
-    }
-  });
-
-  it("filters by genre", () => {
-    const scifi = seedsForGenre("sci-fi");
-    expect(scifi.length).toBeGreaterThan(0);
-    for (const s of scifi) {
-      expect(s.genres).toContain("sci-fi");
-    }
-  });
-
-  it("picks N random seeds", () => {
-    const picks = randomSeeds(3);
-    expect(picks).toHaveLength(3);
-    // All unique
-    const names = new Set(picks.map((s) => s.name));
-    expect(names.size).toBe(3);
-  });
-
-  it("picks random seeds filtered by genre", () => {
-    const picks = randomSeeds(2, "fantasy");
-    expect(picks).toHaveLength(2);
-    for (const s of picks) {
-      expect(s.genres).toContain("fantasy");
-    }
-  });
-
-  it("handles requesting more seeds than available", () => {
-    const picks = randomSeeds(100, "sci-fi");
-    expect(picks.length).toBeLessThanOrEqual(SEEDS.length);
-    expect(picks.length).toBeGreaterThan(0);
-  });
-});
+// Seed tests moved to world-loader.test.ts (validates .mvworld files directly).

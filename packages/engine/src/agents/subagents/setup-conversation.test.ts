@@ -262,7 +262,7 @@ describe("createSetupConversation", () => {
     expect(systemPrompt).toContain("present_choices");
   });
 
-  it("Known Players section appears before campaign seeds", async () => {
+  it("Known Players section appears before campaign worlds", async () => {
     const provider = mockProvider([textResponse("Welcome!")]);
     const conv = createSetupConversation(provider, "claude-sonnet-4-6", [
       { name: "Alice", ageGroup: "adult" },
@@ -273,10 +273,10 @@ describe("createSetupConversation", () => {
     const systemPrompt = streamCalls[0][0].systemPrompt as string;
 
     const knownIdx = systemPrompt.indexOf("## Known Players");
-    const seedsIdx = systemPrompt.indexOf("## Available campaign seeds");
+    const worldsIdx = systemPrompt.indexOf("## Available campaign worlds");
     expect(knownIdx).toBeGreaterThan(-1);
-    expect(seedsIdx).toBeGreaterThan(-1);
-    expect(knownIdx).toBeLessThan(seedsIdx);
+    expect(worldsIdx).toBeGreaterThan(-1);
+    expect(knownIdx).toBeLessThan(worldsIdx);
   });
 
   it("single known player still uses present_choices instruction", async () => {

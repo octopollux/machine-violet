@@ -1,0 +1,29 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "Ghosts of Station Proxima",
+  "summary": "An abandoned space station just started broadcasting again.",
+  "genres": [
+    "sci-fi"
+  ],
+  "detail": "The broadcast is a distress call — but it's in the player's own voice. They've never been to Proxima. Or have they?\n\nRoll or choose the station's secret:\n1. TIME LOOP — The station exists in a temporal fold. The \"ghosts\" are future and past versions of the crew (and possibly the player) overlapping. Solving it means choosing which timeline gets to be real.\n2. DIGITAL AFTERLIFE — The station was an experimental consciousness-upload facility. The \"ghosts\" are uploaded crew members who don't know they're dead. The broadcast is a plea from the one who figured it out.\n3. FIRST CONTACT — The station was humanity's secret first-contact site. The aliens communicated by mimicking human signals — poorly at first, now perfectly. The broadcast isn't from humans. It's an invitation.\n\nStation structure: Six modules connected by a central spine. Gravity works in some, not others. Power flickers between modules — the player can restore it, but each module powered up reveals something uncomfortable. One module is completely missing from the blueprints but physically present.\n\nKey NPC: A maintenance AI named PELL who has been alone for 11 years. PELL is helpful, chatty, deeply lonely, and knows more than it admits. It may be compromised. It may just be scared.",
+  "suboptions": [
+    {
+      "label": "The station",
+      "choices": [
+        {
+          "name": "Derelict alien megastructure",
+          "description": "Ancient, non-human construction. The architecture doesn't obey human geometry. Whoever built it is long gone — or dormant."
+        },
+        {
+          "name": "Abandoned near-future hardware",
+          "description": "A NASA/ESA successor station, maybe 30 years from now. Familiar tech, cramped corridors, coffee-stained manuals floating in zero-g. The horror is intimate and grounded."
+        },
+        {
+          "name": "Military black site",
+          "description": "Year-2200 classified facility. Sleek, over-engineered, full of locked compartments and redacted logs. Whatever happened here, someone powerful wanted it kept quiet."
+        }
+      ]
+    }
+  ]
+}
