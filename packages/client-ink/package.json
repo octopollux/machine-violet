@@ -15,12 +15,12 @@
     "@machine-violet/shared": "*",
     "clipboardy": "^5.3.1",
     "dotenv": "^16.4.5",
-    "ink": "^6.8.0",
+    "ink": "^7.0.0",
     "ink-scroll-view": "^0.3.6",
-    "react": "^19.0.0"
+    "react": "^19.2.0"
   },
   "devDependencies": {
-    "@types/react": "^19.0.0",
+    "@types/react": "^19.2.0",
     "@xterm/addon-serialize": "^0.14.0",
     "@xterm/headless": "^6.0.0",
     "cross-env": "^10.1.0",
