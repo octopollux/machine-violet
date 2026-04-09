@@ -12,3 +12,5 @@ export type { KeyHint } from "./KeyHints.js";
 export { TerminalTooSmall } from "./TerminalTooSmall.js";
 export { FullScreenFrame } from "./FullScreenFrame.js";
 export type { FullScreenFrameProps } from "./FullScreenFrame.js";
+export { useStarfield, StarfieldRows } from "./Starfield.js";
+export type { StarfieldConfig, StarfieldCell } from "./Starfield.js";
