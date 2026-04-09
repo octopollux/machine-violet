@@ -4,6 +4,8 @@ Version: **1**
 
 This document defines the on-disk format for a Machine Violet campaign. It is the canonical reference for any tool that reads, writes, repairs, exports, or migrates campaign state. A conforming implementation can construct a campaign directory from scratch that loads and plays in the engine.
 
+Cross-references: [state-atlas.md](state-atlas.md) (runtime types, ownership, persistence map, invariants).
+
 ---
 
 ## 1. Conventions
@@ -195,9 +197,13 @@ All fields except `version`, `name`, `dm_personality` (with `name` and `prompt_f
 
 ## 4. State Files (`state/`)
 
-State files are JSON, written by the engine's `StatePersister` with fire-and-forget semantics. Each file is independently loadable — a missing file means that subsystem has never been activated. All state files use 2-space indented JSON except `conversation.json` (compact, no indentation — it can be large).
+State files are JSON, written by the engine's `StatePersister` (`src/context/state-persistence.ts`) with fire-and-forget semantics. Each file is independently loadable — a missing file means that subsystem has never been activated. All state files use 2-space indented JSON except `conversation.json` (compact, no indentation — it can be large).
+
+Runtime types, ownership, and mutation rules are documented in [state-atlas.md §2 Persistence Map](state-atlas.md#2-persistence-map).
 
 ### 4.1 Combat (`state/combat.json`)
+
+**Runtime type:** `CombatState` (`shared/types/combat.ts`)
 
 ```jsonc
 {
@@ -215,6 +221,8 @@ State files are JSON, written by the engine's `StatePersister` with fire-and-for
 ```
 
 ### 4.2 Clocks (`state/clocks.json`)
+
+**Runtime type:** `ClocksState` (`shared/types/clocks.ts`)
 
 ```jsonc
 {
@@ -240,6 +248,8 @@ State files are JSON, written by the engine's `StatePersister` with fire-and-for
 ```
 
 ### 4.3 Maps (`state/maps.json`)
+
+**Runtime type:** `Record<string, MapData>` (`shared/types/maps.ts`)
 
 All maps, keyed by map ID. Also written individually to `locations/<slug>/<mapId>.json`.
 
@@ -285,6 +295,8 @@ All maps, keyed by map ID. Also written individually to `locations/<slug>/<mapId
 
 ### 4.4 Decks (`state/decks.json`)
 
+**Runtime type:** `DecksState` (`shared/types/cards.ts`)
+
 ```jsonc
 {
   "decks": {
@@ -307,6 +319,8 @@ All maps, keyed by map ID. Also written individually to `locations/<slug>/<mapId
 
 ### 4.5 Objectives (`state/objectives.json`)
 
+**Runtime type:** `ObjectivesState` (`shared/types/objectives.ts`)
+
 ```jsonc
 {
   "objectives": {
@@ -325,6 +339,8 @@ All maps, keyed by map ID. Also written individually to `locations/<slug>/<mapId
 ```
 
 ### 4.6 Scene (`state/scene.json`)
+
+**Runtime type:** `PersistedSceneState` (`engine/src/context/state-persistence.ts`)
 
 ```jsonc
 {
@@ -348,6 +364,8 @@ All maps, keyed by map ID. Also written individually to `locations/<slug>/<mapId
 
 ### 4.7 Conversation (`state/conversation.json`)
 
+**Runtime type:** `ConversationExchange[]` (`engine/src/context/conversation.ts`)
+
 Array of exchanges. Compact JSON (no indentation) since this file can grow large.
 
 ```jsonc
@@ -365,6 +383,8 @@ Array of exchanges. Compact JSON (no indentation) since this file can grow large
 
 ### 4.8 UI (`state/ui.json`)
 
+**Runtime type:** `PersistedUIState` (`engine/src/context/state-persistence.ts`)
+
 ```jsonc
 {
   "styleName": "gothic",                  // Theme name (matches a .theme asset file).
@@ -381,6 +401,8 @@ Array of exchanges. Compact JSON (no indentation) since this file can grow large
 `modelines` follows null semantics: `null` = explicitly no modelines, absent = never configured.
 
 ### 4.9 Usage (`state/usage.json`)
+
+**Runtime type:** `TokenBreakdown` (`shared/types/engine.ts`)
 
 ```jsonc
 {
@@ -403,6 +425,8 @@ Informational only. Not used by game logic.
 
 ### 4.10 Resources (`state/resources.json`)
 
+**Runtime type:** `PersistedResourceState` (`engine/src/context/state-persistence.ts`)
+
 ```jsonc
 {
   "displayResources": {                   // Which resource keys to show per character.
@@ -420,6 +444,8 @@ Informational only. Not used by game logic.
 Resource keys are freeform strings that correspond to labels on character sheets. Values are freeform display strings (not parsed as numbers).
 
 ### 4.11 Pending Operation (`pending-operation.json`)
+
+**Runtime type:** `PendingOperation` (`engine/src/agents/scene-manager.ts`)
 
 Lives at the campaign root (not in `state/`). Present only during an in-progress scene transition or session end. If this file exists and is non-empty when the engine starts, it resumes the interrupted operation.
 
