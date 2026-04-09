@@ -28,7 +28,7 @@ export interface StarfieldConfig {
   isActive?: boolean;
 }
 
-const DEFAULT_DENSITY = 0.05;
+const DEFAULT_DENSITY = 0.025;
 const DEFAULT_LIFETIME = 60;
 const DEFAULT_QUASAR_CHANCE = 0.03;
 const DEFAULT_INTERVAL = 1000;
@@ -45,10 +45,10 @@ interface StarPalette {
 }
 
 const PALETTE: StarPalette[] = [
-  { peakL: 0.30, C: 0,    H: 0,   weight: 3 }, // dark/black
-  { peakL: 0.90, C: 0,    H: 0,   weight: 4 }, // white
-  { peakL: 0.75, C: 0.14, H: 65,  weight: 2 }, // orange
-  { peakL: 0.65, C: 0.18, H: 300, weight: 2 }, // violet
+  { peakL: 0.30, C: 0,    H: 0,   weight: 3 },   // dark/black
+  { peakL: 0.90, C: 0,    H: 0,   weight: 4 },   // white
+  { peakL: 0.75, C: 0.14, H: 65,  weight: 0.4 }, // orange (rare)
+  { peakL: 0.65, C: 0.18, H: 300, weight: 2 },   // violet
 ];
 
 const TOTAL_WEIGHT = PALETTE.reduce((s, p) => s + p.weight, 0);
@@ -68,12 +68,19 @@ function pickColor(rng: () => number): StarPalette {
 // Glyph selection by brightness
 // ---------------------------------------------------------------------------
 
-/** Map normalized brightness (0–1) to a glyph that conveys intensity. */
-export function glyphForBrightness(t: number): string {
-  if (t < 0.20) return "·";
-  if (t < 0.45) return "∗";
-  if (t < 0.70) return "✦";
-  return "★";
+const GLYPH_TIERS = ["·", "∗", "✦", "★"] as const;
+const GLYPH_THRESHOLDS = [0.20, 0.45, 0.70];
+
+/**
+ * Map normalized brightness (0–1) to a glyph that conveys intensity.
+ * `maxTier` caps the brightest glyph (0 = ·, 3 = ★). Default 3.
+ */
+export function glyphForBrightness(t: number, maxTier = 3): string {
+  let tier = 0;
+  for (let i = 0; i < GLYPH_THRESHOLDS.length; i++) {
+    if (t >= GLYPH_THRESHOLDS[i]) tier = i + 1;
+  }
+  return GLYPH_TIERS[Math.min(tier, maxTier)];
 }
 
 // ---------------------------------------------------------------------------
@@ -113,6 +120,8 @@ interface Star {
   lifetime: number;
   palette: StarPalette;
   isQuasar: boolean;
+  /** Highest glyph tier this star can reach (0=·, 1=∗, 2=✦, 3=★). */
+  maxGlyphTier: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -133,10 +142,15 @@ export function createRng(seed: number): () => number {
 // Luminance curve
 // ---------------------------------------------------------------------------
 
-/** Sine fade: 0 → 1 → 0 over a normalized lifetime [0, 1]. */
+/**
+ * Sine-cubed fade: 0 → 1 → 0 over a normalized lifetime [0, 1].
+ * The cubic sharpens the peak so stars spend most of their life dim
+ * and only briefly reach full brightness.
+ */
 export function fadeCurve(age: number, lifetime: number): number {
   if (age < 0 || age >= lifetime) return 0;
-  return Math.sin((age / lifetime) * Math.PI);
+  const s = Math.sin((age / lifetime) * Math.PI);
+  return s * s * s;
 }
 
 // ---------------------------------------------------------------------------
@@ -167,6 +181,10 @@ function spawnStar(
   lifetime: number,
   quasarChance: number,
 ): Star {
+  // 60% of stars cap at tier 0–2 (never reach ★), 40% can reach tier 3
+  const tierRoll = rng();
+  const maxGlyphTier = tierRoll < 0.25 ? 1 : tierRoll < 0.60 ? 2 : 3;
+
   return {
     x: Math.floor(rng() * width),
     y: Math.floor(rng() * height),
@@ -174,6 +192,7 @@ function spawnStar(
     lifetime: Math.round(lifetime * (0.7 + rng() * 0.6)), // ±30% variation
     palette: pickColor(rng),
     isQuasar: rng() < quasarChance,
+    maxGlyphTier,
   };
 }
 
@@ -242,7 +261,7 @@ export function buildGrid(
           const L = brightness * star.palette.peakL;
           const C = brightness * star.palette.C;
           row[star.x] = {
-            glyph: glyphForBrightness(brightness),
+            glyph: glyphForBrightness(brightness, star.maxGlyphTier),
             color: oklchToHex({ L, C, H: star.palette.H }),
           };
         }

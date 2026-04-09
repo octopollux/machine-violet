@@ -53,6 +53,15 @@ describe("fadeCurve", () => {
     expect(fadeCurve(-1, 60)).toBe(0);
     expect(fadeCurve(61, 60)).toBe(0);
   });
+
+  it("spends most of its life below half brightness (cubic sharpening)", () => {
+    let aboveHalf = 0;
+    for (let age = 0; age < 60; age++) {
+      if (fadeCurve(age, 60) > 0.5) aboveHalf++;
+    }
+    // With sin³, only ~1/3 of frames are above 0.5 brightness
+    expect(aboveHalf).toBeLessThanOrEqual(25);
+  });
 });
 
 describe("glyphForBrightness", () => {
@@ -74,6 +83,15 @@ describe("glyphForBrightness", () => {
   it("returns bright glyph for high brightness", () => {
     expect(glyphForBrightness(0.75)).toBe("★");
     expect(glyphForBrightness(1.0)).toBe("★");
+  });
+
+  it("respects maxTier cap", () => {
+    // At full brightness, maxTier=1 caps at ∗
+    expect(glyphForBrightness(1.0, 1)).toBe("∗");
+    // maxTier=2 caps at ✦
+    expect(glyphForBrightness(1.0, 2)).toBe("✦");
+    // maxTier=0 caps at ·
+    expect(glyphForBrightness(1.0, 0)).toBe("·");
   });
 });
 
