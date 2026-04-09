@@ -1,6 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
-import type { LLMProvider, ChatResult, NormalizedUsage } from "../../providers/types.js";
+import type { LLMProvider, ChatResult, NormalizedUsage, SystemBlock } from "../../providers/types.js";
 import { createSetupConversation } from "./setup-conversation.js";
+
+/** Flatten SystemBlock[] | string to a single string for content assertions. */
+function flattenSystem(sp: string | SystemBlock[]): string {
+  if (typeof sp === "string") return sp;
+  return sp.map((b) => b.text).join("");
+}
 
 function mockUsage(input = 50, output = 20): NormalizedUsage {
   return { inputTokens: input, outputTokens: output, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 };
@@ -203,7 +209,7 @@ describe("createSetupConversation", () => {
     await conv.start(noop);
 
     const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
-    const systemPrompt = streamCalls[0][0].systemPrompt as string;
+    const systemPrompt = flattenSystem(streamCalls[0][0].systemPrompt);
 
     // Verify tiered system groups
     expect(systemPrompt).toContain("Light systems");
@@ -254,7 +260,7 @@ describe("createSetupConversation", () => {
     await conv.start(noop);
 
     const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
-    const systemPrompt = streamCalls[0][0].systemPrompt as string;
+    const systemPrompt = flattenSystem(streamCalls[0][0].systemPrompt);
 
     expect(systemPrompt).toContain("## Known Players");
     expect(systemPrompt).toContain("Alice (age group: adult)");
@@ -270,7 +276,7 @@ describe("createSetupConversation", () => {
     await conv.start(noop);
 
     const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
-    const systemPrompt = streamCalls[0][0].systemPrompt as string;
+    const systemPrompt = flattenSystem(streamCalls[0][0].systemPrompt);
 
     const knownIdx = systemPrompt.indexOf("## Known Players");
     const worldsIdx = systemPrompt.indexOf("## Available campaign worlds");
@@ -287,7 +293,7 @@ describe("createSetupConversation", () => {
     await conv.start(noop);
 
     const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
-    const systemPrompt = streamCalls[0][0].systemPrompt as string;
+    const systemPrompt = flattenSystem(streamCalls[0][0].systemPrompt);
 
     expect(systemPrompt).toContain("## Known Players");
     expect(systemPrompt).toContain("present_choices");
@@ -300,7 +306,7 @@ describe("createSetupConversation", () => {
     await conv.start(noop);
 
     const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
-    const systemPrompt = streamCalls[0][0].systemPrompt as string;
+    const systemPrompt = flattenSystem(streamCalls[0][0].systemPrompt);
 
     expect(systemPrompt).not.toContain("## Known Players");
   });
@@ -314,7 +320,7 @@ describe("createSetupConversation", () => {
     await conv.start(noop);
 
     const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
-    const systemPrompt = streamCalls[0][0].systemPrompt as string;
+    const systemPrompt = flattenSystem(streamCalls[0][0].systemPrompt);
 
     expect(systemPrompt).toContain("Alicescript");
     expect(systemPrompt).toContain("Bob Evil");
@@ -329,7 +335,7 @@ describe("createSetupConversation", () => {
     await conv.start(noop);
 
     const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
-    const systemPrompt = streamCalls[0][0].systemPrompt as string;
+    const systemPrompt = flattenSystem(streamCalls[0][0].systemPrompt);
 
     expect(systemPrompt).toContain("Player0");
     expect(systemPrompt).toContain("Player8");
@@ -348,5 +354,63 @@ describe("createSetupConversation", () => {
 
     expect(result.usage.inputTokens).toBe(180);
     expect(result.usage.outputTokens).toBe(55);
+  });
+
+  it("system prompt uses SystemBlock[] with cache breakpoints", async () => {
+    const provider = mockProvider([textResponse("Welcome!")]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    await conv.start(noop);
+
+    const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
+    const blocks = streamCalls[0][0].systemPrompt as SystemBlock[];
+
+    // Must be an array (not a plain string)
+    expect(Array.isArray(blocks)).toBe(true);
+    expect(blocks.length).toBeGreaterThanOrEqual(3);
+
+    // Tier 1 blocks should have a 1h cache breakpoint on the last one
+    // (base prompt + systems/chargen)
+    const tier1Cached = blocks.filter((b: SystemBlock) => b.cacheControl?.ttl === "1h");
+    expect(tier1Cached.length).toBeGreaterThanOrEqual(1);
+
+    // Last block (Tier 3: seeds + personalities) should NOT have cache control
+    const lastBlock = blocks[blocks.length - 1];
+    expect(lastBlock.cacheControl).toBeUndefined();
+
+    // Verify content is in the right tiers
+    const fullText = flattenSystem(blocks);
+    expect(fullText).toContain("Available game systems");
+    expect(fullText).toContain("Available campaign worlds");
+    expect(fullText).toContain("Available DM personalities");
+  });
+
+  it("system prompt includes cache breakpoint on Known Players block", async () => {
+    const provider = mockProvider([textResponse("Welcome!")]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6", [
+      { name: "Alice", ageGroup: "adult" },
+    ]);
+    await conv.start(noop);
+
+    const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
+    const blocks = streamCalls[0][0].systemPrompt as SystemBlock[];
+
+    // Known Players block should be its own cached block (Tier 2)
+    // Match the actual player data block, not the base prompt's instructions about Known Players
+    const playersBlock = blocks.find((b: SystemBlock) => b.text.includes("Alice (age group: adult)"));
+    expect(playersBlock).toBeDefined();
+    expect(playersBlock!.cacheControl).toEqual({ ttl: "1h" });
+  });
+
+  it("ChatParams include cacheHints for tools and messages", async () => {
+    const provider = mockProvider([textResponse("Welcome!")]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    await conv.start(noop);
+
+    const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
+    const params = streamCalls[0][0];
+
+    expect(params.cacheHints).toBeDefined();
+    expect(params.cacheHints).toContainEqual({ target: "tools", ttl: "1h" });
+    expect(params.cacheHints).toContainEqual({ target: "messages" });
   });
 });
