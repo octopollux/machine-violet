@@ -405,7 +405,7 @@ export function createSetupConversation(
           if (world.suboptions?.length) {
             for (const sub of world.suboptions) {
               parts.push(`## Suboption: ${sub.label}\n` +
-                sub.choices.map((c) => `- **${c.name}** — ${c.description}`).join("\n"));
+                sub.choices.map((c: { name: string; description: string }) => `- **${c.name}** — ${c.description}`).join("\n"));
             }
           }
           if (world.system) parts.push(`Suggested system: ${world.system}`);

@@ -888,7 +888,7 @@ export class SessionManager {
       modelines: this.persistedUI.modelines ?? {},
       themeName: this.persistedUI.themeName,
       variant: this.persistedUI.variant,
-      keyColor: this.persistedUI.keyColor,
+      keyColor: this.persistedUI.keyColor ?? undefined,
       mode: this.currentMode,
     };
   }
