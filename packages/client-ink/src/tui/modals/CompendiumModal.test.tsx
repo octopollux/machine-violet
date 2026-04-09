@@ -101,6 +101,35 @@ describe("CompendiumModal", () => {
     expect(frame).toContain("Objectives (1)");
   });
 
+  it("handles compendium with missing category arrays", () => {
+    // Legacy compendiums may lack newer categories (e.g. items)
+    const legacy = {
+      version: 1 as const,
+      lastUpdatedScene: 3,
+      characters: [entry({ name: "Oros", slug: "oros", summary: "A PC." })],
+      places: [],
+      storyline: [],
+      lore: [],
+      objectives: [],
+      // items intentionally missing
+    } as unknown as Compendium;
+
+    const { lastFrame } = render(
+      <Box width={60} height={24}>
+        <CompendiumModal
+          theme={theme}
+          width={60}
+          height={24}
+          data={legacy}
+          onClose={() => {}}
+        />
+      </Box>,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("Characters (1)");
+    expect(frame).toContain("Items (0)");
+  });
+
   it("renders title as Compendium", () => {
     const { lastFrame } = render(
       <Box width={60} height={24}>
