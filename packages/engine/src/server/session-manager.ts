@@ -680,12 +680,6 @@ export class SessionManager {
     config: CampaignConfig,
     gs: GameState,
   ): Promise<void> {
-    // Welcome message gives the client immediate feedback while the DM works.
-    this.broadcast({
-      type: "narrative:chunk",
-      data: { text: `Welcome to ${config.name}. The story begins...`, kind: "system" },
-    });
-
     // Trigger opening scene — TUI commands (theme, resources, modelines)
     // stream live to the client as activity:update events during this call.
     const active = getActivePlayer(gs);

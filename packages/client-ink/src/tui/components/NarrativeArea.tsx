@@ -331,7 +331,7 @@ const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
 
     case "system": {
       const text = typeof line.nodes[0] === "string" ? line.nodes[0] : "";
-      return <Text wrap="truncate" color="yellowBright">{text}</Text>;
+      return <Text wrap="truncate" color="#FFBF00">{text}</Text>;
     }
 
     case "dm": {
