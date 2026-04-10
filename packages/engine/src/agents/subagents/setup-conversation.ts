@@ -228,6 +228,7 @@ async function streamWithRetry(
   provider: LLMProvider,
   params: ChatParams,
   onDelta: (delta: string) => void,
+  onRetry?: (status: number, delayMs: number) => void,
 ): Promise<ChatResult> {
   for (let attempt = 0; ; attempt++) {
     try {
@@ -244,7 +245,9 @@ async function streamWithRetry(
       if (status === null || !RETRYABLE_STATUS.has(status)) {
         throw e instanceof Error ? e : new Error(String(e));
       }
-      await sleep(retryDelay(attempt));
+      const delay = retryDelay(attempt);
+      onRetry?.(status, delay);
+      await sleep(delay);
     }
   }
 }
@@ -275,6 +278,7 @@ export function createSetupConversation(
   provider: LLMProvider,
   model: string,
   existingPlayers?: KnownPlayer[],
+  onRetry?: (status: number, delayMs: number) => void,
 ): SetupConversation {
   // Build per-session system prompt (randomizes seed/personality order).
   // Known players are injected right after the base prompt (before seeds/personalities)
@@ -369,7 +373,7 @@ export function createSetupConversation(
       thinking,
     };
 
-    const result = await streamWithRetry(provider, lastParams, onDelta);
+    const result = await streamWithRetry(provider, lastParams, onDelta, onRetry);
 
     // Accumulate usage
     totalUsage.inputTokens += result.usage.inputTokens;
@@ -457,7 +461,7 @@ export function createSetupConversation(
         tools: TOOLS,
         thinking,
       };
-      const followUp = await streamWithRetry(provider, lastParams, onDelta);
+      const followUp = await streamWithRetry(provider, lastParams, onDelta, onRetry);
 
       totalUsage.inputTokens += followUp.usage.inputTokens;
       totalUsage.outputTokens += followUp.usage.outputTokens;
