@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { LLMProvider, ChatResult, NormalizedUsage } from "./types.js";
 import { runProviderLoop } from "./agent-loop-bridge.js";
 
@@ -29,6 +29,9 @@ function networkError(): Error {
 }
 
 describe("runProviderLoop retry", () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
   it("retries on 429 and succeeds on second attempt", async () => {
     let callCount = 0;
     const provider: LLMProvider = {
@@ -43,7 +46,7 @@ describe("runProviderLoop retry", () => {
     };
 
     const onRetry = vi.fn();
-    const result = await runProviderLoop(provider, "system", [
+    const promise = runProviderLoop(provider, "system", [
       { role: "user", content: "hello" },
     ], {
       name: "test",
@@ -52,6 +55,9 @@ describe("runProviderLoop retry", () => {
       stream: false,
       onRetry,
     });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    const result = await promise;
 
     expect(result.text).toBe("Success after retry");
     expect(callCount).toBe(2);
@@ -73,7 +79,7 @@ describe("runProviderLoop retry", () => {
     };
 
     const onRetry = vi.fn();
-    const result = await runProviderLoop(provider, "system", [
+    const promise = runProviderLoop(provider, "system", [
       { role: "user", content: "hello" },
     ], {
       name: "test",
@@ -82,6 +88,9 @@ describe("runProviderLoop retry", () => {
       stream: false,
       onRetry,
     });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    const result = await promise;
 
     expect(result.text).toBe("OK");
     expect(onRetry).toHaveBeenCalledWith(529, expect.any(Number));
@@ -101,7 +110,7 @@ describe("runProviderLoop retry", () => {
     };
 
     const onRetry = vi.fn();
-    const result = await runProviderLoop(provider, "system", [
+    const promise = runProviderLoop(provider, "system", [
       { role: "user", content: "hello" },
     ], {
       name: "test",
@@ -110,6 +119,9 @@ describe("runProviderLoop retry", () => {
       stream: false,
       onRetry,
     });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    const result = await promise;
 
     expect(result.text).toBe("Reconnected");
     expect(onRetry).toHaveBeenCalledWith(0, expect.any(Number));
@@ -124,7 +136,7 @@ describe("runProviderLoop retry", () => {
     };
 
     const onRetry = vi.fn();
-    await expect(runProviderLoop(provider, "system", [
+    const promise = runProviderLoop(provider, "system", [
       { role: "user", content: "hello" },
     ], {
       name: "test",
@@ -133,9 +145,23 @@ describe("runProviderLoop retry", () => {
       stream: false,
       maxRetries: 2,
       onRetry,
-    })).rejects.toThrow("Always rate limited");
+    });
 
-    // Should have retried exactly maxRetries times (attempts 0, 1, 2 — fail on attempt 2 with attempt < maxRetries false)
+    // Catch the rejection early to avoid unhandled rejection warning,
+    // then advance timers and assert the error.
+    let caughtError: Error | undefined;
+    promise.catch((e: Error) => { caughtError = e; });
+
+    // Advance through both retry delays (1s + 2s)
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(2000);
+    // Let the final rejection settle
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(caughtError).toBeDefined();
+    expect(caughtError!.message).toBe("Always rate limited");
+
+    // 2 retries (attempts 0 and 1 trigger onRetry; attempt 2 exceeds maxRetries and throws)
     expect(onRetry).toHaveBeenCalledTimes(2);
   });
 
@@ -198,7 +224,7 @@ describe("runProviderLoop retry", () => {
     };
 
     // No onRetry callback — subagents and resolve-session don't pass one
-    const result = await runProviderLoop(provider, "system", [
+    const promise = runProviderLoop(provider, "system", [
       { role: "user", content: "hello" },
     ], {
       name: "test",
@@ -206,6 +232,9 @@ describe("runProviderLoop retry", () => {
       maxTokens: 100,
       stream: false,
     });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    const result = await promise;
 
     expect(result.text).toBe("OK");
     expect(callCount).toBe(2);
@@ -228,7 +257,7 @@ describe("runProviderLoop retry", () => {
 
     const onRetry = vi.fn();
     const onTextDelta = vi.fn();
-    const result = await runProviderLoop(provider, "system", [
+    const promise = runProviderLoop(provider, "system", [
       { role: "user", content: "hello" },
     ], {
       name: "test",
@@ -238,6 +267,9 @@ describe("runProviderLoop retry", () => {
       onTextDelta,
       onRetry,
     });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    const result = await promise;
 
     expect(result.text).toBe("Streamed OK");
     expect(onRetry).toHaveBeenCalledWith(502, expect.any(Number));

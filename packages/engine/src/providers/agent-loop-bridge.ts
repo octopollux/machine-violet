@@ -73,7 +73,7 @@ export interface ProviderLoopConfig {
   onError?: (error: Error) => void;
   /** Called when a retryable API error triggers a backoff wait. */
   onRetry?: (status: number, delayMs: number) => void;
-  /** Max retry attempts per API call (default 5 → ~27s total backoff). */
+  /** Max retries after the initial attempt (default 5 → up to 6 total attempts, ~27s backoff). */
   maxRetries?: number;
 }
 
