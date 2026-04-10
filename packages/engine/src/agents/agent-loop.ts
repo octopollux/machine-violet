@@ -55,6 +55,8 @@ export interface AgentLoopConfig {
   onComplete?: (usage: UsageStats) => void;
   /** Called on error */
   onError?: (error: Error) => void;
+  /** Called when a retryable API error triggers a backoff wait */
+  onRetry?: (status: number, delayMs: number) => void;
 }
 
 import type { UsageStats, TuiCommand } from "@machine-violet/shared/types/engine.js";
@@ -144,6 +146,7 @@ async function runAgentLoopInternal(
     onToolEnd: config.onToolEnd,
     onComplete: config.onComplete,
     onError: config.onError,
+    onRetry: config.onRetry,
   });
 
   return {

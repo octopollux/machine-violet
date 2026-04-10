@@ -1174,6 +1174,7 @@ export class GameEngine {
         // visual updates appear mid-narration instead of after the turn.
         this.callbacks.onTuiCommand(cmd);
       },
+      onRetry: (status, delayMs) => this.callbacks.onRetry(status, delayMs),
     };
   }
 

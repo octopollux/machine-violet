@@ -16,6 +16,9 @@ import type {
 } from "./types.js";
 import type { ToolResult } from "../agents/tool-registry.js";
 import type { TuiCommand } from "../agents/agent-loop.js";
+import {
+  extractStatus, RETRYABLE_STATUS, retryDelay, sleep,
+} from "../utils/retry.js";
 
 /**
  * TUI command types that require engine-side processing (scene transitions,
@@ -68,6 +71,10 @@ export interface ProviderLoopConfig {
   onToolEnd?: (name: string, result: ToolResult) => void;
   onComplete?: (usage: NormalizedUsage) => void;
   onError?: (error: Error) => void;
+  /** Called when a retryable API error triggers a backoff wait. */
+  onRetry?: (status: number, delayMs: number) => void;
+  /** Max retry attempts per API call (default 5 → ~27s total backoff). */
+  maxRetries?: number;
 }
 
 export interface ProviderLoopResult {
@@ -89,6 +96,7 @@ export async function runProviderLoop(
   config: ProviderLoopConfig,
 ): Promise<ProviderLoopResult> {
   const maxToolRounds = config.maxToolRounds ?? 3;
+  const maxRetries = config.maxRetries ?? 5;
   const shouldStream = config.stream !== false && !!config.onTextDelta;
 
   // Only enable thinking for models that support it (per model registry).
@@ -148,22 +156,40 @@ export async function runProviderLoop(
 
     let result: ChatResult;
     const apiStart = Date.now();
-    try {
-      if (shouldStream) {
-        result = await provider.stream(chatParams, (delta) => config.onTextDelta?.(delta));
-      } else {
-        result = await provider.chat(chatParams);
-        // In non-streaming mode, emit the full text
-        if (result.text) config.onTextDelta?.(result.text);
+    for (let attempt = 0; ; attempt++) {
+      try {
+        if (shouldStream) {
+          result = await provider.stream(chatParams, (delta) => config.onTextDelta?.(delta));
+        } else {
+          result = await provider.chat(chatParams);
+          // In non-streaming mode, emit the full text
+          if (result.text) config.onTextDelta?.(result.text);
+        }
+        break; // success — exit retry loop
+      } catch (apiErr) {
+        const status = extractStatus(apiErr);
+        const retryable = status !== null
+          && RETRYABLE_STATUS.has(status)
+          && attempt < maxRetries;
+
+        logEvent("api:error", {
+          agent: config.name,
+          model: config.model,
+          durationMs: Date.now() - apiStart,
+          message: apiErr instanceof Error ? apiErr.message : String(apiErr),
+          status,
+          attempt,
+          willRetry: retryable,
+        });
+
+        if (!retryable) {
+          throw apiErr;
+        }
+
+        const delay = retryDelay(attempt);
+        config.onRetry?.(status, delay);
+        await sleep(delay);
       }
-    } catch (apiErr) {
-      logEvent("api:error", {
-        agent: config.name,
-        model: config.model,
-        durationMs: Date.now() - apiStart,
-        message: apiErr instanceof Error ? apiErr.message : String(apiErr),
-      });
-      throw apiErr;
     }
 
     logEvent("api:call", {

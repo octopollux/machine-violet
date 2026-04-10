@@ -338,14 +338,61 @@ describe("event-handler", () => {
   });
 
   describe("errors", () => {
-    it("stores error", () => {
+    it("stores error with status and delayMs", () => {
       const h = makeHarness();
       h.dispatch({
         type: "error",
-        data: { message: "API retry", recoverable: true, status: 529, delayMs: 5000 },
+        data: { message: "API retry (status 529)", recoverable: true, status: 529, delayMs: 2000 },
       });
 
-      expect(h.state.lastError).toEqual({ message: "API retry", recoverable: true });
+      expect(h.state.lastError).toEqual({
+        message: "API retry (status 529)",
+        recoverable: true,
+        status: 529,
+        delayMs: 2000,
+      });
+    });
+
+    it("stores non-recoverable error without status/delayMs", () => {
+      const h = makeHarness();
+      h.dispatch({
+        type: "error",
+        data: { message: "Something broke", recoverable: false },
+      });
+
+      expect(h.state.lastError).toEqual({
+        message: "Something broke",
+        recoverable: false,
+        status: undefined,
+        delayMs: undefined,
+      });
+    });
+
+    it("clears recoverable lastError on narrative:chunk", () => {
+      const h = makeHarness();
+      // Set a recoverable error (retry in progress)
+      h.dispatch({
+        type: "error",
+        data: { message: "API retry (status 429)", recoverable: true, status: 429, delayMs: 1000 },
+      });
+      expect(h.state.lastError).not.toBeNull();
+
+      // Narrative chunk arrives → retry succeeded
+      h.dispatch({ type: "narrative:chunk", data: { text: "The door opens.", kind: "dm" } });
+      expect(h.state.lastError).toBeNull();
+    });
+
+    it("preserves non-recoverable lastError on narrative:chunk", () => {
+      const h = makeHarness();
+      h.dispatch({
+        type: "error",
+        data: { message: "Something broke", recoverable: false },
+      });
+
+      h.dispatch({ type: "narrative:chunk", data: { text: "Hello", kind: "dm" } });
+      // Non-recoverable error should persist
+      expect(h.state.lastError).not.toBeNull();
+      expect(h.state.lastError!.recoverable).toBe(false);
     });
   });
 
