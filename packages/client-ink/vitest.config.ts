@@ -16,7 +16,6 @@ export default defineConfig({
       // (campaignPaths, campaign-archive, updater, content pipeline).
       // They'll be fixed or removed during Phase 5 cleanup.
       "src/commands/slash-commands.test.ts",
-      "src/tui/hooks/useGameCallbacks.test.ts",
       "src/phases/AddContentPhase.test.tsx",
       "src/phases/ArchivedCampaignsPhase.test.tsx",
       "src/phases/UpdatePhase.test.tsx",

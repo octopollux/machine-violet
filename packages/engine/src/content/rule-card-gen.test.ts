@@ -2,8 +2,13 @@ import { loadModelConfig } from "../config/models.js";
 import { resetContentPromptCache } from "./prompts/load-content-prompt.js";
 import { hasHandAuthoredRuleCard, copyBundledRuleCard, runRuleCardGen } from "./rule-card-gen.js";
 import { readFileSync, existsSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
+
+// Resolve repo root from this file's location (not cwd, which depends on which package
+// vitest is invoked from).
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
 import type { FileIO } from "../agents/scene-manager.js";
 import type Anthropic from "@anthropic-ai/sdk";
 
@@ -17,19 +22,19 @@ beforeEach(() => {
 describe("hasHandAuthoredRuleCard", () => {
   it("returns true for bundled dnd-5e system", () => {
     // The repo has systems/dnd-5e/rule-card.md
-    const projectRoot = process.cwd();
+    const projectRoot = REPO_ROOT;
     expect(hasHandAuthoredRuleCard(projectRoot, "dnd-5e")).toBe(true);
   });
 
   it("returns false for non-existent system", () => {
-    const projectRoot = process.cwd();
+    const projectRoot = REPO_ROOT;
     expect(hasHandAuthoredRuleCard(projectRoot, "some-random-system")).toBe(false);
   });
 });
 
 describe("copyBundledRuleCard", () => {
   it("copies bundled rule card to output directory", () => {
-    const projectRoot = process.cwd();
+    const projectRoot = REPO_ROOT;
     const tempHome = join(tmpdir(), `mv-test-${Date.now()}`);
 
     try {
@@ -110,7 +115,7 @@ describe("runRuleCardGen", () => {
 
   it("skips when hand-authored rule card exists", async () => {
     const io = mockIO({});
-    const projectRoot = process.cwd();
+    const projectRoot = REPO_ROOT;
     const tempHome = join(tmpdir(), `mv-test-rulecard-${Date.now()}`);
 
     try {
@@ -151,7 +156,7 @@ describe("runRuleCardGen", () => {
     const io = mockIO({
       "/home/systems/new-system/entities/rules/combat.md": "# Combat\n\nRoll to hit.",
     });
-    const projectRoot = process.cwd();
+    const projectRoot = REPO_ROOT;
 
     const generated = await runRuleCardGen(freshClient, io, "/home", "new-system", projectRoot);
     expect(generated).toBe(true);

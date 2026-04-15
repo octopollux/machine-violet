@@ -12,7 +12,7 @@
 
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join, basename } from "node:path";
-import { defaultCampaignRoot } from "../src/tools/filesystem/platform.js";
+import { defaultCampaignRoot } from "../packages/engine/src/tools/filesystem/platform.js";
 
 // --- Resolve campaigns directory ---
 

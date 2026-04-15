@@ -53,7 +53,7 @@ Game system support uses a three-layer content model:
 2. **Ingested layer** (from PDF) — user-supplied sourcebooks extracted locally via pdf-parse, then processed by Haiku into entity files. Layered on top of templates.
 3. **Runtime layer** — character sheets, transcripts, and entity files created during play.
 
-The content pipeline (`src/content/`) is **completely separate** from the game engine. They share only a filesystem format as interface. PDF text extraction is local (no AI, no API calls); content processing uses the Batch API for Haiku-powered classification and extraction.
+The content pipeline (`packages/engine/src/content/`) is **completely separate** from the game engine. They share only a filesystem format as interface. PDF text extraction is local (no AI, no API calls); content processing uses the Batch API for Haiku-powered classification and extraction.
 
 A "Just jump in" mode uses a hidden lightweight system (24XX or text-adventure conventions) for zero-friction freeform play.
 

@@ -25,7 +25,7 @@ All documentation lives in `docs/`. Start at `docs/index.md` for navigation, `do
 - **No globals.** Tool handlers take explicit state objects.
 - **FileIO/GitIO interfaces** abstract all I/O. Never call `fs` directly in game logic.
 - Tool results use `ok(data)` / `err(message)` helpers.
-- Content pipeline (`src/content/`) is **completely separate** from the game engine. Never import between them.
+- Content pipeline (`packages/engine/src/content/`) is **completely separate** from the rest of the game engine. Never import between them.
 
 ### Testing
 - Tests are **co-located** with source (`foo.ts` + `foo.test.ts`).

@@ -6,8 +6,6 @@ The codebase is split across three packages:
 - **`packages/client-ink/`** — Ink TUI, themes, modals, formatting, phases
 - **`packages/shared/`** — Shared types and protocol schemas
 
-Legacy `src/` only contains `src/content/` (content pipeline) and `src/services/` (Discord).
-
 Most directories have `index.ts` barrel exports — check those before reaching into subdirectories. Paths below are relative to their package root (e.g. `agents/game-engine.ts` = `packages/engine/src/agents/game-engine.ts`).
 
 ## Engine: agents/ — Orchestration
@@ -142,9 +140,9 @@ Shared TypeScript interfaces. No implementations. All re-exported from `index.ts
 | `tui.ts` | `NarrativeLine`, `FormattingNode`, modal types |
 | `compendium.ts` | `Compendium`, `CompendiumEntry`, `CompendiumCategory` |
 
-## Root: src/content/ — Content Pipeline
+## Engine: content/ — Content Pipeline
 
-PDF ingestion and content processing. **Completely separate from the game engine** — the only shared interface is the filesystem format. If you delete this module, the game still runs.
+PDF ingestion and content processing. **Completely separate from the rest of the game engine** — the only shared interface is the filesystem format. If you delete this module, the game still runs.
 
 | File | Purpose |
 |---|---|

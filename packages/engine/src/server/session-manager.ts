@@ -39,6 +39,10 @@ import type { StyleVariant } from "@machine-violet/shared/types/tui.js";
 import { createBridge } from "./bridge.js";
 import { createBaseFileIO } from "./fileio.js";
 import { SetupSession } from "./setup-session.js";
+import { generateDiscordStatus } from "../agents/subagents/discord-status.js";
+
+/** DM-narrative interval at which a fresh Discord presence string is generated. */
+const DISCORD_STATUS_INTERVAL = 8;
 
 export interface ConnectedClient {
   ws: WebSocket;
@@ -477,9 +481,36 @@ export class SessionManager {
       if (this.sessionGeneration !== gen) return;
       this.broadcast(event);
     };
+    // Discord rich-presence: counter resets per backend session load. Every
+    // DISCORD_STATUS_INTERVAL DM narratives, the engine asks a small model to
+    // summarise the latest narrative as a punchy ≤40-char status string and
+    // broadcasts it. Each frontend independently decides whether to forward
+    // the result to its local Discord IPC based on its own opt-in setting.
+    let dmNarrativeCount = 0;
+    const onDmNarrative = (text: string): void => {
+      if (this.sessionGeneration !== gen) return;
+      dmNarrativeCount++;
+      if (dmNarrativeCount % DISCORD_STATUS_INTERVAL !== 0) return;
+      void (async () => {
+        try {
+          const details = await generateDiscordStatus(provider, text);
+          if (this.sessionGeneration !== gen) return;
+          scopedBroadcast({
+            type: "discord:presence",
+            data: { action: "update", details },
+          });
+        } catch (err) {
+          logEvent("discord:status_error", {
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
+      })();
+    };
+
     const callbacks = createBridge({
       broadcast: scopedBroadcast,
       costTracker: this.costTracker,
+      onDmNarrative,
     });
 
     // Intercept TUI commands so persistedUI stays in sync — ensures
@@ -515,6 +546,17 @@ export class SessionManager {
       isResume,
       provider: provider.providerId,
       scene: scene.sceneNumber,
+    });
+
+    // Announce session-level Discord presence info (campaign + DM persona).
+    // Frontends with Discord opt-in toggled on use this to call DiscordPresence.start().
+    scopedBroadcast({
+      type: "discord:presence",
+      data: {
+        action: "start",
+        campaignName: config.name ?? campaignId,
+        dmPersona: config.dm_personality?.name ?? "The DM",
+      },
     });
 
     // Start idle timer in case no players are connected yet
@@ -805,6 +847,11 @@ export class SessionManager {
     this.currentMode = "play";
     this.persistedUI = {};
     this.status = "idle";
+
+    this.broadcast({
+      type: "discord:presence",
+      data: { action: "stop" },
+    });
 
     this.broadcast({
       type: "session:ended",

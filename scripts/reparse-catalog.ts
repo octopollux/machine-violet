@@ -3,12 +3,12 @@
  * Avoids re-running the classifier batch.
  */
 import "dotenv/config";
-import { createClient } from "../src/config/client.js";
+import { createClient } from "../packages/engine/src/config/client.js";
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { collectBatchResults } from "../src/content/batch-client.js";
-import { parseClassifierResults, mergeSections, buildCatalog } from "../src/content/classifier.js";
-import { loadModelConfig } from "../src/config/models.js";
+import { collectBatchResults } from "../packages/engine/src/content/batch-client.js";
+import { parseClassifierResults, mergeSections, buildCatalog } from "../packages/engine/src/content/classifier.js";
+import { loadModelConfig } from "../packages/engine/src/config/models.js";
 
 async function main() {
   loadModelConfig({ reset: true });

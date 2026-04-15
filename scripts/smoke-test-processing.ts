@@ -12,12 +12,12 @@
  */
 
 import "dotenv/config";
-import { createClient } from "../src/config/client.js";
+import { createClient } from "../packages/engine/src/config/client.js";
 import { readFile, writeFile, appendFile, mkdir, stat, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
-import type { FileIO } from "../src/agents/scene-manager.js";
-import { loadModelConfig } from "../src/config/models.js";
-import { runProcessingPipeline } from "../src/content/process.js";
+import type { FileIO } from "../packages/engine/src/agents/scene-manager.js";
+import { loadModelConfig } from "../packages/engine/src/config/models.js";
+import { runProcessingPipeline } from "../packages/engine/src/content/process.js";
 
 // --- Real FileIO ---
 const io: FileIO = {
