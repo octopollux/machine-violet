@@ -15,6 +15,10 @@ export interface CommandResult {
   message?: string;
   error?: boolean;
   endSession?: boolean;
+  /** Reason to pass to sessionManager.endSession — e.g. "rollback" skips
+   *  the final flush+checkpoint that would otherwise clobber disk with
+   *  stale in-memory state. */
+  endSessionReason?: string;
 }
 
 export async function handleCommand(
@@ -86,7 +90,11 @@ async function handleRollback(args: string, engine: GameEngine, gameState: GameS
   }
   const fileIO = engine.getSceneManager().getFileIO();
   const result = await performRollback(repo, `exchanges_ago:${n}`, gameState.campaignRoot, fileIO);
-  return { message: `Rolled back ${n} exchange(s): ${result.summary}`, endSession: true };
+  return {
+    message: `Rolled back ${n} exchange(s): ${result.summary}`,
+    endSession: true,
+    endSessionReason: "rollback",
+  };
 }
 
 function handleRetry(engine: GameEngine): CommandResult {
