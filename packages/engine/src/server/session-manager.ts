@@ -59,6 +59,10 @@ export class SessionManager {
   private costTracker: CostTracker | null = null;
   private currentMode: "play" | "ooc" | "dev" | "setup" = "play";
   private persistedUI: { themeName?: string; variant?: string; keyColor?: string | null; modelines?: Record<string, string> | null } = {};
+  /** One-shot recap payload: set during sessionResume, emitted in the next
+   *  buildStateSnapshot() call and cleared. Ensures only the first snapshot
+   *  after a clean session-end carries the recap. */
+  private pendingSessionRecap: { id: string; lines: string[] } | null = null;
   private setupSession: SetupSession | null = null;
 
   /** Campaign ID of the currently active session (null if none). */
@@ -440,6 +444,7 @@ export class SessionManager {
         npcIntents: "",
         playerReads: [],
         sessionNumber: 1,
+        sessionRecapPending: false,
       };
     }
 
@@ -590,6 +595,7 @@ export class SessionManager {
       if (loaded.scene.openThreads !== undefined) scene.openThreads = loaded.scene.openThreads ?? "";
       if (loaded.scene.npcIntents !== undefined) scene.npcIntents = loaded.scene.npcIntents ?? "";
       if (loaded.scene.playerReads != null) scene.playerReads = loaded.scene.playerReads;
+      scene.sessionRecapPending = loaded.scene.sessionRecapPending === true;
     }
 
     // Capture persisted UI state (theme, modelines) for snapshots
@@ -618,10 +624,18 @@ export class SessionManager {
       await engine.resumePendingTransition(pendingOp);
     }
 
-    // Get session recap
+    // Get session recap. Non-empty only when the previous session ended
+    // cleanly (sessionEnd set the pending flag and sessionResume consumed it).
+    // Mid-session reconnects return "" so no modal is shown.
     const recap = await engine.resumeSession();
+    if (recap) {
+      this.pendingSessionRecap = {
+        id: `session-${scene.sessionNumber - 1}`,
+        lines: recap.split("\n"),
+      };
+    }
 
-    // Broadcast state snapshot
+    // Broadcast state snapshot — carries sessionRecap exactly once when set.
     this.broadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
 
     // Send display history from previous session as a single chunk per kind-group.
@@ -662,13 +676,8 @@ export class SessionManager {
       data: { text: `Welcome back to ${config.name}.`, kind: "system" },
     });
 
-    // Session recap as narrative (not a modal — client decides rendering)
-    if (recap) {
-      this.broadcast({
-        type: "narrative:chunk",
-        data: { text: recap, kind: "system" },
-      });
-    }
+    // Session recap is delivered via sessionRecap in the state:snapshot above;
+    // the client renders it as SessionRecapModal, not narrative text.
 
     // Open first turn
     this.openNextTurn();
@@ -866,6 +875,11 @@ export class SessionManager {
     const gs = this.gameState;
     const config = gs?.config;
 
+    // Consume the one-shot recap: include it in this snapshot and clear so
+    // subsequent snapshots (e.g. after each DM turn) don't re-open the modal.
+    const recap = this.pendingSessionRecap;
+    this.pendingSessionRecap = null;
+
     return {
       campaignId: this.campaignId ?? "",
       campaignName: config?.name ?? "",
@@ -884,6 +898,7 @@ export class SessionManager {
       variant: this.persistedUI.variant,
       keyColor: this.persistedUI.keyColor ?? undefined,
       mode: this.currentMode,
+      sessionRecap: recap ?? undefined,
     };
   }
 

@@ -131,6 +131,7 @@ function mockScene(): SceneState {
 
     playerReads: [],
     sessionNumber: 1,
+    sessionRecapPending: false,
   };
 }
 

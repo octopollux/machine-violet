@@ -104,7 +104,8 @@ SceneState
 ├── openThreads: string                    mut   → state/scene.json     Precis updater
 ├── npcIntents: string                     mut   → state/scene.json     Precis updater
 ├── playerReads: PlayerRead[]              mut   → state/scene.json     Precis updater
-└── sessionNumber: number                  mut   (incremented at session end)
+├── sessionNumber: number                  mut   (incremented at session end)
+└── sessionRecapPending: boolean           mut   → state/scene.json     set by sessionEnd, cleared by sessionResume
 ```
 
 #### DMSessionState (`src/agents/dm-prompt.ts`)
@@ -437,7 +438,9 @@ Load config.json from campaignRoot
     │
     ├─ buildDMPrefix(config, sessionState) → cached system prompt
     │
-    └─ SceneManager.sessionResume() → recap text for modal
+    └─ SceneManager.sessionResume() → recap text (only if sessionRecapPending);
+        session-manager bundles it into the first StateSnapshot.sessionRecap;
+        client opens SessionRecapModal.
 ```
 
 ### Exchange Loop

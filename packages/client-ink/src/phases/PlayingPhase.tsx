@@ -24,7 +24,7 @@ import { Layout } from "../tui/layout.js";
 import {
   ChoiceOverlay, DESCRIPTION_ROWS, GameMenu, ApiErrorModal,
   CharacterSheetModal, CompendiumModal, PlayerNotesModal, SwatchModal,
-  CenteredModal, CharacterPane,
+  SessionRecapModal, CenteredModal, CharacterPane,
 } from "../tui/modals/index.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { useGameContext } from "../tui/game-context.js";
@@ -419,6 +419,17 @@ export function PlayingPhase() {
             apiClient.saveNotes(content).catch(() => { /* no-op */ });
           }}
           onClose={() => setActiveModal(null)}
+          topOffset={conversationPaneTop}
+        />
+      )}
+      {am?.kind === "recap" && (
+        <SessionRecapModal
+          theme={theme}
+          width={cols}
+          height={narRows}
+          lines={(am.lines as string[]) ?? []}
+          onDismiss={() => setActiveModal(null)}
+          scrollRef={modalScrollRef}
           topOffset={conversationPaneTop}
         />
       )}

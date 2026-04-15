@@ -50,6 +50,16 @@ export const StateSnapshot = Type.Object({
   /** Scene info */
   sceneNumber: Type.Optional(Type.Number()),
   scenePrecis: Type.Optional(Type.String()),
+
+  /**
+   * One-shot: present only in the first snapshot after a session resume where
+   * the previous session ended cleanly. The client renders SessionRecapModal
+   * and does not need to ACK — the server clears the pending flag as it emits.
+   */
+  sessionRecap: Type.Optional(Type.Object({
+    id: Type.String(),
+    lines: Type.Array(Type.String()),
+  })),
 });
 
 export type StateSnapshot = Static<typeof StateSnapshot>;

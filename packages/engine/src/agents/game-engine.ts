@@ -202,6 +202,7 @@ export class GameEngine {
 
       playerReads: scene.playerReads,
       activePlayerIndex: this.gameState.activePlayerIndex,
+      sessionRecapPending: scene.sessionRecapPending,
     });
     this.persister.persistConversation(this.conversation.getExchanges());
   }
@@ -529,6 +530,7 @@ export class GameEngine {
           npcIntents: scene.npcIntents || null,
           playerReads: scene.playerReads,
           activePlayerIndex: this.gameState.activePlayerIndex,
+          sessionRecapPending: scene.sessionRecapPending,
         });
         this.persister.persistConversation(this.conversation.getExchanges());
       }
@@ -717,6 +719,12 @@ export class GameEngine {
    */
   async resumeSession(): Promise<string> {
     const recap = await this.sceneManager.sessionResume();
+    // If a recap was returned, sessionResume has just cleared the pending
+    // flag — persist the cleared state now so a crash before the first turn
+    // doesn't cause the same recap to reappear on a subsequent resume.
+    if (recap) {
+      this.persistCurrentScene();
+    }
     this.setState("waiting_input");
     return recap;
   }

@@ -40,6 +40,8 @@ export interface SceneState {
   npcIntents: string;
   playerReads: PlayerRead[];
   sessionNumber: number;
+  /** True when the previous session ended cleanly and its recap has not yet been shown to the player. */
+  sessionRecapPending: boolean;
 }
 
 export type PendingStep =
@@ -345,6 +347,10 @@ export class SceneManager {
       // Non-critical — bullet recap still exists for fallback
     }
 
+    // Mark recap as pending — session-manager will deliver it in the first
+    // state:snapshot after the next session resume, then clear the flag.
+    this.scene.sessionRecapPending = true;
+
     // Git session commit
     await this.repo?.sessionCommit(this.scene.sessionNumber);
 
@@ -472,7 +478,13 @@ export class SceneManager {
       this.devLog?.(`[dev] session resume validation failed: ${e instanceof Error ? e.message : String(e)}`);
     }
 
-    // Return narrative recap for player display, fall back to bullet recap
+    // Only return a recap for player display when the flag is set — i.e. the
+    // previous session ended cleanly and this is the first resume afterward.
+    // Mid-session reconnects (no clean sessionEnd) leave the flag false.
+    if (!this.scene.sessionRecapPending) {
+      return "";
+    }
+    this.scene.sessionRecapPending = false;
     return narrativeRecap || recap;
   }
 
@@ -1036,6 +1048,7 @@ export async function detectSceneState(campaignRoot: string, io: FileIO): Promis
     npcIntents: "",
     playerReads: [],
     sessionNumber: maxSession + 1,
+    sessionRecapPending: false,
   };
 }
 

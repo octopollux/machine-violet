@@ -136,6 +136,7 @@ function mockSceneManager(scene?: Partial<SceneState>): SceneManager {
       npcIntents: "",
       playerReads: [],
       sessionNumber: 1,
+      sessionRecapPending: false,
       ...scene,
     })),
   } as unknown as SceneManager;
