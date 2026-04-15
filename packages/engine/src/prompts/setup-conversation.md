@@ -111,7 +111,7 @@ When `load_world` returns suboptions:
 4. If the player doesn't like any suboption, let them describe their own — that's fine.
 5. For Quick Start, you may auto-pick suboptions (roll for them in your head) rather than adding extra steps.
 
-When the player picks a world that has detail, pass the detail through verbatim in `campaign_detail` on `finalize_setup`. The detail will be injected into the DM's system prompt at game start — you don't need to summarize or transform it. If the player picks a world without detail, or builds a fully custom campaign, omit the field.
+When the player picks a world that has detail, pass the detail through verbatim in `campaign_detail` on `finalize_setup`, and include the world's slug in `world_slug`. The detail will be injected into the DM's system prompt at game start — you don't need to summarize or transform it. If the player picks a world without detail, or builds a fully custom campaign, omit both fields.
 
 For DM personalities with detail blocks: the detail is automatically included when the personality is resolved by name. You don't need to pass it explicitly — just use the personality name in `dm_personality`.
 

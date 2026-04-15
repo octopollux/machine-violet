@@ -68,6 +68,7 @@ const FINALIZE_TOOL: NormalizedTool = {
       character_description: { type: "string", description: "One-sentence character concept" },
       character_details: { type: "string", description: "Mechanical character details gathered during setup (class, skills, approaches, etc). Free-form text. Omit or null for pure narrative.", nullable: true },
       campaign_detail: { type: "string", description: "The world's hidden detail block (from load_world), passed through verbatim for the DM. Omit if the chosen world has no detail or the campaign is fully custom.", nullable: true },
+      world_slug: { type: "string", description: "Slug of the world file used (from load_world). Omit for fully custom campaigns.", nullable: true },
       age_group: { type: "string", enum: ["child", "teenager", "adult"], description: "Player's age group. Set to 'child' or 'teenager' if the player clearly indicates so. Otherwise — including when age is not discussed or the player declines — set to 'adult'. Always include this field." },
       content_preferences: { type: "string", description: "Any content preferences or sensitivities the player mentioned during setup (one per line). Only include if the player volunteered them — never prompt for these.", nullable: true },
     },
@@ -356,8 +357,11 @@ export function createSetupConversation(
     let campaignDetail: string | null = typeof rawDetail === "string" && rawDetail.trim()
       ? rawDetail : null;
     if (rawDetail === undefined || rawDetail === null) {
-      // Try to find matching world by slug derived from campaign name
-      const slug = campaignName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+      // Primary: use world_slug if the agent passed it (reliable — came from load_world)
+      // Fallback: derive slug from campaign_name (fragile — agent may rename the campaign)
+      const worldSlug = typeof input.world_slug === "string" ? input.world_slug.trim() : "";
+      const fallbackSlug = campaignName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+      const slug = worldSlug || fallbackSlug;
       const world = loadWorldBySlug(slug);
       if (world?.detail) campaignDetail = world.detail;
     }
