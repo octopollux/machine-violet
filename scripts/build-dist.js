@@ -185,7 +185,9 @@ const assets = [
   { src: "systems", dest: "systems" },
   { src: "worlds", dest: "worlds", filter: /\.mvworld$/ },
   { src: "packages/engine/src/config", dest: "config", filter: /\.json$/ },
-  { src: "packages/engine/src/assets", dest: "assets", filter: /\.json$/ },
+  // Keep upstream LICENSE/README alongside JSON assets so dataset
+  // attribution travels with the compiled binary, not just the source tree.
+  { src: "packages/engine/src/assets", dest: "assets", filter: /(?:\.json$|(?:^|[\\/])(?:LICENSE|README\.md)$)/ },
 ];
 
 for (const { src, dest, filter } of assets) {

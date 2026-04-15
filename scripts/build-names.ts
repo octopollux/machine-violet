@@ -32,9 +32,11 @@ function clean(raw: string): string[] {
   for (const line of raw.split(/\r?\n/)) {
     const trimmed = line.replace(/^\uFEFF/, "").trim();
     if (!trimmed || !NAME_RE.test(trimmed)) continue;
-    // Title-case so "JONES" and "jones" collapse with "Jones".
-    const titled = trimmed[0].toLocaleUpperCase() + trimmed.slice(1).toLocaleLowerCase();
-    const key = titled.toLocaleLowerCase();
+    // Title-case so "JONES" and "jones" collapse with "Jones". Use locale-
+    // insensitive casing so the build is reproducible regardless of the
+    // machine's locale (Turkish dotless-i, Lithuanian, etc.).
+    const titled = trimmed[0].toUpperCase() + trimmed.slice(1).toLowerCase();
+    const key = titled.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(titled);
