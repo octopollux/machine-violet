@@ -18,7 +18,7 @@ import type {
 import { GameEngine } from "../agents/game-engine.js";
 import type { SceneState } from "../agents/scene-manager.js";
 import { detectSceneState, loadContentBoundaries } from "../agents/scene-manager.js";
-import type { DMSessionState } from "../agents/dm-prompt.js";
+import { buildUIState, type DMSessionState } from "../agents/dm-prompt.js";
 import { getActivePlayer } from "../agents/player-manager.js";
 import { loadEnv } from "../config/first-launch.js";
 import { loadConnectionStore, buildEffectiveConnections, getTierProvider } from "../config/connections.js";
@@ -541,6 +541,7 @@ export class SessionManager {
 
       // Normal play: send to DM
       const active = getActivePlayer(this.gameState);
+      this.syncUIState();
       await this.engine.processInput(active.characterName, text);
       this.persistTurnState();
       scopedBroadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
@@ -618,6 +619,9 @@ export class SessionManager {
       await engine.resumePendingTransition(pendingOp);
     }
 
+    // Sync UI state so the DM's resume narration sees current modelines
+    this.syncUIState();
+
     // Get session recap
     const recap = await engine.resumeSession();
 
@@ -688,6 +692,7 @@ export class SessionManager {
     const pc = config.players[0];
     if (pc) openingParts.push(`The player character is ${pc.character}.`);
 
+    this.syncUIState();
     await engine.processInput(
       active.characterName,
       openingParts.join(" ") + "]",
@@ -835,6 +840,20 @@ export class SessionManager {
       keyColor: this.persistedUI.keyColor,
       modelines: this.persistedUI.modelines,
     });
+  }
+
+  /**
+   * Push current UI state (modelines, theme, variant) into the engine's
+   * session state so the DM's volatile context reflects what's on screen.
+   * Call before each engine.processInput() so the DM sees its own modelines.
+   */
+  private syncUIState(): void {
+    if (!this.engine) return;
+    this.engine.setUIState(buildUIState({
+      modelines: this.persistedUI.modelines ?? {},
+      styleName: this.persistedUI.themeName ?? "clean",
+      variant: this.persistedUI.variant ?? "exploration",
+    }));
   }
 
   /** Keep persistedUI in sync with TUI commands so snapshots are always accurate. */
