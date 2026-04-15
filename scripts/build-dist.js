@@ -185,6 +185,7 @@ const assets = [
   { src: "systems", dest: "systems" },
   { src: "worlds", dest: "worlds", filter: /\.mvworld$/ },
   { src: "packages/engine/src/config", dest: "config", filter: /\.json$/ },
+  { src: "packages/engine/src/assets", dest: "assets", filter: /\.json$/ },
 ];
 
 for (const { src, dest, filter } of assets) {

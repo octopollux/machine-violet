@@ -39,9 +39,10 @@ const DEV_ASSET_DIRS: Record<string, string> = {
   systems: "../../systems",
   worlds: "../../worlds",
   config: "src/config",
+  assets: "src/assets",
 };
 
-export function assetDir(category: "prompts" | "themes" | "systems" | "worlds" | "config"): string {
+export function assetDir(category: "prompts" | "themes" | "systems" | "worlds" | "config" | "assets"): string {
   const cached = _cache.get(category);
   if (cached) return cached;
 

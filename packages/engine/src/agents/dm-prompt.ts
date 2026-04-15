@@ -24,6 +24,8 @@ export interface DMSessionState {
   uiState?: string;
   compendiumSummary?: string;
   contentBoundaries?: string;
+  /** Multicultural name pool sampled at session start to perturb naming priors. */
+  nameInspiration?: string;
 }
 
 /**

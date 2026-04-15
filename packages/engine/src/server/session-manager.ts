@@ -19,6 +19,7 @@ import { GameEngine } from "../agents/game-engine.js";
 import type { SceneState } from "../agents/scene-manager.js";
 import { detectSceneState, loadContentBoundaries } from "../agents/scene-manager.js";
 import { buildUIState, type DMSessionState } from "../agents/dm-prompt.js";
+import { buildNameInspiration } from "../agents/name-inspiration.js";
 import { getActivePlayer } from "../agents/player-manager.js";
 import { loadEnv } from "../config/first-launch.js";
 import { loadConnectionStore, buildEffectiveConnections, getTierProvider } from "../config/connections.js";
@@ -451,6 +452,11 @@ export class SessionManager {
         sessionState.dmNotes = await fileIO.readFile(dmNotesPath);
       }
     } catch { /* ignore — may not exist yet */ }
+
+    // Sample a fresh multicultural name pool to perturb the DM's naming
+    // priors. Drawn once per session and held in DMSessionState so it
+    // rides Tier 2 cache instead of churning per turn.
+    sessionState.nameInspiration = buildNameInspiration();
 
     // --- Build entity tree from disk ---
     const entityTree = await buildEntityTree(campaignRoot, fileIO);
