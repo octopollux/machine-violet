@@ -137,12 +137,12 @@ export class SceneManager {
   }
 
   /** Get the current system prompt (cached prefix) and volatile context. */
-  getSystemPrompt(): CachedPrefixResult {
+  getSystemPrompt(opts?: { turnHolder?: string }): CachedPrefixResult {
     this.state.objectives.current_scene = this.scene.sceneNumber;
     this.sessionState.activeState = buildActiveState({
       pcSummaries: this.pcSummaries,
       pendingAlarms: [],
-      turnHolder: undefined,
+      turnHolder: opts?.turnHolder,
       resourceValues: this.state.resourceValues,
       activeObjectives: this.getActiveObjectives(),
     });
