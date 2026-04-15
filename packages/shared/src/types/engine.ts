@@ -35,7 +35,7 @@ export interface TuiCommand {
 export interface ToolResult {
   content: string;
   is_error?: boolean;
-  /** TUI command payload, kept out of conversation. When set, agent-session
+  /** TUI command payload, kept out of conversation. When set, the agent loop
    *  uses this for the TUI command instead of parsing `content`. */
   _tui?: Record<string, unknown>;
 }

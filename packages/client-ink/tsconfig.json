@@ -19,7 +19,6 @@
     "src/phases/AddContentPhase.tsx",
     "src/phases/UpdatePhase.tsx",
     "src/commands/**/*",
-    "src/tui/hooks/useGameCallbacks.ts",
     "src/tui/game-context.test.tsx"
   ],
   "references": [
