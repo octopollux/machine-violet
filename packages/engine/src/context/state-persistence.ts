@@ -39,6 +39,8 @@ export interface PersistedSceneState {
   npcIntents?: string | null;
   playerReads: SceneState["playerReads"];
   activePlayerIndex: number;
+  /** Set true by sessionEnd after writing recap files; cleared by sessionResume once delivered. */
+  sessionRecapPending?: boolean;
 }
 
 /** UI theme state that gets persisted.

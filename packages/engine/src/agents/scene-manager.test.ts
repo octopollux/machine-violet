@@ -99,6 +99,7 @@ function mockScene(): SceneState {
 
     playerReads: [],
     sessionNumber: 1,
+    sessionRecapPending: false,
   };
 }
 
@@ -402,6 +403,25 @@ describe("SceneManager", () => {
     expect(recapCalls.length).toBeGreaterThanOrEqual(1);
   });
 
+  it("sessionEnd sets sessionRecapPending on the scene", async () => {
+    const provider = transitionProvider([
+      textResponse("- Session summary\n---MINI---\nSession summary."),
+      textResponse(""),
+    ]);
+    const scene = mockScene();
+    const mgr = new SceneManager(
+      mockState(),
+      scene,
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      mockFileIO(),
+    );
+
+    await mgr.sessionEnd(provider, "End of session");
+
+    expect(scene.sessionRecapPending).toBe(true);
+  });
+
   it("sessionResume loads recap and campaign log", async () => {
     const fileIO = mockFileIO();
     files["/tmp/test-campaign/campaign/session-recaps/session-000.md"] = "# Session 0 Recap\nThe adventure began.";
@@ -418,6 +438,10 @@ describe("SceneManager", () => {
     const sessionState = mockSessionState();
     const scene = mockScene();
     scene.sessionNumber = 1; // resuming session 1, so loads recap of session 0
+    // Simulate previous session having ended cleanly — sessionEnd would have
+    // flipped the flag, the session-manager hydrates it from disk, and
+    // sessionResume is expected to consume it.
+    scene.sessionRecapPending = true;
 
     const mgr = new SceneManager(
       mockState(),
@@ -429,8 +453,32 @@ describe("SceneManager", () => {
 
     const recap = await mgr.sessionResume();
     expect(recap).toContain("adventure began");
+    // Flag consumed — subsequent resume (e.g. mid-session reconnect) returns "".
+    expect(scene.sessionRecapPending).toBe(false);
     expect(sessionState.campaignSummary).toContain("Campaign Log: Test Campaign");
     expect(sessionState.campaignSummary).toContain("Scene 1");
+  });
+
+  it("sessionResume returns empty string when recap is not pending", async () => {
+    // Regression guard for #392: mid-session reconnects (where sessionEnd
+    // never ran) must not re-show a previously consumed recap.
+    const fileIO = mockFileIO();
+    files["/tmp/test-campaign/campaign/session-recaps/session-000.md"] = "# Session 0\nStale recap.";
+
+    const scene = mockScene();
+    scene.sessionNumber = 1;
+    scene.sessionRecapPending = false; // flag already consumed or never set
+
+    const mgr = new SceneManager(
+      mockState(),
+      scene,
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      mockSessionState(),
+      fileIO,
+    );
+
+    const recap = await mgr.sessionResume();
+    expect(recap).toBe("");
   });
 
   it("contextRefresh populates sessionState fields from disk", async () => {

@@ -197,6 +197,7 @@ Full game state. Sent on initial connect, after every DM turn completes, after s
 | `cost`             | object?  | Token cost breakdown. |
 | `sceneNumber`      | number?  | Current scene number. |
 | `scenePrecis`      | string?  | One-line scene summary. |
+| `sessionRecap`     | object?  | `{ id, lines }` — present only in the first snapshot after a clean session-end. Client renders the "Previously on..." modal; server clears the pending flag as it emits. Omitted on mid-session reconnects and fresh campaigns. |
 
 **Player** (nested in `players` array):
 

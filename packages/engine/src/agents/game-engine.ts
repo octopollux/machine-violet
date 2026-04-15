@@ -202,6 +202,7 @@ export class GameEngine {
 
       playerReads: scene.playerReads,
       activePlayerIndex: this.gameState.activePlayerIndex,
+      sessionRecapPending: scene.sessionRecapPending,
     });
     this.persister.persistConversation(this.conversation.getExchanges());
   }
@@ -529,6 +530,7 @@ export class GameEngine {
           npcIntents: scene.npcIntents || null,
           playerReads: scene.playerReads,
           activePlayerIndex: this.gameState.activePlayerIndex,
+          sessionRecapPending: scene.sessionRecapPending,
         });
         this.persister.persistConversation(this.conversation.getExchanges());
       }
@@ -717,6 +719,15 @@ export class GameEngine {
    */
   async resumeSession(): Promise<string> {
     const recap = await this.sceneManager.sessionResume();
+    // sessionResume clears sessionRecapPending whenever it was set, regardless
+    // of whether the recap files existed. Persist and await the flush so a
+    // crash before the first turn cannot resurface the modal on next resume.
+    // Persisting unconditionally is safe: when the flag was already false,
+    // the write is a no-op for recap purposes.
+    if (this.persister) {
+      this.persistCurrentScene();
+      await this.persister.flush();
+    }
     this.setState("waiting_input");
     return recap;
   }

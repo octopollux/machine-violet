@@ -168,6 +168,12 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
             setThemeDef(def);
           } catch { /* fall back to current theme */ }
         }
+        // Show session recap modal when the server flags it on resume.
+        // Server emits this only once per clean session-end, so no need to
+        // guard against repeat opens.
+        if (snap.sessionRecap) {
+          setActiveModal({ kind: "recap", lines: snap.sessionRecap.lines });
+        }
       }
       setAgentClientState(next);
       return next;
