@@ -19,7 +19,6 @@ The game loop, state management, and AI session handling.
 | `game-state.ts` | `GameState` interface — the single mutable state object |
 | `game-engine.ts` | Main orchestrator: callbacks, turn management, scene transitions |
 | `agent-loop.ts` | Single-turn conversation loop: streaming, tool handling, usage |
-| `agent-session.ts` | Session wrapper: retries, thinking config, terse suffix |
 | `tool-registry.ts` | All tool definitions + `TOOL_STATE_MAP` + dispatch |
 | `scene-manager.ts` | `SceneState`, transitions, pending operations, precis updates |
 | `dm-prompt.ts` | `DMSessionState`, system prompt builder, active state formatting |
@@ -105,7 +104,7 @@ Ink (React for CLI) components, formatting pipeline, theme system.
 | `themes/` | Theme parser, loader, resolver. Built-in themes in `themes/assets/` |
 | `color/` | OKLCH color space utilities, gradient generation |
 | `frames/` | Box drawing, styled content lines, string measurement |
-| `hooks/` | `useGameCallbacks()`, `useTextInput()`, `useTerminalSize()`, `useScrollHandle()`, `useMouseScroll()`, `kittyProtocol.ts` (Kitty keyboard protocol detection, CSI-u parsing, legacy re-emission), `stdinFilterChain.ts` (managed stdin filter pipeline for Kitty + mouse scroll interception) |
+| `hooks/` | `useTextInput()`, `useTerminalSize()`, `useScrollHandle()`, `useMouseScroll()`, `kittyProtocol.ts` (Kitty keyboard protocol detection, CSI-u parsing, legacy re-emission), `stdinFilterChain.ts` (managed stdin filter pipeline for Kitty + mouse scroll interception) |
 
 ## Engine: config/ — Configuration
 

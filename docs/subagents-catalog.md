@@ -433,7 +433,7 @@ Subagents with heavily dynamic system prompts (e.g. AI Player, whose prompt incl
 **Infrastructure** (`src/agents/subagent.ts`):
 - `cacheSystemPrompt(text)` wraps a string as `TextBlockParam[]` with `cache_control: { type: "ephemeral", ttl: "1h" }`.
 - `oneShot()` auto-wraps its system prompt via `cacheSystemPrompt()`, so one-shot Haiku agents with static system prompts get caching automatically. Agents with fully dynamic prompts should call `spawnSubagent` directly instead.
-- `SubagentConfig.cacheTools` stamps `cache_control` on the last tool definition (1h TTL) via `stampToolsCacheControl()` in `agent-session.ts`.
+- `SubagentConfig.cacheTools` stamps `cache_control` on the last tool definition (1h TTL) via the `cacheHints` system in `src/providers/agent-loop-bridge.ts`.
 
 **Sonnet agents** (OOC, Dev Mode) use structured `TextBlockParam[]` system prompts with breakpoints separating stable (cached) and dynamic (uncached) content — the same pattern as the DM's cached prefix.
 

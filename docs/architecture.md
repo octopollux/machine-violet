@@ -160,7 +160,7 @@ Tool handlers receive `(state: GameState, input: T)` and return `ToolResult`:
 - `err(message)` — error with `is_error: true`
 - UI/engine commands — returned as structured objects, handled by the agent loop
 
-**TUI tools** (`TUI_TOOLS` set in `agent-session.ts`) are fire-and-forget: their results drive engine/UI behavior but don't inform the DM's narration. When ALL tool calls in a round are TUI tools, the agent loop skips the acknowledgment API call — the tool_use/tool_result pair is kept in conversation history (so the DM sees a coherent exchange) but no Opus round-trip is burned waiting for an "OK."
+**TUI tools** (`TUI_TOOLS` set in `agent-loop.ts`) are fire-and-forget: their results drive engine/UI behavior but don't inform the DM's narration. Their `_tui` payloads are dispatched to the client as soon as the tool fires (non-deferred types broadcast immediately; deferred types queued for post-loop processing), so visual updates appear mid-narration instead of at turn-end. Tool_use/tool_result pairs stay in conversation history and the agent loop continues normally — an earlier bail-out optimization on TUI-only rounds was removed (#266) because it prevented the DM from completing multi-step turns.
 
 Tools are organized by domain in `src/tools/`: dice, cards, clocks, combat, maps, filesystem, git, validation.
 

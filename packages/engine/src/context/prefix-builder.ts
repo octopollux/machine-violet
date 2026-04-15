@@ -11,7 +11,7 @@ import type { SystemBlock } from "../providers/types.js";
  *   Tier 3 (volatile): active state, entity index, UI state — injected into conversation, NOT system
  *
  * BP1 on rules appendix (1h). BP2 on last emitted Tier 2 block (1h).
- * BP3 on tools (stamped in agent-session). BP4 on conversation (stamped in game-engine).
+ * BP3 on tools (stamped in agent-loop-bridge via cacheHints). BP4 on conversation (stamped in game-engine).
  *
  * Tier 3 is returned separately as `volatile` so the caller can inject it
  * into the conversation tail. This prevents Tier 3 changes from invalidating

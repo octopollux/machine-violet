@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { LLMProvider, ChatResult, ContentPart, NormalizedUsage } from "../providers/types.js";
 import { agentLoop } from "./agent-loop.js";
-import { extractStatus, retryDelay } from "./agent-session.js";
+import { extractStatus, retryDelay } from "../utils/retry.js";
 import type { AgentLoopConfig } from "./agent-loop.js";
 import { createTestRegistry } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
