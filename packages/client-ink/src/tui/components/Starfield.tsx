@@ -333,7 +333,10 @@ export function useStarfield(
       // Resume: map animation frame 0 → the simulation frame after where we paused
       frameOffsetRef.current = cached.lastFrame + 1;
     } else {
-      stateRef.current = { stars: [], rng: createRng(42), lastFrame: -1, dimKey };
+      // stateCache persists across mount/unmount within a session, so the stars
+      // survive menu navigation. A fresh seed is drawn only on first sight of a
+      // given dim (or after resetStarfieldCache / app restart).
+      stateRef.current = { stars: [], rng: createRng(Date.now() | 0), lastFrame: -1, dimKey };
       frameOffsetRef.current = 0;
     }
   }
