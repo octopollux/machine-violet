@@ -124,7 +124,8 @@ DMSessionState
 ├── dmNotes?: string                       Loaded from campaign dm-notes
 ├── entityIndex?: string                   Built from entity filesystem scan
 ├── uiState?: string                       Built from modelines + style info
-└── compendiumSummary?: string             Rendered from campaign/compendium.json
+├── compendiumSummary?: string             Rendered from campaign/compendium.json
+└── nameInspiration?: string                Sampled at session start from src/assets/names/names.json
 ```
 
 #### Conversation (`src/context/conversation.ts`)

@@ -21,11 +21,12 @@ export function isCompiled(): boolean {
  * Resolve the directory for a named asset category.
  *
  * Compiled binary layout (next to the exe):
- *   prompts/  themes/  systems/  worlds/  config/
+ *   prompts/  themes/  systems/  worlds/  config/  assets/
  *
  * Dev layout (packages/engine package root):
  *   src/prompts/           — prompts live inside this package
  *   src/config/            — shipped JSON config (known-models.json)
+ *   src/assets/            — bundled data assets (e.g. names/names.json)
  *   ../../systems/         — systems/ is at the monorepo root
  *   ../../worlds/          — .mvworld seed files at the monorepo root
  *   ../../src/tui/themes/assets/ — themes are in the monolith TUI (engine doesn't use this)
@@ -39,9 +40,10 @@ const DEV_ASSET_DIRS: Record<string, string> = {
   systems: "../../systems",
   worlds: "../../worlds",
   config: "src/config",
+  assets: "src/assets",
 };
 
-export function assetDir(category: "prompts" | "themes" | "systems" | "worlds" | "config"): string {
+export function assetDir(category: "prompts" | "themes" | "systems" | "worlds" | "config" | "assets"): string {
   const cached = _cache.get(category);
   if (cached) return cached;
 

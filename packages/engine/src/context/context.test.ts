@@ -326,6 +326,18 @@ describe("buildCachedPrefix", () => {
     expect(allText).toContain("Two goblins remain");
   });
 
+  it("includes name inspiration as a Tier 2 block when present", () => {
+    const { system } = buildCachedPrefix(mockConfig, {
+      dmPrompt: "You are the DM.",
+      personality: "Terse.",
+      nameInspiration: "Given names: Yui, Kwame, Ingrid\nFamily names: Petrov, Achebe, Bauer",
+    });
+    const allText = system.map((b) => b.text).join("\n");
+    expect(allText).toContain("## Name Inspiration");
+    expect(allText).toContain("Yui");
+    expect(allText).toContain("Petrov");
+  });
+
   it("omits empty sections", () => {
     const { system } = buildCachedPrefix(mockConfig, {
       dmPrompt: "You are the DM.",

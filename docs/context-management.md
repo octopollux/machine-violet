@@ -132,7 +132,7 @@ The DM's input context stays small. Haiku does the reading in its own cheap cont
 ```
 Session start:
   → Build cached prefix: system prompt, tools, rules, campaign summary,
-    session recap, active state
+    session recap, active state, name-inspiration sample
   → Conversation is empty (or session_resume provides a brief recap)
 
 Each exchange:

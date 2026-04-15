@@ -33,6 +33,7 @@ export interface PrefixSections {
   uiState?: string;
   compendiumSummary?: string;
   contentBoundaries?: string;
+  nameInspiration?: string;
 }
 
 export interface CachedPrefixResult {
@@ -134,6 +135,12 @@ export function buildCachedPrefix(
   // Player knowledge (compendium summary)
   if (sections.compendiumSummary) {
     blocks.push({ text: `\n\n## Player Knowledge\nThe player currently knows about:\n${sections.compendiumSummary}` });
+  }
+
+  // Name inspiration — multicultural sample to perturb naming priors.
+  // Refreshes per session; rides Tier 2 cache.
+  if (sections.nameInspiration) {
+    blocks.push({ text: `\n\n## Name Inspiration\n${sections.nameInspiration}` });
   }
 
   // BP2 — stamp on last emitted Tier 2 block (1h)
