@@ -49,4 +49,28 @@ After completing a coding task, make a detailed commit; you'll need this history
 
 ## Code Review
 
-After creating a PR, poll for Copilot code review comments every two minutes for up to ten minutes (it reviews once but takes 2-10 minutes to arrive). Address any issues you judge worthwhile — use your own judgement on what to fix vs skip.
+After creating a PR, watch for Copilot's review with the `Monitor` tool (it reviews once but takes 2-10 minutes to arrive). Arm a monitor that polls `gh api` for new review comments and exits once the review lands — no manual polling, and the notification lets you keep working on other things in the meantime. Cap the timeout at 10 minutes so the watch ends even if the review never arrives. Address any issues you judge worthwhile — use your own judgement on what to fix vs skip.
+
+Example:
+```bash
+Monitor(
+  description: "Copilot review on PR #NNN",
+  timeout_ms: 600000,
+  persistent: false,
+  command: "
+    seen=''
+    while true; do
+      new=$(gh api repos/OWNER/REPO/pulls/NNN/comments --jq '.[] | select(.user.login==\"copilot-pull-request-reviewer[bot]\" or .user.login==\"github-copilot[bot]\") | \"\\(.id) \\(.path):\\(.line // .original_line) \\(.body | gsub(\"\\n\"; \" \"))\"')
+      while IFS= read -r line; do
+        [ -z \"$line\" ] && continue
+        id=$(echo \"$line\" | awk '{print $1}')
+        if ! echo \"$seen\" | grep -q \"\\b$id\\b\"; then
+          echo \"$line\"
+          seen=\"$seen $id\"
+        fi
+      done <<< \"$new\"
+      sleep 30
+    done
+  "
+)
+```
