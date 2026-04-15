@@ -1,5 +1,20 @@
 import { describe, it, expect, vi } from "vitest";
 import type { LLMProvider, ChatResult, NormalizedUsage, SystemBlock } from "../../providers/types.js";
+
+// Mock loadWorldBySlug so we can test world_slug resolution without real .mvworld files
+vi.mock("../../config/world-loader.js", async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>;
+  return {
+    ...actual,
+    loadWorldBySlug: vi.fn((slug: string) => {
+      if (slug === "the-shattered-crown") {
+        return { name: "The Shattered Crown", summary: "A kingdom torn apart", genres: ["fantasy"], detail: "Secret detail about the crown." };
+      }
+      return undefined;
+    }),
+  };
+});
+
 import { createSetupConversation } from "./setup-conversation.js";
 
 /** Flatten SystemBlock[] | string to a single string for content assertions. */
@@ -412,5 +427,61 @@ describe("createSetupConversation", () => {
     expect(params.cacheHints).toBeDefined();
     expect(params.cacheHints).toContainEqual({ target: "tools", ttl: "1h" });
     expect(params.cacheHints).toContainEqual({ target: "messages" });
+  });
+
+  it("finalize_setup uses world_slug for detail lookup when campaign_name differs", async () => {
+    // Agent renamed campaign from "The Shattered Crown" to "Crownfall" but passed world_slug
+    const input = {
+      ...FINALIZE_INPUT,
+      campaign_name: "Crownfall",
+      world_slug: "the-shattered-crown",
+      // campaign_detail omitted — should fall back to world file lookup via world_slug
+    };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Your adventure begins!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.campaignName).toBe("Crownfall");
+    expect(result.finalized!.campaignDetail).toBe("Secret detail about the crown.");
+  });
+
+  it("finalize_setup falls back to campaign_name slug when world_slug is absent", async () => {
+    // Campaign name matches the world slug directly
+    const input = {
+      ...FINALIZE_INPUT,
+      campaign_name: "The Shattered Crown",
+      // no world_slug, no campaign_detail — should derive slug from campaign_name
+    };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Your adventure begins!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.campaignDetail).toBe("Secret detail about the crown.");
+  });
+
+  it("finalize_setup sanitizes world_slug (path traversal prevention)", async () => {
+    const input = {
+      ...FINALIZE_INPUT,
+      campaign_name: "Evil Campaign",
+      world_slug: "../../../etc/passwd",
+      // Should be sanitized to "etc-passwd" which won't match any world
+    };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Your adventure begins!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.campaignDetail).toBeNull();
   });
 });

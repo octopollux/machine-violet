@@ -359,7 +359,9 @@ export function createSetupConversation(
     if (rawDetail === undefined || rawDetail === null) {
       // Primary: use world_slug if the agent passed it (reliable — came from load_world)
       // Fallback: derive slug from campaign_name (fragile — agent may rename the campaign)
-      const worldSlug = typeof input.world_slug === "string" ? input.world_slug.trim() : "";
+      // Sanitize world_slug to prevent path traversal (strip non-slug chars)
+      const rawWorldSlug = typeof input.world_slug === "string" ? input.world_slug.trim().toLowerCase() : "";
+      const worldSlug = rawWorldSlug.replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
       const fallbackSlug = campaignName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
       const slug = worldSlug || fallbackSlug;
       const world = loadWorldBySlug(slug);
