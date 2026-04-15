@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 // vitest is invoked from).
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
 import type { FileIO } from "../agents/scene-manager.js";
-import type Anthropic from "@anthropic-ai/sdk";
+import { makeMockProvider } from "./test-helpers.js";
 
 const norm = (p: string) => p.replace(/\\/g, "/");
 
@@ -89,29 +89,7 @@ describe("runRuleCardGen", () => {
     };
   }
 
-  const mockClient = {
-    messages: {
-      create: vi.fn(async () => ({
-        id: "msg_test",
-        type: "message",
-        role: "assistant",
-        model: "claude-haiku-4-5-20251001",
-        content: [{ type: "text", text: '<system name="Test">\n<core_mechanic>\nRoll dice.\n</core_mechanic>\n</system>' }],
-        stop_reason: "end_turn",
-        stop_sequence: null,
-        usage: {
-          input_tokens: 100,
-          output_tokens: 50,
-          cache_creation_input_tokens: 0,
-          cache_read_input_tokens: 0,
-          cache_creation: null,
-          inference_geo: null,
-          server_tool_use: null,
-          service_tier: null,
-        },
-      })),
-    },
-  } as unknown as Anthropic;
+  const mockProvider = makeMockProvider('<system name="Test">\n<core_mechanic>\nRoll dice.\n</core_mechanic>\n</system>');
 
   it("skips when hand-authored rule card exists", async () => {
     const io = mockIO({});
@@ -120,45 +98,23 @@ describe("runRuleCardGen", () => {
 
     try {
       // dnd-5e has a hand-authored rule card — copies it to tempHome instead of generating
-      const generated = await runRuleCardGen(mockClient, io, tempHome, "dnd-5e", projectRoot);
+      const generated = await runRuleCardGen(mockProvider, io, tempHome, "dnd-5e", projectRoot);
       expect(generated).toBe(false);
-      expect(mockClient.messages.create).not.toHaveBeenCalled();
+      expect(mockProvider.chat).not.toHaveBeenCalled();
     } finally {
       rmSync(tempHome, { recursive: true, force: true });
     }
   });
 
   it("generates rule card for new system", async () => {
-    const freshClient = {
-      messages: {
-        create: vi.fn(async () => ({
-          id: "msg_test",
-          type: "message",
-          role: "assistant",
-          model: "claude-haiku-4-5-20251001",
-          content: [{ type: "text", text: "<system>Generated</system>" }],
-          stop_reason: "end_turn",
-          stop_sequence: null,
-          usage: {
-            input_tokens: 100,
-            output_tokens: 50,
-            cache_creation_input_tokens: 0,
-            cache_read_input_tokens: 0,
-            cache_creation: null,
-            inference_geo: null,
-            server_tool_use: null,
-            service_tier: null,
-          },
-        })),
-      },
-    } as unknown as Anthropic;
+    const freshProvider = makeMockProvider("<system>Generated</system>");
 
     const io = mockIO({
       "/home/systems/new-system/entities/rules/combat.md": "# Combat\n\nRoll to hit.",
     });
     const projectRoot = REPO_ROOT;
 
-    const generated = await runRuleCardGen(freshClient, io, "/home", "new-system", projectRoot);
+    const generated = await runRuleCardGen(freshProvider, io, "/home", "new-system", projectRoot);
     expect(generated).toBe(true);
 
     const ruleCardPath = "/home/systems/new-system/rule-card.md";

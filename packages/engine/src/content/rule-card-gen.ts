@@ -8,8 +8,8 @@
 
 import { readFileSync, existsSync, readdirSync, copyFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import type Anthropic from "@anthropic-ai/sdk";
 import type { FileIO } from "../agents/scene-manager.js";
+import type { LLMProvider } from "../providers/types.js";
 import { getModel } from "../config/models.js";
 import { oneShot } from "../agents/subagent.js";
 import { processingPaths } from "./processing-paths.js";
@@ -96,7 +96,7 @@ async function loadRulesEntities(
  * Generate a rule card from extracted rules entities.
  */
 export async function generateRuleCard(
-  client: Anthropic,
+  provider: LLMProvider,
   io: FileIO,
   homeDir: string,
   collectionSlug: string,
@@ -120,7 +120,7 @@ export async function generateRuleCard(
   userMessage += rulesText || "*No rules entities available — generate a minimal template.*";
 
   const result = await oneShot(
-    client,
+    provider,
     getModel("small"),
     systemPrompt,
     userMessage,
@@ -136,7 +136,7 @@ export async function generateRuleCard(
  * Returns true if a rule card was generated, false if skipped.
  */
 export async function runRuleCardGen(
-  client: Anthropic,
+  provider: LLMProvider,
   io: FileIO,
   homeDir: string,
   collectionSlug: string,
@@ -149,7 +149,7 @@ export async function runRuleCardGen(
   }
 
   const paths = processingPaths(homeDir, collectionSlug);
-  const content = await generateRuleCard(client, io, homeDir, collectionSlug, projectRoot);
+  const content = await generateRuleCard(provider, io, homeDir, collectionSlug, projectRoot);
   await io.mkdir(paths.base);
   await io.writeFile(paths.ruleCard, content);
   return true;

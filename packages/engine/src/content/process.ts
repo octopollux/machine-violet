@@ -14,6 +14,7 @@
 
 import type Anthropic from "@anthropic-ai/sdk";
 import type { FileIO } from "../agents/scene-manager.js";
+import type { LLMProvider } from "../providers/types.js";
 import {
   computeChunks,
   loadChunkPages,
@@ -55,8 +56,10 @@ export type ProcessingProgressCallback = (progress: ProcessingProgress) => void;
 // --- Orchestrator ---
 
 export interface ProcessingOptions {
-  /** Anthropic client instance. */
+  /** Anthropic client instance — used for the Batch API (classifier + extractor stages). */
   client: Anthropic;
+  /** Provider abstraction — used for the synchronous merge / index / rule-card stages. */
+  provider: LLMProvider;
   /** FileIO abstraction. */
   io: FileIO;
   /** Application home directory (e.g. ~/.machine-violet). */
@@ -80,11 +83,11 @@ export interface ProcessingOptions {
  * Each stage saves state before advancing.
  */
 export async function runProcessingPipeline(opts: ProcessingOptions): Promise<void> {
-  const { client, io, homeDir, collectionSlug, jobSlug, totalPages, projectRoot, onProgress } = opts;
+  const { client, provider, io, homeDir, collectionSlug, jobSlug, totalPages, projectRoot, onProgress } = opts;
 
   // Single-PDF convenience: run per-book stages then shared stages
   await runPerBookStages({ client, io, homeDir, collectionSlug, jobSlug, totalPages, onProgress });
-  await runSharedStages({ client, io, homeDir, collectionSlug, projectRoot, onProgress });
+  await runSharedStages({ provider, io, homeDir, collectionSlug, projectRoot, onProgress });
 }
 
 // --- Split pipeline for multi-PDF support ---
@@ -175,7 +178,7 @@ export async function runPerBookStages(opts: PerBookOptions): Promise<void> {
 }
 
 export interface SharedStagesOptions {
-  client: Anthropic;
+  provider: LLMProvider;
   io: FileIO;
   homeDir: string;
   collectionSlug: string;
@@ -188,7 +191,7 @@ export interface SharedStagesOptions {
  * Call this after all per-book stages have completed.
  */
 export async function runSharedStages(opts: SharedStagesOptions): Promise<void> {
-  const { client, io, homeDir, collectionSlug, projectRoot, onProgress } = opts;
+  const { provider, io, homeDir, collectionSlug, projectRoot, onProgress } = opts;
   const paths = processingPaths(homeDir, collectionSlug);
 
   let state = await loadPipelineState(io, homeDir, collectionSlug);
@@ -209,7 +212,7 @@ export async function runSharedStages(opts: SharedStagesOptions): Promise<void> 
   // Stage 3: Merge
   if (!hasReachedStage(state, "index")) {
     progress("merge", "Merging drafts with existing entities...");
-    const mergeResult = await runMerge(client, io, homeDir, collectionSlug);
+    const mergeResult = await runMerge(provider, io, homeDir, collectionSlug);
     progress("merge", `Merge: ${mergeResult.created} created, ${mergeResult.skipped} skipped, ${mergeResult.merged} merged`);
     advanceStage(state);
     await savePipelineState(io, homeDir, state);
@@ -218,7 +221,7 @@ export async function runSharedStages(opts: SharedStagesOptions): Promise<void> 
   // Stage 4: Index
   if (!hasReachedStage(state, "rule-card")) {
     progress("index", "Building index and cheat sheet...");
-    const indexResult = await runIndexer(client, io, homeDir, collectionSlug);
+    const indexResult = await runIndexer(provider, io, homeDir, collectionSlug);
     progress("index", `Indexed ${indexResult.totalEntities} entities across ${indexResult.categories.length} categories`);
     advanceStage(state);
     await savePipelineState(io, homeDir, state);
@@ -227,7 +230,7 @@ export async function runSharedStages(opts: SharedStagesOptions): Promise<void> 
   // Stage 5: Rule Card
   if (!hasReachedStage(state, "complete")) {
     progress("rule-card", "Checking for rule card...");
-    const generated = await runRuleCardGen(client, io, homeDir, collectionSlug, projectRoot);
+    const generated = await runRuleCardGen(provider, io, homeDir, collectionSlug, projectRoot);
     progress("rule-card", generated ? "Rule card generated" : "Rule card skipped (hand-authored exists)");
     advanceStage(state);
     await savePipelineState(io, homeDir, state);

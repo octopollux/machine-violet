@@ -2,7 +2,7 @@ import { loadModelConfig } from "../config/models.js";
 import { resetContentPromptCache } from "./prompts/load-content-prompt.js";
 import { listDraftEntities, runMerge } from "./merge.js";
 import type { FileIO } from "../agents/scene-manager.js";
-import type Anthropic from "@anthropic-ai/sdk";
+import { makeMockProvider } from "./test-helpers.js";
 
 /** Normalize backslashes for cross-platform assertions. */
 const norm = (p: string) => p.replace(/\\/g, "/");
@@ -73,37 +73,14 @@ describe("listDraftEntities", () => {
 });
 
 describe("runMerge", () => {
-  /** Mock Anthropic client that returns merged text. */
-  const mockClient = {
-    messages: {
-      create: vi.fn(async () => ({
-        id: "msg_123",
-        type: "message",
-        role: "assistant",
-        content: [{ type: "text", text: "# Merged Entity\n\nMerged content." }],
-        model: "claude-haiku-4-5-20251001",
-        stop_reason: "end_turn",
-        stop_sequence: null,
-        usage: {
-          input_tokens: 100,
-          output_tokens: 50,
-          cache_creation_input_tokens: 0,
-          cache_read_input_tokens: 0,
-          cache_creation: null,
-          inference_geo: null,
-          server_tool_use: null,
-          service_tier: null,
-        },
-      })),
-    },
-  } as unknown as Anthropic;
+  const mockProvider = makeMockProvider("# Merged Entity\n\nMerged content.");
 
   it("creates new entities (no existing version)", async () => {
     const io = mockIO({
       "/home/systems/d-d-5e/drafts/characters/goblin.md": "# Goblin\n\nNew creature.",
     });
 
-    const result = await runMerge(mockClient, io, "/home", "d-d-5e");
+    const result = await runMerge(mockProvider, io, "/home", "d-d-5e");
     expect(result.created).toBe(1);
     expect(result.skipped).toBe(0);
     expect(result.merged).toBe(0);
@@ -121,7 +98,7 @@ describe("runMerge", () => {
       "/home/systems/d-d-5e/entities/characters/goblin.md": content,
     });
 
-    const result = await runMerge(mockClient, io, "/home", "d-d-5e");
+    const result = await runMerge(mockProvider, io, "/home", "d-d-5e");
     expect(result.skipped).toBe(1);
     expect(result.created).toBe(0);
     expect(result.merged).toBe(0);
@@ -133,7 +110,7 @@ describe("runMerge", () => {
       "/home/systems/d-d-5e/entities/characters/goblin.md": "# Goblin\n\nOld version.",
     });
 
-    const result = await runMerge(mockClient, io, "/home", "d-d-5e");
+    const result = await runMerge(mockProvider, io, "/home", "d-d-5e");
     expect(result.merged).toBe(1);
     expect(result.created).toBe(0);
     expect(result.skipped).toBe(0);

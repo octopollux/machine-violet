@@ -4,6 +4,7 @@ import { runProcessingPipeline } from "./process.js";
 import type { ProcessingProgress } from "./process.js";
 import type { FileIO } from "../agents/scene-manager.js";
 import type Anthropic from "@anthropic-ai/sdk";
+import { makeMockProvider } from "./test-helpers.js";
 
 const norm = (p: string) => p.replace(/\\/g, "/");
 
@@ -48,17 +49,13 @@ function mockIO(initial: Record<string, string> = {}): FileIO & { files: Record<
   };
 }
 
-function mockUsage() {
-  return {
-    input_tokens: 100,
-    output_tokens: 50,
-    cache_creation_input_tokens: 0,
-    cache_read_input_tokens: 0,
-    cache_creation: null,
-    inference_geo: null,
-    server_tool_use: null,
-    service_tier: null,
-  };
+/** Provider mock for the synchronous shared stages (cheat sheet first, then rule card). */
+function buildMockProvider() {
+  let chatCalls = 0;
+  return makeMockProvider(() => {
+    chatCalls++;
+    return chatCalls <= 1 ? "# Cheat Sheet\n\nQuick ref." : "<system>Generated</system>";
+  });
 }
 
 /** Classifier returns a catalog, extractor returns entities. */
@@ -77,29 +74,10 @@ Slug: attack-action
 
 Make a melee or ranged attack.`;
 
-  const cheatSheet = "# Cheat Sheet\n\nQuick ref.";
-  const ruleCard = "<system>Generated</system>";
-
   let batchCallCount = 0;
-  let createCallCount = 0;
 
   return {
     messages: {
-      // oneShot calls for merge, cheat sheet, rule card
-      create: vi.fn(async () => {
-        createCallCount++;
-        const text = createCallCount <= 1 ? cheatSheet : ruleCard;
-        return {
-          id: `msg_${createCallCount}`,
-          type: "message",
-          role: "assistant",
-          model: "claude-haiku-4-5-20251001",
-          content: [{ type: "text", text }],
-          stop_reason: "end_turn",
-          stop_sequence: null,
-          usage: mockUsage(),
-        };
-      }),
       batches: {
         create: vi.fn(async (params: { requests: unknown[] }) => {
           batchCallCount++;
@@ -143,10 +121,12 @@ describe("runProcessingPipeline", () => {
     });
 
     const client = buildMockClient();
+    const provider = buildMockProvider();
     const stages: string[] = [];
 
     await runProcessingPipeline({
       client,
+      provider,
       io,
       homeDir: "/home",
       collectionSlug: "test-system",
@@ -193,10 +173,12 @@ describe("runProcessingPipeline", () => {
     });
 
     const client = buildMockClient();
+    const provider = buildMockProvider();
     const stages: string[] = [];
 
     await runProcessingPipeline({
       client,
+      provider,
       io,
       homeDir: "/home",
       collectionSlug: "test-system",
