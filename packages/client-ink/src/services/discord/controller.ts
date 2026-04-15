@@ -15,6 +15,9 @@ export class DiscordPresenceController {
   private presence: DiscordPresence | null = null;
   private session: SessionInfo | null = null;
   private starting = false;
+  /** Bumped by anything that should cancel an in-flight ensureStarted() —
+   *  shutdown(), disable(), or a `discord:presence` stop event. */
+  private generation = 0;
 
   /** Dispatch a server event. `enabled` is the current frontend-local opt-in. */
   handle(event: ServerEvent, enabled: boolean): void {
@@ -44,6 +47,7 @@ export class DiscordPresenceController {
 
   /** Call from app teardown. */
   async shutdown(): Promise<void> {
+    this.generation++;
     if (this.presence) {
       const p = this.presence;
       this.presence = null;
@@ -54,16 +58,23 @@ export class DiscordPresenceController {
   private async ensureStarted(): Promise<void> {
     if (this.presence || this.starting || !this.session) return;
     this.starting = true;
+    const startedAt = this.generation;
+    const session = this.session;
     try {
       const next = new DiscordPresence();
       await next.start({
         clientId: "",
-        campaignName: this.session.campaignName,
-        dmPersona: this.session.dmPersona,
+        campaignName: session.campaignName,
+        dmPersona: session.dmPersona,
       });
-      // Only retain the instance if the IPC actually connected — DiscordPresence
-      // silently no-ops when Discord is unreachable.
-      if (next.active) this.presence = next;
+      // Race guard: if shutdown()/disable() ran while start() was awaiting,
+      // generation has advanced. Tear down what we just started instead of
+      // re-attaching it.
+      if (this.generation !== startedAt || !next.active) {
+        if (next.active) await next.stop();
+        return;
+      }
+      this.presence = next;
     } finally {
       this.starting = false;
     }

@@ -493,11 +493,12 @@ export class SessionManager {
       if (dmNarrativeCount % DISCORD_STATUS_INTERVAL !== 0) return;
       void (async () => {
         try {
-          const details = await generateDiscordStatus(provider, text);
+          const { status, usage } = await generateDiscordStatus(provider, text);
           if (this.sessionGeneration !== gen) return;
+          if (usage) this.costTracker?.record(usage, "small");
           scopedBroadcast({
             type: "discord:presence",
-            data: { action: "update", details },
+            data: { action: "update", details: status },
           });
         } catch (err) {
           logEvent("discord:status_error", {
