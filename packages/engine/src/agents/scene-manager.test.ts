@@ -725,6 +725,35 @@ describe("SceneManager", () => {
     expect(volatile).not.toContain("Entity Registry");
   });
 
+  it("getSystemPrompt surfaces turnHolder as a Turn: line in Current State", () => {
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      mockFileIO(),
+    );
+
+    const { volatile } = mgr.getSystemPrompt({ turnHolder: "Adam James" });
+    expect(volatile).toContain("## Current State");
+    expect(volatile).toContain("Turn: Adam James");
+  });
+
+  it("getSystemPrompt omits Turn: line when no turnHolder is passed", () => {
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      mockFileIO(),
+    );
+
+    const { volatile } = mgr.getSystemPrompt();
+    expect(volatile).not.toContain("Turn:");
+  });
+
   it("mid-scene upserts update the tree but not the DM snapshot", () => {
     const sessionState = mockSessionState();
     const mgr = new SceneManager(
