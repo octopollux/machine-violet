@@ -53,6 +53,14 @@ export interface ConnectedClient {
 
 export type SessionStatus = "idle" | "starting" | "active" | "stopping";
 
+/**
+ * Reasons a session can end. Drives teardown behavior — "rollback" skips
+ * the flush+checkpoint that would otherwise clobber rolled-back disk state
+ * with stale in-memory values. Keep this a closed union so new callsites
+ * can't silently bypass the rollback-safe path with a typo'd string.
+ */
+export type EndSessionReason = "explicit" | "idle_timeout" | "rollback";
+
 export class SessionManager {
   private campaignsDir: string;
   private clients = new Map<WebSocket, ConnectedClient>();
@@ -599,7 +607,7 @@ export class SessionManager {
               type: "narrative:chunk",
               data: { text: `[${err.message}]`, kind: "system" },
             });
-            void this.endSession("rollback");
+            await this.endSession("rollback");
             return;
           }
           throw err;
@@ -619,12 +627,16 @@ export class SessionManager {
       } catch (err) {
         // DM-initiated rollback throws RollbackCompleteError from inside
         // processInput; same handling as the mode-session path above.
+        // Flush any buffered DM deltas with narrative:complete before the
+        // system message so the client doesn't stay stuck in "streaming"
+        // state while teardown runs.
         if (err instanceof RollbackCompleteError) {
+          scopedBroadcast({ type: "narrative:complete", data: { text: "" } });
           scopedBroadcast({
             type: "narrative:chunk",
             data: { text: `[${err.message}]`, kind: "system" },
           });
-          void this.endSession("rollback");
+          await this.endSession("rollback");
           return;
         }
         throw err;
@@ -848,7 +860,7 @@ export class SessionManager {
   }
 
   /** End the current session gracefully. */
-  async endSession(reason = "explicit"): Promise<void> {
+  async endSession(reason: EndSessionReason = "explicit"): Promise<void> {
     if (this.status === "idle" || this.status === "stopping") return;
 
     // If a start is still in progress, wait for it to finish so we can
