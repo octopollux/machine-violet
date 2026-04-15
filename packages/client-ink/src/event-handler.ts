@@ -50,7 +50,7 @@ export interface ClientState {
   transitionCampaignId: string | null;
   /** Human-readable campaign name from the transition event. */
   transitionCampaignName: string | null;
-  lastError: { message: string; recoverable: boolean } | null;
+  lastError: { message: string; recoverable: boolean; status?: number; delayMs?: number } | null;
   /** Per-character modeline text (character name → status string). */
   modelines: Record<string, string>;
   /** Per-character resource display keys. */
@@ -190,6 +190,8 @@ function handleNarrativeChunk(event: NarrativeChunkEvent, update: StateUpdater):
     return {
       ...prev,
       narrativeLines: appendDelta(lines, text, lineKind),
+      // Clear any retry error — arriving data proves the retry succeeded
+      lastError: prev.lastError?.recoverable ? null : prev.lastError,
     };
   });
 }
@@ -372,6 +374,11 @@ function handleSessionEnded(_event: SessionEndedEvent, update: StateUpdater): vo
 function handleError(event: ErrorEvent, update: StateUpdater): void {
   update((prev) => ({
     ...prev,
-    lastError: { message: event.data.message, recoverable: event.data.recoverable },
+    lastError: {
+      message: event.data.message,
+      recoverable: event.data.recoverable,
+      status: event.data.status,
+      delayMs: event.data.delayMs,
+    },
   }));
 }

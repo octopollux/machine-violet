@@ -572,7 +572,10 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
       activeModal,
       setActiveModal,
       retryOverlay: clientState.lastError?.recoverable
-        ? { status: 0, delaySec: 5 }
+        ? {
+            status: clientState.lastError.status ?? 0,
+            delaySec: Math.ceil((clientState.lastError.delayMs ?? 5000) / 1000),
+          }
         : null,
       mode: clientState.mode,
       stateSnapshot,
