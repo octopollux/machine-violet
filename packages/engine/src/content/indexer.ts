@@ -8,8 +8,8 @@
  * and produces a 1-2 page DM quick reference.
  */
 
-import type Anthropic from "@anthropic-ai/sdk";
 import type { FileIO } from "../agents/scene-manager.js";
+import type { LLMProvider } from "../providers/types.js";
 import { getModel } from "../config/models.js";
 import { oneShot } from "../agents/subagent.js";
 import { processingPaths } from "./processing-paths.js";
@@ -96,13 +96,13 @@ export async function buildIndex(
  * Generate cheat-sheet.md via Haiku oneShot.
  */
 export async function buildCheatSheet(
-  client: Anthropic,
+  provider: LLMProvider,
   indexContent: string,
 ): Promise<string> {
   const systemPrompt = loadContentPrompt("indexer");
 
   const result = await oneShot(
-    client,
+    provider,
     getModel("small"),
     systemPrompt,
     `Here is the entity index for a sourcebook:\n\n${indexContent}\n\nGenerate a DM cheat sheet.`,
@@ -117,7 +117,7 @@ export async function buildCheatSheet(
  * Run the full index stage: write index.md and cheat-sheet.md.
  */
 export async function runIndexer(
-  client: Anthropic,
+  provider: LLMProvider,
   io: FileIO,
   homeDir: string,
   collectionSlug: string,
@@ -131,7 +131,7 @@ export async function runIndexer(
 
   // Generate cheat sheet if we have entities
   if (result.totalEntities > 0) {
-    const cheatSheet = await buildCheatSheet(client, indexContent);
+    const cheatSheet = await buildCheatSheet(provider, indexContent);
     await io.writeFile(paths.cheatSheet, cheatSheet);
   }
 

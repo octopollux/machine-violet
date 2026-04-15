@@ -133,6 +133,26 @@ export const SessionTransitionEvent = Type.Object({
   }),
 });
 
+// --- Discord rich presence (frontend-local; backend just emits the data) ---
+
+export const DiscordPresenceEvent = Type.Object({
+  type: Type.Literal("discord:presence"),
+  data: Type.Union([
+    Type.Object({
+      action: Type.Literal("start"),
+      campaignName: Type.String(),
+      dmPersona: Type.String(),
+    }),
+    Type.Object({
+      action: Type.Literal("update"),
+      details: Type.String(),
+    }),
+    Type.Object({
+      action: Type.Literal("stop"),
+    }),
+  ]),
+});
+
 // --- Error ---
 
 export const ErrorEvent = Type.Object({
@@ -161,6 +181,7 @@ export const ServerEvent = Type.Union([
   SessionModeEvent,
   SessionEndedEvent,
   SessionTransitionEvent,
+  DiscordPresenceEvent,
   ErrorEvent,
 ]);
 
@@ -178,5 +199,6 @@ export type StateSnapshotEvent = Static<typeof StateSnapshotEvent>;
 export type SessionModeEvent = Static<typeof SessionModeEvent>;
 export type SessionEndedEvent = Static<typeof SessionEndedEvent>;
 export type SessionTransitionEvent = Static<typeof SessionTransitionEvent>;
+export type DiscordPresenceEvent = Static<typeof DiscordPresenceEvent>;
 export type ErrorEvent = Static<typeof ErrorEvent>;
 export type ServerEvent = Static<typeof ServerEvent>;

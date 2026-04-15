@@ -12,6 +12,7 @@ import type { ChoicesData } from "@machine-violet/shared";
 import type { ActiveModal } from "@machine-violet/shared/types/tui.js";
 import { ApiClient } from "./api-client.js";
 import { WsClient } from "./ws-client.js";
+import { DiscordPresenceController } from "./services/discord/index.js";
 import {
   createEventHandler,
   initialClientState,
@@ -145,6 +146,10 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
 
   const apiClientRef = useRef<ApiClient>(new ApiClient(serverUrl, playerId));
   const wsClientRef = useRef<WsClient | null>(null);
+  const discordControllerRef = useRef<DiscordPresenceController>(new DiscordPresenceController());
+  // Latest discordEnabled value, snapshotted into a ref so the WS event
+  // closure (registered once on mount) sees the current opt-in state.
+  const discordEnabledRef = useRef<boolean>(false);
 
   useEffect(() => {
     setTheme(resolveTheme(themeDef, variant, keyColor));
@@ -277,10 +282,14 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
   useEffect(() => {
     const eventHandler = createEventHandler(handleStateUpdate);
     const api = apiClientRef.current;
+    const discordController = discordControllerRef.current;
 
     const ws = new WsClient({
       url: `${serverUrl.replace(/^http/, "ws")}/session/ws?role=player&player=${encodeURIComponent(playerId)}`,
-      onEvent: eventHandler,
+      onEvent: (event) => {
+        discordController.handle(event, discordEnabledRef.current);
+        eventHandler(event);
+      },
       onConnect: () => {
         if (campaignId) {
           startCampaign(campaignId);
@@ -308,8 +317,20 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
     wsClientRef.current = ws;
     ws.connect();
 
-    return () => ws.disconnect();
+    return () => {
+      ws.disconnect();
+      void discordController.shutdown();
+    };
   }, []);
+
+  // Sync Discord opt-in changes into the controller (and the closure ref).
+  useEffect(() => {
+    const wasEnabled = discordEnabledRef.current;
+    const nowEnabled = discordEnabled === true;
+    discordEnabledRef.current = nowEnabled;
+    if (nowEnabled && !wasEnabled) discordControllerRef.current.enable();
+    else if (!nowEnabled && wasEnabled) discordControllerRef.current.disable();
+  }, [discordEnabled]);
 
   // --- Management helpers ---
 

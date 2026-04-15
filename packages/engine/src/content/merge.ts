@@ -10,8 +10,8 @@
  * need context from prior merges.
  */
 
-import type Anthropic from "@anthropic-ai/sdk";
 import type { FileIO } from "../agents/scene-manager.js";
+import type { LLMProvider } from "../providers/types.js";
 import { getModel } from "../config/models.js";
 import { oneShot } from "../agents/subagent.js";
 import { processingPaths } from "./processing-paths.js";
@@ -62,7 +62,7 @@ export async function listDraftEntities(
  * Run the merge stage. Compares each draft against existing entities.
  */
 export async function runMerge(
-  client: Anthropic,
+  provider: LLMProvider,
   io: FileIO,
   homeDir: string,
   collectionSlug: string,
@@ -97,7 +97,7 @@ export async function runMerge(
     // Conflict — merge via AI
     try {
       const mergedContent = await mergeConflict(
-        client,
+        provider,
         existingContent,
         draftContent,
       );
@@ -115,7 +115,7 @@ export async function runMerge(
  * Merge two conflicting entity versions via Haiku oneShot.
  */
 async function mergeConflict(
-  client: Anthropic,
+  provider: LLMProvider,
   existing: string,
   draft: string,
 ): Promise<string> {
@@ -123,7 +123,7 @@ async function mergeConflict(
   const userMessage = `## Existing Version\n\n${existing}\n\n## New Version\n\n${draft}`;
 
   const result = await oneShot(
-    client,
+    provider,
     getModel("small"),
     systemPrompt,
     userMessage,

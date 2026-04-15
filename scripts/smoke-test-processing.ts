@@ -12,12 +12,13 @@
  */
 
 import "dotenv/config";
-import { createClient } from "../src/config/client.js";
+import { createClient } from "../packages/engine/src/config/client.js";
+import { createAnthropicProvider } from "../packages/engine/src/providers/anthropic.js";
 import { readFile, writeFile, appendFile, mkdir, stat, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
-import type { FileIO } from "../src/agents/scene-manager.js";
-import { loadModelConfig } from "../src/config/models.js";
-import { runProcessingPipeline } from "../src/content/process.js";
+import type { FileIO } from "../packages/engine/src/agents/scene-manager.js";
+import { loadModelConfig } from "../packages/engine/src/config/models.js";
+import { runProcessingPipeline } from "../packages/engine/src/content/process.js";
 
 // --- Real FileIO ---
 const io: FileIO = {
@@ -35,6 +36,7 @@ async function main() {
   loadModelConfig({ reset: true });
 
   const client = createClient();
+  const provider = createAnthropicProvider();
   const homeDir = resolve(process.env.USERPROFILE ?? process.env.HOME ?? "~", "Documents", ".machine-violet");
   const projectRoot = resolve(import.meta.dirname, "..");
 
@@ -52,6 +54,7 @@ async function main() {
 
   await runProcessingPipeline({
     client,
+    provider,
     io,
     homeDir,
     collectionSlug,

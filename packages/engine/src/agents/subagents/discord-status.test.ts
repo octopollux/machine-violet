@@ -31,7 +31,8 @@ describe("generateDiscordStatus", () => {
     });
 
     const result = await generateDiscordStatus(mockClient, "The party approached the enchanted door.");
-    expect(result).toBe("negotiating with a door");
+    expect(result.status).toBe("negotiating with a door");
+    expect(result.usage?.inputTokens).toBe(100);
   });
 
   it("truncates long responses to 40 characters", async () => {
@@ -41,7 +42,7 @@ describe("generateDiscordStatus", () => {
     });
 
     const result = await generateDiscordStatus(mockClient, "context");
-    expect(result.length).toBeLessThanOrEqual(40);
+    expect(result.status.length).toBeLessThanOrEqual(40);
   });
 
   it("strips surrounding quotes from response", async () => {
@@ -51,14 +52,15 @@ describe("generateDiscordStatus", () => {
     });
 
     const result = await generateDiscordStatus(mockClient, "context");
-    expect(result).toBe("technically alive");
+    expect(result.status).toBe("technically alive");
   });
 
   it("returns fallback on API failure", async () => {
     vi.mocked(oneShot).mockRejectedValue(new Error("API error"));
 
     const result = await generateDiscordStatus(mockClient, "context");
-    expect(result).toBe("Adventuring...");
+    expect(result.status).toBe("Adventuring...");
+    expect(result.usage).toBeNull();
   });
 
   it("returns fallback on empty response", async () => {
@@ -68,6 +70,6 @@ describe("generateDiscordStatus", () => {
     });
 
     const result = await generateDiscordStatus(mockClient, "context");
-    expect(result).toBe("Adventuring...");
+    expect(result.status).toBe("Adventuring...");
   });
 });

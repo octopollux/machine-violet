@@ -11,7 +11,7 @@ The pipeline has two distinct operations, separated by a durable cache:
 1. **PDF Cracking** — local text extraction, no AI, no API calls
 2. **Content Processing** — Haiku-powered classification, extraction, merging, indexing, and rule card generation
 
-The content pipeline (`src/content/`) is **completely separate** from the game engine. They share only a filesystem format as interface.
+The content pipeline (`packages/engine/src/content/`) is **completely separate** from the rest of the game engine. They share only a filesystem format as interface.
 
 ## User Flow
 
@@ -48,7 +48,7 @@ Pages that yield no text (full-art pages, image-only scans) are tracked as empty
 
 The original design used the Claude API's native PDF support with Haiku for extraction. This was blocked by content policy — the model refuses to reproduce text from copyrighted sourcebooks, regardless of system prompt framing. Local text extraction bypasses this entirely since it's a mechanical operation (like copy-paste), not content generation.
 
-The Batch API client (`src/content/batch-client.ts`) is retained for the content processing pipeline, where AI is needed for *understanding* content, not reproducing it.
+The Batch API client (`packages/engine/src/content/batch-client.ts`) is retained for the content processing pipeline, where AI is needed for *understanding* content, not reproducing it.
 
 ## Content Processing
 

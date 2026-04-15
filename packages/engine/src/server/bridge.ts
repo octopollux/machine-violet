@@ -23,6 +23,8 @@ export interface BridgeOptions {
   broadcast: (event: ServerEvent) => void;
   /** Cost tracker for accumulating token usage. */
   costTracker?: CostTracker;
+  /** Fired after each completed DM narrative — used to drive Discord rich-presence updates. */
+  onDmNarrative?: (text: string) => void;
 }
 
 export function createBridge(
@@ -31,7 +33,7 @@ export function createBridge(
   const opts: BridgeOptions = typeof broadcastOrOpts === "function"
     ? { broadcast: broadcastOrOpts }
     : broadcastOrOpts;
-  const { broadcast, costTracker } = opts;
+  const { broadcast, costTracker, onDmNarrative } = opts;
   // --- Narrative buffering ---
   let buffer = "";
   let flushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -74,6 +76,8 @@ export function createBridge(
         type: "narrative:complete",
         data: { text, playerAction },
       });
+
+      if (text && onDmNarrative) onDmNarrative(text);
     },
 
     onStateChange(state: EngineState): void {

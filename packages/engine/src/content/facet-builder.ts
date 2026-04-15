@@ -6,7 +6,7 @@
  */
 
 import type { FileIO } from "../agents/scene-manager.js";
-import type { EntityFacet, CategoryFacets } from "../types/facets.js";
+import type { EntityFacet, CategoryFacets } from "@machine-violet/shared/types/facets.js";
 import { processingPaths } from "./processing-paths.js";
 
 /** Same pattern used in entity-parser.ts and frontmatter.ts — inlined to avoid cross-boundary import. */

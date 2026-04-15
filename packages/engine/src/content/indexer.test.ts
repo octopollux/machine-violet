@@ -2,7 +2,7 @@ import { loadModelConfig } from "../config/models.js";
 import { resetContentPromptCache } from "./prompts/load-content-prompt.js";
 import { buildIndex, runIndexer } from "./indexer.js";
 import type { FileIO } from "../agents/scene-manager.js";
-import type Anthropic from "@anthropic-ai/sdk";
+import { makeMockProvider } from "./test-helpers.js";
 
 const norm = (p: string) => p.replace(/\\/g, "/");
 
@@ -96,29 +96,7 @@ describe("buildIndex", () => {
 });
 
 describe("runIndexer", () => {
-  const mockClient = {
-    messages: {
-      create: vi.fn(async () => ({
-        id: "msg_test",
-        type: "message",
-        role: "assistant",
-        model: "claude-haiku-4-5-20251001",
-        content: [{ type: "text", text: "# DM Cheat Sheet\n\nQuick reference content." }],
-        stop_reason: "end_turn",
-        stop_sequence: null,
-        usage: {
-          input_tokens: 100,
-          output_tokens: 50,
-          cache_creation_input_tokens: 0,
-          cache_read_input_tokens: 0,
-          cache_creation: null,
-          inference_geo: null,
-          server_tool_use: null,
-          service_tier: null,
-        },
-      })),
-    },
-  } as unknown as Anthropic;
+  const mockProvider = makeMockProvider("# DM Cheat Sheet\n\nQuick reference content.");
 
   it("writes index.md, cheat-sheet.md, and facets.json", async () => {
     const io = mockIO({
@@ -126,7 +104,7 @@ describe("runIndexer", () => {
       "/home/systems/d-d-5e/entities/rules/combat.md": "# Combat",
     });
 
-    const result = await runIndexer(mockClient, io, "/home", "d-d-5e");
+    const result = await runIndexer(mockProvider, io, "/home", "d-d-5e");
 
     expect(result.totalEntities).toBe(2);
 
@@ -147,18 +125,14 @@ describe("runIndexer", () => {
   });
 
   it("skips cheat sheet when no entities", async () => {
-    const noCallClient = {
-      messages: {
-        create: vi.fn(async () => { throw new Error("should not be called"); }),
-      },
-    } as unknown as Anthropic;
+    const noCallProvider = makeMockProvider(() => { throw new Error("should not be called"); });
 
     const io = mockIO({});
 
-    const result = await runIndexer(noCallClient, io, "/home", "d-d-5e");
+    const result = await runIndexer(noCallProvider, io, "/home", "d-d-5e");
 
     expect(result.totalEntities).toBe(0);
     // Cheat sheet should not be written
-    expect(noCallClient.messages.create).not.toHaveBeenCalled();
+    expect(noCallProvider.chat).not.toHaveBeenCalled();
   });
 });
