@@ -13,6 +13,7 @@ export default defineConfig({
     projects: [
       "packages/engine",
       "packages/client-ink",
+      "tools/campaign-explorer",
     ],
   },
 });
