@@ -379,8 +379,13 @@ export class GameEngine {
       this.sceneManager.appendPlayerInput(characterName, text);
     }
 
-    // Get system prompt (cached Tier 1+2) and volatile context (Tier 3)
-    const { system: systemPrompt, volatile: volatileContext } = this.sceneManager.getSystemPrompt();
+    // Get system prompt (cached Tier 1+2) and volatile context (Tier 3).
+    // Pass the active character so the DM sees an explicit "Turn: {name}"
+    // line in Current State, reinforcing whose decision it is and discouraging
+    // the DM from acting on the PC's behalf.
+    const { system: systemPrompt, volatile: volatileContext } = this.sceneManager.getSystemPrompt({
+      turnHolder: characterName,
+    });
 
     // Build message list
     const messages: NormalizedMessage[] = [...this.conversation.getMessages()];
