@@ -41,9 +41,9 @@ Before calling `finalize_setup`, you MUST read back the full configuration in na
 
 ---
 
-<center><i>The Shattered Crown</i></center>
+<center><i>{World Name}</i></center>
 
-A <color=#cc4444>grimdark fantasy</color>, balanced difficulty, narrated by <b>The Chronicler</b>. Pure narrative — no dice system. You'll be playing as <color=#44cc44>Kael</color>, a wandering sellsword with a debt and a bad reputation.
+A <color=#cc4444>{genre/mood}</color>, {difficulty} difficulty, narrated by <b>{DM Personality}</b>. {System note}. You'll be playing as <color=#44cc44>{Character Name}</color>, {one-sentence concept}.
 
 Sound good, or want to change anything?
 
