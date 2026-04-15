@@ -37,7 +37,9 @@ interface ContextDump {
   agent: string;
   timestamp: string;
   model?: string;
-  system?: string | Array<{ type: string; text?: string }>;
+  // Engine SystemBlocks are `{ text, cacheControl? }` — no `type` field —
+  // but older dumps from the Anthropic SDK shape include `{ type: "text", text }`.
+  system?: string | Array<{ type?: string; text?: string }>;
   messages?: Message[];
   tools?: ToolDef[];
   _thinking_trace?: ThinkingTrace[];
@@ -170,11 +172,13 @@ function ToolsList({ tools }: { tools: ToolDef[] }) {
   );
 }
 
-function SystemPrompt({ system }: { system: string | Array<{ type: string; text?: string }> }) {
+function SystemPrompt({ system }: { system: string | Array<{ type?: string; text?: string }> }) {
+  // Engine blocks have no `type` field; accept any block with `text`.
+  // Keep the optional `type === "text"` path so SDK-shaped blocks still render.
   const text = typeof system === "string"
     ? system
     : system
-        .filter((b) => b.type === "text" && b.text)
+        .filter((b) => b.text && (b.type === undefined || b.type === "text"))
         .map((b) => b.text)
         .join("\n\n");
 
