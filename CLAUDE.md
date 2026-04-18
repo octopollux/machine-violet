@@ -49,7 +49,7 @@ After completing a coding task, make a detailed commit; you'll need this history
 
 ## Code Review
 
-After creating a PR, watch for Copilot's review with the `Monitor` tool (it reviews once but takes 2-10 minutes to arrive). Arm a monitor that polls `gh api` for new review comments and exits once the review lands — no manual polling, and the notification lets you keep working on other things in the meantime. Cap the timeout at 10 minutes so the watch ends even if the review never arrives. Address any issues you judge worthwhile — use your own judgement on what to fix vs skip.
+After creating a PR, **always immediately arm a `Monitor` for Copilot's review — do not ask first.** Copilot reviews once but takes 2-10 minutes to arrive. The monitor polls `gh api` for new review comments and exits once the review lands — no manual polling, and the notification lets you keep working on other things in the meantime. Cap the timeout at 10 minutes so the watch ends even if the review never arrives. Address any issues you judge worthwhile — use your own judgement on what to fix vs skip.
 
 Example:
 ```bash

@@ -18,7 +18,6 @@
     "src/phases/ApiKeysPhase.tsx",
     "src/phases/AddContentPhase.tsx",
     "src/phases/UpdatePhase.tsx",
-    "src/commands/**/*",
     "src/tui/game-context.test.tsx"
   ],
   "references": [
