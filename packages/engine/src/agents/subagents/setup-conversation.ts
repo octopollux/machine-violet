@@ -395,13 +395,19 @@ export function createSetupConversation(
   }
 
   /**
-   * Run one API call, stream text, process tool calls.
-   * Returns the result, which may include pendingChoices (needs resolveChoice)
-   * or finalized (setup complete).
+   * Run one player turn. Makes API calls in a loop, processing tool calls
+   * every round, until one of three exit conditions:
+   *   1. Model emits `present_choices` — return early with pendingChoices;
+   *      app resumes via resolveChoice/send.
+   *   2. Round produces no tool calls — turn is done.
+   *   3. Hit MAX_ROUNDS — defensive cap to prevent runaway loops.
    *
-   * Uses deferred tool handling: present_choices pauses the loop and returns
-   * to the app for player input. This pattern doesn't fit runAgentLoop's
-   * immediate-tool-result model, so we handle it manually with retry.
+   * Looping (vs. a single follow-up call) matters because the model legitimately
+   * chains tools across rounds: e.g. call `load_world` to fetch suboptions, then
+   * call `present_choices` in the next round to show them to the player.
+   *
+   * Uses deferred tool handling for present_choices (pauses for player input),
+   * which doesn't fit runAgentLoop's immediate-tool-result model.
    */
   async function runTurn(onDelta: (delta: string) => void): Promise<SetupTurnResult> {
     finalized = undefined;
@@ -418,119 +424,104 @@ export function createSetupConversation(
       { target: "messages" as const },
     ];
 
-    let lastParams: ChatParams = {
-      model,
-      maxTokens: TOKEN_LIMITS.SUBAGENT_LARGE,
-      systemPrompt,
-      messages,
-      tools: TOOLS,
-      thinking,
-      cacheHints,
-    };
+    const MAX_ROUNDS = 4;
+    let text = "";
 
-    const result = await streamWithRetry(provider, lastParams, onDelta, onRetry);
-
-    // Accumulate usage
-    totalUsage.inputTokens += result.usage.inputTokens;
-    totalUsage.outputTokens += result.usage.outputTokens;
-    totalUsage.cacheReadTokens += result.usage.cacheReadTokens;
-    totalUsage.cacheCreationTokens += result.usage.cacheCreationTokens;
-    totalUsage.reasoningTokens += result.usage.reasoningTokens;
-
-    // Process tool calls from normalized result
-    let text = result.text;
-    const toolResults: ContentPart[] = [];
-    let pendingChoices: { prompt: string; choices: string[]; descriptions?: string[] } | undefined;
-
-    for (const tc of result.toolCalls) {
-      if (tc.name === "present_choices") {
-        // Don't resolve immediately — pause and return to the app for player input
-        const input = tc.input as { prompt?: string; choices?: unknown; descriptions?: unknown };
-        const rawChoices = Array.isArray(input.choices) ? input.choices : [];
-        const choices = rawChoices.map((c: unknown) => typeof c === "string" ? c : String(c));
-        const rawDescs = Array.isArray(input.descriptions) ? input.descriptions : [];
-        const descriptions = rawDescs.length > 0
-          ? rawDescs.map((d: unknown) => typeof d === "string" ? d : String(d))
-          : undefined;
-        pendingChoices = { prompt: input.prompt ?? "Choose:", choices, descriptions };
-        pendingToolUseId = tc.id;
-      } else if (tc.name === "load_world") {
-        const slug = (tc.input as { slug?: string }).slug ?? "";
-        const world = loadWorldBySlug(slug);
-        let content: string;
-        if (world) {
-          const parts: string[] = [];
-          if (world.detail) parts.push(`## Detail\n${world.detail}`);
-          if (world.suboptions?.length) {
-            for (const sub of world.suboptions) {
-              parts.push(`## Suboption: ${sub.label}\n` +
-                sub.choices.map((c: { name: string; description: string }) => `- **${c.name}** — ${c.description}`).join("\n"));
-            }
-          }
-          if (world.system) parts.push(`Suggested system: ${world.system}`);
-          if (world.mood) parts.push(`Suggested mood: ${world.mood}`);
-          if (world.difficulty) parts.push(`Suggested difficulty: ${world.difficulty}`);
-          content = parts.length > 0 ? parts.join("\n\n") : "World loaded but has no additional detail.";
-        } else {
-          content = `No world found with slug "${slug}".`;
-        }
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: tc.id,
-          content,
-        });
-      } else if (tc.name === "finalize_setup") {
-        handleFinalize(tc.input);
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: tc.id,
-          content: "Setup finalized. Say a brief farewell to the player before the adventure begins.",
-        });
-      }
-    }
-
-    // Dump thinking
-    if (result.thinkingText) dumpThinking("setup", 0, result.thinkingText);
-
-    // Append assistant message (thinking already stripped by provider)
-    messages.push({ role: "assistant", content: result.assistantContent });
-
-    // If we have pending choices, return now — app will call resolveChoice later.
-    // Any tool results produced alongside present_choices (e.g. load_world) are
-    // stashed so they can be flushed with the eventual choice resolution.
-    if (pendingChoices) {
-      pendingExtraToolResults = toolResults;
-      return {
-        text,
-        usage: { ...totalUsage },
-        pendingChoices,
-      };
-    }
-
-    // If any tool produced results, send them back and get the agent's continuation
-    if (toolResults.length > 0) {
-      messages.push({ role: "user", content: toolResults });
-
-      lastParams = {
+    for (let round = 0; round < MAX_ROUNDS; round++) {
+      const params: ChatParams = {
         model,
-        maxTokens: TOKEN_LIMITS.SUBAGENT_MEDIUM,
+        // First round gets a larger budget for the model's main response;
+        // follow-ups (reacting to tool results) are typically shorter.
+        maxTokens: round === 0 ? TOKEN_LIMITS.SUBAGENT_LARGE : TOKEN_LIMITS.SUBAGENT_MEDIUM,
         systemPrompt,
         messages,
         tools: TOOLS,
         thinking,
         cacheHints,
       };
-      const followUp = await streamWithRetry(provider, lastParams, onDelta, onRetry);
 
-      totalUsage.inputTokens += followUp.usage.inputTokens;
-      totalUsage.outputTokens += followUp.usage.outputTokens;
-      totalUsage.cacheReadTokens += followUp.usage.cacheReadTokens;
-      totalUsage.cacheCreationTokens += followUp.usage.cacheCreationTokens;
-      totalUsage.reasoningTokens += followUp.usage.reasoningTokens;
+      const result = await streamWithRetry(provider, params, onDelta, onRetry);
 
-      text += followUp.text;
-      if (followUp.thinkingText) dumpThinking("setup", 1, followUp.thinkingText);
-      messages.push({ role: "assistant", content: followUp.assistantContent });
+      totalUsage.inputTokens += result.usage.inputTokens;
+      totalUsage.outputTokens += result.usage.outputTokens;
+      totalUsage.cacheReadTokens += result.usage.cacheReadTokens;
+      totalUsage.cacheCreationTokens += result.usage.cacheCreationTokens;
+      totalUsage.reasoningTokens += result.usage.reasoningTokens;
+
+      text += result.text;
+      if (result.thinkingText) dumpThinking("setup", round, result.thinkingText);
+
+      // Append assistant message (thinking already stripped by provider)
+      messages.push({ role: "assistant", content: result.assistantContent });
+
+      // Process tool calls from this round
+      const toolResults: ContentPart[] = [];
+      let pendingChoices: { prompt: string; choices: string[]; descriptions?: string[] } | undefined;
+
+      for (const tc of result.toolCalls) {
+        if (tc.name === "present_choices") {
+          // Don't resolve immediately — pause and return to the app for player input
+          const input = tc.input as { prompt?: string; choices?: unknown; descriptions?: unknown };
+          const rawChoices = Array.isArray(input.choices) ? input.choices : [];
+          const choices = rawChoices.map((c: unknown) => typeof c === "string" ? c : String(c));
+          const rawDescs = Array.isArray(input.descriptions) ? input.descriptions : [];
+          const descriptions = rawDescs.length > 0
+            ? rawDescs.map((d: unknown) => typeof d === "string" ? d : String(d))
+            : undefined;
+          pendingChoices = { prompt: input.prompt ?? "Choose:", choices, descriptions };
+          pendingToolUseId = tc.id;
+        } else if (tc.name === "load_world") {
+          const slug = (tc.input as { slug?: string }).slug ?? "";
+          const world = loadWorldBySlug(slug);
+          let content: string;
+          if (world) {
+            const parts: string[] = [];
+            if (world.detail) parts.push(`## Detail\n${world.detail}`);
+            if (world.suboptions?.length) {
+              for (const sub of world.suboptions) {
+                parts.push(`## Suboption: ${sub.label}\n` +
+                  sub.choices.map((c: { name: string; description: string }) => `- **${c.name}** — ${c.description}`).join("\n"));
+              }
+            }
+            if (world.system) parts.push(`Suggested system: ${world.system}`);
+            if (world.mood) parts.push(`Suggested mood: ${world.mood}`);
+            if (world.difficulty) parts.push(`Suggested difficulty: ${world.difficulty}`);
+            content = parts.length > 0 ? parts.join("\n\n") : "World loaded but has no additional detail.";
+          } else {
+            content = `No world found with slug "${slug}".`;
+          }
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: tc.id,
+            content,
+          });
+        } else if (tc.name === "finalize_setup") {
+          handleFinalize(tc.input);
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: tc.id,
+            content: "Setup finalized. Say a brief farewell to the player before the adventure begins.",
+          });
+        }
+      }
+
+      // If we have pending choices, return now — app will call resolveChoice later.
+      // Any tool results produced alongside present_choices (e.g. load_world) are
+      // stashed so they can be flushed with the eventual choice resolution.
+      if (pendingChoices) {
+        pendingExtraToolResults = toolResults;
+        return {
+          text,
+          usage: { ...totalUsage },
+          pendingChoices,
+        };
+      }
+
+      // No tool calls → turn is done
+      if (toolResults.length === 0) break;
+
+      // Send tool results back and loop for the model's continuation
+      messages.push({ role: "user", content: toolResults });
     }
 
     return {

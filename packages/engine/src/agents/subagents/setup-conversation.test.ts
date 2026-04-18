@@ -284,6 +284,49 @@ describe("createSetupConversation", () => {
     expect(ids).toContain("toolu_choices_2");
   });
 
+  it("load_world in round 1 → present_choices in round 2 is captured as pendingChoices", async () => {
+    // Regression: previously the follow-up round's tool calls were ignored,
+    // so suboption choices (which need load_world's detail before they can
+    // be presented) were silently dropped and the turn ended without a modal.
+    const loadWorldResp: ChatResult = {
+      text: "Let me pull up that world...",
+      toolCalls: [{ id: "toolu_load_1", name: "load_world", input: { slug: "the-shattered-crown" } }],
+      usage: mockUsage(),
+      stopReason: "tool_use",
+      assistantContent: [
+        { type: "text", text: "Let me pull up that world..." },
+        { type: "tool_use", id: "toolu_load_1", name: "load_world", input: { slug: "the-shattered-crown" } },
+      ],
+    };
+    const presentSuboptions: ChatResult = {
+      text: "What kind of story?",
+      toolCalls: [{
+        id: "toolu_subopts",
+        name: "present_choices",
+        input: { prompt: "Pick a tone:", choices: ["Heroic", "Tragic"] },
+      }],
+      usage: mockUsage(),
+      stopReason: "tool_use",
+      assistantContent: [
+        { type: "text", text: "What kind of story?" },
+        { type: "tool_use", id: "toolu_subopts", name: "present_choices", input: { prompt: "Pick a tone:", choices: ["Heroic", "Tragic"] } },
+      ],
+    };
+    const provider = mockProvider([loadWorldResp, presentSuboptions]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+
+    const result = await conv.start(noop);
+
+    expect(provider.stream).toHaveBeenCalledTimes(2);
+    expect(result.pendingChoices).toBeDefined();
+    expect(result.pendingChoices!.prompt).toBe("Pick a tone:");
+    expect(result.pendingChoices!.choices).toEqual(["Heroic", "Tragic"]);
+
+    // Concatenated text from both rounds
+    expect(result.text).toContain("Let me pull up that world...");
+    expect(result.text).toContain("What kind of story?");
+  });
+
   it("send() after dismissed choice includes tool_result", async () => {
     const provider = mockProvider([
       presentChoicesResponse("Pick one:", "Genre:", ["Fantasy", "Sci-Fi"]),
