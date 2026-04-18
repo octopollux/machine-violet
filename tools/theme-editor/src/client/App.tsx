@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import type { AssetsResponse, ThemeAssetPayload } from "../shared/protocol";
 import type { StyleVariant, ThemeAsset, PlayerPaneFrame } from "@engine-src/tui/themes/types.js";
-import { parseThemeAsset, parsePlayerPaneFrame } from "@engine-src/tui/themes/parser.js";
+import {
+  parseThemeAsset,
+  parsePlayerPaneFrame,
+  parseSections,
+  extractThemeConfig,
+} from "@engine-src/tui/themes/parser.js";
 import { deriveModalTheme } from "@engine-src/tui/themes/color-resolve.js";
 import { buildDefinition } from "./lib/definition";
 import { resolveThemeWithAssets } from "./lib/resolve";
+import { setColorKey } from "./lib/mutate";
 import {
   renderConversationFrame,
   renderModal,
@@ -13,6 +19,7 @@ import {
 } from "./lib/render";
 import { FrameCanvas } from "./components/FrameCanvas";
 import { SourceEditor } from "./components/SourceEditor";
+import { ColorChips } from "./components/ColorChips";
 
 const VARIANTS: StyleVariant[] = ["exploration", "combat", "ooc", "levelup", "dev"];
 
@@ -184,6 +191,32 @@ export function App() {
   const themesList = assets?.themes ?? [];
   const framesList = assets?.playerFrames ?? [];
 
+  // Derive base-section (not variant-merged) values for chip highlighting.
+  const baseColors = useMemo(() => {
+    try {
+      const sections = parseSections(themeSource);
+      const config = extractThemeConfig(sections.metadata, sections.sections);
+      // gradient: null → user wrote "none"; undefined → not written (treat as "none" for UX)
+      const gradientChip =
+        config.gradient === null
+          ? "none"
+          : config.gradient === undefined
+            ? "none"
+            : config.gradient.preset;
+      return {
+        preset: config.swatchConfig?.preset,
+        harmony: config.swatchConfig?.harmony,
+        gradient: gradientChip,
+      };
+    } catch {
+      return { preset: undefined, harmony: undefined, gradient: undefined };
+    }
+  }, [themeSource]);
+
+  const onChipSet = (key: "preset" | "harmony" | "gradient", value: string) => {
+    setThemeSource((prev) => setColorKey(prev, key, value));
+  };
+
   const resetTheme = () => {
     const match = findAsset(themesList, themeName);
     if (match) setThemeSource(match.content);
@@ -246,6 +279,12 @@ export function App() {
               <button onClick={() => copyToClipboard(themeSource)}>Copy .theme</button>
               <button onClick={resetTheme}>Reset to {themeName}</button>
             </div>
+            <ColorChips
+              preset={baseColors.preset}
+              harmony={baseColors.harmony}
+              gradient={baseColors.gradient}
+              onSet={onChipSet}
+            />
             <SourceEditor
               label={`${themeName}.theme`}
               value={themeSource}
