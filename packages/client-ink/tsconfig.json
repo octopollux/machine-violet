@@ -14,7 +14,6 @@
     "node_modules", "dist",
     "src/**/*.test.ts", "src/**/*.test.tsx",
     "src/phases/index.ts",
-    "src/phases/SetupPhase.tsx",
     "src/phases/ApiKeysPhase.tsx",
     "src/phases/AddContentPhase.tsx",
     "src/phases/UpdatePhase.tsx",

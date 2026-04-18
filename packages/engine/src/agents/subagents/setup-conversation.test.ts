@@ -194,6 +194,80 @@ describe("createSetupConversation", () => {
     expect(result.text).toContain("May your blade stay sharp!");
   });
 
+  it("co-emitted load_world + present_choices: both tool_results flushed on resolveChoice", async () => {
+    // Model emits load_world AND present_choices in the same assistant turn.
+    // Regression: previously the load_world tool_result was discarded on early-return,
+    // leaving its tool_use orphaned — Anthropic 400s on the next request.
+    const coEmitted: ChatResult = {
+      text: "Let me check that world...",
+      toolCalls: [
+        { id: "toolu_load_1", name: "load_world", input: { slug: "the-shattered-crown" } },
+        { id: "toolu_choices_1", name: "present_choices", input: { prompt: "Pick one:", choices: ["A", "B"] } },
+      ],
+      usage: mockUsage(),
+      stopReason: "tool_use",
+      assistantContent: [
+        { type: "text", text: "Let me check that world..." },
+        { type: "tool_use", id: "toolu_load_1", name: "load_world", input: { slug: "the-shattered-crown" } },
+        { type: "tool_use", id: "toolu_choices_1", name: "present_choices", input: { prompt: "Pick one:", choices: ["A", "B"] } },
+      ],
+    };
+    const provider = mockProvider([coEmitted, textResponse("Good pick!")]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+
+    const first = await conv.start(noop);
+    expect(first.pendingChoices).toBeDefined();
+
+    await conv.resolveChoice("A", noop);
+
+    // Second API call's user message must satisfy BOTH tool_uses
+    const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
+    const secondCall = streamCalls[1][0];
+    const userMsg = secondCall.messages.find(
+      (m: { role: string; content?: unknown }) => m.role === "user" && Array.isArray(m.content),
+    );
+    expect(userMsg).toBeDefined();
+    const ids = (userMsg.content as { type: string; tool_use_id: string }[])
+      .filter((c) => c.type === "tool_result")
+      .map((c) => c.tool_use_id);
+    expect(ids).toContain("toolu_load_1");
+    expect(ids).toContain("toolu_choices_1");
+  });
+
+  it("co-emitted load_world + present_choices: both tool_results flushed on dismissal", async () => {
+    // Same scenario but the user dismisses the modal (send instead of resolveChoice).
+    const coEmitted: ChatResult = {
+      text: "",
+      toolCalls: [
+        { id: "toolu_load_2", name: "load_world", input: { slug: "the-shattered-crown" } },
+        { id: "toolu_choices_2", name: "present_choices", input: { prompt: "Pick one:", choices: ["A", "B"] } },
+      ],
+      usage: mockUsage(),
+      stopReason: "tool_use",
+      assistantContent: [
+        { type: "tool_use", id: "toolu_load_2", name: "load_world", input: { slug: "the-shattered-crown" } },
+        { type: "tool_use", id: "toolu_choices_2", name: "present_choices", input: { prompt: "Pick one:", choices: ["A", "B"] } },
+      ],
+    };
+    const provider = mockProvider([coEmitted, textResponse("Got it.")]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+
+    await conv.start(noop);
+    await conv.send("never mind, let's do something else", noop);
+
+    const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
+    const secondCall = streamCalls[1][0];
+    const userMsg = secondCall.messages.find(
+      (m: { role: string; content?: unknown }) => m.role === "user" && Array.isArray(m.content),
+    );
+    expect(userMsg).toBeDefined();
+    const ids = (userMsg.content as { type: string; tool_use_id: string }[])
+      .filter((c) => c.type === "tool_result")
+      .map((c) => c.tool_use_id);
+    expect(ids).toContain("toolu_load_2");
+    expect(ids).toContain("toolu_choices_2");
+  });
+
   it("send() after dismissed choice includes tool_result", async () => {
     const provider = mockProvider([
       presentChoicesResponse("Pick one:", "Genre:", ["Fantasy", "Sci-Fi"]),
