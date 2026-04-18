@@ -18,7 +18,7 @@ import {
 import type {
   LLMProvider, ChatParams, ChatResult,
   NormalizedMessage, NormalizedTool, NormalizedUsage,
-  SystemBlock,
+  SystemBlock, ContentPart,
 } from "../../providers/types.js";
 
 // --- Types ---
@@ -334,7 +334,7 @@ export function createSetupConversation(
   // Tool results for tools that ran alongside present_choices (e.g. load_world).
   // They must be flushed with the choice resolution — otherwise their tool_use
   // blocks are left orphaned and Anthropic 400s on the next request.
-  let pendingExtraToolResults: NormalizedMessage["content"] = [];
+  let pendingExtraToolResults: ContentPart[] = [];
 
   function handleFinalize(input: Record<string, unknown>): void {
     const personalityName = (input.dm_personality as string) || "The Chronicler";
@@ -436,7 +436,7 @@ export function createSetupConversation(
 
     // Process tool calls from normalized result
     let text = result.text;
-    const toolResults: NormalizedMessage["content"] = [];
+    const toolResults: ContentPart[] = [];
     let pendingChoices: { prompt: string; choices: string[]; descriptions?: string[] } | undefined;
 
     for (const tc of result.toolCalls) {
@@ -471,14 +471,14 @@ export function createSetupConversation(
         } else {
           content = `No world found with slug "${slug}".`;
         }
-        (toolResults as { type: "tool_result"; tool_use_id: string; content: string }[]).push({
+        toolResults.push({
           type: "tool_result",
           tool_use_id: tc.id,
           content,
         });
       } else if (tc.name === "finalize_setup") {
         handleFinalize(tc.input);
-        (toolResults as { type: "tool_result"; tool_use_id: string; content: string }[]).push({
+        toolResults.push({
           type: "tool_result",
           tool_use_id: tc.id,
           content: "Setup finalized. Say a brief farewell to the player before the adventure begins.",
@@ -505,7 +505,7 @@ export function createSetupConversation(
     }
 
     // If any tool produced results, send them back and get the agent's continuation
-    if ((toolResults as unknown[]).length > 0) {
+    if (toolResults.length > 0) {
       messages.push({ role: "user", content: toolResults });
 
       lastParams = {
