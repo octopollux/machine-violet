@@ -524,6 +524,34 @@ export function createSetupConversation(
       messages.push({ role: "user", content: toolResults });
     }
 
+    // Defensive wrap-up: if we exited the loop with the last message being
+    // tool_results (i.e. we hit MAX_ROUNDS while the model was still chaining
+    // tool calls), do one final tools-disabled API call. Otherwise the next
+    // runTurn would push a plain user message on top of an existing one,
+    // breaking the role-alternation contract and 400-ing the next request.
+    const last = messages[messages.length - 1];
+    if (last && last.role === "user" && Array.isArray(last.content)
+      && last.content.some((c) => (c as { type?: string }).type === "tool_result")) {
+      const wrapParams: ChatParams = {
+        model,
+        maxTokens: TOKEN_LIMITS.SUBAGENT_MEDIUM,
+        systemPrompt,
+        messages,
+        // No tools — force a text-only response so the model can't extend the chain.
+        thinking,
+        cacheHints,
+      };
+      const wrap = await streamWithRetry(provider, wrapParams, onDelta, onRetry);
+      totalUsage.inputTokens += wrap.usage.inputTokens;
+      totalUsage.outputTokens += wrap.usage.outputTokens;
+      totalUsage.cacheReadTokens += wrap.usage.cacheReadTokens;
+      totalUsage.cacheCreationTokens += wrap.usage.cacheCreationTokens;
+      totalUsage.reasoningTokens += wrap.usage.reasoningTokens;
+      text += wrap.text;
+      if (wrap.thinkingText) dumpThinking("setup", MAX_ROUNDS, wrap.thinkingText);
+      messages.push({ role: "assistant", content: wrap.assistantContent });
+    }
+
     return {
       text,
       usage: { ...totalUsage },

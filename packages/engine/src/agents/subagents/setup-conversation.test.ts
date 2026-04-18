@@ -284,6 +284,35 @@ describe("createSetupConversation", () => {
     expect(ids).toContain("toolu_choices_2");
   });
 
+  it("hits MAX_ROUNDS with chained tools → wraps with a tools-disabled call", async () => {
+    // Model keeps calling load_world every round. After MAX_ROUNDS (4) iterations
+    // we must do one final tools-disabled call so the tool_use chain terminates
+    // and the next runTurn doesn't see two consecutive user messages.
+    const loadResp = (n: number): ChatResult => ({
+      text: `chain ${n}`,
+      toolCalls: [{ id: `toolu_load_${n}`, name: "load_world", input: { slug: "the-shattered-crown" } }],
+      usage: mockUsage(),
+      stopReason: "tool_use",
+      assistantContent: [
+        { type: "text", text: `chain ${n}` },
+        { type: "tool_use", id: `toolu_load_${n}`, name: "load_world", input: { slug: "the-shattered-crown" } },
+      ],
+    });
+    // 4 chained load_world responses + 1 wrap-up text response = 5 calls total
+    const provider = mockProvider([loadResp(1), loadResp(2), loadResp(3), loadResp(4), textResponse("OK, ready when you are.")]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+
+    const result = await conv.start(noop);
+
+    expect(provider.stream).toHaveBeenCalledTimes(5);
+    expect(result.text).toContain("OK, ready when you are.");
+
+    // The wrap-up call must have NO tools to prevent the chain from extending
+    const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
+    const wrapCall = streamCalls[4][0];
+    expect(wrapCall.tools).toBeUndefined();
+  });
+
   it("load_world in round 1 → present_choices in round 2 is captured as pendingChoices", async () => {
     // Regression: previously the follow-up round's tool calls were ignored,
     // so suboption choices (which need load_world's detail before they can

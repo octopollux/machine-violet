@@ -101,7 +101,7 @@ export async function createServer(
           "1. **List campaigns** — `GET /campaigns` returns saved campaigns.",
           "2. **Start a session** — `POST /campaigns/:id/start` (resume) or `POST /campaigns` (new). Returns a `sessionId` and `wsUrl`.",
           "3. **Connect via WebSocket** — open `ws://<host>/session/ws?role=player&player=<name>`. The server immediately pushes a `state:snapshot` event with full game state.",
-          "4. **Play** — submit player actions and choice responses with `POST /session/turn/contribute` (set `fromChoice: true` when the contribution comes from a choice modal). The DM narrates via WebSocket `narrative:chunk` / `narrative:complete` events.",
+          "4. **Play** — submit player actions and choice responses with `POST /session/turn/contribute` (set `fromChoice: true` when the contribution comes from a choice selection). The DM narrates via WebSocket `narrative:chunk` / `narrative:complete` events.",
           "5. **End** — `POST /session/end` tears down the session. The server also auto-saves and ends the session after 5 minutes with no player connections.",
           "",
           "Starting a session while one is already active returns **409 Conflict**.",
