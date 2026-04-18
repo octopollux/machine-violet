@@ -65,7 +65,12 @@ export class TurnManager {
   }
 
   /** Add a contribution to the current turn. Returns the contribution. */
-  contribute(playerId: string, text: string, source: "client" | "engine" = "client"): TurnContribution {
+  contribute(
+    playerId: string,
+    text: string,
+    source: "client" | "engine" = "client",
+    options: { fromChoice?: boolean } = {},
+  ): TurnContribution {
     const turn = this.currentTurn;
     if (!turn || turn.status !== "open") {
       throw new Error("No open turn to contribute to.");
@@ -89,6 +94,7 @@ export class TurnManager {
       source,
       text,
       amendment,
+      ...(options.fromChoice ? { fromChoice: true } : {}),
     };
 
     turn.contributions.push(contribution);

@@ -43,6 +43,9 @@ export interface SetupConversation {
   send(text: string, onDelta: (delta: string) => void): Promise<SetupTurnResult>;
   /** Resolve a pending present_choices tool call with the player's selection */
   resolveChoice(selectedText: string, onDelta: (delta: string) => void): Promise<SetupTurnResult>;
+  /** True while a present_choices tool call is unresolved — the next user
+   *  turn must supply a matching tool_result (either selection or dismissal). */
+  readonly hasPendingChoice: boolean;
 }
 
 // --- Tool definitions ---
@@ -590,6 +593,10 @@ export function createSetupConversation(
       pendingExtraToolResults = [];
 
       return runTurn(onDelta);
+    },
+
+    get hasPendingChoice() {
+      return pendingToolUseId !== null;
     },
   };
 }

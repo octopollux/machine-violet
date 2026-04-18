@@ -7,7 +7,7 @@ import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import {
   ContributeRequest, ContributeResponse, ContributeQuery,
   CommitResponse, CommandRequest, CommandParams, CommandResponse,
-  ChoiceResponseRequest, OkResponse, CyclePlayerResponse,
+  CyclePlayerResponse,
   SessionEndResponse, ErrorResponse, StateSnapshot,
 } from "@machine-violet/shared";
 import { handleCommand } from "../command-handler.js";
@@ -82,7 +82,9 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
       : turn.activePlayers[0] ?? "player";
 
     try {
-      const contribution = tm.contribute(playerId, text);
+      const contribution = tm.contribute(playerId, text, "client", {
+        fromChoice: body.fromChoice === true,
+      });
       return { turnId: turn.id, contributionId: contribution.id };
     } catch (err) {
       return reply.status(400).send({
@@ -157,29 +159,6 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
     }
 
     return { ok: !result.error, message: result.message };
-  });
-
-  /** Respond to a choice presented by the DM or setup agent. */
-  server.post("/choice/respond", {
-    schema: {
-      tags: ["Session"],
-      body: ChoiceResponseRequest,
-      response: { 200: OkResponse },
-    },
-  }, async (request, _reply) => {
-    const { value } = (request.body as { value: string }) ?? {};
-
-    // During setup, resolve choice selections through the session manager
-    // (which handles turn lifecycle + game transition)
-    const sm = server.sessionManager;
-    const setup = sm.getSetupSession();
-    if (setup) {
-      await sm.resolveSetupChoice(String(value));
-      return { ok: true };
-    }
-
-    server.log.info({ value }, "Choice response received");
-    return { ok: true };
   });
 
   /** Cycle to the next player (Tab key). */

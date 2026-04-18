@@ -163,6 +163,11 @@ export class SetupSession {
     return this.started;
   }
 
+  /** True while the setup agent is awaiting a present_choices tool_result. */
+  get hasPendingChoice(): boolean {
+    return this.conversation?.hasPendingChoice ?? false;
+  }
+
   // --- Private ---
 
   private async handleResult(result: SetupTurnResult): Promise<{ finalized?: string; campaignName?: string }> {

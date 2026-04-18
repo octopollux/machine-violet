@@ -49,6 +49,10 @@ export const ContributeRequest = Type.Object({
   campaignId: Type.Optional(Type.String()),
   /** Turn sequence number the client believes is current. Rejected on mismatch. */
   turnSeq: Type.Optional(Type.Number()),
+  /** True when the contribution is the player selecting an option from a
+   *  choice modal (vs. typing free-form text). Used by setup so the agent
+   *  can distinguish selection from dismissal+free-form. */
+  fromChoice: Type.Optional(Type.Boolean()),
 });
 
 export const CommitResponse = Type.Object({
@@ -57,11 +61,6 @@ export const CommitResponse = Type.Object({
 
 export const CommandRequest = Type.Object({
   args: Type.Optional(Type.String()),
-});
-
-export const ChoiceResponseRequest = Type.Object({
-  /** The selected choice text. */
-  value: Type.String(),
 });
 
 export const SettingsPatch = Type.Object({}, { additionalProperties: true });
@@ -258,7 +257,6 @@ export type StartCampaignResponse = Static<typeof StartCampaignResponse>;
 export type ContributeRequest = Static<typeof ContributeRequest>;
 export type CommitResponse = Static<typeof CommitResponse>;
 export type CommandRequest = Static<typeof CommandRequest>;
-export type ChoiceResponseRequest = Static<typeof ChoiceResponseRequest>;
 export type SettingsPatch = Static<typeof SettingsPatch>;
 export type SessionEndResponse = Static<typeof SessionEndResponse>;
 export type ErrorResponse = Static<typeof ErrorResponse>;

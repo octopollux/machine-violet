@@ -52,6 +52,18 @@ describe("TurnManager", () => {
       expect(() => tm.contribute("sable", "I help")).toThrow("not an active player");
     });
 
+    it("threads fromChoice flag onto the contribution", () => {
+      tm.openTurn(["aldric"]);
+      const contribution = tm.contribute("aldric", "Heroic", "client", { fromChoice: true });
+      expect(contribution.fromChoice).toBe(true);
+    });
+
+    it("omits fromChoice when not set", () => {
+      tm.openTurn(["aldric"]);
+      const contribution = tm.contribute("aldric", "I attack");
+      expect(contribution.fromChoice).toBeUndefined();
+    });
+
     it("marks amendments correctly", () => {
       tm.openTurn(["aldric", "sable"]);
       tm.contribute("aldric", "I attack");

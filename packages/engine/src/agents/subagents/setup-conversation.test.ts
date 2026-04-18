@@ -141,6 +141,22 @@ describe("createSetupConversation", () => {
     expect(result.text).toBe("Fantasy it is! Now tell me about your character.");
   });
 
+  it("hasPendingChoice tracks the present_choices lifecycle", async () => {
+    const provider = mockProvider([
+      presentChoicesResponse("Pick:", "Genre:", ["Fantasy", "Sci-Fi"]),
+      textResponse("Fantasy it is."),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+
+    expect(conv.hasPendingChoice).toBe(false);
+
+    await conv.start(noop);
+    expect(conv.hasPendingChoice).toBe(true);
+
+    await conv.resolveChoice("Fantasy", noop);
+    expect(conv.hasPendingChoice).toBe(false);
+  });
+
   it("resolveChoice() throws when no pending choice", async () => {
     const provider = mockProvider([textResponse("Hello!")]);
     const conv = createSetupConversation(provider, "claude-sonnet-4-6");
