@@ -12,8 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint packages/shared/src/ packages/engine/src/ packages/client-ink/src/",
-    "typecheck": "npm run -w packages/shared build && npm run -w packages/engine typecheck && npm run -w packages/client-ink typecheck",
+    "lint": "eslint --cache --cache-location node_modules/.cache/eslint packages/shared/src/ packages/engine/src/ packages/client-ink/src/",
+    "typecheck": "tsc -b",
     "check": "concurrently -n lint,test --kill-others-on-fail \"npm run lint\" \"npm test\"",
     "dist": "node scripts/build-dist.js",
     "explorer": "node tools/campaign-explorer/scripts/dev.js"
