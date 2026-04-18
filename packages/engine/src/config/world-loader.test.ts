@@ -1,7 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { readdirSync, readFileSync } from "node:fs";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { worldSummaries } from "./world-loader.js";
+import { loadAllWorlds, worldSummaries } from "./world-loader.js";
 import type { WorldFile } from "@machine-violet/shared/types/world.js";
 
 // --- Bundled seed validation (uses real filesystem, no mocks) ---
@@ -74,6 +75,64 @@ function makeWorld(overrides?: Partial<WorldFile>): WorldFile {
     ...overrides,
   };
 }
+
+describe("loadAllWorlds — user world warnings", () => {
+  const tempDirs: string[] = [];
+  afterEach(() => {
+    vi.restoreAllMocks();
+    while (tempDirs.length) {
+      const d = tempDirs.pop()!;
+      try { rmSync(d, { recursive: true, force: true }); } catch { /* ignore */ }
+    }
+  });
+
+  function makeUserDir(): string {
+    const dir = mkdtempSync(join(tmpdir(), "mv-worlds-test-"));
+    tempDirs.push(dir);
+    return dir;
+  }
+
+  it("warns and skips user world files with unparseable JSON", () => {
+    const userDir = makeUserDir();
+    writeFileSync(join(userDir, "broken.mvworld"), "{ not valid json", "utf-8");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const worlds = loadAllWorlds(userDir);
+
+    expect(worlds.find((w) => w.slug === "broken")).toBeUndefined();
+    expect(warn).toHaveBeenCalledTimes(1);
+    const msg = warn.mock.calls[0][0] as string;
+    expect(msg).toContain("broken.mvworld");
+    expect(msg).toContain("[worlds]");
+  });
+
+  it("warns and skips user world files that fail schema validation", () => {
+    const userDir = makeUserDir();
+    // Valid JSON but missing required fields (e.g. wrong format string).
+    writeFileSync(join(userDir, "bad-schema.mvworld"), JSON.stringify({ format: "not-a-world", version: 1 }), "utf-8");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const worlds = loadAllWorlds(userDir);
+
+    expect(worlds.find((w) => w.slug === "bad-schema")).toBeUndefined();
+    expect(warn).toHaveBeenCalledTimes(1);
+    const msg = warn.mock.calls[0][0] as string;
+    expect(msg).toContain("bad-schema.mvworld");
+    expect(msg).toContain("schema validation");
+  });
+
+  it("does not warn on valid user world files", () => {
+    const userDir = makeUserDir();
+    const good = makeWorld({ name: "Custom", summary: "Custom world." });
+    writeFileSync(join(userDir, "custom.mvworld"), JSON.stringify(good), "utf-8");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const worlds = loadAllWorlds(userDir);
+
+    expect(worlds.find((w) => w.slug === "custom")).toBeDefined();
+    expect(warn).not.toHaveBeenCalled();
+  });
+});
 
 describe("worldSummaries", () => {
   it("builds summaries from loaded worlds", () => {

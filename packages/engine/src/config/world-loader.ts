@@ -67,12 +67,14 @@ function scanDir(dir: string, strict: boolean): LoadedWorld[] {
         if (strict) {
           throw new Error(`Invalid world file: ${filePath} (failed schema validation)`);
         }
+        console.warn(`[worlds] Skipping user world ${filePath}: failed schema validation.`);
         continue;
       }
       results.push({ slug, world: data });
     } catch (e) {
       if (strict) throw e;
-      // User worlds: skip silently (or log in future)
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`[worlds] Skipping user world ${filePath}: ${msg}`);
     }
   }
   return results;
