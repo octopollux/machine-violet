@@ -40,7 +40,8 @@ import { TOKEN_LIMITS } from "../config/tokens.js";
 import type { ToolRegistry } from "./tool-registry.js";
 import { isAITurn, getActivePlayer, getCombatActivePlayer } from "./player-manager.js";
 import { aiPlayerTurn } from "./subagents/ai-player.js";
-import { generateChoices, shouldGenerateChoices } from "./subagents/choice-generator.js";
+import { createChoiceGeneratorSession, shouldGenerateChoices } from "./subagents/choice-generator.js";
+import type { ChoiceGeneratorSession } from "./subagents/choice-generator.js";
 import { campaignPaths, parseFrontMatter, serializeEntity, formatChangelogEntry } from "../tools/filesystem/index.js";
 import { runScribe } from "./subagents/scribe.js";
 import { promoteCharacter } from "./subagents/character-promotion.js";
@@ -95,6 +96,10 @@ export class GameEngine {
   /** Set while the DM turn is running if the DM called `present_choices` itself.
    *  Used to suppress auto-generated choices for that turn. */
   private dmProvidedChoicesThisTurn = false;
+
+  /** Long-lived Haiku session for generating suggested responses.
+   *  Lazy-initialized on first use, reset on scene transitions. */
+  private choiceSession: ChoiceGeneratorSession | null = null;
 
   constructor(params: {
     provider: LLMProvider;
@@ -702,12 +707,13 @@ export class GameEngine {
     if (!shouldGenerateChoices(frequency, this.dmProvidedChoicesThisTurn)) return;
 
     try {
-      const generated = await generateChoices(
-        this.provider,
+      const session = await this.getOrCreateChoiceSession();
+      const generated = await session.generate({
         narration,
-        active.characterName,
-        playerAction || undefined,
-      );
+        playerAction,
+        volatileContext: this.buildChoiceVolatileContext(active.characterName),
+        activeCharacterName: active.characterName,
+      });
       accUsage(this.sessionUsage, generated.usage);
       this.callbacks.onUsageUpdate(generated.usage, "small");
 
@@ -723,6 +729,52 @@ export class GameEngine {
         `[dev] choice-generator failed: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
+  }
+
+  /**
+   * Lazy-init the long-lived Haiku choice session. Character sheets are loaded
+   * once and baked into the cached system prompt prefix — we intentionally do
+   * NOT refresh mid-session (character promotions show up in narration anyway,
+   * and blowing away the cache on every tweak is not worth it).
+   */
+  private async getOrCreateChoiceSession(): Promise<ChoiceGeneratorSession> {
+    if (this.choiceSession) return this.choiceSession;
+
+    const sheets: string[] = [];
+    for (const player of this.gameState.config.players) {
+      const name = player.character;
+      try {
+        const sheetPath = campaignPaths(this.gameState.campaignRoot).character(name);
+        const content = await this.fileIO.readFile(sheetPath);
+        if (content && content.trim().length > 0) {
+          sheets.push(content);
+        }
+      } catch {
+        // Missing sheet is fine — systemless or freshly-created characters.
+      }
+    }
+
+    this.choiceSession = createChoiceGeneratorSession({
+      provider: this.provider,
+      characterSheets: sheets.join("\n\n---\n\n"),
+      onRetry: (status, delayMs) => this.callbacks.onRetry(status, delayMs),
+    });
+    return this.choiceSession;
+  }
+
+  /**
+   * Build the per-turn volatile `<context>` block for the choice generator.
+   * Mirrors the DM's volatile-context pattern: ephemeral scene snapshot that
+   * is injected into the API message but not persisted into the conversation.
+   */
+  private buildChoiceVolatileContext(activeCharacterName: string): string {
+    const scene = this.sceneManager.getScene();
+    const parts: string[] = [];
+    if (scene.precis?.trim()) parts.push(`<scene_precis>\n${scene.precis.trim()}\n</scene_precis>`);
+    if (scene.openThreads?.trim()) parts.push(`<open_threads>${scene.openThreads.trim()}</open_threads>`);
+    if (scene.npcIntents?.trim()) parts.push(`<npc_intents>${scene.npcIntents.trim()}</npc_intents>`);
+    parts.push(`<active_turn>${activeCharacterName}</active_turn>`);
+    return `<context>\n${parts.join("\n")}\n</context>`;
   }
 
   /**
@@ -750,6 +802,11 @@ export class GameEngine {
 
       // Auto-apply theme from location entity if it has theme metadata
       await this.applyLocationTheme(title);
+
+      // Reset the choice session so Haiku doesn't drag a full scene's worth of
+      // user/assistant pairs across the cut. Reseed with the condensed campaign
+      // log entry so cross-scene threads still carry forward.
+      this.choiceSession?.reset(result.campaignLogEntry);
 
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
