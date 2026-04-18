@@ -1,10 +1,9 @@
 import React, { useState } from "react";
-import { useInput, Text, Box } from "ink";
+import { useInput, Text, Box, useWindowSize } from "ink";
 import type { ResolvedTheme } from "../tui/themes/types.js";
 import type { UpdateInfo } from "../config/updater.js";
 import { ThemedHorizontalBorder, ThemedSideFrame, TerminalTooSmall } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
-import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
 
 export interface UpdatePhaseProps {
@@ -22,7 +21,7 @@ export function UpdatePhase({
   onApply,
   onBack,
 }: UpdatePhaseProps) {
-  const { columns: cols, rows: termRows } = useTerminalSize();
+  const { columns: cols, rows: termRows } = useWindowSize();
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   useInput((_input, key) => {

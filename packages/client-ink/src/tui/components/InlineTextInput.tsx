@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Box, Text, useInput, useStdin } from "ink";
+import { Box, Text, useInput, usePaste, useStdin } from "ink";
 import chalk from "chalk";
 
 interface State {
@@ -190,6 +190,15 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
       onChange?.(renderState.value);
     }
   }, [renderState.value, onChange]);
+
+  // Bracketed paste: pasted text arrives as one string and is never forwarded
+  // to useInput, so embedded "\r" characters can't trigger a premature submit.
+  // Collapse any newlines so the input stays single-line-shaped even when wrap
+  // mode spreads the value across multiple rendered rows.
+  usePaste((text) => {
+    const sanitized = text.replace(/[\r\n]+/g, " ");
+    if (sanitized.length > 0) processAction({ type: "insert", text: sanitized });
+  }, { isActive: !isDisabled });
 
   useInput((input, key) => {
     // Pass through keys we don't handle

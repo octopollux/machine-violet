@@ -10,6 +10,7 @@ export default defineConfig({
   },
   test: {
     globals: true,
+    setupFiles: ["./vitest.setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
     exclude: [
       // Monolith vestiges — these test modules that have engine-only imports

@@ -104,7 +104,10 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
     }));
   }
 
-  const renderOpts: RenderOptions = { exitOnCtrlC: !mockStdin };
+  // alternateScreen: TUI renders in the alt buffer so exit restores whatever
+  // the terminal showed before launch instead of leaving the final frame
+  // parked above the shell prompt. Ignored in non-interactive mode (tests).
+  const renderOpts: RenderOptions = { exitOnCtrlC: !mockStdin, alternateScreen: !mockStdin };
   if (mockStdin) renderOpts.stdin = mockStdin;
 
   const { unmount, waitUntilExit: inkWaitUntilExit } = render(
