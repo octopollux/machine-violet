@@ -79,13 +79,22 @@ Sandboxed conversation for out-of-character discussion. Receives the DM's curren
 | **Trigger** | Engine auto-triggers based on frequency config, or DM calls `present_choices({})` with no params |
 | **Source doc** | [tui-design.md](tui-design.md) |
 
-Reads the last few exchanges of DM narration and generates 3-6 reasonable player options. Each choice is prepended with a Unicode bullet glyph (e.g. ◆, ▸, ◇) chosen to suit the scene's tone. Does not need to be brilliant — freeform input is always available as a fallback.
+Generates 3-6 reasonable player options for the next turn. Each choice is prepended with a Unicode bullet glyph (e.g. ◆, ▸, ◇) chosen to suit the scene's tone. Does not need to be brilliant — freeform input is always available as a fallback.
 
 The prompt gently asks the subagent to stretch across tones where it fits the scene — thoughtful, passive, bold/aggressive, playful/funny, chaotic — but does **not** force any mood. If a tone would break fiction, it's omitted. Frequency is a 5-step probability (never / rarely / sometimes / often / always) set in `config.choices.campaign_default`, with optional per-character overrides. Default is `never` (opt-in).
 
-**Context**: Last 3-5 exchanges of DM narration + player input. ~500-1K tokens.
+**Session model.** Unlike most subagents, the choice generator runs as a **long-lived accumulating session** (`createChoiceGeneratorSession` in `packages/engine/src/agents/subagents/choice-generator.ts`), mirroring the DM's main conversation loop rather than one-shot inference. The shape matches the DM tiers:
 
-**Returns**: A prompt string and 3-6 bullet-prefixed choice strings. ~50-100 tokens.
+- **Tier 1** — `choice-generator.md` system prompt (1h cache).
+- **Tier 2** — party character sheets loaded at session construction (1h cache). Not refreshed mid-session: promotions are rare and any resulting changes show up in narration anyway, which isn't worth invalidating the cache for.
+- **Tier 3** — accumulating user/assistant pairs. Each turn's `user` is the plain `Player action + DM narration` body; each `assistant` is the prior set of generated choices. Messages use ephemeral cache hints so the turn-N+1 call reads the turn-N prefix from cache.
+- **Tier 4 (volatile)** — an XML `<context>` block with scene precis, open threads, NPC intents, and the active turn-holder. Prepended to the current user message only and discarded afterward (mirrors the DM's `<context>` pattern — the stored conversation never contains it).
+
+The session is reset on scene transitions with a synthetic seed exchange carrying the condensed campaign-log entry, so Haiku keeps long-range continuity across cuts without dragging a full scene's conversation tokens forward.
+
+**Context per turn**: ~500 input tokens of volatile + growing prefix (usually cached). Even a long scene stays well under 30K tokens of accumulated history.
+
+**Returns**: 3-6 bullet-prefixed choice strings, possibly with inline `<color=…>` tags for chaotic (orange), aggressive (red), or funny (pink) tones. ~50-200 tokens.
 
 ---
 
