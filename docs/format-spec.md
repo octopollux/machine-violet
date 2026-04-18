@@ -182,8 +182,8 @@ Everything else is created during play.
 
   // Choice presentation
   "choices": {
-    "campaign_default": "often",          // "none" | "rarely" | "often" | "always"
-    "player_overrides": {}                // Per-player overrides, keyed by player name.
+    "campaign_default": "never",          // "never" | "rarely" | "sometimes" | "often" | "always" — 5-step probability. "none" is still accepted as a legacy alias for "never".
+    "player_overrides": {}                // Per-player overrides (same enum), keyed by character name.
   },
 
   // Display

@@ -3,7 +3,16 @@ import type { CombatConfig } from "./combat.js";
 /** Bump when CampaignConfig schema changes in a breaking way. */
 export const CAMPAIGN_FORMAT_VERSION = 1;
 
-export type ChoiceFrequency = "none" | "rarely" | "often" | "always";
+export type ChoiceFrequency = "never" | "rarely" | "sometimes" | "often" | "always";
+
+/** Ordered for UI sliders — low to high. */
+export const CHOICE_FREQUENCY_LEVELS: readonly ChoiceFrequency[] = [
+  "never",
+  "rarely",
+  "sometimes",
+  "often",
+  "always",
+] as const;
 
 export interface PlayerConfig {
   name: string;

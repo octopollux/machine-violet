@@ -24,8 +24,9 @@ import { Layout } from "../tui/layout.js";
 import {
   ChoiceOverlay, DESCRIPTION_ROWS, GameMenu, ApiErrorModal,
   CharacterSheetModal, CompendiumModal, PlayerNotesModal, SwatchModal,
-  SessionRecapModal, CenteredModal, CharacterPane,
+  SessionRecapModal, CenteredModal, CharacterPane, CampaignSettingsModal,
 } from "../tui/modals/index.js";
+import type { CampaignConfig, ChoiceFrequency } from "@machine-violet/shared/types/config.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { useGameContext } from "../tui/game-context.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
@@ -249,7 +250,12 @@ export function PlayingPhase() {
     } else if (item === "Color Swatch") {
       setActiveModal({ kind: "swatch" } as never);
     } else if (item === "Settings") {
-      // TODO: campaign settings modal
+      try {
+        const { config } = await apiClient.getSettings();
+        setActiveModal({ kind: "settings", config } as never);
+      } catch {
+        // Fail quietly — menu will reopen on next ESC.
+      }
     }
   }, [apiClient, onReturnToMenu, activeChar, setActiveModal, saveTranscript]);
 
@@ -440,6 +446,28 @@ export function PlayingPhase() {
           height={narRows}
           topOffset={conversationPaneTop}
           onDismiss={() => setActiveModal(null)}
+        />
+      )}
+      {am?.kind === "settings" && (
+        <CampaignSettingsModal
+          theme={theme}
+          width={cols}
+          height={narRows}
+          config={am.config as CampaignConfig}
+          onDismiss={() => {
+            // Settings is launched from the ESC menu, so closing it (via ESC or
+            // after Enter-to-save) returns to the menu rather than all the way
+            // to gameplay. One more ESC then drops back to play.
+            setActiveModal(null);
+            setMenuOpen(true);
+          }}
+          onChoicesFrequencyChange={async (value: ChoiceFrequency) => {
+            const cfg = am.config as CampaignConfig;
+            const existingOverrides = cfg.choices?.player_overrides ?? {};
+            await apiClient.patchSettings({
+              choices: { campaign_default: value, player_overrides: existingOverrides },
+            }).catch(() => { /* ignore — user sees no toast, value just won't persist */ });
+          }}
         />
       )}
       {am?.kind === "saving" && (

@@ -40,8 +40,21 @@ describe("shouldGenerateChoices", () => {
     expect(shouldGenerateChoices("always", false)).toBe(true);
   });
 
-  it("returns false for 'none' frequency", () => {
+  it("returns false for 'never' frequency", () => {
+    expect(shouldGenerateChoices("never", false)).toBe(false);
+  });
+
+  it("accepts legacy 'none' alias as off", () => {
     expect(shouldGenerateChoices("none", false)).toBe(false);
+  });
+
+  it("rolls probabilistically for 'sometimes'", () => {
+    const spy = vi.spyOn(Math, "random");
+    spy.mockReturnValueOnce(0.4);
+    expect(shouldGenerateChoices("sometimes", false)).toBe(true);
+    spy.mockReturnValueOnce(0.6);
+    expect(shouldGenerateChoices("sometimes", false)).toBe(false);
+    spy.mockRestore();
   });
 });
 

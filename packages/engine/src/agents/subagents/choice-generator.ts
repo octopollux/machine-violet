@@ -18,9 +18,13 @@ const SYSTEM_PROMPT = loadPrompt("choice-generator");
 
 /**
  * Should we auto-generate choices for this turn?
+ *
+ * The "frequency" knob maps to a random probability each turn — configurable
+ * from the in-campaign settings menu. "none" is accepted as a legacy alias for
+ * "never" so campaigns created before the 5-step scale keep working.
  */
 export function shouldGenerateChoices(
-  frequency: ChoiceFrequency,
+  frequency: ChoiceFrequency | "none",
   dmProvidedChoices: boolean,
 ): boolean {
   // Explicit DM choices always take precedence
@@ -28,9 +32,11 @@ export function shouldGenerateChoices(
 
   switch (frequency) {
     case "always": return true;
-    case "often": return Math.random() < 0.7;
-    case "rarely": return Math.random() < 0.3;
-    case "none": return false;
+    case "often": return Math.random() < 0.75;
+    case "sometimes": return Math.random() < 0.5;
+    case "rarely": return Math.random() < 0.25;
+    case "never": return false;
+    case "none": return false; // legacy alias
   }
 }
 

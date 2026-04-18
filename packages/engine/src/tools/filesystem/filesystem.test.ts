@@ -558,9 +558,25 @@ describe("validateConfig", () => {
 
   it("validates choices config", () => {
     const config = createDefaultCampaignConfig("Test", "Alex", "aldric");
-    (config.choices as unknown as Record<string, unknown>).campaign_default = "sometimes";
+    (config.choices as unknown as Record<string, unknown>).campaign_default = "bogus";
     const errors = validateConfig(config);
     expect(errors.some((e) => e.includes("campaign_default"))).toBe(true);
+  });
+
+  it("accepts all five valid choice frequencies", () => {
+    for (const freq of ["never", "rarely", "sometimes", "often", "always"]) {
+      const config = createDefaultCampaignConfig("Test", "Alex", "aldric");
+      (config.choices as unknown as Record<string, unknown>).campaign_default = freq;
+      const errors = validateConfig(config);
+      expect(errors.filter((e) => e.includes("campaign_default"))).toEqual([]);
+    }
+  });
+
+  it("accepts legacy 'none' alias for backward compatibility", () => {
+    const config = createDefaultCampaignConfig("Test", "Alex", "aldric");
+    (config.choices as unknown as Record<string, unknown>).campaign_default = "none";
+    const errors = validateConfig(config);
+    expect(errors.filter((e) => e.includes("campaign_default"))).toEqual([]);
   });
 });
 

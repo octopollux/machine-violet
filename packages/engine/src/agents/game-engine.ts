@@ -40,6 +40,7 @@ import { TOKEN_LIMITS } from "../config/tokens.js";
 import type { ToolRegistry } from "./tool-registry.js";
 import { isAITurn, getActivePlayer } from "./player-manager.js";
 import { aiPlayerTurn } from "./subagents/ai-player.js";
+import { generateChoices, shouldGenerateChoices } from "./subagents/choice-generator.js";
 import { campaignPaths, parseFrontMatter, serializeEntity, formatChangelogEntry } from "../tools/filesystem/index.js";
 import { runScribe } from "./subagents/scribe.js";
 import { promoteCharacter } from "./subagents/character-promotion.js";
@@ -90,6 +91,10 @@ export class GameEngine {
 
   /** Tracks the last failed input so the player can press Enter to retry. */
   private lastFailedInput: { characterName: string; text: string; opts?: { fromAI?: boolean; skipTranscript?: boolean } } | null = null;
+
+  /** Set while the DM turn is running if the DM called `present_choices` itself.
+   *  Used to suppress auto-generated choices for that turn. */
+  private dmProvidedChoicesThisTurn = false;
 
   constructor(params: {
     provider: LLMProvider;
@@ -363,6 +368,7 @@ export class GameEngine {
 
     this.setState("dm_thinking");
     const turnStartTime = Date.now();
+    this.dmProvidedChoicesThisTurn = false;
     logEvent("turn:player_input", { character: characterName, textLength: text.length });
 
     // Tag the input with character name; prepend OOC summary if pending
@@ -612,6 +618,12 @@ export class GameEngine {
       this.callbacks.onNarrativeComplete(result.text, text || undefined);
       this.callbacks.onTurnEnd(dmTurn);
 
+      // Auto-generate suggested responses for the next (human) turn when the
+      // campaign's Choices Frequency is set above "never" and the DM didn't
+      // already call `present_choices` itself. Fire-and-forget failures — the
+      // turn itself has already succeeded, so we never want this to break it.
+      void this.maybeGenerateSuggestedChoices(result.text, text, opts);
+
       // Clear any pending retry on success
       this.lastFailedInput = null;
 
@@ -653,6 +665,59 @@ export class GameEngine {
 
     // Check if an AI player should auto-act next
     this.processAITurnIfNeeded();
+  }
+
+  /**
+   * Auto-generate suggested responses after a DM turn.
+   *
+   * Gated by the campaign's Choices Frequency setting (never/rarely/sometimes/often/always)
+   * with an optional per-player override. Skipped when the DM already called
+   * `present_choices`, when the turn was AI-driven, or when the next player is an AI.
+   * Emitted as a synthetic `present_choices` TUI command so the bridge broadcasts it
+   * on the existing choices:presented channel — no new wiring on the client.
+   */
+  private async maybeGenerateSuggestedChoices(
+    narration: string,
+    playerAction: string,
+    opts?: { fromAI?: boolean; skipTranscript?: boolean },
+  ): Promise<void> {
+    if (opts?.skipTranscript) return;
+    if (!narration || narration.length < 40) return;
+
+    const choicesConfig = this.gameState.config.choices;
+    if (!choicesConfig) return;
+
+    const active = getActivePlayer(this.gameState);
+    // Choices are for a human player taking their next turn.
+    if (active.isAI) return;
+
+    const frequency =
+      choicesConfig.player_overrides?.[active.characterName] ?? choicesConfig.campaign_default;
+
+    if (!shouldGenerateChoices(frequency, this.dmProvidedChoicesThisTurn)) return;
+
+    try {
+      const generated = await generateChoices(
+        this.provider,
+        narration,
+        active.characterName,
+        playerAction || undefined,
+      );
+      accUsage(this.sessionUsage, generated.usage);
+      this.callbacks.onUsageUpdate(generated.usage, "small");
+
+      if (generated.choices.length === 0) return;
+
+      this.callbacks.onTuiCommand({
+        type: "present_choices",
+        prompt: "",
+        choices: generated.choices,
+      });
+    } catch (e) {
+      this.callbacks.onDevLog?.(
+        `[dev] choice-generator failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
   }
 
   /**
@@ -1188,6 +1253,9 @@ export class GameEngine {
         // Immediate TUI commands (modeline, resources, choices, etc.)
         // are broadcast to the client as soon as the tool fires, so
         // visual updates appear mid-narration instead of after the turn.
+        if (cmd.type === "present_choices") {
+          this.dmProvidedChoicesThisTurn = true;
+        }
         this.callbacks.onTuiCommand(cmd);
       },
       onRetry: (status, delayMs) => this.callbacks.onRetry(status, delayMs),

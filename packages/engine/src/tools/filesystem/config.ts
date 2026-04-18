@@ -70,10 +70,12 @@ export function validateConfig(config: unknown): string[] {
     errors.push("choices config is required");
   } else {
     const ch = c.choices as Record<string, unknown>;
-    const validFreqs = ["none", "rarely", "often", "always"];
+    // "none" is a legacy alias for "never" — accepted for backward compatibility
+    // with campaigns created before the 5-step frequency scale.
+    const validFreqs = ["never", "rarely", "sometimes", "often", "always", "none"];
     if (!validFreqs.includes(ch.campaign_default as string)) {
       errors.push(
-        `choices.campaign_default must be one of: ${validFreqs.join(", ")}`,
+        `choices.campaign_default must be one of: never, rarely, sometimes, often, always`,
       );
     }
   }
@@ -116,7 +118,7 @@ export function createDefaultCampaignConfig(
       enable_git: true,
     },
     choices: {
-      campaign_default: "often",
+      campaign_default: "never",
       player_overrides: {},
     },
   };
