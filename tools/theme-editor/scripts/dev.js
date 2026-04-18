@@ -10,7 +10,10 @@ import { dirname, join } from "node:path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
 
-const SERVER_PORT = process.env.PORT ?? "3998";
+// Ports are pinned to match the Vite proxy in vite.config.ts — both must
+// change together. If you need to run the backend standalone on a different
+// port, invoke src/server/index.ts directly with PORT set.
+const SERVER_PORT = "3998";
 const CLIENT_PORT = "5198";
 
 const server = spawn("node", ["--import", "tsx/esm", "src/server/index.ts"], {

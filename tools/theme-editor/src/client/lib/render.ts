@@ -120,6 +120,9 @@ export function renderConversationFrame(theme: ResolvedTheme, opts: FrameRenderO
   const turnColor = themeColor(theme, "turnIndicator");
   const sideHex = themeColor(theme, "sideFrame");
   const separatorColor = themeColor(theme, "separator");
+  // Match ThemedSideFrame: gradient base falls back to sideFrame so themes
+  // without a border color still get a gradient on the sides.
+  const gradientBaseHex = borderColor ?? sideHex;
 
   const top = composeTopFrame(theme.asset, width, title);
   const bottom = composeBottomFrame(theme.asset, width, turnIndicator);
@@ -140,9 +143,9 @@ export function renderConversationFrame(theme: ResolvedTheme, opts: FrameRenderO
     const rightEdge = rightCol[i] ?? " ";
 
     let sideColor: string | undefined;
-    if (theme.gradient && borderColor) {
+    if (theme.gradient && gradientBaseHex) {
       const t = mirrorT(i, contentHeight);
-      sideColor = applyGradient(theme.gradient, hexToOklch(borderColor), t);
+      sideColor = applyGradient(theme.gradient, hexToOklch(gradientBaseHex), t);
     } else {
       sideColor = sideHex;
     }
