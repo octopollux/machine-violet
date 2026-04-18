@@ -193,10 +193,10 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
 
   // Bracketed paste: pasted text arrives as one string and is never forwarded
   // to useInput, so embedded "\r" characters can't trigger a premature submit.
-  // Collapse any newlines so the input stays single-line-shaped even when wrap
-  // mode spreads the value across multiple rendered rows.
+  // Collapse newline runs to a single space and trim the result so a typical
+  // trailing-newline paste ("foo\n") doesn't land an extra space in the value.
   usePaste((text) => {
-    const sanitized = text.replace(/[\r\n]+/g, " ");
+    const sanitized = text.replace(/[\r\n]+/g, " ").trim();
     if (sanitized.length > 0) processAction({ type: "insert", text: sanitized });
   }, { isActive: !isDisabled });
 

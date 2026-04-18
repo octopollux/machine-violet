@@ -255,6 +255,22 @@ describe("InlineTextInput component", () => {
       expect(frame).toContain("H");
     });
   });
+
+  it("inserts bracketed-paste content with newlines collapsed and doesn't submit", async () => {
+    const onChange = vi.fn();
+    const onSubmit = vi.fn();
+    const { stdin } = render(
+      React.createElement(InlineTextInput, { onChange, onSubmit }),
+    );
+    // Bracketed paste: CSI 200 ~ <text> CSI 201 ~. The embedded "\r" would
+    // trigger a submit via useInput's key.return path if it leaked through
+    // the normal input channel — usePaste keeps it on a separate event.
+    stdin.write("\x1b[200~hello\r\nworld\n\x1b[201~");
+    await vi.waitFor(() => {
+      expect(onChange).toHaveBeenLastCalledWith("hello world");
+    });
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
 });
 
 describe("InlineTextInput wrap mode", () => {
