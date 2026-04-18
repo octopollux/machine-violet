@@ -81,6 +81,8 @@ Sandboxed conversation for out-of-character discussion. Receives the DM's curren
 
 Reads the last few exchanges of DM narration and generates 3-6 reasonable player options. Each choice is prepended with a Unicode bullet glyph (e.g. ◆, ▸, ◇) chosen to suit the scene's tone. Does not need to be brilliant — freeform input is always available as a fallback.
 
+The prompt gently asks the subagent to stretch across tones where it fits the scene — thoughtful, passive, bold/aggressive, playful/funny, chaotic — but does **not** force any mood. If a tone would break fiction, it's omitted. Frequency is a 5-step probability (never / rarely / sometimes / often / always) set in `config.choices.campaign_default`, with optional per-character overrides. Default is `never` (opt-in).
+
 **Context**: Last 3-5 exchanges of DM narration + player input. ~500-1K tokens.
 
 **Returns**: A prompt string and 3-6 bullet-prefixed choice strings. ~50-100 tokens.

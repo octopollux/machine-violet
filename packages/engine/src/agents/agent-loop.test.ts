@@ -25,7 +25,7 @@ function mockState(): GameState {
       combat: createDefaultConfig(),
       context: { retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 },
       recovery: { auto_commit_interval: 300, max_commits: 100, enable_git: false },
-      choices: { campaign_default: "often", player_overrides: {} },
+      choices: { campaign_default: "never", player_overrides: {} },
     },
     campaignRoot: "/tmp/test",
     homeDir: "/tmp/home",

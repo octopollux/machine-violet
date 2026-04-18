@@ -61,6 +61,8 @@ After completing a coding task, make a detailed commit; you'll need this history
 
 After creating a PR, **always immediately arm a `Monitor` for Copilot's review — do not ask first.** Copilot reviews once but takes 2-10 minutes to arrive. The monitor polls `gh api` for new review comments and exits once the review lands — no manual polling, and the notification lets you keep working on other things in the meantime. Cap the timeout at 10 minutes so the watch ends even if the review never arrives. Address any issues you judge worthwhile — use your own judgement on what to fix vs skip.
 
+**Two endpoints, multiple logins.** Copilot posts to *both* `/pulls/:n/comments` (inline review comments, login `Copilot`) and `/pulls/:n/reviews` (top-level review with an optional summary body, login `copilot-pull-request-reviewer[bot]`). Hardcoding either login misses half the feedback — match on `user.type == "Bot"` plus a case-insensitive substring match on `copilot`, and poll both endpoints.
+
 Example:
 ```bash
 Monitor(
@@ -69,8 +71,11 @@ Monitor(
   persistent: false,
   command: "
     seen=''
+    is_copilot='.user.type == \"Bot\" and (.user.login | ascii_downcase | test(\"copilot\"))'
     while true; do
-      new=$(gh api repos/OWNER/REPO/pulls/NNN/comments --jq '.[] | select(.user.login==\"copilot-pull-request-reviewer[bot]\" or .user.login==\"github-copilot[bot]\") | \"\\(.id) \\(.path):\\(.line // .original_line) \\(.body | gsub(\"\\n\"; \" \"))\"')
+      inline=$(gh api repos/OWNER/REPO/pulls/NNN/comments --jq \".[] | select($is_copilot) | \\\"\\(.id) \\(.path):\\(.line // .original_line) \\(.body | gsub(\\\"\\\\n\\\"; \\\" \\\"))\\\"\" 2>/dev/null || true)
+      reviews=$(gh api repos/OWNER/REPO/pulls/NNN/reviews --jq \".[] | select($is_copilot and ((.body // \\\"\\\") | length > 0)) | \\\"review-\\(.id) [review:\\(.state)] \\(.body | gsub(\\\"\\\\n\\\"; \\\" \\\"))\\\"\" 2>/dev/null || true)
+      new=$(printf '%s\n%s\n' \"$inline\" \"$reviews\")
       while IFS= read -r line; do
         [ -z \"$line\" ] && continue
         id=$(echo \"$line\" | awk '{print $1}')

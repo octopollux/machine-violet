@@ -298,7 +298,7 @@ describe("buildCachedPrefix", () => {
     combat: { initiative_method: "d20_dex", round_structure: "individual", surprise_rules: false },
     context: defaultContextConfig,
     recovery: { auto_commit_interval: 300, max_commits: 100, enable_git: false },
-    choices: { campaign_default: "often", player_overrides: {} },
+    choices: { campaign_default: "never", player_overrides: {} },
   };
 
   it("builds prefix with all sections", () => {

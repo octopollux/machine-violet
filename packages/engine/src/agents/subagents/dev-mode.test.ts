@@ -96,7 +96,7 @@ function makeGameState(overrides?: Partial<GameState>): GameState {
       combat: { initiative_method: "d20_dex", round_structure: "individual", surprise_rules: false },
       context: { retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 500 },
       recovery: { auto_commit_interval: 5, max_commits: 100, enable_git: false },
-      choices: { campaign_default: "often", player_overrides: {} },
+      choices: { campaign_default: "never", player_overrides: {} },
     },
     campaignRoot: "/campaigns/test-campaign",
     homeDir: "/tmp/home",

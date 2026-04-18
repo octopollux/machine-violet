@@ -66,7 +66,7 @@ export function buildCampaignConfig(result: SetupResult): CampaignConfig {
       enable_git: true,
     },
     choices: {
-      campaign_default: "often",
+      campaign_default: "never",
       player_overrides: {},
     },
   };

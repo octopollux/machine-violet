@@ -396,10 +396,11 @@ PDF import pipeline. Can be deferred if needed — the game works without it.
 - [ ] Optional display in settings/OOC
 
 ### 10.2 Choice auto-generation
-- [ ] Engine detects "player's turn" after DM narration
-- [ ] Checks frequency config (campaign default + player override)
-- [ ] Fires Haiku subagent with recent context
-- [ ] Explicit DM choices take precedence
+- [x] Engine detects "player's turn" after DM narration
+- [x] Checks frequency config (campaign default + player override)
+- [x] Fires Haiku subagent with recent context
+- [x] Explicit DM choices take precedence
+- [x] Frequency is a 5-step scale (never/rarely/sometimes/often/always); see `docs/format-spec.md`. Default is `never` (opt-in per issue #406).
 
 ### 10.3 Character promotion
 - [ ] `promote_character` tool wired to Haiku subagent
@@ -409,7 +410,7 @@ PDF import pipeline. Can be deferred if needed — the game works without it.
 ### 10.4 Edge cases and polish
 - [ ] Responsive breakpoint testing at actual terminal sizes
 - [ ] ESC game menu full functionality (all options wired)
-- [ ] Settings modal: choice frequency, display prefs
+- [x] Settings modal: choice frequency (← / → slider); display prefs still TBD
 - [ ] API key rotation without app restart
 - [ ] Graceful shutdown (save state on SIGINT/SIGTERM)
 

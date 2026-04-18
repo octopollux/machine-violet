@@ -558,9 +558,51 @@ describe("validateConfig", () => {
 
   it("validates choices config", () => {
     const config = createDefaultCampaignConfig("Test", "Alex", "aldric");
-    (config.choices as unknown as Record<string, unknown>).campaign_default = "sometimes";
+    (config.choices as unknown as Record<string, unknown>).campaign_default = "bogus";
     const errors = validateConfig(config);
     expect(errors.some((e) => e.includes("campaign_default"))).toBe(true);
+  });
+
+  it("accepts all five valid choice frequencies", () => {
+    for (const freq of ["never", "rarely", "sometimes", "often", "always"]) {
+      const config = createDefaultCampaignConfig("Test", "Alex", "aldric");
+      (config.choices as unknown as Record<string, unknown>).campaign_default = freq;
+      const errors = validateConfig(config);
+      expect(errors.filter((e) => e.includes("campaign_default"))).toEqual([]);
+    }
+  });
+
+  it("accepts legacy 'none' alias for backward compatibility", () => {
+    const config = createDefaultCampaignConfig("Test", "Alex", "aldric");
+    (config.choices as unknown as Record<string, unknown>).campaign_default = "none";
+    const errors = validateConfig(config);
+    expect(errors.filter((e) => e.includes("campaign_default"))).toEqual([]);
+  });
+
+  it("rejects invalid player_overrides values", () => {
+    const config = createDefaultCampaignConfig("Test", "Alex", "aldric");
+    (config.choices as unknown as Record<string, unknown>).player_overrides = {
+      aldric: "wild",
+    };
+    const errors = validateConfig(config);
+    expect(errors.some((e) => e.includes("player_overrides") && e.includes("aldric"))).toBe(true);
+  });
+
+  it("accepts valid player_overrides entries", () => {
+    const config = createDefaultCampaignConfig("Test", "Alex", "aldric");
+    (config.choices as unknown as Record<string, unknown>).player_overrides = {
+      aldric: "often",
+      briar: "never",
+    };
+    const errors = validateConfig(config);
+    expect(errors.filter((e) => e.includes("player_overrides"))).toEqual([]);
+  });
+
+  it("rejects non-object player_overrides", () => {
+    const config = createDefaultCampaignConfig("Test", "Alex", "aldric");
+    (config.choices as unknown as Record<string, unknown>).player_overrides = [];
+    const errors = validateConfig(config);
+    expect(errors.some((e) => e.includes("player_overrides must be an object"))).toBe(true);
   });
 });
 

@@ -73,7 +73,7 @@ function makeConfig(players: PlayerConfig[]): CampaignConfig {
     },
     context: { retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 },
     recovery: { auto_commit_interval: 3, max_commits: 500, enable_git: true },
-    choices: { campaign_default: "often", player_overrides: {} },
+    choices: { campaign_default: "never", player_overrides: {} },
   };
 }
 
