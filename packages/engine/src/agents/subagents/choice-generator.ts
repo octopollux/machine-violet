@@ -23,13 +23,19 @@ import type { UsageStats, ModelId } from "../agent-loop.js";
 import { getModel } from "../../config/models.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
+import { extractStatus, retryDelay, RETRYABLE_STATUS, sleep } from "../../utils/retry.js";
 
 export interface GeneratedChoices extends SubagentResult {
   choices: string[];
 }
 
 const SYSTEM_PROMPT = loadPrompt("choice-generator");
-const MAX_OUTPUT_TOKENS = 400;
+
+/** Per small-tier convention: 6 bullet-prefixed choice lines with room for
+ *  bullets, color tags, and a short action phrase fits comfortably here.
+ *  Extreme colored outputs might graze the edge; freeform input is always
+ *  available as a fallback if a set gets truncated. */
+const MAX_OUTPUT_TOKENS = TOKEN_LIMITS.SUBAGENT_SMALL;
 
 /**
  * Should we auto-generate choices for this turn?
@@ -182,23 +188,26 @@ export function createChoiceGeneratorSession(
       model,
       systemPrompt: systemBlocks,
       messages: apiMessages,
-      maxTokens: Math.min(MAX_OUTPUT_TOKENS, TOKEN_LIMITS.SUBAGENT_LARGE),
+      maxTokens: MAX_OUTPUT_TOKENS,
       // Cache hints: system prompt blocks are stamped with 1h cache above.
       // On messages, ephemeral ("messages" target) means each call refreshes
       // the last-message breakpoint — subsequent calls hit cached history.
       cacheHints: [{ target: "messages" as const }],
     };
 
-    // Retry on transient provider errors the caller knows how to signal.
+    // Retry on transient provider errors. Uses the same `extractStatus` /
+    // `RETRYABLE_STATUS` / `retryDelay` / `sleep` helpers as the main provider
+    // loop so network-level failures (status 0) and overload strings (→ 529)
+    // get retried consistently with the rest of the engine.
     for (let attempt = 0; ; attempt++) {
       try {
         return await provider.chat(params);
       } catch (e) {
         const status = extractStatus(e);
-        if (status === null || !RETRYABLE.has(status) || attempt >= 4) {
+        if (status === null || !RETRYABLE_STATUS.has(status) || attempt >= 4) {
           throw e instanceof Error ? e : new Error(String(e));
         }
-        const delay = Math.min(1000 * 2 ** attempt, 8000);
+        const delay = retryDelay(attempt);
         opts.onRetry?.(status, delay);
         await sleep(delay);
       }
@@ -259,21 +268,3 @@ export function createChoiceGeneratorSession(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Retry internals (match the modest retry profile used elsewhere)
-// ---------------------------------------------------------------------------
-
-const RETRYABLE = new Set([408, 409, 429, 500, 502, 503, 504, 529]);
-
-function extractStatus(err: unknown): number | null {
-  if (err && typeof err === "object") {
-    const e = err as { status?: unknown; response?: { status?: unknown } };
-    if (typeof e.status === "number") return e.status;
-    if (e.response && typeof e.response.status === "number") return e.response.status;
-  }
-  return null;
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}

@@ -749,8 +749,15 @@ export class GameEngine {
         if (content && content.trim().length > 0) {
           sheets.push(content);
         }
-      } catch {
-        // Missing sheet is fine — systemless or freshly-created characters.
+      } catch (e) {
+        // Missing sheet is fine (systemless play, freshly-created characters).
+        // Anything else (permissions, I/O error) should surface in the dev log
+        // instead of being swallowed silently.
+        if ((e as NodeJS.ErrnoException)?.code !== "ENOENT") {
+          this.callbacks.onDevLog?.(
+            `[dev] choice-session: failed to read ${name} sheet: ${e instanceof Error ? e.message : String(e)}`,
+          );
+        }
       }
     }
 
@@ -1221,8 +1228,15 @@ export class GameEngine {
       const sheetPath = campaignPaths(this.gameState.campaignRoot).character(characterName);
       const content = await this.fileIO.readFile(sheetPath);
       if (content) characterSheet = content;
-    } catch {
-      // Fallback to name-only — fine for systemless play
+    } catch (e) {
+      // Missing sheet is fine — systemless or freshly-created characters.
+      // Other errors (permissions, I/O) surface in the dev log rather than
+      // vanishing silently.
+      if ((e as NodeJS.ErrnoException)?.code !== "ENOENT") {
+        this.callbacks.onDevLog?.(
+          `[dev] ai-player: failed to read ${characterName} sheet: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
     }
 
     // Gather recent narration from conversation
