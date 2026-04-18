@@ -278,7 +278,15 @@ export class SessionManager {
     this.turnManager.setCommitHandler(async (contributions) => {
       if (!this.setupSession) return;
       const text = contributions.map((c) => c.text).join("\n");
-      const result = await this.setupSession.send(text);
+      // Choice-modal selections (fromChoice=true) resolve a pending
+      // present_choices tool_use as a selection. Free-form text — even when
+      // a choice is pending — is treated as a dismissal so the agent's
+      // tool_result reflects the player's actual intent.
+      const isChoiceSelection = contributions.some((c) => c.fromChoice)
+        && this.setupSession.hasPendingChoice;
+      const result = isChoiceSelection
+        ? await this.setupSession.resolveChoice(text)
+        : await this.setupSession.send(text);
       if (result.finalized) {
         await this.transitionToGame(result.finalized, result.campaignName);
       } else {
@@ -310,18 +318,6 @@ export class SessionManager {
         data: { message: err instanceof Error ? err.message : String(err), recoverable: false },
       });
     });
-  }
-
-  /** Resolve a choice during setup. */
-  async resolveSetupChoice(selectedText: string): Promise<{ finalized?: string }> {
-    if (!this.setupSession) throw new Error("No setup session.");
-    const result = await this.setupSession.resolveChoice(selectedText);
-    if (result.finalized) {
-      await this.transitionToGame(result.finalized, result.campaignName);
-      return { finalized: result.finalized };
-    }
-    this.openNextTurn();
-    return {};
   }
 
   getSetupSession(): SetupSession | null {

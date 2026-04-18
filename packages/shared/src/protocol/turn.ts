@@ -13,6 +13,10 @@ export const TurnContribution = Type.Object({
   text: Type.String(),
   /** If true, replaces the previous contribution from the same player. */
   amendment: Type.Boolean({ default: false }),
+  /** True when the contribution came from picking a choice modal option
+   *  (vs. typing free-form text). Lets the setup agent distinguish a
+   *  selection from a dismissal+free-form response for its tool_result. */
+  fromChoice: Type.Optional(Type.Boolean()),
 });
 
 export const Turn = Type.Object({

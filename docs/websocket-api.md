@@ -19,7 +19,7 @@ No authentication is required (localhost-only). Auth will be added when remote c
 
 ## Communication Direction
 
-All WebSocket messages flow **server to client**. The WebSocket channel is one-way push — clients send commands via REST endpoints (`POST /session/turn/contribute`, `POST /session/choice/respond`, etc.), not over the WebSocket.
+All WebSocket messages flow **server to client**. The WebSocket channel is one-way push — clients send commands via REST endpoints (`POST /session/turn/contribute`, `POST /session/command/:name`, etc.), not over the WebSocket.
 
 ## Message Format
 
@@ -141,7 +141,7 @@ The DM or setup agent is offering the player a set of choices.
 | `choices`      | string[] | Available options. |
 | `descriptions` | string[]?| Optional per-choice descriptions. |
 
-The player responds by sending the selected text as a turn contribution (`POST /session/turn/contribute`) during gameplay, or via `POST /session/choice/respond` during setup.
+The player responds by sending the selected text as a turn contribution (`POST /session/turn/contribute`) with `fromChoice: true` so the setup agent can distinguish a real selection from a dismissal+free-form reply. The wire path is identical for setup and gameplay.
 
 #### `choices:cleared`
 

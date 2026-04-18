@@ -11,7 +11,6 @@ import type {
   ContributeRequest,
   CommitResponse,
   CommandRequest,
-  ChoiceResponseRequest,
   SessionEndResponse,
   StateSnapshot,
   MachineSettingsResponse,
@@ -149,9 +148,23 @@ export class ApiClient {
 
   async contribute(
     text: string,
-    opts?: { type?: "action" | "dialogue" | "ooc"; campaignId?: string; turnSeq?: number },
+    opts?: {
+      type?: "action" | "dialogue" | "ooc";
+      campaignId?: string;
+      turnSeq?: number;
+      /** Set to true when the contribution comes from picking a choice modal
+       *  option (vs. typing free-form). Used by setup to distinguish a
+       *  selection from a dismissal+free-form response. */
+      fromChoice?: boolean;
+    },
   ): Promise<{ turnId: string; contributionId: string }> {
-    const body: ContributeRequest = { text, type: opts?.type, campaignId: opts?.campaignId, turnSeq: opts?.turnSeq };
+    const body: ContributeRequest = {
+      text,
+      type: opts?.type,
+      campaignId: opts?.campaignId,
+      turnSeq: opts?.turnSeq,
+      fromChoice: opts?.fromChoice,
+    };
     return this.post(`/session/turn/contribute?player=${encodeURIComponent(this.playerId)}`, body);
   }
 
@@ -162,11 +175,6 @@ export class ApiClient {
   async command(name: string, args?: string): Promise<{ ok: boolean }> {
     const body: CommandRequest = { args };
     return this.post(`/session/command/${encodeURIComponent(name)}`, body);
-  }
-
-  async respondToChoice(value: string): Promise<{ ok: boolean }> {
-    const body: ChoiceResponseRequest = { value };
-    return this.post("/session/choice/respond", body);
   }
 
   async patchSettings(settings: Record<string, unknown>): Promise<{ ok: boolean }> {

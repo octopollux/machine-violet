@@ -4,9 +4,9 @@
  * In the two-tier architecture, this component is dramatically simpler
  * than the monolith version. All game logic lives on the server:
  *
- * - Player input → POST /session/turn/contribute
+ * - Player input → POST /session/turn/contribute (free-form text)
+ * - Choice responses → POST /session/turn/contribute with fromChoice=true
  * - Slash commands → POST /session/command/:name
- * - Choice responses → POST /session/choice/respond
  * - OOC/Dev mode → POST /session/command/ooc or /dev (server manages session)
  * - Narrative, choices, state → arrive via WebSocket events
  *
@@ -180,10 +180,11 @@ export function PlayingPhase() {
 
   // --- Choice selection ---
   const handleChoiceSelect = useCallback(async (choice: string) => {
-    const choices = activeChoices;
     setActiveChoices(null);
 
-    // Echo the player's choice into the narrative (separator + player line)
+    // Optimistic echo. The server also rebroadcasts the contribution via
+    // turn:updated so the canonical state picks it up — these lines just
+    // smooth the UI while the round-trip lands.
     const tag = `optimistic-${Date.now()}`;
     setNarrativeLines((prev) => [
       ...prev,
@@ -192,25 +193,19 @@ export function PlayingPhase() {
       { kind: "dm", text: "", tag },
     ]);
 
-    // Setup choices are resolved via the choice respond endpoint
-    if (choices?.id === "setup-choice") {
-      try {
-        await apiClient.respondToChoice(choice);
-      } catch { /* no-op */ }
-      return;
-    }
-
-    // Gameplay choices — contribute to the current turn
+    // Same path for setup and gameplay: contribute() with fromChoice=true.
+    // The server's setup commit handler dispatches resolveChoice vs send
+    // based on this flag.
     try {
       await apiClient.contribute(choice, {
         campaignId: currentTurn?.campaignId,
         turnSeq: currentTurn?.seq,
+        fromChoice: true,
       });
     } catch {
-      // Contribution rejected — remove optimistic lines
       setNarrativeLines((prev) => prev.filter((l) => l.tag !== tag));
     }
-  }, [apiClient, activeChoices, setActiveChoices, activeChar, currentTurn, setNarrativeLines]);
+  }, [apiClient, setActiveChoices, activeChar, currentTurn, setNarrativeLines]);
 
   const handleChoiceDismiss = useCallback(() => setActiveChoices(null), [setActiveChoices]);
 
