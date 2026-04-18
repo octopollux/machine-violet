@@ -1,9 +1,8 @@
 import React, { useState, useCallback } from "react";
-import { useInput, Text, Box } from "ink";
+import { useInput, Text, Box, useWindowSize } from "ink";
 import type { ResolvedTheme } from "../tui/themes/types.js";
 import { ThemedHorizontalBorder, ThemedSideFrame, TerminalTooSmall } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
-import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
 import { InlineTextInput } from "../tui/components/InlineTextInput.js";
 import type { ValidatedPdf } from "../content/index.js";
@@ -36,7 +35,7 @@ export function AddContentPhase({
   errorMsg: externalError,
   statusMsg,
 }: AddContentPhaseProps) {
-  const { columns: cols, rows: termRows } = useTerminalSize();
+  const { columns: cols, rows: termRows } = useWindowSize();
   const [step, setStep] = useState<Step>("pick_system");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [systemSlug, setSystemSlug] = useState("");

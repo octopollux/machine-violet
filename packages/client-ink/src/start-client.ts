@@ -104,7 +104,13 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
     }));
   }
 
-  const renderOpts: RenderOptions = { exitOnCtrlC: !mockStdin };
+  // alternateScreen: TUI renders in the alt buffer so exit restores whatever
+  // the terminal showed before launch instead of leaving the final frame
+  // parked above the shell prompt. Only enable for interactive TTY sessions
+  // so alt-screen escape codes don't leak into redirected output, pipes, or
+  // CI logs.
+  const alternateScreen = !mockStdin && Boolean(process.stdout.isTTY) && Boolean(activeStdin.isTTY);
+  const renderOpts: RenderOptions = { exitOnCtrlC: !mockStdin, alternateScreen };
   if (mockStdin) renderOpts.stdin = mockStdin;
 
   const { unmount, waitUntilExit: inkWaitUntilExit } = render(

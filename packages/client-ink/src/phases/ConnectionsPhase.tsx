@@ -7,11 +7,10 @@
  *            → Add Connection (provider → key → label → baseUrl wizard)
  */
 import React, { useState, useEffect, useRef } from "react";
-import { useInput, Text } from "ink";
+import { useInput, Text, useWindowSize } from "ink";
 import type { ResolvedTheme } from "../tui/themes/types.js";
 import { TerminalTooSmall, FullScreenFrame } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
-import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { useTextInput } from "../tui/hooks/useTextInput.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
 import type {
@@ -75,7 +74,7 @@ export function ConnectionsPhase({
   onSetTier,
   onBack,
 }: ConnectionsPhaseProps) {
-  const { columns: cols, rows: termRows } = useTerminalSize();
+  const { columns: cols, rows: termRows } = useWindowSize();
   const [screen, setScreen] = useState<Screen>("menu");
   const [menuIndex, setMenuIndex] = useState(0);
   const [connIndex, setConnIndex] = useState(0);

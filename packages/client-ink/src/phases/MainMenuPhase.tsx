@@ -1,11 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useInput, Text, Box } from "ink";
+import { useInput, Text, Box, useWindowSize } from "ink";
 import type { ResolvedTheme } from "../tui/themes/types.js";
 import { TerminalTooSmall, FullScreenFrame } from "../tui/components/index.js";
 import { DeleteCampaignModal } from "../tui/modals/index.js";
 import type { CampaignDeleteInfo } from "../tui/modals/DeleteCampaignModal.js";
 import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
-import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
 
 // Types inlined to avoid importing from engine config modules
@@ -86,7 +85,7 @@ export function MainMenuPhase({
   devModeEnabled,
   onQuit,
 }: MainMenuPhaseProps) {
-  const { columns: cols, rows: termRows } = useTerminalSize();
+  const { columns: cols, rows: termRows } = useWindowSize();
   const [mainMenuIndex, setMainMenuIndex] = useState(0);
   const [expandedCampaigns, setExpandedCampaigns] = useState(false);
   const [campaignSelectIndex, setCampaignSelectIndex] = useState(0);

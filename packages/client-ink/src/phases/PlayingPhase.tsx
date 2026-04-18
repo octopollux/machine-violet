@@ -13,12 +13,11 @@
  * The component just renders what the server says and sends what the player types.
  */
 import React, { useState, useRef, useCallback, useMemo } from "react";
-import { useInput, Box } from "ink";
+import { useInput, Box, useWindowSize } from "ink";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
 import type { KeyHint } from "../tui/components/index.js";
 import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, narrativeRows, choiceRowBudget } from "../tui/responsive.js";
-import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { useRawModeGuardian } from "../tui/hooks/useRawModeGuardian.js";
 import { Layout } from "../tui/layout.js";
 import {
@@ -49,7 +48,7 @@ export function PlayingPhase() {
     retryOverlay,
     onReturnToMenu,
   } = useGameContext();
-  const { columns: cols, rows } = useTerminalSize();
+  const { columns: cols, rows } = useWindowSize();
 
   // On Windows without Kitty protocol, periodically refresh raw mode to
   // recover from ConPTY silently corrupting console mode flags.

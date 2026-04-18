@@ -102,7 +102,7 @@ Ink (React for CLI) components, formatting pipeline, theme system.
 | `themes/` | Theme parser, loader, resolver. Built-in themes in `themes/assets/` |
 | `color/` | OKLCH color space utilities, gradient generation |
 | `frames/` | Box drawing, styled content lines, string measurement |
-| `hooks/` | `useTextInput()`, `useTerminalSize()`, `useScrollHandle()`, `useMouseScroll()`, `kittyProtocol.ts` (Kitty keyboard protocol detection, CSI-u parsing, legacy re-emission), `stdinFilterChain.ts` (managed stdin filter pipeline for Kitty + mouse scroll interception) |
+| `hooks/` | `useTextInput()`, `useScrollHandle()`, `useMouseScroll()`, `kittyProtocol.ts` (Kitty keyboard protocol detection, CSI-u parsing, legacy re-emission), `stdinFilterChain.ts` (managed stdin filter pipeline for Kitty + mouse scroll interception) |
 
 ## Engine: config/ — Configuration
 

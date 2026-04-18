@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { useInput, Text } from "ink";
+import { useInput, Text, useWindowSize } from "ink";
 import type { ResolvedTheme } from "../tui/themes/types.js";
 import { TerminalTooSmall, FullScreenFrame } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
-import { useTerminalSize } from "../tui/hooks/useTerminalSize.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
 
 const noop = () => { /* no-op */ };
@@ -41,7 +40,7 @@ export function SettingsPhase({
   onArchivedCampaigns,
   onBack,
 }: SettingsPhaseProps) {
-  const { columns: cols, rows: termRows } = useTerminalSize();
+  const { columns: cols, rows: termRows } = useWindowSize();
   const [menuIndex, setMenuIndex] = useState(0);
   const navigatedRef = useRef(false);
 
