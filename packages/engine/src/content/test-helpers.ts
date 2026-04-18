@@ -25,6 +25,6 @@ export function makeMockProvider(textOrFn: string | (() => string)): LLMProvider
     providerId: "test",
     chat: vi.fn(async () => result()),
     stream: vi.fn(async (_p, onDelta) => { const r = result(); onDelta(r.text); return r; }),
-    healthCheck: vi.fn(async () => ({ status: "valid", message: "ok" })),
+    healthCheck: vi.fn(async () => ({ status: "valid" as const, message: "ok" })),
   };
 }
