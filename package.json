@@ -16,7 +16,8 @@
     "typecheck": "tsc -b",
     "check": "concurrently -n lint,test --kill-others-on-fail \"npm run lint\" \"npm test\"",
     "dist": "node scripts/build-dist.js",
-    "explorer": "node tools/campaign-explorer/scripts/dev.js"
+    "explorer": "node tools/campaign-explorer/scripts/dev.js",
+    "theme-editor": "node tools/theme-editor/scripts/dev.js"
   },
   "keywords": [
     "rpg",
@@ -60,7 +61,8 @@
   },
   "workspaces": [
     "packages/*",
-    "tools/campaign-explorer"
+    "tools/campaign-explorer",
+    "tools/theme-editor"
   ],
   "engines": {
     "node": ">=22.0.0"
