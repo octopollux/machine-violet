@@ -35,6 +35,16 @@ All documentation lives in `docs/`. Start at `docs/index.md` for navigation, `do
 - Vitest `globals: true` — `describe`/`it`/`expect` available without import.
 - Anthropic client mocked via `vi.fn()`. FileIO mocked with in-memory `Record<string, string>`.
 
+### CPU-efficient iteration
+
+Multiple agents often run in parallel against this repo; `npm test` is ~80s CPU/run and dominates total check cost. Lint (with `--cache`) and typecheck (`tsc -b` incremental) are already cheap to re-run.
+
+For mid-iteration validation, prefer targeted vitest over the full suite:
+- **`npx vitest run --changed`** — only tests for files changed since HEAD. ~3s CPU on a clean tree.
+- **`npx vitest run related <files>`** — only tests reachable from the given files.
+
+Reserve `npm run check` for the pre-commit / pre-PR gate. Use your judgement: full suite for risk-sensitive or cross-cutting changes, targeted for routine iteration.
+
 ## Cost Awareness
 
 Live API key in `.env` with limited credit. Default dev override uses Sonnet for DM. Don't make unnecessary API calls in manual testing.
