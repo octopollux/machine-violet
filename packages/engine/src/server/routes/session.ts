@@ -153,7 +153,7 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
     }
 
     if (result.endSession) {
-      await sm.endSession();
+      await sm.endSession(result.endSessionReason);
     }
 
     return { ok: !result.error, message: result.message };

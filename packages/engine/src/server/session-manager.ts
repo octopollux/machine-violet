@@ -16,6 +16,7 @@ import type {
   GameState,
 } from "@machine-violet/shared";
 import { GameEngine } from "../agents/game-engine.js";
+import { RollbackCompleteError } from "@machine-violet/shared/types/errors.js";
 import type { SceneState } from "../agents/scene-manager.js";
 import { detectSceneState, loadContentBoundaries } from "../agents/scene-manager.js";
 import { buildUIState, type DMSessionState } from "../agents/dm-prompt.js";
@@ -51,6 +52,14 @@ export interface ConnectedClient {
 }
 
 export type SessionStatus = "idle" | "starting" | "active" | "stopping";
+
+/**
+ * Reasons a session can end. Drives teardown behavior — "rollback" skips
+ * the flush+checkpoint that would otherwise clobber rolled-back disk state
+ * with stale in-memory values. Keep this a closed union so new callsites
+ * can't silently bypass the rollback-safe path with a typo'd string.
+ */
+export type EndSessionReason = "explicit" | "idle_timeout" | "rollback";
 
 export class SessionManager {
   private campaignsDir: string;
@@ -583,9 +592,26 @@ export class SessionManager {
       // If a mode session (OOC/Dev) is active, route to it
       const modeSession = this.engine.getModeSession();
       if (modeSession) {
-        await modeSession.send(text, (delta) => {
-          scopedBroadcast({ type: "narrative:chunk", data: { text: delta, kind: "dm" } });
-        });
+        try {
+          await modeSession.send(text, (delta) => {
+            scopedBroadcast({ type: "narrative:chunk", data: { text: delta, kind: "dm" } });
+          });
+        } catch (err) {
+          // OOC/Dev rollback throws RollbackCompleteError to signal that
+          // teardown should NOT re-persist in-memory state (would undo the
+          // rollback). End the session with the "rollback" reason so
+          // endSession skips its flush+checkpoint.
+          if (err instanceof RollbackCompleteError) {
+            scopedBroadcast({ type: "narrative:complete", data: { text: "" } });
+            scopedBroadcast({
+              type: "narrative:chunk",
+              data: { text: `[${err.message}]`, kind: "system" },
+            });
+            await this.endSession("rollback");
+            return;
+          }
+          throw err;
+        }
         scopedBroadcast({ type: "narrative:complete", data: { text: "" } });
         this.persistTurnState();
         scopedBroadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
@@ -596,7 +622,25 @@ export class SessionManager {
       // Normal play: send to DM
       const active = getActivePlayer(this.gameState);
       this.syncUIState();
-      await this.engine.processInput(active.characterName, text);
+      try {
+        await this.engine.processInput(active.characterName, text);
+      } catch (err) {
+        // DM-initiated rollback throws RollbackCompleteError from inside
+        // processInput; same handling as the mode-session path above.
+        // Flush any buffered DM deltas with narrative:complete before the
+        // system message so the client doesn't stay stuck in "streaming"
+        // state while teardown runs.
+        if (err instanceof RollbackCompleteError) {
+          scopedBroadcast({ type: "narrative:complete", data: { text: "" } });
+          scopedBroadcast({
+            type: "narrative:chunk",
+            data: { text: `[${err.message}]`, kind: "system" },
+          });
+          await this.endSession("rollback");
+          return;
+        }
+        throw err;
+      }
       this.persistTurnState();
       scopedBroadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
       this.openNextTurn();
@@ -816,7 +860,7 @@ export class SessionManager {
   }
 
   /** End the current session gracefully. */
-  async endSession(reason = "explicit"): Promise<void> {
+  async endSession(reason: EndSessionReason = "explicit"): Promise<void> {
     if (this.status === "idle" || this.status === "stopping") return;
 
     // If a start is still in progress, wait for it to finish so we can
@@ -843,7 +887,14 @@ export class SessionManager {
     try {
       // Flush any pending state, with a timeout so a hanging flush
       // can never permanently brick the session lifecycle.
-      if (this.engine) {
+      //
+      // Skip this block when ending due to a rollback: disk has just been
+      // reset to the target commit, but the engine's in-memory state
+      // (ConversationManager, SceneState) is still ahead by the rolled-back
+      // turns. A flush+checkpoint here would persist that stale state and
+      // silently undo the rollback for whole-file artifacts like
+      // conversation.json and scene.json.
+      if (this.engine && reason !== "rollback") {
         const timeout = (ms: number) => new Promise<void>((_, reject) =>
           setTimeout(() => reject(new Error("endSession flush timeout")), ms));
         const persister = this.engine.getPersister();
