@@ -78,6 +78,28 @@ export function validateConfig(config: unknown): string[] {
         `choices.campaign_default must be one of: never, rarely, sometimes, often, always`,
       );
     }
+
+    // Per-character overrides must be an object of the same enum. A malformed
+    // override can silently disable choice generation for that character
+    // (shouldGenerateChoices fails closed on unknown values), so validate here.
+    if (ch.player_overrides !== undefined) {
+      if (
+        typeof ch.player_overrides !== "object" ||
+        ch.player_overrides === null ||
+        Array.isArray(ch.player_overrides)
+      ) {
+        errors.push("choices.player_overrides must be an object");
+      } else {
+        const overrides = ch.player_overrides as Record<string, unknown>;
+        for (const [character, freq] of Object.entries(overrides)) {
+          if (!validFreqs.includes(freq as string)) {
+            errors.push(
+              `choices.player_overrides["${character}"] must be one of: never, rarely, sometimes, often, always`,
+            );
+          }
+        }
+      }
+    }
   }
 
   return errors;

@@ -3,7 +3,7 @@ import { Box } from "ink";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render } from "ink-testing-library";
 import { CampaignSettingsModal } from "./CampaignSettingsModal.js";
-import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
+import type { CampaignConfig, ChoiceFrequency } from "@machine-violet/shared/types/config.js";
 import { resetThemeCache, resolveTheme, BUILTIN_DEFINITIONS } from "../themes/index.js";
 
 beforeEach(() => {
@@ -28,7 +28,7 @@ function minimalConfig(overrides?: Partial<CampaignConfig>): CampaignConfig {
   };
 }
 
-function renderModal(config: CampaignConfig, onFreq?: (v: string) => void) {
+function renderModal(config: CampaignConfig, onFreq?: (v: ChoiceFrequency) => void) {
   const theme = makeTheme();
   return render(
     <Box width={80} height={30}>
@@ -38,7 +38,7 @@ function renderModal(config: CampaignConfig, onFreq?: (v: string) => void) {
         height={30}
         config={config}
         onDismiss={() => {}}
-        onChoicesFrequencyChange={onFreq as never}
+        onChoicesFrequencyChange={onFreq}
       />
     </Box>,
   );

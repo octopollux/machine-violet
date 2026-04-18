@@ -38,7 +38,7 @@ import { accUsage } from "../context/usage-helpers.js";
 import { logEvent } from "../context/engine-log.js";
 import { TOKEN_LIMITS } from "../config/tokens.js";
 import type { ToolRegistry } from "./tool-registry.js";
-import { isAITurn, getActivePlayer } from "./player-manager.js";
+import { isAITurn, getActivePlayer, getCombatActivePlayer } from "./player-manager.js";
 import { aiPlayerTurn } from "./subagents/ai-player.js";
 import { generateChoices, shouldGenerateChoices } from "./subagents/choice-generator.js";
 import { campaignPaths, parseFrontMatter, serializeEntity, formatChangelogEntry } from "../tools/filesystem/index.js";
@@ -687,8 +687,13 @@ export class GameEngine {
     const choicesConfig = this.gameState.config.choices;
     if (!choicesConfig) return;
 
-    const active = getActivePlayer(this.gameState);
-    // Choices are for a human player taking their next turn.
+    // During combat, the next actor is determined by initiative — NPC turns
+    // return null and should not receive suggested choices. Outside combat,
+    // fall back to the free-play active player.
+    const active = this.gameState.combat.active
+      ? getCombatActivePlayer(this.gameState)
+      : getActivePlayer(this.gameState);
+    if (!active) return;
     if (active.isAI) return;
 
     const frequency =

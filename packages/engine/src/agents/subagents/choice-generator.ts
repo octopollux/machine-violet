@@ -38,6 +38,9 @@ export function shouldGenerateChoices(
     case "never": return false;
     case "none": return false; // legacy alias
   }
+
+  // Fail closed for unknown frequency strings (e.g. corrupt override on disk).
+  return false;
 }
 
 /**
