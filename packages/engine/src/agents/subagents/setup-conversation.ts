@@ -18,7 +18,7 @@ import {
 import type {
   LLMProvider, ChatParams, ChatResult,
   NormalizedMessage, NormalizedTool, NormalizedUsage,
-  SystemBlock,
+  SystemBlock, ContentPart,
 } from "../../providers/types.js";
 
 // --- Types ---
@@ -331,6 +331,10 @@ export function createSetupConversation(
   let finalized: SetupResult | undefined;
   // Pending state when present_choices is called — stores tool_use_id so we can send the result back
   let pendingToolUseId: string | null = null;
+  // Tool results for tools that ran alongside present_choices (e.g. load_world).
+  // They must be flushed with the choice resolution — otherwise their tool_use
+  // blocks are left orphaned and Anthropic 400s on the next request.
+  let pendingExtraToolResults: ContentPart[] = [];
 
   function handleFinalize(input: Record<string, unknown>): void {
     const personalityName = (input.dm_personality as string) || "The Chronicler";
@@ -432,7 +436,7 @@ export function createSetupConversation(
 
     // Process tool calls from normalized result
     let text = result.text;
-    const toolResults: NormalizedMessage["content"] = [];
+    const toolResults: ContentPart[] = [];
     let pendingChoices: { prompt: string; choices: string[]; descriptions?: string[] } | undefined;
 
     for (const tc of result.toolCalls) {
@@ -467,14 +471,14 @@ export function createSetupConversation(
         } else {
           content = `No world found with slug "${slug}".`;
         }
-        (toolResults as { type: "tool_result"; tool_use_id: string; content: string }[]).push({
+        toolResults.push({
           type: "tool_result",
           tool_use_id: tc.id,
           content,
         });
       } else if (tc.name === "finalize_setup") {
         handleFinalize(tc.input);
-        (toolResults as { type: "tool_result"; tool_use_id: string; content: string }[]).push({
+        toolResults.push({
           type: "tool_result",
           tool_use_id: tc.id,
           content: "Setup finalized. Say a brief farewell to the player before the adventure begins.",
@@ -488,8 +492,11 @@ export function createSetupConversation(
     // Append assistant message (thinking already stripped by provider)
     messages.push({ role: "assistant", content: result.assistantContent });
 
-    // If we have pending choices, return now — app will call resolveChoice later
+    // If we have pending choices, return now — app will call resolveChoice later.
+    // Any tool results produced alongside present_choices (e.g. load_world) are
+    // stashed so they can be flushed with the eventual choice resolution.
     if (pendingChoices) {
+      pendingExtraToolResults = toolResults;
       return {
         text,
         usage: { ...totalUsage },
@@ -498,7 +505,7 @@ export function createSetupConversation(
     }
 
     // If any tool produced results, send them back and get the agent's continuation
-    if ((toolResults as unknown[]).length > 0) {
+    if (toolResults.length > 0) {
       messages.push({ role: "user", content: toolResults });
 
       lastParams = {
@@ -539,16 +546,22 @@ export function createSetupConversation(
     async send(text, onDelta) {
       if (pendingToolUseId) {
         // User dismissed the choice modal and typed a free-form response.
-        // Still must send a tool_result to satisfy the API contract.
+        // Still must send a tool_result to satisfy the API contract — and
+        // flush any tool_results stashed from co-emitted tools (e.g. load_world)
+        // so their tool_use blocks are not orphaned.
         messages.push({
           role: "user",
-          content: [{
-            type: "tool_result" as const,
-            tool_use_id: pendingToolUseId,
-            content: `The player dismissed the choices and instead wrote: "${text}"`,
-          }],
+          content: [
+            ...pendingExtraToolResults,
+            {
+              type: "tool_result" as const,
+              tool_use_id: pendingToolUseId,
+              content: `The player dismissed the choices and instead wrote: "${text}"`,
+            },
+          ],
         });
         pendingToolUseId = null;
+        pendingExtraToolResults = [];
       } else {
         messages.push({ role: "user", content: text });
       }
@@ -560,16 +573,21 @@ export function createSetupConversation(
         throw new Error("No pending choice to resolve");
       }
 
-      // Send the player's selection as the tool result
+      // Send the player's selection as the tool result, along with any stashed
+      // tool_results from tools that ran alongside present_choices.
       messages.push({
         role: "user",
-        content: [{
-          type: "tool_result" as const,
-          tool_use_id: pendingToolUseId,
-          content: `The player selected: "${selectedText}"`,
-        }],
+        content: [
+          ...pendingExtraToolResults,
+          {
+            type: "tool_result" as const,
+            tool_use_id: pendingToolUseId,
+            content: `The player selected: "${selectedText}"`,
+          },
+        ],
       });
       pendingToolUseId = null;
+      pendingExtraToolResults = [];
 
       return runTurn(onDelta);
     },
