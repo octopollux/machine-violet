@@ -74,6 +74,10 @@ function transformText(
 ): FormattingNode[] {
   return nodes.map((node) => {
     if (typeof node === "string") return substituteChars(node, map);
+    // Stop at nested sub/sup — the inner renderer applies its own map.
+    // Pre-substituting would double-transform chars present in both maps
+    // (e.g. digits), breaking H<sub>1<sup>2</sup></sub> → "₁²".
+    if (node.type === "subscript" || node.type === "superscript") return node;
     return { ...node, content: transformText(node.content, map) } as FormattingTag;
   });
 }
