@@ -38,12 +38,20 @@ export function sceneDir(
  * Standard file paths within a campaign.
  *
  * The entity-type helpers (`character`, `location`, `faction`, `lore`, `item`,
- * `rule`) defensively slugify the name. Callers can pass either a raw display
- * name ("Janey Bruce") or an already-slugified id ("janey-bruce") and land on
- * the same canonical path. This is belt-and-suspenders against a class of
- * bugs where a DM-side codepath reads/writes an entity file under its display
- * name while a sibling path (setup, scribe) uses the slug — producing two
- * parallel files for the same entity.
+ * `rule`) defensively slugify the name via the canonical `slugify` in
+ * `utils/slug.ts`. Callers can pass either a raw display name ("Janey Bruce")
+ * or a slug already produced by that same canonical slugify ("janey-bruce")
+ * and land on the same path. Ad-hoc slugs produced by other transformations
+ * are NOT guaranteed to round-trip — e.g. a hand-written "the-goblin-caves"
+ * stays "the-goblin-caves" here (article-stripping only triggers on whitespace)
+ * and would not collide with the canonical "goblin-caves". Everything
+ * campaign-internal routes through `slugify()`, so this only matters if a
+ * caller is constructing slugs manually — don't.
+ *
+ * This is belt-and-suspenders against a class of bugs where a DM-side
+ * codepath reads/writes an entity file under its display name while a
+ * sibling path (setup, scribe) uses the slug — producing two parallel files
+ * for the same entity.
  */
 export function campaignPaths(root: string) {
   return {

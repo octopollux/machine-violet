@@ -28,7 +28,7 @@ import { createProviderFromConnection, createAnthropicProvider } from "../provid
 import type { LLMProvider } from "../providers/types.js";
 import { getModel } from "../config/models.js";
 import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
-import { readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { CampaignRepo } from "../tools/git/campaign-repo.js";
 import { createGitIO } from "../tools/git/isogit-adapter.js";
@@ -242,7 +242,7 @@ export class SetupSession {
   private async commitHandoff(campaignRoot: string): Promise<void> {
     let config: CampaignConfig;
     try {
-      const raw = readFileSync(join(campaignRoot, "config.json"), "utf-8");
+      const raw = await readFile(join(campaignRoot, "config.json"), "utf-8");
       config = JSON.parse(raw) as CampaignConfig;
     } catch (err) {
       logEvent("setup:handoff_commit_error", {

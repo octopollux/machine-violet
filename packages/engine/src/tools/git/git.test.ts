@@ -111,6 +111,22 @@ describe("CampaignRepo", () => {
     expect(git.commits[0].message).toBe("handoff: campaign scaffolded from setup");
   });
 
+  it("is a no-op on repeat init() calls against the same instance", async () => {
+    const git = mockGitIO();
+    const repo = new CampaignRepo({ dir: "/tmp/campaign", git });
+
+    await repo.init("handoff: campaign scaffolded from setup");
+    await repo.init("handoff: campaign scaffolded from setup");
+    await repo.init();
+
+    // git.init must fire exactly once despite three calls — the documented
+    // in-process idempotence contract. Without it, a caller that wires init()
+    // into a retry path would thrash git.init and git.log each time.
+    expect((git.init as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1);
+    expect(git.commits).toHaveLength(1);
+    expect(git.commits[0].message).toBe("handoff: campaign scaffolded from setup");
+  });
+
   it("skips the initial commit when the repo already has a commit", async () => {
     const git = mockGitIO();
 

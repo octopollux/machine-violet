@@ -95,6 +95,21 @@ export class CampaignRepo {
    */
   async init(initialMessage = "auto: initial state"): Promise<void> {
     if (!this.enabled) return;
+    // In-process idempotence: subsequent init() calls on the same instance
+    // are no-ops. Matches the docstring contract and avoids redundant
+    // git.init/git.log I/O if a caller wires init() into a retry path.
+    if (this.initialized) return;
+    if (this.initPromise) {
+      await this.initPromise;
+      return;
+    }
+    this.initPromise = this.runInit(initialMessage).finally(() => {
+      this.initPromise = null;
+    });
+    await this.initPromise;
+  }
+
+  private async runInit(initialMessage: string): Promise<void> {
     await this.git.init(this.dir);
     let hasCommits = false;
     try {
@@ -110,15 +125,11 @@ export class CampaignRepo {
     this.initialized = true;
   }
 
-  /** Ensure init() has been called. Safe to call multiple times. */
+  /** Ensure init() has been called. Safe to call multiple times —
+   *  init() itself is idempotent and handles concurrent callers via
+   *  initPromise. */
   private async ensureInit(): Promise<void> {
-    if (this.initialized) return;
-    if (!this.initPromise) {
-      this.initPromise = this.init().finally(() => {
-        this.initPromise = null;
-      });
-    }
-    await this.initPromise;
+    await this.init();
   }
 
   /**
