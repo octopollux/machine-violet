@@ -1,6 +1,8 @@
 import { Router } from "express";
+import { createReadStream } from "node:fs";
 import { readdir, readFile, stat } from "node:fs/promises";
-import { join, relative, resolve, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
+import { createInterface } from "node:readline";
 import type { CampaignInfo, TreeEntry } from "../shared/protocol.js";
 import { classifyPath, classifyMachinePath } from "./watcher.js";
 
@@ -130,7 +132,93 @@ export function createApiRouter(
     }
   });
 
+  // Engine-log: parsed api:call events for per-turn stats display.
+  // Reads .debug/engine.jsonl (same location as the machine-scope debug dir
+  // for machine installs; falls back to the parent of the first campaign
+  // path so that per-campaign dev trees also work).
+  //
+  // Streams line-by-line with a bounded rolling buffer so memory stays O(limit)
+  // regardless of how large engine.jsonl has grown over many sessions.
+  router.get("/engine-log/api-calls", async (req, res) => {
+    const agent = typeof req.query.agent === "string" ? req.query.agent : undefined;
+    const limit = Math.max(1, Math.min(500, Number(req.query.limit) || 50));
+
+    const logPath = resolveEngineLogPath(getMachineDir, getCampaigns, getCampaignPath);
+    if (!logPath) {
+      res.json([]);
+      return;
+    }
+
+    try {
+      const events = await tailApiCallEvents(logPath, limit, agent);
+      res.json(events);
+    } catch {
+      res.json([]);
+    }
+  });
+
   return router;
+}
+
+/**
+ * Stream `engine.jsonl` line-by-line and return the last `limit` `api:call`
+ * events (optionally filtered to one agent). Memory is bounded by
+ * `max(limit * 2, 200)` events — no matter how many MB the log has grown to,
+ * this never loads the full file at once.
+ */
+async function tailApiCallEvents(
+  logPath: string,
+  limit: number,
+  agent: string | undefined,
+): Promise<Record<string, unknown>[]> {
+  const matched: Record<string, unknown>[] = [];
+  // Trim threshold: allow the buffer to grow past `limit` before trimming, so
+  // we're not splicing on every match. At the end we slice to the last `limit`.
+  const trimAt = Math.max(limit * 2, 200);
+
+  const stream = createReadStream(logPath, { encoding: "utf-8" });
+  const rl = createInterface({ input: stream, crlfDelay: Infinity });
+  try {
+    for await (const line of rl) {
+      if (!line) continue;
+      try {
+        const obj = JSON.parse(line) as Record<string, unknown>;
+        if (obj.event !== "api:call") continue;
+        if (agent && obj.agent !== agent) continue;
+        matched.push(obj);
+        if (matched.length > trimAt) {
+          matched.splice(0, matched.length - limit);
+        }
+      } catch {
+        // skip malformed line
+      }
+    }
+  } finally {
+    rl.close();
+    stream.close();
+  }
+  return matched.slice(-limit);
+}
+
+/**
+ * Locate engine.jsonl. Prefer the machine-scope .debug dir; fall back to
+ * {dirname(campaignsDir)}/.debug for dev setups where machine mode is off.
+ */
+function resolveEngineLogPath(
+  getMachineDir: (() => string | null) | undefined,
+  getCampaigns: () => CampaignInfo[],
+  getCampaignPath: (slug: string) => string | undefined,
+): string | null {
+  const machineDir = getMachineDir?.();
+  if (machineDir) return join(machineDir, "engine.jsonl");
+
+  // Fallback: siblings of the first campaign's parent
+  const first = getCampaigns()[0];
+  if (!first) return null;
+  const path = getCampaignPath(first.slug);
+  if (!path) return null;
+  // campaign path = {campaignsDir}/{slug}; engine.jsonl at {dirname(campaignsDir)}/.debug
+  return join(dirname(dirname(path)), ".debug", "engine.jsonl");
 }
 
 /** Recursively walk a directory and return tree entries. */

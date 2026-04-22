@@ -60,7 +60,8 @@ async function anthropicChat(
 // Parameter mapping: normalized → Anthropic
 // ---------------------------------------------------------------------------
 
-function toAnthropicParams(params: ChatParams): {
+/** Exported for tests — maps normalized ChatParams to Anthropic SDK params. */
+export function toAnthropicParams(params: ChatParams): {
   model: string;
   max_tokens: number;
   system: string | Anthropic.TextBlockParam[];
@@ -129,31 +130,50 @@ function toAnthropicParams(params: ChatParams): {
     maxTokens = Math.max(maxTokens, modelMax);
   }
 
-  // Apply cache hint to last conversation message (BP4) if requested
+  // Apply cache hint for conversation messages (BP4) if requested.
+  //
+  // Stamp on the last *non-ephemeral* message — i.e., the last message whose
+  // bytes will be identical on subsequent turns. If we stamped on an ephemeral
+  // message (e.g., the fresh user turn with its `<context>` preamble), the
+  // next turn would send a stripped version of that message, the cached
+  // prefix would diverge at that position, and everything downstream would
+  // need to be rewritten. By stamping on the last stable message we ensure
+  // the cached prefix contains only content that's byte-identical across
+  // turns, and cross-turn hits only pay for the actual one-turn delta.
+  //
+  // Within a tool-use loop (rounds 2+), the newly-appended tool_use /
+  // tool_result messages are non-ephemeral and stable, so we stamp on them
+  // as usual — within-round caching is preserved.
   const msgCacheHint = params.cacheHints?.find((h) => h.target === "messages");
   if (msgCacheHint && messages.length > 0) {
-    const last = messages[messages.length - 1];
-    if (typeof last.content === "string") {
-      if (last.content) {
-        messages[messages.length - 1] = {
-          role: last.role,
-          content: [{
-            type: "text" as const,
-            text: last.content,
-            cache_control: { type: "ephemeral" },
-          } as Anthropic.TextBlockParam],
-        };
-      }
-    } else if (Array.isArray(last.content) && last.content.length > 0) {
-      const blocks = [...last.content] as unknown as Record<string, unknown>[];
-      // Find last non-empty text block
-      let stampIdx = blocks.length - 1;
-      while (stampIdx >= 0 && blocks[stampIdx].type === "text" && !(blocks[stampIdx].text as string)) {
-        stampIdx--;
-      }
-      if (stampIdx >= 0) {
-        blocks[stampIdx] = { ...blocks[stampIdx], cache_control: { type: "ephemeral" } };
-        messages[messages.length - 1] = { role: last.role, content: blocks as unknown as Anthropic.MessageParam["content"] };
+    let stampMsgIdx = messages.length - 1;
+    while (stampMsgIdx >= 0 && params.messages[stampMsgIdx]?.ephemeral) {
+      stampMsgIdx--;
+    }
+    if (stampMsgIdx >= 0) {
+      const last = messages[stampMsgIdx];
+      if (typeof last.content === "string") {
+        if (last.content) {
+          messages[stampMsgIdx] = {
+            role: last.role,
+            content: [{
+              type: "text" as const,
+              text: last.content,
+              cache_control: { type: "ephemeral" },
+            } as Anthropic.TextBlockParam],
+          };
+        }
+      } else if (Array.isArray(last.content) && last.content.length > 0) {
+        const blocks = [...last.content] as unknown as Record<string, unknown>[];
+        // Find last non-empty text block
+        let stampIdx = blocks.length - 1;
+        while (stampIdx >= 0 && blocks[stampIdx].type === "text" && !(blocks[stampIdx].text as string)) {
+          stampIdx--;
+        }
+        if (stampIdx >= 0) {
+          blocks[stampIdx] = { ...blocks[stampIdx], cache_control: { type: "ephemeral" } };
+          messages[stampMsgIdx] = { role: last.role, content: blocks as unknown as Anthropic.MessageParam["content"] };
+        }
       }
     }
   }

@@ -23,6 +23,12 @@ export interface InjectionContext {
   skipTranscript: boolean;
   /** Terminal dimensions, or undefined if not yet reported by the TUI. */
   terminalDims: TerminalDims | undefined;
+  /**
+   * Rendered hard-stats string for this turn (turn holder, combat round,
+   * resource values). HardStatsInjection compares against its last-emitted
+   * copy to decide whether to re-emit ahead of cadence.
+   */
+  hardStatsText?: string;
 }
 
 /** Post-response information for updating internal counters. */
@@ -145,6 +151,55 @@ export class LengthSteeringInjection implements Injection {
     } else {
       this.consecutiveOverlong = 0;
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// HardStatsInjection — turn holder, combat round, resource values
+// ---------------------------------------------------------------------------
+
+/**
+ * Hard numeric state that the DM tends to lose track of (HP, initiative,
+ * turn holder). Emits on a fixed cadence (CADENCE turns between emissions)
+ * or immediately when the rendered string changes since the last emission.
+ *
+ * Why not every turn? That's what we were doing via the volatile-context
+ * prefix, and it was the main source of uncached input tokens — the block
+ * is structurally new text every turn, so nothing in it was cache-hittable.
+ * Cadence + on-change keeps the DM accurate at a fraction of the cost.
+ *
+ * Staleness safety: when the string does change, we emit immediately rather
+ * than waiting for the cadence, so numeric drift never persists for more
+ * than one turn.
+ */
+export class HardStatsInjection implements Injection {
+  readonly name = "hard-stats";
+  /** Emit at most every N turns in steady state. 2 = every-other-turn. */
+  static readonly CADENCE = 2;
+  private lastEmitted = "";
+  private turnsSinceEmitted = Infinity; // guarantee first turn emits
+
+  build(ctx: InjectionContext): string | null {
+    if (ctx.skipTranscript) return null;
+    const text = ctx.hardStatsText ?? "";
+    if (!text) return null;
+    const changed = text !== this.lastEmitted;
+    const dueByCadence = this.turnsSinceEmitted >= HardStatsInjection.CADENCE;
+    if (!changed && !dueByCadence) return null;
+    this.lastEmitted = text;
+    this.turnsSinceEmitted = 0;
+    return `[stats]\n${text}`;
+  }
+
+  afterResponse(info: ResponseInfo): void {
+    if (info.fromAI) return;
+    this.turnsSinceEmitted++;
+  }
+
+  /** Reset for scene transitions so the next turn in a new scene re-emits. */
+  reset(): void {
+    this.lastEmitted = "";
+    this.turnsSinceEmitted = Infinity;
   }
 }
 

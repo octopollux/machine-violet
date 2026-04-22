@@ -1,8 +1,26 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 
 interface ContextDumpViewerProps {
   content: string;
+}
+
+/**
+ * One api:call event from engine.jsonl. Fields are optional because older
+ * log lines may pre-date the cacheCreation addition.
+ */
+interface ApiCallEvent {
+  t?: number;
+  agent?: string;
+  model?: string;
+  durationMs?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheRead?: number;
+  cacheCreation?: number;
+  reasoningTokens?: number;
+  toolCalls?: number;
+  stopReason?: string;
 }
 
 interface ThinkingTrace {
@@ -209,9 +227,16 @@ function SystemPrompt({ system }: { system: string | SystemBlockLike[] }) {
 function InterleavedMessages({
   messages,
   traces,
+  events,
 }: {
   messages: Message[];
   traces: ThinkingTrace[];
+  /**
+   * api:call events for this agent. Paired with assistant messages by index
+   * from the tail (events are already filtered; we align the last N of them
+   * to the N assistant messages in the dump).
+   */
+  events: ApiCallEvent[] | null;
 }) {
   // Index traces by round for O(1) lookup
   const tracesByRound = new Map<number, ThinkingTrace[]>();
@@ -221,13 +246,17 @@ function InterleavedMessages({
     tracesByRound.set(t.round, list);
   }
 
+  // Count assistant messages to align events to rounds from the tail.
+  const assistantTotal = messages.filter((m) => m.role === "assistant").length;
+  const eventOffset = events ? Math.max(0, events.length - assistantTotal) : 0;
+
   const elements: ReactNode[] = [];
   let assistantCount = 0;
 
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i];
 
-    // Insert thinking traces before each assistant message
+    // Insert thinking traces + stats chip before each assistant message
     if (msg.role === "assistant") {
       const roundTraces = tracesByRound.get(assistantCount);
       if (roundTraces) {
@@ -241,6 +270,10 @@ function InterleavedMessages({
             </div>,
           );
         }
+      }
+      const event = events?.[eventOffset + assistantCount];
+      if (event) {
+        elements.push(<TurnStatsChip key={`stats-${assistantCount}`} round={assistantCount} event={event} />);
       }
       assistantCount++;
     }
@@ -268,6 +301,103 @@ function InterleavedMessages({
   return <>{elements}</>;
 }
 
+function fmtK(n: number | undefined): string {
+  if (!n) return "0";
+  if (n < 1000) return String(n);
+  return (n / 1000).toFixed(1).replace(/\.0$/, "") + "k";
+}
+
+/** Fetch api:call events for an agent from the engine log. */
+function useApiCallEvents(agent: string): {
+  events: ApiCallEvent[] | null;
+  error: string | null;
+} {
+  const [events, setEvents] = useState<ApiCallEvent[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setEvents(null);
+    setError(null);
+    fetch(`/api/engine-log/api-calls?agent=${encodeURIComponent(agent)}&limit=100`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((data: ApiCallEvent[]) => { if (!cancelled) setEvents(data); })
+      .catch((e: Error) => { if (!cancelled) setError(e.message); });
+    return () => { cancelled = true; };
+  }, [agent]);
+
+  return { events, error };
+}
+
+/**
+ * Compact per-turn stats chip, shown immediately before the assistant
+ * message it corresponds to. Green tint = cache-dominated round; red =
+ * mostly uncached.
+ */
+function TurnStatsChip({ round, event }: { round: number; event: ApiCallEvent }) {
+  const uncached = event.inputTokens ?? 0;
+  const read = event.cacheRead ?? 0;
+  const write = event.cacheCreation ?? 0;
+  const total = uncached + read + write;
+  const readPct = total > 0 ? (read / total) * 100 : 0;
+
+  const bg = total === 0
+    ? "rgba(128,128,128,0.08)"
+    : readPct > 80
+      ? "rgba(46,160,67,0.12)"
+      : readPct < 20
+        ? "rgba(218,54,51,0.12)"
+        : "rgba(128,128,128,0.08)";
+
+  const ts = event.t ? new Date(event.t).toISOString().slice(11, 19) : null;
+
+  return (
+    <div
+      style={{
+        background: bg,
+        fontSize: 11,
+        padding: "4px 8px",
+        margin: "4px 0",
+        borderRadius: 4,
+        display: "flex",
+        gap: 10,
+        flexWrap: "wrap",
+        fontFamily: "monospace",
+      }}
+    >
+      <span style={{ opacity: 0.8 }}>round {round}</span>
+      {ts && <span style={{ opacity: 0.6 }}>{ts}</span>}
+      <span>in {fmtK(uncached)}</span>
+      <span>out {fmtK(event.outputTokens)}</span>
+      <span>cacheR {fmtK(read)}</span>
+      <span>cacheW {fmtK(write)}</span>
+      {total > 0 && <span style={{ opacity: 0.8 }}>hit {readPct.toFixed(0)}%</span>}
+      {(event.toolCalls ?? 0) > 0 && <span>tools {event.toolCalls}</span>}
+      {event.durationMs != null && <span style={{ opacity: 0.6 }}>{event.durationMs}ms</span>}
+      {event.stopReason && <span style={{ opacity: 0.6 }}>stop:{event.stopReason}</span>}
+    </div>
+  );
+}
+
+/** One-line aggregate across the loaded turn window. */
+function TurnsSummary({ events }: { events: ApiCallEvent[] }) {
+  let totIn = 0, totRead = 0, totWrite = 0, totOut = 0;
+  for (const e of events) {
+    totIn += e.inputTokens ?? 0;
+    totRead += e.cacheRead ?? 0;
+    totWrite += e.cacheCreation ?? 0;
+    totOut += e.outputTokens ?? 0;
+  }
+  const denom = totIn + totRead + totWrite;
+  const hitPct = denom > 0 ? ((totRead / denom) * 100).toFixed(1) : "—";
+  return (
+    <div style={{ fontSize: 11, marginBottom: 8, opacity: 0.85 }}>
+      {events.length} turns — cache hit {hitPct}% · in {fmtK(totIn)} · read {fmtK(totRead)}
+      {" · write "}{fmtK(totWrite)} · out {fmtK(totOut)}
+    </div>
+  );
+}
+
 export function ContextDumpViewer({ content }: ContextDumpViewerProps) {
   let dump: ContextDump;
   try {
@@ -278,6 +408,7 @@ export function ContextDumpViewer({ content }: ContextDumpViewerProps) {
 
   const thinkingTraces = dump._thinking_trace ?? [];
   const hasMessages = dump.messages && dump.messages.length > 0;
+  const { events, error: eventsError } = useApiCallEvents(dump.agent);
 
   return (
     <div className="context-dump-viewer">
@@ -285,6 +416,13 @@ export function ContextDumpViewer({ content }: ContextDumpViewerProps) {
         Agent: <strong>{dump.agent}</strong> | Model: {dump.model ?? "unknown"} |{" "}
         {dump.timestamp}
       </div>
+
+      {events && events.length > 0 && <TurnsSummary events={events} />}
+      {eventsError && (
+        <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 8 }}>
+          Turn stats unavailable ({eventsError})
+        </div>
+      )}
 
       {dump.system && (
         <Section title="System Prompt" color="var(--role-system)">
@@ -307,7 +445,7 @@ export function ContextDumpViewer({ content }: ContextDumpViewerProps) {
           title={`Conversation (${dump.messages!.length} messages${thinkingTraces.length > 0 ? `, ${thinkingTraces.length} thinking` : ""})`}
           color="var(--role-user)"
         >
-          <InterleavedMessages messages={dump.messages!} traces={thinkingTraces} />
+          <InterleavedMessages messages={dump.messages!} traces={thinkingTraces} events={events} />
         </Section>
       )}
 

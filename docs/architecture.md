@@ -70,10 +70,12 @@ The DM's context is structured in layers with cache breakpoints:
 ```
 [BP1] System prompt + rules appendix        ← cached 1h, rebuilt on scene change
 [BP2] Campaign summary + session recap       ← cached 1h, rebuilt on scene change
-      + scene precis + active state
+      + scene precis + DM notes
 [BP3] Tool definitions                       ← cached per request
-[BP4] Conversation exchanges                 ← accumulates within scene, cached rate
-      + current player input
+[BP4] Conversation exchanges                 ← stamped on the last *stable* message;
+                                               ephemeral per-turn preambles are
+                                               skipped so cross-turn cache hits
+                                               through the end of the prior turn
 ```
 
 Conversation accumulates within a scene and is cleared at scene transition. With automatic caching, prior exchanges are read at cache rate. Scene pacing nudges and transition pressure handle long scenes naturally; `max_conversation_tokens` defaults to 0 (disabled) since mid-scene pruning invalidates the prompt cache.
