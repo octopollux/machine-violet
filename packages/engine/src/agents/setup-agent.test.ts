@@ -51,6 +51,18 @@ describe("buildCampaignConfig", () => {
     expect(config.campaign_detail).toBeUndefined();
   });
 
+  it("passes handoffNote through as setup_handoff", () => {
+    const result = makeSetupResult({ handoffNote: "Player leans noir-burnout. Wants ensemble scenes." });
+    const config = buildCampaignConfig(result);
+    expect(config.setup_handoff).toBe("Player leans noir-burnout. Wants ensemble scenes.");
+  });
+
+  it("omits setup_handoff when handoffNote is undefined", () => {
+    const result = makeSetupResult();
+    const config = buildCampaignConfig(result);
+    expect(config.setup_handoff).toBeUndefined();
+  });
+
   it("passes personality detail through to config", () => {
     const result = makeSetupResult({
       personality: { name: "Test", prompt_fragment: "Terse.", detail: "Use callbacks." },

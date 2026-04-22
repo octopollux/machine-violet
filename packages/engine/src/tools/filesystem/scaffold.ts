@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { slugify } from "../../utils/slug.js";
 
 /**
  * The deterministic campaign directory structure.
@@ -35,6 +36,22 @@ export function sceneDir(
 
 /**
  * Standard file paths within a campaign.
+ *
+ * The entity-type helpers (`character`, `location`, `faction`, `lore`, `item`,
+ * `rule`) defensively slugify the name via the canonical `slugify` in
+ * `utils/slug.ts`. Callers can pass either a raw display name ("Janey Bruce")
+ * or a slug already produced by that same canonical slugify ("janey-bruce")
+ * and land on the same path. Ad-hoc slugs produced by other transformations
+ * are NOT guaranteed to round-trip — e.g. a hand-written "the-goblin-caves"
+ * stays "the-goblin-caves" here (article-stripping only triggers on whitespace)
+ * and would not collide with the canonical "goblin-caves". Everything
+ * campaign-internal routes through `slugify()`, so this only matters if a
+ * caller is constructing slugs manually — don't.
+ *
+ * This is belt-and-suspenders against a class of bugs where a DM-side
+ * codepath reads/writes an entity file under its display name while a
+ * sibling path (setup, scribe) uses the slug — producing two parallel files
+ * for the same entity.
  */
 export function campaignPaths(root: string) {
   return {
@@ -43,15 +60,15 @@ export function campaignPaths(root: string) {
     legacyLog: join(root, "campaign", "log.md"),
     sceneSummary: (n: number, slug: string) =>
       join(sceneDir(root, n, slug), "summary.md"),
-    character: (name: string) => join(root, "characters", `${name}.md`),
-    location: (name: string) => join(root, "locations", name, "index.md"),
+    character: (name: string) => join(root, "characters", `${slugify(name)}.md`),
+    location: (name: string) => join(root, "locations", slugify(name), "index.md"),
     locationMap: (name: string, mapId: string) =>
-      join(root, "locations", name, `${mapId}.json`),
+      join(root, "locations", slugify(name), `${mapId}.json`),
     party: join(root, "characters", "party.md"),
-    faction: (name: string) => join(root, "factions", `${name}.md`),
-    lore: (name: string) => join(root, "lore", `${name}.md`),
-    item: (name: string) => join(root, "items", `${name}.md`),
-    rule: (name: string) => join(root, "rules", `${name}.md`),
+    faction: (name: string) => join(root, "factions", `${slugify(name)}.md`),
+    lore: (name: string) => join(root, "lore", `${slugify(name)}.md`),
+    item: (name: string) => join(root, "items", `${slugify(name)}.md`),
+    rule: (name: string) => join(root, "rules", `${slugify(name)}.md`),
     sessionRecap: (n: number) =>
       join(root, "campaign", "session-recaps", `session-${String(n).padStart(3, "0")}.md`),
     sessionRecapNarrative: (n: number) =>

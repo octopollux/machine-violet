@@ -135,7 +135,7 @@ export function createDefaultCampaignConfig(
       tool_result_stub_after: 5,
     },
     recovery: {
-      auto_commit_interval: 3,
+      auto_commit_interval: 1,
       max_commits: 100,
       enable_git: true,
     },
