@@ -3,7 +3,7 @@ import type { GameState } from "./game-state.js";
 import type { ConversationManager, DroppedExchange } from "../context/index.js";
 import { renderCampaignLog, parseLegacyLog } from "../context/index.js";
 import type { CampaignLog, CampaignLogEntry } from "../context/index.js";
-import { buildDMPrefix, buildActiveState } from "./dm-prompt.js";
+import { buildDMPrefix, buildActiveState, buildHardStats } from "./dm-prompt.js";
 import type { DMSessionState } from "./dm-prompt.js";
 import type { CachedPrefixResult } from "../context/index.js";
 import { summarizeScene } from "./subagents/scene-summarizer.js";
@@ -142,9 +142,11 @@ export class SceneManager {
     this.sessionState.activeState = buildActiveState({
       pcSummaries: this.pcSummaries,
       pendingAlarms: [],
+      activeObjectives: this.getActiveObjectives(),
+    });
+    this.sessionState.hardStats = buildHardStats({
       turnHolder: opts?.turnHolder,
       resourceValues: this.state.resourceValues,
-      activeObjectives: this.getActiveObjectives(),
     });
     this.sessionState.scenePrecis = buildScenePrecis(this.scene);
     this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);
@@ -533,8 +535,10 @@ export class SceneManager {
     this.sessionState.activeState = buildActiveState({
       pcSummaries: this.pcSummaries,
       pendingAlarms,
-      resourceValues: this.state.resourceValues,
       activeObjectives: this.getActiveObjectives(),
+    });
+    this.sessionState.hardStats = buildHardStats({
+      resourceValues: this.state.resourceValues,
     });
 
     // Sync precis and player read

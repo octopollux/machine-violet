@@ -11,7 +11,7 @@ import { StatePersister } from "../context/state-persistence.js";
 import type { StateSlice } from "../context/state-persistence.js";
 import { SceneManager } from "./scene-manager.js";
 import type { SceneState, FileIO } from "./scene-manager.js";
-import { InjectionRegistry, BehaviorInjection, ScenePacingInjection, LengthSteeringInjection } from "./injections.js";
+import { InjectionRegistry, BehaviorInjection, ScenePacingInjection, LengthSteeringInjection, HardStatsInjection } from "./injections.js";
 import type { TerminalDims, InjectionContext } from "./injections.js";
 import type { NarrativeLine } from "@machine-violet/shared/types/tui.js";
 
@@ -165,6 +165,7 @@ export class GameEngine {
     this.injectionRegistry.register(new BehaviorInjection());
     this.injectionRegistry.register(new ScenePacingInjection());
     this.injectionRegistry.register(new LengthSteeringInjection());
+    this.injectionRegistry.register(new HardStatsInjection());
 
     // Wire dev logging to scene manager
     this.sceneManager.devLog = params.callbacks.onDevLog;
@@ -390,11 +391,12 @@ export class GameEngine {
       this.sceneManager.appendPlayerInput(characterName, text);
     }
 
-    // Get system prompt (cached Tier 1+2) and volatile context (Tier 3).
-    // Pass the active character so the DM sees an explicit "Turn: {name}"
-    // line in Current State, reinforcing whose decision it is and discouraging
-    // the DM from acting on the PC's behalf.
-    const { system: systemPrompt, volatile: volatileContext } = this.sceneManager.getSystemPrompt({
+    // Get system prompt (cached Tier 1+2), volatile context (Tier 3 soft),
+    // and hard-stats string (Tier 3 hard). Pass the active character so the
+    // DM sees an explicit "Turn: {name}" line in the stats block, reinforcing
+    // whose decision it is and discouraging the DM from acting on the PC's
+    // behalf.
+    const { system: systemPrompt, volatile: volatileContext, hardStats: hardStatsText } = this.sceneManager.getSystemPrompt({
       turnHolder: characterName,
     });
 
@@ -412,12 +414,14 @@ export class GameEngine {
       preambleParts.push(volatileContext);
     }
 
-    // Registered injections (behavior, scene-pacing, length steering, etc.)
+    // Registered injections (behavior, scene-pacing, length steering,
+    // hard-stats, etc.)
     const injCtx: InjectionContext = {
       conversationSize: this.conversation.size,
       scene: this.sceneManager.getScene(),
       skipTranscript: !!opts?.skipTranscript,
       terminalDims: this.terminalDims,
+      hardStatsText,
     };
     preambleParts.push(...this.injectionRegistry.buildAll(injCtx, this.callbacks.onDevLog));
 
@@ -428,9 +432,17 @@ export class GameEngine {
     // The API message includes the preamble; the stored exchange does not.
     // Volatile context and reminders are ephemeral per-turn injections that
     // should not persist in conversation history.
+    //
+    // `ephemeral: true` tells the provider that this message's bytes won't be
+    // present on subsequent turns (we store the stripped version). The
+    // Anthropic provider uses that to stamp BP4 on the previous stable
+    // message instead of this one, so next turn's cache lookup hits through
+    // the stable tail and only pays for one turn's delta — not the entire
+    // conversation tail.
     const apiUserMessage: NormalizedMessage = {
       role: "user",
       content: `${preamble}${taggedInput}`,
+      ephemeral: preamble.length > 0,
     };
     const storedUserMessage: NormalizedMessage = {
       role: "user",
@@ -789,6 +801,7 @@ export class GameEngine {
    */
   async transitionScene(title: string, timeAdvance?: number): Promise<void> {
     this.injectionRegistry.get<BehaviorInjection>("behavior")?.reset();
+    this.injectionRegistry.get<HardStatsInjection>("hard-stats")?.reset();
     this.setState("scene_transition");
 
     try {
@@ -829,6 +842,7 @@ export class GameEngine {
    */
   async endSession(title: string, timeAdvance?: number): Promise<void> {
     this.injectionRegistry.get<BehaviorInjection>("behavior")?.reset();
+    this.injectionRegistry.get<HardStatsInjection>("hard-stats")?.reset();
     this.setState("session_ending");
 
     try {

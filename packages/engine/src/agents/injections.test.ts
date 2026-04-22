@@ -3,6 +3,7 @@ import {
   BehaviorInjection,
   ScenePacingInjection,
   LengthSteeringInjection,
+  HardStatsInjection,
   InjectionRegistry,
 } from "./injections.js";
 import type {
@@ -326,5 +327,83 @@ describe("InjectionRegistry", () => {
     reg.register(behavior);
     expect(reg.get("behavior")).toBe(behavior);
     expect(reg.get("nonexistent")).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HardStatsInjection
+// ---------------------------------------------------------------------------
+
+describe("HardStatsInjection", () => {
+  const STATS_A = "Turn: Aldric\nResources:\n  Aldric: HP=24/30";
+  const STATS_B = "Turn: Aldric\nResources:\n  Aldric: HP=18/30";
+
+  it("emits on the first turn when stats are present", () => {
+    const inj = new HardStatsInjection();
+    const result = inj.build(baseCtx({ hardStatsText: STATS_A }));
+    expect(result).toContain("[stats]");
+    expect(result).toContain("HP=24/30");
+  });
+
+  it("skips on the following turn when nothing changes (every-other cadence)", () => {
+    const inj = new HardStatsInjection();
+    expect(inj.build(baseCtx({ hardStatsText: STATS_A }))).not.toBeNull();
+    inj.afterResponse(responseInfo());
+    expect(inj.build(baseCtx({ hardStatsText: STATS_A }))).toBeNull();
+  });
+
+  it("re-emits on the turn after that when nothing changes", () => {
+    const inj = new HardStatsInjection();
+    // Turn 1: emit
+    expect(inj.build(baseCtx({ hardStatsText: STATS_A }))).not.toBeNull();
+    inj.afterResponse(responseInfo());
+    // Turn 2: skip
+    expect(inj.build(baseCtx({ hardStatsText: STATS_A }))).toBeNull();
+    inj.afterResponse(responseInfo());
+    // Turn 3: emit
+    expect(inj.build(baseCtx({ hardStatsText: STATS_A }))).not.toBeNull();
+  });
+
+  it("re-emits immediately when stats change, and resets the cadence counter", () => {
+    const inj = new HardStatsInjection();
+    expect(inj.build(baseCtx({ hardStatsText: STATS_A }))).not.toBeNull();
+    inj.afterResponse(responseInfo());
+    // Would normally skip — but stats changed, so emit.
+    const result = inj.build(baseCtx({ hardStatsText: STATS_B }));
+    expect(result).not.toBeNull();
+    expect(result).toContain("HP=18/30");
+    inj.afterResponse(responseInfo());
+    // Counter was reset on the forced emission, so we skip the next turn.
+    expect(inj.build(baseCtx({ hardStatsText: STATS_B }))).toBeNull();
+  });
+
+  it("returns null when hardStatsText is empty or missing", () => {
+    const inj = new HardStatsInjection();
+    expect(inj.build(baseCtx({ hardStatsText: "" }))).toBeNull();
+    expect(inj.build(baseCtx({}))).toBeNull();
+  });
+
+  it("returns null on skipTranscript turns (session open/resume)", () => {
+    const inj = new HardStatsInjection();
+    expect(inj.build(baseCtx({ hardStatsText: STATS_A, skipTranscript: true }))).toBeNull();
+  });
+
+  it("does not advance the cadence counter on AI-author turns", () => {
+    // AI-driven turns (e.g. AI-player simulated inputs) shouldn't count —
+    // mirrors BehaviorInjection / LengthSteeringInjection.
+    const inj = new HardStatsInjection();
+    expect(inj.build(baseCtx({ hardStatsText: STATS_A }))).not.toBeNull();
+    inj.afterResponse(responseInfo({ fromAI: true }));
+    // Counter did not advance → still skipping.
+    expect(inj.build(baseCtx({ hardStatsText: STATS_A }))).toBeNull();
+  });
+
+  it("reset() re-arms immediate emission", () => {
+    const inj = new HardStatsInjection();
+    expect(inj.build(baseCtx({ hardStatsText: STATS_A }))).not.toBeNull();
+    inj.afterResponse(responseInfo());
+    expect(inj.build(baseCtx({ hardStatsText: STATS_A }))).toBeNull();
+    inj.reset();
+    expect(inj.build(baseCtx({ hardStatsText: STATS_A }))).not.toBeNull();
   });
 });

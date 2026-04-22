@@ -7,13 +7,13 @@ export { extractStatus, retryDelay, RETRYABLE_STATUS, sleep } from "../utils/ret
 export { TUI_TOOLS, isTuiCommand } from "./agent-loop.js";
 export { spawnSubagent, oneShot, cacheSystemPrompt } from "./subagent.js";
 export type { SubagentConfig, SubagentResult, SubagentVisibility, SubagentStreamCallback } from "./subagent.js";
-export { buildDMPrefix, buildActiveState, DM_PROMPT } from "./dm-prompt.js";
+export { buildDMPrefix, buildActiveState, buildHardStats, DM_PROMPT } from "./dm-prompt.js";
 export type { DMSessionState } from "./dm-prompt.js";
 export { SceneManager } from "./scene-manager.js";
 export type { SceneState, FileIO, PendingOperation, TransitionResult } from "./scene-manager.js";
 export { GameEngine } from "./game-engine.js";
 export type { EngineState, EngineCallbacks, TurnInfo } from "./game-engine.js";
-export { InjectionRegistry, BehaviorInjection, ScenePacingInjection, LengthSteeringInjection } from "./injections.js";
+export { InjectionRegistry, BehaviorInjection, ScenePacingInjection, LengthSteeringInjection, HardStatsInjection } from "./injections.js";
 export type { Injection, InjectionContext, TerminalDims, ResponseInfo } from "./injections.js";
 export { summarizeScene } from "./subagents/index.js";
 export { updatePrecis } from "./subagents/index.js";

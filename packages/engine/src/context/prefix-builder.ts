@@ -11,7 +11,9 @@ import type { SystemBlock } from "../providers/types.js";
  *   Tier 3 (volatile): active state, entity index, UI state — injected into conversation, NOT system
  *
  * BP1 on rules appendix (1h). BP2 on last emitted Tier 2 block (1h).
- * BP3 on tools (stamped in agent-loop-bridge via cacheHints). BP4 on conversation (stamped in game-engine).
+ * BP3 on tools (stamped in agent-loop-bridge via cacheHints). BP4 on
+ * conversation (stamped by the Anthropic provider on the last non-ephemeral
+ * message, so ephemeral preambles don't poison the cache for next turn).
  *
  * Tier 3 is returned separately as `volatile` so the caller can inject it
  * into the conversation tail. This prevents Tier 3 changes from invalidating
@@ -26,6 +28,12 @@ export interface PrefixSections {
   campaignSummary?: string;
   sessionRecap?: string;
   activeState?: string;
+  /**
+   * Hard-numeric state (turn holder, combat round, resource values).
+   * Surfaced separately on CachedPrefixResult so the caller can route it
+   * through HardStatsInjection instead of into the volatile preamble.
+   */
+  hardStats?: string;
   scenePrecis?: string;
   playerRead?: string;
   dmNotes?: string;
@@ -39,8 +47,13 @@ export interface PrefixSections {
 export interface CachedPrefixResult {
   /** System prompt blocks (Tier 1 + Tier 2, cache-stable). */
   system: SystemBlock[];
-  /** Volatile context string (Tier 3). Inject into conversation, not system prompt. */
+  /** Volatile context string (Tier 3 soft). Inject into conversation, not system prompt. */
   volatile: string;
+  /**
+   * Hard-numeric state string (Tier 3 hard). Routed through HardStatsInjection
+   * so it's emitted on a cadence + on-change, not every turn.
+   */
+  hardStats: string;
 }
 
 /**
@@ -168,7 +181,11 @@ export function buildCachedPrefix(
     volatileParts.push(`## Content Boundaries\nHonor these absolutely — no exceptions, no references to them in narration.\n${sections.contentBoundaries}`);
   }
 
-  return { system: blocks, volatile: volatileParts.join("\n\n") };
+  return {
+    system: blocks,
+    volatile: volatileParts.join("\n\n"),
+    hardStats: sections.hardStats ?? "",
+  };
 }
 
 /**

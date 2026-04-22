@@ -725,7 +725,7 @@ describe("SceneManager", () => {
     expect(volatile).not.toContain("Entity Registry");
   });
 
-  it("getSystemPrompt surfaces turnHolder as a Turn: line in Current State", () => {
+  it("getSystemPrompt surfaces turnHolder on the hardStats channel, not volatile", () => {
     const sessionState = mockSessionState();
     const mgr = new SceneManager(
       mockState(),
@@ -735,12 +735,15 @@ describe("SceneManager", () => {
       mockFileIO(),
     );
 
-    const { volatile } = mgr.getSystemPrompt({ turnHolder: "Adam James" });
+    const { volatile, hardStats } = mgr.getSystemPrompt({ turnHolder: "Adam James" });
+    // Soft volatile still emits Current State (alarms/objectives) when present.
     expect(volatile).toContain("## Current State");
-    expect(volatile).toContain("Turn: Adam James");
+    // Hard numeric state now rides the separate hardStats channel.
+    expect(hardStats).toContain("Turn: Adam James");
+    expect(volatile).not.toContain("Turn: Adam James");
   });
 
-  it("getSystemPrompt omits Turn: line when no turnHolder is passed", () => {
+  it("getSystemPrompt emits empty hardStats when no turnHolder is passed", () => {
     const sessionState = mockSessionState();
     const mgr = new SceneManager(
       mockState(),
@@ -750,8 +753,9 @@ describe("SceneManager", () => {
       mockFileIO(),
     );
 
-    const { volatile } = mgr.getSystemPrompt();
+    const { volatile, hardStats } = mgr.getSystemPrompt();
     expect(volatile).not.toContain("Turn:");
+    expect(hardStats).not.toContain("Turn:");
   });
 
   it("mid-scene upserts update the tree but not the DM snapshot", () => {

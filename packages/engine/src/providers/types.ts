@@ -24,6 +24,16 @@ export type ContentPart =
 export interface NormalizedMessage {
   role: MessageRole;
   content: string | ContentPart[];
+  /**
+   * True if this message's bytes are ephemeral — present only on the current
+   * request and not persisted to conversation storage. Downstream the
+   * Anthropic provider uses this to pick the BP4 cache stamp: we stamp on
+   * the last *non-ephemeral* message so the cache entry's prefix matches
+   * what subsequent turns send (which have this message stripped). Without
+   * this flag, stamping on an ephemeral message would make every next-turn
+   * lookup miss at that position and force a full tail rewrite.
+   */
+  ephemeral?: boolean;
 }
 
 // ---------------------------------------------------------------------------

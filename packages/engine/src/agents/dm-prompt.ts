@@ -17,6 +17,13 @@ export interface DMSessionState {
   campaignSummary?: string;
   sessionRecap?: string;
   activeState?: string;
+  /**
+   * Hard numeric state (turn holder, combat round, resource values).
+   * Not part of the volatile context prefix — the HardStatsInjection pulls
+   * this out so it can be emitted on a cadence + on-change, rather than
+   * re-sent every turn. See docs on HardStatsInjection for why.
+   */
+  hardStats?: string;
   scenePrecis?: string;
   playerRead?: string;
   dmNotes?: string;
@@ -57,9 +64,6 @@ export function buildActiveState(params: {
   location?: string;
   pcSummaries: string[];
   pendingAlarms: string[];
-  turnHolder?: string;
-  combatRound?: number;
-  resourceValues?: Record<string, Record<string, string>>;
   activeObjectives?: string[];
 }): string {
   const lines: string[] = [];
@@ -75,15 +79,43 @@ export function buildActiveState(params: {
     }
   }
 
-  if (params.turnHolder) {
-    lines.push(`Turn: ${params.turnHolder}${params.combatRound ? ` (Round ${params.combatRound})` : ""}`);
-  }
-
   if (params.pendingAlarms.length > 0) {
     lines.push("Pending alarms:");
     for (const alarm of params.pendingAlarms) {
       lines.push(`  ${alarm}`);
     }
+  }
+
+  if (params.activeObjectives && params.activeObjectives.length > 0) {
+    lines.push("Objectives:");
+    for (const obj of params.activeObjectives) {
+      lines.push(`  ${obj}`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Build the hard-numeric stats block: turn holder, combat round, resource
+ * values. These are the facts the DM most often loses track of (HP, initiative),
+ * but they're also the parts of the volatile context most likely to be
+ * structurally stable turn-to-turn. Emitted on a cadence (every-other-turn)
+ * via HardStatsInjection rather than on every turn, plus immediately whenever
+ * the rendered string changes — so we keep the DM accurate without paying
+ * the full uncached cost of the volatile block every turn.
+ *
+ * Returns "" when there's nothing to show, so callers can cheaply skip.
+ */
+export function buildHardStats(params: {
+  turnHolder?: string;
+  combatRound?: number;
+  resourceValues?: Record<string, Record<string, string>>;
+}): string {
+  const lines: string[] = [];
+
+  if (params.turnHolder) {
+    lines.push(`Turn: ${params.turnHolder}${params.combatRound ? ` (Round ${params.combatRound})` : ""}`);
   }
 
   if (params.resourceValues) {
@@ -97,13 +129,6 @@ export function buildActiveState(params: {
     if (resourceLines.length > 0) {
       lines.push("Resources:");
       lines.push(...resourceLines);
-    }
-  }
-
-  if (params.activeObjectives && params.activeObjectives.length > 0) {
-    lines.push("Objectives:");
-    for (const obj of params.activeObjectives) {
-      lines.push(`  ${obj}`);
     }
   }
 
