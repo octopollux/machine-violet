@@ -199,6 +199,7 @@ export async function runProviderLoop(
       inputTokens: result.usage.inputTokens,
       outputTokens: result.usage.outputTokens,
       cacheRead: result.usage.cacheReadTokens,
+      cacheCreation: result.usage.cacheCreationTokens,
       reasoningTokens: result.usage.reasoningTokens,
       toolCalls: result.toolCalls.length,
       stopReason: result.stopReason,

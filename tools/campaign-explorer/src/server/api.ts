@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { readdir, readFile, stat } from "node:fs/promises";
-import { join, relative, resolve, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import type { CampaignInfo, TreeEntry } from "../shared/protocol.js";
 import { classifyPath, classifyMachinePath } from "./watcher.js";
 
@@ -130,7 +130,63 @@ export function createApiRouter(
     }
   });
 
+  // Engine-log: parsed api:call events for per-turn stats display.
+  // Reads .debug/engine.jsonl (same location as the machine-scope debug dir
+  // for machine installs; falls back to the parent of the first campaign
+  // path so that per-campaign dev trees also work).
+  router.get("/engine-log/api-calls", async (req, res) => {
+    const agent = typeof req.query.agent === "string" ? req.query.agent : undefined;
+    const limit = Math.max(1, Math.min(500, Number(req.query.limit) || 50));
+
+    const logPath = resolveEngineLogPath(getMachineDir, getCampaigns, getCampaignPath);
+    if (!logPath) {
+      res.json([]);
+      return;
+    }
+
+    try {
+      const content = await readFile(logPath, "utf-8");
+      const events: Array<Record<string, unknown>> = [];
+      for (const line of content.split("\n")) {
+        if (!line) continue;
+        try {
+          const obj = JSON.parse(line) as Record<string, unknown>;
+          if (obj.event !== "api:call") continue;
+          if (agent && obj.agent !== agent) continue;
+          events.push(obj);
+        } catch {
+          // skip malformed line
+        }
+      }
+      // Most-recent last in the file; return the tail.
+      res.json(events.slice(-limit));
+    } catch {
+      res.json([]);
+    }
+  });
+
   return router;
+}
+
+/**
+ * Locate engine.jsonl. Prefer the machine-scope .debug dir; fall back to
+ * {dirname(campaignsDir)}/.debug for dev setups where machine mode is off.
+ */
+function resolveEngineLogPath(
+  getMachineDir: (() => string | null) | undefined,
+  getCampaigns: () => CampaignInfo[],
+  getCampaignPath: (slug: string) => string | undefined,
+): string | null {
+  const machineDir = getMachineDir?.();
+  if (machineDir) return join(machineDir, "engine.jsonl");
+
+  // Fallback: siblings of the first campaign's parent
+  const first = getCampaigns()[0];
+  if (!first) return null;
+  const path = getCampaignPath(first.slug);
+  if (!path) return null;
+  // campaign path = {campaignsDir}/{slug}; engine.jsonl at {dirname(campaignsDir)}/.debug
+  return join(dirname(dirname(path)), ".debug", "engine.jsonl");
 }
 
 /** Recursively walk a directory and return tree entries. */
