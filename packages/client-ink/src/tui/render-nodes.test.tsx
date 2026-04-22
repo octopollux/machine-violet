@@ -32,6 +32,14 @@ describe("renderNodes sub/sup", () => {
     expect(renderToString("<sup>qb</sup>")).toBe("qᵇ");
   });
 
+  it("substitutes asterisk in superscript for footnote markers", () => {
+    expect(renderToString("see note<sup>*</sup>")).toBe("see note﹡");
+  });
+
+  it("substitutes asterisk in subscript", () => {
+    expect(renderToString("x<sub>*</sub>")).toBe("x⁎");
+  });
+
   it("handles subscript nested inside superscript without double-transform", () => {
     // Regression: outer transform must NOT descend into inner sub/sup.
     // If it did, the inner "2" would be substituted by the outer SUPERSCRIPT_MAP
