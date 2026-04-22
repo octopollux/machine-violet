@@ -4,6 +4,7 @@ import { buildCampaignConfig } from "./setup-agent.js";
 import { campaignDirs, campaignPaths, machineDirs, machinePaths } from "../tools/filesystem/index.js";
 import { serializeEntity, parseFrontMatter, extractSection } from "../tools/filesystem/index.js";
 import { norm } from "../utils/paths.js";
+import { slugify } from "../utils/slug.js";
 import { findSystem, readBundledRuleCard } from "../config/systems.js";
 import { processingPaths } from "../config/processing-paths.js";
 
@@ -190,15 +191,9 @@ function buildInitialContentBoundaries(
 }
 
 /**
- * Convert a name to a filesystem-safe slug.
- * Strips leading articles (the, a, an) so "The Black Coin" and "Black Coin"
- * produce the same slug, preventing accidental duplicate entities.
+ * Re-exported from utils/slug for backwards compatibility.
+ * The canonical entity-name → slug function lives in `../utils/slug.js` so
+ * the filesystem path helpers can defensively slugify without creating a
+ * circular dependency through this file.
  */
-export function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/^(the|a|an)\s+/i, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 50);
-}
+export { slugify };

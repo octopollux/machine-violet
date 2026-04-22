@@ -74,11 +74,12 @@ const FINALIZE_TOOL: NormalizedTool = {
       world_slug: { type: "string", description: "Slug of the world file used (from load_world). Omit for fully custom campaigns.", nullable: true },
       age_group: { type: "string", enum: ["child", "teenager", "adult"], description: "Player's age group. Set to 'child' or 'teenager' if the player clearly indicates so. Otherwise — including when age is not discussed or the player declines — set to 'adult'. Always include this field." },
       content_preferences: { type: "string", description: "Any content preferences or sensitivities the player mentioned during setup (one per line). Only include if the player volunteered them — never prompt for these.", nullable: true },
+      handoff_note: { type: "string", description: "Handoff postcard for the DM's first turn. Free-form prose — the DM sees this once as priming for the opening scene. Include: what the player said about their character IN THEIR OWN WORDS (quote or paraphrase closely, don't sanitize), any freeform remarks they made about the world / tone / things they want or don't want, and anything you (the setup agent) want to pass along to the DM — hooks you promised, tone cues the structured fields don't capture, unresolved ambiguities. Write it as a direct note to the DM, not as narration. A paragraph or two is usually right. Always include this field." },
     },
     required: [
       "genre", "campaign_name", "campaign_premise", "mood",
       "difficulty", "dm_personality", "player_name",
-      "character_name", "character_description",
+      "character_name", "character_description", "handoff_note",
     ],
   },
 };
@@ -391,6 +392,8 @@ export function createSetupConversation(
       themeColor: generateThemeColor(characterName),
       ageGroup: (input.age_group as "child" | "teenager" | "adult" | undefined) ?? undefined,
       contentPreferences: (input.content_preferences as string) || undefined,
+      handoffNote: (typeof input.handoff_note === "string" && input.handoff_note.trim())
+        ? input.handoff_note.trim() : undefined,
     };
   }
 

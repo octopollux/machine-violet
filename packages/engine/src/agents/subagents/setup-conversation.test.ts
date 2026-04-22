@@ -183,6 +183,46 @@ describe("createSetupConversation", () => {
     expect(result.finalized!.characterDetails).toBeNull();
   });
 
+  it("finalize_setup passes through handoff_note", async () => {
+    const note = "Player leans noir-burnout. Wants ensemble scenes, not solo monologues.";
+    const input = { ...FINALIZE_INPUT, handoff_note: note };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Onward!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.handoffNote).toBe(note);
+  });
+
+  it("finalize_setup leaves handoffNote undefined when the model omits it", async () => {
+    // Defensive: the schema marks handoff_note required, but handleFinalize
+    // must not crash if the model misbehaves.
+    const provider = mockProvider([
+      finalizeResponse(FINALIZE_INPUT),
+      textResponse("Onward!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.handoffNote).toBeUndefined();
+  });
+
+  it("finalize_setup trims whitespace-only handoff_note to undefined", async () => {
+    const input = { ...FINALIZE_INPUT, handoff_note: "   \n  \t  " };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Onward!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized!.handoffNote).toBeUndefined();
+  });
+
   it("finalize_setup passes through characterDetails", async () => {
     const input = { ...FINALIZE_INPUT, system: "dnd-5e", character_details: "Human Fighter, level 1, soldier background" };
     const provider = mockProvider([

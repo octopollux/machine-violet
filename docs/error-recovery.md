@@ -41,7 +41,7 @@ After rollback completes, a `RollbackSummaryModal` displays what was restored an
 // config.json (partial)
 {
   "recovery": {
-    "auto_commit_interval": 3,     // commit every N exchanges
+    "auto_commit_interval": 1,     // commit every N exchanges (default 1 — every turn)
     "max_commits": 500,            // prune oldest auto-commits beyond this (keep scene/session commits)
     "enable_git": true             // can be disabled if the user doesn't want it
   }

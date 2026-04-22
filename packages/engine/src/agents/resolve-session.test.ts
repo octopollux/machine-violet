@@ -298,9 +298,10 @@ describe("ResolveSession", () => {
     const result = await session.resolve({ actor: "Kael", action: "Check stats" });
     expect(result.narrative).toBe("Checked sheet.");
 
-    // Verify the character sheet was read
+    // Verify the character sheet was read. campaignPaths.character slugifies
+    // the name defensively, so "Kael" → "kael.md" on disk.
     expect(fileIO.readFile).toHaveBeenCalledWith(
-      expect.stringContaining("Kael.md"),
+      expect.stringContaining("kael.md"),
     );
   });
 });

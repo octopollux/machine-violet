@@ -79,13 +79,34 @@ export class CampaignRepo {
     this.maxCommits = params.maxCommits ?? 500;
   }
 
-  /** Initialize git repo in campaign directory. No-op if already initialized. */
-  async init(): Promise<void> {
+  /**
+   * Initialize git repo in campaign directory.
+   *
+   * Idempotent in two senses:
+   *   1. In-process: no-op if `init()` has already succeeded on this instance.
+   *   2. Cross-process: if `.git` already has a commit (e.g. a handoff commit
+   *      written during setup), skip the "initial state" commit rather than
+   *      writing a duplicate. This lets the setup handoff own the first commit
+   *      and the engine's first `trackExchange` quietly attach to the existing
+   *      repo without polluting history.
+   *
+   * The initial commit message is configurable so the setup handoff can use
+   * a descriptive label; the engine's lazy fallback still uses "auto: initial state".
+   */
+  async init(initialMessage = "auto: initial state"): Promise<void> {
     if (!this.enabled) return;
     await this.git.init(this.dir);
-    // Initial commit with all existing files
-    await this.stageAll();
-    await this.commitIfDirty("auto: initial state");
+    let hasCommits = false;
+    try {
+      const existing = await this.git.log(this.dir, 1);
+      hasCommits = existing.length > 0;
+    } catch {
+      // No HEAD yet — fresh repo.
+    }
+    if (!hasCommits) {
+      await this.stageAll();
+      await this.commitIfDirty(initialMessage);
+    }
     this.initialized = true;
   }
 

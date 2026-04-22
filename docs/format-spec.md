@@ -175,7 +175,7 @@ Everything else is created during play.
 
   // Git recovery
   "recovery": {
-    "auto_commit_interval": 3,            // Exchanges between auto-commits.
+    "auto_commit_interval": 1,            // Exchanges between auto-commits. 1 = commit every turn (default).
     "max_commits": 100,                   // Pruning threshold.
     "enable_git": true                    // Whether git snapshots are active.
   },

@@ -101,6 +101,33 @@ describe("CampaignRepo", () => {
     expect(git.commits[0].message).toBe("auto: initial state");
   });
 
+  it("uses a custom initial commit message when one is passed to init", async () => {
+    const git = mockGitIO();
+    const repo = new CampaignRepo({ dir: "/tmp/campaign", git });
+
+    await repo.init("handoff: campaign scaffolded from setup");
+
+    expect(git.commits).toHaveLength(1);
+    expect(git.commits[0].message).toBe("handoff: campaign scaffolded from setup");
+  });
+
+  it("skips the initial commit when the repo already has a commit", async () => {
+    const git = mockGitIO();
+
+    // First process: setup's handoff commit
+    const setupRepo = new CampaignRepo({ dir: "/tmp/campaign", git });
+    await setupRepo.init("handoff: campaign scaffolded from setup");
+    expect(git.commits).toHaveLength(1);
+
+    // Second process: engine's CampaignRepo attaching to the same repo.
+    // Its lazy init must not write a duplicate "auto: initial state" commit.
+    const engineRepo = new CampaignRepo({ dir: "/tmp/campaign", git });
+    await engineRepo.init();
+
+    expect(git.commits).toHaveLength(1);
+    expect(git.commits[0].message).toBe("handoff: campaign scaffolded from setup");
+  });
+
   it("tracks exchanges and auto-commits at interval", async () => {
     const git = mockGitIO();
     const repo = new CampaignRepo({ dir: "/tmp/campaign", git, autoCommitInterval: 3 });

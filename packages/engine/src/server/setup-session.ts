@@ -27,6 +27,12 @@ import { loadConnectionStore, buildEffectiveConnections, getTierProvider } from 
 import { createProviderFromConnection, createAnthropicProvider } from "../providers/index.js";
 import type { LLMProvider } from "../providers/types.js";
 import { getModel } from "../config/models.js";
+import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { CampaignRepo } from "../tools/git/campaign-repo.js";
+import { createGitIO } from "../tools/git/isogit-adapter.js";
+import { logEvent } from "../context/engine-log.js";
 
 export class SetupSession {
   private conversation: SetupConversation | null = null;
@@ -48,18 +54,21 @@ export class SetupSession {
     this.broadcast = broadcast;
     this.fileIO = createBaseFileIO();
 
-    // Resolve medium tier from connections (same path as gameplay uses for large)
+    // Setup runs on the large tier — the conversation is short and
+    // cache-friendly (stable system prompt with BP1 1h caching), so the
+    // incremental cost over medium is small and the quality of the handoff
+    // note + world framing benefits meaningfully.
     const appConfigDir = configDir();
     const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
-    const mediumTier = getTierProvider(connStore, "medium");
+    const largeTier = getTierProvider(connStore, "large");
 
-    if (mediumTier) {
-      this.provider = createProviderFromConnection(mediumTier.connection);
-      this.model = mediumTier.modelId;
+    if (largeTier) {
+      this.provider = createProviderFromConnection(largeTier.connection);
+      this.model = largeTier.modelId;
     } else {
-      // Fallback: Anthropic from env key with default medium model
+      // Fallback: Anthropic from env key with default large model
       this.provider = createAnthropicProvider();
-      this.model = getModel("medium");
+      this.model = getModel("large");
     }
   }
 
@@ -209,9 +218,56 @@ export class SetupSession {
       await this.buildInitialSheet(campaignRoot, result);
     }
 
+    // Handoff commit — the campaign directory becomes a git repo and all
+    // scaffolded files (config.json, character sheet, party.md, etc.) land
+    // in a single commit BEFORE the DM's first turn runs. If the first turn
+    // crashes mid-flight, reloading from disk restores this exact state and
+    // the DM is re-primed with the same handoff note. Without this commit,
+    // a crash would leave us with scaffolded-but-unsnapshot files and a lazy
+    // "auto: initial state" commit baked into the first-turn critical path.
+    await this.commitHandoff(campaignRoot);
+
     // Return the campaign directory name as the ID
     const parts = norm(campaignRoot).split("/");
     return parts[parts.length - 1];
+  }
+
+  /**
+   * Initialize git + write the handoff commit for a freshly scaffolded campaign.
+   *
+   * Reads the just-written config.json to honour `recovery.enable_git` — if the
+   * player opted out of git, this is a no-op. Failures here are logged but never
+   * throw: git is recovery infrastructure, not a hard dependency of setup.
+   */
+  private async commitHandoff(campaignRoot: string): Promise<void> {
+    let config: CampaignConfig;
+    try {
+      const raw = readFileSync(join(campaignRoot, "config.json"), "utf-8");
+      config = JSON.parse(raw) as CampaignConfig;
+    } catch (err) {
+      logEvent("setup:handoff_commit_error", {
+        phase: "read_config",
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return;
+    }
+    if (!config.recovery?.enable_git) return;
+
+    try {
+      const repo = new CampaignRepo({
+        dir: campaignRoot,
+        git: createGitIO(),
+        enabled: true,
+        autoCommitInterval: config.recovery.auto_commit_interval,
+        maxCommits: config.recovery.max_commits,
+      });
+      await repo.init("handoff: campaign scaffolded from setup");
+    } catch (err) {
+      logEvent("setup:handoff_commit_error", {
+        phase: "commit",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   private async buildInitialSheet(campaignRoot: string, result: SetupResult): Promise<void> {
