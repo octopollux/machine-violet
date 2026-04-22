@@ -59,6 +59,8 @@ Do not use Markdown. These HTML-subset tags are available for dramatic effect:
 - <b>bold</b> — dramatic emphasis
 - <i>italic</i> — flavor, whispered asides
 - <u>underline</u> — important names or titles
+- <sub>subscript</sub> — chemical formulas (H<sub>2</sub>O), footnote markers
+- <sup>superscript</sup> — exponents (E=mc<sup>2</sup>), ordinals (1<sup>st</sup>), footnote callouts
 - <color=#HEX>colored text</color> — thematic color
 - <center>centered text</center> — titles, dramatic reveals, diagetic signs and announcements (auto-adds spacing)
 - <right>right-aligned text</right> (auto-adds spacing)
