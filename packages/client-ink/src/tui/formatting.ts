@@ -3,7 +3,7 @@ import type { FormattingNode, FormattingTag, NarrativeLine, ProcessedLine } from
 /**
  * Parse DM text with inline formatting tags into a tree of FormattingNodes.
  *
- * Supported tags: <b>, <i>, <u>, <center>, <right>, <color=#hex>
+ * Supported tags: <b>, <i>, <u>, <sub>, <sup>, <center>, <right>, <color=#hex>
  * Unrecognized tags are stripped. Malformed tags render as plain text.
  * Tags can be nested: <b><i>bold italic</i></b>
  */
@@ -502,7 +502,7 @@ function scanTagChanges(line: string): TagChange[] {
     if (tagStart === -1) break;
 
     // Try close tag first: </tagname>
-    const closeMatch = line.slice(tagStart).match(/^<\/(b|i|u|center|right|color)>/);
+    const closeMatch = line.slice(tagStart).match(/^<\/(b|i|u|sub|sup|center|right|color)>/);
     if (closeMatch) {
       changes.push({ kind: "close", name: closeMatch[1], raw: closeMatch[0] });
       i = tagStart + closeMatch[0].length;
@@ -583,6 +583,8 @@ const SIMPLE_TAGS: Record<string, string> = {
   b: "bold",
   i: "italic",
   u: "underline",
+  sub: "subscript",
+  sup: "superscript",
   center: "center",
   right: "right",
 };
@@ -591,8 +593,8 @@ function parseOpenTag(input: string, start: number): ParsedTag | null {
   // Match <tagname> or <color=#hex>
   const remaining = input.slice(start);
 
-  // Simple tags: <b>, <i>, <u>, <center>, <right>
-  const simpleMatch = remaining.match(/^<(b|i|u|center|right)>/);
+  // Simple tags: <b>, <i>, <u>, <sub>, <sup>, <center>, <right>
+  const simpleMatch = remaining.match(/^<(b|i|u|sub|sup|center|right)>/);
   if (simpleMatch) {
     const tagName = simpleMatch[1];
     return {
@@ -662,6 +664,10 @@ function buildNode(
       return { type: "italic", content: children };
     case "underline":
       return { type: "underline", content: children };
+    case "subscript":
+      return { type: "subscript", content: children };
+    case "superscript":
+      return { type: "superscript", content: children };
     case "center":
       return { type: "center", content: children };
     case "right":

@@ -108,10 +108,11 @@ The DM can use a small set of inline tags in narration for dramatic effect. Thes
 
 Available tags:
 - `<b>`, `<i>`, `<u>` — bold, italic, underline
+- `<sub>`, `<sup>` — subscript, superscript (rendered via Unicode substitution in `render-nodes.tsx`; chars without a Unicode equivalent pass through unchanged)
 - `<center>`, `<right>` — text justification (default is left)
 - `<color=#hex>` — hex color (e.g., `<color=#cc0000>The King has died.</color>`)
 
-The DM prompt includes one line: *"You can use `<b>`, `<i>`, `<u>`, `<center>`, `<right>`, and `<color=#hex>` tags in your narration for dramatic effect. Use sparingly."*
+The DM prompt includes one line: *"You can use `<b>`, `<i>`, `<u>`, `<sub>`, `<sup>`, `<center>`, `<right>`, and `<color=#hex>` tags in your narration for dramatic effect. Use sparingly."*
 
 Unrecognized tags are stripped. Malformed tags render as plain text. This is cosmetic — no tag changes game state.
 

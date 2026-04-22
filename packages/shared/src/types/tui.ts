@@ -35,6 +35,8 @@ export type FormattingTag =
   | { type: "bold"; content: FormattingNode[] }
   | { type: "italic"; content: FormattingNode[] }
   | { type: "underline"; content: FormattingNode[] }
+  | { type: "subscript"; content: FormattingNode[] }
+  | { type: "superscript"; content: FormattingNode[] }
   | { type: "center"; content: FormattingNode[] }
   | { type: "right"; content: FormattingNode[] }
   | { type: "color"; color: string; content: FormattingNode[] };
