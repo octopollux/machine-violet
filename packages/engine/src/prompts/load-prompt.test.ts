@@ -12,6 +12,7 @@ beforeEach(() => {
 
 const EXPECTED_PROMPTS = [
   "dm-identity",
+  "dm-directives",
   "setup-conversation",
   "scene-summarizer",
   "precis-updater",

@@ -4,10 +4,18 @@ import type { PrefixSections, CachedPrefixResult } from "../context/index.js";
 import { loadPrompt } from "../prompts/load-prompt.js";
 
 /**
- * The DM identity prompt. Kept under ~800 tokens.
- * This is the stable core — paid at cached rate on every turn.
+ * The DM identity preamble (just the <identity> block).
+ * Emitted first so the personality can sit directly under it, before the
+ * operational directives take effect.
  */
-const DM_PROMPT = loadPrompt("dm-identity");
+const DM_IDENTITY = loadPrompt("dm-identity");
+
+/**
+ * The DM operational directives (directives, voice, craft, formatting, tools).
+ * Emitted after the personality so that persona-specific register claims the
+ * seat before these generic directives.
+ */
+const DM_DIRECTIVES = loadPrompt("dm-directives");
 
 /**
  * Session state needed to build the DM's prefix.
@@ -46,7 +54,8 @@ export function buildDMPrefix(
   sessionState: DMSessionState,
 ): CachedPrefixResult {
   const sections: PrefixSections = {
-    dmPrompt: DM_PROMPT,
+    dmIdentity: DM_IDENTITY,
+    dmDirectives: DM_DIRECTIVES,
     personality: config.dm_personality.prompt_fragment,
     personalityDetail: config.dm_personality.detail,
     campaignDetail: config.campaign_detail,
@@ -157,4 +166,4 @@ export function buildUIState(params: {
 }
 
 /** Exported for testing */
-export { DM_PROMPT };
+export { DM_IDENTITY, DM_DIRECTIVES };

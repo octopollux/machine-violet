@@ -303,7 +303,7 @@ describe("buildCachedPrefix", () => {
 
   it("builds prefix with all sections", () => {
     const { system, volatile } = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the Dungeon Master.",
+      dmIdentity: "You are the Dungeon Master.",
       personality: "You are terse and ominous.",
       rulesAppendix: "## Combat\nRoll d20 + modifier.",
       campaignSummary: "Scene 1: Party entered dungeon.",
@@ -328,7 +328,7 @@ describe("buildCachedPrefix", () => {
 
   it("includes name inspiration as a Tier 2 block when present", () => {
     const { system } = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the DM.",
+      dmIdentity: "You are the DM.",
       personality: "Terse.",
       nameInspiration: "Given names: Yui, Kwame, Ingrid\nFamily names: Petrov, Achebe, Bauer",
     });
@@ -340,7 +340,7 @@ describe("buildCachedPrefix", () => {
 
   it("omits empty sections", () => {
     const { system } = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the DM.",
+      dmIdentity: "You are the DM.",
       personality: "Terse.",
     });
 
@@ -351,7 +351,7 @@ describe("buildCachedPrefix", () => {
 
   it("places BP1 on rules appendix when present", () => {
     const { system } = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the DM.",
+      dmIdentity: "You are the DM.",
       personality: "Terse.",
       rulesAppendix: "Some rules.",
     });
@@ -363,7 +363,7 @@ describe("buildCachedPrefix", () => {
 
   it("falls back BP1 to last Tier 1 block when rulesAppendix is absent", () => {
     const { system } = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the DM.",
+      dmIdentity: "You are the DM.",
       personality: "Terse.",
     });
 
@@ -374,7 +374,7 @@ describe("buildCachedPrefix", () => {
 
   it("places BP2 on last Tier 2 block", () => {
     const { system, volatile } = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the DM.",
+      dmIdentity: "You are the DM.",
       personality: "Terse.",
       rulesAppendix: "Some rules.",
       sessionRecap: "Last time...",
@@ -400,7 +400,7 @@ describe("buildCachedPrefix", () => {
 
   it("places BP2 on campaign summary when it is the last Tier 2 block", () => {
     const { system } = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the DM.",
+      dmIdentity: "You are the DM.",
       personality: "Terse.",
       campaignSummary: "Scene 1: Party entered dungeon.",
     });
@@ -411,7 +411,7 @@ describe("buildCachedPrefix", () => {
 
   it("includes Player Read block when provided", () => {
     const { system } = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the DM.",
+      dmIdentity: "You are the DM.",
       personality: "Terse.",
       scenePrecis: "Round 1 of combat.",
       playerRead: "Engagement: high | Focus: combat | Tone: aggressive | Pacing: pushing_forward | Off-script: no",
@@ -425,7 +425,7 @@ describe("buildCachedPrefix", () => {
 
   it("omits Player Read block when not provided", () => {
     const { system } = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the DM.",
+      dmIdentity: "You are the DM.",
       personality: "Terse.",
     });
 
@@ -435,7 +435,7 @@ describe("buildCachedPrefix", () => {
 
   it("includes DM Notes block in Tier 2 when provided", () => {
     const { system } = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the DM.",
+      dmIdentity: "You are the DM.",
       personality: "Terse.",
       dmNotes: "The innkeeper is a spy. Plot hook: missing merchant.",
     });
@@ -447,7 +447,7 @@ describe("buildCachedPrefix", () => {
 
   it("omits DM Notes block when not provided", () => {
     const { system } = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the DM.",
+      dmIdentity: "You are the DM.",
       personality: "Terse.",
     });
 
@@ -457,7 +457,7 @@ describe("buildCachedPrefix", () => {
 
   it("places BP2 on DM Notes when it is the last Tier 2 block", () => {
     const { system } = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the DM.",
+      dmIdentity: "You are the DM.",
       personality: "Terse.",
       playerRead: "Engagement: high",
       dmNotes: "Secret plot info.",
@@ -473,7 +473,7 @@ describe("buildCachedPrefix", () => {
 
   it("does not include Scene Pacing block (removed from prefix)", () => {
     const { system } = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the DM.",
+      dmIdentity: "You are the DM.",
       personality: "Terse.",
     });
 
@@ -483,7 +483,7 @@ describe("buildCachedPrefix", () => {
 
   it("Tier 3 content goes to volatile, not system blocks", () => {
     const { system, volatile } = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the DM.",
+      dmIdentity: "You are the DM.",
       personality: "Terse.",
       rulesAppendix: "Some rules.",
       sessionRecap: "Last time...",
@@ -517,7 +517,7 @@ describe("buildCachedPrefix", () => {
 
   it("volatile is empty when no Tier 3 content provided", () => {
     const { volatile } = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the DM.",
+      dmIdentity: "You are the DM.",
       personality: "Terse.",
     });
 
@@ -526,7 +526,7 @@ describe("buildCachedPrefix", () => {
 
   it("includes personality detail in personality block", () => {
     const { system } = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the DM.",
+      dmIdentity: "You are the DM.",
       personality: "Terse.",
       personalityDetail: "Use weather as mood. Track motifs in DM notes.",
     });
@@ -539,7 +539,7 @@ describe("buildCachedPrefix", () => {
 
   it("includes campaign detail in campaign setting block", () => {
     const { system } = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the DM.",
+      dmIdentity: "You are the DM.",
       personality: "Terse.",
       campaignDetail: "Roll for variant: 1. THE PRETENDER 2. THE EMPTY THRONE",
     });
@@ -551,7 +551,7 @@ describe("buildCachedPrefix", () => {
 
   it("omits personality detail when undefined", () => {
     const { system } = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the DM.",
+      dmIdentity: "You are the DM.",
       personality: "Terse.",
     });
 
@@ -563,7 +563,7 @@ describe("buildCachedPrefix", () => {
 
   it("omits campaign detail when undefined", () => {
     const { system } = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the DM.",
+      dmIdentity: "You are the DM.",
       personality: "Terse.",
     });
 
@@ -573,7 +573,7 @@ describe("buildCachedPrefix", () => {
 
   it("omits personality detail when empty string", () => {
     const { system } = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the DM.",
+      dmIdentity: "You are the DM.",
       personality: "Terse.",
       personalityDetail: "",
     });
@@ -584,7 +584,7 @@ describe("buildCachedPrefix", () => {
 
   it("omits campaign detail when empty string", () => {
     const { system } = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the DM.",
+      dmIdentity: "You are the DM.",
       personality: "Terse.",
       campaignDetail: "",
     });
@@ -603,7 +603,7 @@ describe("buildCachedPrefix", () => {
       system: undefined,
     };
     const { system } = buildCachedPrefix(minimalConfig, {
-      dmPrompt: "You are the DM.",
+      dmIdentity: "You are the DM.",
       personality: "Terse.",
       campaignDetail: "Secret variant instructions.",
     });
@@ -613,9 +613,28 @@ describe("buildCachedPrefix", () => {
     expect(allText).toContain("Secret variant instructions.");
   });
 
+  it("emits personality between identity and directives so persona claims the seat before generic voice rules", () => {
+    const { system } = buildCachedPrefix(mockConfig, {
+      dmIdentity: "IDENTITY_MARKER",
+      dmDirectives: "DIRECTIVES_MARKER",
+      personality: "PERSONALITY_MARKER",
+    });
+
+    const allText = system.map((b) => b.text).join("\n");
+    const identityIdx = allText.indexOf("IDENTITY_MARKER");
+    const personalityIdx = allText.indexOf("PERSONALITY_MARKER");
+    const directivesIdx = allText.indexOf("DIRECTIVES_MARKER");
+
+    expect(identityIdx).toBeGreaterThan(-1);
+    expect(personalityIdx).toBeGreaterThan(-1);
+    expect(directivesIdx).toBeGreaterThan(-1);
+    expect(identityIdx).toBeLessThan(personalityIdx);
+    expect(personalityIdx).toBeLessThan(directivesIdx);
+  });
+
   it("places session recap before campaign summary in Tier 2", () => {
     const { system } = buildCachedPrefix(mockConfig, {
-      dmPrompt: "You are the DM.",
+      dmIdentity: "You are the DM.",
       personality: "Terse.",
       rulesAppendix: "Some rules.",
       campaignSummary: "Scene 1: Party entered dungeon.",

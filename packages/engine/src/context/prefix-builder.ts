@@ -6,7 +6,7 @@ import type { SystemBlock } from "../providers/types.js";
  *
  * Three stability tiers with four cache breakpoints:
  *
- *   Tier 1 (campaign-stable): DM prompt, personality, game system, campaign setting, rules  [BP1]
+ *   Tier 1 (campaign-stable): DM identity, personality, DM directives, game system, campaign setting, rules  [BP1]
  *   Tier 2 (session/scene-stable): session recap, campaign summary, scene precis, player read  [BP2]
  *   Tier 3 (volatile): active state, entity index, UI state — injected into conversation, NOT system
  *
@@ -20,7 +20,8 @@ import type { SystemBlock } from "../providers/types.js";
  * the tools cache (BP3), which was causing ~2k+ tokens of cache writes per turn.
  */
 export interface PrefixSections {
-  dmPrompt: string;
+  dmIdentity: string;
+  dmDirectives?: string;
   personality: string;
   personalityDetail?: string;
   campaignDetail?: string;
@@ -71,16 +72,23 @@ export function buildCachedPrefix(
 
   // ── Tier 1: Campaign-stable (never invalidated) ──
 
-  // DM identity
-  blocks.push({ text: sections.dmPrompt });
+  // DM identity (preamble only — the <identity> block)
+  blocks.push({ text: sections.dmIdentity });
 
-  // DM personality fragment + hidden detail
+  // DM personality fragment + hidden detail — slotted BETWEEN identity and
+  // directives so the persona's register claims the seat before the generic
+  // voice/craft/formatting rules that follow.
   if (sections.personality) {
     let personalityText = `\n\n## Your Personality\n${sections.personality}`;
     if (sections.personalityDetail) {
       personalityText += `\n\n${sections.personalityDetail}`;
     }
     blocks.push({ text: personalityText });
+  }
+
+  // DM operational directives (directives + voice + craft + formatting + tools)
+  if (sections.dmDirectives) {
+    blocks.push({ text: `\n\n${sections.dmDirectives}` });
   }
 
   // Game system
