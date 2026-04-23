@@ -1402,29 +1402,29 @@ describe("buildScenePacing", () => {
 
   it("nudges when scene is long and thread-heavy", () => {
     const scene = mockScene();
-    // 8 player exchanges
+    // 20 player exchanges
     scene.transcript = [];
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 20; i++) {
       scene.transcript.push(`**[Aldric]** Action ${i}.`);
       scene.transcript.push(`**DM:** Response ${i}.`);
     }
-    scene.openThreads = "[[a]], [[b]], [[c]]";
+    scene.openThreads = "[[a]], [[b]], [[c]], [[d]], [[e]]";
     const result = buildScenePacing(scene)!;
-    expect(result).toContain("Exchanges: 8");
-    expect(result).toContain("Open threads: 3");
+    expect(result).toContain("Exchanges: 20");
+    expect(result).toContain("Open threads: 5");
     expect(result).toContain("Scene is long and thread-heavy");
   });
 
   it("nudges when scene is long even with few threads", () => {
     const scene = mockScene();
     scene.transcript = [];
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 30; i++) {
       scene.transcript.push(`**[Aldric]** Action ${i}.`);
       scene.transcript.push(`**DM:** Response ${i}.`);
     }
     scene.openThreads = "[[a]]";
     const result = buildScenePacing(scene)!;
-    expect(result).toContain("Exchanges: 10");
+    expect(result).toContain("Exchanges: 30");
     expect(result).toContain("running long");
   });
 
@@ -1434,9 +1434,9 @@ describe("buildScenePacing", () => {
       "**[Aldric]** I look around.",
       "**DM:** You see many things.",
     ];
-    scene.openThreads = "[[a]], [[b]], [[c]], [[d]]";
+    scene.openThreads = "[[a]], [[b]], [[c]], [[d]], [[e]]";
     const result = buildScenePacing(scene)!;
-    expect(result).toContain("Open threads: 4");
+    expect(result).toContain("Open threads: 5");
     expect(result).toContain("Many open threads");
   });
 
