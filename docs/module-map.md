@@ -168,7 +168,7 @@ State machine for the application: main menu → playing (setup or gameplay) / a
 
 Markdown files loaded at runtime via `loadPrompt(name)` (sync, cached, CRLF→LF normalized). Template interpolation via `loadTemplate(name, vars)` with `{{placeholder}}` syntax.
 
-Key prompts: `dm-identity.md` (DM behavioral instructions), plus one `.md` per subagent (named to match).
+Key prompts: `dm-identity.md` (identity preamble) and `dm-directives.md` (directives, voice, craft, formatting, tools — emitted after the personality so persona-specific register claims the seat before the generic rules), plus one `.md` per subagent (named to match).
 
 Tests must call `resetPromptCache()` in `beforeEach`.
 
