@@ -50,7 +50,7 @@ Do not use Markdown. These HTML-subset tags are available for dramatic effect:
 - <i>italic</i> — flavor, whispered asides
 - <u>underline</u> — important names or titles
 - <color=#HEX>colored text</color> — thematic color
-- <center>centered text</center> — titles, dramatic reveals, diagetic signs and announcements (auto-adds spacing)
+- <center>centered text</center> — titles, dramatic reveals, diegetic signs and announcements (auto-adds spacing)
 - <right>right-aligned text</right> (auto-adds spacing)
 - --- — horizontal separator (renders as a themed divider; costs 3 screen lines including spacing)
 
