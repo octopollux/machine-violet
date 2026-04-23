@@ -112,6 +112,37 @@ describe("parseFormatting", () => {
     expect(underline.type).toBe("underline");
     expect(underline.content).toEqual(["deep"]);
   });
+
+  it("parses subscript tags", () => {
+    const result = parseFormatting("H<sub>2</sub>O");
+    expect(result).toHaveLength(3);
+    expect(result[0]).toBe("H");
+    expect((result[1] as FormattingTag).type).toBe("subscript");
+    expect((result[1] as FormattingTag).content).toEqual(["2"]);
+    expect(result[2]).toBe("O");
+  });
+
+  it("parses superscript tags", () => {
+    const result = parseFormatting("E=mc<sup>2</sup>");
+    expect((result[1] as FormattingTag).type).toBe("superscript");
+    expect((result[1] as FormattingTag).content).toEqual(["2"]);
+  });
+
+  it("does not confuse <sub> and <sup>", () => {
+    const result = parseFormatting("<sub>a</sub><sup>b</sup>");
+    expect(result).toHaveLength(2);
+    expect((result[0] as FormattingTag).type).toBe("subscript");
+    expect((result[1] as FormattingTag).type).toBe("superscript");
+  });
+
+  it("allows sub/sup to nest inside other tags", () => {
+    const result = parseFormatting("<b>x<sup>2</sup></b>");
+    const bold = result[0] as FormattingTag;
+    expect(bold.type).toBe("bold");
+    expect(bold.content).toHaveLength(2);
+    expect(bold.content[0]).toBe("x");
+    expect((bold.content[1] as FormattingTag).type).toBe("superscript");
+  });
 });
 
 describe("toPlainText", () => {

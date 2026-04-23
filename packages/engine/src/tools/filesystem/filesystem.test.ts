@@ -400,6 +400,33 @@ describe("campaignPaths", () => {
     expect(norm(paths.sceneTranscript(1, "tavern"))).toContain("001-tavern/transcript.md");
     expect(norm(paths.sceneDmNotes(1, "tavern"))).toContain("001-tavern/dm-notes.md");
   });
+
+  it("slugifies display names defensively across entity helpers", () => {
+    const paths = campaignPaths("/root");
+    // Display names with spaces/casing collapse to slugged filenames. This is
+    // the invariant that keeps the DM's lazy codepaths (promote_character,
+    // read_character_sheet, combatant sheet loading) from creating parallel
+    // entity files under the raw display name.
+    expect(norm(paths.character("Janey Bruce"))).toContain("characters/janey-bruce.md");
+    expect(norm(paths.location("The Goblin Caves"))).toContain("locations/goblin-caves/index.md");
+    expect(norm(paths.locationMap("Maren Crossing", "level-1")))
+      .toContain("locations/maren-crossing/level-1.json");
+    expect(norm(paths.faction("The Silver Hand"))).toContain("factions/silver-hand.md");
+    expect(norm(paths.lore("Ancient Sword"))).toContain("lore/ancient-sword.md");
+    expect(norm(paths.item("Ring of Power"))).toContain("items/ring-of-power.md");
+    expect(norm(paths.rule("Combat Basics"))).toContain("rules/combat-basics.md");
+  });
+
+  it("is idempotent for already-slugified names", () => {
+    const paths = campaignPaths("/root");
+    // Callers that already pass slugs must land on the same path either way —
+    // otherwise introducing the defensive slugify would break every correct
+    // existing callsite (world-builder, scribe).
+    expect(norm(paths.character("janey-bruce"))).toContain("characters/janey-bruce.md");
+    expect(norm(paths.location("starting-location")))
+      .toContain("locations/starting-location/index.md");
+    expect(norm(paths.faction("silver-hand"))).toContain("factions/silver-hand.md");
+  });
 });
 
 // --- Changelog ---

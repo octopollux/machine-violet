@@ -40,6 +40,10 @@ function tagToHtml(tag: FormattingTag): string {
       return `<i>${inner}</i>`;
     case "underline":
       return `<u>${inner}</u>`;
+    case "subscript":
+      return `<sub>${inner}</sub>`;
+    case "superscript":
+      return `<sup>${inner}</sup>`;
     case "color":
       return `<span style="color:${esc(tag.color)}">${inner}</span>`;
     case "center":

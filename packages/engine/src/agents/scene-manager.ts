@@ -1173,11 +1173,11 @@ export function buildScenePacing(scene: SceneState): string | undefined {
   parts.push(`Open threads: ${threadCount}`);
 
   // Advisory nudge when the scene is running long or overloaded
-  if (exchangeCount >= 8 && threadCount >= 3) {
+  if (exchangeCount >= 20 && threadCount >= 5) {
     parts.push("→ Scene is long and thread-heavy. Consider ending it — unresolved threads carry forward, and your alarms and clocks need a transition to fire.");
-  } else if (exchangeCount >= 10) {
+  } else if (exchangeCount >= 30) {
     parts.push("→ Scene is running long. Look for a cut point.");
-  } else if (threadCount >= 4) {
+  } else if (threadCount >= 5) {
     parts.push("→ Many open threads. Resolve or cut — don't open more.");
   }
 

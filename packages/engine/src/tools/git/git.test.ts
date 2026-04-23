@@ -101,6 +101,49 @@ describe("CampaignRepo", () => {
     expect(git.commits[0].message).toBe("auto: initial state");
   });
 
+  it("uses a custom initial commit message when one is passed to init", async () => {
+    const git = mockGitIO();
+    const repo = new CampaignRepo({ dir: "/tmp/campaign", git });
+
+    await repo.init("handoff: campaign scaffolded from setup");
+
+    expect(git.commits).toHaveLength(1);
+    expect(git.commits[0].message).toBe("handoff: campaign scaffolded from setup");
+  });
+
+  it("is a no-op on repeat init() calls against the same instance", async () => {
+    const git = mockGitIO();
+    const repo = new CampaignRepo({ dir: "/tmp/campaign", git });
+
+    await repo.init("handoff: campaign scaffolded from setup");
+    await repo.init("handoff: campaign scaffolded from setup");
+    await repo.init();
+
+    // git.init must fire exactly once despite three calls — the documented
+    // in-process idempotence contract. Without it, a caller that wires init()
+    // into a retry path would thrash git.init and git.log each time.
+    expect((git.init as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1);
+    expect(git.commits).toHaveLength(1);
+    expect(git.commits[0].message).toBe("handoff: campaign scaffolded from setup");
+  });
+
+  it("skips the initial commit when the repo already has a commit", async () => {
+    const git = mockGitIO();
+
+    // First process: setup's handoff commit
+    const setupRepo = new CampaignRepo({ dir: "/tmp/campaign", git });
+    await setupRepo.init("handoff: campaign scaffolded from setup");
+    expect(git.commits).toHaveLength(1);
+
+    // Second process: engine's CampaignRepo attaching to the same repo.
+    // Its lazy init must not write a duplicate "auto: initial state" commit.
+    const engineRepo = new CampaignRepo({ dir: "/tmp/campaign", git });
+    await engineRepo.init();
+
+    expect(git.commits).toHaveLength(1);
+    expect(git.commits[0].message).toBe("handoff: campaign scaffolded from setup");
+  });
+
   it("tracks exchanges and auto-commits at interval", async () => {
     const git = mockGitIO();
     const repo = new CampaignRepo({ dir: "/tmp/campaign", git, autoCommitInterval: 3 });

@@ -28,7 +28,8 @@ import { createProviderFromConnection } from "../providers/index.js";
 import { configDir } from "../utils/paths.js";
 import { sandboxFileIO } from "../tools/filesystem/sandbox.js";
 import { campaignPaths } from "../tools/filesystem/scaffold.js";
-import { buildEntityTree } from "../tools/filesystem/entity-tree.js";
+import { buildEntityTree, renderEntityTree } from "../tools/filesystem/entity-tree.js";
+import type { EntityTree } from "@machine-violet/shared/types/entities.js";
 import { createGitIO } from "../tools/git/isogit-adapter.js";
 import { createClocksState } from "../tools/clocks/index.js";
 import { createCombatState } from "../tools/combat/index.js";
@@ -646,7 +647,7 @@ export class SessionManager {
     if (isResume) {
       await this.resumeSession(engine, config, gs, scene);
     } else {
-      await this.startNewGame(engine, config, gs);
+      await this.startNewGame(engine, config, gs, entityTree);
     }
   }
 
@@ -781,19 +782,43 @@ export class SessionManager {
     engine: GameEngine,
     config: CampaignConfig,
     gs: GameState,
+    entityTree: EntityTree,
   ): Promise<void> {
     // Trigger opening scene — TUI commands (theme, resources, modelines)
     // stream live to the client as activity:update events during this call.
+    //
+    // Priming message layout:
+    //   1. Bracketed stage direction: "[Session begins. Set the scene. <premise>. <PC>.]"
+    //      This is the cue the DM is trained to react to.
+    //   2. If the setup agent wrote a handoff note, a blank line + the note verbatim.
+    //      The note carries the player's own words and any setup-agent notes that
+    //      don't survive into structured config. It's a one-shot read; after the
+    //      opening turn succeeds it remains in config.json purely for resume.
+    //   3. A "Pre-existing entities" block listing every entity file already on
+    //      disk after setup scaffolding. This is the "chain of custody" the DM
+    //      relies on to avoid creating duplicate files (e.g. writing a fresh
+    //      character sheet at `Janey Bruce.md` when `janey-bruce.md` already
+    //      exists). Always included when the tree is non-empty.
     const active = getActivePlayer(gs);
     const openingParts = ["[Session begins. Set the scene."];
     if (config.premise) openingParts.push(`Campaign premise: ${config.premise}`);
     const pc = config.players[0];
     if (pc) openingParts.push(`The player character is ${pc.character}.`);
+    let priming = openingParts.join(" ") + "]";
+    if (config.setup_handoff && config.setup_handoff.trim()) {
+      priming += "\n\nSetup agent's handoff note:\n" + config.setup_handoff.trim();
+    }
+    const entityListing = renderEntityTree(entityTree);
+    if (entityListing) {
+      priming += "\n\nPre-existing entities (created during setup — write to these paths,"
+        + " do not create duplicates under alternate names):\n"
+        + entityListing;
+    }
 
     this.syncUIState();
     await engine.processInput(
       active.characterName,
-      openingParts.join(" ") + "]",
+      priming,
       { skipTranscript: true },
     );
 

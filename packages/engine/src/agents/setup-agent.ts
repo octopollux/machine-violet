@@ -28,6 +28,15 @@ export interface SetupResult {
   ageGroup?: "child" | "teenager" | "adult";
   /** Freeform content preferences captured during setup (one per line). */
   contentPreferences?: string;
+  /**
+   * Handoff postcard for the DM's first turn. Written by the setup agent
+   * as free-form prose summarising what the player actually said (character
+   * in their own words, freeform world/tone notes, anything else useful),
+   * plus anything the setup agent wants to pass along. Injected once into
+   * the DM's first-turn priming message; persisted in CampaignConfig so it
+   * survives a mid-first-turn crash and restart.
+   */
+  handoffNote?: string;
 }
 
 /**
@@ -52,6 +61,7 @@ export function buildCampaignConfig(result: SetupResult): CampaignConfig {
     difficulty: result.difficulty,
     premise: result.campaignPremise,
     campaign_detail: result.campaignDetail ?? undefined,
+    setup_handoff: result.handoffNote ?? undefined,
     dm_personality: result.personality,
     players: [player],
     combat: defaultCombatConfig(),
@@ -61,7 +71,12 @@ export function buildCampaignConfig(result: SetupResult): CampaignConfig {
       tool_result_stub_after: 5,
     },
     recovery: {
-      auto_commit_interval: 3,
+      // Commit every exchange. Git commits on a fresh campaign are tiny and
+      // cheap; the downside of bundling exchanges is that a crash drops work
+      // back to the last commit, and losing even a single DM turn is painful
+      // because DM turns frequently produce rich content (full dm-notes, NPCs,
+      // scene prep). One commit per exchange is the crash-safety floor.
+      auto_commit_interval: 1,
       max_commits: 500,
       enable_git: true,
     },

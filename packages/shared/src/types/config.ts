@@ -68,6 +68,15 @@ export interface CampaignConfig {
   premise?: string;
   /** Hidden campaign detail — DM-only instructions (variants, secrets, pacing notes). */
   campaign_detail?: string;
+  /**
+   * Handoff postcard written by the setup agent for the DM's first turn.
+   * Free-form prose: player's words about their character, any freeform intent
+   * captured in setup, setup-agent notes to the DM. Injected once into the
+   * first-turn priming message; persists here for resume-from-disk after a
+   * mid-first-turn crash. Never re-injected after the DM's opening narration
+   * succeeds.
+   */
+  setup_handoff?: string;
   dm_personality: DMPersonality;
   players: PlayerConfig[];
   combat: CombatConfig;
