@@ -30,11 +30,19 @@ export function revealInExplorer(filePath: string): void {
   const opts = { detached: true, stdio: "ignore" as const };
   let child;
   if (process.platform === "win32") {
-    // explorer.exe /select, requires Windows-style backslashes — forward
-    // slashes silently fail and Explorer opens the Documents folder instead.
-    // Comma (not space) separates the switch from the path.
+    // explorer.exe /select, has two Windows-specific quirks:
+    //   1. Path must use backslashes — forward slashes silently fail and
+    //      Explorer opens the Documents folder instead.
+    //   2. When the path contains spaces, Node's default arg quoting wraps
+    //      the whole arg in quotes (`"/select,C:\foo bar\file"`), and
+    //      Explorer's parser does not accept that form. Use
+    //      windowsVerbatimArguments + manual inner quoting so the command
+    //      line arrives as `explorer.exe /select,"C:\foo bar\file"`.
     const winPath = filePath.replace(/\//g, "\\");
-    child = spawn("explorer.exe", [`/select,${winPath}`], opts);
+    child = spawn("explorer.exe", [`/select,"${winPath}"`], {
+      ...opts,
+      windowsVerbatimArguments: true,
+    });
   } else if (process.platform === "darwin") {
     child = spawn("open", ["-R", filePath], opts);
   } else {
