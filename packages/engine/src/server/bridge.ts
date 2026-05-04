@@ -25,6 +25,13 @@ export interface BridgeOptions {
   costTracker?: CostTracker;
   /** Fired after each completed DM narrative — used to drive Discord rich-presence updates. */
   onDmNarrative?: (text: string) => void;
+  /**
+   * Fired when a streaming retry has just discarded its in-flight delta
+   * buffer. Consumers (typically SessionManager) should publish a
+   * corrective state:snapshot so the client replaces its accumulated
+   * narrative before the retry's deltas arrive.
+   */
+  onRollback?: () => void;
 }
 
 export function createBridge(
@@ -33,7 +40,7 @@ export function createBridge(
   const opts: BridgeOptions = typeof broadcastOrOpts === "function"
     ? { broadcast: broadcastOrOpts }
     : broadcastOrOpts;
-  const { broadcast, costTracker, onDmNarrative } = opts;
+  const { broadcast, costTracker, onDmNarrative, onRollback } = opts;
   // --- Narrative buffering ---
   let buffer = "";
   let flushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -129,6 +136,24 @@ export function createBridge(
         type: "error",
         data: { message: `API retry (status ${status})`, recoverable: true, status, delayMs },
       });
+    },
+
+    onRollback(): void {
+      // A streaming attempt failed after emitting partial deltas. Drop our
+      // pending un-flushed buffer so a stale tail-fragment from the failed
+      // attempt can't sneak out after the corrective snapshot. (Already-sent
+      // chunks live on the client and are cleared by the snapshot's
+      // narrativeLines replace.)
+      if (flushTimer) {
+        clearTimeout(flushTimer);
+        flushTimer = null;
+      }
+      buffer = "";
+      logEvent("api:rollback", {});
+      // Hand off to the consumer so it can publish the corrective snapshot
+      // — bridge doesn't know the snapshot shape, only that the client
+      // needs an authoritative reset before the retry's deltas arrive.
+      onRollback?.();
     },
 
     onRefusal(): void {

@@ -218,6 +218,32 @@ function shouldInjectDmSeparator(lines: NarrativeLine[]): boolean {
   return false;
 }
 
+/**
+ * Reconstruct the rendered narrative shape (with turn separators) from a
+ * flat dm/player line sequence — used when handleStateSnapshot replaces
+ * the local log with the server's authoritative committed transcript.
+ *
+ * Mirrors the per-chunk separator injection that happens during live
+ * streaming so the rendered output looks identical whether the lines
+ * arrived live or via snapshot replace. Spacers between turns aren't
+ * recreated (they're added by handleNarrativeComplete during live play
+ * and by appendDelta on intra-paragraph newlines, neither of which
+ * applies to a one-shot replace) — empty dm lines in the source serve
+ * the same paragraph-boundary role.
+ */
+function withTurnSeparators(
+  source: readonly { kind: "dm" | "player"; text: string }[],
+): NarrativeLine[] {
+  const out: NarrativeLine[] = [];
+  for (const line of source) {
+    if (line.kind === "dm" && shouldInjectDmSeparator(out)) {
+      out.push({ kind: "separator", text: "---" });
+    }
+    out.push(line);
+  }
+  return out;
+}
+
 function handleNarrativeChunk(event: NarrativeChunkEvent, update: StateUpdater): void {
   const { text, kind } = event.data;
   const lineKind = (kind ?? "dm") as NarrativeLine["kind"];
@@ -391,6 +417,17 @@ function handleStateSnapshot(event: StateSnapshotEvent, update: StateUpdater): v
       displayResources: snapshot.displayResources ?? prev.displayResources,
       resourceValues: snapshot.resourceValues ?? prev.resourceValues,
       modelines: snapshot.modelines ?? prev.modelines,
+      // Authoritative transcript replace, when the server includes one.
+      // Sent on connect (so reconnecting clients see history) and on retry
+      // rollback (to discard a partial DM stream that's about to be
+      // re-issued). Snapshots that omit narrativeLines preserve whatever
+      // we've already accumulated, so per-turn snapshots don't clobber
+      // in-flight stream deltas. The server only carries dm/player lines;
+      // we re-derive turn separators here so the post-replace rendering
+      // matches what the live-streaming path produces.
+      narrativeLines: snapshot.narrativeLines
+        ? withTurnSeparators(snapshot.narrativeLines)
+        : prev.narrativeLines,
     };
   });
 }

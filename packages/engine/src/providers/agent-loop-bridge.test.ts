@@ -274,4 +274,123 @@ describe("runProviderLoop retry", () => {
     expect(result.text).toBe("Streamed OK");
     expect(onRetry).toHaveBeenCalledWith(502, expect.any(Number));
   });
+
+  // The rollback signal exists for issue #431: a streaming call that emits
+  // partial deltas before failing leaves those deltas accumulated on the
+  // client. Without onRollback, the retry would re-stream from scratch and
+  // visibly duplicate the text. The signal lets the consumer publish a
+  // corrective snapshot before the retry begins.
+  it("fires onRollback when a partial stream fails before retrying", async () => {
+    let callCount = 0;
+    const provider: LLMProvider = {
+      providerId: "test",
+      chat: vi.fn(),
+      stream: vi.fn(async (_params, onDelta) => {
+        callCount++;
+        if (callCount === 1) {
+          // Emit some deltas, then fail — simulates the actual bug shape.
+          onDelta("The bell ");
+          onDelta("chimes. Mollie ");
+          throw apiError(502, "Bad gateway");
+        }
+        const result = textResult("The bell chimes. Mollie glances up.");
+        onDelta(result.text);
+        return result;
+      }),
+      healthCheck: vi.fn(),
+    };
+
+    const onRetry = vi.fn();
+    const onRollback = vi.fn();
+    const onTextDelta = vi.fn();
+    const promise = runProviderLoop(provider, "system", [
+      { role: "user", content: "hello" },
+    ], {
+      name: "test",
+      model: "test-model",
+      maxTokens: 100,
+      stream: true,
+      onTextDelta,
+      onRetry,
+      onRollback,
+    });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    const result = await promise;
+
+    expect(result.text).toBe("The bell chimes. Mollie glances up.");
+    // Critical ordering: rollback must fire before retry, so the corrective
+    // snapshot lands before the next attempt's deltas start arriving.
+    expect(onRollback).toHaveBeenCalledOnce();
+    const rollbackOrder = onRollback.mock.invocationCallOrder[0];
+    const retryOrder = onRetry.mock.invocationCallOrder[0];
+    expect(rollbackOrder).toBeLessThan(retryOrder);
+  });
+
+  it("does NOT fire onRollback when stream fails before emitting any delta", async () => {
+    let callCount = 0;
+    const provider: LLMProvider = {
+      providerId: "test",
+      chat: vi.fn(),
+      stream: vi.fn(async (_params, onDelta) => {
+        callCount++;
+        if (callCount === 1) throw apiError(529, "Overloaded");
+        const result = textResult("OK");
+        onDelta(result.text);
+        return result;
+      }),
+      healthCheck: vi.fn(),
+    };
+
+    const onRollback = vi.fn();
+    const promise = runProviderLoop(provider, "system", [
+      { role: "user", content: "hello" },
+    ], {
+      name: "test",
+      model: "test-model",
+      maxTokens: 100,
+      stream: true,
+      onTextDelta: vi.fn(),
+      onRollback,
+    });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await promise;
+
+    // Nothing leaked to the client, so no rollback needed — avoids a
+    // pointless snapshot round-trip on every transient pre-stream failure.
+    expect(onRollback).not.toHaveBeenCalled();
+  });
+
+  it("does NOT fire onRollback for non-streaming retries", async () => {
+    let callCount = 0;
+    const provider: LLMProvider = {
+      providerId: "test",
+      chat: vi.fn(async () => {
+        callCount++;
+        if (callCount === 1) throw apiError(503, "Service unavailable");
+        return textResult("OK");
+      }),
+      stream: vi.fn(),
+      healthCheck: vi.fn(),
+    };
+
+    const onRollback = vi.fn();
+    const promise = runProviderLoop(provider, "system", [
+      { role: "user", content: "hello" },
+    ], {
+      name: "test",
+      model: "test-model",
+      maxTokens: 100,
+      stream: false,
+      onRollback,
+    });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await promise;
+
+    // Non-streaming responses are emitted as a single onTextDelta on success
+    // only. A failed non-streaming attempt has no partial output to roll back.
+    expect(onRollback).not.toHaveBeenCalled();
+  });
 });

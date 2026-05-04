@@ -78,6 +78,27 @@ export class SessionManager {
    *  buildStateSnapshot() call and cleared. Ensures only the first snapshot
    *  after a clean session-end carries the recap. */
   private pendingSessionRecap: { id: string; lines: string[] } | null = null;
+  /**
+   * Authoritative committed transcript for the active session.
+   *
+   * Tracks only `dm` and `player` lines — the kinds the state:snapshot
+   * narrativeLines schema accepts. (The persisted display log additionally
+   * keeps `system` and `separator` lines, but those are presentation-only
+   * and not mirrored into the live committed log.) Stored as one entry per
+   * text line — multi-paragraph DM/player text is split on `\n` at append
+   * time so the shape matches what `appendDelta` produces during live
+   * streaming and what `markdownToNarrativeLines` produces from the on-disk
+   * log on resume; the client can therefore replace its narrative log with
+   * this verbatim and have it render identically.
+   *
+   * Replayed into a state:snapshot when the client needs an authoritative
+   * reset — on connect (so reconnects see history) or on retry rollback
+   * (so a partial DM stream that's about to be re-issued doesn't
+   * accumulate twice in the client log). Seeded from the display log on
+   * resume; appended to as DM responses complete and as `client`-source
+   * contributions arrive. Reset on each new session start.
+   */
+  private committedNarrative: { kind: "dm" | "player"; text: string }[] = [];
   private setupSession: SetupSession | null = null;
 
   /** Campaign ID of the currently active session (null if none). */
@@ -114,9 +135,12 @@ export class SessionManager {
       this.checkIdleTimeout();
     });
 
-    // Send current state snapshot on connect
+    // Send current state snapshot on connect. Include the committed
+    // narrative so reconnecting clients see history without needing the
+    // server to re-stream it; first-time connections during an active
+    // session pick up everything that was committed before they joined.
     if (this.status === "active") {
-      const snapshot = this.buildStateSnapshot();
+      const snapshot = this.buildStateSnapshot({ includeNarrative: true });
       this.sendTo(ws, {
         type: "state:snapshot",
         data: snapshot,
@@ -494,8 +518,23 @@ export class SessionManager {
     // silently discard their events instead of leaking into the new session.
     this.sessionGeneration++;
     const gen = this.sessionGeneration;
+    // Reset the committed transcript for the new session. Resume seeds it
+    // from the display log later in resumeSession().
+    this.committedNarrative = [];
     const scopedBroadcast = (event: ServerEvent) => {
       if (this.sessionGeneration !== gen) return;
+      // Mirror client-side narrative accumulation into the committed log
+      // so a snapshot can replay it verbatim. We watch turn:updated for
+      // player contributions; DM lines are appended via onNarrativeComplete
+      // below. Only client-source contributions are mirrored — engine-source
+      // (AI player) contributions follow a separate path.
+      if (event.type === "turn:updated") {
+        const data = event.data as { contribution?: { source?: string; playerId?: string; text?: string } };
+        const c = data.contribution;
+        if (c?.source === "client" && c.playerId && typeof c.text === "string") {
+          this.appendCommittedLines("player", `[${c.playerId}] ${c.text}`);
+        }
+      }
       this.broadcast(event);
     };
     // Discord rich-presence: counter resets per backend session load. Every
@@ -529,6 +568,18 @@ export class SessionManager {
       broadcast: scopedBroadcast,
       costTracker: this.costTracker,
       onDmNarrative,
+      // Fires after the bridge has dropped its pending delta buffer, when
+      // a streaming retry is about to re-issue the request. We publish a
+      // corrective snapshot so the client replaces its accumulated
+      // narrative (which includes the leaked partial output) with the
+      // last committed transcript before the retry's deltas arrive.
+      onRollback: () => {
+        if (this.sessionGeneration !== gen) return;
+        scopedBroadcast({
+          type: "state:snapshot",
+          data: this.buildStateSnapshot({ includeNarrative: true }),
+        });
+      },
     });
 
     // Intercept TUI commands so persistedUI stays in sync — ensures
@@ -540,6 +591,18 @@ export class SessionManager {
       if (this.sessionGeneration !== gen) return;
       this.trackTuiState(cmd);
       originalOnTui(cmd);
+    };
+
+    // Mirror DM narrative completions into the committed transcript.
+    // Wrapped (not folded into onDmNarrative) because onDmNarrative is
+    // sampled — only fires every Nth narrative for Discord status updates,
+    // whereas the committed log needs every one.
+    const originalOnNarrativeComplete = callbacks.onNarrativeComplete;
+    callbacks.onNarrativeComplete = (text, playerAction) => {
+      if (this.sessionGeneration === gen && text) {
+        this.appendCommittedLines("dm", text);
+      }
+      originalOnNarrativeComplete(text, playerAction);
     };
 
     // --- Instantiate GameEngine ---
@@ -737,6 +800,16 @@ export class SessionManager {
     const historyLines = await persister.loadDisplayLogFull();
     if (historyLines.length > 0) {
       const narrativeLines = markdownToNarrativeLines(historyLines);
+      // Seed the committed transcript with dm/player lines from history so a
+      // mid-session rollback after resume produces a snapshot that contains
+      // the prior session's text — not just lines accumulated since this load.
+      // Skip separators/spacers/system/dev: those are presentation-only and
+      // re-derived (or simply absent post-replace, which is acceptable).
+      for (const line of narrativeLines) {
+        if (line.kind === "dm" || line.kind === "player") {
+          this.committedNarrative.push({ kind: line.kind, text: line.text });
+        }
+      }
       // Group consecutive same-kind lines and send each group as one chunk.
       // Separators (---) are sent as DM lines — the formatting pipeline
       // converts them to styled horizontal rules during rendering.
@@ -1016,7 +1089,32 @@ export class SessionManager {
     }
   }
 
-  buildStateSnapshot(): StateSnapshot {
+  /**
+   * Push a multi-line text blob into the committed transcript as one entry
+   * per `\n`-separated line — matching the per-line shape that
+   * `appendDelta` produces during live streaming and that
+   * `markdownToNarrativeLines` produces from the on-disk log on resume.
+   * Empty splits ARE preserved: they render as blank lines, which act as
+   * paragraph boundaries in the formatting pipeline.
+   */
+  private appendCommittedLines(kind: "dm" | "player", text: string): void {
+    for (const line of text.split("\n")) {
+      this.committedNarrative.push({ kind, text: line });
+    }
+  }
+
+  /**
+   * Build a state snapshot for broadcast.
+   *
+   * @param opts.includeNarrative — when true, include the committed transcript
+   *   (DM + player lines). The client treats this as authoritative and
+   *   REPLACES its accumulated narrative log. Pass true on connect (so
+   *   reconnecting clients see history) and on retry rollback (to discard
+   *   a partial DM stream that's about to be re-issued). Default false:
+   *   per-turn snapshots omit narrative so they don't clobber in-flight
+   *   stream deltas with a stale committed view.
+   */
+  buildStateSnapshot(opts?: { includeNarrative?: boolean }): StateSnapshot {
     const gs = this.gameState;
     const config = gs?.config;
 
@@ -1044,6 +1142,9 @@ export class SessionManager {
       keyColor: this.persistedUI.keyColor ?? undefined,
       mode: this.currentMode,
       sessionRecap: recap ?? undefined,
+      narrativeLines: opts?.includeNarrative
+        ? this.committedNarrative.slice()
+        : undefined,
     };
   }
 
