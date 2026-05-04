@@ -318,6 +318,40 @@ describe("event-handler", () => {
       expect(h.state.narrativeLines).toEqual(before);
     });
 
+    // Server only sends dm/player kinds. Turn separators must be re-derived
+    // client-side so the post-replace rendering matches what live streaming
+    // would produce — otherwise a rolled-back retry would visibly drop the
+    // turn-boundary divider that was rendered before the failure.
+    it("re-derives turn separators between player and dm transitions", () => {
+      const h = makeHarness();
+      h.dispatch({
+        type: "state:snapshot",
+        data: {
+          campaignId: "c1", campaignName: "Test", players: [],
+          activePlayerIndex: 0, displayResources: {}, resourceValues: {},
+          modelines: {}, mode: "play",
+          narrativeLines: [
+            { kind: "dm", text: "Opening narration." },
+            { kind: "player", text: "[Aldric] open the door" },
+            { kind: "dm", text: "The door swings open." },
+            { kind: "dm", text: "" },
+            { kind: "dm", text: "A bell chimes." },
+          ],
+        },
+      });
+
+      // Separator inserted only at the player→dm boundary, not before the
+      // very first dm line and not between consecutive dm lines.
+      expect(h.state.narrativeLines).toEqual([
+        { kind: "dm", text: "Opening narration." },
+        { kind: "player", text: "[Aldric] open the door" },
+        { kind: "separator", text: "---" },
+        { kind: "dm", text: "The door swings open." },
+        { kind: "dm", text: "" },
+        { kind: "dm", text: "A bell chimes." },
+      ]);
+    });
+
     it("treats empty narrativeLines as 'replace with empty' (not omitted)", () => {
       const h = makeHarness();
       h.dispatch({ type: "narrative:chunk", data: { text: "stale", kind: "dm" } });

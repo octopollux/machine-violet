@@ -72,9 +72,16 @@ export const StateSnapshot = Type.Object({
    * about to be re-issued). It is intentionally omitted from per-turn
    * snapshots so live-streamed deltas aren't clobbered.
    *
-   * Only `dm` and `player` kinds are tracked server-side; transient kinds
-   * (separator, spacer, dev, system) are presentation-only and re-derived
-   * by the client from the line sequence.
+   * Only `dm` and `player` kinds cross the wire; turn separators are
+   * re-derived by the client from kind transitions so post-replace
+   * rendering matches live streaming, while system/dev lines and any
+   * spacers from a prior live stream are dropped on replace (they're
+   * presentation-only and not worth round-tripping).
+   *
+   * Each entry is one rendered line — multi-paragraph DM/player text is
+   * split on `\n` server-side so the shape matches what `appendDelta`
+   * produces during live streaming. Empty entries represent paragraph
+   * boundaries.
    */
   narrativeLines: Type.Optional(Type.Array(Type.Union([
     Type.Object({

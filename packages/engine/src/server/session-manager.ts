@@ -38,7 +38,7 @@ import { createObjectivesState } from "../tools/objectives/index.js";
 import { markdownToNarrativeLines } from "../context/display-log.js";
 import { CostTracker } from "../context/cost-tracker.js";
 import { TurnManager } from "./turn-manager.js";
-import type { StyleVariant, NarrativeLine } from "@machine-violet/shared/types/tui.js";
+import type { StyleVariant } from "@machine-violet/shared/types/tui.js";
 import { createBridge } from "./bridge.js";
 import { createBaseFileIO } from "./fileio.js";
 import { SetupSession } from "./setup-session.js";
@@ -81,17 +81,24 @@ export class SessionManager {
   /**
    * Authoritative committed transcript for the active session.
    *
-   * Tracks only `dm` and `player` lines (the same kinds the persisted
-   * display log records) so it can be replayed verbatim into a state:snapshot
-   * when the client needs an authoritative reset — on connect (so reconnects
-   * see history) or on retry rollback (so a partial DM stream that's about
-   * to be re-issued doesn't accumulate twice in the client log).
+   * Tracks only `dm` and `player` lines — the kinds the state:snapshot
+   * narrativeLines schema accepts. (The persisted display log additionally
+   * keeps `system` and `separator` lines, but those are presentation-only
+   * and not mirrored into the live committed log.) Stored as one entry per
+   * text line — multi-paragraph DM/player text is split on `\n` at append
+   * time so the shape matches what `appendDelta` produces during live
+   * streaming and what `markdownToNarrativeLines` produces from the on-disk
+   * log on resume; the client can therefore replace its narrative log with
+   * this verbatim and have it render identically.
    *
-   * Seeded from the display log on resume; appended to as DM responses
-   * complete and as `client`-source contributions arrive. Reset on each
-   * new session start.
+   * Replayed into a state:snapshot when the client needs an authoritative
+   * reset — on connect (so reconnects see history) or on retry rollback
+   * (so a partial DM stream that's about to be re-issued doesn't
+   * accumulate twice in the client log). Seeded from the display log on
+   * resume; appended to as DM responses complete and as `client`-source
+   * contributions arrive. Reset on each new session start.
    */
-  private committedNarrative: NarrativeLine[] = [];
+  private committedNarrative: { kind: "dm" | "player"; text: string }[] = [];
   private setupSession: SetupSession | null = null;
 
   /** Campaign ID of the currently active session (null if none). */
@@ -525,10 +532,7 @@ export class SessionManager {
         const data = event.data as { contribution?: { source?: string; playerId?: string; text?: string } };
         const c = data.contribution;
         if (c?.source === "client" && c.playerId && typeof c.text === "string") {
-          this.committedNarrative.push({
-            kind: "player",
-            text: `[${c.playerId}] ${c.text}`,
-          });
+          this.appendCommittedLines("player", `[${c.playerId}] ${c.text}`);
         }
       }
       this.broadcast(event);
@@ -596,7 +600,7 @@ export class SessionManager {
     const originalOnNarrativeComplete = callbacks.onNarrativeComplete;
     callbacks.onNarrativeComplete = (text, playerAction) => {
       if (this.sessionGeneration === gen && text) {
-        this.committedNarrative.push({ kind: "dm", text });
+        this.appendCommittedLines("dm", text);
       }
       originalOnNarrativeComplete(text, playerAction);
     };
@@ -1086,6 +1090,20 @@ export class SessionManager {
   }
 
   /**
+   * Push a multi-line text blob into the committed transcript as one entry
+   * per `\n`-separated line — matching the per-line shape that
+   * `appendDelta` produces during live streaming and that
+   * `markdownToNarrativeLines` produces from the on-disk log on resume.
+   * Empty splits ARE preserved: they render as blank lines, which act as
+   * paragraph boundaries in the formatting pipeline.
+   */
+  private appendCommittedLines(kind: "dm" | "player", text: string): void {
+    for (const line of text.split("\n")) {
+      this.committedNarrative.push({ kind, text: line });
+    }
+  }
+
+  /**
    * Build a state snapshot for broadcast.
    *
    * @param opts.includeNarrative — when true, include the committed transcript
@@ -1125,7 +1143,7 @@ export class SessionManager {
       mode: this.currentMode,
       sessionRecap: recap ?? undefined,
       narrativeLines: opts?.includeNarrative
-        ? this.committedNarrative.map((l) => ({ kind: l.kind, text: l.text }))
+        ? this.committedNarrative.slice()
         : undefined,
     };
   }
