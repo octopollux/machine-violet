@@ -28,13 +28,18 @@ export function openPath(filePath: string): void {
  */
 export function revealInExplorer(filePath: string): void {
   const opts = { detached: true, stdio: "ignore" as const };
-  const child =
-    process.platform === "win32"
-      // explorer.exe uses comma (not space) between /select and the path
-      ? spawn("explorer.exe", [`/select,${filePath}`], opts)
-      : process.platform === "darwin"
-        ? spawn("open", ["-R", filePath], opts)
-        : spawn("xdg-open", [dirname(filePath)], opts);
+  let child;
+  if (process.platform === "win32") {
+    // explorer.exe /select, requires Windows-style backslashes — forward
+    // slashes silently fail and Explorer opens the Documents folder instead.
+    // Comma (not space) separates the switch from the path.
+    const winPath = filePath.replace(/\//g, "\\");
+    child = spawn("explorer.exe", [`/select,${winPath}`], opts);
+  } else if (process.platform === "darwin") {
+    child = spawn("open", ["-R", filePath], opts);
+  } else {
+    child = spawn("xdg-open", [dirname(filePath)], opts);
+  }
 
   child.on("error", () => { /* ignore errors */ });
   child.unref();
