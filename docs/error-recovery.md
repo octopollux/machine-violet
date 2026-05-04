@@ -84,7 +84,7 @@ The `/retry` command retries the last DM turn at any time — useful for recover
 
 The `/diagnostics` command bundles the current campaign folder together with the top-level `.debug/` (engine.jsonl, server.log, context dumps) into a single zip and reveals it in the OS file explorer:
 
-- Output path: `<homeDir>/diagnostics/<campaign-name>-<timestamp>.zip`.
+- Output path: `<homeDir>/diagnostics/<campaign-name>-<timestamp>.mvdiag` (a zip with a Machine Violet-specific extension — any zip tool can still read it).
 - The bundle includes a `manifest.json` at the root with the collection timestamp, campaign name, platform, and Node version.
 - Per-campaign `.debug/` is captured as part of the campaign walk; the top-level `.debug/` is added under a `.debug/` prefix in the archive.
 - Reveal-in-folder uses platform-specific commands (`explorer /select,` on Windows, `open -R` on macOS, `xdg-open <parent>` on Linux). The system message in the chat always prints the absolute path as a fallback when reveal is unavailable or silently fails.

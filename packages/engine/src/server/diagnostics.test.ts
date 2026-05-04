@@ -134,7 +134,7 @@ describe("collectDiagnostics", () => {
       io,
     );
     expect(result.ok).toBe(true);
-    expect(result.path!).toMatch(/\/home\/diagnostics\/Test Quest-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.zip$/);
+    expect(result.path!).toMatch(/\/home\/diagnostics\/Test Quest-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.mvdiag$/);
   });
 
   it("works when the top-level .debug folder is absent", async () => {
@@ -179,6 +179,6 @@ describe("collectDiagnostics", () => {
       fs.io,
     );
     expect(result.ok).toBe(true);
-    expect(result.path!).toMatch(/no-config-here-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.zip$/);
+    expect(result.path!).toMatch(/no-config-here-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.mvdiag$/);
   });
 });

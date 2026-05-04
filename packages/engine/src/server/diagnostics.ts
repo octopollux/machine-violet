@@ -6,7 +6,9 @@
  * for triage. The campaign's own per-campaign `.debug/` is captured as
  * part of the campaign walk.
  *
- * Output: `<homeDir>/diagnostics/<campaignSlug>-<timestamp>.zip`.
+ * Output: `<homeDir>/diagnostics/<campaignSlug>-<timestamp>.mvdiag`
+ * (a zip file with a Machine Violet-specific extension for easy
+ * recognition in support inboxes — any zip tool can still read it).
  */
 
 import { join, basename } from "node:path";
@@ -24,6 +26,7 @@ export interface DiagnosticsResult {
 
 const DIAGNOSTICS_DIR = "diagnostics";
 const DEBUG_DIR = ".debug";
+const BUNDLE_EXT = "mvdiag";
 
 /** Sanitize a name for use as a filename component. */
 function sanitizeFilename(name: string): string {
@@ -125,12 +128,12 @@ export async function collectDiagnostics(
 
     const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
     const safeName = sanitizeFilename(campaignName);
-    let zipPath = norm(join(outDir, `${safeName}-${ts}.zip`));
+    let zipPath = norm(join(outDir, `${safeName}-${ts}.${BUNDLE_EXT}`));
 
     // Sub-second collision guard.
     let counter = 2;
     while (await io.exists(zipPath)) {
-      zipPath = norm(join(outDir, `${safeName}-${ts}-${counter}.zip`));
+      zipPath = norm(join(outDir, `${safeName}-${ts}-${counter}.${BUNDLE_EXT}`));
       counter++;
     }
 
