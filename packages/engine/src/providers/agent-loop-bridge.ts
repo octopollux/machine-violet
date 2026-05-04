@@ -73,6 +73,14 @@ export interface ProviderLoopConfig {
   onError?: (error: Error) => void;
   /** Called when a retryable API error triggers a backoff wait. */
   onRetry?: (status: number, delayMs: number) => void;
+  /**
+   * Called when a streaming attempt fails mid-stream and is about to be
+   * retried. Fires only if `onTextDelta` was actually invoked during the
+   * failed attempt (i.e., partial output may have leaked to consumers).
+   * Fires before the backoff sleep, so consumers can publish a corrective
+   * snapshot before the retry begins streaming again.
+   */
+  onRollback?: () => void;
   /** Max retries after the initial attempt (default 5 → up to 6 total attempts, ~27s backoff). */
   maxRetries?: number;
 }
@@ -157,9 +165,17 @@ export async function runProviderLoop(
     let result: ChatResult;
     const apiStart = Date.now();
     for (let attempt = 0; ; attempt++) {
+      // Per-attempt flag: did this attempt actually stream any text before
+      // erroring? If so, a retry needs to roll back the partial output that
+      // leaked to consumers via onTextDelta.
+      let attemptEmittedDeltas = false;
+      const wrappedDelta = (delta: string): void => {
+        if (delta) attemptEmittedDeltas = true;
+        config.onTextDelta?.(delta);
+      };
       try {
         if (shouldStream) {
-          result = await provider.stream(chatParams, (delta) => config.onTextDelta?.(delta));
+          result = await provider.stream(chatParams, wrappedDelta);
         } else {
           result = await provider.chat(chatParams);
           // In non-streaming mode, emit the full text
@@ -180,10 +196,20 @@ export async function runProviderLoop(
           status,
           attempt,
           willRetry: retryable,
+          partialStream: attemptEmittedDeltas,
         });
 
         if (!retryable) {
           throw apiErr;
+        }
+
+        // If the failed attempt streamed any text, the next attempt will
+        // re-emit it from scratch — instruct consumers to discard the
+        // partial leak before we retry. Skipped when nothing leaked, so
+        // pre-stream failures (e.g. immediate 429s) don't cause a needless
+        // snapshot round-trip to clients.
+        if (attemptEmittedDeltas) {
+          config.onRollback?.();
         }
 
         const delay = retryDelay(attempt);

@@ -267,6 +267,74 @@ describe("event-handler", () => {
       expect(h.state.stateSnapshot).not.toBeNull();
       expect(h.state.stateSnapshot!.campaignId).toBe("c1");
     });
+
+    // Issue #431: snapshots that include narrativeLines act as authoritative
+    // resets — the server uses this on retry rollback to discard a partial
+    // DM stream that's about to be re-issued, and on connect to give
+    // reconnecting clients the prior history.
+    it("REPLACES narrativeLines when snapshot includes them", () => {
+      const h = makeHarness();
+      // Accumulate some chunks (simulating the partial bug-causing stream)
+      h.dispatch({ type: "narrative:chunk", data: { text: "The bell ", kind: "dm" } });
+      h.dispatch({ type: "narrative:chunk", data: { text: "chimes. Mol", kind: "dm" } });
+      expect(h.state.narrativeLines.length).toBeGreaterThan(0);
+
+      // Server publishes a corrective snapshot — committed transcript only.
+      h.dispatch({
+        type: "state:snapshot",
+        data: {
+          campaignId: "c1", campaignName: "Test", players: [],
+          activePlayerIndex: 0, displayResources: {}, resourceValues: {},
+          modelines: {}, mode: "play",
+          narrativeLines: [
+            { kind: "player", text: "[Aldric] open the door" },
+          ],
+        },
+      });
+
+      expect(h.state.narrativeLines).toEqual([
+        { kind: "player", text: "[Aldric] open the door" },
+      ]);
+    });
+
+    // Per-turn snapshots omit narrativeLines specifically so they don't
+    // clobber in-flight stream deltas. Client must coalesce to existing
+    // state in that case.
+    it("PRESERVES narrativeLines when snapshot omits them", () => {
+      const h = makeHarness();
+      h.dispatch({ type: "narrative:chunk", data: { text: "Hello world", kind: "dm" } });
+      const before = h.state.narrativeLines;
+
+      h.dispatch({
+        type: "state:snapshot",
+        data: {
+          campaignId: "c1", campaignName: "Test", players: [],
+          activePlayerIndex: 0, displayResources: {}, resourceValues: {},
+          modelines: {}, mode: "play",
+          // No narrativeLines field
+        },
+      });
+
+      expect(h.state.narrativeLines).toEqual(before);
+    });
+
+    it("treats empty narrativeLines as 'replace with empty' (not omitted)", () => {
+      const h = makeHarness();
+      h.dispatch({ type: "narrative:chunk", data: { text: "stale", kind: "dm" } });
+      expect(h.state.narrativeLines.length).toBeGreaterThan(0);
+
+      h.dispatch({
+        type: "state:snapshot",
+        data: {
+          campaignId: "c1", campaignName: "Test", players: [],
+          activePlayerIndex: 0, displayResources: {}, resourceValues: {},
+          modelines: {}, mode: "play",
+          narrativeLines: [],
+        },
+      });
+
+      expect(h.state.narrativeLines).toEqual([]);
+    });
   });
 
   describe("set_display_resources", () => {

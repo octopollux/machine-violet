@@ -347,6 +347,13 @@ function handleStateSnapshot(event: StateSnapshotEvent, update: StateUpdater): v
       displayResources: snapshot.displayResources ?? prev.displayResources,
       resourceValues: snapshot.resourceValues ?? prev.resourceValues,
       modelines: snapshot.modelines ?? prev.modelines,
+      // Authoritative transcript replace, when the server includes one.
+      // Sent on connect (so reconnecting clients see history) and on retry
+      // rollback (to discard a partial DM stream that's about to be
+      // re-issued). Snapshots that omit narrativeLines preserve whatever
+      // we've already accumulated, so per-turn snapshots don't clobber
+      // in-flight stream deltas.
+      narrativeLines: snapshot.narrativeLines ?? prev.narrativeLines,
     };
   });
 }

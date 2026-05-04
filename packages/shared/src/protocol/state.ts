@@ -60,6 +60,32 @@ export const StateSnapshot = Type.Object({
     id: Type.String(),
     lines: Type.Array(Type.String()),
   })),
+
+  /**
+   * Authoritative committed transcript (DM + player lines only).
+   *
+   * When present, the client REPLACES its accumulated narrative log with
+   * these lines. When absent, the client's existing narrative is preserved.
+   *
+   * The server populates this on connect (so reconnecting clients see
+   * history) and on retry rollback (to discard a partial DM stream that's
+   * about to be re-issued). It is intentionally omitted from per-turn
+   * snapshots so live-streamed deltas aren't clobbered.
+   *
+   * Only `dm` and `player` kinds are tracked server-side; transient kinds
+   * (separator, spacer, dev, system) are presentation-only and re-derived
+   * by the client from the line sequence.
+   */
+  narrativeLines: Type.Optional(Type.Array(Type.Union([
+    Type.Object({
+      kind: Type.Literal("dm"),
+      text: Type.String(),
+    }),
+    Type.Object({
+      kind: Type.Literal("player"),
+      text: Type.String(),
+    }),
+  ]))),
 });
 
 export type StateSnapshot = Static<typeof StateSnapshot>;

@@ -1349,6 +1349,7 @@ export class GameEngine {
         this.callbacks.onTuiCommand(cmd);
       },
       onRetry: (status, delayMs) => this.callbacks.onRetry(status, delayMs),
+      onRollback: () => this.callbacks.onRollback?.(),
     };
   }
 
