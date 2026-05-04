@@ -95,18 +95,42 @@ export function initialClientState(): ClientState {
 export type StateUpdater = (fn: (prev: ClientState) => ClientState) => void;
 
 /**
+ * Event types that prove the engine is making forward progress on the
+ * agent loop. Receiving any of these means an in-flight API retry has
+ * resolved, so the recoverable `lastError` (and the connection-issue
+ * modal it drives) should clear — even if the resolution didn't
+ * produce a narrative chunk (e.g., a successful choice-generator
+ * subagent call emits `choices:presented`, not `narrative:chunk`,
+ * and would otherwise leave the modal stuck).
+ *
+ * Allowlist (not an exclude list of `error` + `discord:presence`)
+ * because new event types should default to *not* clearing the modal:
+ * silently dismissing a retry overlay because some unrelated UI-side
+ * event arrived is worse than leaving it open one event longer.
+ */
+const PROGRESS_EVENT_TYPES: ReadonlySet<ServerEvent["type"]> = new Set([
+  "narrative:chunk",
+  "narrative:complete",
+  "turn:opened",
+  "turn:updated",
+  "turn:committed",
+  "turn:resolved",
+  "choices:presented",
+  "choices:cleared",
+  "activity:update",
+  "state:snapshot",
+  "session:mode",
+  "session:ended",
+  "session:transition",
+]);
+
+/**
  * Create an event handler that dispatches server events to state updates.
  * Pass this as the `onEvent` callback to WsClient.
  */
 export function createEventHandler(update: StateUpdater): (event: ServerEvent) => void {
   return (event: ServerEvent) => {
-    // Any non-error event proves the engine is making progress, which
-    // means an in-flight retry has resolved. Clear the recoverable
-    // lastError so the connection-issue modal closes — even if the
-    // resolution didn't produce a narrative chunk (e.g., a successful
-    // choice-generator subagent call emits choices:presented, not
-    // narrative:chunk, and would otherwise leave the modal stuck).
-    if (event.type !== "error") {
+    if (PROGRESS_EVENT_TYPES.has(event.type)) {
       update((prev) =>
         prev.lastError?.recoverable ? { ...prev, lastError: null } : prev,
       );
