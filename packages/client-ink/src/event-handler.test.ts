@@ -350,6 +350,7 @@ describe("event-handler", () => {
         recoverable: true,
         status: 529,
         delayMs: 2000,
+        attemptId: 1,
       });
     });
 
@@ -365,7 +366,25 @@ describe("event-handler", () => {
         recoverable: false,
         status: undefined,
         delayMs: undefined,
+        attemptId: undefined,
       });
+    });
+
+    it("bumps attemptId on each successive recoverable retry", () => {
+      const h = makeHarness();
+      h.dispatch({
+        type: "error",
+        data: { message: "retry 1", recoverable: true, status: 529, delayMs: 12000 },
+      });
+      expect(h.state.lastError?.attemptId).toBe(1);
+
+      // Same status/delay (backoff capped) — attemptId must still advance
+      // so the modal resets its countdown.
+      h.dispatch({
+        type: "error",
+        data: { message: "retry 2", recoverable: true, status: 529, delayMs: 12000 },
+      });
+      expect(h.state.lastError?.attemptId).toBe(2);
     });
 
     it("clears recoverable lastError on narrative:chunk", () => {
@@ -379,6 +398,40 @@ describe("event-handler", () => {
 
       // Narrative chunk arrives → retry succeeded
       h.dispatch({ type: "narrative:chunk", data: { text: "The door opens.", kind: "dm" } });
+      expect(h.state.lastError).toBeNull();
+    });
+
+    it("clears recoverable lastError on choices:presented", () => {
+      // Regression: a successful choice-generator subagent retry produces
+      // choices:presented, not narrative:chunk. The modal must still close.
+      const h = makeHarness();
+      h.dispatch({
+        type: "error",
+        data: { message: "retry", recoverable: true, status: 529, delayMs: 4000 },
+      });
+      expect(h.state.lastError).not.toBeNull();
+
+      h.dispatch({
+        type: "choices:presented",
+        data: { id: "x", prompt: "", choices: ["a", "b"] },
+      });
+      expect(h.state.lastError).toBeNull();
+    });
+
+    it("clears recoverable lastError on activity:update", () => {
+      // Any progress signal proves the retry resolved — even tool-only API
+      // responses produce activity updates rather than narrative.
+      const h = makeHarness();
+      h.dispatch({
+        type: "error",
+        data: { message: "retry", recoverable: true, status: 0, delayMs: 1000 },
+      });
+      expect(h.state.lastError).not.toBeNull();
+
+      h.dispatch({
+        type: "activity:update",
+        data: { engineState: "dm_thinking" },
+      });
       expect(h.state.lastError).toBeNull();
     });
 

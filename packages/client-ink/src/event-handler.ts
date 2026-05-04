@@ -50,7 +50,17 @@ export interface ClientState {
   transitionCampaignId: string | null;
   /** Human-readable campaign name from the transition event. */
   transitionCampaignName: string | null;
-  lastError: { message: string; recoverable: boolean; status?: number; delayMs?: number } | null;
+  lastError: {
+    message: string;
+    recoverable: boolean;
+    status?: number;
+    delayMs?: number;
+    /** Monotonic id stamped when the retry event arrives. Used by the modal
+     *  to reset its countdown even if status/delayMs are identical to the
+     *  previous retry (the backoff caps at 12s, so successive attempts
+     *  routinely look identical). */
+    attemptId?: number;
+  } | null;
   /** Per-character modeline text (character name → status string). */
   modelines: Record<string, string>;
   /** Per-character resource display keys. */
@@ -90,6 +100,18 @@ export type StateUpdater = (fn: (prev: ClientState) => ClientState) => void;
  */
 export function createEventHandler(update: StateUpdater): (event: ServerEvent) => void {
   return (event: ServerEvent) => {
+    // Any non-error event proves the engine is making progress, which
+    // means an in-flight retry has resolved. Clear the recoverable
+    // lastError so the connection-issue modal closes — even if the
+    // resolution didn't produce a narrative chunk (e.g., a successful
+    // choice-generator subagent call emits choices:presented, not
+    // narrative:chunk, and would otherwise leave the modal stuck).
+    if (event.type !== "error") {
+      update((prev) =>
+        prev.lastError?.recoverable ? { ...prev, lastError: null } : prev,
+      );
+    }
+
     switch (event.type) {
       case "narrative:chunk":
         handleNarrativeChunk(event, update);
@@ -190,8 +212,6 @@ function handleNarrativeChunk(event: NarrativeChunkEvent, update: StateUpdater):
     return {
       ...prev,
       narrativeLines: appendDelta(lines, text, lineKind),
-      // Clear any retry error — arriving data proves the retry succeeded
-      lastError: prev.lastError?.recoverable ? null : prev.lastError,
     };
   });
 }
@@ -379,6 +399,9 @@ function handleError(event: ErrorEvent, update: StateUpdater): void {
       recoverable: event.data.recoverable,
       status: event.data.status,
       delayMs: event.data.delayMs,
+      attemptId: event.data.recoverable
+        ? (prev.lastError?.attemptId ?? 0) + 1
+        : undefined,
     },
   }));
 }

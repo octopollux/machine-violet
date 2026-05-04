@@ -602,6 +602,7 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
         ? {
             status: clientState.lastError.status ?? 0,
             delaySec: Math.ceil((clientState.lastError.delayMs ?? 5000) / 1000),
+            attemptId: clientState.lastError.attemptId ?? 0,
           }
         : null,
       mode: clientState.mode,

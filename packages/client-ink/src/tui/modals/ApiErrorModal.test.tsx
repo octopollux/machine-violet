@@ -18,7 +18,7 @@ describe("ApiErrorModal", () => {
   it("renders title, status label, and countdown for 429", () => {
     const { lastFrame } = render(
       <Box width={60} height={24}>
-        <ApiErrorModal theme={theme} width={60} height={24} overlay={{ status: 429, delaySec: 10 }} />
+        <ApiErrorModal theme={theme} width={60} height={24} overlay={{ status: 429, delaySec: 10, attemptId: 1 }} />
       </Box>,
     );
     const frame = lastFrame();
@@ -31,7 +31,7 @@ describe("ApiErrorModal", () => {
   it("renders status label for 529 (API overloaded)", () => {
     const { lastFrame } = render(
       <Box width={60} height={24}>
-        <ApiErrorModal theme={theme} width={60} height={24} overlay={{ status: 529, delaySec: 30 }} />
+        <ApiErrorModal theme={theme} width={60} height={24} overlay={{ status: 529, delaySec: 30, attemptId: 1 }} />
       </Box>,
     );
     const frame = lastFrame();
@@ -42,7 +42,7 @@ describe("ApiErrorModal", () => {
   it("renders status label for 0 (connection lost)", () => {
     const { lastFrame } = render(
       <Box width={60} height={24}>
-        <ApiErrorModal theme={theme} width={60} height={24} overlay={{ status: 0, delaySec: 5 }} />
+        <ApiErrorModal theme={theme} width={60} height={24} overlay={{ status: 0, delaySec: 5, attemptId: 1 }} />
       </Box>,
     );
     const frame = lastFrame();
@@ -53,7 +53,7 @@ describe("ApiErrorModal", () => {
   it("renders generic status label for 500", () => {
     const { lastFrame } = render(
       <Box width={60} height={24}>
-        <ApiErrorModal theme={theme} width={60} height={24} overlay={{ status: 500, delaySec: 15 }} />
+        <ApiErrorModal theme={theme} width={60} height={24} overlay={{ status: 500, delaySec: 15, attemptId: 1 }} />
       </Box>,
     );
     const frame = lastFrame();
