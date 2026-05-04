@@ -4,7 +4,7 @@
  *
  * Uses spawn with argument arrays (no shell) to avoid command injection.
  */
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { dirname } from "node:path";
 
 export function openPath(filePath: string): void {
@@ -28,7 +28,7 @@ export function openPath(filePath: string): void {
  */
 export function revealInExplorer(filePath: string): void {
   const opts = { detached: true, stdio: "ignore" as const };
-  let child;
+  let child: ChildProcess;
   if (process.platform === "win32") {
     // explorer.exe /select, has two Windows-specific quirks:
     //   1. Path must use backslashes — forward slashes silently fail and

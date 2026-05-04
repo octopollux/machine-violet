@@ -118,13 +118,45 @@ describe("collectDiagnostics", () => {
     expect(keys).toContain(".debug/server.log");
     expect(keys).toContain(".debug/context/dump-1.txt");
 
-    // Manifest is present
+    // Manifest is present, with safe-to-share metadata only
     expect(keys).toContain("manifest.json");
     const manifest = JSON.parse(new TextDecoder().decode(entries!["manifest.json"]));
     expect(manifest.campaignName).toBe("Test Quest");
-    expect(manifest.campaignRoot).toBe(norm("/home/campaigns/my-campaign"));
+    expect(manifest.campaignSlug).toBe("my-campaign");
     expect(typeof manifest.collectedAt).toBe("string");
     expect(manifest.platform).toBe(process.platform);
+    // Absolute paths must NOT leak into the bundle.
+    expect(manifest.campaignRoot).toBeUndefined();
+    expect(manifest.homeDir).toBeUndefined();
+  });
+
+  it("skips the campaign's .git/ folder during the walk", async () => {
+    const fs = makeMemFs({
+      "/home/campaigns/c/config.json": JSON.stringify({ name: "C" }),
+      "/home/campaigns/c/state/log.md": "live state",
+      "/home/campaigns/c/.git/HEAD": "ref: refs/heads/main",
+      "/home/campaigns/c/.git/objects/aa/bbccddee": "binary blob",
+      "/home/campaigns/c/.git/refs/heads/main": "abc1234",
+    });
+    const result = await collectDiagnostics("/home/campaigns/c", "/home", fs.io);
+    expect(result.ok).toBe(true);
+    const entries = unzipBinaryFiles(fs.files.get(norm(result.path!))!)!;
+    const keys = Object.keys(entries);
+    // Working tree present, git internals absent
+    expect(keys).toContain("campaign/state/log.md");
+    expect(keys.some((k) => k.startsWith("campaign/.git/"))).toBe(false);
+  });
+
+  it("returns a clear error when the bundle would exceed the size cap", async () => {
+    // 30 MB single file > 25 MB cap
+    const big = new Uint8Array(30 * 1024 * 1024);
+    const fs = makeMemFs({
+      "/home/campaigns/huge/config.json": JSON.stringify({ name: "Huge" }),
+      "/home/campaigns/huge/state/giant.bin": big,
+    });
+    const result = await collectDiagnostics("/home/campaigns/huge", "/home", fs.io);
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/cap|MB/i);
   });
 
   it("writes the zip under <homeDir>/diagnostics with a sanitized name and timestamp", async () => {

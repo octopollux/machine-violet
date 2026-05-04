@@ -9,12 +9,17 @@
  * Output: `<homeDir>/diagnostics/<campaignSlug>-<timestamp>.mvdiag`
  * (a zip file with a Machine Violet-specific extension for easy
  * recognition in support inboxes — any zip tool can still read it).
+ *
+ * `.git/` is skipped during the campaign walk: the object database is
+ * heavy and rarely needed for triage — the working tree files already
+ * tell the "what's the current state" story. A total in-memory cap
+ * guards against pathological cases (very large logs / scene transcripts).
  */
 
 import { join, basename } from "node:path";
 import { norm } from "../utils/paths.js";
 import { zipBinaryFiles, type BinaryFileMap } from "../utils/archive.js";
-import { walkAllBinary, type ArchiveFileIO } from "../config/campaign-archive.js";
+import { type ArchiveFileIO, readCampaignName } from "../config/campaign-archive.js";
 
 export interface DiagnosticsResult {
   ok: boolean;
@@ -27,6 +32,12 @@ export interface DiagnosticsResult {
 const DIAGNOSTICS_DIR = "diagnostics";
 const DEBUG_DIR = ".debug";
 const BUNDLE_EXT = "mvdiag";
+/** Directory names skipped during the recursive walk (heavy / not useful for triage). */
+const SKIP_DIRS = new Set([".git"]);
+/** Hard cap on uncompressed bundle bytes. fflate does an in-memory zipSync,
+ *  so the cap protects against OOM and keeps the resulting `.mvdiag` small
+ *  enough to upload to a support channel (Discord free tier is ~25 MB). */
+const MAX_UNCOMPRESSED_BYTES = 25 * 1024 * 1024;
 
 /** Sanitize a name for use as a filename component. */
 function sanitizeFilename(name: string): string {
@@ -37,31 +48,68 @@ function sanitizeFilename(name: string): string {
   return safe || "campaign";
 }
 
-/** Read `config.json` to extract the campaign name; fall back to dir basename. */
-async function readCampaignName(campaignRoot: string, io: ArchiveFileIO): Promise<string> {
+/**
+ * Recursive walk that mirrors `walkAllBinary` from campaign-archive.ts but
+ * adds two diagnostics-specific behaviors:
+ *  - skip directory names in `SKIP_DIRS` (notably `.git/`)
+ *  - throw `"size_exceeded"` when running totals cross `MAX_UNCOMPRESSED_BYTES`
+ *
+ * Kept local rather than parameterized into the shared walker so the
+ * archive code path stays simple.
+ */
+async function walkForDiagnostics(
+  io: ArchiveFileIO,
+  root: string,
+  prefix: string,
+  acc: { totalBytes: number },
+): Promise<{ relativePath: string; content: Uint8Array }[]> {
+  const results: { relativePath: string; content: Uint8Array }[] = [];
+  let entries: string[];
   try {
-    const raw = await io.readFile(norm(join(campaignRoot, "config.json")));
-    const config = JSON.parse(raw);
-    if (typeof config.name === "string" && config.name) return config.name;
-  } catch { /* fall through */ }
-  return basename(campaignRoot);
+    entries = await io.listDir(root);
+  } catch {
+    return results;
+  }
+
+  for (const entry of entries) {
+    if (SKIP_DIRS.has(entry)) continue;
+    const abs = norm(join(root, entry));
+    const rel = prefix ? `${prefix}/${entry}` : entry;
+    if (await io.isDirectory(abs)) {
+      const children = await walkForDiagnostics(io, abs, rel, acc);
+      results.push(...children);
+    } else {
+      try {
+        const content = await io.readBinary(abs);
+        acc.totalBytes += content.length;
+        if (acc.totalBytes > MAX_UNCOMPRESSED_BYTES) {
+          throw new Error("size_exceeded");
+        }
+        results.push({ relativePath: rel, content });
+      } catch (e) {
+        if (e instanceof Error && e.message === "size_exceeded") throw e;
+        // Skip unreadable files — they shouldn't break the bundle.
+      }
+    }
+  }
+  return results;
 }
 
 /**
  * Build a manifest describing the bundle origin. Helps whoever reads the
  * archive later (typically the developer triaging a bug) understand what
- * machine produced it and when.
+ * machine produced it and when. Absolute paths are deliberately omitted —
+ * they leak the user's home directory layout (and on Windows, the
+ * username).
  */
 function buildManifest(args: {
   campaignName: string;
-  campaignRoot: string;
-  homeDir: string;
+  campaignSlug: string;
 }): string {
   const manifest = {
     collectedAt: new Date().toISOString(),
     campaignName: args.campaignName,
-    campaignRoot: args.campaignRoot,
-    homeDir: args.homeDir,
+    campaignSlug: args.campaignSlug,
     platform: process.platform,
     nodeVersion: process.version,
   };
@@ -71,12 +119,12 @@ function buildManifest(args: {
 /**
  * Collect a diagnostics bundle. Includes:
  *  - The current campaign folder (under `campaign/`) — captures per-campaign
- *    `.debug/`, state, config, characters, and the git history if enabled.
+ *    `.debug/`, state, config, characters. The campaign's `.git/` is skipped.
  *  - The top-level `.debug/` folder (under `.debug/`) — engine.jsonl,
  *    server.log, top-level context dumps.
  *  - A `manifest.json` at the root of the archive.
  *
- * The bundle is written to `<homeDir>/diagnostics/<campaignSlug>-<ts>.zip`.
+ * The bundle is written to `<homeDir>/diagnostics/<campaignSlug>-<ts>.mvdiag`.
  * If a file with that exact name already exists, the timestamp ensures
  * uniqueness; on collision (sub-second), an extra suffix is appended.
  */
@@ -87,9 +135,10 @@ export async function collectDiagnostics(
 ): Promise<DiagnosticsResult> {
   try {
     const fileMap: BinaryFileMap = {};
+    const acc = { totalBytes: 0 };
 
-    // 1. Walk the campaign folder.
-    const campaignFiles = await walkAllBinary(io, norm(campaignRoot), "");
+    // 1. Walk the campaign folder (skips .git).
+    const campaignFiles = await walkForDiagnostics(io, norm(campaignRoot), "", acc);
     for (const f of campaignFiles) {
       fileMap[`campaign/${f.relativePath}`] = f.content;
     }
@@ -97,7 +146,7 @@ export async function collectDiagnostics(
     // 2. Walk the top-level .debug folder (may not exist in test envs).
     const debugRoot = norm(join(homeDir, DEBUG_DIR));
     if (await io.exists(debugRoot)) {
-      const debugFiles = await walkAllBinary(io, debugRoot, "");
+      const debugFiles = await walkForDiagnostics(io, debugRoot, "", acc);
       for (const f of debugFiles) {
         fileMap[`${DEBUG_DIR}/${f.relativePath}`] = f.content;
       }
@@ -108,12 +157,11 @@ export async function collectDiagnostics(
       return { ok: false, error: "Nothing to collect — campaign and .debug folders are empty or unreadable." };
     }
 
-    // 3. Add manifest.
+    // 3. Add manifest. Only safe-to-share metadata — no absolute paths.
     const campaignName = await readCampaignName(norm(campaignRoot), io);
     fileMap["manifest.json"] = new TextEncoder().encode(buildManifest({
       campaignName,
-      campaignRoot: norm(campaignRoot),
-      homeDir: norm(homeDir),
+      campaignSlug: basename(norm(campaignRoot)),
     }));
 
     // 4. Zip.
@@ -140,6 +188,10 @@ export async function collectDiagnostics(
     await io.writeBinary(zipPath, zipped);
     return { ok: true, path: zipPath };
   } catch (e) {
+    if (e instanceof Error && e.message === "size_exceeded") {
+      const mb = Math.round(MAX_UNCOMPRESSED_BYTES / (1024 * 1024));
+      return { ok: false, error: `Diagnostics bundle exceeds the ${mb} MB cap — share the campaign folder directly instead.` };
+    }
     return { ok: false, error: e instanceof Error ? e.message : "Diagnostics collection failed." };
   }
 }

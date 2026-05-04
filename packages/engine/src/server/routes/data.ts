@@ -13,7 +13,6 @@ import {
   TranscriptSaveRequest, TranscriptSaveResponse,
   DiagnosticsResponse,
 } from "@machine-violet/shared";
-import { dirname } from "node:path";
 import { campaignPaths, machinePaths } from "../../tools/filesystem/scaffold.js";
 import { createArchiveFileIO } from "../fileio.js";
 import { collectDiagnostics } from "../diagnostics.js";
@@ -225,9 +224,8 @@ export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) =>
     const gs = server.sessionManager.getGameState();
     if (!gs) return reply.status(400).send({ error: "No game state." });
 
-    const homeDir = dirname(server.sessionManager.getCampaignsDir());
     const io = createArchiveFileIO();
-    const result = await collectDiagnostics(gs.campaignRoot, homeDir, io);
+    const result = await collectDiagnostics(gs.campaignRoot, gs.homeDir, io);
     if (!result.ok || !result.path) {
       return reply.status(500).send({ error: result.error ?? "Diagnostics collection failed." });
     }
