@@ -81,7 +81,7 @@ function sanitizeFilename(name: string): string {
  * Recursively walk a directory, returning relative paths and binary contents.
  * Reads all files as raw bytes to preserve git objects and other binary data.
  */
-async function walkAllBinary(
+export async function walkAllBinary(
   io: ArchiveFileIO,
   root: string,
   prefix: string,

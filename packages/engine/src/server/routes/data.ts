@@ -11,8 +11,12 @@ import {
   NotesResponse, NotesUpdateRequest, OkResponse,
   SettingsResponse, SettingsPatch, CostResponse, ErrorResponse,
   TranscriptSaveRequest, TranscriptSaveResponse,
+  DiagnosticsResponse,
 } from "@machine-violet/shared";
+import { dirname } from "node:path";
 import { campaignPaths, machinePaths } from "../../tools/filesystem/scaffold.js";
+import { createArchiveFileIO } from "../fileio.js";
+import { collectDiagnostics } from "../diagnostics.js";
 
 export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) => {
 
@@ -209,6 +213,25 @@ export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) =>
         error: `Failed to save transcript: ${err instanceof Error ? err.message : err}`,
       });
     }
+  });
+
+  /** Collect a diagnostics bundle (campaign + .debug → zip) and return its path. */
+  server.put("/diagnostics", {
+    schema: {
+      tags: ["Data"],
+      response: { 200: DiagnosticsResponse, 400: ErrorResponse, 500: ErrorResponse },
+    },
+  }, async (_request, reply) => {
+    const gs = server.sessionManager.getGameState();
+    if (!gs) return reply.status(400).send({ error: "No game state." });
+
+    const homeDir = dirname(server.sessionManager.getCampaignsDir());
+    const io = createArchiveFileIO();
+    const result = await collectDiagnostics(gs.campaignRoot, homeDir, io);
+    if (!result.ok || !result.path) {
+      return reply.status(500).send({ error: result.error ?? "Diagnostics collection failed." });
+    }
+    return { ok: true, path: result.path };
   });
 
   /** Get token cost breakdown. */

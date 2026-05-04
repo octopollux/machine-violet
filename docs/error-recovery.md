@@ -80,6 +80,17 @@ The `/retry` command retries the last DM turn at any time — useful for recover
 - Otherwise, it pops the last exchange from conversation history and replays the original player input (with `skipTranscript: true`).
 - Both paths log a `dev` narrative line (visible when verbose display is enabled in Settings).
 
+### `/diagnostics` slash command
+
+The `/diagnostics` command bundles the current campaign folder together with the top-level `.debug/` (engine.jsonl, server.log, context dumps) into a single zip and reveals it in the OS file explorer:
+
+- Output path: `<homeDir>/diagnostics/<campaign-name>-<timestamp>.zip`.
+- The bundle includes a `manifest.json` at the root with the collection timestamp, campaign name, platform, and Node version.
+- Per-campaign `.debug/` is captured as part of the campaign walk; the top-level `.debug/` is added under a `.debug/` prefix in the archive.
+- Reveal-in-folder uses platform-specific commands (`explorer /select,` on Windows, `open -R` on macOS, `xdg-open <parent>` on Linux). The system message in the chat always prints the absolute path as a fallback when reveal is unavailable or silently fails.
+
+Use this when sending a triage bundle for a bug report.
+
 ### Subagent failures
 
 If a Haiku/Sonnet subagent call fails (during resolution, OOC, chargen, etc.), the engine retries the subagent call. The parent (Opus DM) doesn't see the failure unless retries are exhausted, in which case it receives an error result: "Resolution failed — resolve manually or retry." The DM can narrate around it or ask the player to wait.
