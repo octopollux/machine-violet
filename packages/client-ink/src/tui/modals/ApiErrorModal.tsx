@@ -31,7 +31,10 @@ export function ApiErrorModal({ theme, width, height, overlay }: ApiErrorModalPr
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [overlay.status, overlay.delaySec]);
+    // attemptId changes on every retry event, so successive retries with
+    // identical status/delaySec (the backoff caps at 12s) still reset the
+    // visible countdown rather than freezing at 0.
+  }, [overlay.status, overlay.delaySec, overlay.attemptId]);
 
   const lines = [
     "",

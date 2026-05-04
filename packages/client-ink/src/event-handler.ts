@@ -50,7 +50,17 @@ export interface ClientState {
   transitionCampaignId: string | null;
   /** Human-readable campaign name from the transition event. */
   transitionCampaignName: string | null;
-  lastError: { message: string; recoverable: boolean; status?: number; delayMs?: number } | null;
+  lastError: {
+    message: string;
+    recoverable: boolean;
+    status?: number;
+    delayMs?: number;
+    /** Monotonic id stamped when the retry event arrives. Used by the modal
+     *  to reset its countdown even if status/delayMs are identical to the
+     *  previous retry (the backoff caps at 12s, so successive attempts
+     *  routinely look identical). */
+    attemptId?: number;
+  } | null;
   /** Per-character modeline text (character name → status string). */
   modelines: Record<string, string>;
   /** Per-character resource display keys. */
@@ -85,11 +95,47 @@ export function initialClientState(): ClientState {
 export type StateUpdater = (fn: (prev: ClientState) => ClientState) => void;
 
 /**
+ * Event types that prove the engine is making forward progress on the
+ * agent loop. Receiving any of these means an in-flight API retry has
+ * resolved, so the recoverable `lastError` (and the connection-issue
+ * modal it drives) should clear — even if the resolution didn't
+ * produce a narrative chunk (e.g., a successful choice-generator
+ * subagent call emits `choices:presented`, not `narrative:chunk`,
+ * and would otherwise leave the modal stuck).
+ *
+ * Allowlist (not an exclude list of `error` + `discord:presence`)
+ * because new event types should default to *not* clearing the modal:
+ * silently dismissing a retry overlay because some unrelated UI-side
+ * event arrived is worse than leaving it open one event longer.
+ */
+const PROGRESS_EVENT_TYPES: ReadonlySet<ServerEvent["type"]> = new Set([
+  "narrative:chunk",
+  "narrative:complete",
+  "turn:opened",
+  "turn:updated",
+  "turn:committed",
+  "turn:resolved",
+  "choices:presented",
+  "choices:cleared",
+  "activity:update",
+  "state:snapshot",
+  "session:mode",
+  "session:ended",
+  "session:transition",
+]);
+
+/**
  * Create an event handler that dispatches server events to state updates.
  * Pass this as the `onEvent` callback to WsClient.
  */
 export function createEventHandler(update: StateUpdater): (event: ServerEvent) => void {
   return (event: ServerEvent) => {
+    if (PROGRESS_EVENT_TYPES.has(event.type)) {
+      update((prev) =>
+        prev.lastError?.recoverable ? { ...prev, lastError: null } : prev,
+      );
+    }
+
     switch (event.type) {
       case "narrative:chunk":
         handleNarrativeChunk(event, update);
@@ -190,8 +236,6 @@ function handleNarrativeChunk(event: NarrativeChunkEvent, update: StateUpdater):
     return {
       ...prev,
       narrativeLines: appendDelta(lines, text, lineKind),
-      // Clear any retry error — arriving data proves the retry succeeded
-      lastError: prev.lastError?.recoverable ? null : prev.lastError,
     };
   });
 }
@@ -379,6 +423,9 @@ function handleError(event: ErrorEvent, update: StateUpdater): void {
       recoverable: event.data.recoverable,
       status: event.data.status,
       delayMs: event.data.delayMs,
+      attemptId: event.data.recoverable
+        ? (prev.lastError?.attemptId ?? 0) + 1
+        : undefined,
     },
   }));
 }
