@@ -36,15 +36,11 @@ const DEFAULTS: ModelConfig = {
     "ooc": "high",
     "setup": "high",
     "dev-mode": "high",
+    "ai-player": "low",
+    "promote_character": "medium",
+    "repair-state": "medium",
   },
 };
-
-const VALID_MODELS = new Set<string>([
-  "claude-opus-4-6",
-  "claude-sonnet-4-6",
-  "claude-sonnet-4-5-20250929",
-  "claude-haiku-4-5-20251001",
-]);
 
 export interface ModelPricing {
   input: number;
@@ -64,7 +60,9 @@ let cached: ModelConfig | null = null;
 let cachedPricing: Record<string, ModelPricing> | null = null;
 
 /**
- * Load model config: defaults merged with optional dev-config.json overrides.
+ * Load model config: defaults merged with optional dev-config.json effort overrides.
+ * Tier model IDs are fixed defaults — per-tier provider/model selection lives in
+ * `connections.json` (managed via the Connections UI).
  * Reads from cwd. Result is cached after first call.
  * Pass `reset: true` in tests to clear cache.
  */
@@ -78,14 +76,6 @@ export function loadModelConfig(opts?: { cwd?: string; reset?: boolean }): Model
   try {
     const raw = readFileSync(join(dir, "dev-config.json"), "utf-8");
     const parsed = JSON.parse(raw);
-    const models = parsed?.models;
-    if (models && typeof models === "object") {
-      for (const tier of ["large", "medium", "small"] as ModelTier[]) {
-        if (typeof models[tier] === "string" && VALID_MODELS.has(models[tier])) {
-          config[tier] = models[tier] as ModelId;
-        }
-      }
-    }
     const effort = parsed?.effort;
     if (effort && typeof effort === "object" && !Array.isArray(effort)) {
       const map: Record<string, EffortLevel | null> = {};

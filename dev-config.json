@@ -1,20 +1,20 @@
-{
-  "models": {
-    "large": "claude-sonnet-4-6"
-  },
-  "effort": {
-    "default": null,
-    "dm": "high",
-    "ooc": "high",
-    "dev-mode": "high",
-    "setup": "high",
-    "ai-player": "low",
-    "scene-summarizer": null,
-    "precis-updater": null,
-    "changelog-updater": null,
-    "compendium-updater": null,
-    "choice-generator": null,
-    "promote_character": "medium",
-    "repair-state": "medium"
-  }
-}
+// Dev overrides — currently inert. JSON.parse fails on these comments and the
+// loader (packages/engine/src/config/models.ts) silently falls back to the
+// hardcoded DEFAULTS. Per-tier model selection now lives in connections.json
+// (managed by the Connections UI), so dev-config no longer needs to override
+// model IDs. The effort values below mirror the current production defaults
+// in models.ts — kept here as documentation in case you ever want to flip
+// one for local experimentation (delete this comment block to re-enable).
+//
+// {
+//   "effort": {
+//     "default": null,
+//     "dm": "high",
+//     "ooc": "high",
+//     "setup": "high",
+//     "dev-mode": "high",
+//     "ai-player": "low",
+//     "promote_character": "medium",
+//     "repair-state": "medium"
+//   }
+// }

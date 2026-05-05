@@ -24,6 +24,7 @@ import { buildNameInspiration } from "../agents/name-inspiration.js";
 import { getActivePlayer } from "../agents/player-manager.js";
 import { loadEnv } from "../config/first-launch.js";
 import { loadConnectionStore, buildEffectiveConnections, getTierProvider } from "../config/connections.js";
+import { getModel } from "../config/models.js";
 import { createProviderFromConnection } from "../providers/index.js";
 import { configDir } from "../utils/paths.js";
 import { sandboxFileIO } from "../tools/filesystem/sandbox.js";
@@ -543,8 +544,13 @@ export class SessionManager {
     };
 
     // --- Instantiate GameEngine ---
+    // Mirror setup-session.ts: pair the model ID with the connection it was
+    // assigned to, falling back to the hardcoded large default only when no
+    // tier assignment exists. Without this, the engine's getModel("large")
+    // fallback can hand an Anthropic model ID to an OpenAI provider.
     const engine = new GameEngine({
       provider,
+      model: largeTier?.modelId ?? getModel("large"),
       gameState: gs,
       scene,
       sessionState,

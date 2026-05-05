@@ -23,45 +23,8 @@ describe("model config", () => {
     expect(config.small).toBe("claude-haiku-4-5-20251001");
   });
 
-  it("applies partial override", () => {
-    writeFileSync(
-      join(testDir, "dev-config.json"),
-      JSON.stringify({ models: { large: "claude-sonnet-4-6" } }),
-    );
-    const config = loadModelConfig({ cwd: testDir, reset: true });
-    expect(config.large).toBe("claude-sonnet-4-6");
-    expect(config.medium).toBe("claude-sonnet-4-6");
-    expect(config.small).toBe("claude-haiku-4-5-20251001");
-  });
-
-  it("applies full override", () => {
-    writeFileSync(
-      join(testDir, "dev-config.json"),
-      JSON.stringify({
-        models: {
-          large: "claude-sonnet-4-6",
-          medium: "claude-haiku-4-5-20251001",
-          small: "claude-haiku-4-5-20251001",
-        },
-      }),
-    );
-    const config = loadModelConfig({ cwd: testDir, reset: true });
-    expect(config.large).toBe("claude-sonnet-4-6");
-    expect(config.medium).toBe("claude-haiku-4-5-20251001");
-    expect(config.small).toBe("claude-haiku-4-5-20251001");
-  });
-
   it("ignores malformed JSON", () => {
     writeFileSync(join(testDir, "dev-config.json"), "not json {{{");
-    const config = loadModelConfig({ cwd: testDir, reset: true });
-    expect(config.large).toBe("claude-opus-4-6");
-  });
-
-  it("ignores invalid model IDs", () => {
-    writeFileSync(
-      join(testDir, "dev-config.json"),
-      JSON.stringify({ models: { large: "gpt-4o" } }),
-    );
     const config = loadModelConfig({ cwd: testDir, reset: true });
     expect(config.large).toBe("claude-opus-4-6");
   });
@@ -71,10 +34,10 @@ describe("model config", () => {
     // Write file after first load — should be ignored due to cache
     writeFileSync(
       join(testDir, "dev-config.json"),
-      JSON.stringify({ models: { large: "claude-sonnet-4-6" } }),
+      JSON.stringify({ effort: { dm: "low" } }),
     );
     const b = loadModelConfig({ cwd: testDir });
-    expect(b.large).toBe(a.large);
+    expect(b.effort.dm).toBe(a.effort.dm);
   });
 
   it("getModel returns tier value", () => {
@@ -87,7 +50,14 @@ describe("model config", () => {
   it("defaults effort with dev high", () => {
     const config = loadModelConfig({ cwd: testDir, reset: true });
     expect(config.effort).toEqual({
-      "default": null, "dm": "high", "ooc": "high", "setup": "high", "dev-mode": "high",
+      "default": null,
+      "dm": "high",
+      "ooc": "high",
+      "setup": "high",
+      "dev-mode": "high",
+      "ai-player": "low",
+      "promote_character": "medium",
+      "repair-state": "medium",
     });
   });
 
@@ -130,7 +100,14 @@ describe("model config", () => {
     );
     const config = loadModelConfig({ cwd: testDir, reset: true });
     expect(config.effort).toEqual({
-      "default": null, "dm": "high", "ooc": "high", "setup": "high", "dev-mode": "high",
+      "default": null,
+      "dm": "high",
+      "ooc": "high",
+      "setup": "high",
+      "dev-mode": "high",
+      "ai-player": "low",
+      "promote_character": "medium",
+      "repair-state": "medium",
     });
   });
 
