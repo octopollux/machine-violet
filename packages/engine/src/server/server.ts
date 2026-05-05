@@ -76,9 +76,6 @@ export async function createServer(
   }
 
   const server = Fastify({
-    // Transcript HTML can grow large in long campaigns; default 1 MB rejects
-    // saves around the 60-turn mark with HTTP 413.
-    bodyLimit: 50 * 1024 * 1024,
     logger: process.env.NODE_ENV === "test" ? false : { level: "info" },
   });
 
