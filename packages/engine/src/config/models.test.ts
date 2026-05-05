@@ -16,7 +16,7 @@ describe("model config", () => {
     rmSync(testDir, { recursive: true, force: true });
   });
 
-  it("returns defaults when no dev-config.json", () => {
+  it("returns defaults when no dev-config.jsonc", () => {
     const config = loadModelConfig({ cwd: testDir, reset: true });
     expect(config.large).toBe("claude-opus-4-6");
     expect(config.medium).toBe("claude-sonnet-4-6");
@@ -24,7 +24,7 @@ describe("model config", () => {
   });
 
   it("ignores malformed JSON", () => {
-    writeFileSync(join(testDir, "dev-config.json"), "not json {{{");
+    writeFileSync(join(testDir, "dev-config.jsonc"), "not json {{{");
     const config = loadModelConfig({ cwd: testDir, reset: true });
     expect(config.large).toBe("claude-opus-4-6");
   });
@@ -33,7 +33,7 @@ describe("model config", () => {
     const a = loadModelConfig({ cwd: testDir, reset: true });
     // Write file after first load — should be ignored due to cache
     writeFileSync(
-      join(testDir, "dev-config.json"),
+      join(testDir, "dev-config.jsonc"),
       JSON.stringify({ effort: { dm: "low" } }),
     );
     const b = loadModelConfig({ cwd: testDir });
@@ -61,9 +61,9 @@ describe("model config", () => {
     });
   });
 
-  it("loads per-agent effort map from dev-config.json", () => {
+  it("loads per-agent effort map from dev-config.jsonc", () => {
     writeFileSync(
-      join(testDir, "dev-config.json"),
+      join(testDir, "dev-config.jsonc"),
       JSON.stringify({ effort: { dm: "high", ooc: "medium" } }),
     );
     const config = loadModelConfig({ cwd: testDir, reset: true });
@@ -75,7 +75,7 @@ describe("model config", () => {
 
   it("rejects invalid effort values", () => {
     writeFileSync(
-      join(testDir, "dev-config.json"),
+      join(testDir, "dev-config.jsonc"),
       JSON.stringify({ effort: { dm: "turbo", ooc: "low" } }),
     );
     const config = loadModelConfig({ cwd: testDir, reset: true });
@@ -85,7 +85,7 @@ describe("model config", () => {
 
   it("accepts null/none as disabled effort", () => {
     writeFileSync(
-      join(testDir, "dev-config.json"),
+      join(testDir, "dev-config.jsonc"),
       JSON.stringify({ effort: { dm: null, ooc: "none" } }),
     );
     const config = loadModelConfig({ cwd: testDir, reset: true });
@@ -93,9 +93,37 @@ describe("model config", () => {
     expect(config.effort.ooc).toBeNull();
   });
 
+  it("strips JSONC line and block comments before parsing", () => {
+    writeFileSync(
+      join(testDir, "dev-config.jsonc"),
+      `// leading line comment
+       /* block
+          comment */
+       {
+         "effort": {
+           // dm gets max effort during testing
+           "dm": "max", /* trailing block */
+           "ooc": "low" // line comment after value
+         }
+       }`,
+    );
+    const config = loadModelConfig({ cwd: testDir, reset: true });
+    expect(config.effort.dm).toBe("max");
+    expect(config.effort.ooc).toBe("low");
+  });
+
+  it("preserves // and /* */ inside string values", () => {
+    writeFileSync(
+      join(testDir, "dev-config.jsonc"),
+      `{ "pricing": { "model//with/*chars": { "input": 1, "output": 2, "cacheWrite": 0, "cacheRead": 0 } } }`,
+    );
+    const pricing = loadPricingConfig({ cwd: testDir, reset: true });
+    expect(pricing["model//with/*chars"]).toEqual({ input: 1, output: 2, cacheWrite: 0, cacheRead: 0 });
+  });
+
   it("ignores effort if not an object", () => {
     writeFileSync(
-      join(testDir, "dev-config.json"),
+      join(testDir, "dev-config.jsonc"),
       JSON.stringify({ effort: "high" }),
     );
     const config = loadModelConfig({ cwd: testDir, reset: true });
@@ -126,7 +154,7 @@ describe("model config", () => {
 
     it("returns agent-specific config when set", () => {
       writeFileSync(
-        join(testDir, "dev-config.json"),
+        join(testDir, "dev-config.jsonc"),
         JSON.stringify({ effort: { dm: "max" } }),
       );
       loadModelConfig({ cwd: testDir, reset: true });
@@ -136,7 +164,7 @@ describe("model config", () => {
 
     it("falls back to 'default' key for unconfigured agents", () => {
       writeFileSync(
-        join(testDir, "dev-config.json"),
+        join(testDir, "dev-config.jsonc"),
         JSON.stringify({ effort: { default: "medium" } }),
       );
       loadModelConfig({ cwd: testDir, reset: true });
@@ -146,7 +174,7 @@ describe("model config", () => {
 
     it("agent-specific overrides default", () => {
       writeFileSync(
-        join(testDir, "dev-config.json"),
+        join(testDir, "dev-config.jsonc"),
         JSON.stringify({ effort: { default: "high", dm: null } }),
       );
       loadModelConfig({ cwd: testDir, reset: true });
@@ -168,7 +196,7 @@ describe("pricing config", () => {
     rmSync(testDir, { recursive: true, force: true });
   });
 
-  it("returns defaults when no dev-config.json", () => {
+  it("returns defaults when no dev-config.jsonc", () => {
     const pricing = loadPricingConfig({ cwd: testDir, reset: true });
     expect(pricing["claude-opus-4-6"].input).toBe(5);
     expect(pricing["claude-opus-4-6"].output).toBe(25);
@@ -177,7 +205,7 @@ describe("pricing config", () => {
 
   it("overrides specific model pricing", () => {
     writeFileSync(
-      join(testDir, "dev-config.json"),
+      join(testDir, "dev-config.jsonc"),
       JSON.stringify({
         pricing: {
           "claude-opus-4-6": { input: 10, output: 50, cacheWrite: 12.5, cacheRead: 1.0 },
@@ -193,7 +221,7 @@ describe("pricing config", () => {
 
   it("adds pricing for unknown models", () => {
     writeFileSync(
-      join(testDir, "dev-config.json"),
+      join(testDir, "dev-config.jsonc"),
       JSON.stringify({
         pricing: {
           "claude-next-gen": { input: 8, output: 40, cacheWrite: 10, cacheRead: 0.8 },
@@ -206,7 +234,7 @@ describe("pricing config", () => {
 
   it("ignores malformed pricing entries", () => {
     writeFileSync(
-      join(testDir, "dev-config.json"),
+      join(testDir, "dev-config.jsonc"),
       JSON.stringify({
         pricing: {
           "claude-opus-4-6": { input: "not a number" },
@@ -221,7 +249,7 @@ describe("pricing config", () => {
   it("caches after first load", () => {
     const a = loadPricingConfig({ cwd: testDir, reset: true });
     writeFileSync(
-      join(testDir, "dev-config.json"),
+      join(testDir, "dev-config.jsonc"),
       JSON.stringify({
         pricing: {
           "claude-opus-4-6": { input: 99, output: 99, cacheWrite: 99, cacheRead: 99 },

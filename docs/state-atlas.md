@@ -610,7 +610,7 @@ In addition to campaign-scoped state, Machine Violet maintains machine-scoped co
                                Per-model: pricing, capabilities, context window, tier defaults.
 ```
 
-Additionally, `dev-config.json` (read from the process working directory, not the app config directory) provides dev-only model overrides (e.g. use Sonnet for DM tier to save costs).
+Additionally, `dev-config.jsonc` (read from the process working directory, not the app config directory) provides optional dev-only overrides for `effort` (per-agent reasoning level) and `pricing` (per-model cost calculations). `//` and `/* */` comments are stripped before JSON parsing. Per-tier provider/model assignment is *not* configured here — that lives in `connections.json`, managed via the Connections UI.
 
 **Code:** `packages/engine/src/config/connections.ts`, `packages/engine/src/config/discord.ts`, `packages/engine/src/config/model-registry.ts`, `packages/engine/src/config/first-launch.ts`
 

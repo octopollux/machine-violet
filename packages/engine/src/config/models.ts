@@ -26,6 +26,56 @@ export interface EffortConfig {
   effort: EffortLevel | null;
 }
 
+const DEV_CONFIG_FILENAME = "dev-config.jsonc";
+
+/**
+ * Strip JSONC comments (line and block) from a source string while preserving
+ * content inside double-quoted strings. Recognizes:
+ *   - `//` to end-of-line
+ *   - block comments delimited by slash-star and star-slash
+ * Trailing commas are not supported — keep the file syntactically JSON once
+ * comments are removed.
+ *
+ * Hand-rolled to avoid pulling in a JSONC parser dep for a single config file.
+ * Single-quoted strings are not recognized (JSON doesn't allow them).
+ */
+function stripJsoncComments(src: string): string {
+  let out = "";
+  let i = 0;
+  let inString = false;
+  let escaped = false;
+  while (i < src.length) {
+    const c = src[i];
+    if (inString) {
+      out += c;
+      if (escaped) escaped = false;
+      else if (c === "\\") escaped = true;
+      else if (c === '"') inString = false;
+      i++;
+    } else if (c === '"') {
+      inString = true;
+      out += c;
+      i++;
+    } else if (c === "/" && src[i + 1] === "/") {
+      while (i < src.length && src[i] !== "\n") i++;
+      // keep the newline so line numbers in error messages stay accurate
+    } else if (c === "/" && src[i + 1] === "*") {
+      i += 2;
+      while (i < src.length && !(src[i] === "*" && src[i + 1] === "/")) i++;
+      i += 2;
+    } else {
+      out += c;
+      i++;
+    }
+  }
+  return out;
+}
+
+function loadDevConfig(dir: string): unknown {
+  const raw = readFileSync(join(dir, DEV_CONFIG_FILENAME), "utf-8");
+  return JSON.parse(stripJsoncComments(raw));
+}
+
 const DEFAULTS: ModelConfig = {
   large: "claude-opus-4-6",
   medium: "claude-sonnet-4-6",
@@ -60,7 +110,7 @@ let cached: ModelConfig | null = null;
 let cachedPricing: Record<string, ModelPricing> | null = null;
 
 /**
- * Load model config: defaults merged with optional dev-config.json effort overrides.
+ * Load model config: defaults merged with optional `dev-config.jsonc` effort overrides.
  *
  * Tier model IDs (`large`/`medium`/`small`) returned here are baked-in defaults.
  * Many callers — subagents (scribe, summarizer, precis-updater, etc.), content
@@ -81,8 +131,7 @@ export function loadModelConfig(opts?: { cwd?: string; reset?: boolean }): Model
   const dir = opts?.cwd ?? process.cwd();
 
   try {
-    const raw = readFileSync(join(dir, "dev-config.json"), "utf-8");
-    const parsed = JSON.parse(raw);
+    const parsed = loadDevConfig(dir) as { effort?: unknown };
     const effort = parsed?.effort;
     if (effort && typeof effort === "object" && !Array.isArray(effort)) {
       const map: Record<string, EffortLevel | null> = {};
@@ -99,7 +148,7 @@ export function loadModelConfig(opts?: { cwd?: string; reset?: boolean }): Model
       }
     }
   } catch {
-    // No dev-config.json or invalid — use defaults
+    // No dev-config.jsonc or invalid — use defaults
   }
 
   cached = config;
@@ -128,7 +177,7 @@ export function getEffortConfig(agentName: string): EffortConfig {
 }
 
 /**
- * Load pricing config: defaults merged with optional dev-config.json overrides.
+ * Load pricing config: defaults merged with optional `dev-config.jsonc` overrides.
  * Pricing overrides are keyed by model ID string.
  * Pass `reset: true` in tests to clear cache.
  */
@@ -140,8 +189,7 @@ export function loadPricingConfig(opts?: { cwd?: string; reset?: boolean }): Rec
   const dir = opts?.cwd ?? process.cwd();
 
   try {
-    const raw = readFileSync(join(dir, "dev-config.json"), "utf-8");
-    const parsed = JSON.parse(raw);
+    const parsed = loadDevConfig(dir) as { pricing?: unknown };
     const overrides = parsed?.pricing;
     if (overrides && typeof overrides === "object") {
       for (const [modelId, values] of Object.entries(overrides)) {
@@ -156,7 +204,7 @@ export function loadPricingConfig(opts?: { cwd?: string; reset?: boolean }): Rec
       }
     }
   } catch {
-    // No dev-config.json or invalid — use defaults
+    // No dev-config.jsonc or invalid — use defaults
   }
 
   cachedPricing = pricing;
