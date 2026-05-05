@@ -39,7 +39,9 @@ Every operation has an explicit cost tier. This is the core economic constraint.
 | T2 (Subagent) | Haiku or Sonnet | Cheap | Summarization, precis, changelogs, resolution, choices, entity writes | `packages/engine/src/agents/subagents/` — `spawnSubagent()` / `oneShot()` |
 | T3 (DM) | Opus | Expensive | Narration, scene direction, NPC dialogue | `packages/engine/src/agents/agent-loop.ts` — main conversation |
 
-Model selection: `packages/engine/src/config/models.ts` — `getModel("large" | "medium" | "small")`. Override via `dev-config.json`.
+Model selection: `packages/engine/src/config/models.ts` — `getModel("large" | "medium" | "small")` returns baked-in defaults. Per-tier provider/model assignment lives in `connections.json` (managed via the Connections UI); `dev-config.jsonc` exposes optional dev-only `effort` and `pricing` overrides.
+
+**Provider routing:** every model call is paired `{provider, model}` — a `TierProvider` (`packages/engine/src/providers/types.ts`). At session start, `buildTierProviders` (`src/config/tier-resolver.ts`) reads the connection store and produces `Record<ModelTier, TierProvider>`, which threads through `GameEngine`, `SceneManager`, and `ResolveSession` to every subagent dispatch site. This guarantees that a heterogeneous setup (e.g. Large=OpenAI, Medium=Anthropic) routes each tier's call through its own connection — sending an Anthropic model ID through an OpenAI client would crash. Subagents accept `model` as a required parameter; there is no silent fallback to `getModel(tier)`.
 
 ## State Architecture
 

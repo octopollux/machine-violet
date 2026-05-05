@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider } from "../../providers/types.js";
 import { trackScene, parseSceneTrackerResult, SCENE_TRACKER_CADENCE } from "./scene-tracker.js";
 import { resetPromptCache } from "../../prompts/load-prompt.js";
 
@@ -78,7 +78,9 @@ describe("parseSceneTrackerResult", () => {
 });
 
 describe("trackScene", () => {
-  const mockClient = {} as Anthropic;
+  // Provider is unused — `oneShot` is mocked at the module boundary, so the
+  // tests never actually call into it. Cast satisfies the type signature.
+  const mockClient = {} as unknown as LLMProvider;
 
   it("returns parsed threads from subagent response", async () => {
     vi.mocked(oneShot).mockResolvedValue({
@@ -89,14 +91,14 @@ describe("trackScene", () => {
     const result = await trackScene(mockClient, [
       "**[Aldric]:** I search the room.",
       "**DM:** You find a hidden compartment.",
-    ]);
+    ], undefined, undefined, "claude-haiku-4-5-20251001");
     expect(result.openThreads).toBe("[[goblin-ambush]], [[missing-merchant]]");
   });
 
   it("returns undefined threads on API failure (preserves existing)", async () => {
     vi.mocked(oneShot).mockRejectedValue(new Error("API error"));
 
-    const result = await trackScene(mockClient, ["**[Aldric]:** Hello"]);
+    const result = await trackScene(mockClient, ["**[Aldric]:** Hello"], undefined, undefined, "claude-haiku-4-5-20251001");
     expect(result.openThreads).toBeUndefined();
     expect(result.usage.inputTokens).toBe(0);
   });
@@ -104,7 +106,7 @@ describe("trackScene", () => {
   it("includes current threads in prompt", async () => {
     vi.mocked(oneShot).mockResolvedValue({ text: "THREADS: (none)", usage: mockUsage });
 
-    await trackScene(mockClient, ["**[Aldric]:** I leave."], "[[quest-a]]", "[[Mira]] waits");
+    await trackScene(mockClient, ["**[Aldric]:** I leave."], "[[quest-a]]", "[[Mira]] waits", "claude-haiku-4-5-20251001");
 
     const userMessage = vi.mocked(oneShot).mock.calls[0][3] as string;
     expect(userMessage).toContain("Current threads: [[quest-a]]");
@@ -115,7 +117,7 @@ describe("trackScene", () => {
     vi.mocked(oneShot).mockResolvedValue({ text: "THREADS: (none)", usage: mockUsage });
 
     const longTranscript = Array.from({ length: 10 }, (_, i) => `line-${i}`);
-    await trackScene(mockClient, longTranscript);
+    await trackScene(mockClient, longTranscript, undefined, undefined, "claude-haiku-4-5-20251001");
 
     const userMessage = vi.mocked(oneShot).mock.calls[0][3] as string;
     expect(userMessage).not.toContain("line-0");
@@ -126,7 +128,7 @@ describe("trackScene", () => {
   it("calls oneShot with correct model and name", async () => {
     vi.mocked(oneShot).mockResolvedValue({ text: "THREADS: (none)", usage: mockUsage });
 
-    await trackScene(mockClient, ["test"]);
+    await trackScene(mockClient, ["test"], undefined, undefined, "claude-haiku-4-5-20251001");
 
     expect(oneShot).toHaveBeenCalledWith(
       mockClient,

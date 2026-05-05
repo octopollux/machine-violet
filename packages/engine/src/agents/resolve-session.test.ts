@@ -142,7 +142,7 @@ describe("ResolveSession", () => {
     const fileIO = mockFileIO();
     const state = mockState();
 
-    const session = new ResolveSession(provider, fileIO, state);
+    const session = new ResolveSession(provider, fileIO, state, "claude-sonnet-4-6");
     await session.initCombat("### Kael\nHP: 35\nSTR: +3", "# Combat\nAttack = d20 + mod");
 
     const result = await session.resolve({
@@ -167,7 +167,7 @@ describe("ResolveSession", () => {
     const fileIO = mockFileIO();
     const state = mockState();
 
-    const session = new ResolveSession(provider, fileIO, state);
+    const session = new ResolveSession(provider, fileIO, state, "claude-sonnet-4-6");
     await session.initCombat("stats", "rules");
 
     const result = await session.resolve({
@@ -198,7 +198,7 @@ describe("ResolveSession", () => {
     const fileIO = mockFileIO();
     const state = mockState();
 
-    const session = new ResolveSession(provider, fileIO, state);
+    const session = new ResolveSession(provider, fileIO, state, "claude-sonnet-4-6");
     await session.initCombat("stats", "rules");
 
     // First resolve
@@ -223,7 +223,7 @@ describe("ResolveSession", () => {
     const fileIO = mockFileIO();
     const state = mockState();
 
-    const session = new ResolveSession(provider, fileIO, state);
+    const session = new ResolveSession(provider, fileIO, state, "claude-sonnet-4-6");
     await session.initCombat("stats", "rules");
 
     await session.resolve({ actor: "Kael", action: "Attack" });
@@ -244,7 +244,7 @@ describe("ResolveSession", () => {
     const fileIO = mockFileIO();
     const state = mockState();
 
-    const session = new ResolveSession(provider, fileIO, state);
+    const session = new ResolveSession(provider, fileIO, state, "claude-sonnet-4-6");
 
     const summary = session.teardown();
     expect(summary).toBe("Combat ended with no resolved turns.");
@@ -265,7 +265,7 @@ describe("ResolveSession", () => {
     const fileIO = mockFileIO();
     const state = mockState();
 
-    const session = new ResolveSession(provider, fileIO, state);
+    const session = new ResolveSession(provider, fileIO, state, "claude-sonnet-4-6");
     await session.initCombat("stats", "rules");
 
     const result = await session.resolve({ actor: "Kael", action: "Attack" });
@@ -292,7 +292,7 @@ describe("ResolveSession", () => {
     const fileIO = mockFileIO();
     const state = mockState();
 
-    const session = new ResolveSession(provider, fileIO, state);
+    const session = new ResolveSession(provider, fileIO, state, "claude-sonnet-4-6");
     await session.initCombat("stats", "rules");
 
     const result = await session.resolve({ actor: "Kael", action: "Check stats" });

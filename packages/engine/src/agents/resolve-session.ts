@@ -3,6 +3,7 @@ import type {
   NormalizedTool,
   NormalizedMessage,
   SystemBlock,
+  TierProvider,
 } from "../providers/types.js";
 import type { GameState } from "./game-state.js";
 import type { FileIO } from "./scene-manager.js";
@@ -16,7 +17,6 @@ import { runProviderLoop } from "../providers/agent-loop-bridge.js";
 import { parseResolutionXml } from "./resolve-xml.js";
 import { rollDice } from "../tools/dice/index.js";
 import type { RollDiceInput } from "@machine-violet/shared/types/dice.js";
-import { getModel } from "../config/models.js";
 import { TOKEN_LIMITS } from "../config/tokens.js";
 import { loadPrompt } from "../prompts/load-prompt.js";
 import { searchContent } from "./subagents/search-content.js";
@@ -95,6 +95,8 @@ const SESSION_TOOLS: NormalizedTool[] = [
  */
 export class ResolveSession {
   private provider: LLMProvider;
+  private model: string;
+  private smallTier?: TierProvider;
   private fileIO: FileIO;
   private gameState: GameState;
   private systemPrompt: SystemBlock[] = [];
@@ -103,10 +105,29 @@ export class ResolveSession {
   private ruleCardContent = "";
   private currentRound = 1;
 
-  constructor(provider: LLMProvider, fileIO: FileIO, gameState: GameState) {
+  /**
+   * @param provider Provider assigned to the medium tier. Combat resolution
+   *   needs medium-tier reasoning; passing it explicitly (rather than
+   *   defaulting to a tier lookup) lets a heterogeneous-vendor session
+   *   route the medium tier through its connection independently of the DM.
+   * @param model Model ID for the medium tier; paired with `provider`.
+   * @param smallTier Provider+model for the search_content subagent, which
+   *   runs on the small tier and may live on a different vendor than the
+   *   medium combat resolver. Optional for tests that never exercise the
+   *   tool; required in production where combatants can search rule cards.
+   */
+  constructor(
+    provider: LLMProvider,
+    fileIO: FileIO,
+    gameState: GameState,
+    model: string,
+    smallTier?: TierProvider,
+  ) {
     this.provider = provider;
+    this.model = model;
     this.fileIO = fileIO;
     this.gameState = gameState;
+    this.smallTier = smallTier;
   }
 
   /**
@@ -153,8 +174,9 @@ export class ResolveSession {
 
   /**
    * Resolve a combat action. Accumulates messages across the session.
+   * Uses the constructor's `model` unless overridden (e.g. tests).
    */
-  async resolve(action: ActionDeclaration): Promise<ResolutionResult> {
+  async resolve(action: ActionDeclaration, model?: string): Promise<ResolutionResult> {
     // Track current round from game state
     if (this.gameState.combat.active) {
       this.currentRound = this.gameState.combat.round;
@@ -177,7 +199,7 @@ export class ResolveSession {
       this.messages,
       {
         name: "resolve_session",
-        model: getModel("medium"),
+        model: model ?? this.model,
         maxTokens: TOKEN_LIMITS.RESOLVE_SESSION,
         maxToolRounds: 8,
         stream: false,
@@ -372,12 +394,15 @@ export class ResolveSession {
           if (!systemSlug) {
             return { content: "No game system configured.", is_error: true };
           }
+          if (!this.smallTier) {
+            return { content: "Small-tier provider not available for content search.", is_error: true };
+          }
           try {
-            const result = await searchContent(this.provider, {
+            const result = await searchContent(this.smallTier.provider, {
               query,
               systemSlug,
               homeDir: this.gameState.homeDir,
-            }, this.fileIO);
+            }, this.fileIO, this.smallTier.model);
             return { content: result.text };
           } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);

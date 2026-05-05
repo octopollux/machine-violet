@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { LLMProvider, ChatResult } from "../providers/types.js";
+import type { LLMProvider, ChatResult, TierProvider } from "../providers/types.js";
 import { GameEngine } from "./game-engine.js";
 import { pruneEmptyDirs } from "../tools/git/index.js";
 import type { EngineCallbacks, EngineState, TurnInfo } from "./game-engine.js";
 import type { GameState } from "./game-state.js";
+import type { ModelTier } from "@machine-violet/shared/types/engine.js";
 import type { SceneState, FileIO } from "./scene-manager.js";
 import type { DMSessionState } from "./dm-prompt.js";
 import type { TuiCommand, UsageStats } from "./agent-loop.js";
@@ -11,6 +12,55 @@ import { createClocksState } from "../tools/clocks/index.js";
 import { createCombatState, createDefaultConfig } from "../tools/combat/index.js";
 import { createDecksState } from "../tools/cards/index.js";
 import { createObjectivesState } from "../tools/objectives/index.js";
+
+/**
+ * Test-only convenience: build a homogeneous tierProviders map from a single
+ * provider. Production constructs this from the connection store; tests stub
+ * it because most assertions don't care which tier a call goes through.
+ *
+ * If a test does need to assert per-tier routing, it should construct a
+ * heterogeneous map by hand and pass it as `tierProviders`.
+ */
+function tierProvidersForTest(provider: LLMProvider, dmModel?: string): Record<ModelTier, TierProvider> {
+  return {
+    large: { provider, model: dmModel ?? "claude-opus-4-6" },
+    medium: { provider, model: "claude-sonnet-4-6" },
+    small: { provider, model: "claude-haiku-4-5-20251001" },
+  };
+}
+
+/**
+ * Wraps `new GameEngine(...)` for tests, auto-filling `tierProviders` from
+ * `params.provider` and `params.model`. Production code constructs
+ * `tierProviders` explicitly via `buildTierProviders` — keeping the fallback
+ * out of the engine itself preserves the no-silent-fallback invariant under
+ * heterogeneous routing.
+ */
+function makeEngine(params: {
+  provider: LLMProvider;
+  gameState: GameState;
+  scene: SceneState;
+  sessionState: DMSessionState;
+  fileIO: FileIO;
+  callbacks: EngineCallbacks;
+  model?: string;
+  tierProviders?: Record<ModelTier, TierProvider>;
+  gitIO?: import("../tools/git/index.js").GitIO;
+  entityTree?: import("@machine-violet/shared/types/entities.js").EntityTree;
+}): GameEngine {
+  const tierProviders = params.tierProviders ?? tierProvidersForTest(params.provider, params.model);
+  return new GameEngine({
+    provider: params.provider,
+    gameState: params.gameState,
+    scene: params.scene,
+    sessionState: params.sessionState,
+    fileIO: params.fileIO,
+    callbacks: params.callbacks,
+    tierProviders,
+    gitIO: params.gitIO,
+    entityTree: params.entityTree,
+  });
+}
 
 vi.mock("./subagents/ai-player.js", () => ({
   aiPlayerTurn: vi.fn(async () => ({
@@ -215,7 +265,7 @@ describe("GameEngine", () => {
     const provider = mockProvider([textMessage("The door creaks open.")]);
     const { callbacks, log } = mockCallbacks();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: mockState(),
       scene: mockScene(),
@@ -239,7 +289,7 @@ describe("GameEngine", () => {
     ]);
     const { callbacks, log } = mockCallbacks();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: mockState(),
       scene: mockScene(),
@@ -261,7 +311,7 @@ describe("GameEngine", () => {
     const provider = mockProvider([textMessage("Hello.")]);
     const { callbacks, log } = mockCallbacks();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: mockState(),
       scene: mockScene(),
@@ -283,7 +333,7 @@ describe("GameEngine", () => {
     const { callbacks } = mockCallbacks();
     const scene = mockScene();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: mockState(),
       scene,
@@ -306,7 +356,7 @@ describe("GameEngine", () => {
     ]);
     const { callbacks, log } = mockCallbacks();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: mockState(),
       scene: mockScene(),
@@ -336,7 +386,7 @@ describe("GameEngine", () => {
 
     const { callbacks, log } = mockCallbacks();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider: errorProvider,
       gameState: mockState(),
       scene: mockScene(),
@@ -359,7 +409,7 @@ describe("GameEngine", () => {
     const { callbacks, log } = mockCallbacks();
     const scene = mockScene();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: mockState(),
       scene,
@@ -383,7 +433,7 @@ describe("GameEngine", () => {
     const state = mockState();
 
     const sessionState = mockSessionState();
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: state,
       scene: mockScene(),
@@ -412,7 +462,7 @@ describe("GameEngine", () => {
     const state = mockState();
 
     const sessionState = mockSessionState();
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: state,
       scene: mockScene(),
@@ -439,7 +489,7 @@ describe("GameEngine", () => {
     const provider = mockProvider([textMessage("- Session summary")]);
     const { callbacks, log } = mockCallbacks();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: mockState(),
       scene: mockScene(),
@@ -460,7 +510,7 @@ describe("GameEngine", () => {
     const provider = mockProvider([textMessage("Response 1")]);
     const { callbacks } = mockCallbacks();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: mockState(),
       scene: mockScene(),
@@ -488,7 +538,7 @@ describe("GameEngine", () => {
     ]);
     const { callbacks, log } = mockCallbacks();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: mockState(),
       scene: mockScene(),
@@ -512,7 +562,7 @@ describe("GameEngine", () => {
     ]);
     const { callbacks, log } = mockCallbacks();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: mockState(),
       scene: mockScene(),
@@ -544,7 +594,7 @@ describe("GameEngine Scribe Integration", () => {
     const devLogs: string[] = [];
     callbacks.onDevLog = (msg) => devLogs.push(msg);
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: mockState(),
       scene: mockScene(),
@@ -575,7 +625,7 @@ describe("GameEngine Scribe Integration", () => {
     const { callbacks } = mockCallbacks();
     const fio = mockFileIO();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: mockState(),
       scene: mockScene(),
@@ -625,7 +675,7 @@ describe("GameEngine Git Auto-Commit", () => {
     ]);
     const { callbacks } = mockCallbacks();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: state,
       scene: mockScene(),
@@ -652,7 +702,7 @@ describe("GameEngine Git Auto-Commit", () => {
     const provider = mockProvider([textMessage("Response.")]);
     const { callbacks, log } = mockCallbacks();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: mockState(),
       scene: mockScene(),
@@ -674,7 +724,7 @@ describe("GameEngine Git Auto-Commit", () => {
     state.config.recovery.enable_git = true;
 
     const { callbacks } = mockCallbacks();
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider: mockProvider([]),
       gameState: state,
       scene: mockScene(),
@@ -737,7 +787,7 @@ describe("GameEngine AI Auto-Turn", () => {
     ]);
     const { callbacks, log } = mockCallbacks();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: state,
       scene: mockScene(),
@@ -775,7 +825,7 @@ describe("GameEngine AI Auto-Turn", () => {
     const provider = mockProvider([textMessage("Response.")]);
     const { callbacks, log } = mockCallbacks();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: state,
       scene: mockScene(),
@@ -827,7 +877,7 @@ describe("GameEngine AI Auto-Turn", () => {
     ]);
     const { callbacks } = mockCallbacks();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: state,
       scene: mockScene(),
@@ -857,7 +907,7 @@ describe("GameEngine AI Auto-Turn", () => {
     const provider = mockProvider([textMessage("DM responds.")]);
     const { callbacks } = mockCallbacks();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: state,
       scene: mockScene(),
@@ -893,7 +943,7 @@ describe("GameEngine AI Auto-Turn", () => {
     const provider = mockProvider([textMessage("The goblin falls!")]);
     const { callbacks, log } = mockCallbacks();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: state,
       scene: mockScene(),
@@ -929,7 +979,7 @@ describe("GameEngine Behavioral Reminder", () => {
       textMessage("Turn 3."),
     ]);
     const { callbacks } = mockCallbacks();
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
@@ -953,7 +1003,7 @@ describe("GameEngine Behavioral Reminder", () => {
       textMessage("Four."),
     ]);
     const { callbacks } = mockCallbacks();
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
@@ -981,7 +1031,7 @@ describe("GameEngine Behavioral Reminder", () => {
       textMessage("Five."),           // turn 5 → stream[5]
     ]);
     const { callbacks } = mockCallbacks();
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
@@ -1008,7 +1058,7 @@ describe("GameEngine Behavioral Reminder", () => {
       textMessage("Four."),
     ]);
     const { callbacks } = mockCallbacks();
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
@@ -1035,7 +1085,7 @@ describe("GameEngine Behavioral Reminder", () => {
       textMessage("Five."),
     ]);
     const { callbacks } = mockCallbacks();
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
@@ -1063,7 +1113,7 @@ describe("GameEngine Behavioral Reminder", () => {
       textMessage("Session resumed."),
     ]);
     const { callbacks } = mockCallbacks();
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
@@ -1086,7 +1136,7 @@ describe("GameEngine Behavioral Reminder", () => {
       textMessage("Four."),
     ]);
     const { callbacks, log } = mockCallbacks();
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
@@ -1124,7 +1174,7 @@ describe("GameEngine Turn Lifecycle", () => {
     const origEnd = callbacks.onTurnEnd;
     callbacks.onTurnEnd = (turn) => { events.push(`turnEnd:${turn.role}`); origEnd(turn); };
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
@@ -1148,7 +1198,7 @@ describe("GameEngine Turn Lifecycle", () => {
     ]);
     const { callbacks, log } = mockCallbacks();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
@@ -1172,7 +1222,7 @@ describe("GameEngine Turn Lifecycle", () => {
     ]);
     const { callbacks, log } = mockCallbacks();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
@@ -1222,7 +1272,7 @@ describe("GameEngine Turn Lifecycle", () => {
     const provider = mockProvider([textMessage("DM responds to AI.")]);
     const { callbacks, log } = mockCallbacks();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider, gameState: state, scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
@@ -1256,7 +1306,7 @@ describe("GameEngine Turn Lifecycle", () => {
     ]);
     const { callbacks } = mockCallbacks();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
       model: "claude-haiku-4-5-20251001",
@@ -1386,7 +1436,7 @@ describe("GameEngine OOC summary injection", () => {
     } as unknown as LLMProvider;
 
     const { callbacks } = mockCallbacks();
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider: spyProvider,
       gameState: mockState(),
       scene: mockScene(),
@@ -1438,7 +1488,7 @@ describe("GameEngine OOC summary injection", () => {
     } as unknown as LLMProvider;
 
     const { callbacks } = mockCallbacks();
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider: spyProvider,
       gameState: mockState(),
       scene: mockScene(),
@@ -1494,7 +1544,7 @@ describe("GameEngine TUI-only tool round (#266)", () => {
 
     const { callbacks } = mockCallbacks();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider: spyProvider,
       gameState: mockState(),
       scene: mockScene(),
@@ -1544,7 +1594,7 @@ describe("GameEngine resolve_turn routing", () => {
     ]);
     const { callbacks, log } = mockCallbacks();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: mockState(),
       scene: mockScene(),
@@ -1571,7 +1621,7 @@ describe("cross-mode resource dispatch: Engine + Dev Mode share singleton", () =
     const { callbacks } = mockCallbacks();
 
     // Construct engine (production code wires callbacks on singleton)
-    new GameEngine({
+    makeEngine({
       provider,
       gameState: state,
       scene: mockScene(),
@@ -1583,7 +1633,7 @@ describe("cross-mode resource dispatch: Engine + Dev Mode share singleton", () =
     // Simulate Dev Mode dispatching resource tools via the same singleton
     const { buildDevToolHandler } = await import("./subagents/dev-mode.js");
     const onTuiCommand = vi.fn();
-    const handler = buildDevToolHandler(state, fio, undefined, undefined, undefined, onTuiCommand);
+    const handler = buildDevToolHandler(state, fio, undefined, undefined, undefined, undefined, onTuiCommand);
 
     await handler("set_display_resources", { character: "Aldric", resources: ["HP", "MP"] });
     await handler("set_resource_values", { character: "Aldric", values: { HP: "20/30", MP: "5/10" } });
@@ -1608,7 +1658,7 @@ describe("applyResolutionDeltas — system-agnostic hp_change", () => {
 
     const provider = mockProvider([textMessage("ok")]);
     const { callbacks } = mockCallbacks();
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider, gameState: state, scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
     });
@@ -1626,7 +1676,7 @@ describe("applyResolutionDeltas — system-agnostic hp_change", () => {
 
     const provider = mockProvider([textMessage("ok")]);
     const { callbacks } = mockCallbacks();
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider, gameState: state, scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
     });
@@ -1642,7 +1692,7 @@ describe("applyResolutionDeltas — system-agnostic hp_change", () => {
     const state = mockState();
     const provider = mockProvider([textMessage("ok")]);
     const { callbacks } = mockCallbacks();
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider, gameState: state, scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
     });
@@ -1672,7 +1722,7 @@ describe("content classifier refusal", () => {
     let refusalFired = false;
     callbacks.onRefusal = () => { refusalFired = true; };
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
     });
@@ -1689,7 +1739,7 @@ describe("content classifier refusal", () => {
     const { callbacks, log } = mockCallbacks();
     callbacks.onRefusal = () => {};
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
     });
@@ -1706,7 +1756,7 @@ describe("content classifier refusal", () => {
     const { callbacks, log } = mockCallbacks();
     callbacks.onRefusal = () => {};
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
     });
@@ -1721,7 +1771,7 @@ describe("content classifier refusal", () => {
     const { callbacks, log } = mockCallbacks();
     callbacks.onRefusal = () => {};
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider, gameState: mockState(), scene: mockScene(),
       sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
     });
@@ -1747,7 +1797,7 @@ describe("content classifier refusal", () => {
     const { callbacks, log } = mockCallbacks();
     const io = mockFileIO();
 
-    const engine = new GameEngine({
+    const engine = makeEngine({
       provider,
       gameState: mockState(),
       scene: mockScene(),

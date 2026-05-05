@@ -40,6 +40,16 @@
       "pricing": { "input": 1, "output": 5, "cacheWrite": 1.25, "cacheRead": 0.10 },
       "capabilities": { "thinking": false, "tools": true, "streaming": true, "caching": true }
     },
+    "gpt-5.5": {
+      "provider": "openai",
+      "displayName": "GPT-5.5",
+      "contextWindow": 1050000,
+      "maxOutput": 128000,
+      "defaultTier": "large",
+      "compactionThreshold": 800000,
+      "pricing": { "input": 5, "output": 30, "cacheWrite": 0, "cacheRead": 0.50 },
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
+    },
     "gpt-5.4": {
       "provider": "openai",
       "displayName": "GPT-5.4",
@@ -103,6 +113,6 @@
   },
   "tierDefaults": {
     "anthropic": { "large": "claude-opus-4-6", "medium": "claude-sonnet-4-6", "small": "claude-haiku-4-5-20251001" },
-    "openai": { "large": "gpt-5.4", "medium": "gpt-5-mini", "small": "gpt-5-nano" }
+    "openai": { "large": "gpt-5.5", "medium": "gpt-5-mini", "small": "gpt-5-nano" }
   }
 }

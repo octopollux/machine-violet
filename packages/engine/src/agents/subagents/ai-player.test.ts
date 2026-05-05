@@ -79,29 +79,31 @@ describe("buildAIPlayerPrompt", () => {
 describe("aiPlayerTurn", () => {
   it("returns trimmed action", async () => {
     const provider = mockProvider([textResult("  I swing my sword at the goblin.  ")]);
-    const result = await aiPlayerTurn(provider, makeContext());
+    const result = await aiPlayerTurn(provider, makeContext(), "claude-haiku-4-5-20251001");
     expect(result.action).toBe("I swing my sword at the goblin.");
   });
 
   it("uses fallback when recentNarration is empty", async () => {
     const provider = mockProvider([textResult("I look around.")]);
-    await aiPlayerTurn(provider, makeContext({ recentNarration: "" }));
+    await aiPlayerTurn(provider, makeContext({ recentNarration: "" }), "claude-haiku-4-5-20251001");
 
     const call = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(call.messages[0].content).toBe("It's your turn. What do you do?");
   });
 
-  it("defaults to small model (haiku)", async () => {
+  it("uses the model the caller passes (haiku)", async () => {
+    // Tier resolution moved to the caller (game-engine.ts maps player.model to
+    // small or medium tier). aiPlayerTurn now just trusts the passed model.
     const provider = mockProvider([textResult("Action.")]);
-    await aiPlayerTurn(provider, makeContext());
+    await aiPlayerTurn(provider, makeContext(), "claude-haiku-4-5-20251001");
 
     const call = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(call.model).toContain("haiku");
   });
 
-  it("uses medium model for sonnet players", async () => {
+  it("uses the model the caller passes (sonnet)", async () => {
     const provider = mockProvider([textResult("Action.")]);
-    await aiPlayerTurn(provider, makeContext({ player: makePlayer({ model: "sonnet" }) }));
+    await aiPlayerTurn(provider, makeContext({ player: makePlayer({ model: "sonnet" }) }), "claude-sonnet-4-6");
 
     const call = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(call.model).toContain("sonnet");
@@ -109,7 +111,7 @@ describe("aiPlayerTurn", () => {
 
   it("returns usage stats", async () => {
     const provider = mockProvider([textResult("Done.")]);
-    const result = await aiPlayerTurn(provider, makeContext());
+    const result = await aiPlayerTurn(provider, makeContext(), "claude-haiku-4-5-20251001");
     expect(result.usage.inputTokens).toBe(50);
     expect(result.usage.outputTokens).toBe(20);
   });

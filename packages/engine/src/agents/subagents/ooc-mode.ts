@@ -1,4 +1,4 @@
-import type { LLMProvider, NormalizedTool, SystemBlock } from "../../providers/types.js";
+import type { LLMProvider, NormalizedTool, SystemBlock, TierProvider } from "../../providers/types.js";
 import type { SubagentStreamCallback } from "../subagent.js";
 import { spawnSubagent } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
@@ -7,7 +7,6 @@ import type { FileIO } from "../scene-manager.js";
 import type { GameState } from "../game-state.js";
 import type { TuiCommand } from "../agent-loop.js";
 import { registry } from "../tool-registry.js";
-import { getModel } from "../../config/models.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
@@ -274,9 +273,18 @@ export function buildOOCTools(hasFileIO: boolean, hasGameState: boolean): Normal
   return tools;
 }
 
-/** Build OOC tool handler. */
+/**
+ * Build the OOC tool handler.
+ *
+ * `smallTier` is the provider+model for spawning small-tier subagents from
+ * within OOC tools (scribe, promote_character). Distinct from `provider` —
+ * which is the medium-tier OOC session itself — because under heterogeneous
+ * routing those two tiers may live on different vendors. Required when the
+ * scribe/promote tools are wired up; otherwise unused.
+ */
 export function buildOOCToolHandler(
   provider: LLMProvider | undefined,
+  smallTier: TierProvider | undefined,
   repo?: CampaignRepo,
   campaignRoot?: string,
   fileIO?: FileIO,
@@ -336,7 +344,7 @@ export function buildOOCToolHandler(
         default:
           // DM tool dispatch
           if (OOC_DM_TOOL_SET.has(name) && gameState) {
-            return await dispatchDMTool(name, input, gameState, provider, repo, fileIO, campaignRoot, onTuiCommand);
+            return await dispatchDMTool(name, input, gameState, provider, smallTier, repo, fileIO, campaignRoot, onTuiCommand);
           }
           return { content: `Unknown tool: ${name}`, is_error: true };
       }
@@ -348,12 +356,19 @@ export function buildOOCToolHandler(
   };
 }
 
-/** Dispatch a DM tool from OOC context, post-processing based on category. */
+/**
+ * Dispatch a DM tool from OOC context, post-processing based on category.
+ *
+ * `smallTier` is needed for tools that spawn small-tier subagents
+ * (scribe, promote_character) — separate from the medium-tier `provider`
+ * because the two tiers may map to different vendors.
+ */
 async function dispatchDMTool(
   name: string,
   input: Record<string, unknown>,
   gameState: GameState,
-  provider?: LLMProvider,
+  provider: LLMProvider | undefined,
+  smallTier: TierProvider | undefined,
   repo?: CampaignRepo,
   fileIO?: FileIO,
   campaignRoot?: string,
@@ -378,25 +393,25 @@ async function dispatchDMTool(
 
   // Scribe — spawn subagent to handle entity operations
   if (name === "scribe") {
-    if (!provider || !fileIO || !campaignRoot) {
-      return { content: "Client and file I/O required for scribe", is_error: true };
+    if (!smallTier || !fileIO || !campaignRoot) {
+      return { content: "Small-tier provider and file I/O required for scribe", is_error: true };
     }
     const result = registry.dispatch(gameState, name, input);
     if (result.is_error) return result;
     const cmd = result._tui ?? JSON.parse(result.content);
-    const scribeResult = await runScribe(provider, {
+    const scribeResult = await runScribe(smallTier.provider, {
       updates: (cmd as Record<string, unknown>).updates as import("./scribe.js").ScribeUpdate[],
       campaignRoot,
       sceneNumber: 0, // OOC has no scene number
       homeDir: gameState.homeDir,
-    }, fileIO);
+    }, fileIO, smallTier.model);
     return { content: scribeResult.summary };
   }
 
   // Promote character — read sheet, spawn subagent, write back
   if (name === "promote_character") {
-    if (!provider || !fileIO || !campaignRoot) {
-      return { content: "Client and file I/O required for promote_character", is_error: true };
+    if (!smallTier || !fileIO || !campaignRoot) {
+      return { content: "Small-tier provider and file I/O required for promote_character", is_error: true };
     }
     const result = registry.dispatch(gameState, name, input);
     if (result.is_error) return result;
@@ -417,11 +432,11 @@ async function dispatchDMTool(
     }
 
     const { promoteCharacter } = await import("./character-promotion.js");
-    const promoResult = await promoteCharacter(provider, {
+    const promoResult = await promoteCharacter(smallTier.provider, {
       characterName,
       characterSheet: currentSheet,
       context,
-    });
+    }, undefined, smallTier.model);
 
     if (promoResult.updatedSheet) {
       await fileIO.writeFile(filePath, promoResult.updatedSheet);
@@ -480,6 +495,14 @@ export async function enterOOC(
     clocks?: ClocksState;
     gameState?: GameState;
     onTuiCommand?: (cmd: TuiCommand) => void;
+    model: string;
+    /**
+     * Small-tier provider+model for spawning small-tier subagents (scribe,
+     * promote_character) from inside OOC tool handlers. Heterogeneous-routing
+     * safe: under Medium=Anthropic/Small=OpenAI the scribe call still routes
+     * through the OpenAI client + small model, not the medium-tier provider.
+     */
+    smallTier?: TierProvider;
   },
   onStream?: SubagentStreamCallback,
 ): Promise<OOCResult> {
@@ -501,14 +524,14 @@ export async function enterOOC(
   const hasTools = !!options.repo || hasFileIO || hasGameState;
   const tools = hasTools ? buildOOCTools(hasFileIO, hasGameState) : undefined;
   const toolHandler = hasTools
-    ? buildOOCToolHandler(provider, options.repo, options.campaignRoot, options.fileIO, options.maps, options.clocks, options.gameState, options.onTuiCommand)
+    ? buildOOCToolHandler(provider, options.smallTier, options.repo, options.campaignRoot, options.fileIO, options.maps, options.clocks, options.gameState, options.onTuiCommand)
     : undefined;
 
   const result = await spawnSubagent(
     provider,
     {
       name: "ooc",
-      model: getModel("medium"),
+      model: options.model,
       visibility: "player_facing",
       systemPrompt,
       maxTokens: hasTools ? TOKEN_LIMITS.SUBAGENT_LARGE : TOKEN_LIMITS.SUBAGENT_MEDIUM,
@@ -616,6 +639,10 @@ export function createOOCSession(
     clocks?: ClocksState;
     gameState?: GameState;
     onTuiCommand?: (cmd: TuiCommand) => void;
+    /** Model ID for the medium tier; threaded into enterOOC's options. */
+    model: string;
+    /** Small-tier {provider, model} for OOC tools that spawn small-tier subagents. */
+    smallTier?: TierProvider;
   },
 ): ModeSession {
   return {

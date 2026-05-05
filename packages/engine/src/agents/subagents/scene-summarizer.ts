@@ -1,7 +1,6 @@
 import type { LLMProvider } from "../../providers/types.js";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
-import { getModel } from "../../config/models.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
@@ -30,11 +29,12 @@ export interface SceneSummaryResult extends SubagentResult {
 export async function summarizeScene(
   provider: LLMProvider,
   transcript: string,
-  aliasContext?: string,
+  aliasContext: string | undefined,
+  model: string,
 ): Promise<SceneSummaryResult> {
   const result = await oneShot(
     provider,
-    getModel("small"),
+    model,
     SYSTEM_PROMPT,
     `Write a campaign log entry for this scene:\n\n${transcript}${aliasContext ?? ""}`,
     TOKEN_LIMITS.DM_RESPONSE,

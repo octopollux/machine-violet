@@ -7,7 +7,6 @@ import type { LLMProvider, SystemBlock } from "../../providers/types.js";
 import type { SubagentStreamCallback } from "../subagent.js";
 import { spawnSubagent, cacheSystemPrompt } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
-import { getModel } from "../../config/models.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
@@ -38,7 +37,8 @@ const BASE_PROMPT = loadPrompt("character-promotion");
 export async function promoteCharacter(
   provider: LLMProvider,
   input: PromotionInput,
-  onStream?: SubagentStreamCallback,
+  onStream: SubagentStreamCallback | undefined,
+  model: string,
 ): Promise<PromotionResult> {
   const systemPrompt: SystemBlock[] = [
     ...cacheSystemPrompt(BASE_PROMPT),
@@ -57,7 +57,7 @@ ${input.characterSheet}`;
     provider,
     {
       name: "promote_character",
-      model: getModel("small"),
+      model,
       visibility: onStream ? "player_facing" : "silent",
       systemPrompt,
       maxTokens: TOKEN_LIMITS.SUBAGENT_LARGE,

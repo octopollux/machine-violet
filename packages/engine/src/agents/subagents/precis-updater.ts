@@ -1,7 +1,6 @@
 import type { LLMProvider } from "../../providers/types.js";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
-import { getModel } from "../../config/models.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
 /** Lightweight player sentiment/engagement signals extracted per exchange. */
@@ -40,10 +39,11 @@ export async function updatePrecis(
   provider: LLMProvider,
   currentPrecis: string,
   droppedExchange: string,
-  currentOpenThreads?: string,
-  pcIdentification?: string,
-  aliasContext?: string,
-  currentNpcIntents?: string,
+  currentOpenThreads: string | undefined,
+  pcIdentification: string | undefined,
+  aliasContext: string | undefined,
+  currentNpcIntents: string | undefined,
+  model: string,
 ): Promise<PrecisUpdateResult> {
   const openThreadsLine = currentOpenThreads
     ? `Current open threads: ${currentOpenThreads}`
@@ -61,7 +61,7 @@ export async function updatePrecis(
 
   const result = await oneShot(
     provider,
-    getModel("small"),
+    model,
     SYSTEM_PROMPT,
     prompt,
     256,

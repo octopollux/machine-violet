@@ -1,4 +1,5 @@
-import type { LLMProvider } from "../providers/types.js";
+import type { LLMProvider, TierProvider } from "../providers/types.js";
+import { getModel, type ModelTier } from "../config/models.js";
 import type { GameState } from "./game-state.js";
 import type { ConversationManager, DroppedExchange } from "../context/index.js";
 import { renderCampaignLog, parseLegacyLog } from "../context/index.js";
@@ -111,6 +112,15 @@ export class SceneManager {
   private entityTreeSnapshot: string | undefined;
   /** Content boundaries snapshot — refreshed at scene transitions only. */
   private contentBoundariesSnapshot: string | undefined;
+  /**
+   * Per-tier {provider, model} resolution for subagent dispatch. When supplied,
+   * methods route subagent calls through `this.tierProviders[tier]` so a
+   * heterogeneous setup (Large=OpenAI, Medium/Small=Anthropic) sends each call
+   * to the matching vendor. When omitted (legacy test paths), the `provider`
+   * argument passed into each method is reused for the tier and `getModel(tier)`
+   * provides the default model — preserving pre-PR-440 behavior.
+   */
+  private tierProviders: Record<ModelTier, TierProvider> | undefined;
 
   /** Optional dev mode log callback. */
   devLog?: (msg: string) => void;
@@ -123,6 +133,7 @@ export class SceneManager {
     fileIO: FileIO,
     repo?: CampaignRepo,
     entityTree?: EntityTree,
+    tierProviders?: Record<ModelTier, TierProvider>,
   ) {
     this.state = state;
     this.scene = scene;
@@ -134,6 +145,16 @@ export class SceneManager {
     this.entityTreeSnapshot = renderEntityTree(this.entityTree);
     this.contentBoundariesSnapshot = sessionState.contentBoundaries;
     this.pcSummaries = state.config.players.map((p) => p.character);
+    this.tierProviders = tierProviders;
+  }
+
+  /**
+   * Resolve a tier's `{provider, model}` for a subagent call. When a
+   * per-tier map exists, return that tier's pair; otherwise pair the
+   * caller's `provider` arg with the tier's default model.
+   */
+  private routeFor(tier: ModelTier, fallbackProvider: LLMProvider): TierProvider {
+    return this.tierProviders?.[tier] ?? { provider: fallbackProvider, model: getModel(tier) };
   }
 
   /** Get the current system prompt (cached prefix) and volatile context. */
@@ -194,12 +215,14 @@ export class SceneManager {
       .join(", ");
 
     this.devLog?.("[dev] subagent:precis-updater starting");
+    const r = this.routeFor("small", provider);
     const result = await updatePrecis(
-      provider, this.scene.precis, exchangeText,
+      r.provider, this.scene.precis, exchangeText,
       this.scene.openThreads || undefined,
       pcIdent,
       this.aliasContext || undefined,
       this.scene.npcIntents || undefined,
+      r.model,
     );
     this.devLog?.("[dev] subagent:precis-updater done");
     this.scene.precis += "\n" + result.text;
@@ -223,11 +246,13 @@ export class SceneManager {
     }
 
     this.devLog?.("[dev] subagent:scene-tracker starting");
+    const r = this.routeFor("small", provider);
     const result = await trackScene(
-      provider,
+      r.provider,
       tail,
       this.scene.openThreads || undefined,
       this.scene.npcIntents || undefined,
+      r.model,
     );
     this.devLog?.("[dev] subagent:scene-tracker done");
 
@@ -335,10 +360,12 @@ export class SceneManager {
 
     // Generate narrative recap for the "Previously on..." modal
     try {
+      const r = this.routeFor("small", provider);
       const narrativeResult = await generateNarrativeRecap(
-        provider,
+        r.provider,
         result.campaignLogEntry,
         this.state.config.name,
+        r.model,
       );
       await this.fileIO.writeFile(
         paths.sessionRecapNarrative(this.scene.sessionNumber),
@@ -654,8 +681,9 @@ export class SceneManager {
     // changelog uses the full transcript (DM-facing), while the
     // summarizer uses the filtered player transcript.
     this.devLog?.("[dev] subagent:summarizer starting");
+    const summaryRoute = this.routeFor("small", provider);
     const summaryPromise = summarizeScene(
-      provider, playerTranscript, this.aliasContext || undefined,
+      summaryRoute.provider, playerTranscript, this.aliasContext || undefined, summaryRoute.model,
     );
     const changelogPromise = this.stepChangelogUpdates(provider, result);
 
@@ -722,12 +750,14 @@ export class SceneManager {
 
     const transcript = this.scene.transcript.join("\n");
     this.devLog?.(`[dev] subagent:changelog starting (${entityFiles.length} entities)`);
+    const r = this.routeFor("small", provider);
     const changelogResult = await updateChangelogs(
-      provider,
+      r.provider,
       transcript,
       this.scene.sceneNumber,
       entityFiles,
       this.aliasContext || undefined,
+      r.model,
     );
     accUsage(result.usage, changelogResult.usage);
     this.devLog?.("[dev] subagent:changelog done");
@@ -764,12 +794,14 @@ export class SceneManager {
     }
 
     this.devLog?.("[dev] subagent:compendium starting");
+    const r = this.routeFor("small", provider);
     const { compendium, usage } = await updateCompendium(
-      provider,
+      r.provider,
       current,
       sceneSummary,
       this.scene.sceneNumber,
       this.aliasContext || undefined,
+      r.model,
     );
     accUsage(result.usage, usage);
     this.devLog?.("[dev] subagent:compendium done");
