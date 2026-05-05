@@ -38,7 +38,7 @@ export function PlayingPhase() {
     narrativeLines, setNarrativeLines,
     theme,
     campaignName, activePlayerIndex,
-    engineState, toolGlyphs, resources, modelines,
+    engineState, engineStateSince, toolGlyphs, resources, modelines,
     currentTurn,
     activeChoices, setActiveChoices,
     activeModal, setActiveModal,
@@ -374,6 +374,7 @@ export function PlayingPhase() {
         resources={resources}
         turnHolder={engineState === "waiting_input" ? activeChar : "DM"}
         engineState={engineState}
+        engineStateSince={engineStateSince}
         toolGlyphs={toolGlyphs}
         quoteColor="#ffffff"
         playerColor={stateSnapshot?.players?.[activePlayerIndex]?.color}
