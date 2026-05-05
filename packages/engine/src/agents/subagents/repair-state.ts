@@ -3,7 +3,6 @@ import type { GameState } from "../game-state.js";
 import type { FileIO } from "../scene-manager.js";
 import type { UsageStats } from "../agent-loop.js";
 import { oneShot } from "../subagent.js";
-import { getModel } from "../../config/models.js";
 import { extractWikilinks, uniqueTargets } from "../../tools/filesystem/index.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import { accUsage } from "../../context/usage-helpers.js";
@@ -163,7 +162,7 @@ export async function repairState(
   gameState: GameState,
   fileIO: FileIO,
   dryRun: boolean,
-  model?: string,
+  model: string,
 ): Promise<RepairResult> {
   const root = gameState.campaignRoot;
   const totalUsage: UsageStats = {
@@ -232,7 +231,7 @@ export async function repairState(
     try {
       const genResult = await oneShot(
         provider,
-        model ?? getModel("small"),
+        model,
         systemPrompt,
         lines.join("\n"),
         1024,

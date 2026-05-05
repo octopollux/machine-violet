@@ -144,10 +144,13 @@ function handleModeToggle(
   // Capture current variant before entering mode
   const previousVariant = engine.getPreviousVariant() ?? "exploration";
 
-  // OOC and dev mode are medium-tier — route them through the medium tier's
-  // {provider, model} so a heterogeneous setup (e.g. Large=OpenAI, Medium=
-  // Anthropic) sends mode commands to the connection assigned to medium.
+  // OOC and dev mode run on the medium tier — but their tool handlers can
+  // spawn small-tier subagents (scribe, promote_character, repair_state).
+  // Pass both tiers so a heterogeneous setup (e.g. Medium=Anthropic, Small=
+  // OpenAI) routes each subagent through its own connection rather than
+  // sending an OpenAI model ID through the Anthropic client.
   const medium = engine.getTier("medium");
+  const small = engine.getTier("small");
   if (target === "ooc") {
     const sm = engine.getSceneManager();
     const session = createOOCSession(medium.provider, {
@@ -159,6 +162,7 @@ function handleModeToggle(
       fileIO: sm.getFileIO(),
       campaignRoot: gameState.campaignRoot,
       model: medium.model,
+      smallTier: small,
     });
     engine.setModeSession(session);
   } else {
@@ -170,6 +174,7 @@ function handleModeToggle(
       sceneManager: engine.getSceneManager(),
       repo: engine.getRepo() ?? undefined,
       model: medium.model,
+      smallTier: small,
     });
     engine.setModeSession(session);
   }

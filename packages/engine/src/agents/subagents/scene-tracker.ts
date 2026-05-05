@@ -1,6 +1,5 @@
 import type { LLMProvider } from "../../providers/types.js";
 import { oneShot, type SubagentResult } from "../subagent.js";
-import { getModel } from "../../config/models.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
 const SYSTEM_PROMPT = loadPrompt("scene-tracker");
@@ -25,9 +24,9 @@ export interface SceneTrackerResult extends SubagentResult {
 export async function trackScene(
   provider: LLMProvider,
   recentTranscript: string[],
-  currentOpenThreads?: string,
-  currentNpcIntents?: string,
-  model?: string,
+  currentOpenThreads: string | undefined,
+  currentNpcIntents: string | undefined,
+  model: string,
 ): Promise<SceneTrackerResult> {
   const tail = recentTranscript.slice(-TRANSCRIPT_TAIL);
   const parts: string[] = [];
@@ -38,7 +37,7 @@ export async function trackScene(
   try {
     const result = await oneShot(
       provider,
-      model ?? getModel("small"),
+      model,
       SYSTEM_PROMPT,
       parts.join("\n"),
       128,

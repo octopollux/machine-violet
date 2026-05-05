@@ -20,7 +20,6 @@ import type { ChoiceFrequency } from "@machine-violet/shared/types/config.js";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import type { UsageStats, ModelId } from "../agent-loop.js";
-import { getModel } from "../../config/models.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
 import { extractStatus, retryDelay, RETRYABLE_STATUS, sleep } from "../../utils/retry.js";
@@ -86,15 +85,15 @@ export async function generateChoices(
   provider: LLMProvider,
   recentNarration: string,
   characterName: string,
-  playerAction?: string,
-  model?: string,
+  playerAction: string | undefined,
+  model: string,
 ): Promise<GeneratedChoices> {
   const actionContext = playerAction ? `\n\nPlayer's last action:\n${playerAction}` : "";
   const userMessage = `Character: ${characterName}${actionContext}\n\nDM narration:\n${recentNarration}`;
 
   const result = await oneShot(
     provider,
-    model ?? getModel("small"),
+    model,
     SYSTEM_PROMPT,
     userMessage,
     250,
@@ -136,7 +135,7 @@ export interface ChoiceGeneratorSession {
 export interface ChoiceGeneratorSessionOptions {
   provider: LLMProvider;
   /** Haiku (or equivalent small-tier) model id. */
-  model?: ModelId;
+  model: ModelId;
   /** Character sheets (one or more, concatenated markdown). Goes in the cached Tier-2 prefix. */
   characterSheets: string;
   /** Bubbled up from the session manager for transient-retry notifications. */
@@ -177,7 +176,7 @@ export function createChoiceGeneratorSession(
   opts: ChoiceGeneratorSessionOptions,
 ): ChoiceGeneratorSession {
   const provider = opts.provider;
-  const model = opts.model ?? getModel("small");
+  const model = opts.model;
   const systemBlocks = buildSystemBlocks(opts.characterSheets);
 
   // Stored conversation — plain user/assistant pairs with NO volatile context.

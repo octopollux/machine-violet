@@ -32,7 +32,6 @@ export function setLineCounter(fn: LineCounter): void {
   processNarrativeLines = fn;
 }
 import type { DMSessionState } from "./dm-prompt.js";
-import { getModel } from "../config/models.js";
 import type { ModelTier } from "../config/models.js";
 import { accUsage } from "../context/usage-helpers.js";
 import { logEvent } from "../context/engine-log.js";
@@ -71,9 +70,8 @@ export class GameEngine {
   /**
    * Per-tier resolved {provider, model} pairs. The DM uses `large`; subagents
    * pick `medium` or `small` per task. session-manager builds this from the
-   * connections store at session start. When omitted (older test paths), all
-   * three tiers default to {`provider`, `getModel(tier)`} — the legacy
-   * single-provider fallback that pre-dates per-tier routing.
+   * connections store at session start; tests construct a homogeneous map
+   * via the `tierProvidersForTest` helper.
    */
   private tierProviders: Record<ModelTier, TierProvider>;
   private registry: ToolRegistry;
@@ -116,22 +114,21 @@ export class GameEngine {
     sessionState: DMSessionState;
     fileIO: FileIO;
     callbacks: EngineCallbacks;
-    model?: AgentLoopConfig["model"];
     /**
-     * Per-tier {provider, model} map. When omitted, all three tiers default
-     * to `{ provider: params.provider, model: getModel(tier) }` — the legacy
-     * pre-PR-440 behavior, used by tests that mock a single provider.
+     * Per-tier {provider, model} map — the routing table for every model call
+     * the engine makes. The DM uses `large`; subagents pick `medium` or `small`
+     * per task. Required because under heterogeneous routing (different vendors
+     * per tier) any silent fallback to `params.provider` would send the wrong
+     * model ID through the wrong client. The DM's model ID is read from
+     * `tierProviders.large.model`; there is no separate `model` param. Tests
+     * synthesize a homogeneous map via `tierProvidersForTest`.
      */
-    tierProviders?: Record<ModelTier, TierProvider>;
+    tierProviders: Record<ModelTier, TierProvider>;
     gitIO?: GitIO;
     entityTree?: EntityTree;
   }) {
     this.provider = params.provider;
-    this.tierProviders = params.tierProviders ?? {
-      large: { provider: params.provider, model: params.model ?? getModel("large") },
-      medium: { provider: params.provider, model: getModel("medium") },
-      small: { provider: params.provider, model: getModel("small") },
-    };
+    this.tierProviders = params.tierProviders;
     this.registry = singletonRegistry;
     this.gameState = params.gameState;
     this.fileIO = params.fileIO;
@@ -178,7 +175,7 @@ export class GameEngine {
       this.tierProviders,
     );
     this.callbacks = params.callbacks;
-    this.model = params.model ?? getModel("large");
+    this.model = params.tierProviders.large.model;
 
     // Set up injection registry
     this.injectionRegistry = new InjectionRegistry();
@@ -1503,7 +1500,7 @@ export class GameEngine {
       const mapSnapshot = this.buildMapSnapshot();
 
       const medium = this.tierProviders.medium;
-      this.resolveSession = new ResolveSession(medium.provider, this.fileIO, this.gameState, medium.model);
+      this.resolveSession = new ResolveSession(medium.provider, this.fileIO, this.gameState, medium.model, this.tierProviders.small);
       await this.resolveSession.initCombat(sheets, ruleCard, mapSnapshot || undefined);
       this.callbacks.onDevLog?.(`[dev] resolve_session: initialized for ${state.combat.order.length} combatants`);
     } catch (e) {

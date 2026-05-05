@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type Anthropic from "@anthropic-ai/sdk";
+import type { LLMProvider } from "../../providers/types.js";
 import { generateDiscordStatus } from "./discord-status.js";
 import { resetPromptCache } from "../../prompts/load-prompt.js";
 
@@ -22,7 +22,9 @@ beforeEach(() => {
 });
 
 describe("generateDiscordStatus", () => {
-  const mockClient = {} as Anthropic;
+  // Provider is unused — `oneShot` is mocked at the module boundary, so the
+  // tests never actually call into it. Cast satisfies the type signature.
+  const mockClient = {} as unknown as LLMProvider;
 
   it("returns the subagent response trimmed to 40 chars", async () => {
     vi.mocked(oneShot).mockResolvedValue({
@@ -30,7 +32,7 @@ describe("generateDiscordStatus", () => {
       usage: { inputTokens: 100, outputTokens: 10, cacheReadTokens: 0, cacheCreationTokens: 0 },
     });
 
-    const result = await generateDiscordStatus(mockClient, "The party approached the enchanted door.");
+    const result = await generateDiscordStatus(mockClient, "The party approached the enchanted door.", "claude-haiku-4-5-20251001");
     expect(result.status).toBe("negotiating with a door");
     expect(result.usage?.inputTokens).toBe(100);
   });
@@ -41,7 +43,7 @@ describe("generateDiscordStatus", () => {
       usage: { inputTokens: 100, outputTokens: 10, cacheReadTokens: 0, cacheCreationTokens: 0 },
     });
 
-    const result = await generateDiscordStatus(mockClient, "context");
+    const result = await generateDiscordStatus(mockClient, "context", "claude-haiku-4-5-20251001");
     expect(result.status.length).toBeLessThanOrEqual(40);
   });
 
@@ -51,14 +53,14 @@ describe("generateDiscordStatus", () => {
       usage: { inputTokens: 100, outputTokens: 10, cacheReadTokens: 0, cacheCreationTokens: 0 },
     });
 
-    const result = await generateDiscordStatus(mockClient, "context");
+    const result = await generateDiscordStatus(mockClient, "context", "claude-haiku-4-5-20251001");
     expect(result.status).toBe("technically alive");
   });
 
   it("returns fallback on API failure", async () => {
     vi.mocked(oneShot).mockRejectedValue(new Error("API error"));
 
-    const result = await generateDiscordStatus(mockClient, "context");
+    const result = await generateDiscordStatus(mockClient, "context", "claude-haiku-4-5-20251001");
     expect(result.status).toBe("Adventuring...");
     expect(result.usage).toBeNull();
   });
@@ -69,7 +71,7 @@ describe("generateDiscordStatus", () => {
       usage: { inputTokens: 100, outputTokens: 10, cacheReadTokens: 0, cacheCreationTokens: 0 },
     });
 
-    const result = await generateDiscordStatus(mockClient, "context");
+    const result = await generateDiscordStatus(mockClient, "context", "claude-haiku-4-5-20251001");
     expect(result.status).toBe("Adventuring...");
   });
 });

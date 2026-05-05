@@ -64,7 +64,7 @@ describe("generateChoices", () => {
       textResponse("Search the room for hidden passages\nSpeak to the old merchant\nLeave through the back door\nExamine the strange symbol on the wall"),
     ]);
 
-    const result = await generateChoices(provider, "You enter a dusty shop. An old merchant eyes you warily.", "Aldric");
+    const result = await generateChoices(provider, "You enter a dusty shop. An old merchant eyes you warily.", "Aldric", undefined, "claude-haiku-4-5-20251001");
 
     expect(result.choices).toHaveLength(4);
     expect(result.choices[0]).toContain("Search");
@@ -76,7 +76,7 @@ describe("generateChoices", () => {
       textResponse("- Draw your sword\n• Cast a defensive spell\n1. Try to negotiate"),
     ]);
 
-    const result = await generateChoices(provider, "Goblins block the path.", "Aldric");
+    const result = await generateChoices(provider, "Goblins block the path.", "Aldric", undefined, "claude-haiku-4-5-20251001");
 
     expect(result.choices[0]).toBe("Draw your sword");
     expect(result.choices[1]).toBe("Cast a defensive spell");
@@ -88,7 +88,7 @@ describe("generateChoices", () => {
       textResponse("One\nTwo\nThree\nFour\nFive\nSix\nSeven\nEight"),
     ]);
 
-    const result = await generateChoices(provider, "...", "Aldric");
+    const result = await generateChoices(provider, "...", "Aldric", undefined, "claude-haiku-4-5-20251001");
     expect(result.choices).toHaveLength(6);
   });
 });
@@ -114,7 +114,7 @@ Level 5: +1 STR (16), Extra Attack, +5 HP (max 42)`),
       characterSheet: "# Aldric\n\n**Type:** PC\n**Level:** 4\n**HP:** 37/37",
       context: "Reached level 5 after defeating the dragon",
       characterName: "Aldric",
-    });
+    }, undefined, "claude-haiku-4-5-20251001");
 
     expect(result.updatedSheet).toContain("Level:** 5");
     expect(result.updatedSheet).toContain("HP:** 42");
@@ -130,7 +130,7 @@ Level 5: +1 STR (16), Extra Attack, +5 HP (max 42)`),
       characterSheet: "# Aldric\n\n**Type:** PC\n**Level:** 4",
       context: "Level up",
       characterName: "Aldric",
-    });
+    }, undefined, "claude-haiku-4-5-20251001");
 
     expect(result.updatedSheet).toContain("Level:** 5");
     expect(result.changelogEntry).toBe("Character promoted.");
@@ -150,6 +150,7 @@ Level 5: +1 STR (16), Extra Attack, +5 HP (max 42)`),
         characterName: "Rook",
       },
       onStream,
+      "claude-haiku-4-5-20251001",
     );
 
     expect(provider.stream).toHaveBeenCalled();

@@ -401,7 +401,7 @@ describe("buildDevToolHandler", () => {
 
   it("get_scene_state returns scene data", async () => {
     const sm = mockSceneManager();
-    const handler = buildDevToolHandler(makeGameState(), mockFileIO(), undefined, sm);
+    const handler = buildDevToolHandler(makeGameState(), mockFileIO(), undefined, undefined, sm);
 
     const result = await handler("get_scene_state", {});
     const parsed = JSON.parse(result.content);
@@ -498,11 +498,11 @@ describe("buildDevToolHandler", () => {
     expect(result.content).toContain("Delete not supported");
   });
 
-  it("repair_state errors without client", async () => {
+  it("repair_state errors without small-tier provider", async () => {
     const handler = buildDevToolHandler(makeGameState(), mockFileIO());
     const result = await handler("repair_state", { dry_run: true });
     expect(result.is_error).toBe(true);
-    expect(result.content).toContain("No API client");
+    expect(result.content).toContain("Small-tier provider");
   });
 
   it("resolve_dead_links errors without client", async () => {
@@ -592,7 +592,7 @@ describe("buildDevToolHandler — resource tools mutate state and forward TUI co
     const gs = makeGameState();
     const fio = mockFileIO();
     const onTuiCommand = vi.fn();
-    const handler = buildDevToolHandler(gs, fio, undefined, undefined, undefined, onTuiCommand);
+    const handler = buildDevToolHandler(gs, fio, undefined, undefined, undefined, undefined, onTuiCommand);
     const result = await handler("set_display_resources", { character: "Kael", resources: ["HP"] });
     expect(result.is_error).toBeUndefined();
     expect(gs.displayResources["Kael"]).toEqual(["HP"]);
@@ -604,7 +604,7 @@ describe("buildDevToolHandler — resource tools mutate state and forward TUI co
     const gs = makeGameState();
     const fio = mockFileIO();
     const onTuiCommand = vi.fn();
-    const handler = buildDevToolHandler(gs, fio, undefined, undefined, undefined, onTuiCommand);
+    const handler = buildDevToolHandler(gs, fio, undefined, undefined, undefined, undefined, onTuiCommand);
     const result = await handler("set_resource_values", { character: "Kael", values: { HP: "24/30" } });
     expect(result.is_error).toBeUndefined();
     expect(gs.resourceValues["Kael"]).toEqual({ HP: "24/30" });
@@ -663,7 +663,7 @@ describe("buildDevToolHandler — get_commit_log", () => {
     const gs = makeGameState();
     const fio = mockFileIO();
     const repo = await repoWithHistory();
-    const handler = buildDevToolHandler(gs, fio, undefined, undefined, repo);
+    const handler = buildDevToolHandler(gs, fio, undefined, undefined, undefined, repo);
 
     const result = await handler("get_commit_log", {});
     expect(result.is_error).toBeUndefined();
@@ -679,7 +679,7 @@ describe("buildDevToolHandler — get_commit_log", () => {
   it("filters by type", async () => {
     const gs = makeGameState();
     const repo = await repoWithHistory();
-    const handler = buildDevToolHandler(gs, mockFileIO(), undefined, undefined, repo);
+    const handler = buildDevToolHandler(gs, mockFileIO(), undefined, undefined, undefined, repo);
 
     const result = await handler("get_commit_log", { type: "scene" });
     expect(result.content).toContain("[scene]");
@@ -701,6 +701,7 @@ describe("enterDevMode", () => {
     const provider = mockProvider([textResponse("Combat state has 2 active entities. Both are alive.")]);
     const result = await enterDevMode(provider, "show combat state", {
       campaignName: "Test",
+      model: "claude-sonnet-4-6",
     });
     expect(result.summary).toBe("Combat state has 2 active entities.");
   });
@@ -710,6 +711,7 @@ describe("enterDevMode", () => {
     const provider = mockProvider([textResponse(longText)]);
     const result = await enterDevMode(provider, "dump everything", {
       campaignName: "Test",
+      model: "claude-sonnet-4-6",
     });
     expect(result.summary).toHaveLength(100);
     expect(result.summary).toMatch(/\.\.\.$/);
@@ -719,6 +721,7 @@ describe("enterDevMode", () => {
     const provider = mockProvider([textResponse("")]);
     const result = await enterDevMode(provider, "test", {
       campaignName: "Test",
+      model: "claude-sonnet-4-6",
     });
     expect(result.summary).toBe("Dev mode discussion.");
   });
@@ -728,6 +731,7 @@ describe("enterDevMode", () => {
     const onStream = vi.fn();
     await enterDevMode(provider, "question", {
       campaignName: "Test",
+      model: "claude-sonnet-4-6",
     }, onStream);
     expect(provider.stream).toHaveBeenCalled();
   });
@@ -736,6 +740,7 @@ describe("enterDevMode", () => {
     const provider = mockProvider([textResponse("Done.")]);
     const result = await enterDevMode(provider, "test", {
       campaignName: "Test",
+      model: "claude-sonnet-4-6",
     });
     expect(result.usage.inputTokens).toBe(50);
     expect(result.usage.outputTokens).toBe(20);
@@ -750,6 +755,7 @@ describe("enterDevMode", () => {
       campaignName: "Test",
       gameState: gs,
       fileIO: fio,
+      model: "claude-sonnet-4-6",
     });
 
     // When tools are provided, the chat call should include tools
@@ -764,6 +770,7 @@ describe("enterDevMode", () => {
     const provider = mockProvider([textResponse("Done.")]);
     await enterDevMode(provider, "test", {
       campaignName: "Test",
+      model: "claude-sonnet-4-6",
     });
 
     const chatCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];

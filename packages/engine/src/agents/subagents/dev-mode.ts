@@ -1,10 +1,9 @@
-import type { LLMProvider, NormalizedTool, SystemBlock } from "../../providers/types.js";
+import type { LLMProvider, NormalizedTool, SystemBlock, TierProvider } from "../../providers/types.js";
 import type { SubagentStreamCallback } from "../subagent.js";
 import { spawnSubagent, cacheSystemPrompt } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import type { GameState } from "../game-state.js";
 import type { FileIO, SceneManager } from "../scene-manager.js";
-import { getModel } from "../../config/models.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import { validateCampaign } from "../../tools/validation/index.js";
@@ -260,10 +259,20 @@ export function resolveDevPath(campaignRoot: string, relative: string): string {
 }
 
 /** Build an async tool handler for dev mode tools. */
+/**
+ * Build the Dev tool handler.
+ *
+ * `smallTier` is the provider+model for spawning the repair-state subagent
+ * (small tier). Distinct from `provider` — the medium-tier dev session
+ * itself — because under heterogeneous routing the two tiers may live on
+ * different vendors, and sending the medium provider a small-tier model ID
+ * would crash.
+ */
 export function buildDevToolHandler(
   gameState: GameState,
   fileIO: FileIO,
   provider?: LLMProvider,
+  smallTier?: TierProvider,
   sceneManager?: SceneManager,
   repo?: CampaignRepo,
   onTuiCommand?: (cmd: TuiCommand) => void,
@@ -322,11 +331,11 @@ export function buildDevToolHandler(
         }
 
         case "repair_state": {
-          if (!provider) {
-            return { content: "No API client available for repair", is_error: true };
+          if (!smallTier) {
+            return { content: "Small-tier provider not available for repair", is_error: true };
           }
           const dryRun = input.dry_run !== false; // default true
-          const repairResult = await repairState(provider, gameState, fileIO, dryRun);
+          const repairResult = await repairState(smallTier.provider, gameState, fileIO, dryRun, smallTier.model);
           return { content: JSON.stringify(repairResult, null, 2) };
         }
 
@@ -410,10 +419,11 @@ export function buildDevToolHandler(
         }
 
         case "style_scene": {
-          // Handle style_scene with subagent support
+          // Handle style_scene with subagent support — small tier, distinct
+          // vendor from the medium-tier dev session under heterogeneous routing.
           const description = input.description as string | undefined;
-          if (description && provider) {
-            const stylerResult = await styleTheme(provider, description);
+          if (description && smallTier) {
+            const stylerResult = await styleTheme(smallTier.provider, description, undefined, undefined, smallTier.model);
             if (stylerResult.command && onTuiCommand) {
               onTuiCommand(stylerResult.command);
               return { content: `Styled: theme=${stylerResult.command.theme ?? "(unchanged)"} key_color=${stylerResult.command.key_color ?? "(unchanged)"}` };
@@ -537,7 +547,13 @@ export async function enterDevMode(
     sceneManager?: SceneManager;
     repo?: CampaignRepo;
     onTuiCommand?: (cmd: TuiCommand) => void;
-    model?: string;
+    model: string;
+    /**
+     * Small-tier provider+model for the repair-state subagent. Heterogeneous
+     * -routing safe: under Medium=Anthropic/Small=OpenAI, repair routes
+     * through OpenAI rather than the medium-tier provider.
+     */
+    smallTier?: TierProvider;
   },
   onStream?: SubagentStreamCallback,
 ): Promise<DevModeResult> {
@@ -549,14 +565,14 @@ export async function enterDevMode(
   const hasTools = !!(options.gameState && options.fileIO);
   const tools = hasTools ? buildDevTools() : undefined;
   const toolHandler = hasTools
-    ? buildDevToolHandler(options.gameState as NonNullable<typeof options.gameState>, options.fileIO as NonNullable<typeof options.fileIO>, provider, options.sceneManager, options.repo, options.onTuiCommand)
+    ? buildDevToolHandler(options.gameState as NonNullable<typeof options.gameState>, options.fileIO as NonNullable<typeof options.fileIO>, provider, options.smallTier, options.sceneManager, options.repo, options.onTuiCommand)
     : undefined;
 
   const result = await spawnSubagent(
     provider,
     {
       name: "dev-mode",
-      model: options.model ?? getModel("medium"),
+      model: options.model,
       visibility: "player_facing",
       systemPrompt,
       maxTokens: TOKEN_LIMITS.DEV_MODE,
@@ -662,7 +678,9 @@ export function createDevSession(
     repo?: CampaignRepo;
     onTuiCommand?: (cmd: TuiCommand) => void;
     /** Model ID for the medium tier; threaded into enterDevMode's options. */
-    model?: string;
+    model: string;
+    /** Small-tier {provider, model} for repair-state subagent dispatch. */
+    smallTier?: TierProvider;
   },
 ): ModeSession {
   return {

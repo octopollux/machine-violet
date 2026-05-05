@@ -23,11 +23,11 @@ import { parseFrontMatter, serializeEntity } from "../tools/filesystem/frontmatt
 import { promoteCharacter } from "../agents/subagents/character-promotion.js";
 import { processingPaths } from "../config/processing-paths.js";
 import { readBundledRuleCard } from "../config/systems.js";
-import { loadConnectionStore, buildEffectiveConnections, getTierProvider } from "../config/connections.js";
-import { createProviderFromConnection, createAnthropicProvider } from "../providers/index.js";
+import { loadConnectionStore, buildEffectiveConnections } from "../config/connections.js";
+import { buildTierProviders } from "../config/tier-resolver.js";
+import { createAnthropicProvider } from "../providers/index.js";
 import type { LLMProvider, TierProvider } from "../providers/types.js";
 import type { ModelTier } from "../config/models.js";
-import { getModel } from "../config/models.js";
 import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -69,36 +69,7 @@ export class SetupSession {
     // note + world framing benefits meaningfully.
     const appConfigDir = configDir();
     const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
-
-    const providerCache = new Map<string, LLMProvider>();
-    const getProviderForConnId = (connId: string): LLMProvider => {
-      let p = providerCache.get(connId);
-      if (!p) {
-        const conn = connStore.connections.find((c) => c.id === connId);
-        if (!conn) throw new Error(`Connection not found: ${connId}`);
-        p = createProviderFromConnection(conn);
-        providerCache.set(connId, p);
-      }
-      return p;
-    };
-    let fallbackProvider: LLMProvider | undefined;
-    const getFallbackProvider = (): LLMProvider => {
-      if (!fallbackProvider) fallbackProvider = createAnthropicProvider();
-      return fallbackProvider;
-    };
-    const resolveTier = (tier: ModelTier): TierProvider => {
-      const assignment = getTierProvider(connStore, tier);
-      if (assignment) {
-        return { provider: getProviderForConnId(assignment.connection.id), model: assignment.modelId };
-      }
-      return { provider: getFallbackProvider(), model: getModel(tier) };
-    };
-
-    this.tierProviders = {
-      large: resolveTier("large"),
-      medium: resolveTier("medium"),
-      small: resolveTier("small"),
-    };
+    this.tierProviders = buildTierProviders(connStore, () => createAnthropicProvider());
     this.provider = this.tierProviders.large.provider;
     this.model = this.tierProviders.large.model;
   }

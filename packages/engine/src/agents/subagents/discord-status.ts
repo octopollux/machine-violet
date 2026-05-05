@@ -1,7 +1,6 @@
 import type { LLMProvider } from "../../providers/types.js";
 import type { UsageStats } from "@machine-violet/shared/types/engine.js";
 import { oneShot } from "../subagent.js";
-import { getModel } from "../../config/models.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
 const SYSTEM_PROMPT = loadPrompt("discord-status");
@@ -22,12 +21,12 @@ export interface DiscordStatusResult {
 export async function generateDiscordStatus(
   provider: LLMProvider,
   recentContext: string,
-  model?: string,
+  model: string,
 ): Promise<DiscordStatusResult> {
   try {
     const result = await oneShot(
       provider,
-      model ?? getModel("small"),
+      model,
       SYSTEM_PROMPT,
       recentContext,
       60,

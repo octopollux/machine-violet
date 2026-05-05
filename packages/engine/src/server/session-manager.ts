@@ -23,11 +23,8 @@ import { buildUIState, type DMSessionState } from "../agents/dm-prompt.js";
 import { buildNameInspiration } from "../agents/name-inspiration.js";
 import { getActivePlayer } from "../agents/player-manager.js";
 import { loadEnv } from "../config/first-launch.js";
-import { loadConnectionStore, buildEffectiveConnections, getTierProvider } from "../config/connections.js";
-import { getModel } from "../config/models.js";
-import type { ModelTier } from "@machine-violet/shared/types/engine.js";
-import type { LLMProvider, TierProvider } from "../providers/types.js";
-import { createProviderFromConnection } from "../providers/index.js";
+import { loadConnectionStore, buildEffectiveConnections } from "../config/connections.js";
+import { buildTierProviders } from "../config/tier-resolver.js";
 import { configDir } from "../utils/paths.js";
 import { sandboxFileIO } from "../tools/filesystem/sandbox.js";
 import { campaignPaths } from "../tools/filesystem/scaffold.js";
@@ -407,38 +404,7 @@ export class SessionManager {
     const appConfigDir = configDir();
     const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
     const { createAnthropicProvider } = await import("../providers/anthropic.js");
-
-    const providerCache = new Map<string, LLMProvider>();
-    const getProviderForConnId = (connId: string): LLMProvider => {
-      let p = providerCache.get(connId);
-      if (!p) {
-        const conn = connStore.connections.find((c) => c.id === connId);
-        if (!conn) throw new Error(`Connection not found: ${connId}`);
-        p = createProviderFromConnection(conn);
-        providerCache.set(connId, p);
-      }
-      return p;
-    };
-
-    let fallbackProvider: LLMProvider | undefined;
-    const getFallbackProvider = (): LLMProvider => {
-      if (!fallbackProvider) fallbackProvider = createAnthropicProvider();
-      return fallbackProvider;
-    };
-
-    const resolveTier = (tier: ModelTier): TierProvider => {
-      const assignment = getTierProvider(connStore, tier);
-      if (assignment) {
-        return { provider: getProviderForConnId(assignment.connection.id), model: assignment.modelId };
-      }
-      return { provider: getFallbackProvider(), model: getModel(tier) };
-    };
-
-    const tierProviders: Record<ModelTier, TierProvider> = {
-      large: resolveTier("large"),
-      medium: resolveTier("medium"),
-      small: resolveTier("small"),
-    };
+    const tierProviders = buildTierProviders(connStore, () => createAnthropicProvider());
 
     // The DM uses the large tier; keep `provider` as a local alias for the
     // many downstream sites in this method that still reference it directly.
@@ -545,7 +511,10 @@ export class SessionManager {
       if (dmNarrativeCount % DISCORD_STATUS_INTERVAL !== 0) return;
       void (async () => {
         try {
-          const { status, usage } = await generateDiscordStatus(provider, text);
+          // Discord status is a small-tier subagent — route through the small
+          // tier's connection so heterogeneous setups send the right model ID.
+          const small = tierProviders.small;
+          const { status, usage } = await generateDiscordStatus(small.provider, text, small.model);
           if (this.sessionGeneration !== gen) return;
           if (usage) this.costTracker?.record(usage, "small");
           scopedBroadcast({
@@ -582,7 +551,6 @@ export class SessionManager {
     // (medium/small) each route to the right vendor.
     const engine = new GameEngine({
       provider,
-      model: tierProviders.large.model,
       tierProviders,
       gameState: gs,
       scene,
