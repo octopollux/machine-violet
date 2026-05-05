@@ -12,6 +12,7 @@
  * remainder. Filters run in registration order; each receives the output
  * of the previous filter.
  */
+import { logInputEvent, bytesToHex } from "./inputDebugLog.js";
 
 export interface ReadableStdin {
   read(size?: number): Buffer | string | null;
@@ -54,12 +55,17 @@ export function installStdinFilterChain(input: ReadableStdin): StdinFilterChain 
     if (chunk === null) return null;
 
     const str = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+    logInputEvent("stdin-raw", { len: str.length, bytes: bytesToHex(str) });
+
     let current: string | null = str;
 
     for (const filter of filters) {
       if (current === null || current.length === 0) break;
       current = filter.process(current);
     }
+
+    const out = current ?? "";
+    logInputEvent("stdin-after-filter", { len: out.length, bytes: bytesToHex(out) });
 
     // Return empty (not null) when fully consumed — null would signal
     // "no data available" and desync the stream's internal buffer.
