@@ -31,10 +31,11 @@ export async function summarizeScene(
   provider: LLMProvider,
   transcript: string,
   aliasContext?: string,
+  model?: string,
 ): Promise<SceneSummaryResult> {
   const result = await oneShot(
     provider,
-    getModel("small"),
+    model ?? getModel("small"),
     SYSTEM_PROMPT,
     `Write a campaign log entry for this scene:\n\n${transcript}${aliasContext ?? ""}`,
     TOKEN_LIMITS.DM_RESPONSE,

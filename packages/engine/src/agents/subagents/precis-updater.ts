@@ -44,6 +44,7 @@ export async function updatePrecis(
   pcIdentification?: string,
   aliasContext?: string,
   currentNpcIntents?: string,
+  model?: string,
 ): Promise<PrecisUpdateResult> {
   const openThreadsLine = currentOpenThreads
     ? `Current open threads: ${currentOpenThreads}`
@@ -61,7 +62,7 @@ export async function updatePrecis(
 
   const result = await oneShot(
     provider,
-    getModel("small"),
+    model ?? getModel("small"),
     SYSTEM_PROMPT,
     prompt,
     256,

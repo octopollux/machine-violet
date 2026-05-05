@@ -3,7 +3,7 @@ import type { GameState } from "./game-state.js";
 import type { EntityTree } from "@machine-violet/shared/types/entities.js";
 import { agentLoopStreaming } from "./agent-loop.js";
 import type { AgentLoopConfig, TuiCommand, UsageStats } from "./agent-loop.js";
-import type { LLMProvider, NormalizedMessage, ContentPart } from "../providers/types.js";
+import type { LLMProvider, NormalizedMessage, ContentPart, TierProvider } from "../providers/types.js";
 import { ConversationManager } from "../context/conversation.js";
 import type { DroppedExchange } from "../context/conversation.js";
 import { narrativeLinesToMarkdown } from "../context/display-log.js";
@@ -68,6 +68,14 @@ export type { EngineState, TurnInfo, EngineCallbacks } from "@machine-violet/sha
  */
 export class GameEngine {
   private provider: LLMProvider;
+  /**
+   * Per-tier resolved {provider, model} pairs. The DM uses `large`; subagents
+   * pick `medium` or `small` per task. session-manager builds this from the
+   * connections store at session start. When omitted (older test paths), all
+   * three tiers default to {`provider`, `getModel(tier)`} — the legacy
+   * single-provider fallback that pre-dates per-tier routing.
+   */
+  private tierProviders: Record<ModelTier, TierProvider>;
   private registry: ToolRegistry;
   private gameState: GameState;
   private conversation: ConversationManager;
@@ -109,10 +117,21 @@ export class GameEngine {
     fileIO: FileIO;
     callbacks: EngineCallbacks;
     model?: AgentLoopConfig["model"];
+    /**
+     * Per-tier {provider, model} map. When omitted, all three tiers default
+     * to `{ provider: params.provider, model: getModel(tier) }` — the legacy
+     * pre-PR-440 behavior, used by tests that mock a single provider.
+     */
+    tierProviders?: Record<ModelTier, TierProvider>;
     gitIO?: GitIO;
     entityTree?: EntityTree;
   }) {
     this.provider = params.provider;
+    this.tierProviders = params.tierProviders ?? {
+      large: { provider: params.provider, model: params.model ?? getModel("large") },
+      medium: { provider: params.provider, model: getModel("medium") },
+      small: { provider: params.provider, model: getModel("small") },
+    };
     this.registry = singletonRegistry;
     this.gameState = params.gameState;
     this.fileIO = params.fileIO;
@@ -156,6 +175,7 @@ export class GameEngine {
       params.fileIO,
       this.repo ?? undefined,
       params.entityTree,
+      this.tierProviders,
     );
     this.callbacks = params.callbacks;
     this.model = params.model ?? getModel("large");
@@ -246,6 +266,15 @@ export class GameEngine {
   /** Get the LLM provider (for subagent creation). */
   getProvider(): LLMProvider {
     return this.provider;
+  }
+
+  /**
+   * Get the resolved {provider, model} for a given tier. Subagent dispatch
+   * sites that live outside the engine (command-handler, etc.) call this to
+   * pick the right pair without having to know about tierProviders directly.
+   */
+  getTier(tier: ModelTier): TierProvider {
+    return this.tierProviders[tier];
   }
 
   /** Active mode session (OOC/Dev). Null when in normal play mode. */
@@ -774,7 +803,8 @@ export class GameEngine {
     }
 
     this.choiceSession = createChoiceGeneratorSession({
-      provider: this.provider,
+      provider: this.tierProviders.small.provider,
+      model: this.tierProviders.small.model,
       characterSheets: sheets.join("\n\n---\n\n"),
       onRetry: (status, delayMs) => this.callbacks.onRetry(status, delayMs),
     });
@@ -940,7 +970,8 @@ export class GameEngine {
     logEvent("subagent:start", { name: "scribe" });
     try {
       const sceneNumber = this.sceneManager.getScene().sceneNumber;
-      const result = await runScribe(this.provider, {
+      const small = this.tierProviders.small;
+      const result = await runScribe(small.provider, {
         updates: updates.map(u => ({
           visibility: u.visibility as "private" | "player-facing",
           content: u.content,
@@ -949,7 +980,7 @@ export class GameEngine {
         sceneNumber,
         entityTree: this.sceneManager.getEntityTree(),
         homeDir: this.gameState.homeDir,
-      }, this.fileIO);
+      }, this.fileIO, small.model);
 
       // Apply entity tree deltas from Scribe
       if (result.entityDeltas) {
@@ -1007,12 +1038,13 @@ export class GameEngine {
       // Load system rules if available
       const ruleCard = await this.loadRuleCardCombat();
 
-      const result = await promoteCharacter(this.provider, {
+      const small = this.tierProviders.small;
+      const result = await promoteCharacter(small.provider, {
         characterName,
         characterSheet: currentSheet,
         context,
         systemRules: ruleCard !== "No rule card available." ? ruleCard : undefined,
-      });
+      }, undefined, small.model);
 
       // Write the updated sheet
       if (result.updatedSheet) {
@@ -1085,11 +1117,13 @@ export class GameEngine {
       // Spawn theme stylist subagent
       this.callbacks.onDevLog?.(`[dev] style_scene: spawning theme-styler for "${description}"`);
       try {
+        const small = this.tierProviders.small;
         const result = await styleTheme(
-          this.provider,
+          small.provider,
           description,
           undefined, // current theme name not easily accessible here
           undefined, // current key color not easily accessible here
+          small.model,
         );
         accUsage(this.sessionUsage, result.usage);
         this.callbacks.onUsageUpdate(result.usage, "small");
@@ -1262,11 +1296,16 @@ export class GameEngine {
       .join("\n");
 
     try {
-      const result = await aiPlayerTurn(this.provider, {
+      // ai-player picks small or medium based on `player.model` ("haiku"/"sonnet").
+      // Resolve the matching tier here so the AI player runs through the right
+      // connection in heterogeneous setups.
+      const aiTierName: ModelTier = active.player.model === "sonnet" ? "medium" : "small";
+      const aiTier = this.tierProviders[aiTierName];
+      const result = await aiPlayerTurn(aiTier.provider, {
         player: active.player,
         characterSheet,
         recentNarration: recentAssistant || "It's your turn. What do you do?",
-      });
+      }, aiTier.model);
 
       // Fire AI player turn lifecycle
       this.turnCounter++;
@@ -1280,9 +1319,8 @@ export class GameEngine {
       this.callbacks.onTurnEnd(aiTurn);
 
       // Accumulate usage from subagent
-      const aiTier: ModelTier = active.player.model === "sonnet" ? "medium" : "small";
       accUsage(this.sessionUsage, result.usage);
-      this.callbacks.onUsageUpdate(result.usage, aiTier);
+      this.callbacks.onUsageUpdate(result.usage, aiTierName);
 
       // Feed the action into the game loop as player input
       await this.processInput(characterName, result.action, { fromAI: true });
@@ -1404,10 +1442,11 @@ export class GameEngine {
       }
 
       try {
-        const result = await searchCampaign(this.provider, {
+        const small = this.tierProviders.small;
+        const result = await searchCampaign(small.provider, {
           query,
           campaignRoot: this.gameState.campaignRoot,
-        }, this.fileIO);
+        }, this.fileIO, small.model);
 
         accUsage(this.sessionUsage, result.usage);
         this.callbacks.onUsageUpdate(result.usage, "small");
@@ -1432,11 +1471,12 @@ export class GameEngine {
       }
 
       try {
-        const result = await searchContent(this.provider, {
+        const small = this.tierProviders.small;
+        const result = await searchContent(small.provider, {
           query,
           systemSlug,
           homeDir: this.gameState.homeDir,
-        }, this.fileIO);
+        }, this.fileIO, small.model);
 
         accUsage(this.sessionUsage, result.usage);
         this.callbacks.onUsageUpdate(result.usage, "small");
@@ -1462,7 +1502,8 @@ export class GameEngine {
       const ruleCard = await this.loadRuleCardCombat();
       const mapSnapshot = this.buildMapSnapshot();
 
-      this.resolveSession = new ResolveSession(this.provider, this.fileIO, this.gameState);
+      const medium = this.tierProviders.medium;
+      this.resolveSession = new ResolveSession(medium.provider, this.fileIO, this.gameState, medium.model);
       await this.resolveSession.initCombat(sheets, ruleCard, mapSnapshot || undefined);
       this.callbacks.onDevLog?.(`[dev] resolve_session: initialized for ${state.combat.order.length} combatants`);
     } catch (e) {

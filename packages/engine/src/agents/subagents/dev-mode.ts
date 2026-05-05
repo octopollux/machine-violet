@@ -537,6 +537,7 @@ export async function enterDevMode(
     sceneManager?: SceneManager;
     repo?: CampaignRepo;
     onTuiCommand?: (cmd: TuiCommand) => void;
+    model?: string;
   },
   onStream?: SubagentStreamCallback,
 ): Promise<DevModeResult> {
@@ -555,7 +556,7 @@ export async function enterDevMode(
     provider,
     {
       name: "dev-mode",
-      model: getModel("medium"),
+      model: options.model ?? getModel("medium"),
       visibility: "player_facing",
       systemPrompt,
       maxTokens: TOKEN_LIMITS.DEV_MODE,
@@ -660,6 +661,8 @@ export function createDevSession(
     sceneManager?: SceneManager;
     repo?: CampaignRepo;
     onTuiCommand?: (cmd: TuiCommand) => void;
+    /** Model ID for the medium tier; threaded into enterDevMode's options. */
+    model?: string;
   },
 ): ModeSession {
   return {

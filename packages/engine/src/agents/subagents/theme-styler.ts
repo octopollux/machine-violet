@@ -33,6 +33,7 @@ export async function styleTheme(
   description: string,
   currentTheme?: string,
   currentKeyColor?: string,
+  model?: string,
 ): Promise<ThemeStylerResult> {
   const contextParts: string[] = [];
   if (currentTheme) contextParts.push(`Current theme: ${currentTheme}`);
@@ -43,7 +44,7 @@ export async function styleTheme(
 
   const result = await oneShot(
     provider,
-    getModel("small"),
+    model ?? getModel("small"),
     SYSTEM_PROMPT,
     userMessage,
     200,

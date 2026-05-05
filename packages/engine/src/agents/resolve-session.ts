@@ -95,6 +95,7 @@ const SESSION_TOOLS: NormalizedTool[] = [
  */
 export class ResolveSession {
   private provider: LLMProvider;
+  private model: string;
   private fileIO: FileIO;
   private gameState: GameState;
   private systemPrompt: SystemBlock[] = [];
@@ -103,8 +104,18 @@ export class ResolveSession {
   private ruleCardContent = "";
   private currentRound = 1;
 
-  constructor(provider: LLMProvider, fileIO: FileIO, gameState: GameState) {
+  /**
+   * @param provider Provider assigned to the medium tier. Combat resolution
+   *   needs medium-tier reasoning; passing it explicitly (rather than
+   *   defaulting to a tier lookup) lets a heterogeneous-vendor session
+   *   route the medium tier through its connection independently of the DM.
+   * @param model Model ID for the medium tier; paired with `provider`.
+   *   Defaults to `getModel("medium")` for legacy test paths that don't
+   *   thread per-tier resolution.
+   */
+  constructor(provider: LLMProvider, fileIO: FileIO, gameState: GameState, model?: string) {
     this.provider = provider;
+    this.model = model ?? getModel("medium");
     this.fileIO = fileIO;
     this.gameState = gameState;
   }
@@ -153,8 +164,10 @@ export class ResolveSession {
 
   /**
    * Resolve a combat action. Accumulates messages across the session.
+   * The constructor's `model` is used; the optional argument is kept for
+   * call-site overrides (e.g. tests).
    */
-  async resolve(action: ActionDeclaration): Promise<ResolutionResult> {
+  async resolve(action: ActionDeclaration, model?: string): Promise<ResolutionResult> {
     // Track current round from game state
     if (this.gameState.combat.active) {
       this.currentRound = this.gameState.combat.round;
@@ -177,7 +190,7 @@ export class ResolveSession {
       this.messages,
       {
         name: "resolve_session",
-        model: getModel("medium"),
+        model: model ?? this.model,
         maxTokens: TOKEN_LIMITS.RESOLVE_SESSION,
         maxToolRounds: 8,
         stream: false,

@@ -193,6 +193,7 @@ export async function searchCampaign(
   provider: LLMProvider,
   input: SearchCampaignInput,
   fileIO: FileIO,
+  model?: string,
 ): Promise<SearchCampaignResult> {
   const systemPrompt = cacheSystemPrompt(loadPrompt("search-campaign"));
 
@@ -207,7 +208,7 @@ export async function searchCampaign(
 
   const result: SubagentResult = await spawnSubagent(provider, {
     name: "search_campaign",
-    model: getModel("small"),
+    model: model ?? getModel("small"),
     visibility: "silent",
     systemPrompt,
     maxTokens: 512,

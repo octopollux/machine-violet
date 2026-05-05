@@ -480,6 +480,7 @@ export async function enterOOC(
     clocks?: ClocksState;
     gameState?: GameState;
     onTuiCommand?: (cmd: TuiCommand) => void;
+    model?: string;
   },
   onStream?: SubagentStreamCallback,
 ): Promise<OOCResult> {
@@ -508,7 +509,7 @@ export async function enterOOC(
     provider,
     {
       name: "ooc",
-      model: getModel("medium"),
+      model: options.model ?? getModel("medium"),
       visibility: "player_facing",
       systemPrompt,
       maxTokens: hasTools ? TOKEN_LIMITS.SUBAGENT_LARGE : TOKEN_LIMITS.SUBAGENT_MEDIUM,
@@ -616,6 +617,8 @@ export function createOOCSession(
     clocks?: ClocksState;
     gameState?: GameState;
     onTuiCommand?: (cmd: TuiCommand) => void;
+    /** Model ID for the medium tier; threaded into enterOOC's options. */
+    model?: string;
   },
 ): ModeSession {
   return {

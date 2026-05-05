@@ -25,6 +25,8 @@ import { getActivePlayer } from "../agents/player-manager.js";
 import { loadEnv } from "../config/first-launch.js";
 import { loadConnectionStore, buildEffectiveConnections, getTierProvider } from "../config/connections.js";
 import { getModel } from "../config/models.js";
+import type { ModelTier } from "@machine-violet/shared/types/engine.js";
+import type { LLMProvider, TierProvider } from "../providers/types.js";
 import { createProviderFromConnection } from "../providers/index.js";
 import { configDir } from "../utils/paths.js";
 import { sandboxFileIO } from "../tools/filesystem/sandbox.js";
@@ -396,19 +398,51 @@ export class SessionManager {
     // --- Ensure API key is loaded ---
     loadEnv();
 
-    // --- Resolve provider from connections ---
+    // --- Resolve per-tier providers from connections ---
+    // Each tier (large/medium/small) becomes a {provider, model} pair. The DM
+    // runs on `large`; subagents pick `medium` or `small` per task. Resolving
+    // all three up front means a heterogeneous setup (e.g. Large=OpenAI,
+    // Medium/Small=Anthropic) routes each call to the right vendor without
+    // ever sending an Anthropic model ID through an OpenAI client.
     const appConfigDir = configDir();
     const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
-    const largeTier = getTierProvider(connStore, "large");
+    const { createAnthropicProvider } = await import("../providers/anthropic.js");
 
-    // Create provider from large tier, or fall back to Anthropic env key
-    let provider;
-    if (largeTier) {
-      provider = createProviderFromConnection(largeTier.connection);
-    } else {
-      const { createAnthropicProvider } = await import("../providers/anthropic.js");
-      provider = createAnthropicProvider();
-    }
+    const providerCache = new Map<string, LLMProvider>();
+    const getProviderForConnId = (connId: string): LLMProvider => {
+      let p = providerCache.get(connId);
+      if (!p) {
+        const conn = connStore.connections.find((c) => c.id === connId);
+        if (!conn) throw new Error(`Connection not found: ${connId}`);
+        p = createProviderFromConnection(conn);
+        providerCache.set(connId, p);
+      }
+      return p;
+    };
+
+    let fallbackProvider: LLMProvider | undefined;
+    const getFallbackProvider = (): LLMProvider => {
+      if (!fallbackProvider) fallbackProvider = createAnthropicProvider();
+      return fallbackProvider;
+    };
+
+    const resolveTier = (tier: ModelTier): TierProvider => {
+      const assignment = getTierProvider(connStore, tier);
+      if (assignment) {
+        return { provider: getProviderForConnId(assignment.connection.id), model: assignment.modelId };
+      }
+      return { provider: getFallbackProvider(), model: getModel(tier) };
+    };
+
+    const tierProviders: Record<ModelTier, TierProvider> = {
+      large: resolveTier("large"),
+      medium: resolveTier("medium"),
+      small: resolveTier("small"),
+    };
+
+    // The DM uses the large tier; keep `provider` as a local alias for the
+    // many downstream sites in this method that still reference it directly.
+    const provider = tierProviders.large.provider;
 
     // --- Debug: set context dump directory ---
     const { setContextDumpDir } = await import("../config/context-dump.js");
@@ -544,13 +578,12 @@ export class SessionManager {
     };
 
     // --- Instantiate GameEngine ---
-    // Mirror setup-session.ts: pair the model ID with the connection it was
-    // assigned to, falling back to the hardcoded large default only when no
-    // tier assignment exists. Without this, the engine's getModel("large")
-    // fallback can hand an Anthropic model ID to an OpenAI provider.
+    // Pass the full tier resolution so the DM (large) and subagents
+    // (medium/small) each route to the right vendor.
     const engine = new GameEngine({
       provider,
-      model: largeTier?.modelId ?? getModel("large"),
+      model: tierProviders.large.model,
+      tierProviders,
       gameState: gs,
       scene,
       sessionState,

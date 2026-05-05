@@ -144,9 +144,13 @@ function handleModeToggle(
   // Capture current variant before entering mode
   const previousVariant = engine.getPreviousVariant() ?? "exploration";
 
+  // OOC and dev mode are medium-tier — route them through the medium tier's
+  // {provider, model} so a heterogeneous setup (e.g. Large=OpenAI, Medium=
+  // Anthropic) sends mode commands to the connection assigned to medium.
+  const medium = engine.getTier("medium");
   if (target === "ooc") {
     const sm = engine.getSceneManager();
-    const session = createOOCSession(engine.getProvider(), {
+    const session = createOOCSession(medium.provider, {
       campaignName: gameState.config.name,
       previousVariant,
       config: gameState.config,
@@ -154,16 +158,18 @@ function handleModeToggle(
       repo: engine.getRepo() ?? undefined,
       fileIO: sm.getFileIO(),
       campaignRoot: gameState.campaignRoot,
+      model: medium.model,
     });
     engine.setModeSession(session);
   } else {
-    const session = createDevSession(engine.getProvider(), {
+    const session = createDevSession(medium.provider, {
       campaignName: gameState.config.name,
       gameStateSummary: summarizeGameState(gameState),
       gameState,
       fileIO: engine.getSceneManager().getFileIO(),
       sceneManager: engine.getSceneManager(),
       repo: engine.getRepo() ?? undefined,
+      model: medium.model,
     });
     engine.setModeSession(session);
   }

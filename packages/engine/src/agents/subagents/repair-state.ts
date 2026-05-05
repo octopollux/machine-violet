@@ -163,6 +163,7 @@ export async function repairState(
   gameState: GameState,
   fileIO: FileIO,
   dryRun: boolean,
+  model?: string,
 ): Promise<RepairResult> {
   const root = gameState.campaignRoot;
   const totalUsage: UsageStats = {
@@ -231,7 +232,7 @@ export async function repairState(
     try {
       const genResult = await oneShot(
         provider,
-        getModel("small"),
+        model ?? getModel("small"),
         systemPrompt,
         lines.join("\n"),
         1024,

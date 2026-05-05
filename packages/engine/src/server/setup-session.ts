@@ -25,7 +25,8 @@ import { processingPaths } from "../config/processing-paths.js";
 import { readBundledRuleCard } from "../config/systems.js";
 import { loadConnectionStore, buildEffectiveConnections, getTierProvider } from "../config/connections.js";
 import { createProviderFromConnection, createAnthropicProvider } from "../providers/index.js";
-import type { LLMProvider } from "../providers/types.js";
+import type { LLMProvider, TierProvider } from "../providers/types.js";
+import type { ModelTier } from "../config/models.js";
 import { getModel } from "../config/models.js";
 import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
 import { readFile } from "node:fs/promises";
@@ -38,6 +39,14 @@ export class SetupSession {
   private conversation: SetupConversation | null = null;
   private provider: LLMProvider;
   private model: string;
+  /**
+   * Per-tier resolved {provider, model} pairs. Setup runs on `large` for the
+   * main conversation, but subagents invoked during setup (e.g.
+   * `promoteCharacter` on the small tier) need to route through the
+   * connection assigned to their tier — otherwise a heterogeneous setup
+   * (Large=OpenAI, Small=Anthropic) sends an Anthropic model ID to OpenAI.
+   */
+  private tierProviders: Record<ModelTier, TierProvider>;
   private broadcast: (event: ServerEvent) => void;
   private campaignsDir: string;
   private homeDir: string;
@@ -60,16 +69,38 @@ export class SetupSession {
     // note + world framing benefits meaningfully.
     const appConfigDir = configDir();
     const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
-    const largeTier = getTierProvider(connStore, "large");
 
-    if (largeTier) {
-      this.provider = createProviderFromConnection(largeTier.connection);
-      this.model = largeTier.modelId;
-    } else {
-      // Fallback: Anthropic from env key with default large model
-      this.provider = createAnthropicProvider();
-      this.model = getModel("large");
-    }
+    const providerCache = new Map<string, LLMProvider>();
+    const getProviderForConnId = (connId: string): LLMProvider => {
+      let p = providerCache.get(connId);
+      if (!p) {
+        const conn = connStore.connections.find((c) => c.id === connId);
+        if (!conn) throw new Error(`Connection not found: ${connId}`);
+        p = createProviderFromConnection(conn);
+        providerCache.set(connId, p);
+      }
+      return p;
+    };
+    let fallbackProvider: LLMProvider | undefined;
+    const getFallbackProvider = (): LLMProvider => {
+      if (!fallbackProvider) fallbackProvider = createAnthropicProvider();
+      return fallbackProvider;
+    };
+    const resolveTier = (tier: ModelTier): TierProvider => {
+      const assignment = getTierProvider(connStore, tier);
+      if (assignment) {
+        return { provider: getProviderForConnId(assignment.connection.id), model: assignment.modelId };
+      }
+      return { provider: getFallbackProvider(), model: getModel(tier) };
+    };
+
+    this.tierProviders = {
+      large: resolveTier("large"),
+      medium: resolveTier("medium"),
+      small: resolveTier("small"),
+    };
+    this.provider = this.tierProviders.large.provider;
+    this.model = this.tierProviders.large.model;
   }
 
   /** Scan machine-scope players directory for returning player recognition. */
@@ -295,12 +326,13 @@ export class SetupSession {
     if (!ruleCard) return;
 
     try {
-      const { updatedSheet } = await promoteCharacter(this.provider, {
+      const small = this.tierProviders.small;
+      const { updatedSheet } = await promoteCharacter(small.provider, {
         characterSheet: stub,
         systemRules: ruleCard,
         context: `Build initial character sheet: ${result.characterDetails}`,
         characterName: result.characterName,
-      });
+      }, undefined, small.model);
       if (updatedSheet) {
         const { frontMatter, body, changelog } = parseFrontMatter(updatedSheet);
         frontMatter.sheet_status = "complete";

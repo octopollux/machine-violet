@@ -61,9 +61,10 @@ export function buildAIPlayerPrompt(ctx: AIPlayerContext): string {
 export async function aiPlayerTurn(
   provider: LLMProvider,
   ctx: AIPlayerContext,
+  model?: string,
 ): Promise<AIPlayerResult> {
   const lookup = MODEL_MAP[ctx.player.model ?? "haiku"] ?? MODEL_MAP.haiku;
-  const model = lookup();
+  const resolvedModel = model ?? lookup();
   const systemPrompt = buildAIPlayerPrompt(ctx);
 
   const userMessage = ctx.recentNarration || "It's your turn. What do you do?";
@@ -72,7 +73,7 @@ export async function aiPlayerTurn(
   // so we skip system prompt caching to avoid paying the cache-write surcharge with no reuse.
   const result = await spawnSubagent(provider, {
     name: "ai-player",
-    model,
+    model: resolvedModel,
     visibility: "silent",
     systemPrompt,
     maxTokens: 150, // AI players should be brief

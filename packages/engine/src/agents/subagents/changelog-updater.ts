@@ -22,12 +22,13 @@ export async function updateChangelogs(
   sceneNumber: number,
   entityFiles: string[],
   aliasContext?: string,
+  model?: string,
 ): Promise<SubagentResult> {
   const prompt = `Scene ${sceneNumber} transcript:\n${transcript}\n\nKnown entity files:\n${entityFiles.join("\n")}${aliasContext ?? ""}\n\nList changelog entries for entities meaningfully involved.`;
 
   return oneShot(
     provider,
-    getModel("small"),
+    model ?? getModel("small"),
     SYSTEM_PROMPT,
     prompt,
     512,

@@ -37,6 +37,7 @@ export async function updateCompendium(
   sceneSummary: string,
   sceneNumber: number,
   aliasContext?: string,
+  model?: string,
 ): Promise<{ compendium: Compendium; usage: SubagentResult["usage"] }> {
   const userMessage = [
     `Scene ${sceneNumber} summary:\n\n${sceneSummary}`,
@@ -46,7 +47,7 @@ export async function updateCompendium(
 
   const result = await oneShot(
     provider,
-    getModel("small"),
+    model ?? getModel("small"),
     SYSTEM_PROMPT,
     userMessage,
     2048,

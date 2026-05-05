@@ -87,13 +87,14 @@ export async function generateChoices(
   recentNarration: string,
   characterName: string,
   playerAction?: string,
+  model?: string,
 ): Promise<GeneratedChoices> {
   const actionContext = playerAction ? `\n\nPlayer's last action:\n${playerAction}` : "";
   const userMessage = `Character: ${characterName}${actionContext}\n\nDM narration:\n${recentNarration}`;
 
   const result = await oneShot(
     provider,
-    getModel("small"),
+    model ?? getModel("small"),
     SYSTEM_PROMPT,
     userMessage,
     250,

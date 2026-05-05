@@ -22,11 +22,12 @@ export interface DiscordStatusResult {
 export async function generateDiscordStatus(
   provider: LLMProvider,
   recentContext: string,
+  model?: string,
 ): Promise<DiscordStatusResult> {
   try {
     const result = await oneShot(
       provider,
-      getModel("small"),
+      model ?? getModel("small"),
       SYSTEM_PROMPT,
       recentContext,
       60,

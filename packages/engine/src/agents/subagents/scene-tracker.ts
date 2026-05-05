@@ -27,6 +27,7 @@ export async function trackScene(
   recentTranscript: string[],
   currentOpenThreads?: string,
   currentNpcIntents?: string,
+  model?: string,
 ): Promise<SceneTrackerResult> {
   const tail = recentTranscript.slice(-TRANSCRIPT_TAIL);
   const parts: string[] = [];
@@ -37,7 +38,7 @@ export async function trackScene(
   try {
     const result = await oneShot(
       provider,
-      getModel("small"),
+      model ?? getModel("small"),
       SYSTEM_PROMPT,
       parts.join("\n"),
       128,

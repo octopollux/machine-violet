@@ -39,6 +39,7 @@ export async function promoteCharacter(
   provider: LLMProvider,
   input: PromotionInput,
   onStream?: SubagentStreamCallback,
+  model?: string,
 ): Promise<PromotionResult> {
   const systemPrompt: SystemBlock[] = [
     ...cacheSystemPrompt(BASE_PROMPT),
@@ -57,7 +58,7 @@ ${input.characterSheet}`;
     provider,
     {
       name: "promote_character",
-      model: getModel("small"),
+      model: model ?? getModel("small"),
       visibility: onStream ? "player_facing" : "silent",
       systemPrompt,
       maxTokens: TOKEN_LIMITS.SUBAGENT_LARGE,

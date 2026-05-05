@@ -406,6 +406,7 @@ export async function runScribe(
   provider: LLMProvider,
   input: ScribeInput,
   fileIO: ScribeFileIO,
+  model?: string,
 ): Promise<ScribeResult> {
   const systemPrompt = cacheSystemPrompt(loadPrompt("scribe"));
   const created: string[] = [];
@@ -435,7 +436,7 @@ export async function runScribe(
 
   const result: SubagentResult = await spawnSubagent(provider, {
     name: "scribe",
-    model: getModel("small"),
+    model: model ?? getModel("small"),
     visibility: "silent",
     systemPrompt,
     maxTokens: 512,
