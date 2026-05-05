@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Text, Box } from "ink";
-import { getActivity, getActivityLabel } from "../activity.js";
+import { getActivity, getActivityLabel, hasElapsedAwareLabel } from "../activity.js";
 import type { ToolGlyph } from "../activity.js";
 
 interface ActivityLineProps {
@@ -37,15 +37,16 @@ export const ActivityLine = React.memo(function ActivityLine({
   const hasGlyphs = !!(toolGlyphs && toolGlyphs.length > 0);
 
   // Tick every second while a tiered/elapsed-aware state is active so the
-  // suffix and tier label stay accurate. The interval is only registered
-  // when needed and cleans up on state change.
+  // suffix and tier label stay accurate. The interval is gated on
+  // hasElapsedAwareLabel — fast states (roll_dice, rule_lookup) don't get
+  // a ticker or an "(Ns)" suffix.
+  const elapsedAware = hasElapsedAwareLabel(engineState);
   const [, setTick] = useState(0);
   useEffect(() => {
-    if (!engineState || !engineStateSince) return;
-    if (!getActivityLabel(engineState, 0)) return;
+    if (!elapsedAware || !engineStateSince) return;
     const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
-  }, [engineState, engineStateSince]);
+  }, [elapsedAware, engineStateSince]);
 
   // Render whenever we have *anything* to show — an indicator label or
   // accumulated tool glyphs. This keeps the row alive across unmapped or
@@ -57,7 +58,9 @@ export const ActivityLine = React.memo(function ActivityLine({
     ? Math.max(0, Math.floor((Date.now() - engineStateSince) / 1000))
     : 0;
   const tieredLabel = getActivityLabel(engineState, elapsedSec) ?? activity?.label;
-  const showElapsed = tieredLabel != null
+  // Suffix is gated on elapsedAware so fast states (roll_dice, rule_lookup)
+  // don't grow a "(Ns)" tail just because the player paused before the tool fired.
+  const showElapsed = elapsedAware
     && engineStateSince != null
     && elapsedSec >= ELAPSED_VISIBLE_THRESHOLD_SEC;
   const display = tieredLabel

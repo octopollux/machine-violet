@@ -331,6 +331,14 @@ function handleActivityUpdate(event: ActivityUpdateEvent, update: StateUpdater):
   const data = event.data as Record<string, unknown>;
   const { engineState, toolStarted } = data;
 
+  // tui:* engineState values are data carriers (TUI command payloads riding
+  // on the activity:update channel), not real engine state transitions. They
+  // must not override engineState — otherwise the activity indicator briefly
+  // drops to an unmapped state during every TUI command, blanking the
+  // full-height activity line label and the standard-tier modeline glyph.
+  const isTuiPayload = typeof engineState === "string" && engineState.startsWith("tui:");
+  const incomingState = isTuiPayload ? undefined : (engineState as string | undefined);
+
   update((prev) => {
     // Accumulate tool glyphs for the turn (don't remove on end — they persist visually)
     let glyphs = prev.toolGlyphs;
@@ -352,13 +360,13 @@ function handleActivityUpdate(event: ActivityUpdateEvent, update: StateUpdater):
     // "starting_session" counts as idle — the first dm_thinking after a
     // setup→game handoff is the start of a fresh turn.
     // tool_running → dm_thinking transitions within a turn must NOT clear.
-    const newState = (engineState as string) ?? prev.engineState;
+    const newState = incomingState ?? prev.engineState;
     const wasIdle = !prev.engineState
       || prev.engineState === "waiting_input"
       || prev.engineState === "starting_session";
-    if (engineState === "waiting_input" || engineState === "idle") {
+    if (incomingState === "waiting_input" || incomingState === "idle") {
       glyphs = [];
-    } else if (engineState === "dm_thinking" && wasIdle) {
+    } else if (incomingState === "dm_thinking" && wasIdle) {
       glyphs = [];
     }
 
@@ -374,10 +382,10 @@ function handleActivityUpdate(event: ActivityUpdateEvent, update: StateUpdater):
       toolGlyphs: glyphs,
     };
 
-    // Handle embedded TUI command payloads
-    const tuiType = typeof engineState === "string" && engineState.startsWith("tui:")
-      ? engineState.slice(4)
-      : null;
+    // Handle embedded TUI command payloads (engineState carries the tui:*
+    // discriminator only as routing metadata — the actual engine state was
+    // preserved above).
+    const tuiType = isTuiPayload ? (engineState as string).slice(4) : null;
 
     if (tuiType === "update_modeline") {
       const character = data.character as string | undefined;

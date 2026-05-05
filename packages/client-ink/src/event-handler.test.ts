@@ -372,6 +372,25 @@ describe("event-handler", () => {
       expect(h.state.displayResources).toEqual({ Aldric: ["HP", "Spell Slots"] });
     });
 
+    it("does not override engineState (tui:* values are data carriers)", () => {
+      // Regression: tui:* states used to overwrite engineState, briefly
+      // dropping the activity indicator into an unmapped state during every
+      // TUI command. They're routing metadata, not real state transitions.
+      const h = makeHarness();
+      h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
+      const stampBefore = h.state.engineStateSince;
+
+      h.dispatch({
+        type: "activity:update",
+        data: { engineState: "tui:set_display_resources", character: "Aldric", resources: ["HP"] },
+      });
+
+      expect(h.state.engineState).toBe("dm_thinking");
+      expect(h.state.engineStateSince).toBe(stampBefore);
+      // Data payload still applied
+      expect(h.state.displayResources).toEqual({ Aldric: ["HP"] });
+    });
+
     it("merges resources for multiple characters", () => {
       const h = makeHarness();
       h.dispatch({

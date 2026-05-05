@@ -151,3 +151,13 @@ export function getActivityLabel(
   }
   return label;
 }
+
+/** True when the state's indicator declares tier escalations — i.e. it's a
+ *  known-slow state that should display elapsed-time hints and tick its
+ *  label. Fast states (roll_dice, rule_lookup) return false here so they
+ *  don't accumulate "(Ns)" suffixes or burn an interval timer. */
+export function hasElapsedAwareLabel(state: string | null): boolean {
+  if (!state) return false;
+  const ind = ACTIVITY_MAP[state];
+  return !!(ind?.tiers && ind.tiers.length > 0);
+}

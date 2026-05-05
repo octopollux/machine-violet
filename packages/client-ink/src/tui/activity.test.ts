@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   getActivity,
   getActivityLabel,
+  hasElapsedAwareLabel,
   getToolGlyph,
   ACTIVITY_MAP,
   parseRetryState,
@@ -79,6 +80,25 @@ describe("getActivityLabel", () => {
   it("returns undefined for null or unknown state", () => {
     expect(getActivityLabel(null, 0)).toBeUndefined();
     expect(getActivityLabel("nope", 0)).toBeUndefined();
+  });
+});
+
+describe("hasElapsedAwareLabel", () => {
+  it("is true only for states that declare tier escalations", () => {
+    // Known-slow states with tiers
+    expect(hasElapsedAwareLabel("dm_thinking")).toBe(true);
+    expect(hasElapsedAwareLabel("tool_running")).toBe(true);
+    expect(hasElapsedAwareLabel("starting_session")).toBe(true);
+    // Mapped but tier-less — fast states should NOT trigger ticker/suffix
+    expect(hasElapsedAwareLabel("roll_dice")).toBe(false);
+    expect(hasElapsedAwareLabel("rule_lookup")).toBe(false);
+    expect(hasElapsedAwareLabel("scene_transition")).toBe(false);
+  });
+
+  it("is false for null or unmapped states", () => {
+    expect(hasElapsedAwareLabel(null)).toBe(false);
+    expect(hasElapsedAwareLabel("waiting_input")).toBe(false);
+    expect(hasElapsedAwareLabel("nope")).toBe(false);
   });
 });
 
