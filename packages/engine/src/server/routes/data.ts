@@ -189,6 +189,10 @@ export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) =>
 
   /** Save HTML transcript to campaign root. */
   server.put("/transcript", {
+    // Transcript HTML grows large in long campaigns; the global 1 MB default
+    // rejects saves around the 60-turn mark with HTTP 413. Scoped here rather
+    // than globally so other endpoints keep the tighter default.
+    bodyLimit: 50 * 1024 * 1024,
     schema: {
       tags: ["Data"],
       body: TranscriptSaveRequest,
