@@ -61,10 +61,17 @@ let cachedPricing: Record<string, ModelPricing> | null = null;
 
 /**
  * Load model config: defaults merged with optional dev-config.json effort overrides.
- * Tier model IDs are fixed defaults — per-tier provider/model selection lives in
- * `connections.json` (managed via the Connections UI).
- * Reads from cwd. Result is cached after first call.
- * Pass `reset: true` in tests to clear cache.
+ *
+ * Tier model IDs (`large`/`medium`/`small`) returned here are baked-in defaults.
+ * Many callers — subagents (scribe, summarizer, precis-updater, etc.), content
+ * pipeline, fallbacks — still consult them via `getModel(tier)`. The user-facing
+ * Connections UI writes its tier→provider+model assignments to `connections.json`,
+ * which currently overrides only the DM's model selection at session start; the
+ * subagent call sites have not yet been migrated to the connection store, so they
+ * continue to receive these defaults. See PR #440 follow-up for the broader
+ * migration.
+ *
+ * Reads from cwd. Result is cached after first call. Pass `reset: true` in tests.
  */
 export function loadModelConfig(opts?: { cwd?: string; reset?: boolean }): ModelConfig {
   if (opts?.reset) cached = null;
