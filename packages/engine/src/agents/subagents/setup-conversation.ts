@@ -503,7 +503,7 @@ export function createSetupConversation(
           toolResults.push({
             type: "tool_result",
             tool_use_id: tc.id,
-            content: "Setup finalized. Say a brief farewell to the player before the adventure begins.",
+            content: "Setup finalized. Say a brief farewell (don't narrate on behalf of the DM!) and finish with a separator: `---`",
           });
         }
       }

@@ -207,12 +207,18 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
     setSessionKey((k) => k + 1); // remount PlayingPhase
     // Preserve live UI state through the handoff so the transition is seamless:
     // - narrativeLines: setup conversation stays visible as the DM's opening streams in
-    // - engineState: "DM is thinking..." indicator survives (first turn is already in progress)
+    // - engineState: the session:transition handler sets this to "starting_session"
+    //   so the activity line keeps spinning across the WS reconnect and the long
+    //   first DM call (60-90s of LLM silence). Without this the UI reads as
+    //   "control returned to player" until the first tool call lands.
+    // - engineStateSince: timestamp paired with engineState; preserves the
+    //   elapsed-time hint shown by ActivityLine.
     // - toolGlyphs: early tool activity stays visible until replaced
     setClientState((prev) => ({
       ...initialClientState(),
       narrativeLines: prev.narrativeLines,
       engineState: prev.engineState,
+      engineStateSince: prev.engineStateSince,
       toolGlyphs: prev.toolGlyphs,
     }));
   }, [clientState.transitionCampaignId]);
@@ -585,6 +591,7 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
       activePlayerIndex: stateSnapshot?.activePlayerIndex ?? 0,
       setActivePlayerIndex: () => { /* server manages this */ },
       engineState: clientState.engineState,
+      engineStateSince: clientState.engineStateSince,
       toolGlyphs: clientState.toolGlyphs,
       resources: Object.keys(clientState.displayResources).length > 0
         ? formatResources(clientState.displayResources, clientState.resourceValues)

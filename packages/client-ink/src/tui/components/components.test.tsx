@@ -216,6 +216,21 @@ describe("ActivityLine", () => {
     expect(diceCount).toBe(2);
     expect(frame).toContain("◈");
   });
+
+  it("renders glyphs when engine state has no label", () => {
+    // Unmapped states (or transient ones) shouldn't make the whole row
+    // disappear — that wipes accumulated tool glyphs and reads as a pause.
+    const glyphs = [{ glyph: "⚄", color: "yellow" }];
+    const { lastFrame } = render(
+      <ActivityLine engineState="some_unmapped_state" toolGlyphs={glyphs} />,
+    );
+    expect(lastFrame()!).toContain("⚄");
+  });
+
+  it("renders tool_running with the working label so subagent calls stay visible", () => {
+    const { lastFrame } = render(<ActivityLine engineState="tool_running" />);
+    expect(lastFrame()!).toContain("DM is working");
+  });
 });
 
 describe("NarrativeArea", () => {

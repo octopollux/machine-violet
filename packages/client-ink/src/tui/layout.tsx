@@ -61,6 +61,8 @@ export interface LayoutProps {
   // Turn/activity
   turnHolder?: string;
   engineState: string | null;
+  /** Wall-clock timestamp (ms) when engineState last changed. */
+  engineStateSince?: number | null;
   toolGlyphs?: ToolGlyph[];
 
   // Display options
@@ -113,6 +115,7 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
     resources,
     turnHolder,
     engineState,
+    engineStateSince,
     toolGlyphs,
     showVerbose,
     quoteColor,
@@ -234,7 +237,13 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
           />
 
           {/* Activity Line */}
-          {elements.activityLine && <ActivityLine engineState={engineState} toolGlyphs={toolGlyphs} />}
+          {elements.activityLine && (
+            <ActivityLine
+              engineState={engineState}
+              engineStateSince={engineStateSince}
+              toolGlyphs={toolGlyphs}
+            />
+          )}
         </Box>
 
         {rightSide}

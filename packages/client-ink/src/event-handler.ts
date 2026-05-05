@@ -35,6 +35,10 @@ export interface ClientState {
   currentTurn: Turn | null;
   activeChoices: ChoicesData | null;
   engineState: string | null;
+  /** Wall-clock timestamp (ms) when `engineState` last changed value.
+   *  Used by ActivityLine to render elapsed-time hints during long waits.
+   *  null when engineState is null. */
+  engineStateSince: number | null;
   /** Accumulated tool glyphs for the current DM turn. Cleared on new turn. */
   toolGlyphs: ToolGlyph[];
   variant: StyleVariant;
@@ -75,6 +79,7 @@ export function initialClientState(): ClientState {
     currentTurn: null,
     activeChoices: null,
     engineState: null,
+    engineStateSince: null,
     toolGlyphs: [],
     variant: "exploration",
     mode: "play",
@@ -176,6 +181,11 @@ export function createEventHandler(update: StateUpdater): (event: ServerEvent) =
       case "session:transition": {
         // Clear state that could trigger stale detection before the
         // app's useEffect runs and reconnects the WebSocket.
+        //
+        // engineState becomes "starting_session" (not null) so the activity
+        // line keeps spinning across the WS reconnect and the long first
+        // DM call. Without this the UI reads as "control returned to player"
+        // for 60-90s while the DM agent thinks silently.
         const transition = event.data as { campaignId: string; campaignName?: string };
         update((prev) => ({
           ...prev,
@@ -184,7 +194,8 @@ export function createEventHandler(update: StateUpdater): (event: ServerEvent) =
           stateSnapshot: null,
           currentTurn: null,
           activeChoices: null,
-          engineState: null,
+          engineState: "starting_session",
+          engineStateSince: Date.now(),
           toolGlyphs: [],
         }));
         break;
@@ -328,17 +339,38 @@ function handleActivityUpdate(event: ActivityUpdateEvent, update: StateUpdater):
       if (tg) glyphs = [...glyphs, tg];
     }
 
-    // Clear glyphs only when entering dm_thinking from idle (new turn),
-    // not on tool_running → dm_thinking transitions within a turn.
+    // Clear glyphs at two natural turn boundaries:
+    //   1. End of turn — engine transitions to "waiting_input" or "idle".
+    //      Glyphs belong to the turn that just ended; they should not bleed
+    //      into the player's input window. (This mattered less before
+    //      ActivityLine learned to render glyphs without a label, because
+    //      the row was hidden during idle states. Now it stays visible, so
+    //      we have to clear explicitly.)
+    //   2. Start of next turn — entering "dm_thinking" from an idle state.
+    //      Belt-and-suspenders: covers cases where the engine skips straight
+    //      to thinking without an explicit waiting_input event.
+    // "starting_session" counts as idle — the first dm_thinking after a
+    // setup→game handoff is the start of a fresh turn.
+    // tool_running → dm_thinking transitions within a turn must NOT clear.
     const newState = (engineState as string) ?? prev.engineState;
-    const wasIdle = !prev.engineState || prev.engineState === "waiting_input";
-    if (engineState === "dm_thinking" && wasIdle) {
+    const wasIdle = !prev.engineState
+      || prev.engineState === "waiting_input"
+      || prev.engineState === "starting_session";
+    if (engineState === "waiting_input" || engineState === "idle") {
+      glyphs = [];
+    } else if (engineState === "dm_thinking" && wasIdle) {
       glyphs = [];
     }
 
+    // Stamp engineStateSince whenever engineState transitions to a new value
+    // so ActivityLine can render elapsed-time hints during long waits.
+    const stateChanged = newState !== prev.engineState;
     let next = {
       ...prev,
       engineState: newState,
+      engineStateSince: stateChanged
+        ? (newState ? Date.now() : null)
+        : prev.engineStateSince,
       toolGlyphs: glyphs,
     };
 

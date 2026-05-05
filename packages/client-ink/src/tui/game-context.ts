@@ -35,6 +35,8 @@ export interface GameContextValue {
   activePlayerIndex: number;
   setActivePlayerIndex: (i: number) => void;
   engineState: string | null;
+  /** Wall-clock timestamp (ms) when engineState last changed. */
+  engineStateSince: number | null;
   toolGlyphs: ToolGlyph[];
   resources: string[];
   modelines: Record<string, string>;

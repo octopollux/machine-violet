@@ -231,6 +231,29 @@ describe("event-handler", () => {
       expect(h.state.toolGlyphs).toEqual([]);
     });
 
+    it("clears tool glyphs when turn ends (engineState → waiting_input)", () => {
+      const h = makeHarness();
+      // Mid-turn: glyphs accumulate
+      h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
+      h.dispatch({ type: "activity:update", data: { toolStarted: "roll_dice" } });
+      h.dispatch({ type: "activity:update", data: { toolStarted: "scribe" } });
+      expect(h.state.toolGlyphs.length).toBe(2);
+
+      // Turn ends — glyphs belong to the previous turn, not the player's input window
+      h.dispatch({ type: "activity:update", data: { engineState: "waiting_input" } });
+      expect(h.state.toolGlyphs).toEqual([]);
+    });
+
+    it("clears tool glyphs when engine returns to idle", () => {
+      const h = makeHarness();
+      h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
+      h.dispatch({ type: "activity:update", data: { toolStarted: "roll_dice" } });
+      expect(h.state.toolGlyphs.length).toBe(1);
+
+      h.dispatch({ type: "activity:update", data: { engineState: "idle" } });
+      expect(h.state.toolGlyphs).toEqual([]);
+    });
+
     it("preserves tool glyphs on tool_running → dm_thinking within a turn", () => {
       const h = makeHarness();
       // DM starts thinking
@@ -249,6 +272,76 @@ describe("event-handler", () => {
       const h = makeHarness();
       h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
       expect(h.state.engineState).toBe("dm_thinking");
+    });
+
+    it("stamps engineStateSince when state changes", () => {
+      const h = makeHarness();
+      const before = Date.now();
+      h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
+      const after = Date.now();
+      expect(h.state.engineStateSince).not.toBeNull();
+      expect(h.state.engineStateSince!).toBeGreaterThanOrEqual(before);
+      expect(h.state.engineStateSince!).toBeLessThanOrEqual(after);
+    });
+
+    it("does not bump engineStateSince when state value is unchanged", () => {
+      const h = makeHarness();
+      h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
+      const firstStamp = h.state.engineStateSince;
+      // tool start without state change should preserve the timestamp
+      h.dispatch({ type: "activity:update", data: { toolStarted: "roll_dice" } });
+      expect(h.state.engineStateSince).toBe(firstStamp);
+    });
+
+    it("bumps engineStateSince on transition between distinct states", async () => {
+      const h = makeHarness();
+      h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
+      const first = h.state.engineStateSince!;
+      // Wait a tick so Date.now() advances reliably even on coarse clocks
+      await new Promise((r) => setTimeout(r, 5));
+      h.dispatch({ type: "activity:update", data: { engineState: "tool_running" } });
+      expect(h.state.engineStateSince!).toBeGreaterThan(first);
+    });
+  });
+
+  describe("session:transition", () => {
+    it("sets engineState to starting_session and stamps engineStateSince", () => {
+      const h = makeHarness();
+      const before = Date.now();
+      h.dispatch({
+        type: "session:transition",
+        data: { campaignId: "new-campaign", campaignName: "New Campaign" },
+      });
+      const after = Date.now();
+
+      expect(h.state.engineState).toBe("starting_session");
+      expect(h.state.engineStateSince).not.toBeNull();
+      expect(h.state.engineStateSince!).toBeGreaterThanOrEqual(before);
+      expect(h.state.engineStateSince!).toBeLessThanOrEqual(after);
+      expect(h.state.transitionCampaignId).toBe("new-campaign");
+      expect(h.state.transitionCampaignName).toBe("New Campaign");
+      // Tool glyphs and stale per-session state get cleared
+      expect(h.state.toolGlyphs).toEqual([]);
+      expect(h.state.currentTurn).toBeNull();
+      expect(h.state.activeChoices).toBeNull();
+      expect(h.state.stateSnapshot).toBeNull();
+    });
+
+    it("clears tool glyphs when first dm_thinking arrives after starting_session", () => {
+      const h = makeHarness();
+      // Stale glyph from the dying setup session
+      h.dispatch({ type: "activity:update", data: { toolStarted: "roll_dice" } });
+      // Transition arrives — glyphs cleared, state becomes starting_session
+      h.dispatch({
+        type: "session:transition",
+        data: { campaignId: "c2" },
+      });
+      expect(h.state.toolGlyphs).toEqual([]);
+      // First dm_thinking from the new session is treated as a new turn,
+      // so any glyphs accumulated in between are cleared.
+      h.dispatch({ type: "activity:update", data: { toolStarted: "scribe" } });
+      h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
+      expect(h.state.toolGlyphs).toEqual([]);
     });
   });
 

@@ -230,6 +230,8 @@ The server is transitioning from the setup session to a newly created campaign. 
 | `campaignId`   | string  | The campaign ID of the newly created campaign. |
 | `campaignName` | string? | Human-readable campaign name for immediate display. |
 
+The reference client keeps its activity line live across the transition by setting `engineState` to `"starting_session"` on receipt (and timestamping the change), so the indicator survives the WS reconnect and the long first DM call. See [Activity Indicators / Elapsed-time hints](tui-design.md#elapsed-time-hints-and-tier-escalation).
+
 #### `session:ended`
 
 The campaign session has ended.
