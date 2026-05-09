@@ -229,8 +229,14 @@ export function isHorizontalRule(text: string): boolean {
  * (e.g. "You drive home.---"), return the prefix text. Returns null when
  * no trailing rule is present. The rule must be 3+ adjacent identical
  * chars (-, *, _); whitespace between the prefix and rule is permitted.
+ *
+ * Returns null for whole-line rules — those are the caller's job to
+ * detect via isHorizontalRule(). Without this guard, an input like
+ * "----" would match with the lazy prefix consuming the first `-`,
+ * producing "-" as the bogus prefix.
  */
 export function splitTrailingHorizontalRule(text: string): string | null {
+  if (isHorizontalRule(text)) return null;
   const m = text.match(/^(.*?\S)\s*([-*_])\2{2,}\s*$/);
   return m ? m[1] : null;
 }

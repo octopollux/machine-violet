@@ -988,6 +988,14 @@ describe("splitTrailingHorizontalRule", () => {
     // The whole-line case is handled by isHorizontalRule, not this helper.
     expect(splitTrailingHorizontalRule("---")).toBeNull();
     expect(splitTrailingHorizontalRule("   ---")).toBeNull();
+    // Without the isHorizontalRule guard, the lazy prefix would eat the
+    // first `-` and return "-" for these — bogus.
+    expect(splitTrailingHorizontalRule("----")).toBeNull();
+    expect(splitTrailingHorizontalRule("----------")).toBeNull();
+    expect(splitTrailingHorizontalRule("***")).toBeNull();
+    expect(splitTrailingHorizontalRule("****")).toBeNull();
+    expect(splitTrailingHorizontalRule("- - -")).toBeNull();
+    expect(splitTrailingHorizontalRule("   ----")).toBeNull();
   });
 });
 
