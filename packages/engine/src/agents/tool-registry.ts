@@ -888,13 +888,13 @@ const TOOL_DEFS: RegisteredTool[] = [
       },
     },
     handler: (_state, input) => {
-      const character = input.character as string;
-      const context = input.context as string;
-      if (!character?.trim()) return err("Character name is required.");
-      if (!context?.trim()) return err("Context is required — describe what changed.");
+      const character = (input.character as string)?.trim();
+      const context = (input.context as string)?.trim();
+      if (!character) return err("Character name is required.");
+      if (!context) return err("Context is required — describe what changed.");
       return {
         content: `Promotion queued for ${character}.`,
-        _tui: { type: "promote_character", character: character.trim(), context: context.trim() },
+        _tui: { type: "promote_character", character, context },
       };
     },
   },
