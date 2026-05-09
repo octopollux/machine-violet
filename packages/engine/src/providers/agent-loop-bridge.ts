@@ -135,6 +135,10 @@ export async function runProviderLoop(
   const tuiCommands: TuiCommand[] = [];
   let fullText = "";
   let truncated = false;
+  // Tracks whether the round we just completed emitted any text deltas.
+  // Used to roll the client back at the boundary into the next round —
+  // see the inter-round rollback comment inside the loop.
+  let priorRoundEmittedText = false;
 
   const workingMessages = [...messages];
   const loopStartIndex = workingMessages.length;
@@ -143,6 +147,19 @@ export async function runProviderLoop(
   const priorAssistantCount = messages.filter((m) => m.role === "assistant").length;
 
   for (let round = 0; round < maxToolRounds; round++) {
+    // Inter-round rollback: when a round emitted narrative text alongside a
+    // tool call (typically a deferred TUI tool like scribe / scene_transition
+    // / dm_notes), Claude often re-narrates the same content in the next
+    // round after seeing the synthetic tool_result. The streamed deltas from
+    // round N are still in the client's narrative log; without a rollback,
+    // round N+1's stream is appended after them and the user sees the same
+    // text twice. Reuse the retry-rollback path so the bridge clears its
+    // delta buffer and the session-manager publishes a corrective snapshot
+    // before round N+1's deltas begin arriving.
+    if (priorRoundEmittedText) {
+      config.onRollback?.();
+    }
+
     const chatParams: ChatParams = {
       model: config.model,
       systemPrompt: effectiveSystem,
@@ -163,6 +180,7 @@ export async function runProviderLoop(
     });
 
     let result: ChatResult;
+    let roundEmittedDeltas: boolean;
     const apiStart = Date.now();
     for (let attempt = 0; ; attempt++) {
       // Per-attempt flag: did this attempt actually stream any text before
@@ -181,6 +199,12 @@ export async function runProviderLoop(
           // In non-streaming mode, emit the full text
           if (result.text) config.onTextDelta?.(result.text);
         }
+        // Successful attempt: capture whether deltas leaked so the
+        // inter-round rollback at the top of the next iteration knows
+        // whether a corrective snapshot is needed. Per-attempt rollbacks
+        // for retries already cleared the failed-attempt streams; this
+        // flag reflects only the surviving (successful) attempt.
+        roundEmittedDeltas = shouldStream ? attemptEmittedDeltas : !!result.text;
         break; // success — exit retry loop
       } catch (apiErr) {
         const status = extractStatus(apiErr);
@@ -255,7 +279,22 @@ export async function runProviderLoop(
       dumpThinking(config.name, priorAssistantCount + round, result.thinkingText);
     }
 
-    fullText += result.text;
+    // Last-non-empty-round-wins: each round with text overwrites prior text.
+    // When the model emits text alongside a tool call and then re-narrates
+    // after the tool_result (Claude does this routinely with deferred TUI
+    // tools, see the inter-round rollback comment above), accumulating across
+    // rounds doubles the response in every downstream sink — display log,
+    // scene transcript, committed narrative, etc. Overwriting keeps
+    // `result.text` consistent with the final assistant message in
+    // `roundMessages`, which is what the conversation history already
+    // collapses to via `finalAssistantText` in game-engine.ts. The non-empty
+    // guard preserves the prior round's text for the unusual case where the
+    // model said its piece alongside a tool call and then end_turn'd in the
+    // next round without further narration.
+    if (result.text) {
+      fullText = result.text;
+    }
+    priorRoundEmittedText = roundEmittedDeltas;
 
     // Process tool calls concurrently. Sync handlers still run sequentially
     // on the JS event loop; async handlers (subagent spawns, search) genuinely

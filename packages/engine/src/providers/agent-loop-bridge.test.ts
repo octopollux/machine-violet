@@ -16,6 +16,20 @@ function textResult(text: string): ChatResult {
   };
 }
 
+/** A round that emits text alongside a tool_use, prompting another loop iteration. */
+function textPlusToolResult(text: string, toolName: string, toolId = "toolu_1"): ChatResult {
+  const assistantContent: ChatResult["assistantContent"] = [];
+  if (text) assistantContent.push({ type: "text", text });
+  assistantContent.push({ type: "tool_use", id: toolId, name: toolName, input: {} });
+  return {
+    text,
+    toolCalls: [{ id: toolId, name: toolName, input: {} }],
+    usage: mockUsage(),
+    stopReason: "tool_use",
+    assistantContent,
+  };
+}
+
 function apiError(status: number, message = "error"): Error {
   const err = new Error(message);
   (err as unknown as Record<string, unknown>).status = status;
@@ -392,5 +406,183 @@ describe("runProviderLoop retry", () => {
     // Non-streaming responses are emitted as a single onTextDelta on success
     // only. A failed non-streaming attempt has no partial output to roll back.
     expect(onRollback).not.toHaveBeenCalled();
+  });
+});
+
+// Round-boundary handling: when the model emits narrative text alongside a
+// tool call (especially a deferred TUI tool that doesn't broadcast on its
+// own), Claude can re-narrate the same content after the tool_result. The
+// loop must (a) keep result.text aligned with the final assistant message,
+// not the running concatenation, and (b) tell consumers to roll back the
+// streamed deltas from the prior round before the next round's stream
+// begins, so the live UI doesn't show the response twice.
+describe("runProviderLoop round-boundary rollback", () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("returns only the final round's text, not the accumulation", async () => {
+    let callCount = 0;
+    const provider: LLMProvider = {
+      providerId: "test",
+      chat: vi.fn(),
+      stream: vi.fn(async (_params, onDelta) => {
+        callCount++;
+        if (callCount === 1) {
+          // Model speaks, then calls a deferred TUI tool.
+          const r = textPlusToolResult("Round one narrative.", "scribe");
+          onDelta(r.text);
+          return r;
+        }
+        // Model re-narrates after seeing the tool_result.
+        const r = textResult("Round one narrative.");
+        onDelta(r.text);
+        return r;
+      }),
+      healthCheck: vi.fn(),
+    };
+
+    const onTextDelta = vi.fn();
+    const result = await runProviderLoop(provider, "system", [
+      { role: "user", content: "hello" },
+    ], {
+      name: "test",
+      model: "test-model",
+      maxTokens: 100,
+      stream: true,
+      onTextDelta,
+      toolHandler: () => ({ content: "ok" }),
+    });
+
+    // Without last-round-wins, fullText would be "Round one narrative.Round
+    // one narrative." — the bug from the playtester report.
+    expect(result.text).toBe("Round one narrative.");
+    expect(callCount).toBe(2);
+  });
+
+  it("fires onRollback between rounds when the prior round emitted text", async () => {
+    let callCount = 0;
+    const provider: LLMProvider = {
+      providerId: "test",
+      chat: vi.fn(),
+      stream: vi.fn(async (_params, onDelta) => {
+        callCount++;
+        if (callCount === 1) {
+          const r = textPlusToolResult("Round one text.", "scribe");
+          onDelta(r.text);
+          return r;
+        }
+        const r = textResult("Round two text.");
+        onDelta(r.text);
+        return r;
+      }),
+      healthCheck: vi.fn(),
+    };
+
+    const onRollback = vi.fn();
+    const onTextDelta = vi.fn();
+    const result = await runProviderLoop(provider, "system", [
+      { role: "user", content: "hello" },
+    ], {
+      name: "test",
+      model: "test-model",
+      maxTokens: 100,
+      stream: true,
+      onTextDelta,
+      onRollback,
+      toolHandler: () => ({ content: "ok" }),
+    });
+
+    expect(result.text).toBe("Round two text.");
+    // Exactly one rollback at the round boundary — clears round-1's "Round
+    // one text." from the client before round 2's deltas arrive.
+    expect(onRollback).toHaveBeenCalledOnce();
+  });
+
+  it("does NOT fire onRollback when the prior round emitted no text", async () => {
+    let callCount = 0;
+    const provider: LLMProvider = {
+      providerId: "test",
+      chat: vi.fn(),
+      stream: vi.fn(async (_params, onDelta) => {
+        callCount++;
+        if (callCount === 1) {
+          // Tool-only round — no narrative text. (The common case: model
+          // calls a tool, gets the result, then narrates.)
+          return textPlusToolResult("", "roll_dice");
+        }
+        const r = textResult("You rolled a 17.");
+        onDelta(r.text);
+        return r;
+      }),
+      healthCheck: vi.fn(),
+    };
+
+    const onRollback = vi.fn();
+    const onTextDelta = vi.fn();
+    await runProviderLoop(provider, "system", [
+      { role: "user", content: "Roll" },
+    ], {
+      name: "test",
+      model: "test-model",
+      maxTokens: 100,
+      stream: true,
+      onTextDelta,
+      onRollback,
+      toolHandler: () => ({ content: "17" }),
+    });
+
+    // Nothing leaked from round 1, so a corrective snapshot would be a
+    // pointless round-trip — same reasoning as the pre-stream-failure case.
+    expect(onRollback).not.toHaveBeenCalled();
+  });
+
+  it("fires both per-attempt and inter-round rollbacks when both apply", async () => {
+    let callCount = 0;
+    const provider: LLMProvider = {
+      providerId: "test",
+      chat: vi.fn(),
+      stream: vi.fn(async (_params, onDelta) => {
+        callCount++;
+        if (callCount === 1) {
+          // Round 1, attempt 1: partial stream then 502 → per-attempt rollback.
+          onDelta("Round one ");
+          throw apiError(502, "Bad gateway");
+        }
+        if (callCount === 2) {
+          // Round 1, attempt 2: success, with text + tool call.
+          const r = textPlusToolResult("Round one narrative.", "scribe");
+          onDelta(r.text);
+          return r;
+        }
+        // Round 2: final narration → triggers inter-round rollback before it streams.
+        const r = textResult("Round two final.");
+        onDelta(r.text);
+        return r;
+      }),
+      healthCheck: vi.fn(),
+    };
+
+    const onRollback = vi.fn();
+    const onTextDelta = vi.fn();
+    const promise = runProviderLoop(provider, "system", [
+      { role: "user", content: "hello" },
+    ], {
+      name: "test",
+      model: "test-model",
+      maxTokens: 100,
+      stream: true,
+      onTextDelta,
+      onRollback,
+      toolHandler: () => ({ content: "ok" }),
+    });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    const result = await promise;
+
+    expect(result.text).toBe("Round two final.");
+    // One for the failed attempt's partial leak, one for the round-1 → round-2
+    // boundary. Both are necessary: the first protects against retry duplication,
+    // the second against re-narration duplication.
+    expect(onRollback).toHaveBeenCalledTimes(2);
   });
 });
