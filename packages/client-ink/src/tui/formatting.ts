@@ -225,6 +225,17 @@ export function isHorizontalRule(text: string): boolean {
 }
 
 /**
+ * If a DM line ends with a horizontal rule glued to narrative text
+ * (e.g. "You drive home.---"), return the prefix text. Returns null when
+ * no trailing rule is present. The rule must be 3+ adjacent identical
+ * chars (-, *, _); whitespace between the prefix and rule is permitted.
+ */
+export function splitTrailingHorizontalRule(text: string): string | null {
+  const m = text.match(/^(.*?\S)\s*([-*_])\2{2,}\s*$/);
+  return m ? m[1] : null;
+}
+
+/**
  * Unified processing pipeline for NarrativeLines.
  * Heal → parse → wrap → pad alignment → quote highlight.
  * Returns ProcessedLine[] ready for direct rendering.
@@ -236,18 +247,31 @@ export function processNarrativeLines(
 ): ProcessedLine[] {
   // Phase 0: Split inline <center> and <right> blocks onto their own lines.
   // The rendering pipeline expects these to be the sole content of a line.
-  // Also converts DM horizontal rules (---, ***, ___) into separator lines.
+  // Also converts DM horizontal rules (---, ***, ___) into separator lines,
+  // including rules glued to the end of a narrative line ("text.---").
+  // Adjacent separators (with only spacer/empty-dm padding between) collapse
+  // to one — multiple sources can emit a separator for the same turn boundary
+  // (e.g. on session resume, the disk's "---" markers are streamed as DM
+  // chunks AND the client injects a separator before the first DM chunk
+  // after a player line).
   const expandedLines: NarrativeLine[] = [];
   for (const srcLine of lines) {
     if (srcLine.kind === "dm" && srcLine.text.trim() !== "") {
       if (isHorizontalRule(srcLine.text)) {
-        expandedLines.push({ kind: "separator", text: "" });
+        pushSeparator(expandedLines);
       } else {
-        const split = splitAlignmentBlocks(srcLine.text);
+        const trailingPrefix = splitTrailingHorizontalRule(srcLine.text);
+        const text = trailingPrefix ?? srcLine.text;
+        const split = splitAlignmentBlocks(text);
         for (const part of split) {
           expandedLines.push({ kind: "dm", text: part });
         }
+        if (trailingPrefix !== null) {
+          pushSeparator(expandedLines);
+        }
       }
+    } else if (srcLine.kind === "separator") {
+      pushSeparator(expandedLines, srcLine);
     } else {
       expandedLines.push(srcLine);
     }
@@ -401,6 +425,24 @@ function splitAlignmentBlocks(text: string): string[] {
     if (trimmed) result.push(trimmed);
   }
   return result.length > 0 ? result : [text];
+}
+
+/**
+ * Append a separator line, collapsing against an immediately-prior separator
+ * (skipping `spacer` and empty-dm padding between them). Pass the original
+ * source line when the separator came from a NarrativeLine of `kind: "separator"`
+ * so its text/tag are preserved; omit it when the separator was synthesized
+ * from a horizontal rule conversion.
+ */
+function pushSeparator(lines: NarrativeLine[], source?: NarrativeLine): void {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    if (line.kind === "spacer") continue;
+    if (line.kind === "dm" && line.text === "") continue;
+    if (line.kind === "separator") return;
+    break;
+  }
+  lines.push(source && source.kind === "separator" ? source : { kind: "separator", text: "" });
 }
 
 function isAlignmentNode(nodes: FormattingNode[]): boolean {

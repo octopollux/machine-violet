@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseFormatting, toPlainText, stripFormatting, stripLeadingBullet, highlightQuotesWithState, markdownToTags, nodeVisibleLength, wrapNodes, processNarrativeLines, isHorizontalRule } from "./formatting.js";
+import { parseFormatting, toPlainText, stripFormatting, stripLeadingBullet, highlightQuotesWithState, markdownToTags, nodeVisibleLength, wrapNodes, processNarrativeLines, isHorizontalRule, splitTrailingHorizontalRule } from "./formatting.js";
 import type { FormattingTag, FormattingNode, NarrativeLine } from "@machine-violet/shared/types/tui.js";
 
 describe("parseFormatting", () => {
@@ -941,6 +941,180 @@ describe("processNarrativeLines — horizontal rule conversion", () => {
     ], 80);
     // The separator should break the DM line sequence but italic
     // should still heal across because separators don't reset the stack
+    const dmLines = result.filter((l) => l.kind === "dm");
+    const lastDM = dmLines[dmLines.length - 1];
+    const hasItalic = lastDM.nodes.some(
+      (n) => typeof n !== "string" && n.type === "italic",
+    );
+    expect(hasItalic).toBe(true);
+  });
+});
+
+describe("splitTrailingHorizontalRule", () => {
+  it("splits a rule glued to the end of a sentence", () => {
+    expect(splitTrailingHorizontalRule("You drive home.---")).toBe("You drive home.");
+  });
+
+  it("splits with whitespace between text and rule", () => {
+    expect(splitTrailingHorizontalRule("text ---")).toBe("text");
+    expect(splitTrailingHorizontalRule("text   ---")).toBe("text");
+  });
+
+  it("splits trailing asterisks and underscores", () => {
+    expect(splitTrailingHorizontalRule("text***")).toBe("text");
+    expect(splitTrailingHorizontalRule("text___")).toBe("text");
+  });
+
+  it("splits 4+ trailing rule chars", () => {
+    expect(splitTrailingHorizontalRule("text----")).toBe("text");
+    expect(splitTrailingHorizontalRule("text---------")).toBe("text");
+  });
+
+  it("tolerates trailing whitespace after the rule", () => {
+    expect(splitTrailingHorizontalRule("text---   ")).toBe("text");
+  });
+
+  it("returns null when there is no trailing rule", () => {
+    expect(splitTrailingHorizontalRule("plain text")).toBeNull();
+    expect(splitTrailingHorizontalRule("text--")).toBeNull();
+    expect(splitTrailingHorizontalRule("text-")).toBeNull();
+  });
+
+  it("returns null when rule is followed by more text", () => {
+    expect(splitTrailingHorizontalRule("text---more")).toBeNull();
+  });
+
+  it("returns null for a pure horizontal rule line", () => {
+    // The whole-line case is handled by isHorizontalRule, not this helper.
+    expect(splitTrailingHorizontalRule("---")).toBeNull();
+    expect(splitTrailingHorizontalRule("   ---")).toBeNull();
+  });
+});
+
+describe("processNarrativeLines — adjacent separator dedup", () => {
+  const dm = (text: string): NarrativeLine => ({ kind: "dm", text });
+  const sep = (): NarrativeLine => ({ kind: "separator", text: "---" });
+
+  it("collapses two source separators in a row", () => {
+    const result = processNarrativeLines([sep(), sep()], 80);
+    const seps = result.filter((l) => l.kind === "separator");
+    expect(seps).toHaveLength(1);
+  });
+
+  it("collapses a source separator followed by a dm:--- horizontal rule", () => {
+    const result = processNarrativeLines([sep(), dm("---")], 80);
+    const seps = result.filter((l) => l.kind === "separator");
+    expect(seps).toHaveLength(1);
+  });
+
+  it("collapses two dm:--- horizontal rules in a row", () => {
+    const result = processNarrativeLines([dm("---"), dm("---")], 80);
+    const seps = result.filter((l) => l.kind === "separator");
+    expect(seps).toHaveLength(1);
+  });
+
+  it("collapses separators that are only padded apart by an empty dm line", () => {
+    const result = processNarrativeLines([sep(), dm(""), sep()], 80);
+    const seps = result.filter((l) => l.kind === "separator");
+    expect(seps).toHaveLength(1);
+  });
+
+  it("collapses separators that are only padded apart by a spacer", () => {
+    const result = processNarrativeLines([
+      sep(),
+      { kind: "spacer", text: "" },
+      sep(),
+    ], 80);
+    const seps = result.filter((l) => l.kind === "separator");
+    expect(seps).toHaveLength(1);
+  });
+
+  it("does NOT collapse separators with substantive content between them", () => {
+    const result = processNarrativeLines([sep(), dm("middle text"), sep()], 80);
+    const seps = result.filter((l) => l.kind === "separator");
+    expect(seps).toHaveLength(2);
+  });
+
+  it("post-resume duplicate: injected separator + chunk-leading dm:--- collapses to one", () => {
+    // Mirrors the shape produced when the client receives a DM chunk that
+    // starts with the disk separator marker (resume replay): the chunk-arrival
+    // path injects a separator before the player's reply, then appendDelta
+    // splits "---\ntext\n\n---" into a leading dm:"---" — both become
+    // separators in Phase 0, so without dedup the rendering shows two
+    // adjacent horizontal rules between every player turn and DM response.
+    const result = processNarrativeLines([
+      dm("---"),
+      { kind: "player", text: "[Adrian] action" },
+      sep(),                  // injected by handleNarrativeChunk
+      dm("---"),              // first split-part of the chunk text
+      { kind: "spacer", text: "" },
+      dm("Some narration."),
+      dm(""),
+      dm("---"),              // leading rule of the next turn from same chunk
+    ], 80);
+    const kinds = result.map((l) => l.kind);
+    // Expected per turn: separator (lead), player, separator (between),
+    // dm content, dm:"" paragraph break, separator (lead of next turn).
+    // No two separators in a row.
+    for (let i = 1; i < kinds.length; i++) {
+      const prev = kinds[i - 1];
+      const cur = kinds[i];
+      // Adjacent separators are forbidden.
+      expect(prev === "separator" && cur === "separator").toBe(false);
+    }
+    // And there should be exactly three separators in total.
+    expect(kinds.filter((k) => k === "separator")).toHaveLength(3);
+  });
+});
+
+describe("processNarrativeLines — trailing horizontal rule split", () => {
+  const dm = (text: string): NarrativeLine => ({ kind: "dm", text });
+
+  it("splits 'text.---' into a DM line plus a separator", () => {
+    const result = processNarrativeLines(
+      [dm("You drive home with the laptop bag on the passenger seat.---")],
+      80,
+    );
+    expect(result).toHaveLength(2);
+    expect(result[0].kind).toBe("dm");
+    expect(toPlainText(result[0].nodes)).toBe(
+      "You drive home with the laptop bag on the passenger seat.",
+    );
+    expect(result[1].kind).toBe("separator");
+  });
+
+  it("splits 'text ---' (with space) into DM line plus separator", () => {
+    const result = processNarrativeLines([dm("Some narration ---")], 80);
+    expect(result).toHaveLength(2);
+    expect(toPlainText(result[0].nodes)).toBe("Some narration");
+    expect(result[1].kind).toBe("separator");
+  });
+
+  it("preserves DM lines around an inline trailing rule", () => {
+    const result = processNarrativeLines([
+      dm("Before."),
+      dm("End of scene.---"),
+      dm("After."),
+    ], 80);
+    expect(result).toHaveLength(4);
+    expect(toPlainText(result[0].nodes)).toBe("Before.");
+    expect(toPlainText(result[1].nodes)).toBe("End of scene.");
+    expect(result[2].kind).toBe("separator");
+    expect(toPlainText(result[3].nodes)).toBe("After.");
+  });
+
+  it("does not split lines that merely contain dashes", () => {
+    const result = processNarrativeLines([dm("a-b-c")], 80);
+    expect(result).toHaveLength(1);
+    expect(result[0].kind).toBe("dm");
+    expect(toPlainText(result[0].nodes)).toBe("a-b-c");
+  });
+
+  it("preserves cross-line healing across an inline trailing rule", () => {
+    const result = processNarrativeLines([
+      dm("<i>still italic.---"),
+      dm("more italic</i>"),
+    ], 80);
     const dmLines = result.filter((l) => l.kind === "dm");
     const lastDM = dmLines[dmLines.length - 1];
     const hasItalic = lastDM.nodes.some(
