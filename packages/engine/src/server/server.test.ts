@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { createServer } from "./server.js";
 
@@ -55,5 +58,62 @@ describe("engine server", () => {
       });
       expect(response.statusCode).toBe(400);
     });
+  });
+});
+
+describe("createServer stdio mirror", () => {
+  let tempRoot: string;
+  let savedStdoutWrite: typeof process.stdout.write;
+  let savedStderrWrite: typeof process.stderr.write;
+  let savedStdoutTTY: boolean | undefined;
+  let savedNodeEnv: string | undefined;
+  let server: FastifyInstance | undefined;
+
+  beforeEach(() => {
+    tempRoot = mkdtempSync(join(tmpdir(), "mv-server-mirror-"));
+    savedStdoutWrite = process.stdout.write;
+    savedStderrWrite = process.stderr.write;
+    savedStdoutTTY = process.stdout.isTTY;
+    savedNodeEnv = process.env.NODE_ENV;
+    // The mirror is short-circuited when NODE_ENV === "test", so flip it
+    // to exercise the real branch.
+    process.env.NODE_ENV = "development";
+  });
+
+  afterEach(async () => {
+    if (server) {
+      await server.close();
+      server = undefined;
+    }
+    process.stdout.write = savedStdoutWrite;
+    process.stderr.write = savedStderrWrite;
+    if (savedStdoutTTY === undefined) {
+      delete (process.stdout as { isTTY?: boolean }).isTTY;
+    } else {
+      process.stdout.isTTY = savedStdoutTTY;
+    }
+    if (savedNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = savedNodeEnv;
+    rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  it("wraps stdout.write when stdout is not a TTY (headless run)", async () => {
+    process.stdout.isTTY = false;
+    const before = process.stdout.write;
+    server = await createServer({
+      campaignsDir: join(tempRoot, "campaigns"),
+      configDir: tempRoot,
+    });
+    expect(process.stdout.write).not.toBe(before);
+  });
+
+  it("does not wrap stdout.write when stdout is a TTY (launcher / interactive)", async () => {
+    process.stdout.isTTY = true;
+    const before = process.stdout.write;
+    server = await createServer({
+      campaignsDir: join(tempRoot, "campaigns"),
+      configDir: tempRoot,
+    });
+    expect(process.stdout.write).toBe(before);
   });
 });
