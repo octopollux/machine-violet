@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { LLMProvider, ChatResult, NormalizedUsage } from "./types.js";
+import type { LLMProvider, ChatResult, NormalizedUsage, ContentPart } from "./types.js";
 import { runProviderLoop } from "./agent-loop-bridge.js";
 
 function mockUsage(): NormalizedUsage {
@@ -534,6 +534,166 @@ describe("runProviderLoop round-boundary rollback", () => {
     // Nothing leaked from round 1, so a corrective snapshot would be a
     // pointless round-trip — same reasoning as the pre-stream-failure case.
     expect(onRollback).not.toHaveBeenCalled();
+  });
+
+  // Deferred TUI tools (scribe / scene_transition / dm_notes /
+  // promote_character / session_end) execute server-side after the agent
+  // loop returns, so their tool_result is just a queue confirmation. The
+  // bridge appends a uniform "narrative was delivered" signal so the model
+  // doesn't ambiguously interpret the ack and re-narrate.
+  it("appends the narrative-delivered suffix to deferred TUI tool results", async () => {
+    let callCount = 0;
+    const provider: LLMProvider = {
+      providerId: "test",
+      chat: vi.fn(),
+      stream: vi.fn(async (params, onDelta) => {
+        callCount++;
+        if (callCount === 1) {
+          const r = textPlusToolResult("Some narrative.", "scribe");
+          onDelta(r.text);
+          return r;
+        }
+        // Capture is on round 2's messages — tool_result is in there.
+        const r = textResult("Done.");
+        onDelta(r.text);
+        return r;
+      }),
+      healthCheck: vi.fn(),
+    };
+
+    await runProviderLoop(provider, "system", [
+      { role: "user", content: "hello" },
+    ], {
+      name: "test",
+      model: "test-model",
+      maxTokens: 100,
+      stream: true,
+      tuiToolNames: new Set(["scribe"]),
+      onTextDelta: vi.fn(),
+      toolHandler: () => ({
+        content: "Scribe queued: 2 update(s)",
+        _tui: { type: "scribe", updates: [] },
+      }),
+    });
+
+    const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
+    const round2Messages = streamCalls[1][0].messages;
+    const toolResultMsg = round2Messages.find(
+      (m: { role: string; content: unknown }) =>
+        m.role === "user" && Array.isArray(m.content),
+    ) as { content: ContentPart[] } | undefined;
+    const toolResultBlock = toolResultMsg?.content.find(
+      (b) => b.type === "tool_result",
+    );
+
+    expect(toolResultBlock).toBeDefined();
+    expect(toolResultBlock?.content).toContain("Scribe queued: 2 update(s)");
+    expect(toolResultBlock?.content).toContain("delivered to the player");
+    expect(toolResultBlock?.content).toContain("End your turn");
+  });
+
+  it("does NOT append the suffix to non-deferred TUI tools", async () => {
+    let callCount = 0;
+    const provider: LLMProvider = {
+      providerId: "test",
+      chat: vi.fn(),
+      stream: vi.fn(async (_params, onDelta) => {
+        callCount++;
+        if (callCount === 1) {
+          // update_modeline is a TUI tool but not in DEFERRED_TUI_TYPES —
+          // it's broadcast immediately and the model often continues
+          // narrating mid-turn, so the "end your turn" signal would
+          // actively mislead.
+          const r = textPlusToolResult("Mid-narrative.", "update_modeline");
+          onDelta(r.text);
+          return r;
+        }
+        const r = textResult("Continued.");
+        onDelta(r.text);
+        return r;
+      }),
+      healthCheck: vi.fn(),
+    };
+
+    await runProviderLoop(provider, "system", [
+      { role: "user", content: "hello" },
+    ], {
+      name: "test",
+      model: "test-model",
+      maxTokens: 100,
+      stream: true,
+      tuiToolNames: new Set(["update_modeline"]),
+      onTextDelta: vi.fn(),
+      toolHandler: () => ({
+        content: "Modeline updated.",
+        _tui: { type: "update_modeline", character: "Adrian", text: "..." },
+      }),
+    });
+
+    const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
+    const round2Messages = streamCalls[1][0].messages;
+    const toolResultMsg = round2Messages.find(
+      (m: { role: string; content: unknown }) =>
+        m.role === "user" && Array.isArray(m.content),
+    ) as { content: ContentPart[] } | undefined;
+    const toolResultBlock = toolResultMsg?.content.find(
+      (b) => b.type === "tool_result",
+    );
+
+    expect(toolResultBlock).toBeDefined();
+    expect(toolResultBlock?.content).toBe("Modeline updated.");
+    expect(toolResultBlock?.content).not.toContain("delivered to the player");
+  });
+
+  it("does NOT append the suffix when the deferred tool errored", async () => {
+    let callCount = 0;
+    const provider: LLMProvider = {
+      providerId: "test",
+      chat: vi.fn(),
+      stream: vi.fn(async (_params, onDelta) => {
+        callCount++;
+        if (callCount === 1) {
+          const r = textPlusToolResult("", "scribe");
+          return r;
+        }
+        const r = textResult("Recovered.");
+        onDelta(r.text);
+        return r;
+      }),
+      healthCheck: vi.fn(),
+    };
+
+    await runProviderLoop(provider, "system", [
+      { role: "user", content: "hello" },
+    ], {
+      name: "test",
+      model: "test-model",
+      maxTokens: 100,
+      stream: true,
+      tuiToolNames: new Set(["scribe"]),
+      onTextDelta: vi.fn(),
+      toolHandler: () => ({
+        content: "Scribe failed: invalid update",
+        is_error: true,
+        _tui: { type: "scribe", updates: [] },
+      }),
+    });
+
+    const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
+    const round2Messages = streamCalls[1][0].messages;
+    const toolResultMsg = round2Messages.find(
+      (m: { role: string; content: unknown }) =>
+        m.role === "user" && Array.isArray(m.content),
+    ) as { content: ContentPart[] } | undefined;
+    const toolResultBlock = toolResultMsg?.content.find(
+      (b) => b.type === "tool_result",
+    );
+
+    // Errors stay clean so the model sees the actual failure, not a
+    // diluted version mixed with end-your-turn boilerplate.
+    expect(toolResultBlock).toBeDefined();
+    expect(toolResultBlock?.is_error).toBe(true);
+    expect(toolResultBlock?.content).toBe("Scribe failed: invalid update");
   });
 
   it("fires both per-attempt and inter-round rollbacks when both apply", async () => {

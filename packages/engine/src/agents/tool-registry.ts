@@ -893,7 +893,7 @@ const TOOL_DEFS: RegisteredTool[] = [
       if (!character?.trim()) return err("Character name is required.");
       if (!context?.trim()) return err("Context is required — describe what changed.");
       return {
-        content: `Promoting ${character}...`,
+        content: `Promotion queued for ${character}.`,
         _tui: { type: "promote_character", character: character.trim(), context: context.trim() },
       };
     },

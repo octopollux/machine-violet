@@ -345,11 +345,31 @@ export async function runProviderLoop(
           } catch { /* not a TUI command */ }
         }
 
+        // Deferred TUI tools (scribe, scene_transition, dm_notes,
+        // promote_character, session_end) execute server-side after the
+        // agent loop returns, so their tool_result is just a queue
+        // confirmation. Without an explicit signal that the prior narrative
+        // was already delivered, the model treats the generic ack
+        // ambiguously and frequently re-narrates in the next round —
+        // verbatim or lightly regenerated, but always wasting an inference
+        // call. Append a uniform signal here so tool handlers don't each
+        // have to remember to include it (and so updating the wording is
+        // a one-line change). Skipped on errors so failure messages aren't
+        // diluted, and on non-deferred TUI tools (update_modeline,
+        // set_resource_values, etc.) where the model often continues
+        // narrating mid-turn legitimately.
+        const isDeferred = tui !== undefined
+          && DEFERRED_TUI_TYPES.has(tui.type)
+          && !toolResult.is_error;
+        const content = isDeferred
+          ? `${toolResult.content}\n\n(Your prior narrative has been delivered to the player. End your turn unless you have new narrative to add.)`
+          : toolResult.content;
+
         return {
           result: {
             type: "tool_result",
             tool_use_id: tc.id,
-            content: toolResult.content,
+            content,
             is_error: toolResult.is_error,
           },
           tui,
