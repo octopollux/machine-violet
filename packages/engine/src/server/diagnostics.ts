@@ -12,8 +12,7 @@
  *
  * `.git/` is skipped during the campaign walk: the object database is
  * heavy and rarely needed for triage — the working tree files already
- * tell the "what's the current state" story. A total in-memory cap
- * guards against pathological cases (very large logs / scene transcripts).
+ * tell the "what's the current state" story.
  */
 
 import { join, basename } from "node:path";
@@ -34,10 +33,6 @@ const DEBUG_DIR = ".debug";
 const BUNDLE_EXT = "mvdiag";
 /** Directory names skipped during the recursive walk (heavy / not useful for triage). */
 const SKIP_DIRS = new Set([".git"]);
-/** Hard cap on uncompressed bundle bytes. fflate does an in-memory zipSync,
- *  so the cap protects against OOM and keeps the resulting `.mvdiag` small
- *  enough to upload to a support channel (Discord free tier is ~25 MB). */
-const MAX_UNCOMPRESSED_BYTES = 25 * 1024 * 1024;
 
 /** Sanitize a name for use as a filename component. */
 function sanitizeFilename(name: string): string {
@@ -50,18 +45,14 @@ function sanitizeFilename(name: string): string {
 
 /**
  * Recursive walk that mirrors `walkAllBinary` from campaign-archive.ts but
- * adds two diagnostics-specific behaviors:
- *  - skip directory names in `SKIP_DIRS` (notably `.git/`)
- *  - throw `"size_exceeded"` when running totals cross `MAX_UNCOMPRESSED_BYTES`
- *
- * Kept local rather than parameterized into the shared walker so the
- * archive code path stays simple.
+ * skips directory names in `SKIP_DIRS` (notably `.git/`). Kept local rather
+ * than parameterized into the shared walker so the archive code path stays
+ * simple.
  */
 async function walkForDiagnostics(
   io: ArchiveFileIO,
   root: string,
   prefix: string,
-  acc: { totalBytes: number },
 ): Promise<{ relativePath: string; content: Uint8Array }[]> {
   const results: { relativePath: string; content: Uint8Array }[] = [];
   let entries: string[];
@@ -76,18 +67,13 @@ async function walkForDiagnostics(
     const abs = norm(join(root, entry));
     const rel = prefix ? `${prefix}/${entry}` : entry;
     if (await io.isDirectory(abs)) {
-      const children = await walkForDiagnostics(io, abs, rel, acc);
+      const children = await walkForDiagnostics(io, abs, rel);
       results.push(...children);
     } else {
       try {
         const content = await io.readBinary(abs);
-        acc.totalBytes += content.length;
-        if (acc.totalBytes > MAX_UNCOMPRESSED_BYTES) {
-          throw new Error("size_exceeded");
-        }
         results.push({ relativePath: rel, content });
-      } catch (e) {
-        if (e instanceof Error && e.message === "size_exceeded") throw e;
+      } catch {
         // Skip unreadable files — they shouldn't break the bundle.
       }
     }
@@ -135,10 +121,9 @@ export async function collectDiagnostics(
 ): Promise<DiagnosticsResult> {
   try {
     const fileMap: BinaryFileMap = {};
-    const acc = { totalBytes: 0 };
 
     // 1. Walk the campaign folder (skips .git).
-    const campaignFiles = await walkForDiagnostics(io, norm(campaignRoot), "", acc);
+    const campaignFiles = await walkForDiagnostics(io, norm(campaignRoot), "");
     for (const f of campaignFiles) {
       fileMap[`campaign/${f.relativePath}`] = f.content;
     }
@@ -146,7 +131,7 @@ export async function collectDiagnostics(
     // 2. Walk the top-level .debug folder (may not exist in test envs).
     const debugRoot = norm(join(homeDir, DEBUG_DIR));
     if (await io.exists(debugRoot)) {
-      const debugFiles = await walkForDiagnostics(io, debugRoot, "", acc);
+      const debugFiles = await walkForDiagnostics(io, debugRoot, "");
       for (const f of debugFiles) {
         fileMap[`${DEBUG_DIR}/${f.relativePath}`] = f.content;
       }
@@ -188,10 +173,6 @@ export async function collectDiagnostics(
     await io.writeBinary(zipPath, zipped);
     return { ok: true, path: zipPath };
   } catch (e) {
-    if (e instanceof Error && e.message === "size_exceeded") {
-      const mb = Math.round(MAX_UNCOMPRESSED_BYTES / (1024 * 1024));
-      return { ok: false, error: `Diagnostics bundle exceeds the ${mb} MB cap — share the campaign folder directly instead.` };
-    }
     return { ok: false, error: e instanceof Error ? e.message : "Diagnostics collection failed." };
   }
 }
