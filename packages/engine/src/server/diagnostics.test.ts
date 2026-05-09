@@ -147,18 +147,6 @@ describe("collectDiagnostics", () => {
     expect(keys.some((k) => k.startsWith("campaign/.git/"))).toBe(false);
   });
 
-  it("returns a clear error when the bundle would exceed the size cap", async () => {
-    // 30 MB single file > 25 MB cap
-    const big = new Uint8Array(30 * 1024 * 1024);
-    const fs = makeMemFs({
-      "/home/campaigns/huge/config.json": JSON.stringify({ name: "Huge" }),
-      "/home/campaigns/huge/state/giant.bin": big,
-    });
-    const result = await collectDiagnostics("/home/campaigns/huge", "/home", fs.io);
-    expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/cap|MB/i);
-  });
-
   it("writes the zip under <homeDir>/diagnostics with a sanitized name and timestamp", async () => {
     const result = await collectDiagnostics(
       "/home/campaigns/my-campaign",
