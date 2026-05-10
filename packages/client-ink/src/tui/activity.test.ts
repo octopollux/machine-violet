@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { getActivity, getToolGlyph, ACTIVITY_MAP, parseRetryState, retryLabel } from "./activity.js";
+import {
+  getActivity,
+  getActivityLabel,
+  hasElapsedAwareLabel,
+  getToolGlyph,
+  ACTIVITY_MAP,
+  parseRetryState,
+  retryLabel,
+} from "./activity.js";
 
 describe("activity indicators", () => {
   it("returns indicator for known states", () => {
@@ -28,6 +36,69 @@ describe("activity indicators", () => {
     expect(ACTIVITY_MAP.rule_lookup).toBeDefined();
     expect(ACTIVITY_MAP.scene_transition).toBeDefined();
     expect(ACTIVITY_MAP.dm_thinking).toBeDefined();
+    expect(ACTIVITY_MAP.starting_session).toBeDefined();
+  });
+
+  it("returns starting_session indicator for setup→game handoff", () => {
+    const indicator = getActivity("starting_session");
+    expect(indicator).toBeDefined();
+    expect(indicator!.label).toMatch(/preparing|setting/i);
+    expect(indicator!.glyph).toBe("◆");
+  });
+});
+
+describe("getActivityLabel", () => {
+  it("returns base label below first tier threshold", () => {
+    expect(getActivityLabel("starting_session", 0)).toBe("Preparing your campaign...");
+    expect(getActivityLabel("starting_session", 14)).toBe("Preparing your campaign...");
+  });
+
+  it("escalates to next tier once threshold is reached", () => {
+    expect(getActivityLabel("starting_session", 15)).toBe("Setting the scene...");
+    expect(getActivityLabel("starting_session", 44)).toBe("Setting the scene...");
+    expect(getActivityLabel("starting_session", 45)).toBe("Almost there...");
+    expect(getActivityLabel("starting_session", 200)).toBe("Almost there...");
+  });
+
+  it("returns base label for states without tiers", () => {
+    expect(getActivityLabel("roll_dice", 0)).toBe("Rolling...");
+    expect(getActivityLabel("roll_dice", 999)).toBe("Rolling...");
+  });
+
+  it("escalates dm_thinking after long waits", () => {
+    expect(getActivityLabel("dm_thinking", 0)).toBe("The DM is thinking...");
+    expect(getActivityLabel("dm_thinking", 30)).toBe("The DM is composing the scene...");
+    expect(getActivityLabel("dm_thinking", 75)).toBe("The DM is still working...");
+  });
+
+  it("escalates tool_running so subagent-backed tools don't blank the line", () => {
+    expect(getActivityLabel("tool_running", 0)).toBe("The DM is working...");
+    expect(getActivityLabel("tool_running", 15)).toBe("Working on the world...");
+    expect(getActivityLabel("tool_running", 45)).toBe("Still working...");
+  });
+
+  it("returns undefined for null or unknown state", () => {
+    expect(getActivityLabel(null, 0)).toBeUndefined();
+    expect(getActivityLabel("nope", 0)).toBeUndefined();
+  });
+});
+
+describe("hasElapsedAwareLabel", () => {
+  it("is true only for states that declare tier escalations", () => {
+    // Known-slow states with tiers
+    expect(hasElapsedAwareLabel("dm_thinking")).toBe(true);
+    expect(hasElapsedAwareLabel("tool_running")).toBe(true);
+    expect(hasElapsedAwareLabel("starting_session")).toBe(true);
+    // Mapped but tier-less — fast states should NOT trigger ticker/suffix
+    expect(hasElapsedAwareLabel("roll_dice")).toBe(false);
+    expect(hasElapsedAwareLabel("rule_lookup")).toBe(false);
+    expect(hasElapsedAwareLabel("scene_transition")).toBe(false);
+  });
+
+  it("is false for null or unmapped states", () => {
+    expect(hasElapsedAwareLabel(null)).toBe(false);
+    expect(hasElapsedAwareLabel("waiting_input")).toBe(false);
+    expect(hasElapsedAwareLabel("nope")).toBe(false);
   });
 });
 

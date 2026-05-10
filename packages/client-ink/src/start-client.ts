@@ -19,6 +19,7 @@ import {
   kittyKeyToLegacy,
 } from "./tui/hooks/kittyProtocol.js";
 import { installStdinFilterChain } from "./tui/hooks/stdinFilterChain.js";
+import { logInputEvent, bytesToHex, getInputDebugLogPath } from "./tui/hooks/inputDebugLog.js";
 import { getAgentClientState } from "./agent-state-ref.js";
 
 export interface StartClientOptions {
@@ -95,11 +96,22 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
   const hasKitty = !mockStdin && activeStdin.isTTY
     ? await detectKittySupport({ stdin: activeStdin, stdout: process.stdout })
     : false;
+  logInputEvent("start-client", {
+    hasKitty,
+    isTTY: !!activeStdin.isTTY,
+    mockStdin: !!mockStdin,
+    logPath: getInputDebugLogPath(),
+  });
   if (hasKitty) {
     enableKittyProtocol(process.stdout);
     filterChain.add(createKittyFilter((key) => {
       // Re-emit as legacy bytes so Ink's useInput picks them up.
       const legacy = kittyKeyToLegacy(key);
+      logInputEvent("kitty-legacy-push", {
+        key: key.key,
+        legacy: legacy === null ? null : bytesToHex(legacy),
+        legacyLen: legacy?.length ?? 0,
+      });
       if (legacy !== null) activeStdin.push(legacy);
     }));
   }

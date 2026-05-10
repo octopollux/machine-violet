@@ -100,6 +100,12 @@ export interface EngineCallbacks {
   onError: (error: Error) => void;
   /** API call is being retried after a retryable error */
   onRetry: (status: number, delayMs: number) => void;
+  /**
+   * A streaming API call failed mid-stream and is about to be retried.
+   * Implementations should drop any partial deltas already emitted to
+   * clients so the retry can stream cleanly from the start.
+   */
+  onRollback?: () => void;
   /** A player turn is starting (before any API work) */
   onTurnStart: (turn: TurnInfo) => void;
   /** A participant turn has ended */

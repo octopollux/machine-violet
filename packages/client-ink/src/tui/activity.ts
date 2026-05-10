@@ -1,11 +1,54 @@
 import type { ActivityIndicator } from "@machine-violet/shared/types/tui.js";
 
-/** Map of engine states to their display indicators */
-export const ACTIVITY_MAP: Record<string, ActivityIndicator> = {
+/** A label tier that becomes active once `atSec` of elapsed time has passed. */
+export interface LabelTier {
+  atSec: number;
+  label: string;
+}
+
+/** Internal indicator with optional escalation tiers. */
+type IndicatorWithTiers = ActivityIndicator & { tiers?: LabelTier[] };
+
+/** Map of engine states to their display indicators.
+ *  `tiers` (optional) escalate the label after the listed elapsed seconds —
+ *  used for known-slow states (campaign start, first DM turn) so a long
+ *  silent wait reads as progress rather than a hung UI. */
+export const ACTIVITY_MAP: Record<string, IndicatorWithTiers> = {
   roll_dice: { label: "Rolling...", glyph: "⚄" },
   rule_lookup: { label: "Checking rules...", glyph: "📖" },
   scene_transition: { label: "Scene transition...", glyph: "⟳" },
-  dm_thinking: { label: "The DM is thinking...", glyph: "◆" },
+  dm_thinking: {
+    label: "The DM is thinking...",
+    glyph: "◆",
+    tiers: [
+      { atSec: 30, label: "The DM is composing the scene..." },
+      { atSec: 75, label: "The DM is still working..." },
+    ],
+  },
+  // Engine emits this for the duration of any in-flight tool call.
+  // Most tools finish in milliseconds, but subagent-backed tools (style_scene
+  // → theme-styler, scribe, etc.) routinely run 20-60s. Without an entry
+  // here the activity line goes blank — taking the accumulated tool glyphs
+  // with it — and the user sees what looks like a player-turn pause.
+  tool_running: {
+    label: "The DM is working...",
+    glyph: "◆",
+    tiers: [
+      { atSec: 15, label: "Working on the world..." },
+      { atSec: 45, label: "Still working..." },
+    ],
+  },
+  // Spans the gap between setup→game handoff and the first DM event.
+  // The first DM turn after setup is a long single LLM call (theme + modelines
+  // + resources + opening narration) and routinely takes 60-90s of silence.
+  starting_session: {
+    label: "Preparing your campaign...",
+    glyph: "◆",
+    tiers: [
+      { atSec: 15, label: "Setting the scene..." },
+      { atSec: 45, label: "Almost there..." },
+    ],
+  },
 };
 
 /** A glyph with an optional color (for non-emoji unicode characters). */
@@ -85,5 +128,36 @@ export function getActivity(
   state: string | null,
 ): ActivityIndicator | undefined {
   if (!state) return undefined;
-  return ACTIVITY_MAP[state];
+  const ind = ACTIVITY_MAP[state];
+  if (!ind) return undefined;
+  return { label: ind.label, glyph: ind.glyph };
+}
+
+/** Resolve the label for an engine state at a given elapsed time.
+ *  Walks the indicator's tier list (if any) and returns the latest tier
+ *  whose threshold has been reached, falling back to the base label. */
+export function getActivityLabel(
+  state: string | null,
+  elapsedSec: number,
+): string | undefined {
+  if (!state) return undefined;
+  const ind = ACTIVITY_MAP[state];
+  if (!ind) return undefined;
+  let label = ind.label;
+  if (ind.tiers) {
+    for (const t of ind.tiers) {
+      if (elapsedSec >= t.atSec) label = t.label;
+    }
+  }
+  return label;
+}
+
+/** True when the state's indicator declares tier escalations — i.e. it's a
+ *  known-slow state that should display elapsed-time hints and tick its
+ *  label. Fast states (roll_dice, rule_lookup) return false here so they
+ *  don't accumulate "(Ns)" suffixes or burn an interval timer. */
+export function hasElapsedAwareLabel(state: string | null): boolean {
+  if (!state) return false;
+  const ind = ACTIVITY_MAP[state];
+  return !!(ind?.tiers && ind.tiers.length > 0);
 }

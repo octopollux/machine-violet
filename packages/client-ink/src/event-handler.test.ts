@@ -231,6 +231,29 @@ describe("event-handler", () => {
       expect(h.state.toolGlyphs).toEqual([]);
     });
 
+    it("clears tool glyphs when turn ends (engineState → waiting_input)", () => {
+      const h = makeHarness();
+      // Mid-turn: glyphs accumulate
+      h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
+      h.dispatch({ type: "activity:update", data: { toolStarted: "roll_dice" } });
+      h.dispatch({ type: "activity:update", data: { toolStarted: "scribe" } });
+      expect(h.state.toolGlyphs.length).toBe(2);
+
+      // Turn ends — glyphs belong to the previous turn, not the player's input window
+      h.dispatch({ type: "activity:update", data: { engineState: "waiting_input" } });
+      expect(h.state.toolGlyphs).toEqual([]);
+    });
+
+    it("clears tool glyphs when engine returns to idle", () => {
+      const h = makeHarness();
+      h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
+      h.dispatch({ type: "activity:update", data: { toolStarted: "roll_dice" } });
+      expect(h.state.toolGlyphs.length).toBe(1);
+
+      h.dispatch({ type: "activity:update", data: { engineState: "idle" } });
+      expect(h.state.toolGlyphs).toEqual([]);
+    });
+
     it("preserves tool glyphs on tool_running → dm_thinking within a turn", () => {
       const h = makeHarness();
       // DM starts thinking
@@ -250,6 +273,76 @@ describe("event-handler", () => {
       h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
       expect(h.state.engineState).toBe("dm_thinking");
     });
+
+    it("stamps engineStateSince when state changes", () => {
+      const h = makeHarness();
+      const before = Date.now();
+      h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
+      const after = Date.now();
+      expect(h.state.engineStateSince).not.toBeNull();
+      expect(h.state.engineStateSince!).toBeGreaterThanOrEqual(before);
+      expect(h.state.engineStateSince!).toBeLessThanOrEqual(after);
+    });
+
+    it("does not bump engineStateSince when state value is unchanged", () => {
+      const h = makeHarness();
+      h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
+      const firstStamp = h.state.engineStateSince;
+      // tool start without state change should preserve the timestamp
+      h.dispatch({ type: "activity:update", data: { toolStarted: "roll_dice" } });
+      expect(h.state.engineStateSince).toBe(firstStamp);
+    });
+
+    it("bumps engineStateSince on transition between distinct states", async () => {
+      const h = makeHarness();
+      h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
+      const first = h.state.engineStateSince!;
+      // Wait a tick so Date.now() advances reliably even on coarse clocks
+      await new Promise((r) => setTimeout(r, 5));
+      h.dispatch({ type: "activity:update", data: { engineState: "tool_running" } });
+      expect(h.state.engineStateSince!).toBeGreaterThan(first);
+    });
+  });
+
+  describe("session:transition", () => {
+    it("sets engineState to starting_session and stamps engineStateSince", () => {
+      const h = makeHarness();
+      const before = Date.now();
+      h.dispatch({
+        type: "session:transition",
+        data: { campaignId: "new-campaign", campaignName: "New Campaign" },
+      });
+      const after = Date.now();
+
+      expect(h.state.engineState).toBe("starting_session");
+      expect(h.state.engineStateSince).not.toBeNull();
+      expect(h.state.engineStateSince!).toBeGreaterThanOrEqual(before);
+      expect(h.state.engineStateSince!).toBeLessThanOrEqual(after);
+      expect(h.state.transitionCampaignId).toBe("new-campaign");
+      expect(h.state.transitionCampaignName).toBe("New Campaign");
+      // Tool glyphs and stale per-session state get cleared
+      expect(h.state.toolGlyphs).toEqual([]);
+      expect(h.state.currentTurn).toBeNull();
+      expect(h.state.activeChoices).toBeNull();
+      expect(h.state.stateSnapshot).toBeNull();
+    });
+
+    it("clears tool glyphs when first dm_thinking arrives after starting_session", () => {
+      const h = makeHarness();
+      // Stale glyph from the dying setup session
+      h.dispatch({ type: "activity:update", data: { toolStarted: "roll_dice" } });
+      // Transition arrives — glyphs cleared, state becomes starting_session
+      h.dispatch({
+        type: "session:transition",
+        data: { campaignId: "c2" },
+      });
+      expect(h.state.toolGlyphs).toEqual([]);
+      // First dm_thinking from the new session is treated as a new turn,
+      // so any glyphs accumulated in between are cleared.
+      h.dispatch({ type: "activity:update", data: { toolStarted: "scribe" } });
+      h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
+      expect(h.state.toolGlyphs).toEqual([]);
+    });
   });
 
   describe("state snapshot", () => {
@@ -267,6 +360,108 @@ describe("event-handler", () => {
       expect(h.state.stateSnapshot).not.toBeNull();
       expect(h.state.stateSnapshot!.campaignId).toBe("c1");
     });
+
+    // Issue #431: snapshots that include narrativeLines act as authoritative
+    // resets — the server uses this on retry rollback to discard a partial
+    // DM stream that's about to be re-issued, and on connect to give
+    // reconnecting clients the prior history.
+    it("REPLACES narrativeLines when snapshot includes them", () => {
+      const h = makeHarness();
+      // Accumulate some chunks (simulating the partial bug-causing stream)
+      h.dispatch({ type: "narrative:chunk", data: { text: "The bell ", kind: "dm" } });
+      h.dispatch({ type: "narrative:chunk", data: { text: "chimes. Mol", kind: "dm" } });
+      expect(h.state.narrativeLines.length).toBeGreaterThan(0);
+
+      // Server publishes a corrective snapshot — committed transcript only.
+      h.dispatch({
+        type: "state:snapshot",
+        data: {
+          campaignId: "c1", campaignName: "Test", players: [],
+          activePlayerIndex: 0, displayResources: {}, resourceValues: {},
+          modelines: {}, mode: "play",
+          narrativeLines: [
+            { kind: "player", text: "[Aldric] open the door" },
+          ],
+        },
+      });
+
+      expect(h.state.narrativeLines).toEqual([
+        { kind: "player", text: "[Aldric] open the door" },
+      ]);
+    });
+
+    // Per-turn snapshots omit narrativeLines specifically so they don't
+    // clobber in-flight stream deltas. Client must coalesce to existing
+    // state in that case.
+    it("PRESERVES narrativeLines when snapshot omits them", () => {
+      const h = makeHarness();
+      h.dispatch({ type: "narrative:chunk", data: { text: "Hello world", kind: "dm" } });
+      const before = h.state.narrativeLines;
+
+      h.dispatch({
+        type: "state:snapshot",
+        data: {
+          campaignId: "c1", campaignName: "Test", players: [],
+          activePlayerIndex: 0, displayResources: {}, resourceValues: {},
+          modelines: {}, mode: "play",
+          // No narrativeLines field
+        },
+      });
+
+      expect(h.state.narrativeLines).toEqual(before);
+    });
+
+    // Server only sends dm/player kinds. Turn separators must be re-derived
+    // client-side so the post-replace rendering matches what live streaming
+    // would produce — otherwise a rolled-back retry would visibly drop the
+    // turn-boundary divider that was rendered before the failure.
+    it("re-derives turn separators between player and dm transitions", () => {
+      const h = makeHarness();
+      h.dispatch({
+        type: "state:snapshot",
+        data: {
+          campaignId: "c1", campaignName: "Test", players: [],
+          activePlayerIndex: 0, displayResources: {}, resourceValues: {},
+          modelines: {}, mode: "play",
+          narrativeLines: [
+            { kind: "dm", text: "Opening narration." },
+            { kind: "player", text: "[Aldric] open the door" },
+            { kind: "dm", text: "The door swings open." },
+            { kind: "dm", text: "" },
+            { kind: "dm", text: "A bell chimes." },
+          ],
+        },
+      });
+
+      // Separator inserted only at the player→dm boundary, not before the
+      // very first dm line and not between consecutive dm lines.
+      expect(h.state.narrativeLines).toEqual([
+        { kind: "dm", text: "Opening narration." },
+        { kind: "player", text: "[Aldric] open the door" },
+        { kind: "separator", text: "---" },
+        { kind: "dm", text: "The door swings open." },
+        { kind: "dm", text: "" },
+        { kind: "dm", text: "A bell chimes." },
+      ]);
+    });
+
+    it("treats empty narrativeLines as 'replace with empty' (not omitted)", () => {
+      const h = makeHarness();
+      h.dispatch({ type: "narrative:chunk", data: { text: "stale", kind: "dm" } });
+      expect(h.state.narrativeLines.length).toBeGreaterThan(0);
+
+      h.dispatch({
+        type: "state:snapshot",
+        data: {
+          campaignId: "c1", campaignName: "Test", players: [],
+          activePlayerIndex: 0, displayResources: {}, resourceValues: {},
+          modelines: {}, mode: "play",
+          narrativeLines: [],
+        },
+      });
+
+      expect(h.state.narrativeLines).toEqual([]);
+    });
   });
 
   describe("set_display_resources", () => {
@@ -277,6 +472,25 @@ describe("event-handler", () => {
         data: { engineState: "tui:set_display_resources", character: "Aldric", resources: ["HP", "Spell Slots"] },
       });
       expect(h.state.displayResources).toEqual({ Aldric: ["HP", "Spell Slots"] });
+    });
+
+    it("does not override engineState (tui:* values are data carriers)", () => {
+      // Regression: tui:* states used to overwrite engineState, briefly
+      // dropping the activity indicator into an unmapped state during every
+      // TUI command. They're routing metadata, not real state transitions.
+      const h = makeHarness();
+      h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
+      const stampBefore = h.state.engineStateSince;
+
+      h.dispatch({
+        type: "activity:update",
+        data: { engineState: "tui:set_display_resources", character: "Aldric", resources: ["HP"] },
+      });
+
+      expect(h.state.engineState).toBe("dm_thinking");
+      expect(h.state.engineStateSince).toBe(stampBefore);
+      // Data payload still applied
+      expect(h.state.displayResources).toEqual({ Aldric: ["HP"] });
     });
 
     it("merges resources for multiple characters", () => {
@@ -350,6 +564,7 @@ describe("event-handler", () => {
         recoverable: true,
         status: 529,
         delayMs: 2000,
+        attemptId: 1,
       });
     });
 
@@ -365,7 +580,25 @@ describe("event-handler", () => {
         recoverable: false,
         status: undefined,
         delayMs: undefined,
+        attemptId: undefined,
       });
+    });
+
+    it("bumps attemptId on each successive recoverable retry", () => {
+      const h = makeHarness();
+      h.dispatch({
+        type: "error",
+        data: { message: "retry 1", recoverable: true, status: 529, delayMs: 12000 },
+      });
+      expect(h.state.lastError?.attemptId).toBe(1);
+
+      // Same status/delay (backoff capped) — attemptId must still advance
+      // so the modal resets its countdown.
+      h.dispatch({
+        type: "error",
+        data: { message: "retry 2", recoverable: true, status: 529, delayMs: 12000 },
+      });
+      expect(h.state.lastError?.attemptId).toBe(2);
     });
 
     it("clears recoverable lastError on narrative:chunk", () => {
@@ -379,6 +612,40 @@ describe("event-handler", () => {
 
       // Narrative chunk arrives → retry succeeded
       h.dispatch({ type: "narrative:chunk", data: { text: "The door opens.", kind: "dm" } });
+      expect(h.state.lastError).toBeNull();
+    });
+
+    it("clears recoverable lastError on choices:presented", () => {
+      // Regression: a successful choice-generator subagent retry produces
+      // choices:presented, not narrative:chunk. The modal must still close.
+      const h = makeHarness();
+      h.dispatch({
+        type: "error",
+        data: { message: "retry", recoverable: true, status: 529, delayMs: 4000 },
+      });
+      expect(h.state.lastError).not.toBeNull();
+
+      h.dispatch({
+        type: "choices:presented",
+        data: { id: "x", prompt: "", choices: ["a", "b"] },
+      });
+      expect(h.state.lastError).toBeNull();
+    });
+
+    it("clears recoverable lastError on activity:update", () => {
+      // Any progress signal proves the retry resolved — even tool-only API
+      // responses produce activity updates rather than narrative.
+      const h = makeHarness();
+      h.dispatch({
+        type: "error",
+        data: { message: "retry", recoverable: true, status: 0, delayMs: 1000 },
+      });
+      expect(h.state.lastError).not.toBeNull();
+
+      h.dispatch({
+        type: "activity:update",
+        data: { engineState: "dm_thinking" },
+      });
       expect(h.state.lastError).toBeNull();
     });
 

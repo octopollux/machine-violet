@@ -1,6 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Text, useInput, usePaste, useStdin } from "ink";
 import chalk from "chalk";
+import { logInputEvent, bytesToHex } from "../hooks/inputDebugLog.js";
+
+// Diagnostic logging — see inputDebugLog.ts. Remove with the rest of the
+// instrumentation once the missed-Enter bug is resolved.
+let nextInstanceId = 1;
 
 interface State {
   value: string;
@@ -146,6 +151,18 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
 
   const viewStartRef = useRef(0);
 
+  // Diagnostic logging — see inputDebugLog.ts.
+  const instanceIdRef = useRef<number>(0);
+  if (instanceIdRef.current === 0) instanceIdRef.current = nextInstanceId++;
+  const instanceId = instanceIdRef.current;
+  useEffect(() => {
+    logInputEvent("inline-mount", { instanceId });
+    return () => { logInputEvent("inline-unmount", { instanceId }); };
+  }, [instanceId]);
+  useEffect(() => {
+    logInputEvent("inline-disabled", { instanceId, isDisabled });
+  }, [instanceId, isDisabled]);
+
   /** Apply an action and immediately sync to render state. */
   const processAction = useCallback((action: Action) => {
     const prev = stateRef.current;
@@ -168,6 +185,12 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
     if (!emitter) return;
 
     const handleRaw = (data: string) => {
+      logInputEvent("inline-raw-input", {
+        instanceId,
+        isDisabled,
+        len: typeof data === "string" ? data.length : -1,
+        hex: typeof data === "string" ? bytesToHex(data) : "<non-string>",
+      });
       if (HOME_SEQUENCES.has(data)) {
         processAction({ type: "move-cursor-start" });
       } else if (END_SEQUENCES.has(data)) {
@@ -180,8 +203,10 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
   }, [isDisabled, stdinCtx, processAction]);
 
   const submit = useCallback(() => {
-    onSubmit?.(stateRef.current.value);
-  }, [onSubmit]);
+    const value = stateRef.current.value;
+    logInputEvent("inline-submit", { instanceId, valueLen: value.length, value });
+    onSubmit?.(value);
+  }, [onSubmit, instanceId]);
 
   // Fire onChange when the rendered value diverges from the last reported value.
   useEffect(() => {
@@ -197,10 +222,37 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
   // trailing-newline paste ("foo\n") doesn't land an extra space in the value.
   usePaste((text) => {
     const sanitized = text.replace(/[\r\n]+/g, " ").trim();
+    logInputEvent("inline-paste", {
+      instanceId,
+      isDisabled,
+      rawLen: text.length,
+      sanitizedLen: sanitized.length,
+      hex: bytesToHex(text),
+    });
     if (sanitized.length > 0) processAction({ type: "insert", text: sanitized });
   }, { isActive: !isDisabled });
 
   useInput((input, key) => {
+    logInputEvent("inline-key", {
+      instanceId,
+      isDisabled,
+      inputLen: input.length,
+      inputHex: bytesToHex(input),
+      keyReturn: key.return,
+      keyEscape: key.escape,
+      keyTab: key.tab,
+      keyBackspace: key.backspace,
+      keyDelete: key.delete,
+      keyLeft: key.leftArrow,
+      keyRight: key.rightArrow,
+      keyUp: key.upArrow,
+      keyDown: key.downArrow,
+      keyHome: (key as { home?: boolean }).home,
+      keyEnd: (key as { end?: boolean }).end,
+      keyCtrl: key.ctrl,
+      keyMeta: key.meta,
+      keyShift: key.shift,
+    });
     // Pass through keys we don't handle
     if (key.upArrow || key.downArrow || (key.ctrl && input === "c") || key.tab || (key.shift && key.tab)) {
       return;

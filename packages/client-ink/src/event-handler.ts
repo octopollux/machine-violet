@@ -35,6 +35,10 @@ export interface ClientState {
   currentTurn: Turn | null;
   activeChoices: ChoicesData | null;
   engineState: string | null;
+  /** Wall-clock timestamp (ms) when `engineState` last changed value.
+   *  Used by ActivityLine to render elapsed-time hints during long waits.
+   *  null when engineState is null. */
+  engineStateSince: number | null;
   /** Accumulated tool glyphs for the current DM turn. Cleared on new turn. */
   toolGlyphs: ToolGlyph[];
   variant: StyleVariant;
@@ -50,7 +54,17 @@ export interface ClientState {
   transitionCampaignId: string | null;
   /** Human-readable campaign name from the transition event. */
   transitionCampaignName: string | null;
-  lastError: { message: string; recoverable: boolean; status?: number; delayMs?: number } | null;
+  lastError: {
+    message: string;
+    recoverable: boolean;
+    status?: number;
+    delayMs?: number;
+    /** Monotonic id stamped when the retry event arrives. Used by the modal
+     *  to reset its countdown even if status/delayMs are identical to the
+     *  previous retry (the backoff caps at 12s, so successive attempts
+     *  routinely look identical). */
+    attemptId?: number;
+  } | null;
   /** Per-character modeline text (character name → status string). */
   modelines: Record<string, string>;
   /** Per-character resource display keys. */
@@ -65,6 +79,7 @@ export function initialClientState(): ClientState {
     currentTurn: null,
     activeChoices: null,
     engineState: null,
+    engineStateSince: null,
     toolGlyphs: [],
     variant: "exploration",
     mode: "play",
@@ -85,11 +100,47 @@ export function initialClientState(): ClientState {
 export type StateUpdater = (fn: (prev: ClientState) => ClientState) => void;
 
 /**
+ * Event types that prove the engine is making forward progress on the
+ * agent loop. Receiving any of these means an in-flight API retry has
+ * resolved, so the recoverable `lastError` (and the connection-issue
+ * modal it drives) should clear — even if the resolution didn't
+ * produce a narrative chunk (e.g., a successful choice-generator
+ * subagent call emits `choices:presented`, not `narrative:chunk`,
+ * and would otherwise leave the modal stuck).
+ *
+ * Allowlist (not an exclude list of `error` + `discord:presence`)
+ * because new event types should default to *not* clearing the modal:
+ * silently dismissing a retry overlay because some unrelated UI-side
+ * event arrived is worse than leaving it open one event longer.
+ */
+const PROGRESS_EVENT_TYPES: ReadonlySet<ServerEvent["type"]> = new Set([
+  "narrative:chunk",
+  "narrative:complete",
+  "turn:opened",
+  "turn:updated",
+  "turn:committed",
+  "turn:resolved",
+  "choices:presented",
+  "choices:cleared",
+  "activity:update",
+  "state:snapshot",
+  "session:mode",
+  "session:ended",
+  "session:transition",
+]);
+
+/**
  * Create an event handler that dispatches server events to state updates.
  * Pass this as the `onEvent` callback to WsClient.
  */
 export function createEventHandler(update: StateUpdater): (event: ServerEvent) => void {
   return (event: ServerEvent) => {
+    if (PROGRESS_EVENT_TYPES.has(event.type)) {
+      update((prev) =>
+        prev.lastError?.recoverable ? { ...prev, lastError: null } : prev,
+      );
+    }
+
     switch (event.type) {
       case "narrative:chunk":
         handleNarrativeChunk(event, update);
@@ -130,6 +181,11 @@ export function createEventHandler(update: StateUpdater): (event: ServerEvent) =
       case "session:transition": {
         // Clear state that could trigger stale detection before the
         // app's useEffect runs and reconnects the WebSocket.
+        //
+        // engineState becomes "starting_session" (not null) so the activity
+        // line keeps spinning across the WS reconnect and the long first
+        // DM call. Without this the UI reads as "control returned to player"
+        // for 60-90s while the DM agent thinks silently.
         const transition = event.data as { campaignId: string; campaignName?: string };
         update((prev) => ({
           ...prev,
@@ -138,7 +194,8 @@ export function createEventHandler(update: StateUpdater): (event: ServerEvent) =
           stateSnapshot: null,
           currentTurn: null,
           activeChoices: null,
-          engineState: null,
+          engineState: "starting_session",
+          engineStateSince: Date.now(),
           toolGlyphs: [],
         }));
         break;
@@ -172,6 +229,32 @@ function shouldInjectDmSeparator(lines: NarrativeLine[]): boolean {
   return false;
 }
 
+/**
+ * Reconstruct the rendered narrative shape (with turn separators) from a
+ * flat dm/player line sequence — used when handleStateSnapshot replaces
+ * the local log with the server's authoritative committed transcript.
+ *
+ * Mirrors the per-chunk separator injection that happens during live
+ * streaming so the rendered output looks identical whether the lines
+ * arrived live or via snapshot replace. Spacers between turns aren't
+ * recreated (they're added by handleNarrativeComplete during live play
+ * and by appendDelta on intra-paragraph newlines, neither of which
+ * applies to a one-shot replace) — empty dm lines in the source serve
+ * the same paragraph-boundary role.
+ */
+function withTurnSeparators(
+  source: readonly { kind: "dm" | "player"; text: string }[],
+): NarrativeLine[] {
+  const out: NarrativeLine[] = [];
+  for (const line of source) {
+    if (line.kind === "dm" && shouldInjectDmSeparator(out)) {
+      out.push({ kind: "separator", text: "---" });
+    }
+    out.push(line);
+  }
+  return out;
+}
+
 function handleNarrativeChunk(event: NarrativeChunkEvent, update: StateUpdater): void {
   const { text, kind } = event.data;
   const lineKind = (kind ?? "dm") as NarrativeLine["kind"];
@@ -190,8 +273,6 @@ function handleNarrativeChunk(event: NarrativeChunkEvent, update: StateUpdater):
     return {
       ...prev,
       narrativeLines: appendDelta(lines, text, lineKind),
-      // Clear any retry error — arriving data proves the retry succeeded
-      lastError: prev.lastError?.recoverable ? null : prev.lastError,
     };
   });
 }
@@ -276,6 +357,14 @@ function handleActivityUpdate(event: ActivityUpdateEvent, update: StateUpdater):
   const data = event.data as Record<string, unknown>;
   const { engineState, toolStarted } = data;
 
+  // tui:* engineState values are data carriers (TUI command payloads riding
+  // on the activity:update channel), not real engine state transitions. They
+  // must not override engineState — otherwise the activity indicator briefly
+  // drops to an unmapped state during every TUI command, blanking the
+  // full-height activity line label and the standard-tier modeline glyph.
+  const isTuiPayload = typeof engineState === "string" && engineState.startsWith("tui:");
+  const incomingState = isTuiPayload ? undefined : (engineState as string | undefined);
+
   update((prev) => {
     // Accumulate tool glyphs for the turn (don't remove on end — they persist visually)
     let glyphs = prev.toolGlyphs;
@@ -284,24 +373,45 @@ function handleActivityUpdate(event: ActivityUpdateEvent, update: StateUpdater):
       if (tg) glyphs = [...glyphs, tg];
     }
 
-    // Clear glyphs only when entering dm_thinking from idle (new turn),
-    // not on tool_running → dm_thinking transitions within a turn.
-    const newState = (engineState as string) ?? prev.engineState;
-    const wasIdle = !prev.engineState || prev.engineState === "waiting_input";
-    if (engineState === "dm_thinking" && wasIdle) {
+    // Clear glyphs at two natural turn boundaries:
+    //   1. End of turn — engine transitions to "waiting_input" or "idle".
+    //      Glyphs belong to the turn that just ended; they should not bleed
+    //      into the player's input window. (This mattered less before
+    //      ActivityLine learned to render glyphs without a label, because
+    //      the row was hidden during idle states. Now it stays visible, so
+    //      we have to clear explicitly.)
+    //   2. Start of next turn — entering "dm_thinking" from an idle state.
+    //      Belt-and-suspenders: covers cases where the engine skips straight
+    //      to thinking without an explicit waiting_input event.
+    // "starting_session" counts as idle — the first dm_thinking after a
+    // setup→game handoff is the start of a fresh turn.
+    // tool_running → dm_thinking transitions within a turn must NOT clear.
+    const newState = incomingState ?? prev.engineState;
+    const wasIdle = !prev.engineState
+      || prev.engineState === "waiting_input"
+      || prev.engineState === "starting_session";
+    if (incomingState === "waiting_input" || incomingState === "idle") {
+      glyphs = [];
+    } else if (incomingState === "dm_thinking" && wasIdle) {
       glyphs = [];
     }
 
+    // Stamp engineStateSince whenever engineState transitions to a new value
+    // so ActivityLine can render elapsed-time hints during long waits.
+    const stateChanged = newState !== prev.engineState;
     let next = {
       ...prev,
       engineState: newState,
+      engineStateSince: stateChanged
+        ? (newState ? Date.now() : null)
+        : prev.engineStateSince,
       toolGlyphs: glyphs,
     };
 
-    // Handle embedded TUI command payloads
-    const tuiType = typeof engineState === "string" && engineState.startsWith("tui:")
-      ? engineState.slice(4)
-      : null;
+    // Handle embedded TUI command payloads (engineState carries the tui:*
+    // discriminator only as routing metadata — the actual engine state was
+    // preserved above).
+    const tuiType = isTuiPayload ? (engineState as string).slice(4) : null;
 
     if (tuiType === "update_modeline") {
       const character = data.character as string | undefined;
@@ -347,6 +457,17 @@ function handleStateSnapshot(event: StateSnapshotEvent, update: StateUpdater): v
       displayResources: snapshot.displayResources ?? prev.displayResources,
       resourceValues: snapshot.resourceValues ?? prev.resourceValues,
       modelines: snapshot.modelines ?? prev.modelines,
+      // Authoritative transcript replace, when the server includes one.
+      // Sent on connect (so reconnecting clients see history) and on retry
+      // rollback (to discard a partial DM stream that's about to be
+      // re-issued). Snapshots that omit narrativeLines preserve whatever
+      // we've already accumulated, so per-turn snapshots don't clobber
+      // in-flight stream deltas. The server only carries dm/player lines;
+      // we re-derive turn separators here so the post-replace rendering
+      // matches what the live-streaming path produces.
+      narrativeLines: snapshot.narrativeLines
+        ? withTurnSeparators(snapshot.narrativeLines)
+        : prev.narrativeLines,
     };
   });
 }
@@ -379,6 +500,9 @@ function handleError(event: ErrorEvent, update: StateUpdater): void {
       recoverable: event.data.recoverable,
       status: event.data.status,
       delayMs: event.data.delayMs,
+      attemptId: event.data.recoverable
+        ? (prev.lastError?.attemptId ?? 0) + 1
+        : undefined,
     },
   }));
 }

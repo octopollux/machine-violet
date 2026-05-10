@@ -30,7 +30,7 @@ import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { useGameContext } from "../tui/game-context.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
 import { buildTranscriptHtml } from "../commands/transcript.js";
-import { openPath } from "../commands/open-path.js";
+import { openPath, revealInExplorer } from "../commands/open-path.js";
 
 export function PlayingPhase() {
   const {
@@ -38,7 +38,7 @@ export function PlayingPhase() {
     narrativeLines, setNarrativeLines,
     theme,
     campaignName, activePlayerIndex,
-    engineState, toolGlyphs, resources, modelines,
+    engineState, engineStateSince, toolGlyphs, resources, modelines,
     currentTurn,
     activeChoices, setActiveChoices,
     activeModal, setActiveModal,
@@ -139,6 +139,20 @@ export function PlayingPhase() {
       // Client-side commands (need access to TUI state)
       if (name === "transcript") {
         await saveTranscript();
+        clearInput();
+        return;
+      }
+
+      // /diagnostics: server zips campaign + .debug, client reveals it locally
+      if (name === "diagnostics") {
+        try {
+          const { path } = await apiClient.diagnostics();
+          setNarrativeLines((prev) => [...prev, { kind: "system", text: `[Diagnostics saved: ${path}]` }]);
+          revealInExplorer(path);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setNarrativeLines((prev) => [...prev, { kind: "system", text: `[Diagnostics failed: ${msg}]` }]);
+        }
         clearInput();
         return;
       }
@@ -360,6 +374,7 @@ export function PlayingPhase() {
         resources={resources}
         turnHolder={engineState === "waiting_input" ? activeChar : "DM"}
         engineState={engineState}
+        engineStateSince={engineStateSince}
         toolGlyphs={toolGlyphs}
         quoteColor="#ffffff"
         playerColor={stateSnapshot?.players?.[activePlayerIndex]?.color}

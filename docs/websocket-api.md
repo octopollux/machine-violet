@@ -47,6 +47,8 @@ The `type` field is a string discriminant. The `data` field varies by event type
 
 Streaming DM narration text, buffered by word boundaries (whitespace/newline, or >200 chars, with a 50ms flush timeout). Multiple chunks arrive during a single DM response.
 
+If a streaming API call fails mid-response and the engine is about to retry, the server first publishes a `state:snapshot` containing the committed `narrativeLines` (everything before the failed turn). Clients should treat that snapshot as authoritative and replace their accumulated log — otherwise the retry's chunks will visibly duplicate the partial text from the failed attempt. See `state:snapshot` below.
+
 | Field     | Type     | Description |
 |-----------|----------|-------------|
 | `text`    | string   | A buffered fragment of DM output. |
@@ -198,6 +200,7 @@ Full game state. Sent on initial connect, after every DM turn completes, after s
 | `sceneNumber`      | number?  | Current scene number. |
 | `scenePrecis`      | string?  | One-line scene summary. |
 | `sessionRecap`     | object?  | `{ id, lines }` — present only in the first snapshot after a clean session-end. Client renders the "Previously on..." modal; server clears the pending flag as it emits. Omitted on mid-session reconnects and fresh campaigns. |
+| `narrativeLines`   | array?   | Authoritative committed transcript (`{ kind: "dm" \| "player", text }`). When present, the client REPLACES its accumulated narrative log; when omitted, the existing log is preserved. Sent on connect (so reconnecting clients see history) and on retry rollback (so a partial DM stream that's about to be re-issued doesn't accumulate twice on the client). Per-turn snapshots intentionally omit it to avoid clobbering in-flight stream deltas. |
 
 **Player** (nested in `players` array):
 
@@ -229,6 +232,8 @@ The server is transitioning from the setup session to a newly created campaign. 
 |----------------|---------|-------------|
 | `campaignId`   | string  | The campaign ID of the newly created campaign. |
 | `campaignName` | string? | Human-readable campaign name for immediate display. |
+
+The reference client keeps its activity line live across the transition by setting `engineState` to `"starting_session"` on receipt (and timestamping the change), so the indicator survives the WS reconnect and the long first DM call. See [Activity Indicators / Elapsed-time hints](tui-design.md#elapsed-time-hints-and-tier-escalation).
 
 #### `session:ended`
 

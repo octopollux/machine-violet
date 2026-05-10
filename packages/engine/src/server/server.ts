@@ -43,8 +43,10 @@ export async function createServer(
 ): Promise<FastifyInstance> {
   const cfg = { ...DEFAULTS, ...config };
 
-  // Mirror stdout/stderr to .debug/server.log (not in test mode)
-  if (process.env.NODE_ENV !== "test" && cfg.campaignsDir) {
+  // Mirror stdout/stderr to .debug/server.log (not in test mode).
+  // Skip when stdout is a TTY: a human (or Ink TUI in launcher mode) is
+  // attached, and duplicating ANSI redraws into the log balloons it to GBs.
+  if (process.env.NODE_ENV !== "test" && cfg.campaignsDir && !process.stdout.isTTY) {
     try {
       const logDir = join(dirname(cfg.campaignsDir), ".debug");
       mkdirSync(logDir, { recursive: true });

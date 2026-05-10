@@ -67,6 +67,9 @@ export interface ActivityIndicator {
 export interface RetryOverlay {
   status: number;
   delaySec: number;
+  /** Bumped on every retry event so the modal can reset its countdown
+   *  even when a successive retry has identical status/delaySec. */
+  attemptId: number;
 }
 
 export type ActiveModal =

@@ -57,6 +57,8 @@ export interface AgentLoopConfig {
   onError?: (error: Error) => void;
   /** Called when a retryable API error triggers a backoff wait */
   onRetry?: (status: number, delayMs: number) => void;
+  /** Called when a streaming attempt fails after emitting partial deltas — consumers should discard that leaked output before the retry begins. */
+  onRollback?: () => void;
 }
 
 import type { UsageStats, TuiCommand } from "@machine-violet/shared/types/engine.js";
@@ -147,6 +149,7 @@ async function runAgentLoopInternal(
     onComplete: config.onComplete,
     onError: config.onError,
     onRetry: config.onRetry,
+    onRollback: config.onRollback,
   });
 
   return {

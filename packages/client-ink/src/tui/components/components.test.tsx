@@ -1,5 +1,5 @@
 import React from "react";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render } from "ink-testing-library";
 import { Modeline, buildModelineDisplay, splitModeline, modelineVisibleLength } from "./Modeline.js";
 import { InputLine } from "./InputLine.js";
@@ -215,6 +215,67 @@ describe("ActivityLine", () => {
     const diceCount = (frame.match(/⚄/g) || []).length;
     expect(diceCount).toBe(2);
     expect(frame).toContain("◈");
+  });
+
+  it("renders glyphs when engine state has no label", () => {
+    // Unmapped states (or transient ones) shouldn't make the whole row
+    // disappear — that wipes accumulated tool glyphs and reads as a pause.
+    const glyphs = [{ glyph: "⚄", color: "yellow" }];
+    const { lastFrame } = render(
+      <ActivityLine engineState="some_unmapped_state" toolGlyphs={glyphs} />,
+    );
+    expect(lastFrame()!).toContain("⚄");
+  });
+
+  it("renders tool_running with the working label so subagent calls stay visible", () => {
+    const { lastFrame } = render(<ActivityLine engineState="tool_running" />);
+    expect(lastFrame()!).toContain("DM is working");
+  });
+
+  describe("elapsed-time ticker", () => {
+    it("appends (Ns) suffix after the visibility threshold and escalates tier labels", async () => {
+      vi.useFakeTimers();
+      try {
+        const since = Date.now();
+        const { lastFrame } = render(
+          <ActivityLine engineState="starting_session" engineStateSince={since} />,
+        );
+        // Initial render: base label, no elapsed suffix yet (under 5s threshold).
+        expect(lastFrame()!).toContain("Preparing your campaign");
+        expect(lastFrame()!).not.toMatch(/\(\d+s\)/);
+
+        // Past the visibility threshold but before the first tier (15s).
+        // advanceTimersByTimeAsync flushes the React state updates triggered
+        // by the setInterval tick so lastFrame() observes the new render.
+        await vi.advanceTimersByTimeAsync(6000);
+        expect(lastFrame()!).toContain("Preparing your campaign");
+        expect(lastFrame()!).toMatch(/\(6s\)/);
+
+        // Past the first tier — label escalates and counter keeps climbing.
+        await vi.advanceTimersByTimeAsync(10000);
+        expect(lastFrame()!).toContain("Setting the scene");
+        expect(lastFrame()!).toMatch(/\(16s\)/);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("does not tick or append a suffix for fast (non-tiered) states", async () => {
+      vi.useFakeTimers();
+      try {
+        const since = Date.now();
+        const { lastFrame } = render(
+          <ActivityLine engineState="roll_dice" engineStateSince={since} />,
+        );
+        expect(lastFrame()!).toContain("Rolling");
+
+        // Even at 30s, roll_dice has no tiers and should not grow a suffix.
+        await vi.advanceTimersByTimeAsync(30000);
+        expect(lastFrame()!).not.toMatch(/\(\d+s\)/);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });
 

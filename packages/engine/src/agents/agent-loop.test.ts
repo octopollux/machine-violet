@@ -227,7 +227,14 @@ describe("agentLoop", () => {
       mockConfig({ provider }),
     );
 
-    expect(result.text).toBe("Let me roll for you... A natural 20!");
+    // Last-non-empty-round-wins: only the final assistant message's text is
+    // returned, mirroring `finalAssistantText` in the game engine and the
+    // conversation history. This was changed from accumulation in PR/commit
+    // for the duplicate-DM bug — Claude re-narrates after deferred TUI
+    // tool_results often enough that accumulation produced verbatim
+    // doubling in long campaigns. See agent-loop-bridge.test.ts for the
+    // round-boundary cases.
+    expect(result.text).toBe("A natural 20!");
   });
 
   it("accumulates usage across rounds", async () => {

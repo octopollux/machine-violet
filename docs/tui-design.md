@@ -97,9 +97,27 @@ The activity line shows what the engine is doing, mapped automatically from in-f
 | Rule lookup subagent | `Checking rules...` | `📖` |
 | `scene_transition` cascade | `Scene transition...` | `⟳` |
 | Waiting for DM API response | `The DM is thinking...` | `◆` |
+| Tool call in flight (`tool_running`) | `The DM is working...` | `◆` |
+| Setup→game handoff in flight | `Preparing your campaign...` | `◆` |
 | Player's turn (idle) | *(hidden)* | *(hidden)* |
 
+The `tool_running` row matters because subagent-backed tools (e.g. `style_scene` → theme-styler) routinely take 20-60s. ActivityLine also renders any accumulated tool glyphs even when the engine state itself has no mapped label, so a transient or unmapped state can never silently wipe the row.
+
 The modeline glyph column is used when the activity line has been dropped due to viewport size (see [Responsive Design](#responsive-design)). The glyph appears at the start of the modeline.
+
+### Elapsed-time hints and tier escalation
+
+For known-slow states (the first DM turn, the setup→game handoff), the activity line escalates the label after configurable elapsed-time thresholds and appends a `(Ns)` seconds counter once the wait passes ~5s. This turns a 60–90s silent wait (the cost of one giant first-turn LLM call) into visible progress instead of an ambiguous-looking "control returned to player."
+
+Tiers live in `ACTIVITY_MAP` ([packages/client-ink/src/tui/activity.ts](../packages/client-ink/src/tui/activity.ts)). Example progression for `starting_session`:
+
+| Elapsed | Label |
+|---|---|
+| 0–14s | `Preparing your campaign...` |
+| 15–44s | `Setting the scene...` |
+| 45s+ | `Almost there...` |
+
+The timestamp is set client-side: `engineStateSince` is stamped whenever `engineState` transitions to a new value (`event-handler.ts`), and the `session:transition` handler also sets it so the elapsed counter spans the WS reconnect.
 
 
 ## DM Text Formatting

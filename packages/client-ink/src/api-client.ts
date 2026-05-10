@@ -201,6 +201,10 @@ export class ApiClient {
     return this.fetch("/session/transcript", { method: "PUT", body: { html } });
   }
 
+  async diagnostics(): Promise<{ ok: boolean; path: string }> {
+    return this.fetch("/session/diagnostics", { method: "PUT" });
+  }
+
   async getSettings(): Promise<{ config: unknown }> {
     return this.get("/session/settings");
   }

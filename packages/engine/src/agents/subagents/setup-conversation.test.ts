@@ -250,6 +250,29 @@ describe("createSetupConversation", () => {
     expect(result.text).toContain("May your blade stay sharp!");
   });
 
+  it("finalize_setup tool result forbids DM-style narration (regression guard)", async () => {
+    // Without an explicit prohibition, the model stretches "say a brief
+    // farewell" into a full improvised cold-open scene that the real DM then
+    // rewrites with different content — the player reads two contradictory
+    // openings. This test pins the wording so a future drift can't
+    // reintroduce the bug.
+    const provider = mockProvider([
+      finalizeResponse(FINALIZE_INPUT),
+      textResponse("Let's begin.\n\n---"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    await conv.start(noop);
+
+    // The second stream call carries the tool_result fed back into the model.
+    expect(provider.stream).toHaveBeenCalledTimes(2);
+    const secondCallParams = (provider.stream as ReturnType<typeof vi.fn>).mock.calls[1][0];
+    const serialized = JSON.stringify(secondCallParams);
+    // Must instruct the agent NOT to narrate on the DM's behalf.
+    expect(serialized).toMatch(/don't narrate/i);
+    // Must request a separator so the handoff to the DM has a clean visual seam.
+    expect(serialized).toContain("---");
+  });
+
   it("co-emitted load_world + present_choices: both tool_results flushed on resolveChoice", async () => {
     // Model emits load_world AND present_choices in the same assistant turn.
     // Regression: previously the load_world tool_result was discarded on early-return,
