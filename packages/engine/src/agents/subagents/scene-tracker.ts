@@ -1,5 +1,6 @@
 import type { LLMProvider } from "../../providers/types.js";
 import { oneShot, type SubagentResult } from "../subagent.js";
+import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
 const SYSTEM_PROMPT = loadPrompt("scene-tracker");
@@ -40,7 +41,7 @@ export async function trackScene(
       model,
       SYSTEM_PROMPT,
       parts.join("\n"),
-      128,
+      getMaxOutput(model),
       "scene-tracker",
     );
     return parseSceneTrackerResult(result);

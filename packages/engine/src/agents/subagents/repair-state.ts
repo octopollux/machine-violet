@@ -4,6 +4,7 @@ import type { FileIO } from "../scene-manager.js";
 import type { UsageStats } from "../agent-loop.js";
 import { oneShot } from "../subagent.js";
 import { extractWikilinks, uniqueTargets } from "../../tools/filesystem/index.js";
+import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import { accUsage } from "../../context/usage-helpers.js";
 import { norm } from "../../utils/paths.js";
@@ -234,7 +235,7 @@ export async function repairState(
         model,
         systemPrompt,
         lines.join("\n"),
-        1024,
+        getMaxOutput(model),
         "repair-state",
       );
       accUsage(totalUsage, genResult.usage);

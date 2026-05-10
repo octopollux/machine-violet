@@ -135,7 +135,10 @@ describe("trackScene", () => {
       "claude-haiku-4-5-20251001",
       expect.any(String),
       expect.any(String),
-      128,
+      // maxTokens is now adaptive — the model's own ceiling, not a hardcoded
+      // small cap. Just assert it's a positive number; getMaxOutput is
+      // covered by model-registry tests.
+      expect.any(Number),
       "scene-tracker",
     );
   });

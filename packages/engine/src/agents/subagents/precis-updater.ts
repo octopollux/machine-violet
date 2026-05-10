@@ -1,6 +1,7 @@
 import type { LLMProvider } from "../../providers/types.js";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
+import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
 /** Lightweight player sentiment/engagement signals extracted per exchange. */
@@ -64,7 +65,7 @@ export async function updatePrecis(
     model,
     SYSTEM_PROMPT,
     prompt,
-    256,
+    getMaxOutput(model),
     "precis-updater",
   );
 

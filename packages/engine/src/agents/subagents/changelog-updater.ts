@@ -1,6 +1,7 @@
 import type { LLMProvider } from "../../providers/types.js";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
+import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
 const SYSTEM_PROMPT = loadPrompt("changelog-updater");
@@ -30,7 +31,7 @@ export async function updateChangelogs(
     model,
     SYSTEM_PROMPT,
     prompt,
-    512,
+    getMaxOutput(model),
     "changelog-updater",
   );
 }

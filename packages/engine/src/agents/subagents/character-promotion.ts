@@ -7,7 +7,7 @@ import type { LLMProvider, SystemBlock } from "../../providers/types.js";
 import type { SubagentStreamCallback } from "../subagent.js";
 import { spawnSubagent, cacheSystemPrompt } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
-import { TOKEN_LIMITS } from "../../config/tokens.js";
+import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
 export interface PromotionInput {
@@ -60,7 +60,7 @@ ${input.characterSheet}`;
       model,
       visibility: onStream ? "player_facing" : "silent",
       systemPrompt,
-      maxTokens: TOKEN_LIMITS.SUBAGENT_LARGE,
+      maxTokens: getMaxOutput(model),
     },
     userMessage,
     onStream,

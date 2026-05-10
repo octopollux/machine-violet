@@ -7,7 +7,7 @@ import type { FileIO } from "../scene-manager.js";
 import type { GameState } from "../game-state.js";
 import type { TuiCommand } from "../agent-loop.js";
 import { registry } from "../tool-registry.js";
-import { TOKEN_LIMITS } from "../../config/tokens.js";
+import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
 import type { CampaignRepo } from "../../tools/git/index.js";
@@ -534,7 +534,7 @@ export async function enterOOC(
       model: options.model,
       visibility: "player_facing",
       systemPrompt,
-      maxTokens: hasTools ? TOKEN_LIMITS.SUBAGENT_LARGE : TOKEN_LIMITS.SUBAGENT_MEDIUM,
+      maxTokens: getMaxOutput(options.model),
       ...(tools ? { tools, cacheTools: true } : {}),
       ...(toolHandler ? { toolHandler } : {}),
       maxToolRounds: hasTools ? 8 : undefined,

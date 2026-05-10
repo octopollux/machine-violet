@@ -17,7 +17,7 @@ import { runProviderLoop } from "../providers/agent-loop-bridge.js";
 import { parseResolutionXml } from "./resolve-xml.js";
 import { rollDice } from "../tools/dice/index.js";
 import type { RollDiceInput } from "@machine-violet/shared/types/dice.js";
-import { TOKEN_LIMITS } from "../config/tokens.js";
+import { getMaxOutput } from "../config/model-registry.js";
 import { loadPrompt } from "../prompts/load-prompt.js";
 import { searchContent } from "./subagents/search-content.js";
 import { processingPaths } from "../config/processing-paths.js";
@@ -200,7 +200,7 @@ export class ResolveSession {
       {
         name: "resolve_session",
         model: model ?? this.model,
-        maxTokens: TOKEN_LIMITS.RESOLVE_SESSION,
+        maxTokens: getMaxOutput(model ?? this.model),
         maxToolRounds: 8,
         stream: false,
         tools: [...SESSION_TOOLS],

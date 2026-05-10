@@ -4,7 +4,7 @@ import { spawnSubagent, cacheSystemPrompt } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import type { GameState } from "../game-state.js";
 import type { FileIO, SceneManager } from "../scene-manager.js";
-import { TOKEN_LIMITS } from "../../config/tokens.js";
+import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import { validateCampaign } from "../../tools/validation/index.js";
 import { repairState } from "./repair-state.js";
@@ -575,7 +575,7 @@ export async function enterDevMode(
       model: options.model,
       visibility: "player_facing",
       systemPrompt,
-      maxTokens: TOKEN_LIMITS.DEV_MODE,
+      maxTokens: getMaxOutput(options.model),
       ...(tools ? { tools, cacheTools: true } : {}),
       ...(toolHandler ? { toolHandler } : {}),
       maxToolRounds: hasTools ? 10 : undefined,

@@ -21,7 +21,7 @@ import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import type { UsageStats, ModelId } from "../agent-loop.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
-import { TOKEN_LIMITS } from "../../config/tokens.js";
+import { getMaxOutput } from "../../config/model-registry.js";
 import { extractStatus, retryDelay, RETRYABLE_STATUS, sleep } from "../../utils/retry.js";
 
 export interface GeneratedChoices extends SubagentResult {
@@ -29,12 +29,6 @@ export interface GeneratedChoices extends SubagentResult {
 }
 
 const SYSTEM_PROMPT = loadPrompt("choice-generator");
-
-/** Per small-tier convention: 6 bullet-prefixed choice lines with room for
- *  bullets, color tags, and a short action phrase fits comfortably here.
- *  Extreme colored outputs might graze the edge; freeform input is always
- *  available as a fallback if a set gets truncated. */
-const MAX_OUTPUT_TOKENS = TOKEN_LIMITS.SUBAGENT_SMALL;
 
 /**
  * Should we auto-generate choices for this turn?
@@ -96,7 +90,7 @@ export async function generateChoices(
     model,
     SYSTEM_PROMPT,
     userMessage,
-    250,
+    getMaxOutput(model),
     "choice-generator",
   );
 
@@ -188,7 +182,7 @@ export function createChoiceGeneratorSession(
       model,
       systemPrompt: systemBlocks,
       messages: apiMessages,
-      maxTokens: MAX_OUTPUT_TOKENS,
+      maxTokens: getMaxOutput(model),
       // Cache hints: system prompt blocks are stamped with 1h cache above.
       // On messages, ephemeral ("messages" target) means each call refreshes
       // the last-message breakpoint — subsequent calls hit cached history.

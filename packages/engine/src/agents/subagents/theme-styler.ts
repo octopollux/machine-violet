@@ -10,6 +10,7 @@ import type { LLMProvider } from "../../providers/types.js";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import type { TuiCommand } from "../agent-loop.js";
+import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
 const SYSTEM_PROMPT = loadPrompt("theme-styler");
@@ -46,7 +47,7 @@ export async function styleTheme(
     model,
     SYSTEM_PROMPT,
     userMessage,
-    200,
+    getMaxOutput(model),
     "theme-styler",
   );
 

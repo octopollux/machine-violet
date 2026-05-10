@@ -2,6 +2,7 @@ import type { LLMProvider } from "../../providers/types.js";
 import type { PlayerConfig } from "@machine-violet/shared/types/config.js";
 import { spawnSubagent } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
+import { getMaxOutput } from "../../config/model-registry.js";
 import { loadTemplate } from "../../prompts/load-prompt.js";
 
 /**
@@ -66,12 +67,13 @@ export async function aiPlayerTurn(
 
   // AI player prompts are fully dynamic (character sheet + situation change every call),
   // so we skip system prompt caching to avoid paying the cache-write surcharge with no reuse.
+  // Adaptive cap: trust the prompt to keep responses brief rather than hard-truncating.
   const result = await spawnSubagent(provider, {
     name: "ai-player",
     model,
     visibility: "silent",
     systemPrompt,
-    maxTokens: 150, // AI players should be brief
+    maxTokens: getMaxOutput(model),
   }, userMessage);
 
   return {

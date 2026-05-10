@@ -35,7 +35,7 @@ import type { DMSessionState } from "./dm-prompt.js";
 import type { ModelTier } from "../config/models.js";
 import { accUsage } from "../context/usage-helpers.js";
 import { logEvent } from "../context/engine-log.js";
-import { TOKEN_LIMITS } from "../config/tokens.js";
+import { getMaxOutput } from "../config/model-registry.js";
 import type { ToolRegistry } from "./tool-registry.js";
 import { isAITurn, getActivePlayer, getCombatActivePlayer } from "./player-manager.js";
 import { aiPlayerTurn } from "./subagents/ai-player.js";
@@ -1362,7 +1362,7 @@ export class GameEngine {
     return {
       model: this.model,
       provider: this.provider,
-      maxTokens: TOKEN_LIMITS.DM_RESPONSE,
+      maxTokens: getMaxOutput(this.model),
       maxToolRounds: 10,
       asyncToolHandler: (name, input) => this.handleAsyncTool(name, input),
       onTextDelta: (delta) => this.callbacks.onNarrativeDelta(delta),

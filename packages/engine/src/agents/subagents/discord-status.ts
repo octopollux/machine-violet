@@ -1,6 +1,7 @@
 import type { LLMProvider } from "../../providers/types.js";
 import type { UsageStats } from "@machine-violet/shared/types/engine.js";
 import { oneShot } from "../subagent.js";
+import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
 const SYSTEM_PROMPT = loadPrompt("discord-status");
@@ -29,7 +30,7 @@ export async function generateDiscordStatus(
       model,
       SYSTEM_PROMPT,
       recentContext,
-      60,
+      getMaxOutput(model),
       "discord_status",
     );
     const status = result.text.trim().replace(/^["']|["']$/g, "").slice(0, MAX_LENGTH);
