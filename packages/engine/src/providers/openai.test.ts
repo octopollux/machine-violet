@@ -523,18 +523,20 @@ describe("Responses API integration", () => {
       expect(result.stopReason).toBe("end");
     });
 
-    it("extracts reasoning summaries from the final response", async () => {
-      // Streaming uses delta-accumulated text but still walks `response.output`
-      // for tool calls and reasoning items. This guards against the path
-      // diverging — a regression that strips reasoning extraction from one
-      // branch would only show up here.
+    it("captures reasoning summaries from streaming `summary_text.done` events", async () => {
+      // The SDK's response stream accumulator doesn't handle the
+      // `response.reasoning_summary_*` events — it ships the bare reasoning
+      // item from `output_item.added` (with summary: []) and only later
+      // overwrites the snapshot on `response.completed`. In practice that
+      // means `finalResponse().output[i].summary` is empty even when the
+      // model streamed summaries. The provider captures them from the
+      // dedicated `.done` events in the streaming loop instead. This test
+      // mocks an EMPTY summary array on finalResponse to prove that the
+      // events are what produce `thinkingText`, not the output walk.
       const response = fakeResponse({
         output: [
-          {
-            id: "rs_1",
-            type: "reasoning",
-            summary: [{ type: "summary_text", text: "Picking a path." }],
-          },
+          // Summary is empty here on purpose — see comment above.
+          { id: "rs_1", type: "reasoning", summary: [] },
           {
             id: "msg_1",
             type: "message",
@@ -546,6 +548,9 @@ describe("Responses API integration", () => {
       });
       const events = [
         { type: "response.output_text.delta", delta: "You step forward." },
+        // Two summary parts, each terminated with a `.done` event.
+        { type: "response.reasoning_summary_text.done", text: "Picking a path." },
+        { type: "response.reasoning_summary_text.done", text: "Steeling the player." },
         { type: "response.completed", response },
       ];
 
@@ -564,7 +569,47 @@ describe("Responses API integration", () => {
       const result = await provider.stream(baseChatParams(), () => {});
 
       expect(result.text).toBe("You step forward.");
-      expect(result.thinkingText).toBe("Picking a path.");
+      // Multi-part summaries get joined with the same separator as the
+      // non-streaming path uses for `output[i].summary` entries.
+      expect(result.thinkingText).toBe("Picking a path.\n\nSteeling the player.");
+    });
+
+    it("leaves thinkingText undefined when no summary events fire", async () => {
+      // Reasoning may happen with no summary parts emitted (model returned
+      // an empty summary array for the part). The non-streaming sibling
+      // test pins the same invariant — undefined, not "".
+      const response = fakeResponse({
+        output: [
+          { id: "rs_1", type: "reasoning", summary: [] },
+          {
+            id: "msg_1",
+            type: "message",
+            role: "assistant",
+            status: "completed",
+            content: [{ type: "output_text", text: "Hi.", annotations: [] }],
+          },
+        ],
+      });
+      const events = [
+        { type: "response.output_text.delta", delta: "Hi." },
+        { type: "response.completed", response },
+      ];
+
+      let eventIdx = 0;
+      mockResponses.stream.mockReturnValue({
+        [Symbol.asyncIterator]: () => ({
+          next: async () =>
+            eventIdx < events.length
+              ? { value: events[eventIdx++], done: false }
+              : { value: undefined, done: true },
+        }),
+        finalResponse: vi.fn().mockResolvedValue(response),
+      });
+
+      const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+      const result = await provider.stream(baseChatParams(), () => {});
+
+      expect(result.thinkingText).toBeUndefined();
     });
   });
 });
