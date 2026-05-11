@@ -501,7 +501,10 @@ export class SessionManager {
     // with the engine. Bundled cards are CC-licensed system summaries.
     if (config.system) {
       try {
-        const sysPaths = processingPaths(homeDir, config.system);
+        // Use gs.homeDir (the canonical GameState root that loadRuleCardCombat
+        // also points at) rather than the locally-derived homeDir, which diverge
+        // when campaignsDir doesn't literally end in "campaigns".
+        const sysPaths = processingPaths(gs.homeDir, config.system);
         sessionState.rulesAppendix = await fileIO.readFile(norm(sysPaths.ruleCard));
       } catch {
         const bundled = readBundledRuleCard(config.system);
