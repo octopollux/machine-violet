@@ -75,6 +75,8 @@ export interface OOCPromptOptions {
   sessionState?: DMSessionState;
   characterSheet?: string;
   systemRules?: string;
+  /** Model ID for prompt-level conditional inclusion. Omit to skip conditionals. */
+  model?: string;
 }
 
 /**
@@ -109,7 +111,7 @@ export function buildOOCPrompt(
 
   // If no session state, fall back to flat string
   if (!opts.sessionState || !opts.config) {
-    return buildOOCPromptLegacy(opts.campaignName, opts.systemRules, opts.characterSheet);
+    return buildOOCPromptLegacy(opts.campaignName, opts.systemRules, opts.characterSheet, opts.model);
   }
 
   // Build structured TextBlockParam[] with caching
@@ -121,8 +123,9 @@ function buildOOCPromptLegacy(
   campaignName: string,
   systemRules?: string,
   characterSheet?: string,
+  model?: string,
 ): string {
-  let prompt = loadPrompt("ooc-mode");
+  let prompt = loadPrompt("ooc-mode", model);
 
   if (campaignName) {
     prompt += `\n\nCampaign: ${campaignName}`;
@@ -147,7 +150,7 @@ function buildOOCPromptCached(opts: Required<Pick<OOCPromptOptions, "config" | "
 
   // OOC identity prompt (stable — cached)
   blocks.push({
-    text: loadPrompt("ooc-mode"),
+    text: loadPrompt("ooc-mode", opts.model),
     cacheControl: { ttl: "1h" },
   });
 
@@ -512,6 +515,7 @@ export async function enterOOC(
     sessionState: options.sessionState,
     characterSheet: options.characterSheet,
     systemRules: options.systemRules,
+    model: options.model,
   });
 
   const snapshot: OOCSnapshot = {

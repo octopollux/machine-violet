@@ -195,7 +195,7 @@ export async function searchCampaign(
   fileIO: FileIO,
   model: string,
 ): Promise<SearchCampaignResult> {
-  const systemPrompt = cacheSystemPrompt(loadPrompt("search-campaign"));
+  const systemPrompt = cacheSystemPrompt(loadPrompt("search-campaign", model));
 
   // Walk all files once — the subagent's grep tool searches this in-memory snapshot
   const files = await walkCampaignFiles(input.campaignRoot, fileIO);

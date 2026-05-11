@@ -29,8 +29,12 @@ export interface AIPlayerResult extends SubagentResult {
 
 /**
  * Build the system prompt for an AI player.
+ *
+ * `model` is optional — when omitted, model-conditional blocks in the prompt
+ * resolve to their else branches. Production callers should pass the model
+ * they intend to invoke so conditionals fire correctly.
  */
-export function buildAIPlayerPrompt(ctx: AIPlayerContext): string {
+export function buildAIPlayerPrompt(ctx: AIPlayerContext, model?: string): string {
   const { player, characterSheet, situation } = ctx;
 
   const personality = player.personality
@@ -46,7 +50,7 @@ export function buildAIPlayerPrompt(ctx: AIPlayerContext): string {
     personality,
     characterSheet,
     situation: situationBlock,
-  });
+  }, model);
 }
 
 /**
@@ -61,7 +65,7 @@ export async function aiPlayerTurn(
   ctx: AIPlayerContext,
   model: string,
 ): Promise<AIPlayerResult> {
-  const systemPrompt = buildAIPlayerPrompt(ctx);
+  const systemPrompt = buildAIPlayerPrompt(ctx, model);
 
   const userMessage = ctx.recentNarration || "It's your turn. What do you do?";
 

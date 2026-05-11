@@ -4,8 +4,6 @@ import type { SubagentResult } from "../subagent.js";
 import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
-const SYSTEM_PROMPT = loadPrompt("scene-summarizer");
-
 const MINI_DELIMITER = "---MINI---";
 
 /**
@@ -35,7 +33,7 @@ export async function summarizeScene(
   const result = await oneShot(
     provider,
     model,
-    SYSTEM_PROMPT,
+    loadPrompt("scene-summarizer", model),
     `Write a campaign log entry for this scene:\n\n${transcript}${aliasContext ?? ""}`,
     getMaxOutput(model),
     "scene-summarizer",

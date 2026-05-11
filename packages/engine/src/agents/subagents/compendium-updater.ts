@@ -5,8 +5,6 @@ import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import type { Compendium, CompendiumEntry } from "@machine-violet/shared/types/compendium.js";
 
-const SYSTEM_PROMPT = loadPrompt("compendium-updater");
-
 /**
  * Create an empty compendium with default structure.
  */
@@ -48,7 +46,7 @@ export async function updateCompendium(
   const result = await oneShot(
     provider,
     model,
-    SYSTEM_PROMPT,
+    loadPrompt("compendium-updater", model),
     userMessage,
     getMaxOutput(model),
     "compendium-updater",

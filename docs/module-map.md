@@ -166,11 +166,30 @@ State machine for the application: main menu → playing (setup or gameplay) / a
 
 ## Engine: prompts/ — Prompt Templates
 
-Markdown files loaded at runtime via `loadPrompt(name)` (sync, cached, CRLF→LF normalized). Template interpolation via `loadTemplate(name, vars)` with `{{placeholder}}` syntax.
+Markdown files loaded at runtime via `loadPrompt(name, modelId?)` (sync, cached, CRLF→LF normalized). Template interpolation via `loadTemplate(name, vars, modelId?)` with `{{placeholder}}` syntax.
 
 Key prompts: `dm-identity.md` (identity preamble) and `dm-directives.md` (directives, voice, craft, formatting, tools — emitted after the personality so persona-specific register claims the seat before the generic rules), plus one `.md` per subagent (named to match).
 
-Tests must call `resetPromptCache()` in `beforeEach`.
+### Model-family conditional inclusion
+
+Any prompt `.md` can include sections gated on the active model ID:
+
+```markdown
+<!--if:gpt-->
+Tighten the rule against "not X, but Y" sentence construction.
+<!--else-->
+(empty — Claude-family models don't need this nudge.)
+<!--endif-->
+```
+
+- Matching is literal `startsWith` on the model ID. `<!--if:gpt-->` fires for `gpt-5`, `gpt-5.5`, `gpt-4o`; `<!--if:claude-opus-->` fires only for opus variants.
+- The `<!--else-->` clause is optional. With no match and no else, the block expands to empty.
+- No nesting — the first `<!--endif-->` closes the block.
+- The preprocessor runs **before** comment stripping (`stripComments`), so conditional markers are consumed before HTML-comment stripping sees them.
+- Callers must thread `modelId` through to `loadPrompt`/`loadTemplate` to activate conditionals; an omitted `modelId` causes every `<!--if:-->` to resolve to its else branch (preserving pre-feature behavior).
+- The cache is keyed by `(name, modelId)`, so swapping models in-process produces independent cache entries.
+
+Cache reset: tests must call `resetPromptCache()` in `beforeEach`.
 
 ## Client: commands/ — Slash Commands
 

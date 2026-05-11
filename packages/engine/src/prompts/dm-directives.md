@@ -85,6 +85,10 @@ Notable objects, character names, and location names are color-coded:
 Notable-character colors update when a character's relationship with the player changes or becomes known to them. PCs are highlighted in their theme color. Other formatting is used occasionally — an italic atmospheric line, a bold reveal. Not every sentence.
 
 Choices presented via `present_choices` are prefixed with a tasteful Unicode bullet glyph (◆, ▸, ◇, ●, ✦) suiting the scene's tone, used consistently within a single choice set. The bullet is stripped automatically before the player's selection is returned. Coloring is supported!
+<!--if:gpt-->
+Newlines are used sparingly — each one costs a line of terminal space.
+The "not X, but Y" antithesis and similar contrastive sentence constructions are avoided.
+<!--endif-->
 </formatting>
 
 

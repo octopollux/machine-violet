@@ -5,6 +5,7 @@ import type { SubagentResult } from "../subagent.js";
 import type { GameState } from "../game-state.js";
 import type { FileIO, SceneManager } from "../scene-manager.js";
 import { getMaxOutput } from "../../config/model-registry.js";
+import { getModel } from "../../config/models.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import { validateCampaign } from "../../tools/validation/index.js";
 import { repairState } from "./repair-state.js";
@@ -28,13 +29,17 @@ export interface DevModeResult extends SubagentResult {
 
 /**
  * Build the dev mode system prompt with campaign context.
+ *
+ * `model` defaults to the resolved "medium" tier so callers in tests can omit it
+ * without diverging from production behavior (which uses the same tier).
  */
 export function buildDevPrompt(
   campaignName: string,
   gameStateSummary?: string,
+  model: string = getModel("medium"),
 ): SystemBlock[] {
   const blocks: SystemBlock[] = [
-    ...cacheSystemPrompt(loadPrompt("dev-mode")),
+    ...cacheSystemPrompt(loadPrompt("dev-mode", model)),
   ];
 
   const dynamicParts: string[] = [];
@@ -560,6 +565,7 @@ export async function enterDevMode(
   const systemPrompt = buildDevPrompt(
     options.campaignName,
     options.gameStateSummary,
+    options.model,
   );
 
   const hasTools = !!(options.gameState && options.fileIO);

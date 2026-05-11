@@ -4,7 +4,6 @@ import { oneShot } from "../subagent.js";
 import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
-const SYSTEM_PROMPT = loadPrompt("discord-status");
 const FALLBACK = "Adventuring...";
 const MAX_LENGTH = 40;
 
@@ -28,7 +27,7 @@ export async function generateDiscordStatus(
     const result = await oneShot(
       provider,
       model,
-      SYSTEM_PROMPT,
+      loadPrompt("discord-status", model),
       recentContext,
       getMaxOutput(model),
       "discord_status",

@@ -408,7 +408,7 @@ export async function runScribe(
   fileIO: ScribeFileIO,
   model: string,
 ): Promise<ScribeResult> {
-  const systemPrompt = cacheSystemPrompt(loadPrompt("scribe"));
+  const systemPrompt = cacheSystemPrompt(loadPrompt("scribe", model));
   const created: string[] = [];
   const updated: string[] = [];
   const entityDeltas: ScribeEntityDelta[] = [];

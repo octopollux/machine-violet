@@ -22,8 +22,6 @@ export interface PrecisUpdateResult extends SubagentResult {
   npcIntents?: string;
 }
 
-const SYSTEM_PROMPT = loadPrompt("precis-updater");
-
 /**
  * Precis updater subagent.
  * When an exchange drops from the DM's conversation window,
@@ -63,7 +61,7 @@ export async function updatePrecis(
   const result = await oneShot(
     provider,
     model,
-    SYSTEM_PROMPT,
+    loadPrompt("precis-updater", model),
     prompt,
     getMaxOutput(model),
     "precis-updater",

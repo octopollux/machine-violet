@@ -102,7 +102,8 @@ export async function generateRuleCard(
   collectionSlug: string,
   projectRoot: string,
 ): Promise<string> {
-  const systemPrompt = loadContentPrompt("rule-card-gen");
+  const model = getModel("small");
+  const systemPrompt = loadContentPrompt("rule-card-gen", model);
   const rulesText = await loadRulesEntities(io, homeDir, collectionSlug);
 
   // Build user message with few-shot examples
@@ -121,7 +122,7 @@ export async function generateRuleCard(
 
   const result = await oneShot(
     provider,
-    getModel("small"),
+    model,
     systemPrompt,
     userMessage,
     8192,

@@ -4,8 +4,6 @@ import type { SubagentResult } from "../subagent.js";
 import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
-const SYSTEM_PROMPT = loadPrompt("changelog-updater");
-
 /**
  * Changelog updater subagent.
  * Scans a completed scene transcript and identifies entity changelog entries.
@@ -29,7 +27,7 @@ export async function updateChangelogs(
   return oneShot(
     provider,
     model,
-    SYSTEM_PROMPT,
+    loadPrompt("changelog-updater", model),
     prompt,
     getMaxOutput(model),
     "changelog-updater",

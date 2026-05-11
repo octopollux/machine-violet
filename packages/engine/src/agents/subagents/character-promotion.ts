@@ -28,8 +28,6 @@ export interface PromotionResult extends SubagentResult {
   changelogEntry: string;
 }
 
-const BASE_PROMPT = loadPrompt("character-promotion");
-
 /**
  * Run the character promotion subagent.
  * Player-facing so the player can see and interact with choices.
@@ -41,7 +39,7 @@ export async function promoteCharacter(
   model: string,
 ): Promise<PromotionResult> {
   const systemPrompt: SystemBlock[] = [
-    ...cacheSystemPrompt(BASE_PROMPT),
+    ...cacheSystemPrompt(loadPrompt("character-promotion", model)),
     ...(input.systemRules
       ? [{ text: `\n\nGame system rules:\n${input.systemRules}` }]
       : []),

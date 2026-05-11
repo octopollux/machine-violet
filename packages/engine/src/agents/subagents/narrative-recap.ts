@@ -20,7 +20,7 @@ export async function generateNarrativeRecap(
   campaignName: string,
   model: string,
 ): Promise<SubagentResult> {
-  const systemPrompt = loadTemplate("narrative-recap", { campaign_name: campaignName });
+  const systemPrompt = loadTemplate("narrative-recap", { campaign_name: campaignName }, model);
   return oneShot(
     provider,
     model,

@@ -119,12 +119,13 @@ async function mergeConflict(
   existing: string,
   draft: string,
 ): Promise<string> {
-  const systemPrompt = loadContentPrompt("merge-compare");
+  const model = getModel("small");
+  const systemPrompt = loadContentPrompt("merge-compare", model);
   const userMessage = `## Existing Version\n\n${existing}\n\n## New Version\n\n${draft}`;
 
   const result = await oneShot(
     provider,
-    getModel("small"),
+    model,
     systemPrompt,
     userMessage,
     4096,

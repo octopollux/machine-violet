@@ -13,8 +13,6 @@ import type { TuiCommand } from "../agent-loop.js";
 import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
-const SYSTEM_PROMPT = loadPrompt("theme-styler");
-
 export interface ThemeStylerResult extends SubagentResult {
   /** The parsed theme command to dispatch, or null if parsing failed */
   command: TuiCommand | null;
@@ -45,7 +43,7 @@ export async function styleTheme(
   const result = await oneShot(
     provider,
     model,
-    SYSTEM_PROMPT,
+    loadPrompt("theme-styler", model),
     userMessage,
     getMaxOutput(model),
     "theme-styler",

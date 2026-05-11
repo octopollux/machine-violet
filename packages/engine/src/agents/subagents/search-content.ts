@@ -254,7 +254,7 @@ export async function searchContent(
   fileIO: FileIO,
   model: string,
 ): Promise<SearchContentResult> {
-  const systemPrompt = cacheSystemPrompt(loadPrompt("search-content"));
+  const systemPrompt = cacheSystemPrompt(loadPrompt("search-content", model));
 
   const toolHandler = buildContentSearchToolHandler(
     fileIO,

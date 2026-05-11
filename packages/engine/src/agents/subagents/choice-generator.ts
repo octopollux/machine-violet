@@ -28,8 +28,6 @@ export interface GeneratedChoices extends SubagentResult {
   choices: string[];
 }
 
-const SYSTEM_PROMPT = loadPrompt("choice-generator");
-
 /**
  * Should we auto-generate choices for this turn?
  *
@@ -88,7 +86,7 @@ export async function generateChoices(
   const result = await oneShot(
     provider,
     model,
-    SYSTEM_PROMPT,
+    loadPrompt("choice-generator", model),
     userMessage,
     getMaxOutput(model),
     "choice-generator",
@@ -143,14 +141,14 @@ export interface ChoiceGeneratorSessionOptions {
  *
  * Tier 3 (volatile context) lives on the current user message, not here.
  */
-function buildSystemBlocks(characterSheets: string): SystemBlock[] {
+function buildSystemBlocks(model: ModelId, characterSheets: string): SystemBlock[] {
   const trimmed = characterSheets.trim();
   const sheetBlock = trimmed
     ? `\n\n## Character sheets\n\nThese are the PCs whose choices you generate. Refer to their stats, abilities, inventory, and relationships when suggesting actions — their toolkit shapes what's plausible.\n\n${trimmed}`
     : "";
 
   return [
-    { text: SYSTEM_PROMPT, cacheControl: { ttl: "1h" } },
+    { text: loadPrompt("choice-generator", model), cacheControl: { ttl: "1h" } },
     { text: sheetBlock, cacheControl: { ttl: "1h" } },
   ];
 }
@@ -171,7 +169,7 @@ export function createChoiceGeneratorSession(
 ): ChoiceGeneratorSession {
   const provider = opts.provider;
   const model = opts.model;
-  const systemBlocks = buildSystemBlocks(opts.characterSheets);
+  const systemBlocks = buildSystemBlocks(model, opts.characterSheets);
 
   // Stored conversation — plain user/assistant pairs with NO volatile context.
   // Volatile context is added only to the API message, not to what we persist.

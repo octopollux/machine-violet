@@ -179,12 +179,12 @@ function shuffle<T>(arr: readonly T[]): T[] {
  *
  * BP3 (tools) and BP4 (last message) are stamped via cacheHints in runTurn.
  */
-function buildSystemPrompt(existingPlayers?: KnownPlayer[]): SystemBlock[] {
+function buildSystemPrompt(model: string, existingPlayers?: KnownPlayer[]): SystemBlock[] {
   const blocks: SystemBlock[] = [];
 
   // ── Tier 1: Global-stable (identical across all sessions) ──
 
-  const base = loadPrompt("setup-conversation");
+  const base = loadPrompt("setup-conversation", model);
   blocks.push({ text: base });
 
   const { light, crunchy } = groupByTier(KNOWN_SYSTEMS);
@@ -322,7 +322,7 @@ export function createSetupConversation(
   // Build per-session system prompt (randomizes seed/personality order).
   // Known players are injected right after the base prompt (before seeds/personalities)
   // so the model sees them close to the flow instructions that reference them.
-  const systemPrompt = buildSystemPrompt(existingPlayers);
+  const systemPrompt = buildSystemPrompt(model, existingPlayers);
 
   const messages: NormalizedMessage[] = [];
   const totalUsage: NormalizedUsage = {

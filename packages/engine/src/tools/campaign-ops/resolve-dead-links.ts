@@ -229,7 +229,8 @@ export async function resolveDeadLinks(
   }
 
   // --- Phase 3: Haiku triage ---
-  const systemPrompt = loadPrompt("resolve-dead-links");
+  const model = getModel("small");
+  const systemPrompt = loadPrompt("resolve-dead-links", model);
   const batchSize = 10;
 
   for (let i = 0; i < result.deadLinks.length; i += batchSize) {
@@ -263,7 +264,7 @@ export async function resolveDeadLinks(
     try {
       const triageResult = await oneShot(
         provider,
-        getModel("small"),
+        model,
         systemPrompt,
         lines.join("\n"),
         1024,
@@ -324,7 +325,7 @@ export async function resolveDeadLinks(
 
     // 4b. Generate stubs for missing entities
     if (result.triaged.missing.length > 0) {
-      const genSystemPrompt = loadPrompt("repair-generator");
+      const genSystemPrompt = loadPrompt("repair-generator", model);
       const genBatchSize = 5;
 
       for (let i = 0; i < result.triaged.missing.length; i += genBatchSize) {
@@ -347,7 +348,7 @@ export async function resolveDeadLinks(
         try {
           const genResult = await oneShot(
             provider,
-            getModel("small"),
+            model,
             genSystemPrompt,
             genLines.join("\n"),
             1024,
