@@ -28,7 +28,6 @@ import { createProviderFromConnection } from "../providers/index.js";
 import { configDir, norm } from "../utils/paths.js";
 import { processingPaths } from "../config/processing-paths.js";
 import { readBundledRuleCard } from "../config/systems.js";
-import { slugify } from "../utils/slug.js";
 import { sandboxFileIO } from "../tools/filesystem/sandbox.js";
 import { campaignPaths } from "../tools/filesystem/scaffold.js";
 import { buildEntityTree, renderEntityTree } from "../tools/filesystem/entity-tree.js";
@@ -523,7 +522,7 @@ export class SessionManager {
       const charPaths = campaignPaths(campaignRoot);
       const sheets: string[] = [];
       for (const player of config.players) {
-        const filePath = charPaths.character(slugify(player.character));
+        const filePath = charPaths.character(player.character);
         if (await fileIO.exists(filePath)) {
           sheets.push(await fileIO.readFile(filePath));
         }
@@ -542,10 +541,14 @@ export class SessionManager {
     const entityTree = await buildEntityTree(campaignRoot, fileIO);
 
     // --- Load content boundaries from machine-scope player files ---
+    // Use gs.homeDir (the canonical GameState root) so we agree with the
+    // SceneManager refresh path, which reads `state.homeDir`. The locally-
+    // derived `homeDir` diverges from `gs.homeDir` in non-standard layouts
+    // (e.g. test campaigns dirs that don't literally end in "campaigns").
     try {
       sessionState.contentBoundaries = await loadContentBoundaries(
         config.players,
-        homeDir,
+        gs.homeDir,
         fileIO,
       );
     } catch { /* ignore — players dir may not exist yet */ }

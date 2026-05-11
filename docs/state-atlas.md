@@ -114,7 +114,7 @@ Transient per-session state used to build the cached prefix. Not persisted direc
 
 ```
 DMSessionState
-├── rulesAppendix?: string                 Loaded from rules/ at session start
+├── rulesAppendix?: string                 Loaded from the system rule card at session start (~/.machine-violet/systems/<slug>/rule-card.md, with bundled fallback)
 ├── pcSheets?: string                      PC sheets concatenated; load-once at session start, never refreshed
 ├── campaignSummary?: string               Loaded from campaign/log.md
 ├── sessionRecap?: string                  Loaded from session-recaps/
@@ -433,7 +433,7 @@ Load config.json from campaignRoot
     │   └─ If present → SceneManager.resumePendingTransition() (idempotent cascade)
     │
     ├─ Build DMSessionState
-    │   ├─ Load rules/ → rulesAppendix
+    │   ├─ Load system rule card (~/.machine-violet/systems/<slug>/rule-card.md, bundled fallback) → rulesAppendix
     │   ├─ Load characters/<slug>.md for each PC → pcSheets
     │   ├─ Load campaign/log.md → campaignSummary
     │   ├─ Load session recap → sessionRecap
