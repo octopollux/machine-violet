@@ -25,7 +25,9 @@ import { getActivePlayer } from "../agents/player-manager.js";
 import { loadEnv } from "../config/first-launch.js";
 import { loadConnectionStore, buildEffectiveConnections } from "../config/connections.js";
 import { buildTierProviders } from "../config/tier-resolver.js";
-import { configDir } from "../utils/paths.js";
+import { configDir, norm } from "../utils/paths.js";
+import { processingPaths } from "../config/processing-paths.js";
+import { readBundledRuleCard } from "../config/systems.js";
 import { sandboxFileIO } from "../tools/filesystem/sandbox.js";
 import { campaignPaths } from "../tools/filesystem/scaffold.js";
 import { buildEntityTree, renderEntityTree } from "../tools/filesystem/entity-tree.js";
@@ -493,6 +495,44 @@ export class SessionManager {
       }
     } catch { /* ignore — may not exist yet */ }
 
+    // Load the system's rule card so the DM sees core mechanics (dice notation,
+    // resolution rules, advancement, etc.) in its prefix. Prefer the processed
+    // copy under ~/.machine-violet/systems/<slug>/rule-card.md (which a user
+    // may have customized via ingest); fall back to the bundled copy shipped
+    // with the engine. Bundled cards are CC-licensed system summaries.
+    if (config.system) {
+      try {
+        // Use gs.homeDir (the canonical GameState root that loadRuleCardCombat
+        // also points at) rather than the locally-derived homeDir, which diverge
+        // when campaignsDir doesn't literally end in "campaigns".
+        const sysPaths = processingPaths(gs.homeDir, config.system);
+        sessionState.rulesAppendix = await fileIO.readFile(norm(sysPaths.ruleCard));
+      } catch {
+        const bundled = readBundledRuleCard(config.system);
+        if (bundled) sessionState.rulesAppendix = bundled;
+      }
+    }
+
+    // Load PC sheets verbatim so the DM can reference Approaches, Aspects,
+    // HP, Inventory, etc. without round-tripping search_campaign for every
+    // check. Loaded once at session start and intentionally never refreshed
+    // in-session — when the DM edits a sheet via scribe/promote_character it
+    // sees the change in conversation, so a stale cached block doesn't
+    // matter until the next session reload.
+    try {
+      const charPaths = campaignPaths(campaignRoot);
+      const sheets: string[] = [];
+      for (const player of config.players) {
+        const filePath = charPaths.character(player.character);
+        if (await fileIO.exists(filePath)) {
+          sheets.push(await fileIO.readFile(filePath));
+        }
+      }
+      if (sheets.length > 0) {
+        sessionState.pcSheets = sheets.join("\n\n---\n\n");
+      }
+    } catch { /* non-critical — DM can still fall back to search_campaign */ }
+
     // Sample a fresh multicultural name pool to perturb the DM's naming
     // priors. Drawn once per session and held in DMSessionState so it
     // rides Tier 2 cache instead of churning per turn.
@@ -502,10 +542,14 @@ export class SessionManager {
     const entityTree = await buildEntityTree(campaignRoot, fileIO);
 
     // --- Load content boundaries from machine-scope player files ---
+    // Use gs.homeDir (the canonical GameState root) so we agree with the
+    // SceneManager refresh path, which reads `state.homeDir`. The locally-
+    // derived `homeDir` diverges from `gs.homeDir` in non-standard layouts
+    // (e.g. test campaigns dirs that don't literally end in "campaigns").
     try {
       sessionState.contentBoundaries = await loadContentBoundaries(
         config.players,
-        homeDir,
+        gs.homeDir,
         fileIO,
       );
     } catch { /* ignore — players dir may not exist yet */ }

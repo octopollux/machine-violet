@@ -81,7 +81,7 @@ const TOOL_DEFS: RegisteredTool[] = [
       inputSchema: {
         type: "object" as const,
         properties: {
-          expression: { type: "string", description: "Dice notation, e.g. '2d6+3', '4d6kh3', '1d20+5; 2d8+3'" },
+          expression: { type: "string", description: "Dice notation. Examples: '2d6+3' (basic), '4d6kh3' (keep highest 3), '4dF+3' (FATE/Fudge, each die -1/0/+1), '6d10>=7' (count successes), '3d6!' (exploding), '1d100' or '1d%' (percentile), '1d20+5; 2d8+3' (multi-roll). Only one trailing modifier is supported."  },
           reason: { type: "string", description: "Why this roll is being made" },
           display: { type: "boolean", description: "Show roll in a dramatic modal" },
           claimed_result: {

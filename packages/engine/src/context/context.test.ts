@@ -471,6 +471,52 @@ describe("buildCachedPrefix", () => {
     expect(playerReadBlock["cacheControl"]).toBeUndefined();
   });
 
+  it("includes Player Characters block in Tier 2 when pcSheets provided", () => {
+    const { system } = buildCachedPrefix(mockConfig, {
+      dmIdentity: "You are the DM.",
+      personality: "Terse.",
+      rulesAppendix: "Some rules.",
+      pcSheets: "# Aldric\n\n**Type:** PC\n\nApproaches: Careful +3",
+    });
+
+    const allText = system.map((b) => b.text).join("\n");
+    expect(allText).toContain("## Player Characters");
+    expect(allText).toContain("Approaches: Careful +3");
+
+    // pcSheets sits in Tier 2 — rules (the last Tier 1 block) keeps BP1
+    const rulesBlock = system.find((b) => b.text.includes("Rules Reference")) as unknown as Record<string, unknown>;
+    expect(rulesBlock["cacheControl"]).toEqual({ ttl: "1h" });
+  });
+
+  it("omits Player Characters block when pcSheets absent", () => {
+    const { system } = buildCachedPrefix(mockConfig, {
+      dmIdentity: "You are the DM.",
+      personality: "Terse.",
+    });
+
+    const allText = system.map((b) => b.text).join("\n");
+    expect(allText).not.toContain("Player Characters");
+  });
+
+  it("places Player Characters before other Tier 2 blocks", () => {
+    const { system } = buildCachedPrefix(mockConfig, {
+      dmIdentity: "You are the DM.",
+      personality: "Terse.",
+      rulesAppendix: "Some rules.",
+      pcSheets: "# Aldric\n\nHP 28/42",
+      sessionRecap: "Last time...",
+      playerRead: "Engagement: high",
+    });
+
+    const pcIdx = system.findIndex((b) => b.text.includes("Player Characters"));
+    const recapIdx = system.findIndex((b) => b.text.includes("Last Session"));
+    const readIdx = system.findIndex((b) => b.text.includes("Player Read"));
+
+    expect(pcIdx).toBeGreaterThan(-1);
+    expect(pcIdx).toBeLessThan(recapIdx);
+    expect(pcIdx).toBeLessThan(readIdx);
+  });
+
   it("does not include Scene Pacing block (removed from prefix)", () => {
     const { system } = buildCachedPrefix(mockConfig, {
       dmIdentity: "You are the DM.",

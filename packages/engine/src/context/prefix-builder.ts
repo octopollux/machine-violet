@@ -26,6 +26,8 @@ export interface PrefixSections {
   personalityDetail?: string;
   campaignDetail?: string;
   rulesAppendix?: string;
+  /** Concatenated PC sheets — see DMSessionState.pcSheets for caching rationale. */
+  pcSheets?: string;
   campaignSummary?: string;
   sessionRecap?: string;
   activeState?: string;
@@ -127,6 +129,15 @@ export function buildCachedPrefix(
   // ── Tier 2: Session/scene-stable (invalidated at scene transitions) ──
 
   const tier2Start = blocks.length;
+
+  // PC sheets — loaded once at session start, intentionally never refreshed
+  // mid-session. Placed first in Tier 2 (immediately after rules) so the DM
+  // sees Approaches/Aspects/HP/etc. right next to the rules they pair with.
+  // Stale-vs-disk after a scribe edit is acceptable because the DM already
+  // sees its own scribe call in the conversation.
+  if (sections.pcSheets) {
+    blocks.push({ text: `\n\n## Player Characters\n${sections.pcSheets}` });
+  }
 
   // Session recap
   if (sections.sessionRecap) {
