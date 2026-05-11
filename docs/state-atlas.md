@@ -115,6 +115,7 @@ Transient per-session state used to build the cached prefix. Not persisted direc
 ```
 DMSessionState
 ├── rulesAppendix?: string                 Loaded from rules/ at session start
+├── pcSheets?: string                      PC sheets concatenated; load-once at session start, never refreshed
 ├── campaignSummary?: string               Loaded from campaign/log.md
 ├── sessionRecap?: string                  Loaded from session-recaps/
 ├── activeState?: string                   Built from PC summaries + alarms + turn holder
@@ -433,6 +434,7 @@ Load config.json from campaignRoot
     │
     ├─ Build DMSessionState
     │   ├─ Load rules/ → rulesAppendix
+    │   ├─ Load characters/<slug>.md for each PC → pcSheets
     │   ├─ Load campaign/log.md → campaignSummary
     │   ├─ Load session recap → sessionRecap
     │   └─ buildActiveState() → activeState

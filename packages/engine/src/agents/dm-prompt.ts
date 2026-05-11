@@ -22,6 +22,14 @@ const DM_DIRECTIVES = loadPrompt("dm-directives");
  */
 export interface DMSessionState {
   rulesAppendix?: string;
+  /**
+   * Verbatim PC character sheets concatenated into one block. Loaded once at
+   * session start and intentionally NOT refreshed when sheets change in
+   * session — the DM made the change via scribe/promote_character and sees
+   * the result in the conversation, so a stale cached copy is acceptable and
+   * keeps BP2 cache intact across the whole session.
+   */
+  pcSheets?: string;
   campaignSummary?: string;
   sessionRecap?: string;
   activeState?: string;

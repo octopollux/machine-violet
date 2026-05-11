@@ -15,11 +15,12 @@ The entity filesystem, campaign log, and scene transcripts are the DM's long-ter
 │ System prompt: DM identity                     ~800t  │
 │ Tool definitions: all available tools         ~2000t  │
 │ Rules appendix: distilled rule cards          ~1500t  │
+│ PC sheets: verbatim character files            ~2000t  │
 │ Session recap: "last time..."                  ~300t  │
 │ Campaign summary: log with wikilinks           ~800t  │
 │ Active state: location, PC summaries, alarms  ~1500t  │
 │ Current scene summary: running precis          ~500t  │
-│                                        Total: ~7500t  │
+│                                        Total: ~9500t  │
 ├───────────────────────────────────────────────────────┤
 │ CONVERSATION (accumulates within scene, cached rate)   │
 │                                                       │
@@ -131,8 +132,11 @@ The DM's input context stays small. Haiku does the reading in its own cheap cont
 
 ```
 Session start:
-  → Build cached prefix: system prompt, tools, rules, campaign summary,
-    session recap, active state, name-inspiration sample
+  → Build cached prefix: system prompt, tools, rules, PC sheets,
+    campaign summary, session recap, active state, name-inspiration sample
+  → PC sheets read verbatim from characters/<slug>.md; not refreshed
+    again until next session start (stale-vs-disk after scribe edits is
+    accepted — the DM sees its own scribe call in the conversation)
   → Conversation is empty (or session_resume provides a brief recap)
 
 Each exchange:

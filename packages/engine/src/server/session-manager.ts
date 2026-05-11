@@ -28,6 +28,7 @@ import { createProviderFromConnection } from "../providers/index.js";
 import { configDir, norm } from "../utils/paths.js";
 import { processingPaths } from "../config/processing-paths.js";
 import { readBundledRuleCard } from "../config/systems.js";
+import { slugify } from "../utils/slug.js";
 import { sandboxFileIO } from "../tools/filesystem/sandbox.js";
 import { campaignPaths } from "../tools/filesystem/scaffold.js";
 import { buildEntityTree, renderEntityTree } from "../tools/filesystem/entity-tree.js";
@@ -511,6 +512,26 @@ export class SessionManager {
         if (bundled) sessionState.rulesAppendix = bundled;
       }
     }
+
+    // Load PC sheets verbatim so the DM can reference Approaches, Aspects,
+    // HP, Inventory, etc. without round-tripping search_campaign for every
+    // check. Loaded once at session start and intentionally never refreshed
+    // in-session — when the DM edits a sheet via scribe/promote_character it
+    // sees the change in conversation, so a stale cached block doesn't
+    // matter until the next session reload.
+    try {
+      const charPaths = campaignPaths(campaignRoot);
+      const sheets: string[] = [];
+      for (const player of config.players) {
+        const filePath = charPaths.character(slugify(player.character));
+        if (await fileIO.exists(filePath)) {
+          sheets.push(await fileIO.readFile(filePath));
+        }
+      }
+      if (sheets.length > 0) {
+        sessionState.pcSheets = sheets.join("\n\n---\n\n");
+      }
+    } catch { /* non-critical — DM can still fall back to search_campaign */ }
 
     // Sample a fresh multicultural name pool to perturb the DM's naming
     // priors. Drawn once per session and held in DMSessionState so it
