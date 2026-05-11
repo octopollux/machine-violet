@@ -161,6 +161,12 @@ function handleModeToggle(
       repo: engine.getRepo() ?? undefined,
       fileIO: sm.getFileIO(),
       campaignRoot: gameState.campaignRoot,
+      // Pass gameState so the DM-tier tool definitions (scribe,
+      // promote_character, roll_dice, etc.) register. The OOC system
+      // prompt explicitly directs the agent to use scribe for entity
+      // corrections; without gameState the registration is skipped and
+      // the agent correctly tells the player it doesn't have the tool.
+      gameState,
       model: medium.model,
       smallTier: small,
     });
