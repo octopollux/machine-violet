@@ -280,8 +280,17 @@ function fromResponsesResponse(response: OAIResponse): ChatResult {
  * Build a ChatResult from a Responses API response.
  *
  * When called from the streaming path, `accumulatedText` is supplied because
- * `ParsedResponse.output_text` is undefined on streamed responses.
- * For non-streaming, we extract text from the output items.
+ * `ParsedResponse.output_text` is undefined on streamed responses; the
+ * delta-accumulated text is pre-pushed and the loop only picks up tool
+ * calls and reasoning items from `response.output`. For non-streaming,
+ * everything — including text — comes from `response.output` in order so
+ * text ↔ tool_call interleaving is preserved.
+ *
+ * Reasoning summaries (returned because the request set
+ * `reasoning.summary: "concise"`) are joined into `thinkingText` for both
+ * paths. Reasoning items are never pushed to `assistantContent` — that's
+ * persisted conversation history, and per OpenAI's guidance the reasoning
+ * text must not be sent back to the model.
  */
 function fromResponsesResponseWithText(
   response: OAIResponse,
@@ -289,48 +298,47 @@ function fromResponsesResponseWithText(
 ): ChatResult {
   const toolCalls: NormalizedToolCall[] = [];
   const assistantContent: ContentPart[] = [];
-
-  // Build text and assistantContent in output order to preserve interleaving
   const textParts: string[] = [];
+  const reasoningParts: string[] = [];
 
-  if (accumulatedText !== undefined) {
-    // Streaming path: text was accumulated from deltas, just use it
-    if (accumulatedText) {
-      textParts.push(accumulatedText);
-      assistantContent.push({ type: "text", text: accumulatedText });
-    }
-    // Still need to extract tool calls from output
-    for (const item of response.output) {
-      if (item.type === "function_call") {
-        const input = parseToolArgs(item.arguments);
-        toolCalls.push({ id: item.call_id, name: item.name, input });
-        assistantContent.push({ type: "tool_use", id: item.call_id, name: item.name, input });
-      }
-    }
-  } else {
-    // Non-streaming: iterate output in order to preserve text ↔ tool_call interleaving
-    for (const item of response.output) {
-      if (item.type === "message") {
-        for (const part of item.content) {
-          if (part.type === "output_text" && part.text) {
-            textParts.push(part.text);
-            assistantContent.push({ type: "text", text: part.text });
-          }
+  const useAccumulatedText = accumulatedText !== undefined;
+  if (useAccumulatedText && accumulatedText) {
+    textParts.push(accumulatedText);
+    assistantContent.push({ type: "text", text: accumulatedText });
+  }
+
+  for (const item of response.output) {
+    if (item.type === "message" && !useAccumulatedText) {
+      for (const part of item.content) {
+        if (part.type === "output_text" && part.text) {
+          textParts.push(part.text);
+          assistantContent.push({ type: "text", text: part.text });
         }
-      } else if (item.type === "function_call") {
-        const input = parseToolArgs(item.arguments);
-        toolCalls.push({ id: item.call_id, name: item.name, input });
-        assistantContent.push({ type: "tool_use", id: item.call_id, name: item.name, input });
+      }
+    } else if (item.type === "function_call") {
+      const input = parseToolArgs(item.arguments);
+      toolCalls.push({ id: item.call_id, name: item.name, input });
+      assistantContent.push({ type: "tool_use", id: item.call_id, name: item.name, input });
+    } else if (item.type === "reasoning") {
+      // OpenAI returns reasoning summaries as `summary_text` parts. The
+      // `content` array (full reasoning text) is only populated when the
+      // request opts in via `include: ["reasoning.encrypted_content"]` —
+      // we don't, so summary is what we get and what we surface.
+      for (const sum of item.summary ?? []) {
+        if (sum.type === "summary_text" && sum.text) {
+          reasoningParts.push(sum.text);
+        }
       }
     }
   }
 
   const text = textParts.join("");
+  const thinkingText = reasoningParts.length > 0 ? reasoningParts.join("\n\n") : undefined;
 
   const stopReason = mapResponsesStatus(response, toolCalls.length > 0);
   const usage = mapResponsesUsage(response.usage);
 
-  return { text, toolCalls, usage, stopReason, assistantContent };
+  return { text, toolCalls, usage, stopReason, assistantContent, thinkingText };
 }
 
 // ---------------------------------------------------------------------------

@@ -407,6 +407,93 @@ describe("Responses API integration", () => {
     expect(callArgs.max_output_tokens).toBe(2048);
   });
 
+  // -----------------------------------------------------------------------
+  // Reasoning summary extraction
+  //
+  // The provider asks for `reasoning.summary: "concise"` whenever an effort
+  // is set. The Responses API returns the summary as a `type: "reasoning"`
+  // output item with `summary[]: { type: "summary_text"; text: string }`
+  // entries. We surface these as `thinkingText` so context-dump's
+  // `dumpThinking` accumulates a visible reasoning trace alongside the
+  // request log — without this, the only sign that reasoning happened
+  // is the `reasoningTokens` count in the usage block.
+  // -----------------------------------------------------------------------
+
+  it("extracts reasoning summaries into thinkingText", async () => {
+    mockResponses.create.mockResolvedValue(fakeResponse({
+      output: [
+        {
+          id: "rs_1",
+          type: "reasoning",
+          summary: [
+            { type: "summary_text", text: "Considering the player's intent." },
+            { type: "summary_text", text: "Picking a tone." },
+          ],
+        },
+        {
+          id: "msg_1",
+          type: "message",
+          role: "assistant",
+          status: "completed",
+          content: [{ type: "output_text", text: "The door creaks open.", annotations: [] }],
+        },
+      ],
+      usage: {
+        input_tokens: 50,
+        output_tokens: 20,
+        total_tokens: 70,
+        input_tokens_details: { cached_tokens: 0 },
+        output_tokens_details: { reasoning_tokens: 128 },
+      },
+    }));
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+    const result = await provider.chat(baseChatParams());
+
+    expect(result.text).toBe("The door creaks open.");
+    expect(result.thinkingText).toBe("Considering the player's intent.\n\nPicking a tone.");
+    expect(result.usage.reasoningTokens).toBe(128);
+    // Reasoning items must NOT leak into assistantContent — that array is
+    // persisted as conversation history and OpenAI's API rejects reasoning
+    // blocks on the input side.
+    expect(result.assistantContent).toEqual([
+      { type: "text", text: "The door creaks open." },
+    ]);
+  });
+
+  it("leaves thinkingText undefined when no reasoning items are present", async () => {
+    mockResponses.create.mockResolvedValue(fakeResponse());
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+    const result = await provider.chat(baseChatParams());
+
+    expect(result.thinkingText).toBeUndefined();
+  });
+
+  it("skips reasoning items with empty summaries", async () => {
+    // Models can return reasoning items with no summary parts when reasoning
+    // happened but produced nothing the model wanted to summarize. Don't emit
+    // a thinkingText of "" — undefined is the right signal to dumpThinking.
+    mockResponses.create.mockResolvedValue(fakeResponse({
+      output: [
+        { id: "rs_1", type: "reasoning", summary: [] },
+        {
+          id: "msg_1",
+          type: "message",
+          role: "assistant",
+          status: "completed",
+          content: [{ type: "output_text", text: "Hi.", annotations: [] }],
+        },
+      ],
+    }));
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+    const result = await provider.chat(baseChatParams());
+
+    expect(result.thinkingText).toBeUndefined();
+    expect(result.text).toBe("Hi.");
+  });
+
   describe("streaming", () => {
     it("emits text deltas and returns final response", async () => {
       const response = fakeResponse();
@@ -434,6 +521,50 @@ describe("Responses API integration", () => {
       expect(deltas).toEqual(["Hi ", "there!"]);
       expect(result.text).toBe("Hi there!");
       expect(result.stopReason).toBe("end");
+    });
+
+    it("extracts reasoning summaries from the final response", async () => {
+      // Streaming uses delta-accumulated text but still walks `response.output`
+      // for tool calls and reasoning items. This guards against the path
+      // diverging — a regression that strips reasoning extraction from one
+      // branch would only show up here.
+      const response = fakeResponse({
+        output: [
+          {
+            id: "rs_1",
+            type: "reasoning",
+            summary: [{ type: "summary_text", text: "Picking a path." }],
+          },
+          {
+            id: "msg_1",
+            type: "message",
+            role: "assistant",
+            status: "completed",
+            content: [{ type: "output_text", text: "You step forward.", annotations: [] }],
+          },
+        ],
+      });
+      const events = [
+        { type: "response.output_text.delta", delta: "You step forward." },
+        { type: "response.completed", response },
+      ];
+
+      let eventIdx = 0;
+      mockResponses.stream.mockReturnValue({
+        [Symbol.asyncIterator]: () => ({
+          next: async () =>
+            eventIdx < events.length
+              ? { value: events[eventIdx++], done: false }
+              : { value: undefined, done: true },
+        }),
+        finalResponse: vi.fn().mockResolvedValue(response),
+      });
+
+      const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+      const result = await provider.stream(baseChatParams(), () => {});
+
+      expect(result.text).toBe("You step forward.");
+      expect(result.thinkingText).toBe("Picking a path.");
     });
   });
 });

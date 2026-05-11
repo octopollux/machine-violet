@@ -274,6 +274,7 @@ async function streamWithRetry(
         model: params.model,
         max_tokens: params.maxTokens,
         system: params.systemPrompt,
+        thinking: params.thinking,
         tools: params.tools,
         messages: params.messages,
       });
