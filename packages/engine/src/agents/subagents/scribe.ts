@@ -407,7 +407,8 @@ export async function runScribe(
   input: ScribeInput,
   fileIO: ScribeFileIO,
 ): Promise<ScribeResult> {
-  const systemPrompt = cacheSystemPrompt(loadPrompt("scribe"));
+  const model = getModel("small");
+  const systemPrompt = cacheSystemPrompt(loadPrompt("scribe", model));
   const created: string[] = [];
   const updated: string[] = [];
   const entityDeltas: ScribeEntityDelta[] = [];
@@ -435,7 +436,7 @@ export async function runScribe(
 
   const result: SubagentResult = await spawnSubagent(provider, {
     name: "scribe",
-    model: getModel("small"),
+    model,
     visibility: "silent",
     systemPrompt,
     maxTokens: 512,

@@ -29,13 +29,17 @@ export interface DevModeResult extends SubagentResult {
 
 /**
  * Build the dev mode system prompt with campaign context.
+ *
+ * `model` defaults to the resolved "medium" tier so callers in tests can omit it
+ * without diverging from production behavior (which uses the same tier).
  */
 export function buildDevPrompt(
   campaignName: string,
   gameStateSummary?: string,
+  model: string = getModel("medium"),
 ): SystemBlock[] {
   const blocks: SystemBlock[] = [
-    ...cacheSystemPrompt(loadPrompt("dev-mode")),
+    ...cacheSystemPrompt(loadPrompt("dev-mode", model)),
   ];
 
   const dynamicParts: string[] = [];
@@ -540,9 +544,11 @@ export async function enterDevMode(
   },
   onStream?: SubagentStreamCallback,
 ): Promise<DevModeResult> {
+  const model = getModel("medium");
   const systemPrompt = buildDevPrompt(
     options.campaignName,
     options.gameStateSummary,
+    model,
   );
 
   const hasTools = !!(options.gameState && options.fileIO);
@@ -555,7 +561,7 @@ export async function enterDevMode(
     provider,
     {
       name: "dev-mode",
-      model: getModel("medium"),
+      model,
       visibility: "player_facing",
       systemPrompt,
       maxTokens: TOKEN_LIMITS.DEV_MODE,

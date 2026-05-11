@@ -1,21 +1,8 @@
 import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
 import { buildCachedPrefix } from "../context/index.js";
 import type { PrefixSections, CachedPrefixResult } from "../context/index.js";
+import { getModel } from "../config/models.js";
 import { loadPrompt } from "../prompts/load-prompt.js";
-
-/**
- * The DM identity preamble (just the <identity> block).
- * Emitted first so the personality can sit directly under it, before the
- * operational directives take effect.
- */
-const DM_IDENTITY = loadPrompt("dm-identity");
-
-/**
- * The DM operational directives (directives, voice, craft, formatting, tools).
- * Emitted after the personality so that persona-specific register claims the
- * seat before these generic directives.
- */
-const DM_DIRECTIVES = loadPrompt("dm-directives");
 
 /**
  * Session state needed to build the DM's prefix.
@@ -53,9 +40,10 @@ export function buildDMPrefix(
   config: CampaignConfig,
   sessionState: DMSessionState,
 ): CachedPrefixResult {
+  const model = getModel("large");
   const sections: PrefixSections = {
-    dmIdentity: DM_IDENTITY,
-    dmDirectives: DM_DIRECTIVES,
+    dmIdentity: loadPrompt("dm-identity", model),
+    dmDirectives: loadPrompt("dm-directives", model),
     personality: config.dm_personality.prompt_fragment,
     personalityDetail: config.dm_personality.detail,
     campaignDetail: config.campaign_detail,
@@ -165,5 +153,3 @@ export function buildUIState(params: {
   return lines.length > 0 ? lines.join("\n") : undefined;
 }
 
-/** Exported for testing */
-export { DM_IDENTITY, DM_DIRECTIVES };

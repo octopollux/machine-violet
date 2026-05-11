@@ -5,8 +5,6 @@ import { getModel } from "../../config/models.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import type { Compendium, CompendiumEntry } from "@machine-violet/shared/types/compendium.js";
 
-const SYSTEM_PROMPT = loadPrompt("compendium-updater");
-
 /**
  * Create an empty compendium with default structure.
  */
@@ -44,10 +42,11 @@ export async function updateCompendium(
     `\n\nCurrent compendium:\n${JSON.stringify(current, null, 2)}`,
   ].join("");
 
+  const model = getModel("small");
   const result = await oneShot(
     provider,
-    getModel("small"),
-    SYSTEM_PROMPT,
+    model,
+    loadPrompt("compendium-updater", model),
     userMessage,
     2048,
     "compendium-updater",

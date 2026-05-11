@@ -20,10 +20,11 @@ export async function generateNarrativeRecap(
   bulletRecap: string,
   campaignName: string,
 ): Promise<SubagentResult> {
-  const systemPrompt = loadTemplate("narrative-recap", { campaign_name: campaignName });
+  const model = getModel("small");
+  const systemPrompt = loadTemplate("narrative-recap", { campaign_name: campaignName }, model);
   return oneShot(
     provider,
-    getModel("small"),
+    model,
     systemPrompt,
     `Convert this session recap into narrative prose:\n\n${bulletRecap}`,
     TOKEN_LIMITS.SUBAGENT_SMALL,

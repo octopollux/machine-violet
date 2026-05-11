@@ -3,8 +3,6 @@ import { oneShot, type SubagentResult } from "../subagent.js";
 import { getModel } from "../../config/models.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
-const SYSTEM_PROMPT = loadPrompt("scene-tracker");
-
 /** How often (in player exchanges) the scene tracker runs. */
 export const SCENE_TRACKER_CADENCE = 4;
 
@@ -35,10 +33,11 @@ export async function trackScene(
   parts.push(`\nRecent transcript:\n${tail.join("\n")}`);
 
   try {
+    const model = getModel("small");
     const result = await oneShot(
       provider,
-      getModel("small"),
-      SYSTEM_PROMPT,
+      model,
+      loadPrompt("scene-tracker", model),
       parts.join("\n"),
       128,
       "scene-tracker",

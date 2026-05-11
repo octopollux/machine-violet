@@ -253,7 +253,8 @@ export async function searchContent(
   input: SearchContentInput,
   fileIO: FileIO,
 ): Promise<SearchContentResult> {
-  const systemPrompt = cacheSystemPrompt(loadPrompt("search-content"));
+  const model = getModel("small");
+  const systemPrompt = cacheSystemPrompt(loadPrompt("search-content", model));
 
   const toolHandler = buildContentSearchToolHandler(
     fileIO,
@@ -263,7 +264,7 @@ export async function searchContent(
 
   const result: SubagentResult = await spawnSubagent(provider, {
     name: "search_content",
-    model: getModel("small"),
+    model,
     visibility: "silent",
     systemPrompt,
     maxTokens: 512,

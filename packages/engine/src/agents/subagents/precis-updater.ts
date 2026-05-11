@@ -22,8 +22,6 @@ export interface PrecisUpdateResult extends SubagentResult {
   npcIntents?: string;
 }
 
-const SYSTEM_PROMPT = loadPrompt("precis-updater");
-
 /**
  * Precis updater subagent.
  * When an exchange drops from the DM's conversation window,
@@ -59,10 +57,11 @@ export async function updatePrecis(
 
   const prompt = `Current precis:\n${currentPrecis}\n\n${openThreadsLine}${npcIntentsLine}${pcLine}${aliasContext ?? ""}\n\nDropped exchange:\n${droppedExchange}\n\nAppend a terse summary of the dropped exchange to the precis, then add NPC_NEXT: lines (if any NPCs have active intentions), then the OPEN: line (if any threads are open), then the PLAYER_READ: JSON line.`;
 
+  const model = getModel("small");
   const result = await oneShot(
     provider,
-    getModel("small"),
-    SYSTEM_PROMPT,
+    model,
+    loadPrompt("precis-updater", model),
     prompt,
     256,
     "precis-updater",

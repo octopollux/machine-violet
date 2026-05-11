@@ -204,7 +204,8 @@ export async function repairState(
   }
 
   // Step 5: Generate via Haiku in batches
-  const systemPrompt = loadPrompt("repair-generator");
+  const model = getModel("small");
+  const systemPrompt = loadPrompt("repair-generator", model);
   const batchSize = 5;
 
   for (let i = 0; i < missingEntities.length; i += batchSize) {
@@ -231,7 +232,7 @@ export async function repairState(
     try {
       const genResult = await oneShot(
         provider,
-        getModel("small"),
+        model,
         systemPrompt,
         lines.join("\n"),
         1024,

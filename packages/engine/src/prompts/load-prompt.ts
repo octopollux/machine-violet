@@ -1,8 +1,13 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { assetDir } from "../utils/paths.js";
+import { applyModelConditionals } from "./apply-model-conditionals.js";
 
 const cache = new Map<string, string>();
+
+function cacheKey(name: string, modelId: string | undefined): string {
+  return `${name}\0${modelId ?? ""}`;
+}
 
 /**
  * Strip prompt comments before sending to the API.
@@ -19,21 +24,27 @@ export function stripComments(text: string): string {
 
 /**
  * Load a prompt .md file from the prompts directory.
- * Reads synchronously on first call, caches thereafter.
- * Comments (%% lines and <!-- --> blocks) are stripped before caching.
+ * Reads synchronously on first call, caches thereafter (keyed by name + modelId).
+ *
+ * Pipeline: read → CRLF normalize → apply model conditionals → strip comments.
+ * The conditional preprocessor runs before comment stripping because conditional
+ * markers are HTML-comment-shaped (`<!--if:...-->`).
  *
  * @param name - Prompt filename without .md extension (e.g. "dm-identity")
+ * @param modelId - Active model ID, used by `<!--if:PREFIX-->` conditionals.
+ *                  Omit for callers that don't have model context; conditionals
+ *                  will resolve to their else branches.
  */
-export function loadPrompt(name: string): string {
-  const cached = cache.get(name);
+export function loadPrompt(name: string, modelId?: string): string {
+  const key = cacheKey(name, modelId);
+  const cached = cache.get(key);
   if (cached !== undefined) return cached;
 
   const dir = assetDir("prompts");
   const filePath = join(dir, `${name}.md`);
-  const content = stripComments(
-    readFileSync(filePath, "utf-8").replace(/\r\n/g, "\n"),
-  );
-  cache.set(name, content);
+  const raw = readFileSync(filePath, "utf-8").replace(/\r\n/g, "\n");
+  const content = stripComments(applyModelConditionals(raw, modelId));
+  cache.set(key, content);
   return content;
 }
 
@@ -43,9 +54,14 @@ export function loadPrompt(name: string): string {
  *
  * @param name - Prompt filename without .md extension
  * @param vars - Key-value map of placeholder replacements
+ * @param modelId - Active model ID for conditional inclusion (see loadPrompt).
  */
-export function loadTemplate(name: string, vars: Record<string, string>): string {
-  const raw = loadPrompt(name);
+export function loadTemplate(
+  name: string,
+  vars: Record<string, string>,
+  modelId?: string,
+): string {
+  const raw = loadPrompt(name, modelId);
   return raw.replace(/\{\{(\w+)\}\}/g, (_, key: string) => vars[key] ?? "");
 }
 

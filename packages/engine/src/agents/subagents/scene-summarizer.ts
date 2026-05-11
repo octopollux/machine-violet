@@ -5,8 +5,6 @@ import { getModel } from "../../config/models.js";
 import { TOKEN_LIMITS } from "../../config/tokens.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
-const SYSTEM_PROMPT = loadPrompt("scene-summarizer");
-
 const MINI_DELIMITER = "---MINI---";
 
 /**
@@ -32,10 +30,11 @@ export async function summarizeScene(
   transcript: string,
   aliasContext?: string,
 ): Promise<SceneSummaryResult> {
+  const model = getModel("small");
   const result = await oneShot(
     provider,
-    getModel("small"),
-    SYSTEM_PROMPT,
+    model,
+    loadPrompt("scene-summarizer", model),
     `Write a campaign log entry for this scene:\n\n${transcript}${aliasContext ?? ""}`,
     TOKEN_LIMITS.DM_RESPONSE,
     "scene-summarizer",

@@ -4,8 +4,6 @@ import type { SubagentResult } from "../subagent.js";
 import { getModel } from "../../config/models.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
-const SYSTEM_PROMPT = loadPrompt("changelog-updater");
-
 /**
  * Changelog updater subagent.
  * Scans a completed scene transcript and identifies entity changelog entries.
@@ -25,10 +23,11 @@ export async function updateChangelogs(
 ): Promise<SubagentResult> {
   const prompt = `Scene ${sceneNumber} transcript:\n${transcript}\n\nKnown entity files:\n${entityFiles.join("\n")}${aliasContext ?? ""}\n\nList changelog entries for entities meaningfully involved.`;
 
+  const model = getModel("small");
   return oneShot(
     provider,
-    getModel("small"),
-    SYSTEM_PROMPT,
+    model,
+    loadPrompt("changelog-updater", model),
     prompt,
     512,
     "changelog-updater",

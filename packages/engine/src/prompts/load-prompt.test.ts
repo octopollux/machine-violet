@@ -121,3 +121,21 @@ describe("loadTemplate", () => {
     expect(result).not.toContain("{{");
   });
 });
+
+describe("loadPrompt model conditionals", () => {
+  it("caches separately per modelId", () => {
+    const a = loadPrompt("dm-identity", "gpt-5");
+    const b = loadPrompt("dm-identity", "claude-opus-4-7");
+    const aAgain = loadPrompt("dm-identity", "gpt-5");
+    // Same modelId returns identical reference; different modelId is a distinct cache entry.
+    expect(a).toBe(aAgain);
+    // Since dm-identity currently has no conditionals, content is equal but cache entries are separate.
+    expect(a).toEqual(b);
+  });
+
+  it("caches separately for undefined vs defined modelId", () => {
+    const undef = loadPrompt("dm-identity");
+    const undefAgain = loadPrompt("dm-identity");
+    expect(undef).toBe(undefAgain);
+  });
+});

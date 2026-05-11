@@ -194,7 +194,8 @@ export async function searchCampaign(
   input: SearchCampaignInput,
   fileIO: FileIO,
 ): Promise<SearchCampaignResult> {
-  const systemPrompt = cacheSystemPrompt(loadPrompt("search-campaign"));
+  const model = getModel("small");
+  const systemPrompt = cacheSystemPrompt(loadPrompt("search-campaign", model));
 
   // Walk all files once — the subagent's grep tool searches this in-memory snapshot
   const files = await walkCampaignFiles(input.campaignRoot, fileIO);
@@ -207,7 +208,7 @@ export async function searchCampaign(
 
   const result: SubagentResult = await spawnSubagent(provider, {
     name: "search_campaign",
-    model: getModel("small"),
+    model,
     visibility: "silent",
     systemPrompt,
     maxTokens: 512,

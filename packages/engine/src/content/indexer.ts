@@ -99,11 +99,12 @@ export async function buildCheatSheet(
   provider: LLMProvider,
   indexContent: string,
 ): Promise<string> {
-  const systemPrompt = loadContentPrompt("indexer");
+  const model = getModel("small");
+  const systemPrompt = loadContentPrompt("indexer", model);
 
   const result = await oneShot(
     provider,
-    getModel("small"),
+    model,
     systemPrompt,
     `Here is the entity index for a sourcebook:\n\n${indexContent}\n\nGenerate a DM cheat sheet.`,
     4096,

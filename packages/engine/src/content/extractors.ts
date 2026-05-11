@@ -34,9 +34,12 @@ const PROMPT_MAP: Record<ContentType, string> = {
 
 /**
  * Get the extractor system prompt for a given content type.
+ *
+ * `model` is optional — when omitted, model-conditional blocks in the prompt
+ * resolve to their else branches.
  */
-export function getExtractorPrompt(contentType: ContentType): string {
-  return loadContentPrompt(PROMPT_MAP[contentType]);
+export function getExtractorPrompt(contentType: ContentType, model?: string): string {
+  return loadContentPrompt(PROMPT_MAP[contentType], model);
 }
 
 /**
@@ -72,12 +75,13 @@ export function buildExtractorBatchRequests(
   sectionTexts: string[],
   collectionSlug: string,
 ): Anthropic.Messages.Batches.BatchCreateParams.Request[] {
+  const model = getModel("small");
   return sections.map((section, i) => ({
     custom_id: `extract-${collectionSlug}-${i}-${section.startPage}-${section.endPage}`,
     params: {
-      model: getModel("small"),
+      model,
       max_tokens: 8192,
-      system: getExtractorPrompt(section.contentType),
+      system: getExtractorPrompt(section.contentType, model),
       messages: [
         {
           role: "user" as const,

@@ -120,7 +120,7 @@ export class ResolveSession {
   ): Promise<void> {
     this.ruleCardContent = ruleCardCombat;
 
-    const basePrompt = loadPrompt("resolve-session");
+    const basePrompt = loadPrompt("resolve-session", getModel("medium"));
 
     // Build system prompt as SystemBlock[] for cache breakpoint stamping
     // Block 1: Session identity + output format (stable)

@@ -88,12 +88,13 @@ export function buildClassifierBatchRequests(
   chunkTexts: string[],
   collectionSlug: string,
 ): Anthropic.Messages.Batches.BatchCreateParams.Request[] {
-  const systemPrompt = loadContentPrompt("classifier");
+  const model = getModel("small");
+  const systemPrompt = loadContentPrompt("classifier", model);
 
   return chunks.map((chunk, i) => ({
     custom_id: `classify-${collectionSlug}-${chunk.startPage}-${chunk.endPage}`,
     params: {
-      model: getModel("small"),
+      model,
       max_tokens: 4096,
       system: systemPrompt,
       messages: [
