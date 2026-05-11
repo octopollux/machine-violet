@@ -170,11 +170,14 @@ export async function runProviderLoop(
       cacheHints: config.cacheHints,
     };
 
-    // Context dump: log params before API call
+    // Context dump: log params before API call. `thinking` is captured so the
+    // dumped request reflects whether reasoning was actually requested — the
+    // matching response trace (if any) flows through dumpThinking below.
     dumpContext(config.name, {
       model: chatParams.model,
       max_tokens: chatParams.maxTokens,
       system: chatParams.systemPrompt,
+      thinking: chatParams.thinking,
       tools: chatParams.tools,
       messages: chatParams.messages,
     });

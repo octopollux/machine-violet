@@ -199,7 +199,7 @@ describe("updateCompendium", () => {
     const provider = mockProvider([textResult(JSON.stringify(updated))]);
 
     const result = await updateCompendium(
-      provider, emptyCompendium(), "- The party met Mira, a smuggler.", 3,
+      provider, emptyCompendium(), "- The party met Mira, a smuggler.", 3, undefined, "claude-haiku-4-5-20251001",
     );
 
     expect(result.compendium.characters).toHaveLength(1);
@@ -212,14 +212,14 @@ describe("updateCompendium", () => {
     const current = emptyCompendium();
     const provider = mockProvider([textResult("I don't understand the request")]);
 
-    const result = await updateCompendium(provider, current, "- Nothing happened.", 1);
+    const result = await updateCompendium(provider, current, "- Nothing happened.", 1, undefined, "claude-haiku-4-5-20251001");
     expect(result.compendium).toBe(current);
   });
 
   it("passes alias context when provided", async () => {
     const provider = mockProvider([textResult(JSON.stringify(emptyCompendium()))]);
     await updateCompendium(
-      provider, emptyCompendium(), "- Scene summary.", 1, "\n\nEntity aliases:\nfoo: Foo",
+      provider, emptyCompendium(), "- Scene summary.", 1, "\n\nEntity aliases:\nfoo: Foo", "claude-haiku-4-5-20251001",
     );
 
     const call = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
@@ -229,7 +229,7 @@ describe("updateCompendium", () => {
   it("sends scene summary, not raw transcript", async () => {
     const provider = mockProvider([textResult(JSON.stringify(emptyCompendium()))]);
     const summary = "- The party explored the tavern and met a cloaked stranger.";
-    await updateCompendium(provider, emptyCompendium(), summary, 1);
+    await updateCompendium(provider, emptyCompendium(), summary, 1, undefined, "claude-haiku-4-5-20251001");
 
     const call = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(call.messages[0].content).toContain("Scene 1 summary:");

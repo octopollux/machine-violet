@@ -139,6 +139,31 @@ export function getModelPricing(modelId: string, configDir?: string): ModelPrici
 }
 
 /**
+ * Fallback `max_tokens` value for models not present in the registry.
+ *
+ * Generous enough that the DM, scribe, and any plausible subagent can run
+ * to natural completion without truncating; not so high that an out-of-control
+ * loop bleeds money before something else catches it. If you ever ship a
+ * registry with a model whose maxOutput is *less* than this, the registry
+ * value still wins — this constant only applies when lookup fails.
+ */
+const FALLBACK_MAX_OUTPUT = 16384;
+
+/**
+ * Get the model's maximum output tokens — the natural ceiling on any single
+ * response. Used as `max_tokens` for every API call in the engine: passing
+ * a smaller artificial cap risks truncating tool-call JSON or DM narrative
+ * mid-emission (the original sin behind the GPT-5.5 setup-finalize bug).
+ *
+ * Cost is unaffected — providers bill on actual output tokens, not the cap.
+ *
+ * Returns {@link FALLBACK_MAX_OUTPUT} for models not in the registry.
+ */
+export function getMaxOutput(modelId: string, configDir?: string): number {
+  return getKnownModel(modelId, configDir)?.maxOutput ?? FALLBACK_MAX_OUTPUT;
+}
+
+/**
  * Get the default tier assignments for a provider.
  */
 export function getTierDefaults(provider: string, configDir?: string): TierDefaults | undefined {

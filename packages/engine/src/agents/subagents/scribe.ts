@@ -2,7 +2,7 @@ import type { LLMProvider, NormalizedTool } from "../../providers/types.js";
 import { spawnSubagent, cacheSystemPrompt } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import type { UsageStats } from "../agent-loop.js";
-import { getModel } from "../../config/models.js";
+import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import { join, dirname } from "node:path";
 import { campaignPaths, machinePaths } from "../../tools/filesystem/index.js";
@@ -406,6 +406,7 @@ export async function runScribe(
   provider: LLMProvider,
   input: ScribeInput,
   fileIO: ScribeFileIO,
+  model: string,
 ): Promise<ScribeResult> {
   const systemPrompt = cacheSystemPrompt(loadPrompt("scribe"));
   const created: string[] = [];
@@ -435,10 +436,10 @@ export async function runScribe(
 
   const result: SubagentResult = await spawnSubagent(provider, {
     name: "scribe",
-    model: getModel("small"),
+    model,
     visibility: "silent",
     systemPrompt,
-    maxTokens: 512,
+    maxTokens: getMaxOutput(model),
     tools: SCRIBE_TOOLS,
     toolHandler,
     cacheTools: true,

@@ -1,7 +1,7 @@
 import type { LLMProvider } from "../../providers/types.js";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
-import { getModel } from "../../config/models.js";
+import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
 const SYSTEM_PROMPT = loadPrompt("changelog-updater");
@@ -21,16 +21,17 @@ export async function updateChangelogs(
   transcript: string,
   sceneNumber: number,
   entityFiles: string[],
-  aliasContext?: string,
+  aliasContext: string | undefined,
+  model: string,
 ): Promise<SubagentResult> {
   const prompt = `Scene ${sceneNumber} transcript:\n${transcript}\n\nKnown entity files:\n${entityFiles.join("\n")}${aliasContext ?? ""}\n\nList changelog entries for entities meaningfully involved.`;
 
   return oneShot(
     provider,
-    getModel("small"),
+    model,
     SYSTEM_PROMPT,
     prompt,
-    512,
+    getMaxOutput(model),
     "changelog-updater",
   );
 }

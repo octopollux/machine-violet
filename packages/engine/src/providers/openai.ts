@@ -122,18 +122,36 @@ async function responsesStream(
   const stream = client.responses.stream(apiParams);
 
   let text = "";
+  // Reasoning summaries arrive via dedicated streaming events
+  // (`response.reasoning_summary_text.done`, etc.) that the OpenAI SDK's
+  // response accumulator does NOT handle — it has cases for output_text
+  // deltas, function_call argument deltas, and content_part additions, but
+  // no cases for `response.reasoning_summary_part.added` or
+  // `response.reasoning_summary_text.*`. The bare reasoning item pushed by
+  // `response.output_item.added` ships with `summary: []` and never gets
+  // populated, so finalResponse().output[i].summary is empty even though
+  // the API did stream summary parts. Walking finalResponse for summaries
+  // is therefore unreliable on the streaming path; capture them from the
+  // events directly. See node_modules/openai/lib/responses/ResponseStream.mjs.
+  const reasoningParts: string[] = [];
   for await (const event of stream) {
     if (event.type === "response.output_text.delta") {
       text += event.delta;
       onDelta(event.delta);
+    } else if (event.type === "response.reasoning_summary_text.done") {
+      // `.done` carries the complete text for one summary part. We could
+      // also accumulate `.delta` events, but `.done` is authoritative and
+      // simpler — and the API guarantees a `.done` per part.
+      if (event.text) reasoningParts.push(event.text);
     }
   }
 
   const response = await stream.finalResponse();
   // finalResponse() returns ParsedResponse which lacks the output_text
   // convenience property, so we build the result from the accumulated text
-  // and parse tool calls from the output items directly.
-  return fromResponsesResponseWithText(response, text);
+  // and parse tool calls from the output items directly. Reasoning is
+  // passed in from the event-driven capture above.
+  return fromResponsesResponseWithText(response, text, reasoningParts);
 }
 
 // ---------------------------------------------------------------------------
@@ -279,58 +297,81 @@ function fromResponsesResponse(response: OAIResponse): ChatResult {
 /**
  * Build a ChatResult from a Responses API response.
  *
- * When called from the streaming path, `accumulatedText` is supplied because
- * `ParsedResponse.output_text` is undefined on streamed responses.
- * For non-streaming, we extract text from the output items.
+ * When called from the streaming path, `accumulatedText` and
+ * `accumulatedReasoning` are supplied because `ParsedResponse.output_text`
+ * is undefined on streamed responses and `output[i].summary` arrays are
+ * empty (the SDK's response accumulator doesn't handle the
+ * `response.reasoning_summary_*` events — see responsesStream above).
+ * For streaming, text/reasoning are taken from the caller's accumulators
+ * and the loop only walks `response.output` for tool calls.
+ *
+ * For non-streaming, everything — text, reasoning, tool calls — comes
+ * from `response.output` in order so text ↔ tool_call interleaving is
+ * preserved and reasoning summaries (returned because the request set
+ * `reasoning.summary: "concise"`) get extracted from the populated
+ * `summary` arrays.
+ *
+ * Reasoning is joined into `thinkingText` for both paths. Reasoning items
+ * are never pushed to `assistantContent` — that's persisted conversation
+ * history, and per OpenAI's guidance the reasoning text must not be sent
+ * back to the model.
  */
 function fromResponsesResponseWithText(
   response: OAIResponse,
   accumulatedText?: string,
+  accumulatedReasoning?: string[],
 ): ChatResult {
   const toolCalls: NormalizedToolCall[] = [];
   const assistantContent: ContentPart[] = [];
-
-  // Build text and assistantContent in output order to preserve interleaving
   const textParts: string[] = [];
+  const reasoningParts: string[] = [];
 
-  if (accumulatedText !== undefined) {
-    // Streaming path: text was accumulated from deltas, just use it
-    if (accumulatedText) {
-      textParts.push(accumulatedText);
-      assistantContent.push({ type: "text", text: accumulatedText });
-    }
-    // Still need to extract tool calls from output
-    for (const item of response.output) {
-      if (item.type === "function_call") {
-        const input = parseToolArgs(item.arguments);
-        toolCalls.push({ id: item.call_id, name: item.name, input });
-        assistantContent.push({ type: "tool_use", id: item.call_id, name: item.name, input });
-      }
-    }
-  } else {
-    // Non-streaming: iterate output in order to preserve text ↔ tool_call interleaving
-    for (const item of response.output) {
-      if (item.type === "message") {
-        for (const part of item.content) {
-          if (part.type === "output_text" && part.text) {
-            textParts.push(part.text);
-            assistantContent.push({ type: "text", text: part.text });
-          }
+  const useAccumulatedText = accumulatedText !== undefined;
+  if (useAccumulatedText && accumulatedText) {
+    textParts.push(accumulatedText);
+    assistantContent.push({ type: "text", text: accumulatedText });
+  }
+
+  for (const item of response.output) {
+    if (item.type === "message" && !useAccumulatedText) {
+      for (const part of item.content) {
+        if (part.type === "output_text" && part.text) {
+          textParts.push(part.text);
+          assistantContent.push({ type: "text", text: part.text });
         }
-      } else if (item.type === "function_call") {
-        const input = parseToolArgs(item.arguments);
-        toolCalls.push({ id: item.call_id, name: item.name, input });
-        assistantContent.push({ type: "tool_use", id: item.call_id, name: item.name, input });
+      }
+    } else if (item.type === "function_call") {
+      const input = parseToolArgs(item.arguments);
+      toolCalls.push({ id: item.call_id, name: item.name, input });
+      assistantContent.push({ type: "tool_use", id: item.call_id, name: item.name, input });
+    } else if (item.type === "reasoning" && accumulatedReasoning === undefined) {
+      // Non-streaming path only: walk the populated summary array. The
+      // `content` field (full reasoning text) is only populated when the
+      // request opts in via `include: ["reasoning.encrypted_content"]` —
+      // we don't, so summary is what we get and what we surface.
+      // Streaming captures these via dedicated events instead because the
+      // SDK accumulator leaves these arrays empty.
+      for (const sum of item.summary ?? []) {
+        if (sum.type === "summary_text" && sum.text) {
+          reasoningParts.push(sum.text);
+        }
       }
     }
   }
 
+  // Streaming: caller passes summaries captured from streaming events.
+  // Use those instead of (the empty) `output[i].summary` arrays.
+  if (accumulatedReasoning) {
+    reasoningParts.push(...accumulatedReasoning);
+  }
+
   const text = textParts.join("");
+  const thinkingText = reasoningParts.length > 0 ? reasoningParts.join("\n\n") : undefined;
 
   const stopReason = mapResponsesStatus(response, toolCalls.length > 0);
   const usage = mapResponsesUsage(response.usage);
 
-  return { text, toolCalls, usage, stopReason, assistantContent };
+  return { text, toolCalls, usage, stopReason, assistantContent, thinkingText };
 }
 
 // ---------------------------------------------------------------------------
