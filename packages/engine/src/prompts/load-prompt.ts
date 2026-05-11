@@ -69,3 +69,8 @@ export function loadTemplate(
 export function resetPromptCache(): void {
   cache.clear();
 }
+
+/** Number of cached entries. For testing only — lets tests prove cache keying without mocking `readFileSync`. */
+export function _cacheSize(): number {
+  return cache.size;
+}

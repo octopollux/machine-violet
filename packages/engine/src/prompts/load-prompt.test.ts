@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
+  _cacheSize,
   loadPrompt,
   loadTemplate,
   resetPromptCache,
@@ -123,19 +124,42 @@ describe("loadTemplate", () => {
 });
 
 describe("loadPrompt model conditionals", () => {
-  it("caches separately per modelId", () => {
-    const a = loadPrompt("dm-identity", "gpt-5");
-    const b = loadPrompt("dm-identity", "claude-opus-4-7");
-    const aAgain = loadPrompt("dm-identity", "gpt-5");
-    // Same modelId returns identical reference; different modelId is a distinct cache entry.
-    expect(a).toBe(aAgain);
-    // Since dm-identity currently has no conditionals, content is equal but cache entries are separate.
-    expect(a).toEqual(b);
+  it("creates a separate cache entry per distinct modelId", () => {
+    expect(_cacheSize()).toBe(0);
+    loadPrompt("dm-identity", "gpt-5");
+    expect(_cacheSize()).toBe(1);
+    loadPrompt("dm-identity", "claude-opus-4-7");
+    expect(_cacheSize()).toBe(2);
+    // Repeat call with an already-seen modelId must hit cache, not add an entry.
+    loadPrompt("dm-identity", "gpt-5");
+    expect(_cacheSize()).toBe(2);
   });
 
-  it("caches separately for undefined vs defined modelId", () => {
-    const undef = loadPrompt("dm-identity");
-    const undefAgain = loadPrompt("dm-identity");
-    expect(undef).toBe(undefAgain);
+  it("treats undefined and defined modelId as distinct cache keys", () => {
+    expect(_cacheSize()).toBe(0);
+    loadPrompt("dm-identity");
+    expect(_cacheSize()).toBe(1);
+    loadPrompt("dm-identity", "gpt-5");
+    expect(_cacheSize()).toBe(2);
+    // Repeated undefined hits the existing entry.
+    loadPrompt("dm-identity");
+    expect(_cacheSize()).toBe(2);
+  });
+
+  it("returns model-appropriate content for prompts with conditionals", () => {
+    // dm-directives.md gates a formatting block on <!--if:gpt-->; this is the
+    // end-to-end proof that the cache keys produce model-specific output and
+    // that a gpt-cached entry is not served to a claude request.
+    const gptMarker = "antithesis";
+    const gpt = loadPrompt("dm-directives", "gpt-5.5");
+    expect(gpt).toContain(gptMarker);
+    const claude = loadPrompt("dm-directives", "claude-opus-4-7");
+    expect(claude).not.toContain(gptMarker);
+    // Reverse order to rule out load-order dependence.
+    resetPromptCache();
+    const claude2 = loadPrompt("dm-directives", "claude-opus-4-7");
+    const gpt2 = loadPrompt("dm-directives", "gpt-5.5");
+    expect(claude2).not.toContain(gptMarker);
+    expect(gpt2).toContain(gptMarker);
   });
 });
