@@ -25,7 +25,9 @@ import { getActivePlayer } from "../agents/player-manager.js";
 import { loadEnv } from "../config/first-launch.js";
 import { loadConnectionStore, buildEffectiveConnections, getTierProvider } from "../config/connections.js";
 import { createProviderFromConnection } from "../providers/index.js";
-import { configDir } from "../utils/paths.js";
+import { configDir, norm } from "../utils/paths.js";
+import { processingPaths } from "../config/processing-paths.js";
+import { readBundledRuleCard } from "../config/systems.js";
 import { sandboxFileIO } from "../tools/filesystem/sandbox.js";
 import { campaignPaths } from "../tools/filesystem/scaffold.js";
 import { buildEntityTree, renderEntityTree } from "../tools/filesystem/entity-tree.js";
@@ -491,6 +493,21 @@ export class SessionManager {
         sessionState.dmNotes = await fileIO.readFile(dmNotesPath);
       }
     } catch { /* ignore — may not exist yet */ }
+
+    // Load the system's rule card so the DM sees core mechanics (dice notation,
+    // resolution rules, advancement, etc.) in its prefix. Prefer the processed
+    // copy under ~/.machine-violet/systems/<slug>/rule-card.md (which a user
+    // may have customized via ingest); fall back to the bundled copy shipped
+    // with the engine. Bundled cards are CC-licensed system summaries.
+    if (config.system) {
+      try {
+        const sysPaths = processingPaths(homeDir, config.system);
+        sessionState.rulesAppendix = await fileIO.readFile(norm(sysPaths.ruleCard));
+      } catch {
+        const bundled = readBundledRuleCard(config.system);
+        if (bundled) sessionState.rulesAppendix = bundled;
+      }
+    }
 
     // Sample a fresh multicultural name pool to perturb the DM's naming
     // priors. Drawn once per session and held in DMSessionState so it
