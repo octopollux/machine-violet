@@ -2,7 +2,7 @@ import type { LLMProvider, NormalizedTool } from "../../providers/types.js";
 import { spawnSubagent, cacheSystemPrompt } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import type { UsageStats } from "../agent-loop.js";
-import { getModel } from "../../config/models.js";
+import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import type { FileIO } from "../scene-manager.js";
 import { processingPaths } from "../../config/processing-paths.js";
@@ -252,8 +252,8 @@ export async function searchContent(
   provider: LLMProvider,
   input: SearchContentInput,
   fileIO: FileIO,
+  model: string,
 ): Promise<SearchContentResult> {
-  const model = getModel("small");
   const systemPrompt = cacheSystemPrompt(loadPrompt("search-content", model));
 
   const toolHandler = buildContentSearchToolHandler(
@@ -267,7 +267,7 @@ export async function searchContent(
     model,
     visibility: "silent",
     systemPrompt,
-    maxTokens: 512,
+    maxTokens: getMaxOutput(model),
     tools: SEARCH_TOOLS,
     toolHandler,
     cacheTools: true,

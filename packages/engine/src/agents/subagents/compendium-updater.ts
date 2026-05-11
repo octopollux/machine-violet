@@ -1,7 +1,7 @@
 import type { LLMProvider } from "../../providers/types.js";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
-import { getModel } from "../../config/models.js";
+import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import type { Compendium, CompendiumEntry } from "@machine-violet/shared/types/compendium.js";
 
@@ -34,7 +34,8 @@ export async function updateCompendium(
   current: Compendium,
   sceneSummary: string,
   sceneNumber: number,
-  aliasContext?: string,
+  aliasContext: string | undefined,
+  model: string,
 ): Promise<{ compendium: Compendium; usage: SubagentResult["usage"] }> {
   const userMessage = [
     `Scene ${sceneNumber} summary:\n\n${sceneSummary}`,
@@ -42,13 +43,12 @@ export async function updateCompendium(
     `\n\nCurrent compendium:\n${JSON.stringify(current, null, 2)}`,
   ].join("");
 
-  const model = getModel("small");
   const result = await oneShot(
     provider,
     model,
     loadPrompt("compendium-updater", model),
     userMessage,
-    2048,
+    getMaxOutput(model),
     "compendium-updater",
   );
 

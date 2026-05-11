@@ -23,9 +23,11 @@ import { buildUIState, type DMSessionState } from "../agents/dm-prompt.js";
 import { buildNameInspiration } from "../agents/name-inspiration.js";
 import { getActivePlayer } from "../agents/player-manager.js";
 import { loadEnv } from "../config/first-launch.js";
-import { loadConnectionStore, buildEffectiveConnections, getTierProvider } from "../config/connections.js";
-import { createProviderFromConnection } from "../providers/index.js";
-import { configDir } from "../utils/paths.js";
+import { loadConnectionStore, buildEffectiveConnections } from "../config/connections.js";
+import { buildTierProviders } from "../config/tier-resolver.js";
+import { configDir, norm } from "../utils/paths.js";
+import { processingPaths } from "../config/processing-paths.js";
+import { readBundledRuleCard } from "../config/systems.js";
 import { sandboxFileIO } from "../tools/filesystem/sandbox.js";
 import { campaignPaths } from "../tools/filesystem/scaffold.js";
 import { buildEntityTree, renderEntityTree } from "../tools/filesystem/entity-tree.js";
@@ -419,19 +421,20 @@ export class SessionManager {
     // --- Ensure API key is loaded ---
     loadEnv();
 
-    // --- Resolve provider from connections ---
+    // --- Resolve per-tier providers from connections ---
+    // Each tier (large/medium/small) becomes a {provider, model} pair. The DM
+    // runs on `large`; subagents pick `medium` or `small` per task. Resolving
+    // all three up front means a heterogeneous setup (e.g. Large=OpenAI,
+    // Medium/Small=Anthropic) routes each call to the right vendor without
+    // ever sending an Anthropic model ID through an OpenAI client.
     const appConfigDir = configDir();
     const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
-    const largeTier = getTierProvider(connStore, "large");
+    const { createAnthropicProvider } = await import("../providers/anthropic.js");
+    const tierProviders = buildTierProviders(connStore, () => createAnthropicProvider());
 
-    // Create provider from large tier, or fall back to Anthropic env key
-    let provider;
-    if (largeTier) {
-      provider = createProviderFromConnection(largeTier.connection);
-    } else {
-      const { createAnthropicProvider } = await import("../providers/anthropic.js");
-      provider = createAnthropicProvider();
-    }
+    // The DM uses the large tier; keep `provider` as a local alias for the
+    // many downstream sites in this method that still reference it directly.
+    const provider = tierProviders.large.provider;
 
     // --- Debug: set context dump directory ---
     const { setContextDumpDir } = await import("../config/context-dump.js");
@@ -492,6 +495,44 @@ export class SessionManager {
       }
     } catch { /* ignore — may not exist yet */ }
 
+    // Load the system's rule card so the DM sees core mechanics (dice notation,
+    // resolution rules, advancement, etc.) in its prefix. Prefer the processed
+    // copy under ~/.machine-violet/systems/<slug>/rule-card.md (which a user
+    // may have customized via ingest); fall back to the bundled copy shipped
+    // with the engine. Bundled cards are CC-licensed system summaries.
+    if (config.system) {
+      try {
+        // Use gs.homeDir (the canonical GameState root that loadRuleCardCombat
+        // also points at) rather than the locally-derived homeDir, which diverge
+        // when campaignsDir doesn't literally end in "campaigns".
+        const sysPaths = processingPaths(gs.homeDir, config.system);
+        sessionState.rulesAppendix = await fileIO.readFile(norm(sysPaths.ruleCard));
+      } catch {
+        const bundled = readBundledRuleCard(config.system);
+        if (bundled) sessionState.rulesAppendix = bundled;
+      }
+    }
+
+    // Load PC sheets verbatim so the DM can reference Approaches, Aspects,
+    // HP, Inventory, etc. without round-tripping search_campaign for every
+    // check. Loaded once at session start and intentionally never refreshed
+    // in-session — when the DM edits a sheet via scribe/promote_character it
+    // sees the change in conversation, so a stale cached block doesn't
+    // matter until the next session reload.
+    try {
+      const charPaths = campaignPaths(campaignRoot);
+      const sheets: string[] = [];
+      for (const player of config.players) {
+        const filePath = charPaths.character(player.character);
+        if (await fileIO.exists(filePath)) {
+          sheets.push(await fileIO.readFile(filePath));
+        }
+      }
+      if (sheets.length > 0) {
+        sessionState.pcSheets = sheets.join("\n\n---\n\n");
+      }
+    } catch { /* non-critical — DM can still fall back to search_campaign */ }
+
     // Sample a fresh multicultural name pool to perturb the DM's naming
     // priors. Drawn once per session and held in DMSessionState so it
     // rides Tier 2 cache instead of churning per turn.
@@ -501,10 +542,14 @@ export class SessionManager {
     const entityTree = await buildEntityTree(campaignRoot, fileIO);
 
     // --- Load content boundaries from machine-scope player files ---
+    // Use gs.homeDir (the canonical GameState root) so we agree with the
+    // SceneManager refresh path, which reads `state.homeDir`. The locally-
+    // derived `homeDir` diverges from `gs.homeDir` in non-standard layouts
+    // (e.g. test campaigns dirs that don't literally end in "campaigns").
     try {
       sessionState.contentBoundaries = await loadContentBoundaries(
         config.players,
-        homeDir,
+        gs.homeDir,
         fileIO,
       );
     } catch { /* ignore — players dir may not exist yet */ }
@@ -549,7 +594,10 @@ export class SessionManager {
       if (dmNarrativeCount % DISCORD_STATUS_INTERVAL !== 0) return;
       void (async () => {
         try {
-          const { status, usage } = await generateDiscordStatus(provider, text);
+          // Discord status is a small-tier subagent — route through the small
+          // tier's connection so heterogeneous setups send the right model ID.
+          const small = tierProviders.small;
+          const { status, usage } = await generateDiscordStatus(small.provider, text, small.model);
           if (this.sessionGeneration !== gen) return;
           if (usage) this.costTracker?.record(usage, "small");
           scopedBroadcast({
@@ -606,8 +654,11 @@ export class SessionManager {
     };
 
     // --- Instantiate GameEngine ---
+    // Pass the full tier resolution so the DM (large) and subagents
+    // (medium/small) each route to the right vendor.
     const engine = new GameEngine({
       provider,
+      tierProviders,
       gameState: gs,
       scene,
       sessionState,

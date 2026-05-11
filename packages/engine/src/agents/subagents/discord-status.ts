@@ -1,7 +1,7 @@
 import type { LLMProvider } from "../../providers/types.js";
 import type { UsageStats } from "@machine-violet/shared/types/engine.js";
 import { oneShot } from "../subagent.js";
-import { getModel } from "../../config/models.js";
+import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
 const FALLBACK = "Adventuring...";
@@ -21,15 +21,15 @@ export interface DiscordStatusResult {
 export async function generateDiscordStatus(
   provider: LLMProvider,
   recentContext: string,
+  model: string,
 ): Promise<DiscordStatusResult> {
   try {
-    const model = getModel("small");
     const result = await oneShot(
       provider,
       model,
       loadPrompt("discord-status", model),
       recentContext,
-      60,
+      getMaxOutput(model),
       "discord_status",
     );
     const status = result.text.trim().replace(/^["']|["']$/g, "").slice(0, MAX_LENGTH);

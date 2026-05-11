@@ -1,0 +1,28 @@
+// Example dev-config.jsonc — copy to dev-config.jsonc (gitignored) and edit.
+// Loader: packages/engine/src/config/models.ts.
+//
+// Per-tier provider/model assignment lives in connections.json (managed via the
+// Connections UI), not here. Only `effort` and `pricing` are read.
+
+{
+  // Per-agent reasoning effort. Keys are agent names; values are
+  // "low" | "medium" | "high" | "max" | null (null = API default; reasoning disabled).
+  // The "default" key is the fallback for agents not listed.
+  // Production defaults are inlined in models.ts DEFAULTS.effort; entries here override them.
+  "effort": {
+    "default": null,
+    "dm": "high",
+    "ooc": "high",
+    "setup": "high",
+    "dev-mode": "high",
+    "ai-player": "low",
+    "promote_character": "medium",
+    "repair-state": "medium"
+  },
+
+  // Per-model price overrides keyed by model ID. Useful for adjusting cost
+  // calculations during testing without redeploying. USD per 1M tokens.
+  "pricing": {
+    "claude-opus-4-6": { "input": 5, "output": 25, "cacheWrite": 6.25, "cacheRead": 0.50 }
+  }
+}

@@ -114,7 +114,8 @@ Transient per-session state used to build the cached prefix. Not persisted direc
 
 ```
 DMSessionState
-├── rulesAppendix?: string                 Loaded from rules/ at session start
+├── rulesAppendix?: string                 Loaded from the system rule card at session start (~/.machine-violet/systems/<slug>/rule-card.md, with bundled fallback)
+├── pcSheets?: string                      PC sheets concatenated; load-once at session start, never refreshed
 ├── campaignSummary?: string               Loaded from campaign/log.md
 ├── sessionRecap?: string                  Loaded from session-recaps/
 ├── activeState?: string                   Built from PC summaries + alarms + turn holder
@@ -432,7 +433,8 @@ Load config.json from campaignRoot
     │   └─ If present → SceneManager.resumePendingTransition() (idempotent cascade)
     │
     ├─ Build DMSessionState
-    │   ├─ Load rules/ → rulesAppendix
+    │   ├─ Load system rule card (~/.machine-violet/systems/<slug>/rule-card.md, bundled fallback) → rulesAppendix
+    │   ├─ Load characters/<slug>.md for each PC → pcSheets
     │   ├─ Load campaign/log.md → campaignSummary
     │   ├─ Load session recap → sessionRecap
     │   └─ buildActiveState() → activeState
@@ -610,9 +612,11 @@ In addition to campaign-scoped state, Machine Violet maintains machine-scoped co
                                Per-model: pricing, capabilities, context window, tier defaults.
 ```
 
-Additionally, `dev-config.json` (read from the process working directory, not the app config directory) provides dev-only model overrides (e.g. use Sonnet for DM tier to save costs).
+Additionally, `dev-config.jsonc` (read from the process working directory, not the app config directory) provides optional dev-only overrides for `effort` (per-agent reasoning level) and `pricing` (per-model cost calculations). `//` and `/* */` comments are stripped before JSON parsing. Per-tier provider/model assignment is *not* configured here — that lives in `connections.json`, managed via the Connections UI.
 
-**Code:** `packages/engine/src/config/connections.ts`, `packages/engine/src/config/discord.ts`, `packages/engine/src/config/model-registry.ts`, `packages/engine/src/config/first-launch.ts`
+**Tier resolution:** at session start, `buildTierProviders` (`src/config/tier-resolver.ts`) reads `connections.json` and emits a `Record<ModelTier, TierProvider>` — three `{provider, model}` pairs, one per tier. The map threads through `GameEngine`, `SceneManager`, and `ResolveSession` so every subagent call routes through the connection assigned to its tier. Heterogeneous setups (e.g. Large=OpenAI, Medium=Anthropic) just work; subagents accept `model` as a required parameter and never fall back to `getModel(tier)` silently.
+
+**Code:** `packages/engine/src/config/connections.ts`, `packages/engine/src/config/tier-resolver.ts`, `packages/engine/src/config/discord.ts`, `packages/engine/src/config/model-registry.ts`, `packages/engine/src/config/first-launch.ts`
 
 ## 9. Debug Output
 

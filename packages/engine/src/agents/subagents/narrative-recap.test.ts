@@ -44,6 +44,7 @@ describe("generateNarrativeRecap", () => {
       provider,
       "- [[Kael]] entered the ruins\n- Found an ancient seal with dark energy",
       "Dragon's Crown",
+      "claude-haiku-4-5-20251001",
     );
 
     expect(result.text).toContain("Last time on Dragon's Crown");
@@ -54,7 +55,7 @@ describe("generateNarrativeRecap", () => {
 
   it("passes campaign name into the system prompt template", async () => {
     const provider = mockProvider([textResult("Last time on Shadows of Edyn...")]);
-    await generateNarrativeRecap(provider, "- Stuff happened", "Shadows of Edyn");
+    await generateNarrativeRecap(provider, "- Stuff happened", "Shadows of Edyn", "claude-haiku-4-5-20251001");
 
     const call = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
     const systemText = Array.isArray(call.systemPrompt)
@@ -66,7 +67,7 @@ describe("generateNarrativeRecap", () => {
   it("sends bullet recap as user message", async () => {
     const bullets = "- [[Mira]] betrayed the party\n- [[Corvin]] fled into the night";
     const provider = mockProvider([textResult("Last time...")]);
-    await generateNarrativeRecap(provider, bullets, "Test Campaign");
+    await generateNarrativeRecap(provider, bullets, "Test Campaign", "claude-haiku-4-5-20251001");
 
     const call = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(call.messages[0].content).toContain(bullets);

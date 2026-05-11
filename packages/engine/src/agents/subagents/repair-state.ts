@@ -3,8 +3,8 @@ import type { GameState } from "../game-state.js";
 import type { FileIO } from "../scene-manager.js";
 import type { UsageStats } from "../agent-loop.js";
 import { oneShot } from "../subagent.js";
-import { getModel } from "../../config/models.js";
 import { extractWikilinks, uniqueTargets } from "../../tools/filesystem/index.js";
+import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import { accUsage } from "../../context/usage-helpers.js";
 import { norm } from "../../utils/paths.js";
@@ -163,6 +163,7 @@ export async function repairState(
   gameState: GameState,
   fileIO: FileIO,
   dryRun: boolean,
+  model: string,
 ): Promise<RepairResult> {
   const root = gameState.campaignRoot;
   const totalUsage: UsageStats = {
@@ -204,7 +205,6 @@ export async function repairState(
   }
 
   // Step 5: Generate via Haiku in batches
-  const model = getModel("small");
   const systemPrompt = loadPrompt("repair-generator", model);
   const batchSize = 5;
 
@@ -235,7 +235,7 @@ export async function repairState(
         model,
         systemPrompt,
         lines.join("\n"),
-        1024,
+        getMaxOutput(model),
         "repair-state",
       );
       accUsage(totalUsage, genResult.usage);

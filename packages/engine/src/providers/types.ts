@@ -169,3 +169,18 @@ export interface LLMProvider {
   /** Minimal API call to validate credentials. */
   healthCheck(model?: string): Promise<HealthCheckResult>;
 }
+
+/**
+ * A resolved tier assignment: a provider paired with the model ID it should
+ * be invoked with. Each LLM call needs both — and they must match (you can't
+ * send a Claude model ID to an OpenAI provider). Producers (session-manager)
+ * pair them once at session start; consumers (DM agent, subagents) destructure
+ * `provider` and `model` at the call site.
+ *
+ * Used as the building block for `Record<ModelTier, TierProvider>` so subagent
+ * dispatch can pick the right tier without re-resolving connections every call.
+ */
+export interface TierProvider {
+  provider: LLMProvider;
+  model: string;
+}
