@@ -1,8 +1,7 @@
 import type { LLMProvider } from "../../providers/types.js";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
-import { getModel } from "../../config/models.js";
-import { TOKEN_LIMITS } from "../../config/tokens.js";
+import { getMaxOutput } from "../../config/model-registry.js";
 import { loadTemplate } from "../../prompts/load-prompt.js";
 
 /**
@@ -19,14 +18,15 @@ export async function generateNarrativeRecap(
   provider: LLMProvider,
   bulletRecap: string,
   campaignName: string,
+  model: string,
 ): Promise<SubagentResult> {
   const systemPrompt = loadTemplate("narrative-recap", { campaign_name: campaignName });
   return oneShot(
     provider,
-    getModel("small"),
+    model,
     systemPrompt,
     `Convert this session recap into narrative prose:\n\n${bulletRecap}`,
-    TOKEN_LIMITS.SUBAGENT_SMALL,
+    getMaxOutput(model),
     "narrative-recap",
   );
 }

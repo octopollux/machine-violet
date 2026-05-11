@@ -23,8 +23,8 @@ import { buildUIState, type DMSessionState } from "../agents/dm-prompt.js";
 import { buildNameInspiration } from "../agents/name-inspiration.js";
 import { getActivePlayer } from "../agents/player-manager.js";
 import { loadEnv } from "../config/first-launch.js";
-import { loadConnectionStore, buildEffectiveConnections, getTierProvider } from "../config/connections.js";
-import { createProviderFromConnection } from "../providers/index.js";
+import { loadConnectionStore, buildEffectiveConnections } from "../config/connections.js";
+import { buildTierProviders } from "../config/tier-resolver.js";
 import { configDir } from "../utils/paths.js";
 import { sandboxFileIO } from "../tools/filesystem/sandbox.js";
 import { campaignPaths } from "../tools/filesystem/scaffold.js";
@@ -419,19 +419,20 @@ export class SessionManager {
     // --- Ensure API key is loaded ---
     loadEnv();
 
-    // --- Resolve provider from connections ---
+    // --- Resolve per-tier providers from connections ---
+    // Each tier (large/medium/small) becomes a {provider, model} pair. The DM
+    // runs on `large`; subagents pick `medium` or `small` per task. Resolving
+    // all three up front means a heterogeneous setup (e.g. Large=OpenAI,
+    // Medium/Small=Anthropic) routes each call to the right vendor without
+    // ever sending an Anthropic model ID through an OpenAI client.
     const appConfigDir = configDir();
     const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
-    const largeTier = getTierProvider(connStore, "large");
+    const { createAnthropicProvider } = await import("../providers/anthropic.js");
+    const tierProviders = buildTierProviders(connStore, () => createAnthropicProvider());
 
-    // Create provider from large tier, or fall back to Anthropic env key
-    let provider;
-    if (largeTier) {
-      provider = createProviderFromConnection(largeTier.connection);
-    } else {
-      const { createAnthropicProvider } = await import("../providers/anthropic.js");
-      provider = createAnthropicProvider();
-    }
+    // The DM uses the large tier; keep `provider` as a local alias for the
+    // many downstream sites in this method that still reference it directly.
+    const provider = tierProviders.large.provider;
 
     // --- Debug: set context dump directory ---
     const { setContextDumpDir } = await import("../config/context-dump.js");
@@ -549,7 +550,10 @@ export class SessionManager {
       if (dmNarrativeCount % DISCORD_STATUS_INTERVAL !== 0) return;
       void (async () => {
         try {
-          const { status, usage } = await generateDiscordStatus(provider, text);
+          // Discord status is a small-tier subagent — route through the small
+          // tier's connection so heterogeneous setups send the right model ID.
+          const small = tierProviders.small;
+          const { status, usage } = await generateDiscordStatus(small.provider, text, small.model);
           if (this.sessionGeneration !== gen) return;
           if (usage) this.costTracker?.record(usage, "small");
           scopedBroadcast({
@@ -606,8 +610,11 @@ export class SessionManager {
     };
 
     // --- Instantiate GameEngine ---
+    // Pass the full tier resolution so the DM (large) and subagents
+    // (medium/small) each route to the right vendor.
     const engine = new GameEngine({
       provider,
+      tierProviders,
       gameState: gs,
       scene,
       sessionState,

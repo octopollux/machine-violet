@@ -289,7 +289,7 @@ describe("aiPlayerTurn", () => {
       player: aiPlayer,
       characterSheet: "Rook - Rogue, DEX +3, Perception +5",
       recentNarration: "The party enters a dusty chamber. Cobwebs hang from the ceiling.",
-    });
+    }, "claude-haiku-4-5-20251001");
 
     expect(result.action).toBe("I check the shadows near the doorway for traps.");
     expect(result.usage.inputTokens).toBe(50);
@@ -305,7 +305,7 @@ describe("aiPlayerTurn", () => {
       player: aiPlayer,
       characterSheet: "stats",
       recentNarration: "Your turn.",
-    });
+    }, "claude-haiku-4-5-20251001");
 
     expect(result.action).toBe("I swing my blade.");
   });
@@ -344,6 +344,7 @@ describe("enterOOC", () => {
       {
         campaignName: "Test Campaign",
         previousVariant: "exploration",
+        model: "claude-sonnet-4-6",
       },
       onStream,
     );
@@ -365,6 +366,7 @@ describe("enterOOC", () => {
         campaignName: "Test",
         previousVariant: "combat",
         wasMidNarration: true,
+        model: "claude-sonnet-4-6",
       },
     );
 
@@ -380,6 +382,7 @@ describe("enterOOC", () => {
     const result = await enterOOC(provider, "grappling?", {
       campaignName: "Test",
       previousVariant: "exploration",
+      model: "claude-sonnet-4-6",
     });
 
     // Summary should be the first sentence

@@ -6,7 +6,7 @@ import { loadAllWorlds, worldSummaries, loadWorldBySlug } from "../../config/wor
 import { KNOWN_SYSTEMS, readChargenSection } from "../../config/systems.js";
 import type { SystemComplexity } from "../../config/systems.js";
 import { getEffortConfig } from "../../config/models.js";
-import { TOKEN_LIMITS } from "../../config/tokens.js";
+import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import { dumpContext, dumpThinking } from "../../config/context-dump.js";
 import {
@@ -274,6 +274,7 @@ async function streamWithRetry(
         model: params.model,
         max_tokens: params.maxTokens,
         system: params.systemPrompt,
+        thinking: params.thinking,
         tools: params.tools,
         messages: params.messages,
       });
@@ -433,9 +434,10 @@ export function createSetupConversation(
     for (let round = 0; round < MAX_ROUNDS; round++) {
       const params: ChatParams = {
         model,
-        // First round gets a larger budget for the model's main response;
-        // follow-ups (reacting to tool results) are typically shorter.
-        maxTokens: round === 0 ? TOKEN_LIMITS.SUBAGENT_LARGE : TOKEN_LIMITS.SUBAGENT_MEDIUM,
+        // Adaptive cap: trust the model's natural ceiling so long
+        // `finalize_setup` JSON arguments (handoff_note, world detail
+        // passthrough, etc.) don't get truncated mid-emission.
+        maxTokens: getMaxOutput(model),
         systemPrompt,
         messages,
         tools: TOOLS,
@@ -499,6 +501,21 @@ export function createSetupConversation(
             content,
           });
         } else if (tc.name === "finalize_setup") {
+          // The provider returns `_parse_error` when tool-call JSON is
+          // truncated or otherwise unparseable (e.g. a model hits its
+          // output cap mid-emission). Surface that as an error tool_result
+          // so the agent sees it and can retry — `handleFinalize` would
+          // otherwise default-fill every missing field and ship a
+          // placeholder campaign. (Mirrors agent-loop-bridge.ts:312.)
+          if (tc.input._parse_error) {
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: tc.id,
+              content: String(tc.input._parse_error),
+              is_error: true,
+            });
+            continue;
+          }
           handleFinalize(tc.input);
           toolResults.push({
             type: "tool_result",
@@ -537,7 +554,7 @@ export function createSetupConversation(
       && last.content.some((c) => (c as { type?: string }).type === "tool_result")) {
       const wrapParams: ChatParams = {
         model,
-        maxTokens: TOKEN_LIMITS.SUBAGENT_MEDIUM,
+        maxTokens: getMaxOutput(model),
         systemPrompt,
         messages,
         // No tools — force a text-only response so the model can't extend the chain.

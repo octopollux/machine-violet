@@ -144,9 +144,16 @@ function handleModeToggle(
   // Capture current variant before entering mode
   const previousVariant = engine.getPreviousVariant() ?? "exploration";
 
+  // OOC and dev mode run on the medium tier — but their tool handlers can
+  // spawn small-tier subagents (scribe, promote_character, repair_state).
+  // Pass both tiers so a heterogeneous setup (e.g. Medium=Anthropic, Small=
+  // OpenAI) routes each subagent through its own connection rather than
+  // sending an OpenAI model ID through the Anthropic client.
+  const medium = engine.getTier("medium");
+  const small = engine.getTier("small");
   if (target === "ooc") {
     const sm = engine.getSceneManager();
-    const session = createOOCSession(engine.getProvider(), {
+    const session = createOOCSession(medium.provider, {
       campaignName: gameState.config.name,
       previousVariant,
       config: gameState.config,
@@ -154,16 +161,26 @@ function handleModeToggle(
       repo: engine.getRepo() ?? undefined,
       fileIO: sm.getFileIO(),
       campaignRoot: gameState.campaignRoot,
+      // Pass gameState so the DM-tier tool definitions (scribe,
+      // promote_character, roll_dice, etc.) register. The OOC system
+      // prompt explicitly directs the agent to use scribe for entity
+      // corrections; without gameState the registration is skipped and
+      // the agent correctly tells the player it doesn't have the tool.
+      gameState,
+      model: medium.model,
+      smallTier: small,
     });
     engine.setModeSession(session);
   } else {
-    const session = createDevSession(engine.getProvider(), {
+    const session = createDevSession(medium.provider, {
       campaignName: gameState.config.name,
       gameStateSummary: summarizeGameState(gameState),
       gameState,
       fileIO: engine.getSceneManager().getFileIO(),
       sceneManager: engine.getSceneManager(),
       repo: engine.getRepo() ?? undefined,
+      model: medium.model,
+      smallTier: small,
     });
     engine.setModeSession(session);
   }

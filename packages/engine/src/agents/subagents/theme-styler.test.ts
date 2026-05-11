@@ -39,7 +39,7 @@ beforeEach(() => {
 describe("styleTheme", () => {
   it("parses a full theme command from JSON response", async () => {
     const provider = mockProvider('{"theme":"terminal","key_color":"#00ff88","preset":"cyberpunk","gradient":"hueShift"}');
-    const result = await styleTheme(provider, "cyberpunk neon");
+    const result = await styleTheme(provider, "cyberpunk neon", undefined, undefined, "claude-haiku-4-5-20251001");
 
     expect(result.command).not.toBeNull();
     expect(result.command!.type).toBe("set_theme");
@@ -49,7 +49,7 @@ describe("styleTheme", () => {
 
   it("parses a color-only response", async () => {
     const provider = mockProvider('{"key_color":"#cc4444"}');
-    const result = await styleTheme(provider, "make it red");
+    const result = await styleTheme(provider, "make it red", undefined, undefined, "claude-haiku-4-5-20251001");
 
     expect(result.command).not.toBeNull();
     expect(result.command!.key_color).toBe("#cc4444");
@@ -58,7 +58,7 @@ describe("styleTheme", () => {
 
   it("handles markdown-fenced JSON", async () => {
     const provider = mockProvider('```json\n{"theme":"gothic","key_color":"#553388"}\n```');
-    const result = await styleTheme(provider, "dark fantasy");
+    const result = await styleTheme(provider, "dark fantasy", undefined, undefined, "claude-haiku-4-5-20251001");
 
     expect(result.command).not.toBeNull();
     expect(result.command!.theme).toBe("gothic");
@@ -66,21 +66,21 @@ describe("styleTheme", () => {
 
   it("returns null command for unparseable response", async () => {
     const provider = mockProvider("I think you should use a blue color scheme.");
-    const result = await styleTheme(provider, "make it blue");
+    const result = await styleTheme(provider, "make it blue", undefined, undefined, "claude-haiku-4-5-20251001");
 
     expect(result.command).toBeNull();
   });
 
   it("returns null command for empty JSON", async () => {
     const provider = mockProvider("{}");
-    const result = await styleTheme(provider, "do something");
+    const result = await styleTheme(provider, "do something", undefined, undefined, "claude-haiku-4-5-20251001");
 
     expect(result.command).toBeNull();
   });
 
   it("includes current theme context in prompt when provided", async () => {
     const provider = mockProvider('{"key_color":"#884422"}');
-    const result = await styleTheme(provider, "make it warmer", "gothic", "#8888aa");
+    const result = await styleTheme(provider, "make it warmer", "gothic", "#8888aa", "claude-haiku-4-5-20251001");
 
     expect(result.command).not.toBeNull();
     // Verify the create call included the context
@@ -92,7 +92,7 @@ describe("styleTheme", () => {
 
   it("returns usage stats", async () => {
     const provider = mockProvider('{"key_color":"#ff0000"}');
-    const result = await styleTheme(provider, "red");
+    const result = await styleTheme(provider, "red", undefined, undefined, "claude-haiku-4-5-20251001");
 
     expect(result.usage.inputTokens).toBe(50);
     expect(result.usage.outputTokens).toBe(20);

@@ -10,7 +10,7 @@ import type { LLMProvider } from "../../providers/types.js";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import type { TuiCommand } from "../agent-loop.js";
-import { getModel } from "../../config/models.js";
+import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
 const SYSTEM_PROMPT = loadPrompt("theme-styler");
@@ -31,8 +31,9 @@ export interface ThemeStylerResult extends SubagentResult {
 export async function styleTheme(
   provider: LLMProvider,
   description: string,
-  currentTheme?: string,
-  currentKeyColor?: string,
+  currentTheme: string | undefined,
+  currentKeyColor: string | undefined,
+  model: string,
 ): Promise<ThemeStylerResult> {
   const contextParts: string[] = [];
   if (currentTheme) contextParts.push(`Current theme: ${currentTheme}`);
@@ -43,10 +44,10 @@ export async function styleTheme(
 
   const result = await oneShot(
     provider,
-    getModel("small"),
+    model,
     SYSTEM_PROMPT,
     userMessage,
-    200,
+    getMaxOutput(model),
     "theme-styler",
   );
 

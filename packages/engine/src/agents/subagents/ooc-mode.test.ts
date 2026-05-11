@@ -223,6 +223,7 @@ describe("enterOOC", () => {
     const result = await enterOOC(provider, "How does grappling work?", {
       campaignName: "Test",
       previousVariant: "playing",
+      model: "claude-sonnet-4-6",
     });
     expect(result.summary).toBe("Grappling lets you restrain foes.");
   });
@@ -233,6 +234,7 @@ describe("enterOOC", () => {
     const result = await enterOOC(provider, "Tell me everything", {
       campaignName: "Test",
       previousVariant: "playing",
+      model: "claude-sonnet-4-6",
     });
     expect(result.summary).toHaveLength(100);
     expect(result.summary).toMatch(/\.\.\.$/);
@@ -243,6 +245,7 @@ describe("enterOOC", () => {
     const result = await enterOOC(provider, "test", {
       campaignName: "Test",
       previousVariant: "playing",
+      model: "claude-sonnet-4-6",
     });
     expect(result.summary).toBe("OOC discussion.");
   });
@@ -253,6 +256,7 @@ describe("enterOOC", () => {
       campaignName: "Test",
       previousVariant: "narrating",
       wasMidNarration: true,
+      model: "claude-sonnet-4-6",
     });
     expect(result.snapshot.previousVariant).toBe("narrating");
     expect(result.snapshot.wasMidNarration).toBe(true);
@@ -263,6 +267,7 @@ describe("enterOOC", () => {
     const result = await enterOOC(provider, "pause", {
       campaignName: "Test",
       previousVariant: "playing",
+      model: "claude-sonnet-4-6",
     });
     expect(result.snapshot.wasMidNarration).toBe(false);
   });
@@ -273,6 +278,7 @@ describe("enterOOC", () => {
     await enterOOC(provider, "question", {
       campaignName: "Test",
       previousVariant: "playing",
+      model: "claude-sonnet-4-6",
     }, onStream);
     expect(provider.stream).toHaveBeenCalled();
   });
@@ -282,6 +288,7 @@ describe("enterOOC", () => {
     const result = await enterOOC(provider, "test", {
       campaignName: "Test",
       previousVariant: "playing",
+      model: "claude-sonnet-4-6",
     });
     expect(result.usage.inputTokens).toBe(50);
     expect(result.usage.outputTokens).toBe(20);
@@ -295,6 +302,7 @@ describe("enterOOC", () => {
       campaignName: "Test",
       previousVariant: "playing",
       repo,
+      model: "claude-sonnet-4-6",
     });
 
     const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
@@ -309,6 +317,7 @@ describe("enterOOC", () => {
     await enterOOC(provider, "test", {
       campaignName: "Test",
       previousVariant: "playing",
+      model: "claude-sonnet-4-6",
     });
 
     const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
@@ -325,6 +334,7 @@ describe("enterOOC", () => {
       previousVariant: "playing",
       fileIO: fio,
       campaignRoot: "/camp",
+      model: "claude-sonnet-4-6",
     });
 
     const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
@@ -345,6 +355,7 @@ describe("enterOOC", () => {
       previousVariant: "playing",
       config: mockConfig(),
       sessionState: mockSessionState(),
+      model: "claude-sonnet-4-6",
     });
 
     const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
@@ -364,6 +375,7 @@ describe("enterOOC", () => {
     await enterOOC(provider, "test", {
       campaignName: "Test",
       previousVariant: "playing",
+      model: "claude-sonnet-4-6",
     });
 
     const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
@@ -485,7 +497,7 @@ describe("buildOOCToolHandler", () => {
     await repo.sceneCommit("The Dragon's Lair");
     await repo.autoCommit("auto: exchanges");
 
-    const handler = buildOOCToolHandler(undefined, repo);
+    const handler = buildOOCToolHandler(undefined, undefined, repo);
     const result = await handler("get_commit_log", {});
     expect(result.is_error).toBeUndefined();
     expect(result.content).toContain("[scene]");
@@ -502,7 +514,7 @@ describe("buildOOCToolHandler", () => {
     await repo.sceneCommit("The Dragon's Lair");
     await repo.autoCommit("auto: exchanges");
 
-    const handler = buildOOCToolHandler(undefined, repo);
+    const handler = buildOOCToolHandler(undefined, undefined, repo);
     const result = await handler("get_commit_log", { type: "scene" });
     expect(result.content).toContain("[scene]");
     expect(result.content).not.toContain("[auto]");
@@ -511,7 +523,7 @@ describe("buildOOCToolHandler", () => {
   it("returns error for unknown tool", async () => {
     const git = mockGitIO();
     const repo = new CampaignRepo({ dir: "/tmp/campaign", git });
-    const handler = buildOOCToolHandler(undefined, repo);
+    const handler = buildOOCToolHandler(undefined, undefined, repo);
     const result = await handler("nonexistent", {});
     expect(result.is_error).toBe(true);
   });
@@ -520,7 +532,7 @@ describe("buildOOCToolHandler", () => {
     const fio = mockFileIO({
       "/camp/characters/kael.md": "# Kael\n**Type:** PC",
     });
-    const handler = buildOOCToolHandler(undefined, undefined, "/camp", fio);
+    const handler = buildOOCToolHandler(undefined, undefined, undefined, "/camp", fio);
 
     const result = await handler("read_file", { path: "characters/kael.md" });
     expect(result.is_error).toBeUndefined();
@@ -529,7 +541,7 @@ describe("buildOOCToolHandler", () => {
 
   it("read_file rejects path traversal", async () => {
     const fio = mockFileIO();
-    const handler = buildOOCToolHandler(undefined, undefined, "/camp", fio);
+    const handler = buildOOCToolHandler(undefined, undefined, undefined, "/camp", fio);
 
     const result = await handler("read_file", { path: "../etc/passwd" });
     expect(result.is_error).toBe(true);
@@ -537,7 +549,7 @@ describe("buildOOCToolHandler", () => {
   });
 
   it("read_file errors without fileIO", async () => {
-    const handler = buildOOCToolHandler(undefined);
+    const handler = buildOOCToolHandler(undefined, undefined);
     const result = await handler("read_file", { path: "characters/kael.md" });
     expect(result.is_error).toBe(true);
     expect(result.content).toContain("File I/O not available");
@@ -553,7 +565,7 @@ describe("buildOOCToolHandler", () => {
         "/camp/characters": ["kael.md"],
       },
     );
-    const handler = buildOOCToolHandler(undefined, undefined, "/camp", fio);
+    const handler = buildOOCToolHandler(undefined, undefined, undefined, "/camp", fio);
 
     const result = await handler("find_references", { path: "characters/kael.md" });
     expect(result.is_error).toBeUndefined();
@@ -573,7 +585,7 @@ describe("buildOOCToolHandler", () => {
         "/camp/lore": [],
       },
     );
-    const handler = buildOOCToolHandler(undefined, undefined, "/camp", fio);
+    const handler = buildOOCToolHandler(undefined, undefined, undefined, "/camp", fio);
 
     const result = await handler("validate_campaign", {});
     expect(result.is_error).toBeUndefined();
@@ -614,7 +626,7 @@ function mockGameState(overrides?: Partial<GameState>): GameState {
 describe("buildOOCToolHandler (DM tools)", () => {
   it("roll_dice dispatches and returns result directly", async () => {
     const gs = mockGameState();
-    const handler = buildOOCToolHandler(undefined, undefined, "/camp", undefined, undefined, undefined, gs);
+    const handler = buildOOCToolHandler(undefined, undefined, undefined, "/camp", undefined, undefined, undefined, gs);
     const result = await handler("roll_dice", { expression: "1d6" });
     expect(result.is_error).toBeUndefined();
     expect(result.content).toContain("1d6");
@@ -623,7 +635,7 @@ describe("buildOOCToolHandler (DM tools)", () => {
 
   it("alarm check dispatches and returns result directly", async () => {
     const gs = mockGameState();
-    const handler = buildOOCToolHandler(undefined, undefined, "/camp", undefined, undefined, undefined, gs);
+    const handler = buildOOCToolHandler(undefined, undefined, undefined, "/camp", undefined, undefined, undefined, gs);
     const result = await handler("alarm", { operation: "check" });
     expect(result.is_error).toBeUndefined();
     expect(result.content).toContain("calendar");
@@ -632,7 +644,7 @@ describe("buildOOCToolHandler (DM tools)", () => {
   it("style_scene dispatches and calls onTuiCommand", async () => {
     const gs = mockGameState();
     const onTuiCommand = vi.fn();
-    const handler = buildOOCToolHandler(undefined, undefined, "/camp", undefined, undefined, undefined, gs, onTuiCommand);
+    const handler = buildOOCToolHandler(undefined, undefined, undefined, "/camp", undefined, undefined, undefined, gs, onTuiCommand);
     const result = await handler("style_scene", { key_color: "#8844aa" });
     expect(result.is_error).toBeUndefined();
     expect(result.content).toBe("Applied: style_scene");
@@ -645,7 +657,7 @@ describe("buildOOCToolHandler (DM tools)", () => {
   it("show_character_sheet dispatches and calls onTuiCommand", async () => {
     const gs = mockGameState();
     const onTuiCommand = vi.fn();
-    const handler = buildOOCToolHandler(undefined, undefined, "/camp", undefined, undefined, undefined, gs, onTuiCommand);
+    const handler = buildOOCToolHandler(undefined, undefined, undefined, "/camp", undefined, undefined, undefined, gs, onTuiCommand);
     const result = await handler("show_character_sheet", { character: "Kael" });
     expect(result.is_error).toBeUndefined();
     expect(result.content).toBe("Applied: show_character_sheet");
@@ -655,15 +667,15 @@ describe("buildOOCToolHandler (DM tools)", () => {
     expect(cmd.character).toBe("Kael");
   });
 
-  it("scribe without client returns error", async () => {
+  it("scribe without small-tier provider returns error", async () => {
     const gs = mockGameState();
     const fio = mockFileIO();
-    const handler = buildOOCToolHandler(undefined, undefined, "/camp", fio, undefined, undefined, gs);
+    const handler = buildOOCToolHandler(undefined, undefined, undefined, "/camp", fio, undefined, undefined, gs);
     const result = await handler("scribe", {
       updates: [{ visibility: "private", content: "Test" }],
     });
     expect(result.is_error).toBe(true);
-    expect(result.content).toContain("Client");
+    expect(result.content).toContain("Small-tier");
   });
 
   it("rollback calls performRollback and throws RollbackCompleteError", async () => {
@@ -675,7 +687,7 @@ describe("buildOOCToolHandler (DM tools)", () => {
 
     const fio = mockFileIO({ "/camp/config.json": "{}" });
     const gs = mockGameState();
-    const handler = buildOOCToolHandler(undefined, repo, "/camp", fio, undefined, undefined, gs);
+    const handler = buildOOCToolHandler(undefined, undefined, repo, "/camp", fio, undefined, undefined, gs);
     await expect(handler("rollback", { target: "last" })).rejects.toThrow(RollbackCompleteError);
     expect(git.resetTo).toHaveBeenCalled();
   });
@@ -683,7 +695,7 @@ describe("buildOOCToolHandler (DM tools)", () => {
   it("rollback without repo returns error", async () => {
     const gs = mockGameState();
     const fio = mockFileIO();
-    const handler = buildOOCToolHandler(undefined, undefined, "/camp", fio, undefined, undefined, gs);
+    const handler = buildOOCToolHandler(undefined, undefined, undefined, "/camp", fio, undefined, undefined, gs);
     const result = await handler("rollback", { target: "last" });
     expect(result.is_error).toBe(true);
     expect(result.content).toContain("not available");
@@ -695,7 +707,7 @@ describe("buildOOCToolHandler (DM tools)", () => {
     await repo.sceneCommit("The Dragon's Lair");
 
     const gs = mockGameState();
-    const handler = buildOOCToolHandler(undefined, repo, "/camp", undefined, undefined, undefined, gs);
+    const handler = buildOOCToolHandler(undefined, undefined, repo, "/camp", undefined, undefined, undefined, gs);
     const result = await handler("rollback", { target: "last" });
     expect(result.is_error).toBe(true);
     expect(result.content).toContain("File I/O not available");
@@ -703,12 +715,13 @@ describe("buildOOCToolHandler (DM tools)", () => {
 
   it("scribe without fileIO returns error", async () => {
     const gs = mockGameState();
-    const handler = buildOOCToolHandler(undefined, undefined, undefined, undefined, undefined, undefined, gs);
+    const fakeSmallTier = { provider: { providerId: "test", chat: vi.fn(), stream: vi.fn(), healthCheck: vi.fn() }, model: "haiku" };
+    const handler = buildOOCToolHandler(undefined, fakeSmallTier, undefined, undefined, undefined, undefined, undefined, gs);
     const result = await handler("scribe", {
       updates: [{ visibility: "private", content: "Test" }],
     });
     expect(result.is_error).toBe(true);
-    expect(result.content).toContain("Client");
+    expect(result.content).toContain("Small-tier");
   });
 });
 
@@ -723,6 +736,7 @@ describe("enterOOC with gameState", () => {
       fileIO: fio,
       campaignRoot: "/camp",
       gameState: gs,
+      model: "claude-sonnet-4-6",
     });
 
     const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
@@ -744,6 +758,7 @@ describe("enterOOC with gameState", () => {
       previousVariant: "playing",
       fileIO: fio,
       campaignRoot: "/camp",
+      model: "claude-sonnet-4-6",
     });
 
     const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
@@ -762,6 +777,7 @@ describe("enterOOC with gameState", () => {
       fileIO: fio,
       campaignRoot: "/camp",
       gameState: gs,
+      model: "claude-sonnet-4-6",
     });
 
     const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
@@ -832,6 +848,7 @@ describe("enterOOC END_OOC integration", () => {
     const result = await enterOOC(provider, "How does grappling work?", {
       campaignName: "Test",
       previousVariant: "exploration",
+      model: "claude-sonnet-4-6",
     });
     expect(result.endSession).toBe(true);
     expect(result.playerAction).toBeUndefined();
@@ -843,6 +860,7 @@ describe("enterOOC END_OOC integration", () => {
     const result = await enterOOC(provider, "I grab the guard", {
       campaignName: "Test",
       previousVariant: "exploration",
+      model: "claude-sonnet-4-6",
     });
     expect(result.endSession).toBe(true);
     expect(result.playerAction).toBe("I grab the guard");
@@ -854,6 +872,7 @@ describe("enterOOC END_OOC integration", () => {
     const result = await enterOOC(provider, "How does X work?", {
       campaignName: "Test",
       previousVariant: "exploration",
+      model: "claude-sonnet-4-6",
     });
     expect(result.endSession).toBeUndefined();
     expect(result.playerAction).toBeUndefined();

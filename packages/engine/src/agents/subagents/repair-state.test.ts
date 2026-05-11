@@ -157,7 +157,7 @@ A mysterious figure.
 A dark forest.`,
     );
 
-    const result = await repairState(provider, makeGameState(), fio, true);
+    const result = await repairState(provider, makeGameState(), fio, true, "claude-haiku-4-5-20251001");
 
     expect(result.missing).toContain("characters/kael.md");
     expect(result.missing).toContain("locations/thornwood/index.md");
@@ -189,7 +189,7 @@ A dark forest.`,
 A hostile creature.`,
     );
 
-    const result = await repairState(provider, makeGameState(), fio, true);
+    const result = await repairState(provider, makeGameState(), fio, true, "claude-haiku-4-5-20251001");
 
     expect(result.existing).toContain("characters/kael.md");
     expect(result.missing).toContain("characters/goblin.md");
@@ -217,7 +217,7 @@ A hostile creature.`,
 A fighter.`,
     );
 
-    await repairState(provider, makeGameState(), fio, true);
+    await repairState(provider, makeGameState(), fio, true, "claude-haiku-4-5-20251001");
 
     expect(fio.writeFile).not.toHaveBeenCalled();
   });
@@ -243,7 +243,7 @@ A fighter.`,
 A fighter.`,
     );
 
-    const result = await repairState(provider, makeGameState(), fio, false);
+    const result = await repairState(provider, makeGameState(), fio, false, "claude-haiku-4-5-20251001");
 
     expect(fio.writeFile).toHaveBeenCalledWith(
       "/campaigns/test/characters/kael.md",
@@ -267,7 +267,7 @@ A fighter.`,
 
     const provider = mockProvider("");
 
-    const result = await repairState(provider, makeGameState(), fio, true);
+    const result = await repairState(provider, makeGameState(), fio, true, "claude-haiku-4-5-20251001");
 
     expect(result.found).toHaveLength(0);
     expect(result.missing).toHaveLength(0);
@@ -288,7 +288,7 @@ A fighter.`,
 
     const provider = mockProvider("");
 
-    const result = await repairState(provider, makeGameState(), fio, true);
+    const result = await repairState(provider, makeGameState(), fio, true, "claude-haiku-4-5-20251001");
 
     expect(result.found).toHaveLength(0);
     expect(result.missing).toHaveLength(0);
@@ -315,7 +315,7 @@ A fighter.`,
 A character.`,
     );
 
-    const result = await repairState(provider, makeGameState(), fio, true);
+    const result = await repairState(provider, makeGameState(), fio, true, "claude-haiku-4-5-20251001");
 
     expect(result.usage.inputTokens).toBe(100);
     expect(result.usage.outputTokens).toBe(50);

@@ -2,7 +2,7 @@ import type { LLMProvider, NormalizedTool } from "../../providers/types.js";
 import { spawnSubagent, cacheSystemPrompt } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import type { UsageStats } from "../agent-loop.js";
-import { getModel } from "../../config/models.js";
+import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import type { FileIO } from "../scene-manager.js";
 import { walkCampaignFiles } from "../../tools/campaign-ops/walk-campaign.js";
@@ -193,6 +193,7 @@ export async function searchCampaign(
   provider: LLMProvider,
   input: SearchCampaignInput,
   fileIO: FileIO,
+  model: string,
 ): Promise<SearchCampaignResult> {
   const systemPrompt = cacheSystemPrompt(loadPrompt("search-campaign"));
 
@@ -207,10 +208,10 @@ export async function searchCampaign(
 
   const result: SubagentResult = await spawnSubagent(provider, {
     name: "search_campaign",
-    model: getModel("small"),
+    model,
     visibility: "silent",
     systemPrompt,
-    maxTokens: 512,
+    maxTokens: getMaxOutput(model),
     tools: SEARCH_TOOLS,
     toolHandler,
     cacheTools: true,

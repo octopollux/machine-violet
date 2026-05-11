@@ -1,0 +1,25 @@
+// Optional per-developer overrides loaded by packages/engine/src/config/models.ts.
+// JSONC: `//` line and `/* */` block comments are stripped before JSON.parse.
+//
+// Per-tier provider/model assignment lives in connections.json (managed via the
+// Connections UI), not here. The loader reads only `effort` and `pricing`.
+//
+// Effort values below mirror the production defaults in models.ts; uncomment to
+// override one. Pricing overrides are keyed by model ID and useful for adjusting
+// cost calculations during testing without redeploying.
+
+{
+  // "effort": {
+  //   "default": null,
+  //   "dm": "high",
+  //   "ooc": "high",
+  //   "setup": "high",
+  //   "dev-mode": "high",
+  //   "ai-player": "low",
+  //   "promote_character": "medium",
+  //   "repair-state": "medium"
+  // },
+  // "pricing": {
+  //   "claude-opus-4-6": { "input": 5, "output": 25, "cacheWrite": 6.25, "cacheRead": 0.50 }
+  // }
+}

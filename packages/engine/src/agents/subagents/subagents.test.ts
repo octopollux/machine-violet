@@ -38,7 +38,7 @@ describe("summarizeScene", () => {
       textResult("- [[Aldric]] entered the throne room\n- Fought [[G1]], eliminated R4\n---MINI---\n[[Aldric]] fought [[G1]] in the throne room."),
     ]);
 
-    const result = await summarizeScene(provider, "## Scene transcript\n[Aldric] I enter the throne room...");
+    const result = await summarizeScene(provider, "## Scene transcript\n[Aldric] I enter the throne room...", undefined, "claude-haiku-4-5-20251001");
 
     expect(result.full).toContain("Aldric");
     expect(result.full).toContain("throne room");
@@ -52,14 +52,14 @@ describe("summarizeScene", () => {
       textResult("- [[Aldric]] entered the throne room\n- Fought [[G1]]"),
     ]);
 
-    const result = await summarizeScene(provider, "transcript");
+    const result = await summarizeScene(provider, "transcript", undefined, "claude-haiku-4-5-20251001");
     expect(result.full).toContain("Aldric");
     expect(result.mini).toBe("[[Aldric]] entered the throne room");
   });
 
   it("passes terse system prompt with MINI instructions", async () => {
     const provider = mockProvider([textResult("- Summary.\n---MINI---\nSummary.")]);
-    await summarizeScene(provider, "transcript");
+    await summarizeScene(provider, "transcript", undefined, "claude-haiku-4-5-20251001");
 
     const call = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
     const systemText = Array.isArray(call.systemPrompt)
@@ -104,6 +104,11 @@ describe("updatePrecis", () => {
       provider,
       "Scene 14: Combat in throne room. R1-R3: ...",
       "[Aldric] I swing my longsword at the goblin.\nDM: The blade bites deep...",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      "claude-haiku-4-5-20251001",
     );
 
     expect(result.text).toContain("G1");
@@ -118,6 +123,11 @@ describe("updatePrecis", () => {
       provider,
       "Scene 14: Combat in throne room. R1-R3: ...",
       "[Aldric] I swing my longsword at the goblin.\nDM: The blade bites deep...",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      "claude-haiku-4-5-20251001",
     );
 
     expect(result.text).toContain("G1");
@@ -139,6 +149,11 @@ describe("updatePrecis", () => {
       provider,
       "Scene 14: Combat in throne room. R1-R3: ...",
       "[Aldric] I swing my longsword at the goblin.\nDM: The blade bites deep...",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      "claude-haiku-4-5-20251001",
     );
 
     expect(result.playerRead).toBeUndefined();
@@ -226,6 +241,10 @@ describe("updatePrecis open threads", () => {
       "Scene 1: Aldric entered the tavern.",
       "Player: I ask Mira what's wrong.\nDM: She shakes her head.",
       "[[Mira]]'s nervousness",
+      undefined,
+      undefined,
+      undefined,
+      "claude-haiku-4-5-20251001",
     );
 
     const call = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
@@ -241,6 +260,11 @@ describe("updatePrecis open threads", () => {
       provider,
       "Scene 1: Tavern.",
       "Player: I press Mira.\nDM: She glances at the door.",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      "claude-haiku-4-5-20251001",
     );
 
     expect(result.openThreads).toBe("[[Mira]]'s fear, [[stranger]]'s identity");
@@ -258,6 +282,8 @@ describe("updateChangelogs", () => {
       "## Transcript\nAldric fights G1...",
       14,
       ["aldric.md", "g1.md", "mayor-graves.md"],
+      undefined,
+      "claude-haiku-4-5-20251001",
     );
 
     expect(result.text).toContain("aldric.md");
