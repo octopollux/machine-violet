@@ -152,9 +152,46 @@ describe("CampaignRepo", () => {
     expect(await repo.trackExchange()).toBeNull();
     expect(await repo.trackExchange()).toBeNull();
 
-    // Third exchange triggers auto-commit
+    // Third exchange triggers auto-commit; with no player message it falls
+    // back to the generic label.
     const oid = await repo.trackExchange();
     expect(oid).toBeTruthy();
+    expect(git.commits[0].message).toBe("auto: exchanges");
+  });
+
+  it("uses the player message as the auto-commit body when provided", async () => {
+    const git = mockGitIO();
+    const repo = new CampaignRepo({ dir: "/tmp/campaign", git, autoCommitInterval: 1 });
+
+    await repo.trackExchange("I draw my sword and charge the troll.");
+
+    // Repo.init() lays down "auto: initial state" as commit[1]; the exchange
+    // commit lands at the head.
+    expect(git.commits[0].message).toBe("auto: I draw my sword and charge the troll.");
+  });
+
+  it("collapses whitespace and truncates long player messages", async () => {
+    const git = mockGitIO();
+    const repo = new CampaignRepo({ dir: "/tmp/campaign", git, autoCommitInterval: 1 });
+
+    const long = "  I peer\ninto  the  abyss " + "and ".repeat(40) + "wait.";
+    await repo.trackExchange(long);
+
+    const msg = git.commits[0].message;
+    expect(msg.startsWith("auto: I peer into the abyss and ")).toBe(true);
+    // Body (after "auto: " prefix) capped at 72 chars and ellipsized
+    expect(msg.length).toBeLessThanOrEqual("auto: ".length + 72);
+    expect(msg.endsWith("…")).toBe(true);
+    // No raw newlines leaked through
+    expect(msg.includes("\n")).toBe(false);
+  });
+
+  it("falls back to 'auto: exchanges' for an empty/whitespace player message", async () => {
+    const git = mockGitIO();
+    const repo = new CampaignRepo({ dir: "/tmp/campaign", git, autoCommitInterval: 1 });
+
+    await repo.trackExchange("   \n\t  ");
+
     expect(git.commits[0].message).toBe("auto: exchanges");
   });
 
