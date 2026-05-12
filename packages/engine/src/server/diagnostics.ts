@@ -2,9 +2,12 @@
  * Diagnostic bundle collection.
  *
  * Zips the active campaign folder together with the top-level `.debug/`
- * folder (engine.jsonl, server.log, context dumps) into a single archive
- * for triage. The campaign's own per-campaign `.debug/` is captured as
- * part of the campaign walk.
+ * folder (engine.jsonl, context dumps) into a single archive for triage.
+ * The campaign's own per-campaign `.debug/` is captured as part of the
+ * campaign walk.
+ *
+ * `server.log` (mirrored stdout/stderr) is intentionally excluded — it's
+ * noisy and rarely useful for triage compared with `engine.jsonl`.
  *
  * Output: `<homeDir>/diagnostics/<campaignSlug>-<timestamp>.mvdiag`
  * (a zip file with a Machine Violet-specific extension for easy
@@ -33,6 +36,8 @@ const DEBUG_DIR = ".debug";
 const BUNDLE_EXT = "mvdiag";
 /** Directory names skipped during the recursive walk (heavy / not useful for triage). */
 const SKIP_DIRS = new Set([".git"]);
+/** File names (relative to the top-level `.debug/`) excluded from the bundle. */
+const SKIP_TOP_LEVEL_DEBUG_FILES = new Set(["server.log"]);
 
 /** Sanitize a name for use as a filename component. */
 function sanitizeFilename(name: string): string {
@@ -107,7 +112,7 @@ function buildManifest(args: {
  *  - The current campaign folder (under `campaign/`) — captures per-campaign
  *    `.debug/`, state, config, characters. The campaign's `.git/` is skipped.
  *  - The top-level `.debug/` folder (under `.debug/`) — engine.jsonl,
- *    server.log, top-level context dumps.
+ *    top-level context dumps. `server.log` is excluded.
  *  - A `manifest.json` at the root of the archive.
  *
  * The bundle is written to `<homeDir>/diagnostics/<campaignSlug>-<ts>.mvdiag`.
@@ -133,6 +138,7 @@ export async function collectDiagnostics(
     if (await io.exists(debugRoot)) {
       const debugFiles = await walkForDiagnostics(io, debugRoot, "");
       for (const f of debugFiles) {
+        if (SKIP_TOP_LEVEL_DEBUG_FILES.has(f.relativePath)) continue;
         fileMap[`${DEBUG_DIR}/${f.relativePath}`] = f.content;
       }
     }
