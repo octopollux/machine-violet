@@ -349,10 +349,8 @@ All maps, keyed by map ID. Also written individually to `locations/<slug>/<mapId
   "npcIntents": "Chief Grukk is stalling for time while scouts flank.",
   "playerReads": [
     {
-      "engagement": "high",              // "high" | "moderate" | "low"
       "focus": ["combat", "npc-dialogue"],
       "tone": "aggressive",
-      "pacing": "pushing_forward",        // "exploratory" | "pushing_forward" | "hesitant"
       "offScript": false
     }
   ],

@@ -380,7 +380,7 @@ describe("buildCachedPrefix", () => {
       sessionRecap: "Last time...",
       campaignSummary: "Scene 1.",
       scenePrecis: "Round 1.",
-      playerRead: "Engagement: high",
+      playerRead: "Focus: combat | Tone: aggressive | Off-script: no",
       activeState: "Location: Tavern",
     });
 
@@ -414,12 +414,12 @@ describe("buildCachedPrefix", () => {
       dmIdentity: "You are the DM.",
       personality: "Terse.",
       scenePrecis: "Round 1 of combat.",
-      playerRead: "Engagement: high | Focus: combat | Tone: aggressive | Pacing: pushing_forward | Off-script: no",
+      playerRead: "Focus: combat | Tone: aggressive | Off-script: no",
     });
 
     const allText = system.map((b) => b.text).join("\n");
     expect(allText).toContain("## Player Read");
-    expect(allText).toContain("Engagement: high");
+    expect(allText).toContain("Focus: combat");
     expect(allText).toContain("Tone: aggressive");
   });
 
@@ -459,7 +459,7 @@ describe("buildCachedPrefix", () => {
     const { system } = buildCachedPrefix(mockConfig, {
       dmIdentity: "You are the DM.",
       personality: "Terse.",
-      playerRead: "Engagement: high",
+      playerRead: "Focus: combat | Tone: aggressive | Off-script: no",
       dmNotes: "Secret plot info.",
     });
 
@@ -505,7 +505,7 @@ describe("buildCachedPrefix", () => {
       rulesAppendix: "Some rules.",
       pcSheets: "# Aldric\n\nHP 28/42",
       sessionRecap: "Last time...",
-      playerRead: "Engagement: high",
+      playerRead: "Focus: combat | Tone: aggressive | Off-script: no",
     });
 
     const pcIdx = system.findIndex((b) => b.text.includes("Player Characters"));
@@ -535,7 +535,7 @@ describe("buildCachedPrefix", () => {
       sessionRecap: "Last time...",
       campaignSummary: "Scene 1.",
       scenePrecis: "Round 1.",
-      playerRead: "Engagement: high",
+      playerRead: "Focus: combat | Tone: aggressive | Off-script: no",
       activeState: "Location: Tavern",
       entityIndex: "entity-list",
       uiState: "style=classic",

@@ -4,12 +4,10 @@ import type { SubagentResult } from "../subagent.js";
 import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 
-/** Lightweight player sentiment/engagement signals extracted per exchange. */
+/** Lightweight player sentiment signals extracted per exchange. */
 export interface PlayerRead {
-  engagement: "high" | "moderate" | "low";
   focus: string[];
   tone: string;
-  pacing: "exploratory" | "pushing_forward" | "hesitant";
   offScript: boolean;
 }
 
@@ -76,7 +74,7 @@ export async function updatePrecis(
  *   <precis text>
  *   NPC_NEXT: [[Name]] intends to [action]  ← optional, one per NPC
  *   OPEN: [[thread1]], [[thread2]]           ← optional, omitted when no threads
- *   PLAYER_READ: {"engagement":"high",...}
+ *   PLAYER_READ: {"focus":[...],"tone":"...","offScript":...}
  *
  * If any special line is missing or malformed, that field returns undefined.
  */
@@ -123,13 +121,15 @@ export function parsePrecisResult(result: SubagentResult): PrecisUpdateResult {
       const parsed = JSON.parse(jsonStr);
       if (
         parsed &&
-        typeof parsed.engagement === "string" &&
         Array.isArray(parsed.focus) &&
         typeof parsed.tone === "string" &&
-        typeof parsed.pacing === "string" &&
         typeof parsed.offScript === "boolean"
       ) {
-        playerRead = parsed as PlayerRead;
+        playerRead = {
+          focus: parsed.focus,
+          tone: parsed.tone,
+          offScript: parsed.offScript,
+        };
       }
     } catch {
       // Malformed JSON — graceful fallback
