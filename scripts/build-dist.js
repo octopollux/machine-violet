@@ -10,8 +10,9 @@
  * (--build-sea breaks Velopack/Authenticode signing).
  *
  * Usage:
- *   node scripts/build-dist.js                          # build for current platform
- *   node scripts/build-dist.js --version=1.0.0-nightly  # override version
+ *   node scripts/build-dist.js                                       # build for current platform
+ *   node scripts/build-dist.js --version=1.0.0-nightly               # override version
+ *   node scripts/build-dist.js --release-date="2026-04-13 18:32"     # bake release date (UTC, minute precision)
  */
 
 import { build } from "esbuild";
@@ -38,6 +39,11 @@ const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf-8"));
 const versionArg = process.argv.find((a) => a.startsWith("--version="));
 const version = versionArg ? versionArg.split("=")[1] : pkg.version;
 
+// Release date is baked in at build time so the Settings screen can show
+// "released YYYY-MM-DD HH:MM UTC" — empty string in local dev builds.
+const releaseDateArg = process.argv.find((a) => a.startsWith("--release-date="));
+const releaseDate = releaseDateArg ? releaseDateArg.split("=").slice(1).join("=") : "";
+
 const isWindows = process.platform === "win32";
 const exeName = isWindows ? "MachineViolet.exe" : "MachineViolet";
 const exePath = join(DIST, exeName);
@@ -61,6 +67,7 @@ await build({
   external: ["node:*"],
   define: {
     "process.env.MV_VERSION": JSON.stringify(version),
+    "process.env.MV_RELEASE_DATE": JSON.stringify(releaseDate),
   },
   banner: {
     js: [
@@ -208,7 +215,10 @@ if (existsSync(licensePath)) {
 }
 
 // Version file
-writeFileSync(join(DIST, "version.json"), JSON.stringify({ version }, null, 2));
+writeFileSync(
+  join(DIST, "version.json"),
+  JSON.stringify({ version, releaseDate: releaseDate || null }, null, 2),
+);
 
 console.log(`\nDone! Distribution in ${DIST}/`);
 console.log(`  Binary: ${exeName} (${(statSync(exePath).size / 1024 / 1024).toFixed(1)} MB)`);

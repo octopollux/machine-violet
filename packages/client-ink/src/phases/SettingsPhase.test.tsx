@@ -59,4 +59,10 @@ describe("SettingsPhase", () => {
     await new Promise((r) => setTimeout(r, 10));
     expect(onApiKeys).toHaveBeenCalled();
   });
+
+  it("renders a version label pinned to the bottom-left", () => {
+    // In tests, MV_VERSION is unset so APP_VERSION falls back to "dev".
+    const { lastFrame } = render(<SettingsPhase {...defaultProps()} />);
+    expect(lastFrame()).toContain("vdev");
+  });
 });
