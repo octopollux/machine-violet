@@ -274,6 +274,66 @@ export class GameEngine {
     return this.tierProviders[tier];
   }
 
+  /** Get the engine's FileIO (campaign-root anchored). OOC/Dev reuse it. */
+  getFileIO(): FileIO {
+    return this.fileIO;
+  }
+
+  /** Get live game state. OOC dispatches tools against this same object. */
+  getGameState(): GameState {
+    return this.gameState;
+  }
+
+  /** Get the tool registry the DM uses. OOC dispatches through the same singleton. */
+  getRegistry(): ToolRegistry {
+    return this.registry;
+  }
+
+  /**
+   * Async tool handler exposed for mode sessions (OOC/Dev) that want to
+   * reuse the DM's async tool surface (resolve_turn, search_campaign,
+   * search_content, style_scene). Returns null for tools the handler
+   * doesn't cover — callers should fall back to `registry.dispatch`.
+   */
+  handleAsyncTool(name: string, input: Record<string, unknown>): Promise<import("./tool-registry.js").ToolResult | null> {
+    return this.handleAsyncToolInternal(name, input);
+  }
+
+  /**
+   * Forward an immediate (non-deferred) TUI command through the same
+   * pipeline DM tool calls use — broadcasts to the client and updates
+   * persisted UI state. Exposed so OOC/Dev's immediate TUI tool calls
+   * (style_scene, update_modeline, set_resource_values, etc.) reach the
+   * client just like the DM's.
+   */
+  dispatchImmediateTuiCommand(cmd: TuiCommand): void {
+    this.callbacks.onTuiCommand(cmd);
+  }
+
+  /**
+   * Process a batch of deferred TUI commands (scribe, promote_character,
+   * dm_notes, scene_transition, session_end, rollback) the same way the DM
+   * does after its agent loop completes. Exposed so OOC can share the
+   * exact same teardown semantics. May throw RollbackCompleteError.
+   */
+  async applyDeferredTuiCommands(commands: TuiCommand[]): Promise<void> {
+    for (const cmd of commands) {
+      if (cmd.type === "scene_transition") {
+        await this.transitionScene(cmd.title as string, cmd.time_advance as number | undefined);
+      } else if (cmd.type === "session_end") {
+        await this.endSession(cmd.title as string, cmd.time_advance as number | undefined);
+      } else if (cmd.type === "rollback") {
+        await this.rollbackAndExit(cmd.target as string);
+      } else if (cmd.type === "scribe") {
+        await this.handleScribe(cmd);
+      } else if (cmd.type === "promote_character") {
+        await this.handlePromoteCharacter(cmd);
+      } else if (cmd.type === "dm_notes") {
+        await this.handleDmNotes(cmd);
+      }
+    }
+  }
+
   /** Active mode session (OOC/Dev). Null when in normal play mode. */
   private modeSession: import("@machine-violet/shared/types/engine.js").ModeSession | null = null;
   /** Variant active before entering a mode session, for restoration on exit. */
@@ -627,27 +687,7 @@ export class GameEngine {
       // work (scene transitions, subagent spawns, file I/O) remain here.
       // Visual-only commands (modeline, resources, choices, theme) were
       // already broadcast to the client immediately when the tool fired.
-      for (const cmd of result.tuiCommands) {
-        if (cmd.type === "scene_transition") {
-          await this.transitionScene(
-            cmd.title as string,
-            cmd.time_advance as number | undefined,
-          );
-        } else if (cmd.type === "session_end") {
-          await this.endSession(
-            cmd.title as string,
-            cmd.time_advance as number | undefined,
-          );
-        } else if (cmd.type === "rollback") {
-          await this.rollbackAndExit(cmd.target as string);
-        } else if (cmd.type === "scribe") {
-          await this.handleScribe(cmd);
-        } else if (cmd.type === "promote_character") {
-          await this.handlePromoteCharacter(cmd);
-        } else if (cmd.type === "dm_notes") {
-          await this.handleDmNotes(cmd);
-        }
-      }
+      await this.applyDeferredTuiCommands(result.tuiCommands);
 
       // Accumulate usage
       accUsage(this.sessionUsage, result.usage);
@@ -1367,7 +1407,7 @@ export class GameEngine {
       provider: this.provider,
       maxTokens: getMaxOutput(this.model),
       maxToolRounds: 10,
-      asyncToolHandler: (name, input) => this.handleAsyncTool(name, input),
+      asyncToolHandler: (name, input) => this.handleAsyncToolInternal(name, input),
       onTextDelta: (delta) => this.callbacks.onNarrativeDelta(delta),
       onToolStart: (name) => {
         this.setState("tool_running");
@@ -1392,7 +1432,7 @@ export class GameEngine {
   }
 
   /** Handle tools that require async work (subagent spawning, I/O). */
-  private async handleAsyncTool(
+  private async handleAsyncToolInternal(
     name: string,
     input: Record<string, unknown>,
   ): Promise<import("./tool-registry.js").ToolResult | null> {

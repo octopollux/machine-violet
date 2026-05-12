@@ -1,46 +1,48 @@
-import type { LLMProvider, NormalizedTool, SystemBlock, TierProvider } from "../../providers/types.js";
+import type { LLMProvider, NormalizedTool, SystemBlock, TierProvider, NormalizedMessage } from "../../providers/types.js";
 import type { SubagentStreamCallback } from "../subagent.js";
-import { spawnSubagent } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import type { DMSessionState } from "../dm-prompt.js";
+import { buildDMPrefix } from "../dm-prompt.js";
 import type { FileIO } from "../scene-manager.js";
 import type { GameState } from "../game-state.js";
 import type { TuiCommand } from "../agent-loop.js";
-import { registry } from "../tool-registry.js";
+import { TUI_TOOLS } from "../agent-loop.js";
+import type { ToolRegistry, ToolResult } from "../tool-registry.js";
 import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
 import type { CampaignRepo } from "../../tools/git/index.js";
-import { queryCommitLog, performRollback } from "../../tools/git/index.js";
+import { queryCommitLog } from "../../tools/git/index.js";
 import { RollbackCompleteError } from "@machine-violet/shared/types/errors.js";
 import type { MapData } from "@machine-violet/shared/types/maps.js";
 import type { ClocksState } from "@machine-violet/shared/types/clocks.js";
 import { findReferences } from "../../tools/campaign-ops/index.js";
 import { validateCampaign } from "../../tools/validation/index.js";
 import { resolveCampaignPath } from "../../utils/paths.js";
-import { runScribe } from "./scribe.js";
+import { runProviderLoop } from "../../providers/agent-loop-bridge.js";
 import type { ModeSession } from "@machine-violet/shared/types/engine.js";
 
-// --- DM tool categories available in OOC mode ---
+// --- Types ---
 
-const OOC_READONLY_TOOLS = [
-  "roll_dice", "map", "map_entity", "map_query", "alarm",
-];
+/**
+ * Async tool handler exposed by GameEngine. Returns a ToolResult for tools
+ * it handles (resolve_turn, style_scene, search_campaign, search_content),
+ * or null for tools the engine doesn't intercept — falls through to
+ * registry.dispatch in that case.
+ */
+export type EngineAsyncToolHandler = (
+  name: string,
+  input: Record<string, unknown>,
+) => Promise<ToolResult | null>;
 
-const OOC_ENTITY_TOOLS = ["scribe", "promote_character"];
+/** Tools that exist only in OOC — file/git inspection. Layered on top of the
+ *  full DM toolset; not present in the singleton registry. */
+const OOC_ONLY_TOOL_NAMES = ["read_file", "find_references", "validate_campaign", "get_commit_log"] as const;
+const OOC_ONLY_TOOL_SET = new Set<string>(OOC_ONLY_TOOL_NAMES);
 
-const OOC_TUI_TOOLS = ["style_scene", "set_display_resources", "set_resource_values", "show_character_sheet"];
-
-const OOC_RECOVERY_TOOLS = ["rollback"];
-
-const OOC_DM_TOOL_NAMES = [
-  ...OOC_READONLY_TOOLS,
-  ...OOC_ENTITY_TOOLS,
-  ...OOC_TUI_TOOLS,
-  ...OOC_RECOVERY_TOOLS,
-];
-
-const OOC_DM_TOOL_SET = new Set(OOC_DM_TOOL_NAMES);
+/** Tools deliberately excluded from OOC's view of the registry.
+ *  `enter_ooc` — we're already in OOC, no need to advertise re-entry. */
+const OOC_EXCLUDED_FROM_REGISTRY = new Set(["enter_ooc"]);
 
 /**
  * Context snapshot for OOC mode — captured when entering, restored when exiting.
@@ -73,164 +75,74 @@ export interface OOCPromptOptions {
   campaignName: string;
   config?: CampaignConfig;
   sessionState?: DMSessionState;
-  characterSheet?: string;
-  systemRules?: string;
-  /** Model ID for prompt-level conditional inclusion. Omit to skip conditionals. */
+  /**
+   * Reason given by the DM if the OOC session was entered via the
+   * `enter_ooc` tool call (DM-initiated). Surfaces in the suffix so the
+   * OOC agent knows what the DM intended to discuss.
+   */
+  enterReason?: string;
+  /** True when the DM was mid-narration — same heuristic for suffix wording. */
+  wasMidNarration?: boolean;
+  /** Model ID — passed through to loadPrompt for any model-specific tweaks. */
   model?: string;
+  /** Legacy: a system rules appendix when no `sessionState` is available. */
+  systemRules?: string;
+  /** Legacy: a character sheet block when no `sessionState` is available. */
+  characterSheet?: string;
 }
 
 /**
- * Build the OOC system prompt with campaign-specific context.
+ * Build the full OOC system prompt.
  *
- * When `config` + `sessionState` are provided, returns `TextBlockParam[]`
- * with cache_control on stable sections (identity, rules, campaign log).
+ * When `config` + `sessionState` are provided (the in-game path), reuses
+ * `buildDMPrefix` to produce a cache-coherent DM prefix and appends an
+ * OOC suffix block at the tail. Cache breakpoints on the DM prefix are
+ * preserved, so OOC enters/exits ride the same BP1/BP2 cache as normal play.
  *
- * When only `campaignName` is provided (pre-game-start / backward compat),
- * returns a flat string.
+ * Pre-session-state path (legacy / tests without a full SessionState)
+ * falls back to the standalone OOC suffix as a flat string.
  */
-export function buildOOCPrompt(options: OOCPromptOptions): string | SystemBlock[];
+export function buildOOCPrompt(options: OOCPromptOptions): string | SystemBlock[] {
+  const opts = options;
 
-/** @deprecated Legacy overload — use options object form. */
-export function buildOOCPrompt(
-  campaignName: string,
-  systemRules?: string,
-  characterSheet?: string,
-): string;
-
-export function buildOOCPrompt(
-  optionsOrName: OOCPromptOptions | string,
-  systemRules?: string,
-  characterSheet?: string,
-): string | SystemBlock[] {
-  // Legacy call: buildOOCPrompt("name", rules?, sheet?)
-  if (typeof optionsOrName === "string") {
-    return buildOOCPromptLegacy(optionsOrName, systemRules, characterSheet);
-  }
-
-  const opts = optionsOrName;
-
-  // If no session state, fall back to flat string
+  // No game state — fall back to a flat string of just the OOC suffix.
+  // The DM prefix is what makes OOC feel continuous with narration; without
+  // it (e.g. pre-game-start callers) we keep the suffix as-is.
   if (!opts.sessionState || !opts.config) {
-    return buildOOCPromptLegacy(opts.campaignName, opts.systemRules, opts.characterSheet, opts.model);
+    let prompt = loadPrompt("ooc-mode", opts.model);
+    if (opts.campaignName) prompt += `\n\nCampaign: ${opts.campaignName}`;
+    if (opts.systemRules) prompt += `\n\nGame system rules:\n${opts.systemRules}`;
+    if (opts.characterSheet) prompt += `\n\nActive character:\n${opts.characterSheet}`;
+    return prompt;
   }
 
-  // Build structured TextBlockParam[] with caching
-  return buildOOCPromptCached({ ...opts, config: opts.config, sessionState: opts.sessionState });
+  const prefix = buildDMPrefix(opts.config, opts.sessionState);
+
+  // OOC suffix — appended after all DM Tier 1+2 blocks. Uncached on purpose
+  // (it varies per entry and is small), and sits past the last cache_control
+  // marker so BP1/BP2 keep their hits.
+  const suffixParts: string[] = [`\n\n`, loadPrompt("ooc-mode", opts.model)];
+
+  if (opts.enterReason || opts.wasMidNarration) {
+    suffixParts.push(`\n\n### OOC Entry Context\n`);
+    if (opts.wasMidNarration) {
+      suffixParts.push(`The DM (you) called \`enter_ooc\` mid-narration. `);
+    }
+    if (opts.enterReason) {
+      suffixParts.push(`Reason given: ${opts.enterReason}`);
+    }
+  }
+
+  return [...prefix.system, { text: suffixParts.join("") }];
 }
 
-/** Legacy flat-string builder (backward compat / pre-game-start). */
-function buildOOCPromptLegacy(
-  campaignName: string,
-  systemRules?: string,
-  characterSheet?: string,
-  model?: string,
-): string {
-  let prompt = loadPrompt("ooc-mode", model);
-
-  if (campaignName) {
-    prompt += `\n\nCampaign: ${campaignName}`;
-  }
-
-  if (systemRules) {
-    prompt += `\n\nGame system rules:\n${systemRules}`;
-  }
-
-  if (characterSheet) {
-    prompt += `\n\nActive character:\n${characterSheet}`;
-  }
-
-  return prompt;
-}
-
-/** Structured cached-prefix builder — mirrors DM prefix layout minus DM-internal sections. */
-function buildOOCPromptCached(opts: Required<Pick<OOCPromptOptions, "config" | "sessionState">> & OOCPromptOptions): SystemBlock[] {
-  const blocks: SystemBlock[] = [];
-  const config = opts.config;
-  const ss = opts.sessionState;
-
-  // OOC identity prompt (stable — cached)
-  blocks.push({
-    text: loadPrompt("ooc-mode", opts.model),
-    cacheControl: { ttl: "1h" },
-  });
-
-  // Campaign setting
-  {
-    const settingLines: string[] = [`Campaign: ${opts.campaignName}`];
-    if (config.system) settingLines.push(`Game System: ${config.system}`);
-    if (config.genre) settingLines.push(`Genre: ${config.genre}`);
-    if (config.mood) settingLines.push(`Mood: ${config.mood}`);
-    if (config.difficulty) settingLines.push(`Difficulty: ${config.difficulty}`);
-    if (config.premise) settingLines.push(`Premise: ${config.premise}`);
-    blocks.push({
-      text: `\n\n## Campaign Setting\n${settingLines.join("\n")}`,
-    });
-  }
-
-  // Rules appendix (stable — cached)
-  if (ss.rulesAppendix || opts.systemRules) {
-    blocks.push({
-      text: `\n\n## Rules Reference\n${ss.rulesAppendix ?? opts.systemRules}`,
-      cacheControl: { ttl: "1h" },
-    });
-  }
-
-  // Campaign log (stable within a scene — cached)
-  if (ss.campaignSummary) {
-    blocks.push({
-      text: `\n\n## Campaign Log\n${ss.campaignSummary}`,
-      cacheControl: { ttl: "1h" },
-    });
-  }
-
-  // Session recap (changes once at session start)
-  if (ss.sessionRecap) {
-    blocks.push({
-      text: `\n\n## Last Session\n${ss.sessionRecap}`,
-    });
-  }
-
-  // Active state (location, PCs, alarms — changes during play)
-  if (ss.activeState) {
-    blocks.push({
-      text: `\n\n## Current State\n${ss.activeState}`,
-    });
-  }
-
-  // Scene precis (changes as exchanges are pruned)
-  if (ss.scenePrecis) {
-    blocks.push({
-      text: `\n\n## Scene So Far\n${ss.scenePrecis}`,
-    });
-  }
-
-  // Active character sheet (player-specific, uncached)
-  if (opts.characterSheet) {
-    blocks.push({
-      text: `\n\n## Active Character\n${opts.characterSheet}`,
-    });
-  }
-
-  return blocks;
-}
-
-/** Build OOC tool definitions (available when repo or fileIO is provided). */
-export function buildOOCTools(hasFileIO: boolean, hasGameState: boolean): NormalizedTool[] {
-  const tools: NormalizedTool[] = [
-    {
-      name: "get_commit_log",
-      description: "List git snapshot commits for this campaign. Shows commit hash, type, message, and timestamp. Use to review game history for rollback or debugging.",
-      inputSchema: {
-        type: "object" as const,
-        properties: {
-          depth: { type: "number", description: "Number of commits to retrieve (default 20, max 100)" },
-          type: { type: "string", enum: ["auto", "scene", "session", "checkpoint", "character"], description: "Filter by commit type" },
-          search: { type: "string", description: "Filter by message content (case-insensitive)" },
-        },
-        required: [],
-      },
-    },
-  ];
+/**
+ * Build the OOC tool list: every DM tool (so OOC is self-documenting from
+ * the same code path as the DM) minus `enter_ooc`, plus a small set of
+ * OOC-only extras for file/git inspection.
+ */
+export function buildOOCTools(registry: ToolRegistry, hasFileIO: boolean, hasRepo: boolean): NormalizedTool[] {
+  const tools: NormalizedTool[] = registry.getDefinitions(OOC_EXCLUDED_FROM_REGISTRY);
 
   if (hasFileIO) {
     tools.push(
@@ -268,9 +180,20 @@ export function buildOOCTools(hasFileIO: boolean, hasGameState: boolean): Normal
     );
   }
 
-  // Append DM tool definitions when game state is available
-  if (hasGameState) {
-    tools.push(...registry.getDefinitionsFor(OOC_DM_TOOL_NAMES));
+  if (hasRepo) {
+    tools.push({
+      name: "get_commit_log",
+      description: "List git snapshot commits for this campaign. Shows commit hash, type, message, and timestamp. Use to review game history for rollback or debugging.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          depth: { type: "number", description: "Number of commits to retrieve (default 20, max 100)" },
+          type: { type: "string", enum: ["auto", "scene", "session", "checkpoint", "character"], description: "Filter by commit type" },
+          search: { type: "string", description: "Filter by message content (case-insensitive)" },
+        },
+        required: [],
+      },
+    });
   }
 
   return tools;
@@ -279,78 +202,39 @@ export function buildOOCTools(hasFileIO: boolean, hasGameState: boolean): Normal
 /**
  * Build the OOC tool handler.
  *
- * `smallTier` is the provider+model for spawning small-tier subagents from
- * within OOC tools (scribe, promote_character). Distinct from `provider` —
- * which is the medium-tier OOC session itself — because under heterogeneous
- * routing those two tiers may live on different vendors. Required when the
- * scribe/promote tools are wired up; otherwise unused.
+ * Dispatch order on every tool call:
+ *   1. OOC-only extras (file/git inspection) — handled here directly.
+ *   2. Engine async handler — resolve_turn, search_campaign, search_content,
+ *      style_scene live on GameEngine. Falls through with `null` if not its tool.
+ *   3. Registry dispatch — every other DM tool routes through the same
+ *      singleton the DM uses, so state mutations + persistence + the
+ *      onToolSuccess callbacks fire identically.
  */
 export function buildOOCToolHandler(
-  provider: LLMProvider | undefined,
-  smallTier: TierProvider | undefined,
+  registry: ToolRegistry,
+  gameState: GameState,
+  engineAsync: EngineAsyncToolHandler | undefined,
   repo?: CampaignRepo,
   campaignRoot?: string,
   fileIO?: FileIO,
-  maps?: Record<string, MapData>,
-  clocks?: ClocksState,
-  gameState?: GameState,
-  onTuiCommand?: (cmd: TuiCommand) => void,
-): (name: string, input: Record<string, unknown>) => Promise<{ content: string; is_error?: boolean }> {
+): (name: string, input: Record<string, unknown>) => Promise<ToolResult> {
   return async (name: string, input: Record<string, unknown>) => {
     try {
-      switch (name) {
-        case "get_commit_log": {
-          if (!repo) {
-            return { content: "Git is not available", is_error: true };
-          }
-          const result = await queryCommitLog(repo, {
-            depth: input.depth as number | undefined,
-            type: input.type as string | undefined,
-            search: input.search as string | undefined,
-          });
-          return { content: result };
-        }
-
-        case "read_file": {
-          if (!fileIO || !campaignRoot) {
-            return { content: "File I/O not available", is_error: true };
-          }
-          let abs: string;
-          try {
-            abs = resolveCampaignPath(campaignRoot, input.path as string);
-          } catch {
-            return { content: "Path traversal not allowed", is_error: true };
-          }
-          const content = await fileIO.readFile(abs);
-          return { content };
-        }
-
-        case "find_references": {
-          if (!fileIO || !campaignRoot) {
-            return { content: "File I/O not available", is_error: true };
-          }
-          const refResult = await findReferences(campaignRoot, fileIO, input.path as string);
-          return { content: JSON.stringify(refResult, null, 2) };
-        }
-
-        case "validate_campaign": {
-          if (!fileIO || !campaignRoot) {
-            return { content: "File I/O not available", is_error: true };
-          }
-          const validationResult = await validateCampaign(
-            campaignRoot, maps ?? {}, clocks ?? { calendar: { current: 0, epoch: "", display_format: "", alarms: [] }, combat: { current: 0, active: false, alarms: [] } },
-            fileIO,
-          );
-          return { content: JSON.stringify(validationResult, null, 2) };
-        }
-
-        default:
-          // DM tool dispatch
-          if (OOC_DM_TOOL_SET.has(name) && gameState) {
-            return await dispatchDMTool(name, input, gameState, provider, smallTier, repo, fileIO, campaignRoot, onTuiCommand);
-          }
-          return { content: `Unknown tool: ${name}`, is_error: true };
+      // 1. OOC-only extras — validate_campaign reads live maps/clocks
+      // straight from gameState so reports reflect current session state,
+      // not stubs.
+      if (OOC_ONLY_TOOL_SET.has(name)) {
+        return await dispatchOOCExtra(name, input, repo, campaignRoot, fileIO, gameState.maps, gameState.clocks);
       }
+
+      // 2. Engine async handler (DM-side async tools)
+      if (engineAsync) {
+        const r = await engineAsync(name, input);
+        if (r !== null) return r;
+      }
+
+      // 3. Registry dispatch — full DM toolset, same semantics as DM use.
+      return registry.dispatch(gameState, name, input);
     } catch (err) {
       if (err instanceof RollbackCompleteError) throw err;
       const msg = err instanceof Error ? err.message : String(err);
@@ -359,126 +243,73 @@ export function buildOOCToolHandler(
   };
 }
 
-/**
- * Dispatch a DM tool from OOC context, post-processing based on category.
- *
- * `smallTier` is needed for tools that spawn small-tier subagents
- * (scribe, promote_character) — separate from the medium-tier `provider`
- * because the two tiers may map to different vendors.
- */
-async function dispatchDMTool(
+/** Handle the OOC-only tool set (file/git inspection). */
+async function dispatchOOCExtra(
   name: string,
   input: Record<string, unknown>,
-  gameState: GameState,
-  provider: LLMProvider | undefined,
-  smallTier: TierProvider | undefined,
-  repo?: CampaignRepo,
-  fileIO?: FileIO,
-  campaignRoot?: string,
-  onTuiCommand?: (cmd: TuiCommand) => void,
-): Promise<{ content: string; is_error?: boolean }> {
-  // Read-only tools — dispatch directly and return result
-  if (OOC_READONLY_TOOLS.includes(name)) {
-    const result = registry.dispatch(gameState, name, input);
-    return result;
-  }
-
-  // TUI tools — dispatch to get the command JSON, then forward via callback
-  if (OOC_TUI_TOOLS.includes(name)) {
-    const result = registry.dispatch(gameState, name, input);
-    if (result.is_error) return result;
-    if (onTuiCommand) {
-      const cmd = JSON.parse(result.content) as TuiCommand;
-      onTuiCommand(cmd);
-    }
-    return { content: `Applied: ${name}` };
-  }
-
-  // Scribe — spawn subagent to handle entity operations
-  if (name === "scribe") {
-    if (!smallTier || !fileIO || !campaignRoot) {
-      return { content: "Small-tier provider and file I/O required for scribe", is_error: true };
-    }
-    const result = registry.dispatch(gameState, name, input);
-    if (result.is_error) return result;
-    const cmd = result._tui ?? JSON.parse(result.content);
-    const scribeResult = await runScribe(smallTier.provider, {
-      updates: (cmd as Record<string, unknown>).updates as import("./scribe.js").ScribeUpdate[],
-      campaignRoot,
-      sceneNumber: 0, // OOC has no scene number
-      homeDir: gameState.homeDir,
-    }, fileIO, smallTier.model);
-    return { content: scribeResult.summary };
-  }
-
-  // Promote character — read sheet, spawn subagent, write back
-  if (name === "promote_character") {
-    if (!smallTier || !fileIO || !campaignRoot) {
-      return { content: "Small-tier provider and file I/O required for promote_character", is_error: true };
-    }
-    const result = registry.dispatch(gameState, name, input);
-    if (result.is_error) return result;
-    const cmd = result._tui ?? JSON.parse(result.content);
-    const characterName = (cmd as Record<string, unknown>).character as string;
-    const context = (cmd as Record<string, unknown>).context as string;
-
-    const { campaignPaths } = await import("../../tools/filesystem/index.js");
-    const { norm } = await import("../../utils/paths.js");
-    const paths = campaignPaths(campaignRoot);
-    const filePath = norm(paths.character(characterName));
-
-    let currentSheet: string;
-    try {
-      currentSheet = await fileIO.readFile(filePath);
-    } catch {
-      currentSheet = `# ${characterName}\n\n**Type:** character\n`;
+  repo: CampaignRepo | undefined,
+  campaignRoot: string | undefined,
+  fileIO: FileIO | undefined,
+  maps: Record<string, MapData> | undefined,
+  clocks: ClocksState | undefined,
+): Promise<ToolResult> {
+  switch (name) {
+    case "read_file": {
+      if (!fileIO || !campaignRoot) {
+        return { content: "File I/O not available", is_error: true };
+      }
+      let abs: string;
+      try {
+        abs = resolveCampaignPath(campaignRoot, input.path as string);
+      } catch {
+        return { content: "Path traversal not allowed", is_error: true };
+      }
+      const content = await fileIO.readFile(abs);
+      return { content };
     }
 
-    const { promoteCharacter } = await import("./character-promotion.js");
-    const promoResult = await promoteCharacter(smallTier.provider, {
-      characterName,
-      characterSheet: currentSheet,
-      context,
-    }, undefined, smallTier.model);
-
-    if (promoResult.updatedSheet) {
-      await fileIO.writeFile(filePath, promoResult.updatedSheet);
+    case "find_references": {
+      if (!fileIO || !campaignRoot) {
+        return { content: "File I/O not available", is_error: true };
+      }
+      const refResult = await findReferences(campaignRoot, fileIO, input.path as string);
+      return { content: JSON.stringify(refResult, null, 2) };
     }
 
-    return { content: `Updated ${characterName}: ${promoResult.changelogEntry}` };
-  }
+    case "validate_campaign": {
+      if (!fileIO || !campaignRoot) {
+        return { content: "File I/O not available", is_error: true };
+      }
+      const validationResult = await validateCampaign(
+        campaignRoot,
+        maps ?? {},
+        clocks ?? { calendar: { current: 0, epoch: "", display_format: "", alarms: [] }, combat: { current: 0, active: false, alarms: [] } },
+        fileIO,
+      );
+      return { content: JSON.stringify(validationResult, null, 2) };
+    }
 
-  // Rollback — execute via repo (prunes ghost dirs + exits)
-  if (OOC_RECOVERY_TOOLS.includes(name)) {
-    return await executeRollback(input, repo, campaignRoot, fileIO);
-  }
+    case "get_commit_log": {
+      if (!repo) return { content: "Git is not available", is_error: true };
+      const result = await queryCommitLog(repo, {
+        depth: input.depth as number | undefined,
+        type: input.type as string | undefined,
+        search: input.search as string | undefined,
+      });
+      return { content: result };
+    }
 
-  return { content: `Unknown OOC tool: ${name}`, is_error: true };
-}
-
-/** Execute rollback via performRollback — prunes ghost dirs then exits. */
-async function executeRollback(
-  input: Record<string, unknown>,
-  repo?: CampaignRepo,
-  campaignRoot?: string,
-  fileIO?: FileIO,
-): Promise<{ content: string; is_error?: boolean }> {
-  if (!repo) {
-    return { content: "Git is not available for rollback", is_error: true };
+    default:
+      return { content: `Unknown OOC tool: ${name}`, is_error: true };
   }
-  if (!campaignRoot || !fileIO) {
-    return { content: "File I/O not available for rollback cleanup", is_error: true };
-  }
-  const target = input.target as string;
-  const result = await performRollback(repo, target, campaignRoot, fileIO);
-  throw new RollbackCompleteError(result.summary);
 }
 
 /**
- * Enter OOC mode — spawn a Sonnet subagent that handles OOC conversation.
- * The subagent is player-facing (streams to TUI).
+ * Enter OOC mode — run one OOC exchange through the provider.
  *
- * Returns a terse summary for the DM when OOC ends.
+ * Reuses the DM's runProviderLoop directly so TUI command extraction, the
+ * deferred-command list, and async tool handling behave identically to a
+ * DM turn. Streams to the player via `onStream`.
  */
 export async function enterOOC(
   provider: LLMProvider,
@@ -491,20 +322,32 @@ export async function enterOOC(
     characterSheet?: string;
     previousVariant: string;
     wasMidNarration?: boolean;
+    enterReason?: string;
     repo?: CampaignRepo;
     fileIO?: FileIO;
     campaignRoot?: string;
-    maps?: Record<string, MapData>;
-    clocks?: ClocksState;
     gameState?: GameState;
-    onTuiCommand?: (cmd: TuiCommand) => void;
-    model: string;
+    registry?: ToolRegistry;
     /**
-     * Small-tier provider+model for spawning small-tier subagents (scribe,
-     * promote_character) from inside OOC tool handlers. Heterogeneous-routing
-     * safe: under Medium=Anthropic/Small=OpenAI the scribe call still routes
-     * through the OpenAI client + small model, not the medium-tier provider.
+     * Volatile context (Tier 3) injected as a user-message preamble.
+     * Mirrors the DM turn shape so OOC sees "current state", entity index,
+     * UI state without those blocks invalidating the BP3 tools cache.
      */
+    volatileContext?: string;
+    /**
+     * Async tool handler from GameEngine — surfaces resolve_turn,
+     * search_campaign, search_content, style_scene to OOC the same way
+     * the DM uses them.
+     */
+    engineAsyncTool?: EngineAsyncToolHandler;
+    /** Immediate TUI command callback (modeline, resources, theme, etc.). */
+    onTuiCommand?: (cmd: TuiCommand) => void;
+    /** Deferred TUI command consumer — typically `engine.applyDeferredTuiCommands`. */
+    onDeferredTuiCommands?: (cmds: TuiCommand[]) => Promise<void>;
+    model: string;
+    /** Heterogeneous-routing-safe small tier (unused now that scribe/promote
+     *  go through engine.applyDeferredTuiCommands, but kept on the surface for
+     *  callers that build via createOOCSession; remove once migrations land). */
     smallTier?: TierProvider;
   },
   onStream?: SubagentStreamCallback,
@@ -515,6 +358,8 @@ export async function enterOOC(
     sessionState: options.sessionState,
     characterSheet: options.characterSheet,
     systemRules: options.systemRules,
+    wasMidNarration: options.wasMidNarration,
+    enterReason: options.enterReason,
     model: options.model,
   });
 
@@ -524,36 +369,86 @@ export async function enterOOC(
   };
 
   const hasFileIO = !!(options.fileIO && options.campaignRoot);
-  const hasGameState = !!options.gameState;
-  const hasTools = !!options.repo || hasFileIO || hasGameState;
-  const tools = hasTools ? buildOOCTools(hasFileIO, hasGameState) : undefined;
-  const toolHandler = hasTools
-    ? buildOOCToolHandler(provider, options.smallTier, options.repo, options.campaignRoot, options.fileIO, options.maps, options.clocks, options.gameState, options.onTuiCommand)
-    : undefined;
+  const hasRepo = !!options.repo;
+  const hasGameState = !!options.gameState && !!options.registry;
+  const hasTools = hasFileIO || hasRepo || hasGameState;
 
-  const result = await spawnSubagent(
-    provider,
-    {
-      name: "ooc",
-      model: options.model,
-      visibility: "player_facing",
-      systemPrompt,
-      maxTokens: getMaxOutput(options.model),
-      ...(tools ? { tools, cacheTools: true } : {}),
-      ...(toolHandler ? { toolHandler } : {}),
-      maxToolRounds: hasTools ? 8 : undefined,
-    },
-    playerMessage,
-    onStream,
-  );
+  // Build tools: full DM registry minus enter_ooc, plus OOC-only extras.
+  // If we don't have game state, only the OOC-only extras are available.
+  const toolRegistry: ToolRegistry = hasGameState && options.registry
+    ? options.registry
+    : ({ getDefinitions: () => [] } as unknown as ToolRegistry);
+  const tools: NormalizedTool[] = buildOOCTools(toolRegistry, hasFileIO, hasRepo);
 
-  // Parse END_OOC signal if present
-  const signal = parseEndOOCSignal(result.text);
-  const summary = extractSummary(signal.cleanedText);
+  // Build handler chain.
+  const toolHandler = hasTools && hasGameState && options.registry && options.gameState
+    ? buildOOCToolHandler(
+        options.registry,
+        options.gameState,
+        options.engineAsyncTool,
+        options.repo,
+        options.campaignRoot,
+        options.fileIO,
+      )
+    : hasTools
+      ? // No game state: OOC-only extras only. validate_campaign runs
+        // against empty stubs in this branch — the no-gameState path is
+        // for pre-session / test callers without live maps or clocks.
+        async (name: string, input: Record<string, unknown>) => {
+          if (OOC_ONLY_TOOL_SET.has(name)) {
+            return dispatchOOCExtra(name, input, options.repo, options.campaignRoot, options.fileIO, undefined, undefined);
+          }
+          return { content: `Unknown tool: ${name}`, is_error: true };
+        }
+      : undefined;
+
+  // Wrap the player message with volatile-context preamble, mirroring the
+  // DM turn shape. Ephemeral so it doesn't poison the next-turn cache.
+  const userContent = options.volatileContext
+    ? `<context>\n${options.volatileContext}\n</context>\n\n${playerMessage}`
+    : playerMessage;
+  const messages: NormalizedMessage[] = [{
+    role: "user",
+    content: userContent,
+    ephemeral: !!options.volatileContext,
+  }];
+
+  // Run through the same provider loop the DM uses — gets TUI command
+  // extraction, deferred-list collection, and streaming for free.
+  const result = await runProviderLoop(provider, systemPrompt, messages, {
+    name: "ooc",
+    model: options.model,
+    maxTokens: getMaxOutput(options.model),
+    maxToolRounds: hasTools ? 10 : 1,
+    stream: !!onStream,
+    tools: tools.length > 0 ? tools : undefined,
+    toolHandler,
+    cacheHints: tools.length > 0 ? [{ target: "tools", ttl: "1h" }] : undefined,
+    tuiToolNames: TUI_TOOLS,
+    onTuiCommand: options.onTuiCommand,
+    onTextDelta: onStream,
+  });
+
+  // Process deferred TUI commands (scribe, promote_character, dm_notes,
+  // scene_transition, session_end, rollback) the same way the DM does
+  // after its turn.
+  if (options.onDeferredTuiCommands && result.tuiCommands.length > 0) {
+    await options.onDeferredTuiCommands(result.tuiCommands);
+  }
+
+  // Parse the OOC end signal + optional SUMMARY tag.
+  const summaryParse = parseSummaryTag(result.text);
+  const signal = parseEndOOCSignal(summaryParse.cleanedText);
+  const summary = summaryParse.summary ?? extractSummary(signal.cleanedText);
 
   return {
-    ...result,
     text: signal.cleanedText,
+    usage: {
+      inputTokens: result.usage.inputTokens,
+      outputTokens: result.usage.outputTokens,
+      cacheReadTokens: result.usage.cacheReadTokens,
+      cacheCreationTokens: result.usage.cacheCreationTokens,
+    },
     summary,
     snapshot,
     endSession: signal.found || undefined,
@@ -601,7 +496,29 @@ export function parseEndOOCSignal(text: string): EndOOCSignal {
 }
 
 /**
- * Extract a terse summary from OOC text.
+ * Parse an optional `<SUMMARY>one-line digest</SUMMARY>` tag near the end
+ * of the response. Strips the tag from the visible text so the player
+ * never sees it; the digest is forwarded to the DM separately.
+ *
+ * Scans the last 600 chars only — the SUMMARY tag belongs at the end of
+ * the reply, and a tight scan keeps us from grabbing a literal example
+ * tag the agent might have written earlier in the message.
+ */
+export function parseSummaryTag(text: string): { summary?: string; cleanedText: string } {
+  const SUMMARY_RE = /<SUMMARY>([\s\S]*?)<\/SUMMARY>\s*/;
+  const tail = text.slice(Math.max(0, text.length - 600));
+  const tailMatch = tail.match(SUMMARY_RE);
+  if (!tailMatch) return { cleanedText: text };
+
+  // Match position in the full string.
+  const offset = text.length - tail.length + tail.indexOf(tailMatch[0]);
+  const cleaned = text.slice(0, offset) + text.slice(offset + tailMatch[0].length);
+  return { summary: tailMatch[1].trim(), cleanedText: cleaned.trimEnd() };
+}
+
+/**
+ * Extract a terse summary from OOC text — fallback when the agent omits the
+ * `<SUMMARY>` tag.
  * Takes the first substantive sentence (skips filler phrases < 15 chars).
  * Falls back to first 100 chars if no sentence boundary found.
  */
@@ -633,19 +550,24 @@ export function createOOCSession(
   options: {
     campaignName: string;
     previousVariant: string;
+    wasMidNarration?: boolean;
+    enterReason?: string;
     config?: CampaignConfig;
     sessionState?: DMSessionState;
     characterSheet?: string;
     repo?: CampaignRepo;
     fileIO?: FileIO;
     campaignRoot?: string;
-    maps?: Record<string, MapData>;
-    clocks?: ClocksState;
     gameState?: GameState;
+    registry?: ToolRegistry;
+    volatileContext?: string;
+    engineAsyncTool?: EngineAsyncToolHandler;
     onTuiCommand?: (cmd: TuiCommand) => void;
+    onDeferredTuiCommands?: (cmds: TuiCommand[]) => Promise<void>;
     /** Model ID for the medium tier; threaded into enterOOC's options. */
     model: string;
-    /** Small-tier {provider, model} for OOC tools that spawn small-tier subagents. */
+    /** Small-tier provider+model — kept on the surface for caller back-compat
+     *  even though the engine async handler now owns small-tier dispatch. */
     smallTier?: TierProvider;
   },
 ): ModeSession {

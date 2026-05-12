@@ -49,6 +49,7 @@ function makeMockEngine(performRollback = true) {
       mkdir: async () => {},
     }),
     getSessionState: () => ({}),
+    getSystemPrompt: () => ({ system: [], volatile: "## Current State\nstub", hardStats: "" }),
   };
   return {
     getRepo: () => repo,
@@ -60,6 +61,10 @@ function makeMockEngine(performRollback = true) {
     getPreviousVariant: vi.fn(() => "exploration"),
     getModeSession: vi.fn(() => null),
     setModeSession: vi.fn(),
+    getRegistry: vi.fn(() => ({ getDefinitions: () => [] })),
+    handleAsyncTool: vi.fn(async () => null),
+    applyDeferredTuiCommands: vi.fn(async () => {}),
+    dispatchImmediateTuiCommand: vi.fn(),
   } as unknown as GameEngine;
 }
 
