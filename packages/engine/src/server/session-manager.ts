@@ -936,7 +936,11 @@ export class SessionManager {
     if (entityListing) {
       priming += "\n\nPre-existing entities (created during setup — write to these paths,"
         + " do not create duplicates under alternate names):\n"
-        + entityListing;
+        + entityListing
+        + "\n\nThe `Starting Location` entry is a placeholder. The first time"
+        + " your opening narration names the locale, dispatch a Scribe update"
+        + " naming the location — the Scribe will call `rename_entity` to move"
+        + " the placeholder to the real name and rewrite any wikilinks.";
     }
 
     this.syncUIState();

@@ -36,6 +36,17 @@ function mockFileIO(files: Record<string, string> = {}): ScribeFileIO {
       return [...entries];
     }),
     mkdir: vi.fn(async () => {}),
+    deleteFile: vi.fn(async (path: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+      delete store[norm(path)];
+    }),
+    rmdir: vi.fn(async (path: string) => {
+      // Reject if any keys still live under this directory.
+      const prefix = norm(path) + "/";
+      for (const key of Object.keys(store)) {
+        if (key.startsWith(prefix)) throw new Error("ENOTEMPTY");
+      }
+    }),
   };
 }
 
@@ -390,6 +401,152 @@ describe("buildScribeToolHandler", () => {
     const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
     const result = await handler("unknown_tool", {});
     expect(result.is_error).toBe(true);
+  });
+
+  describe("rename_entity", () => {
+    const placeholder = [
+      "# Starting Location",
+      "",
+      "**Type:** Location",
+      "**Placeholder:** true",
+      "",
+      "_Placeholder._",
+      "",
+    ].join("\n");
+
+    it("moves the file, updates the H1, rewrites wikilinks, and tracks tree deltas", async () => {
+      const fio = mockFileIO({
+        "/camp/locations/starting-location/index.md": placeholder,
+        "/camp/characters/aldric.md": [
+          "# Aldric",
+          "",
+          "**Type:** character",
+          "**Location:** [Starting Location](../locations/starting-location/index.md)",
+          "",
+          "Met at the [Starting Location](../locations/starting-location/index.md).",
+          "",
+        ].join("\n"),
+      });
+      const updated: string[] = [];
+      const deltas: { slug: string; name: string; aliases: string[]; type: string; path: string }[] = [];
+      const removedSlugs: string[] = [];
+      const handler = buildScribeToolHandler(fio, "/camp", 7, [], updated, deltas, removedSlugs);
+
+      const result = await handler("rename_entity", {
+        entity_type: "location",
+        old_name: "Starting Location",
+        new_name: "The Crooked Coin Tavern",
+      });
+
+      expect(result.is_error).toBeFalsy();
+      expect(result.content).toContain("Renamed");
+      expect(result.content).toContain("Crooked Coin Tavern");
+
+      // Old file is gone, new file exists. Note: `slugify` strips leading
+      // articles, so "The Crooked Coin Tavern" lands at `crooked-coin-tavern`.
+      expect(await fio.exists("/camp/locations/starting-location/index.md")).toBe(false);
+      expect(await fio.exists("/camp/locations/crooked-coin-tavern/index.md")).toBe(true);
+
+      // New file has the new H1 + carries the placeholder flag forward
+      // (Scribe is supposed to remove `Placeholder:` in a follow-up update.)
+      const moved = await fio.readFile("/camp/locations/crooked-coin-tavern/index.md");
+      expect(moved).toContain("# The Crooked Coin Tavern");
+      expect(moved).toContain("**Placeholder:** true");
+      expect(moved).toContain("Renamed from Starting Location to The Crooked Coin Tavern");
+      expect(moved).toContain("Scene 007");
+
+      // Wikilinks in aldric.md are rewritten
+      const aldric = await fio.readFile("/camp/characters/aldric.md");
+      expect(aldric).not.toContain("starting-location");
+      expect(aldric).toContain("crooked-coin-tavern");
+
+      // Tree bookkeeping
+      expect(removedSlugs).toEqual(["starting-location"]);
+      expect(deltas).toHaveLength(1);
+      expect(deltas[0].slug).toBe("crooked-coin-tavern");
+      expect(deltas[0].name).toBe("The Crooked Coin Tavern");
+      expect(deltas[0].type).toBe("location");
+      expect(norm(deltas[0].path)).toBe("locations/crooked-coin-tavern/index.md");
+
+      // Old empty location dir was rmdir'd
+      expect(fio.rmdir).toHaveBeenCalled();
+    });
+
+    it("uses caller-supplied changelog entry when provided", async () => {
+      const fio = mockFileIO({ "/camp/locations/starting-location/index.md": placeholder });
+      const handler = buildScribeToolHandler(fio, "/camp", 2, [], [], [], []);
+
+      await handler("rename_entity", {
+        entity_type: "location",
+        old_name: "Starting Location",
+        new_name: "Bell Harbor",
+        changelog_entry: "Named on entry to the city",
+      });
+
+      const moved = await fio.readFile("/camp/locations/bell-harbor/index.md");
+      expect(moved).toContain("Named on entry to the city");
+      expect(moved).not.toContain("Renamed from Starting Location");
+    });
+
+    it("rejects when the target slug already exists", async () => {
+      const fio = mockFileIO({
+        "/camp/locations/starting-location/index.md": placeholder,
+        "/camp/locations/bell-harbor/index.md": "# Bell Harbor\n\n**Type:** Location\n",
+      });
+      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], [], []);
+
+      const result = await handler("rename_entity", {
+        entity_type: "location",
+        old_name: "Starting Location",
+        new_name: "Bell Harbor",
+      });
+
+      expect(result.is_error).toBe(true);
+      expect(result.content).toContain("already exists");
+    });
+
+    it("rejects when the source entity does not exist", async () => {
+      const fio = mockFileIO();
+      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], [], []);
+
+      const result = await handler("rename_entity", {
+        entity_type: "location",
+        old_name: "Nowhere",
+        new_name: "Somewhere",
+      });
+
+      expect(result.is_error).toBe(true);
+      expect(result.content).toContain("not found");
+    });
+
+    it("rejects when both names slugify identically", async () => {
+      const fio = mockFileIO({ "/camp/locations/starting-location/index.md": placeholder });
+      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], [], []);
+
+      const result = await handler("rename_entity", {
+        entity_type: "location",
+        old_name: "Starting Location",
+        new_name: "starting-location",
+      });
+
+      expect(result.is_error).toBe(true);
+      expect(result.content).toContain("nothing to rename");
+    });
+
+    it("rejects when deleteFile is unavailable", async () => {
+      const fio = mockFileIO({ "/camp/locations/starting-location/index.md": placeholder });
+      fio.deleteFile = undefined;
+      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], [], []);
+
+      const result = await handler("rename_entity", {
+        entity_type: "location",
+        old_name: "Starting Location",
+        new_name: "Bell Harbor",
+      });
+
+      expect(result.is_error).toBe(true);
+      expect(result.content).toContain("file deletion support");
+    });
   });
 });
 
