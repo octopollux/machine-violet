@@ -135,14 +135,19 @@ export class CampaignRepo {
   /**
    * Track an exchange. Triggers auto-commit when interval is reached.
    * Returns the commit oid if a commit was made, null otherwise.
+   *
+   * `playerMessage` (when provided) becomes the commit subject so the log
+   * reads like a savestate browser. The `auto:` prefix stays so commit-type
+   * parsing and `exchanges_ago:N` rollback continue to work.
    */
-  async trackExchange(): Promise<string | null> {
+  async trackExchange(playerMessage?: string): Promise<string | null> {
     if (!this.enabled) return null;
     await this.ensureInit();
     this.exchangeCount++;
     if (this.exchangeCount >= this.autoCommitInterval) {
       this.exchangeCount = 0;
-      return this.autoCommit(`auto: exchanges`);
+      const subject = playerMessageToCommitSubject(playerMessage);
+      return this.autoCommit(`auto: ${subject}`);
     }
     return null;
   }
@@ -288,6 +293,23 @@ export class CampaignRepo {
 }
 
 // --- Helpers ---
+
+/**
+ * Pure local string op (no LLM): sanitize a player message into a single-line
+ * commit subject. Strips C0/C1 control chars + DEL (so ANSI escapes pasted
+ * from a terminal can't mangle `git log` output), collapses remaining
+ * whitespace, and truncates. Empty/missing input falls back to "exchanges"
+ * so synthetic system turns (session open/resume) don't leak into the log.
+ */
+function playerMessageToCommitSubject(text: string | undefined): string {
+  if (!text) return "exchanges";
+  // eslint-disable-next-line no-control-regex -- stripping these is the point
+  const stripped = text.replace(/[\x00-\x1F\x7F-\x9F]/g, " ");
+  const cleaned = stripped.replace(/\s+/g, " ").trim();
+  if (cleaned.length === 0) return "exchanges";
+  const MAX = 72;
+  return cleaned.length <= MAX ? cleaned : cleaned.slice(0, MAX - 1) + "…";
+}
 
 function parseCommitType(message: string): CommitType {
   if (message.startsWith("scene:")) return "scene";

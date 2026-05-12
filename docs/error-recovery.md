@@ -10,7 +10,7 @@ The campaign directory is all markdown and JSON — a perfect fit for version co
 
 | Event | Commit | Rationale |
 |---|---|---|
-| Every N exchanges (configurable, default 3) | `auto: exchanges 45-47` | Frequent recovery points during play |
+| Every N exchanges (configurable, default 3) | `auto: I draw my sword and charge the troll.` (the player's last message, single-line and truncated to 72 chars; falls back to `auto: exchanges` for synthetic system turns) | Frequent recovery points during play, browsable as a savestate log |
 | Scene transition | `scene: Escape from the Goblin Caves` | Natural checkpoint |
 | Session end | `session: end session 3` | Clean save point |
 | Before destructive operations | `checkpoint: before scene_transition` | Safety net for cascades |

@@ -760,7 +760,7 @@ The campaign directory contains a local git repository managed by isomorphic-git
 
 | Type | Message format | Trigger |
 |---|---|---|
-| `auto` | `auto: exchanges 45-47` | Every N exchanges (configurable) |
+| `auto` | `auto: I draw my sword and charge the troll.` (player's last message, single-line, truncated to 72 chars; `auto: exchanges` for synthetic system turns) | Every N exchanges (configurable) |
 | `scene` | `scene: Escape from the Goblin Caves` | Scene transition checkpoint |
 | `session` | `session: end session 3` | Session end |
 | `character` | `character: Marta Voss promoted` | Character promotion/update |
