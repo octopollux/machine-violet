@@ -4,6 +4,7 @@ import { render } from "ink-testing-library";
 import { SettingsPhase } from "./SettingsPhase.js";
 import type { SettingsPhaseProps } from "./SettingsPhase.js";
 import { resetThemeCache, resolveTheme, BUILTIN_DEFINITIONS } from "../tui/themes/index.js";
+import { APP_VERSION } from "../version.js";
 
 beforeEach(() => {
   resetThemeCache();
@@ -61,8 +62,9 @@ describe("SettingsPhase", () => {
   });
 
   it("renders a version label pinned to the bottom-left", () => {
-    // In tests, MV_VERSION is unset so APP_VERSION falls back to "dev".
+    // Read APP_VERSION at runtime so the test is robust to whatever
+    // MV_VERSION/MV_RELEASE_DATE the environment happens to have set.
     const { lastFrame } = render(<SettingsPhase {...defaultProps()} />);
-    expect(lastFrame()).toContain("vdev");
+    expect(lastFrame()).toContain(`v${APP_VERSION}`);
   });
 });

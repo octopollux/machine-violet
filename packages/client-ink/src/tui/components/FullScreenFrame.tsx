@@ -18,7 +18,12 @@ export interface FullScreenFrameProps {
   /**
    * Optional one-row content pinned to the bottom-left of the frame (just above
    * the bottom border). Consumes one row from the bottom padding; does not
-   * affect the vertical centering of the main children.
+   * affect the vertical centering of the main children. Content is clipped to
+   * a single row to keep the layout stable.
+   *
+   * Note: not currently composited with starfield — when both are enabled, the
+   * slot row appears as a non-animated stripe within the otherwise-animated
+   * padding. Add starfield-aware rendering here when a caller needs both.
    */
   bottomLeft?: React.ReactNode;
   children: React.ReactNode;
@@ -90,7 +95,12 @@ export function FullScreenFrame({
           )}
 
           {hasBottomLeft && (
-            <Box width={contentWidth} justifyContent="flex-start">
+            <Box
+              width={contentWidth}
+              height={1}
+              overflow="hidden"
+              justifyContent="flex-start"
+            >
               {bottomLeft}
             </Box>
           )}
