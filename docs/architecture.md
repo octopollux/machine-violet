@@ -80,7 +80,7 @@ The DM's context is structured in layers with cache breakpoints:
                                                through the end of the prior turn
 ```
 
-Conversation accumulates within a scene and is cleared at scene transition. With automatic caching, prior exchanges are read at cache rate. Scene pacing nudges and transition pressure handle long scenes naturally; `max_conversation_tokens` defaults to 0 (disabled) since mid-scene pruning invalidates the prompt cache.
+Conversation accumulates within a scene and is cleared at scene transition. With automatic caching, prior exchanges are read at cache rate. The DM chooses when to cut a scene based on the narrative; `max_conversation_tokens` defaults to 0 (disabled) since mid-scene pruning invalidates the prompt cache.
 
 **Code:** `src/context/prefix-builder.ts` (prefix assembly), `src/context/conversation.ts` (retention), `src/agents/scene-manager.ts` (precis updates)
 

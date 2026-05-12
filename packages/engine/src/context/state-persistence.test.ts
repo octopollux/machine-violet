@@ -124,7 +124,7 @@ describe("StatePersister", () => {
     const persister = new StatePersister("/tmp/campaign", fio);
     const scene = {
       precis: "The party entered the dungeon.",
-      playerReads: [{ engagement: "high" as const, focus: ["combat"], tone: "aggressive" as const, pacing: "pushing_forward" as const, offScript: false }],
+      playerReads: [{ focus: ["combat"], tone: "aggressive" as const, offScript: false }],
       activePlayerIndex: 1,
     };
 
@@ -249,7 +249,7 @@ describe("StatePersister", () => {
       precis: "The party rests.",
       openThreads: null,
       npcIntents: null,
-      playerReads: [{ engagement: "high" as const, focus: ["combat"], tone: "aggressive" as const, pacing: "pushing_forward" as const, offScript: false }],
+      playerReads: [{ focus: ["combat"], tone: "aggressive" as const, offScript: false }],
       activePlayerIndex: 0,
     };
 
@@ -679,7 +679,7 @@ describe("format spec compliance: field names (§4)", () => {
         precis: "The party rests.",
         openThreads: "Who poisoned the well?",
         npcIntents: null,
-        playerReads: [{ engagement: "high" as const, focus: ["combat"], tone: "aggressive" as const, pacing: "pushing_forward" as const, offScript: false }],
+        playerReads: [{ focus: ["combat"], tone: "aggressive" as const, offScript: false }],
         activePlayerIndex: 0,
       }),
       STATE_FILES.scene,

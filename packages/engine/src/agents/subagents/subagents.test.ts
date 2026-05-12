@@ -116,7 +116,7 @@ describe("updatePrecis", () => {
 
   it("extracts player read from response with PLAYER_READ block", async () => {
     const provider = mockProvider([
-      textResult('R4: Aldric hit G1 for 9 slash. G1: 3/12 HP.\nPLAYER_READ: {"engagement":"high","focus":["combat"],"tone":"aggressive","pacing":"pushing_forward","offScript":false}'),
+      textResult('R4: Aldric hit G1 for 9 slash. G1: 3/12 HP.\nPLAYER_READ: {"focus":["combat"],"tone":"aggressive","offScript":false}'),
     ]);
 
     const result = await updatePrecis(
@@ -133,10 +133,8 @@ describe("updatePrecis", () => {
     expect(result.text).toContain("G1");
     expect(result.text).not.toContain("PLAYER_READ");
     expect(result.playerRead).toBeDefined();
-    expect(result.playerRead!.engagement).toBe("high");
     expect(result.playerRead!.focus).toEqual(["combat"]);
     expect(result.playerRead!.tone).toBe("aggressive");
-    expect(result.playerRead!.pacing).toBe("pushing_forward");
     expect(result.playerRead!.offScript).toBe(false);
   });
 
@@ -163,17 +161,28 @@ describe("updatePrecis", () => {
 describe("parsePrecisResult", () => {
   it("parses well-formed PLAYER_READ block", () => {
     const result = parsePrecisResult({
-      text: 'Aldric entered the cave.\nPLAYER_READ: {"engagement":"moderate","focus":["exploration","puzzle"],"tone":"cautious","pacing":"exploratory","offScript":true}',
+      text: 'Aldric entered the cave.\nPLAYER_READ: {"focus":["exploration","puzzle"],"tone":"cautious","offScript":true}',
       usage: { inputTokens: 50, outputTokens: 20, cacheReadTokens: 0, cacheCreationTokens: 0 },
     });
 
     expect(result.text).toBe("Aldric entered the cave.");
     expect(result.playerRead).toEqual({
-      engagement: "moderate",
       focus: ["exploration", "puzzle"],
       tone: "cautious",
-      pacing: "exploratory",
       offScript: true,
+    });
+  });
+
+  it("ignores legacy engagement/pacing fields in PLAYER_READ block", () => {
+    const result = parsePrecisResult({
+      text: 'Aldric entered the cave.\nPLAYER_READ: {"engagement":"high","focus":["exploration"],"tone":"cautious","pacing":"exploratory","offScript":false}',
+      usage: { inputTokens: 50, outputTokens: 20, cacheReadTokens: 0, cacheCreationTokens: 0 },
+    });
+
+    expect(result.playerRead).toEqual({
+      focus: ["exploration"],
+      tone: "cautious",
+      offScript: false,
     });
   });
 
@@ -199,18 +208,18 @@ describe("parsePrecisResult", () => {
 
   it("parses OPEN: line and strips it from precis text", () => {
     const result = parsePrecisResult({
-      text: '[[Mira]] served drinks, seemed nervous.\nOPEN: [[Mira]]\'s nervousness, [[Corvin]]\'s offer\nPLAYER_READ: {"engagement":"high","focus":["npc_interaction"],"tone":"curious","pacing":"exploratory","offScript":false}',
+      text: '[[Mira]] served drinks, seemed nervous.\nOPEN: [[Mira]]\'s nervousness, [[Corvin]]\'s offer\nPLAYER_READ: {"focus":["npc_interaction"],"tone":"curious","offScript":false}',
       usage: { inputTokens: 50, outputTokens: 20, cacheReadTokens: 0, cacheCreationTokens: 0 },
     });
 
     expect(result.text).toBe("[[Mira]] served drinks, seemed nervous.");
     expect(result.openThreads).toBe("[[Mira]]'s nervousness, [[Corvin]]'s offer");
-    expect(result.playerRead?.engagement).toBe("high");
+    expect(result.playerRead?.tone).toBe("curious");
   });
 
   it("returns undefined openThreads when OPEN: line is absent", () => {
     const result = parsePrecisResult({
-      text: 'Corvin paid and left.\nPLAYER_READ: {"engagement":"moderate","focus":["npc_interaction"],"tone":"cautious","pacing":"pushing_forward","offScript":false}',
+      text: 'Corvin paid and left.\nPLAYER_READ: {"focus":["npc_interaction"],"tone":"cautious","offScript":false}',
       usage: { inputTokens: 50, outputTokens: 20, cacheReadTokens: 0, cacheCreationTokens: 0 },
     });
 
@@ -233,7 +242,7 @@ describe("parsePrecisResult", () => {
 describe("updatePrecis open threads", () => {
   it("passes currentOpenThreads into the prompt", async () => {
     const provider = mockProvider([
-      textResult("Aldric questioned [[Mira]].\nOPEN: [[Mira]]'s fear\nPLAYER_READ: {\"engagement\":\"high\",\"focus\":[\"npc_interaction\"],\"tone\":\"curious\",\"pacing\":\"exploratory\",\"offScript\":false}"),
+      textResult("Aldric questioned [[Mira]].\nOPEN: [[Mira]]'s fear\nPLAYER_READ: {\"focus\":[\"npc_interaction\"],\"tone\":\"curious\",\"offScript\":false}"),
     ]);
 
     await updatePrecis(
@@ -253,7 +262,7 @@ describe("updatePrecis open threads", () => {
 
   it("returns openThreads from OPEN: line", async () => {
     const provider = mockProvider([
-      textResult("Aldric questioned [[Mira]].\nOPEN: [[Mira]]'s fear, [[stranger]]'s identity\nPLAYER_READ: {\"engagement\":\"high\",\"focus\":[\"npc_interaction\"],\"tone\":\"cautious\",\"pacing\":\"exploratory\",\"offScript\":false}"),
+      textResult("Aldric questioned [[Mira]].\nOPEN: [[Mira]]'s fear, [[stranger]]'s identity\nPLAYER_READ: {\"focus\":[\"npc_interaction\"],\"tone\":\"cautious\",\"offScript\":false}"),
     ]);
 
     const result = await updatePrecis(

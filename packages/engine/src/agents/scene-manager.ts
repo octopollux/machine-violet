@@ -1176,12 +1176,6 @@ export function classifyTranscriptEntry(entry: string): { kind: "dm" | "player" 
   return { kind: "dm", text: entry };
 }
 
-/**
- * Build a terse scene-pacing signal for the DM prefix.
- * Gives the DM concrete data to evaluate scene ripeness:
- * exchange count, open thread count, and whether any threads
- * have been resolved (precis updates happened but thread count stayed or dropped).
- */
 /** Assemble the scene precis string from precis text, NPC intents, and open threads. */
 export function buildScenePrecis(scene: SceneState): string {
   let result = scene.precis;
@@ -1190,6 +1184,11 @@ export function buildScenePrecis(scene: SceneState): string {
   return result;
 }
 
+/**
+ * Build a raw scene-length readout for the DM prefix: exchange count and
+ * open-thread count, nothing more. The DM decides what (if anything) to do
+ * with it — keeping this unopinionated avoids forcing premature transitions.
+ */
 export function buildScenePacing(scene: SceneState): string | undefined {
   // Count player exchanges (lines starting with **[)
   const exchangeCount = scene.transcript.filter((t) => t.startsWith("**[")).length;
@@ -1201,19 +1200,7 @@ export function buildScenePacing(scene: SceneState): string | undefined {
     : [];
   const threadCount = threadList.length;
 
-  const parts: string[] = [`Exchanges: ${exchangeCount}`];
-  parts.push(`Open threads: ${threadCount}`);
-
-  // Advisory nudge when the scene is running long or overloaded
-  if (exchangeCount >= 20 && threadCount >= 5) {
-    parts.push("→ Scene is long and thread-heavy. Consider ending it — unresolved threads carry forward, and your alarms and clocks need a transition to fire.");
-  } else if (exchangeCount >= 30) {
-    parts.push("→ Scene is running long. Look for a cut point.");
-  } else if (threadCount >= 5) {
-    parts.push("→ Many open threads. Resolve or cut — don't open more.");
-  }
-
-  return parts.join(" | ");
+  return `Exchanges: ${exchangeCount} | Open threads: ${threadCount}`;
 }
 
 function parseChangelogEntries(text: string): string[] {
@@ -1227,7 +1214,7 @@ function parseChangelogEntries(text: string): string[] {
 function synthesizePlayerRead(reads: PlayerRead[]): string | undefined {
   if (reads.length === 0) return undefined;
   const latest = reads[reads.length - 1];
-  return `Engagement: ${latest.engagement} | Focus: ${latest.focus.join(", ")} | Tone: ${latest.tone} | Pacing: ${latest.pacing} | Off-script: ${latest.offScript ? "yes" : "no"}`;
+  return `Focus: ${latest.focus.join(", ")} | Tone: ${latest.tone} | Off-script: ${latest.offScript ? "yes" : "no"}`;
 }
 
 /**

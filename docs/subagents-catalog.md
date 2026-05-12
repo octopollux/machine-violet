@@ -124,23 +124,21 @@ Writes the campaign log entry for a completed scene. Dense, wikilinked, one line
 | **Trigger** | When an exchange drops from the DM's conversation window |
 | **Source doc** | [context-management.md](context-management.md) |
 
-Appends a terse summary of the dropped exchange to the running scene precis. Keeps the DM oriented despite the short conversation window. Also extracts structured player engagement signals (see **PlayerRead** below).
+Appends a terse summary of the dropped exchange to the running scene precis. Keeps the DM oriented despite the short conversation window. Also extracts a lightweight `PlayerRead` describing what the player engaged with (see below).
 
 **Context**: The dropped exchange + current precis. ~500-1K tokens.
 
-**Returns**: Updated precis append (~20-50 tokens) + a `PlayerRead` JSON object with engagement signals.
+**Returns**: Updated precis append (~20-50 tokens) + a `PlayerRead` JSON object.
 
-**PlayerRead interface**: Extracted from every dropped exchange, providing lightweight sentiment/engagement tracking without a dedicated subagent call:
+**PlayerRead interface**: Extracted from every dropped exchange.
 
 | Field | Type | Description |
 |---|---|---|
-| `engagement` | `"high" \| "moderate" \| "low"` | How invested the player seems (high = detailed/creative input) |
 | `focus` | `string[]` | 1-3 tags for player focus (e.g. `"npc_interaction"`, `"combat"`, `"puzzle"`) |
 | `tone` | `string` | Single word for the player's tone (e.g. `"playful"`, `"cautious"`) |
-| `pacing` | `"exploratory" \| "pushing_forward" \| "hesitant"` | Whether the player is exploring, driving forward, or hesitant |
 | `offScript` | `boolean` | `true` if the player typed a custom action rather than picking from offered choices |
 
-The engine can use PlayerRead signals to adjust choice frequency, pacing hints in the DM prompt, or DM personality modulation.
+The most recent `PlayerRead` is synthesized into the DM prefix as a `Player Read` block — descriptive only, with no transition directives attached.
 
 ---
 
@@ -161,7 +159,7 @@ With `max_conversation_tokens` disabled (default), the precis updater never fire
 
 **Returns**: `SceneTrackerResult` with `openThreads` (comma-separated wikilinks) and optional `npcIntents` (semicolon-separated).
 
-**Consumed by**: `buildScenePacing()` → `ScenePacingInjection` (advisory nudges about scene length and thread count).
+**Consumed by**: `buildScenePacing()` → `ScenePacingInjection` (unopinionated scene-length and thread-count readout for the DM).
 
 ---
 
@@ -419,7 +417,7 @@ Haiku, silent. Summarizes campaign book structure for DM cached prefix. See [doc
 | 2 | OOC | Sonnet | Player-facing | Runtime — out-of-character mode |
 | 3 | Choice Generation | Haiku | Silent | Runtime — player choice options |
 | 4 | Scene Summarizer | Haiku | Silent | Runtime — scene transition |
-| 5 | Precis Updater + PlayerRead | Haiku | Silent | Runtime — context pruning + engagement tracking |
+| 5 | Precis Updater + PlayerRead | Haiku | Silent | Runtime — context pruning + lightweight player signals |
 | 6 | Changelog Updater | Haiku | Silent | Runtime — scene transition |
 | 6a | Compendium Updater | Haiku | Silent | Runtime — scene transition |
 | 6b | Scribe | Haiku | Silent | Runtime — entity file management |

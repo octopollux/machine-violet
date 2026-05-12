@@ -233,7 +233,7 @@ describe("SceneManager", () => {
 
   it("accumulates player reads from dropped exchanges", async () => {
     const provider = mockProvider([
-      textResponse('Aldric entered the tavern.\nPLAYER_READ: {"engagement":"high","focus":["exploration"],"tone":"curious","pacing":"exploratory","offScript":true}'),
+      textResponse('Aldric entered the tavern.\nPLAYER_READ: {"focus":["exploration"],"tone":"curious","offScript":true}'),
     ]);
 
     const mgr = new SceneManager(
@@ -255,7 +255,6 @@ describe("SceneManager", () => {
     });
 
     expect(mgr.getScene().playerReads).toHaveLength(1);
-    expect(mgr.getScene().playerReads[0].engagement).toBe("high");
     expect(mgr.getScene().playerReads[0].tone).toBe("curious");
   });
 
@@ -267,7 +266,7 @@ describe("SceneManager", () => {
 
     const scene = mockScene();
     scene.playerReads = [
-      { engagement: "high", focus: ["combat"], tone: "aggressive", pacing: "pushing_forward", offScript: false },
+      { focus: ["combat"], tone: "aggressive", offScript: false },
     ];
 
     const mgr = new SceneManager(
@@ -498,7 +497,7 @@ describe("SceneManager", () => {
     scene.sessionNumber = 1;
     scene.precis = "Current precis text";
     scene.playerReads = [
-      { engagement: "high", focus: ["exploration"], tone: "curious", pacing: "exploratory", offScript: false },
+      { focus: ["exploration"], tone: "curious", offScript: false },
     ];
 
     const sessionState = mockSessionState();
@@ -516,7 +515,7 @@ describe("SceneManager", () => {
     expect(sessionState.sessionRecap).toContain("Recap here");
     expect(sessionState.activeState).toContain("Aldric");
     expect(sessionState.scenePrecis).toBe("Current precis text");
-    expect(sessionState.playerRead).toContain("high");
+    expect(sessionState.playerRead).toContain("curious");
   });
 
   it("contextRefresh produces enriched PC summaries with aliases", async () => {
@@ -1400,44 +1399,17 @@ describe("buildScenePacing", () => {
     expect(result).not.toContain("→");
   });
 
-  it("nudges when scene is long and thread-heavy", () => {
-    const scene = mockScene();
-    // 20 player exchanges
-    scene.transcript = [];
-    for (let i = 0; i < 20; i++) {
-      scene.transcript.push(`**[Aldric]** Action ${i}.`);
-      scene.transcript.push(`**DM:** Response ${i}.`);
-    }
-    scene.openThreads = "[[a]], [[b]], [[c]], [[d]], [[e]]";
-    const result = buildScenePacing(scene)!;
-    expect(result).toContain("Exchanges: 20");
-    expect(result).toContain("Open threads: 5");
-    expect(result).toContain("Scene is long and thread-heavy");
-  });
-
-  it("nudges when scene is long even with few threads", () => {
+  it("stays unopinionated when scene is long and thread-heavy", () => {
     const scene = mockScene();
     scene.transcript = [];
     for (let i = 0; i < 30; i++) {
       scene.transcript.push(`**[Aldric]** Action ${i}.`);
       scene.transcript.push(`**DM:** Response ${i}.`);
     }
-    scene.openThreads = "[[a]]";
-    const result = buildScenePacing(scene)!;
-    expect(result).toContain("Exchanges: 30");
-    expect(result).toContain("running long");
-  });
-
-  it("nudges when many threads are open even in short scene", () => {
-    const scene = mockScene();
-    scene.transcript = [
-      "**[Aldric]** I look around.",
-      "**DM:** You see many things.",
-    ];
     scene.openThreads = "[[a]], [[b]], [[c]], [[d]], [[e]]";
     const result = buildScenePacing(scene)!;
-    expect(result).toContain("Open threads: 5");
-    expect(result).toContain("Many open threads");
+    expect(result).toBe("Exchanges: 30 | Open threads: 5");
+    expect(result).not.toMatch(/long|cut|resolve|consider|→/i);
   });
 
   it("handles empty openThreads string", () => {
