@@ -1028,6 +1028,11 @@ export class GameEngine {
           this.sceneManager.upsertEntity(delta);
         }
       }
+      if (result.removedSlugs) {
+        for (const slug of result.removedSlugs) {
+          this.sceneManager.removeEntity(slug);
+        }
+      }
 
       logEvent("subagent:end", { name: "scribe", durationMs: Date.now() - subStart });
       accUsage(this.sessionUsage, result.usage);

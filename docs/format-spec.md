@@ -640,6 +640,7 @@ Front matter lines appear immediately after the H1 heading and before the body. 
 | `hp` | HP | Characters | `28/35` |
 | `ac` | AC | Characters | `16` |
 | `xp` | XP | Characters | `1200` |
+| `placeholder` | Placeholder | Any | `true` — flags a stub entity that the Scribe should rename + flesh out (e.g. the bootstrap `Starting Location`). Removed once the entity has a real name and content. |
 
 The `_title` key is internal (extracted from the H1 heading) and never serialized.
 

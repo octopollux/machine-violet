@@ -199,9 +199,13 @@ describe("buildCampaignWorld", () => {
     expect(logData.campaignName).toBe(result.campaignName);
     expect(logData.entries).toEqual([]);
 
-    // Location was created
+    // Location was created — and explicitly flagged as a placeholder
+    // so the Scribe knows to rename it once the DM names the opening locale.
     const locationFile = Object.keys(files).find((p) => p.includes("/locations/"));
     expect(locationFile).toBeTruthy();
+    expect(locationFile).toContain("starting-location/index.md");
+    expect(files[locationFile!]).toContain("**Placeholder:** true");
+    expect(files[locationFile!]).toContain("Placeholder");
 
     // Party file was written with PC as member
     const partyFile = Object.keys(files).find((p) => p.endsWith("/party.md"));

@@ -76,6 +76,7 @@ vi.mock("./subagents/scribe.js", () => ({
     created: ["/tmp/test-campaign/characters/grimjaw.md"],
     updated: [],
     entityDeltas: [{ slug: "grimjaw", name: "Grimjaw", aliases: [], type: "character", path: "characters/grimjaw.md" }],
+    removedSlugs: [],
     usage: { inputTokens: 30, outputTokens: 15, cacheReadTokens: 0, cacheCreationTokens: 0 },
   })),
 }));
