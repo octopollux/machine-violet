@@ -60,6 +60,8 @@ Retry with exponential backoff (1s, 2s, 4s, 8s, capped at 12s) **indefinitely** 
 
 Retryable statuses: 429, 500, 502, 503, 529, plus synthetic status 0 for connection-level errors. No state has changed — the API call didn't complete — so there's nothing to roll back.
 
+The retry modal can be dismissed with **Esc** so the player can open the pause menu and Save & Exit instead of waiting for the connection. Dismissal is scoped to the current retry attempt — the next failed attempt brings the modal back automatically (each `onRetry` event bumps `attemptId`, which is what the dismissal latch keys on). Retries continue in the background regardless of whether the modal is on screen.
+
 ### Non-retryable API errors (manual retry)
 
 When an API call fails with an error that exhausts automatic retries or isn't in the retryable set, the engine stores the failed input and prompts the player:

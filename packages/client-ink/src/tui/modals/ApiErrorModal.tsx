@@ -55,6 +55,7 @@ export function ApiErrorModal({ theme, width, height, overlay }: ApiErrorModalPr
       minWidth={36}
       maxWidth={44}
       lines={lines}
+      footer="Esc to dismiss"
     />
   );
 }

@@ -81,7 +81,11 @@ export interface ProviderLoopConfig {
    * snapshot before the retry begins streaming again.
    */
   onRollback?: () => void;
-  /** Max retries after the initial attempt (default 5 → up to 6 total attempts, ~27s backoff). */
+  /** Max retries after the initial attempt. Defaults to Infinity — the spec
+   *  promises indefinite retry on transient errors (status 0, 429, 500, 502,
+   *  503, 529) and the user-facing modal says "auto-resume on reconnect", so
+   *  giving up after a fixed cap silently strands the player. Tests override
+   *  this with a small number to exercise the exhaustion path. */
   maxRetries?: number;
 }
 
@@ -104,7 +108,7 @@ export async function runProviderLoop(
   config: ProviderLoopConfig,
 ): Promise<ProviderLoopResult> {
   const maxToolRounds = config.maxToolRounds ?? 3;
-  const maxRetries = config.maxRetries ?? 5;
+  const maxRetries = config.maxRetries ?? Number.POSITIVE_INFINITY;
   const shouldStream = config.stream !== false && !!config.onTextDelta;
 
   // Only enable thinking for models that support it (per model registry).
