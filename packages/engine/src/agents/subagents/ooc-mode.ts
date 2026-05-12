@@ -217,14 +217,14 @@ export function buildOOCToolHandler(
   repo?: CampaignRepo,
   campaignRoot?: string,
   fileIO?: FileIO,
-  maps?: Record<string, MapData>,
-  clocks?: ClocksState,
 ): (name: string, input: Record<string, unknown>) => Promise<ToolResult> {
   return async (name: string, input: Record<string, unknown>) => {
     try {
-      // 1. OOC-only extras
+      // 1. OOC-only extras — validate_campaign reads live maps/clocks
+      // straight from gameState so reports reflect current session state,
+      // not stubs.
       if (OOC_ONLY_TOOL_SET.has(name)) {
-        return await dispatchOOCExtra(name, input, repo, campaignRoot, fileIO, maps, clocks);
+        return await dispatchOOCExtra(name, input, repo, campaignRoot, fileIO, gameState.maps, gameState.clocks);
       }
 
       // 2. Engine async handler (DM-side async tools)
@@ -326,8 +326,6 @@ export async function enterOOC(
     repo?: CampaignRepo;
     fileIO?: FileIO;
     campaignRoot?: string;
-    maps?: Record<string, MapData>;
-    clocks?: ClocksState;
     gameState?: GameState;
     registry?: ToolRegistry;
     /**
@@ -391,14 +389,14 @@ export async function enterOOC(
         options.repo,
         options.campaignRoot,
         options.fileIO,
-        options.maps,
-        options.clocks,
       )
     : hasTools
-      ? // No game state: OOC-only extras only.
+      ? // No game state: OOC-only extras only. validate_campaign runs
+        // against empty stubs in this branch — the no-gameState path is
+        // for pre-session / test callers without live maps or clocks.
         async (name: string, input: Record<string, unknown>) => {
           if (OOC_ONLY_TOOL_SET.has(name)) {
-            return dispatchOOCExtra(name, input, options.repo, options.campaignRoot, options.fileIO, options.maps, options.clocks);
+            return dispatchOOCExtra(name, input, options.repo, options.campaignRoot, options.fileIO, undefined, undefined);
           }
           return { content: `Unknown tool: ${name}`, is_error: true };
         }
@@ -560,8 +558,6 @@ export function createOOCSession(
     repo?: CampaignRepo;
     fileIO?: FileIO;
     campaignRoot?: string;
-    maps?: Record<string, MapData>;
-    clocks?: ClocksState;
     gameState?: GameState;
     registry?: ToolRegistry;
     volatileContext?: string;

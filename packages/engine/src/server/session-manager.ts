@@ -729,8 +729,9 @@ export class SessionManager {
 
         // If OOC signaled end-of-session, exit OOC and stash the summary
         // so the next DM turn picks up <ooc_summary> context. If OOC also
-        // produced a player action, forward it to the DM as the next turn —
-        // skipping openNextTurn() since processInput will close the gate.
+        // produced a player action, run it through the DM right now so the
+        // same turn that exits OOC carries both the summary and the
+        // in-character action forward.
         if (modeResult?.endSession) {
           this.engine.setModeSession(null);
           const previousVariant = this.engine.getPreviousVariant() ?? "exploration";
