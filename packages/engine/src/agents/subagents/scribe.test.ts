@@ -533,6 +533,20 @@ describe("buildScribeToolHandler", () => {
       expect(result.content).toContain("nothing to rename");
     });
 
+    it("rejects player entities (machine-scope, not campaign-scope)", async () => {
+      const fio = mockFileIO();
+      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], [], []);
+
+      const result = await handler("rename_entity", {
+        entity_type: "player",
+        old_name: "Alex",
+        new_name: "Alexandra",
+      });
+
+      expect(result.is_error).toBe(true);
+      expect(result.content).toContain("player");
+    });
+
     it("rejects when deleteFile is unavailable", async () => {
       const fio = mockFileIO({ "/camp/locations/starting-location/index.md": placeholder });
       fio.deleteFile = undefined;

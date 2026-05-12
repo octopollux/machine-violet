@@ -148,14 +148,14 @@ const SCRIBE_TOOLS: NormalizedTool[] = [
   {
     name: "rename_entity",
     description:
-      "Rename an existing entity. Moves the file to the new slug, updates its H1 to the new display name, and rewrites every wikilink across the campaign that pointed to the old entity. Use this when an entity is renamed in fiction (e.g. a tavern reveals its real name) — and especially to replace the placeholder `Starting Location` once the opening locale has a real name.",
+      "Rename an existing entity. Moves the file to the new slug, updates its H1 to the new display name, and rewrites every wikilink across the campaign that pointed to the old entity. Use this when an entity is renamed in fiction (e.g. a tavern reveals its real name) — and especially to replace the placeholder `Starting Location` once the opening locale has a real name. Player entities are machine-scope and not renamable through this tool.",
     inputSchema: {
       type: "object" as const,
       properties: {
         entity_type: {
           type: "string",
-          enum: ["character", "location", "faction", "lore", "item", "player"],
-          description: "Entity type",
+          enum: ["character", "location", "faction", "lore", "item"],
+          description: "Entity type. `player` is intentionally excluded — player files are machine-scope.",
         },
         old_name: {
           type: "string",
@@ -434,6 +434,12 @@ export function buildScribeToolHandler(
         if (!oldName || !newName) {
           return { content: "rename_entity requires 'old_name' and 'new_name'", is_error: true };
         }
+        // Player entities live under homeDir, not campaignRoot — renaming them
+        // would mean retargeting every campaign that knows the player.
+        // Out of scope for an in-campaign Scribe.
+        if (entityType === "player") {
+          return { content: "rename_entity does not support player entities (machine-scope, not campaign-scope)", is_error: true };
+        }
         const oldSlug = slugify(oldName);
         const newSlug = slugify(newName);
         if (oldSlug === newSlug) {
@@ -445,6 +451,12 @@ export function buildScribeToolHandler(
 
         const oldFilePath = norm(entityPath(entityType, oldSlug));
         const newFilePath = norm(entityPath(entityType, newSlug));
+        // Defense in depth: refuse anything that didn't resolve under campaignRoot.
+        // Catches future bugs where a new entity type lands outside the campaign tree.
+        const normRoot = norm(campaignRoot);
+        if (!oldFilePath.startsWith(normRoot + "/") || !newFilePath.startsWith(normRoot + "/")) {
+          return { content: `rename_entity refused: ${entityType} resolves outside the campaign root`, is_error: true };
+        }
         if (!(await fileIO.exists(oldFilePath))) {
           return { content: `Entity not found: ${entityType}/${oldSlug}`, is_error: true };
         }
@@ -452,9 +464,8 @@ export function buildScribeToolHandler(
           return { content: `Cannot rename: ${entityType}/${newSlug} already exists`, is_error: true };
         }
 
-        const normRoot = norm(campaignRoot);
-        const oldRelative = oldFilePath.replace(normRoot + "/", "");
-        const newRelative = newFilePath.replace(normRoot + "/", "");
+        const oldRelative = oldFilePath.slice(normRoot.length + 1);
+        const newRelative = newFilePath.slice(normRoot.length + 1);
 
         try {
           // Move the file and rewrite incoming wikilinks campaign-wide.
