@@ -595,8 +595,9 @@ export class GameEngine {
       await this.sceneManager.flushTranscript();
 
       // Track exchange for git auto-commit. Use the raw player message as the
-      // commit body so the savestate log is browsable; synthetic system turns
-      // (skipTranscript: session open/resume) fall back to the generic label.
+      // commit subject so the savestate log is browsable; synthetic system
+      // turns (skipTranscript: session open/resume) fall back to the generic
+      // label.
       await this.repo?.trackExchange(opts?.skipTranscript ? undefined : text);
 
       // Run scene tracker periodically to maintain open threads / NPC intents

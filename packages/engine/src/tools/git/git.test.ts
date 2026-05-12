@@ -186,6 +186,19 @@ describe("CampaignRepo", () => {
     expect(msg.includes("\n")).toBe(false);
   });
 
+  it("strips C0/C1 control chars and DEL from player messages", async () => {
+    const git = mockGitIO();
+    const repo = new CampaignRepo({ dir: "/tmp/campaign", git, autoCommitInterval: 1 });
+
+    // ESC[31m red, BEL, NULL, DEL, U+0085 NEL — none should reach the log.
+    await repo.trackExchange("hello \x1b[31mworld\x1b[0m\x07\x00 next\x7f line\u0085done");
+
+    const msg = git.commits[0].message;
+    expect(msg).toBe("auto: hello [31mworld [0m next line done");
+    // eslint-disable-next-line no-control-regex -- assertion intentionally checks for control chars
+    expect(/[\x00-\x1F\x7F-\x9F]/.test(msg)).toBe(false);
+  });
+
   it("falls back to 'auto: exchanges' for an empty/whitespace player message", async () => {
     const git = mockGitIO();
     const repo = new CampaignRepo({ dir: "/tmp/campaign", git, autoCommitInterval: 1 });

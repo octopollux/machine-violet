@@ -136,9 +136,9 @@ export class CampaignRepo {
    * Track an exchange. Triggers auto-commit when interval is reached.
    * Returns the commit oid if a commit was made, null otherwise.
    *
-   * `playerMessage` (when provided) becomes the commit body so the log reads
-   * like a savestate browser. The `auto:` prefix stays so commit-type parsing
-   * and `exchanges_ago:N` rollback continue to work.
+   * `playerMessage` (when provided) becomes the commit subject so the log
+   * reads like a savestate browser. The `auto:` prefix stays so commit-type
+   * parsing and `exchanges_ago:N` rollback continue to work.
    */
   async trackExchange(playerMessage?: string): Promise<string | null> {
     if (!this.enabled) return null;
@@ -146,8 +146,8 @@ export class CampaignRepo {
     this.exchangeCount++;
     if (this.exchangeCount >= this.autoCommitInterval) {
       this.exchangeCount = 0;
-      const body = playerMessageToCommitBody(playerMessage);
-      return this.autoCommit(`auto: ${body}`);
+      const subject = playerMessageToCommitSubject(playerMessage);
+      return this.autoCommit(`auto: ${subject}`);
     }
     return null;
   }
@@ -295,14 +295,17 @@ export class CampaignRepo {
 // --- Helpers ---
 
 /**
- * Pure local string op (no LLM): collapse the player message to a single line
- * and truncate so it fits a commit subject. Empty/missing input falls back to
- * "exchanges" so synthetic system turns (session open/resume) don't leak into
- * the log.
+ * Pure local string op (no LLM): sanitize a player message into a single-line
+ * commit subject. Strips C0/C1 control chars + DEL (so ANSI escapes pasted
+ * from a terminal can't mangle `git log` output), collapses remaining
+ * whitespace, and truncates. Empty/missing input falls back to "exchanges"
+ * so synthetic system turns (session open/resume) don't leak into the log.
  */
-function playerMessageToCommitBody(text: string | undefined): string {
+function playerMessageToCommitSubject(text: string | undefined): string {
   if (!text) return "exchanges";
-  const cleaned = text.replace(/\s+/g, " ").trim();
+  // eslint-disable-next-line no-control-regex -- stripping these is the point
+  const stripped = text.replace(/[\x00-\x1F\x7F-\x9F]/g, " ");
+  const cleaned = stripped.replace(/\s+/g, " ").trim();
   if (cleaned.length === 0) return "exchanges";
   const MAX = 72;
   return cleaned.length <= MAX ? cleaned : cleaned.slice(0, MAX - 1) + "…";
