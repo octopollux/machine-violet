@@ -41,7 +41,8 @@ jobs:
         shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          node scripts/build-dist.js --version="${VERSION}-test"
+          RELEASE_DATE="$(date -u +'%Y-%m-%d %H:%M')"
+          node scripts/build-dist.js --version="${VERSION}-test" --release-date="$RELEASE_DATE"
 
       - name: Bundle Windows Terminal portable
         shell: bash
@@ -112,7 +113,8 @@ jobs:
       - name: Build distribution
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          node scripts/build-dist.js --version="${VERSION}-test"
+          RELEASE_DATE="$(date -u +'%Y-%m-%d %H:%M')"
+          node scripts/build-dist.js --version="${VERSION}-test" --release-date="$RELEASE_DATE"
 
       - name: Package
         run: tar -czf machine-violet-test-darwin-arm64.tar.gz -C dist .
@@ -142,7 +144,8 @@ jobs:
       - name: Build distribution
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          node scripts/build-dist.js --version="${VERSION}-test"
+          RELEASE_DATE="$(date -u +'%Y-%m-%d %H:%M')"
+          node scripts/build-dist.js --version="${VERSION}-test" --release-date="$RELEASE_DATE"
 
       - name: Package
         run: tar -czf machine-violet-test-linux-x64.tar.gz -C dist .

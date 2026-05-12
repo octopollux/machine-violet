@@ -4,6 +4,7 @@ import { render } from "ink-testing-library";
 import { SettingsPhase } from "./SettingsPhase.js";
 import type { SettingsPhaseProps } from "./SettingsPhase.js";
 import { resetThemeCache, resolveTheme, BUILTIN_DEFINITIONS } from "../tui/themes/index.js";
+import { APP_VERSION } from "../version.js";
 
 beforeEach(() => {
   resetThemeCache();
@@ -58,5 +59,12 @@ describe("SettingsPhase", () => {
     // setTimeout(0) is used for the deep-link, so wait a tick
     await new Promise((r) => setTimeout(r, 10));
     expect(onApiKeys).toHaveBeenCalled();
+  });
+
+  it("renders a version label pinned to the bottom-left", () => {
+    // Read APP_VERSION at runtime so the test is robust to whatever
+    // MV_VERSION/MV_RELEASE_DATE the environment happens to have set.
+    const { lastFrame } = render(<SettingsPhase {...defaultProps()} />);
+    expect(lastFrame()).toContain(`v${APP_VERSION}`);
   });
 });
