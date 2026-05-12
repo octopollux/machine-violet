@@ -153,6 +153,7 @@ function handleModeToggle(
   const small = engine.getTier("small");
   if (target === "ooc") {
     const sm = engine.getSceneManager();
+    const prefix = sm.getSystemPrompt({});
     const session = createOOCSession(medium.provider, {
       campaignName: gameState.config.name,
       previousVariant,
@@ -161,12 +162,23 @@ function handleModeToggle(
       repo: engine.getRepo() ?? undefined,
       fileIO: sm.getFileIO(),
       campaignRoot: gameState.campaignRoot,
-      // Pass gameState so the DM-tier tool definitions (scribe,
-      // promote_character, roll_dice, etc.) register. The OOC system
-      // prompt explicitly directs the agent to use scribe for entity
-      // corrections; without gameState the registration is skipped and
-      // the agent correctly tells the player it doesn't have the tool.
       gameState,
+      // OOC dispatches the full DM toolset through the same singleton
+      // registry the DM uses — same state mutations, same persistence,
+      // same TUI side effects.
+      registry: engine.getRegistry(),
+      // Volatile DM context (Tier 3: current state, entity index, UI state)
+      // gets injected as a user-message preamble so OOC sees live game
+      // state without invalidating the cached system prefix.
+      volatileContext: prefix.volatile,
+      // Surface the DM's async tool handler (resolve_turn, search_campaign,
+      // search_content, style_scene) to OOC so the agent can use them the
+      // same way the DM does.
+      engineAsyncTool: (name, input) => engine.handleAsyncTool(name, input),
+      // Route immediate (visual) TUI commands through the engine so they
+      // reach the client + update persistedUI just like DM-side calls.
+      onTuiCommand: (cmd) => engine.dispatchImmediateTuiCommand(cmd),
+      onDeferredTuiCommands: (cmds) => engine.applyDeferredTuiCommands(cmds),
       model: medium.model,
       smallTier: small,
     });
