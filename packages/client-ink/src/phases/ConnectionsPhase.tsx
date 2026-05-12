@@ -7,12 +7,15 @@
  *            → Add Connection (provider → key → label → baseUrl wizard)
  */
 import React, { useState, useEffect, useRef } from "react";
-import { useInput, Text, useWindowSize } from "ink";
+import { useInput, Box, Text, useWindowSize } from "ink";
 import type { ResolvedTheme } from "../tui/themes/types.js";
 import { TerminalTooSmall, FullScreenFrame } from "../tui/components/index.js";
+import { CenteredModal } from "../tui/modals/CenteredModal.js";
 import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
 import { useTextInput } from "../tui/hooks/useTextInput.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
+import { openPath } from "../commands/open-path.js";
+import { copyToClipboard } from "../utils/clipboard.js";
 import type {
   ConnectionInfo, TierAssignmentsResponse, TierAssignmentEntry,
   KnownModelInfo, ConnectionHealthResponse,
@@ -176,6 +179,7 @@ export function ConnectionsPhase({
   const [loginInfo, setLoginInfo] = useState<{ loginId: string; authUrl: string } | null>(null);
   const [loginStatus, setLoginStatus] = useState<ChatGptLoginStatusResponse | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
 
   // Per-connection usage cache. Refreshed on connections-screen mount and
   // every 30s after that. Connections without a live snapshot stay null
@@ -288,6 +292,7 @@ export function ConnectionsPhase({
           setLoginInfo(null);
           setLoginStatus(null);
           setLoginError(null);
+          setCopyStatus("idle");
           setScreen("chatgpt-login");
           void (async () => {
             try {
@@ -316,6 +321,19 @@ export function ConnectionsPhase({
         // Acknowledge the terminal status and go back.
         setScreen("menu");
         return;
+      }
+      // Hotkeys for the URL — only meaningful once we have one.
+      if (loginInfo && (loginStatus?.status ?? "pending") === "pending") {
+        if (input === "o" || input === "O") {
+          openPath(loginInfo.authUrl);
+          return;
+        }
+        if (input === "c" || input === "C") {
+          void copyToClipboard(loginInfo.authUrl).then((ok) => {
+            setCopyStatus(ok ? "copied" : "failed");
+          });
+          return;
+        }
       }
       return;
     }
@@ -479,40 +497,79 @@ export function ConnectionsPhase({
   }
 
   if (screen === "chatgpt-login") {
-    const lines: React.ReactNode[] = [];
+    // Render the AI Connections menu underneath as the visual base; the
+    // login flow renders as a centered modal overlay on top.
+    const menuLines: React.ReactNode[] = [];
+    for (let i = 0; i < MENU_ITEMS.length; i++) {
+      const selected = i === menuIndex;
+      menuLines.push(
+        <Text key={MENU_ITEMS[i]} color={selected ? border : dim}>
+          {selected ? "\u25c6" : "\u25cb"}{" "}{MENU_ITEMS[i]}
+        </Text>,
+      );
+    }
+
+    const status = loginStatus?.status ?? "pending";
+    const modalChildren: React.ReactNode[] = [];
+    let modalFooter = "Esc cancel";
+
     if (loginError) {
-      lines.push(<Text key="err" color="#cc4444">Error: {loginError}</Text>);
-      lines.push(<Text key="back" color={dim}>Press Enter or Esc to return.</Text>);
+      modalChildren.push(<Text key="err" color="#cc4444">Error: {loginError}</Text>);
+      modalChildren.push(<Text key="sp" color={dim}> </Text>);
+      modalChildren.push(<Text key="back" color={dim}>Press Enter or Esc to return.</Text>);
     } else if (!loginInfo) {
-      lines.push(<Text key="starting" color={fg}>Starting Codex subprocess and OAuth flow\u2026</Text>);
+      modalChildren.push(<Text key="starting" color={fg}>Starting Codex subprocess and OAuth flow\u2026</Text>);
     } else {
-      lines.push(<Text key="title" color={accent}>Sign in with ChatGPT</Text>);
-      lines.push(<Text key="sp" color={dim}> </Text>);
-      lines.push(<Text key="instr" color={fg}>Open this URL in your browser:</Text>);
-      lines.push(<Text key="sp2" color={dim}> </Text>);
-      lines.push(<Text key="url" color="#88ccff">{loginInfo.authUrl}</Text>);
-      lines.push(<Text key="sp3" color={dim}> </Text>);
-      const status = loginStatus?.status ?? "pending";
+      modalChildren.push(<Text key="instr" color={fg}>Sign in by opening this URL in your browser:</Text>);
+      modalChildren.push(<Text key="sp" color={dim}> </Text>);
+      modalChildren.push(<Text key="url" color="#88ccff">{loginInfo.authUrl}</Text>);
+      modalChildren.push(<Text key="sp2" color={dim}> </Text>);
       if (status === "pending") {
-        lines.push(<Text key="status" color={dim}>Waiting for browser authentication\u2026 (Esc to cancel)</Text>);
+        modalChildren.push(<Text key="status" color={dim}>Waiting for browser authentication\u2026</Text>);
+        if (copyStatus === "copied") {
+          modalChildren.push(<Text key="copy" color="#88cc88">URL copied to clipboard.</Text>);
+        } else if (copyStatus === "failed") {
+          modalChildren.push(<Text key="copy" color="#cc4444">Clipboard unavailable.</Text>);
+        }
+        modalFooter = " o open in browser \u00b7 c copy URL \u00b7 Esc cancel ";
       } else if (status === "success") {
-        lines.push(<Text key="status" color="#88cc88">
+        modalChildren.push(<Text key="status" color="#88cc88">
           \u2714 Signed in{loginStatus?.email ? ` as ${loginStatus.email}` : ""}{loginStatus?.planType ? ` (${loginStatus.planType})` : ""}.
         </Text>);
-        lines.push(<Text key="sp4" color={dim}> </Text>);
-        lines.push(<Text key="dismiss" color={dim}>Press Enter or Esc to return.</Text>);
+        modalChildren.push(<Text key="sp3" color={dim}> </Text>);
+        modalChildren.push(<Text key="dismiss" color={dim}>Press Enter or Esc to return.</Text>);
       } else if (status === "cancelled") {
-        lines.push(<Text key="status" color={dim}>Login cancelled.</Text>);
-        lines.push(<Text key="dismiss" color={dim}>Press Enter or Esc to return.</Text>);
+        modalChildren.push(<Text key="status" color={dim}>Login cancelled.</Text>);
+        modalChildren.push(<Text key="dismiss" color={dim}>Press Enter or Esc to return.</Text>);
       } else {
-        lines.push(<Text key="status" color="#cc4444">Login failed: {loginStatus?.error ?? "unknown error"}</Text>);
-        lines.push(<Text key="dismiss" color={dim}>Press Enter or Esc to return.</Text>);
+        modalChildren.push(<Text key="status" color="#cc4444">Login failed: {loginStatus?.error ?? "unknown error"}</Text>);
+        modalChildren.push(<Text key="dismiss" color={dim}>Press Enter or Esc to return.</Text>);
       }
     }
+
+    // Aim for ~60% of terminal height as visible content rows. CenteredModal
+    // wraps that with its own borders and clamps to fit the screen.
+    const modalContentRows = Math.max(8, Math.floor(termRows * 0.6) - 4);
+
     return (
-      <FullScreenFrame theme={theme} columns={cols} rows={termRows} title="ChatGPT Login" contentRows={lines.length}>
-        {lines}
-      </FullScreenFrame>
+      <Box flexDirection="column" width={cols} height={termRows}>
+        <FullScreenFrame theme={theme} columns={cols} rows={termRows} title="AI Connections" contentRows={menuLines.length}>
+          {menuLines}
+        </FullScreenFrame>
+        <CenteredModal
+          theme={theme}
+          width={cols}
+          height={termRows}
+          title="Sign in with ChatGPT"
+          widthFraction={0.6}
+          minWidth={50}
+          maxWidth={Math.max(50, Math.floor(cols * 0.6))}
+          contentHeight={modalContentRows}
+          footer={modalFooter}
+        >
+          {modalChildren}
+        </CenteredModal>
+      </Box>
     );
   }
 

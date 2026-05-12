@@ -77,6 +77,7 @@ export const ErrorResponse = Type.Object({
 
 export const IdParams = Type.Object({ id: Type.String() });
 export const NameParams = Type.Object({ name: Type.String() });
+export const LoginIdParams = Type.Object({ loginId: Type.String() });
 
 // --- Session responses ---
 
@@ -290,6 +291,7 @@ export type SessionEndResponse = Static<typeof SessionEndResponse>;
 export type ErrorResponse = Static<typeof ErrorResponse>;
 export type IdParams = Static<typeof IdParams>;
 export type NameParams = Static<typeof NameParams>;
+export type LoginIdParams = Static<typeof LoginIdParams>;
 export type ContributeResponse = Static<typeof ContributeResponse>;
 export type ContributeQuery = Static<typeof ContributeQuery>;
 export type CommandParams = Static<typeof CommandParams>;

@@ -29,7 +29,7 @@ import { loadDiscordSettings, saveDiscordSettings } from "../../config/discord.j
 import { loadMachineSettings, saveMachineSettings } from "../../config/machine-settings.js";
 import { createArchiveFileIO } from "../fileio.js";
 import {
-  IdParams, NameParams,
+  IdParams, NameParams, LoginIdParams,
   AddConnectionRequest, ConnectionsListResponse, HealthCheckResponse,
   UpdateModelsRequest, OkResponse, TiersResponse, SetTiersRequest,
   ModelsResponse, ArchiveResponse, ArchivedListResponse, RestoreRequest,
@@ -302,11 +302,11 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   server.get("/connections/openai-chatgpt/login/:loginId", {
     schema: {
       tags: ["Management"],
-      params: NameParams,
+      params: LoginIdParams,
       response: { 200: ChatGptLoginStatusResponse, 404: ErrorResponse },
     },
   }, async (request, reply) => {
-    const { name: loginId } = request.params as { name: string };
+    const { loginId } = request.params as { loginId: string };
     const entry = pendingLogins.get(loginId);
     if (!entry) {
       return reply.status(404).send({ error: `Unknown loginId: ${loginId}` });
@@ -323,11 +323,11 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   server.post("/connections/openai-chatgpt/login/:loginId/cancel", {
     schema: {
       tags: ["Management"],
-      params: NameParams,
+      params: LoginIdParams,
       response: { 200: OkResponse, 404: ErrorResponse },
     },
   }, async (request, reply) => {
-    const { name: loginId } = request.params as { name: string };
+    const { loginId } = request.params as { loginId: string };
     const entry = pendingLogins.get(loginId);
     if (!entry) {
       return reply.status(404).send({ error: `Unknown loginId: ${loginId}` });
