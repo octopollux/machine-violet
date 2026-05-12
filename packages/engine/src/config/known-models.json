@@ -80,6 +80,16 @@
       "pricing": { "input": 0.4, "output": 1.6, "cacheWrite": 0, "cacheRead": 0.2 },
       "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
     },
+    "gpt-5.4-mini": {
+      "provider": "openai",
+      "displayName": "GPT-5.4 Mini",
+      "contextWindow": 128000,
+      "maxOutput": 16384,
+      "defaultTier": "medium",
+      "compactionThreshold": 100000,
+      "pricing": { "input": 0.4, "output": 1.6, "cacheWrite": 0, "cacheRead": 0.2 },
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
+    },
     "gpt-5-nano": {
       "provider": "openai",
       "displayName": "GPT-5 Nano",
@@ -113,6 +123,7 @@
   },
   "tierDefaults": {
     "anthropic": { "large": "claude-opus-4-6", "medium": "claude-sonnet-4-6", "small": "claude-haiku-4-5-20251001" },
-    "openai": { "large": "gpt-5.5", "medium": "gpt-5-mini", "small": "gpt-5-nano" }
+    "openai-apikey": { "large": "gpt-5.5", "medium": "gpt-5-mini", "small": "gpt-5-nano" },
+    "openai-chatgpt": { "large": "gpt-5.5", "medium": "gpt-5.4-mini", "small": "gpt-5.4-mini" }
   }
 }

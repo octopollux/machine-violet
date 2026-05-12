@@ -520,6 +520,16 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
             setTierAssignments(resp.tierAssignments);
           }).catch(() => { /* ignore */ });
         }}
+        onStartChatGptLogin={() => apiClientRef.current.startChatGptLogin()}
+        onPollChatGptLogin={(loginId) => apiClientRef.current.getChatGptLoginStatus(loginId)}
+        onCancelChatGptLogin={(loginId) => apiClientRef.current.cancelChatGptLogin(loginId)}
+        onRefreshConnections={() => {
+          apiClientRef.current.listConnections().then((resp) => {
+            setConnections(resp.connections);
+            setTierAssignments(resp.tierAssignments);
+          }).catch(() => { /* ignore */ });
+        }}
+        onFetchUsage={(id) => apiClientRef.current.getConnectionUsage(id)}
         onBack={() => setPhase("settings")}
       />
     );

@@ -175,16 +175,39 @@ export const ConnectionsListResponse = Type.Object({
 });
 
 export const AddConnectionRequest = Type.Object({
+  // Note `openai-chatgpt` is intentionally absent — those connections are
+  // created via the OAuth login endpoint at `/manage/connections/openai-chatgpt/login`,
+  // not by submitting an API key here.
   provider: Type.Union([
     Type.Literal("anthropic"),
-    Type.Literal("openai"),
-    Type.Literal("openai-oauth"),
+    Type.Literal("openai-apikey"),
     Type.Literal("openrouter"),
     Type.Literal("custom"),
   ]),
   apiKey: Type.String(),
   label: Type.Optional(Type.String()),
   baseUrl: Type.Optional(Type.String()),
+});
+
+// --- openai-chatgpt OAuth login ---
+
+export const ChatGptLoginStartResponse = Type.Object({
+  loginId: Type.String(),
+  authUrl: Type.String(),
+});
+
+export const ChatGptLoginStatusResponse = Type.Object({
+  status: Type.Union([
+    Type.Literal("pending"),
+    Type.Literal("success"),
+    Type.Literal("error"),
+    Type.Literal("cancelled"),
+  ]),
+  error: Type.Optional(Type.String()),
+  /** Populated on success: connection id + masked account details. */
+  connectionId: Type.Optional(Type.String()),
+  email: Type.Optional(Type.String()),
+  planType: Type.Optional(Type.String()),
 });
 
 export const HealthCheckResponse = Type.Object({
@@ -287,6 +310,8 @@ export type ConnectionModel = Static<typeof ConnectionModel>;
 export type SerializedConnection = Static<typeof SerializedConnection>;
 export type TierAssignmentSchema = Static<typeof TierAssignmentSchema>;
 export type ConnectionsListResponse = Static<typeof ConnectionsListResponse>;
+export type ChatGptLoginStartResponse = Static<typeof ChatGptLoginStartResponse>;
+export type ChatGptLoginStatusResponse = Static<typeof ChatGptLoginStatusResponse>;
 export type AddConnectionRequest = Static<typeof AddConnectionRequest>;
 export type HealthCheckResponse = Static<typeof HealthCheckResponse>;
 export type UpdateModelsRequest = Static<typeof UpdateModelsRequest>;

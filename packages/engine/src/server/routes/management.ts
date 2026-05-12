@@ -8,14 +8,19 @@
  */
 import { join } from "node:path";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
+import { randomBytes } from "node:crypto";
 import {
   loadConnectionStore, saveConnectionStore, buildEffectiveConnections,
   addConnection, removeConnection, setTierAssignment, updateConnectionModels,
   maskKey,
 } from "../../config/connections.js";
-import type { ConnectionStore, TierAssignment, ProviderType } from "../../config/connections.js";
+import type { ConnectionStore, TierAssignment, ProviderType, AIConnection } from "../../config/connections.js";
 import { createProviderFromConnection } from "../../providers/index.js";
-import { loadModelRegistry, getModelsForProvider } from "../../config/model-registry.js";
+import { loadModelRegistry, getModelsForProvider, modelFamilyFor } from "../../config/model-registry.js";
+import {
+  CodexRpcClient, startChatGptLogin, awaitLoginCompletion, cancelLogin, getAccount,
+  listModels,
+} from "../../providers/openai-chatgpt/index.js";
 import {
   archiveCampaign, deleteCampaign, listArchivedCampaigns,
   unarchiveCampaign, getCampaignDeleteInfo,
@@ -29,6 +34,8 @@ import {
   UpdateModelsRequest, OkResponse, TiersResponse, SetTiersRequest,
   ModelsResponse, ArchiveResponse, ArchivedListResponse, RestoreRequest,
   DiscordSettings, MachineSettingsResponse, KeysListResponse, DeleteInfoResponse, ErrorResponse,
+  ChatGptLoginStartResponse, ChatGptLoginStatusResponse,
+  UsageResponse,
 } from "@machine-violet/shared";
 
 export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstance) => {
@@ -74,8 +81,8 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     };
   });
 
-  /** Add a connection. */
-  const VALID_PROVIDERS = new Set<string>(["anthropic", "openai", "openai-oauth", "openrouter", "custom"]);
+  /** Add a connection. `openai-chatgpt` excluded — uses OAuth login flow instead. */
+  const VALID_PROVIDERS = new Set<string>(["anthropic", "openai-apikey", "openrouter", "custom"]);
 
   server.post("/connections", {
     schema: {
@@ -100,8 +107,8 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     let store = getConnections();
     store = addConnection(store, provider as ProviderType, apiKey, label ?? "", baseUrl);
 
-    // Auto-discover known models for this provider
-    const knownModels = getModelsForProvider(provider, server.configDir);
+    // Auto-discover known models for this provider's model family
+    const knownModels = getModelsForProvider(modelFamilyFor(provider), server.configDir);
     const newConn = store.connections[store.connections.length - 1];
     store = updateConnectionModels(store, newConn.id, Object.entries(knownModels).map(([id, m]) => ({
       id, displayName: m.displayName, available: true,
@@ -158,6 +165,211 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     } catch (err) {
       return { id: conn.id, status: "error" as const, message: err instanceof Error ? err.message : String(err) };
     }
+  });
+
+  // -----------------------------------------------------------------------
+  // openai-chatgpt OAuth login flow
+  // -----------------------------------------------------------------------
+  //
+  // The Codex app-server hosts the OAuth loopback callback itself (on
+  // localhost:1455). We spawn a per-login codex subprocess just long
+  // enough to drive the flow, then dispose it once the login completes
+  // or fails. On success, a new AIConnection of type "openai-chatgpt" is
+  // persisted and returned to the client via the status poll.
+
+  interface PendingLogin {
+    client: CodexRpcClient;
+    status: "pending" | "success" | "error" | "cancelled";
+    error?: string;
+    email?: string;
+    planType?: string;
+    connectionId?: string;
+    createdAt: number;
+  }
+  const pendingLogins = new Map<string, PendingLogin>();
+
+  /** Reap logins older than 10 minutes to avoid unbounded growth. */
+  function reapStaleLogins(): void {
+    const cutoff = Date.now() - 10 * 60_000;
+    for (const [id, login] of pendingLogins) {
+      if (login.createdAt < cutoff && login.status !== "pending") {
+        void login.client.stop().catch(() => { /* ignore */ });
+        pendingLogins.delete(id);
+      }
+    }
+  }
+
+  server.post("/connections/openai-chatgpt/login", {
+    schema: {
+      tags: ["Management"],
+      response: { 200: ChatGptLoginStartResponse, 500: ErrorResponse },
+    },
+  }, async (_request, reply) => {
+    reapStaleLogins();
+
+    const client = new CodexRpcClient({ sessionId: `oauth-${randomBytes(4).toString("hex")}` });
+    try {
+      await client.start();
+      await client.call("initialize", {
+        clientInfo: { name: "machine_violet", title: "Machine Violet", version: "1.0.1" },
+        capabilities: { experimentalApi: true },
+      });
+      client.notify("initialized", {});
+
+      const startResult = await startChatGptLogin(client);
+
+      const entry: PendingLogin = {
+        client,
+        status: "pending",
+        createdAt: Date.now(),
+      };
+      pendingLogins.set(startResult.loginId, entry);
+
+      // Wire completion handler — fires once Codex finishes the OAuth flow
+      // (success or failure). On success, also save the connection record.
+      void awaitLoginCompletion(client, startResult.loginId)
+        .then(async (completed) => {
+          if (entry.status !== "pending") return; // cancelled
+          if (!completed.success) {
+            entry.status = "error";
+            entry.error = completed.error ?? "login failed";
+            await client.stop().catch(() => { /* ignore */ });
+            return;
+          }
+          // Pull the resolved account details and persist the connection.
+          try {
+            const acct = await getAccount(client);
+            entry.email = acct.account?.email;
+            entry.planType = acct.account?.planType;
+
+            // Discover models so the new connection has gpt-5.5 etc. populated
+            // up front (avoids an empty tier-picker on first open).
+            let discovered: { id: string; displayName: string; available: boolean }[] = [];
+            try {
+              discovered = (await listModels(client)).map((m) => ({
+                id: m.id, displayName: m.displayName, available: m.available,
+              }));
+            } catch { /* best effort */ }
+
+            const connId = randomBytes(8).toString("hex");
+            const newConn: AIConnection = {
+              id: connId,
+              provider: "openai-chatgpt",
+              label: acct.account?.email
+                ? `ChatGPT (${acct.account.email})`
+                : "ChatGPT",
+              apiKey: "", // Codex owns tokens; no key to store
+              chatgptAccount: acct.account
+                ? {
+                    id: acct.account.email ?? connId, // best fallback when codex omits a numeric id
+                    email: acct.account.email,
+                    planType: acct.account.planType,
+                  }
+                : undefined,
+              models: discovered,
+              source: "oauth",
+              addedAt: new Date().toISOString(),
+            };
+            const stored = loadConnectionStore(server.configDir);
+            stored.connections.push(newConn);
+            saveConnectionStore(server.configDir, stored);
+            entry.connectionId = connId;
+            entry.status = "success";
+          } catch (err) {
+            entry.status = "error";
+            entry.error = err instanceof Error ? err.message : String(err);
+          } finally {
+            // Either way, the login-only codex is no longer needed; the
+            // user's game-session work will spawn a fresh one.
+            await client.stop().catch(() => { /* ignore */ });
+          }
+        })
+        .catch((err) => {
+          entry.status = "error";
+          entry.error = err instanceof Error ? err.message : String(err);
+          void client.stop().catch(() => { /* ignore */ });
+        });
+
+      return { loginId: startResult.loginId, authUrl: startResult.authUrl };
+    } catch (err) {
+      await client.stop().catch(() => { /* ignore */ });
+      return reply.status(500).send({
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  });
+
+  server.get("/connections/openai-chatgpt/login/:loginId", {
+    schema: {
+      tags: ["Management"],
+      params: NameParams,
+      response: { 200: ChatGptLoginStatusResponse, 404: ErrorResponse },
+    },
+  }, async (request, reply) => {
+    const { name: loginId } = request.params as { name: string };
+    const entry = pendingLogins.get(loginId);
+    if (!entry) {
+      return reply.status(404).send({ error: `Unknown loginId: ${loginId}` });
+    }
+    return {
+      status: entry.status,
+      ...(entry.error ? { error: entry.error } : {}),
+      ...(entry.connectionId ? { connectionId: entry.connectionId } : {}),
+      ...(entry.email ? { email: entry.email } : {}),
+      ...(entry.planType ? { planType: entry.planType } : {}),
+    };
+  });
+
+  server.post("/connections/openai-chatgpt/login/:loginId/cancel", {
+    schema: {
+      tags: ["Management"],
+      params: NameParams,
+      response: { 200: OkResponse, 404: ErrorResponse },
+    },
+  }, async (request, reply) => {
+    const { name: loginId } = request.params as { name: string };
+    const entry = pendingLogins.get(loginId);
+    if (!entry) {
+      return reply.status(404).send({ error: `Unknown loginId: ${loginId}` });
+    }
+    if (entry.status === "pending") {
+      entry.status = "cancelled";
+      await cancelLogin(entry.client, loginId).catch(() => { /* ignore */ });
+      await entry.client.stop().catch(() => { /* ignore */ });
+    }
+    return { ok: true };
+  });
+
+  // -----------------------------------------------------------------------
+  // Usage status
+  // -----------------------------------------------------------------------
+
+  server.get("/connections/:id/usage", {
+    schema: {
+      tags: ["Management"],
+      params: IdParams,
+      response: { 200: UsageResponse, 404: ErrorResponse },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const store = getConnections();
+    const conn = store.connections.find((c) => c.id === id);
+    if (!conn) {
+      return reply.status(404).send({ error: "Connection not found." });
+    }
+
+    // Look up the live provider instance from the session manager.
+    // Only providers attached to an active session can report usage; idle
+    // connections have no subprocess and no recent rate-limit snapshot.
+    const provider = server.sessionManager.getProviderForConnectionId(id);
+    if (!provider || !provider.getUsageStatus) {
+      return { id, available: false };
+    }
+    const status = provider.getUsageStatus();
+    if (!status) {
+      return { id, available: false };
+    }
+    return { id, available: true, status };
   });
 
   /** Update discovered models on a connection. */

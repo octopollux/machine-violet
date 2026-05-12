@@ -5,6 +5,7 @@
  * behind this interface. The agent loop and subagent infrastructure only
  * talk to these normalized types.
  */
+import type { UsageStatus } from "@machine-violet/shared";
 
 // ---------------------------------------------------------------------------
 // Messages
@@ -105,6 +106,23 @@ export interface ChatParams {
   maxTokens: number;
   thinking?: ThinkingConfig;
   cacheHints?: CacheHint[];
+  /**
+   * Optional in-process tool dispatcher.
+   *
+   * Some providers (codex app-server) own tool dispatch end-to-end:
+   * the model's tool calls arrive as JSON-RPC server requests that must
+   * be replied to in-band, so the provider runs the entire multi-round
+   * tool loop inside a single `chat()` call rather than surfacing
+   * intermediate tool calls back to the bridge.
+   *
+   * When set, providers that support internal dispatch invoke this
+   * callback per tool call. The returned `content` is sent back to the
+   * model as the tool result. Providers that don't support internal
+   * dispatch (Anthropic, openai-apikey, openrouter, custom) ignore this
+   * field and continue to surface tool calls via `ChatResult.toolCalls`
+   * for the caller to dispatch and re-issue.
+   */
+  dispatchTool?: (call: NormalizedToolCall) => Promise<{ content: string; isError?: boolean }>;
 }
 
 /** A system prompt block (text with optional cache control). */
@@ -168,6 +186,38 @@ export interface LLMProvider {
 
   /** Minimal API call to validate credentials. */
   healthCheck(model?: string): Promise<HealthCheckResult>;
+
+  /**
+   * Return the provider's current remaining-usage snapshot, or null if the
+   * provider has no usage concept (custom OpenAI-compatible endpoints,
+   * local Ollama, etc.). Providers that can report usage may choose to
+   * return a cached snapshot here and surface live updates via
+   * {@link subscribeUsage}. Always synchronous — never call out to the
+   * provider from this method; doing so would block the Connections UI
+   * render loop.
+   */
+  getUsageStatus?(): UsageStatus | null;
+
+  /**
+   * Subscribe to push-style usage updates. Implementations that observe
+   * usage out-of-band (Codex's `account/rateLimits/updated` JSON-RPC
+   * notifications) fire `cb` on every change. Returns an unsubscribe
+   * function. Providers without a push channel may omit this method;
+   * consumers fall back to polling {@link getUsageStatus} on a timer.
+   */
+  subscribeUsage?(cb: (status: UsageStatus) => void): () => void;
+
+  /**
+   * Release any long-lived resources (subprocesses, sockets, file
+   * handles). Stateless providers (Anthropic SDK, OpenAI SDK) may omit
+   * this method. Stateful providers — currently only openai-chatgpt,
+   * which owns a `codex app-server` subprocess — must implement it so
+   * the session manager can shut down cleanly between sessions.
+   *
+   * Idempotent: calling dispose() on an already-disposed provider is a
+   * no-op rather than an error.
+   */
+  dispose?(): Promise<void>;
 }
 
 /**

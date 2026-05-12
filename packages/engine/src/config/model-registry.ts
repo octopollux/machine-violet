@@ -118,7 +118,13 @@ export function getKnownModel(modelId: string, configDir?: string): KnownModelEn
 }
 
 /**
- * Get all known models for a given provider.
+ * Get all known models for a given provider/model family.
+ *
+ * Note the parameter is a *model family* identifier (e.g. `"openai"`,
+ * `"anthropic"`), not a connection-type. The OpenAI model family is
+ * shared by both `openai-apikey` and `openai-chatgpt` connections —
+ * callers that have a connection-type in hand should map through
+ * {@link modelFamilyFor} first.
  */
 export function getModelsForProvider(provider: string, configDir?: string): Record<string, KnownModelEntry> {
   const registry = loadModelRegistry(configDir);
@@ -129,6 +135,22 @@ export function getModelsForProvider(provider: string, configDir?: string): Reco
     }
   }
   return result;
+}
+
+/**
+ * Map a connection-type (the discriminator on `AIConnection.provider`) to
+ * the model-family identifier used in {@link KnownModelEntry.provider}.
+ *
+ * We split the two namespaces because `openai-apikey` and `openai-chatgpt`
+ * connections both reach the same family of GPT-5.x models, but each
+ * connection-type has its own tier-defaults entry in `known-models.json`
+ * (different defaults: ChatGPT auth doesn't expose `gpt-5-nano`).
+ */
+export function modelFamilyFor(connectionProvider: string): string {
+  if (connectionProvider === "openai-apikey" || connectionProvider === "openai-chatgpt") {
+    return "openai";
+  }
+  return connectionProvider;
 }
 
 /**

@@ -94,6 +94,85 @@ export interface ProviderLoopResult {
 }
 
 // ---------------------------------------------------------------------------
+// Per-call dispatch (shared by the bridge's loop and the dispatchTool closure
+// passed to providers that own tool dispatch internally — e.g. openai-chatgpt).
+// ---------------------------------------------------------------------------
+
+interface DispatchedToolCall {
+  /** Content to feed back to the model — either as a tool_result block (bridge loop) or as a Codex DynamicToolCallResponse contentItem. */
+  content: string;
+  isError: boolean;
+}
+
+/**
+ * Run a single tool dispatch. Wraps `config.toolHandler`, surfaces TUI
+ * commands via the `onTui` callback, and applies the deferred-TUI sentinel
+ * to the returned content. Errors are caught and returned as
+ * `{ isError: true }` results so a single throw doesn't abort the caller.
+ *
+ * Why the sentinel: deferred TUI tools (scribe, scene_transition, dm_notes,
+ * promote_character, session_end) execute server-side after the agent
+ * loop returns, so their tool_result is just a queue confirmation. Without
+ * an explicit signal that the prior narrative was already delivered, the
+ * model treats the generic ack ambiguously and frequently re-narrates in
+ * the next round — verbatim or lightly regenerated, but always wasting an
+ * inference call. Append a uniform signal so tool handlers don't each
+ * have to remember to include it. Skipped on errors so failure messages
+ * aren't diluted, and on non-deferred TUI tools where the model often
+ * continues narrating mid-turn legitimately.
+ */
+async function dispatchToolCall(
+  tc: { id: string; name: string; input: Record<string, unknown> },
+  config: ProviderLoopConfig,
+  tuiToolNames: Set<string>,
+  onTui: (cmd: TuiCommand) => void,
+): Promise<DispatchedToolCall> {
+  config.onToolStart?.(tc.name);
+
+  // Strict JSON parse error from the provider — surface as an error result
+  // without ever calling the handler.
+  if (tc.input._parse_error) {
+    const parseResult: ToolResult = {
+      content: String(tc.input._parse_error),
+      is_error: true,
+    };
+    config.onToolEnd?.(tc.name, parseResult);
+    return { content: parseResult.content, isError: true };
+  }
+
+  let toolResult: ToolResult;
+  try {
+    if (config.toolHandler) {
+      toolResult = await config.toolHandler(tc.name, tc.input);
+    } else {
+      toolResult = { content: `No handler for tool: ${tc.name}`, is_error: true };
+    }
+  } catch (e) {
+    toolResult = { content: `Tool error (${tc.name}): ${e instanceof Error ? e.message : String(e)}`, is_error: true };
+  }
+
+  config.onToolEnd?.(tc.name, toolResult);
+
+  let tui: TuiCommand | undefined;
+  if (tuiToolNames.has(tc.name)) {
+    try {
+      tui = (toolResult._tui ?? JSON.parse(toolResult.content)) as TuiCommand;
+    } catch { /* not a TUI command */ }
+  }
+
+  if (tui) onTui(tui);
+
+  const isDeferred = tui !== undefined
+    && DEFERRED_TUI_TYPES.has(tui.type)
+    && !toolResult.is_error;
+  const content = isDeferred
+    ? `${toolResult.content}\n\n(Your prior narrative has been delivered to the player. End your turn unless you have new narrative to add.)`
+    : toolResult.content;
+
+  return { content, isError: toolResult.is_error ?? false };
+}
+
+// ---------------------------------------------------------------------------
 // Main loop
 // ---------------------------------------------------------------------------
 
@@ -168,6 +247,29 @@ export async function runProviderLoop(
       maxTokens: config.maxTokens,
       thinking,
       cacheHints: config.cacheHints,
+      // Tool dispatcher for providers that own tool dispatch internally
+      // (currently openai-chatgpt). Wraps the same per-call logic the
+      // bridge runs after this chat() returns for non-internal-dispatch
+      // providers — so TUI broadcast, deferred-sentinel handling, and
+      // onToolStart/End callbacks fire identically regardless of which
+      // path the provider takes. Other providers (Anthropic, openai-apikey)
+      // ignore this field and surface tool calls back through
+      // ChatResult.toolCalls.
+      dispatchTool: async (call) => {
+        const dispatched = await dispatchToolCall(
+          { id: call.id, name: call.name, input: call.input },
+          config,
+          tuiToolNames,
+          (cmd) => {
+            if (DEFERRED_TUI_TYPES.has(cmd.type)) {
+              tuiCommands.push(cmd);
+            } else {
+              config.onTuiCommand?.(cmd);
+            }
+          },
+        );
+        return { content: dispatched.content, isError: dispatched.isError };
+      },
     };
 
     // Context dump: log params before API call. `thinking` is captured so the
@@ -304,95 +406,43 @@ export async function runProviderLoop(
     // overlap. The model can batch independent calls in one response to save
     // API round-trips.
     //
-    // Each handler is wrapped in try/catch so a single throw doesn't abort
-    // the entire batch. TUI commands are collected per-result and appended
-    // in call-order after Promise.all (not completion-order).
+    // Per-call dispatch is delegated to `dispatchToolCall` (used both here
+    // and by the dispatchTool closure in chatParams above for providers
+    // that handle tool dispatch internally) so the deferred-sentinel
+    // semantics, TUI broadcast, and callback firing happen uniformly.
     const settled = await Promise.all(
-      result.toolCalls.map(async (tc): Promise<{ result: ContentPart; tui?: TuiCommand }> => {
-        config.onToolStart?.(tc.name);
-
-        // Check for parse errors from strict JSON parsing
-        if (tc.input._parse_error) {
-          const parseResult: ToolResult = {
-            content: String(tc.input._parse_error),
-            is_error: true,
-          };
-          config.onToolEnd?.(tc.name, parseResult);
-          return {
-            result: {
-              type: "tool_result",
-              tool_use_id: tc.id,
-              content: parseResult.content,
-              is_error: true,
-            },
-          };
-        }
-
-        let toolResult: ToolResult;
-        try {
-          if (config.toolHandler) {
-            toolResult = await config.toolHandler(tc.name, tc.input);
-          } else {
-            toolResult = { content: `No handler for tool: ${tc.name}`, is_error: true };
-          }
-        } catch (e) {
-          toolResult = { content: `Tool error (${tc.name}): ${e instanceof Error ? e.message : String(e)}`, is_error: true };
-        }
-
-        config.onToolEnd?.(tc.name, toolResult);
-
-        let tui: TuiCommand | undefined;
-        if (tuiToolNames.has(tc.name)) {
-          try {
-            tui = (toolResult._tui ?? JSON.parse(toolResult.content)) as TuiCommand;
-          } catch { /* not a TUI command */ }
-        }
-
-        // Deferred TUI tools (scribe, scene_transition, dm_notes,
-        // promote_character, session_end) execute server-side after the
-        // agent loop returns, so their tool_result is just a queue
-        // confirmation. Without an explicit signal that the prior narrative
-        // was already delivered, the model treats the generic ack
-        // ambiguously and frequently re-narrates in the next round —
-        // verbatim or lightly regenerated, but always wasting an inference
-        // call. Append a uniform signal here so tool handlers don't each
-        // have to remember to include it (and so updating the wording is
-        // a one-line change). Skipped on errors so failure messages aren't
-        // diluted, and on non-deferred TUI tools (update_modeline,
-        // set_resource_values, etc.) where the model often continues
-        // narrating mid-turn legitimately.
-        const isDeferred = tui !== undefined
-          && DEFERRED_TUI_TYPES.has(tui.type)
-          && !toolResult.is_error;
-        const content = isDeferred
-          ? `${toolResult.content}\n\n(Your prior narrative has been delivered to the player. End your turn unless you have new narrative to add.)`
-          : toolResult.content;
-
+      result.toolCalls.map(async (tc) => {
+        const tuiSink: TuiCommand[] = [];
+        const dispatched = await dispatchToolCall(
+          tc,
+          config,
+          tuiToolNames,
+          (cmd) => {
+            if (DEFERRED_TUI_TYPES.has(cmd.type)) {
+              tuiCommands.push(cmd);
+            } else {
+              tuiSink.push(cmd);
+            }
+          },
+        );
         return {
           result: {
-            type: "tool_result",
+            type: "tool_result" as const,
             tool_use_id: tc.id,
-            content,
-            is_error: toolResult.is_error,
+            content: dispatched.content,
+            is_error: dispatched.isError,
           },
-          tui,
+          tuiToBroadcast: tuiSink,
         };
       }),
     );
 
-    // Collect results and TUI commands in call-order (not completion-order).
-    // Non-deferred (visual) commands are broadcast immediately so the client
-    // sees updates as tools fire; deferred commands are collected for
-    // post-loop engine processing.
+    // Broadcast non-deferred TUI commands in call-order.
     const toolResults: ContentPart[] = [];
     for (const s of settled) {
       toolResults.push(s.result);
-      if (s.tui) {
-        if (DEFERRED_TUI_TYPES.has(s.tui.type)) {
-          tuiCommands.push(s.tui);
-        } else {
-          config.onTuiCommand?.(s.tui);
-        }
+      for (const cmd of s.tuiToBroadcast) {
+        config.onTuiCommand?.(cmd);
       }
     }
 

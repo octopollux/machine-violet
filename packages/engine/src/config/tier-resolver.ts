@@ -35,10 +35,35 @@ import { getModel } from "./models.js";
  * @param fallbackProvider  Thunk that returns the fallback provider — typically `createAnthropicProvider()`.
  *                          Called at most once across all three tier resolutions.
  */
+export interface TierProviderResolution {
+  tiers: Record<ModelTier, TierProvider>;
+  /**
+   * Map of connectionId → provider instance for every connection that
+   * actually backs an assigned tier. Used by callers (e.g. session-manager)
+   * that need to find a provider by connection id for non-tier operations
+   * like usage queries. The fallback provider is intentionally absent —
+   * it isn't associated with a connection.
+   */
+  byConnectionId: Map<string, LLMProvider>;
+}
+
 export function buildTierProviders(
   connStore: ConnectionStore,
   fallbackProvider: () => LLMProvider,
 ): Record<ModelTier, TierProvider> {
+  return buildTierProvidersWithCache(connStore, fallbackProvider).tiers;
+}
+
+/**
+ * Variant of {@link buildTierProviders} that also returns the
+ * connectionId → provider cache. Callers that need the raw map (for
+ * dispose / usage lookups) use this; older callers keep the cleaner
+ * legacy return shape.
+ */
+export function buildTierProvidersWithCache(
+  connStore: ConnectionStore,
+  fallbackProvider: () => LLMProvider,
+): TierProviderResolution {
   const providerCache = new Map<string, LLMProvider>();
   const getProviderForConnId = (connId: string): LLMProvider => {
     let p = providerCache.get(connId);
@@ -66,8 +91,11 @@ export function buildTierProviders(
   };
 
   return {
-    large: resolveTier("large"),
-    medium: resolveTier("medium"),
-    small: resolveTier("small"),
+    tiers: {
+      large: resolveTier("large"),
+      medium: resolveTier("medium"),
+      small: resolveTier("small"),
+    },
+    byConnectionId: providerCache,
   };
 }

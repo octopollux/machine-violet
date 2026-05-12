@@ -27,6 +27,7 @@ Ink (React for CLI) + Anthropic Claude SDK + TypeScript.
 | Understand error recovery and git | [error-recovery.md](error-recovery.md) |
 | Look up REST API contracts (auto-generated) | `/docs` endpoint (Scalar UI) or `/docs/json` (OpenAPI spec) |
 | Look up WebSocket event contracts | [websocket-api.md](websocket-api.md) |
+| Understand the openai-chatgpt provider (Codex app-server) | [openai-chatgpt-provider.md](openai-chatgpt-provider.md) |
 | Update documentation after a code change | [maintenance.md](maintenance.md) |
 
 ## Document Layers
