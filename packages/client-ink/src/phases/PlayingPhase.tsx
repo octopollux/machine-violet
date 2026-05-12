@@ -100,10 +100,15 @@ export function PlayingPhase() {
   // Whether TextInput should be disabled.
   // Never block on engine state — the server rejects input if inappropriate.
   // This prevents the client from getting permanently wedged.
+  // Note: gated on `retryOverlay`, not `apiErrorModalActive`. Dismissing the
+  // modal unblocks the keyboard-event path (so Esc can open the pause menu),
+  // but the engine is still retrying and the server has no open turn to
+  // contribute to — letting the input accept text would produce a flash of
+  // optimistic narrative that gets yanked out when the contribute rejects.
   const textInputDisabled =
     !!activeChoices ||
     !!activeModal ||
-    apiErrorModalActive ||
+    !!retryOverlay ||
     menuOpen;
 
   // Resolve player info from state snapshot

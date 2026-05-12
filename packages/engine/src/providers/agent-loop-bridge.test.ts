@@ -210,11 +210,14 @@ describe("runProviderLoop retry", () => {
       // Note: no maxRetries — use the default.
     });
 
-    // Backoff sequence is 1, 2, 4, 8, 12, 12, 12, 12, 12, 12 (capped at 12s).
-    // Advance through all of them so each retry actually fires.
-    const delays = [1, 2, 4, 8, 12, 12, 12, 12, 12, 12];
-    for (const d of delays) {
-      await vi.advanceTimersByTimeAsync(d * 1000);
+    // Step through one pending timer at a time rather than baking in the
+    // current backoff schedule (1,2,4,8,12,…) — that decouples the test from
+    // the exact `retryDelay()` curve so future tuning of the backoff doesn't
+    // break this test even though the "no default cap" behavior is unchanged.
+    // Bounded loop in case the implementation regresses and stops scheduling.
+    for (let i = 0; i < FAILURES_BEFORE_RECOVERY * 2; i++) {
+      if (callCount > FAILURES_BEFORE_RECOVERY) break;
+      await vi.advanceTimersToNextTimerAsync();
     }
     const result = await promise;
 
