@@ -201,6 +201,30 @@ for (const { src, dest, filter } of assets) {
   }
 }
 
+// --- Step 3.5: Vendor the `@openai/codex` runtime ---
+//
+// The openai-chatgpt provider drives `codex app-server` as a subprocess.
+// The codex CLI is a tiny Node wrapper (bin/codex.js) plus a platform-
+// specific Rust binary published as separate optional dependencies
+// (@openai/codex-{platform}-{arch}). Neither survives the esbuild bundle
+// nor the SEA injection: the Rust binary is opaque and the wrapper does
+// runtime `require.resolve` against node_modules that won't exist next to
+// the SEA. So we copy both into `dist/codex/` and have `binary.ts` look
+// there first (see its colocated-path resolution).
+//
+// Layout matches what codex.js expects when its `require.resolve` of the
+// optional-dep package fails (bin/codex.js:92):
+//   dist/codex/bin/codex.js
+//   dist/codex/package.json
+//   dist/codex/vendor/{triple}/codex/codex[.exe]
+//   dist/codex/vendor/{triple}/path/rg[.exe]
+//
+// Each build runs on its own platform's runner (windows-latest,
+// macos-latest, ubuntu-latest), so `npm ci` only installs the matching
+// platform package — we copy whatever's present rather than enumerate.
+console.log("  Vendoring codex runtime...");
+vendorCodex(ROOT, DIST);
+
 // Copy license
 const licensePath = join(ROOT, "LICENSE");
 if (existsSync(licensePath)) {
@@ -217,6 +241,80 @@ console.log(`  Version: ${version}`);
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Copy the platform-matching `@openai/codex` runtime into `dist/codex/`.
+ *
+ * The codex.js wrapper resolves its native binary in two ways:
+ *   (a) `require.resolve("@openai/codex-{platform}-{arch}/package.json")` —
+ *       works only when the optional-dep package sits in node_modules
+ *       next to the wrapper. Inside our SEA build, no such node_modules
+ *       exists, so this branch always fails at runtime.
+ *   (b) Falls back to `path.join(__dirname, "..", "vendor", triple,
+ *       "codex", "codex[.exe]")` — works if we colocate the vendor tree
+ *       with the wrapper. This is the path we feed.
+ *
+ * Per-platform mapping mirrors `bin/codex.js` PLATFORM_PACKAGE_BY_TARGET.
+ * Throws when run on an unsupported platform/arch combination (no point
+ * cutting a Machine Violet build that can't run codex).
+ */
+function vendorCodex(rootDir, distDir) {
+  const { platform, arch } = process;
+  const map = {
+    "win32:x64":   { pkg: "@openai/codex-win32-x64",   triple: "x86_64-pc-windows-msvc" },
+    "win32:arm64": { pkg: "@openai/codex-win32-arm64", triple: "aarch64-pc-windows-msvc" },
+    "darwin:x64":  { pkg: "@openai/codex-darwin-x64",  triple: "x86_64-apple-darwin" },
+    "darwin:arm64":{ pkg: "@openai/codex-darwin-arm64",triple: "aarch64-apple-darwin" },
+    "linux:x64":   { pkg: "@openai/codex-linux-x64",   triple: "x86_64-unknown-linux-musl" },
+    "linux:arm64": { pkg: "@openai/codex-linux-arm64", triple: "aarch64-unknown-linux-musl" },
+  };
+  const key = `${platform}:${arch}`;
+  const entry = map[key];
+  if (!entry) {
+    throw new Error(`vendorCodex: unsupported platform ${key}`);
+  }
+
+  const wrapperRoot = join(rootDir, "node_modules", "@openai", "codex");
+  const platformRoot = join(rootDir, "node_modules", "@openai", entry.pkg.split("/")[1]);
+
+  if (!existsSync(wrapperRoot)) {
+    throw new Error(`vendorCodex: @openai/codex not installed at ${wrapperRoot}`);
+  }
+  if (!existsSync(platformRoot)) {
+    throw new Error(
+      `vendorCodex: ${entry.pkg} not installed at ${platformRoot}. ` +
+      `Optional deps may have been skipped — re-run \`npm install\` without --no-optional.`,
+    );
+  }
+
+  const destRoot = join(distDir, "codex");
+  // Copy wrapper bin + package.json. We don't need anything else under it.
+  mkdirSync(join(destRoot, "bin"), { recursive: true });
+  cpSync(join(wrapperRoot, "bin"), join(destRoot, "bin"), { recursive: true });
+  cpSync(join(wrapperRoot, "package.json"), join(destRoot, "package.json"));
+
+  // Copy the platform vendor tree. The triple subdir contains codex/ and
+  // path/ (ripgrep), both of which the Rust binary expects to find as
+  // siblings — strip nothing, copy the lot.
+  const srcVendor = join(platformRoot, "vendor", entry.triple);
+  const destVendor = join(destRoot, "vendor", entry.triple);
+  cpSync(srcVendor, destVendor, { recursive: true });
+
+  // Log a size summary so build output makes the ~250MB Rust binary visible.
+  const bytes = dirSizeBytes(destRoot);
+  console.log(`    codex/ vendored: ${(bytes / 1024 / 1024).toFixed(1)} MB (${entry.triple})`);
+}
+
+/** Recursive byte-count for a directory tree. */
+function dirSizeBytes(dir) {
+  let total = 0;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, entry.name);
+    if (entry.isDirectory()) total += dirSizeBytes(p);
+    else total += statSync(p).size;
+  }
+  return total;
+}
 
 /** Find signtool.exe in the Windows SDK. Returns path or null. */
 function findSigntool() {

@@ -18,13 +18,14 @@ describe("resolveCodexBinary", () => {
 
   it("returns the bundled @openai/codex bin via Node when available", () => {
     // The bundled package is a workspace dependency installed at the repo
-    // root. resolveCodexBinary should pick up bin/codex.js and return a
-    // {path: process.execPath, prefixArgs: [<jsEntry>], source: 'bundled'}
-    // resolution. If the dep is missing for some reason (e.g. lockfile
-    // change), the fallback is path-resolution which we don't want to
-    // exercise in this test.
+    // root. In dev/test, `process.execPath` is the user's Node binary
+    // (e.g. /usr/bin/node) which has no `codex/bin/codex.js` colocated,
+    // so the colocated probe naturally misses and we fall through to the
+    // createRequire path which resolves `@openai/codex` from node_modules.
+    // Production SEA builds hit the colocated branch instead — the
+    // build-dist.js script vendors `codex/` next to the executable.
     const r = resolveCodexBinary();
-    expect(r.source).toBe("bundled");
+    expect(["bundled", "colocated"]).toContain(r.source);
     expect(r.path).toBe(process.execPath);
     expect(r.prefixArgs).toHaveLength(1);
     expect(r.prefixArgs[0]).toMatch(/codex.*\.js$/);
