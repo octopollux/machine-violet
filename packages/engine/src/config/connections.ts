@@ -26,9 +26,16 @@ export interface DiscoveredModel {
 }
 
 /**
- * Identity metadata for an OpenAI/ChatGPT-account connection. Tokens are
- * managed by Codex itself (`~/.codex/auth.json`); we only persist what's
- * needed to display the connection in the UI and route turns.
+ * Identity metadata + persisted OAuth tokens for an OpenAI/ChatGPT-account
+ * connection. We own the OAuth flow ourselves (codex's built-in flow
+ * requires an allowlisted originator for its connectors scopes), so we
+ * also own token storage. The access_token is pushed into codex at every
+ * session start; the refresh_token is used to mint a new access_token
+ * when the current one expires (codex sends us a refresh request when
+ * it gets a 401).
+ *
+ * Tokens are persisted here in plaintext — same trust boundary as
+ * `apiKey` for the API-key providers. The local machine is trusted.
  */
 export interface ChatGptAccountInfo {
   /** ChatGPT account ID from the OAuth id_token claim. */
@@ -37,6 +44,14 @@ export interface ChatGptAccountInfo {
   email?: string;
   /** Plan tier: plus, pro, business, enterprise, etc. */
   planType?: string;
+  /** Current access token (JWT). Pushed to codex on session start. */
+  accessToken?: string;
+  /** Refresh token. Used to mint a new accessToken when the current expires. */
+  refreshToken?: string;
+  /** id_token from the last token response (kept for debugging / claim re-parse). */
+  idToken?: string;
+  /** Epoch ms when `accessToken` expires. Used to decide whether to refresh. */
+  expiresAtMs?: number;
 }
 
 export interface AIConnection {

@@ -18,9 +18,10 @@ import type { ConnectionStore, TierAssignment, ProviderType, AIConnection } from
 import { createProviderFromConnection } from "../../providers/index.js";
 import { loadModelRegistry, getModelsForProvider, modelFamilyFor } from "../../config/model-registry.js";
 import {
-  CodexRpcClient, startChatGptLogin, awaitLoginCompletion, cancelLogin, getAccount,
-  listModels,
+  CodexRpcClient, startChatGptThirdPartyOAuth, pushChatGptAuthTokens, getAccount,
+  listModels, getCodexClientInfo,
 } from "../../providers/openai-chatgpt/index.js";
+import type { OAuthFlow } from "../../providers/openai-chatgpt/index.js";
 import {
   archiveCampaign, deleteCampaign, listArchivedCampaigns,
   unarchiveCampaign, getCampaignDeleteInfo,
@@ -171,14 +172,19 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   // openai-chatgpt OAuth login flow
   // -----------------------------------------------------------------------
   //
-  // The Codex app-server hosts the OAuth loopback callback itself (on
-  // localhost:1455). We spawn a per-login codex subprocess just long
-  // enough to drive the flow, then dispose it once the login completes
-  // or fails. On success, a new AIConnection of type "openai-chatgpt" is
-  // persisted and returned to the client via the status poll.
+  // We drive the OAuth flow ourselves (PKCE + loopback on localhost:1455
+  // + minimal `openid profile email offline_access` scopes), then push
+  // the resulting access_token into codex via `account/login/start
+  // type:"chatgptAuthTokens"`. Codex's built-in chatgpt flow hardcodes
+  // `api.connectors.*` scopes that gate behind an allowlisted originator —
+  // this side-steps that. Same pattern as Cline, OpenClaw, and others.
+  //
+  // On success a new AIConnection of type "openai-chatgpt" is persisted,
+  // including the refresh_token (we own refresh, codex calls back to us
+  // via `account/chatgptAuthTokens/refresh` when its access_token 401s).
 
   interface PendingLogin {
-    client: CodexRpcClient;
+    flow: OAuthFlow;
     status: "pending" | "success" | "error" | "cancelled";
     error?: string;
     email?: string;
@@ -193,7 +199,6 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     const cutoff = Date.now() - 10 * 60_000;
     for (const [id, login] of pendingLogins) {
       if (login.createdAt < cutoff && login.status !== "pending") {
-        void login.client.stop().catch(() => { /* ignore */ });
         pendingLogins.delete(id);
       }
     }
@@ -207,96 +212,97 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   }, async (_request, reply) => {
     reapStaleLogins();
 
-    const client = new CodexRpcClient({ sessionId: `oauth-${randomBytes(4).toString("hex")}` });
+    const clientInfo = getCodexClientInfo();
+    server.log.info({ originator: clientInfo.name }, "openai-chatgpt login start");
+
+    let flow: OAuthFlow;
     try {
-      await client.start();
-      await client.call("initialize", {
-        clientInfo: { name: "machine_violet", title: "Machine Violet", version: "1.0.1" },
-        capabilities: { experimentalApi: true },
-      });
-      client.notify("initialized", {});
-
-      const startResult = await startChatGptLogin(client);
-
-      const entry: PendingLogin = {
-        client,
-        status: "pending",
-        createdAt: Date.now(),
-      };
-      pendingLogins.set(startResult.loginId, entry);
-
-      // Wire completion handler — fires once Codex finishes the OAuth flow
-      // (success or failure). On success, also save the connection record.
-      void awaitLoginCompletion(client, startResult.loginId)
-        .then(async (completed) => {
-          if (entry.status !== "pending") return; // cancelled
-          if (!completed.success) {
-            entry.status = "error";
-            entry.error = completed.error ?? "login failed";
-            await client.stop().catch(() => { /* ignore */ });
-            return;
-          }
-          // Pull the resolved account details and persist the connection.
-          try {
-            const acct = await getAccount(client);
-            entry.email = acct.account?.email;
-            entry.planType = acct.account?.planType;
-
-            // Discover models so the new connection has gpt-5.5 etc. populated
-            // up front (avoids an empty tier-picker on first open).
-            let discovered: { id: string; displayName: string; available: boolean }[] = [];
-            try {
-              discovered = (await listModels(client)).map((m) => ({
-                id: m.id, displayName: m.displayName, available: m.available,
-              }));
-            } catch { /* best effort */ }
-
-            const connId = randomBytes(8).toString("hex");
-            const newConn: AIConnection = {
-              id: connId,
-              provider: "openai-chatgpt",
-              label: acct.account?.email
-                ? `ChatGPT (${acct.account.email})`
-                : "ChatGPT",
-              apiKey: "", // Codex owns tokens; no key to store
-              chatgptAccount: acct.account
-                ? {
-                    id: acct.account.email ?? connId, // best fallback when codex omits a numeric id
-                    email: acct.account.email,
-                    planType: acct.account.planType,
-                  }
-                : undefined,
-              models: discovered,
-              source: "oauth",
-              addedAt: new Date().toISOString(),
-            };
-            const stored = loadConnectionStore(server.configDir);
-            stored.connections.push(newConn);
-            saveConnectionStore(server.configDir, stored);
-            entry.connectionId = connId;
-            entry.status = "success";
-          } catch (err) {
-            entry.status = "error";
-            entry.error = err instanceof Error ? err.message : String(err);
-          } finally {
-            // Either way, the login-only codex is no longer needed; the
-            // user's game-session work will spawn a fresh one.
-            await client.stop().catch(() => { /* ignore */ });
-          }
-        })
-        .catch((err) => {
-          entry.status = "error";
-          entry.error = err instanceof Error ? err.message : String(err);
-          void client.stop().catch(() => { /* ignore */ });
-        });
-
-      return { loginId: startResult.loginId, authUrl: startResult.authUrl };
+      flow = startChatGptThirdPartyOAuth({ originator: clientInfo.name });
     } catch (err) {
-      await client.stop().catch(() => { /* ignore */ });
       return reply.status(500).send({
         error: err instanceof Error ? err.message : String(err),
       });
     }
+
+    const entry: PendingLogin = {
+      flow,
+      status: "pending",
+      createdAt: Date.now(),
+    };
+    pendingLogins.set(flow.loginId, entry);
+
+    void flow.result.then(async (tokens) => {
+      if (entry.status !== "pending") return; // cancelled
+      if (!tokens.chatgptAccountId) {
+        entry.status = "error";
+        entry.error = "OAuth response missing chatgpt_account_id claim";
+        return;
+      }
+      // Push the tokens into a short-lived codex subprocess so codex can
+      // discover available models for us. We dispose it immediately
+      // after; the user's game session spawns a fresh one that will read
+      // the persisted tokens from the connection record.
+      const codex = new CodexRpcClient({ sessionId: `oauth-${randomBytes(4).toString("hex")}` });
+      try {
+        await codex.start();
+        await codex.call("initialize", {
+          clientInfo,
+          capabilities: { experimentalApi: true },
+        });
+        codex.notify("initialized", {});
+        await pushChatGptAuthTokens(codex, tokens);
+
+        // Confirm account is logged in + pull display metadata.
+        const acct = await getAccount(codex);
+        entry.email = acct.account?.email ?? tokens.email;
+        entry.planType = acct.account?.planType ?? tokens.chatgptPlanType ?? undefined;
+
+        // Discover available models up front so the tier-picker isn't empty
+        // on first open.
+        let discovered: { id: string; displayName: string; available: boolean }[] = [];
+        try {
+          discovered = (await listModels(codex)).map((m) => ({
+            id: m.id, displayName: m.displayName, available: m.available,
+          }));
+        } catch { /* best effort */ }
+
+        const connId = randomBytes(8).toString("hex");
+        const newConn: AIConnection = {
+          id: connId,
+          provider: "openai-chatgpt",
+          label: entry.email ? `ChatGPT (${entry.email})` : "ChatGPT",
+          apiKey: "",
+          chatgptAccount: {
+            id: tokens.chatgptAccountId,
+            email: entry.email,
+            planType: entry.planType,
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
+            idToken: tokens.idToken,
+            expiresAtMs: tokens.expiresAtMs,
+          },
+          models: discovered,
+          source: "oauth",
+          addedAt: new Date().toISOString(),
+        };
+        const stored = loadConnectionStore(server.configDir);
+        stored.connections.push(newConn);
+        saveConnectionStore(server.configDir, stored);
+        entry.connectionId = connId;
+        entry.status = "success";
+      } catch (err) {
+        entry.status = "error";
+        entry.error = err instanceof Error ? err.message : String(err);
+      } finally {
+        await codex.stop().catch(() => { /* ignore */ });
+      }
+    }).catch((err: unknown) => {
+      if (entry.status === "cancelled") return;
+      entry.status = "error";
+      entry.error = err instanceof Error ? err.message : String(err);
+    });
+
+    return { loginId: flow.loginId, authUrl: flow.authUrl };
   });
 
   server.get("/connections/openai-chatgpt/login/:loginId", {
@@ -334,8 +340,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     }
     if (entry.status === "pending") {
       entry.status = "cancelled";
-      await cancelLogin(entry.client, loginId).catch(() => { /* ignore */ });
-      await entry.client.stop().catch(() => { /* ignore */ });
+      entry.flow.cancel();
     }
     return { ok: true };
   });

@@ -35,9 +35,13 @@ import type {
 } from "../types.js";
 import type { UsageStatus } from "@machine-violet/shared";
 import { CodexRpcClient } from "./rpc.js";
-import { getAccount, isChatGptAccount } from "./auth.js";
+import { getAccount, isChatGptAccount, pushChatGptAuthTokens } from "./auth.js";
 import { toUsageStatus, shouldWarn } from "./usage.js";
 import { log } from "./log.js";
+import { getCodexClientInfo } from "./client-info.js";
+import { refreshAccessToken } from "./oauth.js";
+import { tokensFromOAuth } from "./token-store.js";
+import type { ChatGptTokenStore, PersistedChatGptTokens } from "./token-store.js";
 import type {
   InitializeResult, ThreadStartParams, ThreadStartResult,
   TurnStartParams, TurnCompletedNotification,
@@ -46,6 +50,7 @@ import type {
   RateLimitsUpdatedNotification, RateLimits,
   DynamicToolCallParams, DynamicToolCallResponse,
   DynamicToolSpec, ReasoningEffort,
+  ChatgptAuthTokensRefreshParams, ChatgptAuthTokensRefreshResponse,
 } from "./protocol.js";
 
 // ---------------------------------------------------------------------------
@@ -57,6 +62,18 @@ export interface OpenAIChatGptProviderOptions {
   sessionId?: string;
   /** Working directory passed to thread/start. Cosmetic for our use case. */
   cwd?: string;
+  /**
+   * Token store backing the chatgptAuthTokens flow. When provided, the
+   * provider pushes tokens to codex at startup (refreshing first if
+   * expired) and handles codex's `account/chatgptAuthTokens/refresh`
+   * server requests by minting new tokens with the stored refresh_token.
+   *
+   * When absent, the provider falls back to whatever codex has cached in
+   * `~/.codex/auth.json` — useful for the env-key codex_cli flow and for
+   * tests. Sessions that exceed the access-token lifetime will fail
+   * without a token store.
+   */
+  tokenStore?: ChatGptTokenStore;
 }
 
 export function createOpenAIChatGptProvider(opts: OpenAIChatGptProviderOptions = {}): OpenAIChatGptProvider {
@@ -67,6 +84,16 @@ export function createOpenAIChatGptProvider(opts: OpenAIChatGptProviderOptions =
 // Implementation
 // ---------------------------------------------------------------------------
 
+/**
+ * Per-thread tool-call dispatcher registered by an in-flight `runTurn`.
+ * The provider keeps a map keyed by `threadId` so concurrent `chat()`
+ * calls (e.g. DM + theme-styler) each receive only their own
+ * `item/tool/call` server requests. See {@link OpenAIChatGptProvider}
+ * comments around the global `item/tool/call` registration for why we
+ * route at the provider level rather than per-call.
+ */
+type ThreadToolDispatcher = (call: NormalizedToolCall) => Promise<DynamicToolCallResponse>;
+
 export class OpenAIChatGptProvider implements LLMProvider {
   readonly providerId = "openai-chatgpt";
 
@@ -76,10 +103,22 @@ export class OpenAIChatGptProvider implements LLMProvider {
   private rateLimitListeners = new Set<(s: UsageStatus) => void>();
   private readonly sessionId?: string;
   private readonly cwd: string;
+  private readonly tokenStore?: ChatGptTokenStore;
+  /**
+   * Active per-thread tool dispatchers. Populated by `runTurn` at
+   * subscribe time, cleared in its `finally`. The single
+   * `item/tool/call` handler installed in `ensureStarted` looks up by
+   * `threadId` from the incoming params so concurrent turns can't
+   * cross-contaminate. `CodexRpcClient.onServerRequest` only supports
+   * one handler per method (last write wins), so we must do the routing
+   * ourselves.
+   */
+  private readonly toolDispatchers = new Map<string, ThreadToolDispatcher>();
 
   constructor(opts: OpenAIChatGptProviderOptions) {
     this.sessionId = opts.sessionId;
     this.cwd = opts.cwd ?? process.cwd();
+    this.tokenStore = opts.tokenStore;
   }
 
   // -----------------------------------------------------------------------
@@ -142,11 +181,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
       await client.start();
 
       const init = await client.call<InitializeResult>("initialize", {
-        clientInfo: {
-          name: "machine_violet",
-          title: "Machine Violet",
-          version: "1.0.1",
-        },
+        clientInfo: getCodexClientInfo(),
         capabilities: { experimentalApi: true },
       });
       log.spawn({
@@ -162,6 +197,54 @@ export class OpenAIChatGptProvider implements LLMProvider {
         (params) => this.onRateLimitsUpdated(params.rateLimits),
       );
 
+      // Register handler for codex's refresh server requests. Codex sends
+      // this when the access_token returns 401 from the backend. We
+      // exchange our stored refresh_token for a fresh access_token,
+      // persist the new bundle, and reply with the new tokens.
+      client.onServerRequest<ChatgptAuthTokensRefreshParams, ChatgptAuthTokensRefreshResponse>(
+        "account/chatgptAuthTokens/refresh",
+        async (params) => this.handleRefreshRequest(params),
+      );
+
+      // Single global handler for `item/tool/call`. Routes to the active
+      // per-thread dispatcher in `toolDispatchers`. Registering once at
+      // the provider level (rather than once per `runTurn`) is required
+      // because `onServerRequest` is single-handler-per-method: a second
+      // `runTurn` registration would silently overwrite the first, and
+      // the first turn's tool calls would land in the wrong dispatcher.
+      // If no dispatcher is registered for a `threadId` (turn already
+      // finished, race condition, or codex bug), reply with an error
+      // result rather than throwing — the latter would deadlock the
+      // turn waiting for a tool reply that never comes.
+      client.onServerRequest<DynamicToolCallParams, DynamicToolCallResponse>(
+        "item/tool/call",
+        async (callParams) => {
+          const dispatcher = this.toolDispatchers.get(callParams.threadId);
+          if (!dispatcher) {
+            return {
+              success: false,
+              contentItems: [{
+                type: "inputText",
+                text: `no active tool dispatcher for thread ${callParams.threadId}`,
+              }],
+            };
+          }
+          return dispatcher({
+            id: callParams.callId,
+            name: callParams.tool,
+            input: callParams.arguments,
+          });
+        },
+      );
+
+      // If we have stored tokens, hand them to codex now (refreshing first
+      // when they're already expired or about to be). Without this codex
+      // would either fall back to whatever's in ~/.codex/auth.json or hit
+      // an unauthenticated state.
+      if (this.tokenStore) {
+        await this.pushInitialTokens(client);
+      }
+
       this.rpc = client;
       return client;
     })();
@@ -175,6 +258,76 @@ export class OpenAIChatGptProvider implements LLMProvider {
       this.rpc = null;
       throw err;
     }
+  }
+
+  /**
+   * Refresh-if-needed, then push the stored tokens into codex via
+   * `account/login/start type:"chatgptAuthTokens"`. Called from
+   * ensureStarted when a token store is configured.
+   */
+  private async pushInitialTokens(client: CodexRpcClient): Promise<void> {
+    const store = this.tokenStore;
+    if (!store) return;
+    let tokens = store.load();
+    if (!tokens) {
+      // No stored tokens — likely an old connection record from before the
+      // chatgptAuthTokens flow existed. Let codex fall back to auth.json
+      // (or fail at the first call) rather than blocking startup.
+      return;
+    }
+    // 60 seconds of slack so we don't hand codex a token that expires
+    // mid-turn. Codex's refresh request handles longer-running drift.
+    if (tokens.expiresAtMs <= Date.now() + 60_000) {
+      tokens = await this.refreshAndStore(tokens.refreshToken);
+      if (!tokens) {
+        throw new Error("ChatGPT token refresh failed and no valid token available; please sign in again.");
+      }
+    }
+    await pushChatGptAuthTokens(client, {
+      accessToken: tokens.accessToken,
+      chatgptAccountId: tokens.chatgptAccountId,
+      chatgptPlanType: tokens.chatgptPlanType,
+    });
+  }
+
+  /**
+   * Handle codex's `account/chatgptAuthTokens/refresh` server request:
+   * use the stored refresh_token to mint a new access_token, persist it,
+   * and return the new bundle to codex.
+   */
+  private async handleRefreshRequest(
+    _params: ChatgptAuthTokensRefreshParams,
+  ): Promise<ChatgptAuthTokensRefreshResponse> {
+    const store = this.tokenStore;
+    if (!store) {
+      throw new Error("Cannot refresh ChatGPT tokens: no token store configured");
+    }
+    const current = store.load();
+    if (!current) {
+      throw new Error("Cannot refresh ChatGPT tokens: no stored tokens");
+    }
+    log.tokenRefresh({ reason: _params.reason, previousAccountId: _params.previousAccountId ?? undefined });
+    const fresh = await this.refreshAndStore(current.refreshToken);
+    if (!fresh) {
+      throw new Error("ChatGPT refresh_token rejected by OpenAI; please sign in again.");
+    }
+    return {
+      accessToken: fresh.accessToken,
+      chatgptAccountId: fresh.chatgptAccountId,
+      chatgptPlanType: fresh.chatgptPlanType ?? null,
+    };
+  }
+
+  /** Exchange a refresh_token for a fresh bundle and persist via tokenStore. */
+  private async refreshAndStore(refreshToken: string): Promise<PersistedChatGptTokens | null> {
+    const store = this.tokenStore;
+    if (!store) return null;
+    const oauth = await refreshAccessToken(refreshToken);
+    const existing = store.load();
+    const fresh = tokensFromOAuth(oauth, existing?.chatgptAccountId);
+    if (!fresh) return null;
+    store.save(fresh);
+    return fresh;
   }
 
   private onRateLimitsUpdated(limits: RateLimits): void {
@@ -262,69 +415,76 @@ export class OpenAIChatGptProvider implements LLMProvider {
     }
 
     // Subscribe to per-turn notifications BEFORE issuing turn/start.
+    //
+    // CRITICAL: every handler must filter by `threadId`. The codex
+    // subprocess is shared across all concurrent `chat()` calls on this
+    // provider — e.g. DM (gpt-5.5) and theme-styler (gpt-5.4-mini) run
+    // simultaneously during a normal turn. The RPC client broadcasts each
+    // notification to every subscriber, so without this guard each
+    // TurnCollector would harvest deltas, tool calls, and completion
+    // events from the *other* turn, producing duplicated/spliced
+    // assistant output and resolving `completion` on the wrong turn.
     const collected = new TurnCollector(onDelta);
+    const forThisThread = (p: { threadId: string }): boolean => p.threadId === threadId;
     const unsubAgentDelta = client.onNotification<AgentMessageDeltaNotification>(
       "item/agentMessage/delta",
-      (p) => collected.onAgentMessageDelta(p),
+      (p) => { if (forThisThread(p)) collected.onAgentMessageDelta(p); },
     );
     const unsubItemStarted = client.onNotification<ItemStartedNotification>(
       "item/started",
-      (p) => collected.onItemStarted(p),
+      (p) => { if (forThisThread(p)) collected.onItemStarted(p); },
     );
     const unsubItemCompleted = client.onNotification<ItemCompletedNotification>(
       "item/completed",
-      (p) => collected.onItemCompleted(p),
+      (p) => { if (forThisThread(p)) collected.onItemCompleted(p); },
     );
     const unsubReasoning = client.onNotification<AgentMessageDeltaNotification>(
       "item/reasoning/textDelta",
-      (p) => collected.onReasoningDelta(p),
+      (p) => { if (forThisThread(p)) collected.onReasoningDelta(p); },
     );
     const unsubReasoningSummary = client.onNotification<AgentMessageDeltaNotification>(
       "item/reasoning/summaryTextDelta",
-      (p) => collected.onReasoningDelta(p),
+      (p) => { if (forThisThread(p)) collected.onReasoningDelta(p); },
     );
     const unsubTokenUsage = client.onNotification<TokenUsageUpdatedNotification>(
       "thread/tokenUsage/updated",
-      (p) => collected.onTokenUsage(p),
+      (p) => { if (forThisThread(p)) collected.onTokenUsage(p); },
     );
 
-    // Tool dispatch: handle item/tool/call server requests by invoking
-    // the caller's dispatchTool. Replies must use the strict Codex shape:
+    // Tool dispatch: install a per-thread dispatcher into the provider's
+    // routing map. The global `item/tool/call` handler registered in
+    // `ensureStarted` looks us up by `threadId` and forwards. Replies
+    // must use the strict Codex shape:
     //   { success: boolean, contentItems: [{type:"inputText", text}] }
-    const unsubToolCall = client.onServerRequest<DynamicToolCallParams, DynamicToolCallResponse>(
-      "item/tool/call",
-      async (callParams) => {
-        const call: NormalizedToolCall = {
-          id: callParams.callId,
-          name: callParams.tool,
-          input: callParams.arguments,
+    const dispatchForThread: ThreadToolDispatcher = async (call) => {
+      collected.onToolCall(call);
+      const dispatcher = params.dispatchTool;
+      if (!dispatcher) {
+        // Should be unreachable — we guarded above when tools is set.
+        return {
+          success: false,
+          contentItems: [{ type: "inputText", text: "no dispatchTool configured" }],
         };
-        collected.onToolCall(call);
-        const dispatcher = params.dispatchTool;
-        if (!dispatcher) {
-          // Should be unreachable — we guarded above when tools is set.
-          return {
-            success: false,
-            contentItems: [{ type: "inputText", text: "no dispatchTool configured" }],
-          };
-        }
-        try {
-          const result = await dispatcher(call);
-          return {
-            success: !result.isError,
-            contentItems: [{ type: "inputText", text: result.content }],
-          };
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          return {
-            success: false,
-            contentItems: [{ type: "inputText", text: `tool dispatch failed: ${msg}` }],
-          };
-        }
-      },
-    );
+      }
+      try {
+        const result = await dispatcher(call);
+        return {
+          success: !result.isError,
+          contentItems: [{ type: "inputText", text: result.content }],
+        };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return {
+          success: false,
+          contentItems: [{ type: "inputText", text: `tool dispatch failed: ${msg}` }],
+        };
+      }
+    };
+    this.toolDispatchers.set(threadId, dispatchForThread);
+    const unsubToolCall = (): void => { this.toolDispatchers.delete(threadId); };
 
-    // Turn completion future — resolves on `turn/completed` notification.
+    // Turn completion future — resolves on `turn/completed` notification
+    // FOR THIS THREAD ONLY (see thread-filter rationale above).
     let completionResolve: ((p: TurnCompletedNotification) => void) | null = null;
     const completion = new Promise<TurnCompletedNotification>((resolve) => {
       completionResolve = resolve;
@@ -332,6 +492,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
     const unsubCompleted = client.onNotification<TurnCompletedNotification>(
       "turn/completed",
       (p) => {
+        if (!forThisThread(p)) return;
         if (completionResolve) {
           completionResolve(p);
           completionResolve = null;
@@ -340,9 +501,25 @@ export class OpenAIChatGptProvider implements LLMProvider {
     );
 
     try {
+      // Empty `lastUserText` means we're resuming from history alone
+      // (e.g. after resolveChoice pushed a tool_result for a
+      // suspending-tool flow like present_choices). Counter-intuitively
+      // codex no-ops `turn/start` when `input: []` — the RPC returns a
+      // turn id but no task ever starts, so notifications stop arriving
+      // and the call hangs forever. We must hand it a non-empty input.
+      //
+      // We can't avoid this by skipping the function_call_output from
+      // injection either: the Responses API requires `function_call` to
+      // be paired with `function_call_output`, so the items must stay.
+      // Instead we pass a tiny continuation cue. The model treats it as
+      // a benign user prompt and generates its next response from the
+      // injected tool result.
+      const turnInput: TurnStartParams["input"] = lastUserText
+        ? [{ type: "text", text: lastUserText }]
+        : [{ type: "text", text: "(continue)" }];
       const turnReq: TurnStartParams = {
         threadId,
-        input: [{ type: "text", text: lastUserText }],
+        input: turnInput,
         ...(params.thinking?.effort
           ? { effort: mapEffort(params.thinking.effort) }
           : {}),
@@ -408,42 +585,54 @@ interface SplitHistory {
  * tool_use blocks become `function_call` items; user tool_result blocks
  * become `function_call_output` items; plain text becomes `message` items.
  *
- * The trailing user message becomes `turn/start` input; everything before
- * it gets injected. If the last message isn't a user message (model just
- * emitted text and history hasn't been re-asked) we inject the entire
- * history and pass an empty turn input — Codex still runs a turn against
- * whatever context is present.
+ * Turn input strategy depends on what the trailing message looks like:
+ *
+ * - **Trailing user message is pure text** — that's a fresh user turn.
+ *   Use its text as `turn/start` input; inject everything before it as
+ *   history.
+ * - **Trailing user message contains tool_result blocks** — we're
+ *   resuming after an inter-round tool dispatch (e.g. setup's
+ *   `present_choices` → player picked → resolveChoice pushes
+ *   `tool_result` and re-enters the loop). Inject the ENTIRE history,
+ *   including the tool_result message, and pass empty turn input. Codex
+ *   reads the function_call_output items and continues the conversation
+ *   without needing a new user message.
+ * - **Trailing message is assistant** (model emitted text and we haven't
+ *   asked again) — same as the tool_result case: inject everything,
+ *   empty input.
+ *
+ * Empty turn input is supported by codex — it runs a turn against
+ * whatever context is present in the thread.
  */
 function splitHistoryAndUserInput(messages: NormalizedMessage[]): SplitHistory {
-  const items: unknown[] = [];
+  // Find the LAST user message (don't walk past it — its shape decides
+  // the turn-input strategy).
   let lastUserIdx = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].role === "user") {
-      // The "last user message" must be a pure-text message (no tool_results,
-      // no embedded structure) — otherwise we'd inject only part of the
-      // semantic unit. Walk back if the trailing user message has tool_result
-      // content; that's an inter-round message, not a fresh user turn.
-      const m = messages[i];
-      if (typeof m.content === "string") {
-        lastUserIdx = i;
-        break;
-      }
-      // Array content: pure text only counts as the trailing user message
-      const onlyText = m.content.every((p) => p.type === "text");
-      if (onlyText) {
-        lastUserIdx = i;
-        break;
-      }
+      lastUserIdx = i;
+      break;
     }
   }
 
-  const toInject = lastUserIdx >= 0 ? messages.slice(0, lastUserIdx) : messages;
+  // Is that message a fresh user turn (pure text), or inter-round tool
+  // plumbing? Pure text → use as turn input; otherwise → inject as history.
+  let useAsTurnInput = false;
+  if (lastUserIdx >= 0) {
+    const m = messages[lastUserIdx];
+    useAsTurnInput = typeof m.content === "string"
+      || m.content.every((p) => p.type === "text");
+  }
+
+  const items: unknown[] = [];
+  const toInject = useAsTurnInput ? messages.slice(0, lastUserIdx) : messages;
   for (const msg of toInject) {
     items.push(...messageToResponsesItems(msg));
   }
+  const interleaved = interleaveCallsAndOutputs(items);
 
   let lastUserText = "";
-  if (lastUserIdx >= 0) {
+  if (useAsTurnInput && lastUserIdx >= 0) {
     const m = messages[lastUserIdx];
     if (typeof m.content === "string") {
       lastUserText = m.content;
@@ -455,7 +644,54 @@ function splitHistoryAndUserInput(messages: NormalizedMessage[]): SplitHistory {
     }
   }
 
-  return { historyToInject: items, lastUserText };
+  return { historyToInject: interleaved, lastUserText };
+}
+
+/**
+ * Reorder a flat Responses-API item list so each `function_call` is
+ * immediately followed by its matching `function_call_output`.
+ *
+ * Why this exists: our normalized history groups all tool_use blocks
+ * under one assistant message and all tool_result blocks under the next
+ * user message. Naive conversion yields
+ *   function_call(A), function_call(B), function_call_output(A), function_call_output(B)
+ * which the Responses API rejects — it requires strict immediate pairing.
+ *
+ * Outputs that match nothing are dropped (orphan results indicate
+ * upstream state corruption; passing them through would just provoke a
+ * different API error). Calls that match nothing pass through as-is and
+ * will trigger a "missing output" error from codex/OpenAI — preferable
+ * to a silent hang.
+ */
+function interleaveCallsAndOutputs(items: unknown[]): unknown[] {
+  interface Item { type?: string; call_id?: string }
+  // Index every function_call_output by its call_id, and remember which
+  // index it sits at so we can skip it during the main pass.
+  const outputByCallId = new Map<string, unknown>();
+  const consumedOutputIndices = new Set<number>();
+  items.forEach((raw, idx) => {
+    const it = raw as Item;
+    if (it.type === "function_call_output" && typeof it.call_id === "string") {
+      outputByCallId.set(it.call_id, raw);
+      consumedOutputIndices.add(idx);
+    }
+  });
+
+  const result: unknown[] = [];
+  const placedCallIds = new Set<string>();
+  items.forEach((raw, idx) => {
+    if (consumedOutputIndices.has(idx)) return;
+    const it = raw as Item;
+    result.push(raw);
+    if (it.type === "function_call" && typeof it.call_id === "string") {
+      const output = outputByCallId.get(it.call_id);
+      if (output && !placedCallIds.has(it.call_id)) {
+        result.push(output);
+        placedCallIds.add(it.call_id);
+      }
+    }
+  });
+  return result;
 }
 
 /**
@@ -468,8 +704,19 @@ function splitHistoryAndUserInput(messages: NormalizedMessage[]): SplitHistory {
  * extract to providers/openai-shared.ts.
  */
 function messageToResponsesItems(msg: NormalizedMessage): unknown[] {
+  // Codex's Responses-API deserializer is stricter than the OpenAI SDK:
+  // `message.content` MUST be a sequence of typed content parts, never a
+  // bare string. User text → `input_text`, assistant text → `output_text`.
+  // Sending a raw string yields:
+  //   "items[0] is not a valid response item: invalid type: string ...,
+  //    expected a sequence"
+  // and aborts the turn. Always wrap.
+  const userPart = (text: string) => ({ type: "input_text", text });
+  const asstPart = (text: string) => ({ type: "output_text", text });
+
   if (typeof msg.content === "string") {
-    return [{ type: "message", role: msg.role, content: msg.content }];
+    const part = msg.role === "user" ? userPart(msg.content) : asstPart(msg.content);
+    return [{ type: "message", role: msg.role, content: [part] }];
   }
 
   if (msg.role === "assistant") {
@@ -480,7 +727,7 @@ function messageToResponsesItems(msg: NormalizedMessage): unknown[] {
         pendingText += part.text;
       } else if (part.type === "tool_use") {
         if (pendingText) {
-          items.push({ type: "message", role: "assistant", content: pendingText });
+          items.push({ type: "message", role: "assistant", content: [asstPart(pendingText)] });
           pendingText = "";
         }
         items.push({
@@ -493,7 +740,7 @@ function messageToResponsesItems(msg: NormalizedMessage): unknown[] {
       // Skip thinking blocks — never sent back.
     }
     if (pendingText) {
-      items.push({ type: "message", role: "assistant", content: pendingText });
+      items.push({ type: "message", role: "assistant", content: [asstPart(pendingText)] });
     }
     return items;
   }
@@ -508,7 +755,7 @@ function messageToResponsesItems(msg: NormalizedMessage): unknown[] {
         output: part.content,
       });
     } else if (part.type === "text") {
-      items.push({ type: "message", role: "user", content: part.text });
+      items.push({ type: "message", role: "user", content: [userPart(part.text)] });
     }
   }
   return items;

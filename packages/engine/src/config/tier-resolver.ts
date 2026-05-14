@@ -50,8 +50,9 @@ export interface TierProviderResolution {
 export function buildTierProviders(
   connStore: ConnectionStore,
   fallbackProvider: () => LLMProvider,
+  configDir?: string,
 ): Record<ModelTier, TierProvider> {
-  return buildTierProvidersWithCache(connStore, fallbackProvider).tiers;
+  return buildTierProvidersWithCache(connStore, fallbackProvider, configDir).tiers;
 }
 
 /**
@@ -59,10 +60,15 @@ export function buildTierProviders(
  * connectionId → provider cache. Callers that need the raw map (for
  * dispose / usage lookups) use this; older callers keep the cleaner
  * legacy return shape.
+ *
+ * `configDir` is forwarded to {@link createProviderFromConnection} so
+ * `openai-chatgpt` connections can back their token store on disk and
+ * persist refreshed access_tokens.
  */
 export function buildTierProvidersWithCache(
   connStore: ConnectionStore,
   fallbackProvider: () => LLMProvider,
+  configDir?: string,
 ): TierProviderResolution {
   const providerCache = new Map<string, LLMProvider>();
   const getProviderForConnId = (connId: string): LLMProvider => {
@@ -70,7 +76,7 @@ export function buildTierProvidersWithCache(
     if (!p) {
       const conn = connStore.connections.find((c) => c.id === connId);
       if (!conn) throw new Error(`Connection not found: ${connId}`);
-      p = createProviderFromConnection(conn);
+      p = createProviderFromConnection(conn, { configDir });
       providerCache.set(connId, p);
     }
     return p;

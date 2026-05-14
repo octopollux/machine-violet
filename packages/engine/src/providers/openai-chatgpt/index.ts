@@ -22,12 +22,20 @@ export {
   isChatGptAccount,
   startChatGptLogin,
   startChatGptDeviceCodeLogin,
+  startChatGptThirdPartyOAuth,
+  pushChatGptAuthTokens,
   awaitLoginCompletion,
   cancelLogin,
   logout,
 } from "./auth.js";
+export { startOAuthFlow, refreshAccessToken, OPENAI_OAUTH_CONFIG } from "./oauth.js";
+export type { OAuthFlow, OAuthTokens } from "./oauth.js";
+export { createConnectionTokenStore, tokensFromOAuth } from "./token-store.js";
+export type { ChatGptTokenStore, PersistedChatGptTokens } from "./token-store.js";
 export { listModels } from "./models.js";
 export type { DiscoveredCodexModel } from "./models.js";
 export { toUsageStatus } from "./usage.js";
 export { resolveCodexBinary } from "./binary.js";
 export type { CodexBinaryResolution } from "./binary.js";
+export { getCodexClientInfo } from "./client-info.js";
+export type { CodexClientInfo } from "./client-info.js";

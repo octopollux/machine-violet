@@ -21,7 +21,7 @@ import type {
   KnownModelInfo, ConnectionHealthResponse,
   ChatGptLoginStartResponse, ChatGptLoginStatusResponse, UsageResponse,
 } from "../api-client.js";
-import type { UsageSegment } from "@machine-violet/shared";
+import type { UsageSegment, FormattingNode } from "@machine-violet/shared";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -510,46 +510,53 @@ export function ConnectionsPhase({
     }
 
     const status = loginStatus?.status ?? "pending";
-    const modalChildren: React.ReactNode[] = [];
-    let modalFooter = "Esc cancel";
+    const colored = (text: string, color: string): FormattingNode[] =>
+      [{ type: "color" as const, color, content: [text] }];
+
+    const styled: FormattingNode[][] = [];
+    let modalFooter = " Esc cancel ";
 
     if (loginError) {
-      modalChildren.push(<Text key="err" color="#cc4444">Error: {loginError}</Text>);
-      modalChildren.push(<Text key="sp" color={dim}> </Text>);
-      modalChildren.push(<Text key="back" color={dim}>Press Enter or Esc to return.</Text>);
+      styled.push(colored(`Error: ${loginError}`, "#cc4444"));
+      styled.push([]);
+      styled.push(colored("Press Enter or Esc to return.", dim));
     } else if (!loginInfo) {
-      modalChildren.push(<Text key="starting" color={fg}>Starting Codex subprocess and OAuth flow\u2026</Text>);
+      styled.push(colored("Starting Codex subprocess and OAuth flow\u2026", fg));
     } else {
-      modalChildren.push(<Text key="instr" color={fg}>Sign in by opening this URL in your browser:</Text>);
-      modalChildren.push(<Text key="sp" color={dim}> </Text>);
-      modalChildren.push(<Text key="url" color="#88ccff">{loginInfo.authUrl}</Text>);
-      modalChildren.push(<Text key="sp2" color={dim}> </Text>);
+      styled.push(colored("Sign in by opening this URL in your browser:", fg));
+      styled.push([]);
+      styled.push(colored(loginInfo.authUrl, "#88ccff"));
+      styled.push([]);
       if (status === "pending") {
-        modalChildren.push(<Text key="status" color={dim}>Waiting for browser authentication\u2026</Text>);
+        styled.push(colored("Waiting for browser authentication\u2026", dim));
         if (copyStatus === "copied") {
-          modalChildren.push(<Text key="copy" color="#88cc88">URL copied to clipboard.</Text>);
+          styled.push(colored("URL copied to clipboard.", "#88cc88"));
         } else if (copyStatus === "failed") {
-          modalChildren.push(<Text key="copy" color="#cc4444">Clipboard unavailable.</Text>);
+          styled.push(colored("Clipboard unavailable.", "#cc4444"));
         }
         modalFooter = " o open in browser \u00b7 c copy URL \u00b7 Esc cancel ";
       } else if (status === "success") {
-        modalChildren.push(<Text key="status" color="#88cc88">
-          \u2714 Signed in{loginStatus?.email ? ` as ${loginStatus.email}` : ""}{loginStatus?.planType ? ` (${loginStatus.planType})` : ""}.
-        </Text>);
-        modalChildren.push(<Text key="sp3" color={dim}> </Text>);
-        modalChildren.push(<Text key="dismiss" color={dim}>Press Enter or Esc to return.</Text>);
+        const suffix = `${loginStatus?.email ? ` as ${loginStatus.email}` : ""}${loginStatus?.planType ? ` (${loginStatus.planType})` : ""}`;
+        styled.push(colored(`\u2714 Signed in${suffix}.`, "#88cc88"));
+        styled.push([]);
+        styled.push(colored("Press Enter or Esc to return.", dim));
       } else if (status === "cancelled") {
-        modalChildren.push(<Text key="status" color={dim}>Login cancelled.</Text>);
-        modalChildren.push(<Text key="dismiss" color={dim}>Press Enter or Esc to return.</Text>);
+        styled.push(colored("Login cancelled.", dim));
+        styled.push(colored("Press Enter or Esc to return.", dim));
       } else {
-        modalChildren.push(<Text key="status" color="#cc4444">Login failed: {loginStatus?.error ?? "unknown error"}</Text>);
-        modalChildren.push(<Text key="dismiss" color={dim}>Press Enter or Esc to return.</Text>);
+        styled.push(colored(`Login failed: ${loginStatus?.error ?? "unknown error"}`, "#cc4444"));
+        styled.push(colored("Press Enter or Esc to return.", dim));
       }
     }
 
-    // Aim for ~60% of terminal height as visible content rows. CenteredModal
-    // wraps that with its own borders and clamps to fit the screen.
-    const modalContentRows = Math.max(8, Math.floor(termRows * 0.6) - 4);
+    // Pad to ~60% of terminal height with empty lines so the modal body
+    // is fully opaque (CenteredModal pads each line to innerWidth with
+    // trailing spaces, so empty FormattingNode arrays render as blank
+    // opaque rows that cover the menu underneath).
+    const targetRows = Math.max(styled.length, Math.floor(termRows * 0.6) - 4);
+    while (styled.length < targetRows) {
+      styled.push([]);
+    }
 
     return (
       <Box flexDirection="column" width={cols} height={termRows}>
@@ -564,11 +571,9 @@ export function ConnectionsPhase({
           widthFraction={0.6}
           minWidth={50}
           maxWidth={Math.max(50, Math.floor(cols * 0.6))}
-          contentHeight={modalContentRows}
+          styledLines={styled}
           footer={modalFooter}
-        >
-          {modalChildren}
-        </CenteredModal>
+        />
       </Box>
     );
   }

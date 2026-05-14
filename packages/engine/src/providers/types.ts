@@ -98,32 +98,59 @@ export interface NormalizedUsage {
 // Chat request / response
 // ---------------------------------------------------------------------------
 
-export interface ChatParams {
+/**
+ * In-process tool dispatcher.
+ *
+ * Some providers (codex app-server) own tool dispatch end-to-end: the
+ * model's tool calls arrive as JSON-RPC server requests that must be
+ * replied to in-band, so the provider runs the entire multi-round tool
+ * loop inside a single `chat()` call rather than surfacing intermediate
+ * tool calls back to the bridge. Those providers invoke this callback
+ * per tool call; the returned `content` is sent back to the model as
+ * the tool result.
+ *
+ * Providers that don't support internal dispatch (Anthropic, openai-apikey,
+ * openrouter, custom) ignore the field and continue to surface tool calls
+ * via `ChatResult.toolCalls` for the caller to dispatch and re-issue.
+ */
+export type DispatchToolFn = (call: NormalizedToolCall) => Promise<{ content: string; isError?: boolean }>;
+
+interface ChatParamsBase {
   model: string;
   systemPrompt: string | SystemBlock[];
   messages: NormalizedMessage[];
-  tools?: NormalizedTool[];
   maxTokens: number;
   thinking?: ThinkingConfig;
   cacheHints?: CacheHint[];
-  /**
-   * Optional in-process tool dispatcher.
-   *
-   * Some providers (codex app-server) own tool dispatch end-to-end:
-   * the model's tool calls arrive as JSON-RPC server requests that must
-   * be replied to in-band, so the provider runs the entire multi-round
-   * tool loop inside a single `chat()` call rather than surfacing
-   * intermediate tool calls back to the bridge.
-   *
-   * When set, providers that support internal dispatch invoke this
-   * callback per tool call. The returned `content` is sent back to the
-   * model as the tool result. Providers that don't support internal
-   * dispatch (Anthropic, openai-apikey, openrouter, custom) ignore this
-   * field and continue to surface tool calls via `ChatResult.toolCalls`
-   * for the caller to dispatch and re-issue.
-   */
-  dispatchTool?: (call: NormalizedToolCall) => Promise<{ content: string; isError?: boolean }>;
 }
+
+interface ChatParamsToolless extends ChatParamsBase {
+  /** No tools on this call (text-only or model-driven generation). */
+  tools?: undefined;
+  dispatchTool?: undefined;
+}
+
+interface ChatParamsWithTools extends ChatParamsBase {
+  /** Tools available to the model on this call. */
+  tools: NormalizedTool[];
+  /**
+   * Required when `tools` is present. Providers with internal dispatch
+   * (codex app-server) invoke this for each tool call mid-turn. Providers
+   * without internal dispatch ignore it and instead surface tool calls
+   * via `ChatResult.toolCalls`. The type system requires it either way
+   * so the runtime guard in {@link ../openai-chatgpt/provider.ts} can
+   * never silently misfire from a caller forgetting the wiring.
+   */
+  dispatchTool: DispatchToolFn;
+}
+
+/**
+ * Discriminated union over `tools`: a call either provides no tools (and
+ * no dispatcher) or provides both. This prevents the "tools without
+ * dispatcher" footgun at compile time — codex's runtime guard becomes
+ * the second line of defense, not the first.
+ */
+export type ChatParams = ChatParamsToolless | ChatParamsWithTools;
 
 /** A system prompt block (text with optional cache control). */
 export interface SystemBlock {

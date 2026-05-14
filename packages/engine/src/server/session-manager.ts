@@ -448,7 +448,7 @@ export class SessionManager {
     const appConfigDir = configDir();
     const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
     const { createAnthropicProvider } = await import("../providers/anthropic.js");
-    const tierResolution = buildTierProvidersWithCache(connStore, () => createAnthropicProvider());
+    const tierResolution = buildTierProvidersWithCache(connStore, () => createAnthropicProvider(), appConfigDir);
     const tierProviders = tierResolution.tiers;
 
     // Track unique providers for end-of-session disposal. Stateful providers
@@ -703,6 +703,20 @@ export class SessionManager {
     this.gameState = gs;
     this.campaignId = campaignId;
     this.status = "active";
+
+    // Persist cumulative token usage to disk on every API call. The persister
+    // queues writes asynchronously, so the per-call overhead is just a JSON
+    // stringify + enqueue. Without this, the breakdown only lives in memory
+    // and every campaign resume seeds from zero — the resume code in
+    // resumeSession() already calls costTracker.seed(loaded.usage), but
+    // loaded.usage is always undefined because the file was never written.
+    const usagePersister = engine.getPersister();
+    const tracker = this.costTracker;
+    if (usagePersister && tracker) {
+      tracker.onRecord = () => {
+        usagePersister.persistUsage(tracker.getBreakdown());
+      };
+    }
 
     logEvent("session:start", {
       campaignId,

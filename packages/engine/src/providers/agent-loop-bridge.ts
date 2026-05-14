@@ -9,7 +9,7 @@
  * Callers migrate to `runProviderLoop` incrementally.
  */
 import type {
-  LLMProvider, ChatParams, ChatResult,
+  LLMProvider, ChatParams, ChatResult, DispatchToolFn,
   NormalizedMessage, NormalizedTool,
   ContentPart, NormalizedUsage, SystemBlock, ThinkingConfig,
   CacheHint,
@@ -35,6 +35,15 @@ const DEFERRED_TUI_TYPES = new Set([
   "scribe",
   "dm_notes",
   "promote_character",
+  // `present_choices` is visual-only (modal), but we defer its broadcast
+  // so the choice modal never appears before the DM's prose. Models that
+  // interleave text and tool_use (Anthropic) emit prose first naturally,
+  // but GPT-5.5 via codex emits *all* tool calls before any prose, so
+  // an immediate broadcast pops the modal up 5–15s before the player can
+  // read what just happened. Deferring keeps "read narrative → pick" as
+  // the consistent UX across providers. game-engine.ts re-broadcasts
+  // queued present_choices commands via onTuiCommand after the loop.
+  "present_choices",
 ]);
 import { dumpContext, dumpThinking } from "../config/context-dump.js";
 import { logEvent } from "../context/engine-log.js";
@@ -239,38 +248,52 @@ export async function runProviderLoop(
       config.onRollback?.();
     }
 
-    const chatParams: ChatParams = {
-      model: config.model,
-      systemPrompt: effectiveSystem,
-      messages: workingMessages,
-      tools: config.tools,
-      maxTokens: config.maxTokens,
-      thinking,
-      cacheHints: config.cacheHints,
-      // Tool dispatcher for providers that own tool dispatch internally
-      // (currently openai-chatgpt). Wraps the same per-call logic the
-      // bridge runs after this chat() returns for non-internal-dispatch
-      // providers — so TUI broadcast, deferred-sentinel handling, and
-      // onToolStart/End callbacks fire identically regardless of which
-      // path the provider takes. Other providers (Anthropic, openai-apikey)
-      // ignore this field and surface tool calls back through
-      // ChatResult.toolCalls.
-      dispatchTool: async (call) => {
-        const dispatched = await dispatchToolCall(
-          { id: call.id, name: call.name, input: call.input },
-          config,
-          tuiToolNames,
-          (cmd) => {
-            if (DEFERRED_TUI_TYPES.has(cmd.type)) {
-              tuiCommands.push(cmd);
-            } else {
-              config.onTuiCommand?.(cmd);
-            }
-          },
-        );
-        return { content: dispatched.content, isError: dispatched.isError };
-      },
+    // Tool dispatcher for providers that own tool dispatch internally
+    // (currently openai-chatgpt). Wraps the same per-call logic the
+    // bridge runs after this chat() returns for non-internal-dispatch
+    // providers — so TUI broadcast, deferred-sentinel handling, and
+    // onToolStart/End callbacks fire identically regardless of which
+    // path the provider takes. Other providers (Anthropic, openai-apikey)
+    // ignore this field and surface tool calls back through
+    // ChatResult.toolCalls.
+    const dispatchTool: DispatchToolFn = async (call) => {
+      const dispatched = await dispatchToolCall(
+        { id: call.id, name: call.name, input: call.input },
+        config,
+        tuiToolNames,
+        (cmd) => {
+          if (DEFERRED_TUI_TYPES.has(cmd.type)) {
+            tuiCommands.push(cmd);
+          } else {
+            config.onTuiCommand?.(cmd);
+          }
+        },
+      );
+      return { content: dispatched.content, isError: dispatched.isError };
     };
+
+    // ChatParams is a discriminated union: tools + dispatchTool are
+    // either both present (this call uses tools) or both absent (text-only).
+    // Build the variant that matches `config.tools`.
+    const chatParams: ChatParams = config.tools
+      ? {
+          model: config.model,
+          systemPrompt: effectiveSystem,
+          messages: workingMessages,
+          tools: config.tools,
+          maxTokens: config.maxTokens,
+          thinking,
+          cacheHints: config.cacheHints,
+          dispatchTool,
+        }
+      : {
+          model: config.model,
+          systemPrompt: effectiveSystem,
+          messages: workingMessages,
+          maxTokens: config.maxTokens,
+          thinking,
+          cacheHints: config.cacheHints,
+        };
 
     // Context dump: log params before API call. `thinking` is captured so the
     // dumped request reflects whether reasoning was actually requested — the

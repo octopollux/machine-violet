@@ -54,7 +54,16 @@ export interface AccountReadResult {
 export type LoginAccountParams =
   | { type: "apiKey"; apiKey: string }
   | { type: "chatgpt"; codexStreamlinedLogin?: boolean }
-  | { type: "chatgptDeviceCode" };
+  | { type: "chatgptDeviceCode" }
+  | {
+      type: "chatgptAuthTokens";
+      /** Access token (JWT) acquired by the client's own OAuth flow. */
+      accessToken: string;
+      /** Workspace/account identifier (from the id_token's auth claims). */
+      chatgptAccountId: string;
+      /** Optional plan type. When null, codex derives from access-token claims. */
+      chatgptPlanType?: string | null;
+    };
 
 export interface ChatGptLoginResult {
   type: "chatgpt";
@@ -290,4 +299,19 @@ export interface DynamicToolCallResponse {
   success: boolean;
   contentItems: (| { type: "inputText"; text: string }
     | { type: "inputImage"; imageUrl: string })[];
+}
+
+// ---------------------------------------------------------------------------
+// account/chatgptAuthTokens/refresh (server request)
+// ---------------------------------------------------------------------------
+
+export interface ChatgptAuthTokensRefreshParams {
+  reason: "unauthorized" | "expired" | string;
+  previousAccountId?: string | null;
+}
+
+export interface ChatgptAuthTokensRefreshResponse {
+  accessToken: string;
+  chatgptAccountId: string;
+  chatgptPlanType?: string | null;
 }

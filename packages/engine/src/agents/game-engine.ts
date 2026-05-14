@@ -620,10 +620,16 @@ export class GameEngine {
         this.persistCurrentScene();
       }
 
-      // Process deferred TUI commands — only commands that need engine-side
-      // work (scene transitions, subagent spawns, file I/O) remain here.
-      // Visual-only commands (modeline, resources, choices, theme) were
-      // already broadcast to the client immediately when the tool fired.
+      // Process deferred TUI commands — engine-side actions (scene
+      // transitions, subagent spawns, file I/O) and any visual commands
+      // we explicitly deferred for ordering reasons. Modeline/resources/
+      // theme commands were already broadcast to the client immediately
+      // when the tool fired.
+      //
+      // `present_choices` is deferred (see DEFERRED_TUI_TYPES rationale)
+      // so it never beats the DM's prose to the screen. Re-broadcast
+      // each one here through the same onTuiCommand sink the
+      // bridge would have used for non-deferred commands.
       for (const cmd of result.tuiCommands) {
         if (cmd.type === "scene_transition") {
           await this.transitionScene(
@@ -643,6 +649,8 @@ export class GameEngine {
           await this.handlePromoteCharacter(cmd);
         } else if (cmd.type === "dm_notes") {
           await this.handleDmNotes(cmd);
+        } else if (cmd.type === "present_choices") {
+          this.callbacks.onTuiCommand?.(cmd);
         }
       }
 
