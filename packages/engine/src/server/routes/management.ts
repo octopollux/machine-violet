@@ -194,11 +194,28 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   }
   const pendingLogins = new Map<string, PendingLogin>();
 
-  /** Reap logins older than 10 minutes to avoid unbounded growth. */
+  /**
+   * Reap stale login entries to avoid unbounded growth and resource leaks.
+   *
+   * Terminal entries (success/error/cancelled) are deleted after 10 minutes
+   * — they're just status-poll caches at that point. Pending entries that
+   * have aged past 30 minutes are forcibly cancelled and deleted: each
+   * pending entry holds an OAuthFlow whose loopback HTTP server stays
+   * bound to port 1455 until `flow.cancel()` fires, so an abandoned login
+   * blocks any subsequent login attempt. 30 minutes is well past the
+   * outer-edge of a real user finishing the browser OAuth round-trip.
+   */
   function reapStaleLogins(): void {
-    const cutoff = Date.now() - 10 * 60_000;
+    const now = Date.now();
+    const terminalCutoff = now - 10 * 60_000;
+    const pendingCutoff = now - 30 * 60_000;
     for (const [id, login] of pendingLogins) {
-      if (login.createdAt < cutoff && login.status !== "pending") {
+      if (login.status === "pending") {
+        if (login.createdAt < pendingCutoff) {
+          try { login.flow.cancel(); } catch { /* ignore */ }
+          pendingLogins.delete(id);
+        }
+      } else if (login.createdAt < terminalCutoff) {
         pendingLogins.delete(id);
       }
     }
@@ -232,7 +249,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     pendingLogins.set(flow.loginId, entry);
 
     void flow.result.then(async (tokens) => {
-      if (entry.status !== "pending") return; // cancelled
+      if (entry.status !== "pending") return; // cancelled before tokens arrived
       if (!tokens.chatgptAccountId) {
         entry.status = "error";
         entry.error = "OAuth response missing chatgpt_account_id claim";
@@ -242,18 +259,31 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
       // discover available models for us. We dispose it immediately
       // after; the user's game session spawns a fresh one that will read
       // the persisted tokens from the connection record.
+      //
+      // Cancellation races: this block takes several seconds (codex spawn,
+      // initialize, account read, model list, disk write). The user can
+      // hit the cancel endpoint at any of those await boundaries.
+      // `flow.cancel()` only rejects an already-settled promise, so it
+      // does nothing here — we have to actively check `entry.status` at
+      // each await boundary and bail before persisting the connection.
+      // The `finally` block always stops the codex subprocess so the
+      // partial work doesn't leak the loopback port either way.
       const codex = new CodexRpcClient({ sessionId: `oauth-${randomBytes(4).toString("hex")}` });
       try {
         await codex.start();
+        if (entry.status !== "pending") return;
         await codex.call("initialize", {
           clientInfo,
           capabilities: { experimentalApi: true },
         });
+        if (entry.status !== "pending") return;
         codex.notify("initialized", {});
         await pushChatGptAuthTokens(codex, tokens);
+        if (entry.status !== "pending") return;
 
         // Confirm account is logged in + pull display metadata.
         const acct = await getAccount(codex);
+        if (entry.status !== "pending") return;
         entry.email = acct.account?.email ?? tokens.email;
         entry.planType = acct.account?.planType ?? tokens.chatgptPlanType ?? undefined;
 
@@ -265,6 +295,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
             id: m.id, displayName: m.displayName, available: m.available,
           }));
         } catch { /* best effort */ }
+        if (entry.status !== "pending") return;
 
         const connId = randomBytes(8).toString("hex");
         const newConn: AIConnection = {
@@ -285,6 +316,9 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
           source: "oauth",
           addedAt: new Date().toISOString(),
         };
+        // Final guard: cancellation between the model-list await and the
+        // disk write would otherwise still persist the connection.
+        if (entry.status !== "pending") return;
         const stored = loadConnectionStore(server.configDir);
         stored.connections.push(newConn);
         saveConnectionStore(server.configDir, stored);

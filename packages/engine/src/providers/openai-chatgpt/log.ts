@@ -10,6 +10,7 @@
  *
  * Event vocabulary (keep in sync with docs/maintenance.md if added there):
  *   codex:subprocess:spawn        — child started, binary resolved
+ *   codex:subprocess:initialized  — `initialize` handshake completed (records codex version + userAgent)
  *   codex:subprocess:exit         — child died (expected or otherwise)
  *   codex:rpc:error               — JSON-RPC method returned an error
  *   codex:auth:login_started      — OAuth/device-code flow initiated
@@ -26,6 +27,8 @@ import { logEvent } from "../../context/engine-log.js";
 export const log = {
   spawn: (data: { binaryPath: string; version?: string; sessionId?: string }) =>
     logEvent("codex:subprocess:spawn", data),
+  initialized: (data: { userAgent?: string; codexHome?: string; platformOs?: string; platformArch?: string; sessionId?: string }) =>
+    logEvent("codex:subprocess:initialized", data),
   exit: (data: { code: number | null; signal: NodeJS.Signals | null; sessionId?: string }) =>
     logEvent("codex:subprocess:exit", data),
   rpcError: (data: { method: string; code: number; message: string; sessionId?: string }) =>

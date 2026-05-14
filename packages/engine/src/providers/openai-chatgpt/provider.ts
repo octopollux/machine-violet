@@ -184,9 +184,15 @@ export class OpenAIChatGptProvider implements LLMProvider {
         clientInfo: getCodexClientInfo(),
         capabilities: { experimentalApi: true },
       });
-      log.spawn({
-        binaryPath: init.userAgent,
-        version: init.userAgent,
+      // codex:subprocess:spawn is already logged by CodexRpcClient.startInternal
+      // with the resolved binaryPath. Log a separate `initialized` event here
+      // carrying the userAgent / codexHome / platform fields from the
+      // handshake response — useful for debugging "which codex are we
+      // actually talking to" without re-shadowing the spawn event.
+      log.initialized({
+        userAgent: init.userAgent,
+        codexHome: init.codexHome,
+        platformOs: init.platformOs,
         sessionId: this.sessionId,
       });
       client.notify("initialized", {});
