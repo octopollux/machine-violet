@@ -36,9 +36,9 @@ interface Cell {
   color?: string;
 }
 
-const FULL: Cell = { glyph: "◆", color: "#7AC7E8" };       // light-blue diamond
-const RUBY: Cell = { glyph: "⬢", color: "#D03A3A" };       // red hexagon
-const GARNET: Cell = { glyph: "■", color: "#8B4513" };     // brown square
+const FULL: Cell = { glyph: "◆", color: "#529EAB" };       // light-blue diamond
+const RUBY: Cell = { glyph: "⬢", color: "#781313" };       // red hexagon
+const GARNET: Cell = { glyph: "■", color: "#A87712" };     // brown square
 const TARNISHED: Cell = { glyph: "*", color: "gray" };     // grey asterisk
 const EMPTY: Cell = { glyph: " " };
 
