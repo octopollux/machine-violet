@@ -306,7 +306,7 @@ describe("enterOOC", () => {
     expect(result.usage.outputTokens).toBe(20);
   });
 
-  it("works without tools when no game state, no repo, no fileIO", async () => {
+  it("always advertises the OOC-only extras even with no registry/fileIO/repo", async () => {
     const provider = mockProvider([textResponse("Done.")]);
     await enterOOC(provider, "test", {
       campaignName: "Test",
@@ -315,30 +315,17 @@ describe("enterOOC", () => {
     });
 
     const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
-    if (createCall) {
-      expect(createCall.tools).toBeUndefined();
-    }
-  });
-
-  it("exposes only OOC-only file extras when fileIO is set but no gameState", async () => {
-    const provider = mockProvider([textResponse("Done.")]);
-    const fio = mockFileIO();
-    await enterOOC(provider, "test", {
-      campaignName: "Test",
-      previousVariant: "playing",
-      fileIO: fio,
-      campaignRoot: "/camp",
-      model: "claude-sonnet-4-6",
-    });
-
-    const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
-    if (createCall) {
-      const names = createCall.tools.map((t: { name: string }) => t.name);
-      expect(names).toEqual(expect.arrayContaining(["read_file", "find_references", "validate_campaign"]));
-      // No DM tools without gameState
-      expect(names).not.toContain("roll_dice");
-      expect(names).not.toContain("scribe");
-    }
+    expect(createCall).toBeDefined();
+    const names = createCall.tools.map((t: { name: string }) => t.name);
+    // Extras are always present so the prompt's tool advertisement stays
+    // truthful regardless of caller plumbing. They return recoverable errors
+    // at dispatch time when their backing capability isn't wired up.
+    expect(names).toEqual(expect.arrayContaining([
+      "read_file", "find_references", "validate_campaign", "get_commit_log",
+    ]));
+    // No DM tools without a registry.
+    expect(names).not.toContain("roll_dice");
+    expect(names).not.toContain("scribe");
   });
 });
 
@@ -418,25 +405,14 @@ describe("enterOOC with gameState + DM registry", () => {
 // --- buildOOCTools ---
 
 describe("buildOOCTools", () => {
-  it("returns empty when given empty registry + no extras", () => {
-    const tools = buildOOCTools({ getDefinitions: () => [] } as unknown as Parameters<typeof buildOOCTools>[0], false, false);
-    expect(tools).toEqual([]);
-  });
-
-  it("returns file extras when hasFileIO is true (no registry contributions)", () => {
-    const tools = buildOOCTools({ getDefinitions: () => [] } as unknown as Parameters<typeof buildOOCTools>[0], true, false);
+  it("returns just the OOC-only extras when given an empty registry", () => {
+    const tools = buildOOCTools({ getDefinitions: () => [] } as unknown as Parameters<typeof buildOOCTools>[0]);
     const names = tools.map((t) => t.name);
-    expect(names).toEqual(["read_file", "find_references", "validate_campaign"]);
-  });
-
-  it("adds get_commit_log when hasRepo is true", () => {
-    const tools = buildOOCTools({ getDefinitions: () => [] } as unknown as Parameters<typeof buildOOCTools>[0], false, true);
-    const names = tools.map((t) => t.name);
-    expect(names).toEqual(["get_commit_log"]);
+    expect(names).toEqual(["read_file", "find_references", "validate_campaign", "get_commit_log"]);
   });
 
   it("returns all DM tools (minus enter_ooc) plus extras with the real registry", () => {
-    const tools = buildOOCTools(singletonRegistry, true, true);
+    const tools = buildOOCTools(singletonRegistry);
     const names = tools.map((t) => t.name);
 
     expect(names).not.toContain("enter_ooc");
