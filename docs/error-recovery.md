@@ -10,7 +10,7 @@ The campaign directory is all markdown and JSON — a perfect fit for version co
 
 | Event | Commit | Rationale |
 |---|---|---|
-| Every N exchanges (configurable, default 3) | `auto: exchanges 45-47` | Frequent recovery points during play |
+| Every N exchanges (configurable, default 3) | `auto: I draw my sword and charge the troll.` (the player's last message, single-line and truncated to 72 chars; falls back to `auto: exchanges` for synthetic system turns) | Frequent recovery points during play, browsable as a savestate log |
 | Scene transition | `scene: Escape from the Goblin Caves` | Natural checkpoint |
 | Session end | `session: end session 3` | Clean save point |
 | Before destructive operations | `checkpoint: before scene_transition` | Safety net for cascades |
@@ -60,6 +60,8 @@ Retry with exponential backoff (1s, 2s, 4s, 8s, capped at 12s) **indefinitely** 
 
 Retryable statuses: 429, 500, 502, 503, 529, plus synthetic status 0 for connection-level errors. No state has changed — the API call didn't complete — so there's nothing to roll back.
 
+The retry modal can be dismissed with **Esc** so the player can open the pause menu and Save & Exit instead of waiting for the connection. Dismissal is scoped to the current retry attempt — the next failed attempt brings the modal back automatically (each `onRetry` event bumps `attemptId`, which is what the dismissal latch keys on). Retries continue in the background regardless of whether the modal is on screen.
+
 ### Non-retryable API errors (manual retry)
 
 When an API call fails with an error that exhausts automatic retries or isn't in the retryable set, the engine stores the failed input and prompts the player:
@@ -82,11 +84,12 @@ The `/retry` command retries the last DM turn at any time — useful for recover
 
 ### `/diagnostics` slash command
 
-The `/diagnostics` command bundles the current campaign folder together with the top-level `.debug/` (engine.jsonl, server.log, context dumps) into a single zip and reveals it in the OS file explorer:
+The `/diagnostics` command bundles the current campaign folder together with the top-level `.debug/` (engine.jsonl, context dumps) into a single zip and reveals it in the OS file explorer:
 
 - Output path: `<homeDir>/diagnostics/<campaign-name>-<timestamp>.mvdiag` (a zip with a Machine Violet-specific extension — any zip tool can still read it).
 - The bundle includes a `manifest.json` at the root with the collection timestamp, campaign name, platform, and Node version.
 - Per-campaign `.debug/` is captured as part of the campaign walk; the top-level `.debug/` is added under a `.debug/` prefix in the archive.
+- The top-level `.debug/server.log` (mirrored stdout/stderr) is excluded — it's noisy and rarely useful for triage compared with `engine.jsonl`.
 - Reveal-in-folder uses platform-specific commands (`explorer /select,` on Windows, `open -R` on macOS, `xdg-open <parent>` on Linux). The system message in the chat always prints the absolute path as a fallback when reveal is unavailable or silently fails.
 
 Use this when sending a triage bundle for a bug report.

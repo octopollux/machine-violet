@@ -15,6 +15,17 @@ export interface FullScreenFrameProps {
   contentRows: number;
   /** Enable an animated starfield in the padding areas around content. */
   starfield?: boolean | StarfieldConfig;
+  /**
+   * Optional one-row content pinned to the bottom-left of the frame (just above
+   * the bottom border). Consumes one row from the bottom padding; does not
+   * affect the vertical centering of the main children. Content is clipped to
+   * a single row to keep the layout stable.
+   *
+   * Note: not currently composited with starfield — when both are enabled, the
+   * slot row appears as a non-animated stripe within the otherwise-animated
+   * padding. Add starfield-aware rendering here when a caller needs both.
+   */
+  bottomLeft?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -30,6 +41,7 @@ export function FullScreenFrame({
   title,
   contentRows,
   starfield,
+  bottomLeft,
   children,
 }: FullScreenFrameProps) {
   const sideWidth = theme.asset.components.edge_left.width;
@@ -39,7 +51,11 @@ export function FullScreenFrame({
   const contentHeight = rows - borderHeight * 2;
 
   const topPad = Math.max(0, Math.floor((contentHeight - contentRows) / 2));
-  const bottomPad = Math.max(0, contentHeight - contentRows - topPad);
+  const rawBottomPad = Math.max(0, contentHeight - contentRows - topPad);
+  // Pinned bottom-left row eats one row from the bottom padding so it doesn't
+  // disturb the vertical centering of the main children.
+  const hasBottomLeft = bottomLeft != null && rawBottomPad >= 1;
+  const bottomPad = hasBottomLeft ? rawBottomPad - 1 : rawBottomPad;
 
   const sfEnabled = !!starfield;
   const sfConfig: StarfieldConfig = {
@@ -76,6 +92,17 @@ export function FullScreenFrame({
             sfEnabled
               ? <StarfieldRows grid={grid} startRow={topPad + contentRows} rowCount={bottomPad} />
               : <Box height={bottomPad} />
+          )}
+
+          {hasBottomLeft && (
+            <Box
+              width={contentWidth}
+              height={1}
+              overflow="hidden"
+              justifyContent="flex-start"
+            >
+              {bottomLeft}
+            </Box>
           )}
         </Box>
         <ThemedSideFrame theme={theme} side="right" height={contentHeight} />

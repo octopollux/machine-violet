@@ -49,7 +49,8 @@ jobs:
         run: |
           TAG="${{ inputs.tag || github.ref_name }}"
           VERSION="${TAG#v}"
-          node scripts/build-dist.js --version="$VERSION"
+          RELEASE_DATE="$(date -u +'%Y-%m-%d %H:%M')"
+          node scripts/build-dist.js --version="$VERSION" --release-date="$RELEASE_DATE"
 
       - name: Bundle Windows Terminal portable
         if: matrix.os == 'windows-latest'

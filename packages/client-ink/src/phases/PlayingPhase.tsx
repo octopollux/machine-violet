@@ -12,7 +12,7 @@
  *
  * The component just renders what the server says and sends what the player types.
  */
-import React, { useState, useRef, useCallback, useMemo } from "react";
+import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { useInput, Box, useWindowSize } from "ink";
 import type { NarrativeAreaHandle } from "../tui/components/index.js";
 import type { KeyHint } from "../tui/components/index.js";
@@ -66,6 +66,12 @@ export function PlayingPhase() {
   const [characterPaneOpen, setCharacterPaneOpen] = useState(false);
   const [characterSheetCache, setCharacterSheetCache] = useState<string | null>(null);
   const characterSheetCacheCharRef = useRef<string>("");
+  // attemptId the user last dismissed the API-error modal at. The modal hides
+  // while this matches the current overlay's attemptId; each fresh onRetry
+  // bumps attemptId, so the next failure brings the modal back. Reset to null
+  // whenever the overlay clears so a future outage that starts at the same
+  // numeric attemptId still re-shows the modal.
+  const [dismissedAttemptId, setDismissedAttemptId] = useState<number | null>(null);
 
   const clearInput = useCallback(() => { setPendingInput(""); setResetKey((k) => k + 1); }, []);
   /** Reset the input but pre-fill it with text (e.g. after a rejected contribution). */
@@ -75,9 +81,30 @@ export function PlayingPhase() {
   const modalScrollRef = useRef<CenteredModalHandle>(null);
   const escTimestamps = useRef<number[]>([]);
 
+  // Clear the dismissal latch whenever the retry overlay goes away so the
+  // next outage shows the modal again — even if the new attemptId numerically
+  // matches what was dismissed previously (attemptId resets to 1 after the
+  // engine clears lastError on success). Keyed on the boolean rather than the
+  // overlay object itself because app.tsx rebuilds the overlay on every render.
+  const hasRetryOverlay = !!retryOverlay;
+  useEffect(() => {
+    if (!hasRetryOverlay) setDismissedAttemptId(null);
+  }, [hasRetryOverlay]);
+
+  // The modal is "active" only when there's an unresolved retry AND the user
+  // hasn't dismissed this specific attempt. Each fresh retry bumps attemptId,
+  // so dismissal is scoped to a single failure — the next failure shows again.
+  const apiErrorModalActive =
+    !!retryOverlay && retryOverlay.attemptId !== dismissedAttemptId;
+
   // Whether TextInput should be disabled.
   // Never block on engine state — the server rejects input if inappropriate.
   // This prevents the client from getting permanently wedged.
+  // Note: gated on `retryOverlay`, not `apiErrorModalActive`. Dismissing the
+  // modal unblocks the keyboard-event path (so Esc can open the pause menu),
+  // but the engine is still retrying and the server has no open turn to
+  // contribute to — letting the input accept text would produce a flash of
+  // optimistic narrative that gets yanked out when the contribute rejects.
   const textInputDisabled =
     !!activeChoices ||
     !!activeModal ||
@@ -287,7 +314,15 @@ export function PlayingPhase() {
       }
     }
 
-    if (retryOverlay || activeChoices || activeModal || menuOpen) return;
+    // Esc on the API-error modal dismisses it (latched on attemptId so the
+    // next retry brings it back). Handled before the catch-all blocker below
+    // so the user isn't trapped while the engine retries in the background.
+    if (key.escape && apiErrorModalActive && retryOverlay) {
+      setDismissedAttemptId(retryOverlay.attemptId);
+      return;
+    }
+
+    if (apiErrorModalActive || activeChoices || activeModal || menuOpen) return;
 
     // Tab: toggle character pane
     if (key.tab) {
@@ -400,7 +435,7 @@ export function PlayingPhase() {
           onContentLoaded={handleCharacterSheetLoaded}
         />
       )}
-      {retryOverlay && (
+      {apiErrorModalActive && retryOverlay && (
         <ApiErrorModal theme={theme} width={cols} height={rows} overlay={retryOverlay} />
       )}
       {am?.kind === "character_sheet" && (

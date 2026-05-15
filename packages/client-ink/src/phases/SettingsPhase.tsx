@@ -4,6 +4,7 @@ import type { ResolvedTheme } from "../tui/themes/types.js";
 import { TerminalTooSmall, FullScreenFrame } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
+import { APP_VERSION, RELEASE_DATE } from "../version.js";
 
 const noop = () => { /* no-op */ };
 
@@ -105,8 +106,19 @@ export function SettingsPhase({
     );
   }
 
+  const versionLabel = RELEASE_DATE
+    ? `v${APP_VERSION} · released ${RELEASE_DATE} UTC`
+    : `v${APP_VERSION}`;
+
   return (
-    <FullScreenFrame theme={theme} columns={cols} rows={termRows} title="Settings" contentRows={menuLines.length}>
+    <FullScreenFrame
+      theme={theme}
+      columns={cols}
+      rows={termRows}
+      title="Settings"
+      contentRows={menuLines.length}
+      bottomLeft={<Text color={dimColor}>{versionLabel}</Text>}
+    >
       {menuLines}
     </FullScreenFrame>
   );

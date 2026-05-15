@@ -608,6 +608,12 @@ export class SceneManager {
     };
   }
 
+  /** Remove an entry from the entity tree (e.g. after rename). */
+  removeEntity(slug: string): void {
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete this.entityTree[slug];
+  }
+
   /** Get the current entity tree (for passing to subagents). */
   getEntityTree(): EntityTree {
     return this.entityTree;

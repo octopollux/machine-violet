@@ -315,18 +315,24 @@ describe("aiPlayerTurn", () => {
 
 describe("buildOOCPrompt", () => {
   it("builds base OOC prompt", () => {
-    const prompt = buildOOCPrompt("Shattered Crown");
+    const prompt = buildOOCPrompt({ campaignName: "Shattered Crown" });
     expect(prompt).toContain("Out-of-Character");
     expect(prompt).toContain("Shattered Crown");
   });
 
   it("includes system rules when provided", () => {
-    const prompt = buildOOCPrompt("Campaign", "Grappling: contested STR check...");
+    const prompt = buildOOCPrompt({
+      campaignName: "Campaign",
+      systemRules: "Grappling: contested STR check...",
+    });
     expect(prompt).toContain("Grappling: contested STR check");
   });
 
   it("includes character sheet when provided", () => {
-    const prompt = buildOOCPrompt("Campaign", undefined, "Aldric - Paladin, HP 42/42");
+    const prompt = buildOOCPrompt({
+      campaignName: "Campaign",
+      characterSheet: "Aldric - Paladin, HP 42/42",
+    });
     expect(prompt).toContain("Aldric - Paladin");
   });
 });

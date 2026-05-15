@@ -25,6 +25,21 @@ When checking `list_entities`, watch for near-matches that differ only by articl
 
 If an entity was introduced under a provisional name ("a hooded figure") and the true name is now known, update the EXISTING entity. Add revealed names to `Additional Names` in front matter and note the reveal in the changelog.
 
+### Renaming entities
+Use `rename_entity` when an entity's *canonical display name* changes — not just an alias reveal, but a true rename. The tool moves the file to the new slug, updates the H1, and rewrites every wikilink across the campaign that pointed to the old entity. Examples:
+- The opening locale starts as a placeholder (see "Placeholder entities" below) and the DM has just named it.
+- A tavern called "the Crooked Tankard" turns out to actually be "The Last Chance Saloon" — and the old name was simply wrong, not a nickname.
+- A character changes legal name (marriage, exile, royal title).
+
+If the old name is still meaningful as an alias, add it to `Additional Names` *after* the rename via `write_entity` update.
+
+### Placeholder entities
+When a new campaign starts, world-builder creates a stub `Starting Location` with `**Placeholder:** true`. The first time the DM gives the opening locale a real name in narration, you should:
+1. Call `rename_entity` with `entity_type: "location"`, `old_name: "Starting Location"`, `new_name: "<the real name>"`.
+2. Then `write_entity` (mode: update) on the renamed location to set `placeholder: null` (which removes the front matter key) and add real description content.
+
+Never leave `**Placeholder:** true` on an entity that has been fleshed out. If you see any other entity with the placeholder flag, treat it the same way the moment a real name appears.
+
 ### File format
 Entity files are **markdown**. The body field in `write_entity` is markdown text — use real line breaks between paragraphs, not literal `\n` sequences.
 

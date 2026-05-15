@@ -115,8 +115,9 @@ describe("collectDiagnostics", () => {
 
     // Top-level .debug content prefixed with .debug/
     expect(keys).toContain(".debug/engine.jsonl");
-    expect(keys).toContain(".debug/server.log");
     expect(keys).toContain(".debug/context/dump-1.txt");
+    // server.log is intentionally excluded (noisy stdout/stderr mirror).
+    expect(keys).not.toContain(".debug/server.log");
 
     // Manifest is present, with safe-to-share metadata only
     expect(keys).toContain("manifest.json");

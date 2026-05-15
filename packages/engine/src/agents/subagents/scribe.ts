@@ -11,6 +11,8 @@ import { formatChangelogEntry } from "../../tools/filesystem/index.js";
 import type { EntityFrontMatter, EntityTree } from "@machine-violet/shared/types/entities.js";
 import { renderEntityTree } from "../../tools/filesystem/index.js";
 import { norm } from "../../utils/paths.js";
+import { renameEntity as renameEntityOp } from "../../tools/campaign-ops/rename-entity.js";
+import type { FileIO } from "../scene-manager.js";
 
 // Re-export slugify from world-builder so the game engine doesn't need a separate import
 export { slugify } from "../world-builder.js";
@@ -51,6 +53,8 @@ export interface ScribeResult {
   updated: string[];
   /** Entity tree deltas — entries to upsert into the entity tree */
   entityDeltas: ScribeEntityDelta[];
+  /** Slugs to remove from the entity tree (e.g. after a rename). */
+  removedSlugs: string[];
   /** Usage stats */
   usage: UsageStats;
 }
@@ -62,6 +66,10 @@ export interface ScribeFileIO {
   exists(path: string): Promise<boolean>;
   listDir(path: string): Promise<string[]>;
   mkdir(path: string): Promise<void>;
+  /** Optional. Required for `rename_entity`. */
+  deleteFile?(path: string): Promise<void>;
+  /** Optional. Used by `rename_entity` to clean up an emptied location dir. */
+  rmdir?(path: string): Promise<void>;
 }
 
 // --- Scribe Tools (given to the subagent) ---
@@ -135,6 +143,34 @@ const SCRIBE_TOOLS: NormalizedTool[] = [
         },
       },
       required: ["mode", "entity_type", "name"],
+    },
+  },
+  {
+    name: "rename_entity",
+    description:
+      "Rename an existing entity. Moves the file to the new slug, updates its H1 to the new display name, and rewrites every wikilink across the campaign that pointed to the old entity. Use this when an entity is renamed in fiction (e.g. a tavern reveals its real name) — and especially to replace the placeholder `Starting Location` once the opening locale has a real name. Player entities are machine-scope and not renamable through this tool.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        entity_type: {
+          type: "string",
+          enum: ["character", "location", "faction", "lore", "item"],
+          description: "Entity type. `player` is intentionally excluded — player files are machine-scope.",
+        },
+        old_name: {
+          type: "string",
+          description: "Current display name of the entity (e.g. \"Starting Location\"). Used to derive the existing slug.",
+        },
+        new_name: {
+          type: "string",
+          description: "New display name (e.g. \"The Crooked Coin Tavern\"). The new slug is derived from this name.",
+        },
+        changelog_entry: {
+          type: "string",
+          description: "Optional changelog entry. If omitted, a default \"Renamed from X to Y\" entry is added.",
+        },
+      },
+      required: ["entity_type", "old_name", "new_name"],
     },
   },
 ];
@@ -236,6 +272,7 @@ export function buildScribeToolHandler(
   created: string[],
   updated: string[],
   entityDeltas: ScribeEntityDelta[],
+  removedSlugs: string[] = [],
   homeDir?: string,
 ) {
   const paths = campaignPaths(campaignRoot);
@@ -390,6 +427,99 @@ export function buildScribeToolHandler(
         }
       }
 
+      case "rename_entity": {
+        const entityType = input.entity_type as string;
+        const oldName = input.old_name as string;
+        const newName = input.new_name as string;
+        if (!oldName || !newName) {
+          return { content: "rename_entity requires 'old_name' and 'new_name'", is_error: true };
+        }
+        // Player entities live under homeDir, not campaignRoot — renaming them
+        // would mean retargeting every campaign that knows the player.
+        // Out of scope for an in-campaign Scribe.
+        if (entityType === "player") {
+          return { content: "rename_entity does not support player entities (machine-scope, not campaign-scope)", is_error: true };
+        }
+        const oldSlug = slugify(oldName);
+        const newSlug = slugify(newName);
+        if (oldSlug === newSlug) {
+          return { content: `Old and new names slugify to the same value (${oldSlug}); nothing to rename`, is_error: true };
+        }
+        if (!fileIO.deleteFile) {
+          return { content: "rename_entity requires file deletion support, which is unavailable in this environment", is_error: true };
+        }
+
+        const oldFilePath = norm(entityPath(entityType, oldSlug));
+        const newFilePath = norm(entityPath(entityType, newSlug));
+        // Defense in depth: refuse anything that didn't resolve under campaignRoot.
+        // Catches future bugs where a new entity type lands outside the campaign tree.
+        const normRoot = norm(campaignRoot);
+        if (!oldFilePath.startsWith(normRoot + "/") || !newFilePath.startsWith(normRoot + "/")) {
+          return { content: `rename_entity refused: ${entityType} resolves outside the campaign root`, is_error: true };
+        }
+        if (!(await fileIO.exists(oldFilePath))) {
+          return { content: `Entity not found: ${entityType}/${oldSlug}`, is_error: true };
+        }
+        if (await fileIO.exists(newFilePath)) {
+          return { content: `Cannot rename: ${entityType}/${newSlug} already exists`, is_error: true };
+        }
+
+        const oldRelative = oldFilePath.slice(normRoot.length + 1);
+        const newRelative = newFilePath.slice(normRoot.length + 1);
+
+        try {
+          // Move the file and rewrite incoming wikilinks campaign-wide.
+          // ScribeFileIO is a structural subset of the FileIO that
+          // renameEntity needs; deleteFile is the only optional method
+          // it touches and we already checked it above.
+          const renameResult = await renameEntityOp(
+            campaignRoot,
+            fileIO as FileIO,
+            oldRelative,
+            newRelative,
+            false,
+          );
+
+          // Update the H1 to the new display name and add a changelog entry.
+          const moved = await fileIO.readFile(newFilePath);
+          const { frontMatter, body, changelog } = parseFrontMatter(moved);
+          const entry = (input.changelog_entry as string | undefined)?.trim()
+            || `Renamed from ${oldName} to ${newName}`;
+          const updatedChangelog = [
+            ...changelog,
+            formatChangelogEntry(sceneNumber, unescapeNewlines(entry)),
+          ];
+          const finalContent = serializeEntity(newName, frontMatter, body, updatedChangelog);
+          await fileIO.writeFile(newFilePath, finalContent);
+
+          // Best-effort: remove the now-empty location subdirectory.
+          if (entityType === "location" && fileIO.rmdir) {
+            const oldDir = oldFilePath.replace(/\/index\.md$/, "");
+            try {
+              await fileIO.rmdir(oldDir);
+            } catch {
+              // Directory may still contain map JSONs — leave it.
+            }
+          }
+
+          // Track tree changes and updated-file list.
+          const aliasRaw = frontMatter.additional_names as string | undefined;
+          const aliases = aliasRaw ? aliasRaw.split(",").map(a => a.trim()).filter(Boolean) : [];
+          entityDeltas.push({ slug: newSlug, name: newName, aliases, type: entityType, path: newRelative });
+          removedSlugs.push(oldSlug);
+          updated.push(newFilePath);
+
+          const fileWord = renameResult.filesUpdated.length === 1 ? "file" : "files";
+          const linkWord = renameResult.linksUpdated === 1 ? "link" : "links";
+          return {
+            content: `Renamed ${entityType} "${oldName}" -> "${newName}". Rewrote ${renameResult.linksUpdated} ${linkWord} across ${renameResult.filesUpdated.length} ${fileWord}.`,
+          };
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          return { content: `rename_entity failed: ${msg}`, is_error: true };
+        }
+      }
+
       default:
         return { content: `Unknown tool: ${name}`, is_error: true };
     }
@@ -412,6 +542,7 @@ export async function runScribe(
   const created: string[] = [];
   const updated: string[] = [];
   const entityDeltas: ScribeEntityDelta[] = [];
+  const removedSlugs: string[] = [];
 
   const toolHandler = buildScribeToolHandler(
     fileIO,
@@ -420,6 +551,7 @@ export async function runScribe(
     created,
     updated,
     entityDeltas,
+    removedSlugs,
     input.homeDir,
   );
 
@@ -451,6 +583,7 @@ export async function runScribe(
     created,
     updated,
     entityDeltas,
+    removedSlugs,
     usage: result.usage,
   };
 }

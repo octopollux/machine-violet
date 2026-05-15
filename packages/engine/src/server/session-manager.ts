@@ -748,8 +748,9 @@ export class SessionManager {
       // If a mode session (OOC/Dev) is active, route to it
       const modeSession = this.engine.getModeSession();
       if (modeSession) {
+        let modeResult: Awaited<ReturnType<typeof modeSession.send>> | undefined;
         try {
-          await modeSession.send(text, (delta) => {
+          modeResult = await modeSession.send(text, (delta) => {
             scopedBroadcast({ type: "narrative:chunk", data: { text: delta, kind: "dm" } });
           });
         } catch (err) {
@@ -770,6 +771,46 @@ export class SessionManager {
         }
         scopedBroadcast({ type: "narrative:complete", data: { text: "" } });
         this.persistTurnState();
+
+        // If OOC signaled end-of-session, exit OOC and stash the summary
+        // so the next DM turn picks up <ooc_summary> context. If OOC also
+        // produced a player action, run it through the DM right now so the
+        // same turn that exits OOC carries both the summary and the
+        // in-character action forward.
+        if (modeResult?.endSession) {
+          this.engine.setModeSession(null);
+          const previousVariant = this.engine.getPreviousVariant() ?? "exploration";
+          scopedBroadcast({
+            type: "session:mode",
+            data: { mode: "play", variant: previousVariant },
+          });
+          if (modeResult.summary) {
+            this.engine.setPendingOOCSummary(modeResult.summary);
+          }
+          scopedBroadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
+          if (modeResult.playerAction && this.gameState) {
+            const active = getActivePlayer(this.gameState);
+            try {
+              await this.engine.processInput(active.characterName, modeResult.playerAction);
+            } catch (err) {
+              if (err instanceof RollbackCompleteError) {
+                scopedBroadcast({ type: "narrative:complete", data: { text: "" } });
+                scopedBroadcast({
+                  type: "narrative:chunk",
+                  data: { text: `[${err.message}]`, kind: "system" },
+                });
+                await this.endSession("rollback");
+                return;
+              }
+              throw err;
+            }
+            this.persistTurnState();
+            scopedBroadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
+          }
+          this.openNextTurn();
+          return;
+        }
+
         scopedBroadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
         this.openNextTurn();
         return;
@@ -981,7 +1022,11 @@ export class SessionManager {
     if (entityListing) {
       priming += "\n\nPre-existing entities (created during setup — write to these paths,"
         + " do not create duplicates under alternate names):\n"
-        + entityListing;
+        + entityListing
+        + "\n\nThe `Starting Location` entry is a placeholder. The first time"
+        + " your opening narration names the locale, dispatch a Scribe update"
+        + " naming the location — the Scribe will call `rename_entity` to move"
+        + " the placeholder to the real name and rewrite any wikilinks.";
     }
 
     this.syncUIState();

@@ -274,6 +274,73 @@ export class GameEngine {
     return this.tierProviders[tier];
   }
 
+  /** Get the engine's FileIO (campaign-root anchored). OOC/Dev reuse it. */
+  getFileIO(): FileIO {
+    return this.fileIO;
+  }
+
+  /** Get live game state. OOC dispatches tools against this same object. */
+  getGameState(): GameState {
+    return this.gameState;
+  }
+
+  /** Get the tool registry the DM uses. OOC dispatches through the same singleton. */
+  getRegistry(): ToolRegistry {
+    return this.registry;
+  }
+
+  /**
+   * Async tool handler exposed for mode sessions (OOC/Dev) that want to
+   * reuse the DM's async tool surface (resolve_turn, search_campaign,
+   * search_content, style_scene). Returns null for tools the handler
+   * doesn't cover — callers should fall back to `registry.dispatch`.
+   */
+  handleAsyncTool(name: string, input: Record<string, unknown>): Promise<import("./tool-registry.js").ToolResult | null> {
+    return this.handleAsyncToolInternal(name, input);
+  }
+
+  /**
+   * Forward an immediate (non-deferred) TUI command through the same
+   * pipeline DM tool calls use — broadcasts to the client and updates
+   * persisted UI state. Exposed so OOC/Dev's immediate TUI tool calls
+   * (style_scene, update_modeline, set_resource_values, etc.) reach the
+   * client just like the DM's.
+   */
+  dispatchImmediateTuiCommand(cmd: TuiCommand): void {
+    this.callbacks.onTuiCommand(cmd);
+  }
+
+  /**
+   * Process a batch of deferred TUI commands (scribe, promote_character,
+   * dm_notes, scene_transition, session_end, rollback) the same way the DM
+   * does after its agent loop completes. Exposed so OOC can share the
+   * exact same teardown semantics. May throw RollbackCompleteError.
+   */
+  async applyDeferredTuiCommands(commands: TuiCommand[]): Promise<void> {
+    for (const cmd of commands) {
+      if (cmd.type === "scene_transition") {
+        await this.transitionScene(cmd.title as string, cmd.time_advance as number | undefined);
+      } else if (cmd.type === "session_end") {
+        await this.endSession(cmd.title as string, cmd.time_advance as number | undefined);
+      } else if (cmd.type === "rollback") {
+        await this.rollbackAndExit(cmd.target as string);
+      } else if (cmd.type === "scribe") {
+        await this.handleScribe(cmd);
+      } else if (cmd.type === "promote_character") {
+        await this.handlePromoteCharacter(cmd);
+      } else if (cmd.type === "dm_notes") {
+        await this.handleDmNotes(cmd);
+      } else if (cmd.type === "present_choices") {
+        // `present_choices` is in DEFERRED_TUI_TYPES so the modal lands
+        // after the DM's prose (matters for codex/GPT-5.5, which emits
+        // all tool calls before any text). Re-broadcast through the same
+        // onTuiCommand sink the bridge would have used immediately for a
+        // non-deferred command.
+        this.callbacks.onTuiCommand?.(cmd);
+      }
+    }
+  }
+
   /** Active mode session (OOC/Dev). Null when in normal play mode. */
   private modeSession: import("@machine-violet/shared/types/engine.js").ModeSession | null = null;
   /** Variant active before entering a mode session, for restoration on exit. */
@@ -594,8 +661,11 @@ export class GameEngine {
       // during scene transitions, leaving it stale during normal play.
       await this.sceneManager.flushTranscript();
 
-      // Track exchange for git auto-commit
-      await this.repo?.trackExchange();
+      // Track exchange for git auto-commit. Use the raw player message as the
+      // commit subject so the savestate log is browsable; synthetic system
+      // turns (skipTranscript: session open/resume) fall back to the generic
+      // label.
+      await this.repo?.trackExchange(opts?.skipTranscript ? undefined : text);
 
       // Run scene tracker periodically to maintain open threads / NPC intents
       if (!opts?.skipTranscript) {
@@ -620,39 +690,14 @@ export class GameEngine {
         this.persistCurrentScene();
       }
 
-      // Process deferred TUI commands — engine-side actions (scene
-      // transitions, subagent spawns, file I/O) and any visual commands
-      // we explicitly deferred for ordering reasons. Modeline/resources/
-      // theme commands were already broadcast to the client immediately
-      // when the tool fired.
-      //
-      // `present_choices` is deferred (see DEFERRED_TUI_TYPES rationale)
-      // so it never beats the DM's prose to the screen. Re-broadcast
-      // each one here through the same onTuiCommand sink the
-      // bridge would have used for non-deferred commands.
-      for (const cmd of result.tuiCommands) {
-        if (cmd.type === "scene_transition") {
-          await this.transitionScene(
-            cmd.title as string,
-            cmd.time_advance as number | undefined,
-          );
-        } else if (cmd.type === "session_end") {
-          await this.endSession(
-            cmd.title as string,
-            cmd.time_advance as number | undefined,
-          );
-        } else if (cmd.type === "rollback") {
-          await this.rollbackAndExit(cmd.target as string);
-        } else if (cmd.type === "scribe") {
-          await this.handleScribe(cmd);
-        } else if (cmd.type === "promote_character") {
-          await this.handlePromoteCharacter(cmd);
-        } else if (cmd.type === "dm_notes") {
-          await this.handleDmNotes(cmd);
-        } else if (cmd.type === "present_choices") {
-          this.callbacks.onTuiCommand?.(cmd);
-        }
-      }
+      // Process deferred TUI commands — engine-side work (scene transitions,
+      // subagent spawns, file I/O) plus any visual commands we explicitly
+      // deferred for ordering reasons (currently `present_choices`, so the
+      // modal can't beat the DM's prose to the screen). Visual-only
+      // commands not in DEFERRED_TUI_TYPES (modeline, resources, theme)
+      // were already broadcast to the client immediately when the tool
+      // fired.
+      await this.applyDeferredTuiCommands(result.tuiCommands);
 
       // Accumulate usage
       accUsage(this.sessionUsage, result.usage);
@@ -991,6 +1036,11 @@ export class GameEngine {
       if (result.entityDeltas) {
         for (const delta of result.entityDeltas) {
           this.sceneManager.upsertEntity(delta);
+        }
+      }
+      if (result.removedSlugs) {
+        for (const slug of result.removedSlugs) {
+          this.sceneManager.removeEntity(slug);
         }
       }
 
@@ -1372,7 +1422,7 @@ export class GameEngine {
       provider: this.provider,
       maxTokens: getMaxOutput(this.model),
       maxToolRounds: 10,
-      asyncToolHandler: (name, input) => this.handleAsyncTool(name, input),
+      asyncToolHandler: (name, input) => this.handleAsyncToolInternal(name, input),
       onTextDelta: (delta) => this.callbacks.onNarrativeDelta(delta),
       onToolStart: (name) => {
         this.setState("tool_running");
@@ -1397,7 +1447,7 @@ export class GameEngine {
   }
 
   /** Handle tools that require async work (subagent spawning, I/O). */
-  private async handleAsyncTool(
+  private async handleAsyncToolInternal(
     name: string,
     input: Record<string, unknown>,
   ): Promise<import("./tool-registry.js").ToolResult | null> {

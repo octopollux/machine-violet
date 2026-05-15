@@ -179,6 +179,53 @@ describe("runProviderLoop retry", () => {
     expect(onRetry).toHaveBeenCalledTimes(2);
   });
 
+  it("retries indefinitely by default (no maxRetries cap)", async () => {
+    // Regression: an earlier default of maxRetries=5 caused the engine to give
+    // up after ~27s of backoff during a network outage, silently dropping the
+    // retry modal and stranding the player. The spec promises indefinite
+    // retry; this test pins the default by exercising more failures than the
+    // old cap would have permitted.
+    const FAILURES_BEFORE_RECOVERY = 10;
+    let callCount = 0;
+    const provider: LLMProvider = {
+      providerId: "test",
+      chat: vi.fn(async () => {
+        callCount++;
+        if (callCount <= FAILURES_BEFORE_RECOVERY) throw networkError();
+        return textResult("Reconnected");
+      }),
+      stream: vi.fn(),
+      healthCheck: vi.fn(),
+    };
+
+    const onRetry = vi.fn();
+    const promise = runProviderLoop(provider, "system", [
+      { role: "user", content: "hello" },
+    ], {
+      name: "test",
+      model: "test-model",
+      maxTokens: 100,
+      stream: false,
+      onRetry,
+      // Note: no maxRetries — use the default.
+    });
+
+    // Step through one pending timer at a time rather than baking in the
+    // current backoff schedule (1,2,4,8,12,…) — that decouples the test from
+    // the exact `retryDelay()` curve so future tuning of the backoff doesn't
+    // break this test even though the "no default cap" behavior is unchanged.
+    // Bounded loop in case the implementation regresses and stops scheduling.
+    for (let i = 0; i < FAILURES_BEFORE_RECOVERY * 2; i++) {
+      if (callCount > FAILURES_BEFORE_RECOVERY) break;
+      await vi.advanceTimersToNextTimerAsync();
+    }
+    const result = await promise;
+
+    expect(result.text).toBe("Reconnected");
+    expect(callCount).toBe(FAILURES_BEFORE_RECOVERY + 1);
+    expect(onRetry).toHaveBeenCalledTimes(FAILURES_BEFORE_RECOVERY);
+  });
+
   it("does not retry non-retryable errors (400)", async () => {
     const provider: LLMProvider = {
       providerId: "test",

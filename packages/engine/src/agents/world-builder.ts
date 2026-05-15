@@ -99,15 +99,16 @@ export async function buildCampaignWorld(
   );
   await fileIO.writeFile(logPath, logContent);
 
-  // 7. Write starting location (minimal)
+  // 7. Write starting location (placeholder — DM renames via Scribe once it
+  // has named the opening locale; see scribe.md "Placeholder entities").
   const locationSlug = "starting-location";
   const locationPath = norm(paths.location(locationSlug));
   const locationDir = locationPath.replace(/\/index\.md$/, "");
   await fileIO.mkdir(locationDir);
   const locationContent = serializeEntity(
     "Starting Location",
-    { type: "Location" },
-    "The story begins here.",
+    { type: "Location", placeholder: true },
+    "_Placeholder — rename via `rename_entity` once the opening locale has a real name in the fiction._",
     [],
   );
   await fileIO.writeFile(locationPath, locationContent);

@@ -640,6 +640,7 @@ Front matter lines appear immediately after the H1 heading and before the body. 
 | `hp` | HP | Characters | `28/35` |
 | `ac` | AC | Characters | `16` |
 | `xp` | XP | Characters | `1200` |
+| `placeholder` | Placeholder | Any | `true` — flags a stub entity that the Scribe should rename + flesh out (e.g. the bootstrap `Starting Location`). Removed once the entity has a real name and content. |
 
 The `_title` key is internal (extracted from the H1 heading) and never serialized.
 
@@ -760,7 +761,7 @@ The campaign directory contains a local git repository managed by isomorphic-git
 
 | Type | Message format | Trigger |
 |---|---|---|
-| `auto` | `auto: exchanges 45-47` | Every N exchanges (configurable) |
+| `auto` | `auto: I draw my sword and charge the troll.` (player's last message, single-line, truncated to 72 chars; `auto: exchanges` for synthetic system turns) | Every N exchanges (configurable) |
 | `scene` | `scene: Escape from the Goblin Caves` | Scene transition checkpoint |
 | `session` | `session: end session 3` | Session end |
 | `character` | `character: Marta Voss promoted` | Character promotion/update |
