@@ -7,7 +7,7 @@
  */
 import { createContext, useContext } from "react";
 import type { NarrativeLine, ActiveModal, RetryOverlay } from "@machine-violet/shared/types/tui.js";
-import type { ChoicesData, Turn, StateSnapshot } from "@machine-violet/shared";
+import type { ChoicesData, Turn, StateSnapshot, UsageStatus } from "@machine-violet/shared";
 import type { ToolGlyph } from "./activity.js";
 import type { ResolvedTheme, StyleVariant } from "./themes/types.js";
 import type { ApiClient } from "../api-client.js";
@@ -60,6 +60,9 @@ export interface GameContextValue {
 
   // State snapshot (latest from server)
   stateSnapshot: StateSnapshot | null;
+
+  // Provider remaining-usage snapshot (null when not on a usage-tracking provider).
+  usageStatus: UsageStatus | null;
 
   // Terminal capabilities
   /** Whether the Kitty keyboard protocol is active (affects raw mode guardian). */

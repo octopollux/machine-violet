@@ -624,6 +624,7 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
         : null,
       mode: clientState.mode,
       stateSnapshot,
+      usageStatus: clientState.usageStatus,
       hasKittyProtocol,
       stdinFilterChain,
       devModeEnabled,
