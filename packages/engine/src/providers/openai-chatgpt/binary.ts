@@ -2,16 +2,20 @@
  * Resolve the `codex` binary path.
  *
  * Look up order:
- *   1. Colocated with the running executable: `<exeDir>/codex/bin/codex.js`
- *      with vendor binaries at `<exeDir>/codex/vendor/{triple}/...`. This is
- *      what production builds ship — see `scripts/build-dist.js`, which
- *      copies the platform-matching codex tree out of node_modules into
- *      `dist/codex/` next to the SEA executable. The codex.js wrapper's
- *      own fallback path (`../vendor/...` relative to bin/codex.js) finds
- *      the native binary without needing a sibling optional-dep package.
+ *   1. Colocated with the running executable: `<exeDir>/codex/vendor/{triple}/codex/codex[.exe]`,
+ *      vendored next to the SEA binary by `scripts/build-dist.js`. We spawn
+ *      the native Rust binary directly — NOT the `codex.js` wrapper —
+ *      because `process.execPath` in a Node SEA build is the SEA exe itself
+ *      (e.g. `MachineViolet.exe`), not a real `node` interpreter. A SEA
+ *      binary ignores its first script-path argv and always runs its
+ *      embedded main, so `MachineViolet.exe codex/bin/codex.js app-server`
+ *      would relaunch Machine Violet instead of running Codex.
+ *      We also prepend `vendor/{triple}/path` to PATH so the bundled
+ *      `rg.exe` is discoverable — that's what codex.js does too.
  *   2. The `@openai/codex` npm package resolved via `createRequire` —
  *      this is the path for `npm run dev` and tests, where node_modules
- *      lives next to the source.
+ *      lives next to the source and `process.execPath` IS real Node, so
+ *      running codex.js through it works.
  *   3. `process.env.CODEX_BIN` override — for local dev or experiments
  *      (accepts a `.js` script or a native exe).
  *   4. PATH lookup — fallback for environments where the user installed
@@ -20,8 +24,8 @@
  * If none resolves, callers will get a spawn EAGAIN/ENOENT and surface a
  * "Codex runtime not installed" error to the user.
  */
-import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { delimiter, dirname, join } from "node:path";
 import { createRequire } from "node:module";
 
 let cached: CodexBinaryResolution | null = null;
@@ -31,6 +35,8 @@ export interface CodexBinaryResolution {
   path: string;
   /** Arguments to prepend (e.g. ["bin/codex.js"] when path is "node"). */
   prefixArgs: string[];
+  /** Extra env vars to merge into the spawned child's environment (e.g. PATH augmentation for bundled `rg`). */
+  extraEnv?: Record<string, string>;
   source: "colocated" | "bundled" | "env" | "path";
 }
 
@@ -45,21 +51,41 @@ export function resolveCodexBinary(): CodexBinaryResolution {
   if (cached) return cached;
 
   // 1. Colocated with the running executable — production SEA builds ship
-  // `dist/codex/bin/codex.js` + `dist/codex/vendor/{triple}/...` next to
-  // MachineViolet[.exe]. We run codex.js through Node (the SEA process
-  // itself) so we don't need a separate Node install. codex.js's own
-  // bootstrap looks for `../vendor/...` next to itself and finds the
-  // native Rust binary without requiring sibling node_modules.
-  //
-  // In dev mode, `process.execPath` is the user's Node binary (e.g.
-  // /usr/bin/node) and the colocated probe naturally misses, falling
-  // through to the createRequire path.
+  // `dist/codex/vendor/{triple}/codex/codex[.exe]` next to MachineViolet[.exe].
+  // We spawn the native Rust binary directly; running codex.js through
+  // `process.execPath` would actually relaunch the SEA exe itself (the SEA
+  // ignores script-path argv and always runs its embedded main).
   try {
     const exeDir = dirname(process.execPath);
-    const colocated = join(exeDir, "codex", "bin", "codex.js");
-    if (existsSync(colocated)) {
-      cached = { path: process.execPath, prefixArgs: [colocated], source: "colocated" };
-      return cached;
+    const codexRoot = join(exeDir, "codex");
+    const vendorDir = join(codexRoot, "vendor");
+    if (existsSync(vendorDir)) {
+      // Each build vendors exactly one platform triple's subdir. Just take
+      // whatever's there rather than re-deriving the platform mapping.
+      const triples = readdirSync(vendorDir).filter((d) =>
+        statSync(join(vendorDir, d)).isDirectory(),
+      );
+      if (triples.length > 0) {
+        const triple = triples[0];
+        const exeName = process.platform === "win32" ? "codex.exe" : "codex";
+        const nativeBin = join(vendorDir, triple, "codex", exeName);
+        if (existsSync(nativeBin)) {
+          // Prepend the sibling `path/` dir to PATH so codex can find its
+          // bundled ripgrep, matching what codex.js does itself.
+          const pathDir = join(vendorDir, triple, "path");
+          const extraEnv: Record<string, string> = {};
+          if (existsSync(pathDir)) {
+            extraEnv.PATH = pathDir + delimiter + (process.env.PATH ?? "");
+          }
+          cached = {
+            path: nativeBin,
+            prefixArgs: [],
+            extraEnv,
+            source: "colocated",
+          };
+          return cached;
+        }
+      }
     }
   } catch { /* fall through */ }
 

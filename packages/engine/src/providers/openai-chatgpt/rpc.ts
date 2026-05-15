@@ -87,6 +87,7 @@ export class CodexRpcClient extends EventEmitter {
 
     this.proc = spawn(bin.path, [...bin.prefixArgs, "app-server", ...this.extraArgs], {
       stdio: ["pipe", "pipe", "inherit"],
+      env: bin.extraEnv ? { ...process.env, ...bin.extraEnv } : process.env,
       // `.cmd` shims on Windows (used by PATH-resolved global installs) need
       // shell resolution. Bundled-mode invokes node directly so shell is off.
       shell: process.platform === "win32" && bin.source === "path",
