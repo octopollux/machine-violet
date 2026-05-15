@@ -150,6 +150,7 @@ export interface ModelListResult {
 export type SandboxMode = "read-only" | "workspace-write" | "danger-full-access";
 export type ApprovalPolicy = "untrusted" | "on-failure" | "on-request" | "never";
 export type ReasoningEffort = "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
+export type ReasoningSummary = "auto" | "concise" | "detailed" | "none";
 
 /** A custom tool registered with the thread. Wire-supported but absent from generated schema. */
 export interface DynamicToolSpec {
@@ -202,6 +203,15 @@ export interface TurnStartParams {
   input: UserInputItem[];
   model?: string;
   effort?: ReasoningEffort;
+  /**
+   * Per-turn override for reasoning-summary verbosity. When unset, codex
+   * falls back to its config default, which for the ChatGPT-account /
+   * app-server flow is effectively "none" — meaning no
+   * `item/reasoning/summaryTextDelta` notifications fire and our
+   * `thinkingText` stays empty even though reasoning tokens are billed.
+   * Set this explicitly to opt into streamed summaries.
+   */
+  summary?: ReasoningSummary;
 }
 
 export interface TurnStartResult {
