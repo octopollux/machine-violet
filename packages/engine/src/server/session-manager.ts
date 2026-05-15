@@ -14,6 +14,7 @@ import type {
   StateSnapshot,
   CampaignConfig,
   GameState,
+  UsageStatus,
 } from "@machine-violet/shared";
 import { GameEngine } from "../agents/game-engine.js";
 import { RollbackCompleteError } from "@machine-violet/shared/types/errors.js";
@@ -82,6 +83,13 @@ export class SessionManager {
    *  Used by management routes (e.g. usage queries) that need to find a
    *  live provider instance for a specific connection. */
   private providersByConnectionId = new Map<string, LLMProvider>();
+  /** Unsubscribe callbacks for active provider usage subscriptions.
+   *  Drained at endSession so the listeners don't leak across sessions. */
+  private usageUnsubscribers: (() => void)[] = [];
+  /** Latest UsageStatus broadcast for the DM tier, replayed to newly
+   *  connecting clients so the gauge / Esc menu show data immediately
+   *  instead of waiting for the next codex response. */
+  private lastUsageStatus: UsageStatus | null = null;
   private currentMode: "play" | "ooc" | "dev" | "setup" = "play";
   private persistedUI: { themeName?: string; variant?: string; keyColor?: string | null; modelines?: Record<string, string> | null } = {};
   /** One-shot recap payload: set during sessionResume, emitted in the next
@@ -155,6 +163,12 @@ export class SessionManager {
         type: "state:snapshot",
         data: snapshot,
       });
+      // Replay the latest provider usage so the bottom-right gauge / Esc
+      // menu percentage render immediately instead of waiting for the
+      // next codex response.
+      if (this.lastUsageStatus) {
+        this.sendTo(ws, { type: "usage:update", data: this.lastUsageStatus });
+      }
     }
   }
 
@@ -466,6 +480,26 @@ export class SessionManager {
     // The DM uses the large tier; keep `provider` as a local alias for the
     // many downstream sites in this method that still reference it directly.
     const provider = tierProviders.large.provider;
+
+    // Wire usage broadcasts for the DM-tier provider. Currently only
+    // openai-chatgpt exposes a usage concept; other providers omit
+    // `subscribeUsage` and this block is a no-op for them. Seeded with the
+    // current snapshot (if any) so clients connecting before the first
+    // codex response still get something to render.
+    this.lastUsageStatus = null;
+    this.usageUnsubscribers = [];
+    if (provider.subscribeUsage) {
+      const seed = provider.getUsageStatus?.() ?? null;
+      if (seed) {
+        this.lastUsageStatus = seed;
+        this.broadcast({ type: "usage:update", data: seed });
+      }
+      const unsub = provider.subscribeUsage((status) => {
+        this.lastUsageStatus = status;
+        this.broadcast({ type: "usage:update", data: status });
+      });
+      this.usageUnsubscribers.push(unsub);
+    }
 
     // --- Debug: set context dump directory ---
     const { setContextDumpDir } = await import("../config/context-dump.js");
@@ -1144,6 +1178,15 @@ export class SessionManager {
         stack: err instanceof Error ? err.stack : undefined,
       });
     }
+
+    // Drain usage subscriptions before disposing providers so the
+    // unsubscribe callback (which removes from the provider's listener
+    // set) can't race with subprocess teardown.
+    for (const unsub of this.usageUnsubscribers) {
+      try { unsub(); } catch { /* best-effort */ }
+    }
+    this.usageUnsubscribers = [];
+    this.lastUsageStatus = null;
 
     // Dispose stateful providers (openai-chatgpt subprocess teardown).
     // Each provider's dispose is idempotent and best-effort — errors are

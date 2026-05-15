@@ -6,6 +6,7 @@
  */
 import { Type, type Static } from "@sinclair/typebox";
 import { TurnContribution, Turn } from "./turn.js";
+import { UsageStatus } from "./usage.js";
 
 // --- Narrative ---
 
@@ -153,6 +154,13 @@ export const DiscordPresenceEvent = Type.Object({
   ]),
 });
 
+// --- Provider usage (remaining session quota) ---
+
+export const UsageUpdateEvent = Type.Object({
+  type: Type.Literal("usage:update"),
+  data: UsageStatus,
+});
+
 // --- Error ---
 
 export const ErrorEvent = Type.Object({
@@ -182,6 +190,7 @@ export const ServerEvent = Type.Union([
   SessionEndedEvent,
   SessionTransitionEvent,
   DiscordPresenceEvent,
+  UsageUpdateEvent,
   ErrorEvent,
 ]);
 
@@ -200,5 +209,6 @@ export type SessionModeEvent = Static<typeof SessionModeEvent>;
 export type SessionEndedEvent = Static<typeof SessionEndedEvent>;
 export type SessionTransitionEvent = Static<typeof SessionTransitionEvent>;
 export type DiscordPresenceEvent = Static<typeof DiscordPresenceEvent>;
+export type UsageUpdateEvent = Static<typeof UsageUpdateEvent>;
 export type ErrorEvent = Static<typeof ErrorEvent>;
 export type ServerEvent = Static<typeof ServerEvent>;

@@ -43,6 +43,7 @@ export function PlayingPhase() {
     activeChoices, setActiveChoices,
     activeModal, setActiveModal,
     mode, stateSnapshot,
+    usageStatus,
     hasKittyProtocol,
     devModeEnabled,
     showVerbose,
@@ -535,6 +536,7 @@ export function PlayingPhase() {
           devModeEnabled={devModeEnabled}
           devActive={mode === "dev"}
           tokenSummary={tokenSummary}
+          usageStatus={usageStatus}
           onSelect={handleMenuSelect}
           onDismiss={() => setMenuOpen(false)}
         />

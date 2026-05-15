@@ -21,9 +21,11 @@ import type {
   StateSnapshotEvent,
   SessionModeEvent,
   SessionEndedEvent,
+  UsageUpdateEvent,
   ErrorEvent,
   Turn,
   StateSnapshot,
+  UsageStatus,
 } from "@machine-violet/shared";
 import type { NarrativeLine, StyleVariant } from "@machine-violet/shared/types/tui.js";
 import { appendDelta } from "./tui/narrative-helpers.js";
@@ -71,6 +73,9 @@ export interface ClientState {
   displayResources: Record<string, string[]>;
   /** Per-character resource values: character → key → value. */
   resourceValues: Record<string, Record<string, string>>;
+  /** Latest provider usage snapshot. Null until a provider with a usage
+   *  concept (currently only openai-chatgpt) has reported one. */
+  usageStatus: UsageStatus | null;
 }
 
 export function initialClientState(): ClientState {
@@ -92,6 +97,7 @@ export function initialClientState(): ClientState {
     modelines: {},
     displayResources: {},
     resourceValues: {},
+    usageStatus: null,
   };
 }
 
@@ -127,6 +133,7 @@ const PROGRESS_EVENT_TYPES: ReadonlySet<ServerEvent["type"]> = new Set([
   "session:mode",
   "session:ended",
   "session:transition",
+  "usage:update",
 ]);
 
 /**
@@ -197,9 +204,13 @@ export function createEventHandler(update: StateUpdater): (event: ServerEvent) =
           engineState: "starting_session",
           engineStateSince: Date.now(),
           toolGlyphs: [],
+          usageStatus: null,
         }));
         break;
       }
+      case "usage:update":
+        handleUsageUpdate(event, update);
+        break;
       case "error":
         handleError(event, update);
         break;
@@ -489,6 +500,13 @@ function handleSessionEnded(_event: SessionEndedEvent, update: StateUpdater): vo
     activeChoices: null,
     engineState: null,
     toolGlyphs: [],
+  }));
+}
+
+function handleUsageUpdate(event: UsageUpdateEvent, update: StateUpdater): void {
+  update((prev) => ({
+    ...prev,
+    usageStatus: event.data,
   }));
 }
 

@@ -551,6 +551,80 @@ describe("event-handler", () => {
     });
   });
 
+  describe("usage:update", () => {
+    it("starts with null usageStatus", () => {
+      const h = makeHarness();
+      expect(h.state.usageStatus).toBeNull();
+    });
+
+    it("records the latest UsageStatus", () => {
+      const h = makeHarness();
+      const status = {
+        segments: [{
+          id: "primary",
+          label: "5-hour window",
+          kind: "percentage" as const,
+          usedPercent: 42,
+          status: "ok" as const,
+        }],
+        snapshotAt: 1234,
+        fresh: true,
+      };
+      h.dispatch({ type: "usage:update", data: status });
+      expect(h.state.usageStatus).toEqual(status);
+    });
+
+    it("clears usageStatus on session:transition", () => {
+      const h = makeHarness();
+      h.dispatch({
+        type: "usage:update",
+        data: {
+          segments: [{
+            id: "primary",
+            label: "5-hour window",
+            kind: "percentage",
+            usedPercent: 10,
+            status: "ok",
+          }],
+          snapshotAt: 1,
+          fresh: true,
+        },
+      });
+      expect(h.state.usageStatus).not.toBeNull();
+
+      h.dispatch({
+        type: "session:transition",
+        data: { campaignId: "new-campaign" },
+      });
+      expect(h.state.usageStatus).toBeNull();
+    });
+
+    it("clears recoverable lastError when usage update arrives", () => {
+      const h = makeHarness();
+      h.dispatch({
+        type: "error",
+        data: { message: "retrying", recoverable: true, status: 529 },
+      });
+      expect(h.state.lastError).not.toBeNull();
+
+      h.dispatch({
+        type: "usage:update",
+        data: {
+          segments: [{
+            id: "primary",
+            label: "5h",
+            kind: "percentage",
+            usedPercent: 10,
+            status: "ok",
+          }],
+          snapshotAt: 1,
+          fresh: true,
+        },
+      });
+      expect(h.state.lastError).toBeNull();
+    });
+  });
+
   describe("errors", () => {
     it("stores error with status and delayMs", () => {
       const h = makeHarness();

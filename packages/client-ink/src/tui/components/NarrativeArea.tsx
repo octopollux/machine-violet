@@ -11,6 +11,7 @@ import { useMouseScroll } from "../hooks/useMouseScroll.js";
 import { useOptionalGameContext } from "../game-context.js";
 import { composeTurnSeparator } from "../themes/composer.js";
 import type { ThemeAsset } from "../themes/types.js";
+import { UsageGauge } from "./UsageGauge.js";
 
 
 // ---------------------------------------------------------------------------
@@ -244,6 +245,12 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
   // Incremental pipeline: frozen prefix cached, only tail reprocessed
   const processedLines = useProcessedLines(visibleLines, width ?? 0, quoteColor);
 
+  // Bottom-right overlay: the scroll indicator (when there's content
+  // below) takes priority over the usage gauge. They share the same row,
+  // and rendering both would risk visual bleed through the absolute
+  // positioning — so we pick one and only mount the gauge when the
+  // scroll indicator is hidden.
+  const usageStatus = gameCtx?.usageStatus ?? null;
   return (
     <Box height={maxRows} flexDirection="column">
       <ScrollView ref={scrollRef} onScroll={handleScroll}>
@@ -258,9 +265,13 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
           />
         ))}
       </ScrollView>
-      {linesBelow > 0 && (
+      {linesBelow > 0 ? (
         <Box position="absolute" width="100%" marginTop={maxRows - 1} justifyContent="flex-end">
           <Text color="greenBright">{` scroll (${linesBelow}) more `}</Text>
+        </Box>
+      ) : (
+        <Box position="absolute" width="100%" marginTop={maxRows - 1} justifyContent="flex-end">
+          <UsageGauge usage={usageStatus} />
         </Box>
       )}
     </Box>

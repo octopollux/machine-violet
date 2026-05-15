@@ -400,6 +400,66 @@ describe("GameMenu", () => {
     expect(frame).toContain("0/0/0 | 2k/0/15k | 5k/200/40k");
   });
 
+  it("appends remaining-usage percentage to footer when a primary percentage segment is present", () => {
+    const usageStatus = {
+      segments: [{
+        id: "primary",
+        label: "5-hour window",
+        kind: "percentage" as const,
+        usedPercent: 42,
+        status: "warning" as const,
+      }],
+      snapshotAt: 1,
+      fresh: true,
+    };
+    const { lastFrame } = render(
+      <Box width={60} height={24}>
+        <GameMenu
+          theme={theme}
+          width={60}
+          height={24}
+          tokenSummary="0/0/0 | 2k/0/15k | 5k/200/40k"
+          usageStatus={usageStatus}
+          onSelect={noop}
+          onDismiss={noop}
+        />
+      </Box>,
+    );
+    // 42% used → 58% remaining, matching the gauge semantics.
+    expect(lastFrame()).toContain("0/0/0 | 2k/0/15k | 5k/200/40k | 58%");
+  });
+
+  it("omits usage percentage when there is no primary segment", () => {
+    const usageStatus = {
+      segments: [{
+        id: "credits",
+        label: "Credit balance",
+        kind: "balance" as const,
+        used: 0,
+        total: 100,
+        status: "ok" as const,
+      }],
+      snapshotAt: 1,
+      fresh: true,
+    };
+    const { lastFrame } = render(
+      <Box width={60} height={24}>
+        <GameMenu
+          theme={theme}
+          width={60}
+          height={24}
+          tokenSummary="0/0/0"
+          usageStatus={usageStatus}
+          onSelect={noop}
+          onDismiss={noop}
+        />
+      </Box>,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("0/0/0");
+    expect(frame).not.toMatch(/0\/0\/0\s*\|/);
+  });
+
   it("highlights first item by default", () => {
     const { lastFrame } = render(
       <Box width={40} height={24}>
