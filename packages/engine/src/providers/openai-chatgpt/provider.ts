@@ -523,11 +523,18 @@ export class OpenAIChatGptProvider implements LLMProvider {
       const turnInput: TurnStartParams["input"] = lastUserText
         ? [{ type: "text", text: lastUserText }]
         : [{ type: "text", text: "(continue)" }];
+      // Request detailed reasoning summaries whenever we're asking for any
+      // reasoning effort. Without this, codex defaults to summary="none" for
+      // chatgpt-account flows and our thinkingText never gets populated even
+      // though reasoning tokens are billed — see protocol.ts:TurnStartParams.
       const turnReq: TurnStartParams = {
         threadId,
         input: turnInput,
         ...(params.thinking?.effort
-          ? { effort: mapEffort(params.thinking.effort) }
+          ? {
+              effort: mapEffort(params.thinking.effort),
+              summary: "detailed",
+            }
           : {}),
       };
       log.turnStart({ threadId, effort: turnReq.effort });
