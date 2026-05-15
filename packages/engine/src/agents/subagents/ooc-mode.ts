@@ -138,50 +138,50 @@ export function buildOOCPrompt(options: OOCPromptOptions): string | SystemBlock[
 
 /**
  * Build the OOC tool list: every DM tool (so OOC is self-documenting from
- * the same code path as the DM) minus `enter_ooc`, plus a small set of
- * OOC-only extras for file/git inspection.
+ * the same code path as the DM) minus `enter_ooc`, plus the OOC-only extras
+ * for file/git inspection.
+ *
+ * The OOC-only extras are always included. When the corresponding capability
+ * isn't available at dispatch time (no `fileIO`, no `repo`), the tool returns
+ * a recoverable error — the agent learns by trying, and the prompt doesn't
+ * have to gate its tool advertisement on caller plumbing.
  */
-export function buildOOCTools(registry: ToolRegistry, hasFileIO: boolean, hasRepo: boolean): NormalizedTool[] {
+export function buildOOCTools(registry: ToolRegistry): NormalizedTool[] {
   const tools: NormalizedTool[] = registry.getDefinitions(OOC_EXCLUDED_FROM_REGISTRY);
 
-  if (hasFileIO) {
-    tools.push(
-      {
-        name: "read_file",
-        description: "Read a campaign file by relative path (e.g. 'characters/kael.md').",
-        inputSchema: {
-          type: "object" as const,
-          properties: {
-            path: { type: "string", description: "Relative path within the campaign directory" },
-          },
-          required: ["path"],
+  tools.push(
+    {
+      name: "read_file",
+      description: "Read a campaign file by relative path (e.g. 'characters/kael.md').",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          path: { type: "string", description: "Relative path within the campaign directory" },
         },
+        required: ["path"],
       },
-      {
-        name: "find_references",
-        description: "Find all wikilinks pointing to an entity. Returns file, display text, and line number for each reference.",
-        inputSchema: {
-          type: "object" as const,
-          properties: {
-            path: { type: "string", description: "Entity path relative to campaign root (e.g. 'characters/kael.md')" },
-          },
-          required: ["path"],
+    },
+    {
+      name: "find_references",
+      description: "Find all wikilinks pointing to an entity. Returns file, display text, and line number for each reference.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          path: { type: "string", description: "Entity path relative to campaign root (e.g. 'characters/kael.md')" },
         },
+        required: ["path"],
       },
-      {
-        name: "validate_campaign",
-        description: "Run the full campaign validation suite: broken links, malformed entities, clock/map issues.",
-        inputSchema: {
-          type: "object" as const,
-          properties: {},
-          required: [],
-        },
+    },
+    {
+      name: "validate_campaign",
+      description: "Run the full campaign validation suite: broken links, malformed entities, clock/map issues.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {},
+        required: [],
       },
-    );
-  }
-
-  if (hasRepo) {
-    tools.push({
+    },
+    {
       name: "get_commit_log",
       description: "List git snapshot commits for this campaign. Shows commit hash, type, message, and timestamp. Use to review game history for rollback or debugging.",
       inputSchema: {
@@ -193,8 +193,8 @@ export function buildOOCTools(registry: ToolRegistry, hasFileIO: boolean, hasRep
         },
         required: [],
       },
-    });
-  }
+    },
+  );
 
   return tools;
 }
@@ -368,20 +368,20 @@ export async function enterOOC(
     wasMidNarration: options.wasMidNarration ?? false,
   };
 
-  const hasFileIO = !!(options.fileIO && options.campaignRoot);
-  const hasRepo = !!options.repo;
-  const hasGameState = !!options.gameState && !!options.registry;
-  const hasTools = hasFileIO || hasRepo || hasGameState;
+  // Build tools: the four OOC-only extras (always advertised) plus the DM
+  // registry minus enter_ooc when `options.registry` is provided. Production
+  // always provides a registry, so in practice the agent sees the full
+  // toolset; test-only callers that omit the registry get just the extras.
+  // Capabilities that aren't wired at dispatch time (no fileIO, no repo)
+  // surface as recoverable errors — the prompt doesn't have to gate.
+  const toolRegistry: ToolRegistry = options.registry
+    ?? ({ getDefinitions: () => [] } as unknown as ToolRegistry);
+  const tools: NormalizedTool[] = buildOOCTools(toolRegistry);
 
-  // Build tools: full DM registry minus enter_ooc, plus OOC-only extras.
-  // If we don't have game state, only the OOC-only extras are available.
-  const toolRegistry: ToolRegistry = hasGameState && options.registry
-    ? options.registry
-    : ({ getDefinitions: () => [] } as unknown as ToolRegistry);
-  const tools: NormalizedTool[] = buildOOCTools(toolRegistry, hasFileIO, hasRepo);
-
-  // Build handler chain.
-  const toolHandler = hasTools && hasGameState && options.registry && options.gameState
+  // Handler chain. With a full registry + gameState we use buildOOCToolHandler
+  // (engine-async → registry dispatch). Without them, only the OOC-only
+  // extras have a chance — anything else returns an error.
+  const toolHandler = options.registry && options.gameState
     ? buildOOCToolHandler(
         options.registry,
         options.gameState,
@@ -390,17 +390,12 @@ export async function enterOOC(
         options.campaignRoot,
         options.fileIO,
       )
-    : hasTools
-      ? // No game state: OOC-only extras only. validate_campaign runs
-        // against empty stubs in this branch — the no-gameState path is
-        // for pre-session / test callers without live maps or clocks.
-        async (name: string, input: Record<string, unknown>) => {
-          if (OOC_ONLY_TOOL_SET.has(name)) {
-            return dispatchOOCExtra(name, input, options.repo, options.campaignRoot, options.fileIO, undefined, undefined);
-          }
-          return { content: `Unknown tool: ${name}`, is_error: true };
+    : async (name: string, input: Record<string, unknown>) => {
+        if (OOC_ONLY_TOOL_SET.has(name)) {
+          return dispatchOOCExtra(name, input, options.repo, options.campaignRoot, options.fileIO, undefined, undefined);
         }
-      : undefined;
+        return { content: `Tool unavailable: ${name} requires an active game session`, is_error: true };
+      };
 
   // Wrap the player message with volatile-context preamble, mirroring the
   // DM turn shape. Ephemeral so it doesn't poison the next-turn cache.
@@ -419,11 +414,11 @@ export async function enterOOC(
     name: "ooc",
     model: options.model,
     maxTokens: getMaxOutput(options.model),
-    maxToolRounds: hasTools ? 10 : 1,
+    maxToolRounds: 10,
     stream: !!onStream,
-    tools: tools.length > 0 ? tools : undefined,
+    tools,
     toolHandler,
-    cacheHints: tools.length > 0 ? [{ target: "tools", ttl: "1h" }] : undefined,
+    cacheHints: [{ target: "tools", ttl: "1h" }],
     tuiToolNames: TUI_TOOLS,
     onTuiCommand: options.onTuiCommand,
     onTextDelta: onStream,
