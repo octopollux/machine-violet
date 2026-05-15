@@ -24,7 +24,8 @@ import { buildNameInspiration } from "../agents/name-inspiration.js";
 import { getActivePlayer } from "../agents/player-manager.js";
 import { loadEnv } from "../config/first-launch.js";
 import { loadConnectionStore, buildEffectiveConnections } from "../config/connections.js";
-import { buildTierProviders } from "../config/tier-resolver.js";
+import { buildTierProvidersWithCache } from "../config/tier-resolver.js";
+import type { LLMProvider } from "../providers/types.js";
 import { configDir, norm } from "../utils/paths.js";
 import { processingPaths } from "../config/processing-paths.js";
 import { readBundledRuleCard } from "../config/systems.js";
@@ -74,6 +75,13 @@ export class SessionManager {
   private engine: GameEngine | null = null;
   private gameState: GameState | null = null;
   private costTracker: CostTracker | null = null;
+  /** Providers held for this session — disposed on endSession. Stateful providers
+   *  like openai-chatgpt own subprocesses that must be torn down between sessions. */
+  private sessionProviders = new Set<LLMProvider>();
+  /** connectionId → provider lookup, populated alongside sessionProviders.
+   *  Used by management routes (e.g. usage queries) that need to find a
+   *  live provider instance for a specific connection. */
+  private providersByConnectionId = new Map<string, LLMProvider>();
   private currentMode: "play" | "ooc" | "dev" | "setup" = "play";
   private persistedUI: { themeName?: string; variant?: string; keyColor?: string | null; modelines?: Record<string, string> | null } = {};
   /** One-shot recap payload: set during sessionResume, emitted in the next
@@ -225,6 +233,16 @@ export class SessionManager {
 
   getCostTracker(): CostTracker | null {
     return this.costTracker;
+  }
+
+  /**
+   * Look up the live provider instance for a given connection id, or null
+   * if no session is active or the connection isn't backing an assigned
+   * tier. Used by management routes that need to query a stateful
+   * provider (e.g. openai-chatgpt usage status).
+   */
+  getProviderForConnectionId(connectionId: string): LLMProvider | null {
+    return this.providersByConnectionId.get(connectionId) ?? null;
   }
 
   // --- Setup session ---
@@ -430,7 +448,20 @@ export class SessionManager {
     const appConfigDir = configDir();
     const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
     const { createAnthropicProvider } = await import("../providers/anthropic.js");
-    const tierProviders = buildTierProviders(connStore, () => createAnthropicProvider());
+    const tierResolution = buildTierProvidersWithCache(connStore, () => createAnthropicProvider(), appConfigDir);
+    const tierProviders = tierResolution.tiers;
+
+    // Track unique providers for end-of-session disposal. Stateful providers
+    // (openai-chatgpt) own subprocesses that linger across sessions otherwise.
+    this.sessionProviders.add(tierProviders.large.provider);
+    this.sessionProviders.add(tierProviders.medium.provider);
+    this.sessionProviders.add(tierProviders.small.provider);
+
+    // Build the connectionId → provider lookup for management routes.
+    this.providersByConnectionId.clear();
+    for (const [connId, provider] of tierResolution.byConnectionId) {
+      this.providersByConnectionId.set(connId, provider);
+    }
 
     // The DM uses the large tier; keep `provider` as a local alias for the
     // many downstream sites in this method that still reference it directly.
@@ -672,6 +703,20 @@ export class SessionManager {
     this.gameState = gs;
     this.campaignId = campaignId;
     this.status = "active";
+
+    // Persist cumulative token usage to disk on every API call. The persister
+    // queues writes asynchronously, so the per-call overhead is just a JSON
+    // stringify + enqueue. Without this, the breakdown only lives in memory
+    // and every campaign resume seeds from zero — the resume code in
+    // resumeSession() already calls costTracker.seed(loaded.usage), but
+    // loaded.usage is always undefined because the file was never written.
+    const usagePersister = engine.getPersister();
+    const tracker = this.costTracker;
+    if (usagePersister && tracker) {
+      tracker.onRecord = () => {
+        usagePersister.persistUsage(tracker.getBreakdown());
+      };
+    }
 
     logEvent("session:start", {
       campaignId,
@@ -1099,6 +1144,25 @@ export class SessionManager {
         stack: err instanceof Error ? err.stack : undefined,
       });
     }
+
+    // Dispose stateful providers (openai-chatgpt subprocess teardown).
+    // Each provider's dispose is idempotent and best-effort — errors are
+    // logged but never block session teardown.
+    const providersToDispose = Array.from(this.sessionProviders);
+    this.sessionProviders.clear();
+    this.providersByConnectionId.clear();
+    await Promise.all(providersToDispose.map(async (p) => {
+      if (p.dispose) {
+        try {
+          await p.dispose();
+        } catch (err) {
+          logEvent("provider:dispose_error", {
+            providerId: p.providerId,
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+    }));
 
     this.campaignId = null;
     this.turnManager = null;

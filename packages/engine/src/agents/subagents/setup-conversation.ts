@@ -431,6 +431,82 @@ export function createSetupConversation(
     const MAX_ROUNDS = 4;
     let text = "";
 
+    // Per-turn state set by `dispatchTool` for providers that own tool
+    // dispatch internally (openai-chatgpt — codex's `item/tool/call` server
+    // requests must be answered synchronously, so we can't wait for the
+    // outer loop). Mirrors the bookkeeping the loop body does for legacy
+    // providers; consumed after stream() returns.
+    let internalDispatchUsed = false;
+    let internalPendingChoices: { prompt: string; choices: string[]; descriptions?: string[] } | undefined;
+    // tool_result blocks for non-suspending tools dispatched during this turn.
+    // Codex handles the dispatch in-band, but we still need to record the
+    // results in our normalized history so the next turn's `inject_items`
+    // emits a properly-paired `function_call_output` after each `function_call`.
+    // Without this, re-injected history has orphan `function_call` items and
+    // the model interprets them as aborted calls (e.g. "load_world aborted").
+    const internalToolResults: ContentPart[] = [];
+
+    /**
+     * Run a single tool call. Returns content for the tool-result body.
+     * Used both by the outer loop (for providers that surface
+     * `result.toolCalls`) and by the dispatchTool closure on chatParams
+     * (for providers that consume them internally). The two paths produce
+     * the same side effects: `handleFinalize` fires when finalize_setup
+     * lands, `pendingChoices` is captured when present_choices lands, etc.
+     */
+    function runToolDispatch(call: { id: string; name: string; input: Record<string, unknown> }): { content: string; isError: boolean } {
+      if (call.name === "present_choices") {
+        const input = call.input as { prompt?: string; choices?: unknown; descriptions?: unknown };
+        const rawChoices = Array.isArray(input.choices) ? input.choices : [];
+        const choices = rawChoices.map((c: unknown) => typeof c === "string" ? c : String(c));
+        const rawDescs = Array.isArray(input.descriptions) ? input.descriptions : [];
+        const descriptions = rawDescs.length > 0
+          ? rawDescs.map((d: unknown) => typeof d === "string" ? d : String(d))
+          : undefined;
+        internalPendingChoices = { prompt: input.prompt ?? "Choose:", choices, descriptions };
+        pendingToolUseId = call.id;
+        // Tell the model to halt — we'll resume the conversation with the
+        // player's selection via resolveChoice on the next chat() call.
+        return {
+          content: "Choices have been presented to the player. End your turn now; you will be re-invoked once they select.",
+          isError: false,
+        };
+      }
+      if (call.name === "load_world") {
+        const slug = (call.input as { slug?: string }).slug ?? "";
+        const world = loadWorldBySlug(slug);
+        let content: string;
+        if (world) {
+          const parts: string[] = [];
+          if (world.detail) parts.push(`## Detail\n${world.detail}`);
+          if (world.suboptions?.length) {
+            for (const sub of world.suboptions) {
+              parts.push(`## Suboption: ${sub.label}\n` +
+                sub.choices.map((c: { name: string; description: string }) => `- **${c.name}** — ${c.description}`).join("\n"));
+            }
+          }
+          if (world.system) parts.push(`Suggested system: ${world.system}`);
+          if (world.mood) parts.push(`Suggested mood: ${world.mood}`);
+          if (world.difficulty) parts.push(`Suggested difficulty: ${world.difficulty}`);
+          content = parts.length > 0 ? parts.join("\n\n") : "World loaded but has no additional detail.";
+        } else {
+          content = `No world found with slug "${slug}".`;
+        }
+        return { content, isError: false };
+      }
+      if (call.name === "finalize_setup") {
+        if (call.input._parse_error) {
+          return { content: String(call.input._parse_error), isError: true };
+        }
+        handleFinalize(call.input);
+        return {
+          content: "Setup finalized. Say a brief farewell (don't narrate on behalf of the DM!) and finish with a separator: `---`",
+          isError: false,
+        };
+      }
+      return { content: `Unknown tool: ${call.name}`, isError: true };
+    }
+
     for (let round = 0; round < MAX_ROUNDS; round++) {
       const params: ChatParams = {
         model,
@@ -443,9 +519,65 @@ export function createSetupConversation(
         tools: TOOLS,
         thinking,
         cacheHints,
+        // Per-call dispatch for providers that own the tool loop internally
+        // (openai-chatgpt). Codex sends tool calls as in-band server
+        // requests that must be answered synchronously, so we can't let
+        // them flow through the outer for-loop the way Anthropic / OpenAI
+        // API-key providers do. Other providers ignore this field.
+        dispatchTool: async (call) => {
+          internalDispatchUsed = true;
+          const dispatched = runToolDispatch({ id: call.id, name: call.name, input: call.input });
+          // Record tool_result for non-suspending tools. present_choices
+          // produces no recorded result here — its tool_result is synthesized
+          // later from the player's selection in resolveChoice/send.
+          if (call.name !== "present_choices") {
+            internalToolResults.push({
+              type: "tool_result",
+              tool_use_id: call.id,
+              content: dispatched.content,
+              ...(dispatched.isError ? { is_error: true } : {}),
+            });
+          }
+          return dispatched;
+        },
       };
 
       const result = await streamWithRetry(provider, params, onDelta, onRetry);
+
+      // openai-chatgpt path: codex ran the entire multi-round tool loop
+      // inside its single stream() call. `runToolDispatch` already
+      // captured pendingChoices / fired handleFinalize / etc. Skip the
+      // legacy per-tool loop below and either return early (choices) or
+      // exit the outer for-loop (model finished).
+      if (internalDispatchUsed) {
+        totalUsage.inputTokens += result.usage.inputTokens;
+        totalUsage.outputTokens += result.usage.outputTokens;
+        totalUsage.cacheReadTokens += result.usage.cacheReadTokens;
+        totalUsage.cacheCreationTokens += result.usage.cacheCreationTokens;
+        totalUsage.reasoningTokens += result.usage.reasoningTokens;
+        text += result.text;
+        if (result.thinkingText) dumpThinking("setup", round, result.thinkingText);
+        messages.push({ role: "assistant", content: result.assistantContent });
+        if (internalPendingChoices) {
+          // Stash non-suspending tool_results so resolveChoice/send can
+          // flush them with the present_choices result. Same mechanism the
+          // legacy per-tool loop uses (see below).
+          pendingExtraToolResults = internalToolResults;
+          return {
+            text,
+            usage: { ...totalUsage },
+            pendingChoices: internalPendingChoices,
+          };
+        }
+        // No suspension: push tool_results as a synthetic user message so the
+        // next runTurn's history has function_call_output paired with each
+        // function_call. (Codex already saw these in-band, but our normalized
+        // history is the source of truth for the *next* thread's injection.)
+        if (internalToolResults.length > 0) {
+          messages.push({ role: "user", content: internalToolResults });
+        }
+        break;
+      }
 
       totalUsage.inputTokens += result.usage.inputTokens;
       totalUsage.outputTokens += result.usage.outputTokens;
@@ -549,8 +681,17 @@ export function createSetupConversation(
     // tool calls), do one final tools-disabled API call. Otherwise the next
     // runTurn would push a plain user message on top of an existing one,
     // breaking the role-alternation contract and 400-ing the next request.
+    //
+    // SKIPPED for the codex internal-dispatch path: codex completes the
+    // entire multi-tool turn inside a single stream() call and the model
+    // has already produced its final narration. We push internalToolResults
+    // as a synthetic user message purely so the *next* runTurn's history
+    // injection has function_call_output paired with each function_call —
+    // it is NOT a signal that the model still owes us prose. Re-running
+    // here would have the model re-narrate (the duplicate-output symptom).
     const last = messages[messages.length - 1];
-    if (last && last.role === "user" && Array.isArray(last.content)
+    if (!internalDispatchUsed
+      && last && last.role === "user" && Array.isArray(last.content)
       && last.content.some((c) => (c as { type?: string }).type === "tool_result")) {
       const wrapParams: ChatParams = {
         model,

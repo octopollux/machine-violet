@@ -70,6 +70,24 @@ This project maintains a closed loop between code and documentation. When you ch
 2. Add to the `ServerEvent` union type
 3. Update [websocket-api.md](websocket-api.md) with the new event type, payload fields, and when it fires
 
+### Adding a new LLM provider
+
+1. Create the adapter under `packages/engine/src/providers/<provider-id>/` implementing `LLMProvider`
+2. Add the provider id to the `ProviderType` union in `packages/engine/src/config/connections.ts`
+3. Wire the construction case in `createProviderFromConnection` in `packages/engine/src/providers/index.ts`
+4. Add tier defaults under the provider's connection-type key in `packages/engine/src/config/known-models.json`
+5. If the provider's connection-type maps to an existing model family (e.g. both `openai-apikey` and `openai-chatgpt` reach the `openai` family), update `modelFamilyFor` in `packages/engine/src/config/model-registry.ts`
+6. Add the provider id to the `AddConnectionRequest` literal union in `packages/shared/src/protocol/rest.ts` and to `VALID_PROVIDERS` in `packages/engine/src/server/routes/management.ts`
+7. Add it to `PROVIDER_OPTIONS` in `packages/client-ink/src/phases/ConnectionsPhase.tsx` (or, for OAuth-style providers, add a dedicated menu entry that doesn't go through the API-key wizard)
+8. If the provider implements `getUsageStatus` / `subscribeUsage`, the existing `/manage/connections/:id/usage` endpoint surfaces it automatically
+
+### Adding a `codex:*` event
+
+The openai-chatgpt provider emits its own operational events (subprocess lifecycle, login flow, rate-limit warnings) via helpers in `packages/engine/src/providers/openai-chatgpt/log.ts`. Token-counting events still go through the existing `api:call` event from agent-loop-bridge — don't duplicate. New `codex:*` events require:
+
+1. Add a helper to `log.ts`
+2. Document the event name and payload in [openai-chatgpt-provider.md](openai-chatgpt-provider.md)
+
 ### Changes that DON'T need doc updates
 
 - Bug fixes that don't change interfaces or behavior
@@ -92,6 +110,7 @@ This project maintains a closed loop between code and documentation. When you ch
 | WebSocket API | [websocket-api.md](websocket-api.md) | WS event types, payloads, connection protocol |
 | REST API (auto-generated) | `/docs` endpoint | OpenAPI spec from TypeBox route schemas |
 | Conventions | [CLAUDE.md](../CLAUDE.md) | Code style, testing, imports |
+| openai-chatgpt provider | [openai-chatgpt-provider.md](openai-chatgpt-provider.md) | Codex app-server integration, OAuth flow, usage tracking |
 
 ## Principles
 

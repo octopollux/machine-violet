@@ -2,10 +2,14 @@
  * OpenAI-compatible provider adapter.
  *
  * Wraps the official OpenAI SDK. Works with:
- * - OpenAI API (api.openai.com) — uses Responses API
- * - OpenAI OAuth tokens (ChatGPT accounts) — uses Responses API
+ * - OpenAI API (api.openai.com, key-based) — uses Responses API
  * - OpenRouter (openrouter.ai/api) — uses Responses API
  * - Any OpenAI-compatible endpoint (Ollama, vLLM, llama.cpp, etc.) — uses Chat Completions API
+ *
+ * NOT used for ChatGPT-account auth. That goes through the
+ * `openai-chatgpt` provider in `providers/openai-chatgpt/` which drives
+ * the official `codex app-server` subprocess over JSON-RPC instead of
+ * speaking directly to api.openai.com.
  *
  * Handles format translation: OpenAI tool_calls use function.arguments
  * as a JSON string (vs Anthropic's parsed object), different streaming
@@ -25,7 +29,7 @@ import type {
 // ---------------------------------------------------------------------------
 
 /** Provider IDs that use the Responses API instead of Chat Completions. */
-const RESPONSES_API_PROVIDERS = new Set(["openai", "openai-oauth", "openrouter"]);
+const RESPONSES_API_PROVIDERS = new Set(["openai-apikey", "openrouter"]);
 
 function useResponsesAPI(providerId: string): boolean {
   return RESPONSES_API_PROVIDERS.has(providerId);
@@ -40,7 +44,7 @@ export interface OpenAIProviderOptions {
   baseURL?: string;
   /** Extra default headers (e.g., OpenRouter's HTTP-Referer, X-Title). */
   defaultHeaders?: Record<string, string>;
-  /** Provider ID override (default "openai"). */
+  /** Provider ID override (default "openai-apikey"). */
   providerId?: string;
 }
 
@@ -55,7 +59,7 @@ export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
     defaultHeaders: opts.defaultHeaders,
   });
 
-  const providerId = opts.providerId ?? "openai";
+  const providerId = opts.providerId ?? "openai-apikey";
 
   return {
     providerId,

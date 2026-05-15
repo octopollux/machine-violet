@@ -330,6 +330,13 @@ export class GameEngine {
         await this.handlePromoteCharacter(cmd);
       } else if (cmd.type === "dm_notes") {
         await this.handleDmNotes(cmd);
+      } else if (cmd.type === "present_choices") {
+        // `present_choices` is in DEFERRED_TUI_TYPES so the modal lands
+        // after the DM's prose (matters for codex/GPT-5.5, which emits
+        // all tool calls before any text). Re-broadcast through the same
+        // onTuiCommand sink the bridge would have used immediately for a
+        // non-deferred command.
+        this.callbacks.onTuiCommand?.(cmd);
       }
     }
   }
@@ -683,10 +690,13 @@ export class GameEngine {
         this.persistCurrentScene();
       }
 
-      // Process deferred TUI commands — only commands that need engine-side
-      // work (scene transitions, subagent spawns, file I/O) remain here.
-      // Visual-only commands (modeline, resources, choices, theme) were
-      // already broadcast to the client immediately when the tool fired.
+      // Process deferred TUI commands — engine-side work (scene transitions,
+      // subagent spawns, file I/O) plus any visual commands we explicitly
+      // deferred for ordering reasons (currently `present_choices`, so the
+      // modal can't beat the DM's prose to the screen). Visual-only
+      // commands not in DEFERRED_TUI_TYPES (modeline, resources, theme)
+      // were already broadcast to the client immediately when the tool
+      // fired.
       await this.applyDeferredTuiCommands(result.tuiCommands);
 
       // Accumulate usage

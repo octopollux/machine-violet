@@ -11,13 +11,13 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
-import { getModelsForProvider, getTierDefaults } from "./model-registry.js";
+import { getModelsForProvider, getTierDefaults, modelFamilyFor } from "./model-registry.js";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type ProviderType = "anthropic" | "openai" | "openai-oauth" | "openrouter" | "custom";
+export type ProviderType = "anthropic" | "openai-apikey" | "openai-chatgpt" | "openrouter" | "custom";
 
 export interface DiscoveredModel {
   id: string;
@@ -25,12 +25,49 @@ export interface DiscoveredModel {
   available: boolean;
 }
 
+/**
+ * Identity metadata + persisted OAuth tokens for an OpenAI/ChatGPT-account
+ * connection. We own the OAuth flow ourselves (codex's built-in flow
+ * requires an allowlisted originator for its connectors scopes), so we
+ * also own token storage. The access_token is pushed into codex at every
+ * session start; the refresh_token is used to mint a new access_token
+ * when the current one expires (codex sends us a refresh request when
+ * it gets a 401).
+ *
+ * Tokens are persisted here in plaintext — same trust boundary as
+ * `apiKey` for the API-key providers. The local machine is trusted.
+ */
+export interface ChatGptAccountInfo {
+  /** ChatGPT account ID from the OAuth id_token claim. */
+  id: string;
+  /** Account email (best-effort, may be absent for some flows). */
+  email?: string;
+  /** Plan tier: plus, pro, business, enterprise, etc. */
+  planType?: string;
+  /** Current access token (JWT). Pushed to codex on session start. */
+  accessToken?: string;
+  /** Refresh token. Used to mint a new accessToken when the current expires. */
+  refreshToken?: string;
+  /** id_token from the last token response (kept for debugging / claim re-parse). */
+  idToken?: string;
+  /** Epoch ms when `accessToken` expires. Used to decide whether to refresh. */
+  expiresAtMs?: number;
+}
+
 export interface AIConnection {
   id: string;
   provider: ProviderType;
   label: string;
+  /**
+   * API key. Always present for key-based providers; empty string (or
+   * unused) for `openai-chatgpt` connections, where Codex manages tokens
+   * internally. Kept as a required string for backward compatibility with
+   * persisted connections.json files.
+   */
   apiKey: string;
   baseUrl?: string;
+  /** Populated for `openai-chatgpt` connections only. */
+  chatgptAccount?: ChatGptAccountInfo;
   models: DiscoveredModel[];
   source: "env" | "manual" | "oauth";
   addedAt: string;
@@ -79,8 +116,22 @@ export function loadConnectionStore(appDir: string): ConnectionStore {
   try {
     const raw = readFileSync(join(appDir, STORE_FILENAME), "utf-8");
     const parsed = JSON.parse(raw) as ConnectionStore;
+    // Migrate legacy provider strings in-place. The disk format predates the
+    // 2026-05 split where `openai` became `openai-apikey` and the unused
+    // `openai-oauth` scaffolding was retired in favor of `openai-chatgpt`
+    // (which routes through codex app-server, not the OpenAI SDK).
+    const migrated = (parsed.connections ?? [])
+      .filter((c) => c.source !== "env")
+      .map((c) => {
+        const raw = c.provider as unknown as string;
+        if (raw === "openai") return { ...c, provider: "openai-apikey" as ProviderType };
+        return c;
+      })
+      // Drop legacy openai-oauth records — never actually wired to a working
+      // login path. Users on the new openai-chatgpt path re-create via OAuth.
+      .filter((c) => (c.provider as unknown as string) !== "openai-oauth");
     return {
-      connections: (parsed.connections ?? []).filter((c) => c.source !== "env"),
+      connections: migrated,
       tierAssignments: parsed.tierAssignments ?? { large: null, medium: null, small: null },
     };
   } catch {
@@ -120,13 +171,13 @@ export function buildEffectiveConnections(stored: ConnectionStore, configDir?: s
     });
   }
 
-  // Environment: OpenAI
+  // Environment: OpenAI (key-based — distinct from openai-chatgpt subscription auth)
   const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey) {
-    const knownModels = getModelsForProvider("openai", configDir);
+    const knownModels = getModelsForProvider(modelFamilyFor("openai-apikey"), configDir);
     connections.push({
       id: ENV_OPENAI_ID,
-      provider: "openai",
+      provider: "openai-apikey",
       label: "OpenAI (env)",
       apiKey: openaiKey,
       models: Object.entries(knownModels).map(([id, m]) => ({
@@ -141,7 +192,7 @@ export function buildEffectiveConnections(stored: ConnectionStore, configDir?: s
   for (const conn of stored.connections.filter((c) => c.source !== "env")) {
     if (!conn.models) conn.models = [];
     if (conn.models.length === 0) {
-      const knownModels = getModelsForProvider(conn.provider, configDir);
+      const knownModels = getModelsForProvider(modelFamilyFor(conn.provider), configDir);
       conn.models = Object.entries(knownModels).map(([id, m]) => ({
         id, displayName: m.displayName, available: true,
       }));

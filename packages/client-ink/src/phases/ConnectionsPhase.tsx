@@ -7,28 +7,49 @@
  *            → Add Connection (provider → key → label → baseUrl wizard)
  */
 import React, { useState, useEffect, useRef } from "react";
-import { useInput, Text, useWindowSize } from "ink";
+import { useInput, Box, Text, useWindowSize } from "ink";
 import type { ResolvedTheme } from "../tui/themes/types.js";
 import { TerminalTooSmall, FullScreenFrame } from "../tui/components/index.js";
+import { CenteredModal } from "../tui/modals/CenteredModal.js";
 import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
 import { useTextInput } from "../tui/hooks/useTextInput.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
+import { openPath } from "../commands/open-path.js";
+import { copyToClipboard } from "../utils/clipboard.js";
 import type {
   ConnectionInfo, TierAssignmentsResponse, TierAssignmentEntry,
   KnownModelInfo, ConnectionHealthResponse,
+  ChatGptLoginStartResponse, ChatGptLoginStatusResponse, UsageResponse,
 } from "../api-client.js";
+import type { UsageSegment, FormattingNode } from "@machine-violet/shared";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-type Screen = "menu" | "connections" | "tiers" | "tier-pick" | "add-provider" | "add-key" | "add-label" | "add-url";
+type Screen =
+  | "menu"
+  | "connections"
+  | "tiers"
+  | "tier-pick"
+  | "add-provider"
+  | "add-key"
+  | "add-label"
+  | "add-url"
+  | "chatgpt-login";
 
-const MENU_ITEMS = ["Connections", "Model Assignments", "Add Connection"] as const;
+const MENU_ITEMS = ["Connections", "Model Assignments", "Add Connection", "Sign in with ChatGPT"] as const;
 
+/**
+ * Provider options for the Add-Connection wizard.
+ *
+ * Note `openai-chatgpt` is intentionally absent here — it goes through a
+ * dedicated "Sign in with ChatGPT" entry in the Connections menu (no API
+ * key paste; OAuth via the codex app-server).
+ */
 const PROVIDER_OPTIONS = [
   { id: "anthropic", label: "Anthropic", needsBaseUrl: false },
-  { id: "openai", label: "OpenAI", needsBaseUrl: false },
+  { id: "openai-apikey", label: "OpenAI (API key)", needsBaseUrl: false },
   { id: "openrouter", label: "OpenRouter", needsBaseUrl: false },
   { id: "custom", label: "Custom (OpenAI-compatible)", needsBaseUrl: true },
 ] as const;
@@ -40,6 +61,53 @@ const TIER_LABELS: Record<string, string> = {
 };
 
 const TIERS = ["large", "medium", "small"] as const;
+
+// ---------------------------------------------------------------------------
+// Usage segment rendering
+// ---------------------------------------------------------------------------
+
+function formatSegment(seg: UsageSegment): string {
+  const reset = seg.resetsAt ? `, resets ${formatRelativeTime(seg.resetsAt)}` : "";
+  switch (seg.kind) {
+    case "percentage":
+      return `${seg.label}: ${formatPercent(seg.usedPercent)}${reset}`;
+    case "balance":
+      return `${seg.label}: ${formatBalance(seg.used, seg.total, seg.unit)}${reset}`;
+    case "tokens":
+      return `${seg.label}: ${formatBalance(seg.used, seg.total, seg.unit ?? "tokens")}${reset}`;
+  }
+}
+
+function formatPercent(p: number | undefined): string {
+  if (p === undefined) return "—";
+  return `${p.toFixed(p < 10 ? 1 : 0)}% used`;
+}
+
+function formatBalance(used: number | undefined, total: number | undefined, unit?: string): string {
+  if (used === undefined || total === undefined) return "—";
+  const u = unit ?? "";
+  const usedStr = unit === "USD" ? `$${used.toFixed(2)}` : `${used.toLocaleString()}${u ? " " + u : ""}`;
+  const totalStr = unit === "USD" ? `$${total.toFixed(2)}` : `${total.toLocaleString()}`;
+  return `${usedStr} / ${totalStr}`;
+}
+
+function formatRelativeTime(epochSec: number): string {
+  const deltaSec = epochSec - Math.floor(Date.now() / 1000);
+  if (deltaSec <= 0) return "now";
+  if (deltaSec < 60) return `in ${deltaSec}s`;
+  if (deltaSec < 3600) return `in ${Math.round(deltaSec / 60)}m`;
+  if (deltaSec < 86400) return `in ${Math.round(deltaSec / 3600)}h`;
+  return `in ${Math.round(deltaSec / 86400)}d`;
+}
+
+function segmentStatusColor(status: UsageSegment["status"]): string {
+  switch (status) {
+    case "ok": return "#88cc88";
+    case "warning": return "#cccc44";
+    case "critical": return "#cc8844";
+    case "exceeded": return "#cc4444";
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Props
@@ -56,6 +124,19 @@ export interface ConnectionsPhaseProps {
   onCheckHealth: (id: string) => void;
   onSetTier: (tier: "large" | "medium" | "small", assignment: TierAssignmentEntry) => void;
   onBack: () => void;
+  // ChatGPT-account OAuth login. The phase manages the polling loop
+  // internally — `onStart` kicks it off and `onPoll` is called every ~2s
+  // until the returned status is success/error/cancelled. `onRefresh`
+  // triggers a reload of the connections list after successful login.
+  onStartChatGptLogin?: () => Promise<ChatGptLoginStartResponse>;
+  onPollChatGptLogin?: (loginId: string) => Promise<ChatGptLoginStatusResponse>;
+  onCancelChatGptLogin?: (loginId: string) => Promise<unknown>;
+  onRefreshConnections?: () => void;
+  // Usage status fetcher — phase polls per-connection on the connections
+  // screen. Returns `available: false` when no live snapshot exists
+  // (idle session, non-codex provider, etc.), in which case the row
+  // simply omits the usage line.
+  onFetchUsage?: (connectionId: string) => Promise<UsageResponse>;
 }
 
 // ---------------------------------------------------------------------------
@@ -73,6 +154,11 @@ export function ConnectionsPhase({
   onCheckHealth,
   onSetTier,
   onBack,
+  onStartChatGptLogin,
+  onPollChatGptLogin,
+  onCancelChatGptLogin,
+  onRefreshConnections,
+  onFetchUsage,
 }: ConnectionsPhaseProps) {
   const { columns: cols, rows: termRows } = useWindowSize();
   const [screen, setScreen] = useState<Screen>("menu");
@@ -89,6 +175,18 @@ export function ConnectionsPhase({
   const { handleKey: handleLabelInput } = useTextInput({ value: labelInput, onChange: setLabelInput });
   const { handleKey: handleBaseUrlInput } = useTextInput({ value: baseUrlInput, onChange: setBaseUrlInput });
 
+  // ChatGPT login state
+  const [loginInfo, setLoginInfo] = useState<{ loginId: string; authUrl: string } | null>(null);
+  const [loginStatus, setLoginStatus] = useState<ChatGptLoginStatusResponse | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
+
+  // Per-connection usage cache. Refreshed on connections-screen mount and
+  // every 30s after that. Connections without a live snapshot stay null
+  // and render no usage line.
+  const [usageByConn, setUsageByConn] = useState<Record<string, UsageResponse>>({});
+  const usageFetchedRef = useRef(new Set<string>());
+
   // Auto-check health on mount
   const checkedRef = useRef(new Set<string>());
   useEffect(() => {
@@ -99,6 +197,51 @@ export function ConnectionsPhase({
       }
     }
   }, [connections, healthResults, onCheckHealth]);
+
+  // Fetch usage status for each connection on the connections screen.
+  // Refreshed every 30s so live windows (Codex 5h primary) stay current
+  // without busy-polling. Connections without a live snapshot stay null.
+  useEffect(() => {
+    if (screen !== "connections" || !onFetchUsage) return;
+    let cancelled = false;
+    const fetchAll = async () => {
+      for (const conn of connections) {
+        try {
+          const res = await onFetchUsage(conn.id);
+          if (cancelled) return;
+          setUsageByConn((prev) => ({ ...prev, [conn.id]: res }));
+          usageFetchedRef.current.add(conn.id);
+        } catch {
+          // best-effort — leave the row's usage line absent
+        }
+      }
+    };
+    void fetchAll();
+    const timer = setInterval(() => void fetchAll(), 30_000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [screen, connections, onFetchUsage]);
+
+  // ChatGPT login: drive the polling loop while on the chatgpt-login screen.
+  useEffect(() => {
+    if (screen !== "chatgpt-login" || !loginInfo || !onPollChatGptLogin) return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const status = await onPollChatGptLogin(loginInfo.loginId);
+        if (cancelled) return;
+        setLoginStatus(status);
+        if (status.status === "success" || status.status === "error" || status.status === "cancelled") {
+          if (status.status === "success") onRefreshConnections?.();
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setLoginError(err instanceof Error ? err.message : String(err));
+      }
+    };
+    void poll();
+    const timer = setInterval(() => void poll(), 2000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [screen, loginInfo, onPollChatGptLogin, onRefreshConnections]);
 
   // Build model options for tier picking
   const allModels: { connectionId: string; modelId: string; label: string }[] = [];
@@ -141,6 +284,56 @@ export function ConnectionsPhase({
         if (menuIndex === 0) setScreen("connections");
         else if (menuIndex === 1) setScreen("tiers");
         else if (menuIndex === 2) { setScreen("add-provider"); setAddProviderIndex(0); }
+        else if (menuIndex === 3) {
+          // Sign in with ChatGPT — kick off OAuth and switch to the
+          // login progress screen. The polling effect above takes over
+          // from there.
+          if (!onStartChatGptLogin) return;
+          setLoginInfo(null);
+          setLoginStatus(null);
+          setLoginError(null);
+          setCopyStatus("idle");
+          setScreen("chatgpt-login");
+          void (async () => {
+            try {
+              const start = await onStartChatGptLogin();
+              setLoginInfo({ loginId: start.loginId, authUrl: start.authUrl });
+            } catch (err) {
+              setLoginError(err instanceof Error ? err.message : String(err));
+            }
+          })();
+        }
+      }
+      return;
+    }
+
+    // --- ChatGPT login progress ---
+    if (screen === "chatgpt-login") {
+      if (key.escape) {
+        // Cancel an in-flight login when bailing out.
+        if (loginInfo && loginStatus?.status === "pending" && onCancelChatGptLogin) {
+          void onCancelChatGptLogin(loginInfo.loginId).catch(() => { /* ignore */ });
+        }
+        setScreen("menu");
+        return;
+      }
+      if (key.return && loginStatus && loginStatus.status !== "pending") {
+        // Acknowledge the terminal status and go back.
+        setScreen("menu");
+        return;
+      }
+      // Hotkeys for the URL — only meaningful once we have one.
+      if (loginInfo && (loginStatus?.status ?? "pending") === "pending") {
+        if (input === "o" || input === "O") {
+          openPath(loginInfo.authUrl);
+          return;
+        }
+        if (input === "c" || input === "C") {
+          void copyToClipboard(loginInfo.authUrl).then((ok) => {
+            setCopyStatus(ok ? "copied" : "failed");
+          });
+          return;
+        }
       }
       return;
     }
@@ -276,6 +469,20 @@ export function ConnectionsPhase({
           <Text color={dim}>{" \u2014 "}{conn.provider}{conn.models.length > 0 ? ` \u00b7 ${conn.models.length} models` : ""}</Text>
         </Text>,
       );
+      // Usage segments \u2014 one short line per segment when a live snapshot
+      // exists. Segments without one (idle session, providers without a
+      // usage concept, polling not yet returned) just render nothing.
+      const usage = usageByConn[conn.id];
+      if (usage?.available && usage.status) {
+        for (const seg of usage.status.segments) {
+          lines.push(
+            <Text key={`${conn.id}-${seg.id}`} color={dim}>
+              {"     "}
+              <Text color={segmentStatusColor(seg.status)}>{formatSegment(seg)}</Text>
+            </Text>,
+          );
+        }
+      }
     }
     if (connections.length === 0) {
       lines.push(<Text key="empty" color={dim}>No connections configured.</Text>);
@@ -286,6 +493,88 @@ export function ConnectionsPhase({
       <FullScreenFrame theme={theme} columns={cols} rows={termRows} title="Connections" contentRows={lines.length}>
         {lines}
       </FullScreenFrame>
+    );
+  }
+
+  if (screen === "chatgpt-login") {
+    // Render the AI Connections menu underneath as the visual base; the
+    // login flow renders as a centered modal overlay on top.
+    const menuLines: React.ReactNode[] = [];
+    for (let i = 0; i < MENU_ITEMS.length; i++) {
+      const selected = i === menuIndex;
+      menuLines.push(
+        <Text key={MENU_ITEMS[i]} color={selected ? border : dim}>
+          {selected ? "\u25c6" : "\u25cb"}{" "}{MENU_ITEMS[i]}
+        </Text>,
+      );
+    }
+
+    const status = loginStatus?.status ?? "pending";
+    const colored = (text: string, color: string): FormattingNode[] =>
+      [{ type: "color" as const, color, content: [text] }];
+
+    const styled: FormattingNode[][] = [];
+    let modalFooter = " Esc cancel ";
+
+    if (loginError) {
+      styled.push(colored(`Error: ${loginError}`, "#cc4444"));
+      styled.push([]);
+      styled.push(colored("Press Enter or Esc to return.", dim));
+    } else if (!loginInfo) {
+      styled.push(colored("Starting Codex subprocess and OAuth flow\u2026", fg));
+    } else {
+      styled.push(colored("Sign in by opening this URL in your browser:", fg));
+      styled.push([]);
+      styled.push(colored(loginInfo.authUrl, "#88ccff"));
+      styled.push([]);
+      if (status === "pending") {
+        styled.push(colored("Waiting for browser authentication\u2026", dim));
+        if (copyStatus === "copied") {
+          styled.push(colored("URL copied to clipboard.", "#88cc88"));
+        } else if (copyStatus === "failed") {
+          styled.push(colored("Clipboard unavailable.", "#cc4444"));
+        }
+        modalFooter = " o open in browser \u00b7 c copy URL \u00b7 Esc cancel ";
+      } else if (status === "success") {
+        const suffix = `${loginStatus?.email ? ` as ${loginStatus.email}` : ""}${loginStatus?.planType ? ` (${loginStatus.planType})` : ""}`;
+        styled.push(colored(`\u2714 Signed in${suffix}.`, "#88cc88"));
+        styled.push([]);
+        styled.push(colored("Press Enter or Esc to return.", dim));
+      } else if (status === "cancelled") {
+        styled.push(colored("Login cancelled.", dim));
+        styled.push(colored("Press Enter or Esc to return.", dim));
+      } else {
+        styled.push(colored(`Login failed: ${loginStatus?.error ?? "unknown error"}`, "#cc4444"));
+        styled.push(colored("Press Enter or Esc to return.", dim));
+      }
+    }
+
+    // Pad to ~60% of terminal height with empty lines so the modal body
+    // is fully opaque (CenteredModal pads each line to innerWidth with
+    // trailing spaces, so empty FormattingNode arrays render as blank
+    // opaque rows that cover the menu underneath).
+    const targetRows = Math.max(styled.length, Math.floor(termRows * 0.6) - 4);
+    while (styled.length < targetRows) {
+      styled.push([]);
+    }
+
+    return (
+      <Box flexDirection="column" width={cols} height={termRows}>
+        <FullScreenFrame theme={theme} columns={cols} rows={termRows} title="AI Connections" contentRows={menuLines.length}>
+          {menuLines}
+        </FullScreenFrame>
+        <CenteredModal
+          theme={theme}
+          width={cols}
+          height={termRows}
+          title="Sign in with ChatGPT"
+          widthFraction={0.6}
+          minWidth={50}
+          maxWidth={Math.max(50, Math.floor(cols * 0.6))}
+          styledLines={styled}
+          footer={modalFooter}
+        />
+      </Box>
     );
   }
 

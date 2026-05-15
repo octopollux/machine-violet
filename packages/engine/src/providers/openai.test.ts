@@ -79,19 +79,14 @@ function fakeChatCompletion(overrides: Record<string, unknown> = {}) {
 }
 
 // =========================================================================
-// Responses API path (openai, openai-oauth, openrouter)
+// Responses API path (openai-apikey, openrouter)
 // =========================================================================
 
 describe("OpenAI provider — Responses API", () => {
   describe("non-streaming chat", () => {
-    it("creates provider with openai providerId", () => {
-      const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
-      expect(provider.providerId).toBe("openai");
-    });
-
-    it("routes openai-oauth to Responses API", () => {
-      const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-oauth" });
-      expect(provider.providerId).toBe("openai-oauth");
+    it("creates provider with openai-apikey providerId", () => {
+      const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+      expect(provider.providerId).toBe("openai-apikey");
     });
 
     it("routes openrouter to Responses API", () => {
@@ -99,9 +94,9 @@ describe("OpenAI provider — Responses API", () => {
       expect(provider.providerId).toBe("openrouter");
     });
 
-    it("defaults providerId to openai", () => {
+    it("defaults providerId to openai-apikey", () => {
       const provider = createOpenAIProvider({ apiKey: "test-key" });
-      expect(provider.providerId).toBe("openai");
+      expect(provider.providerId).toBe("openai-apikey");
     });
   });
 });
@@ -160,7 +155,7 @@ describe("Responses API integration", () => {
   it("maps a simple text response", async () => {
     mockResponses.create.mockResolvedValue(fakeResponse());
 
-    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
     const result = await provider.chat(baseChatParams());
 
     expect(result.text).toBe("Hi there!");
@@ -189,7 +184,7 @@ describe("Responses API integration", () => {
       status: "completed",
     }));
 
-    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
     const result = await provider.chat(baseChatParams());
 
     expect(result.toolCalls).toEqual([
@@ -216,7 +211,7 @@ describe("Responses API integration", () => {
       ],
     }));
 
-    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
     const result = await provider.chat(baseChatParams());
 
     expect(result.toolCalls[0].input).toHaveProperty("_parse_error");
@@ -228,7 +223,7 @@ describe("Responses API integration", () => {
       incomplete_details: { reason: "max_output_tokens" },
     }));
 
-    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
     const result = await provider.chat(baseChatParams());
 
     expect(result.stopReason).toBe("length");
@@ -240,7 +235,7 @@ describe("Responses API integration", () => {
       incomplete_details: { reason: "content_filter" },
     }));
 
-    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
     const result = await provider.chat(baseChatParams());
 
     expect(result.stopReason).toBe("refusal");
@@ -249,7 +244,7 @@ describe("Responses API integration", () => {
   it("sends instructions from system prompt", async () => {
     mockResponses.create.mockResolvedValue(fakeResponse());
 
-    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
     await provider.chat(baseChatParams({ systemPrompt: "Be concise." }));
 
     const callArgs = mockResponses.create.mock.calls[0][0];
@@ -259,7 +254,7 @@ describe("Responses API integration", () => {
   it("joins system blocks into instructions", async () => {
     mockResponses.create.mockResolvedValue(fakeResponse());
 
-    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
     await provider.chat(baseChatParams({
       systemPrompt: [
         { text: "First block." },
@@ -274,7 +269,7 @@ describe("Responses API integration", () => {
   it("maps tools to flat function format", async () => {
     mockResponses.create.mockResolvedValue(fakeResponse());
 
-    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
     await provider.chat(baseChatParams({
       tools: [{
         name: "search",
@@ -296,7 +291,7 @@ describe("Responses API integration", () => {
   it("maps reasoning config with effort", async () => {
     mockResponses.create.mockResolvedValue(fakeResponse());
 
-    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
     await provider.chat(baseChatParams({ thinking: { effort: "high" } }));
 
     const callArgs = mockResponses.create.mock.calls[0][0];
@@ -306,7 +301,7 @@ describe("Responses API integration", () => {
   it("maps max effort to xhigh", async () => {
     mockResponses.create.mockResolvedValue(fakeResponse());
 
-    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
     await provider.chat(baseChatParams({ thinking: { effort: "max" } }));
 
     const callArgs = mockResponses.create.mock.calls[0][0];
@@ -333,7 +328,7 @@ describe("Responses API integration", () => {
       },
     ];
 
-    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
     await provider.chat(baseChatParams({ messages }));
 
     const callArgs = mockResponses.create.mock.calls[0][0];
@@ -381,7 +376,7 @@ describe("Responses API integration", () => {
       },
     ];
 
-    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
     await provider.chat(baseChatParams({ messages }));
 
     const callArgs = mockResponses.create.mock.calls[0][0];
@@ -399,7 +394,7 @@ describe("Responses API integration", () => {
   it("sets store: false and max_output_tokens", async () => {
     mockResponses.create.mockResolvedValue(fakeResponse());
 
-    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
     await provider.chat(baseChatParams({ maxTokens: 2048 }));
 
     const callArgs = mockResponses.create.mock.calls[0][0];
@@ -447,7 +442,7 @@ describe("Responses API integration", () => {
       },
     }));
 
-    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
     const result = await provider.chat(baseChatParams());
 
     expect(result.text).toBe("The door creaks open.");
@@ -464,7 +459,7 @@ describe("Responses API integration", () => {
   it("leaves thinkingText undefined when no reasoning items are present", async () => {
     mockResponses.create.mockResolvedValue(fakeResponse());
 
-    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
     const result = await provider.chat(baseChatParams());
 
     expect(result.thinkingText).toBeUndefined();
@@ -487,7 +482,7 @@ describe("Responses API integration", () => {
       ],
     }));
 
-    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
     const result = await provider.chat(baseChatParams());
 
     expect(result.thinkingText).toBeUndefined();
@@ -514,7 +509,7 @@ describe("Responses API integration", () => {
         finalResponse: vi.fn().mockResolvedValue(response),
       });
 
-      const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+      const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
       const deltas: string[] = [];
       const result = await provider.stream(baseChatParams(), (d) => deltas.push(d));
 
@@ -565,7 +560,7 @@ describe("Responses API integration", () => {
         finalResponse: vi.fn().mockResolvedValue(response),
       });
 
-      const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+      const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
       const result = await provider.stream(baseChatParams(), () => {});
 
       expect(result.text).toBe("You step forward.");
@@ -606,7 +601,7 @@ describe("Responses API integration", () => {
         finalResponse: vi.fn().mockResolvedValue(response),
       });
 
-      const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+      const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
       const result = await provider.stream(baseChatParams(), () => {});
 
       expect(result.thinkingText).toBeUndefined();
@@ -687,7 +682,7 @@ describe("health check", () => {
   it("uses responses.create for openai provider", async () => {
     mockResponses.create.mockResolvedValue(fakeResponse());
 
-    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai" });
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
     const result = await provider.healthCheck();
 
     expect(result.status).toBe("valid");

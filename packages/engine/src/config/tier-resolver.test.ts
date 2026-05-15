@@ -21,7 +21,7 @@ describe("buildTierProviders", () => {
   it("routes each tier through its assigned connection in a heterogeneous setup", () => {
     const store: ConnectionStore = {
       connections: [
-        { id: "openai-1", provider: "openai", label: "OpenAI", apiKey: "sk-test", models: [], source: "manual", addedAt: "" },
+        { id: "openai-1", provider: "openai-apikey", label: "OpenAI", apiKey: "sk-test", models: [], source: "manual", addedAt: "" },
         { id: "anthropic-1", provider: "anthropic", label: "Anthropic", apiKey: "sk-ant-test", models: [], source: "manual", addedAt: "" },
       ],
       tierAssignments: {
@@ -35,7 +35,7 @@ describe("buildTierProviders", () => {
     const tiers = buildTierProviders(store, fallbackThunk);
 
     expect(tiers.large.model).toBe("gpt-5.5");
-    expect(tiers.large.provider.providerId).toBe("openai");
+    expect(tiers.large.provider.providerId).toBe("openai-apikey");
     expect(tiers.medium.model).toBe("claude-sonnet-4-6");
     expect(tiers.medium.provider.providerId).toBe("anthropic");
     expect(tiers.small.model).toBe("claude-haiku-4-5-20251001");
@@ -74,7 +74,7 @@ describe("buildTierProviders", () => {
   it("does not invoke the fallback thunk when every tier is assigned", () => {
     const store: ConnectionStore = {
       connections: [
-        { id: "openai-1", provider: "openai", label: "OpenAI", apiKey: "sk-test", models: [], source: "manual", addedAt: "" },
+        { id: "openai-1", provider: "openai-apikey", label: "OpenAI", apiKey: "sk-test", models: [], source: "manual", addedAt: "" },
       ],
       tierAssignments: {
         large: { connectionId: "openai-1", modelId: "gpt-5.5" },

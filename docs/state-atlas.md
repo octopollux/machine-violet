@@ -604,9 +604,11 @@ In addition to campaign-scoped state, Machine Violet maintains machine-scoped co
 ├── .env                      API keys (ANTHROPIC_API_KEY, etc.). Loaded at startup via first-launch.ts.
 ├── config.json               App-level config (home directory path, defaults).
 ├── api-keys.json             Manually added API keys (treated as secret, like .env).
-├── connections.json           AI provider connections: Anthropic, OpenAI, OpenRouter, custom.
-│                              Each connection: id, provider, label, apiKey, baseUrl, discovered models, source (env/manual/oauth).
-│                              Tier assignments (large/medium/small → connectionId + modelId).
+├── connections.json           AI provider connections: Anthropic, OpenAI (API key), OpenAI (ChatGPT), OpenRouter, custom.
+│                              Each connection: id, provider (anthropic | openai-apikey | openai-chatgpt | openrouter | custom), label,
+│                              apiKey (empty for openai-chatgpt — Codex owns its own token store at ~/.codex/auth.json),
+│                              optional baseUrl, optional chatgptAccount {id, email?, planType?}, discovered models,
+│                              source (env/manual/oauth). Tier assignments (large/medium/small → connectionId + modelId).
 ├── discord-settings.json      Discord integration: enabled (true), disabled (false), or not-yet-asked (null).
 └── model-overrides.json       User overrides merged on top of shipped known-models.json.
                                Per-model: pricing, capabilities, context window, tier defaults.

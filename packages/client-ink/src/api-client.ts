@@ -14,7 +14,12 @@ import type {
   SessionEndResponse,
   StateSnapshot,
   MachineSettingsResponse,
+  ChatGptLoginStartResponse,
+  ChatGptLoginStatusResponse,
+  UsageResponse,
 } from "@machine-violet/shared";
+
+export type { ChatGptLoginStartResponse, ChatGptLoginStatusResponse, UsageResponse };
 
 export interface ApiKeyInfo {
   id: string;
@@ -259,6 +264,26 @@ export class ApiClient {
 
   async checkConnection(id: string): Promise<ConnectionHealthResponse> {
     return this.post(`/manage/connections/${encodeURIComponent(id)}/check`);
+  }
+
+  // --- openai-chatgpt OAuth login ---
+
+  async startChatGptLogin(): Promise<ChatGptLoginStartResponse> {
+    return this.post("/manage/connections/openai-chatgpt/login");
+  }
+
+  async getChatGptLoginStatus(loginId: string): Promise<ChatGptLoginStatusResponse> {
+    return this.get(`/manage/connections/openai-chatgpt/login/${encodeURIComponent(loginId)}`);
+  }
+
+  async cancelChatGptLogin(loginId: string): Promise<{ ok: boolean }> {
+    return this.post(`/manage/connections/openai-chatgpt/login/${encodeURIComponent(loginId)}/cancel`);
+  }
+
+  // --- Connection usage status ---
+
+  async getConnectionUsage(id: string): Promise<UsageResponse> {
+    return this.get(`/manage/connections/${encodeURIComponent(id)}/usage`);
   }
 
   async getTierAssignments(): Promise<{ tierAssignments: TierAssignmentsResponse }> {
