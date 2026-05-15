@@ -368,11 +368,12 @@ export async function enterOOC(
     wasMidNarration: options.wasMidNarration ?? false,
   };
 
-  // Build tools: full DM registry (minus enter_ooc) plus the OOC-only extras.
-  // The agent always sees the same toolset regardless of caller plumbing —
-  // if a capability isn't wired up (no registry, no fileIO, no repo), the
-  // affected tool returns a recoverable error at dispatch time. We trust the
-  // OOC system prompt to keep the agent in its lane.
+  // Build tools: the four OOC-only extras (always advertised) plus the DM
+  // registry minus enter_ooc when `options.registry` is provided. Production
+  // always provides a registry, so in practice the agent sees the full
+  // toolset; test-only callers that omit the registry get just the extras.
+  // Capabilities that aren't wired at dispatch time (no fileIO, no repo)
+  // surface as recoverable errors — the prompt doesn't have to gate.
   const toolRegistry: ToolRegistry = options.registry
     ?? ({ getDefinitions: () => [] } as unknown as ToolRegistry);
   const tools: NormalizedTool[] = buildOOCTools(toolRegistry);
