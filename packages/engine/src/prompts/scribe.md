@@ -44,14 +44,39 @@ Never leave `**Placeholder:** true` on an entity that has been fleshed out. If y
 Entity files are **markdown**. The body field in `write_entity` is markdown text — use real line breaks between paragraphs, not literal `\n` sequences.
 
 ### Front matter format
-Each entity file starts with `**Key:** Value` lines (not YAML). Common keys:
-- `**Type:** character` (always include)
-- `**Class:** Rogue` (for characters)
-- `**Disposition:** friendly` (for NPCs)
-- `**Location:** [[The Shattered Hall]]` (current location)
-- `**Additional Names:** The Hooded Figure, Shadow` (aliases)
-- `**Color:** #cc4444` (highlight color for this entity)
-- `**Display Resources:** HP, Spell Slots` (for PC stat bar, array)
+Entity files store front matter as `**Key:** Value` lines on disk (not YAML), but **the `front_matter` argument to `write_entity` is a plain JSON object**, not a string of markdown lines.
+
+- Keys are short, lowercase, snake_case identifiers: `type`, `class`, `disposition`, `location`, `additional_names`, `color`, `display_resources`.
+- Values are plain strings. Do NOT wrap keys in `**…:**`. Do NOT include the key inside the value.
+- `null` deletes a key (use this in update mode to clear a field).
+
+**Correct (always do this):**
+```json
+"front_matter": {
+  "type": "character",
+  "disposition": "friendly",
+  "location": "[[The Shattered Hall]]",
+  "additional_names": "The Hooded Figure, Shadow",
+  "color": "#cc4444"
+}
+```
+
+**Wrong (NEVER do this — it corrupts the file with malformed keys like `****Type:** character:** character`):**
+```json
+"front_matter": {
+  "**Type:** character": "character",
+  "**Location:** [[The Shattered Hall]]": "[[The Shattered Hall]]"
+}
+```
+
+Common keys and their values:
+- `type`: `character`, `location`, `faction`, `item`, `lore`, `player` (always include on create)
+- `class`: e.g. `Rogue` (for characters)
+- `disposition`: e.g. `friendly`, `mysterious` (for NPCs)
+- `location`: wikilink to current location, e.g. `[[The Shattered Hall]]`
+- `additional_names`: comma-separated aliases, e.g. `The Hooded Figure, Shadow`
+- `color`: hex highlight color, e.g. `#cc4444`
+- `display_resources`: comma-separated, e.g. `HP, Spell Slots` (for PC stat bar)
 
 ### Item entities
 Not every item needs an entity file. Mundane gear (rations, rope, coins) stays as plain text on the character sheet. Create `item` entities only for objects with narrative significance — named weapons, quest items, magical artifacts, keys to locked plots.

@@ -778,10 +778,10 @@ function messageToResponsesItems(msg: NormalizedMessage): unknown[] {
 // Per-turn notification accumulator
 // ---------------------------------------------------------------------------
 
-class TurnCollector {
+// Exported for unit tests — production callers go through OpenAIChatGptProvider.
+export class TurnCollector {
   private text = "";
   private reasoning: string[] = [];
-  private toolCalls: NormalizedToolCall[] = [];
   private assistantContent: ContentPart[] = [];
   private latestUsage: TokenUsageUpdatedNotification["tokenUsage"] | null = null;
 
@@ -807,20 +807,34 @@ class TurnCollector {
       // item's full text supersedes them only if our accumulation is empty.
       // Otherwise the streaming sum is canonical.
       if (!this.text) this.text = params.item.text;
-      // The assistantContent for history must be the FINAL committed text.
-      if (this.assistantContent.length === 0 && this.text) {
+      if (!this.text) return;
+      // The assistantContent for history must include the FINAL committed
+      // text. Three cases (Copilot-flagged on #481 — case 3 used to drop
+      // the prose entirely):
+      //   1. Empty buffer → push the text block.
+      //   2. Last block is text → update it in place (streaming case).
+      //   3. Last block is a tool_use → append a new text block. Codex
+      //      can complete an agentMessage AFTER a tool_use item in the
+      //      same turn, and without this branch the assistant prose
+      //      vanishes from downstream history.
+      const last = this.assistantContent[this.assistantContent.length - 1];
+      if (!last) {
         this.assistantContent.push({ type: "text", text: this.text });
-      } else if (this.assistantContent.length > 0 && this.text) {
-        const last = this.assistantContent[this.assistantContent.length - 1];
-        if (last.type === "text") {
-          last.text = this.text;
-        }
+      } else if (last.type === "text") {
+        last.text = this.text;
+      } else {
+        this.assistantContent.push({ type: "text", text: this.text });
       }
     }
   }
 
   onToolCall(call: NormalizedToolCall): void {
-    this.toolCalls.push(call);
+    // Codex owns tool dispatch end-to-end (the model gets the tool_result
+    // in-band during the same turn), so we deliberately do NOT surface
+    // calls back through ChatResult.toolCalls — the bridge would otherwise
+    // re-dispatch them after chat() returns, running every write_entity /
+    // scribe write twice. assistantContent keeps the tool_use block so the
+    // returned conversation history still reflects what the model did.
     this.assistantContent.push({
       type: "tool_use",
       id: call.id,
@@ -859,7 +873,9 @@ class TurnCollector {
 
     return {
       text: this.text,
-      toolCalls: this.toolCalls,
+      // Always empty — see onToolCall. Tool calls were dispatched in-band
+      // during the turn, so the bridge must not see them here.
+      toolCalls: [],
       usage,
       stopReason,
       thinkingText: this.reasoning.length > 0 ? this.reasoning.join("") : undefined,

@@ -463,6 +463,65 @@ describe("runProviderLoop retry", () => {
 // not the running concatenation, and (b) tell consumers to roll back the
 // streamed deltas from the prior round before the next round's stream
 // begins, so the live UI doesn't show the response twice.
+describe("runProviderLoop with internal-dispatch providers", () => {
+  // Codex (openai-chatgpt) dispatches tool calls in-band during the turn
+  // via params.dispatchTool. It MUST NOT re-surface those calls through
+  // ChatResult.toolCalls, or the bridge will run every write_entity /
+  // scribe write twice — the symptom that wrecked route-0's character
+  // sheets (duplicated changelog entries, duplicated body paragraphs,
+  // duplicated frontmatter mutations).
+  it("does not re-dispatch tool calls when provider used internal dispatch", async () => {
+    const handlerCalls: { name: string; input: Record<string, unknown> }[] = [];
+    const provider: LLMProvider = {
+      providerId: "test-internal-dispatch",
+      chat: vi.fn(async (params) => {
+        // Simulate codex's internal dispatch: provider invokes
+        // params.dispatchTool itself during the turn.
+        if (params.tools && params.dispatchTool) {
+          await params.dispatchTool({
+            id: "call_1",
+            name: "write_entity",
+            input: { name: "Janey" },
+          });
+        }
+        return {
+          text: "ok",
+          // Critical: an internal-dispatch provider returns no surfaced
+          // tool calls; the bridge would otherwise re-run the handler.
+          toolCalls: [],
+          usage: mockUsage(),
+          stopReason: "end" as const,
+          assistantContent: [
+            { type: "tool_use", id: "call_1", name: "write_entity", input: { name: "Janey" } },
+            { type: "text", text: "ok" },
+          ],
+        };
+      }),
+      stream: vi.fn(),
+      healthCheck: vi.fn(),
+    };
+
+    await runProviderLoop(provider, "system", [
+      { role: "user", content: "do it" },
+    ], {
+      name: "test",
+      model: "test-model",
+      maxTokens: 100,
+      stream: false,
+      tools: [{ name: "write_entity", description: "", inputSchema: { type: "object", properties: {} } }],
+      toolHandler: (name, input) => {
+        handlerCalls.push({ name, input });
+        return { content: "wrote" };
+      },
+    });
+
+    // Exactly one invocation — the internal-dispatch call. If the bridge
+    // re-dispatched result.toolCalls, this would be 2.
+    expect(handlerCalls).toHaveLength(1);
+    expect(handlerCalls[0]).toEqual({ name: "write_entity", input: { name: "Janey" } });
+  });
+});
+
 describe("runProviderLoop round-boundary rollback", () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });

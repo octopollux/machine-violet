@@ -184,6 +184,50 @@ function unescapeNewlines(s: string): string {
   return s.replace(/\\n/g, "\n");
 }
 
+/**
+ * Repair front_matter objects produced by smaller models (gpt-5.4-mini in
+ * particular) that occasionally pass the entire on-disk markdown line as
+ * the JSON key — e.g. `{ "**Type:** character": "character" }` — instead of
+ * the documented `{ "type": "character" }` shape. Without this, the
+ * serializer round-trips the bad key as `****Type:** character:** character`
+ * and the file frontmatter is permanently corrupted on subsequent reads.
+ *
+ * Strategy: detect a `**Key:**` prefix in the key, extract the real key
+ * (lowercased + snake-cased to match {@link normalizeKey}), and use the
+ * trailing fragment as the value if no separate value was supplied or if
+ * the supplied value duplicates the trailing fragment.
+ */
+export function sanitizeFrontMatter(
+  raw: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const KEY_RE = /^\*+\s*([^*:]+?)\s*:\*+\s*(.*)$/;
+  for (const [rawKey, rawValue] of Object.entries(raw)) {
+    const m = KEY_RE.exec(rawKey);
+    if (!m) {
+      out[rawKey] = rawValue;
+      continue;
+    }
+    const recoveredKey = m[1].trim().toLowerCase().replace(/\s+/g, "_");
+    const recoveredValueFromKey = m[2].trim();
+    // `null` is the deletion sentinel — preserve it regardless of any
+    // value fragment recovered from the malformed key. Otherwise a
+    // payload like `{ "**Location:** [[Old]]": null }` would silently
+    // become `{ location: "[[Old]]" }` and never actually delete the
+    // field (Copilot-flagged regression on #481).
+    const value =
+      rawValue === null
+        ? null
+        : typeof rawValue === "string" && rawValue.trim() && rawValue.trim() !== recoveredValueFromKey
+          ? rawValue
+          : recoveredValueFromKey || rawValue;
+    if (!(recoveredKey in out)) {
+      out[recoveredKey] = value;
+    }
+  }
+  return out;
+}
+
 /** Heading pattern: a `## ` at the start of a line (not `###` or deeper). */
 const H2_RE = /^## (?!#)/m;
 
@@ -361,7 +405,7 @@ export function buildScribeToolHandler(
 
             const fm: EntityFrontMatter = {
               type: entityType,
-              ...(input.front_matter as Record<string, unknown> ?? {}),
+              ...sanitizeFrontMatter((input.front_matter as Record<string, unknown> | undefined) ?? {}),
             };
             const body = input.body ? unescapeNewlines(input.body as string) : "";
             const changelog: string[] = [];
@@ -386,10 +430,12 @@ export function buildScribeToolHandler(
             const { frontMatter, body, changelog } = parseFrontMatter(raw);
             const title = (frontMatter._title ?? entityName) as string;
 
-            // Merge front matter
+            // Merge front matter (sanitize first to catch small-model
+            // mistakes that pass full `**Key:** Value` markdown lines as
+            // JSON keys — see sanitizeFrontMatter).
             const fmUpdates = input.front_matter as Record<string, unknown> | undefined;
             if (fmUpdates) {
-              for (const [key, value] of Object.entries(fmUpdates)) {
+              for (const [key, value] of Object.entries(sanitizeFrontMatter(fmUpdates))) {
                 if (value === null) {
                   // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
                   delete frontMatter[key];
