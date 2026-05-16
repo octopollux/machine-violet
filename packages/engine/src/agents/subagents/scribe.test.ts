@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { buildScribeToolHandler, splitSections, mergeSectionBodies } from "./scribe.js";
+import { buildScribeToolHandler, splitSections, mergeSectionBodies, sanitizeFrontMatter } from "./scribe.js";
 import type { ScribeFileIO } from "./scribe.js";
 import { resetPromptCache } from "../../prompts/load-prompt.js";
 import { norm } from "../../utils/paths.js";
@@ -630,5 +630,59 @@ describe("mergeSectionBodies", () => {
     expect(result).toContain("## Stats");
     expect(result).toContain("### Substats");
     expect(result).toContain("STR: 10");
+  });
+});
+
+describe("sanitizeFrontMatter", () => {
+  // These cases all came from route-0 (gpt-5.4-mini scribe). Without the
+  // sanitizer they round-trip as `****Type:** character:** character` etc.
+  // and the file frontmatter is permanently corrupted.
+  it("passes well-formed keys through unchanged", () => {
+    const input = {
+      type: "character",
+      disposition: "friendly",
+      location: "[[The Shattered Hall]]",
+    };
+    expect(sanitizeFrontMatter(input)).toEqual(input);
+  });
+
+  it("recovers when the whole `**Key:** Value` line is the JSON key", () => {
+    const out = sanitizeFrontMatter({ "**Type:** character": "character" });
+    expect(out).toEqual({ type: "character" });
+  });
+
+  it("recovers when the value differs from the key fragment (prefers explicit value)", () => {
+    // Model sometimes passes the new value separately while still
+    // malforming the key — the explicit value should win.
+    const out = sanitizeFrontMatter({ "**Disposition:** old": "new" });
+    expect(out).toEqual({ disposition: "new" });
+  });
+
+  it("handles multiple malformed keys without dropping any", () => {
+    const out = sanitizeFrontMatter({
+      "**Type:** NPC": "NPC",
+      "**Location:** [[US-9]]": "[[US-9]]",
+    });
+    expect(out).toEqual({ type: "NPC", location: "[[US-9]]" });
+  });
+
+  it("lowercases and snake-cases recovered keys to match normalizeKey", () => {
+    const out = sanitizeFrontMatter({ "**Additional Names:** Foo, Bar": "Foo, Bar" });
+    expect(out).toEqual({ additional_names: "Foo, Bar" });
+  });
+
+  it("does not clobber an already-clean key with a malformed duplicate", () => {
+    // If both forms are present, the clean key arrives first in
+    // Object.entries order; sanitizer must not overwrite it.
+    const out = sanitizeFrontMatter({
+      type: "character",
+      "**Type:** NPC": "NPC",
+    });
+    expect(out).toEqual({ type: "character" });
+  });
+
+  it("preserves null sentinel for key deletion", () => {
+    const out = sanitizeFrontMatter({ placeholder: null });
+    expect(out).toEqual({ placeholder: null });
   });
 });

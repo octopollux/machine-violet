@@ -781,7 +781,6 @@ function messageToResponsesItems(msg: NormalizedMessage): unknown[] {
 class TurnCollector {
   private text = "";
   private reasoning: string[] = [];
-  private toolCalls: NormalizedToolCall[] = [];
   private assistantContent: ContentPart[] = [];
   private latestUsage: TokenUsageUpdatedNotification["tokenUsage"] | null = null;
 
@@ -820,7 +819,12 @@ class TurnCollector {
   }
 
   onToolCall(call: NormalizedToolCall): void {
-    this.toolCalls.push(call);
+    // Codex owns tool dispatch end-to-end (the model gets the tool_result
+    // in-band during the same turn), so we deliberately do NOT surface
+    // calls back through ChatResult.toolCalls — the bridge would otherwise
+    // re-dispatch them after chat() returns, running every write_entity /
+    // scribe write twice. assistantContent keeps the tool_use block so the
+    // returned conversation history still reflects what the model did.
     this.assistantContent.push({
       type: "tool_use",
       id: call.id,
@@ -859,7 +863,9 @@ class TurnCollector {
 
     return {
       text: this.text,
-      toolCalls: this.toolCalls,
+      // Always empty — see onToolCall. Tool calls were dispatched in-band
+      // during the turn, so the bridge must not see them here.
+      toolCalls: [],
       usage,
       stopReason,
       thinkingText: this.reasoning.length > 0 ? this.reasoning.join("") : undefined,
