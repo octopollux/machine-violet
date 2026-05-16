@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it, expect, beforeEach } from "vitest";
+import { assetDir } from "../utils/paths.js";
 import {
   _cacheSize,
   loadPrompt,
@@ -150,16 +153,33 @@ describe("loadPrompt model conditionals", () => {
     // dm-directives.md gates a formatting block on <!--if:gpt-->; this is the
     // end-to-end proof that the cache keys produce model-specific output and
     // that a gpt-cached entry is not served to a claude request.
-    const gptMarker = "antithesis";
+    //
+    // The sentinel is extracted from the source at test time so the assertion
+    // tracks whatever the conditional currently contains — prose edits inside
+    // the block don't break this test, only structural removal of the block.
+    const source = readFileSync(
+      join(assetDir("prompts"), "dm-directives.md"),
+      "utf-8",
+    ).replace(/\r\n/g, "\n");
+    const match = source.match(/<!--if:gpt-->([\s\S]*?)<!--endif-->/);
+    if (!match) {
+      throw new Error(
+        "dm-directives.md is missing its <!--if:gpt-->...<!--endif--> block — " +
+          "this test exists to prove conditional inclusion works end-to-end.",
+      );
+    }
+    const gptSentinel = stripComments(match[1]).trim();
+    expect(gptSentinel.length).toBeGreaterThan(0);
+
     const gpt = loadPrompt("dm-directives", "gpt-5.5");
-    expect(gpt).toContain(gptMarker);
+    expect(gpt).toContain(gptSentinel);
     const claude = loadPrompt("dm-directives", "claude-opus-4-7");
-    expect(claude).not.toContain(gptMarker);
+    expect(claude).not.toContain(gptSentinel);
     // Reverse order to rule out load-order dependence.
     resetPromptCache();
     const claude2 = loadPrompt("dm-directives", "claude-opus-4-7");
     const gpt2 = loadPrompt("dm-directives", "gpt-5.5");
-    expect(claude2).not.toContain(gptMarker);
-    expect(gpt2).toContain(gptMarker);
+    expect(claude2).not.toContain(gptSentinel);
+    expect(gpt2).toContain(gptSentinel);
   });
 });

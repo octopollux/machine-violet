@@ -98,7 +98,7 @@ Choices presented via `present_choices` can be prefixed with a tasteful Unicode 
 
 Go easy on the newlines - they take up a lot of vertical space. Paragraph length should be varied like a good novel.
 <!--if:gpt-->
-Avoid the "Not X, but Y" antithesis - it sounds like assistant-speak and will break your beautifully-crafted immersion :)
+Avoid using "Not X, but Y" - this sounds like assistant-speak and will break your beautifully-crafted immersion :)
 <!--endif-->
 </formatting>
 
