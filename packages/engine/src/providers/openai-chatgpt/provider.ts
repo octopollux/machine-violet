@@ -778,7 +778,8 @@ function messageToResponsesItems(msg: NormalizedMessage): unknown[] {
 // Per-turn notification accumulator
 // ---------------------------------------------------------------------------
 
-class TurnCollector {
+// Exported for unit tests — production callers go through OpenAIChatGptProvider.
+export class TurnCollector {
   private text = "";
   private reasoning: string[] = [];
   private assistantContent: ContentPart[] = [];
@@ -806,14 +807,23 @@ class TurnCollector {
       // item's full text supersedes them only if our accumulation is empty.
       // Otherwise the streaming sum is canonical.
       if (!this.text) this.text = params.item.text;
-      // The assistantContent for history must be the FINAL committed text.
-      if (this.assistantContent.length === 0 && this.text) {
+      if (!this.text) return;
+      // The assistantContent for history must include the FINAL committed
+      // text. Three cases (Copilot-flagged on #481 — case 3 used to drop
+      // the prose entirely):
+      //   1. Empty buffer → push the text block.
+      //   2. Last block is text → update it in place (streaming case).
+      //   3. Last block is a tool_use → append a new text block. Codex
+      //      can complete an agentMessage AFTER a tool_use item in the
+      //      same turn, and without this branch the assistant prose
+      //      vanishes from downstream history.
+      const last = this.assistantContent[this.assistantContent.length - 1];
+      if (!last) {
         this.assistantContent.push({ type: "text", text: this.text });
-      } else if (this.assistantContent.length > 0 && this.text) {
-        const last = this.assistantContent[this.assistantContent.length - 1];
-        if (last.type === "text") {
-          last.text = this.text;
-        }
+      } else if (last.type === "text") {
+        last.text = this.text;
+      } else {
+        this.assistantContent.push({ type: "text", text: this.text });
       }
     }
   }

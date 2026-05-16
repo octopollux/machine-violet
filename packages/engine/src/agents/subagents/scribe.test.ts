@@ -685,4 +685,13 @@ describe("sanitizeFrontMatter", () => {
     const out = sanitizeFrontMatter({ placeholder: null });
     expect(out).toEqual({ placeholder: null });
   });
+
+  it("preserves null sentinel even when the malformed key carries an old value fragment", () => {
+    // Regression for the case Copilot flagged on #481: a model that
+    // means to delete a field but also malforms the key would silently
+    // resurrect the old value because the recovered fragment looks like
+    // information. `null` always means delete — never substitute.
+    const out = sanitizeFrontMatter({ "**Location:** [[Old]]": null });
+    expect(out).toEqual({ location: null });
+  });
 });

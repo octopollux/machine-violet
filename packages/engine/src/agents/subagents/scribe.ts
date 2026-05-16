@@ -210,12 +210,17 @@ export function sanitizeFrontMatter(
     }
     const recoveredKey = m[1].trim().toLowerCase().replace(/\s+/g, "_");
     const recoveredValueFromKey = m[2].trim();
-    // Prefer the supplied value when it carries information; otherwise
-    // fall back to the trailing fragment of the malformed key.
+    // `null` is the deletion sentinel — preserve it regardless of any
+    // value fragment recovered from the malformed key. Otherwise a
+    // payload like `{ "**Location:** [[Old]]": null }` would silently
+    // become `{ location: "[[Old]]" }` and never actually delete the
+    // field (Copilot-flagged regression on #481).
     const value =
-      typeof rawValue === "string" && rawValue.trim() && rawValue.trim() !== recoveredValueFromKey
-        ? rawValue
-        : recoveredValueFromKey || rawValue;
+      rawValue === null
+        ? null
+        : typeof rawValue === "string" && rawValue.trim() && rawValue.trim() !== recoveredValueFromKey
+          ? rawValue
+          : recoveredValueFromKey || rawValue;
     if (!(recoveredKey in out)) {
       out[recoveredKey] = value;
     }
