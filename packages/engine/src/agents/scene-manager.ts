@@ -927,6 +927,10 @@ export class SceneManager {
           if (aliases?.trim()) {
             line += ` (also: ${aliases.trim()})`;
           }
+          const themeColor = typeof frontMatter.theme_color === "string" ? frontMatter.theme_color.trim() : "";
+          if (/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(themeColor)) {
+            line += ` [theme color: ${themeColor}]`;
+          }
         }
       } catch { /* non-critical — fall back to bare name */ }
       summaries.push(line);

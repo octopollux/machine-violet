@@ -556,6 +556,61 @@ describe("SceneManager", () => {
     expect(sessionState.activeState).not.toContain("(also:");
   });
 
+  it("contextRefresh appends theme color to PC summary when set in frontmatter", async () => {
+    const fileIO = mockFileIO();
+    files["/tmp/test-campaign/characters/aldric.md"] =
+      "# Aldric\n\n**Type:** PC\n**Theme Color:** #cc55aa\n\nA paladin.\n";
+
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      fileIO,
+    );
+
+    await mgr.contextRefresh();
+    expect(sessionState.activeState).toContain("Aldric [theme color: #cc55aa]");
+  });
+
+  it("contextRefresh combines aliases and theme color on one line", async () => {
+    const fileIO = mockFileIO();
+    files["/tmp/test-campaign/characters/aldric.md"] =
+      "# Aldric\n\n**Type:** PC\n**Additional Names:** The Hooded Figure\n**Theme Color:** #4488cc\n\nA paladin.\n";
+
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      fileIO,
+    );
+
+    await mgr.contextRefresh();
+    expect(sessionState.activeState).toContain("Aldric (also: The Hooded Figure) [theme color: #4488cc]");
+  });
+
+  it("contextRefresh ignores invalid theme color values", async () => {
+    const fileIO = mockFileIO();
+    files["/tmp/test-campaign/characters/aldric.md"] =
+      "# Aldric\n\n**Type:** PC\n**Theme Color:** mauve and gold\n\nA paladin.\n";
+
+    const sessionState = mockSessionState();
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      fileIO,
+    );
+
+    await mgr.contextRefresh();
+    expect(sessionState.activeState).toContain("Aldric");
+    expect(sessionState.activeState).not.toContain("theme color:");
+  });
+
   it("buildAliasContext returns formatted alias lines across entity types", async () => {
     const fileIO = mockFileIO();
     files["/tmp/test-campaign/characters/mysterious-stranger.md"] =
