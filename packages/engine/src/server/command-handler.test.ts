@@ -104,6 +104,32 @@ describe("handleCommand /rollback", () => {
   });
 });
 
+describe("handleCommand /exit_mode", () => {
+  it("with no active mode session: rebroadcasts session:mode play and surfaces no error", async () => {
+    // Regression: the client previously got a user-visible
+    // "Not in a mode session." system message when its mode state had drifted
+    // out of sync with the server, wedging it out of its own ESC menu.
+    // Now we silently realign the client to play mode.
+    const engine = makeMockEngine();
+    const broadcast = vi.fn();
+
+    const result = await handleCommand(
+      "exit_mode",
+      "",
+      engine,
+      makeMockGameState(),
+      broadcast,
+    );
+
+    expect(broadcast).toHaveBeenCalledWith({
+      type: "session:mode",
+      data: { mode: "play", variant: "exploration" },
+    });
+    expect(result.message).toBeFalsy();
+    expect(result.error).toBeFalsy();
+  });
+});
+
 describe("handleCommand /ooc", () => {
   it("passes gameState into createOOCSession so DM-tier tools register", async () => {
     vi.mocked(createOOCSession).mockClear();
