@@ -215,7 +215,16 @@ function handleExitMode(
 ): CommandResult {
   const current = engine.getModeSession();
   if (!current) {
-    return { message: "Not in a mode session." };
+    // Defensive belt: if the client thought it was in a mode session but the
+    // server lost track (e.g. via a teardown path that didn't broadcast),
+    // re-broadcast play mode so the client realigns instead of seeing a
+    // confusing "Not in a mode session." error and getting wedged out of
+    // its own ESC menu.
+    broadcast({
+      type: "session:mode",
+      data: { mode: "play", variant: engine.getPreviousVariant() ?? "exploration" },
+    });
+    return {};
   }
 
   const label = current.label;
