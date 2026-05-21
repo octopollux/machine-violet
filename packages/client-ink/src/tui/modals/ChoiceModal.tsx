@@ -50,10 +50,14 @@ interface ChoiceOverlayProps {
   initialIndex?: number;
   /** Called when the player selects a choice (text) or submits custom input. */
   onSelect: (choice: string) => void;
-  /** Called when the player dismisses the overlay (ESC). */
-  onDismiss: () => void;
   /** Called for PageUp/PageDown to scroll the narrative area behind the overlay. */
   onNarrativeScroll?: (delta: number) => void;
+  /**
+   * When false, the overlay stops consuming keystrokes and the custom-input
+   * row is read-only. Use this when a modal/menu opens above the choices so
+   * arrow keys and Enter don't drive both UIs simultaneously. Defaults to true.
+   */
+  isActive?: boolean;
 }
 
 /** Maximum visual rows available for choice items. */
@@ -86,8 +90,8 @@ export function ChoiceOverlay({
   maxChoiceRows: maxChoiceRowsProp,
   initialIndex,
   onSelect,
-  onDismiss,
   onNarrativeScroll,
+  isActive = true,
 }: ChoiceOverlayProps) {
   const choices = Array.isArray(rawChoices)
     ? rawChoices.map((c) => (typeof c === "string" ? c : String(c)))
@@ -128,7 +132,6 @@ export function ChoiceOverlay({
       return;
     }
 
-    if (key.escape) { onDismiss(); return; }
     if (key.upArrow) { setSelectedIndex((i) => Math.max(0, i - 1)); return; }
     if (key.downArrow) {
       setSelectedIndex((i) => {
@@ -153,7 +156,7 @@ export function ChoiceOverlay({
     if (input === "+" || input === "-") {
       onNarrativeScroll?.(input === "-" ? -1 : 1);
     }
-  });
+  }, { isActive });
 
   const handleCustomInputSubmit = (value: string) => {
     if (!value.trim()) return;
@@ -262,7 +265,7 @@ export function ChoiceOverlay({
   // Help text
   const helpText = customInputActive
     ? "↵ submit  ESC back"
-    : "ESC dismiss";
+    : "↵ select";
 
   const customInputWidth = Math.max(1, width - prefixWidth);
 
@@ -322,7 +325,7 @@ export function ChoiceOverlay({
               {arrowElement}{cursorElement}
               <InlineTextInput
                 key={customInputResetKey}
-                isDisabled={false}
+                isDisabled={!isActive}
                 availableWidth={customInputWidth}
                 wrap
                 placeholder="Enter your own..."
