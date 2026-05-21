@@ -3,7 +3,7 @@ import { useInput, Box, Text } from "ink";
 import { ScrollView } from "ink-scroll-view";
 import type { ScrollViewRef } from "ink-scroll-view";
 import type { FormattingNode } from "@machine-violet/shared/types/tui.js";
-import type { ResolvedTheme } from "../themes/types.js";
+import type { ResolvedTheme, ThemeAsset, ThemeComponent } from "../themes/types.js";
 import { ThemedHorizontalBorder, ThemedSideFrame } from "../components/ThemedFrame.js";
 import { themeColor, deriveModalTheme } from "../themes/color-resolve.js";
 import { stringWidth } from "../frames/index.js";
@@ -14,6 +14,19 @@ import type { ScrollHandle } from "../hooks/useScrollHandle.js";
 import { scrollAmount } from "../components/NarrativeArea.js";
 
 export type CenteredModalHandle = ScrollHandle;
+
+/**
+ * Bottom-row width of the bottom-frame fixed parts (corners + separators).
+ * Used to size the modal so a long `footer` doesn't overflow — `composeBottomFrame`
+ * silently drops the entire bottom border (corners and centerText alike) when the
+ * fill region would go negative, so we expand the modal to keep the footer visible.
+ */
+function bottomFrameOverhead(asset: ThemeAsset): number {
+  const lastRowWidth = (c: ThemeComponent): number => stringWidth(c.rows[c.rows.length - 1] ?? "");
+  const { corner_bl, corner_br, separator_left_bottom, separator_right_bottom } = asset.components;
+  return lastRowWidth(corner_bl) + lastRowWidth(corner_br) +
+    lastRowWidth(separator_left_bottom) + lastRowWidth(separator_right_bottom);
+}
 
 /** Word-wrap a single plain-text line to fit within the given width. */
 function wrapPlainLine(text: string, width: number): string[] {
@@ -108,7 +121,14 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
     const borderHeight = theme.asset.height;
     const sidePadding = 1;
 
-    const modalWidth = Math.max(minWidth, Math.min(Math.floor(width * widthFraction), maxWidth));
+    // Floor on modal width: enough to fit the footer's centerText (text + 2
+     // padding spaces) plus the bottom frame's fixed overhead. Without this,
+     // composeBottomFrame would silently drop the corners and footer text.
+    const footerFloor = footer
+      ? stringWidth(footer) + 2 + bottomFrameOverhead(theme.asset)
+      : 0;
+    const baseModalWidth = Math.max(minWidth, Math.min(Math.floor(width * widthFraction), maxWidth));
+    const modalWidth = Math.min(width, Math.max(baseModalWidth, footerFloor));
     const innerWidth = modalWidth - 2 * sideWidth - 2 * sidePadding;
 
     // Word-wrap text content
