@@ -249,8 +249,6 @@ export function PlayingPhase() {
     }
   }, [apiClient, setActiveChoices, activeChar, currentTurn, setNarrativeLines]);
 
-  const handleChoiceDismiss = useCallback(() => setActiveChoices(null), [setActiveChoices]);
-
   const handleNarrativeScroll = useCallback((direction: number) => {
     const step = scrollAmount(rows);
     narrativeRef.current?.scrollBy(direction < 0 ? -step : step);
@@ -387,7 +385,6 @@ export function PlayingPhase() {
       maxChoiceRows={choiceRowBudget(visibleElements, 1, hasDescriptions, DESCRIPTION_ROWS)}
       initialIndex={0}
       onSelect={handleChoiceSelect}
-      onDismiss={handleChoiceDismiss}
       onNarrativeScroll={handleNarrativeScroll}
     />
   ) : undefined;

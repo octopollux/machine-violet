@@ -134,7 +134,6 @@ describe("ChoiceOverlay", () => {
         choices={["Attack", "Flee", "Negotiate"]}
         initialIndex={0}
         onSelect={noop}
-        onDismiss={noop}
       />,
     );
     const frame = lastFrame()!;
@@ -155,7 +154,6 @@ describe("ChoiceOverlay", () => {
         choices={["A", "B", "C", "D", "E", "F", "G"]}
         initialIndex={5}
         onSelect={noop}
-        onDismiss={noop}
       />,
     );
     const frame = lastFrame()!;
@@ -174,7 +172,6 @@ describe("ChoiceOverlay", () => {
         choices={["A", "B", "C", "D", "E", "F", "G"]}
         initialIndex={6}
         onSelect={noop}
-        onDismiss={noop}
       />,
     );
 
@@ -212,7 +209,6 @@ describe("ChoiceOverlay", () => {
         choices={["A", "B"]}
         initialIndex={0}
         onSelect={noop}
-        onDismiss={noop}
       />,
     );
     const frame = lastFrame()!;
@@ -221,7 +217,7 @@ describe("ChoiceOverlay", () => {
     expect(frame).toContain("▼");
   });
 
-  it("shows ESC dismiss help text", () => {
+  it("shows select help text and does not advertise ESC dismiss", () => {
     const { lastFrame } = render(
       <ChoiceOverlay
         width={60}
@@ -229,10 +225,11 @@ describe("ChoiceOverlay", () => {
         choices={["A", "B"]}
         initialIndex={0}
         onSelect={noop}
-        onDismiss={noop}
       />,
     );
-    expect(lastFrame()!).toContain("ESC dismiss");
+    const frame = lastFrame()!;
+    expect(frame).toContain("↵ select");
+    expect(frame).not.toContain("ESC dismiss");
   });
 
   it("always shows Enter your own row", () => {
@@ -243,7 +240,6 @@ describe("ChoiceOverlay", () => {
         choices={["Attack", "Flee"]}
         initialIndex={0}
         onSelect={noop}
-        onDismiss={noop}
       />,
     );
     expect(lastFrame()!).toContain("Enter your own...");
@@ -258,7 +254,6 @@ describe("ChoiceOverlay", () => {
         choices={["Attack"]}
         initialIndex={1}
         onSelect={noop}
-        onDismiss={noop}
       />,
     );
     const frame = lastFrame()!;
@@ -277,7 +272,6 @@ describe("ChoiceOverlay", () => {
         ]}
         initialIndex={0}
         onSelect={noop}
-        onDismiss={noop}
       />,
     );
     const frame = lastFrame()!;
@@ -299,7 +293,6 @@ describe("ChoiceOverlay", () => {
         choices={["A", "B", "C"]}
         initialIndex={0}
         onSelect={noop}
-        onDismiss={noop}
       />,
     );
     const lines = lastFrame()!.split("\n");
@@ -318,7 +311,6 @@ describe("ChoiceOverlay", () => {
         ]}
         initialIndex={0}
         onSelect={noop}
-        onDismiss={noop}
       />,
     );
     const frame = lastFrame()!;
@@ -342,7 +334,6 @@ describe("ChoiceOverlay", () => {
         choices={[longChoice, "◆ Rest"]}
         initialIndex={0}
         onSelect={noop}
-        onDismiss={noop}
       />,
     );
     const frame = lastFrame()!;
@@ -362,7 +353,6 @@ describe("ChoiceOverlay", () => {
         choices={[longChoice, "◆ Short"]}
         initialIndex={0}
         onSelect={noop}
-        onDismiss={noop}
       />,
     );
     const lines = lastFrame()!.split("\n");

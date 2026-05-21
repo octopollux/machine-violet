@@ -50,8 +50,6 @@ interface ChoiceOverlayProps {
   initialIndex?: number;
   /** Called when the player selects a choice (text) or submits custom input. */
   onSelect: (choice: string) => void;
-  /** Called when the player dismisses the overlay (ESC). */
-  onDismiss: () => void;
   /** Called for PageUp/PageDown to scroll the narrative area behind the overlay. */
   onNarrativeScroll?: (delta: number) => void;
 }
@@ -86,7 +84,6 @@ export function ChoiceOverlay({
   maxChoiceRows: maxChoiceRowsProp,
   initialIndex,
   onSelect,
-  onDismiss,
   onNarrativeScroll,
 }: ChoiceOverlayProps) {
   const choices = Array.isArray(rawChoices)
@@ -128,7 +125,6 @@ export function ChoiceOverlay({
       return;
     }
 
-    if (key.escape) { onDismiss(); return; }
     if (key.upArrow) { setSelectedIndex((i) => Math.max(0, i - 1)); return; }
     if (key.downArrow) {
       setSelectedIndex((i) => {
@@ -262,7 +258,7 @@ export function ChoiceOverlay({
   // Help text
   const helpText = customInputActive
     ? "↵ submit  ESC back"
-    : "ESC dismiss";
+    : "↵ select";
 
   const customInputWidth = Math.max(1, width - prefixWidth);
 
