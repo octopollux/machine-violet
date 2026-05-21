@@ -1222,6 +1222,15 @@ export class SessionManager {
       data: { action: "stop" },
     });
 
+    // Push a final snapshot so any client still tracking mode state sees the
+    // authoritative reset to "play" before the session winds down. Without
+    // this, teardown paths that null the engine's mode session (e.g. the OOC
+    // rollback path that calls endSession("rollback") from the commit handler)
+    // leave clients believing they're still in OOC/Dev — the next ESC sends
+    // /exit_mode against a dead session and surfaces "Not in a mode session."
+    // instead of opening the menu.
+    this.broadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
+
     this.broadcast({
       type: "session:ended",
       data: { summary: "Session ended." },

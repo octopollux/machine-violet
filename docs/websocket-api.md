@@ -244,6 +244,8 @@ The campaign session has ended.
 | `summary` | string? | End-of-session summary text. |
 | `cost`    | object? | Final token cost breakdown. |
 
+Immediately before `session:ended`, the server broadcasts a final `state:snapshot` carrying `mode: "play"` (and otherwise-empty campaign fields). This is the canonical "you are back in play mode" signal for clients that were in OOC/Dev mode — without it, paths that null the engine's mode session as part of teardown (e.g. OOC rollback) would leave clients believing they're still in a mode session, and the next ESC would call `/exit_mode` against a dead session.
+
 ---
 
 ### Discord Presence
