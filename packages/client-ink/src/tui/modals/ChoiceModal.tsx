@@ -52,6 +52,12 @@ interface ChoiceOverlayProps {
   onSelect: (choice: string) => void;
   /** Called for PageUp/PageDown to scroll the narrative area behind the overlay. */
   onNarrativeScroll?: (delta: number) => void;
+  /**
+   * When false, the overlay stops consuming keystrokes and the custom-input
+   * row is read-only. Use this when a modal/menu opens above the choices so
+   * arrow keys and Enter don't drive both UIs simultaneously. Defaults to true.
+   */
+  isActive?: boolean;
 }
 
 /** Maximum visual rows available for choice items. */
@@ -85,6 +91,7 @@ export function ChoiceOverlay({
   initialIndex,
   onSelect,
   onNarrativeScroll,
+  isActive = true,
 }: ChoiceOverlayProps) {
   const choices = Array.isArray(rawChoices)
     ? rawChoices.map((c) => (typeof c === "string" ? c : String(c)))
@@ -149,7 +156,7 @@ export function ChoiceOverlay({
     if (input === "+" || input === "-") {
       onNarrativeScroll?.(input === "-" ? -1 : 1);
     }
-  });
+  }, { isActive });
 
   const handleCustomInputSubmit = (value: string) => {
     if (!value.trim()) return;
@@ -318,7 +325,7 @@ export function ChoiceOverlay({
               {arrowElement}{cursorElement}
               <InlineTextInput
                 key={customInputResetKey}
-                isDisabled={false}
+                isDisabled={!isActive}
                 availableWidth={customInputWidth}
                 wrap
                 placeholder="Enter your own..."

@@ -321,7 +321,18 @@ export function PlayingPhase() {
       return;
     }
 
-    if (apiErrorModalActive || activeChoices || activeModal || menuOpen) return;
+    if (apiErrorModalActive || activeModal || menuOpen) return;
+
+    // ESC while choices are visible opens the menu without clearing them.
+    // The overlay's own input is disabled while the menu is open (isActive
+    // prop), so arrow keys/Enter don't drive both UIs at once.
+    if (key.escape && activeChoices) {
+      setMenuOpen(true);
+      apiClient.getCost().then(({ formatted }) => setTokenSummary(formatted)).catch(() => { /* no-op */ });
+      return;
+    }
+
+    if (activeChoices) return;
 
     // Tab: toggle character pane
     if (key.tab) {
@@ -386,6 +397,7 @@ export function PlayingPhase() {
       initialIndex={0}
       onSelect={handleChoiceSelect}
       onNarrativeScroll={handleNarrativeScroll}
+      isActive={!menuOpen && !activeModal && !apiErrorModalActive}
     />
   ) : undefined;
 
