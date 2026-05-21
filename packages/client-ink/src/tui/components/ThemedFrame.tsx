@@ -50,7 +50,12 @@ interface ThemedHorizontalBorderProps {
   theme: ResolvedTheme;
   width: number;
   position: "top" | "bottom";
-  centerText?: string;
+  /**
+   * Center text on the frame's title row(s). Pass an array of strings on
+   * `position="top"` to place a continuation chunk on each subsequent
+   * row of the top frame (used when the title overflows the head slot).
+   */
+  centerText?: string | string[];
   centerTextColor?: string;
 }
 
@@ -68,22 +73,32 @@ export const ThemedHorizontalBorder = React.memo(function ThemedHorizontalBorder
   const frame =
     position === "top"
       ? composeTopFrame(theme.asset, width, centerText)
-      : composeBottomFrame(theme.asset, width, centerText);
+      : composeBottomFrame(theme.asset, width, typeof centerText === "string" ? centerText : centerText?.[0]);
 
   const borderColor = themeColor(theme, "border");
   const titleColor = centerTextColor ?? themeColor(theme, "title");
 
   const gradient = theme.gradient;
 
+  // Per-row lookup of which text chunk is on which row. The composer
+  // also centers shorter continuations within the longest line's slot,
+  // so we trim each chunk to find its actual span in the row string.
+  const centerLines: (string | undefined)[] = Array.isArray(centerText)
+    ? centerText
+    : centerText
+      ? [centerText]
+      : [];
+
   return (
     <Box flexDirection="column">
       {frame.rows.map((row, i) => {
-        // If there's center text and a distinct title color, render in parts
-        if (centerText && titleColor && titleColor !== borderColor) {
-          const textIdx = row.indexOf(` ${centerText} `);
+        const rowText = position === "top" ? centerLines[i] : (i === frame.rows.length - 1 ? centerLines[0] : undefined);
+        // If there's center text on this row and a distinct title color, render in parts
+        if (rowText && titleColor && titleColor !== borderColor) {
+          const textIdx = row.indexOf(` ${rowText} `);
           if (textIdx >= 0) {
             const before = row.slice(0, textIdx);
-            const middle = ` ${centerText} `;
+            const middle = ` ${rowText} `;
             const after = row.slice(textIdx + middle.length);
 
             if (gradient && borderColor) {

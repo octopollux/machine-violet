@@ -82,6 +82,41 @@ describe("Layout", () => {
     expect(frame).toContain("Loc: The Shattered Hall");
   });
 
+  it("wraps an overflowing title onto a continuation row inside the top frame", () => {
+    // Real campaign repro: "Warranty Void" with four resources blows past
+    // the title slot and used to vanish the entire top edge. The fix
+    // splits the title at ` | ` and renders the spillover on row 1 of the
+    // top frame (gothic's previously-blank second row), so no blank row
+    // appears between the head and the continuation.
+    const { lastFrame } = render(
+      <Layout
+        {...baseProps}
+        campaignName="Warranty Void"
+        resources={[
+          "Processing Cycles 1/10",
+          "Coherence 4/10",
+          "Connections 3/5",
+          "Memory Integrity 6/10",
+        ]}
+      />,
+    );
+    const frame = lastFrame()!;
+    // Top edge corners survive — without wrapping, composeTopFrame would
+    // drop them along with the title.
+    expect(frame).toContain("╔");
+    expect(frame).toContain("╗");
+    // Both halves of the wrapped title render somewhere on screen.
+    expect(frame).toContain("Warranty Void");
+    expect(frame).toContain("Memory Integrity 6/10");
+    // The continuation sits on the very next line below the head row —
+    // no blank intervening row in the frame. (Splitting on \n and reading
+    // adjacent rows is the most direct check.)
+    const lines = frame.split("\n");
+    const headIdx = lines.findIndex((l) => l.includes("Warranty Void"));
+    expect(headIdx).toBeGreaterThanOrEqual(0);
+    expect(lines[headIdx + 1]).toContain("Memory Integrity 6/10");
+  });
+
   it("playerPaneOverlay replaces modeline at standard tier", () => {
     const overlay = <Text>OVERLAY CONTENT</Text>;
     const { lastFrame } = render(

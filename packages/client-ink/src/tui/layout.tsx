@@ -16,6 +16,7 @@ import {
   NarrativeArea,
   KeyHints,
 } from "./components/index.js";
+import { splitTitle, topFrameTitleBudget } from "./title.js";
 import type { KeyHint } from "./components/index.js";
 import {
   ThemedHorizontalBorder,
@@ -145,13 +146,26 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
   const modelineDisplay = buildModelineDisplay(modelineText, actGlyph);
   const modelineLines = splitModeline(modelineDisplay, width);
 
-  // Build resource string for top frame title
+  // Build resource string for top frame title, then split into chunks at
+  // ` | ` boundaries. The head sits in the title slot on row 0 and any
+  // continuation chunks render on rows 1+ of the top frame itself — for
+  // multi-row themes (gothic, arcane) the first continuation fills the
+  // frame's existing blank row 1, so a single overflow row costs nothing.
+  // Without wrapping, a long title silently drops the entire top edge:
+  // composeTopFrame renders just a bare edge tile when fillWidth < 0.
   const titleText = resources.length > 0
     ? `${campaignName} | ${resources.join(" | ")}`
     : campaignName;
+  const titleBudget = elements.topFrame ? topFrameTitleBudget(theme.asset, width) : 0;
+  const titleChunks = elements.topFrame ? splitTitle(titleText, titleBudget) : [titleText];
+  // Rows the top frame grows by beyond its native asset.height. Each extra
+  // row costs one narrative row; chunks that fit within asset.height are
+  // free (they fill rows that were previously blank).
+  const topFrameExtraRows = Math.max(0, titleChunks.length - theme.asset.height);
 
-  // Calculate narrative rows (accounting for themed border heights)
-  const narRows = narrativeRows(
+  // Calculate narrative rows (accounting for themed border heights), then
+  // subtract any extra top-frame rows the title wrap added.
+  const narRowsBase = narrativeRows(
     dimensions.rows,
     elements,
     hideInputLine,
@@ -159,11 +173,13 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
     players.length,
     playerPaneExtraHeight,
   );
+  const narRows = Math.max(1, narRowsBase - topFrameExtraRows);
 
   // Fixed content height inside the Player Pane (between top/bottom borders)
   const playerPaneContentHeight = PLAYER_PANE_HEIGHT + elements.playerPaneExtraRows + playerPaneExtraHeight - 2;
 
-  // Height of the middle section (narrative + activity) for side frames
+  // Height of the middle section (narrative + activity) for side frames.
+  // Wrap rows live inside the top frame, so they don't affect middleHeight.
   const middleHeight = narRows + (elements.activityLine ? 1 : 0);
   const sidePadding = elements.sideFrames ? 1 : 0;
   const innerWidth = elements.sideFrames ? width - 2 * sideFrameWidth - 2 * sidePadding : width;
@@ -172,10 +188,15 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
 
   const topFrame = useMemo(
     () => elements.topFrame ? (
-      <ThemedHorizontalBorder theme={theme} width={width} position="top" centerText={titleText} />
+      <ThemedHorizontalBorder theme={theme} width={width} position="top" centerText={titleChunks} />
     ) : null,
-    [elements.topFrame, theme, width, titleText],
+    // titleChunks is a fresh array each render; key on its joined content.
+    [elements.topFrame, theme, width, titleChunks.join(" ")],
   );
+
+  // Wrap rows used to render below the top frame as standalone Text rows;
+  // they now live inside the top frame itself via composeTopFrame's
+  // multi-line title support.
 
   const bottomFrame = useMemo(
     () => elements.lowerFrame ? (

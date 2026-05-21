@@ -30,27 +30,49 @@ export function tileToWidth(pattern: string, targetWidth: number): string {
  * Compose the top frame (Conversation Pane top border).
  * Each row: corner_tl[r] + tile(edge_top[r]) + sep_lt[r] + title_or_space + sep_rt[r] + tile(edge_top[r]) + corner_tr[r]
  *
- * Title text appears on row 0 only; other rows get spaces.
+ * `title` may be a single string (head only, on row 0) or an array of
+ * strings (head on row 0, continuation chunks on rows 1, 2, …). When
+ * there are more title lines than `asset.height`, the frame's height
+ * grows to fit; extra rows reuse the last available row's corner / edge
+ * components so the side edges stay continuous. The separator decoration
+ * around the title slot still only appears on rows where the source
+ * `separator_*_top` component defines content (typically row 0).
+ *
+ * The title slot is sized to the longest line + 2 padding spaces, so a
+ * short continuation centered under a long head still fits cleanly.
  */
 export function composeTopFrame(
   asset: ThemeAsset,
   width: number,
-  title?: string,
+  title?: string | string[],
 ): ComposedFrame {
-  const { corner_tl, corner_tr, edge_top, separator_left_top, separator_right_top } =
+  const { corner_tl, corner_tr, edge_top, edge_left, edge_right, separator_left_top, separator_right_top } =
     asset.components;
 
-  const titleText = title ?? "";
-  const titleWidth = titleText.length > 0 ? titleText.length + 2 : 0; // +2 for padding spaces
+  const titleLines = Array.isArray(title) ? title : title ? [title] : [];
+  const longestLen = titleLines.reduce((m, l) => Math.max(m, l.length), 0);
+  const titleWidth = longestLen > 0 ? longestLen + 2 : 0; // +2 for padding spaces
+  const totalRows = Math.max(asset.height, titleLines.length);
 
   const rows: string[] = [];
 
-  for (let r = 0; r < asset.height; r++) {
-    const ctl = corner_tl.rows[r] ?? "";
-    const ctr = corner_tr.rows[r] ?? "";
-    const slt = titleWidth > 0 ? (separator_left_top.rows[r] ?? "") : "";
-    const srt = titleWidth > 0 ? (separator_right_top.rows[r] ?? "") : "";
-    const edge = edge_top.rows[r] ?? "";
+  for (let r = 0; r < totalRows; r++) {
+    // For rows inside the native asset.height, use the corner component's
+    // row — multi-row themes (gothic, arcane) design row 1+ of the corner
+    // to look like a side-frame char. Beyond that, switch to edge_left /
+    // edge_right so single-row themes (clean) don't repeat their corners.
+    const insideAsset = r < asset.height;
+    const ctl = insideAsset
+      ? (corner_tl.rows[r] ?? "")
+      : (edge_left.rows[0] ?? "");
+    const ctr = insideAsset
+      ? (corner_tr.rows[r] ?? "")
+      : (edge_right.rows[0] ?? "");
+    const slt = titleWidth > 0 && insideAsset ? (separator_left_top.rows[r] ?? "") : "";
+    const srt = titleWidth > 0 && insideAsset ? (separator_right_top.rows[r] ?? "") : "";
+    // Extension rows have no edge_top equivalent — fill with spaces so the
+    // title sits centered on a clean blank between the side edges.
+    const edge = insideAsset ? (edge_top.rows[r] ?? "") : " ";
 
     const fixedWidth = ctl.length + ctr.length + slt.length + srt.length;
     const centerWidth = titleWidth > 0 ? titleWidth : 0;
@@ -65,12 +87,20 @@ export function composeTopFrame(
     const leftFill = Math.floor(fillWidth / 2);
     const rightFill = fillWidth - leftFill;
 
-    const centerPart =
-      r === 0 && titleText.length > 0
-        ? ` ${titleText} `
-        : titleWidth > 0
-          ? " ".repeat(titleWidth)
-          : "";
+    // Center the row's title line inside the (wider) slot, so a short
+    // continuation under a long head aligns visually under it.
+    const lineForRow = titleLines[r] ?? "";
+    let centerPart: string;
+    if (titleWidth === 0) {
+      centerPart = "";
+    } else if (lineForRow.length === 0) {
+      centerPart = " ".repeat(titleWidth);
+    } else {
+      const innerPad = titleWidth - 2 - lineForRow.length;
+      const innerLeft = Math.floor(innerPad / 2);
+      const innerRight = innerPad - innerLeft;
+      centerPart = ` ${" ".repeat(innerLeft)}${lineForRow}${" ".repeat(innerRight)} `;
+    }
 
     rows.push(
       ctl +
