@@ -4,6 +4,7 @@
  */
 
 import type { ThemeAsset, ThemeComponent, PlayerPaneFrame } from "./types.js";
+import { stringWidth, truncateToWidth } from "../frames/index.js";
 
 /** A composed frame: an array of string rows ready for rendering. */
 export interface ComposedFrame {
@@ -30,34 +31,74 @@ export function tileToWidth(pattern: string, targetWidth: number): string {
  * Compose the top frame (Conversation Pane top border).
  * Each row: corner_tl[r] + tile(edge_top[r]) + sep_lt[r] + title_or_space + sep_rt[r] + tile(edge_top[r]) + corner_tr[r]
  *
- * Title text appears on row 0 only; other rows get spaces.
+ * `title` may be a single string (head only, on row 0) or an array of
+ * strings (head on row 0, continuation chunks on rows 1, 2, …). When
+ * there are more title lines than `asset.height`, the frame's height
+ * grows to fit; extra rows reuse the last available row's corner / edge
+ * components so the side edges stay continuous. The separator decoration
+ * around the title slot still only appears on rows where the source
+ * `separator_*_top` component defines content (typically row 0).
+ *
+ * The title slot is sized to the longest line + 2 padding spaces, so a
+ * short continuation centered under a long head still fits cleanly.
  */
 export function composeTopFrame(
   asset: ThemeAsset,
   width: number,
-  title?: string,
+  title?: string | string[],
 ): ComposedFrame {
-  const { corner_tl, corner_tr, edge_top, separator_left_top, separator_right_top } =
+  const { corner_tl, corner_tr, edge_top, edge_left, edge_right, separator_left_top, separator_right_top } =
     asset.components;
 
-  const titleText = title ?? "";
-  const titleWidth = titleText.length > 0 ? titleText.length + 2 : 0; // +2 for padding spaces
+  const titleLines = Array.isArray(title) ? title : title ? [title] : [];
+  // All column math goes through `stringWidth` so wide Unicode (CJK / emoji)
+  // doesn't lie about how many cells a title or border glyph occupies.
+  const longestLen = titleLines.reduce((m, l) => Math.max(m, stringWidth(l)), 0);
 
+  // Worst-case row overhead: row 0 carries the corners + separators (their
+  // largest configuration, given separators are only painted when titleWidth>0).
+  // Clamping titleWidth against this floor guarantees `fillWidth >= 0` on
+  // every row, so the frame never falls through to the bare-edge fallback.
+  const row0Fixed = stringWidth(corner_tl.rows[0] ?? "")
+    + stringWidth(corner_tr.rows[0] ?? "")
+    + (longestLen > 0 ? stringWidth(separator_left_top.rows[0] ?? "") : 0)
+    + (longestLen > 0 ? stringWidth(separator_right_top.rows[0] ?? "") : 0);
+  const maxTitleSlot = Math.max(0, width - row0Fixed);
+  const titleWidth = longestLen > 0 ? Math.min(longestLen + 2, maxTitleSlot) : 0;
+  // Available room inside the title slot for the line text (excluding the
+  // 2 padding spaces). A line longer than this is hard-truncated with an
+  // ellipsis to preserve the surrounding frame.
+  const lineMaxWidth = Math.max(0, titleWidth - 2);
+
+  const totalRows = Math.max(asset.height, titleLines.length);
   const rows: string[] = [];
 
-  for (let r = 0; r < asset.height; r++) {
-    const ctl = corner_tl.rows[r] ?? "";
-    const ctr = corner_tr.rows[r] ?? "";
-    const slt = titleWidth > 0 ? (separator_left_top.rows[r] ?? "") : "";
-    const srt = titleWidth > 0 ? (separator_right_top.rows[r] ?? "") : "";
-    const edge = edge_top.rows[r] ?? "";
+  for (let r = 0; r < totalRows; r++) {
+    // For rows inside the native asset.height, use the corner component's
+    // row — multi-row themes (gothic, arcane) design row 1+ of the corner
+    // to look like a side-frame char. Beyond that, switch to edge_left /
+    // edge_right so single-row themes (clean) don't repeat their corners.
+    const insideAsset = r < asset.height;
+    const ctl = insideAsset
+      ? (corner_tl.rows[r] ?? "")
+      : (edge_left.rows[0] ?? "");
+    const ctr = insideAsset
+      ? (corner_tr.rows[r] ?? "")
+      : (edge_right.rows[0] ?? "");
+    const slt = titleWidth > 0 && insideAsset ? (separator_left_top.rows[r] ?? "") : "";
+    const srt = titleWidth > 0 && insideAsset ? (separator_right_top.rows[r] ?? "") : "";
+    // Extension rows have no edge_top equivalent — fill with spaces so the
+    // title sits centered on a clean blank between the side edges.
+    const edge = insideAsset ? (edge_top.rows[r] ?? "") : " ";
 
-    const fixedWidth = ctl.length + ctr.length + slt.length + srt.length;
+    const fixedWidth = stringWidth(ctl) + stringWidth(ctr) + stringWidth(slt) + stringWidth(srt);
     const centerWidth = titleWidth > 0 ? titleWidth : 0;
     const fillWidth = width - fixedWidth - centerWidth;
 
     if (fillWidth < 0) {
-      // Degenerate: width too narrow, just tile everything
+      // Safety net — titleWidth was clamped against row 0's worst case, so
+      // we shouldn't land here in practice. Fall back to a bare edge tile
+      // rather than emit a malformed row.
       rows.push(tileToWidth(edge, width));
       continue;
     }
@@ -65,12 +106,24 @@ export function composeTopFrame(
     const leftFill = Math.floor(fillWidth / 2);
     const rightFill = fillWidth - leftFill;
 
-    const centerPart =
-      r === 0 && titleText.length > 0
-        ? ` ${titleText} `
-        : titleWidth > 0
-          ? " ".repeat(titleWidth)
-          : "";
+    // Truncate any per-row line that would overflow the (possibly clamped)
+    // slot, then center it inside the slot so a short continuation under
+    // a long head aligns visually under it.
+    const lineForRow = titleLines[r] ?? "";
+    const fittedLine = stringWidth(lineForRow) > lineMaxWidth
+      ? truncateToWidth(lineForRow, lineMaxWidth)
+      : lineForRow;
+    let centerPart: string;
+    if (titleWidth === 0) {
+      centerPart = "";
+    } else if (fittedLine.length === 0) {
+      centerPart = " ".repeat(titleWidth);
+    } else {
+      const innerPad = titleWidth - 2 - stringWidth(fittedLine);
+      const innerLeft = Math.floor(innerPad / 2);
+      const innerRight = innerPad - innerLeft;
+      centerPart = ` ${" ".repeat(innerLeft)}${fittedLine}${" ".repeat(innerRight)} `;
+    }
 
     rows.push(
       ctl +

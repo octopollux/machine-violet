@@ -180,6 +180,50 @@ describe("composeTopFrame", () => {
     expect(frame.rows[0]).not.toContain("[");
     expect(frame.rows[0]).not.toContain("]");
   });
+
+  it("renders an array of titles across rows, sizing each row to width", () => {
+    const asset = parseThemeAsset(H2_THEME);
+    const frame = composeTopFrame(asset, 50, ["HEAD", "WRAP"]);
+    expect(frame.height).toBe(2);
+    expect(frame.rows[0]).toContain("HEAD");
+    expect(frame.rows[1]).toContain("WRAP");
+    for (const row of frame.rows) expect(row.length).toBe(50);
+  });
+
+  it("extends past asset.height when there are more title lines than rows", () => {
+    const asset = parseThemeAsset(H1_THEME); // height 1
+    const frame = composeTopFrame(asset, 50, ["HEAD", "WRAP1", "WRAP2"]);
+    expect(frame.height).toBe(3);
+    expect(frame.rows[0]).toContain("HEAD");
+    expect(frame.rows[1]).toContain("WRAP1");
+    expect(frame.rows[2]).toContain("WRAP2");
+  });
+
+  it("each row's text chunk is locatable via indexOf for downstream coloring", () => {
+    // ThemedHorizontalBorder uses row.indexOf(rowText) to color the title
+    // span in its own color. With a shorter continuation centered inside
+    // a wider slot, the chunk must still be findable as a contiguous
+    // substring — i.e. the composer must not split it with embedded padding.
+    const asset = parseThemeAsset(H2_THEME);
+    const frame = composeTopFrame(asset, 60, ["LONG HEAD TEXT", "SHORT"]);
+    expect(frame.rows[0].indexOf("LONG HEAD TEXT")).toBeGreaterThanOrEqual(0);
+    expect(frame.rows[1].indexOf("SHORT")).toBeGreaterThanOrEqual(0);
+  });
+
+  it("truncates an over-long title instead of dropping the entire row", () => {
+    // Title of 100 chars on a 30-char frame would push fillWidth negative
+    // under the old code and collapse to a bare edge tile. Now we clamp
+    // the slot and ellipsis-truncate the line so the corners survive.
+    const asset = parseThemeAsset(H1_THEME);
+    const longTitle = "X".repeat(100);
+    const frame = composeTopFrame(asset, 30, longTitle);
+    expect(frame.height).toBe(1);
+    expect(frame.rows[0].length).toBe(30);
+    // Corners survive and an ellipsis marks the truncation.
+    expect(frame.rows[0][0]).toBe("+");
+    expect(frame.rows[0][29]).toBe("+");
+    expect(frame.rows[0]).toContain("…");
+  });
 });
 
 describe("composeBottomFrame", () => {

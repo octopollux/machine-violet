@@ -450,6 +450,41 @@ describe("GameMenu", () => {
     expect(frame).not.toMatch(/0\/0\/0\s*\|/);
   });
 
+  it("expands modal width to keep a long footer visible", () => {
+    // Real-session token summary (multi-tier with cumulative totals) plus
+    // the appended usage percentage easily exceeds the default 48-col
+    // minWidth on an 80-col terminal. composeBottomFrame silently drops
+    // the entire bottom border (corners and footer alike) when the
+    // centerText doesn't fit, so the modal must self-expand.
+    const usageStatus = {
+      segments: [{
+        id: "primary",
+        label: "5-hour window",
+        kind: "percentage" as const,
+        usedPercent: 5,
+        status: "ok" as const,
+      }],
+      snapshotAt: 1,
+      fresh: true,
+    };
+    const longSummary = "200k/30k/300k | 100k/10k/180k | 25k/220/240k";
+    const { lastFrame } = render(
+      <Box width={80} height={25}>
+        <GameMenu
+          theme={theme}
+          width={80}
+          height={25}
+          tokenSummary={longSummary}
+          usageStatus={usageStatus}
+          onSelect={noop}
+          onDismiss={noop}
+        />
+      </Box>,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain(`${longSummary} | 95%`);
+  });
+
   it("highlights first item by default", () => {
     const { lastFrame } = render(
       <Box width={40} height={24}>
