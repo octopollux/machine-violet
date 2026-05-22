@@ -77,13 +77,26 @@ export function patchOrphanedToolUses(messages: NormalizedMessage[]): Normalized
     }
     if (toolUseIds.length === 0) continue;
 
+    // Split the follow-up (if it's a user-with-array-content message) into
+    // existing tool_result blocks and everything else. We never mix text
+    // and tool_result in one outgoing user message: the OpenAI mappers
+    // (`toResponsesInput` / `toOpenAIMessages`) short-circuit on the first
+    // tool_result and drop any sibling text, so the player's bytes would
+    // silently disappear.
     const next = messages[i + 1];
-    const covered = new Set<string>();
-    if (next?.role === "user" && Array.isArray(next.content)) {
-      for (const part of next.content) {
-        if (part.type === "tool_result") covered.add(part.tool_use_id);
+    const nextHasArrayContent = next?.role === "user" && Array.isArray(next.content);
+    const existingResults: ContentPart[] = [];
+    const nonResultBlocks: ContentPart[] = [];
+    if (nextHasArrayContent) {
+      for (const part of next.content as ContentPart[]) {
+        if (part.type === "tool_result") existingResults.push(part);
+        else nonResultBlocks.push(part);
       }
     }
+
+    const covered = new Set<string>(
+      existingResults.map((p) => (p as { tool_use_id: string }).tool_use_id),
+    );
     const missing = toolUseIds.filter((id) => !covered.has(id));
     if (missing.length === 0) continue;
 
@@ -94,21 +107,22 @@ export function patchOrphanedToolUses(messages: NormalizedMessage[]): Normalized
       is_error: true,
     }));
 
-    if (next?.role === "user") {
-      // Merge stubs into the existing follow-up user message so we don't
-      // emit two consecutive user messages. String content gets promoted
-      // to a block array first.
-      const baseBlocks: ContentPart[] = Array.isArray(next.content)
-        ? next.content
-        : next.content
-          ? [{ type: "text", text: next.content }]
-          : [];
-      out.push({ role: "user", content: [...baseBlocks, ...stubs], ephemeral: next.ephemeral });
-      i++; // consume the original next message; we just emitted its merged form
+    if (nextHasArrayContent && next) {
+      // Consolidate ALL tool_result blocks (existing + new stubs) into a
+      // single tool-result-only user message immediately after the
+      // assistant. Re-emit any non-tool_result blocks as a separate
+      // following user message so their bytes are preserved verbatim.
+      // Both Anthropic and OpenAI accept consecutive user messages.
+      out.push({ role: "user", content: [...existingResults, ...stubs], ephemeral: next.ephemeral });
+      if (nonResultBlocks.length > 0) {
+        out.push({ role: "user", content: nonResultBlocks, ephemeral: next.ephemeral });
+      }
+      i++; // consume original next; we just re-emitted it as up to 2 messages
     } else {
-      // No following user message at all (or it's an assistant — also broken
-      // shape). Insert a synthetic user message; subsequent iterations will
-      // re-process whatever comes next in the original list.
+      // String-content next, no follow-up at all, or follow-up is an
+      // assistant (broken shape). Insert a synthetic stub message; the
+      // next loop iteration re-processes the original message normally,
+      // preserving its bytes (including empty strings).
       out.push({ role: "user", content: stubs });
     }
   }

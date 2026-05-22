@@ -75,10 +75,11 @@ describe("patchOrphanedToolUses", () => {
     });
   });
 
-  it("promotes a plain-text follow-up user message to a block array when merging", () => {
-    // Unusual shape but worth covering: assistant emits tool_use, the next
-    // user message is the player's next plain-text turn. Append stubs without
-    // creating two consecutive user messages.
+  it("inserts a synthetic stub message BEFORE a plain-text follow-up (does not merge)", () => {
+    // The OpenAI mappers short-circuit on the first tool_result and drop any
+    // sibling text, so merging stubs into a plain-text user turn would silently
+    // eat the player's input. Insert a separate stub message instead, leaving
+    // the original message byte-identical.
     const messages: NormalizedMessage[] = [
       {
         role: "assistant",
@@ -87,14 +88,73 @@ describe("patchOrphanedToolUses", () => {
       { role: "user", content: "next move", ephemeral: true },
     ];
     const patched = patchOrphanedToolUses(messages);
-    expect(patched).toHaveLength(2);
+    expect(patched).toHaveLength(3);
     expect(patched[1]).toEqual({
       role: "user",
       content: [
-        { type: "text", text: "next move" },
         { type: "tool_result", tool_use_id: "t1", content: ORPHAN_STUB_CONTENT, is_error: true },
       ],
-      ephemeral: true,
+    });
+    // Original follow-up preserved verbatim, including ephemeral flag.
+    expect(patched[2]).toEqual({ role: "user", content: "next move", ephemeral: true });
+  });
+
+  it("preserves an empty-string follow-up user message (no byte erasure)", () => {
+    // Defensive — the previous merge logic collapsed empty-string content to []
+    // via a falsy check. Insertion path preserves the original message intact.
+    const messages: NormalizedMessage[] = [
+      {
+        role: "assistant",
+        content: [{ type: "tool_use", id: "t1", name: "roll_dice", input: {} }],
+      },
+      { role: "user", content: "" },
+    ];
+    const patched = patchOrphanedToolUses(messages);
+    expect(patched).toHaveLength(3);
+    expect(patched[1]).toEqual({
+      role: "user",
+      content: [
+        { type: "tool_result", tool_use_id: "t1", content: ORPHAN_STUB_CONTENT, is_error: true },
+      ],
+    });
+    expect(patched[2]).toEqual({ role: "user", content: "" });
+  });
+
+  it("splits a mixed-content follow-up into tool-result-only + non-result messages", () => {
+    // Exotic shape — normal flow never produces a user message that mixes
+    // text and tool_result. But if one ever appears (imported history,
+    // hand-edit), we must NOT emit a single mixed message to the API: the
+    // OpenAI mappers drop sibling text when any tool_result is present.
+    // Consolidate all tool_results (existing + stub for any missing IDs)
+    // into one message; re-emit non-result blocks as a separate one.
+    const messages: NormalizedMessage[] = [
+      {
+        role: "assistant",
+        content: [
+          { type: "tool_use", id: "t1", name: "a", input: {} },
+          { type: "tool_use", id: "t2", name: "b", input: {} },
+        ],
+      },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "and also" },
+          { type: "tool_result", tool_use_id: "t1", content: "ok" },
+        ],
+      },
+    ];
+    const patched = patchOrphanedToolUses(messages);
+    expect(patched).toHaveLength(3);
+    expect(patched[1]).toEqual({
+      role: "user",
+      content: [
+        { type: "tool_result", tool_use_id: "t1", content: "ok" },
+        { type: "tool_result", tool_use_id: "t2", content: ORPHAN_STUB_CONTENT, is_error: true },
+      ],
+    });
+    expect(patched[2]).toEqual({
+      role: "user",
+      content: [{ type: "text", text: "and also" }],
     });
   });
 
