@@ -95,6 +95,26 @@ export interface NormalizedUsage {
 }
 
 // ---------------------------------------------------------------------------
+// Cache diagnostics
+// ---------------------------------------------------------------------------
+
+/**
+ * Provider-reported reason a prompt-cache lookup diverged from the previous
+ * request. Currently sourced from Anthropic's `cache-diagnosis-2026-04-07`
+ * beta; future providers with comparable signals can populate the same shape.
+ *
+ * `reasonType` mirrors the Anthropic `cache_miss_reason.type` discriminant:
+ * `model_changed | system_changed | tools_changed | messages_changed |
+ *  previous_message_not_found | unavailable`. Kept as `string` so newly
+ * added types don't break parsing.
+ */
+export interface CacheDiagnostics {
+  reasonType: string;
+  /** Estimated input tokens that fell after the divergence point, when known. */
+  missedInputTokens?: number;
+}
+
+// ---------------------------------------------------------------------------
 // Chat request / response
 // ---------------------------------------------------------------------------
 
@@ -122,6 +142,15 @@ interface ChatParamsBase {
   maxTokens: number;
   thinking?: ThinkingConfig;
   cacheHints?: CacheHint[];
+  /**
+   * Opaque stable key identifying this chain of related calls (typically an
+   * agent name like "dm" or "scribe"). Providers that surface cache
+   * diagnostics use this to thread Anthropic's `previous_message_id` between
+   * consecutive calls in the same chain so the API can pinpoint where the
+   * cached prefix diverged. Optional — callers that don't set it just opt
+   * out of cache-miss attribution; the call itself behaves identically.
+   */
+  conversationId?: string;
 }
 
 interface ChatParamsToolless extends ChatParamsBase {
@@ -177,6 +206,15 @@ export interface ChatResult {
    * Thinking blocks are excluded (they must not be sent back).
    */
   assistantContent: ContentPart[];
+  /**
+   * Per-call cache divergence attribution, when the provider supports it and
+   * a comparison ran. `undefined` means the provider didn't surface
+   * diagnostics for this call (no beta enabled, no prior request to compare
+   * against, comparison still pending, or comparison unavailable). A present
+   * value carries the divergence point that caused (or would have caused)
+   * the prompt cache to miss — see {@link CacheDiagnostics}.
+   */
+  cacheDiagnostics?: CacheDiagnostics;
 }
 
 // ---------------------------------------------------------------------------
