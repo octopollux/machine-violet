@@ -268,6 +268,12 @@ export async function runProviderLoop(
     // ChatParams is a discriminated union: tools + dispatchTool are
     // either both present (this call uses tools) or both absent (text-only).
     // Build the variant that matches `config.tools`.
+    //
+    // conversationId = agent name: stable across the bridge's tool-use rounds
+    // and across subsequent player turns for the same agent, distinct between
+    // agents (DM vs scribe vs subagents). Providers that support cache
+    // diagnostics (currently Anthropic) thread `previous_message_id` along
+    // this key so divergence reasons are attributed to the right chain.
     const chatParams: ChatParams = config.tools
       ? {
           model: config.model,
@@ -277,6 +283,7 @@ export async function runProviderLoop(
           maxTokens: config.maxTokens,
           thinking,
           cacheHints: config.cacheHints,
+          conversationId: config.name,
           dispatchTool,
         }
       : {
@@ -286,6 +293,7 @@ export async function runProviderLoop(
           maxTokens: config.maxTokens,
           thinking,
           cacheHints: config.cacheHints,
+          conversationId: config.name,
         };
 
     // Context dump: log params before API call. `thinking` is captured so the
@@ -367,6 +375,14 @@ export async function runProviderLoop(
       reasoningTokens: result.usage.reasoningTokens,
       toolCalls: result.toolCalls.length,
       stopReason: result.stopReason,
+      ...(result.cacheDiagnostics
+        ? {
+            cacheMissReason: result.cacheDiagnostics.reasonType,
+            ...(result.cacheDiagnostics.missedInputTokens !== undefined
+              ? { cacheMissedInputTokens: result.cacheDiagnostics.missedInputTokens }
+              : {}),
+          }
+        : {}),
     });
 
     // Accumulate usage

@@ -9,10 +9,19 @@ import Anthropic from "@anthropic-ai/sdk";
 import type {
   LLMProvider, ChatParams, ChatResult, HealthCheckResult,
   NormalizedMessage, NormalizedToolCall,
-  NormalizedUsage, ContentPart, StopReason,
+  NormalizedUsage, ContentPart, StopReason, CacheDiagnostics,
 } from "./types.js";
 import { getKnownModel } from "../config/model-registry.js";
+import { logEvent } from "../context/engine-log.js";
 import { patchOrphanedToolUses, reorderAssistantToolUseBlocksLast } from "./orphan-patch.js";
+
+/**
+ * Beta header for prompt-cache diagnostics (Anthropic API only). When set,
+ * the API returns a `diagnostics` field describing where the prompt prefix
+ * diverged from a previous request identified by `previous_message_id`.
+ * See https://platform.claude.com/docs/en/build-with-claude/cache-diagnostics.
+ */
+const CACHE_DIAGNOSIS_BETA = "cache-diagnosis-2026-04-07";
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -24,10 +33,20 @@ export function createAnthropicProvider(apiKey?: string): LLMProvider {
     ...(apiKey ? { apiKey } : {}),
   });
 
+  /**
+   * Per-conversation cursor for cache diagnostics. Key is the caller's
+   * `conversationId` (typically the agent name); value is the `id` of the
+   * most recent successful response on that chain. Looked up on each call
+   * to populate `diagnostics.previous_message_id`. Lost on process restart,
+   * which is fine — the next call simply passes `null` and starts a new
+   * chain; the API treats it as a first turn.
+   */
+  const previousIdByConversation = new Map<string, string>();
+
   return {
     providerId: "anthropic",
-    chat: (params) => anthropicChat(client, params, false),
-    stream: (params, onDelta) => anthropicChat(client, params, true, onDelta),
+    chat: (params) => anthropicChat(client, params, false, undefined, previousIdByConversation),
+    stream: (params, onDelta) => anthropicChat(client, params, true, onDelta, previousIdByConversation),
     healthCheck: (model) => anthropicHealthCheck(client, model),
   };
 }
@@ -40,18 +59,48 @@ async function anthropicChat(
   client: Anthropic,
   params: ChatParams,
   streaming: boolean,
-  onDelta?: (text: string) => void,
+  onDelta: ((text: string) => void) | undefined,
+  previousIdByConversation: Map<string, string>,
 ): Promise<ChatResult> {
   const apiParams = toAnthropicParams(params);
 
+  // Cache diagnostics: thread the previous response id on this chain so the
+  // API can pinpoint cache divergence. Sent on every call when the caller
+  // supplied a conversationId; `null` on the first call of a fresh chain
+  // (per Anthropic docs, that's the opt-in signal — no comparison, but
+  // future turns can compare against this one). The SDK at 0.82.0 doesn't
+  // type `diagnostics` yet, so we attach it as an untyped extension.
+  const convoId = params.conversationId;
+  const diagnosticsParams = convoId !== undefined
+    ? { diagnostics: { previous_message_id: previousIdByConversation.get(convoId) ?? null } }
+    : {};
+
+  // Anthropic-beta header per request; doesn't disturb existing default headers.
+  const requestOptions = convoId !== undefined
+    ? { headers: { "anthropic-beta": CACHE_DIAGNOSIS_BETA } }
+    : undefined;
+
   let response: Anthropic.Message;
 
+  // Extension fields (`diagnostics`, `betas`) aren't typed by SDK 0.82.0; we
+  // attach them via an unknown cast that resolves to the same shape the
+  // typed methods accept. `as unknown as ...` keeps the overload resolution
+  // correctly disambiguating Message vs Stream return types.
+  const streamParams = { ...apiParams, ...diagnosticsParams } as unknown as Anthropic.MessageStreamParams;
+  const createParams = { ...apiParams, ...diagnosticsParams, stream: false } as unknown as Anthropic.MessageCreateParamsNonStreaming;
+
   if (streaming && onDelta) {
-    const stream = client.messages.stream(apiParams);
+    const stream = client.messages.stream(streamParams, requestOptions);
     stream.on("text", (delta) => onDelta(delta));
     response = await stream.finalMessage();
   } else {
-    response = await client.messages.create({ ...apiParams, stream: false });
+    response = await client.messages.create(createParams, requestOptions);
+  }
+
+  // Cursor advances on success only — a thrown error leaves the prior id in
+  // place so a retry-then-success doesn't break the chain.
+  if (convoId !== undefined && response.id) {
+    previousIdByConversation.set(convoId, response.id);
   }
 
   return fromAnthropicResponse(response, !streaming ? onDelta : undefined);
@@ -283,6 +332,8 @@ function fromAnthropicResponse(
     reasoningTokens: 0,
   };
 
+  const cacheDiagnostics = extractCacheDiagnostics(response);
+
   return {
     text,
     toolCalls,
@@ -290,7 +341,55 @@ function fromAnthropicResponse(
     stopReason,
     thinkingText: thinkingText || undefined,
     assistantContent,
+    ...(cacheDiagnostics ? { cacheDiagnostics } : {}),
   };
+}
+
+/**
+ * Parse Anthropic's `diagnostics.cache_miss_reason` (beta `cache-diagnosis-2026-04-07`)
+ * from a response. The field has four states per the docs:
+ *   - absent: feature not enabled.
+ *   - `null`: first turn (no prior to compare) or comparison ran and found no divergence.
+ *   - `{ cache_miss_reason: null }`: comparison still running when response serialized.
+ *   - `{ cache_miss_reason: { type, cache_missed_input_tokens? } }`: divergence located.
+ *
+ * Returns `undefined` for the first three (nothing actionable to surface) and a
+ * populated CacheDiagnostics only for the fourth. Also emits a structured log
+ * line on `*_changed` types so operators can grep engine.jsonl for divergence
+ * causes without going through the dump viewer.
+ *
+ * Exported for tests.
+ */
+export function extractCacheDiagnostics(response: Anthropic.Message): CacheDiagnostics | undefined {
+  const raw = (response as unknown as Record<string, unknown>).diagnostics;
+  if (raw == null || typeof raw !== "object") return undefined;
+
+  const reason = (raw as Record<string, unknown>).cache_miss_reason;
+  if (reason == null || typeof reason !== "object") return undefined;
+
+  const reasonObj = reason as Record<string, unknown>;
+  const reasonType = typeof reasonObj.type === "string" ? reasonObj.type : undefined;
+  if (!reasonType) return undefined;
+
+  const missedRaw = reasonObj.cache_missed_input_tokens;
+  const missedInputTokens = typeof missedRaw === "number" ? missedRaw : undefined;
+
+  // *_changed reasons indicate an actual prompt-prefix divergence the operator
+  // can fix; the other two (`previous_message_not_found`, `unavailable`) are
+  // "no comparison was produced" and not bugs in our code. Log only the
+  // actionable ones so the signal stays useful.
+  if (reasonType.endsWith("_changed")) {
+    logEvent("cache:miss", {
+      messageId: response.id,
+      model: response.model,
+      reasonType,
+      ...(missedInputTokens !== undefined ? { missedInputTokens } : {}),
+    });
+  }
+
+  return missedInputTokens !== undefined
+    ? { reasonType, missedInputTokens }
+    : { reasonType };
 }
 
 // ---------------------------------------------------------------------------

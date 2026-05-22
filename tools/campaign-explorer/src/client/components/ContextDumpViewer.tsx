@@ -8,6 +8,14 @@ interface ContextDumpViewerProps {
 /**
  * One api:call event from engine.jsonl. Fields are optional because older
  * log lines may pre-date the cacheCreation addition.
+ *
+ * `cacheMissReason` / `cacheMissedInputTokens` come from Anthropic's
+ * `cache-diagnosis-2026-04-07` beta. The engine surfaces any non-null
+ * `cache_miss_reason.type` here — including the non-actionable
+ * `previous_message_not_found` and `unavailable` cases (rendered in muted
+ * gray by `CacheMissPill`). The truly silent states — "no divergence" and
+ * "comparison still pending" — are omitted entirely so the chip stays
+ * uncluttered when caching is working.
  */
 interface ApiCallEvent {
   t?: number;
@@ -21,6 +29,8 @@ interface ApiCallEvent {
   reasoningTokens?: number;
   toolCalls?: number;
   stopReason?: string;
+  cacheMissReason?: string;
+  cacheMissedInputTokens?: number;
 }
 
 interface ThinkingTrace {
@@ -375,25 +385,77 @@ function TurnStatsChip({ round, event }: { round: number; event: ApiCallEvent })
       {(event.toolCalls ?? 0) > 0 && <span>tools {event.toolCalls}</span>}
       {event.durationMs != null && <span style={{ opacity: 0.6 }}>{event.durationMs}ms</span>}
       {event.stopReason && <span style={{ opacity: 0.6 }}>stop:{event.stopReason}</span>}
+      {event.cacheMissReason && <CacheMissPill reason={event.cacheMissReason} missed={event.cacheMissedInputTokens} />}
     </div>
+  );
+}
+
+/**
+ * Renders the Anthropic cache-diagnosis verdict for a single turn.
+ *
+ * Red tint for `*_changed` reasons — these are actionable: something in the
+ * prompt prefix moved and the cached prefix had to be rewritten from that
+ * point on. Muted gray for `previous_message_not_found` and `unavailable`,
+ * which mean "no comparison was produced" rather than "your prompt drifted"
+ * (e.g. fingerprint expired, parameters outside the comparable set changed).
+ * The distinction matters because the muted cases aren't bugs to fix.
+ */
+function CacheMissPill({ reason, missed }: { reason: string; missed?: number }) {
+  const actionable = reason.endsWith("_changed");
+  const bg = actionable ? "rgba(218,54,51,0.18)" : "rgba(128,128,128,0.18)";
+  const color = actionable ? "rgb(248, 81, 73)" : undefined;
+  return (
+    <span
+      title={
+        actionable
+          ? `Prompt prefix diverged at ${reason.replace("_changed", "")}; ${missed != null ? fmtK(missed) + " input tokens" : "tokens"} fell after the divergence`
+          : `No cache comparison was produced for this turn (${reason})`
+      }
+      style={{
+        background: bg,
+        color,
+        padding: "0 6px",
+        borderRadius: 3,
+        fontWeight: actionable ? 600 : 400,
+      }}
+    >
+      miss:{reason}{missed != null ? ` (${fmtK(missed)})` : ""}
+    </span>
   );
 }
 
 /** One-line aggregate across the loaded turn window. */
 function TurnsSummary({ events }: { events: ApiCallEvent[] }) {
   let totIn = 0, totRead = 0, totWrite = 0, totOut = 0;
+  // Tally actionable cache misses by reason. Non-actionable reasons
+  // (previous_message_not_found, unavailable) are skipped — they aren't
+  // prompt-prefix bugs and shouldn't inflate the headline number.
+  const missByReason = new Map<string, number>();
   for (const e of events) {
     totIn += e.inputTokens ?? 0;
     totRead += e.cacheRead ?? 0;
     totWrite += e.cacheCreation ?? 0;
     totOut += e.outputTokens ?? 0;
+    if (e.cacheMissReason && e.cacheMissReason.endsWith("_changed")) {
+      missByReason.set(e.cacheMissReason, (missByReason.get(e.cacheMissReason) ?? 0) + 1);
+    }
   }
   const denom = totIn + totRead + totWrite;
   const hitPct = denom > 0 ? ((totRead / denom) * 100).toFixed(1) : "—";
+  const totalMisses = [...missByReason.values()].reduce((a, b) => a + b, 0);
+  const missBreakdown = [...missByReason.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([reason, n]) => `${reason}×${n}`)
+    .join(", ");
   return (
     <div style={{ fontSize: 11, marginBottom: 8, opacity: 0.85 }}>
       {events.length} turns — cache hit {hitPct}% · in {fmtK(totIn)} · read {fmtK(totRead)}
       {" · write "}{fmtK(totWrite)} · out {fmtK(totOut)}
+      {totalMisses > 0 && (
+        <span style={{ color: "rgb(248, 81, 73)", marginLeft: 8 }}>
+          · {totalMisses} {totalMisses === 1 ? "miss" : "misses"} ({missBreakdown})
+        </span>
+      )}
     </div>
   );
 }
