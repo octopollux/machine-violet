@@ -23,6 +23,7 @@ import type {
   NormalizedMessage, NormalizedToolCall,
   NormalizedUsage, ContentPart, StopReason,
 } from "./types.js";
+import { patchOrphanedToolUses } from "./orphan-patch.js";
 
 // ---------------------------------------------------------------------------
 // Routing
@@ -181,9 +182,12 @@ function toResponsesParams(params: ChatParams): ResponsesParams {
     instructions = params.systemPrompt.map((b) => b.text).join("\n\n");
   }
 
-  // Conversation messages → input items
+  // Conversation messages → input items. Heal orphaned tool_use blocks first
+  // so OpenAI's strict function_call ↔ function_call_output pairing doesn't
+  // 400 on replays of corrupted history. (No block-order normalization needed
+  // — the Responses API accepts interleaved text/function_call items.)
   const input: OpenAI.Responses.ResponseInputItem[] = [];
-  for (const msg of params.messages) {
+  for (const msg of patchOrphanedToolUses(params.messages)) {
     input.push(...toResponsesInput(msg));
   }
 
@@ -543,8 +547,10 @@ function toOpenAIParams(params: ChatParams): OpenAIChatParams {
     messages.push({ role: "system", content: systemText });
   }
 
-  // Conversation messages (may expand: one normalized msg → multiple OpenAI msgs for tool results)
-  for (const msg of params.messages) {
+  // Conversation messages (may expand: one normalized msg → multiple OpenAI msgs
+  // for tool results). Heal orphaned tool_use blocks first so OpenAI's strict
+  // tool_call ↔ tool message pairing doesn't 400 on replays of corrupted history.
+  for (const msg of patchOrphanedToolUses(params.messages)) {
     messages.push(...toOpenAIMessages(msg));
   }
 

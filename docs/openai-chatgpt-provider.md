@@ -51,6 +51,8 @@ Codex sends tool calls as JSON-RPC server requests (`item/tool/call`) that must 
 
 The bridge sees a single chat() call with the final aggregated text + usage. Cost tracking, `api:call` logging, and prompt caching all work transparently.
 
+**Persisted-history shape.** Because the provider doesn't surface `toolCalls` back to the bridge, the engine's normalized history records only the assistant's `tool_use` blocks (plus the final committed text appended after them) — there are no `tool_result` blocks, and the trailing text sits *after* the tool_use blocks. Neither shape replays cleanly: Anthropic 400s on text-after-tool_use, and any provider 400s on orphaned tool_use ids. The engine compensates inside the provider mappers via `providers/orphan-patch.ts` — see [Malformed history](error-recovery.md#malformed-history-orphan--block-order-patches) for the two heuristics and their cache invariants.
+
 ## Auth flow (server endpoints)
 
 | Endpoint | Purpose |
