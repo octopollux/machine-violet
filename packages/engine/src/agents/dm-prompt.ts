@@ -43,12 +43,21 @@ export interface DMSessionState {
  * Returns system blocks (Tier 1+2) and volatile context (Tier 3) separately.
  * Volatile context should be injected into the conversation, not the system prompt,
  * to avoid invalidating the tools cache (BP3) on every turn.
+ *
+ * `modelId` is the runtime tier-resolved model serving the DM, used by
+ * `<!--if:PREFIX-->` conditionals inside the prompt .md files. Callers should
+ * pass the same model ID they'll send the request with (typically
+ * `tierProviders.large.model`). When omitted, falls back to the static
+ * `getModel("large")` — preserves legacy behavior for callers that don't have
+ * tier routing wired up, but means conditionals won't reflect the actual
+ * runtime provider.
  */
 export function buildDMPrefix(
   config: CampaignConfig,
   sessionState: DMSessionState,
+  modelId?: string,
 ): CachedPrefixResult {
-  const model = getModel("large");
+  const model = modelId ?? getModel("large");
   const sections: PrefixSections = {
     dmIdentity: loadPrompt("dm-identity", model),
     dmDirectives: loadPrompt("dm-directives", model),

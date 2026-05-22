@@ -173,7 +173,12 @@ export class SceneManager {
     this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);
     this.sessionState.entityIndex = this.entityTreeSnapshot;
     this.sessionState.contentBoundaries = this.contentBoundariesSnapshot;
-    return buildDMPrefix(this.state.config, this.sessionState);
+    // Use the runtime tier-resolved model for prompt conditionals
+    // (`<!--if:gpt-->` etc.) so the DM prompt branches match the provider
+    // actually serving the request. Falls back to the static large default
+    // when tierProviders isn't supplied (legacy test paths).
+    const dmModelId = this.tierProviders?.large.model ?? getModel("large");
+    return buildDMPrefix(this.state.config, this.sessionState, dmModelId);
   }
 
   /** Append to the scene transcript */

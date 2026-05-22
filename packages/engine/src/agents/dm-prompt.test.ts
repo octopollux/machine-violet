@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { buildUIState, buildActiveState, buildHardStats } from "./dm-prompt.js";
+import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
+import { buildUIState, buildActiveState, buildHardStats, buildDMPrefix } from "./dm-prompt.js";
 import { resetPromptCache } from "../prompts/load-prompt.js";
+import { loadModelConfig } from "../config/models.js";
 
 beforeEach(() => {
   resetPromptCache();
+  loadModelConfig({ reset: true });
 });
 
 describe("buildUIState", () => {
@@ -133,5 +136,38 @@ describe("buildHardStats", () => {
       resourceValues: { Aldric: { HP: "24/30" } },
     });
     expect(result).toBe("Turn: Aldric\nResources:\n  Aldric: HP=24/30");
+  });
+});
+
+describe("buildDMPrefix model conditionals", () => {
+  // Regression guard for issue #483: the runtime tier-resolved model ID must
+  // reach loadPrompt so `<!--if:gpt-->` blocks in dm-directives.md resolve
+  // their if-branch when the DM is actually served by an OpenAI provider.
+  const mockConfig: CampaignConfig = {
+    name: "Test",
+    system: "D&D 5e",
+    dm_personality: { name: "grim", prompt_fragment: "You are terse." },
+    players: [{ name: "Alice", character: "Aldric", type: "human" }],
+    combat: { initiative_method: "d20_dex", round_structure: "individual", surprise_rules: false },
+    context: { retention_exchanges: 5, max_conversation_tokens: 4000, tool_result_stub_after: 200 },
+    recovery: { auto_commit_interval: 300, max_commits: 100, enable_git: false },
+    choices: { campaign_default: "never", player_overrides: {} },
+  } as CampaignConfig;
+
+  // Phrase from dm-directives.md's <!--if:gpt--> block. If the conditional
+  // body changes, update this string — the test asserts the conditional
+  // plumbing, not the specific wording.
+  const GPT_ONLY_PHRASE = `Not X, but Y`;
+
+  it("includes if:gpt block when a gpt-* model ID is threaded through", () => {
+    const { system } = buildDMPrefix(mockConfig, {}, "gpt-5.5");
+    const allText = system.map((b) => b.text).join("\n");
+    expect(allText).toContain(GPT_ONLY_PHRASE);
+  });
+
+  it("omits if:gpt block when a claude-* model ID is threaded through", () => {
+    const { system } = buildDMPrefix(mockConfig, {}, "claude-opus-4-6");
+    const allText = system.map((b) => b.text).join("\n");
+    expect(allText).not.toContain(GPT_ONLY_PHRASE);
   });
 });

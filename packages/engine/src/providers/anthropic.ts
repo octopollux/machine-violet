@@ -13,6 +13,7 @@ import type {
 } from "./types.js";
 import { getKnownModel } from "../config/model-registry.js";
 import { logEvent } from "../context/engine-log.js";
+import { patchOrphanedToolUses, reorderAssistantToolUseBlocksLast } from "./orphan-patch.js";
 
 /**
  * Beta header for prompt-cache diagnostics (Anthropic API only). When set,
@@ -136,8 +137,20 @@ export function toAnthropicParams(params: ChatParams): {
     });
   }
 
-  // Messages
-  const messages = params.messages.map(toAnthropicMessage);
+  // Messages — heal malformed history before mapping. Two passes:
+  //   1. Reorder assistant blocks so any tool_use blocks come last. Anthropic
+  //      400s when text follows tool_use ("tool_use ids were found without
+  //      tool_result blocks immediately after") — the validator considers
+  //      trailing text as abandoning the tool call and never checks the next
+  //      user message for results.
+  //   2. Insert synthetic tool_result stubs for any unpaired tool_use ids so
+  //      every tool_use has a matching tool_result in the next message.
+  // Together these heal the persisted shape the openai-chatgpt provider
+  // produces (it appends final text after tool_use, and never persists
+  // tool_results for tools it dispatched in-band).
+  const reorderedMessages = params.messages.map(reorderAssistantToolUseBlocksLast);
+  const patchedMessages = patchOrphanedToolUses(reorderedMessages);
+  const messages = patchedMessages.map(toAnthropicMessage);
 
   // Tools
   let tools: Anthropic.Tool[] | undefined;
@@ -196,7 +209,7 @@ export function toAnthropicParams(params: ChatParams): {
   const msgCacheHint = params.cacheHints?.find((h) => h.target === "messages");
   if (msgCacheHint && messages.length > 0) {
     let stampMsgIdx = messages.length - 1;
-    while (stampMsgIdx >= 0 && params.messages[stampMsgIdx]?.ephemeral) {
+    while (stampMsgIdx >= 0 && patchedMessages[stampMsgIdx]?.ephemeral) {
       stampMsgIdx--;
     }
     if (stampMsgIdx >= 0) {
@@ -344,6 +357,7 @@ function fromAnthropicResponse(
  * populated CacheDiagnostics only for the fourth. Also emits a structured log
  * line on `*_changed` types so operators can grep engine.jsonl for divergence
  * causes without going through the dump viewer.
+ *
  */
 function extractCacheDiagnostics(response: Anthropic.Message): CacheDiagnostics | undefined {
   const raw = (response as unknown as Record<string, unknown>).diagnostics;

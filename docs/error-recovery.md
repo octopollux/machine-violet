@@ -98,6 +98,21 @@ Use this when sending a triage bundle for a bug report.
 
 If a Haiku/Sonnet subagent call fails (during resolution, OOC, chargen, etc.), the engine retries the subagent call. The parent (Opus DM) doesn't see the failure unless retries are exhausted, in which case it receives an error result: "Resolution failed — resolve manually or retry." The DM can narrate around it or ask the player to wait.
 
+### Malformed history (orphan & block-order patches)
+
+Conversation history can land on disk in shapes that no provider's strict validator will accept on replay. This is a separate failure mode from the in-flight retries above — the request gets a 400 before any work happens, so retrying doesn't help. `providers/orphan-patch.ts` heals the shapes inside the provider mappers, transparently to the rest of the engine.
+
+Two heuristics, applied in order inside `toAnthropicParams` (and the orphan check alone inside the two OpenAI mappers):
+
+1. **`reorderAssistantToolUseBlocksLast`** — Anthropic only. Stable partition of an assistant message's content into `[…non-tool_use, …tool_use]`. Anthropic's `/v1/messages` rejects assistant turns of shape `[tool_use, text]` with `tool_use ids were found without tool_result blocks immediately after` — the validator considers trailing text as abandoning the call and never looks at the next user message. OpenAI's Responses API accepts interleaved blocks, so reordering would only destroy legitimate sequencing there.
+2. **`patchOrphanedToolUses`** — Anthropic + OpenAI. Walks the message list. For any `tool_use` block whose `id` doesn't appear as a `tool_use_id` in the immediately-following user message, either merges synthetic `tool_result` stubs into that existing follow-up user message, or — when no user message follows at all — inserts a fresh user message containing only the stubs. Each stub has `content: "[no tool result recorded]"` and `is_error: true`, emitted in the same order as the orphaned tool_use blocks.
+
+**Cache invariant.** Both patches are deterministic and idempotent. Same input → same output bytes; re-patching a patched list is a no-op. This is load-bearing for Anthropic BP4 (the cache stamp lands on the last non-ephemeral message — must be a position stable across turns) and for OpenAI's automatic prefix caching.
+
+**Producer.** The openai-chatgpt provider dispatches tools in-band during a single Codex turn, so it persists assistant content of shape `[tool_use…, text]` with no separate `tool_result` blocks — see [openai-chatgpt-provider.md](openai-chatgpt-provider.md#tool-dispatch). Crashed agent loops or interrupted turns can also leave orphans behind; the patches heal those too.
+
+**Debugging tip.** If you see a `tool_use ids were found without tool_result blocks` 400, look at the wire body: if the IDs the API names *are* matched in the next user message but the assistant message ends with a `text` block, the block-order rule is the cause, not orphan pairing. Anthropic's error message conflates the two.
+
 ## Mid-Cascade Failures
 
 Operations like `scene_transition` are multi-step cascades. If a cascade fails partway through (API down during the Haiku summary step), the engine needs to resume from where it stopped.

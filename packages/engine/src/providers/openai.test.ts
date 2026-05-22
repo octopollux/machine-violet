@@ -489,6 +489,32 @@ describe("Responses API integration", () => {
     expect(result.text).toBe("Hi.");
   });
 
+  it("inserts synthetic function_call_output for orphaned tool_use in history", async () => {
+    // Pure-function behavior is covered in orphan-patch.test.ts; this asserts
+    // the wiring in toResponsesParams so the request body stays API-valid.
+    mockResponses.create.mockResolvedValue(fakeResponse());
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    await provider.chat(baseChatParams({
+      messages: [
+        { role: "user", content: "go" },
+        {
+          role: "assistant",
+          content: [{ type: "tool_use", id: "call_orphan", name: "roll_dice", input: {} }],
+        },
+      ],
+    }));
+
+    const sent = mockResponses.create.mock.calls[0][0];
+    // [user message, function_call, function_call_output stub]
+    expect(sent.input).toHaveLength(3);
+    expect(sent.input[2]).toEqual({
+      type: "function_call_output",
+      call_id: "call_orphan",
+      output: "[no tool result recorded]",
+    });
+  });
+
   describe("streaming", () => {
     it("emits text deltas and returns final response", async () => {
       const response = fakeResponse();
@@ -667,6 +693,32 @@ describe("Chat Completions integration (custom provider)", () => {
 
     const callArgs = mockCompletions.create.mock.calls[0][0];
     expect(callArgs.messages[0]).toEqual({ role: "system", content: "You are a pirate." });
+  });
+
+  it("inserts synthetic tool message for orphaned tool_use in history", async () => {
+    // Pure-function behavior is covered in orphan-patch.test.ts; this asserts
+    // the wiring in toOpenAIParams so the request body stays API-valid.
+    mockCompletions.create.mockResolvedValue(fakeChatCompletion());
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "custom" });
+    await provider.chat(baseChatParams({
+      messages: [
+        { role: "user", content: "go" },
+        {
+          role: "assistant",
+          content: [{ type: "tool_use", id: "call_orphan", name: "roll_dice", input: {} }],
+        },
+      ],
+    }));
+
+    const sent = mockCompletions.create.mock.calls[0][0];
+    // [system, user, assistant w/ tool_calls, tool result stub]
+    expect(sent.messages).toHaveLength(4);
+    expect(sent.messages[3]).toEqual({
+      role: "tool",
+      tool_call_id: "call_orphan",
+      content: "[no tool result recorded]",
+    });
   });
 });
 
