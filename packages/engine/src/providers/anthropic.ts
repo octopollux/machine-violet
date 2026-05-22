@@ -358,8 +358,9 @@ function fromAnthropicResponse(
  * line on `*_changed` types so operators can grep engine.jsonl for divergence
  * causes without going through the dump viewer.
  *
+ * Exported for tests.
  */
-function extractCacheDiagnostics(response: Anthropic.Message): CacheDiagnostics | undefined {
+export function extractCacheDiagnostics(response: Anthropic.Message): CacheDiagnostics | undefined {
   const raw = (response as unknown as Record<string, unknown>).diagnostics;
   if (raw == null || typeof raw !== "object") return undefined;
 

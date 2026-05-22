@@ -1,6 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { toAnthropicParams } from "./anthropic.js";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type Anthropic from "@anthropic-ai/sdk";
+import { toAnthropicParams, extractCacheDiagnostics } from "./anthropic.js";
 import type { ChatParams, NormalizedMessage } from "./types.js";
+import * as engineLog from "../context/engine-log.js";
 
 /**
  * Exercise the BP4 (messages) cache-stamp logic — the single most important
@@ -104,5 +106,144 @@ describe("toAnthropicParams: messages cache stamp (BP4)", () => {
     ];
     const out = toAnthropicParams(baseParams({ messages }));
     expect(stampedIndexes(out.messages)).toEqual([false, false]);
+  });
+});
+
+describe("toAnthropicParams: orphan-patch wiring", () => {
+  it("inserts a synthetic tool_result user message and lands the BP4 stamp on it", () => {
+    // End-to-end: an orphan-trailing history with no clean stable tail.
+    // The synthetic stub IS the new stable tail, so the cache stamp should
+    // land on it (not on the original trailing assistant, which would be
+    // invalid both for the API and for cache purposes).
+    // Pure-function behavior is covered in orphan-patch.test.ts.
+    const messages: NormalizedMessage[] = [
+      { role: "user", content: "go" },
+      {
+        role: "assistant",
+        content: [{ type: "tool_use", id: "t1", name: "roll_dice", input: {} }],
+      },
+    ];
+    const out = toAnthropicParams(baseParams({ messages }));
+    expect(out.messages).toHaveLength(3);
+    expect(out.messages[2].role).toBe("user");
+    expect(out.messages[2].content).toEqual([
+      {
+        type: "tool_result",
+        tool_use_id: "t1",
+        content: "[no tool result recorded]",
+        is_error: true,
+        cache_control: { type: "ephemeral" },
+      },
+    ]);
+    expect(stampedIndexes(out.messages)).toEqual([false, false, true]);
+  });
+});
+
+/**
+ * Exercise the four documented `diagnostics` states from the
+ * cache-diagnosis-2026-04-07 beta and verify that only the actionable
+ * `*_changed` reasons (the ones operators can fix) trigger the structured
+ * `cache:miss` engine-log entry. The other states are returned-or-omitted
+ * silently so the log doesn't fill up with non-bugs.
+ */
+describe("extractCacheDiagnostics", () => {
+  let logSpy: ReturnType<typeof vi.spyOn>;
+
+  // Minimal Anthropic.Message stand-in: the function only reads `id`, `model`,
+  // and (via cast) `diagnostics`. Build a permissive cast so each test can
+  // attach whatever `diagnostics` shape it's exercising without re-listing
+  // all the unused Message fields.
+  function msg(diagnostics: unknown): Anthropic.Message {
+    return {
+      id: "msg_test",
+      model: "claude-test",
+      diagnostics,
+    } as unknown as Anthropic.Message;
+  }
+
+  beforeEach(() => {
+    logSpy = vi.spyOn(engineLog, "logEvent").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+  });
+
+  it("returns undefined when the diagnostics field is absent (beta not enabled)", () => {
+    const m = { id: "msg_x", model: "claude-test" } as unknown as Anthropic.Message;
+    expect(extractCacheDiagnostics(m)).toBeUndefined();
+    expect(logSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns undefined when diagnostics is null (first turn or no divergence)", () => {
+    expect(extractCacheDiagnostics(msg(null))).toBeUndefined();
+    expect(logSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns undefined when cache_miss_reason is null (comparison still pending)", () => {
+    expect(extractCacheDiagnostics(msg({ cache_miss_reason: null }))).toBeUndefined();
+    expect(logSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns the reasonType + token count for an actionable *_changed miss", () => {
+    const result = extractCacheDiagnostics(msg({
+      cache_miss_reason: { type: "system_changed", cache_missed_input_tokens: 41850 },
+    }));
+    expect(result).toEqual({ reasonType: "system_changed", missedInputTokens: 41850 });
+  });
+
+  it("emits a cache:miss engine-log entry for *_changed reasons", () => {
+    extractCacheDiagnostics(msg({
+      cache_miss_reason: { type: "tools_changed", cache_missed_input_tokens: 1234 },
+    }));
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    expect(logSpy).toHaveBeenCalledWith("cache:miss", expect.objectContaining({
+      messageId: "msg_test",
+      model: "claude-test",
+      reasonType: "tools_changed",
+      missedInputTokens: 1234,
+    }));
+  });
+
+  it("omits missedInputTokens from the result when the API didn't include it", () => {
+    const result = extractCacheDiagnostics(msg({
+      cache_miss_reason: { type: "model_changed" },
+    }));
+    expect(result).toEqual({ reasonType: "model_changed" });
+    // And the log entry omits missedInputTokens too rather than logging undefined.
+    const logged = logSpy.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(logged).not.toHaveProperty("missedInputTokens");
+  });
+
+  it("returns previous_message_not_found but does NOT emit a cache:miss log", () => {
+    // Non-actionable: the prior request just wasn't on file (fingerprint
+    // expired, different workspace, beta header missing on the prior call).
+    // Surface it for the viewer's gray pill but don't pollute the log with
+    // a "miss" entry — there's nothing in our prompts to fix.
+    const result = extractCacheDiagnostics(msg({
+      cache_miss_reason: { type: "previous_message_not_found" },
+    }));
+    expect(result).toEqual({ reasonType: "previous_message_not_found" });
+    expect(logSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns unavailable but does NOT emit a cache:miss log", () => {
+    // Same rationale as previous_message_not_found — no comparison was
+    // produced, not a prompt-prefix bug.
+    const result = extractCacheDiagnostics(msg({
+      cache_miss_reason: { type: "unavailable" },
+    }));
+    expect(result).toEqual({ reasonType: "unavailable" });
+    expect(logSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns undefined for a malformed cache_miss_reason missing a type", () => {
+    // Defensive against future beta schema drift — if `type` is absent,
+    // treat the whole object as uninterpretable rather than emitting a
+    // pill with `reasonType: undefined`.
+    expect(extractCacheDiagnostics(msg({
+      cache_miss_reason: { cache_missed_input_tokens: 100 },
+    }))).toBeUndefined();
+    expect(logSpy).not.toHaveBeenCalled();
   });
 });

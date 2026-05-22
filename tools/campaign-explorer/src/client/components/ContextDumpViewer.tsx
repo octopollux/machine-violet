@@ -10,10 +10,12 @@ interface ContextDumpViewerProps {
  * log lines may pre-date the cacheCreation addition.
  *
  * `cacheMissReason` / `cacheMissedInputTokens` come from Anthropic's
- * `cache-diagnosis-2026-04-07` beta and are present only on calls where the
- * API actually attributed a divergence. The "no divergence" / "comparison
- * pending" / "unavailable" cases are absent rather than null so the chip
- * stays uncluttered when caching is working.
+ * `cache-diagnosis-2026-04-07` beta. The engine surfaces any non-null
+ * `cache_miss_reason.type` here — including the non-actionable
+ * `previous_message_not_found` and `unavailable` cases (rendered in muted
+ * gray by `CacheMissPill`). The truly silent states — "no divergence" and
+ * "comparison still pending" — are omitted entirely so the chip stays
+ * uncluttered when caching is working.
  */
 interface ApiCallEvent {
   t?: number;
