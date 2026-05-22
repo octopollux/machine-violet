@@ -39,6 +39,19 @@ describe("splitTitle", () => {
     // or producing empty lines.
     expect(splitTitle("Campaign | Foo", 0)).toEqual(["Campaign | Foo"]);
   });
+
+  it("measures width via stringWidth, not raw .length", () => {
+    // stringWidth strips ANSI; raw .length would mismeasure when ANSI is
+    // embedded. (CJK / emoji width is the same as .length under this
+    // codebase's stringWidth, but the ANSI-stripping behavior is what
+    // ensures wide-Unicode robustness once stringWidth gains EAW support.)
+    const ansi = String.fromCharCode(0x1b) + "[31m";
+    const reset = String.fromCharCode(0x1b) + "[0m";
+    const text = `${ansi}Campaign${reset} | A 1/1 | B 2/2`;
+    // Visible content is 23 chars; ANSI sequences would push raw .length
+    // far above. With stringWidth-based sizing, this fits at maxWidth=30.
+    expect(splitTitle(text, 30)).toEqual([text]);
+  });
 });
 
 describe("topFrameTitleBudget", () => {

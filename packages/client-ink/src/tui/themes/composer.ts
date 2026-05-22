@@ -4,6 +4,7 @@
  */
 
 import type { ThemeAsset, ThemeComponent, PlayerPaneFrame } from "./types.js";
+import { stringWidth, truncateToWidth } from "../frames/index.js";
 
 /** A composed frame: an array of string rows ready for rendering. */
 export interface ComposedFrame {
@@ -50,10 +51,26 @@ export function composeTopFrame(
     asset.components;
 
   const titleLines = Array.isArray(title) ? title : title ? [title] : [];
-  const longestLen = titleLines.reduce((m, l) => Math.max(m, l.length), 0);
-  const titleWidth = longestLen > 0 ? longestLen + 2 : 0; // +2 for padding spaces
-  const totalRows = Math.max(asset.height, titleLines.length);
+  // All column math goes through `stringWidth` so wide Unicode (CJK / emoji)
+  // doesn't lie about how many cells a title or border glyph occupies.
+  const longestLen = titleLines.reduce((m, l) => Math.max(m, stringWidth(l)), 0);
 
+  // Worst-case row overhead: row 0 carries the corners + separators (their
+  // largest configuration, given separators are only painted when titleWidth>0).
+  // Clamping titleWidth against this floor guarantees `fillWidth >= 0` on
+  // every row, so the frame never falls through to the bare-edge fallback.
+  const row0Fixed = stringWidth(corner_tl.rows[0] ?? "")
+    + stringWidth(corner_tr.rows[0] ?? "")
+    + (longestLen > 0 ? stringWidth(separator_left_top.rows[0] ?? "") : 0)
+    + (longestLen > 0 ? stringWidth(separator_right_top.rows[0] ?? "") : 0);
+  const maxTitleSlot = Math.max(0, width - row0Fixed);
+  const titleWidth = longestLen > 0 ? Math.min(longestLen + 2, maxTitleSlot) : 0;
+  // Available room inside the title slot for the line text (excluding the
+  // 2 padding spaces). A line longer than this is hard-truncated with an
+  // ellipsis to preserve the surrounding frame.
+  const lineMaxWidth = Math.max(0, titleWidth - 2);
+
+  const totalRows = Math.max(asset.height, titleLines.length);
   const rows: string[] = [];
 
   for (let r = 0; r < totalRows; r++) {
@@ -74,12 +91,14 @@ export function composeTopFrame(
     // title sits centered on a clean blank between the side edges.
     const edge = insideAsset ? (edge_top.rows[r] ?? "") : " ";
 
-    const fixedWidth = ctl.length + ctr.length + slt.length + srt.length;
+    const fixedWidth = stringWidth(ctl) + stringWidth(ctr) + stringWidth(slt) + stringWidth(srt);
     const centerWidth = titleWidth > 0 ? titleWidth : 0;
     const fillWidth = width - fixedWidth - centerWidth;
 
     if (fillWidth < 0) {
-      // Degenerate: width too narrow, just tile everything
+      // Safety net — titleWidth was clamped against row 0's worst case, so
+      // we shouldn't land here in practice. Fall back to a bare edge tile
+      // rather than emit a malformed row.
       rows.push(tileToWidth(edge, width));
       continue;
     }
@@ -87,19 +106,23 @@ export function composeTopFrame(
     const leftFill = Math.floor(fillWidth / 2);
     const rightFill = fillWidth - leftFill;
 
-    // Center the row's title line inside the (wider) slot, so a short
-    // continuation under a long head aligns visually under it.
+    // Truncate any per-row line that would overflow the (possibly clamped)
+    // slot, then center it inside the slot so a short continuation under
+    // a long head aligns visually under it.
     const lineForRow = titleLines[r] ?? "";
+    const fittedLine = stringWidth(lineForRow) > lineMaxWidth
+      ? truncateToWidth(lineForRow, lineMaxWidth)
+      : lineForRow;
     let centerPart: string;
     if (titleWidth === 0) {
       centerPart = "";
-    } else if (lineForRow.length === 0) {
+    } else if (fittedLine.length === 0) {
       centerPart = " ".repeat(titleWidth);
     } else {
-      const innerPad = titleWidth - 2 - lineForRow.length;
+      const innerPad = titleWidth - 2 - stringWidth(fittedLine);
       const innerLeft = Math.floor(innerPad / 2);
       const innerRight = innerPad - innerLeft;
-      centerPart = ` ${" ".repeat(innerLeft)}${lineForRow}${" ".repeat(innerRight)} `;
+      centerPart = ` ${" ".repeat(innerLeft)}${fittedLine}${" ".repeat(innerRight)} `;
     }
 
     rows.push(

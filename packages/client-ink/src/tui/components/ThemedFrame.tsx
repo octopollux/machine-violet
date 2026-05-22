@@ -93,12 +93,16 @@ export const ThemedHorizontalBorder = React.memo(function ThemedHorizontalBorder
     <Box flexDirection="column">
       {frame.rows.map((row, i) => {
         const rowText = position === "top" ? centerLines[i] : (i === frame.rows.length - 1 ? centerLines[0] : undefined);
-        // If there's center text on this row and a distinct title color, render in parts
+        // If there's center text on this row and a distinct title color, render in parts.
+        // The composer centers shorter continuation lines inside the (wider) longest-line
+        // slot by inserting extra spaces around the text, so the ` ${rowText} ` substring
+        // we used to match no longer exists in that case. Search for rowText directly —
+        // the surrounding pad spaces stay border-colored, which is invisible.
         if (rowText && titleColor && titleColor !== borderColor) {
-          const textIdx = row.indexOf(` ${rowText} `);
+          const textIdx = row.indexOf(rowText);
           if (textIdx >= 0) {
             const before = row.slice(0, textIdx);
-            const middle = ` ${rowText} `;
+            const middle = rowText;
             const after = row.slice(textIdx + middle.length);
 
             if (gradient && borderColor) {

@@ -83,6 +83,29 @@ describe("ThemedHorizontalBorder", () => {
       s.replace(new RegExp(`${String.fromCharCode(0x1b)}\\[[0-9;]*m`, "g"), "");
     expect(stripAnsi(framWithGrad()!)).toBe(stripAnsi(framNoGrad()!));
   });
+
+  it("renders both head and continuation chunks when given a title array", () => {
+    // A short continuation under a long head: the composer centers the
+    // short chunk inside the wider slot by inserting extra padding spaces.
+    // The previous ` ${rowText} ` lookup wouldn't find the chunk in that
+    // case and the continuation would silently render in the border color
+    // — see the matching composer-level coverage in composer.test.ts that
+    // asserts the chunk is locatable via indexOf(rowText).
+    const head = "Warranty Void | Processing Cycles 1/10 | Coherence 4/10";
+    const cont = "Connections 3/5";
+    const { lastFrame } = render(
+      <ThemedHorizontalBorder
+        theme={noGrad}
+        width={80}
+        position="top"
+        centerText={[head, cont]}
+        centerTextColor="#ffffff"
+      />,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain(head);
+    expect(frame).toContain(cont);
+  });
 });
 
 describe("ThemedSideFrame", () => {

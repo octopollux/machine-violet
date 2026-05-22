@@ -10,6 +10,7 @@
  * layout inserts above the narrative area.
  */
 import type { ThemeAsset } from "./themes/types.js";
+import { stringWidth } from "./frames/index.js";
 
 /**
  * Maximum title length (in display columns) that fits in the top frame's
@@ -17,26 +18,30 @@ import type { ThemeAsset } from "./themes/types.js";
  * corners + two separators) and the two padding spaces around the
  * centerText. Falls back to 0 if the slot can't accommodate even an
  * empty title (extremely narrow terminal).
+ *
+ * Uses `stringWidth` rather than `.length` so wide Unicode glyphs in a
+ * theme's corner / separator (or in a future title) don't undercount.
  */
 export function topFrameTitleBudget(asset: ThemeAsset, width: number): number {
   const { corner_tl, corner_tr, separator_left_top, separator_right_top } = asset.components;
   // Row 0 is what holds the title; the +2 accounts for ` ${title} ` padding.
   const fixedWidth =
-    (corner_tl.rows[0]?.length ?? 0) +
-    (corner_tr.rows[0]?.length ?? 0) +
-    (separator_left_top.rows[0]?.length ?? 0) +
-    (separator_right_top.rows[0]?.length ?? 0);
+    stringWidth(corner_tl.rows[0] ?? "") +
+    stringWidth(corner_tr.rows[0] ?? "") +
+    stringWidth(separator_left_top.rows[0] ?? "") +
+    stringWidth(separator_right_top.rows[0] ?? "");
   return Math.max(0, width - fixedWidth - 2);
 }
 
 /**
  * Greedily pack ` | `-separated segments into lines of at most `maxWidth`
- * columns. The separator is consumed at the break, mirroring splitModeline's
- * behavior. A segment that alone exceeds maxWidth occupies its own line —
- * truncation isn't this function's job; the renderer does that.
+ * display columns. The separator is consumed at the break, mirroring
+ * splitModeline's behavior. A segment that alone exceeds maxWidth occupies
+ * its own line — truncation isn't this function's job; the renderer does
+ * that.
  */
 export function splitTitle(text: string, maxWidth: number): string[] {
-  if (maxWidth <= 0 || text.length <= maxWidth) return [text];
+  if (maxWidth <= 0 || stringWidth(text) <= maxWidth) return [text];
 
   const segments = text.split(" | ");
   const lines: string[] = [];
@@ -44,7 +49,7 @@ export function splitTitle(text: string, maxWidth: number): string[] {
 
   for (let i = 1; i < segments.length; i++) {
     const candidate = current + " | " + segments[i];
-    if (candidate.length <= maxWidth) {
+    if (stringWidth(candidate) <= maxWidth) {
       current = candidate;
     } else {
       lines.push(current);
