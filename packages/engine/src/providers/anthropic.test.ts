@@ -106,3 +106,33 @@ describe("toAnthropicParams: messages cache stamp (BP4)", () => {
     expect(stampedIndexes(out.messages)).toEqual([false, false]);
   });
 });
+
+describe("toAnthropicParams: orphan-patch wiring", () => {
+  it("inserts a synthetic tool_result user message and lands the BP4 stamp on it", () => {
+    // End-to-end: an orphan-trailing history with no clean stable tail.
+    // The synthetic stub IS the new stable tail, so the cache stamp should
+    // land on it (not on the original trailing assistant, which would be
+    // invalid both for the API and for cache purposes).
+    // Pure-function behavior is covered in orphan-patch.test.ts.
+    const messages: NormalizedMessage[] = [
+      { role: "user", content: "go" },
+      {
+        role: "assistant",
+        content: [{ type: "tool_use", id: "t1", name: "roll_dice", input: {} }],
+      },
+    ];
+    const out = toAnthropicParams(baseParams({ messages }));
+    expect(out.messages).toHaveLength(3);
+    expect(out.messages[2].role).toBe("user");
+    expect(out.messages[2].content).toEqual([
+      {
+        type: "tool_result",
+        tool_use_id: "t1",
+        content: "[no tool result recorded]",
+        is_error: true,
+        cache_control: { type: "ephemeral" },
+      },
+    ]);
+    expect(stampedIndexes(out.messages)).toEqual([false, false, true]);
+  });
+});
