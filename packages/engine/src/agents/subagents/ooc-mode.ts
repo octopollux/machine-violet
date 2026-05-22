@@ -116,7 +116,7 @@ export function buildOOCPrompt(options: OOCPromptOptions): string | SystemBlock[
     return prompt;
   }
 
-  const prefix = buildDMPrefix(opts.config, opts.sessionState);
+  const prefix = buildDMPrefix(opts.config, opts.sessionState, opts.model);
 
   // OOC suffix — appended after all DM Tier 1+2 blocks. Uncached on purpose
   // (it varies per entry and is small), and sits past the last cache_control
