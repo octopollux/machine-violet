@@ -226,11 +226,13 @@ export async function runProviderLoop(
   };
   const tuiCommands: TuiCommand[] = [];
   let fullText = "";
+  // Concatenation of every round's emitted text, in the order the client saw
+  // it on screen. Compared against `fullText` after the loop: if regen-aware
+  // accumulation produced a shorter canonical text than what was streamed,
+  // we emit a corrective rollback + re-stream so the displayed narrative
+  // matches the persisted one.
+  let streamedText = "";
   let truncated = false;
-  // Tracks whether the round we just completed emitted any text deltas.
-  // Used to roll the client back at the boundary into the next round —
-  // see the inter-round rollback comment inside the loop.
-  let priorRoundEmittedText = false;
 
   const workingMessages = [...messages];
   const loopStartIndex = workingMessages.length;
@@ -239,19 +241,6 @@ export async function runProviderLoop(
   const priorAssistantCount = messages.filter((m) => m.role === "assistant").length;
 
   for (let round = 0; round < maxToolRounds; round++) {
-    // Inter-round rollback: when a round emitted narrative text alongside a
-    // tool call (typically a deferred TUI tool like scribe / scene_transition
-    // / dm_notes), Claude often re-narrates the same content in the next
-    // round after seeing the synthetic tool_result. The streamed deltas from
-    // round N are still in the client's narrative log; without a rollback,
-    // round N+1's stream is appended after them and the user sees the same
-    // text twice. Reuse the retry-rollback path so the bridge clears its
-    // delta buffer and the session-manager publishes a corrective snapshot
-    // before round N+1's deltas begin arriving.
-    if (priorRoundEmittedText) {
-      config.onRollback?.();
-    }
-
     // Tool dispatcher for providers that own tool dispatch internally
     // (currently openai-chatgpt). Wraps the same per-call logic the
     // bridge runs after this chat() returns for non-internal-dispatch
@@ -312,7 +301,6 @@ export async function runProviderLoop(
     });
 
     let result: ChatResult;
-    let roundEmittedDeltas: boolean;
     const apiStart = Date.now();
     for (let attempt = 0; ; attempt++) {
       // Per-attempt flag: did this attempt actually stream any text before
@@ -331,12 +319,6 @@ export async function runProviderLoop(
           // In non-streaming mode, emit the full text
           if (result.text) config.onTextDelta?.(result.text);
         }
-        // Successful attempt: capture whether deltas leaked so the
-        // inter-round rollback at the top of the next iteration knows
-        // whether a corrective snapshot is needed. Per-attempt rollbacks
-        // for retries already cleared the failed-attempt streams; this
-        // flag reflects only the surviving (successful) attempt.
-        roundEmittedDeltas = shouldStream ? attemptEmittedDeltas : !!result.text;
         break; // success — exit retry loop
       } catch (apiErr) {
         const status = extractStatus(apiErr);
@@ -411,22 +393,32 @@ export async function runProviderLoop(
       dumpThinking(config.name, priorAssistantCount + round, result.thinkingText);
     }
 
-    // Last-non-empty-round-wins: each round with text overwrites prior text.
-    // When the model emits text alongside a tool call and then re-narrates
-    // after the tool_result (Claude does this routinely with deferred TUI
-    // tools, see the inter-round rollback comment above), accumulating across
-    // rounds doubles the response in every downstream sink — display log,
-    // scene transcript, committed narrative, etc. Overwriting keeps
-    // `result.text` consistent with the final assistant message in
-    // `roundMessages`, which is what the conversation history already
-    // collapses to via `finalAssistantText` in game-engine.ts. The non-empty
-    // guard preserves the prior round's text for the unusual case where the
-    // model said its piece alongside a tool call and then end_turn'd in the
-    // next round without further narration.
+    // Regen-aware accumulation. The model can do one of two things after a
+    // deferred-TUI tool_result:
+    //   (a) Regenerate the prior round's narrative verbatim or near-verbatim
+    //       (it reads the synthetic "queue confirmation" ack ambiguously,
+    //       even with the "narrative delivered" suffix, especially under
+    //       deep context pressure). We must NOT concatenate, or the
+    //       persisted transcript doubles up.
+    //   (b) Add a genuine continuation — a coda, a follow-up beat, a "and
+    //       then the door creaked open." This is exactly what the
+    //       "end your turn unless you have new narrative to add" hint
+    //       invites, and the model does take that invitation. We must
+    //       concatenate, or the new narrative is silently dropped (#485).
+    // Distinguish by prefix overlap: a regen typically shares a long opening
+    // with the prior text; a continuation starts somewhere genuinely new.
+    // Both branches also drive the post-loop corrective rollback below —
+    // streamedText tracks what the client actually saw on screen, fullText
+    // tracks what should be persisted, and any divergence at the end of the
+    // turn means we need to re-stream the canonical text.
     if (result.text) {
-      fullText = result.text;
+      streamedText += result.text;
+      if (fullText && looksLikeRegeneration(fullText, result.text)) {
+        fullText = result.text;
+      } else {
+        fullText += result.text;
+      }
     }
-    priorRoundEmittedText = roundEmittedDeltas;
 
     // Process tool calls concurrently. Sync handlers still run sequentially
     // on the JS event loop; async handlers (subagent spawns, search) genuinely
@@ -489,6 +481,17 @@ export async function runProviderLoop(
     }
   }
 
+  // Post-loop corrective rollback: if regen detection collapsed multiple
+  // rounds into a shorter canonical text, the client's narrative log holds
+  // the un-collapsed stream (regen showed up twice on screen). Clear it via
+  // the snapshot path and re-stream the canonical text so what the player
+  // sees matches what we persist. No-op in the common case where every
+  // round was a genuine continuation, since streamedText === fullText.
+  if (shouldStream && streamedText !== fullText) {
+    config.onRollback?.();
+    if (fullText) config.onTextDelta?.(fullText);
+  }
+
   config.onComplete?.(totalUsage);
 
   return {
@@ -498,4 +501,30 @@ export async function runProviderLoop(
     truncated,
     roundMessages: workingMessages.slice(loopStartIndex),
   };
+}
+
+/**
+ * Heuristic: does `next` look like the model regenerating `prior`, as opposed
+ * to adding a continuation? Used at round boundaries to decide whether to
+ * overwrite (regen) or concatenate (continuation) accumulated text.
+ *
+ * Two strong signals:
+ *  - One text fully contains the other: clear regen (with possible extension).
+ *  - The two share a long common prefix (>= 64 chars): the model started the
+ *    new round by re-typing the prior round, almost always a regen.
+ *
+ * Tuned to favor false negatives (treat as continuation) over false positives
+ * (treat as regen). Wrongly treating a regen as continuation just duplicates
+ * text on screen — annoying but recoverable. Wrongly treating a continuation
+ * as regen silently drops narrative the player can never recover (#485).
+ */
+function looksLikeRegeneration(prior: string, next: string): boolean {
+  const p = prior.trim();
+  const n = next.trim();
+  if (!p || !n) return false;
+  if (n.includes(p) || p.includes(n)) return true;
+  const limit = Math.min(p.length, n.length);
+  let i = 0;
+  while (i < limit && p.charCodeAt(i) === n.charCodeAt(i)) i++;
+  return i >= 64;
 }

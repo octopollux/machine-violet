@@ -565,7 +565,11 @@ describe("runProviderLoop round-boundary rollback", () => {
     expect(callCount).toBe(2);
   });
 
-  it("fires onRollback between rounds when the prior round emitted text", async () => {
+  it("fires a post-loop corrective onRollback when the model regenerates", async () => {
+    // Regen case: the model emits the same narrative both before and after
+    // the deferred tool_result, despite the "narrative delivered" suffix.
+    // The bridge collapses to one canonical copy (last-wins) and tells the
+    // client to discard the doubled stream + replay the canonical text.
     let callCount = 0;
     const provider: LLMProvider = {
       providerId: "test",
@@ -573,11 +577,55 @@ describe("runProviderLoop round-boundary rollback", () => {
       stream: vi.fn(async (_params, onDelta) => {
         callCount++;
         if (callCount === 1) {
-          const r = textPlusToolResult("Round one text.", "scribe");
+          const r = textPlusToolResult("Round one narrative.", "scribe");
           onDelta(r.text);
           return r;
         }
-        const r = textResult("Round two text.");
+        const r = textResult("Round one narrative.");
+        onDelta(r.text);
+        return r;
+      }),
+      healthCheck: vi.fn(),
+    };
+
+    const onRollback = vi.fn();
+    const deltas: string[] = [];
+    const result = await runProviderLoop(provider, "system", [
+      { role: "user", content: "hello" },
+    ], {
+      name: "test",
+      model: "test-model",
+      maxTokens: 100,
+      stream: true,
+      onTextDelta: (d) => deltas.push(d),
+      onRollback,
+      toolHandler: () => ({ content: "ok" }),
+    });
+
+    expect(result.text).toBe("Round one narrative.");
+    expect(onRollback).toHaveBeenCalledOnce();
+    // After the rollback, the canonical text is replayed as a single delta so
+    // the client redraws what we actually persist.
+    expect(deltas.at(-1)).toBe("Round one narrative.");
+  });
+
+  it("concatenates a genuine continuation across rounds (#485)", async () => {
+    // Continuation case: the model takes the "unless you have new narrative
+    // to add" hint at face value and writes a coda after the deferred tool.
+    // The bridge must concatenate (not discard) — that's the entire reason
+    // we replaced the old last-wins-always rule.
+    let callCount = 0;
+    const provider: LLMProvider = {
+      providerId: "test",
+      chat: vi.fn(),
+      stream: vi.fn(async (_params, onDelta) => {
+        callCount++;
+        if (callCount === 1) {
+          const r = textPlusToolResult("Round one narrative.", "scribe");
+          onDelta(r.text);
+          return r;
+        }
+        const r = textResult("Round two coda.");
         onDelta(r.text);
         return r;
       }),
@@ -598,10 +646,10 @@ describe("runProviderLoop round-boundary rollback", () => {
       toolHandler: () => ({ content: "ok" }),
     });
 
-    expect(result.text).toBe("Round two text.");
-    // Exactly one rollback at the round boundary — clears round-1's "Round
-    // one text." from the client before round 2's deltas arrive.
-    expect(onRollback).toHaveBeenCalledOnce();
+    expect(result.text).toBe("Round one narrative.Round two coda.");
+    // No rollback — the client's accumulated stream already matches the
+    // persisted text, so a corrective snapshot would be a pointless flash.
+    expect(onRollback).not.toHaveBeenCalled();
   });
 
   it("does NOT fire onRollback when the prior round emitted no text", async () => {
@@ -802,7 +850,11 @@ describe("runProviderLoop round-boundary rollback", () => {
     expect(toolResultBlock?.content).toBe("Scribe failed: invalid update");
   });
 
-  it("fires both per-attempt and inter-round rollbacks when both apply", async () => {
+  it("fires both per-attempt and post-loop rollbacks when both apply", async () => {
+    // Same round-1 retry path as before, but round 2 regenerates round 1's
+    // text (instead of continuing) so the post-loop corrective rollback also
+    // fires. The two rollbacks address distinct duplication sources: a
+    // failed mid-stream attempt vs. the model re-narrating after the tool.
     let callCount = 0;
     const provider: LLMProvider = {
       providerId: "test",
@@ -820,8 +872,8 @@ describe("runProviderLoop round-boundary rollback", () => {
           onDelta(r.text);
           return r;
         }
-        // Round 2: final narration → triggers inter-round rollback before it streams.
-        const r = textResult("Round two final.");
+        // Round 2: model re-narrates verbatim → post-loop corrective rollback.
+        const r = textResult("Round one narrative.");
         onDelta(r.text);
         return r;
       }),
@@ -845,10 +897,10 @@ describe("runProviderLoop round-boundary rollback", () => {
     await vi.advanceTimersByTimeAsync(1000);
     const result = await promise;
 
-    expect(result.text).toBe("Round two final.");
-    // One for the failed attempt's partial leak, one for the round-1 → round-2
-    // boundary. Both are necessary: the first protects against retry duplication,
-    // the second against re-narration duplication.
+    expect(result.text).toBe("Round one narrative.");
+    // One for the failed attempt's partial leak, one for the post-loop
+    // regen collapse. Both are necessary: the first protects against retry
+    // duplication, the second against re-narration duplication.
     expect(onRollback).toHaveBeenCalledTimes(2);
   });
 });
