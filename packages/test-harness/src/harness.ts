@@ -82,8 +82,8 @@ export class Harness {
     private readonly child: ChildProcess,
     readonly serverPort: number,
     readonly agentPort: number,
-    private readonly campaignsDir: string,
-    private readonly ownsCampaignsDir: boolean,
+    readonly campaignsDir: string,
+    readonly ownsCampaignsDir: boolean,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -513,7 +513,7 @@ function findConfigDir(start: string): string {
 }
 
 async function terminateChild(child: ChildProcess): Promise<void> {
-  if (child.exitCode !== null || child.killed) return;
+  if (child.exitCode !== null) return;
   if (process.platform === "win32") {
     // Windows: kill the whole tree, otherwise the engine subprocess stays alive.
     await new Promise<void>((resolve) => {
@@ -522,11 +522,16 @@ async function terminateChild(child: ChildProcess): Promise<void> {
       killer.on("error", () => resolve());
     });
   } else {
+    // Track actual exit via the 'exit' event. `child.killed` flips to true
+    // the moment a signal is sent, NOT when the process exits — guarding
+    // the SIGKILL fallback on `!child.killed` would never fire against a
+    // child that ignores SIGTERM.
+    let exited = false;
+    child.once("exit", () => { exited = true; });
     child.kill("SIGTERM");
-    // Give it 2s to exit gracefully, then SIGKILL.
     await new Promise<void>((resolve) => {
       const t = setTimeout(() => {
-        if (child.exitCode === null && !child.killed) child.kill("SIGKILL");
+        if (!exited && child.exitCode === null) child.kill("SIGKILL");
         resolve();
       }, 2000);
       child.once("exit", () => { clearTimeout(t); resolve(); });

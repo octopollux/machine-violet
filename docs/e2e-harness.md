@@ -49,7 +49,7 @@ Approximate wall-clock: 5-7 minutes. Uses real LLM API calls.
 | ID | Live API? | ~Time | What it proves |
 |---|---|---|---|
 | `boot-and-quit` | no | ~10 s | Launcher boots, sidecar reachable, main menu renders, process tears down cleanly. The precondition for every other scenario. |
-| `golden-path` | **yes** | 5-10 min | The full new-campaign → first DM turn → player turn → save & exit cycle described above. |
+| `golden-path` | **yes** | 5-7 min | The full new-campaign → first DM turn → player turn cycle described above. Hard-killed on exit; Save & Exit is deliberately skipped. |
 
 Add more scenarios in `packages/test-harness/src/scenarios/`. See "Writing a
 scenario" below.

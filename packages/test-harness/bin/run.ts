@@ -96,6 +96,9 @@ async function main(): Promise<void> {
     } catch { /* ignore */ }
   } finally {
     await harness.shutdown({ cleanup: !keep });
+    if (keep && harness.ownsCampaignsDir) {
+      process.stderr.write(`  campaigns dir kept at: ${harness.campaignsDir}\n`);
+    }
   }
 
   process.exit(failed ? 1 : 0);

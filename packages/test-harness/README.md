@@ -28,7 +28,14 @@ const h = await Harness.launch();
 try {
   await h.waitForScreen("Machine Violet");
   await h.sendKey("return"); // pick "New Campaign"
-  await h.waitForMode("setup", { timeoutMs: 60_000 });
+  // `mode` stays "play" throughout the setup conversation — the setup
+  // session runs under a synthetic campaign id "__setup__". Watch for
+  // that instead. See docs/e2e-harness.md "Engine-state surprises" for
+  // the full list of non-obvious state signals.
+  await h.waitForState(
+    (s) => s.currentTurn?.campaignId === "__setup__" && s.currentTurn?.status === "open",
+    { description: "setup turn opens", timeoutMs: 60_000 },
+  );
   // ...
 } finally {
   await h.shutdown();

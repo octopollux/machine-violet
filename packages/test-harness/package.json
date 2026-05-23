@@ -15,9 +15,6 @@
       "default": "./dist/scenarios/*.js"
     }
   },
-  "bin": {
-    "mv-e2e": "./bin/run.ts"
-  },
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

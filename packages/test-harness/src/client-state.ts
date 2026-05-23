@@ -41,9 +41,13 @@ export interface NarrativeLine {
  * `engineState` transitions are the primary signal for "phase progression":
  *   null → "starting_session" → "dm_thinking" → "waiting_input" → ...
  *
- * `mode` toggles between "setup" (campaign-creation conversation) and "play"
- * (live campaign). `transitionCampaignId` briefly holds the new campaign id
- * during the setup → play handoff.
+ * `mode` does NOT change during the setup-agent conversation — the engine
+ * only broadcasts `session:mode` events for OOC/dev entry/exit, so `mode`
+ * stays "play" throughout setup. The signal that you're in setup is
+ * `currentTurn.campaignId === "__setup__"` (a synthetic campaign id used
+ * for the setup session). `transitionCampaignId` briefly holds the new
+ * campaign id during the setup → live-campaign handoff. See
+ * `docs/e2e-harness.md` "Engine-state surprises" for the full list.
  */
 export interface ClientStateSnapshot {
   engineState: string | null;
