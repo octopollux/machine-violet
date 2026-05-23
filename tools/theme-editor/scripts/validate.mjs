@@ -38,6 +38,11 @@ const frames = readdirSync(assetsDir)
 let failures = 0;
 const VARIANTS = ["exploration", "combat", "ooc", "levelup", "dev"];
 
+function formatError(err) {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
 console.log(`\n=== Themes (${themes.length}) ===`);
 for (const name of themes) {
   try {
@@ -52,7 +57,7 @@ for (const name of themes) {
     console.log(`  ok   ${name.padEnd(28)} h=${asset.height} tile=${cw}x${ch} tags=${tags}`);
   } catch (err) {
     failures++;
-    console.error(`  FAIL ${name}: ${err.message ?? err}`);
+    console.error(`  FAIL ${name}: ${formatError(err)}`);
   }
 }
 
@@ -64,13 +69,15 @@ for (const name of frames) {
     console.log(`  ok   ${name.padEnd(28)} corner_tl=${cw}w`);
   } catch (err) {
     failures++;
-    console.error(`  FAIL ${name}: ${err.message ?? err}`);
+    console.error(`  FAIL ${name}: ${formatError(err)}`);
   }
 }
 
 if (failures > 0) {
   console.error(`\n${failures} file(s) failed validation`);
-  process.exit(failures);
+  // POSIX exit codes are 0-255; clamp so a triple-digit failure count
+  // doesn't wrap and look like success.
+  process.exit(Math.min(failures, 255));
 } else {
   console.log(`\nAll ${themes.length} themes + ${frames.length} frames validated cleanly.`);
 }

@@ -300,7 +300,7 @@ An optional `keyColor` (hex) shifts the swatch hue to center on that color, allo
 | `brass` | `clockwork`, `corporate_dread` | 2 | Brass plate, gears, ledger |
 | `woven` | `hearth`, `autumn_market`, `sunday_morning` | 2 | Basket weave, quilt, slice-of-life |
 
-Each theme files its own `@genre_tags` and may override `[colors]`, `[variant_combat]`, `[variant_ooc]`, etc. for mood. Run `node --import tsx/esm tools/theme-editor/scripts/validate.mjs` after editing to confirm a theme still parses and resolves all variants.
+Each theme declares its own `@genre_tags` and may override `[colors]`, `[variant_combat]`, `[variant_ooc]`, etc. for mood. Run `node --import tsx/esm tools/theme-editor/scripts/validate.mjs` after editing to confirm a theme still parses and resolves all variants.
 
 ### Location-scoped themes
 
