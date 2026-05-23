@@ -55,13 +55,23 @@ Live API key in `.env` with limited credit. Default dev override uses Sonnet for
 
 ## Commit Hygiene
 
-After completing a coding task, make a detailed commit; you'll need this history later.
+After completing a coding task, make a detailed commit; you'll need this history later. **Commit freely, but only push and open a PR when the user explicitly asks for it.** Don't preemptively push or create PRs.
 
 ## Code Review
 
-After creating a PR, **always immediately arm a `Monitor` for Copilot's review — do not ask first.** Copilot reviews once but takes 2-10 minutes to arrive. The monitor polls `gh api` for new review comments and exits once the review lands — no manual polling, and the notification lets you keep working on other things in the meantime. Cap the timeout at 10 minutes so the watch ends even if the review never arrives. Address any issues you judge worthwhile — use your own judgement on what to fix vs skip.
+Once the user asks you to push and open a PR, **immediately arm a `Monitor` for Copilot's review — do not ask first.** Copilot reviews exactly once but takes 2-10 minutes to arrive. The monitor polls `gh api` and exits once the review lands — no manual polling, and the notification lets you keep working on other things in the meantime. Cap the timeout at 10 minutes so the watch ends even if the review never arrives.
 
-**Two endpoints, multiple logins.** Copilot posts to *both* `/pulls/:n/comments` (inline review comments, login `Copilot`) and `/pulls/:n/reviews` (top-level review with an optional summary body, login `copilot-pull-request-reviewer[bot]`). Hardcoding either login misses half the feedback — match on `user.type == "Bot"` plus a case-insensitive substring match on `copilot`, and poll both endpoints.
+**The review isn't complete until Copilot's top-level summary comment appears.** Copilot always posts a default summary body on `/pulls/:n/reviews` exactly once per PR — that's the signal review is done. Inline comments alone don't count; if only inline comments have arrived, keep waiting until either the summary lands or the timeout fires. Don't act on a partial review.
+
+After the review lands, address any issues you judge worthwhile — use your own judgement on what to fix vs skip (no change in rationale here). Then:
+
+1. **Merge the PR** (the user has already authorized this by asking for the PR).
+2. **Notify the user** that the PR has merged.
+3. **Do NOT clean up the worktree** — leave it in place. The user will exit it when ready.
+
+Copilot reviews once per PR. Once feedback has been considered and the PR merged, the review loop is over — don't re-arm the monitor.
+
+**Two endpoints, multiple logins.** Copilot posts to *both* `/pulls/:n/comments` (inline review comments, login `Copilot`) and `/pulls/:n/reviews` (top-level review with the summary body, login `copilot-pull-request-reviewer[bot]`). Hardcoding either login misses half the feedback — match on `user.type == "Bot"` plus a case-insensitive substring match on `copilot`, and poll both endpoints.
 
 Example:
 ```bash
@@ -71,6 +81,7 @@ Monitor(
   persistent: false,
   command: "
     seen=''
+    summary_seen=0
     is_copilot='.user.type == \"Bot\" and (.user.login | ascii_downcase | test(\"copilot\"))'
     while true; do
       inline=$(gh api repos/OWNER/REPO/pulls/NNN/comments --jq \".[] | select($is_copilot) | \\\"\\(.id) \\(.path):\\(.line // .original_line) \\(.body | gsub(\\\"\\\\n\\\"; \\\" \\\"))\\\"\" 2>/dev/null || true)
@@ -82,8 +93,13 @@ Monitor(
         if ! echo \"$seen\" | grep -q \"\\b$id\\b\"; then
           echo \"$line\"
           seen=\"$seen $id\"
+          case \"$id\" in review-*) summary_seen=1 ;; esac
         fi
       done <<< \"$new\"
+      if [ \"$summary_seen\" = \"1\" ]; then
+        echo \"[monitor] Copilot summary received; exiting.\"
+        exit 0
+      fi
       sleep 30
     done
   "
