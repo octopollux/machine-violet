@@ -207,7 +207,8 @@ jobs:
                 QUERY_FIELDS="${QUERY_FIELDS}
                   pr_${pr}: pullRequest(number: ${pr}) {
                     number title body
-                    closingIssuesReferences(first: 20) {
+                    closingIssuesReferences(first: 50) {
+                      totalCount
                       nodes { number title url }
                     }
                   }"
@@ -225,12 +226,17 @@ jobs:
                   | sort_by(.number)
                   | map(
                       "## PR #\(.number): \(.title)\n\(.body // "(no description)")"
-                      + (if (.closingIssuesReferences.nodes | length) > 0
-                         then "\n\nCloses issues:\n"
-                              + (.closingIssuesReferences.nodes
-                                 | map("- #\(.number) \(.title) — \(.url)")
-                                 | join("\n"))
-                         else "" end)
+                      + (.closingIssuesReferences as $cir
+                         | if ($cir.nodes | length) > 0
+                           then "\n\nCloses issues:\n"
+                                + ($cir.nodes
+                                   | sort_by(.number)
+                                   | map("- #\(.number) \(.title) — \(.url)")
+                                   | join("\n"))
+                                + (if $cir.totalCount > ($cir.nodes | length)
+                                   then "\n- …and \($cir.totalCount - ($cir.nodes | length)) more issue(s) not shown"
+                                   else "" end)
+                           else "" end)
                       + "\n---"
                     )
                   | join("\n")
