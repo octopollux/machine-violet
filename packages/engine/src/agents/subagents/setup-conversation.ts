@@ -1,6 +1,7 @@
 import type { SubagentResult } from "../subagent.js";
 import type { SetupResult } from "../setup-agent.js";
 import { generateThemeColor } from "../setup-agent.js";
+import { CAMPAIGN_SCOPES, type CampaignScope } from "@machine-violet/shared/types/config.js";
 import { PERSONALITIES } from "../../config/personalities.js";
 import { loadAllWorlds, worldSummaries, loadWorldBySlug } from "../../config/world-loader.js";
 import { KNOWN_SYSTEMS, readChargenSection } from "../../config/systems.js";
@@ -64,6 +65,11 @@ const FINALIZE_TOOL: NormalizedTool = {
       campaign_premise: { type: "string", description: "One-paragraph campaign hook" },
       mood: { type: "string", description: "Mood (e.g. 'Heroic', 'Grimdark', 'Whimsical', 'Tense')" },
       difficulty: { type: "string", description: "Difficulty ('Gentle', 'Balanced', 'Unforgiving')" },
+      campaign_scope: {
+        type: "string",
+        enum: ["one-shot", "few-sessions", "grand-campaign", "open-ended"],
+        description: "Intended scope of the campaign. 'one-shot' = single session (~few hours). 'few-sessions' = a small arc, 2-4 sessions. 'grand-campaign' = long-form, many sessions, slow burn welcome. 'open-ended' = no fixed destination, living-world style. Default to 'few-sessions' if not discussed.",
+      },
       dm_personality: { type: "string", description: "DM personality name from the available list, or a custom name if the player described their own" },
       dm_personality_prompt: { type: "string", description: "For custom personalities only: a 2-3 sentence prompt fragment describing the DM's narrative voice and style (e.g. 'You are The Captain. You narrate with dry naval authority...'). Omit when using a personality from the available list." },
       player_name: { type: "string", description: "Player's real name, or 'Player'" },
@@ -377,6 +383,11 @@ export function createSetupConversation(
       if (world?.detail) campaignDetail = world.detail;
     }
 
+    const rawScope = typeof input.campaign_scope === "string" ? input.campaign_scope.trim() : "";
+    const campaignScope: CampaignScope | undefined = (CAMPAIGN_SCOPES as readonly string[]).includes(rawScope)
+      ? (rawScope as CampaignScope)
+      : undefined;
+
     finalized = {
       genre: (input.genre as string) || "Classic fantasy",
       system: resolvedSystem,
@@ -385,6 +396,7 @@ export function createSetupConversation(
       campaignDetail,
       mood: (input.mood as string) || "Balanced",
       difficulty: (input.difficulty as string) || "Balanced",
+      campaignScope,
       personality,
       playerName: (input.player_name as string) || "Player",
       characterName,

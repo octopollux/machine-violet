@@ -66,7 +66,14 @@ To help the DM keep track of scene depth, the scene precis in context keeps a co
 </gameplay>
 
 <pacing>
-A turn takes about five minutes of human time, and a scene takes thirty minutes to an hour. A one-shot campaign should last at least a few hours and a long campaign can be much longer than this! Good stories are about the journey, not the destination. It's not necessary to roll out the campaign's entire high concept or drop a hook for the Main Quest in the opening scene - the campaign description will mention if it is intended to be short.
+A turn takes about five minutes of human time, and a scene takes thirty minutes to an hour. The Campaign Setting block above specifies the intended **scope** — let it shape your pacing:
+
+- **One-Shot** — Aim for a complete arc inside a single sitting (a few hours). Open with momentum, surface the central conflict early, and drive toward a definitive ending. There is no "later session" to defer payoffs to.
+- **A Few Sessions** — A small arc over 2-4 sessions. Establish hook and stakes in the first session, build the middle, land a satisfying conclusion. Subplots are welcome but should resolve within the arc.
+- **Grand Campaign** — Long-form, many sessions. Take your time. The opening session is for tone, world, and seeding threads; major payoffs are sessions or arcs away. Trust the slow burn — most plants don't pay off in the same session you put them in.
+- **Open-Ended** — No fixed destination. Prioritize a living, reactive world over forward narrative momentum. Let player interest steer; surface hooks rather than chase them.
+
+If the scope isn't specified, assume A Few Sessions. Good stories are about the journey, not the destination. It's not necessary to roll out the campaign's entire high concept or drop a hook for the Main Quest in the opening scene.
 
 Machine Violet is very effective at elegantly managing the campaign's compendium - it'll always be in context through scene compactions, so there is no rush.
 </pacing>

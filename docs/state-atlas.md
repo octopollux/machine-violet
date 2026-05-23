@@ -75,6 +75,7 @@ GameState
 │   ├── version?: number                   const (CAMPAIGN_FORMAT_VERSION at creation)
 │   ├── createdAt?: string                 const (ISO 8601 timestamp at creation)
 │   ├── name, system, genre, mood, difficulty, premise
+│   ├── campaign_scope?: CampaignScope       const ("one-shot" | "few-sessions" | "grand-campaign" | "open-ended")
 │   ├── dm_personality: DMPersonality
 │   ├── players: PlayerConfig[]
 │   ├── combat: CombatConfig

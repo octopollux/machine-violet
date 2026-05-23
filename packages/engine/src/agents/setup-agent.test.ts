@@ -57,6 +57,18 @@ describe("buildCampaignConfig", () => {
     expect(config.setup_handoff).toBe("Player leans noir-burnout. Wants ensemble scenes.");
   });
 
+  it("passes campaignScope through as campaign_scope", () => {
+    const result = makeSetupResult({ campaignScope: "grand-campaign" });
+    const config = buildCampaignConfig(result);
+    expect(config.campaign_scope).toBe("grand-campaign");
+  });
+
+  it("omits campaign_scope when scope is undefined", () => {
+    const result = makeSetupResult();
+    const config = buildCampaignConfig(result);
+    expect(config.campaign_scope).toBeUndefined();
+  });
+
   it("omits setup_handoff when handoffNote is undefined", () => {
     const result = makeSetupResult();
     const config = buildCampaignConfig(result);

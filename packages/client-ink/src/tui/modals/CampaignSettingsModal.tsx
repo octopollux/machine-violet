@@ -2,7 +2,7 @@ import React, { useCallback, useState } from "react";
 import { useInput } from "ink";
 import type { ResolvedTheme } from "../themes/types.js";
 import type { CampaignConfig, ChoiceFrequency } from "@machine-violet/shared/types/config.js";
-import { CHOICE_FREQUENCY_LEVELS } from "@machine-violet/shared/types/config.js";
+import { CHOICE_FREQUENCY_LEVELS, CAMPAIGN_SCOPE_LABELS } from "@machine-violet/shared/types/config.js";
 import { CenteredModal } from "./CenteredModal.js";
 
 export interface CampaignSettingsModalProps {
@@ -104,6 +104,7 @@ export function CampaignSettingsModal({
   if (config.genre) lines.push(`  Genre:      ${config.genre}`);
   if (config.mood) lines.push(`  Mood:       ${config.mood}`);
   if (config.difficulty) lines.push(`  Difficulty: ${config.difficulty}`);
+  if (config.campaign_scope) lines.push(`  Scope:      ${CAMPAIGN_SCOPE_LABELS[config.campaign_scope]}`);
   lines.push("");
   lines.push("  Choices Frequency");
   lines.push("    How often the DM offers you a set of suggested responses.");

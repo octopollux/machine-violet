@@ -1,4 +1,5 @@
 import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
+import { CAMPAIGN_SCOPE_LABELS } from "@machine-violet/shared/types/config.js";
 import type { SystemBlock } from "../providers/types.js";
 
 /**
@@ -104,6 +105,7 @@ export function buildCachedPrefix(
     if (config.genre) settingLines.push(`Genre: ${config.genre}`);
     if (config.mood) settingLines.push(`Mood: ${config.mood}`);
     if (config.difficulty) settingLines.push(`Difficulty: ${config.difficulty}`);
+    if (config.campaign_scope) settingLines.push(`Scope: ${CAMPAIGN_SCOPE_LABELS[config.campaign_scope]}`);
     if (config.premise) settingLines.push(`Premise: ${config.premise}`);
     if (settingLines.length > 0) {
       let settingText = `\n\n## Campaign Setting\n${settingLines.join("\n")}`;
