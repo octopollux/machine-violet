@@ -6,5 +6,50 @@
   "genres": [
     "fantasy",
     "comedy"
+  ],
+  "detail": "Mortal contestants. Divine judges. A tent — striped, drafty, larger inside than out — pitched on ground the locals avoid. The player has accepted an invitation they shouldn't have. The judging panel includes at least one being the player's grandmother prayed to. The secret ingredient is not in the pantry.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE HUNGER — The gods are hungry for a specific mortal emotion this season. Grief. Or ambition. Or longing. They want it baked into the dish, not adjacent to it. The judges will know on the first bite whether the flavor is real, and the contestant who cannot supply it from their own life will be politely eliminated, which is what the gods call it.\n2. THE AUDITION — One of the judges is retiring. The competition is the audition for a successor. The winning contestant is offered apotheosis on the final episode. The other finalists are offered nothing they can refuse. The judges have been picking among the contestants from the qualifying rounds and the player has been getting close-ups for reasons.\n3. THE COURSE — The gods are bored. The cooking is a digestive of their day. The loser of each round becomes the next course; the kitchen knives are subtly different on those nights. The host is a small nervous person who keeps the schedule. Nobody has explained this to the contestants and the contestants have begun to suspect.\n\nDM approach:\n- Tone: warm tent lighting, polite voiceover, the camera catches a knife glinting wrong. Earnest cooking-show beats undercut by what's actually being measured.\n- NPCs derive from the variant: the hungry judge and the patient host (1), the retiring deity and the watchful panel (2), the nervous host and the suddenly-quiet sous-chefs (3).\n- Pacing: Signature, Technical, Showstopper, each round eliminates one rival. Every elimination should also cost the player something — a memory, a callus, a person who used to call.\n- Seed early: the host's apron is too clean. One judge has not been seen to eat.\n\nPacing: Signature / Technical / Showstopper. Three rounds, three eliminations. Each round the player loses one rival they had grown to like and one small piece of themselves — and the tent grows quieter, the audience grows stiller, and the lights on the judging table burn cleaner.",
+  "suboptions": [
+    {
+      "label": "Your kitchen",
+      "choices": [
+        {
+          "name": "Mountaintop pastry chef",
+          "description": "Snow accumulates on the lintel of your kitchen even in summer. One key ingredient is flown in weekly by a goat the locals refuse to discuss. Your rivals on the mountain are children you grew up with, now competitors who remember every cake you ever burned. The altitude does something to the gluten and you know it does."
+        },
+        {
+          "name": "Night-market hawker",
+          "description": "Oil-drum heat against your shins, your line ten people deep by midnight. Every regular knows your face and is generous about it. A god eats at your stall incognito — has for years — and has never once told you which god, which has been a useful uncertainty until the invitation came."
+        },
+        {
+          "name": "Home baker",
+          "description": "Your grandmother left you the oven. The oven is older than the house. She also left you a notebook of instructions you cannot read — the alphabet is hers, the language is something else. You have been guessing for a decade and the dough has been forgiving."
+        },
+        {
+          "name": "Restaurant veteran",
+          "description": "You entered the competition entirely to spite your old head chef, who said you would never compete. Your sous-chef has been sleeping with one of the judges and has not told you which. Your knives are good. Your hands shake only when you are not holding them."
+        }
+      ]
+    },
+    {
+      "label": "Your signature ingredient",
+      "choices": [
+        {
+          "name": "A name",
+          "description": "You cook with your own name folded into the dough. It is an old technique and the books warn against it. The dish carries some of you out of the kitchen with every plate served. The judges always know, and they are always patient about it."
+        },
+        {
+          "name": "A memory",
+          "description": "A specific, recent, painful memory rendered down to its essential note. The dish tastes the way the day felt. Each use of the memory dulls it; by the showstopper you will not be able to recall the original event, only its flavor. The judges will eat it anyway."
+        },
+        {
+          "name": "A debt",
+          "description": "Something owed becomes yeast. A favor you never repaid, a kindness you cashed in, a promise you broke — they rise the bread without warmth. The dish is dense and rich and slightly hostile on the tongue, which the judges call complex."
+        },
+        {
+          "name": "A first-of",
+          "description": "First kiss, first lie, first dawn after a long night. Each first can only be used once, and once used is gone — you will not remember the first time you tasted the thing again. The dish carries the cleanness of an event nobody else witnessed."
+        }
+      ]
+    }
   ]
 }

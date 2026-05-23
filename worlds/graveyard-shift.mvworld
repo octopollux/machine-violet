@@ -6,5 +6,50 @@
   "genres": [
     "modern",
     "horror"
+  ],
+  "detail": "Midnight, the museum, a flashlight and a radio and a set of keys that open more doors than the player was told about. The day staff have gone home. The HVAC has dropped into the after-hours cycle. The player walks the rounds — they were trained on the rounds — and the rounds are wrong tonight in a way the player will have to put words to before morning, because the morning shift is going to ask.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE PRISON — The museum is a containment facility dressed up as a museum. The artifacts are awake and have been waking up since the new curator started, six months ago. One of them is the warden, and the warden has noticed the player. The new curator either does not know or knows perfectly well; the player will have to decide which is worse.\n2. THE SHELL GAME — Exactly one artifact moves. It rearranges all the others to disguise which one it is. The display cards are correct except for one, and that one changes by the hour. If the player can identify the moving piece by dawn, it stops. If they cannot, it spends another night studying their habits and tries again tomorrow.\n3. THE BUILDING IS ALIVE — The exhibits are not moving. The rooms are. The Egyptian wing is where the medieval armor was. The mastodon is in a hallway that did not exist on Tuesday. The museum is breathing, slowly, and the player is inside the lung. The building wants to be seen. The night staff are its first witnesses.\n\nDM approach:\n- Tone: hum of climate control, footsteps that echo too long, a smell of old varnish.\n- The new curator: charming, well-credentialed, lives in the city, takes calls at odd hours. Knows the artifacts by inventory number and never quite by name.\n- The day janitor: knows everything and pretends not to. Has worked here twenty years. Will trade pieces of the truth for cigarettes and small kindnesses.\n- Seed early: a label card the player remembers reading yesterday that says something different tonight; a display case that is, by daylight, locked, and is, by 2 a.m., not.\n- Pacing: six-hour shift, one anomaly per shift. By shift four the anomalies overlap.\n\nThe clock is the rounds. The player has to complete the loop every hour and sign the sheet by the time clock. Track time by sheet signatures and by which gallery the player did not enter on round three. When the player begins skipping a specific room, the museum has won that round.",
+  "suboptions": [
+    {
+      "label": "The museum",
+      "choices": [
+        {
+          "name": "Natural history",
+          "description": "Bones articulated on steel, dioramas of grasslands behind glass, jarred specimens floating in straw-colored alcohol. The mastodon's tusks have rotated three degrees since the start of your shift. You can measure this. You have been measuring this. The placard says the rotation is impossible."
+        },
+        {
+          "name": "Art",
+          "description": "The portraits whose eyes have moved are the least of it. The sculpture wing has one too many figures and you cannot determine which one was added; they all look like they have been there for centuries. The children's gallery has a noise problem the day staff have stopped reporting, and you avoid it on the third round."
+        },
+        {
+          "name": "Antiquities",
+          "description": "A Sumerian dagger in case seven that pulls light into it the way a drain pulls water. A sarcophagus whose name plaque keeps changing, never the same name twice in a week. \"Do not touch\" signs in three dead languages and one you can almost read. The cleaning staff will not enter this hall alone."
+        },
+        {
+          "name": "Local history",
+          "description": "You recognize the people in the photographs. The diorama of the founding has somebody new in it this week, standing at the back of the founders' group, looking at the front of the case. The donor wall in the lobby has your last name on it, in a gift-tier you cannot afford, and you do not remember anyone in your family being asked."
+        }
+      ]
+    },
+    {
+      "label": "Background",
+      "choices": [
+        {
+          "name": "Grad student needing the job",
+          "description": "Tuition, rent, the kind of stipend that doesn't quite cover both. You took the job because it's quiet and you can read between rounds. Your thesis is on something near enough to the museum's collection that you have begun to wonder whether the job was offered to you, specifically, by someone who knew."
+        },
+        {
+          "name": "Ex-cop who needed something quiet",
+          "description": "You don't talk about why you left the force. The supervisor didn't ask. The pension is small and the rent is what it is. You carry the flashlight the way you used to carry the other thing, and you have already noticed which galleries have blind spots in the camera coverage."
+        },
+        {
+          "name": "Believer",
+          "description": "You took this job on purpose. You have a notebook in your locker that you do not show anyone. You have been writing in it since the second shift. You came in expecting something and you have been finding it, and you are not yet sure whether finding it was the point or whether finding it was the trap."
+        },
+        {
+          "name": "Skeptic",
+          "description": "You'll have an explanation by morning. The first three nights you found one. The fourth night you found three contradictory ones and chose the most boring. Tonight the explanations are getting harder to construct, and your refusal to be impressed is starting to feel like the museum's favorite trick."
+        }
+      ]
+    }
   ]
 }

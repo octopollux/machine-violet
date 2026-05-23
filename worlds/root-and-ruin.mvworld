@@ -6,5 +6,50 @@
   "genres": [
     "fantasy",
     "horror"
+  ],
+  "detail": "The heart-tree at the center of the forest is dying. The bark is sloughing in plates the size of doors. The leaves at the crown have gone the wrong color for the wrong season. And in every direction from its trunk, the rest of the forest is going mad with growth — saplings as thick as a man's leg in a week, fruit ripening on branches that shouldn't bear, paths closing over behind anyone who walks them.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. MAKING ROOM — The new growth is the heart-tree's children, vying for the throne. The tree is shedding itself outward, and what germinates from those seeds is a generation of small contenders, each more like the parent than the last, each willing to grow over the others. By the time the heart-tree falls, one of them will be ready, and only one. The forest is a slow election.\n2. EATEN FROM BELOW — Something is feeding on the heart-tree's roots from a chamber the surface forest has known about and protected for centuries. The wild growth is the forest's panic — pulling up nutrients, throwing out seed, getting its succession plans in order before the eater finishes. The druids of the inner ring have always known. They've been hiding the eater, and now they're losing the secret.\n3. THE OLD AXE-MARK — A century ago someone struck the heart-tree once, badly, and walked away. The wound healed over and was forgotten. The tree has been dying ever since, slowly. The killer is still alive, high in the order that tends the forest, and the wound has just reached the cambium. The forest knows now. The forest is naming the killer in the only language it has, which is overgrowth.\n\nDM approach:\n- Tone: green, suffocating, fertile in a way that is no longer comforting. Sap smells like something rotting. Bird calls overlap.\n- NPCs by variant: a sapling-priest who has begun to speak in the voice of the tree (1); a druid of the inner ring whose hands shake when asked about the lower chambers (2); an aged forester who refuses to enter the heart-grove anymore, and won't say what year he stopped (3).\n- Pacing structure: the forest's wrongness arrives in specific small wrongnesses — a path that wasn't there yesterday, a tree that bore fruit out of season, an animal that should be hibernating awake at noon.\n- Seed early: the heart-tree's bark scattered like discarded clothing; the bees behaving as if it were spring; an apple from the wrong month, tasting correct.\n- The horror is not the dying. The horror is the speed of replacement.\n\nPacing: The forest's mood is wrong in specific ways the player can catalog — animals louder, paths shifting, fruit ripening out of season. Each session, the wrongness escalates by one named symptom. By the fifth, the heart-tree's crown is bare and the new growth is taller than the cottages at the wood's edge.",
+  "suboptions": [
+    {
+      "label": "Your standing",
+      "choices": [
+        {
+          "name": "Acolyte of the tree, raised in its shade",
+          "description": "You were brought to the heart-grove as a child and you do not remember a season without its smell. The other acolytes are your siblings in every way that matters. The tree's dying feels, to you, like a parent's last illness — and you are the only one in your cohort willing to say the word out loud."
+        },
+        {
+          "name": "Forester whose livelihood is the new growth",
+          "description": "You make your living from the saplings, the shed bark, the windfall. The forest's wild season has been the best year of your working life. You are the only one in the village asking the obvious uncomfortable question about where this bounty is coming from and what it costs."
+        },
+        {
+          "name": "Outsider sent to investigate",
+          "description": "Crown agent, university naturalist, or representative of a foreign order — somebody noticed, from far away, and you drew the assignment. The locals tell you nothing in three different ways. The heart-grove smells wrong even to a nose that doesn't know what right smells like."
+        },
+        {
+          "name": "The tree's chosen, summoned in a dream",
+          "description": "You woke knowing the way to the grove and you have never been told it. You don't know what you're meant to do when you arrive. The tree spoke to you in something that wasn't language and the meaning is still settling in your chest. The acolytes will know you when they see you. They will not be glad."
+        }
+      ]
+    },
+    {
+      "label": "The forest",
+      "choices": [
+        {
+          "name": "Continent's lung, famous and vast",
+          "description": "Every kingdom maintains an embassy at the forest's edge. Pilgrims arrive year-round, from places that don't share a calendar. The heart-tree is visible from the next valley as a single dark crown above the canopy, and travelers in inns three days' ride away orient themselves by it. Its dying is a geopolitical event."
+        },
+        {
+          "name": "Local and beloved, one valley",
+          "description": "Everyone in the valley has touched the tree once, in some season of their life. Weddings happen at its roots. So do the funerals. The forest is a member of the community, with its own seat at the harvest table, and nobody who lives in the valley is unmoved by what is happening to it."
+        },
+        {
+          "name": "Forbidden and sacred, walled in",
+          "description": "A single gate, an order of guardians who do not leave, and a wall that has been kept up for generations. Outsiders who climb it die — not always quickly, not always by violence, but they die. What is happening to the tree is happening behind the wall, and the guardians are beginning to come out for the first time in any living memory."
+        },
+        {
+          "name": "Hidden, most don't know it exists",
+          "description": "There is no road. The locals deny the forest with a uniformity that is itself the giveaway. The maps show only mountains. To find the heart-tree you have to be told by someone who isn't supposed to tell you, and that person is risking something specific by saying."
+        }
+      ]
+    }
   ]
 }

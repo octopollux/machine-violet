@@ -7,5 +7,50 @@
     "horror",
     "modern",
     "comedy"
+  ],
+  "detail": "The player is losing time. Two hours here, three there, a whole evening once. They wake to apartments they tidied while asleep, conversations friends remember and they do not, money they did not earn. Eventually there is a note. The note is polite. The note is in handwriting that is theirs and is not theirs. The tenant introduces themselves. The tenant would like to be a good neighbor.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE UNFINISHED TASK — A spirit needs the player's body to do one specific thing — find a person, deliver a letter, finish a sentence — and will leave when it is done. The trouble is that the task keeps changing. Each closure reveals the real task was nested inside the first. The spirit is sincere about wanting to leave. It has been sincere about this for several borrowed bodies in a row.\n2. THE OTHER YOU — The tenant is the player, displaced in time. A future self with warnings, a past self with apologies, a parallel self comparing notes. The notes range across decades. They are time-sharing a single lifetime, and the lifetime is being parceled out by something neither of them remembers signing.\n3. THE CONTRACT — A corporation runs somatic timeshares. Someone — the player, perhaps; or a relative; or an executor of a debt — sold rights to the body. There is a contract. There is a customer-service line. The tenant is a paying client. The player can call the company. The company is sympathetic and unhelpful and has excellent on-hold music.\n\nDM approach:\n- Tone: domestic, intimate, the horror of finding small kindnesses you did not perform.\n- NPCs: the tenant (always offstage when the player is on); the coworker, friend, or stranger who knows both of them; the manager at the corporation, or the priest who handles these cases, depending on the variant.\n- Pacing structure: blackouts at first, two hours a day. Then negotiated co-tenancy. Then the body itself starts to change.\n- Seed early: a small physical alteration the tenant is responsible for — a new callus, a haircut, a piercing. Let the player look in the mirror and see the negotiation.\n- The tenant is a roommate, not a parasite. Play their kindness against the loss of self.\n\nPacing: the time the tenant takes grows on a measurable curve. The first week is two hours a day. By the end of the first month it is half. The body itself begins to show the shared use — a new mark, a softened voice, a preference for tea. The clock the player can read is their own calendar, and the gaps in it.",
+  "suboptions": [
+    {
+      "label": "Communication channel",
+      "choices": [
+        {
+          "name": "Notes left in the apartment",
+          "description": "The handwriting is similar to yours and different in the loops. They appear on the backs of receipts you do not remember keeping, on napkins from places you have not been. The dates at the top are sometimes a day ahead and sometimes a week behind, and there is no apology for either."
+        },
+        {
+          "name": "Voice memos on your phone",
+          "description": "The voice is yours, recorded at timestamps you were asleep. They are practical, mostly — what is in the fridge, who called, what the tenant told the neighbor about the dog. Occasionally, in the background, you can hear the city, and the city does not always sound like your city."
+        },
+        {
+          "name": "A coworker who relays for both of you",
+          "description": "He has known you both for years. He used to know only one of you. He prefers the tenant, and is not subtle about it. He passes messages in the kitchen by the coffee machine and does not understand why this hurts. He thinks of himself as a friend to both of you, which is true."
+        },
+        {
+          "name": "A small notebook by the bed",
+          "description": "It fills itself when neither of you is looking. The pages alternate. Sometimes the tenant draws — small, careful sketches of rooms you have not seen. Sometimes you wake to find your own entry continued in their hand, finishing the sentence you fell asleep mid-writing."
+        }
+      ]
+    },
+    {
+      "label": "What they leave behind",
+      "choices": [
+        {
+          "name": "Money",
+          "description": "More than your salary. It appears in your checking account in deposits with bland descriptions. You do not know how the tenant earns it and you have not yet asked. The amount is increasing on a curve. The tax implications will eventually be your problem."
+        },
+        {
+          "name": "Wounds",
+          "description": "A bruise on the ribs you don't remember getting. A cut on the palm in a place you would not cut yourself working. Once, a stitched gash on the thigh, neatly dressed, with a small note pinned to the bandage saying sorry and naming an antibiotic. The tenant lives a more dangerous life than you do."
+        },
+        {
+          "name": "A relationship",
+          "description": "Someone loves the tenant. You have to keep meeting them, because the tenant cannot show up without you. They look at you the way no one has ever looked at you, and you cannot tell them why your eyes don't quite settle on theirs the way they remember."
+        },
+        {
+          "name": "A skill",
+          "description": "You can suddenly play piano, or speak Cantonese, or pick a lock. The knowledge is in your hands when you reach for it. It is not in your head when you try to explain it. The tenant practiced for years. You inherited the muscle and not the patience."
+        }
+      ]
+    }
   ]
 }

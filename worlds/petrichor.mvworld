@@ -7,5 +7,50 @@
     "modern",
     "fantasy",
     "mystery"
+  ],
+  "detail": "Seven years of dry. The reservoirs are scheduled to the spoonful. Children have grown up not knowing what the word storm means in the mouth. And tonight, from no cloud anyone can see, the air carries that specific green-cement-and-warm-dust smell that means it is about to rain. Nobody says anything at first. Then everyone is on their stoop at once, sniffing like dogs.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE BARGAIN — A century ago the city paid a god something terrible in exchange for permanent fair weather; the god has come back asking for the next installment, and the comptroller's office is hiding the invoice. The cult that brokered the deal still exists, vestigial, reduced to one office in city hall and an elderly woman who knows the right phone number. The smell is the god clearing its throat.\n2. THE WEAPON — Someone with reasons turned the weather off; a sealed device under the old observatory holds the city in its dry pocket, and tonight the seal is failing. The original engineers are dead, their notes redacted by a federal agency that no longer technically exists. The smell rises from the basement of a building nobody is allowed to enter.\n3. THE GRIEF — A single person was crying for everyone, and they died, and the city dried. Tonight someone new has started crying — quietly, in a studio apartment, over something small — and the sky is responding to them. They don't know. They don't even know they're crying.\n\nDM approach:\n- Tone: parched, hopeful, frightened of hope. Every scene starts with whether the smell is stronger or weaker.\n- NPCs by variant: the city comptroller who keeps a private umbrella in her desk (1); the federal liaison who arrives unannounced with a clipboard and no agency name (2); the apartment neighbor who hears a stranger weeping through the wall and doesn't know what to do (3).\n- The smell is the clock. Track it in ticks — five notches from a memory to a downpour.\n- Seed early: a child asks what rain smells like and someone answers wrong; a black-market vendor sells petrichor in vials; the storm drains have been cathedrals for cats.\n- Restraint. A scene where rain almost falls and doesn't is more powerful than one where it does.\n\nPacing: The smell strengthens or weakens by one tick per scene. The player can track it on their own skin, in the breath of the dogs, in the way the elderly tilt their heads. Five ticks up and it rains. Five ticks down and the city forgets again.",
+  "suboptions": [
+    {
+      "label": "Your stake",
+      "choices": [
+        {
+          "name": "Water department engineer",
+          "description": "You know the reservoirs by name. You signed the seven-year drought protocols and you signed the amendments. If it rains, your infrastructure is a museum of plans that were never tested. If it doesn't, you keep being the person who tells people no."
+        },
+        {
+          "name": "Rain-cultist who's been waiting seven years",
+          "description": "You kept the vestments folded in tissue paper. You met monthly with the others, in a basement off Sepulveda, and you read the old liturgies aloud to nobody. Tonight the smell is the answer to a prayer you stopped believing in around year four. You are the only one in the room who isn't surprised, and that is its own kind of terror."
+        },
+        {
+          "name": "Visitor from a wet city who doesn't understand",
+          "description": "You flew in for a wedding or a deposition or a funeral. The locals keep stopping mid-sentence and staring at the air. You can smell what they smell and to you it's just Tuesday. The horror is watching a whole city react to something you grew up inside."
+        },
+        {
+          "name": "Child who's never seen rain",
+          "description": "You know it from books, from the videos the teacher plays at the end of the unit on weather. You have never felt it on your face. Tonight the grown-ups won't go inside. Your mother is crying on the porch and laughing and you don't know which one to believe."
+        }
+      ]
+    },
+    {
+      "label": "The city",
+      "choices": [
+        {
+          "name": "Sprawling LA-like metropolis",
+          "description": "The palm trees have been brown for years; nobody cuts them down because nobody can agree whose problem they are. The concrete riverbeds run with murals where the water was — community projects, gang tags, a memorial wall for the last big flood. Rooftop water-storage has been law since year three and the tanks throw long sharp shadows across every block."
+        },
+        {
+          "name": "Walled medieval city",
+          "description": "Cisterns under every plaza, locked and ledgered. The wells are guarded by city militia who count buckets. The rain-gutters along every eave are kept obsessively clean by ordinance, even now, because the alderman who lifted the ordinance was hanged for it in year two and his replacement is superstitious."
+        },
+        {
+          "name": "Half-abandoned former port",
+          "description": "The harbor is dry; ships sit on cradles where the tide used to lift them, and seabirds nest in the hulls. The desalination plant is the new downtown — three towers, a market, a tram. Whole neighborhoods near the old waterfront stand empty, the shutters banging in the dry wind, kept up by no one."
+        },
+        {
+          "name": "A floating city, drying out",
+          "description": "Canals turning to alleys you can walk. Gondolas grounded at angles, painted by the children who use them as forts. The city's name used to mean something in the old tongue — a word for floating — and now it doesn't, quite, and nobody has decided what the new word is."
+        }
+      ]
+    }
   ]
 }

@@ -7,5 +7,50 @@
     "comedy",
     "modern",
     "sci-fi"
+  ],
+  "detail": "The player advertised for a roommate. Someone answered. Someone showed up. The lease is signed and the rent cleared and the keys are on the hook. The roommate is not from here, in a sense of \"here\" that includes the planet and possibly the geometry. They are very polite. They want to know where to put their things.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE REFUGEE — Their dimension is collapsing. The player's apartment was, by some measure of address that does not translate, the nearest stable address. They are not asking for asylum because they do not know they are a refugee yet. They believe, with the certainty of a person who has lost their map, that this is a sublet.\n2. THE EXCHANGE PROGRAM — There is an agency. There is paperwork. The player signed it, or someone signed it on their behalf, or it was implicitly signed by accepting a piece of mail they did not read. A liaison from the agency will visit on a schedule. The agency takes its bureaucratic obligations very seriously.\n3. THEY ARE HIDING — Someone is after them. That someone can also cross over. The roommate has not said this aloud. The player can read it in the small precautions — the way they will not stand near the window after dark, the way they freeze when the doorbell rings, the way their belongings can be packed in under a minute.\n\nDM approach:\n- Tone: domestic sitcom with the laugh track turned down. The horror, if any, is structural — the roommate is good company, and the cost of housing them is real.\n- NPCs: the roommate (always specific in their oddness); the landlord, the nosy neighbor, the coworker who has met the roommate once and cannot stop bringing them up.\n- Pacing structure: every Tuesday, one rule of physics in the apartment changes for twenty-four hours. The change is keyed to a small request the roommate made earlier in the week.\n- Seed early: a small mundane object the roommate has brought that does not behave correctly. A jar of preserves that hums. A spoon that bends back.\n- Let the relationship be real. The roommate, by the end, should be someone the player would defend.\n\nPacing: the apartment has a Tuesday. On Tuesdays, one law of physics inside the four walls is renegotiated for the day. Gravity, scent, time-flow, the rules around mirrors. The shifts are not random; they correlate with what the roommate has needed from the player that week. The clock the player can read is the calendar on the fridge, and the chalkmark the roommate makes on the doorframe each Wednesday morning.",
+  "suboptions": [
+    {
+      "label": "Your roommate",
+      "choices": [
+        {
+          "name": "Eight feet of polite, has hooves",
+          "description": "They ducked under the doorframe coming in and apologized for the dent. They brought soup, in a tureen of a metal you do not have a name for. They are scrupulously clean. The hooves are quiet on the laminate. They use \"thank you\" in a way that suggests they have studied the phrase."
+        },
+        {
+          "name": "A wisp of light who pays in stock tips",
+          "description": "They occupy the spare room without disturbing the dust. They pay rent in stock tips for a future that will not happen here, but the tickers map onto this market with delightful, illegal accuracy. They glow faintly when discussing the weather and brightly when discussing music."
+        },
+        {
+          "name": "A perfect human-looking person who fails one tell per week",
+          "description": "On Mondays they are flawless. By Wednesday something small has slipped — too many teeth in a smile, a shadow cast in the wrong direction, a meal eaten in the wrong order. By Friday they have noticed they have slipped, and by Saturday they have repaired it, and the cycle begins again on Monday."
+        },
+        {
+          "name": "A small council of seven",
+          "description": "They insist they are one person. They use a single name. They sometimes argue with each other in a language only they speak, and then they reach consensus, and then they hand the player the rent. They eat seven different breakfasts. They are very respectful of the bathroom schedule."
+        }
+      ]
+    },
+    {
+      "label": "The apartment",
+      "choices": [
+        {
+          "name": "Brownstone walkup, top floor",
+          "description": "The boards creak in a sequence you have memorized. The fire escape, since the roommate moved in, leads to a window that is not the window it used to lead to. The downstairs neighbor hears everything, and they have started leaving notes you cannot quite parse, slipped under the door at exactly the wrong hour."
+        },
+        {
+          "name": "Suburban duplex with a shared wall",
+          "description": "The other side of the wall is silent and was empty when you moved in. It is still empty, technically. The silence on the other side has acquired a texture since the roommate arrived — not louder, exactly, but more present. The mailbox over there has begun accumulating mail addressed to no one."
+        },
+        {
+          "name": "Studio in a high-rise",
+          "description": "One room, one bathroom, one of everything. The roommate's belongings are inside your belongings now, in a way that is not physically possible and is nevertheless tidy. The city outside the window sounds different when the roommate is home — closer in some directions and further in others."
+        },
+        {
+          "name": "A house you inherited from your grandmother",
+          "description": "Her things are still here. The roommate has moved into her bedroom and was apologetic when they realized whose it had been. They sometimes call you by her name, and stop themselves, and look sorry. The house seems easier with them in it, which is its own particular grief."
+        }
+      ]
+    }
   ]
 }

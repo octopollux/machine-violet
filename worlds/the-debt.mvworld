@@ -7,5 +7,50 @@
     "fantasy",
     "modern",
     "sci-fi"
+  ],
+  "detail": "Someone the player cannot refuse is asking for a favor. The player owes them, and they both know it, and the conversation will happen tonight whether the player wants it to or not. The ask, when it comes, will be small. The next ask will be larger. By dawn the player will be doing something they would not have agreed to if asked first.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE CHILDHOOD FRIEND — They pulled the player out of a river, or out of a car, or out of a worse version of their own twenties. They have spent twenty years not asking for anything. Tonight they need the player to do something illegal. They will not say what until the player has said yes. Every hour the player delays, the ask gets bigger, because the situation they're trying to fix is getting worse.\n2. THE FORGOTTEN BARGAIN — When the player was eight, they made a deal with something that came to their bedroom window. They forgot about it. The thing did not. It is calling in the bargain now and the price was named at the time, and the price was a firstborn. The player has a child. The player did not connect these two facts until tonight.\n3. THE FUTURE SELF — The caller is the player, from later. They paid forward a debt that the player has not yet accrued. They are here to ask for something that the player will not understand until they themselves become the caller. They are scared. They will not say of what.\n\nDM approach:\n- Tone: intimate, conversational, the comfort of someone who knows you well asking for a thing they shouldn't ask. The horror is in the relationship, not the request.\n- NPCs to seed: the lender (warm, plausible, with leverage); one witness who can corroborate the debt; one offramp NPC who can take the heat for a price.\n- Pacing structure: a one-night chain of asks, each bigger than the last. Offramps exist and cost specific things — money, reputation, a piece of the player's own future. The player can stop at any point. Each stop has a consequence.\n- Seed early: a small detail that confirms the lender is who they say they are (or doesn't); a phone that keeps buzzing; a clock the player keeps checking.\n- The first ask should be doable. The fourth ask should be obviously the line. The fifth ask is where the campaign lives.\n\nPacing: A single night, scene by scene. Each ask is one scene. Offramps cost specific things. The player can track time by the lender's progress through their own evening — the band playing the last set, the IV bag emptying, the diner closing, the eulogy ending.",
+  "suboptions": [
+    {
+      "label": "Your lender",
+      "choices": [
+        {
+          "name": "Old friend with a new face",
+          "description": "They look like the friend you remember and they don't quite. Same laugh. Same way of leaning on a table. The face has been worked on or the years have done something the years don't usually do. They know things only the friend would know and they don't know one thing the friend definitely would. You haven't decided yet whether to ask."
+        },
+        {
+          "name": "A demon with paperwork",
+          "description": "They have an attaché case and a fountain pen and the contract you signed when you were nineteen and high. The contract is dated and witnessed and the signature is yours. They are polite. They are not in a hurry. They will let you read every clause before they ask you to honor the one they're invoking tonight."
+        },
+        {
+          "name": "A small god of obligations",
+          "description": "Their domain is debt itself — the ledger of what is owed, between mortals, between mortals and gods, between past selves and present ones. They are not large. They are not loud. They are the one who notices when an obligation goes unmet, and they have noticed yours, and they have come because the alternative was sending someone less courteous."
+        },
+        {
+          "name": "Your own future self",
+          "description": "Older, thinner, dressed in clothes you don't own yet. They know the room better than you do because they have been in it before, from this seat. They are not threatening. They are exhausted. The thing they need you to do will be hard, and they know it will be hard because they remember doing it, and they remember what it cost."
+        }
+      ]
+    },
+    {
+      "label": "Where the call happens",
+      "choices": [
+        {
+          "name": "The diner where you used to meet",
+          "description": "Lit by the neon sign in the window, which paints the booths pink and then blue and then pink again. The booth in the back corner where you both sat at sixteen, twenty, thirty. The waitress remembers their order before they say it and does not remember yours. The coffee comes free with the third refill, and they want three refills, which means this will take a while."
+        },
+        {
+          "name": "Their hospital bedside",
+          "description": "The machines count their vitals in small clean numbers. The curtain around the bed doesn't quite close on either side. Visiting hours end in forty minutes and the nurses are already glancing at you. The ask will happen before the hour does, because they know how time works in this kind of room better than you do."
+        },
+        {
+          "name": "Their wedding reception",
+          "description": "Everyone is happy. The band is loud enough that you have to lean in to hear. They are wearing white or its equivalent and they pull you aside between the first dance and the toasts, into a side room with folded linens and one chair. They have ninety seconds before someone notices the bride is missing. The ask will fit in ninety seconds and the answer will, too."
+        },
+        {
+          "name": "A funeral — yours",
+          "description": "Your own. You are at the back. Nobody else sees you and you can tell because nobody flinches. The casket is closed. They are at the lectern, and they look at the back of the room, and they look at you, and they begin to speak the eulogy and you understand that the eulogy is the ask. You have until the last word to decide."
+        }
+      ]
+    }
   ]
 }

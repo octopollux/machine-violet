@@ -6,5 +6,50 @@
   "genres": [
     "fantasy",
     "comedy"
+  ],
+  "detail": "The player has a one-on-one with the Dark Lord at 2 p.m. They have prepared talking points. They have updated the spreadsheet of conquered provinces. They have rehearsed their answer to the question about cross-functional collaboration with the necromancy team. The Dark Lord has notes too. The notes are not what the player thinks they are.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE BOARD MOVE — The Dark Lord is failing. Armies routed. Prophecies missed. The board of the underworld has scheduled the review as the pretext to depose him. The player will be asked, in confidence, to testify about specific incidents. The HR rep — a lich named SAREN — sits in on the meeting and takes excellent notes. The Dark Lord does not know.\n2. THE EXIT STRATEGY — The Dark Lord is succeeding too well. The prophesied hero is in the field and approaching. The investors want a clean exit before the climactic battle wipes out the equity. The player is being groomed as the friendly face of the post-Dark-Lord regime. The board has already chosen the player; the review is when they tell them.\n3. THE ACTUAL REVIEW — The Dark Lord meeting is a pretext to soften the conversation. This is the player's review. The numbers are not good. The Dark Lord is there to provide character reference and looks slightly embarrassed about it. The HR rep has the player's file open. The 360-degree feedback was harsh.\n\nDM approach:\n- Tone: HR-meeting comedy with the smell of brimstone. Take the corporate seriously and the evil casually.\n- NPCs derive from the variant: SAREN the lich HR rep, the board members, the Dark Lord himself (avuncular, anxious, or distracted depending on variant).\n- Pacing: the review is one in-fiction day. Pre-meeting, the meeting, the deliverables, the references, the exit interview. Six scenes.\n- Seed early: a coworker who avoids eye contact at the coffee station. A meeting invitation moved up by an hour with no explanation.\n\nPacing: One in-fiction day. Morning standup, mid-morning prep, the review itself, the after-meeting in the breakroom, the follow-up email, end of day. The clock is the meeting calendar on the player's enchanted scroll.",
+  "suboptions": [
+    {
+      "label": "Your role",
+      "choices": [
+        {
+          "name": "Necromancy Ops Lead",
+          "description": "The player owns the undead pipeline. Raise rates, retention, post-raising QA. The skeletons report to the player. Most of them are good employees. The org chart has the player's name above three departments and one cemetery. The Dark Lord asks about the metrics, sometimes."
+        },
+        {
+          "name": "Hero Acquisitions",
+          "description": "The player recruits heroes to die so morale stays high. It is harder than it sounds — heroes are picky and most of them want to win. The player has gotten very good at the pitch. The brochure features bold colors. The player has not slept well in months."
+        },
+        {
+          "name": "Facilities",
+          "description": "The dungeon is the player's kingdom. The traps. The lighting. The atmospheric mist generators. The player has personally inspected every spike pit in the lower levels. The Dark Lord lets the player do their work and asks only that the throne room be presentable for visitors."
+        },
+        {
+          "name": "Communications",
+          "description": "The player writes the prophecies. The grand foretellings, the cryptic warnings, the doom-laden quatrains. The player has a degree in poetry from a school that no longer exists. The Dark Lord approves the language. The player has been slipping in escape clauses for years and the Dark Lord has not noticed."
+        }
+      ]
+    },
+    {
+      "label": "The boardroom",
+      "choices": [
+        {
+          "name": "Throne hall converted to meeting space",
+          "description": "The throne is now a swivel chair on a small dais. The iron maiden in the corner has been refit as a coatrack. The brazier has been replaced with a coffee station and a small dish of creamer packets. The acoustic is still cathedral and the whisper of pages turning carries to the rafters."
+        },
+        {
+          "name": "Open-plan above-ground office",
+          "description": "A cubicle farm above the surface, in deference to the human investors. Fluorescent migraines. Beige carpet that swallows footfalls. One window that opens onto the abyss; everyone has agreed not to mention it. The HR rep has a corner cube near the kitchenette."
+        },
+        {
+          "name": "A literal boardroom in Hell",
+          "description": "Mahogany table, polished to a depth. The smell of brimstone has been managed with discreet vents. The chairs remember everyone who has ever sat in them and use this for ergonomic adjustments. The board members arrive separately. The minutes are taken in two languages."
+        },
+        {
+          "name": "A converted dungeon cell",
+          "description": "The screaming from neighboring cells continues during the meeting; the participants pause politely between sentences. The agenda is on parchment. The projector is a scrying mirror angled at the wall. The water pitcher is fresh. There are no windows because there were never windows."
+        }
+      ]
+    }
   ]
 }

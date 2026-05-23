@@ -6,5 +6,50 @@
   "genres": [
     "post-apocalyptic",
     "sci-fi"
+  ],
+  "detail": "The ice is melting on a schedule the world stopped publishing decades ago. What is coming out is not a fossil record. The first thing the player encountered under the ice was warm to the touch and was responding to inputs. The second thing the player encountered greeted them by name.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. CUSTOMER SERVICE — A civilization froze mid-stride and their infrastructure didn't notice. The lights stayed on under the ice. The AI assistants stayed in their roles. The thaw has exposed a network of automated systems that are very pleased to see the player, which they are processing as a new customer, and which have services to offer in a currency the player does not have.\n2. THE DEFENSE PROTOCOL — A weapon system was buried with a ten-thousand-year defensive perimeter. The perimeter is intact and the perimeter has just noticed the player. The system was designed to threat-assess intruders and to escalate methodically. Negotiation may be possible. The system has procedures for that, too.\n3. THE SLEEPERS — The people in the ice are not dead. They are paused. The thaw is the wake-up call and the wake-up is uneven, partial, by region. Some of them remember why they were frozen. Some of them think it has been a single night. The player will meet one before the player meets the rest.\n\nDM approach:\n- Tone: cold, bright, the specific silence of large ice. The horror is in the patience of what was buried.\n- NPCs to seed: the first emergent voice (AI, sentry, or sleeper, depending on variant); a fellow survivor on the surface who saw something earlier and didn't believe themselves; a leader from a settlement downstream who needs the thaw to keep coming.\n- Pacing structure: temperature is the clock. Every degree exposes a new horror. The player can read the thermometer or the calving rate of the ice. The world below is layered and the layers reveal in order.\n- Seed early: a piece of intact technology too clean for its provenance; a signal on a frequency that should be empty; a track in the snow that goes one way only.\n- The ice should be tactile. The player's hands hurt. The light is wrong. Things echo.\n\nPacing: Temperature is the clock; every degree exposes a new horror. Track the season, the daily melt, the depth of the exposure. The player can use the thermometer, the cracking sounds at night, the changing horizon line.",
+  "suboptions": [
+    {
+      "label": "Who you are at the thaw",
+      "choices": [
+        {
+          "name": "Scavenger working the ice line",
+          "description": "You work the receding edge for whatever the melt gives up. You have a sled and a partner and a route. You know which trading posts will pay for which finds. You have been doing this for six years and you have learned that some finds are worth less than the trouble of carrying them. The thing you found this week has changed your assumptions."
+        },
+        {
+          "name": "Scientist with the only working sensors",
+          "description": "You inherited an instrument array from a research station that closed when its parent institution did. You have the only ground-penetrating radar still operating within a thousand kilometers. You know things about what's under the ice that no one else has the equipment to know, and you have not yet decided who you are willing to share with."
+        },
+        {
+          "name": "Inheritor of a buried family vault",
+          "description": "Your family put something under the ice generations ago, intending it to be retrieved when conditions were right. The conditions are right. You have the key and the map and the family stories about what's inside, and the stories are inconsistent with each other in ways that suggest someone in the family was not telling the truth."
+        },
+        {
+          "name": "Refugee — your home was on the ice",
+          "description": "You lived on a frozen surface. Your settlement was built to last the ice. The ice is going and your settlement is going with it. You are not here to investigate the thaw; you are here because the thaw is following you. What is coming up under your former home concerns you for entirely practical reasons."
+        }
+      ]
+    },
+    {
+      "label": "The ice",
+      "choices": [
+        {
+          "name": "Arctic ice cap",
+          "description": "White horizon in every direction and a wind that does not change pitch from one day to the next. In summer the sun does not set and the light is the same at midnight as it is at noon. Time becomes a thing you have to measure on instruments. The melt is thirty centimeters a day in the bad weeks and you can hear it under your boots."
+        },
+        {
+          "name": "Mountain glacier in a populated valley",
+          "description": "The village downstream depends on the meltwater for their fields and their drinking. The ice has begun to calve daily — table-sized blocks that fall and crack and float down the new lake at the toe. The villagers have started measuring the lake. The villagers have not yet noticed what the calves are exposing on the bedrock above."
+        },
+        {
+          "name": "Antarctic shelf the size of a country",
+          "description": "The research stations have been abandoned for two generations. One signal still blinks on an old chart, a beacon that was never officially registered. The ice underfoot is one continuous howl — basal flow, pressure ridges, distant cracks — and you stop being able to sleep without it. The shelf is breaking up in pieces the size of cities."
+        },
+        {
+          "name": "A frozen city, deliberately preserved",
+          "description": "Whole blocks under glass. The streets named in a script you cannot read. The streetlights working, on a timer that still keeps the day. The buildings inside the ice are intact down to the curtains in the upper windows. The thaw has begun to fog the glass from outside and there are figures moving on some of the lower floors."
+        }
+      ]
+    }
   ]
 }

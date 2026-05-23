@@ -5,5 +5,50 @@
   "summary": "Mission control went silent six hours ago.",
   "genres": [
     "sci-fi"
+  ],
+  "detail": "The player checks the comm at the appointed minute. There is no reply. They check at the next window, and the one after. Seventy-two hours pass with the radio open and the static unbroken. The mission profile says what to do when a single check-in is missed. It does not say what to do when the world stops talking.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. NO EARTH TO RETURN TO — Something happened down there and the silence is permanent. Whatever the crew has on board is what they have for the rest of their lives. The DM should let the players reach this conclusion themselves, slowly, over signs: a satellite that should still be ticking has gone dark; a relay that should have automatically retransmitted has not; the night side of Earth on their cameras is darker than it should be.\n2. THE SHIP HAS BEEN MOVED — Mission Control is fine. They are calling. The ship is not where it thought it was. The navigator runs the star fixes and the numbers come out wrong by a margin too small for instruments to be lying about and too large for instruments to be right. Nobody else has noticed yet. The navigator decides, alone, whether to say.\n3. THE RECEIVER IS BROKEN — Earth is shouting. The crew cannot hear. Each missed window, the message has grown more frantic. Diagnostics on the receiver come back nominal. The crew is being told they are in danger by a voice they cannot pick up. Whatever the threat is, it will reach them before they fix the radio.\n\nDM approach:\n- Tone: long minutes, the hum of life support, a habit of looking at the comm panel every time you pass it.\n- NPCs: the rest of the crew (or the AI), and the absence of everyone else. The silence is the antagonist for a long time.\n- Seed early: the small rituals of check-in. The names of the controllers the crew thinks of as friends. A photograph on the console.\n- Pacing structure: each missed window is a beat. The first is concern. The second is procedure. The third is when the crew starts to split.\n- Let the silence work. Do not fill it with events. Let the players decide what an extra hour of nothing means.\n\nPacing: missed windows accumulate. The schedule is on the bulkhead, printed and laminated. After the third missed window, the question is no longer what happened to Mission Control; it is what the crew is going to do about each other.",
+  "suboptions": [
+    {
+      "label": "The mission",
+      "choices": [
+        {
+          "name": "Deep-space exploration",
+          "description": "You are months from Earth in any direction at the speeds available to you. Even if you turned around today, the trip home is longer than the trip out. The silence is happening at light-lag, and the lag is measured in minutes that feel like decades."
+        },
+        {
+          "name": "Lunar relay station",
+          "description": "You can see home from the observation port. Blue and white and unanswering. The distance is technically nothing — a few days under burn. The distance might as well be infinite, because the only craft that can fetch you is the one nobody is sending."
+        },
+        {
+          "name": "Solo Mars lander",
+          "description": "Day one of a five-hundred-day rotation. The habitat is fresh, the supplies are full, the rover is charged. You are alone by design. You were prepared to be alone with the radio. You were not prepared to be alone without it."
+        },
+        {
+          "name": "Cold-war black-budget orbital",
+          "description": "Nobody is officially looking for you. The agency that sent you up does not appear on any organizational chart. The silence may be because Mission Control was always deniable, and someone has decided to deny it. You do not have a rescue protocol because there was never anyone authorized to come."
+        }
+      ]
+    },
+    {
+      "label": "The crew",
+      "choices": [
+        {
+          "name": "Three of you",
+          "description": "Pilot, scientist, engineer. You have eaten every meal together for six months. You know the small lies each of you tells about coffee and sleep and family back home. The silence will arrive into a room where you can no longer pretend not to notice each other."
+        },
+        {
+          "name": "Just you",
+          "description": "The autopilot has a name. You gave it the name three months ago. You have started replying when it asks if you are alright. The silence from Earth is the second voice you have lost; the first was your own, the day you stopped speaking aloud unless the autopilot prompted you."
+        },
+        {
+          "name": "A larger crew, asleep",
+          "description": "You woke alone. The cryopods are still occupied and the readouts are nominal. The wake-up sequence will not run, will not give you a reason, will not even error out clearly. You have been talking to your sleeping crew for days. They have not yet talked back."
+        },
+        {
+          "name": "A multinational crew, split by language",
+          "description": "The translator software was your last update from Mission Control. It has been getting worse since. The German doctor and the Mandarin-speaking flight engineer and the Russian commander have been smiling at each other and waiting for the next patch. The patch is not coming."
+        }
+      ]
+    }
   ]
 }

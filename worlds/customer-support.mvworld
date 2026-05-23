@@ -7,5 +7,50 @@
     "comedy",
     "fantasy",
     "modern"
+  ],
+  "detail": "The player wears a headset. The headset is the player's life now. Customers call in with wishes that went sideways and want them adjusted, refunded, or escalated. The player has scripts. The scripts have edge cases the scripts do not cover. The player is the edge case the scripts do not cover.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE CO-OP — The company is a djinn cooperative. Old, ethical, unionized. They write the contracts in plain language. They lose money every quarter to competitors who do not. The shop steward is a thousand-year-old djinni named GREEN who organizes the lunch break and is quietly desperate. The player will be asked to choose sides in a dying labor dispute.\n2. THE MONKEY'S-PAW SHOP — A predatory operation that profits on the literal-genie interpretation of every wish. The pleasant voice on the line is the kill mechanism. The player has been hired as bait and being trained without being told — friendly, scripted, the customer dies on the supervisor's call. The supervisor is generous about bonuses and unreadable about everything else.\n3. THE STARTUP — A platform that doesn't understand its own product. Wishes are sublet from a reality the company hasn't paid for. The founders are twenty-eight and on stage at conferences. The wishes work until they don't and the bill is coming due, in dimensions, not dollars.\n\nDM approach:\n- Tone: open-plan office comedy with bureaucratic dread underneath. The ticket queue is the antagonist. Customers are sympathetic, weird, dangerous, or all three.\n- NPCs derive from the variant: GREEN the shop steward (1), the kind dangerous supervisor (2), the founders on Zoom and the customer whose wish has begun to invoice (3).\n- Pacing: tickets queue weekly. Quarterly the metrics worsen and the bonus pool shrinks. The player learns to game both.\n- Seed early: one ticket the player handled perfectly and the customer never called back, in a way that doesn't feel right.\n\nPacing: Tickets queue weekly. Quarterly metrics are the visible clock — the leaderboard in the breakroom, the bonus calculator on the intranet that never quite resolves. The player can track time by which performance review cycle they are in.",
+  "suboptions": [
+    {
+      "label": "Tenure",
+      "choices": [
+        {
+          "name": "First day on the job",
+          "description": "The headset still has the previous wearer's sweat on the foam. Nobody has told the player where the bathrooms are. The training video skipped the section on what to do if the customer is on fire. The lunch lady knows the player's name already; nobody else does."
+        },
+        {
+          "name": "Five years in, dead inside",
+          "description": "The player has a coffee mug they have washed exactly once. They know the scripts so well they hear them in their dreams. They can identify a regional accent in three syllables and the type of wish in five. The work is easy and that is part of the problem."
+        },
+        {
+          "name": "Promoted into supervision",
+          "description": "The player wrote the script they now enforce on others. They have a small office with a door. They sit in meetings where the metrics are explained slowly. Their direct reports include people who were hired the same week the player was, who do not call the player by their first name anymore."
+        },
+        {
+          "name": "Whistleblower in waiting",
+          "description": "The player has a notebook in a locker at the gym. They have been writing things down for a year. They have not yet decided who to send it to or whether sending it will accomplish anything. They smile during the morning huddle. Their hands have started to shake by Wednesday."
+        }
+      ]
+    },
+    {
+      "label": "Escalation path above you",
+      "choices": [
+        {
+          "name": "Middle management",
+          "description": "Human. Useless. Three of them on performance-improvement plans of their own. They have offices with windows and faces that have learned not to register surprise. They forward escalations to one another in a loop the player can trace if they pay attention."
+        },
+        {
+          "name": "A literal djinn-king",
+          "description": "Terrifying and polite. He sends pastries to the breakroom on holidays. He has met the player exactly once at orientation and remembers the player's first name and the names of the player's siblings. His decisions are final and his decisions are kind, and these two things together do not feel safe."
+        },
+        {
+          "name": "An algorithm",
+          "description": "The player has never met it. It routes everything. It assigns tickets, schedules breaks, calculates bonuses, terminates contracts. The intranet calls it OZ. Nobody in the office has spoken its full designation aloud since the rebrand. It does not answer email."
+        },
+        {
+          "name": "The original founder",
+          "description": "Unseen for years. A large portrait in the lobby that everyone insists is fine. The portrait's eyes follow the player exactly the amount that paintings' eyes follow you. HR has a memo addressed from him every Monday. The memo is always signed in fresh ink."
+        }
+      ]
+    }
   ]
 }

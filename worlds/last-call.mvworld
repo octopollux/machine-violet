@@ -6,5 +6,50 @@
   "genres": [
     "modern",
     "mystery"
+  ],
+  "detail": "The bar is a small room with bad light and a smaller number of customers than it had ten years ago. Tonight, every one of them saw the same thing. Nobody is talking about it yet. The next round will arrive, and someone will have to be the first.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE BUILDING THAT WASN'T — Across the street, a murder happened in a building that, by morning, will never have existed. The bar's windows look right at it. Six people watched a shape fall past a window of a building the city will, by breakfast, have no record of permitting. The witnesses are the only proof; their memory is the evidence room, and it's leaking.\n2. THE FADING REGULAR — A man walked in, ordered the same thing he always orders, paid for half of it, and went transparent between the second and third sip. His stool is still warm. His tab is still open. Nobody can quite say his name out loud, though they all knew it an hour ago. The bartender keeps the tab open as a kind of vigil.\n3. THE YOUNGER BARTENDER — The bartender is twelve years younger than she was at open. Same apron, same scar on her wrist, same laugh. She is pulling beers like nothing happened and she is making eye contact with no one. The regulars all see it. The regulars all know that the first person to say it out loud will be responsible for whatever happens next.\n\nDM approach:\n- Tone: hushed, conspiratorial, the comedy of small embarrassments between people who know each other too well. Horror as something nobody wants to be the first to name.\n- NPCs to seed: the bartender (warm or cool depending on variant, the gravitational center of the room); one regular who saw more than the others and won't say; the door (someone will arrive who shouldn't, or won't arrive who should).\n- Pacing structure: each \"last call\" is one in-fiction night. Witnesses' memories decay at different rates — give each witness a roll or a quiet erosion.\n- Seed early: the empty stool that's saved for someone; the chalkboard with names on it; the jukebox song that everyone half-remembers being theirs.\n- The bar is the safe room and the haunted one. The street outside is colder than the weather report.\n\nPacing: One night per session. The witnesses are losing their grip at different rates — the player can track this by who can still describe what happened in detail, who is starting to misremember, and who has stopped mentioning it altogether.",
+  "suboptions": [
+    {
+      "label": "Your seat",
+      "choices": [
+        {
+          "name": "New hire on her first shift",
+          "description": "You don't know the regulars' names yet, but you can tell which stools belong to whom. The previous bartender quit without notice. Your manager handed you the keys and a printed list of pour costs and left. You are the only person here who didn't see whatever they all saw — but they're going to assume you did, and you'll have to decide whether to admit otherwise."
+        },
+        {
+          "name": "Twenty-year regular",
+          "description": "You can tell which booth a story is going to be told from before the storyteller sits down. You know whose marriage ended in which corner. Tonight is the first night in two decades that the room has felt wrong, and you are the person the others will look to for permission to say so."
+        },
+        {
+          "name": "Off-duty cop",
+          "description": "You came in for one drink and got two. Your badge is in your jacket on the back of the chair. You are professionally trained to notice and unprofessionally trained to drink, and tonight those two are at odds. If you make this official, the bar's last six months get harder. If you don't, you have to live with what you saw and didn't write down."
+        },
+        {
+          "name": "Owner trying to sell the lease before it's too late",
+          "description": "You inherited the place from a brother and you have a buyer who will give you enough to leave the city. Closing is in three weeks. Whatever happened tonight is the kind of thing that could either kill the sale or be the only thing that finally makes this room mean something to you. You haven't decided which would be worse."
+        }
+      ]
+    },
+    {
+      "label": "The bar",
+      "choices": [
+        {
+          "name": "Cop bar in a rough precinct",
+          "description": "The jukebox plays one Sinatra album in rotation and nobody has fed it a quarter in a year. The booths are taped vinyl that sticks to bare arms in summer. The bathroom door has a lock that hasn't worked since 1988 and everyone has a private signal for occupied. The regulars carry guns they're not currently allowed to use."
+        },
+        {
+          "name": "Vanishing queer bar in a gentrifying block",
+          "description": "The dance floor is still scuffed from a decade of weekly parties that don't happen anymore. Pride flags have faded to pastel in the front window. The lease ends in two weeks and the landlord won't return calls. Everyone here has somewhere else they could go and nobody wants to be the first to admit they will."
+        },
+        {
+          "name": "Roadside dive at a freeway exit",
+          "description": "Semis idle outside with their running lights making the parking lot blue. The regulars all live within walking distance of nowhere. The pay phone still works and somebody uses it every night. The jukebox has six country songs and a Bruce Springsteen B-side that nobody can explain."
+        },
+        {
+          "name": "Neighborhood bar whose patrons all live within three blocks",
+          "description": "The dog under the table belongs to everyone, and to nobody. The regulars' birthdays are on a chalkboard behind the register, with the years discreetly missing. The owner remembers your father, or somebody's father — the math doesn't quite work. The front door has a bell on a string and the bell rings even when nobody comes in."
+        }
+      ]
+    }
   ]
 }

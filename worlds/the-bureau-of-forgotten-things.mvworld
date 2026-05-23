@@ -7,5 +7,50 @@
     "comedy",
     "fantasy",
     "modern"
+  ],
+  "detail": "The Bureau is a long building with too many doors. Behind every door, a department for a different category of loss. The player has a desk. The desk has a stamp, an in-tray, an out-tray, and a small lamp. The customer line outside the player's door is longer this season than last. The quarterly audit is in three weeks.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE SCHEDULE — The Bureau returns lost things on a schedule mortals cannot access. The player processes pre-return paperwork. The schedule is changing. Items that were due to be returned in twenty years are being moved forward. Other items are being moved back, indefinitely. The senior clerk — a man named ATHIS who has worked here longer than the building — does not know why.\n2. THE METABOLISM — The Bureau metabolizes what it files. It IS the act of forgetting. It is growing. Staff are next on the menu. Coworkers have begun to misplace small things about themselves — a middle initial, the way they take their coffee. The pension office on the third floor has not been visited in a long time.\n3. THE TRIAL — The Bureau is cataloging for a future trial. The player will be a witness. The case file is already thick. The defendant is not named on the file the player can see. The dates on the documents include dates the player has not yet lived through. The senior clerk knows and is not saying.\n\nDM approach:\n- Tone: civil-service comedy with intermittent metaphysical chill. The Bureau is sincerely trying to help and incidentally cannot be trusted.\n- NPCs derive from the variant: ATHIS the senior clerk and the schedule-revision team (1), the coworker who has begun to forget themselves (2), the file the player isn't supposed to read (3).\n- Pacing: quarterly audit in three weeks. New intake every morning. The customer line measurably longer.\n- Seed early: one customer the player can't quite help. One file that won't close.\n\nPacing: Quarterly audit in three weeks. The clock is the wall calendar in the breakroom and the daily count on the intake-log clipboard. The line outside grows by a few people each day; on audit day the line will reach the street.",
+  "suboptions": [
+    {
+      "label": "Your desk",
+      "choices": [
+        {
+          "name": "Lost objects",
+          "description": "A wall of cubbyholes behind the player, sorted by year, then by category, then by the smell of where they were lost. Dust and pocket lint and the faint chemical of old receipts. A kid's mitten in cubbyhole 1964-G has been here sixty years and the owner has been by every winter and not asked for it back."
+        },
+        {
+          "name": "Abandoned intentions",
+          "description": "Folders of unwritten novels, business plans never started, letters composed and never sent. The Sent tray on the player's desk is for filing pending. Nobody opens it. The manuscripts get heavier as they age. By year fifty they require two hands."
+        },
+        {
+          "name": "Missing persons",
+          "description": "Cold files in cabinets the player has memorized. Photographs that have to be developed by the Bureau itself, in a darkroom in the basement, by a man who does not look up. The two chairs across from the player's desk are designed for crying — wide arms, a small shelf for a tissue box."
+        },
+        {
+          "name": "Forgotten gods",
+          "description": "A small quiet room at the end of a corridor most staff do not visit. One customer a year, sometimes two. The player serves them tea from a kettle that is always warm. The visitors are not what the player expected and are very polite. They never stay long."
+        }
+      ]
+    },
+    {
+      "label": "The audit's coming",
+      "choices": [
+        {
+          "name": "A coworker who's been there too long",
+          "description": "They forgot their own name a decade back. The nameplate on their desk reads simply COLLEAGUE in their own handwriting. They still process intake faster than anyone. They have begun to look at the player as though trying to remember something. They are. They have been forgetting it for a while."
+        },
+        {
+          "name": "Your manager",
+          "description": "They came in years ago to file themselves and stayed. They got promoted because they understood the system from both sides. Their performance reviews are exemplary. Their family is no longer reachable through any address. They are kind to the player and they are watching the schedule."
+        },
+        {
+          "name": "A customer who wants their thing back",
+          "description": "They have been coming in every day for a month. They have a claim ticket the system does not recognize. They are not loud. They will not leave. The thing they want is something the Bureau is not supposed to return at all, and the player is the only clerk who has not yet told them no."
+        },
+        {
+          "name": "The Bureau itself",
+          "description": "Quarterly self-inventory. The building counts itself. Doors that should not be there appear in the hallway for the duration of the audit. The hum the building makes deepens by a tone. Staff are part of the inventory. Some of them will not be on the list at the end."
+        }
+      ]
+    }
   ]
 }

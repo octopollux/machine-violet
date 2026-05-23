@@ -5,5 +5,50 @@
   "summary": "Someone is devouring sworn oaths. Contracts unravel. Alliances dissolve overnight.",
   "genres": [
     "fantasy"
+  ],
+  "detail": "An oath, in this world, is a thing. Sworn properly it has weight, color, a faint smell when struck. Marriages bind. Fealties hold. A debt is a visible filament between two people that other people can step around. Lately the filaments have been thinning. Marriages have been forgetting themselves. Knights have wandered out of liege-halls with empty expressions. The merchants are worst hit; the guilds are dissolving like sugar in rain.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE ANCIENT ONE — A single being, bound for an age beneath a temple or stone or sea, released by a mistake or a betrayal or a miscalculated rite, is methodically un-doing every promise ever made. It is hungry and patient and has a queue. The oldest oaths go last because they are the richest. There are clerics who know what it is and who released it. Those clerics are also hiding.\n2. THE SWARM — Not one eater but many. Small parasites, each specialized — one for marriage-vows, one for liege-bonds, one for blood-debts. They have different tells. A marriage going first leaves a sweet smell. A fealty leaves a copper taste. The oldest priests have noticed the symptoms differ by oath-type and are trying to convince the court that this is more than coincidence.\n3. THE NEW GOD — A god of broken trust has been born of the present age, and is gathering worshippers by the only method that works for it: demonstration. Every broken oath is a sermon. The cult is small and the god is small but the god is growing exactly as fast as the breaking is, and the breaking is fast.\n\nDM approach:\n- Tone: brittle, ceremonial, full of small protocol failures. Doors that should open by rite do not. Names that should be remembered are not.\n- NPCs by variant: a temple-keeper who knows what was released and won't say (1); a lay scholar who has begun cataloging the symptoms by oath-type, ignored by her superiors (2); a recent convert to the new god who is calm and articulate and frightening in their certainty (3).\n- Seed early: a small unbreakable oath visibly fraying; a courier who arrives but cannot recall what they came to deliver; a wedding ring slipping off in a marketplace.\n- Pacing structure: the DM picks 3-5 oaths in the world the player cares about — a marriage, a fealty, a debt, a treaty, a personal vow — and unravels them on a clock the player can hear ticking.\n- The horror is that the eater is not personal. It is appetite. It does not know who it is hurting.\n\nPacing: The DM tracks 3-5 active world oaths and unravels them as ticking clocks. The player can hear which is next by watching what the world stops respecting. When the queen's fealty starts to slip, the guard begins drifting in the throne room. When a marriage starts to go, the spouse begins forgetting names.",
+  "suboptions": [
+    {
+      "label": "Your oath",
+      "choices": [
+        {
+          "name": "Vow of revenge",
+          "description": "You swore it at a graveside and you have lived inside it for years. It has been your shape. Lately the edges have begun to soften. You remember what you swore but the wanting has gone slack, and without the wanting you do not know who you are. The person you swore against is still alive and you can no longer quite picture them."
+        },
+        {
+          "name": "Marriage",
+          "description": "Your spouse is starting to forget you. Not in the dramatic ways. In the small ways: a coffee order that was always yours, a private joke that does not land, the side of the bed they reach for. They look at you as one looks at a guest one has been told to be polite to. You have not had the conversation. You do not know yet what to call this."
+        },
+        {
+          "name": "Duty of office",
+          "description": "Your authority is dissolving. The seal on your letters means less than it did last month. The guard who answered your summons yesterday did not answer it today. The office is older than you and you have always served it well, and you can feel it forgetting the shape of the person it used to confer power upon."
+        },
+        {
+          "name": "A debt you owe",
+          "description": "The creditor doesn't remember anymore. You owe them — a sum, a service, a life — and they have stopped sending the polite reminders. They greet you now without recognition. Nobody else knows about it. You are alone with the knowledge of the debt, and the moral problem of what you are now obligated to do."
+        }
+      ]
+    },
+    {
+      "label": "The court",
+      "choices": [
+        {
+          "name": "A high feudal court with the king's daughter married to your enemy",
+          "description": "The realm is held together by an oath that everyone in the room understands and few discuss aloud. The princess's marriage is the spine of the peace. That oath is going first. The court is beginning to look at each other differently. The chancellor has not slept in three days and the household guards are quietly being doubled."
+        },
+        {
+          "name": "A merchant city of guild-contracts",
+          "description": "The city runs on signed contracts and apprentice-oaths, layered like sediment. The guilds are dissolving. The streets are renegotiating who owns what daily, and at the corner of two old guild-districts there have been shoving matches that did not happen a week ago. The clerks are quitting in shifts."
+        },
+        {
+          "name": "A nomad confederation held together by blood-oaths",
+          "description": "The confederation is a generation old and the binding was always thin. The camps are scattering. Old hatreds are returning — the ones the oath was sworn to bury — and the elders who sealed the original cuts are trying to call council and finding that fewer riders come each time."
+        },
+        {
+          "name": "A monastic order whose vows are physical bonds",
+          "description": "The monks are wandering out of their cells. The vow-marks on their hands are fading. The abbot does not remember why he became abbot. The library is unattended for the first time in a hundred years and the gates are open to anyone who walks up. The kitchens are running, just, because someone is still cooking and nobody knows who."
+        }
+      ]
+    }
   ]
 }

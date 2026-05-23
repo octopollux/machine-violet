@@ -7,5 +7,50 @@
     "modern",
     "horror",
     "mystery"
+  ],
+  "detail": "Six chairs in a circle, coffee in the back, a facilitator with a clipboard nobody has ever seen them write on. Everyone in the room survived something nobody else would believe. The rule is you share when you're ready. Tonight someone shares for the first time and the player's skin reacts before their mind does, because the words are right and the cadence is right and something underneath is wrong.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE HUNTER — One of the regulars is using the group as bait. Real survivors of certain things continue to attract what survived them; collect six survivors in one room and you have collected six lures. The hunter is not malicious about it. They have a list of names they intend to save. They will use the group's bodies to do it if they have to.\n2. THE SKINWALKER — A thing is wearing a survivor's skin and learning the language of trauma in order to wear yours next. It studies the room. It cries on cue, three weeks in. It is patient and it improves session by session. The genuine survivor it replaced is somewhere the player can find, if the player asks the right person.\n3. THE WRITER — A novelist is in over their head. They came for research and got it; now what they came researching has noticed them and the group is research for something else entirely. The writer's notebook is filling with details the writer is no longer dictating. The writer is the most frightened person in the room and is the one most committed to coming back.\n\nDM approach:\n- Tone: fluorescent buzz, bad coffee, the specific intimacy of strangers who have agreed not to know each other outside this room.\n- The facilitator: kind, professional, terrified that one of these stories is true. They do not know which.\n- The members: name each one by their share, not their job. The lawyer-who-lost-a-week. The mother-with-the-thing-in-the-walls.\n- Seed early: one member's share that contradicts itself by a tiny verifiable detail. The player notices; the others do not.\n- Pacing: one member's share per session. In six sessions someone will be missing, and the chair will still be in the circle.\n\nThe clock is the chair count. Six chairs at week one, six chairs at week two, six chairs at week six with five people in them. Track time by who has shared, who hasn't, and which member always sits where. When the new arrival picks the empty chair, that's a beat.",
+  "suboptions": [
+    {
+      "label": "Your encounter",
+      "choices": [
+        {
+          "name": "A haunting that followed you home",
+          "description": "You moved twice. It moved with you. It is small and it is patient and it took the previous tenant from your last apartment and you are not yet certain if it followed you because of who you are or because of what you took with you. You came to the group to find out which."
+        },
+        {
+          "name": "A cult you escaped that's still recruiting",
+          "description": "You got out. Others did not, and others have joined since. You see their leaflets sometimes. They have your face on one of them, captioned with a name that is not yours. You came to the group to learn what the right way is to warn the next person you see being approached."
+        },
+        {
+          "name": "A creature nobody else saw",
+          "description": "It was in the room. You are certain. There were three other people in the room and none of them remember anything but you, screaming. You have learned not to insist. The group is the one place you can describe it out loud and not be asked if you are sleeping enough."
+        },
+        {
+          "name": "Lost time you can't account for",
+          "description": "Eleven hours of a Tuesday. Your phone shows steps and a route. Your body shows nothing it should. Whatever you did is in you somewhere; you can taste it under your tongue. You came to the group hoping someone else lost the same Tuesday."
+        }
+      ]
+    },
+    {
+      "label": "The group's setting",
+      "choices": [
+        {
+          "name": "Church basement",
+          "description": "Free coffee in a steel urn. Fluorescent tubes, one of them humming. Metal folding chairs arranged in a ring that nobody has the authority to rearrange. A stack of pamphlets about other support groups that nobody reads. The pastor upstairs has been told it's a grief group and asks no further questions."
+        },
+        {
+          "name": "Hospital therapy wing",
+          "description": "Some members are court-ordered. There is an observation window onto the hallway and the blinds don't quite close. The clock above the door is the loudest thing in the room and you all check it once an hour without meaning to. The facilitator has a hospital lanyard and is paid by the hour."
+        },
+        {
+          "name": "Online video call",
+          "description": "Faces in boxes, three of them lit by their kitchens. One box is always frozen. Someone's microphone catches a sound from outside their room each week, the same sound, and they have never addressed it. The chat sidebar fills slowly with messages that vanish before anyone reads them."
+        },
+        {
+          "name": "A weekend retreat",
+          "description": "A converted lodge two hours into a national forest. Snow coming in by Friday night. No cell signal past the gate. The facilitator has the only car and the keys are in their cabin and the cabin is locked at night. The lodge sleeps twelve and there are six of you, and the empty rooms are not empty in the same way they were on Friday."
+        }
+      ]
+    }
   ]
 }

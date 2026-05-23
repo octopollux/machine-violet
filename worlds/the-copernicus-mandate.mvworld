@@ -6,5 +6,50 @@
   "genres": [
     "sci-fi",
     "comedy"
+  ],
+  "detail": "The letter arrived through a radio telescope in West Virginia at 3:47 a.m. on a Tuesday. It was addressed to humanity, generally. It used the word Whereas. It was signed by a partnership of three names humans cannot pronounce. The Earth has ninety days to respond. The Earth does not have a lawyer.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE VOYAGER PLAQUE — The figures etched on the Voyager probes infringe trademarked iconography belonging to an interstellar guild. The depicted figures are protected IP and the Voyagers are infringing copies leaving the system. Damages calculated since launch. The licensors are amenable to settlement and to a public apology.\n2. THE LICENSED MUSIC — Human radio has been leaking licensed music into the galaxy for over a century without rights. Royalties since Marconi, compounded. The rightsholders represent artists humanity has never met whose work humanity has been broadcasting since first electrification. The list of infringed works includes Happy Birthday.\n3. THE PATENT — The concept of heliocentrism is patented in this region of the galaxy. Humanity is approximately five hundred years overdue on its license fee. The patent holder is willing to discuss a payment plan. The patent does not expire for another nine thousand years.\n\nDM approach:\n- Tone: legal procedural with the camera occasionally panning up to the sky. Underplay the alienness. Lean into the paperwork.\n- NPCs derive from the variant: the curator who has to defend the plaque (1), the original radio broadcaster's heirs and the music industry (2), the team of historians trying to date the patent infringement (3).\n- Pacing: filings have deadlines in Earth weeks. Depositions happen by appointment. First in-person contact is in ninety days.\n- Seed early: one filing in legalese the UN is still translating. The discovery the aliens have been quietly observing Earth's contract law and respect it.\n\nPacing: Ninety days to first contact. The deadlines are in the inbox. The wall in the situation room has a calendar with red dates. Each scene is a filing, a deposition, or a press leak.",
+  "suboptions": [
+    {
+      "label": "Role",
+      "choices": [
+        {
+          "name": "UN counsel assigned the case",
+          "description": "The player has been pulled from a quiet career drafting fisheries treaties and dropped into a courtroom that does not yet exist. They have a small staff and no precedent. The Secretary-General calls personally for updates. The phone has a dedicated line in red, which the player learned about from a memo."
+        },
+        {
+          "name": "Astronomer who first received the letter",
+          "description": "The player was on shift when the signal came in. They followed the protocol they had practiced for years, which did not cover this. They have been quietly retained by every government on Earth as a witness. Their inbox is full and their badge no longer scans them into the canteen."
+        },
+        {
+          "name": "The infringer",
+          "description": "The player personally sent the broadcast that caused this. A college radio show in the seventies. A scientific transmission they signed off on. They have been identified by name in the filings. Their face is on the cover of three magazines. Their mother is asking them to come home."
+        },
+        {
+          "name": "Press secretary",
+          "description": "The player's job is to keep this out of the news for as long as possible. So far, this has been working — the leak hasn't crested. They are lying to journalists they used to drink with. They have a draft press release for the day it breaks, three versions, each shorter than the last."
+        }
+      ]
+    },
+    {
+      "label": "The alien firm",
+      "choices": [
+        {
+          "name": "Old, dignified, three partners",
+          "description": "A firm older than several human civilizations. Three name partners who have not changed in generations. A memo leaked through human intelligence suggests they are bluffing about jurisdiction over Earth. They are betting humanity will not call the bluff. The bluff is excellent."
+        },
+        {
+          "name": "Aggressive contingency-fee newcomers",
+          "description": "A young firm hungry for a precedent. They want a settlement that includes Earth's licensing rights — every patentable concept humanity will develop for the next millennium. They are charismatic in the deposition transcripts. They mention Earth's case in their own marketing."
+        },
+        {
+          "name": "A pro-bono outfit",
+          "description": "They represent an injured third party humanity has never heard of. The injured party has not been informed that they are injured. The firm is acting in what they consider the third party's best interest. The firm is funded by an endowment older than human language."
+        },
+        {
+          "name": "Solo practitioner",
+          "description": "One being. Vast and patient. No assistants. They have been working this case for what humans would call centuries. Every filing arrives in their own hand. They have never lost a case and they have never settled one. They are willing to meet."
+        }
+      ]
+    }
   ]
 }
