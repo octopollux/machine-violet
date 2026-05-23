@@ -337,10 +337,10 @@ A core UX element. The DM (or the engine) presents the player with structured op
 
 ```
 The passage forks ahead.
-▲  > ◆ Left — you hear running water
-▼    ◆ Right — a draft smells of smoke
+▲    ◆ Enter your own...
+▼  > ◆ Left — you hear running water
+     ◆ Right — a draft smells of smoke
      ◆ Listen carefully first
-     ◆ Enter your own...
 
                             ESC dismiss
 ```

@@ -125,6 +125,10 @@ export interface InlineTextInputProps {
   placeholder?: string;
   /** When true, text wraps to multiple lines instead of scrolling horizontally. Requires availableWidth. */
   wrap?: boolean;
+  /** Cap on visible wrap lines. When the text wraps past this many lines, the
+   *  rendered window scrolls vertically to keep the cursor line in view.
+   *  Only applies in wrap mode. */
+  maxLines?: number;
   onChange?: (value: string) => void;
   onSubmit?: (value: string) => void;
 }
@@ -134,7 +138,7 @@ export interface InlineTextInputProps {
  * Supports: left/right arrows, Home/End, Ctrl+A/E, backspace.
  * Clear by changing the React `key` prop.
  */
-export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled = false, defaultValue = "", availableWidth, placeholder, wrap, onChange, onSubmit }: InlineTextInputProps) {
+export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled = false, defaultValue = "", availableWidth, placeholder, wrap, maxLines, onChange, onSubmit }: InlineTextInputProps) {
   const initialState: State = {
     value: defaultValue,
     cursorOffset: defaultValue.length,
@@ -385,7 +389,20 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
     const cursorLine = Math.floor(cursorOffset / w);
     const cursorCol = cursorOffset % w;
 
-    return textLines.map((line, lineIdx) => {
+    // When the wrapped lines exceed maxLines, scroll the window vertically
+    // so the cursor line stays in view. Show the last maxLines lines that
+    // still include the cursor — typically a tail-anchored window.
+    let viewStartLine = 0;
+    let viewLines = textLines;
+    if (maxLines != null && maxLines > 0 && textLines.length > maxLines) {
+      // Keep cursorLine within [viewStartLine, viewStartLine + maxLines - 1].
+      viewStartLine = Math.max(0, cursorLine - maxLines + 1);
+      viewStartLine = Math.min(viewStartLine, textLines.length - maxLines);
+      viewLines = textLines.slice(viewStartLine, viewStartLine + maxLines);
+    }
+
+    return viewLines.map((line, idx) => {
+      const lineIdx = viewStartLine + idx;
       let styled: string;
       if (lineIdx === cursorLine) {
         if (cursorCol >= line.length) {
@@ -399,7 +416,7 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
       }
       return styled + " ".repeat(Math.max(0, w - line.length));
     });
-  }, [useWrap, isDisabled, renderState.value, renderState.cursorOffset, availableWidth, placeholder]);
+  }, [useWrap, isDisabled, renderState.value, renderState.cursorOffset, availableWidth, placeholder, maxLines]);
 
   if (wrappedLines) {
     return (
