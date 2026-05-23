@@ -1,0 +1,94 @@
+<!-- Mortuary Theme
+     Bone frame set. Broken-line borders with skeletal cross
+     separators — fragmented strokes, daggers, dust. For
+     museum-after-dark and grave-keeper campaigns.
+
+     Use for: Taxidermy, Graveyard Shift — quiet rooms full of
+     things that used to be alive.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: mortuary
+@genre_tags: horror, gothic, death, museum, occult
+@height: 2
+
+[colors]
+preset: ember
+harmony: analogous
+gradient: vignette
+border: 2
+corner: 4
+separator: 3
+title: 5
+turn_indicator: 5
+side_frame: 1
+
+[variant_combat]
+<!-- Reanimation: warm secondary, the dust stirs -->
+preset: ember
+harmony: analogous
+border: 105
+corner: 106
+gradient: vignette
+
+[variant_ooc]
+<!-- Cold storage: cool secondary, flat -->
+border: 202
+corner: 203
+gradient: none
+
+[corner_tl]
+╷╌
+┊
+
+[corner_tr]
+╌╷
+ ┊
+
+[corner_bl]
+┊
+╵╌
+
+[corner_br]
+ ┊
+╌╵
+
+[edge_top]
+╌╌
+··
+
+[edge_bottom]
+··
+╌╌
+
+[edge_left]
+┊
+┊
+
+[edge_right]
+┊
+┊
+
+[separator_left_top]
+╌†
+ ·
+
+[separator_right_top]
+†╌
+·
+
+[separator_left_bottom]
+ ·
+╌†
+
+[separator_right_bottom]
+·
+†╌
+
+[turn_separator]
+╌╌··── † ──··╌╌

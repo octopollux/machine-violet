@@ -1,0 +1,94 @@
+<!-- Wraithlight Theme
+     Bone frame set, recolored. Ethereal complementary with
+     hueShift — pale, cold, drifting colors. Subtle horror, the
+     kind where you're not sure what you saw.
+
+     Use for: The Replacement, Beneath the Skin — wrongness you
+     can't quite name.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: wraithlight
+@genre_tags: horror, paranormal, subtle_horror, uncanny, ghost
+@height: 2
+
+[colors]
+preset: ethereal
+harmony: complementary
+gradient: hueShift
+border: 3
+corner: 5
+separator: 4
+title: 6
+turn_indicator: 105
+side_frame: 1
+
+[variant_combat]
+<!-- Manifestation: lean to complementary anchor -->
+preset: ethereal
+harmony: complementary
+border: 104
+corner: 106
+gradient: vignette
+
+[variant_ooc]
+<!-- Settled: cool key arc, no shift -->
+border: 2
+corner: 3
+gradient: none
+
+[corner_tl]
+╷╌
+┊
+
+[corner_tr]
+╌╷
+ ┊
+
+[corner_bl]
+┊
+╵╌
+
+[corner_br]
+ ┊
+╌╵
+
+[edge_top]
+╌╌
+··
+
+[edge_bottom]
+··
+╌╌
+
+[edge_left]
+┊
+┊
+
+[edge_right]
+┊
+┊
+
+[separator_left_top]
+╌†
+ ·
+
+[separator_right_top]
+†╌
+·
+
+[separator_left_bottom]
+ ·
+╌†
+
+[separator_right_bottom]
+·
+†╌
+
+[turn_separator]
+··╌╌── ✟ ──╌╌··

@@ -1,0 +1,90 @@
+<!-- Bio Lab Theme
+     Circuit frame on living foliage. Same dashed PCB lines and bracket
+     separators as `neon_grid`, but the foliage preset roots them in
+     greenhouse chlorophyll, with split-complementary anchors pulling
+     into magenta-bloom and amber-rot directions. Shimmer keeps the
+     palette breathing, like a culture plate left under the warm lights.
+
+     Suited to: The Thaw, Good Soil, Decommissioned, splicer subcultures,
+     genelab incident reports, cryptids in petri dishes.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: bio_lab
+@genre_tags: sci_fi, biopunk, horror, lab, organic_tech
+
+@height: 1
+
+[colors]
+preset: foliage
+harmony: split-complementary
+gradient: shimmer
+border: 3
+corner: 5
+separator: 6
+title: 7
+turn_indicator: 5
+side_frame: 1
+
+[variant_combat]
+<!-- Containment breach: split-comp anchor 1 (magenta bloom) -->
+border: 105
+corner: 107
+separator: 106
+gradient: vignette
+
+[variant_ooc]
+<!-- Quiet lab: base anchor, no gradient -->
+border: 2
+corner: 4
+gradient: none
+
+[variant_levelup]
+<!-- Successful splice: anchor 2 warm bloom, shimmer -->
+border: 205
+corner: 207
+gradient: shimmer
+
+[corner_tl]
+┌
+
+[corner_tr]
+┐
+
+[corner_bl]
+└
+
+[corner_br]
+┘
+
+[edge_top]
+─┈
+
+[edge_bottom]
+┈─
+
+[edge_left]
+│
+
+[edge_right]
+│
+
+[separator_left_top]
+┤
+
+[separator_right_top]
+├
+
+[separator_left_bottom]
+┤
+
+[separator_right_bottom]
+├
+
+[turn_separator]
+┈─┤ ❀ ├─┈

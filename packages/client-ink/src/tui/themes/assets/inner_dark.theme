@@ -1,0 +1,94 @@
+<!-- Inner Dark Theme
+     Bone frame set, recolored. Cyberpunk complementary with
+     deep vignette — psychological horror, claustrophobia, the
+     room you can't leave because the room is your head.
+
+     Use for: The Tenant, Floor 14, Deep Tenancy — apartment
+     hauntings of the self.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: inner_dark
+@genre_tags: horror, psychological, urban, claustrophobic, modern
+@height: 2
+
+[colors]
+preset: cyberpunk
+harmony: complementary
+gradient: vignette
+border: 2
+corner: 5
+separator: 4
+title: 7
+turn_indicator: 6
+side_frame: 1
+
+[variant_combat]
+<!-- Break: complementary anchor explodes -->
+preset: cyberpunk
+harmony: complementary
+border: 105
+corner: 108
+gradient: hueShift
+
+[variant_ooc]
+<!-- Sedation: low chroma, flat -->
+border: 2
+corner: 3
+gradient: none
+
+[corner_tl]
+╷╌
+┊
+
+[corner_tr]
+╌╷
+ ┊
+
+[corner_bl]
+┊
+╵╌
+
+[corner_br]
+ ┊
+╌╵
+
+[edge_top]
+╌╌
+··
+
+[edge_bottom]
+··
+╌╌
+
+[edge_left]
+┊
+┊
+
+[edge_right]
+┊
+┊
+
+[separator_left_top]
+╌†
+ ·
+
+[separator_right_top]
+†╌
+·
+
+[separator_left_bottom]
+ ·
+╌†
+
+[separator_right_bottom]
+·
+†╌
+
+[turn_separator]
+··╌╌── ╳ ──╌╌··

@@ -1,0 +1,83 @@
+<!-- Wet Pavement Theme
+     Noir frame set, cyberpunk-recolored. The thin line and bead glyphs
+     stay, but cyberpunk/split-complementary/hueShift drags the palette
+     through magentas, sodium-vapor yellows, and rain-slick teals — the
+     reflection of a neon sign in a puddle on the wrong side of town.
+
+     Suited to: Route 0, Exit Wounds — long highway nights, somebody
+     bleeding in the passenger seat, the radio losing signal, the city
+     glowing on the horizon for hours before you reach it.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: wet_pavement
+@genre_tags: noir, cyberpunk, horror, urban, thriller
+@height: 1
+
+[colors]
+preset: cyberpunk
+harmony: split-complementary
+gradient: hueShift
+border: 3
+corner: 5
+separator: 4
+title: 7
+turn_indicator: 6
+side_frame: 1
+
+[variant_combat]
+<!-- Tail lights vanishing — push to anchor 1 hard -->
+border: 105
+corner: 107
+separator: 106
+gradient: vignette
+
+[variant_ooc]
+<!-- Idling at the stoplight: pull to anchor 2, settle -->
+border: 202
+corner: 204
+gradient: shimmer
+
+[corner_tl]
+╭┄
+
+[corner_tr]
+┄╮
+
+[corner_bl]
+╰┄
+
+[corner_br]
+┄╯
+
+[edge_top]
+┄┈
+
+[edge_bottom]
+┈┄
+
+[edge_left]
+│
+
+[edge_right]
+│
+
+[separator_left_top]
+┄◦
+
+[separator_right_top]
+◦┄
+
+[separator_left_bottom]
+┄◦
+
+[separator_right_bottom]
+◦┄
+
+[turn_separator]
+┄┈┄── ◉ ──┄┈┄

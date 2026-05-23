@@ -3,6 +3,9 @@ import { Text } from "ink";
 import type { FormattingNode, FrameStyleVariant } from "@machine-violet/shared/types/tui.js";
 import { toPlainText, parseFormatting } from "../formatting.js";
 import { renderNodes } from "../render-nodes.js";
+import { stringWidth, truncateToWidth } from "./string-width.js";
+
+export { stringWidth, truncateToWidth };
 
 /** ASCII fallback for terminals that can't render Unicode box-drawing */
 const ASCII_VARIANT: FrameStyleVariant = {
@@ -198,25 +201,6 @@ export function renderVerticalFrame(
   }
   // Width 2: border char + padding space (inside edge)
   return side === "left" ? `${v.vertical} ` : ` ${v.vertical}`;
-}
-
-/**
- * Approximate string width (handles most common cases).
- * Does not handle full Unicode width detection — just counts characters.
- */
-export function stringWidth(str: string): number {
-  // Strip ANSI escape codes
-  // eslint-disable-next-line no-control-regex
-  return str.replace(/\x1b\[[0-9;]*m/g, "").length;
-}
-
-/**
- * Truncate a string to a maximum display width.
- */
-export function truncateToWidth(str: string, maxWidth: number): string {
-  if (stringWidth(str) <= maxWidth) return str;
-  if (maxWidth <= 1) return str.slice(0, maxWidth);
-  return str.slice(0, maxWidth - 1) + "…";
 }
 
 /**

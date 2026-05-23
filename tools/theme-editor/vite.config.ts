@@ -12,6 +12,13 @@ export default defineConfig({
       "@engine-src": resolve(__dirname, "../../packages/client-ink/src"),
     },
   },
+  // ink and yoga-layout (transitively pulled via @engine-src/tui/frames) use
+  // top-level await, which only es2022+ supports. Both the dev pre-bundler
+  // and the production build need the bumped target.
+  optimizeDeps: {
+    esbuildOptions: { target: "es2022" },
+  },
+  build: { target: "es2022" },
   server: {
     port: 5198,
     proxy: {

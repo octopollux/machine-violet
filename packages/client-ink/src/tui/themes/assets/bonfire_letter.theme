@@ -1,0 +1,94 @@
+<!-- Bonfire Letter Theme
+     Paper frame set. Torn loose-leaf edge with ragged corners, dashed
+     runs, and small ink-blot accents — letters spread on a kitchen
+     table by lamplight, a confession written then almost burned.
+     Ember/analogous/shimmer warms the page like firelight through
+     yellowed pulp.
+
+     Suited to: Heirloom, The Debt — wills and ledgers, hand-written
+     accusations, family secrets sealed in wax and opened too late.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: bonfire_letter
+@genre_tags: mystery, drama, family, period, melodrama
+@height: 2
+
+[colors]
+preset: ember
+harmony: analogous
+gradient: shimmer
+border: 3
+corner: 5
+separator: 4
+title: 6
+turn_indicator: 6
+side_frame: 1
+
+[variant_combat]
+<!-- The reveal — paper goes orange, ink darker -->
+border: 6
+corner: 7
+gradient: vignette
+
+[variant_ooc]
+<!-- Reading aloud, lamp low, palette quieted -->
+border: 102
+corner: 103
+gradient: none
+
+[corner_tl]
+╱┄
+│
+
+[corner_tr]
+┄╲
+ │
+
+[corner_bl]
+│
+╲┄
+
+[corner_br]
+ │
+┄╱
+
+[edge_top]
+┄·
+··
+
+[edge_bottom]
+··
+┄·
+
+[edge_left]
+│
+│
+
+[edge_right]
+│
+│
+
+[separator_left_top]
+┄*
+ ·
+
+[separator_right_top]
+*┄
+·
+
+[separator_left_bottom]
+ ·
+┄*
+
+[separator_right_bottom]
+·
+*┄
+
+[turn_separator]
+╱┄·── ✦ ──·┄╲

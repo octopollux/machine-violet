@@ -1,0 +1,95 @@
+<!-- Congregation Theme
+     Tendrils frame set, recolored with cyberpunk palette. Organic
+     curls in saturated neon — the cult's flowers are alive in a
+     way they shouldn't be. Horror crossed with the wrong kind of
+     ecstasy.
+
+     Use for: Congregation, The Docent, Apocrypha — communion
+     with something that should have stayed buried.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: congregation
+@genre_tags: horror, cult, occult, ritual, body_horror
+@height: 2
+
+[colors]
+preset: cyberpunk
+harmony: split-complementary
+gradient: vignette
+border: 3
+corner: 5
+separator: 4
+title: 7
+turn_indicator: 106
+side_frame: 1
+
+[variant_combat]
+<!-- Rapture: lean to one split-complementary anchor with hueShift -->
+preset: cyberpunk
+harmony: split-complementary
+border: 106
+corner: 108
+gradient: hueShift
+
+[variant_ooc]
+<!-- Apostasy: cool secondary, flat -->
+border: 203
+corner: 204
+gradient: none
+
+[corner_tl]
+╭~
+│
+
+[corner_tr]
+~╮
+ │
+
+[corner_bl]
+│
+╰~
+
+[corner_br]
+ │
+~╯
+
+[edge_top]
+~╌
+ ❀
+
+[edge_bottom]
+ ❀
+~╌
+
+[edge_left]
+│
+│
+
+[edge_right]
+│
+│
+
+[separator_left_top]
+~❦
+ ·
+
+[separator_right_top]
+❦~
+·
+
+[separator_left_bottom]
+ ·
+~❦
+
+[separator_right_bottom]
+·
+❦~
+
+[turn_separator]
+~~╌╌── ✺ ──╌╌~~

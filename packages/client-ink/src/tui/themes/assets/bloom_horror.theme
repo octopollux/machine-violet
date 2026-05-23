@@ -1,0 +1,94 @@
+<!-- Bloom Horror Theme
+     Tendrils frame set, recolored. Beautiful-apocalypse palette: ember
+     hot in the petals, sickly secondaries in the curl. For campaigns
+     where something is blooming that shouldn't be.
+
+     Use for: The Bloom, Red Tide — the world is in flower, and the
+     flowers are wrong.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: bloom_horror
+@genre_tags: horror, body_horror, apocalypse, fantasy, bloom
+@height: 2
+
+[colors]
+preset: ember
+harmony: split-complementary
+gradient: vignette
+border: 3
+corner: 5
+separator: 4
+title: 6
+turn_indicator: 6
+side_frame: 1
+
+[variant_combat]
+<!-- Outbreak: lean into the split-complementary teal -->
+preset: ember
+harmony: split-complementary
+border: 104
+corner: 106
+gradient: hueShift
+
+[variant_ooc]
+<!-- Dormant spores: cool and quiet -->
+border: 202
+corner: 203
+gradient: none
+
+[corner_tl]
+╭~
+│
+
+[corner_tr]
+~╮
+ │
+
+[corner_bl]
+│
+╰~
+
+[corner_br]
+ │
+~╯
+
+[edge_top]
+~╌
+ ❀
+
+[edge_bottom]
+ ❀
+~╌
+
+[edge_left]
+│
+│
+
+[edge_right]
+│
+│
+
+[separator_left_top]
+~❦
+ ·
+
+[separator_right_top]
+❦~
+·
+
+[separator_left_bottom]
+ ·
+~❦
+
+[separator_right_bottom]
+·
+❦~
+
+[turn_separator]
+~~╌╌── ✾ ──╌╌~~

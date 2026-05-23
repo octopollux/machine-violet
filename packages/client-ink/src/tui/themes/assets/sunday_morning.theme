@@ -1,0 +1,101 @@
+<!-- Sunday Morning Theme
+     Woven frame set, sky-light recolored. The diamond weave under
+     ethereal/triadic/shimmer reads pale and bright — robin's-egg blue,
+     daffodil yellow, blush — the kitchen at 9am with the radio low,
+     no agenda but coffee and the crossword.
+
+     Suited to: Middle Management of Doom, The Bake-Off, Library Card —
+     stories where the stakes are mid and the texture is everything:
+     office politics, hobby rivalries, a library overdue notice that
+     spirals into ontological crisis.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: sunday_morning
+@genre_tags: cozy, comedy, slice_of_life, mundane, office
+@height: 2
+
+[colors]
+preset: ethereal
+harmony: triadic
+gradient: shimmer
+border: 3
+corner: 5
+separator: 4
+title: 6
+turn_indicator: 5
+side_frame: 1
+
+[variant_combat]
+<!-- The status meeting — push to anchor 1 -->
+border: 104
+corner: 106
+gradient: hueShift
+
+[variant_ooc]
+<!-- Note-from-the-author: anchor 2 -->
+border: 202
+corner: 203
+gradient: shimmer
+
+[variant_levelup]
+<!-- Promotion / reorg / new title -->
+border: 6
+corner: 7
+gradient: shimmer
+
+[corner_tl]
+╭◇
+│
+
+[corner_tr]
+◇╮
+ │
+
+[corner_bl]
+│
+╰◇
+
+[corner_br]
+ │
+◇╯
+
+[edge_top]
+◇◈
+··
+
+[edge_bottom]
+··
+◇◈
+
+[edge_left]
+│
+│
+
+[edge_right]
+│
+│
+
+[separator_left_top]
+─╋
+ ·
+
+[separator_right_top]
+╋─
+·
+
+[separator_left_bottom]
+ ·
+─╋
+
+[separator_right_bottom]
+·
+╋─
+
+[turn_separator]
+◇◈◇── ✺ ──◇◈◇

@@ -1,0 +1,102 @@
+<!-- Nebula Theme
+     Starlight frame in soft triad. Same sparse slash-corners and dotted
+     stellar drift as `void`, but recolored: the ethereal preset spreads
+     pastel violets, mints, and rose-tints across three triadic anchors,
+     with shimmer keeping the colors slowly breathing. The view is no
+     longer a cold cabin window — it's a wondrous unknown.
+
+     Suited to: The Interstitial, The Cartographer's Error, exploratory
+     surveys, encounters with phenomena nobody has named yet.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: nebula
+@genre_tags: sci_fi, exploration, mystery, wonder, space
+
+@height: 2
+
+[colors]
+preset: ethereal
+harmony: triadic
+gradient: shimmer
+border: 3
+corner: 5
+separator: 4
+title: 6
+turn_indicator: 5
+side_frame: 1
+
+[variant_combat]
+<!-- Phenomenon turns hostile: triadic anchor 1 (sharper) -->
+border: 105
+corner: 107
+separator: 106
+gradient: vignette
+
+[variant_ooc]
+<!-- Tone down to base anchor, no gradient -->
+border: 2
+corner: 3
+gradient: none
+
+[variant_levelup]
+<!-- Revelation: anchor 2 (third triadic), brighter -->
+border: 205
+corner: 207
+gradient: shimmer
+
+[corner_tl]
+╲·
+ ⋅
+
+[corner_tr]
+·╱
+⋅
+
+[corner_bl]
+ ⋅
+╱·
+
+[corner_br]
+⋅
+·╲
+
+[edge_top]
+·⋅
+⋅·
+
+[edge_bottom]
+⋅·
+·⋅
+
+[edge_left]
+╎
+⋅
+
+[edge_right]
+╎
+⋅
+
+[separator_left_top]
+·✧
+ ⋅
+
+[separator_right_top]
+✧·
+⋅
+
+[separator_left_bottom]
+ ⋅
+·✧
+
+[separator_right_bottom]
+⋅
+✧·
+
+[turn_separator]
+⋅ · ✧ · ✦ · ✧ · ⋅

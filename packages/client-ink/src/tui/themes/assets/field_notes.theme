@@ -1,0 +1,94 @@
+<!-- Field Notes Theme
+     Paper frame set, greened. Same torn page with margin-doodle asterisks,
+     but foliage/analogous/shimmer dyes the palette through moss, ink,
+     and damp lichen — a naturalist's journal carried in an oilcloth
+     pocket, smudged with rain and pressed leaves.
+
+     Suited to: Inkblot, Night Mail, Mise en Place — quiet observation,
+     small towns, recipes and route-numbers, the comfort of writing things
+     down as if they could be sorted by description alone.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: field_notes
+@genre_tags: cozy, slice_of_life, mystery, naturalist, journal
+@height: 2
+
+[colors]
+preset: foliage
+harmony: analogous
+gradient: shimmer
+border: 3
+corner: 5
+separator: 4
+title: 6
+turn_indicator: 6
+side_frame: 1
+
+[variant_combat]
+<!-- Storm on the trail — darker, vignette closer -->
+border: 5
+corner: 6
+gradient: vignette
+
+[variant_ooc]
+<!-- Around the kitchen table — soften to anchor 1 -->
+border: 102
+corner: 103
+gradient: none
+
+[corner_tl]
+╱┄
+│
+
+[corner_tr]
+┄╲
+ │
+
+[corner_bl]
+│
+╲┄
+
+[corner_br]
+ │
+┄╱
+
+[edge_top]
+┄·
+··
+
+[edge_bottom]
+··
+┄·
+
+[edge_left]
+│
+│
+
+[edge_right]
+│
+│
+
+[separator_left_top]
+┄*
+ ·
+
+[separator_right_top]
+*┄
+·
+
+[separator_left_bottom]
+ ·
+┄*
+
+[separator_right_bottom]
+·
+*┄
+
+[turn_separator]
+··┄── ✿ ──┄··

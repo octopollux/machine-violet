@@ -1,0 +1,83 @@
+<!-- Cold Open Theme
+     Noir frame set, recolored. Same minimal cinematic line, but pulled
+     toward bluish moonlight and pre-dawn fog instead of bar-sign amber.
+     Ethereal/analogous/vignette gives a quiet, dimmed palette — the
+     first sixty seconds of a thriller before the title card hits.
+
+     Suited to: Cold Open, The Hound and the Fox — espionage, dead-drops,
+     a body before the first commercial break, a chase you join already
+     in progress.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: cold_open
+@genre_tags: noir, espionage, thriller, mystery, modern
+@height: 1
+
+[colors]
+preset: ethereal
+harmony: analogous
+gradient: vignette
+border: 2
+corner: 4
+separator: 3
+title: 6
+turn_indicator: 5
+side_frame: 1
+
+[variant_combat]
+<!-- The chase — sharper, brighter, eyes wide -->
+border: 5
+corner: 6
+separator: 5
+gradient: hueShift
+
+[variant_ooc]
+<!-- Debrief: shift to the warmer analogous anchor -->
+border: 102
+corner: 103
+gradient: none
+
+[corner_tl]
+╭┄
+
+[corner_tr]
+┄╮
+
+[corner_bl]
+╰┄
+
+[corner_br]
+┄╯
+
+[edge_top]
+┄┈
+
+[edge_bottom]
+┈┄
+
+[edge_left]
+│
+
+[edge_right]
+│
+
+[separator_left_top]
+┄◦
+
+[separator_right_top]
+◦┄
+
+[separator_left_bottom]
+┄◦
+
+[separator_right_bottom]
+◦┄
+
+[turn_separator]
+┈┄┈── ◯ ──┈┄┈

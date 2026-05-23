@@ -4,7 +4,7 @@
  */
 
 import type { ThemeAsset, ThemeComponent, PlayerPaneFrame } from "./types.js";
-import { stringWidth, truncateToWidth } from "../frames/index.js";
+import { stringWidth, truncateToWidth } from "../frames/string-width.js";
 
 /** A composed frame: an array of string rows ready for rendering. */
 export interface ComposedFrame {

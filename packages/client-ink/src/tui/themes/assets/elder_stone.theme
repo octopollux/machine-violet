@@ -1,0 +1,94 @@
+<!-- Elder Stone Theme
+     Rune frame set, recolored. Ethereal split-complementary with
+     shimmer — pale moon on grey monoliths. Slow, ancient, the
+     mountain has been here longer than language.
+
+     Use for: Teeth of the World, The Second Labyrinth — vast
+     places where time runs sideways.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: elder_stone
+@genre_tags: fantasy, mythic, ancient, dungeon, cosmic
+@height: 2
+
+[colors]
+preset: ethereal
+harmony: split-complementary
+gradient: shimmer
+border: 3
+corner: 5
+separator: 4
+title: 6
+turn_indicator: 5
+side_frame: 1
+
+[variant_combat]
+<!-- Awakening: warm hueShift, the stone notices you -->
+preset: ember
+harmony: split-complementary
+border: 4
+corner: 6
+gradient: hueShift
+
+[variant_ooc]
+<!-- Stillness: secondary anchor, flat -->
+border: 202
+corner: 203
+gradient: none
+
+[corner_tl]
+◤━
+┃
+
+[corner_tr]
+━◥
+ ┃
+
+[corner_bl]
+┃
+◣━
+
+[corner_br]
+ ┃
+━◢
+
+[edge_top]
+━━
+··
+
+[edge_bottom]
+··
+━━
+
+[edge_left]
+┃
+┃
+
+[edge_right]
+┃
+┃
+
+[separator_left_top]
+━╋
+ ┃
+
+[separator_right_top]
+╋━
+┃
+
+[separator_left_bottom]
+ ┃
+━╋
+
+[separator_right_bottom]
+┃
+╋━
+
+[turn_separator]
+━━┳━── ✶ ──━┳━━
