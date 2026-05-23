@@ -1342,3 +1342,39 @@ describe("multi-line formatting across spacers", () => {
     expect(lastPlain).not.toContain("</center>");
   });
 });
+
+describe("wikilink tag", () => {
+  it("parses <wikilink slug=foo>Foo</wikilink> into a wikilink AST node", () => {
+    const result = parseFormatting("<wikilink slug=aldric-mossback>Aldric Mossback</wikilink>");
+    expect(result).toHaveLength(1);
+    const tag = result[0] as FormattingTag;
+    expect(tag.type).toBe("wikilink");
+    expect((tag as Extract<FormattingTag, { type: "wikilink" }>).target).toBe("aldric-mossback");
+    expect(tag.content).toEqual(["Aldric Mossback"]);
+  });
+
+  it("preserves target through nested coloring", () => {
+    const result = parseFormatting(
+      "<wikilink slug=foo><color=#ff0000>Foo</color></wikilink>",
+    );
+    const tag = result[0] as Extract<FormattingTag, { type: "wikilink" }>;
+    expect(tag.type).toBe("wikilink");
+    expect(tag.target).toBe("foo");
+    const inner = tag.content[0] as FormattingTag;
+    expect(inner.type).toBe("color");
+  });
+
+  it("toPlainText strips wikilink wrapping but keeps display text", () => {
+    expect(stripFormatting("see <wikilink slug=foo>Foo</wikilink> nearby")).toBe(
+      "see Foo nearby",
+    );
+  });
+
+  it("rejects malformed wikilink (no slug attribute)", () => {
+    // Unparseable open tag — `<wikilink>` without slug=. The `<` is emitted
+    // as literal text and the remainder is treated as plain text.
+    const result = parseFormatting("<wikilink>Foo</wikilink>");
+    expect(stripFormatting("<wikilink>Foo</wikilink>")).toBe("<wikilink>Foo</wikilink>");
+    expect(result.length).toBeGreaterThan(0);
+  });
+});

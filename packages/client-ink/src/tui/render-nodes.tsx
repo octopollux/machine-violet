@@ -31,6 +31,9 @@ function renderTag(tag: FormattingTag): React.ReactNode {
       return <Text underline>{children}</Text>;
     case "color":
       return <Text color={tag.color}>{children}</Text>;
+    case "wikilink":
+      // Render-only tag; future navigation will read `tag.target` from the AST.
+      return <Text>{children}</Text>;
     case "center":
     case "right":
       // Alignment is handled at the NarrativeLine level when this is a

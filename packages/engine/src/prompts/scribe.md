@@ -127,6 +127,22 @@ Use `write_entity` with `mode: "create"` for new entities, `mode: "update"` for 
 
 When updating body content, send the **complete replacement** for each `## Section` you are changing. Sections with matching `## ` headings are replaced in-place; genuinely new sections are appended. You do not need to resend sections you aren't changing.
 
+### Inline formatting (optional)
+Entity bodies render through the same formatter the DM uses, so the following HTML-subset tags work inside `body` text:
+- `<b>bold</b>`, `<i>italic</i>`, `<u>underline</u>`
+- `<sub>2</sub>`, `<sup>2</sup>`
+- `<color=#rrggbb>tinted</color>` — any hex color
+
+Use these sparingly when prose benefits from emphasis (a relic's name in italics, a whispered alias). You are not required to add them.
+
+**Do NOT manually wrap things the renderer already colors automatically:**
+- `## Section` headings — colorized in the theme's accent hue
+- `**Key:** Value` front-matter lines — the key is tinted automatically
+- `[[Wikilinks]]` — colored in the entity's hue (from front-matter `color`)
+- Bare hex strings like `#cc4444` in front-matter values — auto-wrapped
+
+Adding manual coloring on top of these creates visual noise and may double-up tags. The auto-rules are the floor; your tags are for genuine in-character flavor on top.
+
 ## Response
 After processing all updates, respond with a terse summary of what you did. One line per entity touched. Example:
 ```
