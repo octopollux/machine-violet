@@ -383,10 +383,14 @@ export function createSetupConversation(
       if (world?.detail) campaignDetail = world.detail;
     }
 
+    // The setup prompt + tool description document `few-sessions` as the
+    // default when the player declines to choose. Apply that default here
+    // too so the stored config matches the documented behavior even if the
+    // model omits the field or emits an unknown value.
     const rawScope = typeof input.campaign_scope === "string" ? input.campaign_scope.trim() : "";
-    const campaignScope: CampaignScope | undefined = (CAMPAIGN_SCOPES as readonly string[]).includes(rawScope)
+    const campaignScope: CampaignScope = (CAMPAIGN_SCOPES as readonly string[]).includes(rawScope)
       ? (rawScope as CampaignScope)
-      : undefined;
+      : "few-sessions";
 
     finalized = {
       genre: (input.genre as string) || "Classic fantasy",

@@ -104,7 +104,10 @@ export function CampaignSettingsModal({
   if (config.genre) lines.push(`  Genre:      ${config.genre}`);
   if (config.mood) lines.push(`  Mood:       ${config.mood}`);
   if (config.difficulty) lines.push(`  Difficulty: ${config.difficulty}`);
-  if (config.campaign_scope) lines.push(`  Scope:      ${CAMPAIGN_SCOPE_LABELS[config.campaign_scope]}`);
+  if (config.campaign_scope) {
+    const scopeLabel = CAMPAIGN_SCOPE_LABELS[config.campaign_scope];
+    if (scopeLabel) lines.push(`  Scope:      ${scopeLabel}`);
+  }
   lines.push("");
   lines.push("  Choices Frequency");
   lines.push("    How often the DM offers you a set of suggested responses.");
