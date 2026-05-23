@@ -5,5 +5,50 @@
   "summary": "The dragons aren't monsters. They're livestock. And something is picking off the herd.",
   "genres": [
     "fantasy"
+  ],
+  "detail": "Dragons are domesticated. They have been for centuries. They are bred, bonded, milked for venom, sheared for scale, and named at hatching. The shepherds know each one by the sound it makes settling. Lately, the herd has been thinning. One missing the first week. Two the second. Nobody has found a body. The bonded dragons that remain are jumpy in a way that suggests they know what the shepherds don't.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. HUMAN HUNTERS — A new generation of would-be heroes from across the border, raised on stories that ended a century ago, doesn't know dragons are domesticated. They are hunting them, badly, for glory, and bringing the heads home to towns where this is still a deed. Each kill is a tragedy three different villages will mourn in three different ways. The hunters think they are saving people.\n2. CULLING — The dragons themselves are sick, and the missing ones are being culled by older dragons to stop the spread. The herd's senior wyrms have a quiet system for this — they take the sick one out and never come back together. The shepherds were never supposed to know. The dragons are managing a plague their human keepers don't know exists, and they have decided humans cannot help.\n3. THE CALL — The dragons are leaving voluntarily. Something is calling them. The senior wyrms hear it first; they go at night. The bonded ones resist longer but only just. The shepherds are about to lose their whole industry, their whole way of life, and they don't yet know that what's happening to them is not a predator but a homecoming.\n\nDM approach:\n- Tone: pastoral, professional, intimate with large animals. The dragons are not symbols. They have names and personalities and you keep them.\n- NPCs by variant: a young border-hunter who genuinely thinks he is a hero, returning with a head wrapped in cloth (1); the eldest shepherd, who suspects what the dragons are doing and is grieving in advance (2); a wyrm who has stopped eating and stands looking east at dusk (3).\n- Seed early: the bonded dragons go quiet at sunset; one dragon's name comes off the roster and the shepherd who wrote it weeps; a hatchling refuses food.\n- Pacing structure: each week, one more missing. The herd's economy gives the player a visible budget. Three months until the village folds.\n- The horror of this setting is competence violated. These people are very good at what they do, and the thing happening is outside their competence.\n\nPacing: One missing dragon per week becomes two, then three. The herd's economy fails in three months. The player can track it on the roster pinned to the shepherds' barn door — names crossed out, fresh ink at the bottom in the foreman's handwriting.",
+  "suboptions": [
+    {
+      "label": "Role in the herd",
+      "choices": [
+        {
+          "name": "Junior shepherd, just earned your first bonded dragon",
+          "description": "You were apprenticed for years and last month you were given a name and a beast to learn it on. You sleep in the same loft and you wake when she does. You are the newest member of the only profession you have ever wanted, and the older shepherds are watching you for signs you can handle bad news."
+        },
+        {
+          "name": "Old hand, you remember when the herd was twice this size",
+          "description": "Forty years of this work. Your hands are the shape of a halter. You remember the great clutch, the year the foreman lost his arm, the winter four dragons died in a single storm. The current losses are not, to you, unprecedented. They are reminiscent — of something you have not yet let yourself name."
+        },
+        {
+          "name": "Foreign buyer's agent, came for scales, stayed for love",
+          "description": "You arrived two seasons ago with a commission to buy and you have not gone home. You write your superiors increasingly evasive letters. The shepherds tolerate you because you are useful and because the foreman's daughter has been seen walking with you. You are the only outsider close enough to see the pattern."
+        },
+        {
+          "name": "Defector — you used to hunt them, the shepherds took you in",
+          "description": "You came from one of the border villages that still thinks dragons are vermin. You were good at it before you knew better. The shepherds know your history. They have given you a chance to be useful and you have taken it seriously. If the hunters are real, you will recognize their methods."
+        }
+      ]
+    },
+    {
+      "label": "Where the herd grazes",
+      "choices": [
+        {
+          "name": "High alpine pasture",
+          "description": "Cold thin air and a sky so clear at noon you can see the curve of the horizon. The dragons sun themselves on the south-facing rock faces, flat as cats, and the shepherds count them from below with brass spyglasses. In summer the lightning storms come in fast off the ridge and the bonded ones come down to the byres to wait it out."
+        },
+        {
+          "name": "Volcanic lowlands",
+          "description": "The ground is warm under your boots and the wind smells of sulfur most days. The dragons nest in the rims of dead calderas, and the village is half-buried in old ash that nobody bothers to dig out anymore. Eggs are kept in the bakery's banked coals. Funerals are quick because the ground is easy."
+        },
+        {
+          "name": "Coastal cliffs",
+          "description": "The dragons here fish. They fold their wings and drop, and come up trailing salt water, and the shepherds row out to the breeding rocks in flat-bottomed boats every spring. The scales taste of brine. The bonded ones smell like the sea even indoors. In storm season everyone helps lash the byres."
+        },
+        {
+          "name": "Deep forest clearings",
+          "description": "These dragons are smaller, smoke-and-shadow, no bigger than a deer at full growth. The canopy is burned in clean rings where they sun themselves on the moss. The shepherds know the clearings by memory and travel between them on paths only the bonded ones can find. The trees have grown used to the scorching."
+        }
+      ]
+    }
   ]
 }

@@ -5,5 +5,50 @@
   "summary": "The generation ship's destination was reached 40 years ago. Nobody told steerage.",
   "genres": [
     "sci-fi"
+  ],
+  "detail": "The ship is huge and old and the player has lived in its lower decks their entire life. There is school, there is work, there is a hydroponics rotation, there is a calendar of festivals. There is a future they are told about. The destination is a planet that they will arrive at, and their children will arrive at, and their grandchildren will inherit. This is the story. The story is at least forty years out of date.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. UNINHABITABLE — The destination was reached and the destination was wrong. Atmosphere failed analysis. Surface conditions unsurvivable. The upper decks have been negotiating among themselves for decades about who admits this to whom, and they have not reached consensus. The player's discovery is the kind of thing that decides the negotiation.\n2. THE COLONY EXISTS — The upper decks disembarked. A colony is on the surface. Steerage is the labor reservoir from which the colony draws — new workers shipped down on a schedule, return shipments of finished goods. The ship is a factory dorm in orbit. The hierarchy is generational, biological, and very old.\n3. THERE IS NO DESTINATION — There never was. The ship has been in cruise for centuries with no target. The mission was a fiction designed to keep generations productive. The truth has now leaked, partially, through channels someone tried to plug and failed. The player is one of the people who is starting to put it together.\n\nDM approach:\n- Tone: industrial fluorescent, the rhythm of a working community, the specific suspicions of a place where everyone knows their neighbors and nobody knows their grandparents' real biographies.\n- NPCs to seed: a foreman who knows something but won't say; a school friend who has gotten access to upper-deck systems; an elder who keeps a private logbook of inconsistencies.\n- Pacing structure: reaching upper decks should take Act 1. Each deck transition costs something specific — a key, a bribe, a forgery, a death. The deeper the player goes, the harder it is to come back to a normal shift.\n- Seed early: a discrepancy the player notices in their own work (a harvest yield, a passenger count, a maintenance log); a sealed bulkhead the player has walked past their whole life.\n- The ship's geography should be precise. Decks named. The smells different on each level. The lights wrong above a certain threshold.\n\nPacing: Reaching upper decks should take Act 1; each deck transition costs something specific. The player can track time by their work shifts, by the lights-on schedule, by the calendar of festivals that mark a destination that may or may not exist.",
+  "suboptions": [
+    {
+      "label": "Your role in steerage",
+      "choices": [
+        {
+          "name": "Hydroponics worker",
+          "description": "You have noticed that the harvest doesn't match the population. The yields are higher than the meals served and the difference goes somewhere you don't have access to. You have been doing the math quietly for two years. You have not yet shown the math to anyone. The math is the kind of thing that, if shown, would change the answer to other questions you have been afraid to ask."
+        },
+        {
+          "name": "Deck-runner with smuggling routes",
+          "description": "You move small things between decks for small payments. You know which conduits are unmonitored and which inspectors look the other way. The smuggling has been ordinary for a long time. Lately you have been asked to carry items that don't fit the usual pattern — sealed packages, written notes, a child once. You have learned not to ask, but you have started to wonder."
+        },
+        {
+          "name": "Schoolteacher",
+          "description": "You teach the official history. You have taught it for a decade and you can recite the dates and the names of the founders without notes. You have started to doubt specific dates. The doubts come from cross-referencing the official text against minor primary sources — a logbook in the library, a photograph that doesn't match its caption. You have not yet changed the lesson."
+        },
+        {
+          "name": "Recent orphan",
+          "description": "Your parent died last month. Their personal terminal is in your quarters and it is locked. You have their thumbprint on a glass and you have not yet tried it. You suspect that you do not want to know what is on the terminal, and you suspect that you will try the thumbprint anyway, and you suspect that this campaign begins on the day you do."
+        }
+      ]
+    },
+    {
+      "label": "The ship's state",
+      "choices": [
+        {
+          "name": "Engines dismantled, static city",
+          "description": "The ship hasn't moved in your lifetime or your parents'. The engine bays have been repurposed as gardens — rebar trellises, conduits laid across as bridges, drip irrigation through what used to be coolant lines. Daylight is on a schedule and the schedule slipped a hundred years ago and is now an hour off the body's expectations. Nobody talks about why."
+        },
+        {
+          "name": "Still in flight, decelerating",
+          "description": "There is a tremor in everything. You learn it before you learn to walk and you stop noticing it by adolescence. The bulkheads creak in patterns that the engineers can read. There is a sense of movement that nobody calls movement because there is nothing to compare it to. Someone above decks knows when arrival is. You do not."
+        },
+        {
+          "name": "Hollowed",
+          "description": "Only steerage decks are populated. The rest are sealed. Corridors go nowhere and end in welded doors with hand-lettered NO ENTRY signs in handwriting that does not match any handwriting taught in school. The air smells different past a certain bulkhead and you can taste it on your tongue if you stand close. Nobody has crossed in your lifetime."
+        },
+        {
+          "name": "Multiple ships once linked, now drifting in parallel",
+          "description": "There are other ships out the porthole. Three of them, sometimes four, holding a loose formation across distances that should not be possible to maintain without active steering. Sometimes they signal. The signals are in a code the engineers half-recognize. Nobody alive remembers when the ships separated, or why, or whether the separation is permanent."
+        }
+      ]
+    }
   ]
 }

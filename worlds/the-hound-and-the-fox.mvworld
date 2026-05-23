@@ -7,5 +7,50 @@
     "mystery",
     "modern",
     "fantasy"
+  ],
+  "detail": "For years they have been each other's whole career. The Hound, a detective with a reputation. The Fox, a thief with a style. Their rivalry is a public sport in this city — the front pages know the joke and so do the bartenders. Today a crime has been committed, in the style of one of them, against a target that belongs to the other. By tomorrow there will be another. Someone is framing them both, and doing it with affection.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE COPYCAT — A new artist is staging crimes in their joint style, for an audience that explicitly includes both of them. The copycat is a fan and a critic. The crimes are pastiche — too neat, too quotational, signed with little flourishes neither of them would actually use. The audience the copycat is performing for is not the public; it is the two of them, specifically, and the copycat wants to be noticed.\n2. THE MENTORS — The Hound and Fox of a generation ago, retired together, now living in a cottage somewhere disreputably bucolic. They were never caught, never publicly acknowledged. They have decided their successors are stuck in a pattern that's killing both of them, and the frame-up is a teaching exercise. They want the player to break the loop. They have a plan and a pot of tea waiting.\n3. THE DISAPPOINTED THIRD — Someone who once loved both of them — a sibling, a partner, a friend, a child raised by both — and who watched the rivalry consume the people they cared about. The frame is a teaching moment. The third party is calm and methodical and would like to be sat down with at the end.\n\nDM approach:\n- Tone: banter, theatre, romance disguised as enmity. Both leads know each other's tells. The chase has rules and the rules are old.\n- NPCs by variant: a fawning rookie reporter who has been documenting both their careers and may be the copycat (1); an antiques dealer who passes messages and used to work for someone older (2); a long-lost sibling who is too composed when interviewed (3).\n- Seed early: a calling card left at the wrong scene; a stolen object returned with a note; an old case file the precinct doesn't have on record.\n- Pacing: each new crime is more intimate. The first is property. The third is personal. The sixth is the meeting they were too proud to make.\n- Both Hound and Fox are tired. Underneath the performance they are exhausted by each other. The frame-up is, in part, mercy.\n\nPacing: Six escalating crimes, each more personal than the last. The clock is the next morning paper — every fresh headline is a fresh staging, and the city is keeping score. By the sixth, both leads are out of professional pretext and have to meet as themselves.",
+  "suboptions": [
+    {
+      "label": "Which one you are",
+      "choices": [
+        {
+          "name": "The Hound",
+          "description": "Detective with a reputation and one rule you keep breaking. The Fox is your white whale and your unpaid muse. You have a notebook with their handwriting in the margins — they leave you notes at scenes — and you have never shown it to anyone. You are very good at your job. You are not as good at sleeping."
+        },
+        {
+          "name": "The Fox",
+          "description": "Thief with a code you keep upgrading. You don't take things people will genuinely miss; you take things that will look good in the paper next to a sketch of you. The Hound is your honest mirror. You have stolen things specifically so the Hound would get to recover them, and you suspect they know."
+        },
+        {
+          "name": "The Witness",
+          "description": "A third party who keeps seeing both of them. A bartender, a beat reporter, a doorman, a fence — whatever the city needs you to be. You can read the rivalry like a serial. You know which scenes they were really at and which the papers got wrong. Tonight you saw something neither of them did, and you have to decide what to do with it."
+        },
+        {
+          "name": "The Quarry",
+          "description": "The thing they have both been chasing. A jewel, a ledger, a body, a piece of leverage — sentient, in the way things become sentient when enough people want them — and tired of running. You have been moved between hiding places by allies of both. You would like very much for this to end. You have an opinion about how."
+        }
+      ]
+    },
+    {
+      "label": "The city",
+      "choices": [
+        {
+          "name": "Gaslit Victorian capital",
+          "description": "Fog so thick the streetlamps haloed. Hansom cabs and the rattle of harness on cobble. The precinct has a single telephone and a long line for it. The Hound and Fox have been pages of the penny papers since they were both younger than they admit, and the engravers have an entire mental file of their faces."
+        },
+        {
+          "name": "1930s art-deco metropolis",
+          "description": "Radio cars and ticker-tape and the smell of cigar smoke in every elevator. Nightclubs that close at sunrise and reopen at sunset. There is one opera house at the heart of downtown and every great chase has ended in its lobby at least once. The musicians know to keep playing."
+        },
+        {
+          "name": "Modern surveillance city",
+          "description": "Cameras at every corner and license-plate readers on every bridge. The chase is data; the chase is also performance, because both Hound and Fox know the cameras are running and act accordingly. One alley downtown still has no coverage. Everyone in the city knows which one. It is where the real conversations happen."
+        },
+        {
+          "name": "A small island town where everyone knows them both",
+          "description": "The chase is a kind of community theatre. The locals lay bets at the harbor pub. The police chief is the Hound's mother and gives an interview every spring. The Fox's sister runs the bakery and will not discuss it. There are exactly two boats off the island and both of them know the schedule."
+        }
+      ]
+    }
   ]
 }

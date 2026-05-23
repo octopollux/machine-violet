@@ -6,5 +6,50 @@
   "genres": [
     "fantasy",
     "horror"
+  ],
+  "detail": "The drill went through. The shaft below the lowest gallery opened on air, not stone. Three crews went down. None came back. The bell at the mineshaft, which has not rung in living memory, started ringing on its own the night after. The town's economy depends on the mine reopening. The town's other priorities are about to be renegotiated.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE SLEEPER — A god is buried below the seam. It has been asleep so long the stone forgot it was there. The mining was the alarm clock. It is stretching, in the patient way of things measured in eras, and the players are very small and very interesting to it. It does not yet have a use for the town. It will.\n2. THE BURIED CIVILIZATION — There are people down there. They have been down there long enough to have their own kings and their own grievances. The surface is the roof of their world. The new shaft is an unauthorized hole punched into their sky. They are surprised, then organized, and they are coming up to discuss the matter.\n3. THE PRISON — Something was bound below, and the mining was the breaking of the binding. The miners were jailbreakers without knowing it. Payment for the work is owed. The prisoner has a list of names, in an order, and the first name on the list is one of the missing crews' foreman. The second is somebody in the town who has not yet been told.\n\nDM approach:\n- Tone: stone-cold air rising from a hole, the silence of a shaft that should be loud with work, a bell ringing slowly and alone.\n- NPCs: a foreman missing three crews; a company representative with bad news to deliver gently; a child whose father was on the last shift; the cleric the diocese sent because of the bell.\n- Pacing structure: one mine-bell ring per dawn. The bell-keeper does not know how to silence it. The bell tells everyone in earshot what the count is.\n- Seed early: a single object brought up by a miner who came back changed. A scrap of metal that does not belong in this geology. A song the missing foreman taught his daughter, now being hummed by someone who has never met him.\n- The mine is not a setting. It is a presence. Let the town behave like a town that knows it is downstream of something.\n\nPacing: one mine-bell ring at every dawn. The town's economy depends on the mine reopening, and the company is making decisions on a calendar the town can read on the saloon's chalkboard. The player can track the clock by the bell and by the freight schedule.",
+  "suboptions": [
+    {
+      "label": "Your role",
+      "choices": [
+        {
+          "name": "Foreman with three missing crews",
+          "description": "You signed off on the descent. You wrote the names in the book. You stood at the top of the shaft for the agreed-on hours and longer. The widows are not yet ready to look at you. The company has not yet decided whether you are the man to send down again, or the man to fire first."
+        },
+        {
+          "name": "Investigator the company hired quietly",
+          "description": "Your papers say you are a geological surveyor. You are not. The company prefers you to find an explanation that does not involve the company. Your room at the boarding house is paid through the month, and the rate is more than the room is worth, and you have not asked about that."
+        },
+        {
+          "name": "Local kid whose dad was on shift",
+          "description": "You know the back ways into the headframe. You know which fence panels are loose. You know who is lying about what they heard the night the bell started. The town adults treat you with the careful gentleness reserved for the recently bereaved, which is a thing you are not yet sure you are."
+        },
+        {
+          "name": "Cleric the diocese sent",
+          "description": "The bishop received the letter and read it twice. You were chosen because you are senior enough to be believed and junior enough to be expendable. You arrive with a small kit, a written rite for sealing a mine, and a confessor's license that the bishop expects you to use before the rite, not after."
+        }
+      ]
+    },
+    {
+      "label": "The town",
+      "choices": [
+        {
+          "name": "Dwarven, ancestral",
+          "description": "The mine is a cathedral. The galleries were carved before this mountain had its current name. The town's foundations are older than the peak above them. You are an outsider even after twenty years of residence, and the courtesy you receive is the kind of courtesy reserved for guests who have outstayed any reasonable visit."
+        },
+        {
+          "name": "Frontier human, debt-mortgaged",
+          "description": "A single rail line in, a single rail line out. One bank, one church, one saloon, and the company owns all three buildings if not the people inside them. The script the miners are paid in is good at the company store and acceptable, at a discount, at the saloon. The bank's loans are not optional."
+        },
+        {
+          "name": "Mixed and uneasy",
+          "description": "Two factions of miners. They take separate shifts. They drink at the saloon on alternate nights by an understanding nobody wrote down. Their work songs are about each other. The accident in the shaft has, for the first time in a generation, given them something to coordinate on, and the coordination is not yet trust."
+        },
+        {
+          "name": "A company town owned outright",
+          "description": "Every house is painted the same shade of green. The script is paid in numbered chits. The company's cemetery has uniform headstones in regular rows. The company's representative knows everyone by name and uses their names in conversation in a manner that feels rehearsed."
+        }
+      ]
+    }
   ]
 }

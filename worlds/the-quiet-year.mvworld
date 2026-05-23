@@ -6,5 +6,50 @@
   "genres": [
     "fantasy",
     "post-apocalyptic"
+  ],
+  "detail": "The war is over. The fighting ended on a specific morning, after years of it, and the silence that came in afterward had a weight nobody had prepared for. There is a town. There are survivors. There are buildings still standing and supplies for a season and a council that has been hastily appointed and does not quite know what it is allowed to decide. The hard part is starting now.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. PYRRHIC — The victors won, but the cost was the thing they were fighting for. The cause is dead in the act of defending it. The player is now administering a corpse-country: the flags are correct, the songs are correct, the people who would have made the songs mean something are gone. Every decision is haunted by who isn't in the room.\n2. EXHAUSTION — Nobody won. The war ended because both sides ran out of soldiers. The survivors of both have to share a ruin. The town has people in it whose accents are wrong, whose papers are wrong, whose presence is owed to the simple fact that there is nowhere else to be. The peace is not a settlement. It is the same exhaustion, distributed.\n3. THE NEW THING — The war ended because something WORSE arrived and made it irrelevant. A blight, a fleet, a god, a wave. It made everyone put down their weapons and look in the same direction. The new threat is currently dormant. It is watching. The town's rebuilding is being done under its eye, and nobody knows when or whether the eye will close.\n\nDM approach:\n- Tone: tired, careful, full of unfinished sentences. People cry at unexpected things. Children play games whose rules they made up during sieges.\n- NPCs by variant: a veteran who was on the winning side and cannot make peace with what she saw (1); a soldier of the other army living openly in town under a new name everyone tactfully uses (2); the watcher in the hills — a single ambassador or scout from the new thing, polite, infrequent, never explained (3).\n- Seed early: a council meeting where the agenda is mundane and the room cannot stay on it; a child asking what the wall was for; a stockpile that turns out to be smaller than the ledger says.\n- Pacing structure: four seasons, each with a crisis. Winter is shortage. Spring is contagion. Summer is the raider or the stranger. Autumn is the election that has to happen.\n- This is a campaign about governance. The fights are committee meetings. The wins are small and never permanent.\n\nPacing: Divide the campaign into four seasons. Each season has a crisis — winter shortage, spring contagion, summer raider or stranger, autumn election. The player can mark the year by what they survived, and what they had to ration to survive it.",
+  "suboptions": [
+    {
+      "label": "Who you were in the war",
+      "choices": [
+        {
+          "name": "A commander now expected to govern",
+          "description": "You were good at the work of war. The work of peace is a different muscle and you have not used it. The people who survived under your command expect you to keep deciding for them and they are looking at you with something that is gratitude and something that is not. You have not slept indoors in five years."
+        },
+        {
+          "name": "A soldier who deserted and lied about it",
+          "description": "You walked away from your unit one night and you came here and you told a story that has been useful to you. People believe it. Some of them love you for it. The truth is in your pack, in a sealed letter you never sent. Someone in this town fought beside you on the day you left, and you have not yet met them at the well."
+        },
+        {
+          "name": "A medic who saw everything and said nothing",
+          "description": "You worked in tents and basements and the back of carts for the duration. You know whose son died screaming and whose lieutenant cried. You have not told any of them. You have a list, mental, careful, of who in town will want to know things and who absolutely will not, and you carry that list like a second uniform."
+        },
+        {
+          "name": "A non-combatant who profited and is now hated for it",
+          "description": "You sold to both armies. You ran the warehouse, the still, the field hospital that took payment. You are alive and well-fed and the people who are not have noticed. The council needs you because you are the only one in town who knows how to keep a ledger. The council also resents you. You eat alone."
+        }
+      ]
+    },
+    {
+      "label": "Your town",
+      "choices": [
+        {
+          "name": "A river-port that fed both sides",
+          "description": "The docks are intact. The warehouses are empty. The river still works and the barge-masters are coming back, one by one, with cargoes that are smaller than they used to be. Both armies bought grain here at different times and the bookkeepers, if anyone wanted to look, kept perfect records of both."
+        },
+        {
+          "name": "A fortress town that held out",
+          "description": "Walls scarred. Population halved. The rationing committee still meets weekly even though there is, technically, no longer a need. The siege ended on a specific morning and most of the people who lived through it have not yet adjusted their habits. The dogs still flinch at the sound of a horn."
+        },
+        {
+          "name": "An occupied capital that traded hands four times",
+          "description": "Each occupation left graffiti in a different language on the same walls. Nobody knows which currency is current; the markets accept four, suspiciously. The cathedral has been reconsecrated three times. The librarian is older than the war and has been quietly hiding the books that don't match whichever flag is up."
+        },
+        {
+          "name": "A village both armies passed through without stopping",
+          "description": "You have all your buildings. You have none of your people. The young left to enlist or to flee and almost none came back. The houses are intact and dark; the gardens have gone to seed; the mill works because the miller is too old to leave. The council is five elderly people and one returned child."
+        }
+      ]
+    }
   ]
 }

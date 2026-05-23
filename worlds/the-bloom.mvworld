@@ -6,5 +6,50 @@
   "genres": [
     "post-apocalyptic",
     "horror"
+  ],
+  "detail": "The world ended some years ago and what came up afterward was flowers. They grow where nothing should — on asphalt, on salt, on the sides of dead skyscrapers, in the eye sockets of unburied dead. They are not all the same species and they have not been catalogued and the air where they grow tastes sweet. The Bloom is in its third or fourth season and the survivors have learned to read it the way old farmers read weather.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. TERRAFORMING GIFT — Something that observed the planet, mistakenly or sentimentally, concluded that humans loved flowers. It seeded the Bloom as a kindness. It is far away. It is not paying close attention. The Bloom is exactly what it appears to be and what it appears to be is well-meant and inadequate.\n2. SLOW COLONIZATION — The Bloom is the first stage of an alien project that has not yet decided what to do with the original inhabitants. The flowers are testing the atmosphere, the soil, the response of the surviving biosphere. The decision about humans will be made by something that has not yet arrived.\n3. THE DREAMER BELOW — The Bloom is the visible surface of an entity that lives underground and is asleep. The pollen carries the dream. People who breathe enough of it begin to share specific images, then to share decisions, then to share a single will. The dreamer is gentle. The dreamer is not human.\n\nDM approach:\n- Tone: beautiful and wrong. Sweetness as menace. Color as warning.\n- NPCs to seed: a botanist with theories; a convert who has stopped being entirely individual; a child who hears the Bloom hum.\n- Pacing structure: the Bloom has seasons. The player learns to read them or doesn't. Each season has its own dangers — pollen storms, mass dormancy, the brief week the flowers all turn the same direction.\n- Seed early: a flower that wasn't there yesterday; a smell that gives the player a memory that isn't theirs; one person in the player's circle who has been spending too much time at the edge of the Bloom.\n- Make the colors specific. The species the player learns by name should be a small handful, each with a behavior.\n\nPacing: The Bloom has seasons. The player can track them by which flowers are open, which are seeding, which are turning their heads. The clock is botanical and it is generous and it is firm.",
+  "suboptions": [
+    {
+      "label": "Your relationship to the Bloom",
+      "choices": [
+        {
+          "name": "Survivor who lost someone to it",
+          "description": "Your sister or your husband or your child walked into the Bloom one morning and did not come back the way they left. They came back, eventually, smiling, but they were not the person you knew, and you have spent the time since trying to decide whether what came back was a worse version or a better one. The Bloom took them. You can't be sure they didn't want to go."
+        },
+        {
+          "name": "Botanist trying to understand",
+          "description": "You had a training that the collapse made irrelevant and the Bloom made urgent. You have a notebook and a hand lens and a private theory you have not yet shared because sharing it would commit you. You are the only person you know who treats the flowers as data, and the people around you have started to wonder if your detachment is faked."
+        },
+        {
+          "name": "Convert who thinks it's holy",
+          "description": "You believe the Bloom is a message from a kind power and you are largely correct. You have organized neighbors into small observances. You leave offerings at the edges. You have started to dream the same dreams as other observants in your sect, and you have decided to trust this rather than be afraid of it."
+        },
+        {
+          "name": "Child born after, who can hear it",
+          "description": "You were born into the Bloom. You do not remember a world without it. The adults talk about Before and you nod and you don't really understand. The flowers hum at a pitch the adults cannot detect and you have always heard it. You assumed everyone did. You are starting to understand that you are something the adults around you do not know how to read."
+        }
+      ]
+    },
+    {
+      "label": "Where the Bloom is densest",
+      "choices": [
+        {
+          "name": "A city, slowly being eaten",
+          "description": "Asphalt cracked by stems thicker than your wrist. The subway tunnels have become growing-tubes, lit by phosphorescent species that bloom in the dark. The skyscrapers are trellises for vines that go up forty floors and break the windows from inside. The intersections smell like a perfume counter and the streetlights still come on at dusk on the blocks where the wires haven't been cut."
+        },
+        {
+          "name": "A coastline where the flowers grow into the surf",
+          "description": "The tide-pools are full of blossoms that open with the water and close with the dry. Salt-tolerant species have built reefs out of stems and petals. The seabirds eat them and sing in patterns the older sailors don't recognize. At low tide you can walk on a carpet that gives slightly under your feet, and the sand beneath it is warm."
+        },
+        {
+          "name": "A high desert where the Bloom is rare and prized",
+          "description": "One flower per kilometer, sometimes less. Pilgrims travel weeks to see a single bloom. The locals know the routes and defend them, more from theft than from sacrilege. The flowers here are larger than elsewhere and they last only a day, and the pilgrimage calendar is built around when each known plant is expected to open."
+        },
+        {
+          "name": "A forest where the Bloom has REPLACED the trees",
+          "description": "The canopy is petals. There is no shade because the petals are translucent and pink. The air tastes like sugar all the time and you stop noticing it after a week and you start craving it after two. The undergrowth is a single species of grass that grows knee-high and bends in coordinated waves when there is no wind."
+        }
+      ]
+    }
   ]
 }

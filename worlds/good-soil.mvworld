@@ -5,5 +5,50 @@
   "summary": "You found a patch of land where things grow clean. Everyone else found out too.",
   "genres": [
     "post-apocalyptic"
+  ],
+  "detail": "The world is poisoned and the player has a piece of ground that isn't. Things grow there that don't grow anywhere else within a week's walk. The player has been quiet about it for as long as they could. Quiet is over. Someone outside the patch has started asking the wrong neighbors the right questions.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. REMEDIATION PROJECT — Before the collapse, a research consortium seeded several sites with engineered microbes designed to detox the soil. Most failed. A handful succeeded. The player stumbled onto one. Others exist; they are marked on a map that nobody who is still alive owns, and the documents that describe what the patches do are in archives accessible only to the very organized.\n2. INNOCENT FLUKE — The patch is good because of a specific coincidence — wind shadow, an old mineral seam, a fungal partnership nobody has named. The leverage exists only as long as the cause is unknown. Once the cause is named, the patch is reproducible and worth nothing. While the cause is unknown, the patch is worth everything and the player owns it.\n3. THE THING BELOW — Something underground is feeding the soil. It is not a machine. It is not a god. It is alive, slow, and has been keeping the patch clean because the patch is the surface of its mouth. The player has been in a relationship with it for as long as they've farmed the land. It will eventually ask for something back.\n\nDM approach:\n- Tone: pastoral and tense. The horror is social. The patch is small and the world is large and the world has been listening.\n- NPCs to seed: a neighbor who suspects but hasn't told; a trader who passes through the region and gossips; one starving stranger who shows up at dawn and won't leave.\n- Pacing structure: the clock is social, not military. Count who knows. Each session, the circle widens by one. When the circle reaches a critical number, someone arrives with an army.\n- Seed early: a specific crop the patch supports that shouldn't be possible; a tool the player uses to keep the patch hidden; one ally who has helped keep the secret and who has their own reasons.\n- The patch should be physical and specific. Mark its borders. Describe the smell of the dirt.\n\nPacing: Count who knows. Each new person who learns moves the clock forward one tick. The player can track this by the visitors at their door, the changing tone of trade conversations, the maps that start to include their valley.",
+  "suboptions": [
+    {
+      "label": "Who you were before",
+      "choices": [
+        {
+          "name": "Pre-collapse agronomist",
+          "description": "You understand exactly what you found, or you can build the theory inside a week if you're allowed to read your old notes. You know that what's happening here is not natural and you know enough categories of unnatural to narrow it down. Your knowledge is your greatest asset and your most dangerous tell — anyone who watches you work will know you are not a peasant."
+        },
+        {
+          "name": "Wanderer who got lucky",
+          "description": "You walked a long time. You stopped here because you were tired and the water tasted right and a stalk of grass beside the stream was the wrong color of green. You have been here three years. You don't know why the patch works. You have been very careful to not learn, in case knowing breaks it."
+        },
+        {
+          "name": "Local who inherited the land",
+          "description": "Your family was here before the poisoning. Your grandparents farmed this ground when it was no more remarkable than the next valley over. After the collapse, you came home to bury people, and the burying showed you that the dirt here was different. You have been keeping the secret out of family loyalty and out of a private suspicion you have not voiced to anyone."
+        },
+        {
+          "name": "Refugee leader; the patch is for your people",
+          "description": "You brought a group across hard country and you arrived here a year ago with fewer than you started with. The patch fed the survivors. It is feeding them now. You are responsible for them and for the patch and for the decision of whether to add the next group of refugees who arrive at the ridge tomorrow."
+        }
+      ]
+    },
+    {
+      "label": "The landscape",
+      "choices": [
+        {
+          "name": "Salt flats with one green valley",
+          "description": "The wind is constant and it is loud and it carries grit. In every direction the ground is white and dead and the sky is bigger than is reasonable. The patch is shaped like a tear running down between two ridges, a corridor of green a few hundred meters long. From the high ground you can see it from twenty miles, which is the problem you have been trying not to think about."
+        },
+        {
+          "name": "Burn scar of an old forest",
+          "description": "Charcoal and clay underfoot. The new growth follows the lines of root systems that burned decades ago — you can read the layout of the dead forest from the pattern of the living one. After rain, mushrooms come up overnight, in colors that don't have names you know. The patch is alive in a way that suggests the forest's ghost is doing the work."
+        },
+        {
+          "name": "Coastal marsh poisoned with runoff",
+          "description": "Your patch is upstream of the worst of it. The water arrives at your land brown and leaves it clear, and it arrives at the next farm downstream killing things again. The neighbors there have noticed. They have not yet asked how. The reeds at your borders grow tall and sweet and the seabirds nest only on your side of the channel."
+        },
+        {
+          "name": "Suburban cul-de-sac",
+          "description": "The lawns on the rest of the street are gray and matted. Yours is green and the tomatoes you planted out of desperation are six feet tall. Two of the neighbors are watching from their windows. One of them has stopped greeting you in the morning. The mailboxes still stand at the curb like nothing has changed and everything has."
+        }
+      ]
+    }
   ]
 }

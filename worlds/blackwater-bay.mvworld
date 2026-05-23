@@ -7,5 +7,50 @@
     "fantasy",
     "modern",
     "mystery"
+  ],
+  "detail": "The player came to Blackwater because someone said you could lose yourself here. They were right. The harbor takes anyone, the harbormaster doesn't write down names, and the regulars at the tavern only ask what you call yourself this week. Then a ship lands that the player recognizes, and the question is whether the bay still protects you when you've been recognized first.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE GEOGRAPHY FORGETS — The bay is easy to enter and hard to find on a map twice. Charts go fuzzy at the headland. Pursuers arrive sharp-eyed and within a week they're squinting at the wrong horizon. The town does nothing — it simply exists in a slightly different place each morning. The player can leave whenever they want. They almost certainly cannot come back.\n2. THE MAGICAL SINK — Whatever was hunting you arrived. They're at the inn. They forgot why a week ago and now they're a regular too. The bay absorbs pursuit and the pursuers stay; over time this means everyone in town is being hunted by someone else who is also in town and also doesn't remember. When somebody remembers, the bay handles it. The harbormaster has a quiet room for the remembering.\n3. THE FAVOR — The bay shelters you and the harbormaster keeps a ledger. He'll never name what's owed; he doesn't have to. One day someone will arrive who can't be turned away, and the harbormaster will look at you, and the ledger will balance. You will know it when you see his face.\n\nDM approach:\n- Tone: salt, fog, the long pull of a rope through a ring. Nobody speaks above the wind.\n- The harbormaster: ancient, courteous, never raises his voice. Knows everyone's real name and has chosen not to.\n- Other refugees: each NPC came running from something. Sketch their tells without naming the cause.\n- Seed early: the ledger is visible behind the harbormaster's desk; the player notices their own name has been written and crossed out and re-written.\n- Pacing: one new arrival per session; one regular vanishes per session and nobody comments.\n\nTrack time by the tide chart at the harbormaster's office and by who's still drinking at the tavern's corner table. When a familiar regular doesn't show, that's a beat. When the new arrival starts answering to a name they didn't give, that's another.",
+  "suboptions": [
+    {
+      "label": "Why you came",
+      "choices": [
+        {
+          "name": "Debt you can't pay",
+          "description": "The figure is too large to settle in one lifetime and too small to be forgiven. The creditor isn't cruel — that would be easier. They are patient and they keep accurate books. You came to Blackwater because the books don't reach here. Yet."
+        },
+        {
+          "name": "Face the wrong person would recognize",
+          "description": "Someone is looking for the person you used to be. You are no longer that person, but your bones are. You've grown a beard, you've cut your hair, you've practiced a different walk. The mirror still tells on you in low light."
+        },
+        {
+          "name": "Child you stole back",
+          "description": "The child is yours. The court disagreed. The court was wrong, and the court was armed. The child sleeps in the room above the tavern and asks about home only when it rains. You have an answer prepared, and you have not yet had to use it."
+        },
+        {
+          "name": "Truth you have to forget",
+          "description": "You know something that would unmake a thing the world depends on. You came to Blackwater because the bay is supposed to take memories along with names. You are testing whether it works fast enough. So far the truth is still in your mouth at night."
+        }
+      ]
+    },
+    {
+      "label": "The town",
+      "choices": [
+        {
+          "name": "New England fishing port",
+          "description": "Clapboard houses with the paint salted off. The smell of low tide and tarred rope, the gulls always working. There is one church the regulars do not attend, one tavern the visitors do not enter, and one dock long enough for the trade. The shutters close early."
+        },
+        {
+          "name": "Caribbean smuggler's cove",
+          "description": "Wooden shutters bake all day and creak open at evening. The rum is good and the locals do not sell it to outsiders; you have to be offered. Pelicans line the breakwater and watch the customs cutter that comes in twice a year and finds nothing. The fog rolls in at dawn, briefly, like a courtesy."
+        },
+        {
+          "name": "Pacific Northwest logging port",
+          "description": "Cedar smoke from every chimney. The rooftops are mossed and the planks of the boardwalk are dark with rain. Sea fog arrives by noon and stays through the next day; in the fog the town is smaller than its map. The mill blade has not turned in a year and nobody mentions it."
+        },
+        {
+          "name": "Old-world Iberian harbor",
+          "description": "Whitewashed and impossibly steep. Bells from a monastery up the cliff mark the hours nobody at the dock observes. Sardines on every menu, oil and lemon, a clay jug of wine you do not have to order twice. The harbormaster keeps his ledger in the cool of a chapel that the priest left to him."
+        }
+      ]
+    }
   ]
 }

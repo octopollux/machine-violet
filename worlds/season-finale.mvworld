@@ -7,5 +7,50 @@
     "meta",
     "comedy",
     "modern"
+  ],
+  "detail": "The player has begun to notice things. Conversations resolve too cleanly. There is a faint music when they walk into a room. Their best friend's character arc seems to be wrapping up. Someone — somewhere — has renewed them for another season, and the renewal envelope is the first thing they ever consciously received from outside the frame.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE AUDIT — An afterlife studio renews soul-leases by quarterly ratings, and the player's numbers are down. A producer in a beige suit arrives with notes. Demographic shifts. The supporting cast wants more screen time. The player's grandmother — long dead — is the network executive and she is fond but firm. Renewal hinges on a sweeps-week performance the player can't see the rubric for.\n2. THE MOURNERS — The player's life is a long-running show watched by grieving relatives in a different world. The cancellation isn't punishment; it's closure. The widow on the other side is ready to move on. The player has begun to glimpse her through reflective surfaces. Whether to fight for renewal or grant her the ending is the show's actual climax.\n3. THE BREAK — There is no studio. The player is having a slow psychotic episode and the universe — kind, or merely tidy — is humoring them with continuity. The supporting cast is real and worried. The renewal envelope was a piece of junk mail. The horror is that the structure the player perceives is mostly accurate, because everyone they love is rewriting themselves to fit the story the player needs.\n\nDM approach:\n- Tone: Pirandello on antidepressants. Funny when the player leans in, devastating when they don't.\n- NPCs derive from the variant: the producer and the grandmother-executive (1), the watching widow glimpsed in glass (2), the worried supporting cast doing their best (3).\n- Pacing: episodes have act breaks the player can feel — a held beat after a confession, a cut to commercial after a near-miss. Honor them or violate them on purpose.\n- Seed early: one moment of audible laugh track. One stranger who lingers half a beat too long after the player exits.\n\nPacing: The season finale is six in-fiction weeks out. Episodes are weeks. Act breaks are scenes. The player can track the clock by reading the room — when the music swells, when the lighting changes, when someone's exit line is too neat for daily life.",
+  "suboptions": [
+    {
+      "label": "Your genre",
+      "choices": [
+        {
+          "name": "Suburban sitcom",
+          "description": "A laugh track audible at peaks of emotion that nobody else seems to hear. The neighbors stop their lives mid-sentence when the player enters the kitchen, then resume on cue. Everybody's house is Stage 4 of a single set, with the same window over the same prop sink. The wallpaper has not changed since the player was a child."
+        },
+        {
+          "name": "Prestige drama",
+          "description": "A body count that demands reasons. Every supporting character has a secret with three-act structure. The player delivers awards-bait monologues at people who do not acknowledge they were spoken aloud. The writers want a mid-season twist and have begun arranging the player's life to permit one."
+        },
+        {
+          "name": "Reality competition",
+          "description": "The cast votes the player off in confessionals the player cannot see. Producers feed lines through a coworker who is sometimes wearing an earpiece. There is an elimination ceremony at the end of every week and the player has not yet figured out what they are competing for or against."
+        },
+        {
+          "name": "Saturday-morning cartoon growing teeth",
+          "description": "The color is lurid in a way that hurts the back of the eyes. Safety-rule violence — anvils, cliff falls — happens and the bones knit by the next scene, except sometimes they don't. One supporting character, the goofy sidekick, has noticed that the children aren't laughing anymore and has stopped doing the bit."
+        }
+      ]
+    },
+    {
+      "label": "The recurring guest star",
+      "choices": [
+        {
+          "name": "Old flame the writers brought back",
+          "description": "Someone the player loved and lost has been re-cast into the season. They have a reason to be in town that almost makes sense. The chemistry hits exactly the marks it used to hit, and the player can feel the writers underlining it. Whether to follow the script is the choice."
+        },
+        {
+          "name": "Sibling you haven't spoken to",
+          "description": "A brother or sister appears with a story problem nobody has solved offscreen. The producers are clearly setting up a reconciliation arc. The unresolved hurt between you is real; the timing of its return is not. What you do with it is."
+        },
+        {
+          "name": "A child who shouldn't be old enough yet",
+          "description": "A small person who calls the player by a familiar name, with eyes the player half-recognizes. The continuity is wrong by years. Nobody else seems to register the discrepancy. The child seems to know they are early and is being patient about it."
+        },
+        {
+          "name": "Yourself, from an alternate cut",
+          "description": "A version of the player who walks into the room with the player's face and a slightly different haircut. They are friendlier than the player would have been. They have notes. The supporting cast greets them warmly and does not seem to notice there are two."
+        }
+      ]
+    }
   ]
 }

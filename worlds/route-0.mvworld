@@ -7,5 +7,50 @@
     "modern",
     "horror",
     "mystery"
+  ],
+  "detail": "The highway runs flat and straight and the median is mowed and the rest stops have working bathrooms. There are exits. The exit signs are green and reflective and they name towns the player has never heard of. The GPS shows the player driving through a field. The radio agrees with the road, not the satellite.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE COLLECTOR'S ROAD — Someone built this highway to keep towns. Each exit is a place lifted whole from somewhere else — a Pennsylvania mill town, a Sonoran mining camp, a Vermont mountain hamlet — held in stasis, kept alive, kept paying rent in a currency the residents no longer remember agreeing to. The collector is reachable, eventually, and has a hospitality streak that makes the bargain harder.\n2. THE CIRCUIT — Route 0 is a closed loop. The player will, after enough exits, return to their own on-ramp. The home they return to will be the same address, with small wrongnesses — a different paint color, a child a year too old, a spouse who never met them. There is no escape; there is only the choice of how many laps to take before stopping somewhere.\n3. THE GRAVEYARD OF AMERICAS — Every failed national experiment is still here, exits in chronological order. The Shaker colony at mile 47. The free-love commune at mile 112. The walled-off pandemic town from 1918, still walled. The corporate company town that paid its workers in scrip. Each one is alive in the present tense and each one will offer the player a place to stay.\n\nDM approach:\n- Tone: Twilight Zone evenness — the road is well-maintained and the diners take cash and the bathrooms have soap. Wrongness arrives in small persistent details that accumulate.\n- NPCs to seed: a gas-station attendant who isn't surprised by the player; one fellow traveler at a rest stop who's been on the road longer; the voice on the radio that knows the next exit's name.\n- Pacing structure: each exit costs something to take — gas, food, a memory, a name. The player can stop, can stay, cannot turn around. The shoulder is a fiction.\n- Seed early: the odometer is wrong; the gas gauge does not move; the sun does not set in the expected place.\n- Resist explaining. The road is not a puzzle to solve from the driver's seat. The road is something the player drives.\n\nPacing: Each exit costs something specific to take. The player can stop driving. The player can stay at an exit. The player cannot turn around. The clock the player can read is the mile-marker count — and the suspicion that the markers don't go up the way they should.",
+  "suboptions": [
+    {
+      "label": "Why you took the exit",
+      "choices": [
+        {
+          "name": "Detour, lost",
+          "description": "You missed the turn for your actual destination an hour ago and you've been pretending not to. The first Route 0 sign was a relief — any exit would do. You took it because going further on the highway felt worse than getting off. That instinct was right. The implications were not."
+        },
+        {
+          "name": "Followed someone",
+          "description": "A car ahead of you took the exit and something in their tail-light pattern, or their license plate, or the way they signaled, made you follow. You are not a person who follows strangers. You followed this one. They are somewhere ahead of you now, or they were never there at all."
+        },
+        {
+          "name": "A voice on the radio said your name",
+          "description": "You were scanning through static between stations and the static said your name. Then your mother's maiden name. Then the name of the street you grew up on. The next exit was the only thing the radio mentioned by number, and you took it before you'd decided to."
+        },
+        {
+          "name": "Been here before in a dream",
+          "description": "You recognized the exit sign. You recognized the curve of the off-ramp. You recognized the diner at the bottom of the ramp before you saw it. You have been having this dream since you were a child, and you have never told anyone about it, and you are about to be a regular here."
+        }
+      ]
+    },
+    {
+      "label": "Your vehicle",
+      "choices": [
+        {
+          "name": "Family sedan with a kid asleep in back",
+          "description": "The dome light won't turn off no matter how many times you check the switch. The gas tank reads full and has read full for two hours. There are Cheerios ground into the floor mat from a snack that happened in another state. Your kid is asleep with their face pressed against the window and you do not want them to wake up at the next exit."
+        },
+        {
+          "name": "Long-haul trucker",
+          "description": "Your CB radio is picking up traffic that was never broadcast — chatter from drivers using names you don't recognize about loads they don't have permits for. Your rig has eighteen gears and one of them is illegal in the lower forty-eight. Your logbook fills itself in handwriting that is yours, with hours you did not drive."
+        },
+        {
+          "name": "Motorcycle, alone",
+          "description": "The wind at speed has been a person for the last hundred miles. They talk to you. You can hear the road through the bones in your wrists. You have one helmet and there are two voices inside it now, and one of them is asking questions about the next exit that you don't want to answer."
+        },
+        {
+          "name": "A car you don't actually own",
+          "description": "The registration in the glove box is in someone else's name and the address is one you've never been to. The keys were left in the ignition at a rest stop and the doors were unlocked. The back seat has a dark stain that you didn't make. You started driving because the car was running and you didn't want to wait for whoever it belonged to."
+        }
+      ]
+    }
   ]
 }

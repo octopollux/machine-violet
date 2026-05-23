@@ -7,5 +7,54 @@
     "fantasy",
     "comedy",
     "horror"
+  ],
+  "detail": "The player has arrived somewhere with a docent. The docent has a lanyard. The docent has a script. The docent works for tips, and the tip jar is not metaphorical. The tour will move along the planned route. Questions are encouraged. There is a gift shop at the end, in a manner of speaking.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. ORIENTATION — The player is recently dead. They may or may not know it. The docent is easing them into the news with the practiced kindness of a hospice nurse who has memorized the script. The tour is the soft landing the afterlife provides between cessation and whatever comes after.\n2. AUDIT — The player is being shown their life from outside. The exhibits are scenes they lived. The tour is the assembly of evidence for a verdict the player will be asked to render, on themselves, at the end. The docent's neutrality is professional and complete.\n3. RECRUITMENT — The afterlife is hiring docents. This is the interview. The other tourists are also candidates, though they may not have been told. The player's questions are being scored. The way they treat the docent counts double.\n\nDM approach:\n- Tone: tour-guide cadence, careful pleasantness, occasional honest answers when no one else is listening.\n- NPCs: the docent (warm, professional, with a private life the player can glimpse if they ask the right questions); the rest of the tour group, if any; the figure at each stop who delivers their small piece of the lesson.\n- Pacing structure: tips accumulate and matter. Each stop concludes with an opportunity to give, and the tour responds.\n- Seed early: the lanyard. The schedule. The fact that the docent looks at their watch in a way the player will eventually understand.\n- Play the comedy and the horror without flinching from either. The afterlife is a job, and a place, and a verdict.\n\nPacing: tips accumulate and matter. The tour ends at a specific door, on a schedule the docent is keeping to. The player can read the clock by counting stops remaining on the laminated itinerary the docent carries, and by the docent's small tells when they fall behind.",
+  "suboptions": [
+    {
+      "label": "Your group",
+      "choices": [
+        {
+          "name": "Solo tour",
+          "description": "Just you and the docent. The schedule is yours; the pace is yours; the questions accumulate without competition. The docent treats you as a single charge they are responsible for. The intimacy of this is its own pressure."
+        },
+        {
+          "name": "Mixed tour",
+          "description": "Five strangers, each hiding their cause of death. There is a small woman who jumps when doors close. There is a man whose collar covers something. The introductions are first names only, by mutual agreement nobody articulated. You will spend the tour learning to read each other."
+        },
+        {
+          "name": "Family tour",
+          "description": "An ancestor is showing you around. They died before you were born. They know things about your family that nobody alive could have told you. They keep stopping at certain exhibits to point out a relative you have heard of only in stories, and to correct the story."
+        },
+        {
+          "name": "VIP",
+          "description": "You weren't supposed to be here yet. The docent keeps apologizing about the paperwork. They have been hastily prepared. They are improvising. The other tour groups make way for yours, and you do not know if that is courtesy or quarantine."
+        }
+      ]
+    },
+    {
+      "label": "Tour stops",
+      "choices": [
+        {
+          "name": "Hall of First Lies",
+          "description": "A long corridor lined with mirrors. Each mirror shows the lie that started a life — the first untruth a person told to make themselves possible. The docent does not stop in front of any particular mirror, but slows when passing yours."
+        },
+        {
+          "name": "River of Unsaid Things",
+          "description": "You can wade in. The water is warm in some places and cold in others, and the difference is not random. The things you did not say will be there, in the river, drifting near the surface where you can pick them out if you are willing to put your hands under the water."
+        },
+        {
+          "name": "Lost-and-Found",
+          "description": "Everything anyone ever lost. The shelves go in every direction at once, including up. The docent says to keep your hands in your pockets and not to call out for anything by name. The lighting is fluorescent and patient. A small placard reminds you that ownership is contested."
+        },
+        {
+          "name": "The Promenade",
+          "description": "Where the dead walk. A wide paved avenue with benches and trees. A few of them will recognize you and nod. One of them is you, older than you have ever been, walking arm-in-arm with someone you do not yet know. The docent will not let you stop and stare."
+        },
+        {
+          "name": "The Office of Returns",
+          "description": "A quiet desk with a kind woman behind it. There is no line, today. If you go in, the docent will wait outside, professionally pretending to check the schedule. You will not come back to the tour. The door is unlocked. The chair is comfortable. The form is on the desk and it is short."
+        }
+      ]
+    }
   ]
 }

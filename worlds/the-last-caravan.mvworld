@@ -6,5 +6,50 @@
   "genres": [
     "fantasy",
     "post-apocalyptic"
+  ],
+  "detail": "Two hundred souls. Eighty wagons, give or take, depending on the week. Everything they could carry and a few things they shouldn't have. The caravan has been moving for long enough that no one remembers a dawn when they didn't break camp. Behind them, something is following at a fixed pace, and the caravan's only strategy is to be one day ahead of it forever.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE EXPANDING ZONE — A line is advancing across the world at a constant rate. Inside the line, things stop working in a specific way — entropy, fae geometry, plague, radiation, depending on the campaign. The caravan stays one day's travel ahead. The line does not rest. The line does not negotiate. The line is a fact.\n2. THE PURSUING ARMY — A force is methodically taking the settlements behind the caravan, one at a time, and leaving them garrisoned. The army is not interested in slaughter; it is interested in territory. Anyone who stops becomes a subject. The caravan is not chased; the caravan is outrun. The distance between caravan and front is a known quantity and is shrinking by one day per week.\n3. TIME ITSELF — Anything older than a month decays catastrophically — buildings, tools, relationships, language. The caravan stays new only by moving. Wagons break and are rebuilt. Stories told too often go grey and cease to mean. The youngest children are the only ones who have always been the right age.\n\nDM approach:\n- Tone: dust, sweat, the politics of small populations. The threat is constant and the conversation is about lunch.\n- NPCs to seed: the caravan's elected leader (consults the player or doesn't); the quartermaster's enemy; a child born on the road who has never seen a building.\n- Pacing structure: one supply crisis per week of in-game time. The caravan must move every dawn. Each week has its own internal politics and its own external scare.\n- Seed early: a wagon that broke and was patched, a person who left and was not stopped, a dog that follows the caravan but won't enter the camp.\n- The terrain should be specific. The horizon line should change in ways the player learns to read.\n\nPacing: One supply crisis per week of in-game time; the caravan must move every dawn. The player can track time by the distance to the threat (a guess everyone makes daily), the number of wagons still rolling, the names of the recently dead.",
+  "suboptions": [
+    {
+      "label": "Your role in the caravan",
+      "choices": [
+        {
+          "name": "Outrider",
+          "description": "You ride ahead and choose the path. You have authority because you know the country and you have responsibility because the country is new every morning. The choices you make at noon become the camp at dusk and become the route at dawn. When you are wrong, two hundred people are wrong with you, and they all know your name."
+        },
+        {
+          "name": "Quartermaster",
+          "description": "You decide who eats. You have a ledger and a small staff and a permanent headache. Rations are an exact science and the science is a series of compromises between mathematics and politics. People resent you specifically. People also rely on you specifically. The day someone disputes your math is the day the caravan finds out whether it is still one thing."
+        },
+        {
+          "name": "Storyteller",
+          "description": "You decide what is remembered. At night you tell the day back to the caravan, and the version you tell becomes the version everyone remembers. Children memorize the route songs you write. Old grievances get folded into legends so they can stop being grievances. You have power that nobody on the council acknowledges and that nobody underestimates."
+        },
+        {
+          "name": "Outsider",
+          "description": "You joined three days ago at a watering hole and the caravan took you in because they had room and you had skills. Nobody trusts you yet. Nobody will tell you anything important. You are sleeping at the edge of camp and eating in the second sitting and you have not yet learned the names of all the people who are watching you."
+        }
+      ]
+    },
+    {
+      "label": "The terrain",
+      "choices": [
+        {
+          "name": "Open steppe",
+          "description": "Grass to the horizon in every direction and no shade for days. The wagons can fan out and travel three abreast where the going is good. The wind carries the sound of pursuit two days before the dust does, and the lookouts have learned to listen for a specific quality of hoofbeat that the steppe transmits like a drum."
+        },
+        {
+          "name": "Mountain passes",
+          "description": "The road is single-file. The caravan stretches more than a mile when it's moving and the front of the line cannot see the back. The passes are choke points and the choke points are where the caravan loses wagons and where the caravan, occasionally, decides to fight rather than run. There are graves at the top of each pass with names in three alphabets."
+        },
+        {
+          "name": "Old-world ruins",
+          "description": "You camp in the shells of cities that died for other reasons in other centuries. The buildings are landmarks; the foragers know which apartment blocks still have canned goods on shelves and which were stripped a generation ago. Some of the ruins are inhabited by people who are not joining the caravan, and the caravan has learned to keep moving past their fires without comment."
+        },
+        {
+          "name": "Coastal road",
+          "description": "The sea is on one side and the threat is on the other. The road is a narrow ribbon between them. The tide takes wagons in storms — the caravan has lost three this season, which is two more than is sustainable. The fishing is good when there is time to fish, which there mostly isn't, and the salt rusts everything in a week."
+        }
+      ]
+    }
   ]
 }

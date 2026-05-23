@@ -6,5 +6,50 @@
   "genres": [
     "fantasy",
     "sci-fi"
+  ],
+  "detail": "The map is wrong. The player knows the country it describes — has walked it, surveyed it, flown over it, scrolled it — and the map shows a city in the middle of land that does not have a city. The dot is labeled. The dot has been on the map for a long time. The player is the first person in living memory who has decided to go there.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. SUMMONED BY THE DRAWING — The cartographer drew a city that wasn't there and the act of drawing it made it be there. The city has been alive for as long as the map has been folded in a drawer. The residents have biographies, grandparents, civic disputes. They do not know they were drawn into being. If the player tells them, something will give.\n2. HIDDEN BY OMISSION — The city is real and old and someone went to enormous trouble to leave it off every other map ever made. The cartographer's mistake was honesty. Someone wants the city found. The player now has the only copy of the map, and the people who have spent generations keeping the city secret are paying attention.\n3. ONLY ON THE MAP — The city does not exist except on paper. Walking to where the map shows it is walking into the map. The player arrives and is, increasingly, a drawing of themselves — outlined, shadowed, then colored in. Coming back requires a different cartographer.\n\nDM approach:\n- Tone: travelogue with a slow leak. The journey is more than half the story. The arrival is the inflection point.\n- NPCs to seed: a previous owner of the map (alive or dead, leaving notes); a fellow traveler who is going for different reasons; an official in the player's home city who notices the map is missing.\n- Pacing structure: the journey is half the campaign. Each leg of the trip gives the player one new piece of evidence about which truth applies — but the evidence is interpretable. Arrival commits.\n- Seed early: a feature on the map that doesn't match the terrain; a name on the map in a script that doesn't fit the period; a margin note in handwriting the player will recognize later.\n- The city, when reached, should be specific. Streets named. A square. A market day. One person who looks up when the player enters and does not look away.\n\nPacing: The journey is half the campaign; arrival is the inflection point. Track the journey in legs — each leg moves the truth-question one notch toward one variant or another.",
+  "suboptions": [
+    {
+      "label": "The map",
+      "choices": [
+        {
+          "name": "Medieval parchment in a monastery archive",
+          "description": "Vellum that smells of mildew and the lanolin that's been worked into it for six hundred years. A single decorated initial in red and gold on the first letter of the city's name. Marginalia in three different hands, each correcting the last, none of them in a language the archivist will translate. You signed for it and the archivist's hands shook."
+        },
+        {
+          "name": "USGS survey with one extra dot",
+          "description": "A 1947 topographic quad, official seal, the kind of map that hangs framed in a federal building. One dot too many in the western quarter, labeled in a typeface that doesn't match the rest. The surveyor's field notebooks went missing the year after publication. There is a brown stain on the back like coffee, except coffee wasn't drunk near it."
+        },
+        {
+          "name": "Alien star chart that resolves into a city when scaled",
+          "description": "Recovered from a crash site that the government does not officially acknowledge. The stars on the chart match no constellation visible from Earth. Scaled down by a factor of a hundred billion, the pattern is the layout of a city: avenues, plazas, a central square. The city is at the chart's exact center, where the convergence dot would be on a celestial map."
+        },
+        {
+          "name": "A child's crayon drawing that turned out to be accurate",
+          "description": "She drew it when she was seven. Her parents reported her missing for six days that year and she came home with the drawing folded in her pocket and would not say where she had been. She is eighty-four now and she gave you the drawing yesterday and asked you to go for her. The streets she drew correspond to streets on a recent satellite image of a place she has never been."
+        }
+      ]
+    },
+    {
+      "label": "Who reached it first",
+      "choices": [
+        {
+          "name": "A previous expedition",
+          "description": "Their journals end mid-sentence in three places. The expedition itself was funded by a society that no longer exists and you found the papers in a public archive that didn't know what it had. The last entry is from a campsite three days short of the city. The handwriting is rushed but not panicked. Whoever wrote it did not expect to stop writing."
+        },
+        {
+          "name": "A native population who treat the map as scripture",
+          "description": "They live in the city. They have always lived in the city. They have a sect that copies the map by hand once a generation and they will recognize yours as a true copy or as a forgery within a heartbeat of seeing it. Their priests will want to know how you got it and what you intend. Their answer to your intent will determine your welcome."
+        },
+        {
+          "name": "An academic rival you trained with",
+          "description": "You shared an advisor. You shared a thesis topic until one of you switched. You have not spoken in eleven years and you tracked their grant applications obsessively until you stopped. They left for the city two months ago with better funding and worse instincts. You are following their trail and you do not know whether you want to find them alive."
+        },
+        {
+          "name": "Nobody — the city is empty and warm, dinner on the tables",
+          "description": "You arrive at dusk. The streetlights are on. Tables in courtyards have plates set, food cooling but not yet cold, wine in the glasses. No bodies. No signs of struggle. No animals, no birds. The kitchens are clean. Somewhere a clock ticks. You can hear your own footfalls and nothing else, and the city was clearly inhabited a few hours ago."
+        }
+      ]
+    }
   ]
 }

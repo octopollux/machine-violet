@@ -6,5 +6,50 @@
   "genres": [
     "horror",
     "mystery"
+  ],
+  "detail": "The player drove past the lot last Tuesday. They are certain. There was something else there — a Wendy's, a vacant building, a field — and now there is a stone church with a copper roof and a sign that says it has served the community since 1887. Everyone in town agrees it has. The pastor smiles at the player by name. The player has never told the pastor their name.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. IT ATE THE BUILDING — The lot used to hold something. The church consumed it and the memory of it together; the bricks were chewed. Trace evidence is buried in the foundation. A photo somewhere, a tax record somewhere, a child who hasn't been corrected yet — these are the player's hooks. The pastor knows the church is hungry and is feeding it the doubts of new arrivals to keep it from feeding on the parish.\n2. THE BEFORE IS THE LIE — The church has always been there. The player's memory is the heresy. Other people who remember a before have started disappearing politely, in ways the town accepts as moves and retirements and breakups. The pastor is kind to the player. The pastor would prefer the player to come inside.\n3. THE WRAPPING PAPER — The church is not the thing. The church is what the thing arrived inside. Something is being prepared on the lot — built up, brick by brick, prayer by prayer — and when it is ready the church will fall away and the actual building will stand. The pastor is the foreman. The congregation are the materials.\n\nDM approach:\n- Tone: Sunday morning, mowed grass, hymn at a window. The horror is wholesome.\n- The pastor: warm, present, remembers everyone's children's names. Does not blink quite often enough.\n- The congregants: pleasant. A neighbor the player has known for ten years who now corrects them about a church potluck the player has never attended.\n- Seed early: an old photograph in a yearbook, a parking citation from the supposed-old-lot, a child who says the wrong thing and is shushed.\n- Pacing: attendance grows by exactly one per Sunday. In three months it will be everyone.\n\nThe player can count Sundays. They can count cars in the lot. They can count whose name the pastor knows now that he didn't know last week. The clock is the bulletin board in the narthex and the new face on the bulletin every week. When the player's own face appears there, the clock has run.",
+  "suboptions": [
+    {
+      "label": "Town",
+      "choices": [
+        {
+          "name": "Suburban subdivision",
+          "description": "Cul-de-sacs named for trees that don't grow here. Identical mailboxes at identical angles. The HOA newsletter mentions the church's bake sale as if you'd been planning to attend, and the church's parking lot is the only freshly paved one on the road. Your neighbor waves the way he always has, and now he waves once more, toward the steeple."
+        },
+        {
+          "name": "Failing rust-belt city",
+          "description": "Shuttered plants, potholes the city can't fix, a tax base that left two decades ago. The church's parking lot is new asphalt, painted lines, and reserved spots for people you went to high school with. The pastor has hired locally for the maintenance staff and they are grateful for the work and they will not meet your eyes."
+        },
+        {
+          "name": "Mountain hamlet, road washed out",
+          "description": "One general store, one gas pump, you know every truck by its tailgate. The church appeared the night before the snow closed the pass. Nobody can leave to check a county record. The church bell rings on the hour and the hour is correct."
+        },
+        {
+          "name": "Suburb already with a church on every corner",
+          "description": "This is just one more. Methodist on Vine, Baptist on Oak, Catholic on Main, and now this one on the corner of Elm and the cross-street nobody can quite remember the name of. Nobody can say what was on the lot before; everyone agrees it has always been a lovely little church."
+        }
+      ]
+    },
+    {
+      "label": "Your faith",
+      "choices": [
+        {
+          "name": "Devout",
+          "description": "This troubles you doctrinally before it troubles you in any other way. The hymns are the right hymns and the sermon almost works. The pastor preaches scripture you know, with one verse you don't recognize at the end of each reading. You looked it up. It isn't there."
+        },
+        {
+          "name": "Lapsed",
+          "description": "You came back recently and you can't say why. The pew fits you the way it used to. The pastor seems to remember you from before, from a parish you no longer believe you attended. You take communion on the third Sunday and you don't tell your spouse."
+        },
+        {
+          "name": "Atheist",
+          "description": "You can see what the others can't. The building has the wrong number of doors from inside. The stained glass has a panel that doesn't match. The shadows in the nave fall in directions that have nothing to do with the sun. You don't go in often. When you do, you count."
+        },
+        {
+          "name": "Clergy of a competing denomination",
+          "description": "Your parishioners are migrating. You watch them through the side window of your own church across the street, walking past your sign on Sunday morning to the new doors. You have not yet preached against the new church and you have not yet visited it. Both decisions feel like they are being made for you."
+        }
+      ]
+    }
   ]
 }

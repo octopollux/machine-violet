@@ -7,5 +7,50 @@
     "mystery",
     "horror",
     "modern"
+  ],
+  "detail": "The painting hung the same way for the opening and for the first morning of the show. The second morning the brushstroke on the left margin was longer. The third morning there was a window in the background that hadn't been there. Today there is a figure in the corner of the canvas standing in approximately the spot the player is standing in the room, and the gallery owner has stopped sleeping, and the security camera footage shows the canvas still all night and shows the painting different at dawn.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE PRISON — The artist trapped something on the canvas at the cost of his own life. The painting is the cage. The gallery owner is breaking the seal by exhibiting it; every viewer who looks at it loosens a stitch. The artist's last letter exists, and the owner has read it, and the owner exhibited the painting anyway because the insurance premium was due.\n2. THE DOOR — Someone on the other side is moving through. The painting is the thinnest part of the membrane between here and there. The arriver is patient and they are picking off witnesses one at a time; the gallery is a quiet place to do this. Each death has matched a change in the painting by a detail the police have not noticed.\n3. THE CONFESSION — The painting is a record of a real crime. The artist witnessed it or committed it and was painting his way toward saying so. Each day the canvas is more specific. The next-to-last detail will be the killer's face. The gallery owner has been very calm about the changes. The gallery owner is the killer and is, quietly, waiting for the canvas to indict him.\n\nDM approach:\n- Tone: turpentine, white walls, the particular silence of an empty gallery at five p.m.\n- The gallery owner: poised, articulate, a little gray under the eyes. Has invested in the show. Cannot afford to take it down. Knows more than they're saying.\n- The artist (dead before the campaign): traceable through their studio, their letters, the people who loved them. The estate executor has the keys to the studio and the key opens a drawer the executor has not opened.\n- Seed early: a detail in the painting that matches something only the player has seen; a previous owner of a piece from the same series who died unexpectedly.\n- Pacing: each change is more specific than the last. Today the painting contains the gallery floor. Tomorrow it will contain the player.\n\nThe clock is the canvas. Photograph it each morning. Compare. The player can count the new strokes. When the new strokes resolve into a face the player recognizes — their own, the owner's, somebody from outside the gallery — the clock has run.",
+  "suboptions": [
+    {
+      "label": "Your way in",
+      "choices": [
+        {
+          "name": "Art critic invited to authenticate",
+          "description": "The gallery wants your byline on the show. You came expecting a routine attribution piece and you are now staring at a canvas that you cannot honestly write about with the vocabulary your editor will accept. You have a deadline. The deadline is becoming the least of your problems."
+        },
+        {
+          "name": "The dead artist's lover",
+          "description": "You were not invited to the opening. You came anyway. You knew which paintings he loved and which he was afraid of, and this one is the one he would not let you see while he was alive. You can feel him in the brushwork. You can also feel something else, and you don't yet know if it has always been there."
+        },
+        {
+          "name": "Gallery employee opening tomorrow",
+          "description": "You have the keys. You are not paid enough to be the first one in the building at seven a.m. and not paid enough to be the last one out at nine p.m. The owner asked you to stop documenting the changes. You have not stopped. The photographs are on a thumb drive in your bag."
+        },
+        {
+          "name": "Cop investigating the prior death",
+          "description": "There was a previous owner. They went off a balcony, no note, the case was closed in a week. You did not work the case, but you read it, and the file mentions this painting once, in a sentence that was struck through and initialed. You came to the gallery because the file would not let you sleep."
+        }
+      ]
+    },
+    {
+      "label": "The gallery",
+      "choices": [
+        {
+          "name": "Glittering Chelsea white-cube",
+          "description": "Champagne in plastic flutes the collectors compliment and do not drink. A guard at every doorway in a uniform tailored too well to do real guard work. The price list is on a tablet at the front desk and the prices are not in the catalog. The painting is on the back wall, lit by a single ceiling fixture that has been re-aimed twice this week."
+        },
+        {
+          "name": "Provincial museum",
+          "description": "Carpeted floors that swallow footsteps. School-trip benches built for ten-year-olds. The security camera in the corner is a prop the board approved as a budget compromise. The painting is on loan from a private collection and the loan paperwork lists a contact who does not answer the phone."
+        },
+        {
+          "name": "Defunct industrial conversion",
+          "description": "Concrete floors, painted columns, a chill that the HVAC will not lift. The painting hangs alone in the long room. The freight elevator is the only access for visitors and the operator is a friend of the owner. The building was a meatpacker's once. The bones of the old drains are visible in the floor."
+        },
+        {
+          "name": "Wealthy private home",
+          "description": "The painting is in the dining room above the sideboard, lit by sconces the host had custom-cast. The owner is hosting a dinner tonight; you were not invited to dessert. The other guests have noticed something is off but have not been able to put a finger on it and are too well-mannered to ask."
+        }
+      ]
+    }
   ]
 }

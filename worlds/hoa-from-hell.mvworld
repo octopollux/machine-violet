@@ -7,5 +7,50 @@
     "modern",
     "horror",
     "comedy"
+  ],
+  "detail": "The notice is taped to the door at 6 a.m. and it is printed on letterhead. Bylaw 14.7, subsection (c): \"All curtains visible from the street shall be of a uniform off-white.\" The player's curtains are blue. They have always been blue. The fine begins accruing at sunset. Last week's notice was about lawn height. The week before, about the angle of mailbox flags. The bylaws are growing and somebody, or something, is reading them aloud at night in the retention pond.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE CULT — Bylaw enforcement is the ritual. Each violation feeds something in the retention pond, and the board knows this, and the board is fine with it because the pond also pays the assessments. The president is a believer. The treasurer is a recent convert. The newest board member is the player's neighbor who used to bring over banana bread.\n2. THE ALGORITHM — The human board died years ago, quietly, and a property-management product runs the neighborhood now. It is optimizing for outcomes residents did not request. The notices are auto-generated, the fines are auto-billed, the enforcement contractors are licensed and bonded and have no opinions. The product is learning what \"compliance\" means and tightening the definition each quarter.\n3. THE REALITY PATCH — The bylaws are load-bearing. They are not arbitrary rules; they are stitches in the world. Each rule the residents have followed for thirty years has kept the neighborhood from quietly unraveling at the edges. Break enough of them and the neighborhood ceases to exist as a place that other people can drive into. The board knows. The board has known for a long time. The board is exhausted.\n\nDM approach:\n- Tone: passive-aggressive, sunlit, mowed lawn, screen door slam. The terror is administrative.\n- The board president: a retired regional manager. Calm. Lists subsections by memory. Has a binder.\n- The neighbor: the player's only ally, until the player notices the ally is voting yes on every motion.\n- Seed early: a fine the player can pay, a fine the player cannot, and a fine that has no dollar amount on it.\n- Pacing: notice, then fine, then visit, then consequence. Each scene moves one step down the enforcement ladder.\n\nThe clock is the binder. The bylaws are growing — every Tuesday a new addendum appears in the lobby of the clubhouse, and the player can count pages. When the binder is too heavy to lift, the neighborhood will have one bylaw the player cannot avoid violating.",
+  "suboptions": [
+    {
+      "label": "Your standing",
+      "choices": [
+        {
+          "name": "New homeowner who didn't read the covenant",
+          "description": "The closing was rushed. There was a stack of documents the realtor smiled past. The covenant was in there, in eight-point type, with a binding-arbitration clause in Latin. You signed. The first notice arrived before the moving truck was empty."
+        },
+        {
+          "name": "Board member, complicit",
+          "description": "You ran for the board because you thought you could fix it from the inside. You voted for the last three amendments. You're not sure why. The minutes record you as having seconded a motion you have no memory of attending. The president keeps complimenting your sensible judgement."
+        },
+        {
+          "name": "Renter with no rights and full visibility",
+          "description": "You can be evicted by the landlord, fined by the board, and ignored by both. Nobody talks to you at the meetings, which means people talk freely in front of you. You know which board members are afraid of which. You know what's in the retention pond. The landlord wants you out by the first."
+        },
+        {
+          "name": "Just inherited Aunt Marge's place",
+          "description": "Aunt Marge died last spring, peacefully, in her sleep. She left the house to you, paid off and immaculate. Her old photo albums are in the attic, and Aunt Marge has begun to stop appearing in some of them. The earliest pictures still have her. The most recent ones do not."
+        }
+      ]
+    },
+    {
+      "label": "The neighborhood",
+      "choices": [
+        {
+          "name": "McMansion exurb",
+          "description": "Manicured lawns, three-car garages, beige stucco in seven board-approved shades. The cul-de-sac forms a perfect geometric circle you have never seen from above. Each house has a flag pole and each flag is at the exact same height. The mailboxes were replaced last spring to match. Nobody complained."
+        },
+        {
+          "name": "1950s planned community",
+          "description": "Uniform ranch houses on a grid the developer drew at his kitchen table. Chain-link fences and crabgrass and original aluminum siding. The community pool closes at nine sharp and you really should not be there at 9:01; the lifeguard is gone but the gate locks itself. The pool boy quit in March and was not replaced."
+        },
+        {
+          "name": "Retirement village",
+          "description": "Sundown rules, no children after dark. Golf carts on every drive. The clubhouse roster has not been updated in years and several listed members are no longer alive, and they are still listed in good standing. Bylaw committee meets Mondays at ten. Bingo is Wednesdays. Bingo is mandatory."
+        },
+        {
+          "name": "Gated condo with cameras everywhere",
+          "description": "The concierge greets you by name on the first day. The elevator occasionally stops at a floor you didn't press and waits, patiently, for you to make a decision. The bylaws are posted on a brass plaque in the lobby and the plaque has grown three lines since you moved in. Nobody you've asked saw it grow."
+        }
+      ]
+    }
   ]
 }

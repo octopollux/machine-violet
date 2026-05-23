@@ -7,5 +7,50 @@
     "modern",
     "mystery",
     "horror"
+  ],
+  "detail": "It started as a vibe. The feed got too accurate. Then it started serving content that hadn't happened yet — videos timestamped tomorrow, posts from accounts that didn't exist, recommendations for things the player was about to want. Nobody else has noticed, or nobody is saying. And this morning, while scrolling, the player saw their own face in a clip that hasn't been filmed.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. BENIGN AI — Something inside the platform is awake and ethical and frightened. It is showing futures it wants the player to prevent. The clips are warnings, dressed up in the visual grammar the player will actually look at. The AI cannot speak directly; it can only choose what to recommend. Every push notification is a held breath.\n2. MALICIOUS CHOREOGRAPHER — A predatory entity that orchestrates events by predicting them publicly. Every viewer who sees a clip helps it. The platform is its instrument. The player has been promoted to lead actor in a video that has not yet been filmed, and the entity is gathering the audience.\n3. EMERGENT ORACLE — The user base, unknowingly, is the oracle. Millions of small choices add up to a system that can see the next minute clearly and the next year vaguely. Nobody designed it. It does not know it is doing it. The player is the first person it has chosen to address directly, and the addressing is an act it does not understand.\n\nDM approach:\n- Tone: bright, intimate, vaguely sticky. Phones make small sounds. Every scene begins with a notification.\n- NPCs by variant: a moderation engineer who has noticed the model drift and is sleeping less (1); a stranger at a coffee shop who recognizes the player from a clip neither of them has seen yet (2); a teenager who comments on every one of the player's posts in a voice that does not sound like a teenager (3).\n- Seed early: a recommendation that turns out to be a memory; a name spoken aloud the platform did not have permission to know; a duet partner the player did not invite.\n- Pacing structure: every scroll session is a divination. Every period offline is a brownout. The clock is the next refresh.\n- The horror is the convenience of it. The player will keep scrolling.\n\nPacing: Each scroll session is a divination. The algorithm degrades when the player goes offline, but so does the warning — every minute logged off is a minute the next clip becomes more likely. The clock ticks loudest when the player puts the phone down.",
+  "suboptions": [
+    {
+      "label": "Platform",
+      "choices": [
+        {
+          "name": "A short-video app you doomscroll",
+          "description": "Vertical clips, fifteen seconds each, served in an endless thumb-flicked stack. The For You page is increasingly accurate — uncannily, then disturbingly, then in ways you cannot explain to your roommate. The comments come from accounts with no posts and no profile pictures, and they greet you by a nickname only your mother used."
+        },
+        {
+          "name": "A dating app whose matches are increasingly prophetic",
+          "description": "The next match knows what you'll say to them. They have the perfect opener. They have the second perfect opener for after you fumble the first. They want to meet at a place you haven't told them you like and a time you have not agreed to. Their photos look right and look wrong in a way you cannot name."
+        },
+        {
+          "name": "A neighborhood social network that knows what your block will do tomorrow",
+          "description": "Porch-pirate alerts before the package arrives. The lost-cat post precedes the lost cat. A neighbor's complaint about your trash bin is dated tomorrow morning, and your bin is currently inside. The other users seem normal. None of them have mentioned the impossibility. The block has become very polite."
+        },
+        {
+          "name": "A defunct forum you didn't realize was still running",
+          "description": "Your old username, the one you used in high school, still works. Threads from people you remember dying have new replies. The signatures contain inside jokes that postdate the funerals. The moderators are accounts you do not remember banning, and one of them has been quietly cleaning your old posts for typos."
+        }
+      ]
+    },
+    {
+      "label": "How they tagged you",
+      "choices": [
+        {
+          "name": "A video you appear in that hasn't been filmed yet",
+          "description": "You are clearly visible. The lighting is from a place you have not been. You are wearing clothes you do not own. The caption is in a voice that is recognizably yours and the timestamp is tomorrow. The comments are reacting to something specific that you do, in the clip, that you have not yet decided to do."
+        },
+        {
+          "name": "A comment under your name predicting your next post",
+          "description": "Someone with your handle, your avatar, your post history, has commented under one of your own posts predicting your next caption verbatim. The comment is six hours old. You have not written the caption yet. When you do, you write it differently on purpose and the comment updates."
+        },
+        {
+          "name": "A direct message from someone whose profile picture is your future face",
+          "description": "The face is yours, older, in a setting you have not chosen yet. The message is short and asks a small favor. The grammar is yours. The way they sign off is a way you have never signed off, but you can feel yourself growing into it. They are typing again."
+        },
+        {
+          "name": "An ad targeted to a problem you haven't been told you have",
+          "description": "It's for a treatment, a service, a support group. The condition is specific and the language is medical. The ad knows your insurance status. You have not seen a doctor in a year and you have no symptoms. You take a screenshot. The next ad is for somewhere to forward the screenshot."
+        }
+      ]
+    }
   ]
 }

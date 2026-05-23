@@ -6,5 +6,50 @@
   "genres": [
     "fantasy",
     "meta"
+  ],
+  "detail": "Somewhere in the canon, in small print, in a chapter most readers skim, there is a sentence about the player. It names them, or almost names them. It tells a story about something they did, or did not do. It is read in temples in a dozen languages, and the people who read it pause at the player's name for a second and then move on. The player has lived their life around this fact. Today, somebody is going to ask them about it.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE FOOTNOTE GOT YOU WRONG — You did the thing in the text. The text is wrong about why. The canon describes a betrayal, a miracle, a death, a refusal — and the canon ascribes a motive that is the opposite of the one you had. You have spent your life as the wrong kind of villain or the wrong kind of saint. Correcting the record is a kind of resurrection. It is also a kind of suicide.\n2. YOU NEVER EXISTED — Someone wrote you into the text to hide a real person. The footnote is camouflage. The real person, the one your name is covering for, is alive, and aware, and angry that the camouflage is now walking around. They are hunting you to put the record back in order. They are well-funded and patient and they have the inside of the scripture memorized.\n3. THE FOOTNOTE IS CORRECT — Everything else in the holy text is the lie. The footnote, with its mundane sentence about you, is the only honest line. You know this because you remember the events. Nobody else does. Telling anyone the truth would unmake their world, which is the only world they have.\n\nDM approach:\n- Tone: a long quiet, the weight of words other people memorized.\n- NPCs: a priest who has been waiting all their life to meet you; a scholar with a worn copy of the chapter; an inquisitor whose manual quotes you; the real subject of the footnote, in variant 2.\n- Pacing structure: your existence creates small escalating breaks in the world — a hill that should not be there, a saint's statue that no longer matches its description, a holy day whose date has begun to slip.\n- Seed early: someone misquoting you to your face, and almost recognizing you while they do it.\n- The text is doing the player's work for them, and against them, every day. Use that.\n\nPacing: each session, a small thing in the world goes wrong in proportion to the player's continued presence in it. A relic loses its provenance. A pilgrim route loses a stop. A holy day shifts by one. The player can read the clock by walking into any temple and asking what day it is.",
+  "suboptions": [
+    {
+      "label": "The footnote",
+      "choices": [
+        {
+          "name": "A betrayal you didn't commit",
+          "description": "The text says you handed over the saint. You walked into the room. You said nothing. The text records a kiss, an embrace, a word. You did not give the kiss. You were there for another reason, and the text has confused proximity for participation, and the confusion is now scripture."
+        },
+        {
+          "name": "A miracle you didn't perform",
+          "description": "Something extraordinary happened. The text credits it to your hand. It was not your hand. You were standing nearby, and the credit fell on you the way credit falls — by accident and conviction. People come to you for healings you cannot perform. You have not yet refused them all."
+        },
+        {
+          "name": "A death you didn't die",
+          "description": "The chapter says you were martyred. There is a feast day. There are children named for you. You are alive. You have been alive for the entire span of your own veneration. The question of why you have not corrected the record is, at this point, an answer in itself."
+        },
+        {
+          "name": "A name that was never yours",
+          "description": "The footnote uses a name you have never been called by anyone who knew you. It is close to your name. It is not your name. The misnaming is small enough that scholars debate it and large enough that you might, technically, deny everything by pointing at the spelling."
+        }
+      ]
+    },
+    {
+      "label": "The current age",
+      "choices": [
+        {
+          "name": "Crusading orthodoxy",
+          "description": "Heretics are hunted and the manuals are precise. Your name appears in the manuals, in a context you would prefer it did not. Travel requires papers. Papers require a name. You can be recognized at any border crossing by any clerk who has done his homework, and many of them have."
+        },
+        {
+          "name": "Reformation schism",
+          "description": "Two factions want your story for opposite ends. The reformers want a martyr they can canonize against the old guard. The old guard wants you buried, quietly and quickly, before the reformers can find you. Both sides will be polite until the moment they are not."
+        },
+        {
+          "name": "Decadent late empire",
+          "description": "Nobody cares about scripture anymore, which is worse. The text is treated as poetry, performed at salons and quoted in songs. You are a punchline. Your name appears in a popular tavern ballad with a rhyme that has stuck. Being mocked by people who do not know you exist is a particular humiliation."
+        },
+        {
+          "name": "Post-collapse remnant",
+          "description": "Only fragments of the canon survive. One fragment, by accident, includes you. The locals quote your name as a synonym for a quality — courage, or treachery, or patience — and do not know that it is a name. The fragment is the foundation of their small theology."
+        }
+      ]
+    }
   ]
 }

@@ -7,5 +7,50 @@
     "horror",
     "sci-fi",
     "modern"
+  ],
+  "detail": "Between the stations on the dial there is static, and inside the static there is a third channel. It is faint. It is intermittent. It is broadcasting the player's name. The player has heard it three times. The third time they wrote down what came after the name.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. REFUGEES — Something is hunting on a band the player can almost hear. The voices on the interstitial are people fleeing it, asking for asylum on a frequency that won't carry them home. Their syllables hurt to hear because they were not shaped by mouths that fit human ears. Granting asylum is possible. Hosting them is harder than the player will guess.\n2. THE ARCHIVE — A library indexes every broadcast ever made — news bulletins, dispatch chatter, prayers said into open mics, lullabies. Someone has been editing the archive. The edits are starting to include the player. The player's earlier broadcasts are being trimmed, and the trims are starting to retroactively trim the player.\n3. THE PREDATOR — A thing uses radio as its hunting medium. It waits for someone to notice it. The player noticed it. It now knows the player's name, the player's location, and the wavelengths the player will be on tonight, tomorrow, and the night the player meant to sleep through.\n\nDM approach:\n- Tone: low room hum, the specific physical attention of someone hunched over a receiver. The horror is auditory and the silence is the loudest part.\n- NPCs to seed: a previous listener who left a logbook; one correspondent on the interstitial who is reachable; one mundane person in the player's life who is starting to ask why the player is up all night.\n- Pacing structure: the signal is intermittent. The player has to be at the receiver to hear it. When the player is not listening, things happen on the channel anyway, and the player will learn this later.\n- Seed early: a word the player heard but doesn't remember writing down; a station that used to be on a frequency the player listens to and isn't anymore.\n- The interstitial answers. Not always. Not predictably. Sometimes it answers a question the player asked yesterday.\n\nPacing: The signal is intermittent. In dead air, you can hear it answer back. Sessions are structured around listening windows — when the signal is strong, when it's weak, when it cuts out. The clock the player can read is the SNR meter, or the warmth of the tubes, or the spectrum waterfall.",
+  "suboptions": [
+    {
+      "label": "How you found the channel",
+      "choices": [
+        {
+          "name": "Inherited the radio",
+          "description": "It was your father's, or your aunt's, or a grandparent you barely remember. It came to you in a box of estate items along with a tin of paper clips and a folded shirt. You plugged it in because it was beautiful and because you were curious. The channel was the first thing it pulled in, as if the radio had been left on this frequency the whole time."
+        },
+        {
+          "name": "Built it",
+          "description": "You sourced the parts over six months from estate sales and online auctions. You read three books on RF theory. You soldered every joint yourself. The first time you powered it up, the channel was there before you'd finished tuning, and you had not finished tuning, and you have not been able to design a circuit that doesn't pick it up since."
+        },
+        {
+          "name": "Born with the ability",
+          "description": "You have been hearing it since you were small. You thought everyone heard it. You stopped mentioning it at seven, after your mother's face. You have spent your adult life calibrating around it — sleeping with white noise, avoiding tunnels, never working in a basement. Tonight, for the first time, the channel said something you understood."
+        },
+        {
+          "name": "Hired by someone who already knew",
+          "description": "They paid in cash. They gave you the frequency, the times, and a list of words to listen for. They did not tell you what the words mean or who they work for. The first week's pay is in an envelope you have not yet opened. The contract is verbal. The deadline is when you stop being useful, which they will determine."
+        }
+      ]
+    },
+    {
+      "label": "Where you listen",
+      "choices": [
+        {
+          "name": "A 1960s ham-radio shack in the basement",
+          "description": "Tube-warm and dust-fragrant. The QSL cards on the walls are from operators across three continents and two of them are dead. The logbook on the desk is in your father's handwriting and the last entry is from 1978 and there is a blank line under it that you have not been able to bring yourself to write on."
+        },
+        {
+          "name": "A car at night, parked at a turnout",
+          "description": "The antenna on the roof is the only one for miles. The dashboard glows green and you have learned to keep your eyes on the road that isn't there in front of you instead of on the meters. The signal is stronger here than anywhere else you've tried. You have not figured out why. You have not asked why."
+        },
+        {
+          "name": "A modern home studio",
+          "description": "A USB SDR, three monitors, headphones that cost more than your rent. The waterfall display shows the spectrum in real time and there is a smear of color in the dead band that should not be there and that does not appear on any other SDR within forty miles when you've checked. The smear is brighter when you say your name out loud."
+        },
+        {
+          "name": "A defunct radio station you're squatting in",
+          "description": "The building was condemned eight years ago. The transmitter still works because nobody told it to stop. You don't remember turning it on the first time. The on-air light flickers in a rhythm that has stopped feeling random. You sleep on a cot in the production booth and the channel is sometimes inside the room with you."
+        }
+      ]
+    }
   ]
 }

@@ -6,5 +6,50 @@
   "genres": [
     "fantasy",
     "mystery"
+  ],
+  "detail": "The militant orders were named for their patrons. The patrons were saints, and the saints were reliable. A prayer at the chapel door produced, in a measured number of days, a knight on the road. The system worked for centuries. It has stopped working this season. The knights still ride. They still wear the colors. They are not coming when called.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE SCHISM — A patriarch on the eastern edge of the diocese has been quietly assembling a parallel church. The saints have been re-bonded to him. He did not need an army to take the orders; he needed a liturgy and a forge. The bonds were transferred at a ceremony the chronicles do not mention. The saints did not object.\n2. THE HOSTAGE — A foreign power has the relics. The bones, the swords, the pieces of cloth — the things the saints are bonded to — are in a vault under another flag. The negotiations have begun. The negotiating party is patient and intends to bargain in coin, in territory, and in concessions the church will not be able to take back.\n3. THE COUP — The saints have concluded that the gods are dead, or were always a story, or have left. They are running the militant orders as a temporal power. They are good at it. The orders are now a state, and the state is not yet acting like one in public, and the player is one of the few people in a position to notice.\n\nDM approach:\n- Tone: empty chapels, polite knights, the smell of altar incense gone slightly stale.\n- NPCs: a village priest whose congregation is shrinking; a knight of the orders who will not say the right things in the right order; a papal investigator with a writ and an escort; the saint themselves, in a vision or in person, depending on the variant.\n- Pacing structure: every session, a place that depended on a saint's intervention discovers the intervention did not arrive. A bridge that should have been blessed. A child who should have been healed. A bandit lord who should not have lived to see Tuesday.\n- Seed early: a chapel collection plate with less in it than last month, and a parish priest who has noticed.\n- The saints are not gone. They are choosing. Let the players feel the weight of being chosen against.\n\nPacing: each session, the absence of a saint becomes visible somewhere in the world. The player can read the clock by traveling — a parish a week distant will, by the time they arrive, be the next place where a prayer went unanswered. The map fills in by negation.",
+  "suboptions": [
+    {
+      "label": "Your station",
+      "choices": [
+        {
+          "name": "A village priest whose congregation is dying",
+          "description": "The fever came in spring. The prayers, before, would have done their work. They are not doing it now. The doors of the chapel still open. The collection plate still circulates. You have stopped using the responses that promise intervention, because you have begun to feel them as small lies."
+        },
+        {
+          "name": "A Saint yourself, suddenly silent",
+          "description": "You were the answer to prayers. You felt the calls. You rode where you were summoned. The summons stopped a season ago, and you have been waiting at the chapel, increasingly humanly, for a sign that did not arrive. The relic in the reliquary downstairs is colder to the touch than it used to be."
+        },
+        {
+          "name": "A papal investigator with a writ",
+          "description": "Your authority is broad and your escort is small. You carry a writ signed in a hand that does not bear public scrutiny. Every door opens for the writ; some of them close behind you faster than they opened. You are being told, in many polite ways, to ask different questions than the ones you have."
+        },
+        {
+          "name": "An apostate hunter the saints used to protect",
+          "description": "You hunt the church's enemies. The saints would step between you and a blade. They are not stepping anymore. You have noticed first because you live closer to the edge than most. Your last three engagements were closer than they should have been, and one of your hands is going to bear the proof of that for the rest of your life."
+        }
+      ]
+    },
+    {
+      "label": "The faith",
+      "choices": [
+        {
+          "name": "Monolithic and ancient",
+          "description": "One church, one calendar, one set of names. The saints are in every village shrine and on every road marker. The institution is older than the language it preaches in. A failure of the saints is not a regional problem; it is a structural one, and the structure is not built to admit it."
+        },
+        {
+          "name": "Recently reformed, fragile",
+          "description": "The new prayer-book is half-printed. The old guard still uses the old words in private. The reform was supposed to bring the saints closer to the people. The saints have responded by stepping further away from everyone, which neither faction predicted, and both are now claiming as evidence."
+        },
+        {
+          "name": "One of many in a polytheist setting",
+          "description": "Other gods watch with interest. The temples of the rival cults have been suspiciously generous about offering aid, and suspiciously specific about the terms. Alliances are possible. So are absorptions. The saints' silence is a vacancy several other interests would like to fill."
+        },
+        {
+          "name": "Forbidden everywhere except here",
+          "description": "This is the last country where the orders ride openly. The borders are full of refugees who came for the rites and have nowhere else to take them. The crown's tolerance is conditional, and the condition was that the saints would keep delivering. They are not delivering. The crown is watching."
+        }
+      ]
+    }
   ]
 }
