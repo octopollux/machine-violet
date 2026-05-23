@@ -10,9 +10,9 @@ import React, { useEffect, useRef, useMemo, forwardRef } from "react";
 import type { FormattingNode } from "@machine-violet/shared/types/tui.js";
 import type { ResolvedTheme } from "../themes/types.js";
 import type { ApiClient } from "../../api-client.js";
-import { markdownToTags, parseFormatting } from "../formatting.js";
 import { OverlayPane } from "./OverlayPane.js";
 import type { OverlayPaneHandle } from "./OverlayPane.js";
+import { colorizeSheetLines, parseFrontMatterLines } from "../character-colorization.js";
 
 export type CharacterPaneHandle = OverlayPaneHandle;
 
@@ -53,11 +53,6 @@ export function extractSections(
   }
 
   return result;
-}
-
-/** Strip wikilink brackets: [[Name]] → Name */
-function stripWikilinks(line: string): string {
-  return line.replace(/\[\[([^\]]+)\]\]/g, "$1");
 }
 
 /**
@@ -185,16 +180,24 @@ export const CharacterPane = forwardRef<CharacterPaneHandle, CharacterPaneProps>
 
   const sheetContent = cachedContent ?? null;
 
-  // Parse Stats + Inventory sections
+  // Parse Stats + Inventory sections, then run through the shared colorizer.
+  // CharacterPane sits in the main game frame (anchor 0) — accents pull from
+  // the complement anchor (1) so headings and key labels offset the frame.
+  // Wikilinks: "strip" preserves the pane's pre-existing bare-text behavior
+  // since the pane is explicitly out of scope for future navigation.
   const styledLines = useMemo((): FormattingNode[][] | undefined => {
     if (!sheetContent) return undefined;
     const sectionLines = extractSections(sheetContent, ["Stats", "Inventory"]);
     if (sectionLines.length === 0) return undefined;
     const processed = renderMarkdownTables(sectionLines);
-    return processed.map(
-      (line) => parseFormatting(markdownToTags(stripWikilinks(line))),
-    );
-  }, [sheetContent]);
+    const frontMatter = parseFrontMatterLines(sheetContent);
+    return colorizeSheetLines(processed, {
+      theme,
+      frameAnchor: 0,
+      frontMatter,
+      wikilinks: "strip",
+    });
+  }, [sheetContent, theme]);
 
   // Show a placeholder while loading, an error message on failure, or nothing
   const placeholderLines = sheetContent == null

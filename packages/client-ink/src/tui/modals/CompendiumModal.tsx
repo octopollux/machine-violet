@@ -5,6 +5,7 @@ import type { FormattingNode } from "@machine-violet/shared/types/tui.js";
 import { CenteredModal } from "./CenteredModal.js";
 import { themeColor, deriveModalTheme } from "../themes/color-resolve.js";
 import { parseFormatting } from "../formatting.js";
+import { colorizeSheetLines } from "../character-colorization.js";
 import type {
   Compendium,
   CompendiumEntry,
@@ -131,22 +132,33 @@ export function CompendiumModal({
 
   // --- Detail view ---
   if (detail) {
+    // Format metadata rows as `**Label:** Value` so the colorizer's KV pattern
+    // tints the label like front-matter keys. Summary lines may contain
+    // [[wikilinks]] — the colorizer wraps them in a wikilink AST tag so a
+    // future navigation feature can jump to the linked sheet.
     const detailLines: string[] = [];
     detailLines.push("");
     detailLines.push(detail.summary || "(No information yet.)");
     detailLines.push("");
     if (detail.aliases && detail.aliases.length > 0) {
-      detailLines.push(`Also known as: ${detail.aliases.join(", ")}`);
+      detailLines.push(`**Also known as:** ${detail.aliases.join(", ")}`);
     }
-    const sceneLine = detail.firstScene === detail.lastScene
-      ? `Scene ${detail.firstScene}`
-      : `Scenes ${detail.firstScene}-${detail.lastScene}`;
-    detailLines.push(sceneLine);
+    const sceneValue = detail.firstScene === detail.lastScene
+      ? `${detail.firstScene}`
+      : `${detail.firstScene}-${detail.lastScene}`;
+    const sceneLabel = detail.firstScene === detail.lastScene ? "Scene" : "Scenes";
+    detailLines.push(`**${sceneLabel}:** ${sceneValue}`);
     if (detail.related.length > 0) {
-      detailLines.push(`Related: ${detail.related.join(", ")}`);
+      detailLines.push(`**Related:** ${detail.related.join(", ")}`);
     }
     detailLines.push("");
     detailLines.push("ESC to go back");
+
+    const styledLines = colorizeSheetLines(detailLines, {
+      theme,
+      frameAnchor: 1,
+      wikilinks: "preserve",
+    });
 
     return (
       <CenteredModal
@@ -155,6 +167,7 @@ export function CompendiumModal({
         height={height}
         title={detail.name}
         lines={detailLines}
+        styledLines={styledLines}
         minWidth={30}
         maxWidth={999}
         widthFraction={0.6}

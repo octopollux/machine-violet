@@ -46,6 +46,10 @@ function tagToHtml(tag: FormattingTag): string {
       return `<sup>${inner}</sup>`;
     case "color":
       return `<span style="color:${esc(tag.color)}">${inner}</span>`;
+    case "wikilink":
+      // Wikilinks are render-only AST nodes from the character/compendium
+      // colorizer. Transcript HTML doesn't link them yet; render inline.
+      return inner;
     case "center":
     case "right":
       // Alignment handled at line level; if nested, just render inline

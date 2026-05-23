@@ -3,7 +3,8 @@ import type { FormattingNode, FormattingTag, NarrativeLine, ProcessedLine } from
 /**
  * Parse DM text with inline formatting tags into a tree of FormattingNodes.
  *
- * Supported tags: <b>, <i>, <u>, <sub>, <sup>, <center>, <right>, <color=#hex>
+ * Supported tags: <b>, <i>, <u>, <sub>, <sup>, <center>, <right>, <color=#hex>,
+ * <wikilink slug=foo>...</wikilink> (render-only — emitted by the colorizer, not LLMs)
  * Unrecognized tags are stripped. Malformed tags render as plain text.
  * Tags can be nested: <b><i>bold italic</i></b>
  */
@@ -50,7 +51,7 @@ export function parseFormatting(input: string): FormattingNode[] {
     const innerContent = input.slice(parsed.end, closeIdx);
     const children = parseFormatting(innerContent);
 
-    const node = buildNode(parsed.type, parsed.color, children);
+    const node = buildNode(parsed.type, parsed.color, parsed.target, children);
     if (node) {
       result.push(node);
     } else {
@@ -550,7 +551,7 @@ function scanTagChanges(line: string): TagChange[] {
     if (tagStart === -1) break;
 
     // Try close tag first: </tagname>
-    const closeMatch = line.slice(tagStart).match(/^<\/(b|i|u|sub|sup|center|right|color)>/);
+    const closeMatch = line.slice(tagStart).match(/^<\/(b|i|u|sub|sup|center|right|color|wikilink)>/);
     if (closeMatch) {
       changes.push({ kind: "close", name: closeMatch[1], raw: closeMatch[0] });
       i = tagStart + closeMatch[0].length;
@@ -624,6 +625,7 @@ interface ParsedTag {
   tagName: string;
   type: string;
   color?: string;
+  target?: string;
   end: number; // index after the closing >
 }
 
@@ -660,6 +662,18 @@ function parseOpenTag(input: string, start: number): ParsedTag | null {
       type: "color",
       color: colorMatch[1],
       end: start + colorMatch[0].length,
+    };
+  }
+
+  // Wikilink tag: <wikilink slug=foo-bar>. Slug accepts the slugify charset
+  // (lowercase letters, digits, hyphens) — strict to keep parsing unambiguous.
+  const wikiMatch = remaining.match(/^<wikilink slug=([a-z0-9-]+)>/);
+  if (wikiMatch) {
+    return {
+      tagName: "wikilink",
+      type: "wikilink",
+      target: wikiMatch[1],
+      end: start + wikiMatch[0].length,
     };
   }
 
@@ -703,6 +717,7 @@ function findClosingTag(input: string, startAfter: number, tagName: string): num
 function buildNode(
   type: string,
   color: string | undefined,
+  target: string | undefined,
   children: FormattingNode[],
 ): FormattingTag | null {
   switch (type) {
@@ -723,6 +738,9 @@ function buildNode(
     case "color":
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- color is set when tag === "color"
       return { type: "color", color: color!, content: children };
+    case "wikilink":
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- target is set when tag === "wikilink"
+      return { type: "wikilink", target: target!, content: children };
     default:
       return null;
   }

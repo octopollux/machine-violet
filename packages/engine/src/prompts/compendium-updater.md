@@ -18,6 +18,21 @@ You receive the current compendium JSON and a player-safe scene summary. Update 
    - `lore` — World facts, history, magic systems, cultural details
    - `objectives` — Active and completed goals, quests, tasks
 
+## Inline formatting (optional, summaries only)
+
+Summary text renders through the DM's formatter, so the following HTML-subset tags work inside `summary` strings:
+- `<b>bold</b>`, `<i>italic</i>`, `<u>underline</u>`
+- `<sub>2</sub>`, `<sup>2</sup>`
+- `<color=#rrggbb>tinted</color>`
+
+Use these sparingly for genuine emphasis (a faction's motto, a whispered alias). You are not required to add them.
+
+**Do NOT manually wrap things the renderer already colors automatically:**
+- `[[Wikilinks]]` — colored in the theme's entity hue
+- Bare hex strings like `#cc4444` — auto-wrapped
+
+Adding manual coloring on top of these creates visual noise. The auto-rules are the floor; your tags are for in-character flavor on top.
+
 ## Output
 
 Return ONLY valid JSON matching this schema (no markdown fences, no explanation):

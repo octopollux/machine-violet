@@ -17,6 +17,10 @@
     "./types/*.js": {
       "source": "./src/types/*.ts",
       "default": "./dist/types/*.js"
+    },
+    "./utils/*.js": {
+      "source": "./src/utils/*.ts",
+      "default": "./dist/utils/*.js"
     }
   },
   "scripts": {

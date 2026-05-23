@@ -1,9 +1,9 @@
 import React from "react";
 import type { FormattingNode } from "@machine-violet/shared/types/tui.js";
 import type { ResolvedTheme } from "../themes/types.js";
-import { markdownToTags, parseFormatting } from "../formatting.js";
 import { CenteredModal } from "./CenteredModal.js";
 import type { CenteredModalHandle } from "./CenteredModal.js";
+import { colorizeSheetLines, parseFrontMatterLines } from "../character-colorization.js";
 
 interface CharacterSheetModalProps {
   theme: ResolvedTheme;
@@ -14,11 +14,6 @@ interface CharacterSheetModalProps {
   /** Ref for external scroll control (e.g. mouse wheel override). */
   scrollRef?: React.Ref<CenteredModalHandle>;
   topOffset?: number;
-}
-
-/** Wrap bare hex color strings (#rrggbb) in color tags so they render in their own color. */
-function colorizeHexStrings(line: string): string {
-  return line.replace(/#([0-9a-fA-F]{6})\b/g, (match) => `<color=${match}>${match}</color>`);
 }
 
 /**
@@ -47,9 +42,16 @@ export function CharacterSheetModal({
     }
   }
 
-  const styledLines: FormattingNode[][] = bodyLines.map(
-    (line) => parseFormatting(colorizeHexStrings(markdownToTags(line))),
-  );
+  // CenteredModal wraps itself in deriveModalTheme — so by the time the
+  // colorizer's heading/accent picks land in the frame, anchor 1 IS the
+  // frame's primary. Pass frameAnchor: 1 to swing accents back to anchor 0.
+  const frontMatter = parseFrontMatterLines(content);
+  const styledLines: FormattingNode[][] = colorizeSheetLines(bodyLines, {
+    theme,
+    frameAnchor: 1,
+    frontMatter,
+    wikilinks: "preserve",
+  });
 
   return (
     <CenteredModal

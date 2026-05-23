@@ -39,7 +39,12 @@ export type FormattingTag =
   | { type: "superscript"; content: FormattingNode[] }
   | { type: "center"; content: FormattingNode[] }
   | { type: "right"; content: FormattingNode[] }
-  | { type: "color"; color: string; content: FormattingNode[] };
+  | { type: "color"; color: string; content: FormattingNode[] }
+  // `target` is the slug of the linked entity, preserved through the render
+  // pipeline so future navigation features (clicking/keyboard-selecting a
+  // wikilink to jump to its sheet) have the destination available without
+  // re-parsing the source text. Render-only — not authored by LLMs.
+  | { type: "wikilink"; target: string; content: FormattingNode[] };
 
 export type FormattingNode = string | FormattingTag;
 
