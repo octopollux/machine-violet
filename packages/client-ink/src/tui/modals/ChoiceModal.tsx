@@ -111,10 +111,14 @@ export function ChoiceOverlay({
   const [selectedIndex, setSelectedIndex] = useState(defaultIndex);
   const [customInputActive, setCustomInputActive] = useState(defaultIndex === 0);
   const [customInputResetKey, setCustomInputResetKey] = useState(0);
-  // Mirrors the InlineTextInput's current value so the parent can size the
-  // custom-active row to its actual wrapped height (and the scroll/budget
-  // logic can count those lines).
+  // Mirrors the InlineTextInput's current value + cursor offset so the
+  // parent can size the custom-active row to its actual wrapped height
+  // (and the scroll/budget logic can count those lines). Tracking the
+  // cursor lets us match InlineTextInput's "extra empty wrap line only
+  // when atEnd" rule exactly — without this, moving the cursor mid-text
+  // would leave the parent's count one line too high.
   const [customInputValue, setCustomInputValue] = useState("");
+  const [customCursorOffset, setCustomCursorOffset] = useState(0);
   const scrollStartRef = useRef(0);
 
   // Reset state when choices change (e.g. choice-generator replaces DM-provided choices).
@@ -126,16 +130,24 @@ export function ChoiceOverlay({
     setCustomInputActive(idx === 0);
     setCustomInputResetKey((k) => k + 1);
     setCustomInputValue("");
+    setCustomCursorOffset(0);
     scrollStartRef.current = 0;
   }, [choicesKey, initialIndex, choices.length]);
 
   useInput((input, key) => {
     if (customInputActive) {
-      if (key.escape) { setCustomInputActive(false); return; }
+      if (key.escape) {
+        setCustomInputActive(false);
+        setCustomInputResetKey((k) => k + 1);
+        setCustomInputValue("");
+        setCustomCursorOffset(0);
+        return;
+      }
       if (key.downArrow) {
         setCustomInputActive(false);
         setCustomInputResetKey((k) => k + 1);
         setCustomInputValue("");
+        setCustomCursorOffset(0);
         setSelectedIndex(choices.length > 0 ? 1 : 0);
         return;
       }
@@ -193,16 +205,17 @@ export function ChoiceOverlay({
   //   - Idle (input not active): always 1 line ("Enter your own...").
   //   - Active and empty: 1 line (cursor + placeholder).
   //   - Active with text: ceil(len / w), plus an extra empty wrap line when
-  //     the value lands on a wrap boundary so the cursor has somewhere to sit.
-  //   Mirrors the textLines computation inside InlineTextInput so the
-  //   parent's budget matches what gets drawn. Capped at `choiceRows` so
-  //   long input scrolls *inside* the InlineTextInput (via maxLines) rather
-  //   than spilling past the bottom of the overlay.
+  //     the cursor sits at the end *and* the value lands on a wrap boundary
+  //     (matches InlineTextInput's `atEnd && len % w === 0` rule — without
+  //     the cursor check, moving off the end would over-count by 1 line).
+  // Capped at `choiceRows` so long input scrolls *inside* the InlineTextInput
+  // (via maxLines) rather than spilling past the bottom of the overlay.
   let customLineCount = 1;
   if (customInputActive && customInputValue.length > 0) {
     const w = customInputWidth;
     const len = customInputValue.length;
-    customLineCount = Math.ceil(len / w) + (len % w === 0 ? 1 : 0);
+    const atEnd = customCursorOffset === len;
+    customLineCount = Math.ceil(len / w) + (atEnd && len % w === 0 ? 1 : 0);
   }
   const customLineCap = Math.max(1, choiceRows);
   customLineCount = Math.min(customLineCount, customLineCap);
@@ -399,6 +412,7 @@ export function ChoiceOverlay({
                 maxLines={customLineCap}
                 placeholder="Enter your own..."
                 onChange={setCustomInputValue}
+                onCursorOffsetChange={setCustomCursorOffset}
                 onSubmit={handleCustomInputSubmit}
               />
             </Box>

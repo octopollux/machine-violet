@@ -130,6 +130,10 @@ export interface InlineTextInputProps {
    *  Only applies in wrap mode. */
   maxLines?: number;
   onChange?: (value: string) => void;
+  /** Fired whenever the cursor offset changes. Lets a parent that mirrors
+   *  the input's value also mirror cursor position (e.g. to replicate the
+   *  atEnd-only wrap-boundary line rule in wrap mode). */
+  onCursorOffsetChange?: (offset: number) => void;
   onSubmit?: (value: string) => void;
 }
 
@@ -138,7 +142,7 @@ export interface InlineTextInputProps {
  * Supports: left/right arrows, Home/End, Ctrl+A/E, backspace.
  * Clear by changing the React `key` prop.
  */
-export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled = false, defaultValue = "", availableWidth, placeholder, wrap, maxLines, onChange, onSubmit }: InlineTextInputProps) {
+export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled = false, defaultValue = "", availableWidth, placeholder, wrap, maxLines, onChange, onCursorOffsetChange, onSubmit }: InlineTextInputProps) {
   const initialState: State = {
     value: defaultValue,
     cursorOffset: defaultValue.length,
@@ -152,6 +156,8 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
 
   // Track last value reported to onChange to avoid duplicate callbacks.
   const lastReportedValueRef = useRef(defaultValue);
+  // Same pattern for cursor offset reporting.
+  const lastReportedCursorRef = useRef(defaultValue.length);
 
   const viewStartRef = useRef(0);
 
@@ -219,6 +225,14 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
       onChange?.(renderState.value);
     }
   }, [renderState.value, onChange]);
+
+  // Fire onCursorOffsetChange when cursor moves.
+  useEffect(() => {
+    if (renderState.cursorOffset !== lastReportedCursorRef.current) {
+      lastReportedCursorRef.current = renderState.cursorOffset;
+      onCursorOffsetChange?.(renderState.cursorOffset);
+    }
+  }, [renderState.cursorOffset, onCursorOffsetChange]);
 
   // Bracketed paste: pasted text arrives as one string and is never forwarded
   // to useInput, so embedded "\r" characters can't trigger a premature submit.

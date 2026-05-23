@@ -394,7 +394,6 @@ export function PlayingPhase() {
       choices={activeChoices.choices ?? []}
       descriptions={activeChoices.descriptions}
       maxChoiceRows={choiceRowBudget(visibleElements, 1, hasDescriptions, DESCRIPTION_ROWS)}
-      initialIndex={1}
       onSelect={handleChoiceSelect}
       onNarrativeScroll={handleNarrativeScroll}
       isActive={!menuOpen && !activeModal && !apiErrorModalActive}
