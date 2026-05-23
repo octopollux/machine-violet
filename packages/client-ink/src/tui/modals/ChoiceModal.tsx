@@ -46,7 +46,7 @@ interface ChoiceOverlayProps {
   accentColor?: string;
   /** Max visual rows for choice items. Defaults to MAX_CHOICE_ROWS (5). */
   maxChoiceRows?: number;
-  /** Initial selection index (e.g. choices.length to start on "Enter your own"). */
+  /** Initial selection index. 0 = "Enter your own" (always at the top); 1..choices.length = regular choices. */
   initialIndex?: number;
   /** Called when the player selects a choice (text) or submits custom input. */
   onSelect: (choice: string) => void;
@@ -65,6 +65,11 @@ const MAX_CHOICE_ROWS = 5;
 
 /**
  * Frameless choice list for embedding inside the Player Pane.
+ *
+ * "Enter your own" always sits at the top of the choice list (index 0).
+ * Choices are top-anchored: as items wrap to more visual rows, the list
+ * extends downward (pushing later options down) while the freeform row
+ * stays put.
  *
  * Without descriptions — 7-row layout:
  *   Row 0: prompt text
@@ -98,31 +103,52 @@ export function ChoiceOverlay({
     : [];
 
   const showCustomInput = true;
-  const totalOptions = choices.length + 1; // +1 for "Enter your own"
-  const defaultIndex = initialIndex ?? (choices.length < 5 ? choices.length : 0);
+  const totalOptions = choices.length + 1; // +1 for "Enter your own" (index 0)
+  // "Enter your own" sits at index 0. For short lists, default focus there
+  // so the player can type without navigating; for long lists, default to
+  // the first real choice (index 1).
+  const defaultIndex = initialIndex ?? (choices.length < 5 ? 0 : 1);
   const [selectedIndex, setSelectedIndex] = useState(defaultIndex);
-  const [customInputActive, setCustomInputActive] = useState(defaultIndex === choices.length);
+  const [customInputActive, setCustomInputActive] = useState(defaultIndex === 0);
   const [customInputResetKey, setCustomInputResetKey] = useState(0);
+  // Mirrors the InlineTextInput's current value + cursor offset so the
+  // parent can size the custom-active row to its actual wrapped height
+  // (and the scroll/budget logic can count those lines). Tracking the
+  // cursor lets us match InlineTextInput's "extra empty wrap line only
+  // when atEnd" rule exactly — without this, moving the cursor mid-text
+  // would leave the parent's count one line too high.
+  const [customInputValue, setCustomInputValue] = useState("");
+  const [customCursorOffset, setCustomCursorOffset] = useState(0);
   const scrollStartRef = useRef(0);
 
   // Reset state when choices change (e.g. choice-generator replaces DM-provided choices).
   // Keyed on the serialized choices array so we only reset when actual options change.
   const choicesKey = rawChoices.join("\0");
   useEffect(() => {
-    const idx = initialIndex ?? (choices.length < 5 ? choices.length : 0);
+    const idx = initialIndex ?? (choices.length < 5 ? 0 : 1);
     setSelectedIndex(idx);
-    setCustomInputActive(idx === choices.length);
+    setCustomInputActive(idx === 0);
     setCustomInputResetKey((k) => k + 1);
+    setCustomInputValue("");
+    setCustomCursorOffset(0);
     scrollStartRef.current = 0;
   }, [choicesKey, initialIndex, choices.length]);
 
   useInput((input, key) => {
     if (customInputActive) {
-      if (key.escape) { setCustomInputActive(false); return; }
-      if (key.upArrow) {
+      if (key.escape) {
         setCustomInputActive(false);
         setCustomInputResetKey((k) => k + 1);
-        setSelectedIndex(choices.length - 1);
+        setCustomInputValue("");
+        setCustomCursorOffset(0);
+        return;
+      }
+      if (key.downArrow) {
+        setCustomInputActive(false);
+        setCustomInputResetKey((k) => k + 1);
+        setCustomInputValue("");
+        setCustomCursorOffset(0);
+        setSelectedIndex(choices.length > 0 ? 1 : 0);
         return;
       }
       if (key.pageUp || key.pageDown) {
@@ -132,21 +158,24 @@ export function ChoiceOverlay({
       return;
     }
 
-    if (key.upArrow) { setSelectedIndex((i) => Math.max(0, i - 1)); return; }
-    if (key.downArrow) {
+    if (key.upArrow) {
       setSelectedIndex((i) => {
-        const next = Math.min(totalOptions - 1, i + 1);
-        if (next === choices.length) setCustomInputActive(true);
+        const next = Math.max(0, i - 1);
+        if (next === 0) setCustomInputActive(true);
         return next;
       });
       return;
     }
+    if (key.downArrow) {
+      setSelectedIndex((i) => Math.min(totalOptions - 1, i + 1));
+      return;
+    }
     if (key.return) {
-      if (selectedIndex === choices.length) {
+      if (selectedIndex === 0) {
         setCustomInputActive(true);
         return;
       }
-      const chosen = stripLeadingBullet(stripFormatting(choices[selectedIndex]));
+      const chosen = stripLeadingBullet(stripFormatting(choices[selectedIndex - 1]));
       onSelect(chosen);
       return;
     }
@@ -170,9 +199,39 @@ export function ChoiceOverlay({
   // Prefix layout: [arrow 1ch][gap 1ch][cursor 1ch][space 1ch] = 4 chars
   const prefixWidth = 4;
   const labelWidth = Math.max(1, width - prefixWidth);
+  const customInputWidth = Math.max(1, width - prefixWidth);
+
+  // Visual line count for the custom-input row.
+  //   - Idle (input not active): always 1 line ("Enter your own...").
+  //   - Active and empty: 1 line (cursor + placeholder).
+  //   - Active with text: ceil(len / w), plus an extra empty wrap line when
+  //     the cursor sits at the end *and* the value lands on a wrap boundary
+  //     (matches InlineTextInput's `atEnd && len % w === 0` rule — without
+  //     the cursor check, moving off the end would over-count by 1 line).
+  // Capped at `choiceRows` so long input scrolls *inside* the InlineTextInput
+  // (via maxLines) rather than spilling past the bottom of the overlay.
+  let customLineCount = 1;
+  if (customInputActive && customInputValue.length > 0) {
+    const w = customInputWidth;
+    const len = customInputValue.length;
+    const atEnd = customCursorOffset === len;
+    customLineCount = Math.ceil(len / w) + (atEnd && len % w === 0 ? 1 : 0);
+  }
+  const customLineCap = Math.max(1, choiceRows);
+  customLineCount = Math.min(customLineCount, customLineCap);
 
   interface WrappedItem { index: number; isCustom: boolean; lines: FormattingNode[][] }
   const allItems: WrappedItem[] = [];
+  if (showCustomInput) {
+    const customLines: FormattingNode[][] = customInputActive
+      ? Array.from({ length: customLineCount }, () => [] as FormattingNode[])
+      : [["Enter your own..."]];
+    allItems.push({
+      index: 0,
+      isCustom: true,
+      lines: customLines,
+    });
+  }
   for (let i = 0; i < choices.length; i++) {
     const nodes = parseFormatting(choices[i]);
     const lines = wrapNodes(nodes, labelWidth);
@@ -182,14 +241,7 @@ export function ChoiceOverlay({
       const lastLine = lines[MAX_CHOICE_ROWS - 1];
       lines[MAX_CHOICE_ROWS - 1] = [...lastLine, "…"];
     }
-    allItems.push({ index: i, isCustom: false, lines });
-  }
-  if (showCustomInput) {
-    allItems.push({
-      index: choices.length,
-      isCustom: true,
-      lines: [["Enter your own..."]],
-    });
+    allItems.push({ index: i + 1, isCustom: false, lines });
   }
 
   // Find visible window: fit items within choiceRows visual rows,
@@ -256,9 +308,10 @@ export function ChoiceOverlay({
       ? prompt.slice(0, width - 1) + "…"
       : prompt;
 
-  // Description for highlighted choice (word-wrapped to fixed rows)
-  const descText = hasDescriptions && selectedIndex < (descriptions?.length ?? 0)
-    ? (descriptions ?? [])[selectedIndex] ?? ""
+  // Description for highlighted choice (word-wrapped to fixed rows).
+  // selectedIndex 0 = "Enter your own" (no description); 1..N = choices[i-1].
+  const descText = hasDescriptions && selectedIndex > 0 && (selectedIndex - 1) < (descriptions?.length ?? 0)
+    ? (descriptions ?? [])[selectedIndex - 1] ?? ""
     : "";
   const descLines: FormattingNode[][] = hasDescriptions ? wrapToFixedRows(descText, width, DESCRIPTION_ROWS) : [];
 
@@ -267,17 +320,12 @@ export function ChoiceOverlay({
     ? "↵ submit  ESC back"
     : "↵ select";
 
-  const customInputWidth = Math.max(1, width - prefixWidth);
-
   return (
     <Box flexDirection="column" flexGrow={1} width={width}>
       {/* Row 0: prompt text */}
       <Box>
         <Text>{displayPrompt}</Text>
       </Box>
-
-      {/* Growth space: empty area between prompt and bottom-justified choices */}
-      <Box flexGrow={1} />
 
       {/* Description region (fixed height, only when descriptions provided) */}
       {hasDescriptions && (
@@ -292,6 +340,13 @@ export function ChoiceOverlay({
 
       {/* Choice rows — arrow column (col 0) + cursor column (col 1) */}
       {visualRows.map((row, rowIdx) => {
+        // The active custom input renders all its visual lines from a single
+        // InlineTextInput placed on the first row. Drop the placeholder rows
+        // for lines 1..N-1 so they don't double-count vertically.
+        if (row.isCustom && customInputActive && !row.isItemFirstLine) {
+          return null;
+        }
+
         const isSelected = row.itemIndex === selectedIndex;
 
         // Arrow column: ▲ on row 0, ▼ on row 1 — bright when scrollable, dimmed otherwise
@@ -318,17 +373,46 @@ export function ChoiceOverlay({
           ? <Text color={accentColor}>{" " + cursorStr + " "}</Text>
           : <Text>{" " + cursorStr + " "}</Text>;
 
-        // Special rendering for active custom input — wraps to multiple lines
+        // Special rendering for active custom input — wraps to multiple lines.
+        // The arrow and cursor columns are rendered as their own N-tall
+        // columns so they line up row-by-row with the InlineTextInput's
+        // wrapped lines (in particular, ▼ stays visible on the second visual
+        // line when the input has wrapped).
         if (row.isCustom && customInputActive && row.isItemFirstLine) {
+          const arrowColumn = Array.from({ length: customLineCount }, (_, i) => {
+            if (i === 0) {
+              return canScrollUp
+                ? <Text key={i} color="#aaff00">▲</Text>
+                : <Text key={i} dimColor>▲</Text>;
+            }
+            if (i === 1) {
+              return canScrollDown
+                ? <Text key={i} color="#aaff00">▼</Text>
+                : <Text key={i} dimColor>▼</Text>;
+            }
+            return <Text key={i}> </Text>;
+          });
+          const cursorColumn = Array.from({ length: customLineCount }, (_, i) => {
+            if (i === 0) {
+              return accentColor
+                ? <Text key={i} color={accentColor}>{" > "}</Text>
+                : <Text key={i}>{" > "}</Text>;
+            }
+            return <Text key={i}>{"   "}</Text>;
+          });
           return (
             <Box key="custom-active">
-              {arrowElement}{cursorElement}
+              <Box flexDirection="column">{arrowColumn}</Box>
+              <Box flexDirection="column">{cursorColumn}</Box>
               <InlineTextInput
                 key={customInputResetKey}
                 isDisabled={!isActive}
                 availableWidth={customInputWidth}
                 wrap
+                maxLines={customLineCap}
                 placeholder="Enter your own..."
+                onChange={setCustomInputValue}
+                onCursorOffsetChange={setCustomCursorOffset}
                 onSubmit={handleCustomInputSubmit}
               />
             </Box>
@@ -342,6 +426,10 @@ export function ChoiceOverlay({
           </Box>
         );
       })}
+
+      {/* Growth space: pushes help to the bottom while choices stay top-anchored,
+        * so wrapped choices expand downward (not upward) into the empty area. */}
+      <Box flexGrow={1} />
 
       {/* Bottom row: right-aligned help */}
       <Box justifyContent="flex-end">

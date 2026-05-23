@@ -132,7 +132,7 @@ describe("ChoiceOverlay", () => {
         width={60}
         prompt="What do you do?"
         choices={["Attack", "Flee", "Negotiate"]}
-        initialIndex={0}
+        initialIndex={1}
         onSelect={noop}
       />,
     );
@@ -152,7 +152,7 @@ describe("ChoiceOverlay", () => {
         width={60}
         prompt="Pick one"
         choices={["A", "B", "C", "D", "E", "F", "G"]}
-        initialIndex={5}
+        initialIndex={6}
         onSelect={noop}
       />,
     );
@@ -170,7 +170,7 @@ describe("ChoiceOverlay", () => {
         width={60}
         prompt="Pick one"
         choices={["A", "B", "C", "D", "E", "F", "G"]}
-        initialIndex={6}
+        initialIndex={7}
         onSelect={noop}
       />,
     );
@@ -207,7 +207,7 @@ describe("ChoiceOverlay", () => {
         width={60}
         prompt="Pick one"
         choices={["A", "B"]}
-        initialIndex={0}
+        initialIndex={1}
         onSelect={noop}
       />,
     );
@@ -223,7 +223,7 @@ describe("ChoiceOverlay", () => {
         width={60}
         prompt="Pick one"
         choices={["A", "B"]}
-        initialIndex={0}
+        initialIndex={1}
         onSelect={noop}
       />,
     );
@@ -238,21 +238,40 @@ describe("ChoiceOverlay", () => {
         width={60}
         prompt="What do you do?"
         choices={["Attack", "Flee"]}
-        initialIndex={0}
+        initialIndex={1}
         onSelect={noop}
       />,
     );
     expect(lastFrame()!).toContain("Enter your own...");
   });
 
+  it("shows Enter your own at the top of the list", () => {
+    const { lastFrame } = render(
+      <ChoiceOverlay
+        width={60}
+        prompt="What do you do?"
+        choices={["Attack", "Flee"]}
+        initialIndex={1}
+        onSelect={noop}
+      />,
+    );
+    const lines = lastFrame()!.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+    const customRow = lines.findIndex((l) => l.includes("Enter your own"));
+    const attackRow = lines.findIndex((l) => l.includes("Attack"));
+    const fleeRow = lines.findIndex((l) => l.includes("Flee"));
+    expect(customRow).toBeGreaterThanOrEqual(0);
+    expect(customRow).toBeLessThan(attackRow);
+    expect(attackRow).toBeLessThan(fleeRow);
+  });
+
   it("shows submit/back help text when custom input is active", () => {
-    // initialIndex = choices.length activates custom input mode
+    // initialIndex = 0 activates custom input mode (custom is at the top now)
     const { lastFrame } = render(
       <ChoiceOverlay
         width={60}
         prompt="What do you do?"
         choices={["Attack"]}
-        initialIndex={1}
+        initialIndex={0}
         onSelect={noop}
       />,
     );
@@ -270,7 +289,7 @@ describe("ChoiceOverlay", () => {
           "<color=#cc4444>Dread and Horror</color> — Slow burn",
           "<b>Grim Survival</b> — Desperate",
         ]}
-        initialIndex={0}
+        initialIndex={1}
         onSelect={noop}
       />,
     );
@@ -291,7 +310,7 @@ describe("ChoiceOverlay", () => {
         width={60}
         prompt="Pick"
         choices={["A", "B", "C"]}
-        initialIndex={0}
+        initialIndex={1}
         onSelect={noop}
       />,
     );
@@ -309,7 +328,7 @@ describe("ChoiceOverlay", () => {
           "A <b>dark</b> and <color=#22aa44>mossy</color> trail",
           "Echoing <i>whispers</i> from within",
         ]}
-        initialIndex={0}
+        initialIndex={1}
         onSelect={noop}
       />,
     );
@@ -332,7 +351,8 @@ describe("ChoiceOverlay", () => {
         width={40}
         prompt="What next?"
         choices={[longChoice, "◆ Rest"]}
-        initialIndex={0}
+        initialIndex={1}
+        maxChoiceRows={10}
         onSelect={noop}
       />,
     );
@@ -351,7 +371,7 @@ describe("ChoiceOverlay", () => {
         width={30}
         prompt="Pick"
         choices={[longChoice, "◆ Short"]}
-        initialIndex={0}
+        initialIndex={1}
         onSelect={noop}
       />,
     );
