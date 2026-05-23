@@ -1,0 +1,25 @@
+{
+  "name": "@machine-violet/test-harness",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./scenarios/*.js": {
+      "source": "./src/scenarios/*.ts",
+      "default": "./dist/scenarios/*.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@machine-violet/shared": "*"
+  }
+}

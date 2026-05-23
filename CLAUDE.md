@@ -49,6 +49,46 @@ Reserve `npm run check` for the pre-commit / pre-PR gate. Use your judgement: fu
 
 Live API key in `.env` with limited credit. Default dev override uses Sonnet for DM. Don't make unnecessary API calls in manual testing.
 
+## Validating changes end-to-end
+
+Before reporting any cross-cutting change as done — anything touching UI flow, session lifecycle, the setup agent, the DM loop, save/load, or any code path that spans server + client + WebSocket — **run a harness scenario**. Type checks and unit tests do not prove the flow works end-to-end.
+
+```bash
+npm run e2e:boot           # 10s, no API key — precondition for everything else
+npm run e2e:golden-path    # 5-10 min, real LLM calls — the baseline smoke test
+npm run e2e -- <id>        # any scenario from packages/test-harness/src/scenarios/
+```
+
+**The golden path** is the minimum every smoke run does: New Campaign → walk setup-agent → handoff to live campaign → wait for first DM turn (3-5 min, watched via state transitions, not timers) → submit one player turn → receive DM response. Then the harness hard-kills its subprocess — save-on-exit is unit-tested elsewhere and we deliberately skip it to avoid burning a Haiku recap call on every smoke run. Failure prints the screen + state + launcher log so you can diagnose without re-running.
+
+The harness auto-detects an existing `connections.json` by walking up from the worktree (so any worktree can run the live golden path without copying credentials around).
+
+See [docs/e2e-harness.md](docs/e2e-harness.md) for the full scenario catalogue, harness primitives, and how to add a new scenario. New scenarios get registered in `packages/test-harness/bin/run.ts`.
+
+Do not bypass the harness with a hand-rolled `setTimeout` or a "give it 5 minutes" wait — every wait is anchored to an observable state change. If you find yourself reaching for a timer, look in `Harness` for the `waitFor*` helper that fits.
+
+### Parallelize validation: live test in the main thread, lint/tests in a subagent
+
+The golden path is 5-12 minutes of wall-clock waiting. Lint + tests is ~80s. Run them in parallel — but use **different mechanisms**, because subagent Bash has a 10-minute hard cap that breaks live polling.
+
+**Live smoke test** → main thread, `Bash` with `run_in_background: true`:
+
+```
+npm run e2e -- golden-path
+```
+
+Launch it and continue with other work in the same turn (write the commit message, update docs, plan the next change). The harness auto-invokes you when the process exits, with the full output captured to a tasks/ file. No polling, no babysitting. Foreground `timeout` does not apply to background commands.
+
+**Lint + typecheck + tests** → subagent (`general-purpose`):
+
+> Run `npm run check` and `npx tsc -b` from repo root. PASS → one line. FAIL → paste failure verbatim, no commentary.
+
+~80s, returns cleanly.
+
+**Do NOT delegate the live smoke test to a subagent.** The subagent's Bash tool has a 10-minute hard ceiling. A 12-minute golden path hits that ceiling mid-poll, the agent sees the bash timeout, and returns with "the test is making progress, I'll wait for the notification" — but there is no notification, and the test gets orphaned. Burned an entire test run finding this out the hard way. The main-thread background pattern doesn't share that cap.
+
+**Don't tail the background output in subsequent turns.** Just keep working. When the process exits, the harness re-invokes you with a `<task-notification>` containing the final output path. Read the tail of that file then — not before.
+
 ## Worktrees
 
 **Always use a worktree for code changes.** Multiple Claude instances may run concurrently against this repo. Working directly on `main` risks branch collisions and lost commits. Use `EnterWorktree` at the start of every task and `ExitWorktree` when done.
