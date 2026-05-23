@@ -274,11 +274,15 @@ jobs:
           - Describe user-facing bug fixes and features in plain,
             friendly language a player would understand.
           - A few concise bullet points in markdown. No heading, no preamble.
-          - If a PR's data includes a "Closes issues:" section, append
-            markdown links for those issues to the matching bullet, e.g.
-            "([#45](https://github.com/owner/repo/issues/45))". Use the
-            exact URL from the "Closes issues:" list. Only link issues
-            tied to user-facing changes — skip them for internal commits.
+          - Append issue links ONLY when that PR's context contains a
+            "Closes issues:" section. For each issue listed there, add a
+            markdown link in parens at the end of the matching bullet,
+            e.g. "([#45](https://github.com/owner/repo/issues/45))".
+            Copy the number and URL verbatim from "Closes issues:" —
+            never construct a URL, and never link a PR number. The
+            "## PR #N:" heading is context for you, NOT a link target;
+            if a PR has no "Closes issues:" section its bullet has no
+            trailing link.
           - If there are genuinely no player-facing changes, output exactly:
             "Internal improvements and maintenance."
 
