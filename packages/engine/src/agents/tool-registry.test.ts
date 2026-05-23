@@ -35,8 +35,11 @@ function mockState(): GameState {
 describe("ToolRegistry", () => {
   it("registers all T1 tools", () => {
     const reg = createTestRegistry();
-    // Map (3) + Dice (1) + Deck (1) + Clocks (2) + Combat (4) + TUI (6) + Scene (3) + Entity (5) + Objectives (1) + Search (2) + Player (1) = 29
-    expect(reg.size).toBe(29);
+    // Map (3) + Dice (1) + Deck (1) + Clocks (2) + Combat (4) + TUI (6) + Scene (3)
+    //   + Entity-narrative (5: scribe/dm_notes/resolve_turn/promote_character/search)
+    //   + Entity-CRUD (6: entity/describe_entity_type/list_entity_types/validate_entity/find_schema_drift/detect_orphans)
+    //   + Objectives (1) + Search (2) + Player (1) = 35
+    expect(reg.size).toBe(35);
   });
 
   it("generates API-compatible tool definitions", () => {

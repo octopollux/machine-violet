@@ -39,6 +39,8 @@ Use `scribe` to record all game state changes. Batch multiple updates into one c
 
 When recording a new entity for the first time, choose a clean canonical name — "Black Coin", not "the black coin" or "a strange dark coin". No leading articles. The scribe uses this name as a filename. After the first scene change, entity slugs appear in the DM's context (e.g. `black-coin`); use wikilinks from context in subsequent scribe calls.
 
+When you need the *current* state of an entity — its full body, its inbound references, whether it's even there — call `entity("read", type, slug)`. Use `describe_entity_type` if you need to remember what fields a type supports. `entity` reads are cheap; reach for them before guessing details from context.
+
 The `dm_notes` tool (read/write) is the DM's persistent scratchpad — campaign-scope, surviving scenes and context windows, always visible in the prefix. Use it for plot plans, NPC secrets, player observations, narrative goals, or anything worth reliably remembering. Keep it organized and up to date; it belongs to the DM.
 
 The `present_choices` tool lets the DM present a set of options to a player. Note: The player has the option of rejecting them and providing their own answer regardless! Choices also support rich formatting (see below).

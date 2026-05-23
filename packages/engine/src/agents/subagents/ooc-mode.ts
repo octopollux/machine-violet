@@ -18,7 +18,6 @@ import type { MapData } from "@machine-violet/shared/types/maps.js";
 import type { ClocksState } from "@machine-violet/shared/types/clocks.js";
 import { findReferences } from "../../tools/campaign-ops/index.js";
 import { validateCampaign } from "../../tools/validation/index.js";
-import { resolveCampaignPath } from "../../utils/paths.js";
 import { runProviderLoop } from "../../providers/agent-loop-bridge.js";
 import type { ModeSession } from "@machine-violet/shared/types/engine.js";
 
@@ -35,9 +34,10 @@ export type EngineAsyncToolHandler = (
   input: Record<string, unknown>,
 ) => Promise<ToolResult | null>;
 
-/** Tools that exist only in OOC — file/git inspection. Layered on top of the
- *  full DM toolset; not present in the singleton registry. */
-const OOC_ONLY_TOOL_NAMES = ["read_file", "find_references", "validate_campaign", "get_commit_log"] as const;
+/** Tools that exist only in OOC — git/validation extras. Layered on top of the
+ *  full DM toolset; not present in the singleton registry. Entity reads use
+ *  the new `entity` tool, so `read_file` is no longer surfaced here. */
+const OOC_ONLY_TOOL_NAMES = ["find_references", "validate_campaign", "get_commit_log"] as const;
 const OOC_ONLY_TOOL_SET = new Set<string>(OOC_ONLY_TOOL_NAMES);
 
 /** Tools deliberately excluded from OOC's view of the registry.
@@ -151,17 +151,6 @@ export function buildOOCTools(registry: ToolRegistry): NormalizedTool[] {
 
   tools.push(
     {
-      name: "read_file",
-      description: "Read a campaign file by relative path (e.g. 'characters/kael.md').",
-      inputSchema: {
-        type: "object" as const,
-        properties: {
-          path: { type: "string", description: "Relative path within the campaign directory" },
-        },
-        required: ["path"],
-      },
-    },
-    {
       name: "find_references",
       description: "Find all wikilinks pointing to an entity. Returns file, display text, and line number for each reference.",
       inputSchema: {
@@ -254,20 +243,6 @@ async function dispatchOOCExtra(
   clocks: ClocksState | undefined,
 ): Promise<ToolResult> {
   switch (name) {
-    case "read_file": {
-      if (!fileIO || !campaignRoot) {
-        return { content: "File I/O not available", is_error: true };
-      }
-      let abs: string;
-      try {
-        abs = resolveCampaignPath(campaignRoot, input.path as string);
-      } catch {
-        return { content: "Path traversal not allowed", is_error: true };
-      }
-      const content = await fileIO.readFile(abs);
-      return { content };
-    }
-
     case "find_references": {
       if (!fileIO || !campaignRoot) {
         return { content: "File I/O not available", is_error: true };

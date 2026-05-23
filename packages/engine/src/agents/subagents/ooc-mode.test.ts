@@ -321,7 +321,7 @@ describe("enterOOC", () => {
     // truthful regardless of caller plumbing. They return recoverable errors
     // at dispatch time when their backing capability isn't wired up.
     expect(names).toEqual(expect.arrayContaining([
-      "read_file", "find_references", "validate_campaign", "get_commit_log",
+      "find_references", "validate_campaign", "get_commit_log",
     ]));
     // No DM tools without a registry.
     expect(names).not.toContain("roll_dice");
@@ -389,9 +389,12 @@ describe("enterOOC with gameState + DM registry", () => {
     expect(names).not.toContain("enter_ooc");
     expect(names).toContain("rollback");
     expect(names).toContain("show_character_sheet");
-    expect(names).toContain("read_file");
+    // Entity surface replaces raw read_file in OOC.
+    expect(names).toContain("entity");
+    expect(names).toContain("describe_entity_type");
     expect(names).toContain("find_references");
     expect(names).toContain("validate_campaign");
+    expect(names).not.toContain("read_file");
 
     // Smoke: representative DM tools are present.
     expect(names).toContain("roll_dice");
@@ -408,7 +411,7 @@ describe("buildOOCTools", () => {
   it("returns just the OOC-only extras when given an empty registry", () => {
     const tools = buildOOCTools({ getDefinitions: () => [] } as unknown as Parameters<typeof buildOOCTools>[0]);
     const names = tools.map((t) => t.name);
-    expect(names).toEqual(["read_file", "find_references", "validate_campaign", "get_commit_log"]);
+    expect(names).toEqual(["find_references", "validate_campaign", "get_commit_log"]);
   });
 
   it("returns all DM tools (minus enter_ooc) plus extras with the real registry", () => {
@@ -419,7 +422,9 @@ describe("buildOOCTools", () => {
     expect(names).toContain("roll_dice");
     expect(names).toContain("scribe");
     expect(names).toContain("rollback");
-    expect(names).toContain("read_file");
+    // Structured entity surface replaces the old read_file extra.
+    expect(names).toContain("entity");
+    expect(names).not.toContain("read_file");
     expect(names).toContain("get_commit_log");
   });
 });
@@ -439,30 +444,9 @@ describe("buildOOCToolHandler — OOC-only extras", () => {
     expect(result.content).toContain("Dragon's Lair");
   });
 
-  it("read_file reads a campaign file", async () => {
-    const fio = mockFileIO({ "/camp/characters/kael.md": "# Kael\n**Type:** PC" });
-    const handler = buildOOCToolHandler(singletonRegistry, mockGameState(), undefined, undefined, "/camp", fio);
-
-    const result = await handler("read_file", { path: "characters/kael.md" });
-    expect(result.is_error).toBeUndefined();
-    expect(result.content).toBe("# Kael\n**Type:** PC");
-  });
-
-  it("read_file rejects path traversal", async () => {
-    const fio = mockFileIO();
-    const handler = buildOOCToolHandler(singletonRegistry, mockGameState(), undefined, undefined, "/camp", fio);
-
-    const result = await handler("read_file", { path: "../etc/passwd" });
-    expect(result.is_error).toBe(true);
-    expect(result.content).toContain("Path traversal not allowed");
-  });
-
-  it("read_file errors when fileIO is missing", async () => {
-    const handler = buildOOCToolHandler(singletonRegistry, mockGameState(), undefined);
-    const result = await handler("read_file", { path: "characters/kael.md" });
-    expect(result.is_error).toBe(true);
-    expect(result.content).toContain("File I/O not available");
-  });
+  // OOC no longer surfaces `read_file`; entity reads route through the
+  // `entity` tool dispatched by GameEngine.handleAsyncTool. See
+  // packages/engine/src/entities/tools.test.ts for the structured surface.
 
   it("find_references finds wikilinks", async () => {
     const fio = mockFileIO(

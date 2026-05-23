@@ -4,14 +4,16 @@ import type { SubagentResult } from "../subagent.js";
 import type { UsageStats } from "../agent-loop.js";
 import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
-import { join, dirname } from "node:path";
-import { campaignPaths, machinePaths } from "../../tools/filesystem/index.js";
+import { dirname } from "node:path";
+import { machinePaths } from "../../tools/filesystem/index.js";
 import { parseFrontMatter, serializeEntity } from "../../tools/filesystem/index.js";
 import { formatChangelogEntry } from "../../tools/filesystem/index.js";
 import type { EntityFrontMatter, EntityTree } from "@machine-violet/shared/types/entities.js";
 import { renderEntityTree } from "../../tools/filesystem/index.js";
 import { norm } from "../../utils/paths.js";
 import { renameEntity as renameEntityOp } from "../../tools/campaign-ops/rename-entity.js";
+import { EntityStore } from "../../entities/store.js";
+import { isFileBackedEntityType } from "@machine-violet/shared/schemas/entities/index.js";
 import type { FileIO } from "../scene-manager.js";
 
 // Re-export slugify from world-builder so the game engine doesn't need a separate import
@@ -319,35 +321,33 @@ export function buildScribeToolHandler(
   removedSlugs: string[] = [],
   homeDir?: string,
 ) {
-  const paths = campaignPaths(campaignRoot);
   const mPaths = homeDir ? machinePaths(homeDir) : undefined;
+  // EntityStore owns disk I/O for the five file-backed types. Scribe still
+  // handles `player` itself because players are machine-scope, not
+  // campaign-scope, and don't fit the store's campaign-rooted model.
+  const store = new EntityStore(campaignRoot, fileIO);
+
+  function playerPath(slug: string): string {
+    if (!mPaths) throw new Error("player entity type requires homeDir");
+    return mPaths.player(slug);
+  }
 
   function entityPath(entityType: string, slug: string): string {
-    switch (entityType) {
-      case "character": return paths.character(slug);
-      case "location": return paths.location(slug);
-      case "faction": return paths.faction(slug);
-      case "lore": return paths.lore(slug);
-      case "item": return paths.item(slug);
-      case "player":
-        if (!mPaths) throw new Error("player entity type requires homeDir");
-        return mPaths.player(slug);
-      default: return paths.lore(slug);
+    if (isFileBackedEntityType(entityType)) {
+      return store.pathFor(entityType, slug).abs;
     }
+    if (entityType === "player") return playerPath(slug);
+    // Unknown type — fall back to lore for back-compat with prior behavior.
+    return store.pathFor("lore", slug).abs;
   }
 
   function entityDir(entityType: string): string {
-    switch (entityType) {
-      case "character": return join(campaignRoot, "characters");
-      case "location": return join(campaignRoot, "locations");
-      case "faction": return join(campaignRoot, "factions");
-      case "lore": return join(campaignRoot, "lore");
-      case "item": return join(campaignRoot, "items");
-      case "player":
-        if (!mPaths) throw new Error("player entity type requires homeDir");
-        return mPaths.playersDir;
-      default: return join(campaignRoot, "lore");
+    if (isFileBackedEntityType(entityType)) return store.dirFor(entityType);
+    if (entityType === "player") {
+      if (!mPaths) throw new Error("player entity type requires homeDir");
+      return mPaths.playersDir;
     }
+    return store.dirFor("lore");
   }
 
   return async (name: string, input: Record<string, unknown>): Promise<{ content: string; is_error?: boolean }> => {
@@ -355,20 +355,26 @@ export function buildScribeToolHandler(
       case "list_entities": {
         const entityType = input.entity_type as string;
         const dir = entityDir(entityType);
+        // Probe the directory directly so we can distinguish "no entities of
+        // this type yet" (dir doesn't exist) from "dir exists but is empty"
+        // — the prompt relies on the wording. For file-backed types, route
+        // the actual enumeration through the store so the location-subdir
+        // quirk + skip-files behaviour is unified.
         try {
-          const entries = await fileIO.listDir(dir);
-          const names = entries
-            .filter(e => e.endsWith(".md"))
-            .map(e => e.replace(/\.md$/, ""));
-          // For locations, list subdirectories instead
-          if (entityType === "location") {
-            const dirEntries = entries.filter(e => !e.includes("."));
-            return { content: dirEntries.length > 0 ? dirEntries.join("\n") : "(none)" };
-          }
-          return { content: names.length > 0 ? names.join("\n") : "(none)" };
+          await fileIO.listDir(dir);
         } catch {
           return { content: "(directory not found — no entities of this type yet)" };
         }
+        if (isFileBackedEntityType(entityType)) {
+          const entries = await store.list(entityType);
+          return { content: entries.length > 0 ? entries.map(e => e.id).join("\n") : "(none)" };
+        }
+        // Player (machine-scope) — flat .md listing.
+        const entries = await fileIO.listDir(dir);
+        const names = entries
+          .filter(e => e.endsWith(".md"))
+          .map(e => e.replace(/\.md$/, ""));
+        return { content: names.length > 0 ? names.join("\n") : "(none)" };
       }
 
       case "read_entity": {

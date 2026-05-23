@@ -52,6 +52,7 @@ import {
 } from "../tools/combat/index.js";
 import { manageObjectives } from "../tools/objectives/index.js";
 import type { ManageObjectivesInput } from "../tools/objectives/index.js";
+import { ENTITY_TOOLS } from "../entities/tools.js";
 
 // --- Helpers ---
 
@@ -898,6 +899,15 @@ const TOOL_DEFS: RegisteredTool[] = [
       };
     },
   },
+
+  // ====== ENTITIES ======
+  // Definitions only — actual dispatch lives in GameEngine.handleAsyncToolInternal,
+  // which owns the per-session EntityStore. If a caller ever invokes these
+  // through the sync registry path, the stub returns an explicit error.
+  ...ENTITY_TOOLS.map((def): RegisteredTool => ({
+    definition: def,
+    handler: () => err(`${def.name} requires async handler`),
+  })),
 
   // ====== OBJECTIVES ======
   {

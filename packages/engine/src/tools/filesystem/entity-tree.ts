@@ -1,92 +1,28 @@
 /**
- * Entity tree — campaign-wide registry of all entities.
+ * Entity tree — thin compatibility shim.
  *
- * Built from disk on session load by scanning entity directories and
- * parsing front matter. Injected into DM and Scribe context so agents
- * can resolve entity names to file paths without guessing slugs.
+ * The real scan/index lives in `entities/store.ts`. This module exists so
+ * legacy call sites (session-manager, scene-manager) keep working with their
+ * existing import path while the underlying scan goes through the store.
  *
- * Updated incrementally during play when the Scribe creates or
- * modifies entities.
+ * `renderEntityTree` is pure formatting and lives here; everything else
+ * delegates.
  */
-import { join } from "node:path";
-import { parseFrontMatter } from "./frontmatter.js";
-import { norm } from "../../utils/paths.js";
 import type { EntityTree } from "@machine-violet/shared/types/entities.js";
-
-/** Directories to scan, mapped to their entity type. */
-const ENTITY_DIRS: { dir: string; type: string; subdirs: boolean }[] = [
-  { dir: "characters", type: "character", subdirs: false },
-  { dir: "locations", type: "location", subdirs: true },
-  { dir: "factions", type: "faction", subdirs: false },
-  { dir: "lore", type: "lore", subdirs: false },
-  { dir: "items", type: "item", subdirs: false },
-];
-
-/** Files to skip during entity scanning. */
-const SKIP_FILES = new Set(["party.md", "notes.md"]);
-
-interface TreeFileIO {
-  readFile(path: string): Promise<string>;
-  listDir(path: string): Promise<string[]>;
-  exists(path: string): Promise<boolean>;
-}
+import { EntityStore, type EntityFileIO } from "../../entities/store.js";
 
 /**
  * Build the entity tree by scanning all entity directories on disk.
- * Parses front matter from each entity file to extract name and aliases.
+ *
+ * Thin wrapper around `EntityStore.scanIndex`. Kept for back-compat with
+ * existing callers — new code should construct an EntityStore once and reuse
+ * it instead of paying the construction cost on every scan.
  */
 export async function buildEntityTree(
   campaignRoot: string,
-  fileIO: TreeFileIO,
+  fileIO: EntityFileIO,
 ): Promise<EntityTree> {
-  const tree: EntityTree = {};
-
-  for (const { dir, type, subdirs } of ENTITY_DIRS) {
-    const dirPath = join(campaignRoot, dir);
-    if (!(await fileIO.exists(dirPath))) continue;
-
-    let entries: string[];
-    try {
-      entries = await fileIO.listDir(dirPath);
-    } catch { continue; }
-
-    for (const entry of entries) {
-      if (SKIP_FILES.has(entry)) continue;
-
-      let filePath: string;
-      let slug: string;
-
-      if (subdirs && !entry.endsWith(".md")) {
-        // Subdirectory pattern (locations): slug/index.md
-        const indexPath = norm(join(dirPath, entry, "index.md"));
-        if (!(await fileIO.exists(indexPath))) continue;
-        filePath = indexPath;
-        slug = entry;
-      } else if (entry.endsWith(".md")) {
-        filePath = norm(join(dirPath, entry));
-        slug = entry.replace(/\.md$/, "");
-      } else {
-        continue;
-      }
-
-      try {
-        const raw = await fileIO.readFile(filePath);
-        const { frontMatter } = parseFrontMatter(raw);
-        const name = (frontMatter._title as string) || slug;
-        const aliasRaw = frontMatter.additional_names as string | undefined;
-        const aliases = aliasRaw
-          ? aliasRaw.split(",").map((a) => a.trim()).filter(Boolean)
-          : [];
-        const relativePath = norm(filePath).replace(norm(campaignRoot) + "/", "");
-
-        tree[slug] = { name, aliases, type, path: relativePath };
-      } catch {
-        // Skip files that can't be parsed
-      }
-    }
-  }
-
-  return tree;
+  return new EntityStore(campaignRoot, fileIO).scanIndex();
 }
 
 /**
