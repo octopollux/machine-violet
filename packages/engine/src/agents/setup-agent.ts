@@ -1,4 +1,4 @@
-import type { CampaignConfig, PlayerConfig } from "@machine-violet/shared/types/config.js";
+import type { CampaignConfig, PlayerConfig, CampaignScope } from "@machine-violet/shared/types/config.js";
 import { CAMPAIGN_FORMAT_VERSION } from "@machine-violet/shared/types/config.js";
 import type { DMPersonality } from "@machine-violet/shared/types/config.js";
 import { createDefaultConfig as defaultCombatConfig } from "../tools/combat/index.js";
@@ -19,6 +19,8 @@ export interface SetupResult {
   campaignDetail: string | null;
   mood: string;
   difficulty: string;
+  /** Intended scope of the campaign — shapes DM pacing. Optional for back-compat. */
+  campaignScope?: CampaignScope;
   personality: DMPersonality;
   playerName: string;
   characterName: string;
@@ -59,6 +61,7 @@ export function buildCampaignConfig(result: SetupResult): CampaignConfig {
     genre: result.genre,
     mood: result.mood,
     difficulty: result.difficulty,
+    campaign_scope: result.campaignScope,
     premise: result.campaignPremise,
     campaign_detail: result.campaignDetail ?? undefined,
     setup_handoff: result.handoffNote ?? undefined,

@@ -223,6 +223,43 @@ describe("createSetupConversation", () => {
     expect(result.finalized!.handoffNote).toBeUndefined();
   });
 
+  it("finalize_setup passes through a valid campaign_scope", async () => {
+    const input = { ...FINALIZE_INPUT, campaign_scope: "grand-campaign" };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Onward!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized!.campaignScope).toBe("grand-campaign");
+  });
+
+  it("finalize_setup defaults campaign_scope to few-sessions when omitted", async () => {
+    // Setup prompt + tool description document few-sessions as the default
+    // when the player declines to choose. The stored config must match.
+    const provider = mockProvider([
+      finalizeResponse(FINALIZE_INPUT),
+      textResponse("Onward!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized!.campaignScope).toBe("few-sessions");
+  });
+
+  it("finalize_setup defaults campaign_scope to few-sessions when given an unknown value", async () => {
+    const input = { ...FINALIZE_INPUT, campaign_scope: "epic-saga" };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Onward!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized!.campaignScope).toBe("few-sessions");
+  });
+
   it("finalize_setup passes through characterDetails", async () => {
     const input = { ...FINALIZE_INPUT, system: "dnd-5e", character_details: "Human Fighter, level 1, soldier background" };
     const provider = mockProvider([

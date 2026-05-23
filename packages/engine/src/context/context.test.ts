@@ -595,6 +595,41 @@ describe("buildCachedPrefix", () => {
     expect(allText).toContain("Roll for variant");
   });
 
+  it("includes campaign scope label in campaign setting block when set", () => {
+    const scopedConfig: CampaignConfig = { ...mockConfig, campaign_scope: "grand-campaign" };
+    const { system } = buildCachedPrefix(scopedConfig, {
+      dmIdentity: "You are the DM.",
+      personality: "Terse.",
+    });
+
+    const allText = system.map((b) => b.text).join("\n");
+    expect(allText).toContain("Scope: Grand Campaign");
+  });
+
+  it("omits scope line when campaign_scope is undefined", () => {
+    const { system } = buildCachedPrefix(mockConfig, {
+      dmIdentity: "You are the DM.",
+      personality: "Terse.",
+    });
+
+    const allText = system.map((b) => b.text).join("\n");
+    expect(allText).not.toContain("Scope:");
+  });
+
+  it("omits scope line when campaign_scope is an unknown slug (hand-edited config)", () => {
+    // Defensive: config.json is hand-editable, so an unknown value must not
+    // render `Scope: undefined` into the DM prefix.
+    const badScopeConfig = { ...mockConfig, campaign_scope: "epic-saga" as never };
+    const { system } = buildCachedPrefix(badScopeConfig, {
+      dmIdentity: "You are the DM.",
+      personality: "Terse.",
+    });
+
+    const allText = system.map((b) => b.text).join("\n");
+    expect(allText).not.toContain("Scope:");
+    expect(allText).not.toContain("undefined");
+  });
+
   it("omits personality detail when undefined", () => {
     const { system } = buildCachedPrefix(mockConfig, {
       dmIdentity: "You are the DM.",

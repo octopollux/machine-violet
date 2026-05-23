@@ -14,6 +14,30 @@ export const CHOICE_FREQUENCY_LEVELS: readonly ChoiceFrequency[] = [
   "always",
 ] as const;
 
+/**
+ * Intended scope of a campaign at build time. Drives DM pacing — opening
+ * momentum, willingness to slow-burn, when to start steering toward a
+ * climax. Set during setup and read by the DM prefix; the user can change
+ * it later by editing config.json.
+ */
+export type CampaignScope = "one-shot" | "few-sessions" | "grand-campaign" | "open-ended";
+
+/** Ordered short → long. */
+export const CAMPAIGN_SCOPES: readonly CampaignScope[] = [
+  "one-shot",
+  "few-sessions",
+  "grand-campaign",
+  "open-ended",
+] as const;
+
+/** Human labels for UI and prompt rendering. */
+export const CAMPAIGN_SCOPE_LABELS: Record<CampaignScope, string> = {
+  "one-shot": "One-Shot",
+  "few-sessions": "A Few Sessions",
+  "grand-campaign": "Grand Campaign",
+  "open-ended": "Open-Ended",
+};
+
 export interface PlayerConfig {
   name: string;
   character: string;
@@ -65,6 +89,8 @@ export interface CampaignConfig {
   genre?: string;
   mood?: string;
   difficulty?: string;
+  /** Intended campaign scope, set at build time. Shapes DM pacing decisions. */
+  campaign_scope?: CampaignScope;
   premise?: string;
   /** Hidden campaign detail — DM-only instructions (variants, secrets, pacing notes). */
   campaign_detail?: string;

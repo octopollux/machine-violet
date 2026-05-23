@@ -69,6 +69,11 @@ describe("CampaignSettingsModal", () => {
     expect(frame).toContain("Hard");
   });
 
+  it("displays scope label when campaign_scope is set", () => {
+    const { lastFrame } = renderModal(minimalConfig({ campaign_scope: "few-sessions" }));
+    expect(lastFrame()).toContain("A Few Sessions");
+  });
+
   it("omits optional fields when not set", () => {
     const { lastFrame } = renderModal(minimalConfig());
     const frame = lastFrame();
@@ -76,6 +81,7 @@ describe("CampaignSettingsModal", () => {
     expect(frame).not.toContain("Genre:");
     expect(frame).not.toContain("Mood:");
     expect(frame).not.toContain("Difficulty:");
+    expect(frame).not.toContain("Scope:");
   });
 
   it("renders the Choices Frequency slider with all five steps", () => {
