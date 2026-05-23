@@ -230,7 +230,13 @@ jobs:
               QUERY_FIELDS=""
               for pr in $PR_NUMBERS; do
                 QUERY_FIELDS="${QUERY_FIELDS}
-                  pr_${pr}: pullRequest(number: ${pr}) { number title body }"
+                  pr_${pr}: pullRequest(number: ${pr}) {
+                    number title body
+                    closingIssuesReferences(first: 50) {
+                      totalCount
+                      nodes { number title url }
+                    }
+                  }"
               done
 
               PR_CONTEXT=$(gh api graphql \
@@ -243,7 +249,21 @@ jobs:
                   | to_entries
                   | map(select(.value != null) | .value)
                   | sort_by(.number)
-                  | map("## PR #\(.number): \(.title)\n\(.body // "(no description)")\n---")
+                  | map(
+                      "## PR #\(.number): \(.title)\n\(.body // "(no description)")"
+                      + (.closingIssuesReferences as $cir
+                         | if ($cir.nodes | length) > 0
+                           then "\n\nCloses issues:\n"
+                                + ($cir.nodes
+                                   | sort_by(.number)
+                                   | map("- #\(.number) \(.title) — \(.url)")
+                                   | join("\n"))
+                                + (if $cir.totalCount > ($cir.nodes | length)
+                                   then "\n- …and \($cir.totalCount - ($cir.nodes | length)) more issue(s) not shown"
+                                   else "" end)
+                           else "" end)
+                      + "\n---"
+                    )
                   | join("\n")
                 ')
             fi
@@ -281,6 +301,11 @@ jobs:
           - Describe user-facing bug fixes and features in plain,
             friendly language a player would understand.
           - A few concise bullet points in markdown. No heading, no preamble.
+          - If a PR's data includes a "Closes issues:" section, append
+            markdown links for those issues to the matching bullet, e.g.
+            "([#45](https://github.com/owner/repo/issues/45))". Use the
+            exact URL from the "Closes issues:" list. Only link issues
+            tied to user-facing changes — skip them for internal commits.
           - If there are genuinely no player-facing changes, output exactly:
             "Internal improvements and maintenance."
 
