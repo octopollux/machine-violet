@@ -81,6 +81,7 @@ Monitor(
   persistent: false,
   command: "
     seen=''
+    summary_seen=0
     is_copilot='.user.type == \"Bot\" and (.user.login | ascii_downcase | test(\"copilot\"))'
     while true; do
       inline=$(gh api repos/OWNER/REPO/pulls/NNN/comments --jq \".[] | select($is_copilot) | \\\"\\(.id) \\(.path):\\(.line // .original_line) \\(.body | gsub(\\\"\\\\n\\\"; \\\" \\\"))\\\"\" 2>/dev/null || true)
@@ -92,8 +93,13 @@ Monitor(
         if ! echo \"$seen\" | grep -q \"\\b$id\\b\"; then
           echo \"$line\"
           seen=\"$seen $id\"
+          case \"$id\" in review-*) summary_seen=1 ;; esac
         fi
       done <<< \"$new\"
+      if [ \"$summary_seen\" = \"1\" ]; then
+        echo \"[monitor] Copilot summary received; exiting.\"
+        exit 0
+      fi
       sleep 30
     done
   "
