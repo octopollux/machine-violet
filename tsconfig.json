@@ -3,6 +3,7 @@
   "references": [
     { "path": "./packages/shared" },
     { "path": "./packages/engine" },
-    { "path": "./packages/client-ink" }
+    { "path": "./packages/client-ink" },
+    { "path": "./packages/test-harness" }
   ]
 }

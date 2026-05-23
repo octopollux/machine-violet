@@ -129,3 +129,48 @@ describe("agent sidecar HTTP", () => {
     expect(res.status).toBe(404);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Stdout tee regression: the sidecar must install a process.stdout.write
+// wrapper so /screen returns rendered terminal content. We don't try to
+// drive a real write through it here — vitest intercepts process.stdout
+// in a way that bypasses our wrapper for test-emitted writes. Full
+// coverage of the tee lives in the test-harness `boot-and-quit` scenario,
+// which spawns a real subprocess.
+// ---------------------------------------------------------------------------
+
+describe("agent sidecar stdout tee", () => {
+  let handle: SidecarHandle | undefined;
+
+  afterEach(async () => {
+    if (handle) {
+      await handle.close();
+      handle = undefined;
+    }
+  });
+
+  it("installs and restores the process.stdout.write wrapper", async () => {
+    const TEST_PORT = 19877;
+    const originalWrite = process.stdout.write;
+    handle = await startAgentSidecar(TEST_PORT, () => initialClientState());
+
+    // After startAgentSidecar, process.stdout.write must be a different
+    // function — that's our tee. If this assertion ever flips back to
+    // equality, the tee got skipped and /screen will return blanks.
+    expect(process.stdout.write).not.toBe(originalWrite);
+
+    // Wrapped write still must satisfy the WriteStream.write contract —
+    // exercised by Ink with both string and Buffer chunks.
+    const ok1 = process.stdout.write("");
+    const ok2 = process.stdout.write(Buffer.alloc(0));
+    expect(typeof ok1).toBe("boolean");
+    expect(typeof ok2).toBe("boolean");
+
+    await handle.close();
+    handle = undefined;
+
+    // close() must restore the original write to avoid leaking the tee
+    // across tests / subsequent renders.
+    expect(process.stdout.write).toBe(originalWrite);
+  });
+});

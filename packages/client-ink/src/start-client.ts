@@ -73,6 +73,10 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
     // Ink calls ref()/unref() to manage the event loop — no-ops for a mock.
     stream.ref = () => stream;
     stream.unref = () => stream;
+    // Don't call resume() here: Ink attaches a 'readable' listener (paused
+    // mode) and pulls via stdin.read(). Calling resume() would put the
+    // stream in flowing mode, push()'d bytes would fire 'data' instead of
+    // 'readable', and Ink would never read the data via its read() loop.
     mockStdin = stream;
   }
   const activeStdin = mockStdin ?? process.stdin;
@@ -123,21 +127,37 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
   // CI logs.
   const alternateScreen = !mockStdin && Boolean(process.stdout.isTTY) && Boolean(activeStdin.isTTY);
   const renderOpts: RenderOptions = { exitOnCtrlC: !mockStdin, alternateScreen };
-  if (mockStdin) renderOpts.stdin = mockStdin;
+  if (mockStdin) {
+    renderOpts.stdin = mockStdin;
+    // Force Ink interactive mode in headless agent mode. Without this, Ink's
+    // resolveInteractiveOption() falls back to `Boolean(stdout.isTTY)` — and
+    // since the spawning process has no real TTY, stdout.isTTY is false, so
+    // Ink silently skips every non-<Static> stdout.write (ink/build/ink.js
+    // around line 329). The agent-sidecar tee then sees nothing. We need
+    // real ANSI cursor/erase sequences in the stream so the vterm can render
+    // a faithful screen for /screen consumers.
+    renderOpts.interactive = true;
+  }
+
+  // Agent sidecar: dynamic import keeps @xterm/headless out of the bundle.
+  // Must boot BEFORE render() so the vterm tee captures Ink's first frame —
+  // Ink only re-renders on state changes, so a missed first frame leaves the
+  // virtual screen blank until something forces a redraw.
+  let sidecarClose: (() => Promise<void>) | undefined;
+  if (agentPort) {
+    try {
+      const { startAgentSidecar } = await import("./agent-sidecar.js");
+      const handle = await startAgentSidecar(agentPort, getAgentClientState, mockStdin);
+      sidecarClose = handle.close;
+    } catch (err) {
+      process.stderr.write(`Agent sidecar failed: ${err}\n`);
+    }
+  }
 
   const { unmount, waitUntilExit: inkWaitUntilExit } = render(
     React.createElement(App, { serverUrl, playerId, campaignId, hasKittyProtocol: hasKitty, stdinFilterChain: filterChain }),
     renderOpts,
   );
-
-  // Agent sidecar: dynamic import keeps @xterm/headless out of the bundle.
-  let sidecarClose: (() => Promise<void>) | undefined;
-  if (agentPort) {
-    import("./agent-sidecar.js")
-      .then(({ startAgentSidecar }) => startAgentSidecar(agentPort, getAgentClientState, mockStdin))
-      .then((h) => { sidecarClose = h.close; })
-      .catch((err) => { process.stderr.write(`Agent sidecar failed: ${err}\n`); });
-  }
 
   // Graceful shutdown on SIGINT
   const onSigInt = () => {

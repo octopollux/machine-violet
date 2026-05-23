@@ -81,6 +81,18 @@ This project maintains a closed loop between code and documentation. When you ch
 7. Add it to `PROVIDER_OPTIONS` in `packages/client-ink/src/phases/ConnectionsPhase.tsx` (or, for OAuth-style providers, add a dedicated menu entry that doesn't go through the API-key wizard)
 8. If the provider implements `getUsageStatus` / `subscribeUsage`, the existing `/manage/connections/:id/usage` endpoint surfaces it automatically
 
+### Adding or changing an e2e scenario
+
+1. Add the scenario file under `packages/test-harness/src/scenarios/`
+2. Register it in `ALL_SCENARIOS` in `packages/test-harness/bin/run.ts`
+3. Append a row to the scenarios table in [e2e-harness.md](e2e-harness.md)
+4. If you change the golden path's contract (what it proves, what it walks through), update the "The golden path" section in both [e2e-harness.md](e2e-harness.md) and the "Validating changes end-to-end" section in [CLAUDE.md](../CLAUDE.md)
+
+### Changing harness primitives (wait helpers, input methods, state shape)
+
+1. Update the method on `Harness` / re-export from `packages/test-harness/src/index.ts`
+2. Update the "State-driven waiting" table in [e2e-harness.md](e2e-harness.md)
+
 ### Adding a `codex:*` event
 
 The openai-chatgpt provider emits its own operational events (subprocess lifecycle, login flow, rate-limit warnings) via helpers in `packages/engine/src/providers/openai-chatgpt/log.ts`. Token-counting events still go through the existing `api:call` event from agent-loop-bridge — don't duplicate. New `codex:*` events require:
@@ -111,6 +123,7 @@ The openai-chatgpt provider emits its own operational events (subprocess lifecyc
 | REST API (auto-generated) | `/docs` endpoint | OpenAPI spec from TypeBox route schemas |
 | Conventions | [CLAUDE.md](../CLAUDE.md) | Code style, testing, imports |
 | openai-chatgpt provider | [openai-chatgpt-provider.md](openai-chatgpt-provider.md) | Codex app-server integration, OAuth flow, usage tracking |
+| E2E test harness | [e2e-harness.md](e2e-harness.md) | Golden path, scenario catalogue, harness primitives, how to add scenarios |
 
 ## Principles
 

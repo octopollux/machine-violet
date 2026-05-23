@@ -1,0 +1,538 @@
+/**
+ * The test harness: spawn the launcher with a sidecar attached, drive the
+ * TUI through HTTP, observe state transitions.
+ *
+ * Lifecycle:
+ *
+ *   const h = await Harness.launch({ campaignsDir, ... });
+ *   try {
+ *     await h.waitForMenu();
+ *     await h.sendKey("return");          // pick "New Campaign"
+ *     ...
+ *   } finally {
+ *     await h.shutdown();
+ *   }
+ *
+ * The harness owns one child process. It always cleans up: shutdown() kills
+ * the process tree and removes any temporary campaigns dir if `cleanup` was
+ * requested. Long scenarios should put shutdown() in a `finally` block.
+ */
+import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import {
+  pollUntil,
+  type WaitOptions,
+  DEFAULT_SHORT_TIMEOUT_MS,
+  DEFAULT_LONG_TIMEOUT_MS,
+} from "./wait.js";
+import type { ClientStateSnapshot, ActiveChoices } from "./client-state.js";
+import { choiceLabel } from "./client-state.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = resolve(__dirname, "../../..");
+
+export interface HarnessOptions {
+  /** Port for the engine REST + WS server. Default: ephemeral high port. */
+  serverPort?: number;
+  /** Port for the agent sidecar HTTP server. Default: ephemeral high port. */
+  agentPort?: number;
+  /** Campaign data directory. Default: a fresh tmp dir wiped on shutdown. */
+  campaignsDir?: string;
+  /** Player name passed to the launcher. */
+  player?: string;
+  /** Pass-through campaign id (skips menu, auto-starts). Usually omitted. */
+  campaign?: string;
+  /**
+   * Working directory for the spawned launcher. In dev mode, configDir() ==
+   * process.cwd(), so this also determines where the engine looks for
+   * `connections.json` and `.env`. If omitted, the harness walks up from
+   * REPO_ROOT looking for the first ancestor that contains `connections.json`
+   * — this lets a worktree run the live golden path without copying
+   * credentials in.
+   */
+  cwd?: string;
+  /**
+   * Where to send child stdio.
+   *   "inherit"  — pipe to current process (useful when interactively debugging)
+   *   "buffer"   — captured in memory, exposed via Harness.childLog (default)
+   *   "ignore"   — drop everything
+   */
+  stdio?: "inherit" | "buffer" | "ignore";
+  /** Extra env vars to set on the child process. */
+  env?: Record<string, string>;
+  /** Max time to wait for the sidecar to become reachable. Default 30s. */
+  launchTimeoutMs?: number;
+}
+
+export interface ShutdownOptions {
+  /** Remove the temporary campaigns dir if the harness created one. Default true. */
+  cleanup?: boolean;
+}
+
+export class Harness {
+  /** Captured combined stdout/stderr from the child when stdio: "buffer". */
+  readonly childLog: string[] = [];
+
+  private constructor(
+    private readonly child: ChildProcess,
+    readonly serverPort: number,
+    readonly agentPort: number,
+    private readonly campaignsDir: string,
+    private readonly ownsCampaignsDir: boolean,
+  ) {}
+
+  // -------------------------------------------------------------------------
+  // Launch + shutdown
+  // -------------------------------------------------------------------------
+
+  static async launch(opts: HarnessOptions = {}): Promise<Harness> {
+    const serverPort = opts.serverPort ?? pickEphemeralPort();
+    const agentPort = opts.agentPort ?? pickEphemeralPort();
+    const launchTimeoutMs = opts.launchTimeoutMs ?? 30_000;
+    const stdio = opts.stdio ?? "buffer";
+
+    let campaignsDir: string;
+    let ownsCampaignsDir = false;
+    if (opts.campaignsDir) {
+      campaignsDir = opts.campaignsDir;
+    } else {
+      campaignsDir = await mkdtemp(join(tmpdir(), "mv-e2e-"));
+      ownsCampaignsDir = true;
+    }
+
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      MV_PORT: String(serverPort),
+      MV_AGENT_PORT: String(agentPort),
+      MV_CAMPAIGNS: campaignsDir,
+      MV_PLAYER: opts.player ?? "TestPlayer",
+      NODE_ENV: process.env.NODE_ENV ?? "development",
+      ...opts.env,
+    };
+    if (opts.campaign) env.MV_CAMPAIGN = opts.campaign;
+
+    // Some embedded shells (Claude Code) pre-set sensitive env vars like
+    // ANTHROPIC_API_KEY="" as an empty string to sandbox subprocesses. The
+    // engine uses dotenv without override:true, so an empty value blocks
+    // .env from populating the real key. Here we treat empty as "unset" and
+    // explicitly load any *_API_KEY from the configDir's .env so the
+    // harness can run live scenarios from inside such shells.
+
+    const launcherPath = join(REPO_ROOT, "scripts", "launcher.ts");
+    const args = ["--max-semi-space-size=16", "--import", "tsx/esm", launcherPath];
+    // configDir() in dev = process.cwd(); pick the nearest dir that actually
+    // has connections so the spawned launcher finds an API key without us
+    // having to materialize one in the worktree.
+    const cwd = opts.cwd ?? findConfigDir(REPO_ROOT);
+    injectApiKeysFromEnvFile(env, join(cwd, ".env"));
+
+    const childLog: string[] = [];
+    const child = spawn(process.execPath, args, {
+      env,
+      cwd,
+      stdio: stdio === "inherit" ? "inherit" : ["ignore", "pipe", "pipe"],
+      // Windows: detached:false keeps signals working; the harness explicitly
+      // kills the whole tree on shutdown via taskkill / SIGTERM.
+    });
+
+    if (stdio === "buffer") {
+      const onData = (buf: Buffer) => {
+        const lines = buf.toString("utf8").split(/\r?\n/);
+        for (const line of lines) {
+          if (line.length > 0) childLog.push(line);
+        }
+      };
+      child.stdout?.on("data", onData);
+      child.stderr?.on("data", onData);
+    } else if (stdio === "ignore") {
+      child.stdout?.resume();
+      child.stderr?.resume();
+    }
+
+    // Wait for the sidecar to be reachable. If the child dies first, throw.
+    const start = Date.now();
+    let lastErr: unknown;
+    const childDied = new Promise<never>((_resolve, reject) => {
+      child.once("exit", (code, signal) => {
+        const tail = childLog.slice(-30).join("\n");
+        reject(new Error(
+          `Launcher exited before sidecar became ready ` +
+          `(code=${code}, signal=${signal}). Recent output:\n${tail}`,
+        ));
+      });
+    });
+    const sidecarReady = (async () => {
+      while (Date.now() - start < launchTimeoutMs) {
+        try {
+          const r = await fetch(`http://127.0.0.1:${agentPort}/state`);
+          if (r.ok) return;
+        } catch (err) {
+          lastErr = err;
+        }
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      throw new Error(
+        `Sidecar did not become reachable on port ${agentPort} within ` +
+        `${launchTimeoutMs}ms. Last error: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
+      );
+    })();
+
+    try {
+      await Promise.race([sidecarReady, childDied]);
+    } catch (err) {
+      await terminateChild(child).catch(() => { /* best-effort */ });
+      if (ownsCampaignsDir) {
+        await rm(campaignsDir, { recursive: true, force: true }).catch(() => { /* ignore */ });
+      }
+      throw err;
+    }
+
+    const harness = new Harness(child, serverPort, agentPort, campaignsDir, ownsCampaignsDir);
+    // Pipe captured log into the harness instance.
+    if (stdio === "buffer") {
+      for (const line of childLog) harness.childLog.push(line);
+      const onData = (buf: Buffer) => {
+        const lines = buf.toString("utf8").split(/\r?\n/);
+        for (const line of lines) {
+          if (line.length > 0) harness.childLog.push(line);
+        }
+      };
+      child.stdout?.on("data", onData);
+      child.stderr?.on("data", onData);
+    }
+    return harness;
+  }
+
+  async shutdown(opts: ShutdownOptions = {}): Promise<void> {
+    await terminateChild(this.child).catch(() => { /* best-effort */ });
+    if (this.ownsCampaignsDir && opts.cleanup !== false) {
+      await rm(this.campaignsDir, { recursive: true, force: true }).catch(() => { /* ignore */ });
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Reading state + screen
+  // -------------------------------------------------------------------------
+
+  /** Fetch the current ClientState snapshot from /state. */
+  async getState(): Promise<ClientStateSnapshot> {
+    const res = await fetch(`http://127.0.0.1:${this.agentPort}/state`);
+    if (!res.ok) throw new Error(`/state returned ${res.status}`);
+    return await res.json() as ClientStateSnapshot;
+  }
+
+  /** Fetch the current rendered screen (plain text). */
+  async getScreen(): Promise<string> {
+    const res = await fetch(`http://127.0.0.1:${this.agentPort}/screen`);
+    if (!res.ok) throw new Error(`/screen returned ${res.status}`);
+    return await res.text();
+  }
+
+  /** Fetch the rendered screen with ANSI escape sequences preserved. */
+  async getScreenAnsi(): Promise<string> {
+    const res = await fetch(`http://127.0.0.1:${this.agentPort}/screen?ansi=true`);
+    if (!res.ok) throw new Error(`/screen?ansi returned ${res.status}`);
+    return await res.text();
+  }
+
+  // -------------------------------------------------------------------------
+  // Sending input
+  // -------------------------------------------------------------------------
+
+  /** POST a named key to /input/key. See KEY_MAP in agent-sidecar.ts. */
+  async sendKey(key: string): Promise<void> {
+    const res = await fetch(`http://127.0.0.1:${this.agentPort}/input/key`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key }),
+    });
+    if (res.status !== 204) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`sendKey(${key}) failed: ${res.status} ${body}`);
+    }
+  }
+
+  /** Send the same key N times with a small delay so Ink renders between presses. */
+  async sendKeys(key: string, count: number): Promise<void> {
+    for (let i = 0; i < count; i++) {
+      await this.sendKey(key);
+      if (i < count - 1) await new Promise((r) => setTimeout(r, 50));
+    }
+  }
+
+  /** POST raw text (typed characters) to /input. */
+  async sendText(text: string): Promise<void> {
+    const res = await fetch(`http://127.0.0.1:${this.agentPort}/input`, {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: text,
+    });
+    if (res.status !== 204) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`sendText failed: ${res.status} ${body}`);
+    }
+  }
+
+  /** Send text + Enter, with a small delay so the text settles before submit. */
+  async submitText(text: string): Promise<void> {
+    await this.sendText(text);
+    await new Promise((r) => setTimeout(r, 50));
+    await this.sendKey("return");
+  }
+
+  // -------------------------------------------------------------------------
+  // Choice navigation: find the right entry, arrow over to it, press enter.
+  // -------------------------------------------------------------------------
+
+  /**
+   * Pick a choice from the current `activeChoices` overlay. Searches by
+   * exact label match first, then case-insensitive substring. Throws if
+   * no choice is currently presented or no candidate matches.
+   *
+   * Implementation: assumes the overlay opens with selection at index 0.
+   * If your scenario navigates choices between presentations, drive arrow
+   * keys directly with sendKey.
+   */
+  async selectChoice(query: string | { index: number }): Promise<void> {
+    const state = await this.getState();
+    const choices = state.activeChoices;
+    if (!choices) throw new Error(`selectChoice: no activeChoices presented`);
+
+    let targetIndex: number;
+    if (typeof query === "object") {
+      targetIndex = query.index;
+    } else {
+      targetIndex = findChoiceIndex(choices, query);
+      if (targetIndex < 0) {
+        const labels = choices.choices.map(choiceLabel);
+        throw new Error(`selectChoice(${JSON.stringify(query)}): no match. Available: ${JSON.stringify(labels)}`);
+      }
+    }
+    if (targetIndex < 0 || targetIndex >= choices.choices.length) {
+      throw new Error(`selectChoice: index ${targetIndex} out of range (${choices.choices.length} choices)`);
+    }
+    // The ChoiceOverlay opens with selection at index 0; navigate down.
+    if (targetIndex > 0) {
+      await this.sendKeys("down", targetIndex);
+    }
+    await this.sendKey("return");
+  }
+
+  // -------------------------------------------------------------------------
+  // State-driven waits
+  // -------------------------------------------------------------------------
+
+  /**
+   * Wait until the predicate is satisfied. Polls /state at pollMs intervals.
+   * Returns the first satisfying snapshot.
+   */
+  async waitForState(
+    predicate: (s: ClientStateSnapshot) => boolean,
+    opts: WaitOptions,
+  ): Promise<ClientStateSnapshot> {
+    return pollUntil(() => this.getState(), predicate, opts);
+  }
+
+  /** Wait until engineState matches one of the named values. */
+  async waitForEngineState(
+    states: string | string[],
+    opts: Omit<WaitOptions, "description"> & { description?: string } = {},
+  ): Promise<ClientStateSnapshot> {
+    const wanted = Array.isArray(states) ? states : [states];
+    return this.waitForState(
+      (s) => s.engineState !== null && wanted.includes(s.engineState),
+      { description: `engineState in {${wanted.join(",")}}`, ...opts },
+    );
+  }
+
+  /** Wait until `activeChoices` is non-null. */
+  async waitForChoices(
+    opts: Omit<WaitOptions, "description"> & { description?: string } = {},
+  ): Promise<ClientStateSnapshot> {
+    return this.waitForState(
+      (s) => s.activeChoices !== null,
+      { description: "activeChoices presented", timeoutMs: DEFAULT_LONG_TIMEOUT_MS, ...opts },
+    );
+  }
+
+  /** Wait until `activeChoices` is cleared (server accepted the selection). */
+  async waitForChoicesCleared(
+    opts: Omit<WaitOptions, "description"> & { description?: string } = {},
+  ): Promise<ClientStateSnapshot> {
+    return this.waitForState(
+      (s) => s.activeChoices === null,
+      { description: "activeChoices cleared", ...opts },
+    );
+  }
+
+  /** Wait until narrativeLines grows past the baseline length. */
+  async waitForNarrativeAtLeast(
+    minLength: number,
+    opts: Omit<WaitOptions, "description"> & { description?: string } = {},
+  ): Promise<ClientStateSnapshot> {
+    return this.waitForState(
+      (s) => s.narrativeLines.length >= minLength,
+      { description: `narrativeLines.length >= ${minLength}`, timeoutMs: DEFAULT_LONG_TIMEOUT_MS, ...opts },
+    );
+  }
+
+  /** Wait until `mode` flips to the given value. */
+  async waitForMode(
+    mode: ClientStateSnapshot["mode"],
+    opts: Omit<WaitOptions, "description"> & { description?: string } = {},
+  ): Promise<ClientStateSnapshot> {
+    return this.waitForState(
+      (s) => s.mode === mode,
+      { description: `mode === ${mode}`, ...opts },
+    );
+  }
+
+  /**
+   * Wait until the screen contains the given substring. Polls /screen at
+   * pollMs intervals. Use sparingly — state-driven waits are more reliable.
+   * Mostly useful for menu-phase navigation where the menu items aren't
+   * exposed in ClientState.
+   */
+  async waitForScreen(
+    needle: string,
+    opts: Omit<WaitOptions, "description"> & { description?: string } = {},
+  ): Promise<string> {
+    return pollUntil(
+      () => this.getScreen(),
+      (screen) => screen.includes(needle),
+      { description: `screen contains ${JSON.stringify(needle)}`, ...opts },
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Session lifecycle (server REST — bypasses TUI navigation)
+  // -------------------------------------------------------------------------
+
+  /**
+   * End the active session via `POST /session/end`. The server flushes the
+   * scene to disk, creates a git checkpoint, generates the session recap,
+   * and broadcasts `session:ended`. Equivalent to selecting "Save & Exit"
+   * in the in-game menu, minus the keystroke navigation. Use this when
+   * your scenario isn't specifically testing menu nav.
+   */
+  async endSession(): Promise<void> {
+    const res = await fetch(`http://127.0.0.1:${this.serverPort}/session/end`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`endSession failed: ${res.status} ${body}`);
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Debug
+  // -------------------------------------------------------------------------
+
+  /** Format the last N lines of captured child output. */
+  childLogTail(n = 30): string {
+    return this.childLog.slice(-n).join("\n");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function findChoiceIndex(choices: ActiveChoices, query: string): number {
+  const labels = choices.choices.map(choiceLabel);
+  const exact = labels.indexOf(query);
+  if (exact >= 0) return exact;
+  const lower = query.toLowerCase();
+  for (let i = 0; i < labels.length; i++) {
+    if (labels[i].toLowerCase().includes(lower)) return i;
+  }
+  return -1;
+}
+
+function pickEphemeralPort(): number {
+  // Pick a port in the 30000-39999 range; we re-check after spawn via the
+  // sidecar-ready probe, so collisions just look like a launch timeout.
+  return 30000 + Math.floor(Math.random() * 10000);
+}
+
+/**
+ * Pull `*_API_KEY` and `*_BASE_URL` values out of the .env file and stuff
+ * them into `env` if the corresponding key is missing or empty. We don't
+ * use dotenv because dotenv refuses to overwrite already-present empty
+ * keys without `override: true`, and we don't want to modify the engine's
+ * loadEnv() to set override:true globally — that'd surprise normal users
+ * whose .env values should *not* clobber explicitly-set process env vars.
+ */
+function injectApiKeysFromEnvFile(env: NodeJS.ProcessEnv, envPath: string): void {
+  if (!existsSync(envPath)) return;
+  const content = readFileSync(envPath, "utf8");
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const eq = line.indexOf("=");
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim();
+    let value = line.slice(eq + 1).trim();
+    // Strip surrounding quotes per common .env conventions.
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    // Only inject API keys and base URLs — those are what the engine cares
+    // about for provider connections. Don't dump arbitrary .env contents
+    // into the spawn env.
+    if (!/^[A-Z0-9_]+_(API_KEY|BASE_URL)$/.test(key)) continue;
+    if (!env[key]) env[key] = value;
+  }
+}
+
+/**
+ * Walk up from `start` looking for the first directory that contains a
+ * `connections.json`. Falls back to `start` if none is found in 12 levels.
+ *
+ * Background: in dev mode, the engine's `configDir()` returns `process.cwd()`
+ * — so when a worktree spawns the launcher with cwd=worktree, the launcher
+ * reads connections from the worktree (which is empty), then refuses to
+ * start a campaign. Walking up lets a worktree pick up the main repo's
+ * existing credentials without copies.
+ */
+function findConfigDir(start: string): string {
+  let dir = resolve(start);
+  for (let i = 0; i < 12; i++) {
+    if (existsSync(join(dir, "connections.json"))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return start;
+}
+
+async function terminateChild(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null || child.killed) return;
+  if (process.platform === "win32") {
+    // Windows: kill the whole tree, otherwise the engine subprocess stays alive.
+    await new Promise<void>((resolve) => {
+      const killer = spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+      killer.on("exit", () => resolve());
+      killer.on("error", () => resolve());
+    });
+  } else {
+    child.kill("SIGTERM");
+    // Give it 2s to exit gracefully, then SIGKILL.
+    await new Promise<void>((resolve) => {
+      const t = setTimeout(() => {
+        if (child.exitCode === null && !child.killed) child.kill("SIGKILL");
+        resolve();
+      }, 2000);
+      child.once("exit", () => { clearTimeout(t); resolve(); });
+    });
+  }
+}
+
+// Convenient default-timeout constants for scenarios.
+export { DEFAULT_SHORT_TIMEOUT_MS, DEFAULT_LONG_TIMEOUT_MS };

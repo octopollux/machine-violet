@@ -28,6 +28,7 @@ Ink (React for CLI) + Anthropic Claude SDK + TypeScript.
 | Look up REST API contracts (auto-generated) | `/docs` endpoint (Scalar UI) or `/docs/json` (OpenAPI spec) |
 | Look up WebSocket event contracts | [websocket-api.md](websocket-api.md) |
 | Understand the openai-chatgpt provider (Codex app-server) | [openai-chatgpt-provider.md](openai-chatgpt-provider.md) |
+| Run an end-to-end smoke test against the full stack | [e2e-harness.md](e2e-harness.md) |
 | Update documentation after a code change | [maintenance.md](maintenance.md) |
 
 ## Document Layers
