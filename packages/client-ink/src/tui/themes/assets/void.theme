@@ -1,0 +1,103 @@
+<!-- Void Theme
+     Starlight frame on cold complement. Diagonal slash corners and a
+     sparse star/dot edge run frame the conversation in negative space —
+     the cabin window of a long-haul ship, the observation deck of an
+     abandoned outpost. Vignette pulls the eye inward; the cyberpunk
+     complement pairs an icy cyan signal with a distant orange anomaly.
+
+     Suited to: Lighthouse, Ghosts of Station Proxima, Deep Tenancy,
+     derelict-vessel boardings, long silences between transmissions.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: void
+@genre_tags: sci_fi, horror, space, isolation, derelict
+
+@height: 2
+
+[colors]
+preset: cyberpunk
+harmony: complementary
+gradient: vignette
+border: 2
+corner: 5
+separator: 4
+title: 7
+turn_indicator: 6
+side_frame: 1
+
+[variant_combat]
+<!-- The anomaly arrives: shift to the complement, brighter -->
+border: 106
+corner: 108
+separator: 107
+gradient: hueShift
+
+[variant_ooc]
+<!-- Drift: lower contrast, no gradient -->
+preset: ethereal
+border: 1
+corner: 3
+gradient: none
+
+[variant_levelup]
+<!-- Encounter with the unknown — push to the complement -->
+border: 107
+corner: 109
+gradient: shimmer
+
+[corner_tl]
+╲·
+ ⋅
+
+[corner_tr]
+·╱
+⋅
+
+[corner_bl]
+ ⋅
+╱·
+
+[corner_br]
+⋅
+·╲
+
+[edge_top]
+·⋅
+⋅·
+
+[edge_bottom]
+⋅·
+·⋅
+
+[edge_left]
+╎
+⋅
+
+[edge_right]
+╎
+⋅
+
+[separator_left_top]
+·✦
+ ⋅
+
+[separator_right_top]
+✦·
+⋅
+
+[separator_left_bottom]
+ ⋅
+·✦
+
+[separator_right_bottom]
+⋅
+✦·
+
+[turn_separator]
+·  ⋅  ·  ✦  ·  ⋅  ·

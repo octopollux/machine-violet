@@ -1,0 +1,84 @@
+<!-- Whiskey Neon Theme
+     Noir frame set. Thin lines, single-row, with a dashed horizon and a
+     small bead at every interruption — like a fluorescent sign humming
+     in the rain, or condensation tracking down a glass of bourbon.
+
+     Ember/complementary/vignette burns amber for the sign and pulls
+     cyan-teal for the wet asphalt outside.
+
+     Suited to: Last Call, Blackwater Bay — bar at 2am, the night that
+     wouldn't end, a stranger with too many questions.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: whiskey_neon
+@genre_tags: noir, crime, mystery, modern, urban
+@height: 1
+
+[colors]
+preset: ember
+harmony: complementary
+gradient: vignette
+border: 3
+corner: 5
+separator: 4
+title: 6
+turn_indicator: 5
+side_frame: 1
+
+[variant_combat]
+<!-- Bar fight: amber hot, vignette tighter -->
+border: 6
+corner: 7
+separator: 5
+gradient: vignette
+
+[variant_ooc]
+<!-- Back booth, low light — cool complement -->
+border: 102
+corner: 103
+gradient: none
+
+[corner_tl]
+╭┄
+
+[corner_tr]
+┄╮
+
+[corner_bl]
+╰┄
+
+[corner_br]
+┄╯
+
+[edge_top]
+┄┈
+
+[edge_bottom]
+┈┄
+
+[edge_left]
+│
+
+[edge_right]
+│
+
+[separator_left_top]
+┄◦
+
+[separator_right_top]
+◦┄
+
+[separator_left_bottom]
+┄◦
+
+[separator_right_bottom]
+◦┄
+
+[turn_separator]
+┄┈┄── ◯ ──┄┈┄

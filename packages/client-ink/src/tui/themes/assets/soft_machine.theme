@@ -1,0 +1,89 @@
+<!-- Soft Machine Theme
+     Circuit frame with the edges sanded down. Rounded corners, light
+     dotted runs, and a quiet shimmer through the ethereal preset turn
+     the IDE/PCB look into something gentler — a friendly companion app,
+     a domestic robot's status screen, a barista's order ticket.
+
+     Suited to: Skinjob, Known Issue, The Coffee Shop, slice-of-life
+     sci-fi, downtime episodes, conversations with helpful machines.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: soft_machine
+@genre_tags: sci_fi, slice_of_life, cozy, modern, ai_companion
+
+@height: 1
+
+[colors]
+preset: ethereal
+harmony: analogous
+gradient: shimmer
+border: 2
+corner: 4
+separator: 3
+title: 5
+turn_indicator: 4
+side_frame: 1
+
+[variant_combat]
+<!-- Even soft machines have edges. Just a touch more saturation. -->
+preset: cyberpunk
+border: 4
+corner: 6
+gradient: vignette
+
+[variant_ooc]
+<!-- Lean further into the cool secondary analogous anchor -->
+border: 103
+corner: 104
+gradient: none
+
+[variant_levelup]
+<!-- Warm milestone tint via the warm analogous anchor -->
+border: 203
+corner: 205
+gradient: shimmer
+
+[corner_tl]
+╭
+
+[corner_tr]
+╮
+
+[corner_bl]
+╰
+
+[corner_br]
+╯
+
+[edge_top]
+╴·
+
+[edge_bottom]
+·╶
+
+[edge_left]
+╎
+
+[edge_right]
+╎
+
+[separator_left_top]
+┤
+
+[separator_right_top]
+├
+
+[separator_left_bottom]
+┤
+
+[separator_right_bottom]
+├
+
+[turn_separator]
+··╴── ◌ ──╶··

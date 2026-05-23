@@ -1,0 +1,100 @@
+<!-- Autumn Market Theme
+     Woven frame set, autumn-recolored. Same diamond-weave border, but
+     ember/split-complementary/shimmer turns it into pumpkin and persimmon
+     with cool teal piping in the seams — a stall canopy at the harvest
+     fair, a knit scarf on a folding chair, jam jars catching October light.
+
+     Suited to: Customer Support, The Roommate, HOA from Hell — suburban
+     comedy where neighbors run feuds the way armies run wars, but with
+     casseroles instead of campaigns.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: autumn_market
+@genre_tags: cozy, comedy, suburb, slice_of_life, community
+@height: 2
+
+[colors]
+preset: ember
+harmony: split-complementary
+gradient: shimmer
+border: 3
+corner: 5
+separator: 4
+title: 6
+turn_indicator: 5
+side_frame: 1
+
+[variant_combat]
+<!-- The neighborhood meeting boils over -->
+border: 6
+corner: 7
+gradient: vignette
+
+[variant_ooc]
+<!-- Friendly aside — pull to cool anchor 1 -->
+border: 102
+corner: 103
+gradient: none
+
+[variant_dev]
+<!-- The HOA bylaws spreadsheet — anchor 2 -->
+border: 202
+corner: 203
+gradient: shimmer
+
+[corner_tl]
+╭◇
+│
+
+[corner_tr]
+◇╮
+ │
+
+[corner_bl]
+│
+╰◇
+
+[corner_br]
+ │
+◇╯
+
+[edge_top]
+◇◈
+··
+
+[edge_bottom]
+··
+◇◈
+
+[edge_left]
+│
+│
+
+[edge_right]
+│
+│
+
+[separator_left_top]
+─╋
+ ·
+
+[separator_right_top]
+╋─
+·
+
+[separator_left_bottom]
+ ·
+─╋
+
+[separator_right_bottom]
+·
+╋─
+
+[turn_separator]
+◇◈◇── ✦ ──◇◈◇

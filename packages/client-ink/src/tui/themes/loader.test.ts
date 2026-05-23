@@ -53,7 +53,6 @@ describe("loader", () => {
     expect(themes).toContain("arcane");
     expect(themes).toContain("terminal");
     expect(themes).toContain("clean");
-    expect(themes).toHaveLength(4);
   });
 
   it("resetThemeCache clears cache", () => {

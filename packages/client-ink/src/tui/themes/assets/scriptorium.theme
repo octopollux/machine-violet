@@ -1,0 +1,91 @@
+<!-- Scriptorium Theme
+     Illuminated-manuscript style for scripture, mystery, and prophecy campaigns.
+     Rounded double-line frame with diamond-rosette flourishes — like a page
+     of an old book inked in iron-gall and gold leaf.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: scriptorium
+@genre_tags: scripture, mystery, prophecy, fantasy, meta
+@height: 2
+
+[colors]
+preset: ember
+harmony: split-complementary
+gradient: shimmer
+border: 2
+corner: 4
+separator: 5
+title: 6
+turn_indicator: 5
+side_frame: 1
+
+[variant_combat]
+<!-- Burning wrath: tighter ember palette, darker vignette -->
+preset: ember
+harmony: analogous
+border: 5
+corner: 6
+gradient: vignette
+
+[variant_ooc]
+<!-- Quiet vellum: pull the colors toward the cool secondary anchor -->
+border: 102
+corner: 103
+gradient: none
+
+[corner_tl]
+╭═
+║
+
+[corner_tr]
+═╮
+ ║
+
+[corner_bl]
+║
+╰═
+
+[corner_br]
+ ║
+═╯
+
+[edge_top]
+══
+··
+
+[edge_bottom]
+··
+══
+
+[edge_left]
+║
+║
+
+[edge_right]
+║
+║
+
+[separator_left_top]
+═◇
+ ·
+
+[separator_right_top]
+◇═
+·
+
+[separator_left_bottom]
+ ·
+═◇
+
+[separator_right_bottom]
+·
+◇═
+
+[turn_separator]
+══··── ❦ ──··══

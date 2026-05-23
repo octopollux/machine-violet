@@ -1,0 +1,103 @@
+<!-- Clockwork Theme
+     Brass frame for bureaucratic retrofuture. Round riveted corners,
+     double-line edges with a quiet shaded row underneath, and gear-disc
+     separators evoke a leatherbound ledger sitting on the desk of an
+     overworked clerk at the Department of Compliance. Ember preset in
+     warm analogous harmony with a soft vignette — the lamp on the desk
+     is the only light in the room.
+
+     Suited to: Customer Support, The Gravity Tax, Closing Time, paper
+     trails, filing-cabinet horror, the slow grind of process.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: clockwork
+@genre_tags: sci_fi, retrofuture, bureaucracy, steampunk, mystery
+
+@height: 2
+
+[colors]
+preset: ember
+harmony: analogous
+gradient: vignette
+border: 3
+corner: 5
+separator: 6
+title: 7
+turn_indicator: 5
+side_frame: 1
+
+[variant_combat]
+<!-- Audit triggered: punch the ember saturation up, hueShift -->
+border: 5
+corner: 7
+separator: 6
+gradient: hueShift
+
+[variant_ooc]
+<!-- After hours: cool analogous anchor, lights low -->
+border: 102
+corner: 104
+gradient: none
+
+[variant_levelup]
+<!-- Promotion granted: warm anchor, ribbon-cutting glow -->
+border: 205
+corner: 207
+gradient: shimmer
+
+[corner_tl]
+◯═
+║·
+
+[corner_tr]
+═◯
+·║
+
+[corner_bl]
+║·
+◯═
+
+[corner_br]
+·║
+═◯
+
+[edge_top]
+══
+··
+
+[edge_bottom]
+··
+══
+
+[edge_left]
+║
+▓
+
+[edge_right]
+║
+▓
+
+[separator_left_top]
+═⊙
+ ·
+
+[separator_right_top]
+⊙═
+·
+
+[separator_left_bottom]
+ ·
+═⊙
+
+[separator_right_bottom]
+·
+⊙═
+
+[turn_separator]
+═══◍═── ⊛ ──═◍═══

@@ -1,0 +1,90 @@
+<!-- Klaxon Theme
+     Circuit frame lit by emergency-bay lighting. Heavy single-line
+     borders, double-dash edges, and chevron-style separators evoke a
+     ship damage-control panel mid-incident: amber primary, with the
+     triadic alarm-red and warning-yellow anchors waiting to flash.
+
+     Suited to: Ember Protocol, Signal Lost, life-support failures,
+     reactor breach drills, anything where the lights are about to go red.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: klaxon
+@genre_tags: sci_fi, survival, emergency, horror, station
+
+@height: 1
+
+[colors]
+preset: ember
+harmony: triadic
+gradient: vignette
+border: 3
+corner: 5
+separator: 6
+title: 7
+turn_indicator: 6
+side_frame: 1
+
+[variant_combat]
+<!-- Hull breach: full red across the board -->
+border: 6
+corner: 7
+separator: 5
+gradient: hueShift
+
+[variant_ooc]
+<!-- Lights up, alarms off: swing to the second triadic anchor -->
+border: 103
+corner: 104
+separator: 102
+gradient: shimmer
+
+[variant_levelup]
+<!-- Repair-bay: third anchor, cooler tone -->
+border: 203
+corner: 205
+gradient: shimmer
+
+[corner_tl]
+┏
+
+[corner_tr]
+┓
+
+[corner_bl]
+┗
+
+[corner_br]
+┛
+
+[edge_top]
+━╾
+
+[edge_bottom]
+╼━
+
+[edge_left]
+┃
+
+[edge_right]
+┃
+
+[separator_left_top]
+┫
+
+[separator_right_top]
+┣
+
+[separator_left_bottom]
+┫
+
+[separator_right_bottom]
+┣
+
+[turn_separator]
+╾━━┫ ◈ ┣━━╼

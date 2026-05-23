@@ -1,0 +1,94 @@
+<!-- Salt Throne Theme
+     Rune frame set, recolored. Triadic ember with hueShift —
+     brutal kingdoms, salt-crusted crowns, hot blood under cold
+     iron. The throne is heavy and tastes of the sea.
+
+     Use for: A Throne of Salt, The Shattered Crown — power that
+     corrodes everything it touches.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: salt_throne
+@genre_tags: fantasy, grimdark, kingdom, political, ruin
+@height: 2
+
+[colors]
+preset: ember
+harmony: triadic
+gradient: hueShift
+border: 3
+corner: 5
+separator: 4
+title: 6
+turn_indicator: 105
+side_frame: 1
+
+[variant_combat]
+<!-- War council: tighter analogous warmth -->
+preset: ember
+harmony: analogous
+border: 106
+corner: 107
+gradient: vignette
+
+[variant_ooc]
+<!-- Salt and slate: cool triadic anchor -->
+border: 203
+corner: 204
+gradient: none
+
+[corner_tl]
+◤━
+┃
+
+[corner_tr]
+━◥
+ ┃
+
+[corner_bl]
+┃
+◣━
+
+[corner_br]
+ ┃
+━◢
+
+[edge_top]
+━━
+··
+
+[edge_bottom]
+··
+━━
+
+[edge_left]
+┃
+┃
+
+[edge_right]
+┃
+┃
+
+[separator_left_top]
+━╋
+ ┃
+
+[separator_right_top]
+╋━
+┃
+
+[separator_left_bottom]
+ ┃
+━╋
+
+[separator_right_bottom]
+┃
+╋━
+
+[turn_separator]
+━━┳━── ♛ ──━┳━━

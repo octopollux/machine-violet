@@ -1,0 +1,104 @@
+<!-- Corporate Dread Theme
+     Brass frame, but the brass has been replaced by injection-molded
+     polymer with a corporate logo embossed on it. Same riveted round
+     corners and gear-disc separators as `clockwork`, repainted in
+     cyberpunk triadic — three saturated brand anchors fighting for
+     dominance, with a vignette darkening the periphery the way a
+     well-lit boardroom darkens everything beyond the glass.
+
+     Suited to: Terms and Conditions, The Debt, Warranty Void, the
+     megacorp campaign, signing things you should not be signing.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: corporate_dread
+@genre_tags: sci_fi, cyberpunk, megacorp, dystopia, bureaucracy
+
+@height: 2
+
+[colors]
+preset: cyberpunk
+harmony: triadic
+gradient: vignette
+border: 3
+corner: 6
+separator: 7
+title: 8
+turn_indicator: 6
+side_frame: 1
+
+[variant_combat]
+<!-- Legal escalation: jump to triadic anchor 1, hueShift -->
+border: 106
+corner: 108
+separator: 107
+gradient: hueShift
+
+[variant_ooc]
+<!-- Breakroom: triadic anchor 2, dimmer -->
+border: 203
+corner: 205
+gradient: none
+
+[variant_dev]
+<!-- Sysadmin console: foliage green, no gradient -->
+preset: foliage
+border: 4
+corner: 6
+gradient: none
+
+[corner_tl]
+◯═
+║·
+
+[corner_tr]
+═◯
+·║
+
+[corner_bl]
+║·
+◯═
+
+[corner_br]
+·║
+═◯
+
+[edge_top]
+══
+··
+
+[edge_bottom]
+··
+══
+
+[edge_left]
+║
+▓
+
+[edge_right]
+║
+▓
+
+[separator_left_top]
+═◐
+ ·
+
+[separator_right_top]
+◑═
+·
+
+[separator_left_bottom]
+ ·
+═◐
+
+[separator_right_bottom]
+·
+◑═
+
+[turn_separator]
+══◍▓══ ▣ ══▓◍══

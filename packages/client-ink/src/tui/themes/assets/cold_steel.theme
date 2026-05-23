@@ -1,0 +1,91 @@
+<!-- Cold Steel Theme
+     Circuit frame stripped down to bone. Thin square corners, a single
+     hairline dashed run, and the ethereal preset on a complementary
+     two-anchor split — a cool steel-blue against a single warning
+     accent. Vignette pulls the periphery dark; what's left is the
+     readout, the cursor, and whatever you brought into the room.
+
+     Suited to: Cold Open, Floor 14 (sci-fi side), corporate-noir interrogations,
+     midnight server-room thefts, the side of cyberpunk that doesn't shout.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: cold_steel
+@genre_tags: sci_fi, noir, cyberpunk, minimal, thriller
+
+@height: 1
+
+[colors]
+preset: ethereal
+harmony: complementary
+gradient: vignette
+border: 2
+corner: 4
+separator: 5
+title: 6
+turn_indicator: 5
+side_frame: 1
+
+[variant_combat]
+<!-- Move to the complement: warm accent ignites -->
+border: 105
+corner: 107
+separator: 106
+gradient: hueShift
+
+[variant_ooc]
+<!-- Damp everything down -->
+border: 1
+corner: 2
+gradient: none
+
+[variant_dev]
+<!-- Engineering layer: cyberpunk for diagnostics -->
+preset: cyberpunk
+border: 4
+corner: 6
+gradient: none
+
+[corner_tl]
+┌
+
+[corner_tr]
+┐
+
+[corner_bl]
+└
+
+[corner_br]
+┘
+
+[edge_top]
+╴╶
+
+[edge_bottom]
+╶╴
+
+[edge_left]
+│
+
+[edge_right]
+│
+
+[separator_left_top]
+┤
+
+[separator_right_top]
+├
+
+[separator_left_bottom]
+┤
+
+[separator_right_bottom]
+├
+
+[turn_separator]
+╶── ▪ ──╴

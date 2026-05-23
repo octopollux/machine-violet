@@ -1,0 +1,103 @@
+<!-- Glitched Margin Theme
+     Paper frame set, signal-corrupted. The torn loose-leaf line is still
+     there but cyberpunk/complementary/hueShift recasts every margin-doodle
+     as a CRT artifact — apocrypha photocopied past legibility, drafts of
+     a script the showrunner doesn't want you to read, footnotes that
+     argue with the manuscript.
+
+     Suited to: Apocrypha, Season Finale, The Understudies, Cartomancy —
+     metafiction, fourth-wall hijinks, comedy bits that get a little too
+     real, characters reading their own stage directions.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: glitched_margin
+@genre_tags: meta, comedy, surreal, metafiction, theatre
+@height: 2
+
+[colors]
+preset: cyberpunk
+harmony: complementary
+gradient: hueShift
+border: 3
+corner: 6
+separator: 5
+title: 8
+turn_indicator: 7
+side_frame: 1
+
+[variant_combat]
+<!-- The bit goes off the rails — flip to complement -->
+border: 105
+corner: 107
+gradient: vignette
+
+[variant_ooc]
+<!-- Notes-on-the-script: dim and ethereal -->
+preset: ethereal
+border: 2
+corner: 3
+gradient: shimmer
+
+[variant_dev]
+<!-- The writers' room is open — foliage green-screen -->
+preset: foliage
+border: 4
+corner: 5
+gradient: none
+
+[corner_tl]
+╱┄
+│
+
+[corner_tr]
+┄╲
+ │
+
+[corner_bl]
+│
+╲┄
+
+[corner_br]
+ │
+┄╱
+
+[edge_top]
+┄·
+··
+
+[edge_bottom]
+··
+┄·
+
+[edge_left]
+│
+│
+
+[edge_right]
+│
+│
+
+[separator_left_top]
+┄*
+ ·
+
+[separator_right_top]
+*┄
+·
+
+[separator_left_bottom]
+ ·
+┄*
+
+[separator_right_bottom]
+·
+*┄
+
+[turn_separator]
+··┄·── ‹§› ──·┄··

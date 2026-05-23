@@ -1,0 +1,100 @@
+<!-- Palimpsest Theme
+     Paper frame set, ethereally recolored. Same torn loose-leaf edges,
+     but ethereal/triadic/shimmer drifts the palette across cool blues,
+     dusty lavenders, and pale gold — a manuscript scraped and rewritten,
+     three texts visible through the parchment when held to candle.
+
+     Suited to: Palimpsest, Cartomancy, The Bureau of Forgotten Things —
+     archives where the indexes don't agree, files that disappear when
+     read aloud, a draft beneath every draft.
+
+     Configuration keys:
+       preset       — swatch preset (ember, ethereal, cyberpunk, foliage)
+       harmony      — color harmony (analogous, complementary, triadic, ...)
+       gradient     — gradient preset (vignette, shimmer, hueShift, none)
+       border/corner/separator/title/turn_indicator/side_frame — swatch indices
+-->
+
+@name: palimpsest
+@genre_tags: mystery, occult, bureaucracy, archive, meta
+@height: 2
+
+[colors]
+preset: ethereal
+harmony: triadic
+gradient: shimmer
+border: 3
+corner: 5
+separator: 4
+title: 6
+turn_indicator: 5
+side_frame: 1
+
+[variant_combat]
+<!-- The third text surfaces — pull to anchor 1 -->
+border: 105
+corner: 107
+gradient: hueShift
+
+[variant_ooc]
+<!-- Out-of-character: pull to triadic anchor 2 -->
+border: 202
+corner: 204
+gradient: shimmer
+
+[variant_levelup]
+<!-- A page reveals itself — brighten anchor 0 -->
+border: 6
+corner: 7
+gradient: shimmer
+
+[corner_tl]
+╱┄
+│
+
+[corner_tr]
+┄╲
+ │
+
+[corner_bl]
+│
+╲┄
+
+[corner_br]
+ │
+┄╱
+
+[edge_top]
+┄·
+··
+
+[edge_bottom]
+··
+┄·
+
+[edge_left]
+│
+│
+
+[edge_right]
+│
+│
+
+[separator_left_top]
+┄*
+ ·
+
+[separator_right_top]
+*┄
+·
+
+[separator_left_bottom]
+ ·
+┄*
+
+[separator_right_bottom]
+·
+*┄
+
+[turn_separator]
+··┄── ✧ ──┄··
