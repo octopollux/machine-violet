@@ -202,6 +202,21 @@ function flattenToWords(
           wordBreak = false;
         }
       }
+    } else if (node.type === "wikilink") {
+      // Wikilinks are atomic at wrap time: a `[[Two Word]]` link must render
+      // as one contiguous span (splitting it would visually break the link
+      // and also produces two AST fragments that downstream collectors
+      // would double-count). Emit the whole tag as a single word token.
+      const visible = nodeVisibleLength(node.content);
+      if (visible === 0) continue;
+      if (words.length > 0 && !wordBreak) {
+        const prev = words[words.length - 1];
+        prev.nodes.push(node);
+        prev.visible += visible;
+      } else {
+        words.push({ nodes: [node], visible });
+      }
+      wordBreak = false;
     } else {
       // Tag node — recurse into children, wrapping fragments in the same tag type
       const childWords: { nodes: FormattingNode[]; visible: number }[] = [];
