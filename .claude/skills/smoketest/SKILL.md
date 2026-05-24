@@ -1,6 +1,7 @@
 ---
 name: smoketest
 description: Run the Machine Violet end-to-end smoke test against the local repo. Default scenario is `golden-path` — the full new-campaign → live DM turn cycle, ~5-7 minutes, real LLM API calls. Pass `boot-and-quit` for the cheap precondition (no API key, ~10s). USE THIS SKILL whenever validating cross-cutting changes — anything touching UI flow, session lifecycle, the setup agent, the DM loop, save/load, or any code path that spans server + client + WebSocket — and whenever the user says "smoke test", "/smoketest", "run the harness", "validate end-to-end", "golden path", "run e2e", "did I break it", "is it still working". Type checks and unit tests do not prove the flow works end-to-end; the harness does.
+allowed-tools: Bash(npm run e2e:*), Bash(npm run e2e -- :*), Read
 ---
 
 # Smoketest
@@ -9,7 +10,7 @@ Runs `packages/test-harness` against the full launcher stack (engine server + In
 
 ## Pick the scenario
 
-If `$ARGUMENTS` is non-empty, use it as the scenario id. Otherwise default to `golden-path`.
+If `$ARGUMENTS` is non-empty, use it verbatim as the scenario id. Otherwise default to `golden-path`.
 
 Available scenarios live in `packages/test-harness/src/scenarios/`. Today:
 
@@ -18,10 +19,14 @@ Available scenarios live in `packages/test-harness/src/scenarios/`. Today:
 
 ## How to invoke
 
-Use the `Bash` tool with `run_in_background: true`:
+Use the `Bash` tool with `run_in_background: true`. The command is exactly one of:
 
-```
-npm run e2e -- <scenario>
+```bash
+# When $ARGUMENTS is empty (the default):
+npm run e2e:golden-path
+
+# When $ARGUMENTS is non-empty (substitute the scenario id):
+npm run e2e -- $ARGUMENTS
 ```
 
 Then continue with whatever else needs doing in the same turn — write a commit message, draft a follow-up doc edit, sketch the next change. The harness auto-invokes you with a `<task-notification>` when the process exits.
