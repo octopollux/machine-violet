@@ -762,7 +762,7 @@ describe("enterDevMode", () => {
     const chatCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     if (chatCall) {
       expect(chatCall.tools.length).toBeGreaterThanOrEqual(15);
-      expect(chatCall.maxTokens).toBe(16384); // DEV_MODE
+      expect(chatCall.maxTokens).toBe(64000); // DEV_MODE — getMaxOutput("claude-sonnet-4-6")
     }
   });
 
@@ -776,7 +776,7 @@ describe("enterDevMode", () => {
     const chatCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     if (chatCall) {
       expect(chatCall.tools).toBeUndefined();
-      expect(chatCall.maxTokens).toBe(16384); // DEV_MODE
+      expect(chatCall.maxTokens).toBe(64000); // DEV_MODE — getMaxOutput("claude-sonnet-4-6")
     }
   });
 });

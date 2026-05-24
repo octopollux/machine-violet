@@ -1,3 +1,5 @@
+import type { CampaignScope } from "./config.js";
+
 /**
  * World file format (.mvworld) — portable campaign seed or world export.
  *
@@ -74,6 +76,10 @@ export interface WorldFile {
   mood?: string;
   /** Difficulty (e.g., "hard", "easy"). */
   difficulty?: string;
+  /** Intended campaign length. When set, the setup agent uses this instead of
+   *  asking the player about scope. Useful for seeds with a clear length (e.g.
+   *  a one-shot premise, or a long-form intrigue that doesn't fit short arcs). */
+  campaign_scope?: CampaignScope;
   /** DM personality override. */
   dm_personality?: { name: string; prompt_fragment: string };
   /** Calendar display format hint. */

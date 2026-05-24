@@ -21,7 +21,6 @@ export interface KnownModelEntry {
   contextWindow: number;
   maxOutput: number;
   defaultTier: "large" | "medium" | "small";
-  compactionThreshold: number;
   pricing: ModelPricing;
   capabilities: ModelCapabilities;
 }

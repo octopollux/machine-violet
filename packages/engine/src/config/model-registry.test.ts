@@ -13,8 +13,8 @@ describe("getMaxOutput", () => {
   });
 
   it("returns the registry's maxOutput for a known model", () => {
-    // claude-opus-4-6 is shipped with maxOutput=16384.
-    expect(getMaxOutput("claude-opus-4-6")).toBe(16384);
+    // claude-opus-4-6 is shipped with maxOutput=128000 (the docs ceiling).
+    expect(getMaxOutput("claude-opus-4-6")).toBe(128000);
   });
 
   it("returns the registry's maxOutput for GPT-5.5 (the model that triggered this fix)", () => {

@@ -505,6 +505,10 @@ export function createSetupConversation(
           if (world.system) parts.push(`Suggested system: ${world.system}`);
           if (world.mood) parts.push(`Suggested mood: ${world.mood}`);
           if (world.difficulty) parts.push(`Suggested difficulty: ${world.difficulty}`);
+          if (world.campaign_scope) {
+            parts.push(`Required campaign_scope: ${world.campaign_scope}`);
+            parts.push("(The world above defines a required campaign scope. Use the slug exactly as shown — no extra text — in finalize_setup, and do NOT ask the player about campaign length.)");
+          }
           content = parts.length > 0 ? parts.join("\n\n") : "World loaded but has no additional detail.";
         } else {
           content = `No world found with slug "${slug}".`;
@@ -640,6 +644,10 @@ export function createSetupConversation(
             if (world.system) parts.push(`Suggested system: ${world.system}`);
             if (world.mood) parts.push(`Suggested mood: ${world.mood}`);
             if (world.difficulty) parts.push(`Suggested difficulty: ${world.difficulty}`);
+            if (world.campaign_scope) {
+              parts.push(`Required campaign_scope: ${world.campaign_scope}`);
+              parts.push("(The world above defines a required campaign scope. Use the slug exactly as shown — no extra text — in finalize_setup, and do NOT ask the player about campaign length.)");
+            }
             content = parts.length > 0 ? parts.join("\n\n") : "World loaded but has no additional detail.";
           } else {
             content = `No world found with slug "${slug}".`;

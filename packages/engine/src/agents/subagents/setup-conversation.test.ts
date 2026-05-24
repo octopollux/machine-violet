@@ -10,6 +10,9 @@ vi.mock("../../config/world-loader.js", async (importOriginal) => {
       if (slug === "the-shattered-crown") {
         return { name: "The Shattered Crown", summary: "A kingdom torn apart", genres: ["fantasy"], detail: "Secret detail about the crown." };
       }
+      if (slug === "scoped-seed") {
+        return { name: "Scoped Seed", summary: "A seed with a baked-in scope.", genres: ["fantasy"], detail: "Some detail.", campaign_scope: "open-ended" };
+      }
       return undefined;
     }),
   };
@@ -482,6 +485,42 @@ describe("createSetupConversation", () => {
     await conv.start(noop);
 
     expect(loadWorldBySlug).toHaveBeenCalledWith("the-shattered-crown", "/fake/user/worlds");
+  });
+
+  it("load_world surfaces campaign_scope as a clean standalone slug line", async () => {
+    // When a world declares campaign_scope, the tool result must emit
+    // `Required campaign_scope: <slug>` on its own line (with the instruction
+    // prose as a separate paragraph) so the model doesn't accidentally copy
+    // the parenthetical into finalize_setup as the scope value.
+    const loadResp: ChatResult = {
+      text: "",
+      toolCalls: [{ id: "toolu_load_s", name: "load_world", input: { slug: "scoped-seed" } }],
+      usage: mockUsage(),
+      stopReason: "tool_use",
+      assistantContent: [
+        { type: "tool_use", id: "toolu_load_s", name: "load_world", input: { slug: "scoped-seed" } },
+      ],
+    };
+    const provider = mockProvider([loadResp, textResponse("Got it.")]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+
+    await conv.start(noop);
+
+    // The second call's history contains the tool_result for load_world
+    const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
+    const secondCall = streamCalls[1][0];
+    const userMsg = secondCall.messages.find(
+      (m: { role: string; content?: unknown }) => m.role === "user" && Array.isArray(m.content),
+    );
+    expect(userMsg).toBeDefined();
+    const toolResult = (userMsg.content as { type: string; tool_use_id: string; content: string }[])
+      .find((c) => c.type === "tool_result" && c.tool_use_id === "toolu_load_s");
+    expect(toolResult).toBeDefined();
+
+    // The slug appears on its own line, exactly — no parenthetical glued on.
+    expect(toolResult!.content).toMatch(/^Required campaign_scope: open-ended$/m);
+    // The instruction prose is present, but on a separate paragraph.
+    expect(toolResult!.content).toContain("do NOT ask the player about campaign length");
   });
 
   it("send() after dismissed choice includes tool_result", async () => {
