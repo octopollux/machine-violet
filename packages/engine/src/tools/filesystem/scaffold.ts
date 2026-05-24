@@ -98,5 +98,6 @@ export function machinePaths(homeDir: string) {
   return {
     player: (name: string) => join(homeDir, "players", `${name}.md`),
     playersDir: join(homeDir, "players"),
+    worldsDir: join(homeDir, "worlds"),
   };
 }

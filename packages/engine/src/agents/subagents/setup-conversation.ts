@@ -185,7 +185,7 @@ function shuffle<T>(arr: readonly T[]): T[] {
  *
  * BP3 (tools) and BP4 (last message) are stamped via cacheHints in runTurn.
  */
-function buildSystemPrompt(model: string, existingPlayers?: KnownPlayer[]): SystemBlock[] {
+function buildSystemPrompt(model: string, existingPlayers?: KnownPlayer[], userWorldsDir?: string): SystemBlock[] {
   const blocks: SystemBlock[] = [];
 
   // ── Tier 1: Global-stable (identical across all sessions) ──
@@ -238,7 +238,7 @@ function buildSystemPrompt(model: string, existingPlayers?: KnownPlayer[]): Syst
 
   // ── Tier 3: Randomized per session (stable across turns within session) ──
 
-  const worlds = worldSummaries(loadAllWorlds());
+  const worlds = worldSummaries(loadAllWorlds(userWorldsDir));
   const seedList = shuffle(worlds).map((s) => {
     const desc = s.description ? ` | Description: ${s.description}` : "";
     const extra = s.hasDetail ? " [has detail]" : "";
@@ -324,11 +324,12 @@ export function createSetupConversation(
   model: string,
   existingPlayers?: KnownPlayer[],
   onRetry?: (status: number, delayMs: number) => void,
+  userWorldsDir?: string,
 ): SetupConversation {
   // Build per-session system prompt (randomizes seed/personality order).
   // Known players are injected right after the base prompt (before seeds/personalities)
   // so the model sees them close to the flow instructions that reference them.
-  const systemPrompt = buildSystemPrompt(model, existingPlayers);
+  const systemPrompt = buildSystemPrompt(model, existingPlayers, userWorldsDir);
 
   const messages: NormalizedMessage[] = [];
   const totalUsage: NormalizedUsage = {
@@ -379,7 +380,7 @@ export function createSetupConversation(
       const worldSlug = rawWorldSlug.replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
       const fallbackSlug = campaignName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
       const slug = worldSlug || fallbackSlug;
-      const world = loadWorldBySlug(slug);
+      const world = loadWorldBySlug(slug, userWorldsDir);
       if (world?.detail) campaignDetail = world.detail;
     }
 
@@ -490,7 +491,7 @@ export function createSetupConversation(
       }
       if (call.name === "load_world") {
         const slug = (call.input as { slug?: string }).slug ?? "";
-        const world = loadWorldBySlug(slug);
+        const world = loadWorldBySlug(slug, userWorldsDir);
         let content: string;
         if (world) {
           const parts: string[] = [];
@@ -625,7 +626,7 @@ export function createSetupConversation(
           pendingToolUseId = tc.id;
         } else if (tc.name === "load_world") {
           const slug = (tc.input as { slug?: string }).slug ?? "";
-          const world = loadWorldBySlug(slug);
+          const world = loadWorldBySlug(slug, userWorldsDir);
           let content: string;
           if (world) {
             const parts: string[] = [];

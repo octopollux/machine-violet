@@ -109,12 +109,13 @@ export class SetupSession {
   /** Start the setup conversation. Streams opening narrative to clients. */
   async start(): Promise<void> {
     const knownPlayers = await this.scanKnownPlayers();
+    const userWorldsDir = machinePaths(this.homeDir).worldsDir;
     this.conversation = createSetupConversation(this.provider, this.model, knownPlayers, (status, delayMs) => {
       this.broadcast({
         type: "error",
         data: { message: `API retry (status ${status})`, recoverable: true, status, delayMs },
       });
-    });
+    }, userWorldsDir);
     this.started = true;
 
     this.emitThinking();
