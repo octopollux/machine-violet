@@ -122,6 +122,12 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
     apiClientRef.current.getMachineSettings().then((s) => {
       setDevModeEnabled(s.devModeEnabled);
     }).catch(() => { /* best-effort — keep default */ });
+    // Honor a persisted opt-out on every launch path (menu and direct-launch
+    // via campaignId both depend on this firing before the controller-sync
+    // effect activates Rich Presence).
+    apiClientRef.current.getDiscordSettings().then((s) => {
+      setDiscordEnabled(s.enabled);
+    }).catch(() => { /* best-effort — keep default */ });
   }, []);
 
   // Persist client-only settings whenever they change (skip the initial load)
