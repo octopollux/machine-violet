@@ -134,7 +134,7 @@ TUI tools are **fire-and-forget**: their results drive engine/UI state but the D
 
 ---
 
-## OOC / Mode Tools → [dm-prompt.md](dm-prompt.md), [overview.md](overview.md)
+## OOC / Mode Tools → [subagents-catalog.md](subagents-catalog.md), [overview.md](overview.md)
 
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|

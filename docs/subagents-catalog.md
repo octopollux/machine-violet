@@ -26,7 +26,7 @@ Every subagent pattern specified across the design docs. A subagent is a nested 
 
 **Returns**: `ResolutionResult` with structured `StateDelta[]` (engine auto-applies HP/conditions/resources), `RollRecord[]`, and a narrative summary for the DM. Output format is XML (`<resolution>` block). Graceful fallback: if no XML block found, full text returned as narrative.
 
-**Cost**: ~$0.20 for a 20-turn combat with prompt caching. Turns 2-20 read prior context at cache rate.
+**Caching**: Turns 2-N read prior context at cache rate; the persistent session is the reason this stays cheap even for marathon combats.
 
 ### 1b. Resolution Subagent (Legacy)
 
@@ -50,7 +50,7 @@ Every subagent pattern specified across the design docs. A subagent is a nested 
 | **Model** | Sonnet |
 | **Visibility** | Player-facing |
 | **Trigger** | DM calls `enter_ooc`, or player via game menu / `/ooc` |
-| **Source doc** | [dm-prompt.md](dm-prompt.md), [overview.md](overview.md) |
+| **Source doc** | [overview.md](overview.md) |
 
 Sandboxed conversation for out-of-character discussion. Receives the DM's current context on entry. Handles rules questions, transcript searches, configuration changes, player corrections, validation requests, rollback.
 
