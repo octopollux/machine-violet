@@ -1,4 +1,5 @@
-import { dirname, join } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { defaultConfigDir } from "../tools/filesystem/platform.js";
 
 /** Normalize a path to use forward slashes (cross-platform). */
@@ -61,17 +62,31 @@ export function assetDir(category: "prompts" | "themes" | "systems" | "worlds" |
 }
 
 /**
- * Resolve the directory for user config files (.env, api-keys.json, config.json).
+ * Resolve the directory for user config files (.env, connections.json).
  *
  * Compiled: platform-conventional config dir (e.g. %APPDATA%\MachineViolet).
- * Dev: process.cwd() (repo root, where .env already lives).
+ * Dev: walk up from cwd looking for an ancestor containing `connections.json`
+ * so a worktree picks up the parent repo's saved config. Falls back to cwd
+ * (first-time setup writes there; move the file up once if you want it
+ * shared across worktrees).
  */
 let _configDir: string | undefined;
 
 export function configDir(): string {
   if (_configDir) return _configDir;
-  _configDir = isCompiled() ? defaultConfigDir() : process.cwd();
+  _configDir = isCompiled() ? defaultConfigDir() : findConfigDirUpward(process.cwd());
   return _configDir;
+}
+
+function findConfigDirUpward(start: string): string {
+  let dir = resolve(start);
+  for (let i = 0; i < 12; i++) {
+    if (existsSync(join(dir, "connections.json"))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return start;
 }
 
 /** Reset the configDir cache (for tests). */
