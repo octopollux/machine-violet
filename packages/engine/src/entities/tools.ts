@@ -236,7 +236,7 @@ async function handleDescribe(
   const declaredFmKeys = new Set<string>();
   for (const [name, field] of Object.entries(schema.fields)) {
     if (field.source === "frontmatter") {
-      declaredFmKeys.add(name === "aliases" ? "additional_names" : name);
+      declaredFmKeys.add(name);
     }
   }
   const observedDrift: Record<string, { occursIn: number; examples: string[] }> = {};
@@ -303,7 +303,7 @@ async function handleFindDrift(
     const declaredFmKeys = new Set<string>();
     for (const [name, field] of Object.entries(schema.fields)) {
       if (field.source === "frontmatter") {
-        declaredFmKeys.add(name === "aliases" ? "additional_names" : name);
+        declaredFmKeys.add(name);
       }
     }
     const drift: Record<string, { occursIn: number; examples: string[] }> = {};

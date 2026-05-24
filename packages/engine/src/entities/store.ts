@@ -13,11 +13,10 @@
  */
 
 import { join, dirname } from "node:path";
-import { parseFrontMatter, serializeEntity } from "../tools/filesystem/frontmatter.js";
+import { parseFrontMatter, serializeEntity, sanitizeFrontMatter } from "../tools/filesystem/frontmatter.js";
 import { formatChangelogEntry } from "../tools/filesystem/changelog.js";
 import { campaignPaths } from "../tools/filesystem/scaffold.js";
-import { findReferences } from "../tools/campaign-ops/find-references.js";
-import { walkCampaignFiles } from "../tools/campaign-ops/walk-campaign.js";
+import { walkCampaignFiles, type CampaignFile } from "../tools/campaign-ops/walk-campaign.js";
 import { extractWikilinks } from "../tools/filesystem/wikilinks.js";
 import { resolveRelativePath } from "../tools/filesystem/validation.js";
 import { norm } from "../utils/paths.js";
@@ -165,6 +164,14 @@ export class EntityStore {
   private observedCache = new Map<FileBackedEntityType, ObservedFields>();
   /** Cached entity tree. Cleared on writes. */
   private treeCache: EntityTree | null = null;
+  /**
+   * Cached campaign-file walk + the derived inbound-reference index.
+   * Both invalidated on writes. Lazy because the first call is the expensive
+   * one (reads every campaign file); subsequent calls within the same session
+   * keep entity reads cheap, which the prompt advertises.
+   */
+  private walkedFilesCache: CampaignFile[] | null = null;
+  private inboundIndexCache: Map<string, { file: string; line: number; display: string }[]> | null = null;
 
   constructor(
     public readonly campaignRoot: string,
@@ -212,6 +219,40 @@ export class EntityStore {
   private invalidateCaches(): void {
     this.observedCache.clear();
     this.treeCache = null;
+    this.walkedFilesCache = null;
+    this.inboundIndexCache = null;
+  }
+
+  /**
+   * Walk every campaign file once and cache the result. Used by reference
+   * resolution + orphan detection; without this, every `entity("read")`
+   * re-walks the whole campaign.
+   */
+  private async getWalkedFiles(): Promise<CampaignFile[]> {
+    if (this.walkedFilesCache) return this.walkedFilesCache;
+    this.walkedFilesCache = await walkCampaignFiles(this.campaignRoot, this.fileIO as Parameters<typeof walkCampaignFiles>[1]);
+    return this.walkedFilesCache;
+  }
+
+  /**
+   * Build a `targetRelativePath → references[]` index from the cached walk.
+   * Inbound-ref lookups become O(1) per entity after the first walk.
+   */
+  private async getInboundIndex(): Promise<Map<string, { file: string; line: number; display: string }[]>> {
+    if (this.inboundIndexCache) return this.inboundIndexCache;
+    const files = await this.getWalkedFiles();
+    const index = new Map<string, { file: string; line: number; display: string }[]>();
+    for (const file of files) {
+      const links = extractWikilinks(file.content);
+      for (const link of links) {
+        const resolved = resolveRelativePath(file.relativePath, link.target);
+        const bucket = index.get(resolved) ?? [];
+        bucket.push({ file: file.relativePath, line: link.line, display: link.display });
+        index.set(resolved, bucket);
+      }
+    }
+    this.inboundIndexCache = index;
+    return index;
   }
 
   // ── Index / list ──
@@ -367,10 +408,13 @@ export class EntityStore {
 
     await this.fileIO.mkdir(dirname(abs));
 
-    const fm: EntityFrontMatter = {
-      type,
-      ...(patch.frontMatter ?? {}),
-    };
+    // Sanitize first to catch small-model corruption like
+    // `{ "**Type:** character": "character" }` keys — without this they
+    // round-trip as `****Type:** character:** character` and permanently
+    // corrupt the file. Then pin `type` last so a patch can never override
+    // the category marker the directory is committed to.
+    const sanitized = sanitizeFrontMatter(patch.frontMatter ?? {});
+    const fm: EntityFrontMatter = { ...sanitized, type };
     const changelog: string[] = [];
     if (patch.changelogEntry) {
       changelog.push(formatChangelogEntry(sceneNumber, patch.changelogEntry));
@@ -407,7 +451,9 @@ export class EntityStore {
     const fm: EntityFrontMatter = { ...parsed.frontMatter };
     delete (fm as Record<string, unknown>)._title;
     if (patch.frontMatter) {
-      for (const [k, v] of Object.entries(patch.frontMatter)) {
+      // Sanitize before merge — see sanitizeFrontMatter for why.
+      const sanitized = sanitizeFrontMatter(patch.frontMatter);
+      for (const [k, v] of Object.entries(sanitized)) {
         if (v === null) {
           // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
           delete (fm as Record<string, unknown>)[k];
@@ -416,6 +462,10 @@ export class EntityStore {
         }
       }
     }
+    // Pin `type` to the directory's canonical category. Patches that try to
+    // change or null it are silently overridden — the on-disk type is the
+    // contract validateEntityFile checks and many other places assume.
+    fm.type = type;
 
     const body = patch.body !== undefined ? patch.body : parsed.body;
     const changelog = [...parsed.changelog];
@@ -449,8 +499,10 @@ export class EntityStore {
 
     // Capture inbound refs BEFORE deletion — once the file is gone, the next
     // `walk` won't see it as a target, but the caller still wants to know
-    // which links now dangle.
-    const refResult = await findReferences(this.campaignRoot, this.fileIO as Parameters<typeof findReferences>[1], rel);
+    // which links now dangle. Uses the cached link index when it's been
+    // populated this session.
+    const inboundIndex = await this.getInboundIndex();
+    const deadReferences = (inboundIndex.get(rel) ?? []).filter(r => r.file !== rel);
 
     await this.fileIO.deleteFile(abs);
 
@@ -468,11 +520,7 @@ export class EntityStore {
       type,
       id: slug,
       path: rel,
-      deadReferences: refResult.references.map(r => ({
-        file: r.file,
-        line: r.line,
-        display: r.display,
-      })),
+      deadReferences,
     };
   }
 
@@ -528,24 +576,13 @@ export class EntityStore {
   /** Find files in the campaign with no inbound wikilinks. */
   async detectOrphans(): Promise<{ type: FileBackedEntityType; id: string; path: string }[]> {
     const tree = await this.scanIndex();
-    const walked = await walkCampaignFiles(this.campaignRoot, this.fileIO as Parameters<typeof walkCampaignFiles>[1]);
-
-    // Build inbound count by resolving every link.
-    const inbound = new Map<string, number>();
-    for (const file of walked) {
-      const links = extractWikilinks(file.content);
-      for (const link of links) {
-        const resolved = resolveRelativePath(file.relativePath, link.target);
-        // Don't count self-references as inbound.
-        if (resolved === file.relativePath) continue;
-        inbound.set(resolved, (inbound.get(resolved) ?? 0) + 1);
-      }
-    }
+    const inboundIndex = await this.getInboundIndex();
 
     const orphans: { type: FileBackedEntityType; id: string; path: string }[] = [];
     for (const [slug, entry] of Object.entries(tree)) {
       if (!isFileBackedEntityType(entry.type)) continue;
-      if ((inbound.get(entry.path) ?? 0) === 0) {
+      const refs = (inboundIndex.get(entry.path) ?? []).filter(r => r.file !== entry.path);
+      if (refs.length === 0) {
         orphans.push({ type: entry.type, id: slug, path: entry.path });
       }
     }
@@ -585,9 +622,9 @@ export class EntityStore {
       else dead.push(resolved);
     }
 
-    const refResult = await findReferences(this.campaignRoot, this.fileIO as Parameters<typeof findReferences>[1], rel);
+    const inboundIndex = await this.getInboundIndex();
     const inbound: string[] = [];
-    for (const ref of refResult.references) {
+    for (const ref of inboundIndex.get(rel) ?? []) {
       // Skip self-references.
       if (ref.file === rel) continue;
       const labeled = pathToTypeSlug.get(ref.file) ?? ref.file;
@@ -609,19 +646,14 @@ export class EntityStore {
     for (const [name, field] of Object.entries(schema.fields)) {
       if (field.source === "frontmatter") declaredFmKeys.add(name);
     }
-    // `aliases` is sourced from frontmatter under the on-disk key
-    // `additional_names`, not the logical name `aliases`. Map it.
-    declaredFmKeys.delete("aliases");
-    declaredFmKeys.add("additional_names");
 
     const unknownFields = Object.keys(frontMatter).filter(k => !declaredFmKeys.has(k));
     const missingFields: string[] = [];
     for (const [name, field] of Object.entries(schema.fields)) {
       if (!field.required) continue;
       // displayName is sourced from h1, not frontmatter — checked separately.
-      if (field.source === "frontmatter") {
-        const key = name === "aliases" ? "additional_names" : name;
-        if (!(key in frontMatter)) missingFields.push(name);
+      if (field.source === "frontmatter" && !(name in frontMatter)) {
+        missingFields.push(name);
       }
     }
     return { unknownFields, missingFields };
@@ -639,11 +671,8 @@ export class EntityStore {
       if (field.source === "h1" && !displayName.trim()) {
         issues.push({ level: "error", field: name, msg: `Missing H1 heading (${name})` });
       }
-      if (field.source === "frontmatter") {
-        const key = name === "aliases" ? "additional_names" : name;
-        if (!(key in frontMatter)) {
-          issues.push({ level: "error", field: name, msg: `Missing required field: ${name}` });
-        }
+      if (field.source === "frontmatter" && !(name in frontMatter)) {
+        issues.push({ level: "error", field: name, msg: `Missing required field: ${name}` });
       }
     }
     for (const dead of refs.dead) {

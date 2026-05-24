@@ -199,6 +199,46 @@ describe("EntityStore CRUD roundtrip", () => {
   });
 });
 
+describe("EntityStore type safety", () => {
+  it("pins type to the directory category on create even if patch tries to override", async () => {
+    const io = inMemoryFileIO();
+    const store = new EntityStore(ROOT, io);
+    const rec = await store.create("character", {
+      displayName: "Arvid",
+      // Adversarial patch trying to mislabel the entity.
+      frontMatter: { type: "location" },
+    });
+    expect(rec.frontMatter.type).toBe("character");
+  });
+
+  it("pins type on update even when patch tries to delete or change it", async () => {
+    const io = inMemoryFileIO({
+      "/root/characters/arvid.md": character("Arvid"),
+    });
+    const store = new EntityStore(ROOT, io);
+    await store.update("character", "arvid", { frontMatter: { type: null } });
+    const rec = await store.read("character", "arvid");
+    expect(rec.frontMatter.type).toBe("character");
+  });
+
+  it("repairs malformed `**Type:** character` keys via sanitizeFrontMatter", async () => {
+    // Reproduces the small-model corruption pattern that scribe's
+    // sanitizeFrontMatter was added for. The store must apply the same
+    // repair — otherwise the file rounds-trips to `****Type:** ...`.
+    const io = inMemoryFileIO({
+      "/root/characters/arvid.md": character("Arvid"),
+    });
+    const store = new EntityStore(ROOT, io);
+    await store.update("character", "arvid", {
+      frontMatter: { "**Location:** [[Town]]": "[[Town]]" },
+    });
+    const rec = await store.read("character", "arvid");
+    expect(rec.frontMatter.location).toBe("[[Town]]");
+    // No corrupted key sneaks through.
+    expect(Object.keys(rec.frontMatter)).not.toContain("**Location:** [[Town]]");
+  });
+});
+
 describe("EntityStore.delete + wikilink sweep", () => {
   it("deletes the file and surfaces inbound refs as dead", async () => {
     const io = inMemoryFileIO({

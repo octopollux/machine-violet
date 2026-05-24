@@ -152,6 +152,50 @@ const DISPLAY_NAMES: Record<string, string> = Object.assign(Object.create(null),
   xp: "XP",
 });
 
+/**
+ * Repair front_matter objects produced by smaller models that occasionally
+ * pass the entire on-disk markdown line as the JSON key — e.g.
+ * `{ "**Type:** character": "character" }` — instead of the documented
+ * `{ "type": "character" }` shape. Without this, the serializer round-trips
+ * the bad key as `****Type:** character:** character` and the file
+ * frontmatter is permanently corrupted on subsequent reads.
+ *
+ * Lives here (instead of next to scribe) because EntityStore.create/update
+ * also accept agent-supplied frontmatter and must apply the same repair.
+ *
+ * Strategy: detect a `**Key:**` prefix in the key, extract the real key
+ * (lowercased + snake-cased to match {@link normalizeKey}), and use the
+ * trailing fragment as the value if no separate value was supplied or if
+ * the supplied value duplicates the trailing fragment. `null` values are
+ * preserved as the deletion sentinel even when the malformed key carries
+ * a value fragment.
+ */
+export function sanitizeFrontMatter(
+  raw: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const KEY_RE = /^\*+\s*([^*:]+?)\s*:\*+\s*(.*)$/;
+  for (const [rawKey, rawValue] of Object.entries(raw)) {
+    const m = KEY_RE.exec(rawKey);
+    if (!m) {
+      out[rawKey] = rawValue;
+      continue;
+    }
+    const recoveredKey = m[1].trim().toLowerCase().replace(/\s+/g, "_");
+    const recoveredValueFromKey = m[2].trim();
+    const value =
+      rawValue === null
+        ? null
+        : typeof rawValue === "string" && rawValue.trim() && rawValue.trim() !== recoveredValueFromKey
+          ? rawValue
+          : recoveredValueFromKey || rawValue;
+    if (!(recoveredKey in out)) {
+      out[recoveredKey] = value;
+    }
+  }
+  return out;
+}
+
 /** Convert storage key to display key: "display_resources" -> "Display Resources" */
 export function displayKeyName(key: string): string {
   const canonical = DISPLAY_NAMES[key];

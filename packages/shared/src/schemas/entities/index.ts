@@ -80,18 +80,21 @@ const DISPLAY_NAME: SchemaField = {
   description: "Canonical display name (the H1 heading).",
 };
 
-const ALIASES: SchemaField = {
-  required: false,
-  kind: "string[]",
-  source: "frontmatter",
-  description: "Comma-separated alternative names. Surfaced as `Additional Names`.",
-};
-
-const TYPE_TAG: SchemaField = {
+// Schema field names match on-disk keys exactly so agents can write what
+// they read. `EntityRecord.aliases` is a parsed convenience on top of this
+// raw string.
+const ADDITIONAL_NAMES: SchemaField = {
   required: false,
   kind: "string",
   source: "frontmatter",
-  description: "Subtype tag (e.g. NPC vs PC for character). Free-form string.",
+  description: "Comma-separated alternative names (e.g. \"Pale One, The Pale\"). Parsed into `EntityRecord.aliases` on read.",
+};
+
+const TYPE_CATEGORY: SchemaField = {
+  required: true,
+  kind: "string",
+  source: "frontmatter",
+  description: "Entity category marker (\"character\", \"location\", \"faction\", \"lore\", or \"item\"). Set automatically by the store from the on-disk directory; do not override.",
 };
 
 // --- Per-type schemas ---
@@ -102,8 +105,8 @@ export const CHARACTER_SCHEMA: EntitySchema = {
   storage: { dir: "characters", subdirs: false, format: "markdown+frontmatter" },
   fields: {
     displayName: DISPLAY_NAME,
-    aliases: ALIASES,
-    type: TYPE_TAG,
+    additional_names: ADDITIONAL_NAMES,
+    type: TYPE_CATEGORY,
     location: {
       required: false,
       kind: "wikilink",
@@ -113,7 +116,7 @@ export const CHARACTER_SCHEMA: EntitySchema = {
   },
   conventions: [
     ...SHARED_CONVENTIONS,
-    "PCs and named NPCs both live here. Use the `type` field to distinguish (PC, NPC).",
+    "PCs and named NPCs both live here. The `type` field is fixed to \"character\" — PC vs NPC is conventionally noted in the body or via promote_character's sheet status, not via type.",
     "Promoted character sheets follow `promote_character`'s sheet format under `## Stats`/`## Abilities`.",
   ],
 };
@@ -124,8 +127,8 @@ export const LOCATION_SCHEMA: EntitySchema = {
   storage: { dir: "locations", subdirs: true, format: "markdown+frontmatter" },
   fields: {
     displayName: DISPLAY_NAME,
-    aliases: ALIASES,
-    type: TYPE_TAG,
+    additional_names: ADDITIONAL_NAMES,
+    type: TYPE_CATEGORY,
   },
   conventions: [
     ...SHARED_CONVENTIONS,
@@ -140,8 +143,8 @@ export const FACTION_SCHEMA: EntitySchema = {
   storage: { dir: "factions", subdirs: false, format: "markdown+frontmatter" },
   fields: {
     displayName: DISPLAY_NAME,
-    aliases: ALIASES,
-    type: TYPE_TAG,
+    additional_names: ADDITIONAL_NAMES,
+    type: TYPE_CATEGORY,
   },
   conventions: [
     ...SHARED_CONVENTIONS,
@@ -155,8 +158,8 @@ export const LORE_SCHEMA: EntitySchema = {
   storage: { dir: "lore", subdirs: false, format: "markdown+frontmatter" },
   fields: {
     displayName: DISPLAY_NAME,
-    aliases: ALIASES,
-    type: TYPE_TAG,
+    additional_names: ADDITIONAL_NAMES,
+    type: TYPE_CATEGORY,
   },
   conventions: [
     ...SHARED_CONVENTIONS,
@@ -170,8 +173,8 @@ export const ITEM_SCHEMA: EntitySchema = {
   storage: { dir: "items", subdirs: false, format: "markdown+frontmatter" },
   fields: {
     displayName: DISPLAY_NAME,
-    aliases: ALIASES,
-    type: TYPE_TAG,
+    additional_names: ADDITIONAL_NAMES,
+    type: TYPE_CATEGORY,
   },
   conventions: [
     ...SHARED_CONVENTIONS,
