@@ -56,6 +56,16 @@ scenario" below.
 
 ## Running
 
+The canonical handle is the **`/smoketest` skill** (`.claude/skills/smoketest/`):
+
+```
+/smoketest                  # golden-path (default)
+/smoketest boot-and-quit    # the cheap precondition
+/smoketest <scenario-id>    # any scenario from packages/test-harness/src/scenarios/
+```
+
+Agents invoke the same skill via the Skill tool when validating cross-cutting work. Under the hood, it calls these npm scripts — which you can also run directly:
+
 ```bash
 # Quick precondition — no API key needed:
 npm run e2e:boot
