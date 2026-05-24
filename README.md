@@ -21,7 +21,7 @@ Machine Violet is an agentic AI storytelling/roleplay engine that runs in your t
 
 Machine Violet works with whichever AI provider you already pay for:
 
-- **ChatGPT Plus / Pro / Business / Enterprise** — sign in with your existing subscription. No API credits required. Uses OpenAI's official Codex app-server under the hood for OAuth, token refresh, and rate-limit reporting.
+- **ChatGPT Plus / Pro / Business / Enterprise** — sign in with your existing subscription. No API credits required. Uses OpenAI's official Codex app-server for backend API calls and live rate-limit reporting.
 - **Anthropic API** — Claude Opus / Sonnet / Haiku via [console.anthropic.com](https://console.anthropic.com/).
 - **OpenAI API** — GPT-5.5 and friends via an OpenAI API key.
 - **OpenRouter** — one key, many models.
@@ -37,7 +37,7 @@ Add a connection from the main menu on first launch. Mix providers across tiers 
 
 **Portable** — Download [**`MachineViolet-nightly-Portable.zip`**](https://github.com/octopollux/machine-violet/releases/download/nightly/MachineViolet-nightly-Portable.zip), unzip anywhere, run `MachineViolet.exe`.
 
-> Use Windows Terminal (Preview 1.25+) for the best experience — `cmd.exe` and PowerShell ISE are not supported. The portable zip bundles a copy of Windows Terminal for convenience.
+> Use Windows Terminal (Preview 1.25+) for the best experience. PowerShell ISE is not supported; if launched from bare `cmd.exe` or by double-click, Machine Violet auto-relaunches in Windows Terminal when one is available. The portable zip bundles a copy of Windows Terminal.
 
 ### macOS (Apple Silicon) / Linux (x64)
 
@@ -45,15 +45,15 @@ Add a connection from the main menu on first launch. Mix providers across tiers 
 ```bash
 brew install octopollux/mv-tap/machine-violet
 ```
+Then run `machine-violet` in your terminal.
 
-**Install script** — adds `machine-violet` to `~/.local/bin`:
+**Install script** — downloads the tarball and symlinks `machine-violet` into `~/.local/bin`:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/octopollux/machine-violet/main/scripts/install.sh | bash
 ```
-
-**Tarball** — grab `machine-violet-nightly-darwin-arm64.tar.gz` or `machine-violet-nightly-linux-x64.tar.gz` from the [latest release](https://github.com/octopollux/machine-violet/releases/tag/nightly), extract, and run `./MachineViolet`.
-
 Then run `machine-violet` in your terminal.
+
+**Tarball (manual)** — grab `machine-violet-nightly-darwin-arm64.tar.gz` or `machine-violet-nightly-linux-x64.tar.gz` from the [latest release](https://github.com/octopollux/machine-violet/releases/tag/nightly), extract, and run `./MachineViolet` from the extracted directory.
 
 ## Development
 
