@@ -27,6 +27,20 @@ const CATEGORY_LABELS: Record<CompendiumCategory, string> = {
 
 const DETAIL_MODAL_OPTS = { minWidth: 30, maxWidth: 999, widthFraction: 0.6 } as const;
 
+/**
+ * Footer for the detail view. The "N/M links" numerator is left-padded to
+ * the digit width of `linkCount` so the rendered footer width stays stable
+ * as the user Tabs through links — the modal doesn't twitch a column wider
+ * when the numerator gains a digit, and a single sizing footer can drive
+ * both the pre-wrap innerWidth calculation and CenteredModal's own.
+ */
+function buildDetailFooter(linkIndex: number, linkCount: number): string {
+  if (linkCount === 0) return "*Bksp*: back  *ESC*: close";
+  const denom = String(linkCount);
+  const num = String(linkIndex + 1).padStart(denom.length, " ");
+  return `${num}/${denom} links  *Tab*: next  *Enter*: follow  *Bksp*: back  *ESC*: close`;
+}
+
 interface CompendiumModalProps {
   theme: ResolvedTheme;
   width: number;
@@ -130,10 +144,22 @@ export function CompendiumModal({
       lines.push(`**Related:** ${detail.related.join(", ")}`);
     }
 
-    const innerWidth = computeModalInnerWidth(theme, width, DETAIL_MODAL_OPTS);
     const styled = colorizeSheetLines(lines, { theme, frameAnchor: 1, wikilinks: "preserve" });
-    // Pre-wrap at the modal's exact innerWidth so each wikilink lives on a
-    // known row index — required for ensureLineVisible to scroll precisely.
+    // Wikilinks are atomic at wrap time (see wrapNodes), so the count is
+    // stable between styled and pre-wrapped — counting on the un-wrapped
+    // styled lines lets us size the footer BEFORE we need an innerWidth.
+    const linkCount = collectWikilinks(styled, new Set()).length;
+    // Build the worst-case sizing footer first, then compute innerWidth
+    // against the same footer CenteredModal will render with. Otherwise the
+    // footer's `footerFloor` widens the modal at render time but not at
+    // pre-wrap time, so content wraps narrower than the modal actually is.
+    const sizingFooter = buildDetailFooter(Math.max(0, linkCount - 1), linkCount);
+    const innerWidth = computeModalInnerWidth(theme, width, {
+      ...DETAIL_MODAL_OPTS,
+      footer: sizingFooter,
+    });
+    // Pre-wrap at the modal's actual innerWidth so each wikilink lives on
+    // a known row index — required for ensureLineVisible to scroll precisely.
     // CenteredModal will re-wrap, but at the same width this is idempotent.
     const wrapped = styled.flatMap((line) => wrapNodes(line, Math.max(1, innerWidth)));
     const brokenSlugs = new Set<string>();
@@ -254,9 +280,7 @@ export function CompendiumModal({
   if (detail && detailContent) {
     const { wrapped, links, brokenSlugs } = detailContent;
     const styledLines = markWikilinks(wrapped, brokenSlugs, links.length > 0 ? linkIndex : -1);
-    const linkFooter = links.length > 0
-      ? `${linkIndex + 1}/${links.length} links  *Tab*: next  *Enter*: follow  *Bksp*: back  *ESC*: close`
-      : "*Bksp*: back  *ESC*: close";
+    const linkFooter = buildDetailFooter(linkIndex, links.length);
 
     return (
       <CenteredModal

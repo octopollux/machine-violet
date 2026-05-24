@@ -487,6 +487,43 @@ describe("wrapNodes", () => {
     expect(result).toHaveLength(1);
     expect(toPlainText(result[0])).toBe("cd e");
   });
+
+  it("keeps multi-word wikilinks as a single atomic node when wrapping", () => {
+    // Wikilinks must not split across rows: a `[[Captain Voss]]` link has
+    // to render as one contiguous span (visually and structurally) so the
+    // compendium's link collector counts it once and Tab navigation works.
+    const nodes = parseFormatting("See <wikilink slug=captain-voss>Captain Voss</wikilink> for details");
+    const result = wrapNodes(nodes, 16);
+    // The link is 12 visible chars ("Captain Voss"); "See " before it is 4
+    // chars, which together fit width 16, but "for details" forces a wrap.
+    // What matters: the wikilink itself stays as ONE tag, not two halves.
+    const wikilinkNodes = result.flatMap((row) =>
+      row.filter((n): n is Extract<FormattingTag, { type: "wikilink" }> =>
+        typeof n !== "string" && n.type === "wikilink",
+      ),
+    );
+    expect(wikilinkNodes).toHaveLength(1);
+    expect(wikilinkNodes[0].target).toBe("captain-voss");
+    expect(toPlainText(wikilinkNodes[0].content)).toBe("Captain Voss");
+  });
+
+  it("places a wikilink atom on a new row when it doesn't fit the current row", () => {
+    // Width 12 forces "Captain Voss" (12 chars) onto a new row from "See ".
+    const nodes = parseFormatting("See <wikilink slug=captain-voss>Captain Voss</wikilink>");
+    const result = wrapNodes(nodes, 12);
+    expect(result.length).toBeGreaterThanOrEqual(2);
+    // The wikilink must appear on exactly one row, intact.
+    const linkRows = result.filter((row) =>
+      row.some((n) => typeof n !== "string" && n.type === "wikilink"),
+    );
+    expect(linkRows).toHaveLength(1);
+    const linkNodes = linkRows[0].filter(
+      (n): n is Extract<FormattingTag, { type: "wikilink" }> =>
+        typeof n !== "string" && n.type === "wikilink",
+    );
+    expect(linkNodes).toHaveLength(1);
+    expect(toPlainText(linkNodes[0].content)).toBe("Captain Voss");
+  });
 });
 
 describe("processNarrativeLines", () => {
