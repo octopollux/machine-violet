@@ -809,6 +809,7 @@ Bundled seeds are validated strictly (malformed files fail the build). User worl
   "system": "dnd-5e",                   // Game system slug.
   "mood": "gritty",
   "difficulty": "hard",
+  "campaign_scope": "open-ended",        // Optional. Bakes campaign length into the seed; setup agent skips the length question.
   "dm_personality": { "name": "...", "prompt_fragment": "..." },
   "calendar_display_format": "fantasy",
 
