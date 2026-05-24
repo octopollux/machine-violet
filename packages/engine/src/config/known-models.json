@@ -1,5 +1,15 @@
 {
   "models": {
+    "claude-opus-4-7": {
+      "provider": "anthropic",
+      "displayName": "Claude Opus 4.7",
+      "contextWindow": 1000000,
+      "maxOutput": 128000,
+      "defaultTier": "large",
+      "compactionThreshold": 800000,
+      "pricing": { "input": 5, "output": 25, "cacheWrite": 6.25, "cacheRead": 0.50 },
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
+    },
     "claude-opus-4-6": {
       "provider": "anthropic",
       "displayName": "Claude Opus 4.6",
