@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useInput } from "ink";
 import type { UsageStatus } from "@machine-violet/shared";
+import type { FormattingNode } from "@machine-violet/shared/types/tui.js";
 import type { ResolvedTheme } from "../themes/types.js";
+import { themeColor, deriveModalTheme } from "../themes/color-resolve.js";
 import { CenteredModal } from "./CenteredModal.js";
 
 export interface MenuItem {
@@ -83,19 +85,28 @@ export function GameMenu({
     }
   });
 
-  const lines: string[] = [];
+  // Group headers want the modal's accent (title) color so they read as
+  // structural rules rather than dim equals. Derive the modal theme the
+  // same way CenteredModal does internally so the header tint matches the
+  // "Menu" title in the top border.
+  const accentColor = useMemo(() => themeColor(deriveModalTheme(theme), "title"), [theme]);
+
+  const styledLines: FormattingNode[][] = [];
   let flatIdx = 0;
-  for (let g = 0; g < groups.length; g++) {
-    const group = groups[g];
-    if (g > 0) lines.push("");
-    lines.push(groupHeaderLine(group.title));
+  for (const group of groups) {
+    const headerText = groupHeaderLine(group.title);
+    styledLines.push(
+      accentColor
+        ? [{ type: "color", color: accentColor, content: [headerText] }]
+        : [headerText],
+    );
     for (const item of group.items) {
       const marker = flatIdx === menuIndex ? "◆" : "○";
-      lines.push(`   ${marker} ${item.label}`);
+      styledLines.push([`   ${marker} ${item.label}`]);
       flatIdx++;
     }
   }
 
   const footer = buildFooter(tokenSummary, usageStatus);
-  return <CenteredModal theme={theme} width={width} height={height} title="Menu" footer={footer} lines={lines} minWidth={48} />;
+  return <CenteredModal theme={theme} width={width} height={height} title="Menu" footer={footer} styledLines={styledLines} minWidth={48} />;
 }
