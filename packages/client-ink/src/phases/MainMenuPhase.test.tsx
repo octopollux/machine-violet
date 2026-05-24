@@ -141,6 +141,30 @@ describe("MainMenuPhase", () => {
     expect(lastFrame()).not.toContain("Update Available");
   });
 
+  it("shows a 'Requires a valid API key' hint when items are disabled", () => {
+    const { lastFrame } = render(<MainMenuPhase {...defaultProps({ apiKeyValid: false })} />);
+    expect(lastFrame()).toContain("Requires a valid API key");
+  });
+
+  it("does not show the disabled hint when the API key is valid", () => {
+    const { lastFrame } = render(<MainMenuPhase {...defaultProps({ apiKeyValid: true })} />);
+    expect(lastFrame()).not.toContain("Requires a valid API key");
+  });
+
+  it("renders the disabled hint only once even with multiple disabled items", () => {
+    const props = defaultProps({
+      apiKeyValid: false,
+      campaigns: [{ name: "X", path: "/x" }],
+      devModeEnabled: true,
+    });
+    const { lastFrame } = render(<MainMenuPhase {...props} />);
+    const frame = lastFrame()!;
+    // New Campaign, Continue Campaign, Add Content are all disabled — the hint
+    // should appear once total, not once per disabled item.
+    const matches = frame.match(/Requires a valid API key/g) ?? [];
+    expect(matches.length).toBe(1);
+  });
+
   it("calls onUpdate when Update Available is selected", () => {
     const onUpdate = vi.fn();
     const props = defaultProps({

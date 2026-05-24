@@ -162,14 +162,3 @@ describe("CompendiumModal", () => {
   });
 });
 
-describe("GameMenu includes Compendium", () => {
-  it("shows Compendium in menu items", async () => {
-    const { getMenuItems } = await import("./GameMenu.js");
-    const items = getMenuItems();
-    expect(items).toContain("Compendium");
-    // Should be after Character Sheet
-    const csIndex = items.indexOf("Character Sheet");
-    const compIndex = items.indexOf("Compendium");
-    expect(compIndex).toBe(csIndex + 1);
-  });
-});

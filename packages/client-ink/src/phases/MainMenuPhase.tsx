@@ -218,6 +218,9 @@ export function MainMenuPhase({
 
   // Build menu lines
   const menuLines: React.ReactNode[] = [];
+  // Render the "why disabled" hint only once — under the first disabled
+  // item — to avoid repeating the same nudge on three consecutive lines.
+  let disabledHintShown = false;
   for (let i = 0; i < mainMenuItems.length; i++) {
     const item = mainMenuItems[i];
     const isSelected = !expandedCampaigns && i === mainMenuIndex;
@@ -226,6 +229,10 @@ export function MainMenuPhase({
     const markerColor = disabled ? "#555555" : isSelected ? borderColor : dimColor;
 
     const isUpdateItem = item === "Update Available";
+    // API Keys appears in the main menu only when the active key is
+    // broken — colour it yellow so the eye lands on the actionable nudge.
+    const isApiKeyNudge = item === "API Keys";
+    const emphasis = isUpdateItem || isApiKeyNudge;
     let description = "";
     if (isUpdateItem && updateInfo) description = `v${updateInfo.currentVersion} → v${updateInfo.latestVersion}`;
     else if (item === "New Campaign") description = "Start a new adventure";
@@ -235,15 +242,26 @@ export function MainMenuPhase({
     else if (item === "Discord") description = "Set up Rich Presence";
     else if (item === "Settings") description = "";
 
-    const itemColor = isUpdateItem ? "yellow" : disabled ? "#555555" : undefined;
-    const descColor = isUpdateItem ? "yellow" : disabled ? "#555555" : dimColor;
+    const itemColor = emphasis ? "yellow" : disabled ? "#555555" : undefined;
+    const descColor = emphasis ? "yellow" : disabled ? "#555555" : dimColor;
     menuLines.push(
       <Text key={item}>
-        <Text color={isUpdateItem ? "yellow" : markerColor}>{marker}</Text>
-        <Text color={itemColor} dimColor={disabled} bold={isUpdateItem}>{` ${item}`}</Text>
+        <Text color={emphasis ? "yellow" : markerColor}>{marker}</Text>
+        <Text color={itemColor} dimColor={disabled} bold={emphasis}>{` ${item}`}</Text>
         {description ? <Text color={descColor} dimColor={disabled}>{` — ${description}`}</Text> : null}
       </Text>,
     );
+
+    // Surface the underlying reason once, beneath the first disabled item.
+    // Only the API-key gate exists today; if more gates appear, branch here.
+    if (disabled && !disabledHintShown) {
+      disabledHintShown = true;
+      menuLines.push(
+        <Text key={`${item}-hint`} color="#555555">
+          {`   ↳ Requires a valid API key`}
+        </Text>,
+      );
+    }
 
     // Inline campaign sub-list when expanded (columns: Name | Archive | Delete)
     if (item === "Continue Campaign" && expandedCampaigns) {
