@@ -204,7 +204,21 @@ This is a Haiku subagent job:
 
 **Sheet Status flag:** When the post-setup `buildInitialSheet` creates a PC's full sheet, it adds `**Sheet Status:** complete` to front matter. The engine checks this flag when `promote_character` is called — if present, it skips the redundant promotion (which would duplicate sections like Skills and Stats) and clears the flag. The DM can still call `promote_character` normally for level-ups; the flag only suppresses the first redundant attempt and then removes itself.
 
+**Placeholder flag:** Entities created during setup as bootstrap stubs (e.g., the starting location whose real name will only emerge in the DM's opening narration) carry `**Placeholder:** true` in their front matter. This signals to the DM and Scribe that the entity is name-of-convenience and should be renamed once the fiction settles. Once renamed via `rename_entity`, the flag is cleared.
+
 The reverse is also natural: a character who was important can fade into irrelevance. The file stays (the changelog is historical record), but the DM simply stops linking to it in new transcripts.
+
+## Renaming Entities
+
+The Scribe subagent can rename an entity mid-campaign via the `rename_entity` tool. A rename:
+
+1. Moves the file to its new slug (`characters/old-name.md` → `characters/new-name.md`)
+2. Updates the H1 heading to the new display name
+3. Rewrites every inbound wikilink across the campaign (transcripts, log entries, other entity files)
+4. Appends a `## Changelog` line recording the rename
+5. Clears the `Placeholder` flag if it was set
+
+This is the canonical way to settle a placeholder once the DM commits to a real name, and it's also useful when an NPC is renamed in fiction (false identities revealed, sobriquets adopted, etc.). Implementation: `packages/engine/src/tools/campaign-ops/rename-entity.ts`.
 
 ## Changelog Automation
 

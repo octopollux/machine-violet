@@ -422,15 +422,17 @@ When auto-generation is active, the engine detects "it's the player's turn" and 
 
 ### Compendium Browser
 
-Player-accessible via ESC menu → Compendium. Displays a navigable tree of everything the player has learned, organized into five categories: Characters, Places, Storyline, Lore, Objectives.
+Player-accessible via ESC menu → Compendium. Displays a navigable tree of everything the player has learned. The category list is the `COMPENDIUM_CATEGORIES` constant in `packages/shared/src/types/compendium.ts` (currently: Characters, Places, Items, Storyline, Lore, Objectives).
 
-**Navigation**: Up/Down arrows move cursor, Enter on category expands/collapses, Enter on entry shows detail view, ESC in detail goes back, ESC in tree closes modal.
+**Navigation**: Up/Down arrows move cursor in the tree, Enter on a category expands/collapses, Enter on an entry shows detail view, ESC in the tree closes the modal.
 
 **Detail view**: Shows entry summary, aliases, scene range, and related entries.
 
+**Wikilink navigation**: Tab / Shift+Tab cycle through `[[wikilinks]]` in the entry text — the cursored link renders inverse; links whose slug doesn't resolve render red (Wikipedia-style "dead link"). Enter follows the cursored link and pushes the current entry onto a back-stack. Backspace pops the stack — back to a previous entry, or back to the tree when empty. ESC always closes the modal.
+
 **Data source**: `campaign/compendium.json`, maintained by a Haiku subagent at scene transitions. Player-facing only — no DM secrets.
 
-**Code:** `src/tui/modals/CompendiumModal.tsx`
+**Code:** `packages/client-ink/src/tui/modals/CompendiumModal.tsx`
 
 ### Session Recap
 
@@ -438,22 +440,32 @@ On `session_resume`, the "Previously on..." summary displays as a modal before g
 
 ### Game Menu
 
-ESC key opens the game menu modal:
+ESC key opens the game menu modal. Items are organized into colour-tinted groups (View / Session / Settings / Exit) so the cursor doesn't land on a leave action when the user opens the menu to do something:
 
 ```
-╔══════════════════════╗
-║     ◆ Resume         ║
-║     ○ Character Sheet ║
-║     ○ Compendium     ║
-║     ○ Player Notes   ║
-║     ○ OOC Mode       ║
-║     ○ Settings       ║
-║     ○ Save & Exit    ║
-║     ○ End Session    ║
-╚══════════════════════╝
+╔══════════════════════════════╗
+║   ── View ──                 ║
+║     ◆ Character Sheet        ║
+║     ○ Compendium             ║
+║     ○ Player Notes           ║
+║   ── Session ──              ║
+║     ○ Engine Console         ║   ← only when Dev Mode is enabled
+║     ○ Save Transcript        ║
+║   ── Settings ──             ║
+║     ○ Campaign Settings      ║
+║   ── Exit ──                 ║
+║     ○ Resume                 ║
+║     ○ Return to Menu         ║
+╚══════════════════════════════╝
 ```
 
-Standard navigation (arrow keys + Enter). "Save & Exit" persists state and returns to the main menu. "End Session" runs full session-end housekeeping (transcript, summary, git commit) then returns to menu. Settings covers choice frequency, display preferences, and other player-level configuration. OOC Mode from here is equivalent to the DM detecting an OOC request.
+Standard navigation (arrow keys + Enter). "Resume" dismisses the menu. "Return to Menu" persists state and returns to the main menu (the engine's session save runs as part of teardown). OOC Mode is no longer a menu entry — the DM detects out-of-character intent automatically. End Session was removed for the same reason: the campaign ends when the player returns to the menu, not via an explicit kill switch. Engine Console is the developer view of the running session; it's gated on the Dev Mode toggle in Campaign Settings.
+
+### Campaign Settings
+
+Player-accessible via ESC menu → Settings → Campaign Settings. Modal that shows campaign identity fields (read-only) and editable per-campaign player settings — currently the Choices Frequency slider (←/→ to adjust, Enter to save). Changes round-trip to the engine via REST and persist to `config.json`.
+
+**Code:** `packages/client-ink/src/tui/modals/CampaignSettingsModal.tsx`
 
 ### Player Notes
 
@@ -497,7 +509,9 @@ The `/swatch` command opens a debug modal showing the full harmony swatch grid, 
 
 `FullScreenFrame` is the shared layout shell for out-of-game full-screen pages (MainMenuPhase, SettingsPhase). It renders the themed top/bottom borders, side frames, and vertically centers children within the content area. Callers pass `contentRows` (the number of rows their content occupies) for centering math.
 
-**Code:** `src/tui/components/FullScreenFrame.tsx`
+The main menu uses `FullScreenFrame` with `starfield` enabled — the padding area renders an animated starfield (`Starfield.tsx`) seeded with the current time, so the visual differs between sessions without producing motion that competes with the menu cursor.
+
+**Code:** `packages/client-ink/src/tui/components/FullScreenFrame.tsx`, `packages/client-ink/src/tui/components/Starfield.tsx`
 
 
 ## Character Pane

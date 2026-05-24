@@ -77,9 +77,26 @@ Note: Session resume is an engine operation, not a callable tool. It runs automa
 
 ## Entity Tools → [entity-filesystem.md](entity-filesystem.md)
 
+### Structured entity surface (OOC + Dev)
+
+T1 tools backed by the unified `EntityStore` (`packages/engine/src/entities/`). Surfaced to OOC and Dev Mode for inspection and repair; the DM uses `scribe` for narrative writes instead.
+
+| Tool | Operations | Effect |
+|---|---|---|
+| `entity` | `read`, `create`, `update`, `delete`, `list` | CRUD on file-backed entities (characters, locations, factions, lore, items). `read` returns frontmatter + body + inbound/outbound refs + schema + drift. `update` patch values of `null` delete a frontmatter key. `delete` reports inbound wikilinks that just became dead. |
+| `describe_entity_type` | — | Returns the declared schema, observed drift, storage layout, conventions, and examples for an entity type. |
+| `list_entity_types` | — | Lists all file-backed entity types with on-disk counts. |
+| `validate_entity` | — | Validates a single entity: missing required fields, dead outbound wikilinks, schema conformance. |
+| `find_schema_drift` | — | Lists frontmatter fields present on disk but not in the declared schema. Optionally scoped to one type. |
+| `detect_orphans` | — | Lists file-backed entities with zero inbound wikilinks across the campaign. |
+
+Dev Mode additionally exposes `raw_entity_io` (`read`/`write`/`delete` against a raw path) as a schema-bypass escape hatch for recovering from corrupted entity files. If you see `raw_entity_io` in a turn, it means the agent bypassed the structured surface.
+
+### Narrative + search
+
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
-| `scribe` | T2 (Haiku) | DM | `({ updates: [{ visibility, content }] })` | Batch entity creation/updates. Each update tagged `private` or `player-facing`. Spawns Haiku subagent with `list_entities`, `read_entity`, `write_entity` tools for autonomous entity file management. Handles deduplication, front matter, changelogs. |
+| `scribe` | T2 (Haiku) | DM | `({ updates: [{ visibility, content }] })` | Batch entity creation/updates. Each update tagged `private` or `player-facing`. Spawns Haiku subagent with `list_entities`, `read_entity`, `write_entity`, and `rename_entity` tools for autonomous entity file management. Handles deduplication, front matter, changelogs, and placeholder rename. |
 | `search_campaign` | T2 (Haiku) | DM | `({ query })` | Search across all campaign files — entities, scene summaries, transcripts, session recaps, logs. Spawns Haiku subagent with `grep_campaign` and `read_campaign_file` tools. Returns terse excerpts with `[[wikilinks]]` and source references. |
 
 Note: `promote_character` is not a registered tool — it's a subagent function called internally. See [subagents-catalog.md](subagents-catalog.md) #7.

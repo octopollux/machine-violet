@@ -80,12 +80,13 @@ Conversational flow — the agent asks about each topic one or two at a time:
 
 1. Genre/setting
 2. Campaign concept (seeds offered via `present_choices`, or freeform)
-3. Mood
-4. Difficulty
-5. DM personality
-6. Character (name + one-sentence concept)
-7. Player name
-8. Game system
+3. Campaign scope (`one-shot` | `few-sessions` | `grand-campaign` | `open-ended`) — bakes intended length into `config.json` so the DM can pace accordingly. Skipped when the chosen seed declares a required scope.
+4. Mood
+5. Difficulty
+6. DM personality
+7. Character (name + one-sentence concept)
+8. Player name
+9. Game system
 
 Both paths include a mandatory pre-finalize review where the agent reads back the full configuration and gets explicit confirmation.
 
@@ -146,10 +147,7 @@ Personalities are stored as short prompt fragments shipped with the app. Each is
 
 ### Shipped personalities
 
-**The Chronicler** — measured, literary, loves foreshadowing and callbacks.
-**The Trickster** — chaotic, surprising, delights in unlikely turns.
-**The Warden** — fair but unforgiving, the world has its own logic.
-**The Bard** — warm, character-driven, every NPC has a story.
+The canonical roster lives in [packages/engine/src/config/personalities.ts](../packages/engine/src/config/personalities.ts) — read it for the current list, voices, and fragment text. The roster has grown well past the original four (Chronicler / Trickster / Warden / Bard) and is curated rather than counted; treat the source file as the source of truth and avoid mirroring the list here.
 
 ### Custom personalities
 
@@ -162,6 +160,7 @@ The selected personality fragment is stored in `config.json` and loaded into the
 ```jsonc
 // config.json (partial)
 {
+  "campaign_scope": "few-sessions",
   "dm_personality": {
     "name": "The Chronicler",
     "prompt_fragment": "You are The Chronicler. Your narration is deliberate..."

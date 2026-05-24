@@ -81,6 +81,7 @@ All emitted via `logEvent` to `.debug/engine.jsonl`. Token counts and per-call c
 | Event | Payload | When |
 |---|---|---|
 | `codex:subprocess:spawn` | `{ binaryPath, version?, sessionId? }` | Codex child process starts |
+| `codex:subprocess:initialized` | `{ userAgent?, codexHome?, platformOs?, platformArch?, sessionId? }` | `initialize` handshake completed — records codex version + platform diagnostics |
 | `codex:subprocess:exit` | `{ code, signal, sessionId? }` | Codex child process dies |
 | `codex:rpc:error` | `{ method, code, message, sessionId? }` | A JSON-RPC request returned an error result |
 | `codex:auth:login_started` | `{ type, loginId }` | OAuth or device-code flow initiated |

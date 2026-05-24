@@ -178,5 +178,6 @@ The app should track and optionally display:
 - Estimated cost per turn
 - Session running total
 - A warning if conversation is growing faster than expected (e.g., tool-heavy turns)
+- Anthropic cache-miss reasons attributed per turn — `system_changed`, `tools_changed`, `messages_changed`, `model_changed` — surfaced inline in the campaign-explorer dump viewer and in `.debug/engine.jsonl`. A cache miss costs ~4× the cached rate, so attribution is critical when chasing cost regressions.
 
 This helps users understand costs and helps us tune the retention window.

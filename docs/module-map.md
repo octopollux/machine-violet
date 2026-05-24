@@ -1,12 +1,18 @@
 # Module Map
 
-The codebase is split across three packages:
+The codebase is split across four packages:
 
 - **`packages/engine/`** — Game engine, AI agents, tools, state, prompts, Fastify server
-- **`packages/client-ink/`** — Ink TUI, themes, modals, formatting, phases
+- **`packages/client-ink/`** — Ink TUI, themes, modals, formatting, phases, Discord IPC
 - **`packages/shared/`** — Shared types and protocol schemas
+- **`packages/test-harness/`** — End-to-end smoke harness (state-driven scenarios over the real WebSocket). See [e2e-harness.md](e2e-harness.md).
 
 Most directories have `index.ts` barrel exports — check those before reaching into subdirectories. Paths below are relative to their package root (e.g. `agents/game-engine.ts` = `packages/engine/src/agents/game-engine.ts`).
+
+Two root-level dev companion tools live outside the package tree under `tools/`:
+
+- **`tools/campaign-explorer/`** — Express API + React client for browsing campaign state and engine logs.
+- **`tools/theme-editor/`** — Theme tinkering UI; `tools/theme-editor/scripts/validate.mjs` parses every theme and resolves every variant (run after editing a `.theme` asset).
 
 ## Engine: agents/ — Orchestration
 
@@ -216,11 +222,29 @@ Platform abstractions and helpers that don't belong to any single domain.
 | `clipboard.ts` | `ClipboardIO` interface, `copyToClipboard()`, `readFromClipboard()` — cross-platform clipboard via `clipboardy`, lazy-loaded. `setClipboardIO()` for test mocking |
 | `paths.ts` | Runtime asset path resolution (prompts, themes, systems relative to executable) |
 
-## Root Files
+## Client: services/ — Side Integrations
+
+| Directory | Purpose |
+|---|---|
+| `services/discord/` | Discord rich-presence IPC client + controller. Per-frontend opt-in (see `discord-settings.json`); engine emits `discord:presence` events and the client forwards them to local Discord IPC when enabled. |
+
+## Test Harness Package (`packages/test-harness/`)
+
+End-to-end smoke testing. Boots the real engine as a subprocess, drives it over the WebSocket, and asserts against observable state (no timer-based waits).
+
+| Path | Purpose |
+|---|---|
+| `bin/run.ts` | CLI entry. `ALL_SCENARIOS` registers each scenario. Run via `npm run e2e -- <id>`. |
+| `src/harness.ts` | `Harness` class — process lifecycle, WS connect, `waitForEngineState`, `waitForTurnSeq`, input helpers. |
+| `src/client-state.ts` | Mirror of client-side state for assertion. |
+| `src/scenarios/` | Individual scenarios (`golden-path`, `boot`, etc.). |
+
+See [e2e-harness.md](e2e-harness.md) for the full primitives table and golden-path contract.
+
+## Client Entry Points
 
 | File | Purpose |
 |---|---|
-| `src/app.tsx` | Root Ink component — phase state machine, FileIO/GitIO setup, cost tracking |
-| `src/index.tsx` | Entry point — Ink render, raw mode guards |
-| `src/shutdown.ts` | Graceful shutdown helper (files, git, terminal) — called by teardown.ts |
-| `src/teardown.ts` | Return-to-menu teardown: graceful shutdown + cache reset |
+| `packages/client-ink/src/app.tsx` | Root Ink component — phase state machine, FileIO/GitIO setup, cost tracking. |
+| `packages/client-ink/src/index.tsx` | Entry point — Ink render, raw mode guards. |
+| `packages/client-ink/src/start-client.ts` | Bootstrap helper: REST/WS client init, server lifecycle. |

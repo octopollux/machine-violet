@@ -76,6 +76,7 @@ GameState
 │   ├── createdAt?: string                 const (ISO 8601 timestamp at creation)
 │   ├── name, system, genre, mood, difficulty, premise
 │   ├── campaign_scope?: CampaignScope       const ("one-shot" | "few-sessions" | "grand-campaign" | "open-ended")
+│   ├── setup_handoff?: string               const (postcard from setup agent, injected once into the first-turn priming; persists for resume-from-disk after a mid-first-turn crash)
 │   ├── dm_personality: DMPersonality
 │   ├── players: PlayerConfig[]
 │   ├── combat: CombatConfig
