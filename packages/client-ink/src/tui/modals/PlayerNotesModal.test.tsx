@@ -55,14 +55,14 @@ describe("editorReducer", () => {
 
   it("forward-delete removes character at cursor without moving it", () => {
     const state = mkState({ lines: ["abc"], col: 1 });
-    const next = editorReducer(state, { type: "forward-delete" });
+    const next = editorReducer(state, { type: "forward-delete", maxRows: 20 });
     expect(next.lines).toEqual(["ac"]);
     expect(next.col).toBe(1);
   });
 
   it("forward-delete at end of line merges with next line", () => {
     const state = mkState({ lines: ["ab", "cd"], row: 0, col: 2 });
-    const next = editorReducer(state, { type: "forward-delete" });
+    const next = editorReducer(state, { type: "forward-delete", maxRows: 20 });
     expect(next.lines).toEqual(["abcd"]);
     expect(next.row).toBe(0);
     expect(next.col).toBe(2);
@@ -70,8 +70,22 @@ describe("editorReducer", () => {
 
   it("forward-delete at end of last line is a no-op", () => {
     const state = mkState({ lines: ["abc"], col: 3 });
-    const next = editorReducer(state, { type: "forward-delete" });
+    const next = editorReducer(state, { type: "forward-delete", maxRows: 20 });
     expect(next).toBe(state);
+  });
+
+  it("forward-delete line-merge clamps scrollOffset so no blank rows show below", () => {
+    // 5 lines, maxRows=3, scrolled to the bottom (offset 2 shows lines 2..4).
+    // Merging lines 2+3 leaves 4 lines; max valid scrollOffset becomes 4-3=1.
+    const state = mkState({
+      lines: ["a", "b", "c", "d", "e"],
+      row: 2,
+      col: 1,
+      scrollOffset: 2,
+    });
+    const next = editorReducer(state, { type: "forward-delete", maxRows: 3 });
+    expect(next.lines).toEqual(["a", "b", "cd", "e"]);
+    expect(next.scrollOffset).toBe(1);
   });
 
   it("backspace at start of first line is a no-op", () => {
