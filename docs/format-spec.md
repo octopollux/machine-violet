@@ -136,6 +136,8 @@ Everything else is created during play.
   "difficulty": "hard",                   // Freeform difficulty tag.
   "premise": "A frontier town...",        // Player-visible campaign premise.
   "campaign_detail": "Hidden DM notes...",// DM-only campaign instructions.
+  "campaign_scope": "few-sessions",       // Optional. "one-shot" | "few-sessions" | "grand-campaign" | "open-ended". Shapes DM pacing.
+  "setup_handoff": "Player wants to...",  // Optional. Postcard from the setup agent for the DM's first-turn priming. Injected once.
 
   // DM personality
   "dm_personality": {

@@ -225,7 +225,7 @@ Wire up the Claude SDK. First time we talk to an API.
 Connect the agent to the game. The DM can narrate, use tools, and manage scenes.
 
 ### 5.1 DM system prompt assembly
-- [ ] Load DM prompt from dm-prompt.md template
+- [ ] Load DM prompt from packages/engine/src/prompts/ (dm-identity.md + dm-directives.md)
 - [ ] Inject DM personality fragment from config
 - [ ] Inject game system rules appendix (distilled cards if available)
 - [ ] Build the full cached prefix per context-management.md layout

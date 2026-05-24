@@ -121,7 +121,7 @@ Automatic git snapshots provide point-in-time rollback. API failures retry with 
 
 The DM is not an assistant — it runs a world. The system prompt establishes role (decide things, say no, let bad things happen, have secrets, surprise yourself), voice (personality via swappable DM personality fragments), and tool discipline (call the tool when state changes, delegate mechanical work to subagents).
 
-Agent-facing documents should be written densely, using shorthand and cultural/literary references to maximize information per token. The dice-for-narrative-choices pattern (prepare options, roll to choose) keeps storytelling unpredictable. → [DM Developer Prompt](dm-prompt.md)
+The live prompt is split across [packages/engine/src/prompts/dm-identity.md](../packages/engine/src/prompts/dm-identity.md) (preamble) and [dm-directives.md](../packages/engine/src/prompts/dm-directives.md) (`<roles>`, `<directives>`, `<tools>`, `<gameplay>`, `<pacing>`, `<formatting>` blocks), with a personality fragment slotted between. Read those files directly when working on prompt content — they are the source of truth.
 
 
 ## Implementation Constraints
@@ -139,7 +139,6 @@ Agent-facing documents should be written densely, using shorthand and cultural/l
 | [Entity Filesystem](entity-filesystem.md) | Entity types, folder structure, wikilinks, changelogs |
 | [Randomization Tools](randomization.md) | Dice, cards, action resolution, hooks |
 | [Rules Systems Reference](rules-systems.md) | Free game system catalog, licensing, freeform play |
-| [DM Developer Prompt](dm-prompt.md) | DM system prompt draft and engineering notes |
 | [Document Ingestion](document-ingestion.md) | PDF import pipeline, batch API |
 | [Context Management](context-management.md) | Token economics, retention policy, cost modeling |
 | [Clocks and Alarms](clocks-and-alarms.md) | Calendar, combat rounds, alarm system |

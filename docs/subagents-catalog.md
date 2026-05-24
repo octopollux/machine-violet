@@ -26,7 +26,7 @@ Every subagent pattern specified across the design docs. A subagent is a nested 
 
 **Returns**: `ResolutionResult` with structured `StateDelta[]` (engine auto-applies HP/conditions/resources), `RollRecord[]`, and a narrative summary for the DM. Output format is XML (`<resolution>` block). Graceful fallback: if no XML block found, full text returned as narrative.
 
-**Cost**: ~$0.20 for a 20-turn combat with prompt caching. Turns 2-20 read prior context at cache rate.
+**Caching**: Turns 2-N read prior context at cache rate; the persistent session is the reason this stays cheap even for marathon combats.
 
 ### 1b. Resolution Subagent (Legacy)
 
@@ -49,8 +49,8 @@ Every subagent pattern specified across the design docs. A subagent is a nested 
 |---|---|
 | **Model** | Sonnet |
 | **Visibility** | Player-facing |
-| **Trigger** | DM calls `enter_ooc`, or player via game menu / `/ooc` |
-| **Source doc** | [dm-prompt.md](dm-prompt.md), [overview.md](overview.md) |
+| **Trigger** | DM calls `enter_ooc`, or player via `/ooc` slash command |
+| **Source** | [packages/engine/src/prompts/ooc-mode.md](../packages/engine/src/prompts/ooc-mode.md), [packages/engine/src/agents/subagents/ooc-mode.ts](../packages/engine/src/agents/subagents/ooc-mode.ts) |
 
 Sandboxed conversation for out-of-character discussion. Receives the DM's current context on entry. Handles rules questions, transcript searches, configuration changes, player corrections, validation requests, rollback.
 
@@ -60,11 +60,13 @@ Sandboxed conversation for out-of-character discussion. Receives the DM's curren
 
 **Auto-exit**: The OOC agent can signal session end by emitting `<END_OOC />` (no player action) or `<END_OOC>player action text</END_OOC>` (with in-character text to forward). When a payload is provided, PlayingPhase auto-exits OOC and forwards the text to the DM as player input. This handles the case where the player drifts back to in-character mid-OOC. The player can also still exit manually via ESC.
 
-**DM injection (player-initiated only)**: When OOC is entered from the game menu or `/ooc` slash command (not via DM's `enter_ooc` tool), accumulated summaries are injected as an `<ooc_summary>` XML tag prepended to the next player message. This persists in conversation history so the DM retains OOC context across turns. The DM-initiated path does not need this because the DM already sees the tool result.
+**DM injection (player-initiated only)**: When OOC is entered via the `/ooc` slash command (not via DM's `enter_ooc` tool), accumulated summaries are injected as an `<ooc_summary>` XML tag prepended to the next player message. This persists in conversation history so the DM retains OOC context across turns. The DM-initiated path does not need this because the DM already sees the tool result.
 
-**Tools available**: `read_file`, `find_references`, `scribe`, `promote_character`, `style_scene`, `set_display_resources`, `show_character_sheet`, `map`, `map_entity`, `map_query`, `alarm`, `get_commit_log`, `roll_dice`; when file I/O and/or live game state are available, may also use `validate_campaign`, `set_resource_values`, and `rollback`. Cannot call DM-only narrative tools.
+**Tools available**: every DM tool (so OOC is self-documenting from the same registry the DM uses) **minus `enter_ooc`**, plus three OOC-only extras pushed by `buildOOCTools`: `find_references`, `validate_campaign`, `get_commit_log`. `rollback` is already in the DM registry so OOC inherits it through `registry.getDefinitions()`, not as a manual push. The structured entity surface (`entity`, `describe_entity_type`, `list_entity_types`, `validate_entity`, `find_schema_drift`, `detect_orphans` — see [tools-catalog.md](tools-catalog.md)) is always advertised; tools that need capabilities not available at dispatch time (no `fileIO`, no `repo`) return recoverable errors. Capability-gating was dropped (#475) so the agent learns by trying.
 
-**In scope**: Rules questions, character corrections, entity file reads, UI customization, dice rolls, map/clock queries, git history, campaign validation, resource adjustments via supported tools, and rollback.
+**Summary line**: on the turn OOC ends — and only that turn — the agent emits a one-line `<SUMMARY>...</SUMMARY>` immediately before `<END_OOC>`. The player never sees this; it is forwarded to the DM as the digest. For entity corrections it includes before/after values; for AI mistakes it leads with the reported error and the correction. If the tag is omitted, the DM falls back to the first substantive sentence of the reply.
+
+**In scope**: Rules questions, character corrections, structured entity reads, UI customization, dice rolls, map/clock queries, git history, campaign validation, resource adjustments via supported tools, and rollback.
 
 **Out of scope**: Bulk file operations, arbitrary direct game state JSON patching, engine internals, and DM-only narrative actions.
 

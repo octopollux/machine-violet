@@ -33,22 +33,11 @@ The entity filesystem, campaign log, and scene transcripts are the DM's long-ter
 └───────────────────────────────────────────────────────┘
 ```
 
-### Cost model (at current Opus pricing: $5/M input, $1.25/M cached, $25/M output)
+### Cost mechanics
 
-With automatic caching, conversation tokens that were present on the previous turn are read at cache rate (~25% of full input). Only the newest exchange pays full input rate. This makes retaining the full scene conversation cheap.
+With automatic prompt caching, conversation tokens that were present on the previous turn are read at cache rate (~25% of full input). Only the newest exchange pays full input rate. This makes retaining the full scene conversation cheap, and makes anything that invalidates the cached prefix (system/tools/messages/model changes) disproportionately expensive — the next turn re-pays cache-write rates for the entire prefix.
 
-```
-Cached prefix:     ~8K tokens × $1.25/M  = ~$0.01/turn
-Conversation:      ~4K cached  × $1.25/M = ~$0.005/turn
-                   + ~0.5K new × $5/M    = ~$0.0025/turn
-Output:            ~300 tokens × $25/M   = ~$0.008/turn
-───────────────────────────────────────────────────
-Per turn:          ~$0.025
-Per session (60t): ~$1.50 for Opus DM
-Haiku subagents:   ~$0.30-0.70 for the session
-───────────────────────────────────────────────────
-Total session:     ~$2-2.50
-```
+Live per-turn cost surfaces in the modeline (USD via `CostTracker`); specific dollar figures aren't tracked here because model selection and pricing shift too fast for the docs to stay honest.
 
 ## Conversation Retention
 
@@ -178,5 +167,6 @@ The app should track and optionally display:
 - Estimated cost per turn
 - Session running total
 - A warning if conversation is growing faster than expected (e.g., tool-heavy turns)
+- Anthropic cache-miss reasons attributed per turn — `system_changed`, `tools_changed`, `messages_changed`, `model_changed` — surfaced inline in the campaign-explorer dump viewer and in `.debug/engine.jsonl`. Cache misses are disproportionately expensive (re-paying cache-write rate for the whole prefix), so attribution is critical when chasing cost regressions.
 
 This helps users understand costs and helps us tune the retention window.
