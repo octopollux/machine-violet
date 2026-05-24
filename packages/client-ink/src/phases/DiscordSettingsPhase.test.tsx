@@ -17,7 +17,7 @@ function makeTheme() {
 function defaultProps(overrides?: Partial<DiscordSettingsPhaseProps>): DiscordSettingsPhaseProps {
   return {
     theme: makeTheme(),
-    currentSetting: null,
+    currentSetting: true,
     onSave: vi.fn(),
     onBack: vi.fn(),
     ...overrides,
@@ -67,9 +67,9 @@ describe("DiscordSettingsPhase", () => {
     });
   });
 
-  it("pre-selects Enable when currentSetting is null", () => {
+  it("pre-selects Enable when currentSetting is true", () => {
     const onSave = vi.fn();
-    const { stdin } = render(<DiscordSettingsPhase {...defaultProps({ onSave, currentSetting: null })} />);
+    const { stdin } = render(<DiscordSettingsPhase {...defaultProps({ onSave, currentSetting: true })} />);
     stdin.write("\r");
     expect(onSave).toHaveBeenCalledWith(true);
   });
