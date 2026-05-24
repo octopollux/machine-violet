@@ -275,7 +275,9 @@ function toAnthropicMessage(msg: NormalizedMessage): Anthropic.MessageParam {
         is_error: part.is_error,
       });
     }
-    // Skip thinking blocks — they must not be sent back
+    // Skip Anthropic `thinking` text blocks — they must not be sent back.
+    // Skip OpenAI `reasoning` blocks too — they're a Responses-API construct
+    // and Anthropic's API would reject them on the input side.
   }
   return { role: msg.role, content };
 }
