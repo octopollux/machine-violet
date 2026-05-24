@@ -50,7 +50,7 @@ Every subagent pattern specified across the design docs. A subagent is a nested 
 | **Model** | Sonnet |
 | **Visibility** | Player-facing |
 | **Trigger** | DM calls `enter_ooc`, or player via game menu / `/ooc` |
-| **Source doc** | [overview.md](overview.md) |
+| **Source** | [packages/engine/src/prompts/ooc-mode.md](../packages/engine/src/prompts/ooc-mode.md), [packages/engine/src/agents/subagents/ooc-mode.ts](../packages/engine/src/agents/subagents/ooc-mode.ts) |
 
 Sandboxed conversation for out-of-character discussion. Receives the DM's current context on entry. Handles rules questions, transcript searches, configuration changes, player corrections, validation requests, rollback.
 
