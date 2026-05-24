@@ -285,8 +285,11 @@ export function PlayingPhase() {
     } catch { /* fail quietly — menu reopens on next ESC */ }
   }, [apiClient, setActiveModal]);
 
-  const toggleEngineConsole = useCallback(async () => {
-    await apiClient.command(mode === "dev" ? "exit_mode" : "dev");
+  const toggleEngineConsole = useCallback(() => {
+    // Silent catch matches the triple-ESC and direct-ESC mode-toggle handlers
+    // elsewhere in this component — a transient command failure shouldn't
+    // surface as an unhandled rejection, and the user can retry from the menu.
+    apiClient.command(mode === "dev" ? "exit_mode" : "dev").catch(() => { /* no-op */ });
   }, [apiClient, mode]);
 
   // Build grouped menu items. View-on-top so the cursor doesn't sit on a
@@ -309,7 +312,7 @@ export function PlayingPhase() {
       sessionItems.push({
         key: "engine_console",
         label: mode === "dev" ? "Exit Engine Console" : "Engine Console",
-        action: () => void toggleEngineConsole(),
+        action: toggleEngineConsole,
       });
     }
     sessionItems.push({ key: "save_transcript", label: "Save Transcript", action: () => void saveTranscript() });
