@@ -109,8 +109,19 @@ export function worldSummaries(worlds: LoadedWorld[]): WorldSummary[] {
   }));
 }
 
-/** Load a specific world by slug. Returns undefined if not found. */
+/**
+ * Load a specific world by slug. Returns undefined if not found or if the
+ * slug fails sanitization (prevents path traversal — slugs that contain
+ * `..`, path separators, or other unsafe characters are rejected outright
+ * rather than coerced, so a malicious tool-call slug can't escape the
+ * bundled or user worlds directory).
+ */
 export function loadWorldBySlug(slug: string, userWorldsDir?: string): WorldFile | undefined {
+  // Reject anything that isn't already a clean slug. `..`, path separators,
+  // null bytes, etc. all fail this and return undefined without touching the
+  // filesystem.
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) return undefined;
+
   // Check user worlds first (override), then bundled
   if (userWorldsDir) {
     const userPath = join(userWorldsDir, `${slug}.mvworld`);
