@@ -83,7 +83,7 @@ export function SettingsPhase({
     return <TerminalTooSmall columns={cols} rows={termRows} />;
   }
 
-  const borderColor = themeColor(theme, "border");
+  const accentColor = themeColor(theme, "title") ?? themeColor(theme, "border");
   const dimColor = themeColor(theme, "separator") ?? "#666666";
 
   const menuLines: React.ReactNode[] = [];
@@ -91,7 +91,7 @@ export function SettingsPhase({
     const item = items[i];
     const isSelected = i === menuIndex;
     const marker = isSelected ? "◆" : "○";
-    const markerColor = isSelected ? borderColor : dimColor;
+    const markerColor = isSelected ? accentColor : dimColor;
 
     const suffix = item.toggle !== undefined
       ? item.toggle ? "  ON" : "  OFF"
@@ -100,7 +100,7 @@ export function SettingsPhase({
     menuLines.push(
       <Text key={item.label}>
         <Text color={markerColor}>{marker}</Text>
-        <Text>{` ${item.label}`}</Text>
+        <Text color={isSelected ? accentColor : undefined} bold={isSelected}>{` ${item.label}`}</Text>
         {suffix && <Text color={item.toggle ? "#66cc66" : dimColor} bold={item.toggle}>{suffix}</Text>}
       </Text>,
     );

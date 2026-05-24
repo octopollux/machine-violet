@@ -204,7 +204,7 @@ export function MainMenuPhase({
     return <TerminalTooSmall columns={cols} rows={termRows} />;
   }
 
-  const borderColor = themeColor(theme, "border");
+  const accentColor = themeColor(theme, "title") ?? themeColor(theme, "border");
   const dimColor = themeColor(theme, "separator") ?? "#666666";
 
   // Build menu lines
@@ -217,7 +217,7 @@ export function MainMenuPhase({
     const isSelected = !expandedCampaigns && i === mainMenuIndex;
     const disabled = isItemDisabled(item);
     const marker = isSelected ? "◆" : "○";
-    const markerColor = disabled ? "#555555" : isSelected ? borderColor : dimColor;
+    const markerColor = disabled ? "#555555" : isSelected ? accentColor : dimColor;
 
     const isUpdateItem = item === "Update Available";
     // API Keys appears in the main menu only when the active key is
@@ -232,12 +232,12 @@ export function MainMenuPhase({
     else if (item === "API Keys") description = apiKeyStatus ?? "";
     else if (item === "Settings") description = "";
 
-    const itemColor = emphasis ? "yellow" : disabled ? "#555555" : undefined;
+    const itemColor = emphasis ? "yellow" : isSelected && !disabled ? accentColor : disabled ? "#555555" : undefined;
     const descColor = emphasis ? "yellow" : disabled ? "#555555" : dimColor;
     menuLines.push(
       <Text key={item}>
         <Text color={emphasis ? "yellow" : markerColor}>{marker}</Text>
-        <Text color={itemColor} dimColor={disabled} bold={emphasis}>{` ${item}`}</Text>
+        <Text color={itemColor} dimColor={disabled} bold={emphasis || (isSelected && !disabled)}>{` ${item}`}</Text>
         {description ? <Text color={descColor} dimColor={disabled}>{` — ${description}`}</Text> : null}
       </Text>,
     );
@@ -261,12 +261,12 @@ export function MainMenuPhase({
         const archiveActive = cSelected && campaignColumn === COL_ARCHIVE;
         const deleteActive = cSelected && campaignColumn === COL_DELETE;
         const cMarker = nameActive ? "◆" : "○";
-        const cColor = nameActive ? borderColor : dimColor;
+        const cColor = nameActive ? accentColor : dimColor;
         menuLines.push(
           <Text key={`c-${campaigns[j].path}`}>
             <Text>{`    `}</Text>
             <Text color={cColor}>{cMarker}</Text>
-            <Text bold={nameActive}>{` ${campaigns[j].name}`}</Text>
+            <Text color={nameActive ? accentColor : undefined} bold={nameActive}>{` ${campaigns[j].name}`}</Text>
             <Text>{`  `}</Text>
             <Text color="yellow" bold={archiveActive} dimColor={!cSelected}>{archiveActive ? "[Archive]" : " Archive "}</Text>
             <Text>{` `}</Text>
