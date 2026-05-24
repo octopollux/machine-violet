@@ -103,14 +103,11 @@ export function GameMenu({
     for (const item of group.items) {
       const isSelected = flatIdx === menuIndex;
       const marker = isSelected ? "◆" : "○";
-      if (isSelected && accentColor) {
+      if (isSelected) {
+        const bolded: FormattingNode = { type: "bold", content: [`${marker} ${item.label}`] };
         styledLines.push([
           "   ",
-          {
-            type: "color",
-            color: accentColor,
-            content: [{ type: "bold", content: [`${marker} ${item.label}`] }],
-          },
+          accentColor ? { type: "color", color: accentColor, content: [bolded] } : bolded,
         ]);
       } else {
         styledLines.push([`   ${marker} ${item.label}`]);
