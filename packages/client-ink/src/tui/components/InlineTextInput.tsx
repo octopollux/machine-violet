@@ -18,7 +18,8 @@ type Action =
   | { type: "move-cursor-start" }
   | { type: "move-cursor-end" }
   | { type: "insert"; text: string }
-  | { type: "delete" };
+  | { type: "delete" }
+  | { type: "forward-delete" };
 
 export function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -42,6 +43,13 @@ export function reducer(state: State, action: Action): State {
         ...state,
         value: state.value.slice(0, state.cursorOffset - 1) + state.value.slice(state.cursorOffset),
         cursorOffset: state.cursorOffset - 1,
+      };
+    }
+    case "forward-delete": {
+      if (state.cursorOffset >= state.value.length) return state;
+      return {
+        ...state,
+        value: state.value.slice(0, state.cursorOffset) + state.value.slice(state.cursorOffset + 1),
       };
     }
   }
@@ -293,8 +301,10 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
       processAction({ type: "move-cursor-left" });
     } else if (key.rightArrow) {
       processAction({ type: "move-cursor-right" });
-    } else if (key.backspace || key.delete) {
+    } else if (key.backspace) {
       processAction({ type: "delete" });
+    } else if (key.delete) {
+      processAction({ type: "forward-delete" });
     } else if (input && !key.ctrl && !key.meta) {
       processAction({ type: "insert", text: input });
     }

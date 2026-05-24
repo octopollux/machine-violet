@@ -53,6 +53,27 @@ describe("editorReducer", () => {
     expect(next.col).toBe(2);
   });
 
+  it("forward-delete removes character at cursor without moving it", () => {
+    const state = mkState({ lines: ["abc"], col: 1 });
+    const next = editorReducer(state, { type: "forward-delete" });
+    expect(next.lines).toEqual(["ac"]);
+    expect(next.col).toBe(1);
+  });
+
+  it("forward-delete at end of line merges with next line", () => {
+    const state = mkState({ lines: ["ab", "cd"], row: 0, col: 2 });
+    const next = editorReducer(state, { type: "forward-delete" });
+    expect(next.lines).toEqual(["abcd"]);
+    expect(next.row).toBe(0);
+    expect(next.col).toBe(2);
+  });
+
+  it("forward-delete at end of last line is a no-op", () => {
+    const state = mkState({ lines: ["abc"], col: 3 });
+    const next = editorReducer(state, { type: "forward-delete" });
+    expect(next).toBe(state);
+  });
+
   it("backspace at start of first line is a no-op", () => {
     const state = mkState({ lines: ["abc"], col: 0 });
     const next = editorReducer(state, { type: "backspace", maxRows: 20 });
