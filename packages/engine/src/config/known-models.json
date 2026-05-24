@@ -4,7 +4,7 @@
       "provider": "anthropic",
       "displayName": "Claude Opus 4.7",
       "contextWindow": 1000000,
-      "maxOutput": 128000,
+      "maxOutput": 16384,
       "defaultTier": "large",
       "compactionThreshold": 800000,
       "pricing": { "input": 5, "output": 25, "cacheWrite": 6.25, "cacheRead": 0.50 },
