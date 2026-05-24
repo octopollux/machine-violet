@@ -53,6 +53,10 @@ Live API key in `.env` with limited credit. Default dev override uses Sonnet for
 
 Before reporting any cross-cutting change as done — anything touching UI flow, session lifecycle, the setup agent, the DM loop, save/load, or any code path that spans server + client + WebSocket — **run a harness scenario**. Type checks and unit tests do not prove the flow works end-to-end.
 
+The canonical handle is the **`/smoketest` skill** (`.claude/skills/smoketest/`). Users invoke it as `/smoketest` (or `/smoketest boot-and-quit`); agents invoke it via the Skill tool when validating cross-cutting work. The skill defaults to `golden-path` and follows the parallelization pattern below.
+
+Underneath, the skill calls these npm scripts directly:
+
 ```bash
 npm run e2e:boot           # 10s, no API key — precondition for everything else
 npm run e2e:golden-path    # 5-10 min, real LLM calls — the baseline smoke test

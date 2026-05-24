@@ -25,6 +25,8 @@
       "Read(.claude/**)",
       "Read(scripts/**)",
       "Bash(npx tsx scripts/dump-state.ts:*)",
+      "Bash(npm run e2e:*)",
+      "Bash(npm run e2e -- :*)",
       "Edit(src/**)",
       "Edit(design-docs/**)",
       "Write(src/**)",
