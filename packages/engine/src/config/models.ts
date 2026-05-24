@@ -100,6 +100,7 @@ export interface ModelPricing {
 }
 
 const DEFAULT_PRICING: Record<string, ModelPricing> = {
+  "claude-opus-4-7":             { input: 5,    output: 25,  cacheWrite: 6.25,  cacheRead: 0.50 },
   "claude-opus-4-6":             { input: 5,    output: 25,  cacheWrite: 6.25,  cacheRead: 0.50 },
   "claude-sonnet-4-6":           { input: 3,    output: 15,  cacheWrite: 3.75,  cacheRead: 0.30 },
   "claude-sonnet-4-5-20250929":  { input: 3,    output: 15,  cacheWrite: 3.75,  cacheRead: 0.30 },
