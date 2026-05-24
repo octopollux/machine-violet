@@ -6,7 +6,6 @@
       "contextWindow": 1000000,
       "maxOutput": 16384,
       "defaultTier": "large",
-      "compactionThreshold": 800000,
       "pricing": { "input": 5, "output": 25, "cacheWrite": 6.25, "cacheRead": 0.50 },
       "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
     },
@@ -16,7 +15,6 @@
       "contextWindow": 1000000,
       "maxOutput": 16384,
       "defaultTier": "medium",
-      "compactionThreshold": 800000,
       "pricing": { "input": 3, "output": 15, "cacheWrite": 3.75, "cacheRead": 0.30 },
       "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
     },
@@ -26,7 +24,6 @@
       "contextWindow": 200000,
       "maxOutput": 8192,
       "defaultTier": "medium",
-      "compactionThreshold": 160000,
       "pricing": { "input": 3, "output": 15, "cacheWrite": 3.75, "cacheRead": 0.30 },
       "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
     },
@@ -36,7 +33,6 @@
       "contextWindow": 200000,
       "maxOutput": 8192,
       "defaultTier": "small",
-      "compactionThreshold": 160000,
       "pricing": { "input": 1, "output": 5, "cacheWrite": 1.25, "cacheRead": 0.10 },
       "capabilities": { "thinking": false, "tools": true, "streaming": true, "caching": true }
     },
@@ -46,7 +42,6 @@
       "contextWindow": 1050000,
       "maxOutput": 128000,
       "defaultTier": "large",
-      "compactionThreshold": 800000,
       "pricing": { "input": 5, "output": 30, "cacheWrite": 0, "cacheRead": 0.50 },
       "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
     },
@@ -56,7 +51,6 @@
       "contextWindow": 128000,
       "maxOutput": 16384,
       "defaultTier": "large",
-      "compactionThreshold": 100000,
       "pricing": { "input": 2.5, "output": 10, "cacheWrite": 0, "cacheRead": 1.25 },
       "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
     },
@@ -66,7 +60,6 @@
       "contextWindow": 128000,
       "maxOutput": 16384,
       "defaultTier": "large",
-      "compactionThreshold": 100000,
       "pricing": { "input": 10, "output": 40, "cacheWrite": 0, "cacheRead": 5 },
       "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
     },
@@ -76,7 +69,6 @@
       "contextWindow": 128000,
       "maxOutput": 16384,
       "defaultTier": "medium",
-      "compactionThreshold": 100000,
       "pricing": { "input": 0.4, "output": 1.6, "cacheWrite": 0, "cacheRead": 0.2 },
       "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
     },
@@ -86,7 +78,6 @@
       "contextWindow": 128000,
       "maxOutput": 16384,
       "defaultTier": "medium",
-      "compactionThreshold": 100000,
       "pricing": { "input": 0.4, "output": 1.6, "cacheWrite": 0, "cacheRead": 0.2 },
       "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
     },
@@ -96,7 +87,6 @@
       "contextWindow": 128000,
       "maxOutput": 16384,
       "defaultTier": "small",
-      "compactionThreshold": 100000,
       "pricing": { "input": 0.1, "output": 0.4, "cacheWrite": 0, "cacheRead": 0.05 },
       "capabilities": { "thinking": false, "tools": true, "streaming": true, "caching": true }
     },
@@ -106,7 +96,6 @@
       "contextWindow": 128000,
       "maxOutput": 16384,
       "defaultTier": "medium",
-      "compactionThreshold": 100000,
       "pricing": { "input": 2.5, "output": 10, "cacheWrite": 0, "cacheRead": 1.25 },
       "capabilities": { "thinking": false, "tools": true, "streaming": true, "caching": true }
     },
@@ -116,7 +105,6 @@
       "contextWindow": 128000,
       "maxOutput": 16384,
       "defaultTier": "small",
-      "compactionThreshold": 100000,
       "pricing": { "input": 0.15, "output": 0.6, "cacheWrite": 0, "cacheRead": 0.075 },
       "capabilities": { "thinking": false, "tools": true, "streaming": true, "caching": true }
     }
