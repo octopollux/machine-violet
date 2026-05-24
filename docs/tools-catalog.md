@@ -77,9 +77,9 @@ Note: Session resume is an engine operation, not a callable tool. It runs automa
 
 ## Entity Tools → [entity-filesystem.md](entity-filesystem.md)
 
-### Structured entity surface (OOC + Dev)
+### Structured entity surface (DM + OOC + Dev)
 
-T1 tools backed by the unified `EntityStore` (`packages/engine/src/entities/`). Surfaced to OOC and Dev Mode for inspection and repair; the DM uses `scribe` for narrative writes instead.
+T1 tools backed by the unified `EntityStore` (`packages/engine/src/entities/`), registered in the shared DM `ToolRegistry` so the DM, OOC, and Dev Mode all see them. The DM uses these for inspection (e.g. `entity("read", "characters", "kael")` to fetch a full record before narrating) and `scribe` for narrative writes; OOC and Dev additionally drive `create`/`update`/`delete` and the diagnostic tools when repairing the campaign.
 
 | Tool | Operations | Effect |
 |---|---|---|
