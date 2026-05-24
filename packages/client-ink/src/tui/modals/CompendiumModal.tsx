@@ -255,8 +255,8 @@ export function CompendiumModal({
     const { wrapped, links, brokenSlugs } = detailContent;
     const styledLines = markWikilinks(wrapped, brokenSlugs, links.length > 0 ? linkIndex : -1);
     const linkFooter = links.length > 0
-      ? `${linkIndex + 1}/${links.length} links  Tab: next  Enter: follow  Bksp: back  ESC: close`
-      : "Bksp: back  ESC: close";
+      ? `${linkIndex + 1}/${links.length} links  *Tab*: next  *Enter*: follow  *Bksp*: back  *ESC*: close`
+      : "*Bksp*: back  *ESC*: close";
 
     return (
       <CenteredModal
@@ -324,7 +324,7 @@ export function CompendiumModal({
       width={width}
       height={height}
       title="Compendium"
-      footer="Enter: select  ESC: close"
+      footer="*Enter*: select  *ESC*: close"
       styledLines={treeStyledLines}
       minWidth={30}
       maxWidth={999}
