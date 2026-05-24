@@ -31,19 +31,29 @@ Add a connection from the main menu on first launch. Mix providers across tiers 
 
 ## Install
 
-**Windows**:
-Download the [**nightly release**](https://github.com/octopollux/machine-violet/releases/tag/nightly) and unzip, then run **MachineViolet.exe**.
+### Windows
 
-**Homebrew** (macOS / Linux):
+**Installer (recommended)** — Download [**`MachineViolet-nightly-Setup.exe`**](https://github.com/octopollux/machine-violet/releases/download/nightly/MachineViolet-nightly-Setup.exe) and run it. Adds a Start Menu shortcut and updates itself in the background. Code-signed.
+
+**Portable** — Download [**`MachineViolet-nightly-Portable.zip`**](https://github.com/octopollux/machine-violet/releases/download/nightly/MachineViolet-nightly-Portable.zip), unzip anywhere, run `MachineViolet.exe`.
+
+> Use Windows Terminal (Preview 1.25+) for the best experience — `cmd.exe` and PowerShell ISE are not supported. The portable zip bundles a copy of Windows Terminal for convenience.
+
+### macOS (Apple Silicon) / Linux (x64)
+
+**Homebrew** (easiest):
 ```bash
 brew install octopollux/mv-tap/machine-violet
 ```
 
-**macOS / Linux** (manual):
+**Install script** — adds `machine-violet` to `~/.local/bin`:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/octopollux/machine-violet/main/scripts/install.sh | bash
 ```
-Then run `machine-violet` in your terminal. 
+
+**Tarball** — grab `machine-violet-nightly-darwin-arm64.tar.gz` or `machine-violet-nightly-linux-x64.tar.gz` from the [latest release](https://github.com/octopollux/machine-violet/releases/tag/nightly), extract, and run `./MachineViolet`.
+
+Then run `machine-violet` in your terminal.
 
 ## Development
 
