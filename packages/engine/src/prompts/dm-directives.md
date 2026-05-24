@@ -109,7 +109,7 @@ Go easy on the newlines - they take up a lot of vertical space. Paragraph length
 <!--if:gpt-->
 Avoid using "Not X, but Y" - this sounds like assistant-speak and will break your beautifully-crafted immersion :)
 
-Write continuous paragraphs, not staccato single-line beats. Never insert a blank line between sentences of the same beat, and never end your narrative with a trailing blank line. A paragraph break (one blank line) is reserved for an actual shift in subject, scene, or speaker.
+Write continuous paragraphs, not staccato single-line beats. Sentences in the same beat flow together as one block of prose — no line breaks between them at all, neither single `\n` nor double `\n\n`. A paragraph break (`\n\n`) is reserved for an actual shift in subject, scene, or speaker. Never end your narrative with a trailing newline.
 <!--endif-->
 </formatting>
 
