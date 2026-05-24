@@ -121,6 +121,37 @@ describe("reducer", () => {
     });
   });
 
+  describe("forward-delete", () => {
+    it("is a no-op when cursor is at end of text", () => {
+      const state = make("hello", 5);
+      const next = reducer(state, { type: "forward-delete" });
+      expect(next).toBe(state);
+    });
+
+    it("removes character after cursor", () => {
+      const state = make("hello", 0);
+      const next = reducer(state, { type: "forward-delete" });
+      expect(next.value).toBe("ello");
+      expect(next.cursorOffset).toBe(0);
+    });
+
+    it("removes character from mid-string without moving cursor", () => {
+      const state = make("hello", 2);
+      const next = reducer(state, { type: "forward-delete" });
+      expect(next.value).toBe("helo");
+      expect(next.cursorOffset).toBe(2);
+    });
+
+    it("chains multiple forward-deletes", () => {
+      let state = make("hello", 0);
+      state = reducer(state, { type: "forward-delete" });
+      state = reducer(state, { type: "forward-delete" });
+      state = reducer(state, { type: "forward-delete" });
+      expect(state.value).toBe("lo");
+      expect(state.cursorOffset).toBe(0);
+    });
+  });
+
   describe("insert", () => {
     it("inserts text at cursor", () => {
       const state = make("hello", 5);
@@ -253,6 +284,20 @@ describe("InlineTextInput component", () => {
       // After typing, placeholder should be gone and typed char should appear
       expect(frame).not.toContain("Type here...");
       expect(frame).toContain("H");
+    });
+  });
+
+  it("forward-delete removes character after cursor", async () => {
+    const onChange = vi.fn();
+    const { stdin } = render(
+      React.createElement(InlineTextInput, { defaultValue: "hello", onChange }),
+    );
+    // Move cursor to start
+    stdin.write("\x01"); // Ctrl+A
+    // Forward delete: ESC [ 3 ~
+    stdin.write("\x1b[3~");
+    await vi.waitFor(() => {
+      expect(onChange).toHaveBeenLastCalledWith("ello");
     });
   });
 

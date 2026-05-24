@@ -27,6 +27,7 @@ interface EditorState {
 type EditorAction =
   | { type: "insert"; text: string }
   | { type: "backspace"; maxRows: number }
+  | { type: "forward-delete"; maxRows: number }
   | { type: "enter"; maxRows: number }
   | { type: "up"; maxRows: number }
   | { type: "down"; maxRows: number }
@@ -71,6 +72,25 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
           col: newCol,
           scrollOffset: ensureVisible(newRow, action.maxRows, scrollOffset),
         };
+      }
+      return state;
+    }
+
+    case "forward-delete": {
+      const line = lines[row];
+      if (col < line.length) {
+        const next = [...lines];
+        next[row] = line.slice(0, col) + line.slice(col + 1);
+        return { ...state, lines: next };
+      }
+      if (row < lines.length - 1) {
+        const next = [...lines];
+        next[row] = next[row] + next[row + 1];
+        next.splice(row + 1, 1);
+        // Line count shrank — clamp scrollOffset so the viewport doesn't
+        // leave blank rows at the bottom when scrolled near the end.
+        const maxScroll = Math.max(0, next.length - action.maxRows);
+        return { ...state, lines: next, scrollOffset: Math.min(scrollOffset, maxScroll) };
       }
       return state;
     }
@@ -195,7 +215,8 @@ export function PlayerNotesModal({
     if (key.leftArrow) { dispatch({ type: "left", maxRows: maxContentRows }); return; }
     if (key.rightArrow) { dispatch({ type: "right", maxRows: maxContentRows }); return; }
     if (key.return) { dispatch({ type: "enter", maxRows: maxContentRows }); return; }
-    if (key.backspace || key.delete) { dispatch({ type: "backspace", maxRows: maxContentRows }); return; }
+    if (key.backspace) { dispatch({ type: "backspace", maxRows: maxContentRows }); return; }
+    if (key.delete) { dispatch({ type: "forward-delete", maxRows: maxContentRows }); return; }
     if (key.ctrl && input === "a") { dispatch({ type: "home" }); return; }
     if (key.ctrl && input === "e") { dispatch({ type: "end" }); return; }
 
