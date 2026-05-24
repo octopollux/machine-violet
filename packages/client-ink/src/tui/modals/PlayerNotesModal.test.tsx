@@ -202,12 +202,4 @@ describe("PlayerNotesModal rendering", () => {
     expect(lastFrame()).toContain("Player Notes");
   });
 
-  it("shows in GameMenu items after Compendium", async () => {
-    const { getMenuItems } = await import("./GameMenu.js");
-    const items = getMenuItems();
-    expect(items).toContain("Player Notes");
-    const compIndex = items.indexOf("Compendium");
-    const notesIndex = items.indexOf("Player Notes");
-    expect(notesIndex).toBe(compIndex + 1);
-  });
 });

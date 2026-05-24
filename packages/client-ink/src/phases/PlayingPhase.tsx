@@ -25,6 +25,7 @@ import {
   CharacterSheetModal, CompendiumModal, PlayerNotesModal, SwatchModal,
   SessionRecapModal, CenteredModal, CharacterPane, CampaignSettingsModal,
 } from "../tui/modals/index.js";
+import type { MenuGroup, MenuItem } from "../tui/modals/index.js";
 import type { CampaignConfig, ChoiceFrequency } from "@machine-violet/shared/types/config.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { useGameContext } from "../tui/game-context.js";
@@ -255,43 +256,80 @@ export function PlayingPhase() {
   }, [rows]);
 
   // --- Menu ---
-  const handleMenuSelect = useCallback(async (item: string) => {
-    setMenuOpen(false);
-    if (item === "Resume") return;
-    if (item === "Save & Exit" || item === "End Session") {
-      onReturnToMenu(); // returnToMenu handles endSession + state reset
-    } else if (item === "OOC Mode") {
-      await apiClient.command("ooc");
-    } else if (item === "Dev Mode") {
-      await apiClient.command("dev");
-    } else if (item === "Character Sheet") {
-      try {
-        const { content } = await apiClient.getCharacterSheet(activeChar);
-        setActiveModal({ kind: "character_sheet", content } as never);
-      } catch { setActiveModal({ kind: "character_sheet", content: "(No character sheet found)" } as never); }
-    } else if (item === "Compendium") {
-      try {
-        const { data } = await apiClient.getCompendium();
-        setActiveModal({ kind: "compendium", data } as never);
-      } catch { /* ignore */ }
-    } else if (item === "Player Notes") {
-      try {
-        const { content } = await apiClient.getNotes();
-        setActiveModal({ kind: "notes", content } as never);
-      } catch { setActiveModal({ kind: "notes", content: "" } as never); }
-    } else if (item === "Save Transcript") {
-      await saveTranscript();
-    } else if (item === "Color Swatch") {
-      setActiveModal({ kind: "swatch" } as never);
-    } else if (item === "Settings") {
-      try {
-        const { config } = await apiClient.getSettings();
-        setActiveModal({ kind: "settings", config } as never);
-      } catch {
-        // Fail quietly — menu will reopen on next ESC.
-      }
+  // Action helpers — extracted so menu items can colocate their behavior.
+  const openCharacterSheet = useCallback(async () => {
+    try {
+      const { content } = await apiClient.getCharacterSheet(activeChar);
+      setActiveModal({ kind: "character_sheet", content } as never);
+    } catch { setActiveModal({ kind: "character_sheet", content: "(No character sheet found)" } as never); }
+  }, [apiClient, activeChar, setActiveModal]);
+
+  const openCompendium = useCallback(async () => {
+    try {
+      const { data } = await apiClient.getCompendium();
+      setActiveModal({ kind: "compendium", data } as never);
+    } catch { /* ignore */ }
+  }, [apiClient, setActiveModal]);
+
+  const openPlayerNotes = useCallback(async () => {
+    try {
+      const { content } = await apiClient.getNotes();
+      setActiveModal({ kind: "notes", content } as never);
+    } catch { setActiveModal({ kind: "notes", content: "" } as never); }
+  }, [apiClient, setActiveModal]);
+
+  const openCampaignSettings = useCallback(async () => {
+    try {
+      const { config } = await apiClient.getSettings();
+      setActiveModal({ kind: "settings", config } as never);
+    } catch { /* fail quietly — menu reopens on next ESC */ }
+  }, [apiClient, setActiveModal]);
+
+  const toggleEngineConsole = useCallback(async () => {
+    await apiClient.command(mode === "dev" ? "exit_mode" : "dev");
+  }, [apiClient, mode]);
+
+  // Build grouped menu items. View-on-top so the cursor doesn't sit on a
+  // leave action when the user opens the menu to do something. Engine
+  // Console is gated on dev mode (master toggle in Settings).
+  const menuGroups = useMemo(() => {
+    const groups: MenuGroup[] = [
+      {
+        title: "View",
+        items: [
+          { key: "character_sheet", label: "Character Sheet", action: () => void openCharacterSheet() },
+          { key: "compendium", label: "Compendium", action: () => void openCompendium() },
+          { key: "player_notes", label: "Player Notes", action: () => void openPlayerNotes() },
+        ],
+      },
+    ];
+
+    const sessionItems: MenuItem[] = [];
+    if (devModeEnabled) {
+      sessionItems.push({
+        key: "engine_console",
+        label: mode === "dev" ? "Exit Engine Console" : "Engine Console",
+        action: () => void toggleEngineConsole(),
+      });
     }
-  }, [apiClient, onReturnToMenu, activeChar, setActiveModal, saveTranscript]);
+    sessionItems.push({ key: "save_transcript", label: "Save Transcript", action: () => void saveTranscript() });
+    groups.push({ title: "Session", items: sessionItems });
+
+    groups.push({
+      title: "Settings",
+      items: [{ key: "campaign_settings", label: "Campaign Settings", action: () => void openCampaignSettings() }],
+    });
+
+    groups.push({
+      title: "Exit",
+      items: [
+        { key: "resume", label: "Resume", action: () => { /* dismiss-only */ } },
+        { key: "return_to_menu", label: "Return to Menu", action: onReturnToMenu },
+      ],
+    });
+
+    return groups;
+  }, [devModeEnabled, mode, openCharacterSheet, openCompendium, openPlayerNotes, openCampaignSettings, toggleEngineConsole, saveTranscript, onReturnToMenu]);
 
   // --- Input handling ---
   useInput((_input, key) => {
@@ -540,12 +578,9 @@ export function PlayingPhase() {
           theme={theme}
           width={cols}
           height={rows}
-          oocActive={mode === "ooc"}
-          devModeEnabled={devModeEnabled}
-          devActive={mode === "dev"}
+          groups={menuGroups}
           tokenSummary={tokenSummary}
           usageStatus={usageStatus}
-          onSelect={handleMenuSelect}
           onDismiss={() => setMenuOpen(false)}
         />
       )}

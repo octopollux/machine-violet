@@ -4,7 +4,8 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render } from "ink-testing-library";
 import { Modal } from "./Modal.js";
 import { ChoiceModal, ChoiceOverlay } from "./ChoiceModal.js";
-import { GameMenu, getMenuItems } from "./GameMenu.js";
+import { GameMenu } from "./GameMenu.js";
+import type { MenuGroup } from "./GameMenu.js";
 import { CharacterSheetModal } from "./CharacterSheetModal.js";
 import { SessionRecapModal } from "./SessionRecapModal.js";
 import { SwatchModal } from "./SwatchModal.js";
@@ -380,17 +381,55 @@ describe("ChoiceOverlay", () => {
   });
 });
 
+// Sample groups mirroring the in-game ESC menu shape — built fresh per test
+// so each test can mutate without leaking state. Engine Console is omitted
+// here (the in-game version only shows it when dev mode is enabled).
+function sampleGroups(): MenuGroup[] {
+  return [
+    { title: "View", items: [
+      { key: "character_sheet", label: "Character Sheet", action: noop },
+      { key: "compendium", label: "Compendium", action: noop },
+      { key: "player_notes", label: "Player Notes", action: noop },
+    ] },
+    { title: "Session", items: [
+      { key: "save_transcript", label: "Save Transcript", action: noop },
+    ] },
+    { title: "Settings", items: [
+      { key: "campaign_settings", label: "Campaign Settings", action: noop },
+    ] },
+    { title: "Exit", items: [
+      { key: "resume", label: "Resume", action: noop },
+      { key: "return_to_menu", label: "Return to Menu", action: noop },
+    ] },
+  ];
+}
+
 describe("GameMenu", () => {
-  it("renders all menu items", () => {
+  it("renders every item across every group", () => {
+    const groups = sampleGroups();
     const { lastFrame } = render(
-      <Box width={40} height={24}>
-        <GameMenu theme={theme} width={40} height={24} onSelect={noop} onDismiss={noop} />
+      <Box width={60} height={30}>
+        <GameMenu theme={theme} width={60} height={30} groups={groups} onDismiss={noop} />
       </Box>,
     );
     const frame = lastFrame();
-    for (const item of getMenuItems()) {
-      expect(frame).toContain(item);
+    for (const group of groups) {
+      expect(frame).toContain(group.title);
+      for (const item of group.items) {
+        expect(frame).toContain(item.label);
+      }
     }
+  });
+
+  it("does not render End Session (removed) or OOC Mode (removed)", () => {
+    const { lastFrame } = render(
+      <Box width={60} height={30}>
+        <GameMenu theme={theme} width={60} height={30} groups={sampleGroups()} onDismiss={noop} />
+      </Box>,
+    );
+    const frame = lastFrame()!;
+    expect(frame).not.toContain("End Session");
+    expect(frame).not.toContain("OOC Mode");
   });
 
   it("renders token summary in footer", () => {
@@ -401,7 +440,7 @@ describe("GameMenu", () => {
           width={60}
           height={24}
           tokenSummary="0/0/0 | 2k/0/15k | 5k/200/40k"
-          onSelect={noop}
+          groups={sampleGroups()}
           onDismiss={noop}
         />
       </Box>,
@@ -430,7 +469,7 @@ describe("GameMenu", () => {
           height={24}
           tokenSummary="0/0/0 | 2k/0/15k | 5k/200/40k"
           usageStatus={usageStatus}
-          onSelect={noop}
+          groups={sampleGroups()}
           onDismiss={noop}
         />
       </Box>,
@@ -460,7 +499,7 @@ describe("GameMenu", () => {
           height={24}
           tokenSummary="0/0/0"
           usageStatus={usageStatus}
-          onSelect={noop}
+          groups={sampleGroups()}
           onDismiss={noop}
         />
       </Box>,
@@ -496,7 +535,7 @@ describe("GameMenu", () => {
           height={25}
           tokenSummary={longSummary}
           usageStatus={usageStatus}
-          onSelect={noop}
+          groups={sampleGroups()}
           onDismiss={noop}
         />
       </Box>,
@@ -505,15 +544,31 @@ describe("GameMenu", () => {
     expect(frame).toContain(`${longSummary} | 95%`);
   });
 
-  it("highlights first item by default", () => {
+  it("places cursor on the first selectable item (top of the first group)", () => {
     const { lastFrame } = render(
-      <Box width={40} height={24}>
-        <GameMenu theme={theme} width={40} height={24} onSelect={noop} onDismiss={noop} />
+      <Box width={60} height={30}>
+        <GameMenu theme={theme} width={60} height={30} groups={sampleGroups()} onDismiss={noop} />
       </Box>,
     );
     const frame = lastFrame();
-    expect(frame).toContain("◆ Resume");
-    expect(frame).toContain("○ Character Sheet");
+    // View is the first group; Character Sheet is its first item.
+    expect(frame).toContain("◆ Character Sheet");
+    expect(frame).toContain("○ Resume");
+  });
+
+  it("renders group header rows above each group's items", () => {
+    const { lastFrame } = render(
+      <Box width={60} height={30}>
+        <GameMenu theme={theme} width={60} height={30} groups={sampleGroups()} onDismiss={noop} />
+      </Box>,
+    );
+    const frame = lastFrame()!;
+    // Headers render with surrounding dashes; matching the title in a "── X ─+"
+    // shape confirms it's a group rule, not just an item label coincidence.
+    expect(frame).toMatch(/── View ─+/);
+    expect(frame).toMatch(/── Session ─+/);
+    expect(frame).toMatch(/── Settings ─+/);
+    expect(frame).toMatch(/── Exit ─+/);
   });
 });
 
