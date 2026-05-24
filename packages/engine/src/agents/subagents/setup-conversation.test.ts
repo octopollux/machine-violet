@@ -459,6 +459,34 @@ describe("createSetupConversation", () => {
     expect(result.text).toContain("What kind of story?");
   });
 
+  it("threads userWorldsDir through load_world tool dispatch", async () => {
+    // Regression for #375: setup conversation must pass userWorldsDir into
+    // loadWorldBySlug so user-imported .mvworld files are reachable.
+    const loadWorldResp: ChatResult = {
+      text: "Loading...",
+      toolCalls: [{ id: "toolu_load_dir", name: "load_world", input: { slug: "the-shattered-crown" } }],
+      usage: mockUsage(),
+      stopReason: "tool_use",
+      assistantContent: [
+        { type: "text", text: "Loading..." },
+        { type: "tool_use", id: "toolu_load_dir", name: "load_world", input: { slug: "the-shattered-crown" } },
+      ],
+    };
+    const provider = mockProvider([loadWorldResp, textResponse("Done.")]);
+    const { loadWorldBySlug } = await import("../../config/world-loader.js");
+    const conv = createSetupConversation(
+      provider,
+      "claude-sonnet-4-6",
+      undefined,
+      undefined,
+      "/fake/user/worlds",
+    );
+
+    await conv.start(noop);
+
+    expect(loadWorldBySlug).toHaveBeenCalledWith("the-shattered-crown", "/fake/user/worlds");
+  });
+
   it("load_world surfaces campaign_scope as a clean standalone slug line", async () => {
     // When a world declares campaign_scope, the tool result must emit
     // `Required campaign_scope: <slug>` on its own line (with the instruction

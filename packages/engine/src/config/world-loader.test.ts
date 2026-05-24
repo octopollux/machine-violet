@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadAllWorlds, worldSummaries } from "./world-loader.js";
+import { loadAllWorlds, loadWorldBySlug, worldSummaries } from "./world-loader.js";
 import type { WorldFile } from "@machine-violet/shared/types/world.js";
 
 // --- Bundled seed validation (uses real filesystem, no mocks) ---
@@ -131,6 +131,42 @@ describe("loadAllWorlds — user world warnings", () => {
 
     expect(worlds.find((w) => w.slug === "custom")).toBeDefined();
     expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+describe("loadWorldBySlug — slug sanitization", () => {
+  const tempDirs: string[] = [];
+  afterEach(() => {
+    while (tempDirs.length) {
+      const d = tempDirs.pop()!;
+      try { rmSync(d, { recursive: true, force: true }); } catch { /* ignore */ }
+    }
+  });
+
+  function makeUserDir(): string {
+    const dir = mkdtempSync(join(tmpdir(), "mv-worlds-slug-"));
+    tempDirs.push(dir);
+    return dir;
+  }
+
+  it("rejects slugs containing path traversal sequences", () => {
+    const userDir = makeUserDir();
+    // Plant a file outside the worlds dir that traversal would reach.
+    expect(loadWorldBySlug("../etc/passwd", userDir)).toBeUndefined();
+    expect(loadWorldBySlug("..", userDir)).toBeUndefined();
+    expect(loadWorldBySlug("foo/bar", userDir)).toBeUndefined();
+    expect(loadWorldBySlug("foo\\bar", userDir)).toBeUndefined();
+    expect(loadWorldBySlug("", userDir)).toBeUndefined();
+    expect(loadWorldBySlug("FOO", userDir)).toBeUndefined();
+    expect(loadWorldBySlug("-leading-dash", userDir)).toBeUndefined();
+  });
+
+  it("loads a valid user world by clean slug", () => {
+    const userDir = makeUserDir();
+    const good = makeWorld({ name: "Custom" });
+    writeFileSync(join(userDir, "custom-world.mvworld"), JSON.stringify(good), "utf-8");
+    const world = loadWorldBySlug("custom-world", userDir);
+    expect(world?.name).toBe("Custom");
   });
 });
 
