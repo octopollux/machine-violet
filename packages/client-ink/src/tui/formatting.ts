@@ -6,6 +6,9 @@ import type { FormattingNode, FormattingTag, NarrativeLine, ProcessedLine } from
  * Supported tags: <b>, <i>, <u>, <sub>, <sup>, <center>, <right>, <color=#hex>,
  * <wikilink slug=foo>...</wikilink> (render-only — emitted by the colorizer, not LLMs)
  * Unrecognized tags are stripped. Malformed tags render as plain text.
+ * Orphan close tags (e.g. `</i>` with no matching open in scope) are stripped
+ * silently — they're nearly always a leak from healing across paragraph
+ * boundaries, never something the user intended to display literally.
  * Tags can be nested: <b><i>bold italic</i></b>
  */
 export function parseFormatting(input: string): FormattingNode[] {
@@ -30,7 +33,16 @@ export function parseFormatting(input: string): FormattingNode[] {
     // Try to parse an opening tag
     const parsed = parseOpenTag(input, tagStart);
     if (!parsed) {
-      // Not a valid tag — treat the < as plain text
+      // Orphan close tag (e.g. `</i>` with no matching open in this scope):
+      // strip it silently. Healing leaves these behind when an open tag is
+      // reset by a paragraph boundary before its close arrives — without this,
+      // the close would render as literal `</tagname>` text (issue #454).
+      const orphanClose = input.slice(tagStart).match(KNOWN_CLOSE_TAG_RE);
+      if (orphanClose) {
+        i = tagStart + orphanClose[0].length;
+        continue;
+      }
+      // Not a recognized tag at all — treat the < as plain text
       pushText(result, "<");
       i = tagStart + 1;
       continue;
@@ -628,6 +640,8 @@ interface ParsedTag {
   target?: string;
   end: number; // index after the closing >
 }
+
+const KNOWN_CLOSE_TAG_RE = /^<\/(?:b|i|u|sub|sup|center|right|color|wikilink)>/;
 
 const SIMPLE_TAGS: Record<string, string> = {
   b: "bold",

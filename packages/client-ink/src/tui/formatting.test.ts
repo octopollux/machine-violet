@@ -83,6 +83,21 @@ describe("parseFormatting", () => {
     expect(toPlainText(result)).toBe("<blink>flashing</blink>");
   });
 
+  it("strips orphan close tags silently (issue #454)", () => {
+    // A close tag with no matching open in scope is a leak from healing
+    // across a paragraph boundary — never literal text the user meant.
+    expect(parseFormatting("verse 4</i></center>")).toEqual(["verse 4"]);
+    expect(parseFormatting("</b>plain</b>")).toEqual(["plain"]);
+    expect(parseFormatting("a</color>b")).toEqual(["ab"]);
+  });
+
+  it("does not strip unrecognized close tags", () => {
+    // Only known tag names are stripped; arbitrary </blink> stays literal
+    // so e.g. code samples and quoted HTML still render.
+    const result = parseFormatting("text</blink>more");
+    expect(toPlainText(result)).toBe("text</blink>more");
+  });
+
   it("handles empty content between tags", () => {
     const result = parseFormatting("<b></b>");
     expect(result).toHaveLength(1);
@@ -1329,6 +1344,32 @@ describe("multi-line formatting across spacers", () => {
     expect(lastDm.nodes).toEqual(["clean"]);
   });
 
+  it("no dangling close tags after paragraph break (issue #454)", () => {
+    // Reported bug: poem with <center><i>...</i></center> spanning a blank
+    // verse-separator line. The blank line resets the healing stack, then
+    // </i></center> arrives on the last verse line with nothing to match —
+    // previously rendered as literal "</i></center>" text after the poem.
+    const result = processNarrativeLines([
+      dm("<center><i>verse 1"),
+      dm("verse 2"),
+      dm(""),
+      dm("verse 3"),
+      dm("verse 4</i></center>"),
+      dm(""),
+      dm("prose after"),
+    ], 80);
+    const dmLines = result.filter((l) => l.kind === "dm");
+    for (const line of dmLines) {
+      const plain = toPlainText(line.nodes);
+      expect(plain).not.toContain("</i>");
+      expect(plain).not.toContain("</center>");
+    }
+    // Verses 3 and 4 are unformatted (Layer-1 fix: strip, don't reflow).
+    const verse4 = dmLines.find((l) => toPlainText(l.nodes).startsWith("verse 4"));
+    expect(verse4).toBeDefined();
+    expect(toPlainText(verse4!.nodes)).toBe("verse 4");
+  });
+
   it("no dangling close tags after spacer", () => {
     // The core bug: close tag on second line should NOT appear as literal text
     const result = processNarrativeLines([
@@ -1371,10 +1412,12 @@ describe("wikilink tag", () => {
   });
 
   it("rejects malformed wikilink (no slug attribute)", () => {
-    // Unparseable open tag — `<wikilink>` without slug=. The `<` is emitted
-    // as literal text and the remainder is treated as plain text.
+    // Unparseable open tag — `<wikilink>` without slug=. The `<wikilink>`
+    // open emits as literal text (no matching close for an unparseable open).
+    // The trailing `</wikilink>` is a known close tag with no matching open
+    // in scope, so it's stripped as an orphan (issue #454 behavior).
     const result = parseFormatting("<wikilink>Foo</wikilink>");
-    expect(stripFormatting("<wikilink>Foo</wikilink>")).toBe("<wikilink>Foo</wikilink>");
+    expect(stripFormatting("<wikilink>Foo</wikilink>")).toBe("<wikilink>Foo");
     expect(result.length).toBeGreaterThan(0);
   });
 });
