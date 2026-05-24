@@ -47,7 +47,7 @@ export function UpdatePhase({
     return <TerminalTooSmall columns={cols} rows={termRows} />;
   }
 
-  const borderColor = themeColor(theme, "border");
+  const accentColor = themeColor(theme, "title") ?? themeColor(theme, "border");
   const dimColor = themeColor(theme, "separator") ?? "#666666";
   const sideWidth = theme.asset.components.edge_left.width;
   const topHeight = theme.asset.height;
@@ -90,11 +90,11 @@ export function UpdatePhase({
   for (let i = 0; i < OPTIONS.length; i++) {
     const isSelected = i === selectedIndex;
     const marker = isSelected ? "◆" : "○";
-    const markerColor = isSelected ? borderColor : dimColor;
+    const markerColor = isSelected ? accentColor : dimColor;
     lines.push(
       <Text key={OPTIONS[i]}>
         <Text color={markerColor}>{marker}</Text>
-        <Text>{` ${OPTIONS[i]}`}</Text>
+        <Text color={isSelected ? accentColor : undefined} bold={isSelected}>{` ${OPTIONS[i]}`}</Text>
       </Text>,
     );
   }

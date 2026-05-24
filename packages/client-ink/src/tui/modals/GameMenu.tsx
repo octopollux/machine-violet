@@ -101,8 +101,20 @@ export function GameMenu({
         : [headerText],
     );
     for (const item of group.items) {
-      const marker = flatIdx === menuIndex ? "◆" : "○";
-      styledLines.push([`   ${marker} ${item.label}`]);
+      const isSelected = flatIdx === menuIndex;
+      const marker = isSelected ? "◆" : "○";
+      if (isSelected && accentColor) {
+        styledLines.push([
+          "   ",
+          {
+            type: "color",
+            color: accentColor,
+            content: [{ type: "bold", content: [`${marker} ${item.label}`] }],
+          },
+        ]);
+      } else {
+        styledLines.push([`   ${marker} ${item.label}`]);
+      }
       flatIdx++;
     }
   }

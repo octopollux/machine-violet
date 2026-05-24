@@ -56,7 +56,7 @@ export function ArchivedCampaignsPhase({
     return <TerminalTooSmall columns={cols} rows={termRows} />;
   }
 
-  const borderColor = themeColor(theme, "border");
+  const accentColor = themeColor(theme, "title") ?? themeColor(theme, "border");
   const dimColor = themeColor(theme, "separator") ?? "#666666";
 
   const menuLines: React.ReactNode[] = [];
@@ -79,13 +79,13 @@ export function ArchivedCampaignsPhase({
       const entry = archives[i];
       const isSelected = i === menuIndex;
       const marker = isSelected ? "◆" : "○";
-      const markerColor = isSelected ? borderColor : dimColor;
+      const markerColor = isSelected ? accentColor : dimColor;
       const dateStr = formatDate(entry.archivedDate);
 
       menuLines.push(
         <Text key={entry.zipPath}>
           <Text color={markerColor}>{marker}</Text>
-          <Text bold={isSelected}>{` ${entry.name}`}</Text>
+          <Text color={isSelected ? accentColor : undefined} bold={isSelected}>{` ${entry.name}`}</Text>
           <Text color={dimColor}>{`  Archived ${dateStr}`}</Text>
         </Text>,
       );
