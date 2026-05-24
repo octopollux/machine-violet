@@ -52,7 +52,10 @@ export function assetDir(category: "prompts" | "themes" | "systems"): string {
 }
 
 /**
- * Resolve the directory for user config files (.env, connections.json).
+ * Resolve the directory for user config artifacts — anything the client
+ * persists between runs that isn't campaign data. Today that includes
+ * `client-settings.json` plus the engine-side files the launcher reads from
+ * the same dir (`.env`, `connections.json`, `machine-settings.json`, etc.).
  *
  * Compiled: platform-conventional config dir (e.g. %APPDATA%\MachineViolet).
  * Dev: walk up from cwd looking for an ancestor containing `connections.json`
@@ -68,9 +71,14 @@ export function configDir(): string {
   return _configDir;
 }
 
+// Bounded so a stray cwd outside any project doesn't walk all the way to /.
+// 12 comfortably covers nested worktrees in this repo's `.claude/worktrees/<name>` layout
+// with headroom; matches the cap used by the test harness's launcher-cwd resolver.
+const MAX_PARENT_TRAVERSALS = 12;
+
 function findConfigDirUpward(start: string): string {
   let dir = resolve(start);
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < MAX_PARENT_TRAVERSALS; i++) {
     if (existsSync(join(dir, "connections.json"))) return dir;
     const parent = dirname(dir);
     if (parent === dir) break;
