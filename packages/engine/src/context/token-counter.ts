@@ -23,6 +23,18 @@ export function estimateContentTokens(content: NormalizedMessage["content"]): nu
       total += estimateTokens(block.name) + estimateTokens(JSON.stringify(block.input));
     } else if (block.type === "tool_result") {
       total += estimateTokens(block.content);
+    } else if (block.type === "reasoning") {
+      // Encrypted reasoning blobs are opaque (typically base64) but get
+      // replayed verbatim to the model as input on the next turn, so they
+      // contribute to context pressure even though we can't see inside.
+      // Count the raw bytes with the same 4-chars-per-token heuristic —
+      // an overestimate is safe (favors eviction), an underestimate
+      // (the original 0) lets ConversationManager retain unbounded
+      // history when reasoning effort is high.
+      total += estimateTokens(block.encryptedContent);
+      for (const s of block.summary) {
+        total += estimateTokens(s);
+      }
     }
   }
   return total;

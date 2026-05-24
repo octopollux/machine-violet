@@ -143,10 +143,12 @@ async function responsesStream(
   // `include: ["reasoning.encrypted_content"]`): we don't trust the
   // finalResponse snapshot for reasoning items at all. The blob is
   // emitted on `response.output_item.done` events alongside the final
-  // reasoning item shape, so capture it directly from there. Each id may
-  // only have its blob delivered once, so we store by id.
+  // reasoning item shape, so capture it directly from there. Keyed by id
+  // (last-write-wins) so a hypothetical retry or duplicate `done` for the
+  // same item can't replay the same reasoning input twice on the next turn
+  // — the Responses API would reject duplicate item ids.
   const reasoningParts: string[] = [];
-  const encryptedReasoning: { id: string; encryptedContent: string; summary: string[] }[] = [];
+  const encryptedReasoningById = new Map<string, { id: string; encryptedContent: string; summary: string[] }>();
   for await (const event of stream) {
     if (event.type === "response.output_text.delta") {
       text += event.delta;
@@ -166,7 +168,7 @@ async function responsesStream(
         for (const sum of event.item.summary ?? []) {
           if (sum.type === "summary_text" && sum.text) summary.push(sum.text);
         }
-        encryptedReasoning.push({
+        encryptedReasoningById.set(event.item.id, {
           id: event.item.id,
           encryptedContent: event.item.encrypted_content,
           summary,
@@ -179,8 +181,9 @@ async function responsesStream(
   // finalResponse() returns ParsedResponse which lacks the output_text
   // convenience property, so we build the result from the accumulated text
   // and parse tool calls from the output items directly. Reasoning is
-  // passed in from the event-driven capture above.
-  return fromResponsesResponseWithText(response, text, reasoningParts, encryptedReasoning);
+  // passed in from the event-driven capture above. Map preserves insertion
+  // order, which matches the order ids first appeared in the stream.
+  return fromResponsesResponseWithText(response, text, reasoningParts, [...encryptedReasoningById.values()]);
 }
 
 // ---------------------------------------------------------------------------

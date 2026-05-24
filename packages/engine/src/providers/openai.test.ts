@@ -823,6 +823,63 @@ describe("Responses API integration", () => {
       ]);
     });
 
+    it("dedupes encrypted reasoning by item id (last-write-wins)", async () => {
+      // OpenAI shouldn't emit `output_item.done` twice for the same id, but
+      // SDK retries or reconnect logic could; replaying duplicate reasoning
+      // items on the next turn would have OpenAI reject the request for
+      // duplicate ids. Map-by-id makes that defensive: a second `.done` for
+      // the same id overwrites the earlier capture rather than appending.
+      const response = fakeResponse({
+        output: [
+          { id: "rs_1", type: "reasoning", summary: [] },
+          {
+            id: "msg_1",
+            type: "message",
+            role: "assistant",
+            status: "completed",
+            content: [{ type: "output_text", text: "Onward.", annotations: [] }],
+          },
+        ],
+      });
+      const events = [
+        { type: "response.output_text.delta", delta: "Onward." },
+        {
+          type: "response.output_item.done",
+          item: { id: "rs_1", type: "reasoning", encrypted_content: "enc-first", summary: [] },
+        },
+        // Hypothetical duplicate — should overwrite, not append.
+        {
+          type: "response.output_item.done",
+          item: { id: "rs_1", type: "reasoning", encrypted_content: "enc-second", summary: [] },
+        },
+        { type: "response.completed", response },
+      ];
+
+      let eventIdx = 0;
+      mockResponses.stream.mockReturnValue({
+        [Symbol.asyncIterator]: () => ({
+          next: async () =>
+            eventIdx < events.length
+              ? { value: events[eventIdx++], done: false }
+              : { value: undefined, done: true },
+        }),
+        finalResponse: vi.fn().mockResolvedValue(response),
+      });
+
+      const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+      const result = await provider.stream(baseChatParams({ thinking: { effort: "high" } }), () => {});
+
+      // Exactly one reasoning part, holding the most recent blob.
+      const reasoningParts = result.assistantContent.filter((p) => p.type === "reasoning");
+      expect(reasoningParts).toHaveLength(1);
+      expect(reasoningParts[0]).toEqual({
+        type: "reasoning",
+        id: "rs_1",
+        encryptedContent: "enc-second",
+        summary: [],
+      });
+    });
+
     it("leaves thinkingText undefined when no summary events fire", async () => {
       // Reasoning may happen with no summary parts emitted (model returned
       // an empty summary array for the part). The non-streaming sibling
