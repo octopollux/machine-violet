@@ -465,6 +465,177 @@ describe("Responses API integration", () => {
     expect(result.thinkingText).toBeUndefined();
   });
 
+  // -----------------------------------------------------------------------
+  // Encrypted reasoning replay
+  //
+  // With `store: false`, the Responses API doesn't retain reasoning state
+  // server-side, so each turn the model would re-derive its chain of
+  // thought from scratch. The fix is to ask for an encrypted reasoning
+  // blob via `include: ["reasoning.encrypted_content"]`, persist it on
+  // the assistant turn, and replay it as a `reasoning` input item on the
+  // next request. These tests pin the request opt-in, the response
+  // capture, and the round-trip.
+  // -----------------------------------------------------------------------
+
+  it("requests reasoning.encrypted_content when thinking effort is set", async () => {
+    mockResponses.create.mockResolvedValue(fakeResponse());
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    await provider.chat(baseChatParams({ thinking: { effort: "high" } }));
+
+    const callArgs = mockResponses.create.mock.calls[0][0];
+    expect(callArgs.include).toEqual(["reasoning.encrypted_content"]);
+  });
+
+  it("does not request reasoning.encrypted_content without thinking effort", async () => {
+    mockResponses.create.mockResolvedValue(fakeResponse());
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    await provider.chat(baseChatParams());
+
+    const callArgs = mockResponses.create.mock.calls[0][0];
+    expect(callArgs.include).toBeUndefined();
+  });
+
+  it("captures encrypted reasoning into assistantContent for replay", async () => {
+    // Reasoning item carries an `encrypted_content` blob — this must
+    // round-trip through conversation history so the next turn can hand
+    // it back to the model.
+    mockResponses.create.mockResolvedValue(fakeResponse({
+      output: [
+        {
+          id: "rs_1",
+          type: "reasoning",
+          encrypted_content: "enc-blob-1",
+          summary: [{ type: "summary_text", text: "Weighing options." }],
+        },
+        {
+          id: "msg_1",
+          type: "message",
+          role: "assistant",
+          status: "completed",
+          content: [{ type: "output_text", text: "Onward.", annotations: [] }],
+        },
+      ],
+    }));
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    const result = await provider.chat(baseChatParams({ thinking: { effort: "high" } }));
+
+    expect(result.thinkingText).toBe("Weighing options.");
+    expect(result.assistantContent).toEqual([
+      { type: "reasoning", id: "rs_1", encryptedContent: "enc-blob-1", summary: ["Weighing options."] },
+      { type: "text", text: "Onward." },
+    ]);
+  });
+
+  it("does not push reasoning to assistantContent when encrypted_content is absent", async () => {
+    // Without the opt-in, reasoning items still arrive (summaries) but
+    // carry no encrypted blob. Persisting an empty shell would round-trip
+    // back as an invalid input item, so we leave them out entirely —
+    // only the summary text flows through `thinkingText`.
+    mockResponses.create.mockResolvedValue(fakeResponse({
+      output: [
+        {
+          id: "rs_1",
+          type: "reasoning",
+          summary: [{ type: "summary_text", text: "Thinking…" }],
+        },
+        {
+          id: "msg_1",
+          type: "message",
+          role: "assistant",
+          status: "completed",
+          content: [{ type: "output_text", text: "Hi.", annotations: [] }],
+        },
+      ],
+    }));
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    const result = await provider.chat(baseChatParams());
+
+    expect(result.thinkingText).toBe("Thinking…");
+    expect(result.assistantContent).toEqual([{ type: "text", text: "Hi." }]);
+  });
+
+  it("replays persisted reasoning blocks as input items ahead of function_calls", async () => {
+    // Simulate the second turn of a conversation: the prior assistant
+    // turn had a reasoning block + tool_use, both captured into
+    // assistantContent on turn N and persisted. On turn N+1 we feed that
+    // history back in. The Responses API requires reasoning items before
+    // their corresponding function_call within the same turn.
+    mockResponses.create.mockResolvedValue(fakeResponse());
+
+    const messages: NormalizedMessage[] = [
+      { role: "user", content: "Roll for it." },
+      {
+        role: "assistant",
+        content: [
+          { type: "reasoning", id: "rs_prev", encryptedContent: "enc-prev", summary: ["Pondered."] },
+          { type: "text", text: "Rolling…" },
+          { type: "tool_use", id: "call_1", name: "roll_dice", input: { expression: "1d20" } },
+        ],
+      },
+      {
+        role: "user",
+        content: [{ type: "tool_result", tool_use_id: "call_1", content: "17" }],
+      },
+    ];
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    await provider.chat(baseChatParams({ messages, thinking: { effort: "high" } }));
+
+    const callArgs = mockResponses.create.mock.calls[0][0];
+    const input = callArgs.input;
+
+    // user → reasoning (first within the assistant turn) → assistant text → function_call → tool result
+    expect(input[0]).toEqual({ type: "message", role: "user", content: "Roll for it." });
+    expect(input[1]).toEqual({
+      type: "reasoning",
+      id: "rs_prev",
+      encrypted_content: "enc-prev",
+      summary: [{ type: "summary_text", text: "Pondered." }],
+    });
+    expect(input[2]).toEqual({ type: "message", role: "assistant", content: "Rolling…" });
+    expect(input[3]).toEqual({
+      type: "function_call",
+      call_id: "call_1",
+      name: "roll_dice",
+      arguments: '{"expression":"1d20"}',
+    });
+    expect(input[4]).toEqual({ type: "function_call_output", call_id: "call_1", output: "17" });
+  });
+
+  it("emits reasoning items in order even when stored late in assistantContent", async () => {
+    // Streaming pushes encrypted reasoning items at the END of the
+    // assistantContent array (after text). toResponsesInput must still
+    // emit them at the start of the turn's input items. Two reasoning
+    // items must keep their relative order.
+    mockResponses.create.mockResolvedValue(fakeResponse());
+
+    const messages: NormalizedMessage[] = [
+      { role: "user", content: "Go." },
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "Going." },
+          { type: "reasoning", id: "rs_a", encryptedContent: "enc-a", summary: [] },
+          { type: "reasoning", id: "rs_b", encryptedContent: "enc-b", summary: [] },
+        ],
+      },
+    ];
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    await provider.chat(baseChatParams({ messages, thinking: { effort: "high" } }));
+
+    const input = mockResponses.create.mock.calls[0][0].input;
+    expect(input[0]).toEqual({ type: "message", role: "user", content: "Go." });
+    // Both reasoning items, in original order, before the message.
+    expect(input[1]).toEqual({ type: "reasoning", id: "rs_a", encrypted_content: "enc-a", summary: [] });
+    expect(input[2]).toEqual({ type: "reasoning", id: "rs_b", encrypted_content: "enc-b", summary: [] });
+    expect(input[3]).toEqual({ type: "message", role: "assistant", content: "Going." });
+  });
+
   it("skips reasoning items with empty summaries", async () => {
     // Models can return reasoning items with no summary parts when reasoning
     // happened but produced nothing the model wanted to summarize. Don't emit
@@ -593,6 +764,120 @@ describe("Responses API integration", () => {
       // Multi-part summaries get joined with the same separator as the
       // non-streaming path uses for `output[i].summary` entries.
       expect(result.thinkingText).toBe("Picking a path.\n\nSteeling the player.");
+    });
+
+    it("captures encrypted reasoning from `output_item.done` events", async () => {
+      // The SDK's response accumulator is unreliable for reasoning items
+      // (the same hazard that affects `summary[]` also affects
+      // `encrypted_content` on finalResponse). The streaming path
+      // captures encrypted blobs directly from `output_item.done`
+      // events. This test puts an EMPTY reasoning item on finalResponse
+      // to prove the event-driven capture is what populates the
+      // persisted assistant content, not the output walk.
+      const response = fakeResponse({
+        output: [
+          { id: "rs_1", type: "reasoning", summary: [] },
+          {
+            id: "msg_1",
+            type: "message",
+            role: "assistant",
+            status: "completed",
+            content: [{ type: "output_text", text: "Onward.", annotations: [] }],
+          },
+        ],
+      });
+      const events = [
+        { type: "response.output_text.delta", delta: "Onward." },
+        { type: "response.reasoning_summary_text.done", text: "Weighed it." },
+        {
+          type: "response.output_item.done",
+          item: {
+            id: "rs_1",
+            type: "reasoning",
+            encrypted_content: "enc-stream-1",
+            summary: [{ type: "summary_text", text: "Weighed it." }],
+          },
+        },
+        { type: "response.completed", response },
+      ];
+
+      let eventIdx = 0;
+      mockResponses.stream.mockReturnValue({
+        [Symbol.asyncIterator]: () => ({
+          next: async () =>
+            eventIdx < events.length
+              ? { value: events[eventIdx++], done: false }
+              : { value: undefined, done: true },
+        }),
+        finalResponse: vi.fn().mockResolvedValue(response),
+      });
+
+      const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+      const result = await provider.stream(baseChatParams({ thinking: { effort: "high" } }), () => {});
+
+      expect(result.text).toBe("Onward.");
+      expect(result.thinkingText).toBe("Weighed it.");
+      expect(result.assistantContent).toEqual([
+        { type: "text", text: "Onward." },
+        { type: "reasoning", id: "rs_1", encryptedContent: "enc-stream-1", summary: ["Weighed it."] },
+      ]);
+    });
+
+    it("dedupes encrypted reasoning by item id (last-write-wins)", async () => {
+      // OpenAI shouldn't emit `output_item.done` twice for the same id, but
+      // SDK retries or reconnect logic could; replaying duplicate reasoning
+      // items on the next turn would have OpenAI reject the request for
+      // duplicate ids. Map-by-id makes that defensive: a second `.done` for
+      // the same id overwrites the earlier capture rather than appending.
+      const response = fakeResponse({
+        output: [
+          { id: "rs_1", type: "reasoning", summary: [] },
+          {
+            id: "msg_1",
+            type: "message",
+            role: "assistant",
+            status: "completed",
+            content: [{ type: "output_text", text: "Onward.", annotations: [] }],
+          },
+        ],
+      });
+      const events = [
+        { type: "response.output_text.delta", delta: "Onward." },
+        {
+          type: "response.output_item.done",
+          item: { id: "rs_1", type: "reasoning", encrypted_content: "enc-first", summary: [] },
+        },
+        // Hypothetical duplicate — should overwrite, not append.
+        {
+          type: "response.output_item.done",
+          item: { id: "rs_1", type: "reasoning", encrypted_content: "enc-second", summary: [] },
+        },
+        { type: "response.completed", response },
+      ];
+
+      let eventIdx = 0;
+      mockResponses.stream.mockReturnValue({
+        [Symbol.asyncIterator]: () => ({
+          next: async () =>
+            eventIdx < events.length
+              ? { value: events[eventIdx++], done: false }
+              : { value: undefined, done: true },
+        }),
+        finalResponse: vi.fn().mockResolvedValue(response),
+      });
+
+      const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+      const result = await provider.stream(baseChatParams({ thinking: { effort: "high" } }), () => {});
+
+      // Exactly one reasoning part, holding the most recent blob.
+      const reasoningParts = result.assistantContent.filter((p) => p.type === "reasoning");
+      expect(reasoningParts).toHaveLength(1);
+      expect(reasoningParts[0]).toEqual({
+        type: "reasoning",
+        id: "rs_1",
+        encryptedContent: "enc-second",
+        summary: [],
+      });
     });
 
     it("leaves thinkingText undefined when no summary events fire", async () => {

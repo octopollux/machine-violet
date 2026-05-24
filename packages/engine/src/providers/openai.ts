@@ -138,7 +138,17 @@ async function responsesStream(
   // the API did stream summary parts. Walking finalResponse for summaries
   // is therefore unreliable on the streaming path; capture them from the
   // events directly. See node_modules/openai/lib/responses/ResponseStream.mjs.
+  //
+  // Same hazard for `encrypted_content` (only present when the request set
+  // `include: ["reasoning.encrypted_content"]`): we don't trust the
+  // finalResponse snapshot for reasoning items at all. The blob is
+  // emitted on `response.output_item.done` events alongside the final
+  // reasoning item shape, so capture it directly from there. Keyed by id
+  // (last-write-wins) so a hypothetical retry or duplicate `done` for the
+  // same item can't replay the same reasoning input twice on the next turn
+  // — the Responses API would reject duplicate item ids.
   const reasoningParts: string[] = [];
+  const encryptedReasoningById = new Map<string, { id: string; encryptedContent: string; summary: string[] }>();
   for await (const event of stream) {
     if (event.type === "response.output_text.delta") {
       text += event.delta;
@@ -148,6 +158,22 @@ async function responsesStream(
       // also accumulate `.delta` events, but `.done` is authoritative and
       // simpler — and the API guarantees a `.done` per part.
       if (event.text) reasoningParts.push(event.text);
+    } else if (event.type === "response.output_item.done") {
+      // Reasoning items only show their `encrypted_content` once they're
+      // fully done. Other item types (message, function_call) are handled
+      // in `fromResponsesResponseWithText` via the finalResponse walk —
+      // the SDK accumulator IS reliable for those.
+      if (event.item.type === "reasoning" && event.item.encrypted_content) {
+        const summary: string[] = [];
+        for (const sum of event.item.summary ?? []) {
+          if (sum.type === "summary_text" && sum.text) summary.push(sum.text);
+        }
+        encryptedReasoningById.set(event.item.id, {
+          id: event.item.id,
+          encryptedContent: event.item.encrypted_content,
+          summary,
+        });
+      }
     }
   }
 
@@ -155,8 +181,9 @@ async function responsesStream(
   // finalResponse() returns ParsedResponse which lacks the output_text
   // convenience property, so we build the result from the accumulated text
   // and parse tool calls from the output items directly. Reasoning is
-  // passed in from the event-driven capture above.
-  return fromResponsesResponseWithText(response, text, reasoningParts);
+  // passed in from the event-driven capture above. Map preserves insertion
+  // order, which matches the order ids first appeared in the stream.
+  return fromResponsesResponseWithText(response, text, reasoningParts, [...encryptedReasoningById.values()]);
 }
 
 // ---------------------------------------------------------------------------
@@ -171,6 +198,9 @@ interface ResponsesParams {
   max_output_tokens?: number;
   reasoning?: Reasoning;
   store?: boolean;
+  /** Optional `include` selectors — currently we only use this to opt into
+   * `reasoning.encrypted_content` when a reasoning effort is requested. */
+  include?: OpenAI.Responses.ResponseIncludable[];
 }
 
 function toResponsesParams(params: ChatParams): ResponsesParams {
@@ -203,8 +233,14 @@ function toResponsesParams(params: ChatParams): ResponsesParams {
     }));
   }
 
-  // Reasoning config
+  // Reasoning config. When any effort is set we also opt into encrypted
+  // reasoning blobs (`include: ["reasoning.encrypted_content"]`) so the
+  // model's chain-of-thought survives across turns. Without this, with
+  // `store: false`, every turn restarts cold — the symptom is the model
+  // re-deriving "do I have roll_dice, am I the DM?" deep into a campaign.
+  // The blobs are opaque and we replay them via `toResponsesInput`.
   let reasoning: Reasoning | undefined;
+  let include: OpenAI.Responses.ResponseIncludable[] | undefined;
   if (params.thinking?.effort) {
     const effortMap: Record<string, ReasoningEffort> = {
       low: "low",
@@ -216,6 +252,7 @@ function toResponsesParams(params: ChatParams): ResponsesParams {
       effort: effortMap[params.thinking.effort] ?? "medium",
       summary: "concise",
     };
+    include = ["reasoning.encrypted_content"];
   }
 
   return {
@@ -225,6 +262,7 @@ function toResponsesParams(params: ChatParams): ResponsesParams {
     ...(tools ? { tools } : {}),
     max_output_tokens: params.maxTokens,
     ...(reasoning ? { reasoning } : {}),
+    ...(include ? { include } : {}),
     store: false,
   };
 }
@@ -245,9 +283,26 @@ function toResponsesInput(msg: NormalizedMessage): OpenAI.Responses.ResponseInpu
 
   if (msg.role === "assistant") {
     const items: OpenAI.Responses.ResponseInputItem[] = [];
-    let pendingText = "";
+
+    // Reasoning items must precede the message/function_call items they
+    // reason about, per the Responses API contract. Emit them all up front
+    // in capture order. (`assistantContent` may store them anywhere in the
+    // array depending on path — streaming pushes them late, non-streaming
+    // pushes them early; the relative order among reasoning items is what
+    // matters, and that's preserved here.)
+    for (const part of msg.content) {
+      if (part.type === "reasoning") {
+        items.push({
+          type: "reasoning",
+          id: part.id,
+          encrypted_content: part.encryptedContent,
+          summary: part.summary.map((text) => ({ type: "summary_text", text })),
+        });
+      }
+    }
 
     // Iterate in order to preserve text ↔ tool_use interleaving
+    let pendingText = "";
     for (const part of msg.content) {
       if (part.type === "text") {
         pendingText += part.text;
@@ -264,6 +319,7 @@ function toResponsesInput(msg: NormalizedMessage): OpenAI.Responses.ResponseInpu
           arguments: JSON.stringify(part.input),
         });
       }
+      // Reasoning parts already emitted above.
     }
     // Flush trailing text
     if (pendingText) {
@@ -320,14 +376,18 @@ function fromResponsesResponse(response: OAIResponse): ChatResult {
  * `summary` arrays.
  *
  * Reasoning is joined into `thinkingText` for both paths. Reasoning items
- * are never pushed to `assistantContent` — that's persisted conversation
- * history, and per OpenAI's guidance the reasoning text must not be sent
- * back to the model.
+ * with an `encrypted_content` blob ARE pushed to `assistantContent` so they
+ * round-trip through conversation persistence and get replayed on the next
+ * turn via `toResponsesInput` — this is what lets `store: false` + reasoning
+ * models keep their chain-of-thought across calls. The opaque encrypted
+ * payload is what OpenAI accepts back; the human-readable summary text
+ * continues to surface only through `thinkingText`.
  */
 function fromResponsesResponseWithText(
   response: OAIResponse,
   accumulatedText?: string,
   accumulatedReasoning?: string[],
+  accumulatedEncryptedReasoning?: { id: string; encryptedContent: string; summary: string[] }[],
 ): ChatResult {
   const toolCalls: NormalizedToolCall[] = [];
   const assistantContent: ContentPart[] = [];
@@ -338,6 +398,21 @@ function fromResponsesResponseWithText(
   if (useAccumulatedText && accumulatedText) {
     textParts.push(accumulatedText);
     assistantContent.push({ type: "text", text: accumulatedText });
+  }
+  // Streaming path: surface encrypted reasoning items captured from
+  // `output_item.done` events. The relative order of `reasoning` and other
+  // content parts in `assistantContent` is purely cosmetic — `toResponsesInput`
+  // re-sorts reasoning items ahead of text/tool_use when replaying, which is
+  // the order the Responses API requires.
+  if (accumulatedEncryptedReasoning) {
+    for (const r of accumulatedEncryptedReasoning) {
+      assistantContent.push({
+        type: "reasoning",
+        id: r.id,
+        encryptedContent: r.encryptedContent,
+        summary: r.summary,
+      });
+    }
   }
 
   for (const item of response.output) {
@@ -353,16 +428,34 @@ function fromResponsesResponseWithText(
       toolCalls.push({ id: item.call_id, name: item.name, input });
       assistantContent.push({ type: "tool_use", id: item.call_id, name: item.name, input });
     } else if (item.type === "reasoning" && accumulatedReasoning === undefined) {
-      // Non-streaming path only: walk the populated summary array. The
-      // `content` field (full reasoning text) is only populated when the
-      // request opts in via `include: ["reasoning.encrypted_content"]` —
-      // we don't, so summary is what we get and what we surface.
-      // Streaming captures these via dedicated events instead because the
-      // SDK accumulator leaves these arrays empty.
+      // Non-streaming path. The streaming path's SDK accumulator is
+      // unreliable for reasoning items (see the responsesStream comment),
+      // so for streaming we get summary text via events and encrypted
+      // blobs via `output_item.done` events — both arrive via the
+      // `accumulated*` parameters and we skip the finalResponse walk.
+      const summaryTexts: string[] = [];
       for (const sum of item.summary ?? []) {
         if (sum.type === "summary_text" && sum.text) {
-          reasoningParts.push(sum.text);
+          summaryTexts.push(sum.text);
         }
+      }
+      reasoningParts.push(...summaryTexts);
+
+      // Encrypted-content replay. When the request set
+      // `include: ["reasoning.encrypted_content"]` (i.e. any reasoning
+      // effort was requested), the response carries an opaque blob per
+      // reasoning item. Persist it on the assistant turn so the next call
+      // can pass it back as a `reasoning` input item — that's what keeps
+      // chain-of-thought alive across turns with `store: false`. If the
+      // blob isn't present we don't push anything; persisting an empty
+      // shell would let it round-trip back as an invalid input item.
+      if (item.encrypted_content) {
+        assistantContent.push({
+          type: "reasoning",
+          id: item.id,
+          encryptedContent: item.encrypted_content,
+          summary: summaryTexts,
+        });
       }
     }
   }

@@ -58,6 +58,22 @@ describe("estimateMessageTokens", () => {
     const tokens = estimateMessageTokens(userMsg("Hello world"));
     expect(tokens).toBeGreaterThan(0);
   });
+
+  it("counts reasoning blocks toward the total", () => {
+    // Encrypted reasoning blobs are opaque but get replayed verbatim on
+    // every subsequent turn, so retention math must include them or
+    // ConversationManager will keep unbounded history when reasoning is on.
+    // The blob below is 400 chars → ~100 tokens at the 4-chars-per-token
+    // heuristic; the summary text adds a few more; +4 for role overhead.
+    const blob = "a".repeat(400);
+    const msg = {
+      role: "assistant" as const,
+      content: [
+        { type: "reasoning" as const, id: "rs_1", encryptedContent: blob, summary: ["short"] },
+      ],
+    };
+    expect(estimateMessageTokens(msg)).toBeGreaterThanOrEqual(100);
+  });
 });
 
 describe("ConversationManager", () => {

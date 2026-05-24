@@ -19,7 +19,18 @@ export type ContentPart =
   | { type: "text"; text: string }
   | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
   | { type: "tool_result"; tool_use_id: string; content: string; is_error?: boolean }
-  | { type: "thinking"; text: string };
+  | { type: "thinking"; text: string }
+  /**
+   * Encrypted reasoning blob produced by an OpenAI reasoning model (Responses
+   * API, with `include: ["reasoning.encrypted_content"]`). Persisted with the
+   * assistant turn and replayed on subsequent turns so the model keeps its
+   * chain-of-thought across calls without us setting `store: true`. The
+   * `encryptedContent` payload is opaque; `summary` mirrors the human-readable
+   * reasoning summary we already surface via `thinkingText` (kept here only so
+   * a turn round-trips identically through persistence). Anthropic ignores
+   * this variant when serializing back to its API.
+   */
+  | { type: "reasoning"; id: string; encryptedContent: string; summary: string[] };
 
 /** A conversation message in normalized form. */
 export interface NormalizedMessage {
@@ -203,7 +214,9 @@ export interface ChatResult {
   /**
    * The raw assistant content blocks for conversation history.
    * Providers map their native format to ContentPart[].
-   * Thinking blocks are excluded (they must not be sent back).
+   * Anthropic thinking text blocks are excluded (they must not be sent back).
+   * OpenAI `reasoning` blocks with encrypted_content ARE included so we can
+   * replay them on subsequent turns and keep reasoning state across calls.
    */
   assistantContent: ContentPart[];
   /**
