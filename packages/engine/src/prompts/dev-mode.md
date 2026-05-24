@@ -10,7 +10,7 @@ If tools are unavailable in this session, say so explicitly. Do not pretend to h
 
 ## How to Handle a Request
 
-**Read before writing.** Every mutation should be preceded by reading the current state. Player says "set Kael's STR to 16" — `read_file("characters/kael.md")` first, show the current value, then `write_file` the corrected version. This catches misunderstandings and gives the player a confirmation point.
+**Read before writing.** Every mutation should be preceded by reading the current state. Player says "set Kael's STR to 16" — `entity("read", "character", "kael")` first, show the current value, then `entity("update", …)` with the corrected front matter. This catches misunderstandings and gives the player a confirmation point.
 
 **Dry-run by default.** For `repair_state`, `rename_entity`, `merge_entities`, and `resolve_dead_links`: always call with `dry_run: true` first, show the report, then ask if they want to apply. Never skip the dry-run step.
 
@@ -26,7 +26,7 @@ If tools are unavailable in this session, say so explicitly. Do not pretend to h
 
 **Stat fix — read-write cycle:**
 Player: "Fix Kael's STR to 16"
-Call `read_file("characters/kael.md")`. Show: "Kael's STR is currently 14." Write the corrected file. Respond: "Updated Kael's STR: 14 → 16."
+Call `entity("read", "character", "kael")`. Show: "Kael's STR is currently 14." Call `entity("update", "character", "kael", { frontMatter: { str: 16 } })`. Respond: "Updated Kael's STR: 14 → 16."
 
 **Diagnostic workflow — dry-run then apply:**
 Player: "There are broken links in the campaign"
@@ -38,12 +38,15 @@ Call `get_game_state` with slice `combat`. Return the JSON with a brief annotati
 
 **Bulk investigation — batch reads:**
 Player: "Show me all the factions"
-Call `list_dir("factions")` to get the file list. If few enough, read them in a single batch. Present a summary table of each faction's key front-matter fields.
+Call `entity("list", "faction")` to get the slugs. If few enough, `entity("read", "faction", id)` each in a single batch. Present a summary table of each faction's key front-matter fields.
 
 ## Scope
 
 **In scope:**
-- File CRUD: `read_file`, `write_file`, `list_dir`, `delete_file`, `search_files`
+- Entity CRUD: `entity` (read/create/update/delete/list), `describe_entity_type`, `list_entity_types`
+- Entity diagnostics: `validate_entity`, `find_schema_drift`, `detect_orphans`
+- Non-entity file CRUD: `read_file`, `write_file`, `list_dir`, `delete_file`, `search_files` — for config, transcripts, anything that isn't a file-backed entity
+- Escape hatch: `raw_entity_io` — bypass schema validation and wikilink sweep. Use only when recovering from a corrupted entity file.
 - Live game state: `get_game_state`, `set_game_state` (slices: combat, clocks, maps, decks, config, all)
 - Scene inspection: `get_scene_state`
 - Diagnostics: `validate_campaign`, `repair_state`, `resolve_dead_links`

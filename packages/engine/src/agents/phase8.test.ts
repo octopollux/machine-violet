@@ -447,8 +447,10 @@ describe("new Phase 8 tools", () => {
     expect(registry.has("promote_character")).toBe(true);
   });
 
-  it("registry has 29 tools total", () => {
+  it("registry has 35 tools total", () => {
     const registry = createTestRegistry();
-    expect(registry.size).toBe(29);
+    // Bumped from 29 → 35 by the entity-tool rework: entity, describe_entity_type,
+    // list_entity_types, validate_entity, find_schema_drift, detect_orphans.
+    expect(registry.size).toBe(35);
   });
 });

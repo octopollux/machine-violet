@@ -54,6 +54,8 @@ import { writeDebugDump } from "../tools/filesystem/debug-dump.js";
 import { styleTheme } from "./subagents/theme-styler.js";
 import { SCENE_TRACKER_CADENCE } from "./subagents/scene-tracker.js";
 import { ResolveSession } from "./resolve-session.js";
+import { EntityStore } from "../entities/store.js";
+import { buildEntityToolHandler, ENTITY_TOOL_NAME_SET } from "../entities/tools.js";
 import type { ActionDeclaration, StateDelta } from "@machine-violet/shared/types/resolve-session.js";
 
 // --- Types ---
@@ -95,6 +97,14 @@ export class GameEngine {
   private injectionRegistry: InjectionRegistry;
   private terminalDims: TerminalDims | undefined;
   private resolveSession: ResolveSession | null = null;
+  /**
+   * Entity store + dispatch handler — owns all file-backed entity I/O for
+   * this session. Constructed once because the store caches its index/drift
+   * scans and invalidates on writes. Lazy-init in `getEntityToolDispatcher`
+   * so test sites that bypass agent dispatch don't pay for it.
+   */
+  private entityStore: EntityStore | null = null;
+  private entityToolDispatcher: ((name: string, input: Record<string, unknown>) => Promise<import("./tool-registry.js").ToolResult | null>) | null = null;
 
   /** Tracks the last failed input so the player can press Enter to retry. */
   private lastFailedInput: { characterName: string; text: string; opts?: { fromAI?: boolean; skipTranscript?: boolean } } | null = null;
@@ -1446,11 +1456,37 @@ export class GameEngine {
     };
   }
 
+  /**
+   * Lazily build the entity-tool dispatcher. Stable across turns so the
+   * underlying store's scan/drift caches survive between calls.
+   */
+  private getEntityToolDispatcher(): (name: string, input: Record<string, unknown>) => Promise<import("./tool-registry.js").ToolResult | null> {
+    if (!this.entityToolDispatcher) {
+      this.entityStore = new EntityStore(this.gameState.campaignRoot, this.fileIO);
+      this.entityToolDispatcher = buildEntityToolHandler(this.entityStore, {
+        sceneNumber: this.sceneManager.getScene().sceneNumber,
+      });
+    }
+    return this.entityToolDispatcher;
+  }
+
+  /** Public accessor — used by OOC/Dev wiring that needs the live store. */
+  getEntityStore(): EntityStore {
+    this.getEntityToolDispatcher();
+    return this.entityStore as EntityStore;
+  }
+
   /** Handle tools that require async work (subagent spawning, I/O). */
   private async handleAsyncToolInternal(
     name: string,
     input: Record<string, unknown>,
   ): Promise<import("./tool-registry.js").ToolResult | null> {
+    // Entity tools — encapsulated dispatcher, owns the store, cache lives
+    // for the GameEngine's lifetime.
+    if (ENTITY_TOOL_NAME_SET.has(name)) {
+      return this.getEntityToolDispatcher()(name, input);
+    }
+
     if (name === "resolve_turn") {
       if (!this.resolveSession) {
         return {

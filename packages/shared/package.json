@@ -21,6 +21,10 @@
     "./utils/*.js": {
       "source": "./src/utils/*.ts",
       "default": "./dist/utils/*.js"
+    },
+    "./schemas/entities/*.js": {
+      "source": "./src/schemas/entities/*.ts",
+      "default": "./dist/schemas/entities/*.js"
     }
   },
   "scripts": {
