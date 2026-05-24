@@ -7,7 +7,7 @@ import { themeColor } from "../tui/themes/color-resolve.js";
 
 export interface DiscordSettingsPhaseProps {
   theme: ResolvedTheme;
-  currentSetting: boolean | null;
+  currentSetting: boolean;
   onSave: (enabled: boolean) => void;
   onBack: () => void;
 }
@@ -21,7 +21,7 @@ export function DiscordSettingsPhase({
   onBack,
 }: DiscordSettingsPhaseProps) {
   const { columns: cols, rows: termRows } = useWindowSize();
-  const [selectedIndex, setSelectedIndex] = useState(currentSetting === false ? 1 : 0);
+  const [selectedIndex, setSelectedIndex] = useState(currentSetting ? 0 : 1);
 
   useInput((_input, key) => {
     if (key.escape) {

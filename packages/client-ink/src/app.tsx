@@ -108,7 +108,7 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
   const [apiKeyValid, setApiKeyValid] = useState(true);
   const [apiKeyStatus, setApiKeyStatus] = useState<string | undefined>(undefined);
   const [archivedCampaigns, setArchivedCampaigns] = useState<ArchivedCampaignEntry[]>([]);
-  const [discordEnabled, setDiscordEnabled] = useState<boolean | null>(null);
+  const [discordEnabled, setDiscordEnabled] = useState<boolean>(true);
   const [devModeEnabled, setDevModeEnabled] = useState(false);
   const [showVerbose, setShowVerbose] = useState(false);
   const settingsLoaded = useRef(false);
@@ -332,10 +332,9 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
   // Sync Discord opt-in changes into the controller (and the closure ref).
   useEffect(() => {
     const wasEnabled = discordEnabledRef.current;
-    const nowEnabled = discordEnabled === true;
-    discordEnabledRef.current = nowEnabled;
-    if (nowEnabled && !wasEnabled) discordControllerRef.current.enable();
-    else if (!nowEnabled && wasEnabled) discordControllerRef.current.disable();
+    discordEnabledRef.current = discordEnabled;
+    if (discordEnabled && !wasEnabled) discordControllerRef.current.enable();
+    else if (!discordEnabled && wasEnabled) discordControllerRef.current.disable();
   }, [discordEnabled]);
 
   // --- Management helpers ---
@@ -411,7 +410,6 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
         errorMsg={errorMessage || null}
         apiKeyValid={apiKeyValid}
         apiKeyStatus={apiKeyStatus}
-        discordSettingUnset={discordEnabled === null}
         devModeEnabled={devModeEnabled}
         onNewCampaign={() => {
           setSessionKey((k) => k + 1);
@@ -458,10 +456,6 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
         onAddContent={() => { /* not yet migrated */ }}
         onSettings={() => setPhase("settings")}
         onSettingsApiKeys={() => { refreshConnections(); setPhase("settings_apikeys"); }}
-        onDiscordSettings={() => {
-          apiClientRef.current.getDiscordSettings().then((s) => setDiscordEnabled(s.enabled)).catch(() => { /* ignore */ });
-          setPhase("discord_settings");
-        }}
         onQuit={() => process.exit(0)}
       />
     );

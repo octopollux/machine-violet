@@ -666,8 +666,8 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
       response: { 200: DiscordSettings },
     },
   }, async (request) => {
-    const { enabled } = (request.body as { enabled: boolean }) ?? {};
-    const settings = { enabled: enabled === true };
+    const { enabled } = request.body as { enabled: boolean };
+    const settings = { enabled };
     saveDiscordSettings(server.configDir, settings);
     return settings;
   });

@@ -15,21 +15,21 @@ afterEach(() => {
 });
 
 describe("loadDiscordSettings", () => {
-  it("returns { enabled: null } when file is missing", () => {
+  it("defaults to enabled when file is missing", () => {
     const result = loadDiscordSettings(tempDir);
-    expect(result).toEqual({ enabled: null });
+    expect(result).toEqual({ enabled: true });
   });
 
-  it("returns { enabled: null } when file is corrupt", () => {
+  it("defaults to enabled when file is corrupt", () => {
     writeFileSync(join(tempDir, "discord-settings.json"), "not json", "utf-8");
     const result = loadDiscordSettings(tempDir);
-    expect(result).toEqual({ enabled: null });
+    expect(result).toEqual({ enabled: true });
   });
 
-  it("returns { enabled: null } when enabled field is not a boolean", () => {
+  it("defaults to enabled when enabled field is not a boolean", () => {
     writeFileSync(join(tempDir, "discord-settings.json"), JSON.stringify({ enabled: "yes" }), "utf-8");
     const result = loadDiscordSettings(tempDir);
-    expect(result).toEqual({ enabled: null });
+    expect(result).toEqual({ enabled: true });
   });
 });
 

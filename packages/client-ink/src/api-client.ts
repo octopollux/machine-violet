@@ -326,7 +326,7 @@ export class ApiClient {
     return this.fetch("/manage/settings", { method: "PUT", body: settings });
   }
 
-  async getDiscordSettings(): Promise<{ enabled: boolean | null }> {
+  async getDiscordSettings(): Promise<{ enabled: boolean }> {
     return this.get("/manage/discord");
   }
 

@@ -610,7 +610,7 @@ In addition to campaign-scoped state, Machine Violet maintains machine-scoped co
 │                              apiKey (empty for openai-chatgpt — Codex owns its own token store at ~/.codex/auth.json),
 │                              optional baseUrl, optional chatgptAccount {id, email?, planType?}, discovered models,
 │                              source (env/manual/oauth). Tier assignments (large/medium/small → connectionId + modelId).
-├── discord-settings.json      Discord integration: enabled (true), disabled (false), or not-yet-asked (null).
+├── discord-settings.json      Discord integration: enabled (true) or disabled (false). On by default; absent file means enabled.
 └── model-overrides.json       User overrides merged on top of shipped known-models.json.
                                Per-model: pricing, capabilities, context window, tier defaults.
 ```
