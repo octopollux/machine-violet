@@ -145,4 +145,43 @@ describe("ThemedSideFrame", () => {
       s.replace(new RegExp(`${String.fromCharCode(0x1b)}\\[[0-9;]*m`, "g"), "");
     expect(stripAnsi(framWithGrad()!)).toBe(stripAnsi(framNoGrad()!));
   });
+
+  it("strips *bold* markers from centerText and preserves the plain text width", () => {
+    const { lastFrame: withMarkers } = render(
+      <ThemedHorizontalBorder
+        theme={noGrad}
+        width={60}
+        position="bottom"
+        centerText="*Enter*: select"
+      />,
+    );
+    const { lastFrame: withoutMarkers } = render(
+      <ThemedHorizontalBorder
+        theme={noGrad}
+        width={60}
+        position="bottom"
+        centerText="Enter: select"
+      />,
+    );
+    const marked = withMarkers()!;
+    expect(marked).not.toContain("*");
+    expect(marked).toContain("Enter: select");
+    // The composer must measure by stripped width; the rendered frames
+    // should be byte-identical aside from styling (which ink-testing-library
+    // strips from lastFrame). So both renders must produce the same plain text.
+    expect(marked).toBe(withoutMarkers());
+  });
+
+  it("treats an unmatched *bold marker as a literal asterisk", () => {
+    const { lastFrame } = render(
+      <ThemedHorizontalBorder
+        theme={noGrad}
+        width={60}
+        position="bottom"
+        centerText="rate is 5* of max"
+      />,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("5* of max");
+  });
 });

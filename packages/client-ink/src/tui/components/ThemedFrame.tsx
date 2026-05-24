@@ -17,6 +17,54 @@ import { colorizeSegments, mirrorT, applyGradient, hexToOklch } from "../color/i
 import type { GradientPreset } from "../color/index.js";
 import { themeColor } from "../themes/color-resolve.js";
 
+interface BoldSegment {
+  text: string;
+  bold: boolean;
+}
+
+/**
+ * Parse `*bold*` markers out of frame center text. Returns the plain string
+ * (markers stripped) and a segment list for emphasized rendering.
+ *
+ * The composer measures by string length to center text on the border, so
+ * the marker characters must be gone before it sees the input — width math
+ * is done against `plain`, decoration is applied later when we draw the
+ * middle span. Used today for the compendium modal footer to bold key
+ * names (`*Tab*: next  *Enter*: follow`).
+ */
+function parseBoldMarkers(text: string): { plain: string; segments: BoldSegment[] } {
+  const segments: BoldSegment[] = [];
+  let plain = "";
+  let i = 0;
+  while (i < text.length) {
+    const open = text.indexOf("*", i);
+    if (open === -1) {
+      const tail = text.slice(i);
+      if (tail) segments.push({ text: tail, bold: false });
+      plain += tail;
+      break;
+    }
+    if (open > i) {
+      const lead = text.slice(i, open);
+      segments.push({ text: lead, bold: false });
+      plain += lead;
+    }
+    const close = text.indexOf("*", open + 1);
+    if (close === -1) {
+      // Unmatched marker — treat as literal so a stray `*` doesn't eat the rest.
+      const tail = text.slice(open);
+      segments.push({ text: tail, bold: false });
+      plain += tail;
+      break;
+    }
+    const inner = text.slice(open + 1, close);
+    segments.push({ text: inner, bold: true });
+    plain += inner;
+    i = close + 1;
+  }
+  return { plain, segments };
+}
+
 /** Render a string with per-character gradient coloring, or flat if no gradient. */
 function renderGradientRow(
   row: string,
@@ -70,10 +118,20 @@ export const ThemedHorizontalBorder = React.memo(function ThemedHorizontalBorder
   centerText,
   centerTextColor,
 }: ThemedHorizontalBorderProps) {
+  // Parse `*bold*` markers up-front: composer + row matching see the plain
+  // text (so layout math stays correct), while we keep the bold segment
+  // structure for rich rendering of the middle span.
+  const parsedCenters: { plain: string; segments: BoldSegment[] }[] = Array.isArray(centerText)
+    ? centerText.map(parseBoldMarkers)
+    : centerText
+      ? [parseBoldMarkers(centerText)]
+      : [];
+  const plainCenters: string[] = parsedCenters.map((p) => p.plain);
+
   const frame =
     position === "top"
-      ? composeTopFrame(theme.asset, width, centerText)
-      : composeBottomFrame(theme.asset, width, typeof centerText === "string" ? centerText : centerText?.[0]);
+      ? composeTopFrame(theme.asset, width, plainCenters.length > 0 ? plainCenters : undefined)
+      : composeBottomFrame(theme.asset, width, plainCenters[0]);
 
   const borderColor = themeColor(theme, "border");
   const titleColor = centerTextColor ?? themeColor(theme, "title");
@@ -83,16 +141,14 @@ export const ThemedHorizontalBorder = React.memo(function ThemedHorizontalBorder
   // Per-row lookup of which text chunk is on which row. The composer
   // also centers shorter continuations within the longest line's slot,
   // so we trim each chunk to find its actual span in the row string.
-  const centerLines: (string | undefined)[] = Array.isArray(centerText)
-    ? centerText
-    : centerText
-      ? [centerText]
-      : [];
+  const centerLines: (string | undefined)[] = plainCenters;
+  const centerSegments: (BoldSegment[] | undefined)[] = parsedCenters.map((p) => p.segments);
 
   return (
     <Box flexDirection="column">
       {frame.rows.map((row, i) => {
         const rowText = position === "top" ? centerLines[i] : (i === frame.rows.length - 1 ? centerLines[0] : undefined);
+        const rowSegments = position === "top" ? centerSegments[i] : (i === frame.rows.length - 1 ? centerSegments[0] : undefined);
         // If there's center text on this row and a distinct title color, render in parts.
         // The composer centers shorter continuation lines inside the (wider) longest-line
         // slot by inserting extra spaces around the text, so the ` ${rowText} ` substring
@@ -104,6 +160,12 @@ export const ThemedHorizontalBorder = React.memo(function ThemedHorizontalBorder
             const before = row.slice(0, textIdx);
             const middle = rowText;
             const after = row.slice(textIdx + middle.length);
+            const middleSegments = rowSegments && rowSegments.length > 0
+              ? rowSegments
+              : [{ text: middle, bold: false }];
+            const renderMiddle = middleSegments.map((seg, j) => (
+              <Text key={`m${j}`} color={titleColor} bold={seg.bold}>{seg.text}</Text>
+            ));
 
             if (gradient && borderColor) {
               // Gradient the before/after portions with correct offsets
@@ -117,7 +179,7 @@ export const ThemedHorizontalBorder = React.memo(function ThemedHorizontalBorder
                   {beforeSegs.map((seg, j) => (
                     <Text key={`b${j}`} color={seg.color}>{seg.text}</Text>
                   ))}
-                  <Text color={titleColor}>{middle}</Text>
+                  {renderMiddle}
                   {afterSegs.map((seg, j) => (
                     <Text key={`a${j}`} color={seg.color}>{seg.text}</Text>
                   ))}
@@ -128,7 +190,7 @@ export const ThemedHorizontalBorder = React.memo(function ThemedHorizontalBorder
             return (
               <Box key={i}>
                 <Text color={borderColor}>{before}</Text>
-                <Text color={titleColor}>{middle}</Text>
+                {renderMiddle}
                 <Text color={borderColor}>{after}</Text>
               </Box>
             );

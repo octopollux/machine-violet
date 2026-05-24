@@ -1,6 +1,21 @@
 import React from "react";
 import { Text } from "ink";
 import type { FormattingNode, FormattingTag } from "@machine-violet/shared/types/tui.js";
+import { toPlainText } from "./formatting.js";
+
+/** Recover the first nested <color=...> from a wikilink's content. The colorizer
+ *  emits `<wikilink slug=foo><color=#hex>Name</color></wikilink>` for live
+ *  links, so this is how the inverse-selected state finds the entity hue to
+ *  invert against. Returns undefined for content that lacks any color tag. */
+function firstColor(content: FormattingNode[]): string | undefined {
+  for (const node of content) {
+    if (typeof node === "string") continue;
+    if (node.type === "color") return node.color;
+    const nested = firstColor(node.content);
+    if (nested) return nested;
+  }
+  return undefined;
+}
 
 /** Render a FormattingNode tree into React elements for Ink. */
 export function renderNodes(nodes: FormattingNode[]): React.ReactNode[] {
@@ -31,9 +46,20 @@ function renderTag(tag: FormattingTag): React.ReactNode {
       return <Text underline>{children}</Text>;
     case "color":
       return <Text color={tag.color}>{children}</Text>;
-    case "wikilink":
-      // Render-only tag; future navigation will read `tag.target` from the AST.
-      return <Text>{children}</Text>;
+    case "wikilink": {
+      // Live wikilinks normally pass through inert (the entity hue lives on
+      // an inner <color> tag). Navigation in CompendiumModal marks the
+      // cursored link with `selected` and unresolvable links with `broken`.
+      const broken = tag.broken === true;
+      const selected = tag.selected === true;
+      if (!broken && !selected) return <Text>{children}</Text>;
+      // For both decorated states we render the visible text directly so
+      // `inverse`/red can be applied without an inner color tag overriding
+      // them. The slug is preserved on the AST tag itself, not in children.
+      const text = toPlainText(tag.content);
+      const color = broken ? "red" : firstColor(tag.content);
+      return <Text color={color} inverse={selected} bold={selected}>{text}</Text>;
+    }
     case "center":
     case "right":
       // Alignment is handled at the NarrativeLine level when this is a

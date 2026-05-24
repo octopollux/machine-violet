@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState, useCallback, useEffect, forwardRef } from "react";
+import React, { useMemo, useRef, useState, useCallback, useEffect, forwardRef, useImperativeHandle } from "react";
 import { useInput, Box, Text } from "ink";
 import { ScrollView } from "ink-scroll-view";
 import type { ScrollViewRef } from "ink-scroll-view";
@@ -9,11 +9,19 @@ import { themeColor, deriveModalTheme } from "../themes/color-resolve.js";
 import { stringWidth } from "../frames/index.js";
 import { wrapNodes, toPlainText } from "../formatting.js";
 import { renderNodes } from "../render-nodes.js";
-import { useScrollHandle } from "../hooks/useScrollHandle.js";
 import type { ScrollHandle } from "../hooks/useScrollHandle.js";
 import { scrollAmount } from "../components/NarrativeArea.js";
 
-export type CenteredModalHandle = ScrollHandle;
+/**
+ * Handle exposed via forwardRef. Extends the shared ScrollHandle with
+ * `ensureLineVisible`, which scrolls the modal so the target row sits inside
+ * the viewport with a small margin — used by CompendiumModal to keep the
+ * cursored wikilink onscreen as the user Tabs through links.
+ */
+export interface CenteredModalHandle extends ScrollHandle {
+  /** Scroll so `lineIndex` (0-based) is within the visible window. */
+  ensureLineVisible(lineIndex: number): void;
+}
 
 /**
  * Bottom-row width of the bottom-frame fixed parts (corners + separators).
@@ -26,6 +34,31 @@ function bottomFrameOverhead(asset: ThemeAsset): number {
   const { corner_bl, corner_br, separator_left_bottom, separator_right_bottom } = asset.components;
   return lastRowWidth(corner_bl) + lastRowWidth(corner_br) +
     lastRowWidth(separator_left_bottom) + lastRowWidth(separator_right_bottom);
+}
+
+/**
+ * Compute the inner content width a CenteredModal would use for a given
+ * screen width + sizing options. Exported so callers that need to pre-wrap
+ * styled content (e.g. CompendiumModal stabilising wikilink row indices for
+ * auto-scroll) can do so at exactly the width CenteredModal will render at.
+ *
+ * Keeps the math in lockstep — divergence here would silently break
+ * pre-wrap-driven scroll targeting.
+ */
+export function computeModalInnerWidth(
+  theme: ResolvedTheme,
+  screenWidth: number,
+  opts: { minWidth?: number; maxWidth?: number; widthFraction?: number; footer?: string } = {},
+): number {
+  const { minWidth = 40, maxWidth = 60, widthFraction = 0.5, footer } = opts;
+  const sideWidth = theme.asset.components.edge_left.width;
+  const sidePadding = 1;
+  const footerFloor = footer
+    ? stringWidth(footer) + 2 + bottomFrameOverhead(theme.asset)
+    : 0;
+  const baseModalWidth = Math.max(minWidth, Math.min(Math.floor(screenWidth * widthFraction), maxWidth));
+  const modalWidth = Math.min(screenWidth, Math.max(baseModalWidth, footerFloor));
+  return modalWidth - 2 * sideWidth - 2 * sidePadding;
 }
 
 /** Word-wrap a single plain-text line to fit within the given width. */
@@ -175,7 +208,32 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
       return () => clearTimeout(timer);
     }, [lineCount, updateScrollState]);
 
-    useScrollHandle(ref, scrollRef);
+    useImperativeHandle(ref, () => ({
+      scrollBy(delta: number) {
+        const sv = scrollRef.current;
+        if (!sv) return;
+        if (delta > 0) {
+          const room = sv.getBottomOffset() - sv.getScrollOffset();
+          if (room <= 0) return;
+          sv.scrollBy(Math.min(delta, room));
+        } else {
+          sv.scrollBy(delta);
+        }
+      },
+      ensureLineVisible(lineIndex: number) {
+        const sv = scrollRef.current;
+        if (!sv || lineIndex < 0) return;
+        const offset = sv.getScrollOffset();
+        const maxOffset = sv.getBottomOffset();
+        if (lineIndex < offset) {
+          // Scrolling up: place the target at the top edge.
+          sv.scrollTo(Math.max(0, Math.min(lineIndex, maxOffset)));
+        } else if (lineIndex >= offset + visibleRows) {
+          // Scrolling down: place the target at the bottom edge.
+          sv.scrollTo(Math.max(0, Math.min(lineIndex - visibleRows + 1, maxOffset)));
+        }
+      },
+    }), [visibleRows]);
 
     // Built-in keyboard handling for read-only scrollable modals.
     const scrollBy = useCallback((delta: number) => {

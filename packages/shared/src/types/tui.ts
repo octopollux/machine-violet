@@ -44,7 +44,18 @@ export type FormattingTag =
   // pipeline so future navigation features (clicking/keyboard-selecting a
   // wikilink to jump to its sheet) have the destination available without
   // re-parsing the source text. Render-only — not authored by LLMs.
-  | { type: "wikilink"; target: string; content: FormattingNode[] };
+  //
+  // `selected` and `broken` are applied by post-processing passes (see
+  // wikilink-nav.ts) to drive Lynx-style keyboard navigation in the
+  // compendium detail view: the cursored link renders inverse; links whose
+  // slug doesn't resolve render red (Wikipedia-style) and are inert on Enter.
+  | {
+      type: "wikilink";
+      target: string;
+      content: FormattingNode[];
+      selected?: boolean;
+      broken?: boolean;
+    };
 
 export type FormattingNode = string | FormattingTag;
 

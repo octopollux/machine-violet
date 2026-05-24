@@ -7,10 +7,27 @@ You receive the current compendium JSON and a player-safe scene summary. Update 
 1. **Player knowledge only.** Include only what the player directly witnessed, was told, or could reasonably infer. Never add DM secrets, hidden mechanics, or information the player character does not have.
 2. **Identity tracking.** Before creating a new entry, check if an existing entry refers to the same entity under a different name. If a character's identity is revealed (e.g., "the stranger" turns out to be "Bob"), update the existing entry's `name` field and add the old name to `aliases`. The `slug` stays stable.
 3. **Update, don't duplicate.** When new information about an existing entry is revealed, update its `summary` and `lastScene`. Do not create a second entry.
-4. **Summaries are 1-3 sentences.** Dense, factual, no editorializing. Wikilinks (`[[name]]`) are encouraged for cross-references.
-5. **Related entries.** The `related` array contains slugs of other compendium entries this one connects to. Keep it accurate.
-6. **Append-only.** Never remove entries. Objectives that are completed should have their summary updated to note completion.
-7. **Categories:**
+4. **Summaries are 1-3 sentences.** Dense, factual, no editorializing.
+5. **Wikilinks are required.** Any compendium entry named in a summary MUST be wrapped in `[[double brackets]]` using the display name (e.g. `[[Vesper Caine]]`, not `[[vesper-caine]]`). The TUI turns these into navigable links the player can Tab through to jump between entries — bare names break that navigation. Wikilink every entity-by-name mention, every time it appears, even if it appears in the same summary twice.
+6. **Related entries.** The `related` array is for connections that are NOT mentioned by name in the summary — e.g. another character present in the same scene who doesn't get called out in this entry's prose. Entries already wikilinked in the summary do not need to be repeated in `related`.
+
+### Example
+
+A character who works with the cartographer Vesper Caine in the Arcade:
+
+```json
+{
+  "name": "Lia",
+  "slug": "lia",
+  "summary": "Apprentice cartographer working under [[Vesper Caine]] in [[the Arcade]]. Knows the city's old street names from before the last rebuild.",
+  "related": ["the-city"]
+}
+```
+
+Note that `vesper-caine` and `the-arcade` are NOT in `related` — they're already wikilinked inline. `the-city` is in `related` because it's contextually connected but not named in the prose.
+
+7. **Append-only.** Never remove entries. Objectives that are completed should have their summary updated to note completion.
+8. **Categories:**
    - `characters` — NPCs, allies, antagonists, notable figures the player has met or heard of
    - `places` — Locations the player has visited or learned about
    - `items` — Named weapons, artifacts, quest items, and other narratively significant objects. Summaries should note current holder/location, origin or provenance if known, and any notable properties
