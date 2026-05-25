@@ -6,7 +6,6 @@ import {
   buildAppConfig,
   validateApiKeyFormat,
 } from "./first-launch.js";
-import { PERSONALITIES, getPersonality, randomPersonality } from "./personalities.js";
 
 describe("first-launch", () => {
   it("detects unconfigured state", () => {
@@ -47,32 +46,5 @@ describe("first-launch", () => {
   });
 });
 
-describe("personalities", () => {
-  it("ships personalities", () => {
-    expect(PERSONALITIES.length).toBeGreaterThanOrEqual(4);
-  });
-
-  it("each personality has name and prompt_fragment", () => {
-    for (const p of PERSONALITIES) {
-      expect(p.name).toBeTruthy();
-      expect(p.prompt_fragment.length).toBeGreaterThan(50);
-    }
-  });
-
-  it("gets personality by name", () => {
-    const chronicler = getPersonality("The Chronicler");
-    expect(chronicler).toBeTruthy();
-    expect(chronicler!.prompt_fragment).toContain("Chronicler");
-  });
-
-  it("returns undefined for unknown personality", () => {
-    expect(getPersonality("Unknown")).toBeUndefined();
-  });
-
-  it("picks random personality", () => {
-    const p = randomPersonality(() => 0);
-    expect(PERSONALITIES).toContain(p);
-  });
-});
-
+// Personality tests moved to personality-loader.test.ts (validates .mvdm files directly).
 // Seed tests moved to world-loader.test.ts (validates .mvworld files directly).

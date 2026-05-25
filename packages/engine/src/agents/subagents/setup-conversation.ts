@@ -2,7 +2,7 @@ import type { SubagentResult } from "../subagent.js";
 import type { SetupResult } from "../setup-agent.js";
 import { generateThemeColor } from "../setup-agent.js";
 import { CAMPAIGN_SCOPES, type CampaignScope } from "@machine-violet/shared/types/config.js";
-import { PERSONALITIES } from "../../config/personalities.js";
+import { loadAllPersonalities, getPersonality } from "../../config/personality-loader.js";
 import { loadAllWorlds, worldSummaries, loadWorldBySlug } from "../../config/world-loader.js";
 import { KNOWN_SYSTEMS, readChargenSection } from "../../config/systems.js";
 import type { SystemComplexity } from "../../config/systems.js";
@@ -185,7 +185,7 @@ function shuffle<T>(arr: readonly T[]): T[] {
  *
  * BP3 (tools) and BP4 (last message) are stamped via cacheHints in runTurn.
  */
-function buildSystemPrompt(model: string, existingPlayers?: KnownPlayer[], userWorldsDir?: string): SystemBlock[] {
+function buildSystemPrompt(model: string, existingPlayers?: KnownPlayer[], userWorldsDir?: string, userPersonalitiesDir?: string): SystemBlock[] {
   const blocks: SystemBlock[] = [];
 
   // ── Tier 1: Global-stable (identical across all sessions) ──
@@ -244,7 +244,8 @@ function buildSystemPrompt(model: string, existingPlayers?: KnownPlayer[], userW
     const extra = s.hasDetail ? " [has detail]" : "";
     return `- **${s.name}** (slug: \`${s.slug}\`) — ${s.summary} (${s.genres.join(", ")})${desc}${extra}`;
   }).join("\n");
-  const personalityList = shuffle(PERSONALITIES).map((p) => {
+  const personalities = loadAllPersonalities(userPersonalitiesDir);
+  const personalityList = shuffle(personalities).map((p) => {
     const desc = p.description ? `: ${p.description}` : "";
     const detail = p.detail ? `\n  Detail: ${p.detail.replace(/\n/g, "\n  ")}` : "";
     return `- **${p.name}**${desc}${detail}`;
@@ -325,11 +326,12 @@ export function createSetupConversation(
   existingPlayers?: KnownPlayer[],
   onRetry?: (status: number, delayMs: number) => void,
   userWorldsDir?: string,
+  userPersonalitiesDir?: string,
 ): SetupConversation {
   // Build per-session system prompt (randomizes seed/personality order).
   // Known players are injected right after the base prompt (before seeds/personalities)
   // so the model sees them close to the flow instructions that reference them.
-  const systemPrompt = buildSystemPrompt(model, existingPlayers, userWorldsDir);
+  const systemPrompt = buildSystemPrompt(model, existingPlayers, userWorldsDir, userPersonalitiesDir);
 
   const messages: NormalizedMessage[] = [];
   const totalUsage: NormalizedUsage = {
@@ -349,9 +351,9 @@ export function createSetupConversation(
   let pendingExtraToolResults: ContentPart[] = [];
 
   function handleFinalize(input: Record<string, unknown>): void {
-    const personalityName = (input.dm_personality as string) || "The Chronicler";
+    const personalityName = (input.dm_personality as string) || "The Unknown";
     const customPrompt = input.dm_personality_prompt as string | undefined;
-    const personality = PERSONALITIES.find((p) => p.name === personalityName)
+    const personality = getPersonality(personalityName, userPersonalitiesDir)
       ?? { name: personalityName, prompt_fragment: customPrompt || `You are ${personalityName}.` };
 
     const characterName = (input.character_name as string) || "Adventurer";

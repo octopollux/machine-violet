@@ -120,7 +120,7 @@ Model selection, campaign init, DM personalities, campaign seeds.
 | `connections.ts` | Multi-provider connection management: load/save/add/remove connections, tier assignments. Supports Anthropic, OpenAI, OpenRouter, custom providers. Persists to `connections.json` |
 | `discord.ts` | Discord integration settings: enabled/disabled state persisted to `discord-settings.json` (on by default) |
 | `model-registry.ts` | Dynamic model registry: shipped `known-models.json` merged with user `model-overrides.json`. Pricing, capabilities, context windows, tier defaults per provider |
-| `personalities.ts` | `PERSONALITIES`, `getPersonality()` — DM personality definitions |
+| `personality-loader.ts` | `loadAllPersonalities()`, `getPersonality()` — loads `.mvdm` DM personality files from `personalities/` (bundled, strict) and `~/.machine-violet/personalities/` (user, lenient) |
 | `seeds.ts` | `SEEDS`, `seedsForGenre()` — campaign premise seeds by genre |
 | `first-launch.ts` | `.env` loading, config paths, API key format validation |
 | `campaign-archive.ts` | `archiveCampaign()`, `unarchiveCampaign()`, `deleteCampaign()`, `listArchivedCampaigns()`, `getCampaignDeleteInfo()` — campaign archival, restoration, and deletion with verification |

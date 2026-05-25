@@ -87,7 +87,7 @@ export function campaignPaths(root: string) {
  * Directories that should exist at the machine-scope root (~/.machine-violet).
  */
 export function machineDirs(homeDir: string): string[] {
-  return [join(homeDir, "players"), join(homeDir, "worlds")];
+  return [join(homeDir, "players"), join(homeDir, "worlds"), join(homeDir, "personalities")];
 }
 
 /**
@@ -99,5 +99,6 @@ export function machinePaths(homeDir: string) {
     player: (name: string) => join(homeDir, "players", `${name}.md`),
     playersDir: join(homeDir, "players"),
     worldsDir: join(homeDir, "worlds"),
+    personalitiesDir: join(homeDir, "personalities"),
   };
 }

@@ -1,32 +1,52 @@
 ---
 name: smoketest
-description: Run the Machine Violet end-to-end smoke test against the local repo. Default scenario is `golden-path` — the full new-campaign → live DM turn cycle, ~5-7 minutes, real LLM API calls. Pass `boot-and-quit` for the cheap precondition (no API key, ~10s). USE THIS SKILL whenever validating cross-cutting changes — anything touching UI flow, session lifecycle, the setup agent, the DM loop, save/load, or any code path that spans server + client + WebSocket — and whenever the user says "smoke test", "/smoketest", "run the harness", "validate end-to-end", "golden path", "run e2e", "did I break it", "is it still working". Type checks and unit tests do not prove the flow works end-to-end; the harness does.
-allowed-tools: Bash(npm run e2e:*), Bash(npm run e2e -- :*), Read
+description: Run the Machine Violet end-to-end smoke test against the local repo. Default scenario is `golden-path` — the full new-campaign → live DM turn cycle, ~5-7 minutes, real LLM API calls. Pass `boot-and-quit` for the cheap precondition (no API key, ~10s). Args are freeform — `golden-path, with The Crossroads as the DM personality` is valid. USE THIS SKILL whenever validating cross-cutting changes — anything touching UI flow, session lifecycle, the setup agent, the DM loop, save/load, or any code path that spans server + client + WebSocket — and whenever the user says "smoke test", "/smoketest", "run the harness", "validate end-to-end", "golden path", "run e2e", "did I break it", "is it still working". Type checks and unit tests do not prove the flow works end-to-end; the harness does.
+allowed-tools: Bash(npm run e2e:*), Bash(npm run e2e -- :*), Bash(SMOKETEST_*:*), Read
 ---
 
 # Smoketest
 
 Runs `packages/test-harness` against the full launcher stack (engine server + Ink TUI client + agent sidecar). The harness drives the TUI like a human player and asserts state-driven success.
 
-## Pick the scenario
+## Parse the args
 
-If `$ARGUMENTS` is non-empty, use it verbatim as the scenario id. Otherwise default to `golden-path`.
+`$ARGUMENTS` is **freeform**. Default scenario is `golden-path`.
 
-Available scenarios live in `packages/test-harness/src/scenarios/`. Today:
+Parse it as:
+
+1. **Scenario id** — usually the first token (or first comma-separated chunk). If it matches a scenario in `packages/test-harness/src/scenarios/`, that's the scenario. Otherwise treat all of `$ARGUMENTS` as tweaks and default to `golden-path`.
+2. **Tweaks** — anything past the scenario id is freeform natural-language guidance. Interpret it and apply.
+
+Available scenarios today:
 
 - `golden-path` — full live cycle. ~5-7 min. Real LLM calls. The baseline every cross-cutting change should clear.
 - `boot-and-quit` — confirms the launcher boots and the main menu renders. ~10s. No API key needed. The precondition for everything else.
 
+### Applying tweaks
+
+Map the natural-language tweak onto an existing scenario hook. Today's hooks:
+
+- **DM personality preference** (golden-path only) — env var `SMOKETEST_PERSONALITY="<name>"`. When set, the scenario prefers that personality if it appears in the offered choices, and injects the name into the first free-text answer as a hint to the setup agent. Pass the exact display name (e.g. `"The Crossroads"`).
+
+If the tweak doesn't map to an existing hook, you have two options:
+
+- **Add a new hook** if the tweak is likely to recur — extend the scenario with another env var, default to current behavior when unset, then invoke with that env var set. Land the new hook with the smoketest run.
+- **Temporarily edit the scenario** for a one-off — make the change, run, then revert. Do not commit the temp edit.
+
+If the tweak is too vague to act on confidently, ask the user instead of guessing.
+
 ## How to invoke
 
-Use the `Bash` tool with `run_in_background: true`. The command is exactly one of:
+Use the `Bash` tool with `run_in_background: true`. Set any env-var tweaks inline:
 
 ```bash
-# When $ARGUMENTS is empty (the default):
+# No tweaks:
 npm run e2e:golden-path
+# or
+npm run e2e -- <scenario-id>
 
-# When $ARGUMENTS is non-empty (substitute the scenario id):
-npm run e2e -- $ARGUMENTS
+# With env-var tweaks:
+SMOKETEST_PERSONALITY="The Crossroads" npm run e2e -- golden-path
 ```
 
 Then continue with whatever else needs doing in the same turn — write a commit message, draft a follow-up doc edit, sketch the next change. The harness auto-invokes you with a `<task-notification>` when the process exits.

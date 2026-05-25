@@ -191,6 +191,7 @@ const assets = [
   { src: "packages/client-ink/src/tui/themes/assets", dest: "themes" },
   { src: "systems", dest: "systems" },
   { src: "worlds", dest: "worlds", filter: /\.mvworld$/ },
+  { src: "personalities", dest: "personalities", filter: /\.mvdm$/ },
   { src: "packages/engine/src/config", dest: "config", filter: /\.json$/ },
   // Keep upstream LICENSE/README alongside JSON assets so dataset
   // attribution travels with the compiled binary, not just the source tree.

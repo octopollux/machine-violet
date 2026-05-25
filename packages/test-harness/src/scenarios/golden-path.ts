@@ -31,7 +31,15 @@ import type { Scenario, ScenarioContext } from "./types.js";
 import type { Harness } from "../harness.js";
 import { DEFAULT_LONG_TIMEOUT_MS, DEFAULT_TURN_TIMEOUT_MS, DEFAULT_SHORT_TIMEOUT_MS } from "../wait.js";
 
-const FREE_TEXT_DEFAULT_ANSWER = "you decide";
+// Optional tweak: force a specific DM personality. When set, the scenario
+// prefers this personality if it appears in the offered choices, and folds
+// the name into the free-text default so the setup agent has a hint even
+// when its personality list doesn't include this entry.
+const FORCED_PERSONALITY = process.env.SMOKETEST_PERSONALITY?.trim() || null;
+
+const FREE_TEXT_DEFAULT_ANSWER = FORCED_PERSONALITY
+  ? `you decide. Use ${FORCED_PERSONALITY} as the DM personality.`
+  : "you decide";
 const PLAYER_FIRST_ACTION = "I look around to take stock of my surroundings.";
 
 export const goldenPath: Scenario = {
@@ -194,8 +202,18 @@ function choiceFingerprint(choices: import("../client-state.js").ActiveChoices):
  * offers a "Cancel" option, so the simplest reasonable strategy is "first
  * real choice." If that choice text looks dangerous (free-text input,
  * "Customize..."), skip it.
+ *
+ * When SMOKETEST_PERSONALITY is set and matches one of the offered labels,
+ * prefer that label. (If it isn't offered, the hint embedded in
+ * FREE_TEXT_DEFAULT_ANSWER still steers the setup agent toward it.)
  */
 function pickSetupChoice(labels: string[]): number {
+  if (FORCED_PERSONALITY) {
+    const desired = FORCED_PERSONALITY.toLowerCase();
+    for (let i = 0; i < labels.length; i++) {
+      if (labels[i].toLowerCase() === desired) return i;
+    }
+  }
   for (let i = 0; i < labels.length; i++) {
     const lower = labels[i].toLowerCase();
     // "Enter your own" is added by the UI at index 0; the server never sends

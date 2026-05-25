@@ -147,7 +147,7 @@ Personalities are stored as short prompt fragments shipped with the app. Each is
 
 ### Shipped personalities
 
-The canonical roster lives in [packages/engine/src/config/personalities.ts](../packages/engine/src/config/personalities.ts) — read it for the current list, voices, and fragment text. The roster has grown well past the original four (Chronicler / Trickster / Warden / Bard) and is curated rather than counted; treat the source file as the source of truth and avoid mirroring the list here.
+The canonical roster lives in [personalities/](../personalities/) at the repo root — one `.mvdm` file per personality, parsed by [packages/engine/src/config/personality-loader.ts](../packages/engine/src/config/personality-loader.ts). Each file carries a `format: "machine-violet-dm"` envelope plus the `name`, `description`, `prompt_fragment`, and optional `detail` fields. Read the directory for the current list; the roster has grown well past the original four (Chronicler / Trickster / Warden / Bard) and is curated rather than counted, so treat the files as the source of truth and avoid mirroring the list here. Users can drop additional `.mvdm` files into `~/.machine-violet/personalities/` to add their own.
 
 ### Custom personalities
 
