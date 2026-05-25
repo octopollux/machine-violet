@@ -12,10 +12,18 @@ import { configDir } from "../utils/paths.js";
 
 export interface ClientSettings {
   showVerbose: boolean;
+  /**
+   * Default DM turn length percentage applied to new campaigns. Existing
+   * campaigns keep whatever value is stored on their CampaignConfig; this
+   * is the seed for the next `New Campaign` flow. Range is enforced by
+   * clampDmTurnLengthPct.
+   */
+  dmTurnLengthPctDefault: number;
 }
 
 const DEFAULTS: ClientSettings = {
   showVerbose: false,
+  dmTurnLengthPctDefault: 80,
 };
 
 const FILENAME = "client-settings.json";
@@ -30,6 +38,14 @@ function sanitize(input: unknown): ClientSettings {
   if (input && typeof input === "object") {
     const obj = input as Record<string, unknown>;
     if (typeof obj.showVerbose === "boolean") result.showVerbose = obj.showVerbose;
+    if (typeof obj.dmTurnLengthPctDefault === "number") {
+      // Validate range here rather than importing the shared clamp helper —
+      // keeps client-settings free of cross-package imports for one number.
+      const v = obj.dmTurnLengthPctDefault;
+      if (v >= 50 && v <= 150 && Number.isFinite(v)) {
+        result.dmTurnLengthPctDefault = Math.round(v / 5) * 5;
+      }
+    }
   }
   return result;
 }

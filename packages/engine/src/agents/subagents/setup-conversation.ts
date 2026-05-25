@@ -565,6 +565,28 @@ export function createSetupConversation(
 
       const result = await streamWithRetry(provider, params, onDelta, onRetry);
 
+      // Defense-in-depth: a refusal-stop with no usable output is a dead
+      // end for setup. The previous behavior (silently continue with
+      // empty text) rendered nothing to the player and looked like a
+      // hang. The openai-chatgpt provider now throws CodexTurnFailedError
+      // on `status: "failed"`, but any provider that legitimately returns
+      // `stopReason: "refusal"` (Anthropic content filter, OpenAI
+      // content_filter incomplete) would also leave us with no narrative
+      // to render — surface it as an error so the session-manager catch
+      // can broadcast a user-visible message.
+      if (
+        result.stopReason === "refusal"
+        && !result.text
+        && (!result.assistantContent || result.assistantContent.length === 0)
+        && (!result.toolCalls || result.toolCalls.length === 0)
+      ) {
+        throw new Error(
+          "Setup agent refused or failed to respond. "
+          + "This usually means the configured model rejected the prompt or isn't reachable — "
+          + "check the connections menu and try again.",
+        );
+      }
+
       // openai-chatgpt path: codex ran the entire multi-round tool loop
       // inside its single stream() call. `runToolDispatch` already
       // captured pendingChoices / fired handleFinalize / etc. Skip the

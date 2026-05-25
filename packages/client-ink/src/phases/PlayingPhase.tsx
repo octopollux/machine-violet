@@ -50,6 +50,8 @@ export function PlayingPhase() {
     showVerbose,
     retryOverlay,
     onReturnToMenu,
+    reportViewport,
+    dmTurnLengthPctDefault,
   } = useGameContext();
   const { columns: cols, rows } = useWindowSize();
 
@@ -119,6 +121,22 @@ export function PlayingPhase() {
     isAI: p.type === "ai",
   })) ?? [{ name: "Player", isAI: false }];
   const activeChar = players[activePlayerIndex]?.name ?? "Player";
+
+  // Layout math — used in render below and in the viewport-reporting
+  // effect. Computed up here so the report still fires even when the
+  // terminal is too small to render and we early-return.
+  const tier = getViewportTier({ columns: cols, rows });
+  const visibleElements = getVisibleElements(tier);
+  const hasDescriptions = (activeChoices?.descriptions?.length ?? 0) > 0;
+  const descExtraHeight = hasDescriptions ? DESCRIPTION_ROWS : 0;
+  const narRows = narrativeRows(rows, visibleElements, false, theme.asset.height, players.length, descExtraHeight);
+
+  // Report viewport dims to the server. The server tracks per-client
+  // dims and reports the floor (smallest narrativeRows across clients)
+  // to the DM's length hint.
+  useEffect(() => {
+    reportViewport({ columns: cols, rows, narrativeRows: narRows });
+  }, [cols, rows, narRows, reportViewport]);
 
   // Clear character sheet cache when active character changes
   if (activeChar !== characterSheetCacheCharRef.current) {
@@ -413,11 +431,6 @@ export function PlayingPhase() {
     return <TerminalTooSmall columns={cols} rows={rows} />;
   }
 
-  const tier = getViewportTier({ columns: cols, rows });
-  const visibleElements = getVisibleElements(tier);
-  const hasDescriptions = (activeChoices?.descriptions?.length ?? 0) > 0;
-  const descExtraHeight = hasDescriptions ? DESCRIPTION_ROWS : 0;
-  const narRows = narrativeRows(rows, visibleElements, false, theme.asset.height, players.length, descExtraHeight);
   const conversationPaneTop = visibleElements.topFrame ? theme.asset.height : 0;
 
   const keyHints: KeyHint[] = useMemo(() => [
@@ -562,6 +575,12 @@ export function PlayingPhase() {
               choices: { campaign_default: value, player_overrides: existingOverrides },
             }).catch(() => { /* ignore — user sees no toast, value just won't persist */ });
           }}
+          onDmTurnLengthPctChange={async (value: number) => {
+            await apiClient.patchSettings({
+              dm_turn_length_pct: value,
+            }).catch(() => { /* ignore — same rationale as Choices Frequency above */ });
+          }}
+          globalDmTurnLengthPctDefault={dmTurnLengthPctDefault}
         />
       )}
       {am?.kind === "saving" && (

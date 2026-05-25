@@ -54,6 +54,43 @@ const DISCORD_STATUS_INTERVAL = 8;
 export interface ConnectedClient {
   ws: WebSocket;
   identity: ConnectionIdentity;
+  /** Last-reported viewport dims, or undefined if never reported. */
+  dims?: { columns: number; rows: number; narrativeRows: number };
+}
+
+/**
+ * Compute the viewport floor — the most-constrained dims across all
+ * clients that have reported. Returns undefined if no client has
+ * reported. Exported for unit testing.
+ *
+ * Primary sort: smallest `narrativeRows` (drives the length hint).
+ * Tiebreak: smallest `columns`, then smallest `rows`. Without the
+ * tiebreak two clients sharing terminal height but with different
+ * widths would yield insertion-order-dependent columns, which mis-sizes
+ * GameEngine's wrappedLineCount calculation (it uses
+ * `terminalDims.columns - 4` as the wrap width).
+ */
+export function computeViewportFloor(
+  clients: Iterable<Pick<ConnectedClient, "dims">>,
+): { columns: number; rows: number; narrativeRows: number } | undefined {
+  let floor: { columns: number; rows: number; narrativeRows: number } | undefined;
+  for (const entry of clients) {
+    if (!entry.dims) continue;
+    if (!floor) {
+      floor = entry.dims;
+      continue;
+    }
+    if (entry.dims.narrativeRows < floor.narrativeRows) {
+      floor = entry.dims;
+    } else if (entry.dims.narrativeRows === floor.narrativeRows) {
+      if (entry.dims.columns < floor.columns) {
+        floor = entry.dims;
+      } else if (entry.dims.columns === floor.columns && entry.dims.rows < floor.rows) {
+        floor = entry.dims;
+      }
+    }
+  }
+  return floor;
 }
 
 export type SessionStatus = "idle" | "starting" | "active" | "stopping";
@@ -150,6 +187,7 @@ export class SessionManager {
 
     ws.on("close", () => {
       this.clients.delete(ws);
+      this.recomputeViewportFloor();
       this.checkIdleTimeout();
     });
 
@@ -174,7 +212,36 @@ export class SessionManager {
 
   removeClient(ws: WebSocket): void {
     this.clients.delete(ws);
+    this.recomputeViewportFloor();
     this.checkIdleTimeout();
+  }
+
+  /**
+   * Update a connected client's reported viewport dims and push the new
+   * floor (min `narrativeRows` across all clients) to the engine.
+   *
+   * Called from the WS handler when a `client:viewport` message arrives.
+   * If the floor rises because the previously-smallest client either
+   * disconnected or reported larger dims, the DM sees the new (larger)
+   * floor on its next turn.
+   */
+  updateClientViewport(
+    ws: WebSocket,
+    dims: { columns: number; rows: number; narrativeRows: number },
+  ): void {
+    const entry = this.clients.get(ws);
+    if (!entry) return;
+    entry.dims = dims;
+    this.recomputeViewportFloor();
+  }
+
+  /** Recompute the floor across all connected clients and push to engine. */
+  private recomputeViewportFloor(): void {
+    if (!this.engine) return;
+    const floor = computeViewportFloor(this.clients.values());
+    if (floor) {
+      this.engine.setTerminalDims(floor);
+    }
   }
 
   // --- Broadcasting ---
@@ -737,6 +804,12 @@ export class SessionManager {
     this.gameState = gs;
     this.campaignId = campaignId;
     this.status = "active";
+
+    // Seed the engine with the current viewport floor, if any client has
+    // already reported dims (typically during setup which precedes
+    // transitionToGame). If none have, LengthSteeringInjection will fall
+    // back to its baked default and log a warning on the first turn.
+    this.recomputeViewportFloor();
 
     // Persist cumulative token usage to disk on every API call. The persister
     // queues writes asynchronously, so the per-call overhead is just a JSON

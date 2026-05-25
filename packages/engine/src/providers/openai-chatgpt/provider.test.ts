@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { TurnCollector } from "./provider.js";
+import { TurnCollector, CodexTurnFailedError } from "./provider.js";
 import type {
   AgentMessageDeltaNotification, ItemCompletedNotification,
   TurnCompletedNotification,
@@ -93,5 +93,24 @@ describe("TurnCollector", () => {
 
     expect(result.text).toBe("Non-streamed reply.");
     expect(result.assistantContent).toEqual([{ type: "text", text: "Non-streamed reply." }]);
+  });
+});
+
+describe("CodexTurnFailedError", () => {
+  it("carries the codex error message in both the field and the message", () => {
+    const err = new CodexTurnFailedError("model 'gpt-5.5' not found", "019e60e8-91ad");
+    expect(err.codexMessage).toBe("model 'gpt-5.5' not found");
+    expect(err.turnId).toBe("019e60e8-91ad");
+    expect(err.message).toContain("019e60e8-91ad");
+    expect(err.message).toContain("model 'gpt-5.5' not found");
+    expect(err.name).toBe("CodexTurnFailedError");
+    expect(err).toBeInstanceOf(Error);
+  });
+
+  it("falls back to a placeholder when codex provides no message", () => {
+    // The throw site uses "(no error message from codex)" if turn.error is null.
+    // This test guards against the constructor itself swallowing the input.
+    const err = new CodexTurnFailedError("(no error message from codex)", "t_abc");
+    expect(err.codexMessage).toBe("(no error message from codex)");
   });
 });

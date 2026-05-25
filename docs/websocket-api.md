@@ -19,7 +19,9 @@ No authentication is required (localhost-only). Auth will be added when remote c
 
 ## Communication Direction
 
-All WebSocket messages flow **server to client**. The WebSocket channel is one-way push — clients send commands via REST endpoints (`POST /session/turn/contribute`, `POST /session/command/:name`, etc.), not over the WebSocket.
+WebSocket messages are predominantly **server to client**. Clients send gameplay commands via REST endpoints (`POST /session/turn/contribute`, `POST /session/command/:name`, etc.), not over the WebSocket.
+
+The one client→server WebSocket message is `client:viewport`, used to report the active terminal dimensions so the DM's per-turn length hint can adapt to the smallest connected client. See [Client Events](#client-events) below.
 
 ## Message Format
 
@@ -279,11 +281,31 @@ Error or retry notification.
 | `status`      | number? | HTTP-style status code, if applicable. |
 | `delayMs`     | number? | Suggested wait time before retry (ms). |
 
+## Client Events
+
+The handful of messages clients may send to the server over the WebSocket.
+
+### `client:viewport`
+
+Reports this client's current terminal dimensions. Sent on every WS `open` and whenever the terminal resizes. The server keeps a per-connection map of dims; the value passed to the DM's length-steering injection is the **floor** — the smallest `narrativeRows` across all connected clients. If the smallest client raises its value (resize larger) or disconnects, the floor recomputes upward to whichever client is now smallest.
+
+| Field            | Type   | Description |
+|------------------|--------|-------------|
+| `columns`        | number | Total terminal width in columns. |
+| `rows`           | number | Total terminal height in rows. |
+| `narrativeRows`  | number | Usable narrative-area rows after subtracting UI chrome (top frame, modelines, player pane, input line). The DM's `[length]` hint is keyed on this. |
+
+```json
+{ "type": "client:viewport", "data": { "columns": 120, "rows": 50, "narrativeRows": 32 } }
+```
+
+Unknown WebSocket messages from the client are logged and dropped.
+
 ## Canonical Source
 
 All event schemas are defined as TypeBox objects in:
 
-- `packages/shared/src/protocol/events.ts` — event types, `ChoicesData`, and `ServerEvent` union
+- `packages/shared/src/protocol/events.ts` — event types, `ChoicesData`, `ServerEvent`, and `ClientEvent` unions
 - `packages/shared/src/protocol/turn.ts` — `Turn` and `TurnContribution`
 - `packages/shared/src/protocol/state.ts` — `StateSnapshot`
 - `packages/shared/src/protocol/connection.ts` — `ConnectionIdentity`

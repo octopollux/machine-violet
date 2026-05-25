@@ -172,6 +172,12 @@ export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) =>
 
     // Apply patch to in-memory config
     const patch = (request.body as Record<string, unknown>) ?? {};
+    // Clamp dm_turn_length_pct to its supported range — defensive, since
+    // the modal already clamps but the endpoint is otherwise wide open.
+    if (typeof patch.dm_turn_length_pct === "number") {
+      const { clampDmTurnLengthPct } = await import("@machine-violet/shared/types/config.js");
+      patch.dm_turn_length_pct = clampDmTurnLengthPct(patch.dm_turn_length_pct);
+    }
     Object.assign(gs.config, patch);
 
     // Persist to disk

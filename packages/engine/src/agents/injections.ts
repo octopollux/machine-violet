@@ -24,6 +24,13 @@ export interface InjectionContext {
   /** Terminal dimensions, or undefined if not yet reported by the TUI. */
   terminalDims: TerminalDims | undefined;
   /**
+   * Multiplier (in percent) applied to the reported narrativeRows in the
+   * length hint. 80 means the DM is told the page is 20% shorter than it
+   * actually is — a nudge toward economy. Affects display only; overlong
+   * tracking uses the real row count.
+   */
+  dmTurnLengthPct: number;
+  /**
    * Rendered hard-stats string for this turn (turn holder, combat round,
    * resource values). HardStatsInjection compares against its last-emitted
    * copy to decide whether to re-emit ahead of cadence.
@@ -103,16 +110,49 @@ export class ScenePacingInjection implements Injection {
 // LengthSteeringInjection — terminal-size awareness + overlong reminders
 // ---------------------------------------------------------------------------
 
+/**
+ * Conservative default used when no client has reported viewport dims by
+ * the first DM turn. In a real session this shouldn't happen — the player
+ * has already driven the setup agent over several turns by the time the
+ * first DM priming runs, and the client reports its viewport on WS
+ * connect. If we ever fall back to this, LengthSteeringInjection logs a
+ * warning the first time per session.
+ */
+export const FALLBACK_TERMINAL_DIMS: TerminalDims = {
+  columns: 80,
+  rows: 24,
+  narrativeRows: 20,
+};
+
 export class LengthSteeringInjection implements Injection {
   readonly name = "length";
   private lastReportedDims: TerminalDims | undefined;
   private dimsInjectedOnce = false;
   private consecutiveOverlong = 0;
+  private fallbackWarned = false;
+  private warnFn: ((msg: string) => void) | undefined;
   static readonly OVERLONG_THRESHOLD = 2;
 
+  /** Optional sink for the one-shot "no viewport reported" warning. */
+  setWarnFn(fn: (msg: string) => void): void {
+    this.warnFn = fn;
+  }
+
   build(ctx: InjectionContext): string | null {
-    const dims = ctx.terminalDims;
-    if (!dims) return null;
+    let dims = ctx.terminalDims;
+    if (!dims) {
+      // Use the baked default so the first-turn hint still fires. This
+      // should never happen in a real session — log once if it does so
+      // the issue surfaces rather than silently degrading prose quality.
+      if (!this.fallbackWarned) {
+        this.fallbackWarned = true;
+        const msg = "[length] No client viewport reported by first DM turn — using fallback dims. "
+          + "Expected the client to send client:viewport over WS during setup.";
+        if (this.warnFn) this.warnFn(msg);
+        else console.warn(msg);
+      }
+      dims = FALLBACK_TERMINAL_DIMS;
+    }
 
     const parts: string[] = [];
 
@@ -123,8 +163,14 @@ export class LengthSteeringInjection implements Injection {
       || this.lastReportedDims.narrativeRows !== dims.narrativeRows;
 
     if (!this.dimsInjectedOnce || dimsChanged) {
+      // Fib applied to the displayed row count only. The real value is
+      // kept for internal overlong tracking in afterResponse().
+      const reportedRows = Math.max(
+        1,
+        Math.floor(dims.narrativeRows * ctx.dmTurnLengthPct / 100),
+      );
       parts.push(
-        `Terminal: ${dims.columns} cols × ${dims.narrativeRows} visible rows.`,
+        `Terminal: ${dims.columns} cols × ${reportedRows} visible rows.`,
       );
       this.lastReportedDims = { ...dims };
       this.dimsInjectedOnce = true;

@@ -173,6 +173,29 @@ export const ErrorEvent = Type.Object({
   }),
 });
 
+// --- Client → server events ---
+
+/**
+ * Client viewport dimensions. Sent on WS connect and on resize.
+ * The server tracks dims per WS connection and reports the *floor*
+ * (smallest narrativeRows across all connected clients) to the DM's
+ * length-steering injection. A user-tunable percentage is applied to
+ * the floor before it reaches the DM (see CampaignConfig.dm_turn_length_pct).
+ */
+export const ClientViewportEvent = Type.Object({
+  type: Type.Literal("client:viewport"),
+  data: Type.Object({
+    columns: Type.Number(),
+    rows: Type.Number(),
+    /** Usable narrative-area rows (after subtracting UI chrome). */
+    narrativeRows: Type.Number(),
+  }),
+});
+
+export const ClientEvent = Type.Union([
+  ClientViewportEvent,
+]);
+
 // --- Union of all server events ---
 
 export const ServerEvent = Type.Union([
@@ -212,3 +235,5 @@ export type DiscordPresenceEvent = Static<typeof DiscordPresenceEvent>;
 export type UsageUpdateEvent = Static<typeof UsageUpdateEvent>;
 export type ErrorEvent = Static<typeof ErrorEvent>;
 export type ServerEvent = Static<typeof ServerEvent>;
+export type ClientViewportEvent = Static<typeof ClientViewportEvent>;
+export type ClientEvent = Static<typeof ClientEvent>;
