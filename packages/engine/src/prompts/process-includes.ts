@@ -62,7 +62,11 @@ export interface IncludeFile {
    * treated as one implicit default section — see `flatBody`.
    */
   isFlat: boolean;
-  /** The whole trimmed body, populated only when `isFlat`. */
+  /**
+   * The whole body with only surrounding newlines trimmed (leading/trailing
+   * blank lines), populated only when `isFlat`. Indented prose at the start
+   * of a flat file is preserved verbatim.
+   */
   flatBody: string;
 }
 
@@ -77,7 +81,9 @@ export function parseIncludeFile(content: string): IncludeFile {
     variants.set(tag, body);
   }
   if (variants.size === 0) {
-    return { variants, isFlat: true, flatBody: normalized.trim() };
+    // Strip only surrounding newlines — preserve any intentional indentation
+    // at the start or end of the body.
+    return { variants, isFlat: true, flatBody: normalized.replace(/^\n+/, "").replace(/\n+$/, "") };
   }
   return { variants, isFlat: false, flatBody: "" };
 }
@@ -118,7 +124,7 @@ export function processIncludes(text: string, opts: ProcessIncludesOptions = {})
       } else {
         const choices = [...file.variants.keys()].join(", ") || "<none>";
         throw new Error(
-          `Include '${tag}' has no default <${tag}> section in include/${tag}.md (available: ${choices}); use ${tag}.<Variant>.`,
+          `Include '${tag}' has no default <${tag}> section in prompts/include/${tag}.md (available: ${choices}); use ${tag}.<Variant>.`,
         );
       }
     } else {

@@ -43,6 +43,16 @@ describe("parseIncludeFile", () => {
     expect(file.variants.size).toBe(0);
   });
 
+  it("preserves intentional indentation in a flat file (only newlines are stripped)", () => {
+    // Regression: an earlier version used String.trim() which ate leading
+    // spaces. A markdown list, code block, or any deliberately-indented prose
+    // at the start of a flat include must survive verbatim.
+    const src = "\n\n  - first bullet\n  - second bullet\n\n";
+    const file = parseIncludeFile(src);
+    expect(file.isFlat).toBe(true);
+    expect(file.flatBody).toBe("  - first bullet\n  - second bullet");
+  });
+
   it("ignores indented (non-column-0) XML when deciding section boundaries", () => {
     // The inner <b> is inside the Military body; it must not be promoted to
     // a sibling variant, and it must not break the regex.
