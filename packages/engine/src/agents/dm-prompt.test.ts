@@ -139,6 +139,66 @@ describe("buildHardStats", () => {
   });
 });
 
+describe("buildDMPrefix cascading entity override", () => {
+  // The three layers (main DM → campaign seed → DM personality) all contribute
+  // top-level XML blocks; when they collide on the same tag, the personality
+  // layer wins. This test plants a unique `<NPCS>` block in each of the three
+  // inline-string layers and proves only the personality's content survives in
+  // the assembled system prompt.
+  const baseConfig = (overrides: Partial<CampaignConfig>): CampaignConfig => ({
+    name: "Test",
+    system: "D&D 5e",
+    dm_personality: { name: "grim", prompt_fragment: "You are terse." },
+    players: [{ name: "Alice", character: "Aldric", type: "human" }],
+    combat: { initiative_method: "d20_dex", round_structure: "individual", surprise_rules: false },
+    context: { retention_exchanges: 5, max_conversation_tokens: 4000, tool_result_stub_after: 200 },
+    recovery: { auto_commit_interval: 300, max_commits: 100, enable_git: false },
+    choices: { campaign_default: "never", player_overrides: {} },
+    ...overrides,
+  } as CampaignConfig);
+
+  it("DM personality's <NPCS> block wins over seed and main DM", () => {
+    const config = baseConfig({
+      campaign_detail: "<NPCS>\nseed-npcs\n</NPCS>",
+      dm_personality: {
+        name: "grim",
+        prompt_fragment: "You are terse.\n<NPCS>\npersona-npcs\n</NPCS>",
+      },
+    });
+    const { system } = buildDMPrefix(config, {});
+    const all = system.map((b) => b.text).join("\n");
+
+    expect(all).toContain("persona-npcs");
+    expect(all).not.toContain("seed-npcs");
+    // The main DM file (dm-identity / dm-directives) does not currently define
+    // <NPCS>, so there's no "main-npcs" to assert against — the seed-vs-personality
+    // case is the meaningful collision and the one most likely to regress.
+  });
+
+  it("seed's <NPCS> block wins when personality doesn't define one", () => {
+    const config = baseConfig({
+      campaign_detail: "<NPCS>\nseed-npcs\n</NPCS>",
+    });
+    const { system } = buildDMPrefix(config, {});
+    const all = system.map((b) => b.text).join("\n");
+    expect(all).toContain("seed-npcs");
+  });
+
+  it("leaves uncolliding tags from each layer alone", () => {
+    const config = baseConfig({
+      campaign_detail: "<WORLD_LORE>\nseed-only\n</WORLD_LORE>",
+      dm_personality: {
+        name: "grim",
+        prompt_fragment: "You are terse.\n<VOICE>\npersona-only\n</VOICE>",
+      },
+    });
+    const { system } = buildDMPrefix(config, {});
+    const all = system.map((b) => b.text).join("\n");
+    expect(all).toContain("seed-only");
+    expect(all).toContain("persona-only");
+  });
+});
+
 describe("buildDMPrefix model conditionals", () => {
   // Regression guard for issue #483: the runtime tier-resolved model ID must
   // reach loadPrompt so `<!--if:gpt-->` blocks in dm-directives.md resolve
