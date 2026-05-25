@@ -2,7 +2,7 @@ import type { SubagentResult } from "../subagent.js";
 import type { SetupResult } from "../setup-agent.js";
 import { generateThemeColor } from "../setup-agent.js";
 import { CAMPAIGN_SCOPES, type CampaignScope } from "@machine-violet/shared/types/config.js";
-import { PERSONALITIES } from "../../config/personalities.js";
+import { loadAllPersonalities, getPersonality } from "../../config/personality-loader.js";
 import { loadAllWorlds, worldSummaries, loadWorldBySlug } from "../../config/world-loader.js";
 import { KNOWN_SYSTEMS, readChargenSection } from "../../config/systems.js";
 import type { SystemComplexity } from "../../config/systems.js";
@@ -244,7 +244,8 @@ function buildSystemPrompt(model: string, existingPlayers?: KnownPlayer[], userW
     const extra = s.hasDetail ? " [has detail]" : "";
     return `- **${s.name}** (slug: \`${s.slug}\`) — ${s.summary} (${s.genres.join(", ")})${desc}${extra}`;
   }).join("\n");
-  const personalityList = shuffle(PERSONALITIES).map((p) => {
+  const personalities = loadAllPersonalities();
+  const personalityList = shuffle(personalities).map((p) => {
     const desc = p.description ? `: ${p.description}` : "";
     const detail = p.detail ? `\n  Detail: ${p.detail.replace(/\n/g, "\n  ")}` : "";
     return `- **${p.name}**${desc}${detail}`;
@@ -349,9 +350,9 @@ export function createSetupConversation(
   let pendingExtraToolResults: ContentPart[] = [];
 
   function handleFinalize(input: Record<string, unknown>): void {
-    const personalityName = (input.dm_personality as string) || "The Chronicler";
+    const personalityName = (input.dm_personality as string) || "The Unknown";
     const customPrompt = input.dm_personality_prompt as string | undefined;
-    const personality = PERSONALITIES.find((p) => p.name === personalityName)
+    const personality = getPersonality(personalityName)
       ?? { name: personalityName, prompt_fragment: customPrompt || `You are ${personalityName}.` };
 
     const characterName = (input.character_name as string) || "Adventurer";

@@ -30,6 +30,7 @@ export function isCompiled(): boolean {
  *   src/assets/            — bundled data assets (e.g. names/names.json)
  *   ../../systems/         — systems/ is at the monorepo root
  *   ../../worlds/          — .mvworld seed files at the monorepo root
+ *   ../../personalities/   — .mvdm DM personality files at the monorepo root
  *   ../client-ink/src/tui/themes/assets/ — themes live in the TUI package
  */
 const _cache = new Map<string, string>();
@@ -40,11 +41,12 @@ const DEV_ASSET_DIRS: Record<string, string> = {
   themes: "../client-ink/src/tui/themes/assets",
   systems: "../../systems",
   worlds: "../../worlds",
+  personalities: "../../personalities",
   config: "src/config",
   assets: "src/assets",
 };
 
-export function assetDir(category: "prompts" | "themes" | "systems" | "worlds" | "config" | "assets"): string {
+export function assetDir(category: "prompts" | "themes" | "systems" | "worlds" | "personalities" | "config" | "assets"): string {
   const cached = _cache.get(category);
   if (cached) return cached;
 
