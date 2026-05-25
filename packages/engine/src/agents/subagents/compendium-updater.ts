@@ -3,7 +3,12 @@ import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
-import type { Compendium, CompendiumEntry } from "@machine-violet/shared/types/compendium.js";
+import { slugify } from "@machine-violet/shared/utils/slug.js";
+import {
+  COMPENDIUM_CATEGORIES,
+  type Compendium,
+  type CompendiumEntry,
+} from "@machine-violet/shared/types/compendium.js";
 
 /**
  * Create an empty compendium with default structure.
@@ -93,10 +98,73 @@ export function parseCompendiumOutput(
 
     // Ensure version field
     parsed.version = 1;
-    return parsed;
+    return canonicalizeCompendium(parsed);
   } catch {
     return fallback;
   }
+}
+
+/**
+ * Force every entry's `slug` to match `slugify(entry.name)`, and rewrite
+ * every `related` array through the same rule. Idempotent.
+ *
+ * The compendium-updater subagent (and any older saved compendium) has been
+ * observed emitting slugs that retain leading articles — "the-city" instead
+ * of the canonical "city". That diverges from the slugify() the renderer
+ * uses to resolve wikilinks, so every `[[The City]]` link rendered red even
+ * though the entry existed. We treat slugify() as authoritative and rewrite
+ * the model's output to match, rather than introducing a second slug rule.
+ *
+ * Slugs we've actually seen change are remapped in `related`; any other
+ * slug there is still run through slugify() so a legacy reference like
+ * "the-arcade" → "arcade" lines up even if "the-arcade" never appeared as
+ * an entry slug in this compendium.
+ */
+export function canonicalizeCompendium(compendium: Compendium): Compendium {
+  const renames = new Map<string, string>();
+  const result: Compendium = { ...compendium };
+
+  for (const category of COMPENDIUM_CATEGORIES) {
+    const entries = compendium[category];
+    if (!Array.isArray(entries)) continue;
+    const rewritten: CompendiumEntry[] = [];
+    for (const entry of entries) {
+      const canonical = slugify(entry.name);
+      if (entry.slug !== canonical) renames.set(entry.slug, canonical);
+      rewritten.push({ ...entry, slug: canonical });
+    }
+    result[category] = rewritten;
+  }
+
+  for (const category of COMPENDIUM_CATEGORIES) {
+    for (const entry of result[category]) {
+      if (!Array.isArray(entry.related) || entry.related.length === 0) continue;
+      const seen = new Set<string>();
+      const next: string[] = [];
+      for (const ref of entry.related) {
+        const mapped = renames.get(ref) ?? canonicalizeSlugRef(ref);
+        if (!seen.has(mapped)) {
+          seen.add(mapped);
+          next.push(mapped);
+        }
+      }
+      entry.related = next;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Normalize a string that's already in slug form (hyphens, no spaces).
+ * slugify() only strips a leading article when followed by whitespace, so
+ * `slugify("the-arcade")` returns `"the-arcade"` unchanged — but the
+ * canonical slug for the display name "The Arcade" is `"arcade"`. This
+ * helper closes that gap for `related[]` cross-references that point to
+ * legacy slugs we don't have an entry-level rename for.
+ */
+function canonicalizeSlugRef(ref: string): string {
+  return slugify(ref).replace(/^(the|a|an)-/, "");
 }
 
 /**

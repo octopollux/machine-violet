@@ -1,13 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { LLMProvider, ChatResult, NormalizedUsage } from "../../providers/types.js";
 import {
+  canonicalizeCompendium,
   emptyCompendium,
   parseCompendiumOutput,
   renderCompendiumForDM,
   updateCompendium,
 } from "./compendium-updater.js";
 import { resetPromptCache } from "../../prompts/load-prompt.js";
-import type { Compendium, CompendiumEntry } from "@machine-violet/shared/types/compendium.js";
+import { slugify } from "@machine-violet/shared/utils/slug.js";
+import { COMPENDIUM_CATEGORIES, type Compendium, type CompendiumEntry } from "@machine-violet/shared/types/compendium.js";
 
 function mockUsage(): NormalizedUsage {
   return { inputTokens: 50, outputTokens: 80, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 };
@@ -118,6 +120,34 @@ describe("parseCompendiumOutput", () => {
     expect(result).toBe(fallback);
   });
 
+  it("canonicalizes slugs from the model output (issue #521)", () => {
+    // Simulate the bug: the subagent emits article-retaining slugs.
+    const modelOutput = JSON.stringify({
+      version: 1,
+      lastUpdatedScene: 2,
+      characters: [
+        { name: "Lia", slug: "lia", summary: "Apprentice.", firstScene: 1, lastScene: 2, related: ["the-city", "the-arcade"] },
+      ],
+      places: [
+        { name: "The City", slug: "the-city", summary: "", firstScene: 1, lastScene: 2, related: [] },
+        { name: "The Arcade", slug: "the-arcade", summary: "", firstScene: 1, lastScene: 2, related: [] },
+      ],
+      items: [],
+      storyline: [],
+      lore: [],
+      objectives: [],
+    });
+
+    const result = parseCompendiumOutput(modelOutput, fallback);
+    for (const category of COMPENDIUM_CATEGORIES) {
+      for (const e of result[category]) {
+        expect(e.slug).toBe(slugify(e.name));
+      }
+    }
+    expect(result.places.map((e) => e.slug)).toEqual(["city", "arcade"]);
+    expect(result.characters[0].related).toEqual(["city", "arcade"]);
+  });
+
   it("ensures version is 1", () => {
     const json = JSON.stringify({
       version: 99,
@@ -130,6 +160,82 @@ describe("parseCompendiumOutput", () => {
     });
     const result = parseCompendiumOutput(json, fallback);
     expect(result.version).toBe(1);
+  });
+});
+
+// --- canonicalizeCompendium ---
+
+describe("canonicalizeCompendium", () => {
+  it("rewrites non-canonical slugs to match slugify(name)", () => {
+    const input: Compendium = {
+      ...emptyCompendium(),
+      places: [
+        entry({ name: "The City", slug: "the-city" }),
+        entry({ name: "The Arcade", slug: "the-arcade" }),
+      ],
+      characters: [entry({ name: "Vesper Caine", slug: "vesper-caine" })],
+    };
+
+    const out = canonicalizeCompendium(input);
+    expect(out.places[0].slug).toBe("city");
+    expect(out.places[1].slug).toBe("arcade");
+    expect(out.characters[0].slug).toBe("vesper-caine");
+  });
+
+  it("rewrites related[] through the same rule", () => {
+    const input: Compendium = {
+      ...emptyCompendium(),
+      places: [entry({ name: "The City", slug: "the-city" })],
+      characters: [
+        entry({
+          name: "Lia",
+          slug: "lia",
+          related: ["the-city", "the-arcade", "vesper-caine"],
+        }),
+      ],
+    };
+
+    const out = canonicalizeCompendium(input);
+    expect(out.characters[0].related).toEqual(["city", "arcade", "vesper-caine"]);
+  });
+
+  it("dedupes related entries that collapse to the same slug", () => {
+    const input: Compendium = {
+      ...emptyCompendium(),
+      characters: [
+        entry({
+          name: "Lia",
+          slug: "lia",
+          related: ["the-city", "city"],
+        }),
+      ],
+    };
+
+    const out = canonicalizeCompendium(input);
+    expect(out.characters[0].related).toEqual(["city"]);
+  });
+
+  it("is idempotent on already-canonical compendiums", () => {
+    const canonical: Compendium = {
+      ...emptyCompendium(),
+      places: [entry({ name: "The Undercroft", slug: "undercroft", related: ["mira"] })],
+      characters: [entry({ name: "Mira", slug: "mira" })],
+    };
+
+    const once = canonicalizeCompendium(canonical);
+    const twice = canonicalizeCompendium(once);
+    expect(twice).toEqual(once);
+  });
+
+  it("does not mutate the input", () => {
+    const input: Compendium = {
+      ...emptyCompendium(),
+      places: [entry({ name: "The City", slug: "the-city", related: ["the-arcade"] })],
+    };
+
+    canonicalizeCompendium(input);
+    expect(input.places[0].slug).toBe("the-city");
+    expect(input.places[0].related).toEqual(["the-arcade"]);
   });
 });
 

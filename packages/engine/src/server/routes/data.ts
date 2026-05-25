@@ -16,6 +16,8 @@ import {
 import { campaignPaths, machinePaths } from "../../tools/filesystem/scaffold.js";
 import { createArchiveFileIO } from "../fileio.js";
 import { collectDiagnostics } from "../diagnostics.js";
+import { canonicalizeCompendium } from "../../agents/subagents/compendium-updater.js";
+import type { Compendium } from "@machine-violet/shared/types/compendium.js";
 
 export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) => {
 
@@ -79,7 +81,10 @@ export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) =>
 
     try {
       const raw = await fileIO.readFile(path);
-      const data = JSON.parse(raw);
+      // Migrate on read: rewrite slugs through canonical slugify() so old
+      // saves with article-retaining slugs (e.g. "the-city") line up with
+      // the renderer's wikilink resolution.
+      const data = canonicalizeCompendium(JSON.parse(raw) as Compendium);
       return { data };
     } catch {
       // Return empty compendium if file doesn't exist

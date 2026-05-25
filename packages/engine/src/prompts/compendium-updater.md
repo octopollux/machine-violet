@@ -27,7 +27,8 @@ A character who works with the cartographer Vesper Caine in the Arcade:
 Note that `vesper-caine` and `the-arcade` are NOT in `related` — they're already wikilinked inline. `the-city` is in `related` because it's contextually connected but not named in the prose.
 
 7. **Append-only.** Never remove entries. Objectives that are completed should have their summary updated to note completion.
-8. **Categories:**
+8. **Slugs.** Use lowercase with hyphens, **strip leading `the`/`a`/`an`** ("The City" → `city`, "An Old Map" → `old-map`). Slugs in `related` follow the same rule. The engine rewrites slugs through the canonical rule after parsing — emitting non-canonical slugs (e.g. `the-city`) just wastes tokens.
+9. **Categories:**
    - `characters` — NPCs, allies, antagonists, notable figures the player has met or heard of
    - `places` — Locations the player has visited or learned about
    - `items` — Named weapons, artifacts, quest items, and other narratively significant objects. Summaries should note current holder/location, origin or provenance if known, and any notable properties

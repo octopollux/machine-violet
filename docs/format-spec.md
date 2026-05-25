@@ -542,6 +542,8 @@ Player-facing knowledge base. Updated by a Haiku subagent at scene transitions.
 
 All category arrays use the same `CompendiumEntry` structure. `related` contains slugs of related entries across any category.
 
+Every `slug` must equal `slugify(name)` (see [`packages/shared/src/utils/slug.ts`](../packages/shared/src/utils/slug.ts)) — leading articles `the`/`a`/`an` are stripped, so "The City" gets the slug `city`, not `the-city`. Slugs in `related[]` follow the same rule. The engine canonicalizes compendiums on read and after each subagent update, so older saves with article-retaining slugs migrate transparently.
+
 ### 5.3 Scene Directories
 
 Scene directories live under `campaign/scenes/` and are named `NNN-slug` where NNN is the 3-digit zero-padded scene number and slug is a kebab-case summary.
