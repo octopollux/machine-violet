@@ -18,6 +18,23 @@ vi.mock("../../config/world-loader.js", async (importOriginal) => {
   };
 });
 
+// Spy on the personality loader so we can assert userPersonalitiesDir threading
+// without depending on the contents of the personalities/ directory.
+vi.mock("../../config/personality-loader.js", async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>;
+  return {
+    ...actual,
+    loadAllPersonalities: vi.fn((userDir?: string) => {
+      const original = actual.loadAllPersonalities as (d?: string) => unknown[];
+      return original(userDir);
+    }),
+    getPersonality: vi.fn((name: string, userDir?: string) => {
+      const original = actual.getPersonality as (n: string, d?: string) => unknown;
+      return original(name, userDir);
+    }),
+  };
+});
+
 import { createSetupConversation } from "./setup-conversation.js";
 
 /** Flatten SystemBlock[] | string to a single string for content assertions. */
@@ -485,6 +502,31 @@ describe("createSetupConversation", () => {
     await conv.start(noop);
 
     expect(loadWorldBySlug).toHaveBeenCalledWith("the-shattered-crown", "/fake/user/worlds");
+  });
+
+  it("threads userPersonalitiesDir into the personality loader and finalize lookup", async () => {
+    // User .mvdm files in ~/.machine-violet/personalities/ must reach both the
+    // setup prompt builder (so they appear in the offered list) and the finalize
+    // lookup (so the chosen personality resolves to the user's prompt fragment,
+    // not the synthesized "You are <name>." stub).
+    const provider = mockProvider([
+      finalizeResponse({ ...FINALIZE_INPUT, dm_personality: "Custom Voice" }),
+      textResponse("Done."),
+    ]);
+    const { loadAllPersonalities, getPersonality } = await import("../../config/personality-loader.js");
+    const conv = createSetupConversation(
+      provider,
+      "claude-sonnet-4-6",
+      undefined,
+      undefined,
+      undefined,
+      "/fake/user/personalities",
+    );
+
+    await conv.start(noop);
+
+    expect(loadAllPersonalities).toHaveBeenCalledWith("/fake/user/personalities");
+    expect(getPersonality).toHaveBeenCalledWith("Custom Voice", "/fake/user/personalities");
   });
 
   it("load_world surfaces campaign_scope as a clean standalone slug line", async () => {
