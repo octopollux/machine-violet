@@ -58,4 +58,23 @@ describe("computeViewportFloor", () => {
     // a disconnects — simulate by passing only b
     expect(computeViewportFloor([b])?.narrativeRows).toBe(25);
   });
+
+  it("picks the narrower columns on a narrativeRows tie", () => {
+    // Same narrativeRows but different widths — without tiebreak, the
+    // chosen `columns` would be insertion-order-dependent, which
+    // mis-sizes GameEngine.wrappedLineCount.
+    const wide = client({ columns: 200, rows: 50, narrativeRows: 30 });
+    const narrow = client({ columns: 80, rows: 50, narrativeRows: 30 });
+    expect(computeViewportFloor([wide, narrow])?.columns).toBe(80);
+    expect(computeViewportFloor([narrow, wide])?.columns).toBe(80);
+  });
+
+  it("picks the smaller rows on a (narrativeRows, columns) tie", () => {
+    // Same narrativeRows AND same columns but different total rows —
+    // tertiary tiebreak so the result is fully deterministic.
+    const tall = client({ columns: 80, rows: 60, narrativeRows: 30 });
+    const short = client({ columns: 80, rows: 40, narrativeRows: 30 });
+    expect(computeViewportFloor([tall, short])?.rows).toBe(40);
+    expect(computeViewportFloor([short, tall])?.rows).toBe(40);
+  });
 });

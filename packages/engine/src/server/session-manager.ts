@@ -59,9 +59,16 @@ export interface ConnectedClient {
 }
 
 /**
- * Compute the viewport floor — the entry with the smallest `narrativeRows`
- * across all clients that have reported dims. Returns undefined if no
- * client has reported. Exported for unit testing.
+ * Compute the viewport floor — the most-constrained dims across all
+ * clients that have reported. Returns undefined if no client has
+ * reported. Exported for unit testing.
+ *
+ * Primary sort: smallest `narrativeRows` (drives the length hint).
+ * Tiebreak: smallest `columns`, then smallest `rows`. Without the
+ * tiebreak two clients sharing terminal height but with different
+ * widths would yield insertion-order-dependent columns, which mis-sizes
+ * GameEngine's wrappedLineCount calculation (it uses
+ * `terminalDims.columns - 4` as the wrap width).
  */
 export function computeViewportFloor(
   clients: Iterable<Pick<ConnectedClient, "dims">>,
@@ -69,8 +76,18 @@ export function computeViewportFloor(
   let floor: { columns: number; rows: number; narrativeRows: number } | undefined;
   for (const entry of clients) {
     if (!entry.dims) continue;
-    if (!floor || entry.dims.narrativeRows < floor.narrativeRows) {
+    if (!floor) {
       floor = entry.dims;
+      continue;
+    }
+    if (entry.dims.narrativeRows < floor.narrativeRows) {
+      floor = entry.dims;
+    } else if (entry.dims.narrativeRows === floor.narrativeRows) {
+      if (entry.dims.columns < floor.columns) {
+        floor = entry.dims;
+      } else if (entry.dims.columns === floor.columns && entry.dims.rows < floor.rows) {
+        floor = entry.dims;
+      }
     }
   }
   return floor;

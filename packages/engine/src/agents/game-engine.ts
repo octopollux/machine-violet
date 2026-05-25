@@ -195,8 +195,15 @@ export class GameEngine {
     const lengthInjection = new LengthSteeringInjection();
     // Route the "no viewport reported" fallback warning through the same
     // dev-log channel so it surfaces alongside other injection traces
-    // instead of going to stderr.
-    lengthInjection.setWarnFn((msg) => params.callbacks.onDevLog?.(msg));
+    // instead of going to stderr. Only override when onDevLog is
+    // actually wired — otherwise leave the injection's default
+    // console.warn fallback in place so the warning isn't silently
+    // dropped in environments (tests, headless dev) that don't supply
+    // onDevLog.
+    if (params.callbacks.onDevLog) {
+      const onDevLog = params.callbacks.onDevLog;
+      lengthInjection.setWarnFn((msg) => onDevLog(msg));
+    }
     this.injectionRegistry.register(lengthInjection);
     this.injectionRegistry.register(new HardStatsInjection());
 
