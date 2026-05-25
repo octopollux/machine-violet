@@ -13,7 +13,7 @@ import { updatePrecis } from "./subagents/precis-updater.js";
 import { trackScene } from "./subagents/scene-tracker.js";
 import type { PlayerRead } from "./subagents/precis-updater.js";
 import { updateChangelogs } from "./subagents/changelog-updater.js";
-import { updateCompendium, emptyCompendium, renderCompendiumForDM } from "./subagents/compendium-updater.js";
+import { updateCompendium, emptyCompendium, renderCompendiumForDM, canonicalizeCompendium } from "./subagents/compendium-updater.js";
 import type { Compendium } from "@machine-violet/shared/types/compendium.js";
 import { advanceCalendar, checkClocks } from "../tools/clocks/index.js";
 import { validateCampaign } from "../tools/validation/index.js";
@@ -796,7 +796,9 @@ export class SceneManager {
     let current: Compendium;
     try {
       if (await this.fileIO.exists(paths.compendium)) {
-        current = JSON.parse(await this.fileIO.readFile(paths.compendium)) as Compendium;
+        current = canonicalizeCompendium(
+          JSON.parse(await this.fileIO.readFile(paths.compendium)) as Compendium,
+        );
       } else {
         current = emptyCompendium();
       }
