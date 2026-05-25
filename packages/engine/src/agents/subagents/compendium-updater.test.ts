@@ -227,6 +227,28 @@ describe("canonicalizeCompendium", () => {
     expect(twice).toEqual(once);
   });
 
+  it("backfills missing category arrays (legacy compendiums)", () => {
+    // Old saves predate the `items` category. Canonicalizing them must not
+    // throw — disk-read migration paths in scene-manager and the data route
+    // both call this on raw JSON.
+    const legacy = {
+      version: 1 as const,
+      lastUpdatedScene: 1,
+      characters: [entry({ name: "The Hermit", slug: "the-hermit", related: ["the-thornwood"] })],
+      places: [entry({ name: "The Thornwood", slug: "the-thornwood" })],
+      // items intentionally absent
+      storyline: [],
+      lore: [],
+      objectives: [],
+    } as unknown as Compendium;
+
+    const out = canonicalizeCompendium(legacy);
+    expect(out.items).toEqual([]);
+    expect(out.characters[0].slug).toBe("hermit");
+    expect(out.characters[0].related).toEqual(["thornwood"]);
+    expect(out.places[0].slug).toBe("thornwood");
+  });
+
   it("does not mutate the input", () => {
     const input: Compendium = {
       ...emptyCompendium(),

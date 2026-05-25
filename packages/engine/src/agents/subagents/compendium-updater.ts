@@ -126,7 +126,12 @@ export function canonicalizeCompendium(compendium: Compendium): Compendium {
 
   for (const category of COMPENDIUM_CATEGORIES) {
     const entries = compendium[category];
-    if (!Array.isArray(entries)) continue;
+    // Legacy saves predate some categories (e.g. `items`) — backfill so the
+    // second pass below can iterate every category unconditionally.
+    if (!Array.isArray(entries)) {
+      result[category] = [];
+      continue;
+    }
     const rewritten: CompendiumEntry[] = [];
     for (const entry of entries) {
       const canonical = slugify(entry.name);
