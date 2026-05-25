@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { LLMProvider, ChatResult, NormalizedUsage } from "../../providers/types.js";
 import { styleTheme } from "./theme-styler.js";
 import { resetPromptCache } from "../../prompts/load-prompt.js";
+import { listAvailableThemes, resetThemeListCache } from "./theme-list.js";
 
 // --- Mock helpers ---
 
@@ -34,6 +35,7 @@ function mockProvider(response: string): LLMProvider {
 
 beforeEach(() => {
   resetPromptCache();
+  resetThemeListCache();
 });
 
 describe("styleTheme", () => {
@@ -96,5 +98,26 @@ describe("styleTheme", () => {
 
     expect(result.usage.inputTokens).toBe(50);
     expect(result.usage.outputTokens).toBe(20);
+  });
+
+  it("injects every bundled theme into the system prompt", async () => {
+    const provider = mockProvider('{"theme":"gothic"}');
+    await styleTheme(provider, "anything", undefined, undefined, "claude-haiku-4-5-20251001");
+
+    const chatCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const systemBlocks = chatCall.systemPrompt as { text: string }[];
+    const systemText = systemBlocks.map((b) => b.text).join("\n");
+    const themes = listAvailableThemes();
+
+    // Sanity: there should be many themes — guards against an empty asset dir.
+    expect(themes.length).toBeGreaterThan(10);
+
+    // Every bundled theme name should appear in the prompt.
+    for (const theme of themes) {
+      expect(systemText).toContain(theme.name);
+    }
+
+    // The placeholder must have been substituted.
+    expect(systemText).not.toContain("{{themes_list}}");
   });
 });

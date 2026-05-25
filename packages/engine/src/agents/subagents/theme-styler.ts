@@ -11,7 +11,8 @@ import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import type { TuiCommand } from "../agent-loop.js";
 import { getMaxOutput } from "../../config/model-registry.js";
-import { loadPrompt } from "../../prompts/load-prompt.js";
+import { loadTemplate } from "../../prompts/load-prompt.js";
+import { listAvailableThemes, formatThemesForPrompt } from "./theme-list.js";
 
 export interface ThemeStylerResult extends SubagentResult {
   /** The parsed theme command to dispatch, or null if parsing failed */
@@ -40,10 +41,17 @@ export async function styleTheme(
 
   const userMessage = `${context}Request: ${description}`;
 
+  const themesList = formatThemesForPrompt(listAvailableThemes());
+  const systemPrompt = loadTemplate(
+    "theme-styler",
+    { themes_list: themesList },
+    model,
+  );
+
   const result = await oneShot(
     provider,
     model,
-    loadPrompt("theme-styler", model),
+    systemPrompt,
     userMessage,
     getMaxOutput(model),
     "theme-styler",
