@@ -197,6 +197,24 @@ Tighten the rule against "not X, but Y" sentence construction.
 
 Cache reset: tests must call `resetPromptCache()` in `beforeEach`.
 
+### Includes and cascading entity override
+
+Reusable prompt fragments live in `packages/engine/src/prompts/include/` and are pulled in by directive:
+
+```markdown
+<!--include:NPCS-->
+<!--include:NPCS.Military-->
+```
+
+- The file is `include/<TagName>.md` — the directive's prefix is the file stem.
+- The directive expands inline to `<TagName>...</TagName>`. The outer tag is **always** the file stem, never the variant name — `NPCS.Military` produces `<NPCS>`, not `<Military>` or `<NPCS.Military>`. The dot picks a variant of the same logical entity.
+- Dotless includes look for a section named the same as the file stem (`<NPCS>` inside `NPCS.md`) as the conventional default. A file with no top-level XML sections is treated as one implicit default section.
+- Pipeline order: model conditionals → process includes → strip comments. Includes are HTML-comment-shaped, so they have to be expanded before comment stripping, but after conditionals (so a conditional can gate whether an include happens).
+
+When the same top-level `<TAG>` block appears across the DM's three prompt layers — main DM (`dm-identity` + `dm-directives`) → campaign seed (`campaign_detail`) → DM personality (`prompt_fragment` + `detail`) — the latest layer wins. Earlier occurrences are stripped entirely. This lets a personality template redefine the `<NPCS>` block established by the main prompt without editing the main file. Implemented by `applyLayeredOverrides` in `process-includes.ts`, invoked from `buildDMPrefix`.
+
+Inline `<TAG>...</TAG>` blocks (written literally in a prompt, no include directive) participate in the override too — they're the same kind of entity. Indented or inline-style XML like the narration formatters (`<b>`, `<color=...>`, `<center>`) is never matched because top-level requires the open tag at column 0.
+
 ## Client: commands/ — Slash Commands
 
 Player commands during gameplay. `trySlashCommand()` parses and dispatches.

@@ -3,6 +3,7 @@ import { buildCachedPrefix } from "../context/index.js";
 import type { PrefixSections, CachedPrefixResult } from "../context/index.js";
 import { getModel } from "../config/models.js";
 import { loadPrompt } from "../prompts/load-prompt.js";
+import { processIncludes, applyLayeredOverrides } from "../prompts/process-includes.js";
 
 /**
  * Session state needed to build the DM's prefix.
@@ -58,12 +59,44 @@ export function buildDMPrefix(
   modelId?: string,
 ): CachedPrefixResult {
   const model = modelId ?? getModel("large");
+
+  // Three prompt layers, in cascading-override priority order
+  // (lowest → highest): main DM (dm-identity + dm-directives) → campaign
+  // seed (campaign_detail) → DM personality (prompt_fragment + detail).
+  //
+  // Each layer's text may contain `<!--include:Tag.Variant-->` directives
+  // and top-level `<TAG>...</TAG>` blocks. Includes are resolved per layer
+  // (loadPrompt already does this for the file-based layers; the inline
+  // strings go through processIncludes here). Then applyLayeredOverrides
+  // walks all five slots in order — when the same tag appears in more than
+  // one slot, only the last occurrence survives, so a personality's
+  // `<NPCS>` block trumps a seed's, which in turn trumps the main DM's.
+  const dmIdentity = loadPrompt("dm-identity", model);
+  const dmDirectives = loadPrompt("dm-directives", model);
+  const campaignDetail = processIncludes(config.campaign_detail ?? "");
+  const personality = processIncludes(config.dm_personality.prompt_fragment ?? "");
+  const personalityDetail = processIncludes(config.dm_personality.detail ?? "");
+
+  const [
+    oDmIdentity,
+    oDmDirectives,
+    oCampaignDetail,
+    oPersonality,
+    oPersonalityDetail,
+  ] = applyLayeredOverrides([
+    dmIdentity,
+    dmDirectives,
+    campaignDetail,
+    personality,
+    personalityDetail,
+  ]);
+
   const sections: PrefixSections = {
-    dmIdentity: loadPrompt("dm-identity", model),
-    dmDirectives: loadPrompt("dm-directives", model),
-    personality: config.dm_personality.prompt_fragment,
-    personalityDetail: config.dm_personality.detail,
-    campaignDetail: config.campaign_detail,
+    dmIdentity: oDmIdentity,
+    dmDirectives: oDmDirectives,
+    personality: oPersonality,
+    personalityDetail: oPersonalityDetail || undefined,
+    campaignDetail: oCampaignDetail || undefined,
     ...sessionState,
   };
 

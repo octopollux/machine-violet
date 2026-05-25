@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { assetDir } from "../utils/paths.js";
 import { applyModelConditionals } from "./apply-model-conditionals.js";
+import { processIncludes } from "./process-includes.js";
 
 const cache = new Map<string, string>();
 
@@ -26,9 +27,12 @@ export function stripComments(text: string): string {
  * Load a prompt .md file from the prompts directory.
  * Reads synchronously on first call, caches thereafter (keyed by name + modelId).
  *
- * Pipeline: read → CRLF normalize → apply model conditionals → strip comments.
- * The conditional preprocessor runs before comment stripping because conditional
- * markers are HTML-comment-shaped (`<!--if:...-->`).
+ * Pipeline: read → CRLF normalize → apply model conditionals → process
+ * includes → strip comments. `processIncludes` sits between conditionals
+ * and comment stripping because the `<!--include:Tag.Variant-->` directive
+ * is HTML-comment-shaped — conditionals must still fire first (so they can
+ * gate whether an include happens), then includes resolve, then any
+ * remaining comments are stripped.
  *
  * @param name - Prompt filename without .md extension (e.g. "dm-identity")
  * @param modelId - Active model ID, used by `<!--if:PREFIX-->` conditionals.
@@ -43,7 +47,7 @@ export function loadPrompt(name: string, modelId?: string): string {
   const dir = assetDir("prompts");
   const filePath = join(dir, `${name}.md`);
   const raw = readFileSync(filePath, "utf-8").replace(/\r\n/g, "\n");
-  const content = stripComments(applyModelConditionals(raw, modelId));
+  const content = stripComments(processIncludes(applyModelConditionals(raw, modelId)));
   cache.set(key, content);
   return content;
 }
