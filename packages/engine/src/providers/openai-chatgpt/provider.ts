@@ -542,12 +542,23 @@ export class OpenAIChatGptProvider implements LLMProvider {
       const turnId = turnStart.turn.id;
 
       const completed = await completion;
+      const errorMessage = completed.turn.error?.message ?? null;
       log.turnComplete({
         threadId,
         turnId,
         durationMs: completed.turn.durationMs,
         status: completed.turn.status,
+        error: errorMessage,
       });
+
+      // A failed Codex turn is a system-level failure (model-not-found,
+      // auth, rate limit, tools schema mismatch, etc), not a content
+      // refusal. Surface the reason instead of returning empty text —
+      // callers like setup-conversation don't check stopReason and would
+      // otherwise render nothing.
+      if (completed.turn.status === "failed") {
+        throw new CodexTurnFailedError(errorMessage ?? "(no error message from codex)", turnId);
+      }
 
       return collected.toChatResult(completed);
     } finally {
@@ -886,3 +897,27 @@ export class TurnCollector {
 
 // Re-export for tests / callers that need to recover from spawn failures.
 export { CodexRpcError } from "./rpc.js";
+
+/**
+ * Thrown when a Codex turn returns `status: "failed"`. Carries the
+ * `turn.error.message` Codex reported alongside the failure — without it
+ * callers see only `status: "failed"` in the engine log and can't tell why
+ * (model not found, auth expired, rate limit, tools schema mismatch, …).
+ *
+ * Why throw instead of returning an empty ChatResult? A failed turn is a
+ * system-level error, not a content refusal. The previous behavior mapped
+ * `failed → stopReason: "refusal"` with empty text, which callers like
+ * setup-conversation (which calls `provider.chat()` directly without an
+ * agent-loop wrapper) silently treated as a no-op, rendering nothing to
+ * the player. Throwing forces callers to either handle the failure
+ * explicitly or surface it as an error event.
+ */
+export class CodexTurnFailedError extends Error {
+  constructor(
+    public readonly codexMessage: string,
+    public readonly turnId: string,
+  ) {
+    super(`Codex turn ${turnId} failed: ${codexMessage}`);
+    this.name = "CodexTurnFailedError";
+  }
+}

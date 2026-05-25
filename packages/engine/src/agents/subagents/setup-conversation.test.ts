@@ -40,6 +40,17 @@ function textResponse(text: string, usage?: NormalizedUsage): ChatResult {
   };
 }
 
+/** Empty refusal — what providers that don't throw on system failure return. */
+function refusalResponse(): ChatResult {
+  return {
+    text: "",
+    toolCalls: [],
+    usage: mockUsage(0, 0),
+    stopReason: "refusal",
+    assistantContent: [],
+  };
+}
+
 function presentChoicesResponse(text: string, prompt: string, choices: string[]): ChatResult {
   return {
     text,
@@ -166,6 +177,34 @@ describe("createSetupConversation", () => {
     await conv.start(noop);
 
     await expect(conv.resolveChoice("anything", noop)).rejects.toThrow("No pending choice to resolve");
+  });
+
+  it("throws a clear error when the provider returns an empty refusal", async () => {
+    // Mirrors the Codex `status: "failed"` case the openai-chatgpt
+    // provider now throws on directly. This is the defense-in-depth path
+    // for any other provider that returns refusal + empty content
+    // (Anthropic safety filter, OpenAI content_filter incomplete, etc).
+    // Previously this caused setup to render nothing — the player saw a
+    // hang. It must now surface as a visible error.
+    const provider = mockProvider([refusalResponse()]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    await expect(conv.start(noop)).rejects.toThrow(/refused or failed to respond/);
+  });
+
+  it("does NOT throw on refusal when the model still produced some content", async () => {
+    // A refusal that still has narrative text shouldn't be treated as a
+    // dead end — the model said something, just with a refusal stop reason.
+    const partial: ChatResult = {
+      text: "I can't help with that, but here's a different idea.",
+      toolCalls: [],
+      usage: mockUsage(),
+      stopReason: "refusal",
+      assistantContent: [{ type: "text", text: "I can't help with that, but here's a different idea." }],
+    };
+    const provider = mockProvider([partial]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+    expect(result.text).toContain("different idea");
   });
 
   it("finalize_setup populates finalized result", async () => {

@@ -47,6 +47,13 @@ export const log = {
     logEvent("codex:thread:start", data),
   turnStart: (data: { threadId: string; turnId?: string; effort?: string }) =>
     logEvent("codex:turn:start", data),
-  turnComplete: (data: { threadId: string; turnId: string; durationMs: number; status: string }) =>
-    logEvent("codex:turn:complete", data),
+  turnComplete: (data: {
+    threadId: string;
+    turnId: string;
+    durationMs: number;
+    status: string;
+    /** Codex's own error message when status === "failed". Carries the only
+     *  hint about why the turn aborted (model not found, auth issue, etc). */
+    error?: string | null;
+  }) => logEvent("codex:turn:complete", data),
 };
