@@ -30,14 +30,14 @@ export function isCompiled(): boolean {
  *   src/assets/            — bundled data assets (e.g. names/names.json)
  *   ../../systems/         — systems/ is at the monorepo root
  *   ../../worlds/          — .mvworld seed files at the monorepo root
- *   ../../src/tui/themes/assets/ — themes are in the monolith TUI (engine doesn't use this)
+ *   ../client-ink/src/tui/themes/assets/ — themes live in the TUI package
  */
 const _cache = new Map<string, string>();
 
 // Paths relative to the *package* root (packages/engine/)
 const DEV_ASSET_DIRS: Record<string, string> = {
   prompts: "src/prompts",
-  themes: "../../src/tui/themes/assets",
+  themes: "../client-ink/src/tui/themes/assets",
   systems: "../../systems",
   worlds: "../../worlds",
   config: "src/config",
