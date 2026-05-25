@@ -110,4 +110,23 @@ export interface CampaignConfig {
   recovery: RecoveryConfig;
   choices: ChoicesConfig;
   calendar_display_format?: string;
+  /**
+   * Multiplier (in percent) applied to the narrative row count reported to
+   * the DM in the per-turn `[length]` hint. Default 80 — the DM sees a
+   * smaller page than the terminal actually has, which nudges it toward
+   * tighter prose. Overlong-response tracking still uses the real row count.
+   * Range 50–150 in 5% steps.
+   */
+  dm_turn_length_pct?: number;
+}
+
+export const DM_TURN_LENGTH_PCT_DEFAULT = 80;
+export const DM_TURN_LENGTH_PCT_MIN = 50;
+export const DM_TURN_LENGTH_PCT_MAX = 150;
+export const DM_TURN_LENGTH_PCT_STEP = 5;
+
+/** Clamp a candidate pct to the supported range, rounded to the step. */
+export function clampDmTurnLengthPct(value: number): number {
+  const stepped = Math.round(value / DM_TURN_LENGTH_PCT_STEP) * DM_TURN_LENGTH_PCT_STEP;
+  return Math.max(DM_TURN_LENGTH_PCT_MIN, Math.min(DM_TURN_LENGTH_PCT_MAX, stepped));
 }

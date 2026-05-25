@@ -1,6 +1,7 @@
 import { registry as singletonRegistry } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
 import type { EntityTree } from "@machine-violet/shared/types/entities.js";
+import { DM_TURN_LENGTH_PCT_DEFAULT } from "@machine-violet/shared/types/config.js";
 import { agentLoopStreaming } from "./agent-loop.js";
 import type { AgentLoopConfig, TuiCommand, UsageStats } from "./agent-loop.js";
 import type { LLMProvider, NormalizedMessage, ContentPart, TierProvider } from "../providers/types.js";
@@ -191,7 +192,12 @@ export class GameEngine {
     this.injectionRegistry = new InjectionRegistry();
     this.injectionRegistry.register(new BehaviorInjection());
     this.injectionRegistry.register(new ScenePacingInjection());
-    this.injectionRegistry.register(new LengthSteeringInjection());
+    const lengthInjection = new LengthSteeringInjection();
+    // Route the "no viewport reported" fallback warning through the same
+    // dev-log channel so it surfaces alongside other injection traces
+    // instead of going to stderr.
+    lengthInjection.setWarnFn((msg) => params.callbacks.onDevLog?.(msg));
+    this.injectionRegistry.register(lengthInjection);
     this.injectionRegistry.register(new HardStatsInjection());
 
     // Wire dev logging to scene manager
@@ -524,6 +530,7 @@ export class GameEngine {
       scene: this.sceneManager.getScene(),
       skipTranscript: !!opts?.skipTranscript,
       terminalDims: this.terminalDims,
+      dmTurnLengthPct: this.gameState.config.dm_turn_length_pct ?? DM_TURN_LENGTH_PCT_DEFAULT,
       hardStatsText,
     };
     preambleParts.push(...this.injectionRegistry.buildAll(injCtx, this.callbacks.onDevLog));

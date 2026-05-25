@@ -2,7 +2,15 @@ import React, { useCallback, useState } from "react";
 import { useInput } from "ink";
 import type { ResolvedTheme } from "../themes/types.js";
 import type { CampaignConfig, ChoiceFrequency } from "@machine-violet/shared/types/config.js";
-import { CHOICE_FREQUENCY_LEVELS, CAMPAIGN_SCOPE_LABELS } from "@machine-violet/shared/types/config.js";
+import {
+  CHOICE_FREQUENCY_LEVELS,
+  CAMPAIGN_SCOPE_LABELS,
+  DM_TURN_LENGTH_PCT_DEFAULT,
+  DM_TURN_LENGTH_PCT_MIN,
+  DM_TURN_LENGTH_PCT_MAX,
+  DM_TURN_LENGTH_PCT_STEP,
+  clampDmTurnLengthPct,
+} from "@machine-violet/shared/types/config.js";
 import { CenteredModal } from "./CenteredModal.js";
 
 export interface CampaignSettingsModalProps {
@@ -13,6 +21,13 @@ export interface CampaignSettingsModalProps {
   onDismiss: () => void;
   /** Persists an edited Choices Frequency. Called on Enter when the value changed. */
   onChoicesFrequencyChange?: (value: ChoiceFrequency) => void | Promise<void>;
+  /** Persists an edited DM turn length (percent). Called on Enter when the value changed. */
+  onDmTurnLengthPctChange?: (value: number) => void | Promise<void>;
+  /**
+   * Client-side global default applied when the campaign has no saved value.
+   * Defaults to DM_TURN_LENGTH_PCT_DEFAULT (80).
+   */
+  globalDmTurnLengthPctDefault?: number;
 }
 
 const FREQUENCY_LABELS: Record<ChoiceFrequency, string> = {
@@ -30,9 +45,12 @@ function normalize(value: string | undefined): ChoiceFrequency {
   return "never";
 }
 
+type FocusRow = "choices" | "length";
+
 /**
  * Campaign settings shown from the in-campaign ESC menu.
- * Identity fields are read-only; Choices Frequency is editable with ← / →.
+ * Identity fields are read-only; Choices Frequency and DM Turn Length are
+ * editable. ↑ / ↓ move between rows; ← / → adjust the focused row.
  *
  * Uses CenteredModal's plain-text `lines` mode so every row is padded to
  * innerWidth and rendered opaque — the children-with-short-Text path leaves
@@ -45,58 +63,93 @@ export function CampaignSettingsModal({
   config,
   onDismiss,
   onChoicesFrequencyChange,
+  onDmTurnLengthPctChange,
+  globalDmTurnLengthPctDefault,
 }: CampaignSettingsModalProps) {
-  const initial = normalize(config.choices?.campaign_default);
-  const [freq, setFreq] = useState<ChoiceFrequency>(initial);
+  const initialFreq = normalize(config.choices?.campaign_default);
+  // Initial pct: saved per-campaign value → client global default → hard 80.
+  const initialPct = clampDmTurnLengthPct(
+    config.dm_turn_length_pct ?? globalDmTurnLengthPctDefault ?? DM_TURN_LENGTH_PCT_DEFAULT,
+  );
+  const [freq, setFreq] = useState<ChoiceFrequency>(initialFreq);
+  const [pct, setPct] = useState<number>(initialPct);
+  const [focus, setFocus] = useState<FocusRow>("choices");
   const [saving, setSaving] = useState(false);
-  const dirty = freq !== initial;
+  const dirtyFreq = freq !== initialFreq;
+  const dirtyPct = pct !== initialPct;
+  const dirty = dirtyFreq || dirtyPct;
 
   const commit = useCallback(async () => {
-    if (dirty && onChoicesFrequencyChange) {
-      setSaving(true);
-      try {
-        await onChoicesFrequencyChange(freq);
-      } finally {
-        setSaving(false);
+    if (!dirty) {
+      onDismiss();
+      return;
+    }
+    setSaving(true);
+    try {
+      const tasks: Promise<unknown>[] = [];
+      if (dirtyFreq && onChoicesFrequencyChange) {
+        tasks.push(Promise.resolve(onChoicesFrequencyChange(freq)));
       }
+      if (dirtyPct && onDmTurnLengthPctChange) {
+        tasks.push(Promise.resolve(onDmTurnLengthPctChange(pct)));
+      }
+      await Promise.all(tasks);
+    } finally {
+      setSaving(false);
     }
     onDismiss();
-  }, [dirty, freq, onChoicesFrequencyChange, onDismiss]);
+  }, [dirty, dirtyFreq, dirtyPct, freq, pct, onChoicesFrequencyChange, onDmTurnLengthPctChange, onDismiss]);
 
   useInput((_input, key) => {
     if (saving) return;
+    if (key.upArrow) { setFocus("choices"); return; }
+    if (key.downArrow) { setFocus("length"); return; }
     if (key.leftArrow) {
-      setFreq((f) => {
-        const idx = CHOICE_FREQUENCY_LEVELS.indexOf(f);
-        return CHOICE_FREQUENCY_LEVELS[Math.max(0, idx - 1)];
-      });
+      if (focus === "choices") {
+        setFreq((f) => {
+          const idx = CHOICE_FREQUENCY_LEVELS.indexOf(f);
+          return CHOICE_FREQUENCY_LEVELS[Math.max(0, idx - 1)];
+        });
+      } else {
+        setPct((p) => Math.max(DM_TURN_LENGTH_PCT_MIN, p - DM_TURN_LENGTH_PCT_STEP));
+      }
       return;
     }
     if (key.rightArrow) {
-      setFreq((f) => {
-        const idx = CHOICE_FREQUENCY_LEVELS.indexOf(f);
-        return CHOICE_FREQUENCY_LEVELS[Math.min(CHOICE_FREQUENCY_LEVELS.length - 1, idx + 1)];
-      });
+      if (focus === "choices") {
+        setFreq((f) => {
+          const idx = CHOICE_FREQUENCY_LEVELS.indexOf(f);
+          return CHOICE_FREQUENCY_LEVELS[Math.min(CHOICE_FREQUENCY_LEVELS.length - 1, idx + 1)];
+        });
+      } else {
+        setPct((p) => Math.min(DM_TURN_LENGTH_PCT_MAX, p + DM_TURN_LENGTH_PCT_STEP));
+      }
       return;
     }
     if (key.return) { void commit(); return; }
     if (key.escape) { onDismiss(); return; }
   });
 
-  // Build the slider line: ◂  Never  Rarely  [Sometimes]  Often  Always  ▸
-  // Each segment uses matching space-padding (" Sometimes " vs "[Sometimes]")
-  // so the line width doesn't shift as the user moves between selections.
-  const sliderSegments = CHOICE_FREQUENCY_LEVELS.map((level) => {
+  // Choices Frequency slider line.
+  const freqSegments = CHOICE_FREQUENCY_LEVELS.map((level) => {
     const label = FREQUENCY_LABELS[level];
     return level === freq ? `[${label}]` : ` ${label} `;
   });
-  const sliderLine = `  ◂ ${sliderSegments.join(" ")} ▸`;
+  const freqArrows = focus === "choices" ? "◂" : " ";
+  const freqArrowsR = focus === "choices" ? "▸" : " ";
+  const freqLine = `  ${freqArrows} ${freqSegments.join(" ")} ${freqArrowsR}`;
+
+  // DM Turn Length line — shown as "[ 80% ]" with arrows when focused.
+  const pctArrows = focus === "length" ? "◂" : " ";
+  const pctArrowsR = focus === "length" ? "▸" : " ";
+  const pctValue = focus === "length" ? `[${pct}%]` : ` ${pct}% `;
+  const pctLine = `  ${pctArrows} ${pctValue} ${pctArrowsR}    (range ${DM_TURN_LENGTH_PCT_MIN}–${DM_TURN_LENGTH_PCT_MAX}%, default ${DM_TURN_LENGTH_PCT_DEFAULT}%)`;
 
   const hintLine = saving
     ? "  Saving..."
     : dirty
-      ? "  Enter saves · ESC cancels"
-      : "  ← / → to adjust · Enter to close";
+      ? "  Enter saves · ESC cancels · ↑ / ↓ rows · ← / → adjust"
+      : "  ↑ / ↓ rows · ← / → adjust · Enter to close";
 
   const lines: string[] = [];
   lines.push(`  Campaign:   ${config.name}`);
@@ -109,10 +162,16 @@ export function CampaignSettingsModal({
     if (scopeLabel) lines.push(`  Scope:      ${scopeLabel}`);
   }
   lines.push("");
-  lines.push("  Choices Frequency");
+  lines.push(focus === "choices" ? "  ▶ Choices Frequency" : "    Choices Frequency");
   lines.push("    How often the DM offers you a set of suggested responses.");
   lines.push("");
-  lines.push(sliderLine);
+  lines.push(freqLine);
+  lines.push("");
+  lines.push(focus === "length" ? "  ▶ DM Turn Length" : "    DM Turn Length");
+  lines.push("    Page size the DM is told about. Lower = tighter prose;");
+  lines.push("    100% = actual size. 80% is a useful starting nudge.");
+  lines.push("");
+  lines.push(pctLine);
   lines.push("");
   lines.push(hintLine);
 

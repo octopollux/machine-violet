@@ -189,7 +189,16 @@ Everything else is created during play.
   },
 
   // Display
-  "calendar_display_format": null         // Freeform format hint for calendar display.
+  "calendar_display_format": null,        // Freeform format hint for calendar display.
+
+  // DM prose-length tuning
+  "dm_turn_length_pct": 80                // Optional. Multiplier (in percent) applied to the
+                                          // narrative-row count reported to the DM in each turn's
+                                          // [length] hint. 80 = tell the DM the page is 20% shorter
+                                          // than it really is, nudging tighter prose. Overlong-response
+                                          // tracking still uses the real row count. Range 50–150 in
+                                          // 5% steps; default 80. Editable from the in-game Campaign
+                                          // Settings modal (Esc → Settings).
 }
 ```
 

@@ -28,7 +28,12 @@ function minimalConfig(overrides?: Partial<CampaignConfig>): CampaignConfig {
   };
 }
 
-function renderModal(config: CampaignConfig, onFreq?: (v: ChoiceFrequency) => void) {
+function renderModal(
+  config: CampaignConfig,
+  onFreq?: (v: ChoiceFrequency) => void,
+  onPct?: (v: number) => void,
+  globalDefault?: number,
+) {
   const theme = makeTheme();
   return render(
     <Box width={80} height={30}>
@@ -39,6 +44,8 @@ function renderModal(config: CampaignConfig, onFreq?: (v: ChoiceFrequency) => vo
         config={config}
         onDismiss={() => {}}
         onChoicesFrequencyChange={onFreq}
+        onDmTurnLengthPctChange={onPct}
+        globalDmTurnLengthPctDefault={globalDefault}
       />
     </Box>,
   );
@@ -136,5 +143,94 @@ describe("CampaignSettingsModal", () => {
     stdin.write("\r");
     await new Promise((r) => setTimeout(r, 10));
     expect(onFreq).not.toHaveBeenCalled();
+  });
+
+  it("renders the DM Turn Length row with the default 80% when unset", () => {
+    const { lastFrame } = renderModal(minimalConfig());
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("DM Turn Length");
+    expect(frame).toContain("80%");
+  });
+
+  it("uses the per-campaign saved value when present", () => {
+    const { lastFrame } = renderModal(minimalConfig({ dm_turn_length_pct: 110 }));
+    expect(lastFrame() ?? "").toContain("110%");
+  });
+
+  it("uses the global client default when the campaign has no saved value", () => {
+    const { lastFrame } = renderModal(minimalConfig(), undefined, undefined, 95);
+    expect(lastFrame() ?? "").toContain("95%");
+  });
+
+  it("adjusts DM Turn Length by 5% on ← / → after ↓ to focus", async () => {
+    const onPct = vi.fn();
+    const { stdin, lastFrame } = renderModal(minimalConfig(), undefined, onPct);
+    stdin.write("[B"); // ↓ — focus length row
+    await new Promise((r) => setTimeout(r, 10));
+    stdin.write("[C"); // → +5
+    await new Promise((r) => setTimeout(r, 10));
+    expect(lastFrame() ?? "").toContain("85%");
+    stdin.write("[C"); // → +5
+    await new Promise((r) => setTimeout(r, 10));
+    expect(lastFrame() ?? "").toContain("90%");
+    stdin.write("[D"); // ← -5
+    await new Promise((r) => setTimeout(r, 10));
+    expect(lastFrame() ?? "").toContain("85%");
+    stdin.write("\r"); // Enter saves
+    await new Promise((r) => setTimeout(r, 10));
+    expect(onPct).toHaveBeenCalledWith(85);
+  });
+
+  it("clamps DM Turn Length to the 50–150 range", async () => {
+    const { stdin, lastFrame } = renderModal(minimalConfig({ dm_turn_length_pct: 50 }));
+    stdin.write("[B"); // ↓
+    await new Promise((r) => setTimeout(r, 10));
+    // Already at min — left shouldn't go below 50
+    stdin.write("[D"); // ←
+    await new Promise((r) => setTimeout(r, 10));
+    expect(lastFrame() ?? "").toContain("50%");
+    expect(lastFrame() ?? "").not.toContain("45%");
+  });
+
+  it("clamps at the upper bound 150", async () => {
+    const { stdin, lastFrame } = renderModal(minimalConfig({ dm_turn_length_pct: 150 }));
+    stdin.write("[B"); // ↓
+    await new Promise((r) => setTimeout(r, 10));
+    stdin.write("[C"); // → — should not go above 150
+    await new Promise((r) => setTimeout(r, 10));
+    expect(lastFrame() ?? "").toContain("150%");
+    expect(lastFrame() ?? "").not.toContain("155%");
+  });
+
+  it("up arrow returns focus to the Choices Frequency row", async () => {
+    const onFreq = vi.fn();
+    const onPct = vi.fn();
+    const { stdin } = renderModal(minimalConfig(), onFreq, onPct);
+    stdin.write("[B"); // ↓ — go to length
+    await new Promise((r) => setTimeout(r, 10));
+    stdin.write("[A"); // ↑ — back to choices
+    await new Promise((r) => setTimeout(r, 10));
+    stdin.write("[C"); // → — should adjust choices, not length
+    await new Promise((r) => setTimeout(r, 10));
+    stdin.write("\r");
+    await new Promise((r) => setTimeout(r, 10));
+    expect(onFreq).toHaveBeenCalledWith("rarely");
+    expect(onPct).not.toHaveBeenCalled();
+  });
+
+  it("saves both fields when both are dirty", async () => {
+    const onFreq = vi.fn();
+    const onPct = vi.fn();
+    const { stdin } = renderModal(minimalConfig(), onFreq, onPct);
+    stdin.write("[C"); // → freq
+    await new Promise((r) => setTimeout(r, 10));
+    stdin.write("[B"); // ↓ length
+    await new Promise((r) => setTimeout(r, 10));
+    stdin.write("[C"); // → length
+    await new Promise((r) => setTimeout(r, 10));
+    stdin.write("\r");
+    await new Promise((r) => setTimeout(r, 10));
+    expect(onFreq).toHaveBeenCalledWith("rarely");
+    expect(onPct).toHaveBeenCalledWith(85);
   });
 });

@@ -38,6 +38,7 @@ function baseCtx(overrides?: Partial<InjectionContext>): InjectionContext {
     scene: mockScene(),
     skipTranscript: false,
     terminalDims: undefined,
+    dmTurnLengthPct: 100, // tests assume identity unless they override
     ...overrides,
   };
 }
@@ -178,9 +179,26 @@ describe("ScenePacingInjection", () => {
 // ---------------------------------------------------------------------------
 
 describe("LengthSteeringInjection", () => {
-  it("returns null when terminalDims is undefined", () => {
+  it("falls back to baked dims and warns when terminalDims is undefined", () => {
     const inj = new LengthSteeringInjection();
-    expect(inj.build(baseCtx())).toBeNull();
+    const warnings: string[] = [];
+    inj.setWarnFn((msg) => warnings.push(msg));
+    const result = inj.build(baseCtx());
+    // Baked default is 80 cols × 20 narrative rows
+    expect(result).toContain("[length]");
+    expect(result).toContain("80 cols");
+    expect(result).toContain("20 visible rows");
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("No client viewport reported");
+  });
+
+  it("only warns once across multiple fallback calls", () => {
+    const inj = new LengthSteeringInjection();
+    const warnings: string[] = [];
+    inj.setWarnFn((msg) => warnings.push(msg));
+    inj.build(baseCtx());
+    inj.build(baseCtx());
+    expect(warnings).toHaveLength(1);
   });
 
   it("injects terminal size on first call", () => {
@@ -189,6 +207,41 @@ describe("LengthSteeringInjection", () => {
     expect(result).toContain("[length]");
     expect(result).toContain("100 cols");
     expect(result).toContain("25 visible rows");
+  });
+
+  it("applies dmTurnLengthPct fib to reported rows only", () => {
+    const inj = new LengthSteeringInjection();
+    // 25 * 0.8 = 20
+    const result = inj.build(baseCtx({ terminalDims: dims(100, 40, 25), dmTurnLengthPct: 80 }));
+    expect(result).toContain("100 cols");
+    expect(result).toContain("20 visible rows");
+    // Real value not in the hint
+    expect(result).not.toContain("25 visible rows");
+  });
+
+  it("overlong tracking uses the real narrativeRows, not the fibbed value", () => {
+    const inj = new LengthSteeringInjection();
+    inj.build(baseCtx({ terminalDims: dims(100, 40, 25), dmTurnLengthPct: 80 }));
+    // 22 lines is over the fibbed 20 but under the real 25 — must NOT count as overlong.
+    inj.afterResponse(responseInfo({ wrappedLineCount: 22 }));
+    inj.afterResponse(responseInfo({ wrappedLineCount: 22 }));
+    const result = inj.build(baseCtx({ terminalDims: dims(100, 40, 25), dmTurnLengthPct: 80 }));
+    // No overlong reminder, no dims change — should be null.
+    expect(result).toBeNull();
+  });
+
+  it("supports pct > 100 (tells the DM the page is bigger than it is)", () => {
+    const inj = new LengthSteeringInjection();
+    // 20 * 1.5 = 30
+    const result = inj.build(baseCtx({ terminalDims: dims(100, 30, 20), dmTurnLengthPct: 150 }));
+    expect(result).toContain("30 visible rows");
+  });
+
+  it("never reports 0 rows even at very low pct/dim combinations", () => {
+    const inj = new LengthSteeringInjection();
+    // 1 * 0.5 = 0.5 → floor 0, clamped to 1
+    const result = inj.build(baseCtx({ terminalDims: dims(80, 10, 1), dmTurnLengthPct: 50 }));
+    expect(result).toContain("1 visible rows");
   });
 
   it("returns null on subsequent calls when dims unchanged and no overlong", () => {

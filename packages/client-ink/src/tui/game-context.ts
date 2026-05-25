@@ -73,9 +73,22 @@ export interface GameContextValue {
   // Settings
   devModeEnabled?: boolean;
   showVerbose?: boolean;
+  /**
+   * Client-side global default for DM turn length percentage. Used by the
+   * Campaign Settings modal as the initial slider value when the active
+   * campaign has no per-campaign override saved yet. Falls through to 80.
+   */
+  dmTurnLengthPctDefault?: number;
 
   // Actions
   onReturnToMenu: () => void;
+  /**
+   * Report this client's current viewport dimensions to the server.
+   * Called on PlayingPhase mount and whenever the terminal resizes;
+   * the server tracks per-client dims and tells the DM about the floor
+   * (smallest narrativeRows across all connected clients).
+   */
+  reportViewport: (dims: { columns: number; rows: number; narrativeRows: number }) => void;
 }
 
 const GameContext = createContext<GameContextValue | null>(null);

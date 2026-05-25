@@ -111,12 +111,14 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
   const [discordEnabled, setDiscordEnabled] = useState<boolean>(true);
   const [devModeEnabled, setDevModeEnabled] = useState(false);
   const [showVerbose, setShowVerbose] = useState(false);
+  const [dmTurnLengthPctDefault, setDmTurnLengthPctDefault] = useState(80);
   const settingsLoaded = useRef(false);
 
   // Load persisted client settings on mount
   useEffect(() => {
     loadClientSettings().then((s) => {
       setShowVerbose(s.showVerbose);
+      setDmTurnLengthPctDefault(s.dmTurnLengthPctDefault);
       settingsLoaded.current = true;
     });
     apiClientRef.current.getMachineSettings().then((s) => {
@@ -133,8 +135,8 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
   // Persist client-only settings whenever they change (skip the initial load)
   useEffect(() => {
     if (!settingsLoaded.current) return;
-    saveClientSettings({ showVerbose }).catch(() => { /* best-effort */ });
-  }, [showVerbose]);
+    saveClientSettings({ showVerbose, dmTurnLengthPctDefault }).catch(() => { /* best-effort */ });
+  }, [showVerbose, dmTurnLengthPctDefault]);
   const [archiveStatus, setArchiveStatus] = useState("");
   const [deleteModal, setDeleteModal] = useState<CampaignDeleteInfo | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -266,6 +268,20 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
     api.getDiscordSettings().then((s) => setDiscordEnabled(s.enabled)).catch(() => { /* ignore */ });
   }, []);
 
+  /**
+   * Report the current terminal viewport to the server so the DM's
+   * length-steering hint can adapt to the smallest connected client.
+   *
+   * Buffered: if the WS isn't open yet (mid-reconnect, or before the
+   * very first connect), the latest dims are stashed and replayed in
+   * the next `onConnect`.
+   */
+  const lastViewportRef = useRef<{ columns: number; rows: number; narrativeRows: number } | null>(null);
+  const reportViewport = useCallback((dims: { columns: number; rows: number; narrativeRows: number }) => {
+    lastViewportRef.current = dims;
+    wsClientRef.current?.send({ type: "client:viewport", data: dims });
+  }, []);
+
   // Return to menu from playing
   const returnToMenu = useCallback(async () => {
     // Show a saving overlay on top of PlayingPhase while the server tears down
@@ -303,6 +319,14 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
         eventHandler(event);
       },
       onConnect: () => {
+        // Replay the last-known viewport so the server's per-client dims
+        // table picks it up immediately — including after a setup→game
+        // session:transition where the server-side entry was cleared on
+        // disconnect. Without the replay the DM would fall back to the
+        // baked default on the first turn of the new session.
+        if (lastViewportRef.current) {
+          wsClientRef.current?.send({ type: "client:viewport", data: lastViewportRef.current });
+        }
         if (campaignId) {
           startCampaign(campaignId);
         } else {
@@ -629,7 +653,9 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
       stdinFilterChain,
       devModeEnabled,
       showVerbose,
+      dmTurnLengthPctDefault,
       onReturnToMenu: returnToMenu,
+      reportViewport,
     }}>
       <PlayingPhase key={`${activeCampaignId}-${sessionKey}`} />
     </GameProvider>

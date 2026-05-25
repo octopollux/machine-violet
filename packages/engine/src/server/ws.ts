@@ -38,10 +38,40 @@ export const wsHandler: FastifyPluginAsync = async (server: FastifyInstance) => 
       );
     });
 
-    // Clients send commands via REST, not WebSocket.
-    // This handler is intentionally empty — the WS is server→client only.
+    // Most client→server traffic goes over REST. The one exception is
+    // `client:viewport`, which the client emits on connect and on resize
+    // so the DM's length-steering hint can adapt to the smallest connected
+    // terminal. Unknown messages are logged and dropped.
     socket.on("message", (data: Buffer) => {
-      // Log unexpected messages but don't process them
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(String(data));
+      } catch {
+        server.log.warn({ data: String(data) }, "Unparseable WebSocket message from client");
+        return;
+      }
+      if (
+        parsed
+        && typeof parsed === "object"
+        && (parsed as { type?: unknown }).type === "client:viewport"
+      ) {
+        const d = (parsed as { data?: unknown }).data;
+        if (
+          d
+          && typeof d === "object"
+          && typeof (d as { columns?: unknown }).columns === "number"
+          && typeof (d as { rows?: unknown }).rows === "number"
+          && typeof (d as { narrativeRows?: unknown }).narrativeRows === "number"
+        ) {
+          const v = d as { columns: number; rows: number; narrativeRows: number };
+          sm.updateClientViewport(socket, {
+            columns: v.columns,
+            rows: v.rows,
+            narrativeRows: v.narrativeRows,
+          });
+          return;
+        }
+      }
       server.log.warn({ data: String(data) }, "Unexpected WebSocket message from client");
     });
   });

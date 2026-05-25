@@ -5,7 +5,7 @@
  * Parses incoming messages as ServerEvent discriminated union.
  * Fires typed callbacks for each event kind.
  */
-import type { ServerEvent } from "@machine-violet/shared";
+import type { ClientEvent, ServerEvent } from "@machine-violet/shared";
 
 export type EventHandler = (event: ServerEvent) => void;
 export type ConnectionHandler = () => void;
@@ -68,6 +68,21 @@ export class WsClient {
   /** True if the WebSocket is currently open. */
   get connected(): boolean {
     return this.ws?.readyState === WebSocket.OPEN;
+  }
+
+  /**
+   * Send a client→server event. Currently used only for `client:viewport`
+   * (the rest of the client→server traffic goes over REST). Silently
+   * dropped if the socket isn't open — the caller is expected to re-send
+   * on the next `onConnect`.
+   */
+  send(event: ClientEvent): void {
+    if (this.ws?.readyState !== WebSocket.OPEN) return;
+    try {
+      this.ws.send(JSON.stringify(event));
+    } catch {
+      // Drop — same rationale as the readyState check.
+    }
   }
 
   // --- Private ---
