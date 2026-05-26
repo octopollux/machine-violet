@@ -121,7 +121,7 @@ Automatic git snapshots provide point-in-time rollback. API failures retry with 
 
 The DM is not an assistant — it runs a world. The system prompt establishes role (decide things, say no, let bad things happen, have secrets, surprise yourself), voice (personality via swappable DM personality fragments), and tool discipline (call the tool when state changes, delegate mechanical work to subagents).
 
-The live prompt is split across [packages/engine/src/prompts/dm-identity.md](../packages/engine/src/prompts/dm-identity.md) (preamble) and [dm-directives.md](../packages/engine/src/prompts/dm-directives.md) (`<roles>`, `<directives>`, `<tools>`, `<gameplay>`, `<pacing>`, `<formatting>` blocks), with a personality fragment slotted between. Read those files directly when working on prompt content — they are the source of truth.
+The live prompt is split across [packages/engine/src/prompts/dm-identity.md](../packages/engine/src/prompts/dm-identity.md) (preamble) and [dm-directives.md](../packages/engine/src/prompts/dm-directives.md) (`<roles>`, `<directives>`, `<tools>`, `<gameplay>`, `<NPC>`, `<About_Pacing>`, `<formatting>` blocks), with a personality fragment slotted between. Read those files directly when working on prompt content — they are the source of truth.
 
 
 ## Implementation Constraints

@@ -37,8 +37,17 @@ import { DEFAULT_LONG_TIMEOUT_MS, DEFAULT_TURN_TIMEOUT_MS, DEFAULT_SHORT_TIMEOUT
 // when its personality list doesn't include this entry.
 const FORCED_PERSONALITY = process.env.SMOKETEST_PERSONALITY?.trim() || null;
 
-const FREE_TEXT_DEFAULT_ANSWER = FORCED_PERSONALITY
-  ? `you decide. Use ${FORCED_PERSONALITY} as the DM personality.`
+// Optional tweak: force a specific campaign world. Same shape as
+// SMOKETEST_PERSONALITY — name match in pickSetupChoice + a hint folded
+// into the free-text default so Quick Start lands on this world even if
+// the agent's offered list doesn't include it.
+const FORCED_WORLD = process.env.SMOKETEST_WORLD?.trim() || null;
+
+const FREE_TEXT_HINTS: string[] = [];
+if (FORCED_WORLD) FREE_TEXT_HINTS.push(`Use ${FORCED_WORLD} as the world.`);
+if (FORCED_PERSONALITY) FREE_TEXT_HINTS.push(`Use ${FORCED_PERSONALITY} as the DM personality.`);
+const FREE_TEXT_DEFAULT_ANSWER = FREE_TEXT_HINTS.length > 0
+  ? `you decide. ${FREE_TEXT_HINTS.join(" ")}`
   : "you decide";
 const PLAYER_FIRST_ACTION = "I look around to take stock of my surroundings.";
 
@@ -208,8 +217,9 @@ function choiceFingerprint(choices: import("../client-state.js").ActiveChoices):
  * FREE_TEXT_DEFAULT_ANSWER still steers the setup agent toward it.)
  */
 function pickSetupChoice(labels: string[]): number {
-  if (FORCED_PERSONALITY) {
-    const desired = FORCED_PERSONALITY.toLowerCase();
+  for (const forced of [FORCED_WORLD, FORCED_PERSONALITY]) {
+    if (!forced) continue;
+    const desired = forced.toLowerCase();
     for (let i = 0; i < labels.length; i++) {
       if (labels[i].toLowerCase() === desired) return i;
     }
