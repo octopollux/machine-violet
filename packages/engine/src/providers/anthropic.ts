@@ -256,7 +256,19 @@ function toAnthropicMessage(msg: NormalizedMessage): Anthropic.MessageParam {
     return { role: msg.role, content: msg.content };
   }
 
-  const content: (Anthropic.TextBlockParam | Anthropic.ToolUseBlockParam | Anthropic.ToolResultBlockParam)[] = [];
+  // Anthropic accepts thinking + redacted_thinking blocks as input — and on
+  // Opus 4.5+ / Sonnet 4.6+ requires them to be sent back for the model's
+  // reasoning to survive turn boundaries. The API auto-filters which blocks
+  // are actually needed and only bills for what it shows the model, so we
+  // pass back everything we captured rather than pruning manually.
+  // See https://platform.claude.com/docs/en/docs/build-with-claude/extended-thinking
+  const content: (
+    | Anthropic.TextBlockParam
+    | Anthropic.ToolUseBlockParam
+    | Anthropic.ToolResultBlockParam
+    | Anthropic.ThinkingBlockParam
+    | Anthropic.RedactedThinkingBlockParam
+  )[] = [];
   for (const part of msg.content) {
     if (part.type === "text") {
       content.push({ type: "text", text: part.text });
@@ -274,10 +286,12 @@ function toAnthropicMessage(msg: NormalizedMessage): Anthropic.MessageParam {
         content: part.content,
         is_error: part.is_error,
       });
+    } else if (part.type === "thinking") {
+      content.push({ type: "thinking", thinking: part.text, signature: part.signature });
+    } else if (part.type === "redacted_thinking") {
+      content.push({ type: "redacted_thinking", data: part.data });
     }
-    // Skip Anthropic `thinking` text blocks — they must not be sent back.
-    // Skip OpenAI `reasoning` blocks too — they're a Responses-API construct
-    // and Anthropic's API would reject them on the input side.
+    // OpenAI `reasoning` blocks are skipped — the Anthropic API rejects them.
   }
   return { role: msg.role, content };
 }
@@ -298,6 +312,22 @@ function fromAnthropicResponse(
   for (const block of response.content) {
     if (block.type === "thinking") {
       thinkingText += block.thinking;
+      // Persist for cross-turn replay. The signature is opaque and required
+      // unchanged on the next turn — on Opus 4.5+/Sonnet 4.6+ this is what
+      // lets the model continue reasoning where it left off instead of
+      // re-deriving setup beat-to-beat. (See issue #533.)
+      assistantContent.push({
+        type: "thinking",
+        text: block.thinking,
+        signature: block.signature,
+      });
+      continue;
+    }
+
+    if (block.type === "redacted_thinking") {
+      // No visible text to surface — the API redacted this reasoning step —
+      // but the opaque `data` payload must round-trip for multi-turn continuity.
+      assistantContent.push({ type: "redacted_thinking", data: block.data });
       continue;
     }
 

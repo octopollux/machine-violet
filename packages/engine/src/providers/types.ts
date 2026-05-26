@@ -19,16 +19,34 @@ export type ContentPart =
   | { type: "text"; text: string }
   | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
   | { type: "tool_result"; tool_use_id: string; content: string; is_error?: boolean }
-  | { type: "thinking"; text: string }
+  /**
+   * Anthropic-shape thinking block. Persisted with the assistant turn and
+   * replayed verbatim on subsequent turns so the model keeps its reasoning
+   * across calls — on Opus 4.5+ and Sonnet 4.6+ these blocks are kept by the
+   * API's automatic cache-prefix calculation. The `signature` is opaque and
+   * MUST round-trip unchanged; passing back a thinking block with a missing
+   * or mismatched signature gets rejected. `text` carries the visible thinking
+   * text (Anthropic's wire field is `thinking`; we normalize the name). OpenAI
+   * providers ignore this variant when serializing back to their APIs.
+   */
+  | { type: "thinking"; text: string; signature: string }
+  /**
+   * Redacted Anthropic thinking block — the model produced reasoning that
+   * triggered a safety classifier, so the API returns only an opaque
+   * `data` payload (no visible text) plus the surrounding `thinking` block
+   * for continuity. Must be round-tripped unchanged on subsequent turns.
+   */
+  | { type: "redacted_thinking"; data: string }
   /**
    * Encrypted reasoning blob produced by an OpenAI reasoning model (Responses
-   * API, with `include: ["reasoning.encrypted_content"]`). Persisted with the
-   * assistant turn and replayed on subsequent turns so the model keeps its
-   * chain-of-thought across calls without us setting `store: true`. The
-   * `encryptedContent` payload is opaque; `summary` mirrors the human-readable
-   * reasoning summary we already surface via `thinkingText` (kept here only so
-   * a turn round-trips identically through persistence). Anthropic ignores
-   * this variant when serializing back to its API.
+   * API, with `include: ["reasoning.encrypted_content"]`, OR by `codex
+   * app-server` via the `rawResponseItem/completed` notification). Persisted
+   * with the assistant turn and replayed on subsequent turns so the model
+   * keeps its chain-of-thought across calls without us setting `store: true`.
+   * The `encryptedContent` payload is opaque; `summary` mirrors the
+   * human-readable reasoning summary we already surface via `thinkingText`
+   * (kept here only so a turn round-trips identically through persistence).
+   * Anthropic ignores this variant when serializing back to its API.
    */
   | { type: "reasoning"; id: string; encryptedContent: string; summary: string[] };
 

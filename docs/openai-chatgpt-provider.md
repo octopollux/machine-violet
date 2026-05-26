@@ -93,6 +93,18 @@ All emitted via `logEvent` to `.debug/engine.jsonl`. Token counts and per-call c
 | `codex:turn:start` | `{ threadId, turnId?, effort? }` | A turn was dispatched |
 | `codex:turn:complete` | `{ threadId, turnId, durationMs, status }` | A turn finished |
 
+(Encrypted-reasoning capture has no dedicated event — it flows through the normal turn capture and shows up in the persisted assistant content. Matches the openai-apikey path which is also silent about reasoning blobs.)
+
+## Reasoning preservation across turns
+
+Reasoning-effort-enabled turns produce an opaque `encrypted_content` blob per reasoning item that the Responses API will accept back as input on subsequent turns — that's what lets the model continue its chain-of-thought instead of re-deriving setup each round. The blob is **not** exposed on codex's sanitized `item/completed` stream (the `ReasoningThreadItem` view defines only `summary` and `content` text). It surfaces on a separate notification: **`rawResponseItem/completed`**.
+
+Capture: the provider subscribes to `rawResponseItem/completed` per turn and stores items where `item.type === "reasoning"` and `encrypted_content` is non-null. Each captured item becomes a `reasoning` ContentPart on `assistantContent`. ZDR-off codex configurations don't forward the blob, in which case the item is dropped (persisting an empty shell would replay back as an invalid input item).
+
+Replay: `messageToResponsesItems` emits any `reasoning` ContentPart as a Responses-API `reasoning` item at the **head** of the assistant turn (before message and function_call items, as the API requires).
+
+The same encrypted-blob round-trip is what the `openai-apikey` / `openrouter` paths use directly against the Responses API. See issue #533 for the wider cross-provider context (Anthropic uses its own `thinking` + `redacted_thinking` blocks with `signature`; `custom` Chat-Completions endpoints have no equivalent contract).
+
 ## Wire gotchas (codex 0.130.0)
 
 - **`requiresOpenaiAuth: true`** on `account/read` is misleading — it's true even when ChatGPT auth is fine. It really signals "needs an `sk-...` API key for non-ChatGPT models." Check `account.type === "chatgpt"` instead.

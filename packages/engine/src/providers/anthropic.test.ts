@@ -109,6 +109,73 @@ describe("toAnthropicParams: messages cache stamp (BP4)", () => {
   });
 });
 
+describe("toAnthropicParams: thinking-block round-trip (issue #533)", () => {
+  it("emits thinking ContentParts as native Anthropic thinking blocks with signature", () => {
+    // Round-tripping a thinking block back to the API is what keeps the
+    // model's reasoning alive across turns on Opus 4.5+ / Sonnet 4.6+.
+    // The signature is opaque and must be preserved unchanged.
+    const messages: NormalizedMessage[] = [
+      { role: "user", content: "what is 2+2?" },
+      {
+        role: "assistant",
+        content: [
+          { type: "thinking", text: "Let me think...", signature: "sig-abc123" },
+          { type: "text", text: "4" },
+        ],
+      },
+      { role: "user", content: "and 3+3?" },
+    ];
+    const out = toAnthropicParams(baseParams({ messages, cacheHints: [] }));
+    const assistant = out.messages[1];
+    expect(Array.isArray(assistant.content)).toBe(true);
+    expect(assistant.content).toEqual([
+      { type: "thinking", thinking: "Let me think...", signature: "sig-abc123" },
+      { type: "text", text: "4" },
+    ]);
+  });
+
+  it("emits redacted_thinking ContentParts as native blocks carrying data", () => {
+    // The data payload is opaque (and the API redacted any visible text)
+    // but must round-trip for the model to maintain continuity past the
+    // redacted reasoning step.
+    const messages: NormalizedMessage[] = [
+      { role: "user", content: "tell me about X" },
+      {
+        role: "assistant",
+        content: [
+          { type: "redacted_thinking", data: "redacted-blob-xyz" },
+          { type: "text", text: "I can help with X." },
+        ],
+      },
+      { role: "user", content: "go on" },
+    ];
+    const out = toAnthropicParams(baseParams({ messages, cacheHints: [] }));
+    expect(out.messages[1].content).toEqual([
+      { type: "redacted_thinking", data: "redacted-blob-xyz" },
+      { type: "text", text: "I can help with X." },
+    ]);
+  });
+
+  it("skips OpenAI-shape reasoning blocks (Anthropic API would reject them)", () => {
+    // Cross-provider history (e.g., user switched from openai-apikey to
+    // anthropic mid-campaign) shouldn't 400 — `reasoning` ContentParts
+    // are silently dropped on Anthropic's input side.
+    const messages: NormalizedMessage[] = [
+      { role: "user", content: "hi" },
+      {
+        role: "assistant",
+        content: [
+          { type: "reasoning", id: "rs_1", encryptedContent: "blob", summary: ["thought"] },
+          { type: "text", text: "hello" },
+        ],
+      },
+      { role: "user", content: "again" },
+    ];
+    const out = toAnthropicParams(baseParams({ messages, cacheHints: [] }));
+    expect(out.messages[1].content).toEqual([{ type: "text", text: "hello" }]);
+  });
+});
+
 describe("toAnthropicParams: orphan-patch wiring", () => {
   it("inserts a synthetic tool_result user message and lands the BP4 stamp on it", () => {
     // End-to-end: an orphan-trailing history with no clean stable tail.

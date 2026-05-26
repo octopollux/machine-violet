@@ -160,7 +160,11 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     }
 
     try {
-      const provider = createProviderFromConnection(conn);
+      // configDir is required for openai-chatgpt: without it the provider
+      // builds with no token store and codex never sees the persisted
+      // ChatGPT tokens — health-check returns "no active ChatGPT login"
+      // immediately after the user signs in.
+      const provider = createProviderFromConnection(conn, { configDir: server.configDir });
       const result = await provider.healthCheck();
       return { id: conn.id, ...result };
     } catch (err) {
@@ -505,7 +509,8 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
       return reply.status(404).send({ error: "Connection not found." });
     }
     try {
-      const provider = createProviderFromConnection(conn);
+      // configDir required so openai-chatgpt connections get their token store.
+      const provider = createProviderFromConnection(conn, { configDir: server.configDir });
       const result = await provider.healthCheck();
       return { id: conn.id, ...result };
     } catch (err) {

@@ -69,7 +69,14 @@ export class SetupSession {
     // note + world framing benefits meaningfully.
     const appConfigDir = configDir();
     const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
-    this.tierProviders = buildTierProviders(connStore, () => createAnthropicProvider());
+    // configDir must be forwarded so openai-chatgpt connections get a
+    // token store backed by connections.json — without it the codex
+    // subprocess never sees the persisted ChatGPT tokens and the very
+    // first setup turn throws "no active ChatGPT login" before any
+    // model call. Game sessions (session-manager) already pass this;
+    // setup was missing it, breaking any campaign whose large tier
+    // resolves to an openai-chatgpt connection.
+    this.tierProviders = buildTierProviders(connStore, () => createAnthropicProvider(), appConfigDir);
     this.provider = this.tierProviders.large.provider;
     this.model = this.tierProviders.large.model;
   }

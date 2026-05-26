@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { TurnCollector, CodexTurnFailedError } from "./provider.js";
+import { TurnCollector, CodexTurnFailedError, messageToResponsesItems } from "./provider.js";
 import type {
   AgentMessageDeltaNotification, ItemCompletedNotification,
-  TurnCompletedNotification,
+  TurnCompletedNotification, RawResponseItemCompletedNotification,
 } from "./protocol.js";
+import type { NormalizedMessage } from "../types.js";
 
 function completedTurn(): TurnCompletedNotification {
   return {
@@ -93,6 +94,153 @@ describe("TurnCollector", () => {
 
     expect(result.text).toBe("Non-streamed reply.");
     expect(result.assistantContent).toEqual([{ type: "text", text: "Non-streamed reply." }]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Encrypted reasoning capture + replay (issue #533)
+// ---------------------------------------------------------------------------
+
+function rawReasoning(overrides: Partial<RawResponseItemCompletedNotification["item"]> & { id: string }): RawResponseItemCompletedNotification {
+  return {
+    threadId: "t1",
+    turnId: "turn_1",
+    item: { type: "reasoning", ...overrides },
+  };
+}
+
+describe("TurnCollector: encrypted reasoning capture", () => {
+  it("captures reasoning items carrying encrypted_content into assistantContent", () => {
+    // The opaque blob has to round-trip on the next turn so the model can
+    // continue reasoning from where it left off. Mirrors the openai-apikey
+    // pattern in openai.ts (encryptedReasoningById).
+    const c = new TurnCollector();
+    c.onRawResponseItem(rawReasoning({
+      id: "rs_1",
+      encrypted_content: "enc-blob-1",
+      summary: [{ type: "summary_text", text: "Weighing options." }],
+    }));
+    c.onAgentMessageDelta(agentMessageDelta("Onward."));
+    c.onItemCompleted(agentMessageCompleted("Onward."));
+    const result = c.toChatResult(completedTurn());
+
+    expect(result.text).toBe("Onward.");
+    expect(result.assistantContent).toEqual([
+      { type: "text", text: "Onward." },
+      { type: "reasoning", id: "rs_1", encryptedContent: "enc-blob-1", summary: ["Weighing options."] },
+    ]);
+  });
+
+  it("skips reasoning items without an encrypted_content blob", () => {
+    // ZDR-off / non-ZDR codex configurations don't forward the blob.
+    // Persisting an empty shell would replay back as an invalid input
+    // item, so we drop the item entirely.
+    const c = new TurnCollector();
+    c.onRawResponseItem(rawReasoning({ id: "rs_1", encrypted_content: null, summary: [] }));
+    c.onItemCompleted(agentMessageCompleted("Hi."));
+    const result = c.toChatResult(completedTurn());
+
+    expect(result.assistantContent.some((p) => p.type === "reasoning")).toBe(false);
+  });
+
+  it("ignores non-reasoning raw items", () => {
+    // Codex emits rawResponseItem/completed for every Responses-API item
+    // type (message, function_call, …). Only reasoning carries the blob
+    // we care about — everything else flows through item/completed.
+    const c = new TurnCollector();
+    c.onRawResponseItem({
+      threadId: "t1",
+      turnId: "turn_1",
+      item: { type: "message", id: "msg_x", content: "ignored" },
+    });
+    c.onItemCompleted(agentMessageCompleted("Hello."));
+    const result = c.toChatResult(completedTurn());
+
+    expect(result.assistantContent).toEqual([{ type: "text", text: "Hello." }]);
+  });
+
+  it("dedupes encrypted reasoning by item id (last-write-wins)", () => {
+    // Codex shouldn't emit the same id twice but if it did (retry,
+    // reconnect), replaying duplicate items on the next turn would
+    // have the Responses API reject the request for duplicate ids.
+    const c = new TurnCollector();
+    c.onRawResponseItem(rawReasoning({ id: "rs_1", encrypted_content: "enc-first", summary: [] }));
+    c.onRawResponseItem(rawReasoning({ id: "rs_1", encrypted_content: "enc-second", summary: [] }));
+    c.onItemCompleted(agentMessageCompleted("Done."));
+    const result = c.toChatResult(completedTurn());
+
+    const reasoningParts = result.assistantContent.filter((p) => p.type === "reasoning");
+    expect(reasoningParts).toHaveLength(1);
+    expect(reasoningParts[0]).toEqual({
+      type: "reasoning",
+      id: "rs_1",
+      encryptedContent: "enc-second",
+      summary: [],
+    });
+  });
+});
+
+describe("messageToResponsesItems: reasoning replay (issue #533)", () => {
+  it("emits reasoning items at the head of the assistant turn", () => {
+    // The Responses API requires reasoning items to precede the
+    // message/function_call items they reason about. Even if they're
+    // stored last in assistantContent (e.g. streaming append order),
+    // they must be emitted first.
+    const msg: NormalizedMessage = {
+      role: "assistant",
+      content: [
+        { type: "text", text: "Onward." },
+        { type: "reasoning", id: "rs_1", encryptedContent: "enc-1", summary: ["Pondered."] },
+        { type: "tool_use", id: "call_1", name: "roll_dice", input: { sides: 20 } },
+      ],
+    };
+    const items = messageToResponsesItems(msg);
+    expect(items[0]).toEqual({
+      type: "reasoning",
+      id: "rs_1",
+      encrypted_content: "enc-1",
+      summary: [{ type: "summary_text", text: "Pondered." }],
+    });
+    expect(items[1]).toEqual({
+      type: "message",
+      role: "assistant",
+      content: [{ type: "output_text", text: "Onward." }],
+    });
+    expect(items[2]).toEqual({
+      type: "function_call",
+      call_id: "call_1",
+      name: "roll_dice",
+      arguments: JSON.stringify({ sides: 20 }),
+    });
+  });
+
+  it("preserves relative order of multiple reasoning items", () => {
+    const msg: NormalizedMessage = {
+      role: "assistant",
+      content: [
+        { type: "reasoning", id: "rs_a", encryptedContent: "enc-a", summary: [] },
+        { type: "reasoning", id: "rs_b", encryptedContent: "enc-b", summary: [] },
+        { type: "text", text: "Hi." },
+      ],
+    };
+    const items = messageToResponsesItems(msg);
+    expect((items[0] as { id: string }).id).toBe("rs_a");
+    expect((items[1] as { id: string }).id).toBe("rs_b");
+  });
+
+  it("drops Anthropic thinking blocks (codex would reject them on input)", () => {
+    const msg: NormalizedMessage = {
+      role: "assistant",
+      content: [
+        { type: "thinking", text: "ignored", signature: "sig" },
+        { type: "redacted_thinking", data: "also-ignored" },
+        { type: "text", text: "Hi." },
+      ],
+    };
+    const items = messageToResponsesItems(msg);
+    expect(items).toEqual([
+      { type: "message", role: "assistant", content: [{ type: "output_text", text: "Hi." }] },
+    ]);
   });
 });
 
