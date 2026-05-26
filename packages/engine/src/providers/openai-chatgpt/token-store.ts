@@ -116,6 +116,17 @@ export function createConnectionTokenStore(
       const oauth = await refreshFn(current.refreshToken);
       const fresh = tokensFromOAuth(oauth, current.chatgptAccountId);
       if (!fresh) return null;
+      // Sign-in vs refresh race: the user can re-sign-in while our OAuth
+      // exchange is in flight — `upsertChatGptConnection` writes fresh
+      // tokens (possibly a different account) directly via the connection
+      // store, bypassing this mutex. If the on-disk refreshToken no
+      // longer matches what we exchanged, our result is stale; persisting
+      // it would revert the user's sign-in and re-introduce the "no
+      // active ChatGPT login" failure. Defer to disk in that case.
+      const latest = load();
+      if (latest && latest.refreshToken !== current.refreshToken) {
+        return latest;
+      }
       save(fresh);
       return fresh;
     })();

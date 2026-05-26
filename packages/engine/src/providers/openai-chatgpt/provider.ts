@@ -307,6 +307,13 @@ export class OpenAIChatGptProvider implements LLMProvider {
     if (!store) {
       throw new Error("Cannot refresh ChatGPT tokens: no token store configured");
     }
+    // Pre-check the no-stored-tokens case so codex sees a specific
+    // "no stored tokens" message that prompts a sign-in, rather than
+    // the generic "rejected by OpenAI" we'd otherwise report. (Both
+    // states surface as `refresh()` returning null.)
+    if (!store.load()) {
+      throw new Error("Cannot refresh ChatGPT tokens: no stored tokens; please sign in again.");
+    }
     log.tokenRefresh({ reason: _params.reason, previousAccountId: _params.previousAccountId ?? undefined });
     const fresh = await store.refresh();
     if (!fresh) {

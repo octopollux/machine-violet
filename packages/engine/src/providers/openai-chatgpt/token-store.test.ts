@@ -121,6 +121,43 @@ describe("ChatGptTokenStore.refresh", () => {
     expect(refreshFn).toHaveBeenCalledTimes(2);
   });
 
+  it("defers to disk when the refreshToken changes mid-exchange (sign-in vs refresh race)", async () => {
+    // upsertChatGptConnection writes directly to the connection store
+    // and doesn't go through the mutex. If a refresh is in flight when
+    // the user re-signs in, persisting our stale exchange result would
+    // revert the user's sign-in. Guard re-reads disk after the exchange.
+    writeConnectionWithTokens("rt-original", "at-original", 1);
+    let resolveExchange!: (v: OAuthTokens) => void;
+    const exchange = new Promise<OAuthTokens>((res) => { resolveExchange = res; });
+    const refreshFn = vi.fn<(rt: string) => Promise<OAuthTokens>>().mockReturnValue(exchange);
+
+    const store = createConnectionTokenStore(tempDir, "conn-1", refreshFn);
+    const refreshPromise = store.refresh();
+
+    // While refresh is in flight, simulate a re-sign-in by writing a
+    // wholly different account's tokens directly to disk.
+    writeConnectionWithTokens("rt-fresh-signin", "at-fresh-signin", 9_999_999);
+
+    // The in-flight exchange completes with what would have been the
+    // result for the original RT.
+    resolveExchange({
+      accessToken: "at-stale-from-exchange",
+      refreshToken: "rt-stale-rotated",
+      idToken: undefined,
+      expiresAtMs: 5_000_000,
+      chatgptAccountId: "acct-A",
+      chatgptPlanType: "plus",
+    });
+
+    const result = await refreshPromise;
+    // Returned the on-disk sign-in tokens, not the stale exchange result.
+    expect(result?.accessToken).toBe("at-fresh-signin");
+    expect(result?.refreshToken).toBe("rt-fresh-signin");
+    // Disk was not clobbered.
+    const reloaded = store.load();
+    expect(reloaded?.accessToken).toBe("at-fresh-signin");
+  });
+
   it("scopes the lock per (configDir, connectionId) so unrelated stores don't block each other", async () => {
     writeConnectionWithTokens("rt-1", "at-1", 1);
     const otherDir = mkdtempSync(join(tmpdir(), "mv-token-store-other-"));

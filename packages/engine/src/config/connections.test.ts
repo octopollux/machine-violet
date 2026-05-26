@@ -260,7 +260,7 @@ describe("upsertChatGptConnection", () => {
     expect(store.tierAssignments.small).toEqual({ connectionId: "old-conn", modelId: "gpt-deprecated" });
   });
 
-  it("dedupes multiple legacy chatgpt connections by keeping the matching account and dropping the rest", () => {
+  it("dedupes multiple legacy chatgpt connections by keeping one record and dropping the rest", () => {
     const store: ConnectionStore = {
       connections: [
         {
