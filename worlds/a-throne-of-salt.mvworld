@@ -12,20 +12,20 @@
       "label": "Station",
       "choices": [
         {
-          "name": "Imperial surveyor mapping the loss",
-          "description": "You ride ahead of the line with a sealed satchel of fresh paper and a tripod. Each day you produce a new map. The previous day's map is wrong by morning. Your superiors want the records exact. Your reasons for accepting the assignment are increasingly your own."
+          "name": "The Cartographer of Losses",
+          "description": "Imperial surveyor mapping the loss. You ride ahead of the line with a sealed satchel of fresh paper and a tripod. Each day you produce a new map. The previous day's map is wrong by morning. Your superiors want the records exact. Your reasons for accepting the assignment are increasingly your own."
         },
         {
-          "name": "Conscripted refugee from a swallowed province",
-          "description": "Your village is salt. You walked out with what you could carry and what you could not put down. The empire has counted you and put you to work. Your accent marks you. Your dead are upwind. You are being asked to help build the camps that will hold the next round of people like you."
+          "name": "The Salt-Walked",
+          "description": "Conscripted refugee from a swallowed province. Your village is salt. You walked out with what you could carry and what you could not put down. The empire has counted you and put you to work. Your accent marks you. Your dead are upwind. You are being asked to help build the camps that will hold the next round of people like you."
         },
         {
-          "name": "Heretic prophet who predicted this",
-          "description": "You said it would happen. You were imprisoned for saying it. You were released for being right, which has not been the relief you imagined. Crowds gather where you go. The empire is undecided whether to elevate you or hang you, and it may yet do both."
+          "name": "The Vindicated Heretic",
+          "description": "Heretic prophet who predicted this. You said it would happen. You were imprisoned for saying it. You were released for being right, which has not been the relief you imagined. Crowds gather where you go. The empire is undecided whether to elevate you or hang you, and it may yet do both."
         },
         {
-          "name": "Salt-priest who serves the line itself",
-          "description": "You walk barefoot at the leading edge. Your order tends the advance with prayers older than the dynasty. You know what the salt is for. You may not say. You may, on occasion, decline to perform the rite, and the consequences of declining are your covenant with the line."
+          "name": "Priest of the Advancing Line",
+          "description": "Salt-priest who serves the line itself. You walk barefoot at the leading edge. Your order tends the advance with prayers older than the dynasty. You know what the salt is for. You may not say. You may, on occasion, decline to perform the rite, and the consequences of declining are your covenant with the line."
         }
       ]
     },
@@ -33,19 +33,19 @@
       "label": "What you carry",
       "choices": [
         {
-          "name": "A sealed imperial dispatch you haven't read",
-          "description": "Red wax, the imperial seal pressed deep. It is addressed to a name you have only heard in songs. You were told not to break it. You were told nothing of its contents. The weight of it in your satchel is the weight of an order whose author is somewhere behind the line and may no longer exist."
+          "name": "The Red-Wax Dispatch",
+          "description": "A sealed imperial dispatch you haven't read. Red wax, the imperial seal pressed deep. It is addressed to a name you have only heard in songs. You were told not to break it. You were told nothing of its contents. The weight of it in your satchel is the weight of an order whose author is somewhere behind the line and may no longer exist."
         },
         {
-          "name": "A child the emperor will want",
-          "description": "They are too young to ask what is happening and old enough to remember that you took them. They were given to you by their mother in a doorway you did not see clearly. The reason the throne will want them is not yet apparent to you. The signs will become apparent quickly."
+          "name": "The Doorway Child",
+          "description": "A child the emperor will want. They are too young to ask what is happening and old enough to remember that you took them. They were given to you by their mother in a doorway you did not see clearly. The reason the throne will want them is not yet apparent to you. The signs will become apparent quickly."
         },
         {
-          "name": "The last copy of a reversal-rite",
-          "description": "A folded sheaf, copied by a hand that was shaking. It will, if performed correctly, stop the salt. It requires materials, a location, and a celebrant. You possess none of these reliably. The text describes the cost of performance in a small clause near the end, and the clause is not metaphor."
+          "name": "The Reversal-Rite",
+          "description": "The last copy of a rite to undo the salt. A folded sheaf, copied by a hand that was shaking. It will, if performed correctly, stop the salt. It requires materials, a location, and a celebrant. You possess none of these reliably. The text describes the cost of performance in a small clause near the end, and the clause is not metaphor."
         },
         {
-          "name": "Nothing but your two hands",
+          "name": "Two Empty Hands",
           "description": "You walked out of your previous life with what you had on your back, which was nothing. You arrive in each new town with the credibility of a person who owns no leverage and asks for none. This will be either the truest freedom in the empire or the shortest."
         }
       ]

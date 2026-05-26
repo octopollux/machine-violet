@@ -12,20 +12,20 @@
       "label": "Your role in steerage",
       "choices": [
         {
-          "name": "Hydroponics worker",
-          "description": "You have noticed that the harvest doesn't match the population. The yields are higher than the meals served and the difference goes somewhere you don't have access to. You have been doing the math quietly for two years. You have not yet shown the math to anyone. The math is the kind of thing that, if shown, would change the answer to other questions you have been afraid to ask."
+          "name": "The Yield Counter",
+          "description": "Hydroponics worker. You have noticed that the harvest doesn't match the population. The yields are higher than the meals served and the difference goes somewhere you don't have access to. You have been doing the math quietly for two years. You have not yet shown the math to anyone. The math is the kind of thing that, if shown, would change the answer to other questions you have been afraid to ask."
         },
         {
-          "name": "Deck-runner with smuggling routes",
+          "name": "The Deck-Runner",
           "description": "You move small things between decks for small payments. You know which conduits are unmonitored and which inspectors look the other way. The smuggling has been ordinary for a long time. Lately you have been asked to carry items that don't fit the usual pattern — sealed packages, written notes, a child once. You have learned not to ask, but you have started to wonder."
         },
         {
-          "name": "Schoolteacher",
-          "description": "You teach the official history. You have taught it for a decade and you can recite the dates and the names of the founders without notes. You have started to doubt specific dates. The doubts come from cross-referencing the official text against minor primary sources — a logbook in the library, a photograph that doesn't match its caption. You have not yet changed the lesson."
+          "name": "The Teacher of Founders",
+          "description": "Schoolteacher. You teach the official history. You have taught it for a decade and you can recite the dates and the names of the founders without notes. You have started to doubt specific dates. The doubts come from cross-referencing the official text against minor primary sources — a logbook in the library, a photograph that doesn't match its caption. You have not yet changed the lesson."
         },
         {
-          "name": "Recent orphan",
-          "description": "Your parent died last month. Their personal terminal is in your quarters and it is locked. You have their thumbprint on a glass and you have not yet tried it. You suspect that you do not want to know what is on the terminal, and you suspect that you will try the thumbprint anyway, and you suspect that this campaign begins on the day you do."
+          "name": "The Thumbprint on Glass",
+          "description": "Recently orphaned. Your parent died last month. Their personal terminal is in your quarters and it is locked. You have their thumbprint on a glass and you have not yet tried it. You suspect that you do not want to know what is on the terminal, and you suspect that you will try the thumbprint anyway, and you suspect that this campaign begins on the day you do."
         }
       ]
     },
@@ -33,20 +33,20 @@
       "label": "The ship's state",
       "choices": [
         {
-          "name": "Engines dismantled, static city",
-          "description": "The ship hasn't moved in your lifetime or your parents'. The engine bays have been repurposed as gardens — rebar trellises, conduits laid across as bridges, drip irrigation through what used to be coolant lines. Daylight is on a schedule and the schedule slipped a hundred years ago and is now an hour off the body's expectations. Nobody talks about why."
+          "name": "The Static City",
+          "description": "Engines dismantled. The ship hasn't moved in your lifetime or your parents'. The engine bays have been repurposed as gardens — rebar trellises, conduits laid across as bridges, drip irrigation through what used to be coolant lines. Daylight is on a schedule and the schedule slipped a hundred years ago and is now an hour off the body's expectations. Nobody talks about why."
         },
         {
-          "name": "Still in flight, decelerating",
-          "description": "There is a tremor in everything. You learn it before you learn to walk and you stop noticing it by adolescence. The bulkheads creak in patterns that the engineers can read. There is a sense of movement that nobody calls movement because there is nothing to compare it to. Someone above decks knows when arrival is. You do not."
+          "name": "The Long Deceleration",
+          "description": "Still in flight, slowing. There is a tremor in everything. You learn it before you learn to walk and you stop noticing it by adolescence. The bulkheads creak in patterns that the engineers can read. There is a sense of movement that nobody calls movement because there is nothing to compare it to. Someone above decks knows when arrival is. You do not."
         },
         {
-          "name": "Hollowed",
+          "name": "The Hollowed Decks",
           "description": "Only steerage decks are populated. The rest are sealed. Corridors go nowhere and end in welded doors with hand-lettered NO ENTRY signs in handwriting that does not match any handwriting taught in school. The air smells different past a certain bulkhead and you can taste it on your tongue if you stand close. Nobody has crossed in your lifetime."
         },
         {
-          "name": "Multiple ships once linked, now drifting in parallel",
-          "description": "There are other ships out the porthole. Three of them, sometimes four, holding a loose formation across distances that should not be possible to maintain without active steering. Sometimes they signal. The signals are in a code the engineers half-recognize. Nobody alive remembers when the ships separated, or why, or whether the separation is permanent."
+          "name": "The Parallel Fleet",
+          "description": "Multiple ships once linked, now drifting in parallel. There are other ships out the porthole. Three of them, sometimes four, holding a loose formation across distances that should not be possible to maintain without active steering. Sometimes they signal. The signals are in a code the engineers half-recognize. Nobody alive remembers when the ships separated, or why, or whether the separation is permanent."
         }
       ]
     }

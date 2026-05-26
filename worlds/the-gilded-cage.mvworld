@@ -14,15 +14,15 @@
       "label": "The setting",
       "choices": [
         {
-          "name": "A candlelit manor",
+          "name": "The Candlelit Manor",
           "description": "Gothic elegance, labyrinthine corridors, oil portraits with watching eyes. The party is a masquerade. Think Poe by way of Kubrick."
         },
         {
-          "name": "A modernist penthouse",
-          "description": "Glass walls, brutalist art, a host who knows too much about you. The party is an exclusive soirée. Think corporate thriller with a supernatural edge."
+          "name": "The Glass Penthouse",
+          "description": "A modernist penthouse. Glass walls, brutalist art, a host who knows too much about you. The party is an exclusive soirée. Think corporate thriller with a supernatural edge."
         },
         {
-          "name": "A fae court banquet",
+          "name": "The Fae Court Banquet",
           "description": "Impossible food, glamoured guests, rules nobody will explain. The party follows fae etiquette — breaking a rule you didn't know existed has consequences."
         }
       ]

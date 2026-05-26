@@ -14,20 +14,20 @@
       "label": "Your lender",
       "choices": [
         {
-          "name": "Old friend with a new face",
-          "description": "They look like the friend you remember and they don't quite. Same laugh. Same way of leaning on a table. The face has been worked on or the years have done something the years don't usually do. They know things only the friend would know and they don't know one thing the friend definitely would. You haven't decided yet whether to ask."
+          "name": "The New Face",
+          "description": "An old friend with a new face. They look like the friend you remember and they don't quite. Same laugh. Same way of leaning on a table. The face has been worked on or the years have done something the years don't usually do. They know things only the friend would know and they don't know one thing the friend definitely would. You haven't decided yet whether to ask."
         },
         {
-          "name": "A demon with paperwork",
-          "description": "They have an attaché case and a fountain pen and the contract you signed when you were nineteen and high. The contract is dated and witnessed and the signature is yours. They are polite. They are not in a hurry. They will let you read every clause before they ask you to honor the one they're invoking tonight."
+          "name": "The Counterparty",
+          "description": "A demon with paperwork. They have an attaché case and a fountain pen and the contract you signed when you were nineteen and high. The contract is dated and witnessed and the signature is yours. They are polite. They are not in a hurry. They will let you read every clause before they ask you to honor the one they're invoking tonight."
         },
         {
-          "name": "A small god of obligations",
-          "description": "Their domain is debt itself — the ledger of what is owed, between mortals, between mortals and gods, between past selves and present ones. They are not large. They are not loud. They are the one who notices when an obligation goes unmet, and they have noticed yours, and they have come because the alternative was sending someone less courteous."
+          "name": "The Ledger-Keeper",
+          "description": "A small god of obligations. Their domain is debt itself — the ledger of what is owed, between mortals, between mortals and gods, between past selves and present ones. They are not large. They are not loud. They are the one who notices when an obligation goes unmet, and they have noticed yours, and they have come because the alternative was sending someone less courteous."
         },
         {
-          "name": "Your own future self",
-          "description": "Older, thinner, dressed in clothes you don't own yet. They know the room better than you do because they have been in it before, from this seat. They are not threatening. They are exhausted. The thing they need you to do will be hard, and they know it will be hard because they remember doing it, and they remember what it cost."
+          "name": "The Self Who Comes Later",
+          "description": "Your own future self. Older, thinner, dressed in clothes you don't own yet. They know the room better than you do because they have been in it before, from this seat. They are not threatening. They are exhausted. The thing they need you to do will be hard, and they know it will be hard because they remember doing it, and they remember what it cost."
         }
       ]
     },
@@ -35,20 +35,20 @@
       "label": "Where the call happens",
       "choices": [
         {
-          "name": "The diner where you used to meet",
-          "description": "Lit by the neon sign in the window, which paints the booths pink and then blue and then pink again. The booth in the back corner where you both sat at sixteen, twenty, thirty. The waitress remembers their order before they say it and does not remember yours. The coffee comes free with the third refill, and they want three refills, which means this will take a while."
+          "name": "The Old Booth",
+          "description": "The diner where you used to meet. Lit by the neon sign in the window, which paints the booths pink and then blue and then pink again. The booth in the back corner where you both sat at sixteen, twenty, thirty. The waitress remembers their order before they say it and does not remember yours. The coffee comes free with the third refill, and they want three refills, which means this will take a while."
         },
         {
-          "name": "Their hospital bedside",
-          "description": "The machines count their vitals in small clean numbers. The curtain around the bed doesn't quite close on either side. Visiting hours end in forty minutes and the nurses are already glancing at you. The ask will happen before the hour does, because they know how time works in this kind of room better than you do."
+          "name": "The Bedside",
+          "description": "Their hospital bedside. The machines count their vitals in small clean numbers. The curtain around the bed doesn't quite close on either side. Visiting hours end in forty minutes and the nurses are already glancing at you. The ask will happen before the hour does, because they know how time works in this kind of room better than you do."
         },
         {
-          "name": "Their wedding reception",
-          "description": "Everyone is happy. The band is loud enough that you have to lean in to hear. They are wearing white or its equivalent and they pull you aside between the first dance and the toasts, into a side room with folded linens and one chair. They have ninety seconds before someone notices the bride is missing. The ask will fit in ninety seconds and the answer will, too."
+          "name": "The Side Room at the Reception",
+          "description": "Their wedding reception. Everyone is happy. The band is loud enough that you have to lean in to hear. They are wearing white or its equivalent and they pull you aside between the first dance and the toasts, into a side room with folded linens and one chair. They have ninety seconds before someone notices the bride is missing. The ask will fit in ninety seconds and the answer will, too."
         },
         {
-          "name": "A funeral — yours",
-          "description": "Your own. You are at the back. Nobody else sees you and you can tell because nobody flinches. The casket is closed. They are at the lectern, and they look at the back of the room, and they look at you, and they begin to speak the eulogy and you understand that the eulogy is the ask. You have until the last word to decide."
+          "name": "The Back Pew",
+          "description": "A funeral — yours. Your own. You are at the back. Nobody else sees you and you can tell because nobody flinches. The casket is closed. They are at the lectern, and they look at the back of the room, and they look at you, and they begin to speak the eulogy and you understand that the eulogy is the ask. You have until the last word to decide."
         }
       ]
     }

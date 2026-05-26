@@ -14,20 +14,20 @@
       "label": "Your role",
       "choices": [
         {
-          "name": "Night watchman with a flashlight",
-          "description": "Standard kit, standard rounds, a radio that crackles with the static of an old building. You took this job because the day shift had a waiting list and the night shift didn't. The curator interviewed you herself and asked one strange question, and you gave the answer she seemed to want."
+          "name": "The Night Watch",
+          "description": "Night watchman with a flashlight. Standard kit, standard rounds, a radio that crackles with the static of an old building. You took this job because the day shift had a waiting list and the night shift didn't. The curator interviewed you herself and asked one strange question, and you gave the answer she seemed to want."
         },
         {
-          "name": "Visiting researcher locked in after-hours",
-          "description": "You stayed late in the archive and the doors locked on a schedule the front desk forgot to tell you about. Your phone has one bar. The security office is on the other side of the natural history wing, and the natural history wing is between you and any working exit."
+          "name": "The Late Scholar",
+          "description": "Visiting researcher locked in after-hours. You stayed late in the archive and the doors locked on a schedule the front desk forgot to tell you about. Your phone has one bar. The security office is on the other side of the natural history wing, and the natural history wing is between you and any working exit."
         },
         {
-          "name": "The taxidermist's apprentice",
+          "name": "The Apprentice",
           "description": "You mounted some of these. You know how the elk's right foreleg is wired and you know that the wire isn't strong enough for the angle it's now standing at. You know which animals were rebuilt from incomplete remains. You know which one was finished in a hurry."
         },
         {
-          "name": "A child on a school sleepover the others didn't survive",
-          "description": "Twelve of you came in for the overnight program with sleeping bags and disposable cameras. You are the only one in the rotunda now. You do not remember the others leaving. You remember laughing about the wolf and you remember being told to sleep, and then you remember being awake, and the rotunda is very large in the dark."
+          "name": "The Last Sleepover",
+          "description": "A child on a school sleepover the others didn't survive. Twelve of you came in for the overnight program with sleeping bags and disposable cameras. You are the only one in the rotunda now. You do not remember the others leaving. You remember laughing about the wolf and you remember being told to sleep, and then you remember being awake, and the rotunda is very large in the dark."
         }
       ]
     },
@@ -35,20 +35,20 @@
       "label": "The museum",
       "choices": [
         {
-          "name": "Frontier-town natural history",
-          "description": "A single hall, fluorescent and dusty. Bison, wolf, pronghorn, badger, the standard local taxidermy of a county that paid for it once and never updated. The elk by the door has a fresh wound on its flank that the day staff have not commented on, and the curator has not had patched, and the wound is wet."
+          "name": "The County Hall",
+          "description": "A frontier-town natural history museum. A single hall, fluorescent and dusty. Bison, wolf, pronghorn, badger, the standard local taxidermy of a county that paid for it once and never updated. The elk by the door has a fresh wound on its flank that the day staff have not commented on, and the curator has not had patched, and the wound is wet."
         },
         {
-          "name": "Victorian curio collection",
-          "description": "Cases of butterflies pinned in spirals. Cabinets of stuffed birds posed in tableaux you cannot look away from — a hawk mid-strike, a duck mid-flight, a robin in a teacup. A monkey in a fez behind glass whose eyes follow you across the room and back, and have followed everyone, the docents will tell you, since 1893."
+          "name": "Hartwell's Cabinet",
+          "description": "A Victorian curio collection. Cases of butterflies pinned in spirals. Cabinets of stuffed birds posed in tableaux you cannot look away from — a hawk mid-strike, a duck mid-flight, a robin in a teacup. A monkey in a fez behind glass whose eyes follow you across the room and back, and have followed everyone, the docents will tell you, since 1893."
         },
         {
-          "name": "University zoology department",
-          "description": "Basement specimens in formalin jars on metal shelves. Jarred fetuses of pigs and sheep and one thing the labels have been replaced on twice. The door to Cold Storage has been left open. The light in Cold Storage is on a motion sensor and the motion sensor has been triggering on its own all evening."
+          "name": "Cold Storage",
+          "description": "A university zoology department. Basement specimens in formalin jars on metal shelves. Jarred fetuses of pigs and sheep and one thing the labels have been replaced on twice. The door to Cold Storage has been left open. The light in Cold Storage is on a motion sensor and the motion sensor has been triggering on its own all evening."
         },
         {
-          "name": "Roadside oddity museum",
-          "description": "Poorly mounted, lovingly priced. The grizzly in the lobby has price tags on its claws. The proprietor's RV is parked behind the building and is the only other structure for two miles. He has gone into town for supplies and he left you the key and he said he would be back by one."
+          "name": "Mile 47",
+          "description": "A roadside oddity museum. Poorly mounted, lovingly priced. The grizzly in the lobby has price tags on its claws. The proprietor's RV is parked behind the building and is the only other structure for two miles. He has gone into town for supplies and he left you the key and he said he would be back by one."
         }
       ]
     }

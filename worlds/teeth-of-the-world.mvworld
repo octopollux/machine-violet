@@ -12,20 +12,20 @@
       "label": "Your scale",
       "choices": [
         {
-          "name": "A single village under one mountain's shadow",
-          "description": "You have weeks. The mountain is leaning, and at the rate it is leaning it will pass through your fields by harvest. The elder has called a meeting. The decision is whether to move, and if so where, and with what. The cemetery cannot be moved. The decision is also about who you are willing to leave behind."
+          "name": "The Shadow of One Stone",
+          "description": "A single village under one mountain's shadow. You have weeks. The mountain is leaning, and at the rate it is leaning it will pass through your fields by harvest. The elder has called a meeting. The decision is whether to move, and if so where, and with what. The cemetery cannot be moved. The decision is also about who you are willing to leave behind."
         },
         {
-          "name": "A kingdom's court astrologer with political weight",
-          "description": "You have a year. You have the king's ear and the difficult job of telling him what your charts show. The court does not yet believe you. The neighboring courts are beginning to notice the same data. Your political weight is exactly the weight of the next conversation, and after that you will be a heretic or a saint."
+          "name": "The King's Astrologer",
+          "description": "A kingdom's court astrologer with political weight. You have a year. You have the king's ear and the difficult job of telling him what your charts show. The court does not yet believe you. The neighboring courts are beginning to notice the same data. Your political weight is exactly the weight of the next conversation, and after that you will be a heretic or a saint."
         },
         {
-          "name": "A pilgrim walking the spine of the world to ask why",
-          "description": "You have a lifetime, which may not be enough. You set out from the southernmost peak with a staff and a question. The mountains move ahead of you, and you adjust. You meet others on the spine. None of them have an answer yet. The walking is itself a kind of asking."
+          "name": "The Pilgrim of the Spine",
+          "description": "A pilgrim walking the spine of the world to ask why. You have a lifetime, which may not be enough. You set out from the southernmost peak with a staff and a question. The mountains move ahead of you, and you adjust. You meet others on the spine. None of them have an answer yet. The walking is itself a kind of asking."
         },
         {
-          "name": "A long-lived being who has seen this before and has notes",
-          "description": "You remember the previous time, or you have notes from the predecessor who did. Either way you are the only one in the room who is not surprised, and you carry the responsibility of explaining what is happening to people who will not live to see the end of it. The notes were written for a different age and you are constantly translating."
+          "name": "The Keeper of Notes",
+          "description": "A long-lived being who has seen this before and has notes. You remember the previous time, or you have notes from the predecessor who did. Either way you are the only one in the room who is not surprised, and you carry the responsibility of explaining what is happening to people who will not live to see the end of it. The notes were written for a different age and you are constantly translating."
         }
       ]
     },
@@ -33,20 +33,20 @@
       "label": "The mountain range",
       "choices": [
         {
-          "name": "A long alpine chain dividing two civilizations",
-          "description": "Snow above the treeline year-round, and a handful of passes that have been the only routes between the two great cultures for as long as anyone has been counting. The passes are the first to close. Diplomacy slows; trade ends; the two civilizations are about to discover what they sound like when they can't hear each other."
+          "name": "The Wall Between",
+          "description": "A long alpine chain dividing two civilizations. Snow above the treeline year-round, and a handful of passes that have been the only routes between the two great cultures for as long as anyone has been counting. The passes are the first to close. Diplomacy slows; trade ends; the two civilizations are about to discover what they sound like when they can't hear each other."
         },
         {
-          "name": "A single great solitary peak",
-          "description": "It rises from the plain like an argument. Visible from the whole continent — the navigators set their charts by it. Four religions hold it sacred and have for so long that none of them remembers which was first. Now it is taking small steps westward. All four orders are convening. None of their liturgies covers this."
+          "name": "The Lone Argument",
+          "description": "A single great solitary peak. It rises from the plain like an argument. Visible from the whole continent — the navigators set their charts by it. Four religions hold it sacred and have for so long that none of them remembers which was first. Now it is taking small steps westward. All four orders are convening. None of their liturgies covers this."
         },
         {
-          "name": "A volcanic arc",
-          "description": "A line of cones spaced like teeth in a smile, smoking gently into a sky that never fully clears. The eruptions correlate with the walking — when one moves, another vents — and the relationship is not yet understood. The villages downwind have always lived with ash; now they are learning to live with the rumor of larger plans."
+          "name": "The Smiling Arc",
+          "description": "A volcanic arc. A line of cones spaced like teeth in a smile, smoking gently into a sky that never fully clears. The eruptions correlate with the walking — when one moves, another vents — and the relationship is not yet understood. The villages downwind have always lived with ash; now they are learning to live with the rumor of larger plans."
         },
         {
-          "name": "An ancient eroded range, low and old",
-          "description": "Almost hills now, soft-shouldered, forested to the summits. They have been still for so long that no living tradition imagines them otherwise. The walking is the first new thing they have done in a million years. The locals do not have a word for it. They are inventing one."
+          "name": "The Soft Shoulders",
+          "description": "An ancient eroded range, low and old. Almost hills now, soft-shouldered, forested to the summits. They have been still for so long that no living tradition imagines them otherwise. The walking is the first new thing they have done in a million years. The locals do not have a word for it. They are inventing one."
         }
       ]
     }

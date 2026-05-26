@@ -14,19 +14,19 @@
       "label": "Your card type",
       "choices": [
         {
-          "name": "Common minion",
+          "name": "The Pawn",
           "description": "Cheap, expendable, plentiful. There are dozens of you in this deck and across other decks in other rooms. You know the others by face. Some of you have died many times and come back; some of you are mint and have never been played. The common bond is that nobody mourns you when you go to the bin."
         },
         {
-          "name": "Legendary unique",
+          "name": "The Foil",
           "description": "Powerful but printed in low numbers. Your kin are rare and competitive and territorial. You have not met most of them. When you do, the conversation is brief and barbed. Your owner protects you, displays you, sleeves you carefully, and on the rare turns you are played, the whole table looks up."
         },
         {
-          "name": "Trap card",
+          "name": "The Face-Down",
           "description": "You've been face-down for months. Nobody has activated you. You can hear the games being played over you and you have prepared, again and again, for the moment that does not come. Your effect is specific and devastating. You know it by heart. You wonder, sometimes, if you have been forgotten."
         },
         {
-          "name": "Token",
+          "name": "The Token",
           "description": "You did not exist last turn. You may not exist next turn. Tokens are made by other cards' effects and dissolve at the end of phases. Your whole life is a few minutes long. Other tokens nod at you across the field. The veterans pretend not to see you. You have, in your short life, learned more than most cards ever do."
         }
       ]
@@ -35,19 +35,19 @@
       "label": "The table",
       "choices": [
         {
-          "name": "A bedroom carpet",
+          "name": "The Bedroom Floor",
           "description": "The cards are dog-eared and bent and one of them has a chocolate fingerprint. The younger sibling is crying and the older one is pretending not to notice. A Pokemon poster on the wall has been there for years and the sun has bleached half of it. The lamp light is yellow and the rules change every fifteen minutes."
         },
         {
-          "name": "A green-felt casino room",
+          "name": "The Green Felt",
           "description": "Low lights. Cigar smoke that has been here longer than anyone in the room. The dealer wears white gloves and shuffles with a precision the cards can feel in their backs. The players do not speak. A man at the bar is watching, and his watching is itself a wager. The chips on the felt are real things, and so are you."
         },
         {
-          "name": "A reader's kitchen table",
+          "name": "The Reader's Kitchen",
           "description": "The deck is hand-painted, the work of someone who is no longer alive. Tea steams in a chipped cup. The seeker is asking aloud, in a voice that is careful and slightly embarrassed, and she keeps stopping mid-question. The light through the curtain is afternoon. There is a cat under the table. The cards smell faintly of cedar."
         },
         {
-          "name": "An empty stage in a vast hall",
+          "name": "The Spotlit Stage",
           "description": "The audience is invisible in the dark, but the cards can feel the breathing. A single spotlight on the play area. The cards know they are being watched and behave accordingly. The cues come from somewhere above; the players, when they reach down, are wearing sleeves that disappear into shadow. This is theatre, and the cards are getting better at their lines."
         }
       ]

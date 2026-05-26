@@ -12,15 +12,15 @@
       "label": "The station",
       "choices": [
         {
-          "name": "Derelict alien megastructure",
+          "name": "The Cenotaph",
           "description": "Ancient, non-human construction. The architecture doesn't obey human geometry. Whoever built it is long gone — or dormant."
         },
         {
-          "name": "Abandoned near-future hardware",
+          "name": "Lagrange Six",
           "description": "A NASA/ESA successor station, maybe 30 years from now. Familiar tech, cramped corridors, coffee-stained manuals floating in zero-g. The horror is intimate and grounded."
         },
         {
-          "name": "Military black site",
+          "name": "Site Obsidian",
           "description": "Year-2200 classified facility. Sleek, over-engineered, full of locked compartments and redacted logs. Whatever happened here, someone powerful wanted it kept quiet."
         }
       ]

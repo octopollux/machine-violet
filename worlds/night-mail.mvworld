@@ -13,19 +13,19 @@
       "label": "Your service",
       "choices": [
         {
-          "name": "Imperial postal",
+          "name": "The Crown Post",
           "description": "Uniformed, sworn, official. The crest on your coat opens doors and gets you shot at in equal measure. Defying the carrier is treason, and the carrier knows it; this both protects you and isolates you. The postmaster is a state functionary, and your manifest is countersigned in the capital."
         },
         {
-          "name": "Volunteer rural route",
+          "name": "The Volunteer Round",
           "description": "You took the route for the silence. The pay is bad, the lantern oil is yours, and nobody supervises you because nobody else wants the job. The villages along the route trust you because you chose them. That trust is a weight you don't always want to carry."
         },
         {
-          "name": "Conscripted",
+          "name": "The Debt Route",
           "description": "You owe somebody something, and the route pays it down by the mile. The bag is not yours; it is collateral. Walk away and the debt re-prices itself in something you can't afford. There are other conscripts on other routes, and you've started recognizing their footprints."
         },
         {
-          "name": "Illegal",
+          "name": "The Black Post",
           "description": "The postmasters are wanted in three jurisdictions. The mail you carry is illegal where it's sent from and illegal where it's going. You learned the route from a predecessor who learned it from theirs, and the chain is shorter than you'd like. The recipients hide you on the bad nights."
         }
       ]
@@ -34,19 +34,19 @@
       "label": "Your conveyance",
       "choices": [
         {
-          "name": "Satchel that never empties",
+          "name": "The Bottomless Satchel",
           "description": "It smells of attic and stamp glue and somebody else's tobacco. The bottom has things in it you don't remember picking up — a child's tooth, a key, a letter addressed to someone you haven't met. It talks back when you reach in without thinking. You don't reach in without thinking anymore."
         },
         {
-          "name": "Sled drawn by a thing you don't name",
+          "name": "The Unnamed Sled",
           "description": "It knows the route better than you do. It doesn't eat what you feed it, but it eats. You keep its harness on indoors because the one time you didn't, the route forgot you. At certain stops the recipients won't open the door until the sled is around the corner."
         },
         {
-          "name": "Bicycle that runs on belief",
+          "name": "The Faith Bicycle",
           "description": "You have to believe the next address exists or the pedals stop turning. On bad nights this is a problem. The bell rings without you when something is on the road ahead, and you have learned to brake when it does. The frame is older than any city you deliver to."
         },
         {
-          "name": "Old van that knows the route better than you",
+          "name": "The Old Van",
           "description": "The radio plays the next stop's weather a town early. The gas gauge is a suggestion the van is making about your mood. The back seat occasionally has a passenger you don't acknowledge and who doesn't acknowledge you, and you have agreed, by long habit, not to mention them at the depot."
         }
       ]

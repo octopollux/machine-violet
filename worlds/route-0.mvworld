@@ -14,19 +14,19 @@
       "label": "Why you took the exit",
       "choices": [
         {
-          "name": "Detour, lost",
+          "name": "The Missed Turn",
           "description": "You missed the turn for your actual destination an hour ago and you've been pretending not to. The first Route 0 sign was a relief — any exit would do. You took it because going further on the highway felt worse than getting off. That instinct was right. The implications were not."
         },
         {
-          "name": "Followed someone",
+          "name": "The Tail-Light Ahead",
           "description": "A car ahead of you took the exit and something in their tail-light pattern, or their license plate, or the way they signaled, made you follow. You are not a person who follows strangers. You followed this one. They are somewhere ahead of you now, or they were never there at all."
         },
         {
-          "name": "A voice on the radio said your name",
-          "description": "You were scanning through static between stations and the static said your name. Then your mother's maiden name. Then the name of the street you grew up on. The next exit was the only thing the radio mentioned by number, and you took it before you'd decided to."
+          "name": "The Static",
+          "description": "A voice on the radio said your name. You were scanning through static between stations and the static said your name. Then your mother's maiden name. Then the name of the street you grew up on. The next exit was the only thing the radio mentioned by number, and you took it before you'd decided to."
         },
         {
-          "name": "Been here before in a dream",
+          "name": "The Recurring Dream",
           "description": "You recognized the exit sign. You recognized the curve of the off-ramp. You recognized the diner at the bottom of the ramp before you saw it. You have been having this dream since you were a child, and you have never told anyone about it, and you are about to be a regular here."
         }
       ]
@@ -35,19 +35,19 @@
       "label": "Your vehicle",
       "choices": [
         {
-          "name": "Family sedan with a kid asleep in back",
+          "name": "The Family Sedan",
           "description": "The dome light won't turn off no matter how many times you check the switch. The gas tank reads full and has read full for two hours. There are Cheerios ground into the floor mat from a snack that happened in another state. Your kid is asleep with their face pressed against the window and you do not want them to wake up at the next exit."
         },
         {
-          "name": "Long-haul trucker",
+          "name": "The Eighteen-Wheeler",
           "description": "Your CB radio is picking up traffic that was never broadcast — chatter from drivers using names you don't recognize about loads they don't have permits for. Your rig has eighteen gears and one of them is illegal in the lower forty-eight. Your logbook fills itself in handwriting that is yours, with hours you did not drive."
         },
         {
-          "name": "Motorcycle, alone",
+          "name": "The Lone Bike",
           "description": "The wind at speed has been a person for the last hundred miles. They talk to you. You can hear the road through the bones in your wrists. You have one helmet and there are two voices inside it now, and one of them is asking questions about the next exit that you don't want to answer."
         },
         {
-          "name": "A car you don't actually own",
+          "name": "The Borrowed Car",
           "description": "The registration in the glove box is in someone else's name and the address is one you've never been to. The keys were left in the ignition at a rest stop and the doors were unlocked. The back seat has a dark stain that you didn't make. You started driving because the car was running and you didn't want to wait for whoever it belonged to."
         }
       ]
