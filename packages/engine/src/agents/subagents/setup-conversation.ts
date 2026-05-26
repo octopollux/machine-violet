@@ -9,6 +9,7 @@ import type { SystemComplexity } from "../../config/systems.js";
 import { getEffortConfig } from "../../config/models.js";
 import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
+import { processIncludes } from "../../prompts/process-includes.js";
 import { dumpContext, dumpThinking } from "../../config/context-dump.js";
 import {
   extractStatus,
@@ -497,7 +498,7 @@ export function createSetupConversation(
         let content: string;
         if (world) {
           const parts: string[] = [];
-          if (world.detail) parts.push(`## Detail\n${world.detail}`);
+          if (world.detail) parts.push(`## Detail\n${processIncludes(world.detail)}`);
           if (world.suboptions?.length) {
             for (const sub of world.suboptions) {
               parts.push(`## Suboption: ${sub.label}\n` +
@@ -658,7 +659,7 @@ export function createSetupConversation(
           let content: string;
           if (world) {
             const parts: string[] = [];
-            if (world.detail) parts.push(`## Detail\n${world.detail}`);
+            if (world.detail) parts.push(`## Detail\n${processIncludes(world.detail)}`);
             if (world.suboptions?.length) {
               for (const sub of world.suboptions) {
                 parts.push(`## Suboption: ${sub.label}\n` +
