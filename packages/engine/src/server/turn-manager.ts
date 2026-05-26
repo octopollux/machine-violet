@@ -111,11 +111,18 @@ export class TurnManager {
       // Use setImmediate to avoid blocking the HTTP response
       setImmediate(() => {
         this.commit().catch((err) => {
+          // session-manager's commit handler classifies session-fatal
+          // errors and broadcasts the proper category itself before
+          // returning cleanly. Anything that reaches this fallback catch
+          // either escaped that classification or originated in turn
+          // bookkeeping itself — treat it as recoverable so the client
+          // shows the retry overlay rather than getting stuck.
           this.broadcast({
             type: "error",
             data: {
               message: err instanceof Error ? err.message : String(err),
               recoverable: true,
+              category: "retryable",
             },
           });
         }).finally(() => {

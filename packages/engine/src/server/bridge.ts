@@ -124,9 +124,18 @@ export function createBridge(
 
     onError(error: Error): void {
       logEvent("engine:error", { message: error.message });
+      // Defensive: this fires when the engine surfaces an error via the
+      // callback path rather than throwing — session-manager's
+      // engine.processInput catch is the primary route for thrown errors
+      // and already classifies them. Default here to session-fatal so the
+      // client drops to menu instead of staying wedged.
       broadcast({
         type: "error",
-        data: { message: error.message, recoverable: false },
+        data: {
+          message: error.message,
+          recoverable: false,
+          category: "session-fatal-recoverable",
+        },
       });
     },
 
@@ -134,7 +143,13 @@ export function createBridge(
       logEvent("api:retry", { status, delayMs });
       broadcast({
         type: "error",
-        data: { message: `API retry (status ${status})`, recoverable: true, status, delayMs },
+        data: {
+          message: `API retry (status ${status})`,
+          recoverable: true,
+          status,
+          delayMs,
+          category: "retryable",
+        },
       });
     },
 
@@ -160,7 +175,11 @@ export function createBridge(
       logEvent("api:refusal");
       broadcast({
         type: "error",
-        data: { message: "Content classifier refused the response.", recoverable: false },
+        data: {
+          message: "Content classifier refused the response.",
+          recoverable: false,
+          category: "session-fatal-recoverable",
+        },
       });
     },
 

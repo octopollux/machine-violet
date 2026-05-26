@@ -204,6 +204,40 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
     }
   }, [clientState.sessionStale, clientState.sessionEnded, phase]);
 
+  // Session-fatal-recoverable (issue #529): the active session is dead
+  // (auth expired, model not found, classifier refusal) but the player can
+  // fix it. Drop to menu with the verbatim cause in the existing red
+  // banner. Mid-game flush + checkpoint happens server-side before the
+  // error event lands, so the campaign reappears under "Resume" intact.
+  // Trigger from any phase where a session could be running (playing,
+  // starting, and the menu-with-a-just-started-setup-error case).
+  useEffect(() => {
+    if (clientState.lastError?.category !== "session-fatal-recoverable") return;
+    const message = clientState.lastError.message;
+    // Hide any modals that might be on top of the menu (saving overlay,
+    // delete confirm, recap modal). `setActiveModal(null)` was added in
+    // the same place returnToMenu uses for its own teardown.
+    setActiveModal(null);
+    setErrorMessage(message);
+    if (phase === "playing" || phase === "starting") {
+      // returnToMenu hits /endSession + waitForIdle. With session_fatal the
+      // server has already torn down — the call no-ops but the idle poll
+      // resolves quickly, so we don't need a separate cleanup path.
+      returnToMenu();
+    } else if (phase !== "menu") {
+      // Settings / connections / etc — just bounce to the menu so the
+      // player sees the banner.
+      setPhase("menu");
+    }
+    // Clear the error from clientState so a subsequent session start
+    // doesn't re-fire this effect from stale state.
+    setClientState((prev) => ({ ...prev, lastError: null }));
+    // returnToMenu intentionally omitted from deps: it's declared further
+    // down via useCallback, and listing it triggers a temporal dead zone
+    // at render time. The stale-session effect above uses the same
+    // pattern (closure captures the latest value at run time).
+  }, [clientState.lastError, phase]);
+
   // Handle setup → game transition: reset client state for new session.
   // The WebSocket stays connected — transitionToGame() broadcasts a fresh
   // state:snapshot to all connected clients after starting the new session.
@@ -238,6 +272,9 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
     setPhase("starting");
     setNarrativeLines([]);
     setClientState(initialClientState());
+    // Clear any lingering session-fatal banner (#529) — the player's
+    // remediation action is starting a new session.
+    setErrorMessage("");
 
     apiClientRef.current.startCampaign(id).then(() => {
       setPhase("playing");

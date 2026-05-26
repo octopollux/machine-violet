@@ -59,3 +59,39 @@ describe("createBridge onRollback", () => {
     expect(() => cb.onRollback?.()).not.toThrow();
   });
 });
+
+describe("createBridge error categories (#529)", () => {
+  // The three-tier taxonomy is decided server-side; every WS error event
+  // the bridge emits must carry the right discriminant so the client UX
+  // (retry overlay vs main-menu banner vs hard error screen) matches.
+  it("tags onRetry events as category=retryable", () => {
+    const events: ServerEvent[] = [];
+    const cb = createBridge({ broadcast: (e) => events.push(e) });
+    cb.onRetry(429, 2000);
+    const e = events[0];
+    expect(e.type).toBe("error");
+    expect((e.data as { category?: string }).category).toBe("retryable");
+    expect((e.data as { recoverable: boolean }).recoverable).toBe(true);
+  });
+
+  it("tags onError events as category=session-fatal-recoverable", () => {
+    // Defensive default — most thrown errors hit the session-manager
+    // catch and get classified there, but anything that escapes to the
+    // bridge callback should drop the client to menu (with the verbatim
+    // message), not silently retry forever.
+    const events: ServerEvent[] = [];
+    const cb = createBridge({ broadcast: (e) => events.push(e) });
+    cb.onError(new Error("boom"));
+    const e = events[0];
+    expect((e.data as { category?: string }).category).toBe("session-fatal-recoverable");
+    expect((e.data as { recoverable: boolean }).recoverable).toBe(false);
+  });
+
+  it("tags onRefusal (content classifier) as category=session-fatal-recoverable", () => {
+    const events: ServerEvent[] = [];
+    const cb = createBridge({ broadcast: (e) => events.push(e) });
+    cb.onRefusal();
+    const e = events[0];
+    expect((e.data as { category?: string }).category).toBe("session-fatal-recoverable");
+  });
+});

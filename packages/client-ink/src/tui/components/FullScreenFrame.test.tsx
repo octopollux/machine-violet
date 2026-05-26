@@ -46,4 +46,94 @@ describe("FullScreenFrame", () => {
     );
     expect(lastFrame()).toContain("Content");
   });
+
+  describe("topBanner slot (#529)", () => {
+    // The banner lives in the top-padding region — its whole point is to
+    // surface high-priority info (auth expired, fatal session error)
+    // without shifting the centered children around when it toggles.
+    function rowOfFirstMatch(frame: string, marker: string): number {
+      const lines = frame.split("\n");
+      return lines.findIndex((l) => l.includes(marker));
+    }
+
+    it("renders topBanner content above the centered children", () => {
+      const theme = makeTheme();
+      const banner = <Text>BANNER_MARKER</Text>;
+      const { lastFrame } = render(
+        <FullScreenFrame
+          theme={theme}
+          columns={80}
+          rows={24}
+          contentRows={1}
+          topBanner={banner}
+          topBannerRows={1}
+        >
+          <Text>CHILD_MARKER</Text>
+        </FullScreenFrame>,
+      );
+      const frame = lastFrame() ?? "";
+      expect(frame).toContain("BANNER_MARKER");
+      expect(frame).toContain("CHILD_MARKER");
+      expect(rowOfFirstMatch(frame, "BANNER_MARKER"))
+        .toBeLessThan(rowOfFirstMatch(frame, "CHILD_MARKER"));
+    });
+
+    it("keeps centered children at the same row whether or not the banner is present", () => {
+      // This is the whole reason the slot exists: out-of-band messages
+      // must not cause UI jitter when they appear/disappear. Render the
+      // same children at the same `contentRows` with and without a
+      // 3-row banner; the child row index must be identical.
+      const theme = makeTheme();
+      const without = render(
+        <FullScreenFrame theme={theme} columns={80} rows={24} contentRows={1}>
+          <Text>CHILD_MARKER</Text>
+        </FullScreenFrame>,
+      ).lastFrame() ?? "";
+      const withBanner = render(
+        <FullScreenFrame
+          theme={theme}
+          columns={80}
+          rows={24}
+          contentRows={1}
+          topBanner={
+            <>
+              <Text>BAN1</Text>
+              <Text>BAN2</Text>
+              <Text>BAN3</Text>
+            </>
+          }
+          topBannerRows={3}
+        >
+          <Text>CHILD_MARKER</Text>
+        </FullScreenFrame>,
+      ).lastFrame() ?? "";
+      expect(rowOfFirstMatch(without, "CHILD_MARKER"))
+        .toBe(rowOfFirstMatch(withBanner, "CHILD_MARKER"));
+    });
+
+    it("omits banner space when topBanner is null", () => {
+      // Skip the slot's reservation entirely when there's nothing to show
+      // (don't leave a phantom gap above the menu).
+      const theme = makeTheme();
+      const frame = render(
+        <FullScreenFrame
+          theme={theme}
+          columns={80}
+          rows={24}
+          contentRows={1}
+          topBanner={null}
+          topBannerRows={3}
+        >
+          <Text>CHILD_MARKER</Text>
+        </FullScreenFrame>,
+      ).lastFrame() ?? "";
+      const baseline = render(
+        <FullScreenFrame theme={theme} columns={80} rows={24} contentRows={1}>
+          <Text>CHILD_MARKER</Text>
+        </FullScreenFrame>,
+      ).lastFrame() ?? "";
+      expect(rowOfFirstMatch(frame, "CHILD_MARKER"))
+        .toBe(rowOfFirstMatch(baseline, "CHILD_MARKER"));
+    });
+  });
 });

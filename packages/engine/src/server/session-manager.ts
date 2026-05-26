@@ -47,6 +47,7 @@ import { createBridge } from "./bridge.js";
 import { createBaseFileIO } from "./fileio.js";
 import { SetupSession } from "./setup-session.js";
 import { generateDiscordStatus } from "../agents/subagents/discord-status.js";
+import { classifyServerError, userMessageFor, performSessionFatalTeardown } from "./error-classify.js";
 
 /** DM-narrative interval at which a fresh Discord presence string is generated. */
 const DISCORD_STATUS_INTERVAL = 8;
@@ -100,8 +101,15 @@ export type SessionStatus = "idle" | "starting" | "active" | "stopping";
  * the flush+checkpoint that would otherwise clobber rolled-back disk state
  * with stale in-memory values. Keep this a closed union so new callsites
  * can't silently bypass the rollback-safe path with a typo'd string.
+ *
+ * `session_fatal` is the mid-game "auth expired / wrong model / classifier
+ * refusal" path (issue #529). It behaves like `explicit` for persistence —
+ * flush + checkpoint so the player resumes with no lost turns — but the
+ * caller is expected to broadcast a `session-fatal-recoverable` error
+ * event around the teardown so the client drops to the main menu with the
+ * cause in a red banner.
  */
-export type EndSessionReason = "explicit" | "idle_timeout" | "rollback";
+export type EndSessionReason = "explicit" | "idle_timeout" | "rollback" | "session_fatal";
 
 export class SessionManager {
   private campaignsDir: string;
@@ -434,14 +442,25 @@ export class SessionManager {
         stack: err instanceof Error ? err.stack : undefined,
       });
 
-      // Tear down setup state so a new setup can be started
+      // Tear down setup state so a new setup can be started. Setup has no
+      // per-campaign persistence (the temp __setup__ dir is recreated on
+      // every retry), so we skip the flush/checkpoint dance that the
+      // mid-game session_fatal path needs.
       this.setupSession = null;
       this.turnManager = null;
       this.status = "idle";
 
+      // Session-fatal: setup has died for a reason the player must address
+      // (auth, model, classifier refusal). Surfacing as `recoverable: false`
+      // with the new category drops the client to the main menu with the
+      // verbatim message in a red banner.
       this.broadcast({
         type: "error",
-        data: { message: err instanceof Error ? err.message : String(err), recoverable: false },
+        data: {
+          message: userMessageFor(err),
+          recoverable: false,
+          category: classifyServerError(err),
+        },
       });
     });
   }
@@ -874,6 +893,14 @@ export class SessionManager {
             await this.endSession("rollback");
             return;
           }
+          // Session-fatal in OOC/Dev: same flush + teardown + banner path
+          // as the normal-play branch below. Mode session errors otherwise
+          // bubble to the setImmediate catch in TurnManager and mis-render
+          // as recoverable retries.
+          if (this.isSessionFatal(err)) {
+            await this.handleSessionFatal(err, scopedBroadcast);
+            return;
+          }
           throw err;
         }
         scopedBroadcast({ type: "narrative:complete", data: { text: "" } });
@@ -941,6 +968,20 @@ export class SessionManager {
             data: { text: `[${err.message}]`, kind: "system" },
           });
           await this.endSession("rollback");
+          return;
+        }
+        // Session-fatal mid-game (issue #529): auth expired, model not
+        // found, etc. Player can fix and start again, but this turn is
+        // dead and the in-flight stream needs closing before teardown so
+        // the client doesn't sit in "streaming" forever. Order matters:
+        //   1. narrative:complete flushes any half-rendered DM deltas.
+        //   2. endSession("session_fatal") triggers flush + checkpoint so
+        //      the campaign resumes cleanly (no lost prior turns).
+        //   3. broadcast the error with the new category — sent *after*
+        //      session:ended so the client has already transitioned out
+        //      of playing-phase state.
+        if (this.isSessionFatal(err)) {
+          await this.handleSessionFatal(err, scopedBroadcast);
           return;
         }
         throw err;
@@ -1431,6 +1472,36 @@ export class SessionManager {
         ? this.committedNarrative.slice()
         : undefined,
     };
+  }
+
+  /**
+   * Does this thrown error mean the in-flight session is done — but the
+   * process is fine and the player can fix something and try again?
+   *
+   * Recognises {@link CodexTurnFailedError} today; future provider error
+   * classes that should drop to menu (Anthropic 403 on forbidden model,
+   * setup-conversation refusal with empty content, etc.) should be added
+   * to {@link classifyServerError} rather than branched on here.
+   */
+  private isSessionFatal(err: unknown): boolean {
+    return classifyServerError(err) === "session-fatal-recoverable";
+  }
+
+  /**
+   * Mid-game session-fatal teardown. Delegates to
+   * {@link performSessionFatalTeardown} so the sequencing (flush →
+   * endSession → broadcast) can be unit-tested without a real engine.
+   */
+  private async handleSessionFatal(
+    err: unknown,
+    scopedBroadcast: (event: ServerEvent) => void,
+  ): Promise<void> {
+    await performSessionFatalTeardown({
+      err,
+      scopedBroadcast,
+      unscopedBroadcast: (event) => this.broadcast(event),
+      endSession: () => this.endSession("session_fatal"),
+    });
   }
 
   /** Teardown on server shutdown. */
