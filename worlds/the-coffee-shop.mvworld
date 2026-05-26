@@ -40,15 +40,15 @@
       "label": "Your role",
       "choices": [
         {
-          "name": "The barista",
+          "name": "Behind the Bar",
           "description": "You make the drinks, you hear the stories, you remember everyone's order. You're the background character in a dozen other people's lives — except you're not background to us."
         },
         {
-          "name": "The new owner",
+          "name": "New Proprietor",
           "description": "You just took over. The previous owner left abruptly and the regulars are wary. You're learning names, fixing the plumbing, finding strange notes in the back office. The shop has a history you're inheriting."
         },
         {
-          "name": "The regular",
+          "name": "Same Seat, Same Order",
           "description": "You come here every day. Same seat, same order. You know the staff, you know the other regulars, you have your rituals. Something small is about to change one of them."
         }
       ]

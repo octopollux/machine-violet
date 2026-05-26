@@ -14,20 +14,20 @@
       "label": "Your way in",
       "choices": [
         {
-          "name": "Art critic invited to authenticate",
-          "description": "The gallery wants your byline on the show. You came expecting a routine attribution piece and you are now staring at a canvas that you cannot honestly write about with the vocabulary your editor will accept. You have a deadline. The deadline is becoming the least of your problems."
+          "name": "The Byline",
+          "description": "Art critic invited to authenticate. The gallery wants your byline on the show. You came expecting a routine attribution piece and you are now staring at a canvas that you cannot honestly write about with the vocabulary your editor will accept. You have a deadline. The deadline is becoming the least of your problems."
         },
         {
-          "name": "The dead artist's lover",
-          "description": "You were not invited to the opening. You came anyway. You knew which paintings he loved and which he was afraid of, and this one is the one he would not let you see while he was alive. You can feel him in the brushwork. You can also feel something else, and you don't yet know if it has always been there."
+          "name": "The Beloved",
+          "description": "The dead artist's lover. You were not invited to the opening. You came anyway. You knew which paintings he loved and which he was afraid of, and this one is the one he would not let you see while he was alive. You can feel him in the brushwork. You can also feel something else, and you don't yet know if it has always been there."
         },
         {
-          "name": "Gallery employee opening tomorrow",
-          "description": "You have the keys. You are not paid enough to be the first one in the building at seven a.m. and not paid enough to be the last one out at nine p.m. The owner asked you to stop documenting the changes. You have not stopped. The photographs are on a thumb drive in your bag."
+          "name": "The Keyholder",
+          "description": "Gallery employee opening tomorrow. You have the keys. You are not paid enough to be the first one in the building at seven a.m. and not paid enough to be the last one out at nine p.m. The owner asked you to stop documenting the changes. You have not stopped. The photographs are on a thumb drive in your bag."
         },
         {
-          "name": "Cop investigating the prior death",
-          "description": "There was a previous owner. They went off a balcony, no note, the case was closed in a week. You did not work the case, but you read it, and the file mentions this painting once, in a sentence that was struck through and initialed. You came to the gallery because the file would not let you sleep."
+          "name": "The Struck Line",
+          "description": "Cop investigating the prior death. There was a previous owner. They went off a balcony, no note, the case was closed in a week. You did not work the case, but you read it, and the file mentions this painting once, in a sentence that was struck through and initialed. You came to the gallery because the file would not let you sleep."
         }
       ]
     },
@@ -35,19 +35,19 @@
       "label": "The gallery",
       "choices": [
         {
-          "name": "Glittering Chelsea white-cube",
+          "name": "Halberd & Vine",
           "description": "Champagne in plastic flutes the collectors compliment and do not drink. A guard at every doorway in a uniform tailored too well to do real guard work. The price list is on a tablet at the front desk and the prices are not in the catalog. The painting is on the back wall, lit by a single ceiling fixture that has been re-aimed twice this week."
         },
         {
-          "name": "Provincial museum",
+          "name": "The Pollard Memorial",
           "description": "Carpeted floors that swallow footsteps. School-trip benches built for ten-year-olds. The security camera in the corner is a prop the board approved as a budget compromise. The painting is on loan from a private collection and the loan paperwork lists a contact who does not answer the phone."
         },
         {
-          "name": "Defunct industrial conversion",
+          "name": "The Packing Floor",
           "description": "Concrete floors, painted columns, a chill that the HVAC will not lift. The painting hangs alone in the long room. The freight elevator is the only access for visitors and the operator is a friend of the owner. The building was a meatpacker's once. The bones of the old drains are visible in the floor."
         },
         {
-          "name": "Wealthy private home",
+          "name": "The Sideboard",
           "description": "The painting is in the dining room above the sideboard, lit by sconces the host had custom-cast. The owner is hosting a dinner tonight; you were not invited to dessert. The other guests have noticed something is off but have not been able to put a finger on it and are too well-mannered to ask."
         }
       ]

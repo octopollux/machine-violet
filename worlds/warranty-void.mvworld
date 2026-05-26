@@ -13,20 +13,20 @@
       "label": "Channel",
       "choices": [
         {
-          "name": "Phone",
-          "description": "Hold music is the screams of previous customers, looped, slightly tasteful. Tier escalation is literal — between each tier the player climbs a flight of stairs in a building that the support agent describes over the line. The on-hold timer counts up past sensible numbers. The agent thanks the player for their patience between every sentence."
+          "name": "The Hold Line",
+          "description": "Phone support. Hold music is the screams of previous customers, looped, slightly tasteful. Tier escalation is literal — between each tier the player climbs a flight of stairs in a building that the support agent describes over the line. The on-hold timer counts up past sensible numbers. The agent thanks the player for their patience between every sentence."
         },
         {
-          "name": "Chat",
-          "description": "The agent's avatar is the player's own face, smiling slightly differently. Canned responses arrive in the chat window before the player has finished asking the question. The chat history scrolls upward into messages the player has not yet sent. The typing indicator pulses in the player's own rhythm."
+          "name": "The Mirror Window",
+          "description": "Chat support. The agent's avatar is the player's own face, smiling slightly differently. Canned responses arrive in the chat window before the player has finished asking the question. The chat history scrolls upward into messages the player has not yet sent. The typing indicator pulses in the player's own rhythm."
         },
         {
-          "name": "Email",
-          "description": "Every reply quotes the entire prior chain back at the player. Some of the quoted messages are from threads the player has not sent. The signature block at the bottom of every reply contains the player's own home address. Replies arrive in batches and the timestamps are wrong."
+          "name": "The Quoted Chain",
+          "description": "Email support. Every reply quotes the entire prior chain back at the player. Some of the quoted messages are from threads the player has not sent. The signature block at the bottom of every reply contains the player's own home address. Replies arrive in batches and the timestamps are wrong."
         },
         {
-          "name": "In-person at a kiosk",
-          "description": "A mall that closed in 1997, fluorescent and echoing. The kiosk is staffed by yesterday — literally, the agent is the player as they were the day before. They are exactly as helpful as the player was. The food court is open. Nothing in it is for sale."
+          "name": "The Dead Mall Kiosk",
+          "description": "In-person support. A mall that closed in 1997, fluorescent and echoing. The kiosk is staffed by yesterday — literally, the agent is the player as they were the day before. They are exactly as helpful as the player was. The food court is open. Nothing in it is for sale."
         }
       ]
     },
@@ -34,20 +34,20 @@
       "label": "How you broke it",
       "choices": [
         {
-          "name": "Followed the manual exactly",
-          "description": "The manual was clear. Every step. The player can show their work. The agent agrees the player followed the manual, asks if the player has tried a different manual, and refers them to a supplementary document the player will never be able to find."
+          "name": "By the Manual",
+          "description": "You followed the manual exactly. It was clear. Every step. The player can show their work. The agent agrees the player followed the manual, asks if the player has tried a different manual, and refers them to a supplementary document the player will never be able to find."
         },
         {
-          "name": "A modification you swear was harmless",
-          "description": "A small after-market change. A workaround everyone online uses. The player knows three friends who did the same thing without incident. The agent notes that the warranty does not cover modifications, and the modifications appear to be in the player's permanent record."
+          "name": "The Harmless Mod",
+          "description": "A modification you swear was harmless. A small after-market change. A workaround everyone online uses. The player knows three friends who did the same thing without incident. The agent notes that the warranty does not cover modifications, and the modifications appear to be in the player's permanent record."
         },
         {
-          "name": "Inherited the broken reality from a previous owner",
-          "description": "It came like this. The player did not break it. The previous owner — possibly deceased, possibly fictional — voided the warranty before the transfer. The agent suggests the player contact the previous owner. The previous owner is one of the things that is broken."
+          "name": "The Previous Owner",
+          "description": "You inherited the broken reality. It came like this. The player did not break it. The previous owner — possibly deceased, possibly fictional — voided the warranty before the transfer. The agent suggests the player contact the previous owner. The previous owner is one of the things that is broken."
         },
         {
-          "name": "It was already broken when you got here",
-          "description": "It has been broken from the start. The player has been blamed for it the entire time, including by themselves. The agent's records show the player as the registered owner since a date that predates the player. The agent is sorry but the timestamps are authoritative."
+          "name": "The Authoritative Timestamp",
+          "description": "It was already broken when you got here. It has been broken from the start. The player has been blamed for it the entire time, including by themselves. The agent's records show the player as the registered owner since a date that predates the player. The agent is sorry but the timestamps are authoritative."
         }
       ]
     }

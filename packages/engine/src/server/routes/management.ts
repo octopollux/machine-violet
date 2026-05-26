@@ -12,9 +12,9 @@ import { randomBytes } from "node:crypto";
 import {
   loadConnectionStore, saveConnectionStore, buildEffectiveConnections,
   addConnection, removeConnection, setTierAssignment, updateConnectionModels,
-  maskKey,
+  maskKey, upsertChatGptConnection,
 } from "../../config/connections.js";
-import type { ConnectionStore, TierAssignment, ProviderType, AIConnection } from "../../config/connections.js";
+import type { ConnectionStore, TierAssignment, ProviderType } from "../../config/connections.js";
 import { createProviderFromConnection } from "../../providers/index.js";
 import { loadModelRegistry, getModelsForProvider, modelFamilyFor } from "../../config/model-registry.js";
 import {
@@ -287,6 +287,17 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
         });
         if (entry.status !== "pending") return;
         codex.notify("initialized", {});
+        // Push the freshly-OAuthed tokens. `pushChatGptAuthTokens`
+        // authoritatively sets the chatgpt identity for this subprocess.
+        //
+        // We deliberately do NOT call `account/logout` first. An earlier
+        // attempt wiped `~/.codex/auth.json` defensively, but codex's
+        // chatgptAuthTokens flow is an augmentation layer over its base
+        // identity — pushing into a fully-empty auth.json caused the
+        // *next* session subprocess to spawn against empty disk state and
+        // fail `account/read` with "no active ChatGPT login" even though
+        // we'd push fresh tokens into it. Trust the push to be the source
+        // of truth.
         await pushChatGptAuthTokens(codex, tokens);
         if (entry.status !== "pending") return;
 
@@ -306,33 +317,40 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
         } catch { /* best effort */ }
         if (entry.status !== "pending") return;
 
-        const connId = randomBytes(8).toString("hex");
-        const newConn: AIConnection = {
-          id: connId,
-          provider: "openai-chatgpt",
-          label: entry.email ? `ChatGPT (${entry.email})` : "ChatGPT",
-          apiKey: "",
-          chatgptAccount: {
-            id: tokens.chatgptAccountId,
-            email: entry.email,
-            planType: entry.planType,
-            accessToken: tokens.accessToken,
-            refreshToken: tokens.refreshToken,
-            idToken: tokens.idToken,
-            expiresAtMs: tokens.expiresAtMs,
-          },
-          models: discovered,
-          source: "oauth",
-          addedAt: new Date().toISOString(),
-        };
         // Final guard: cancellation between the model-list await and the
         // disk write would otherwise still persist the connection.
         if (entry.status !== "pending") return;
+
+        // Replace prior chatgpt connection(s) instead of appending — see
+        // upsertChatGptConnection's docstring for the full rationale.
+        // Without this, every "Sign in with ChatGPT" would append a new
+        // record while tier assignments kept pointing at the stale one.
         const stored = loadConnectionStore(server.configDir);
-        stored.connections.push(newConn);
+        const upsert = upsertChatGptConnection(stored, {
+          id: tokens.chatgptAccountId,
+          email: entry.email,
+          planType: entry.planType,
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          idToken: tokens.idToken,
+          expiresAtMs: tokens.expiresAtMs,
+        }, discovered);
         saveConnectionStore(server.configDir, stored);
-        entry.connectionId = connId;
+        entry.connectionId = upsert.connectionId;
         entry.status = "success";
+
+        // If a session is live and was using one of the removed/replaced
+        // connections, dispose its provider so the next chat() call lazily
+        // re-spawns codex and pushes the fresh tokens. Without this the
+        // codex subprocess keeps the prior access_token in memory until
+        // session end.
+        const affectedConnIds = [...upsert.removedIds, upsert.connectionId];
+        for (const connId of affectedConnIds) {
+          const live = server.sessionManager.getProviderForConnectionId(connId);
+          if (live?.dispose) {
+            void live.dispose().catch(() => { /* best effort */ });
+          }
+        }
       } catch (err) {
         entry.status = "error";
         entry.error = err instanceof Error ? err.message : String(err);

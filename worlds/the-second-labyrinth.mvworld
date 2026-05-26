@@ -13,20 +13,20 @@
       "label": "Why you went down",
       "choices": [
         {
-          "name": "Following someone who descended",
-          "description": "They left without telling you. You found their pack at the top of the stair, neatly set down, their lantern still warm. You called and they did not answer, and you went down because waiting at the top felt worse than following. You can no longer hear the surface."
+          "name": "The Lantern Left Warm",
+          "description": "Following someone who descended. They left without telling you. You found their pack at the top of the stair, neatly set down, their lantern still warm. You called and they did not answer, and you went down because waiting at the top felt worse than following. You can no longer hear the surface."
         },
         {
-          "name": "Hired to map it",
-          "description": "A university, a king's geographer, a wealthy antiquarian — somebody who pays in coin and wants results in ink. Your kit is good and your training is real and your contract specifies a finder's fee for any chamber not in the existing surveys. You have already earned the fee three times and you have not yet sent any of it home."
+          "name": "The Finder's Fee",
+          "description": "Hired to map it. A university, a king's geographer, a wealthy antiquarian — somebody who pays in coin and wants results in ink. Your kit is good and your training is real and your contract specifies a finder's fee for any chamber not in the existing surveys. You have already earned the fee three times and you have not yet sent any of it home."
         },
         {
-          "name": "Woke up there",
-          "description": "Last you remember you were on the surface, in bed or at table or on the road. You woke on stone in a chamber you do not recognize, with a lantern and a waterskin you do not remember packing. The chamber has four exits. None of them is up."
+          "name": "The Four Exits",
+          "description": "You woke up there. Last you remember you were on the surface, in bed or at table or on the road. You woke on stone in a chamber you do not recognize, with a lantern and a waterskin you do not remember packing. The chamber has four exits. None of them is up."
         },
         {
-          "name": "You ARE the next minotaur and don't know it yet",
-          "description": "You came down for reasons that made sense at the time. The reasons are starting to feel like instructions. The lower air agrees with you in a way that is alarming when you notice it. The dreams you have had since you started descending are not your dreams. They are someone else's, remembered backwards."
+          "name": "The Heir of Horns",
+          "description": "You ARE the next minotaur and don't know it yet. You came down for reasons that made sense at the time. The reasons are starting to feel like instructions. The lower air agrees with you in a way that is alarming when you notice it. The dreams you have had since you started descending are not your dreams. They are someone else's, remembered backwards."
         }
       ]
     },
@@ -34,24 +34,24 @@
       "label": "Architectural era of each layer",
       "choices": [
         {
-          "name": "Minoan original",
-          "description": "Sea-light on plaster, even this far underground; somewhere a shaft to the sky still works. Bull-leaping frescoes in red and ochre on the walls of an antechamber. The smell of dust and lamp-oil that has been re-applied by hands the player has not seen. The acoustics are exactly the size of the room."
+          "name": "The Bull-Leapers' Stone",
+          "description": "Minoan original. Sea-light on plaster, even this far underground; somewhere a shaft to the sky still works. Bull-leaping frescoes in red and ochre on the walls of an antechamber. The smell of dust and lamp-oil that has been re-applied by hands the player has not seen. The acoustics are exactly the size of the room."
         },
         {
-          "name": "Roman expansion",
-          "description": "Brick vaults arched over older Minoan stone. Mosaic floors in geometric patterns, half-buried in silt. An aqueduct cut through a wall still drips into a cistern that has not been emptied since the legion abandoned the post. The Latin graffiti in one corner names a centurion who was reported missing in 117 AD."
+          "name": "The Legion's Cistern",
+          "description": "Roman expansion. Brick vaults arched over older Minoan stone. Mosaic floors in geometric patterns, half-buried in silt. An aqueduct cut through a wall still drips into a cistern that has not been emptied since the legion abandoned the post. The Latin graffiti in one corner names a centurion who was reported missing in 117 AD."
         },
         {
-          "name": "Norman fortification",
-          "description": "Cold stone, blocks the player can rest a hand on and feel the chill move up the arm. Arrow slits open onto darkness; the player has no idea what the slits were meant to fire at. A small chapel in a recess, the altar still standing, and prayers spoken in the chapel do not echo. They are absorbed."
+          "name": "The Swallowed Chapel",
+          "description": "Norman fortification. Cold stone, blocks the player can rest a hand on and feel the chill move up the arm. Arrow slits open onto darkness; the player has no idea what the slits were meant to fire at. A small chapel in a recess, the altar still standing, and prayers spoken in the chapel do not echo. They are absorbed."
         },
         {
-          "name": "Modern utility",
-          "description": "Concrete poured against ancient rock. Fluorescent tubes hung from rebar, some still flickering on a circuit that has no obvious source. A service map mounted in a junction box that does not match the corridors the player has walked. A coffee cup on the floor, the logo of a company the player has heard of, dated last year."
+          "name": "The Service Corridor",
+          "description": "Modern utility. Concrete poured against ancient rock. Fluorescent tubes hung from rebar, some still flickering on a circuit that has no obvious source. A service map mounted in a junction box that does not match the corridors the player has walked. A coffee cup on the floor, the logo of a company the player has heard of, dated last year."
         },
         {
-          "name": "Future the player can't date",
-          "description": "Matte surfaces that shed no shadow. Signage in a script the player almost reads, in a layout that suggests they were meant to read it eventually. The air-handling is so quiet the player notices the silence first. Whatever this layer is, it was built knowing the player would arrive."
+          "name": "The Undatable Floor",
+          "description": "A future the player can't date. Matte surfaces that shed no shadow. Signage in a script the player almost reads, in a layout that suggests they were meant to read it eventually. The air-handling is so quiet the player notices the silence first. Whatever this layer is, it was built knowing the player would arrive."
         }
       ]
     }

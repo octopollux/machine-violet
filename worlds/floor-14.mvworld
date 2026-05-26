@@ -13,20 +13,20 @@
       "label": "Why you're at the hotel",
       "choices": [
         {
-          "name": "Conference attendee, badge still on",
-          "description": "Two days of breakout sessions, a name tag with your title spelled correctly, a tote bag with a vendor logo on it. You came down to the bar at ten to get away from a colleague. You took the elevator back up after one drink. You have not yet been missed by the conference."
+          "name": "The Lanyard",
+          "description": "Conference attendee, badge still on. Two days of breakout sessions, a name tag with your title spelled correctly, a tote bag with a vendor logo on it. You came down to the bar at ten to get away from a colleague. You took the elevator back up after one drink. You have not yet been missed by the conference."
         },
         {
-          "name": "Affair",
-          "description": "You shouldn't be here. The room was booked under a name that is yours and isn't. The other party has not arrived and is not answering. You can leave. You haven't left. Every minute you stay is one more minute of explanation you will need to construct."
+          "name": "The Other Name",
+          "description": "An affair. You shouldn't be here. The room was booked under a name that is yours and isn't. The other party has not arrived and is not answering. You can leave. You haven't left. Every minute you stay is one more minute of explanation you will need to construct."
         },
         {
-          "name": "Funeral in town, can't sleep at the family home",
-          "description": "Your sister's house was too full. Your father's house was too empty. The hotel was the compromise. The service is at ten tomorrow morning. The eulogy is folded in your jacket pocket and the folded edges are sharp."
+          "name": "The Eulogy",
+          "description": "Funeral in town, can't sleep at the family home. Your sister's house was too full. Your father's house was too empty. The hotel was the compromise. The service is at ten tomorrow morning. The eulogy is folded in your jacket pocket and the folded edges are sharp."
         },
         {
-          "name": "Driving through, picked the cheapest sign",
-          "description": "Eight hundred miles in a day. You took the first exit with a lit vacancy board. The clerk did not ask for your destination and you would not have told them. Nobody you know knows where you are. Nobody you know would think to look for you in this town."
+          "name": "The Lit Vacancy",
+          "description": "Driving through, picked the cheapest sign. Eight hundred miles in a day. You took the first exit with a lit vacancy board. The clerk did not ask for your destination and you would not have told them. Nobody you know knows where you are. Nobody you know would think to look for you in this town."
         }
       ]
     },
@@ -34,19 +34,19 @@
       "label": "The hotel",
       "choices": [
         {
-          "name": "Airport business hotel",
+          "name": "The Concourse Marquis",
           "description": "Hum of HVAC under everything. A coffee station in the lobby until 11 p.m. and then the urn is wheeled away. Runway lights through the curtains in a slow regular sweep, the room briefly lit blue every twelve seconds. The shuttle to the terminal runs every twenty minutes and you can hear it idling from your window."
         },
         {
-          "name": "Old downtown grand",
+          "name": "The Ambassador",
           "description": "Marble lobby, brass fittings the bellman polishes during slow hours. A ballroom with a tarp on the chandelier and a wedding scheduled for Saturday. The elevator man is old enough to remember your grandfather, and he might. The piano in the lounge plays itself for an hour each evening and then stops."
         },
         {
-          "name": "Roadside motor lodge",
+          "name": "The Starlight Inn",
           "description": "Single story except for the office. A pool that's been drained twice this year and is currently full of leaves. The ice machine in the breezeway sings — low, continuous, almost a chord. Your door opens onto the parking lot directly and the parking lot is empty except for your car and a station wagon nobody is in."
         },
         {
-          "name": "Mountain resort, off-season",
+          "name": "The Cloudwell",
           "description": "Closed wings, one staff member at the desk, a dining room with chairs upturned on every other table. Deer on the lawn at dawn, unbothered. The ski lift is still running, slowly, with empty chairs, because somebody has to keep the cables exercised through the summer."
         }
       ]

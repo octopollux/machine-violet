@@ -13,20 +13,20 @@
       "label": "Your station",
       "choices": [
         {
-          "name": "A village priest whose congregation is dying",
-          "description": "The fever came in spring. The prayers, before, would have done their work. They are not doing it now. The doors of the chapel still open. The collection plate still circulates. You have stopped using the responses that promise intervention, because you have begun to feel them as small lies."
+          "name": "The Parish Priest",
+          "description": "A village priest whose congregation is dying. The fever came in spring. The prayers, before, would have done their work. They are not doing it now. The doors of the chapel still open. The collection plate still circulates. You have stopped using the responses that promise intervention, because you have begun to feel them as small lies."
         },
         {
-          "name": "A Saint yourself, suddenly silent",
-          "description": "You were the answer to prayers. You felt the calls. You rode where you were summoned. The summons stopped a season ago, and you have been waiting at the chapel, increasingly humanly, for a sign that did not arrive. The relic in the reliquary downstairs is colder to the touch than it used to be."
+          "name": "The Silent Saint",
+          "description": "A Saint yourself, suddenly silent. You were the answer to prayers. You felt the calls. You rode where you were summoned. The summons stopped a season ago, and you have been waiting at the chapel, increasingly humanly, for a sign that did not arrive. The relic in the reliquary downstairs is colder to the touch than it used to be."
         },
         {
-          "name": "A papal investigator with a writ",
-          "description": "Your authority is broad and your escort is small. You carry a writ signed in a hand that does not bear public scrutiny. Every door opens for the writ; some of them close behind you faster than they opened. You are being told, in many polite ways, to ask different questions than the ones you have."
+          "name": "The Writ",
+          "description": "A papal investigator with a writ. Your authority is broad and your escort is small. You carry a writ signed in a hand that does not bear public scrutiny. Every door opens for the writ; some of them close behind you faster than they opened. You are being told, in many polite ways, to ask different questions than the ones you have."
         },
         {
-          "name": "An apostate hunter the saints used to protect",
-          "description": "You hunt the church's enemies. The saints would step between you and a blade. They are not stepping anymore. You have noticed first because you live closer to the edge than most. Your last three engagements were closer than they should have been, and one of your hands is going to bear the proof of that for the rest of your life."
+          "name": "The Apostate Hunter",
+          "description": "The saints used to protect you. You hunt the church's enemies. The saints would step between you and a blade. They are not stepping anymore. You have noticed first because you live closer to the edge than most. Your last three engagements were closer than they should have been, and one of your hands is going to bear the proof of that for the rest of your life."
         }
       ]
     },
@@ -34,20 +34,20 @@
       "label": "The faith",
       "choices": [
         {
-          "name": "Monolithic and ancient",
-          "description": "One church, one calendar, one set of names. The saints are in every village shrine and on every road marker. The institution is older than the language it preaches in. A failure of the saints is not a regional problem; it is a structural one, and the structure is not built to admit it."
+          "name": "The One See",
+          "description": "Monolithic and ancient. One church, one calendar, one set of names. The saints are in every village shrine and on every road marker. The institution is older than the language it preaches in. A failure of the saints is not a regional problem; it is a structural one, and the structure is not built to admit it."
         },
         {
-          "name": "Recently reformed, fragile",
-          "description": "The new prayer-book is half-printed. The old guard still uses the old words in private. The reform was supposed to bring the saints closer to the people. The saints have responded by stepping further away from everyone, which neither faction predicted, and both are now claiming as evidence."
+          "name": "The Half-Printed Book",
+          "description": "Recently reformed, fragile. The new prayer-book is half-printed. The old guard still uses the old words in private. The reform was supposed to bring the saints closer to the people. The saints have responded by stepping further away from everyone, which neither faction predicted, and both are now claiming as evidence."
         },
         {
-          "name": "One of many in a polytheist setting",
-          "description": "Other gods watch with interest. The temples of the rival cults have been suspiciously generous about offering aid, and suspiciously specific about the terms. Alliances are possible. So are absorptions. The saints' silence is a vacancy several other interests would like to fill."
+          "name": "The Crowded Pantheon",
+          "description": "One of many in a polytheist setting. Other gods watch with interest. The temples of the rival cults have been suspiciously generous about offering aid, and suspiciously specific about the terms. Alliances are possible. So are absorptions. The saints' silence is a vacancy several other interests would like to fill."
         },
         {
-          "name": "Forbidden everywhere except here",
-          "description": "This is the last country where the orders ride openly. The borders are full of refugees who came for the rites and have nowhere else to take them. The crown's tolerance is conditional, and the condition was that the saints would keep delivering. They are not delivering. The crown is watching."
+          "name": "The Last Crown",
+          "description": "Forbidden everywhere except here. This is the last country where the orders ride openly. The borders are full of refugees who came for the rites and have nowhere else to take them. The crown's tolerance is conditional, and the condition was that the saints would keep delivering. They are not delivering. The crown is watching."
         }
       ]
     }

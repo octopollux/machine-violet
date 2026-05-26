@@ -34,19 +34,19 @@
       "label": "The terrain",
       "choices": [
         {
-          "name": "Open steppe",
+          "name": "The Open Steppe",
           "description": "Grass to the horizon in every direction and no shade for days. The wagons can fan out and travel three abreast where the going is good. The wind carries the sound of pursuit two days before the dust does, and the lookouts have learned to listen for a specific quality of hoofbeat that the steppe transmits like a drum."
         },
         {
-          "name": "Mountain passes",
+          "name": "The High Passes",
           "description": "The road is single-file. The caravan stretches more than a mile when it's moving and the front of the line cannot see the back. The passes are choke points and the choke points are where the caravan loses wagons and where the caravan, occasionally, decides to fight rather than run. There are graves at the top of each pass with names in three alphabets."
         },
         {
-          "name": "Old-world ruins",
+          "name": "The Old-World Ruins",
           "description": "You camp in the shells of cities that died for other reasons in other centuries. The buildings are landmarks; the foragers know which apartment blocks still have canned goods on shelves and which were stripped a generation ago. Some of the ruins are inhabited by people who are not joining the caravan, and the caravan has learned to keep moving past their fires without comment."
         },
         {
-          "name": "Coastal road",
+          "name": "The Coastal Ribbon",
           "description": "The sea is on one side and the threat is on the other. The road is a narrow ribbon between them. The tide takes wagons in storms — the caravan has lost three this season, which is two more than is sustainable. The fishing is good when there is time to fish, which there mostly isn't, and the salt rusts everything in a week."
         }
       ]

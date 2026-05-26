@@ -13,20 +13,20 @@
       "label": "Your seat",
       "choices": [
         {
-          "name": "New hire on her first shift",
-          "description": "You don't know the regulars' names yet, but you can tell which stools belong to whom. The previous bartender quit without notice. Your manager handed you the keys and a printed list of pour costs and left. You are the only person here who didn't see whatever they all saw — but they're going to assume you did, and you'll have to decide whether to admit otherwise."
+          "name": "The New Hire",
+          "description": "First shift. You don't know the regulars' names yet, but you can tell which stools belong to whom. The previous bartender quit without notice. Your manager handed you the keys and a printed list of pour costs and left. You are the only person here who didn't see whatever they all saw — but they're going to assume you did, and you'll have to decide whether to admit otherwise."
         },
         {
-          "name": "Twenty-year regular",
-          "description": "You can tell which booth a story is going to be told from before the storyteller sits down. You know whose marriage ended in which corner. Tonight is the first night in two decades that the room has felt wrong, and you are the person the others will look to for permission to say so."
+          "name": "The Fixture",
+          "description": "Twenty years on the same stool. You can tell which booth a story is going to be told from before the storyteller sits down. You know whose marriage ended in which corner. Tonight is the first night in two decades that the room has felt wrong, and you are the person the others will look to for permission to say so."
         },
         {
-          "name": "Off-duty cop",
-          "description": "You came in for one drink and got two. Your badge is in your jacket on the back of the chair. You are professionally trained to notice and unprofessionally trained to drink, and tonight those two are at odds. If you make this official, the bar's last six months get harder. If you don't, you have to live with what you saw and didn't write down."
+          "name": "The Badge in the Jacket",
+          "description": "Off-duty. You came in for one drink and got two. Your badge is in your jacket on the back of the chair. You are professionally trained to notice and unprofessionally trained to drink, and tonight those two are at odds. If you make this official, the bar's last six months get harder. If you don't, you have to live with what you saw and didn't write down."
         },
         {
-          "name": "Owner trying to sell the lease before it's too late",
-          "description": "You inherited the place from a brother and you have a buyer who will give you enough to leave the city. Closing is in three weeks. Whatever happened tonight is the kind of thing that could either kill the sale or be the only thing that finally makes this room mean something to you. You haven't decided which would be worse."
+          "name": "The Outgoing Owner",
+          "description": "Trying to sell the lease before it's too late. You inherited the place from a brother and you have a buyer who will give you enough to leave the city. Closing is in three weeks. Whatever happened tonight is the kind of thing that could either kill the sale or be the only thing that finally makes this room mean something to you. You haven't decided which would be worse."
         }
       ]
     },
@@ -34,19 +34,19 @@
       "label": "The bar",
       "choices": [
         {
-          "name": "Cop bar in a rough precinct",
+          "name": "The Eighth Precinct",
           "description": "The jukebox plays one Sinatra album in rotation and nobody has fed it a quarter in a year. The booths are taped vinyl that sticks to bare arms in summer. The bathroom door has a lock that hasn't worked since 1988 and everyone has a private signal for occupied. The regulars carry guns they're not currently allowed to use."
         },
         {
-          "name": "Vanishing queer bar in a gentrifying block",
+          "name": "The Velvet Anchor",
           "description": "The dance floor is still scuffed from a decade of weekly parties that don't happen anymore. Pride flags have faded to pastel in the front window. The lease ends in two weeks and the landlord won't return calls. Everyone here has somewhere else they could go and nobody wants to be the first to admit they will."
         },
         {
-          "name": "Roadside dive at a freeway exit",
+          "name": "Exit 14 Tavern",
           "description": "Semis idle outside with their running lights making the parking lot blue. The regulars all live within walking distance of nowhere. The pay phone still works and somebody uses it every night. The jukebox has six country songs and a Bruce Springsteen B-side that nobody can explain."
         },
         {
-          "name": "Neighborhood bar whose patrons all live within three blocks",
+          "name": "Murphy's",
           "description": "The dog under the table belongs to everyone, and to nobody. The regulars' birthdays are on a chalkboard behind the register, with the years discreetly missing. The owner remembers your father, or somebody's father — the math doesn't quite work. The front door has a bell on a string and the bell rings even when nobody comes in."
         }
       ]

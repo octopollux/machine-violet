@@ -277,18 +277,35 @@ export function MainMenuPhase({
     }
   }
 
-  // +2 for error message (marginTop=1 + text line) when present
-  const totalRows = menuLines.length + (errorMsg ? 2 : 0);
+  // Error banner pinned to the top via FullScreenFrame's `topBanner` slot
+  // so toggling it on/off doesn't shift the centered menu. We wrap by word
+  // to a fraction of the interior — caps at 80 cols to keep lines readable
+  // on very wide terminals — and pass the wrapped row count to the frame
+  // so its top-padding math knows how much room the banner consumes.
+  const sideWidth = theme.asset.components.edge_left.width;
+  const errorWrapWidth = Math.max(20, Math.min(80, cols - sideWidth * 2 - 4));
+  const errorLines = errorMsg ? wrapByWord(errorMsg, errorWrapWidth) : [];
+  const errorBanner = errorLines.length > 0 ? (
+    <Box flexDirection="column" width={errorWrapWidth}>
+      {errorLines.map((line, idx) => (
+        <Text key={idx} color="red">{line}</Text>
+      ))}
+    </Box>
+  ) : null;
 
   return (
     <>
-      <FullScreenFrame theme={theme} columns={cols} rows={termRows} title="Machine Violet" contentRows={totalRows} starfield>
+      <FullScreenFrame
+        theme={theme}
+        columns={cols}
+        rows={termRows}
+        title="Machine Violet"
+        contentRows={menuLines.length}
+        starfield
+        topBanner={errorBanner}
+        topBannerRows={errorLines.length}
+      >
         {menuLines}
-        {errorMsg && (
-          <Box marginTop={1}>
-            <Text color="red">{errorMsg}</Text>
-          </Box>
-        )}
       </FullScreenFrame>
       {deleteModal && (
         <DeleteCampaignModal
@@ -302,4 +319,39 @@ export function MainMenuPhase({
       )}
     </>
   );
+}
+
+/**
+ * Word-wrap `text` to a maximum line width.
+ *
+ * Splits on whitespace and packs greedily. Words longer than `width` are
+ * emitted on their own line — better to overflow one line than to split a
+ * URL or path token across two and confuse a user trying to copy it. The
+ * caller uses the returned line count to size the FullScreenFrame's
+ * `contentRows`, so the math has to match what gets rendered.
+ *
+ * Inlined here (rather than pulled from a util) to keep MainMenuPhase
+ * self-contained — it's the only caller, and the behavior is small
+ * enough that a dedicated module would be more friction than reuse.
+ */
+export function wrapByWord(text: string, width: number): string[] {
+  if (width <= 0) return [text];
+  const words = text.split(/\s+/).filter((w) => w.length > 0);
+  if (words.length === 0) return [];
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    if (current.length === 0) {
+      current = word;
+      continue;
+    }
+    if (current.length + 1 + word.length <= width) {
+      current += " " + word;
+    } else {
+      lines.push(current);
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
 }

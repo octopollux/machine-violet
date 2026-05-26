@@ -14,20 +14,20 @@
       "label": "Your seat",
       "choices": [
         {
-          "name": "Critic for a publication that doesn't know what this place is",
-          "description": "You were sent to write a feature. The editor cleared the spread. You have a small notebook and a fork and a job to do. You will be asked, in writing, what you ate, and you do not yet have a vocabulary for the truth. You are not the first critic to walk in and the previous one's career is now nothing anyone talks about."
+          "name": "The Critic",
+          "description": "Sent by a publication that doesn't know what this place is. You were sent to write a feature. The editor cleared the spread. You have a small notebook and a fork and a job to do. You will be asked, in writing, what you ate, and you do not yet have a vocabulary for the truth. You are not the first critic to walk in and the previous one's career is now nothing anyone talks about."
         },
         {
-          "name": "Donor selling tonight's special",
-          "description": "You sat in the back office last week and you signed a paper. Tonight your debut, your first heartbreak, the smell of your father's hands — whichever — will be served to a room full of strangers. You came to watch. The maître d' has seated you well. You are about to lose something specific and irreversible and you have already been paid."
+          "name": "The Donor",
+          "description": "Tonight's special is yours. You sat in the back office last week and you signed a paper. Tonight your debut, your first heartbreak, the smell of your father's hands — whichever — will be served to a room full of strangers. You came to watch. The maître d' has seated you well. You are about to lose something specific and irreversible and you have already been paid."
         },
         {
-          "name": "Diner who's been once before and is back",
+          "name": "The Returning Guest",
           "description": "You came a year ago and you ate something you have not stopped thinking about. You don't quite remember what it was. You don't remember what you traded for it, either, and the not-remembering is itself the clue. The maître d' greets you by name and you can't quite hear yourself when you answer."
         },
         {
-          "name": "Kitchen staff — line cook, sous, dishwasher",
-          "description": "You work the line. You handle the ingredients before they become dinner. The supply truck comes at four in the morning and the cargo is in pale glass jars without labels. The chef trained you and you owe her, and you have been beginning, lately, to want to know more than you have been told."
+          "name": "Behind the Pass",
+          "description": "Line cook, sous, dishwasher — you work the line. You handle the ingredients before they become dinner. The supply truck comes at four in the morning and the cargo is in pale glass jars without labels. The chef trained you and you owe her, and you have been beginning, lately, to want to know more than you have been told."
         }
       ]
     },
@@ -35,19 +35,19 @@
       "label": "The restaurant",
       "choices": [
         {
-          "name": "Storefront bistro, intimate",
+          "name": "Sixteen Seats",
           "description": "Sixteen seats and an open kitchen. The chef cooks at you, the way a pianist plays at an audience. The plates are warmed in advance. The cocktail menu is hand-lettered and the room smells, faintly, of caramelized onion and something you can't name. Reservations are taken six months out and refused for no reason anyone can tell you."
         },
         {
-          "name": "Underground supper club",
+          "name": "The Password",
           "description": "No signage. The address is texted the day of, and it is a different basement each season. The password is a feeling, not a word — you have to remember something specific at the door, and the door knows whether you did. There are people here you recognize from the news and people you do not recognize from anywhere."
         },
         {
-          "name": "Pop-up in a different city each night",
+          "name": "The Traveling Service",
           "description": "The staff travels. The equipment is in a truck. The menu changes by the geography — a tasting in Lisbon is not a tasting in Tokyo — and the chef writes each city's menu on the long drive in. The diners are flown in and home. The truck never sleeps in the same parking lot twice."
         },
         {
-          "name": "Always-there, always-empty until you sit down",
+          "name": "Table for One",
           "description": "The building is on a street that doesn't appear on the map. The door opens when you remember it does. Inside, the dining room is laid for exactly one party — yours — and the staff greet you as if expected, which they were. The other tables are set for nobody. The candles are lit."
         }
       ]

@@ -14,19 +14,19 @@
       "label": "The city",
       "choices": [
         {
-          "name": "Present day",
+          "name": "The Walk-Up",
           "description": "A real city, recognizable and mundane. The apartment is a walk-up in a neighborhood the player has no reason to be in. The police are real police. The danger is ordinary and human-scale — corruption, cover-ups, someone powerful who needs the player to stay lost. The tone is paranoid thriller. Trust nothing."
         },
         {
-          "name": "Near future",
+          "name": "The Flagged Face",
           "description": "A surveilled city. Predictive policing, biometric checkpoints, social credit scores. The player's face is flagged. Their past self didn't just write a note — they scrubbed their own biometrics, wiped their transit history, and somehow moved through a city that tracks everything without being tracked. Whatever they were running from has access to the system. The note isn't paranoia. It's engineering."
         },
         {
-          "name": "Dickensian England",
+          "name": "The Chandler's Garret",
           "description": "A cramped garret above a chandler's shop in a city of soot and fog. The note is in the player's hand on good paper — too good for this address. The \"police\" are the newly formed Metropolitan Police, or the private thief-takers who preceded them, or both. The streets are a maze of class, debt, and obligation. Someone has gone to great trouble to hide the player among the poor, and the poor have noticed."
         },
         {
-          "name": "1950s America",
+          "name": "The Motel Off the Highway",
           "description": "A motel room off a state highway, curtains drawn. The note is on the back of a diner receipt. The \"police\" could mean the FBI, HUAC, or a local sheriff who answers to someone other than the law. The player's past self was afraid of something bigger than crime — blacklists, loyalty oaths, the machinery of suspicion. Everyone is an informant or afraid of informants. Paranoia isn't a symptom. It's a survival skill."
         }
       ]

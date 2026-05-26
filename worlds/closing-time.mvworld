@@ -14,19 +14,19 @@
       "label": "Your role",
       "choices": [
         {
-          "name": "Floor associate",
+          "name": "The Keyholder",
           "description": "You know the aisles. You've worked here long enough that customers ask for you by name. The proprietor never told you what you were really selling and you never asked. Now closing is your problem because nobody else has the keys."
         },
         {
-          "name": "Last customer",
+          "name": "The Last Customer",
           "description": "You came in for one specific thing. You don't remember exactly what — you had a list, somewhere. The doors locked behind you and the staff are looking at you expectantly. Something about the way they're looking suggests you might be the inventory."
         },
         {
-          "name": "Corporate auditor",
+          "name": "The Auditor",
           "description": "You were sent to close out the numbers. You are not supposed to feel anything about the inventory. You have a quota of regret you're allowed to express in writing and you're already over it. Your tablet keeps recalculating the loss column."
         },
         {
-          "name": "The owner's child",
+          "name": "The Heir",
           "description": "Your parent ran this place your whole life and never explained it. They left you the shop, the lease, and a debt. The staff knew you when you were small. The aisles smell like home and you've been avoiding them for twenty years."
         }
       ]
@@ -35,19 +35,19 @@
       "label": "The branch",
       "choices": [
         {
-          "name": "Gift-shop annex",
+          "name": "The Annex",
           "description": "A small wing off something larger, full of bottled mini-cosmoses meant as souvenirs. The fluorescents flicker on a schedule the manager pretends not to know. Pegboard hooks, half of them empty, hold keychains shaped like dead stars. Everything smells like cardboard and the faint chemical sweetness of new plastic."
         },
         {
-          "name": "Sprawling warehouse",
+          "name": "The Cathedral Warehouse",
           "description": "Cathedral aisles you could lose a customer in. The forklifts run themselves; you wave at them out of habit. Pallets sit stacked higher than the lights can reach, some of them older than the stars they contain. The PA system pages employees who haven't worked here in decades."
         },
         {
-          "name": "Boutique storefront",
+          "name": "The Boutique",
           "description": "A single proprietor's life work, behind a hand-painted sign. Old wood and the smell of beeswax polish. One window onto a street that isn't quite the one outside the back door. The bell above the door has a specific note and the proprietor used to flinch at it lovingly."
         },
         {
-          "name": "Pop-up clearance tent",
+          "name": "The Clearance Tent",
           "description": "Flapping canvas in a parking lot that wasn't here yesterday. The inventory keeps shifting between visits — what you sold this morning is back on the table tonight, dustier. A FINAL DAY sign has been zip-tied to the entrance for what the older staff swear is several centuries. Nobody has refilled the float."
         }
       ]

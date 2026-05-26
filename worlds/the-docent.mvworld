@@ -14,19 +14,19 @@
       "label": "Your group",
       "choices": [
         {
-          "name": "Solo tour",
-          "description": "Just you and the docent. The schedule is yours; the pace is yours; the questions accumulate without competition. The docent treats you as a single charge they are responsible for. The intimacy of this is its own pressure."
+          "name": "Party of One",
+          "description": "A solo tour. Just you and the docent. The schedule is yours; the pace is yours; the questions accumulate without competition. The docent treats you as a single charge they are responsible for. The intimacy of this is its own pressure."
         },
         {
-          "name": "Mixed tour",
-          "description": "Five strangers, each hiding their cause of death. There is a small woman who jumps when doors close. There is a man whose collar covers something. The introductions are first names only, by mutual agreement nobody articulated. You will spend the tour learning to read each other."
+          "name": "Strangers, First Names Only",
+          "description": "A mixed tour. Five strangers, each hiding their cause of death. There is a small woman who jumps when doors close. There is a man whose collar covers something. The introductions are first names only, by mutual agreement nobody articulated. You will spend the tour learning to read each other."
         },
         {
-          "name": "Family tour",
-          "description": "An ancestor is showing you around. They died before you were born. They know things about your family that nobody alive could have told you. They keep stopping at certain exhibits to point out a relative you have heard of only in stories, and to correct the story."
+          "name": "The Ancestor's Tour",
+          "description": "A family tour. An ancestor is showing you around. They died before you were born. They know things about your family that nobody alive could have told you. They keep stopping at certain exhibits to point out a relative you have heard of only in stories, and to correct the story."
         },
         {
-          "name": "VIP",
+          "name": "Paperwork Pending",
           "description": "You weren't supposed to be here yet. The docent keeps apologizing about the paperwork. They have been hastily prepared. They are improvising. The other tour groups make way for yours, and you do not know if that is courtesy or quarantine."
         }
       ]

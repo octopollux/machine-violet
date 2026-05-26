@@ -12,19 +12,19 @@
       "label": "Your oath",
       "choices": [
         {
-          "name": "Vow of revenge",
+          "name": "The Graveside Vow",
           "description": "You swore it at a graveside and you have lived inside it for years. It has been your shape. Lately the edges have begun to soften. You remember what you swore but the wanting has gone slack, and without the wanting you do not know who you are. The person you swore against is still alive and you can no longer quite picture them."
         },
         {
-          "name": "Marriage",
+          "name": "The Wedded Word",
           "description": "Your spouse is starting to forget you. Not in the dramatic ways. In the small ways: a coffee order that was always yours, a private joke that does not land, the side of the bed they reach for. They look at you as one looks at a guest one has been told to be polite to. You have not had the conversation. You do not know yet what to call this."
         },
         {
-          "name": "Duty of office",
+          "name": "The Seal of Office",
           "description": "Your authority is dissolving. The seal on your letters means less than it did last month. The guard who answered your summons yesterday did not answer it today. The office is older than you and you have always served it well, and you can feel it forgetting the shape of the person it used to confer power upon."
         },
         {
-          "name": "A debt you owe",
+          "name": "The Unremembered Debt",
           "description": "The creditor doesn't remember anymore. You owe them — a sum, a service, a life — and they have stopped sending the polite reminders. They greet you now without recognition. Nobody else knows about it. You are alone with the knowledge of the debt, and the moral problem of what you are now obligated to do."
         }
       ]
@@ -33,20 +33,20 @@
       "label": "The court",
       "choices": [
         {
-          "name": "A high feudal court with the king's daughter married to your enemy",
-          "description": "The realm is held together by an oath that everyone in the room understands and few discuss aloud. The princess's marriage is the spine of the peace. That oath is going first. The court is beginning to look at each other differently. The chancellor has not slept in three days and the household guards are quietly being doubled."
+          "name": "The Spine of Peace",
+          "description": "A high feudal court where the king's daughter is married to your enemy. The realm is held together by an oath that everyone in the room understands and few discuss aloud. The princess's marriage is the spine of the peace. That oath is going first. The court is beginning to look at each other differently. The chancellor has not slept in three days and the household guards are quietly being doubled."
         },
         {
-          "name": "A merchant city of guild-contracts",
-          "description": "The city runs on signed contracts and apprentice-oaths, layered like sediment. The guilds are dissolving. The streets are renegotiating who owns what daily, and at the corner of two old guild-districts there have been shoving matches that did not happen a week ago. The clerks are quitting in shifts."
+          "name": "The Sediment City",
+          "description": "A merchant city of guild-contracts. The city runs on signed contracts and apprentice-oaths, layered like sediment. The guilds are dissolving. The streets are renegotiating who owns what daily, and at the corner of two old guild-districts there have been shoving matches that did not happen a week ago. The clerks are quitting in shifts."
         },
         {
-          "name": "A nomad confederation held together by blood-oaths",
-          "description": "The confederation is a generation old and the binding was always thin. The camps are scattering. Old hatreds are returning — the ones the oath was sworn to bury — and the elders who sealed the original cuts are trying to call council and finding that fewer riders come each time."
+          "name": "The Blood Confederation",
+          "description": "A nomad confederation held together by blood-oaths. The confederation is a generation old and the binding was always thin. The camps are scattering. Old hatreds are returning — the ones the oath was sworn to bury — and the elders who sealed the original cuts are trying to call council and finding that fewer riders come each time."
         },
         {
-          "name": "A monastic order whose vows are physical bonds",
-          "description": "The monks are wandering out of their cells. The vow-marks on their hands are fading. The abbot does not remember why he became abbot. The library is unattended for the first time in a hundred years and the gates are open to anyone who walks up. The kitchens are running, just, because someone is still cooking and nobody knows who."
+          "name": "The Order of the Bound Hand",
+          "description": "A monastic order whose vows are physical bonds. The monks are wandering out of their cells. The vow-marks on their hands are fading. The abbot does not remember why he became abbot. The library is unattended for the first time in a hundred years and the gates are open to anyone who walks up. The kitchens are running, just, because someone is still cooking and nobody knows who."
         }
       ]
     }

@@ -14,20 +14,20 @@
       "label": "Platform",
       "choices": [
         {
-          "name": "A short-video app you doomscroll",
-          "description": "Vertical clips, fifteen seconds each, served in an endless thumb-flicked stack. The For You page is increasingly accurate — uncannily, then disturbingly, then in ways you cannot explain to your roommate. The comments come from accounts with no posts and no profile pictures, and they greet you by a nickname only your mother used."
+          "name": "The For You Page",
+          "description": "A short-video app you doomscroll. Vertical clips, fifteen seconds each, served in an endless thumb-flicked stack. The For You page is increasingly accurate — uncannily, then disturbingly, then in ways you cannot explain to your roommate. The comments come from accounts with no posts and no profile pictures, and they greet you by a nickname only your mother used."
         },
         {
-          "name": "A dating app whose matches are increasingly prophetic",
-          "description": "The next match knows what you'll say to them. They have the perfect opener. They have the second perfect opener for after you fumble the first. They want to meet at a place you haven't told them you like and a time you have not agreed to. Their photos look right and look wrong in a way you cannot name."
+          "name": "Perfect Match",
+          "description": "A dating app whose matches are increasingly prophetic. The next match knows what you'll say to them. They have the perfect opener. They have the second perfect opener for after you fumble the first. They want to meet at a place you haven't told them you like and a time you have not agreed to. Their photos look right and look wrong in a way you cannot name."
         },
         {
-          "name": "A neighborhood social network that knows what your block will do tomorrow",
-          "description": "Porch-pirate alerts before the package arrives. The lost-cat post precedes the lost cat. A neighbor's complaint about your trash bin is dated tomorrow morning, and your bin is currently inside. The other users seem normal. None of them have mentioned the impossibility. The block has become very polite."
+          "name": "Nextblock",
+          "description": "A neighborhood social network that knows what your block will do tomorrow. Porch-pirate alerts before the package arrives. The lost-cat post precedes the lost cat. A neighbor's complaint about your trash bin is dated tomorrow morning, and your bin is currently inside. The other users seem normal. None of them have mentioned the impossibility. The block has become very polite."
         },
         {
-          "name": "A defunct forum you didn't realize was still running",
-          "description": "Your old username, the one you used in high school, still works. Threads from people you remember dying have new replies. The signatures contain inside jokes that postdate the funerals. The moderators are accounts you do not remember banning, and one of them has been quietly cleaning your old posts for typos."
+          "name": "The Old Forum",
+          "description": "A defunct forum you didn't realize was still running. Your old username, the one you used in high school, still works. Threads from people you remember dying have new replies. The signatures contain inside jokes that postdate the funerals. The moderators are accounts you do not remember banning, and one of them has been quietly cleaning your old posts for typos."
         }
       ]
     },
@@ -35,20 +35,20 @@
       "label": "How they tagged you",
       "choices": [
         {
-          "name": "A video you appear in that hasn't been filmed yet",
-          "description": "You are clearly visible. The lighting is from a place you have not been. You are wearing clothes you do not own. The caption is in a voice that is recognizably yours and the timestamp is tomorrow. The comments are reacting to something specific that you do, in the clip, that you have not yet decided to do."
+          "name": "Tomorrow's Clip",
+          "description": "A video you appear in that hasn't been filmed yet. You are clearly visible. The lighting is from a place you have not been. You are wearing clothes you do not own. The caption is in a voice that is recognizably yours and the timestamp is tomorrow. The comments are reacting to something specific that you do, in the clip, that you have not yet decided to do."
         },
         {
-          "name": "A comment under your name predicting your next post",
-          "description": "Someone with your handle, your avatar, your post history, has commented under one of your own posts predicting your next caption verbatim. The comment is six hours old. You have not written the caption yet. When you do, you write it differently on purpose and the comment updates."
+          "name": "Reply From Yourself",
+          "description": "A comment under your name predicting your next post. Someone with your handle, your avatar, your post history, has commented under one of your own posts predicting your next caption verbatim. The comment is six hours old. You have not written the caption yet. When you do, you write it differently on purpose and the comment updates."
         },
         {
-          "name": "A direct message from someone whose profile picture is your future face",
-          "description": "The face is yours, older, in a setting you have not chosen yet. The message is short and asks a small favor. The grammar is yours. The way they sign off is a way you have never signed off, but you can feel yourself growing into it. They are typing again."
+          "name": "DM From Your Future Face",
+          "description": "A direct message from someone whose profile picture is your future face. The face is yours, older, in a setting you have not chosen yet. The message is short and asks a small favor. The grammar is yours. The way they sign off is a way you have never signed off, but you can feel yourself growing into it. They are typing again."
         },
         {
-          "name": "An ad targeted to a problem you haven't been told you have",
-          "description": "It's for a treatment, a service, a support group. The condition is specific and the language is medical. The ad knows your insurance status. You have not seen a doctor in a year and you have no symptoms. You take a screenshot. The next ad is for somewhere to forward the screenshot."
+          "name": "The Diagnosis Ad",
+          "description": "An ad targeted to a problem you haven't been told you have. It's for a treatment, a service, a support group. The condition is specific and the language is medical. The ad knows your insurance status. You have not seen a doctor in a year and you have no symptoms. You take a screenshot. The next ad is for somewhere to forward the screenshot."
         }
       ]
     }

@@ -154,7 +154,13 @@ export class SetupSession {
     this.conversation = createSetupConversation(this.provider, this.model, knownPlayers, (status, delayMs) => {
       this.broadcast({
         type: "error",
-        data: { message: `API retry (status ${status})`, recoverable: true, status, delayMs },
+        data: {
+          message: `API retry (status ${status})`,
+          recoverable: true,
+          status,
+          delayMs,
+          category: "retryable",
+        },
       });
     }, paths.worldsDir, paths.personalitiesDir);
     this.started = true;

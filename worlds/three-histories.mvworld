@@ -17,20 +17,20 @@
       "label": "Your discipline",
       "choices": [
         {
-          "name": "Translator of dead scripts",
-          "description": "You read what others cannot. Two languages most people in the city don't know are alive in your head, and a third is slowly assembling itself. Your translations are quoted in council meetings. Your translations decide what counts as a fact. You have not yet had to translate something whose meaning you would prefer to bury, but you can feel that day coming."
+          "name": "The Translator",
+          "description": "Of dead scripts. You read what others cannot. Two languages most people in the city don't know are alive in your head, and a third is slowly assembling itself. Your translations are quoted in council meetings. Your translations decide what counts as a fact. You have not yet had to translate something whose meaning you would prefer to bury, but you can feel that day coming."
         },
         {
-          "name": "Cartographer of the old quarter",
-          "description": "You map what used to be where. The records describe a city different in layout from the one above it; you are the person who matches the old street names to the new ones, the old foundations to the new walls. Three factions want your maps for three different reasons. The maps are also, increasingly, accurate descriptions of where the city's secrets are buried."
+          "name": "The Cartographer",
+          "description": "Of the old quarter. You map what used to be where. The records describe a city different in layout from the one above it; you are the person who matches the old street names to the new ones, the old foundations to the new walls. Three factions want your maps for three different reasons. The maps are also, increasingly, accurate descriptions of where the city's secrets are buried."
         },
         {
-          "name": "Oral historian",
+          "name": "The Oral Historian",
           "description": "You sit with the old people and you write down what they tell you, and you do it carefully because they are dying faster than you can interview them. You know what their grandparents told them about the years no records cover. You are the only person whose archive grew up with the people it documents — and the only one whose archive talks back."
         },
         {
-          "name": "Material conservator",
-          "description": "You are the one who can actually unfold the parchment, mount the disc, stabilize the microfilm without destroying it. Every other archivist in the city brings you the originals before they bring them to themselves. You have access nobody else has, because nobody else is allowed to touch the things. Your hands have been on every document that matters here."
+          "name": "The Conservator",
+          "description": "Material specialist. You are the one who can actually unfold the parchment, mount the disc, stabilize the microfilm without destroying it. Every other archivist in the city brings you the originals before they bring them to themselves. You have access nobody else has, because nobody else is allowed to touch the things. Your hands have been on every document that matters here."
         }
       ]
     },
@@ -38,20 +38,20 @@
       "label": "Where you sit on the factional map",
       "choices": [
         {
-          "name": "Reformist by sentiment, civil servant by paycheck",
-          "description": "Your sympathies are with the Council and you would say so if asked. You also work for the city archive, which is technically neutral and is in fact paid out of merchant levies. You like your job. You like your colleagues. You are aware that your sentiments and your salary are not in perfect alignment, and you have made small compromises already that you do not want to think about."
+          "name": "The Quiet Reformist",
+          "description": "Reformist by sentiment, civil servant by paycheck. Your sympathies are with the Council and you would say so if asked. You also work for the city archive, which is technically neutral and is in fact paid out of merchant levies. You like your job. You like your colleagues. You are aware that your sentiments and your salary are not in perfect alignment, and you have made small compromises already that you do not want to think about."
         },
         {
-          "name": "Preservationist by upbringing, conflicted now",
-          "description": "Your family were Order people. You grew up at their festivals, you know the calendar in your bones, you can still sing the old harvest round. You have spent your twenties quietly questioning some of it and not telling your father. The Order would welcome you back tomorrow if you walked through their doors. You have not walked through their doors. Yet."
+          "name": "The Lapsed Order-Child",
+          "description": "Preservationist by upbringing, conflicted now. Your family were Order people. You grew up at their festivals, you know the calendar in your bones, you can still sing the old harvest round. You have spent your twenties quietly questioning some of it and not telling your father. The Order would welcome you back tomorrow if you walked through their doors. You have not walked through their doors. Yet."
         },
         {
-          "name": "On the Merchant Coalition's payroll, but only barely",
-          "description": "They retain you for occasional consulting work and they pay extremely well for it. You tell yourself it's a few hours a month. You tell yourself you'd hear about anything serious before you were asked to do anything serious. You have a townhouse with one room more than you need and you are not certain anymore whether the townhouse is the reason you took the consulting work or the consulting work is the reason for the townhouse."
+          "name": "The Townhouse Consultant",
+          "description": "On the Merchant Coalition's payroll, but only barely. They retain you for occasional consulting work and they pay extremely well for it. You tell yourself it's a few hours a month. You tell yourself you'd hear about anything serious before you were asked to do anything serious. You have a townhouse with one room more than you need and you are not certain anymore whether the townhouse is the reason you took the consulting work or the consulting work is the reason for the townhouse."
         },
         {
-          "name": "Independent — you hold the keys and refuse to give them out",
-          "description": "You belong to no faction and you have made a small principled career of belonging to no faction. The archive is technically yours to administer, and you have, twice, refused requests from people who could have ended your career for refusing them. Your independence is a public position. Your independence is also a target. All three factions have stopped asking you politely and are starting to ask you another way."
+          "name": "The Keeper of Keys",
+          "description": "Independent — you hold the keys and refuse to give them out. You belong to no faction and you have made a small principled career of belonging to no faction. The archive is technically yours to administer, and you have, twice, refused requests from people who could have ended your career for refusing them. Your independence is a public position. Your independence is also a target. All three factions have stopped asking you politely and are starting to ask you another way."
         }
       ]
     }

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { ServerEvent } from "@machine-violet/shared";
 import { createBridge } from "./bridge.js";
+import { CodexTurnFailedError } from "../providers/openai-chatgpt/provider.js";
 
 describe("createBridge onRollback", () => {
   // Issue #431: a streaming retry leaves partial deltas accumulated on the
@@ -57,5 +58,57 @@ describe("createBridge onRollback", () => {
 
     cb.onNarrativeDelta("partial ");
     expect(() => cb.onRollback?.()).not.toThrow();
+  });
+});
+
+describe("createBridge error categories (#529)", () => {
+  // The three-tier taxonomy is decided server-side; every WS error event
+  // the bridge emits must carry the right discriminant so the client UX
+  // (retry overlay vs main-menu banner vs hard error screen) matches.
+  it("tags onRetry events as category=retryable", () => {
+    const events: ServerEvent[] = [];
+    const cb = createBridge({ broadcast: (e) => events.push(e) });
+    cb.onRetry(429, 2000);
+    const e = events[0];
+    expect(e.type).toBe("error");
+    expect((e.data as { category?: string }).category).toBe("retryable");
+    expect((e.data as { recoverable: boolean }).recoverable).toBe(true);
+  });
+
+  it("tags plain Error events as category=retryable on the onError callback path", () => {
+    // GameEngine reports most failures via callbacks.onError without
+    // rethrowing — that path is the *primary* surface for transient /
+    // provider errors, so defaulting to retryable preserves the
+    // pre-existing retry-overlay UX for anything we don't explicitly
+    // recognise as session-fatal.
+    const events: ServerEvent[] = [];
+    const cb = createBridge({ broadcast: (e) => events.push(e) });
+    cb.onError(new Error("transient blip"));
+    const e = events[0];
+    expect((e.data as { category?: string }).category).toBe("retryable");
+    expect((e.data as { recoverable: boolean }).recoverable).toBe(true);
+  });
+
+  it("still routes recognised session-fatal classes through onError to session-fatal-recoverable", () => {
+    // CodexTurnFailedError → auth_expired / model_not_found / etc. should
+    // drop to menu even when it arrives via the callback path rather than
+    // via the thrown-error catch in session-manager.
+    const events: ServerEvent[] = [];
+    const cb = createBridge({ broadcast: (e) => events.push(e) });
+    cb.onError(new CodexTurnFailedError(
+      "Your refresh token was already used. Please log out and sign in again.",
+      "t_xyz",
+    ));
+    const e = events[0];
+    expect((e.data as { category?: string }).category).toBe("session-fatal-recoverable");
+    expect((e.data as { recoverable: boolean }).recoverable).toBe(false);
+  });
+
+  it("tags onRefusal (content classifier) as category=session-fatal-recoverable", () => {
+    const events: ServerEvent[] = [];
+    const cb = createBridge({ broadcast: (e) => events.push(e) });
+    cb.onRefusal();
+    const e = events[0];
+    expect((e.data as { category?: string }).category).toBe("session-fatal-recoverable");
   });
 });

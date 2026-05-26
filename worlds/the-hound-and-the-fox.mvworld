@@ -35,20 +35,20 @@
       "label": "The city",
       "choices": [
         {
-          "name": "Gaslit Victorian capital",
-          "description": "Fog so thick the streetlamps haloed. Hansom cabs and the rattle of harness on cobble. The precinct has a single telephone and a long line for it. The Hound and Fox have been pages of the penny papers since they were both younger than they admit, and the engravers have an entire mental file of their faces."
+          "name": "The Gaslit Capital",
+          "description": "A Victorian metropolis. Fog so thick the streetlamps haloed. Hansom cabs and the rattle of harness on cobble. The precinct has a single telephone and a long line for it. The Hound and Fox have been pages of the penny papers since they were both younger than they admit, and the engravers have an entire mental file of their faces."
         },
         {
-          "name": "1930s art-deco metropolis",
-          "description": "Radio cars and ticker-tape and the smell of cigar smoke in every elevator. Nightclubs that close at sunrise and reopen at sunset. There is one opera house at the heart of downtown and every great chase has ended in its lobby at least once. The musicians know to keep playing."
+          "name": "The Deco City",
+          "description": "A 1930s art-deco metropolis. Radio cars and ticker-tape and the smell of cigar smoke in every elevator. Nightclubs that close at sunrise and reopen at sunset. There is one opera house at the heart of downtown and every great chase has ended in its lobby at least once. The musicians know to keep playing."
         },
         {
-          "name": "Modern surveillance city",
-          "description": "Cameras at every corner and license-plate readers on every bridge. The chase is data; the chase is also performance, because both Hound and Fox know the cameras are running and act accordingly. One alley downtown still has no coverage. Everyone in the city knows which one. It is where the real conversations happen."
+          "name": "The Watched City",
+          "description": "A modern surveillance city. Cameras at every corner and license-plate readers on every bridge. The chase is data; the chase is also performance, because both Hound and Fox know the cameras are running and act accordingly. One alley downtown still has no coverage. Everyone in the city knows which one. It is where the real conversations happen."
         },
         {
-          "name": "A small island town where everyone knows them both",
-          "description": "The chase is a kind of community theatre. The locals lay bets at the harbor pub. The police chief is the Hound's mother and gives an interview every spring. The Fox's sister runs the bakery and will not discuss it. There are exactly two boats off the island and both of them know the schedule."
+          "name": "The Island",
+          "description": "A small island town where everyone knows them both. The chase is a kind of community theatre. The locals lay bets at the harbor pub. The police chief is the Hound's mother and gives an interview every spring. The Fox's sister runs the bakery and will not discuss it. There are exactly two boats off the island and both of them know the schedule."
         }
       ]
     }

@@ -163,6 +163,29 @@ export const UsageUpdateEvent = Type.Object({
 
 // --- Error ---
 
+/**
+ * Three-tier error taxonomy. The discriminant tells the client *what UX to
+ * show*, not what caused the error — the same `category` can come from many
+ * underlying conditions. Decided server-side; never inferred from
+ * `message`. Keep this a closed union so new bucket-introducing PRs have to
+ * touch this type (and therefore the matching client handler).
+ *
+ *  - `retryable` (default for backward compat) — transient (429, network
+ *    blip). Server will retry; player just waits. Existing retry overlay.
+ *  - `session-fatal-recoverable` — this session is done (auth expired,
+ *    forbidden model, classifier refusal, etc.) but the process is fine.
+ *    Player must take action (re-auth, change model, fix config) and start
+ *    a new session. Client drops to main menu, shows the message verbatim
+ *    in a red banner.
+ *  - `process-fatal` — process can't continue. Existing error screen / hard
+ *    exit. Reserved for catastrophic conditions; rarely emitted today.
+ */
+export const ErrorCategory = Type.Union([
+  Type.Literal("retryable"),
+  Type.Literal("session-fatal-recoverable"),
+  Type.Literal("process-fatal"),
+]);
+
 export const ErrorEvent = Type.Object({
   type: Type.Literal("error"),
   data: Type.Object({
@@ -170,6 +193,9 @@ export const ErrorEvent = Type.Object({
     recoverable: Type.Boolean(),
     status: Type.Optional(Type.Number()),
     delayMs: Type.Optional(Type.Number()),
+    /** Three-tier discriminator. Optional so pre-existing callsites that
+     *  don't set it behave as before. Absent ↔ `retryable`. */
+    category: Type.Optional(ErrorCategory),
   }),
 });
 
@@ -233,6 +259,7 @@ export type SessionEndedEvent = Static<typeof SessionEndedEvent>;
 export type SessionTransitionEvent = Static<typeof SessionTransitionEvent>;
 export type DiscordPresenceEvent = Static<typeof DiscordPresenceEvent>;
 export type UsageUpdateEvent = Static<typeof UsageUpdateEvent>;
+export type ErrorCategory = Static<typeof ErrorCategory>;
 export type ErrorEvent = Static<typeof ErrorEvent>;
 export type ServerEvent = Static<typeof ServerEvent>;
 export type ClientViewportEvent = Static<typeof ClientViewportEvent>;

@@ -16,6 +16,7 @@ import type {
 } from "@machine-violet/shared";
 import { logEvent } from "../context/engine-log.js";
 import { CostTracker } from "../context/cost-tracker.js";
+import { classifyServerError } from "./error-classify.js";
 /** Buffering config for narrative text. */
 const FLUSH_INTERVAL_MS = 50;
 
@@ -124,9 +125,21 @@ export function createBridge(
 
     onError(error: Error): void {
       logEvent("engine:error", { message: error.message });
+      // GameEngine catches most failures and surfaces them via this
+      // callback rather than rethrowing — so the engine error path is the
+      // *primary* route for many transient/provider errors, not a
+      // defensive edge case. Default to "retryable" so a network blip or
+      // a 5xx doesn't drop the player to menu; only explicitly recognised
+      // session-fatal classes (e.g. CodexTurnFailedError → auth_expired)
+      // route to the new bucket via classifyServerError.
+      const category = classifyServerError(error, "retryable");
       broadcast({
         type: "error",
-        data: { message: error.message, recoverable: false },
+        data: {
+          message: error.message,
+          recoverable: category === "retryable",
+          category,
+        },
       });
     },
 
@@ -134,7 +147,13 @@ export function createBridge(
       logEvent("api:retry", { status, delayMs });
       broadcast({
         type: "error",
-        data: { message: `API retry (status ${status})`, recoverable: true, status, delayMs },
+        data: {
+          message: `API retry (status ${status})`,
+          recoverable: true,
+          status,
+          delayMs,
+          category: "retryable",
+        },
       });
     },
 
@@ -160,7 +179,11 @@ export function createBridge(
       logEvent("api:refusal");
       broadcast({
         type: "error",
-        data: { message: "Content classifier refused the response.", recoverable: false },
+        data: {
+          message: "Content classifier refused the response.",
+          recoverable: false,
+          category: "session-fatal-recoverable",
+        },
       });
     },
 

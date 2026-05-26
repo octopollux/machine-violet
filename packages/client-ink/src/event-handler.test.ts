@@ -639,6 +639,8 @@ describe("event-handler", () => {
         status: 529,
         delayMs: 2000,
         attemptId: 1,
+        // Synthesized from `recoverable` when the wire event omits it.
+        category: "retryable",
       });
     });
 
@@ -655,7 +657,41 @@ describe("event-handler", () => {
         status: undefined,
         delayMs: undefined,
         attemptId: undefined,
+        // Synthesized from `recoverable: false` when the wire event omits
+        // it. Legacy callsites (pre-#529) that didn't set category land
+        // here so the new client UX still kicks in.
+        category: "session-fatal-recoverable",
       });
+    });
+
+    it("propagates the wire-level category discriminator (#529)", () => {
+      const h = makeHarness();
+      // Server-set category overrides the synthesized one. The OAuth-
+      // refresh case from issue #529 ships as recoverable:false +
+      // category:session-fatal-recoverable.
+      h.dispatch({
+        type: "error",
+        data: {
+          message: "Your access token could not be refreshed because your refresh token was already used.",
+          recoverable: false,
+          category: "session-fatal-recoverable",
+        },
+      });
+      expect(h.state.lastError?.category).toBe("session-fatal-recoverable");
+      expect(h.state.lastError?.message).toBe(
+        "Your access token could not be refreshed because your refresh token was already used.",
+      );
+    });
+
+    it("explicit category overrides the synthesized default (#529)", () => {
+      // recoverable:true with category:retryable matches; recoverable:true
+      // with category:process-fatal (hypothetical) lets the explicit one win.
+      const h = makeHarness();
+      h.dispatch({
+        type: "error",
+        data: { message: "fatal", recoverable: true, category: "process-fatal" },
+      });
+      expect(h.state.lastError?.category).toBe("process-fatal");
     });
 
     it("bumps attemptId on each successive recoverable retry", () => {

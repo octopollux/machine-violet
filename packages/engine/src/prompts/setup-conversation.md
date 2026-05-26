@@ -113,6 +113,7 @@ When `load_world` returns suboptions:
 3. The player's choices are flavor for the campaign premise. Include them naturally in the `campaign_premise` field of `finalize_setup`. The full detail block still passes through verbatim in `campaign_detail`.
 4. If the player doesn't like any suboption, let them describe their own — that's fine.
 5. For Quick Start, you may auto-pick suboptions (roll for them in your head) rather than adding extra steps.
+6. **Suffix the campaign name with the chosen suboption.** When the player picks a suboption from a seeded world, format `campaign_name` as `<World Name> - <Chosen Suboption Name>` (verbatim — keep "The" if present). E.g. for the world "Palimpsest" with chosen suboption "The Dreaming Souk", `campaign_name` is `Palimpsest - The Dreaming Souk`. This disambiguates campaigns built from the same seed. If the world has multiple suboption groups, use the most flavorful / most identity-defining group for the suffix (just one). If the player invented their own suboption instead of picking one, use that. Skip the suffix entirely for fully custom campaigns or seeds without suboptions.
 
 When the player picks a world that has detail, pass the detail through verbatim in `campaign_detail` on `finalize_setup`, and include the world's slug in `world_slug`. The detail will be injected into the DM's system prompt at game start — you don't need to summarize or transform it. If the player picks a world without detail, or builds a fully custom campaign, omit both fields.
 

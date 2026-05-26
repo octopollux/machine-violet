@@ -14,20 +14,20 @@
       "label": "Your encounter",
       "choices": [
         {
-          "name": "A haunting that followed you home",
-          "description": "You moved twice. It moved with you. It is small and it is patient and it took the previous tenant from your last apartment and you are not yet certain if it followed you because of who you are or because of what you took with you. You came to the group to find out which."
+          "name": "The Tenant",
+          "description": "A haunting that followed you home. You moved twice. It moved with you. It is small and it is patient and it took the previous tenant from your last apartment and you are not yet certain if it followed you because of who you are or because of what you took with you. You came to the group to find out which."
         },
         {
-          "name": "A cult you escaped that's still recruiting",
-          "description": "You got out. Others did not, and others have joined since. You see their leaflets sometimes. They have your face on one of them, captioned with a name that is not yours. You came to the group to learn what the right way is to warn the next person you see being approached."
+          "name": "The Leaflet",
+          "description": "A cult you escaped that's still recruiting. You got out. Others did not, and others have joined since. You see their leaflets sometimes. They have your face on one of them, captioned with a name that is not yours. You came to the group to learn what the right way is to warn the next person you see being approached."
         },
         {
-          "name": "A creature nobody else saw",
-          "description": "It was in the room. You are certain. There were three other people in the room and none of them remember anything but you, screaming. You have learned not to insist. The group is the one place you can describe it out loud and not be asked if you are sleeping enough."
+          "name": "The Witness",
+          "description": "A creature nobody else saw. It was in the room. You are certain. There were three other people in the room and none of them remember anything but you, screaming. You have learned not to insist. The group is the one place you can describe it out loud and not be asked if you are sleeping enough."
         },
         {
-          "name": "Lost time you can't account for",
-          "description": "Eleven hours of a Tuesday. Your phone shows steps and a route. Your body shows nothing it should. Whatever you did is in you somewhere; you can taste it under your tongue. You came to the group hoping someone else lost the same Tuesday."
+          "name": "The Missing Tuesday",
+          "description": "Lost time you can't account for. Eleven hours of a Tuesday. Your phone shows steps and a route. Your body shows nothing it should. Whatever you did is in you somewhere; you can taste it under your tongue. You came to the group hoping someone else lost the same Tuesday."
         }
       ]
     },
@@ -35,19 +35,19 @@
       "label": "The group's setting",
       "choices": [
         {
-          "name": "Church basement",
+          "name": "The Basement at St. Cyril's",
           "description": "Free coffee in a steel urn. Fluorescent tubes, one of them humming. Metal folding chairs arranged in a ring that nobody has the authority to rearrange. A stack of pamphlets about other support groups that nobody reads. The pastor upstairs has been told it's a grief group and asks no further questions."
         },
         {
-          "name": "Hospital therapy wing",
+          "name": "Ward Seven",
           "description": "Some members are court-ordered. There is an observation window onto the hallway and the blinds don't quite close. The clock above the door is the loudest thing in the room and you all check it once an hour without meaning to. The facilitator has a hospital lanyard and is paid by the hour."
         },
         {
-          "name": "Online video call",
+          "name": "The Six Squares",
           "description": "Faces in boxes, three of them lit by their kitchens. One box is always frozen. Someone's microphone catches a sound from outside their room each week, the same sound, and they have never addressed it. The chat sidebar fills slowly with messages that vanish before anyone reads them."
         },
         {
-          "name": "A weekend retreat",
+          "name": "Pinecrest Lodge",
           "description": "A converted lodge two hours into a national forest. Snow coming in by Friday night. No cell signal past the gate. The facilitator has the only car and the keys are in their cabin and the cabin is locked at night. The lodge sleeps twelve and there are six of you, and the empty rooms are not empty in the same way they were on Friday."
         }
       ]
