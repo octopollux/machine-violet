@@ -13,20 +13,20 @@
       "label": "Role",
       "choices": [
         {
-          "name": "UN counsel assigned the case",
-          "description": "The player has been pulled from a quiet career drafting fisheries treaties and dropped into a courtroom that does not yet exist. They have a small staff and no precedent. The Secretary-General calls personally for updates. The phone has a dedicated line in red, which the player learned about from a memo."
+          "name": "Counsel of Record",
+          "description": "UN counsel assigned the case. The player has been pulled from a quiet career drafting fisheries treaties and dropped into a courtroom that does not yet exist. They have a small staff and no precedent. The Secretary-General calls personally for updates. The phone has a dedicated line in red, which the player learned about from a memo."
         },
         {
-          "name": "Astronomer who first received the letter",
-          "description": "The player was on shift when the signal came in. They followed the protocol they had practiced for years, which did not cover this. They have been quietly retained by every government on Earth as a witness. Their inbox is full and their badge no longer scans them into the canteen."
+          "name": "The Receiving Astronomer",
+          "description": "The player first received the letter. They were on shift when the signal came in. They followed the protocol they had practiced for years, which did not cover this. They have been quietly retained by every government on Earth as a witness. Their inbox is full and their badge no longer scans them into the canteen."
         },
         {
-          "name": "The infringer",
+          "name": "Named Defendant",
           "description": "The player personally sent the broadcast that caused this. A college radio show in the seventies. A scientific transmission they signed off on. They have been identified by name in the filings. Their face is on the cover of three magazines. Their mother is asking them to come home."
         },
         {
-          "name": "Press secretary",
-          "description": "The player's job is to keep this out of the news for as long as possible. So far, this has been working — the leak hasn't crested. They are lying to journalists they used to drink with. They have a draft press release for the day it breaks, three versions, each shorter than the last."
+          "name": "The Spokesperson",
+          "description": "Press secretary. The player's job is to keep this out of the news for as long as possible. So far, this has been working — the leak hasn't crested. They are lying to journalists they used to drink with. They have a draft press release for the day it breaks, three versions, each shorter than the last."
         }
       ]
     },
@@ -34,19 +34,19 @@
       "label": "The alien firm",
       "choices": [
         {
-          "name": "Old, dignified, three partners",
-          "description": "A firm older than several human civilizations. Three name partners who have not changed in generations. A memo leaked through human intelligence suggests they are bluffing about jurisdiction over Earth. They are betting humanity will not call the bluff. The bluff is excellent."
+          "name": "The Three Partners",
+          "description": "Old, dignified, three name partners. A firm older than several human civilizations. Three name partners who have not changed in generations. A memo leaked through human intelligence suggests they are bluffing about jurisdiction over Earth. They are betting humanity will not call the bluff. The bluff is excellent."
         },
         {
-          "name": "Aggressive contingency-fee newcomers",
-          "description": "A young firm hungry for a precedent. They want a settlement that includes Earth's licensing rights — every patentable concept humanity will develop for the next millennium. They are charismatic in the deposition transcripts. They mention Earth's case in their own marketing."
+          "name": "The Contingency Wolves",
+          "description": "Aggressive contingency-fee newcomers. A young firm hungry for a precedent. They want a settlement that includes Earth's licensing rights — every patentable concept humanity will develop for the next millennium. They are charismatic in the deposition transcripts. They mention Earth's case in their own marketing."
         },
         {
-          "name": "A pro-bono outfit",
-          "description": "They represent an injured third party humanity has never heard of. The injured party has not been informed that they are injured. The firm is acting in what they consider the third party's best interest. The firm is funded by an endowment older than human language."
+          "name": "The Pro Bono Endowment",
+          "description": "A pro-bono outfit. They represent an injured third party humanity has never heard of. The injured party has not been informed that they are injured. The firm is acting in what they consider the third party's best interest. The firm is funded by an endowment older than human language."
         },
         {
-          "name": "Solo practitioner",
+          "name": "The Solo Practitioner",
           "description": "One being. Vast and patient. No assistants. They have been working this case for what humans would call centuries. Every filing arrives in their own hand. They have never lost a case and they have never settled one. They are willing to meet."
         }
       ]

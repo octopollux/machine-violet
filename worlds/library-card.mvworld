@@ -12,19 +12,19 @@
       "label": "Your claim to entry",
       "choices": [
         {
-          "name": "Borrower in good standing",
+          "name": "The Cardholder",
           "description": "You have a card. The card is real and the librarians will honor it. Your card is rare. The last time you used it was years ago and the librarian who issued it has been dead for two. You will be welcomed, and you will be watched, because the librarians know that a card in good hands outlives the holder."
         },
         {
-          "name": "Refugee with one item to trade",
+          "name": "The Tribute",
           "description": "You came with nothing else. The item is something the library wants — a fragment of a destroyed edition, a sealed letter, a recording, a recipe. The librarians will accept the item and assess what your continued presence is worth. The trade gets you through the door. What gets you a bed is a separate negotiation."
         },
         {
-          "name": "Scholar smuggled in by a sympathizer",
+          "name": "The Smuggled Scholar",
           "description": "Someone inside arranged for you to be added to a list you didn't earn. They have reasons. The reasons will be made clear after you are admitted, and the cost of those reasons will be paid by you. If your sponsor is discovered, you will both be removed by methods the library uses sparingly and well."
         },
         {
-          "name": "Raider in disguise",
+          "name": "The Wolf at the Desk",
           "description": "You are here to scout for people outside who want what's inside. You have a story for the door. You have practiced it on the road for a week. If you are admitted, you are inside the place you came to betray, and you are surrounded by the only librarians left, who have lived through everything and have ways of recognizing your kind."
         }
       ]
@@ -33,19 +33,19 @@
       "label": "The library",
       "choices": [
         {
-          "name": "Converted university",
+          "name": "The Old Campus",
           "description": "The stacks go down miles, repurposed from a campus that used to teach the children of the country that no longer exists. The stairwells are kept quiet by rule. The buckram bindings give the air a specific smell — glue and cloth and slow decay — that you will not be able to forget once you have inhaled enough of it."
         },
         {
-          "name": "Cliff-top monastery",
+          "name": "The Eyrie",
           "description": "A single switchback road climbs to the gate. Ravens nest in the eaves and they are tame to the librarians and not to you. You brought your own oil for the reading lamps because that is the rule. The walls were built for prayer; they hold heat poorly and they hold sound perfectly, and you can hear a page turn three floors down."
         },
         {
-          "name": "Subway tunnel system mapped to Dewey decimal",
+          "name": "The Dewey Lines",
           "description": "The trains stopped running a century ago. The cars have been gutted and refitted as reading rooms. The platforms are reference desks staffed in shifts. The signal lights still work and they tell librarians which lines are occupied. The deepest tunnels have books that are too dangerous to be lent and too important to be destroyed."
         },
         {
-          "name": "Single vast tower",
+          "name": "The Index Tower",
           "description": "Floors correspond to subjects. The elevator works for those with a card and a key, of which the library has a finite number of each. The spiral staircase is open to penitents and to anyone whose card has been suspended. The top floor is the index, and the librarians who live there have not come down in living memory."
         }
       ]

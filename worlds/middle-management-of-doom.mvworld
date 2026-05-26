@@ -34,19 +34,19 @@
       "label": "The boardroom",
       "choices": [
         {
-          "name": "Throne hall converted to meeting space",
+          "name": "The Refit Throne Hall",
           "description": "The throne is now a swivel chair on a small dais. The iron maiden in the corner has been refit as a coatrack. The brazier has been replaced with a coffee station and a small dish of creamer packets. The acoustic is still cathedral and the whisper of pages turning carries to the rafters."
         },
         {
-          "name": "Open-plan above-ground office",
+          "name": "Suite 666",
           "description": "A cubicle farm above the surface, in deference to the human investors. Fluorescent migraines. Beige carpet that swallows footfalls. One window that opens onto the abyss; everyone has agreed not to mention it. The HR rep has a corner cube near the kitchenette."
         },
         {
-          "name": "A literal boardroom in Hell",
+          "name": "The Mahogany Pit",
           "description": "Mahogany table, polished to a depth. The smell of brimstone has been managed with discreet vents. The chairs remember everyone who has ever sat in them and use this for ergonomic adjustments. The board members arrive separately. The minutes are taken in two languages."
         },
         {
-          "name": "A converted dungeon cell",
+          "name": "Cell Block C",
           "description": "The screaming from neighboring cells continues during the meeting; the participants pause politely between sentences. The agenda is on parchment. The projector is a scrying mirror angled at the wall. The water pitcher is fresh. There are no windows because there were never windows."
         }
       ]

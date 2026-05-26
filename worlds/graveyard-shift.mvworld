@@ -13,19 +13,19 @@
       "label": "The museum",
       "choices": [
         {
-          "name": "Natural history",
+          "name": "The Halls of Bone",
           "description": "Bones articulated on steel, dioramas of grasslands behind glass, jarred specimens floating in straw-colored alcohol. The mastodon's tusks have rotated three degrees since the start of your shift. You can measure this. You have been measuring this. The placard says the rotation is impossible."
         },
         {
-          "name": "Art",
+          "name": "The Pinacotheca",
           "description": "The portraits whose eyes have moved are the least of it. The sculpture wing has one too many figures and you cannot determine which one was added; they all look like they have been there for centuries. The children's gallery has a noise problem the day staff have stopped reporting, and you avoid it on the third round."
         },
         {
-          "name": "Antiquities",
+          "name": "The Antiquities Wing",
           "description": "A Sumerian dagger in case seven that pulls light into it the way a drain pulls water. A sarcophagus whose name plaque keeps changing, never the same name twice in a week. \"Do not touch\" signs in three dead languages and one you can almost read. The cleaning staff will not enter this hall alone."
         },
         {
-          "name": "Local history",
+          "name": "The Founders' Gallery",
           "description": "You recognize the people in the photographs. The diorama of the founding has somebody new in it this week, standing at the back of the founders' group, looking at the front of the case. The donor wall in the lobby has your last name on it, in a gift-tier you cannot afford, and you do not remember anyone in your family being asked."
         }
       ]
@@ -34,12 +34,12 @@
       "label": "Background",
       "choices": [
         {
-          "name": "Grad student needing the job",
-          "description": "Tuition, rent, the kind of stipend that doesn't quite cover both. You took the job because it's quiet and you can read between rounds. Your thesis is on something near enough to the museum's collection that you have begun to wonder whether the job was offered to you, specifically, by someone who knew."
+          "name": "The Thesis",
+          "description": "Grad student needing the job. Tuition, rent, the kind of stipend that doesn't quite cover both. You took the job because it's quiet and you can read between rounds. Your thesis is on something near enough to the museum's collection that you have begun to wonder whether the job was offered to you, specifically, by someone who knew."
         },
         {
-          "name": "Ex-cop who needed something quiet",
-          "description": "You don't talk about why you left the force. The supervisor didn't ask. The pension is small and the rent is what it is. You carry the flashlight the way you used to carry the other thing, and you have already noticed which galleries have blind spots in the camera coverage."
+          "name": "The Pension",
+          "description": "Ex-cop who needed something quiet. You don't talk about why you left the force. The supervisor didn't ask. The pension is small and the rent is what it is. You carry the flashlight the way you used to carry the other thing, and you have already noticed which galleries have blind spots in the camera coverage."
         },
         {
           "name": "Believer",

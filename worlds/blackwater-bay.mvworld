@@ -14,20 +14,20 @@
       "label": "Why you came",
       "choices": [
         {
-          "name": "Debt you can't pay",
-          "description": "The figure is too large to settle in one lifetime and too small to be forgiven. The creditor isn't cruel — that would be easier. They are patient and they keep accurate books. You came to Blackwater because the books don't reach here. Yet."
+          "name": "The Unpayable Sum",
+          "description": "Debt you can't pay. The figure is too large to settle in one lifetime and too small to be forgiven. The creditor isn't cruel — that would be easier. They are patient and they keep accurate books. You came to Blackwater because the books don't reach here. Yet."
         },
         {
-          "name": "Face the wrong person would recognize",
-          "description": "Someone is looking for the person you used to be. You are no longer that person, but your bones are. You've grown a beard, you've cut your hair, you've practiced a different walk. The mirror still tells on you in low light."
+          "name": "The Wrong Face",
+          "description": "A face the wrong person would recognize. Someone is looking for the person you used to be. You are no longer that person, but your bones are. You've grown a beard, you've cut your hair, you've practiced a different walk. The mirror still tells on you in low light."
         },
         {
-          "name": "Child you stole back",
-          "description": "The child is yours. The court disagreed. The court was wrong, and the court was armed. The child sleeps in the room above the tavern and asks about home only when it rains. You have an answer prepared, and you have not yet had to use it."
+          "name": "The Child Above the Tavern",
+          "description": "A child you stole back. The child is yours. The court disagreed. The court was wrong, and the court was armed. The child sleeps in the room above the tavern and asks about home only when it rains. You have an answer prepared, and you have not yet had to use it."
         },
         {
-          "name": "Truth you have to forget",
-          "description": "You know something that would unmake a thing the world depends on. You came to Blackwater because the bay is supposed to take memories along with names. You are testing whether it works fast enough. So far the truth is still in your mouth at night."
+          "name": "The Truth That Won't Drown",
+          "description": "A truth you have to forget. You know something that would unmake a thing the world depends on. You came to Blackwater because the bay is supposed to take memories along with names. You are testing whether it works fast enough. So far the truth is still in your mouth at night."
         }
       ]
     },
@@ -35,19 +35,19 @@
       "label": "The town",
       "choices": [
         {
-          "name": "New England fishing port",
+          "name": "Tarrow's Wharf",
           "description": "Clapboard houses with the paint salted off. The smell of low tide and tarred rope, the gulls always working. There is one church the regulars do not attend, one tavern the visitors do not enter, and one dock long enough for the trade. The shutters close early."
         },
         {
-          "name": "Caribbean smuggler's cove",
+          "name": "Port Mariposa",
           "description": "Wooden shutters bake all day and creak open at evening. The rum is good and the locals do not sell it to outsiders; you have to be offered. Pelicans line the breakwater and watch the customs cutter that comes in twice a year and finds nothing. The fog rolls in at dawn, briefly, like a courtesy."
         },
         {
-          "name": "Pacific Northwest logging port",
+          "name": "Cedar Hollow Landing",
           "description": "Cedar smoke from every chimney. The rooftops are mossed and the planks of the boardwalk are dark with rain. Sea fog arrives by noon and stays through the next day; in the fog the town is smaller than its map. The mill blade has not turned in a year and nobody mentions it."
         },
         {
-          "name": "Old-world Iberian harbor",
+          "name": "Porto Saudade",
           "description": "Whitewashed and impossibly steep. Bells from a monastery up the cliff mark the hours nobody at the dock observes. Sardines on every menu, oil and lemon, a clay jug of wine you do not have to order twice. The harbormaster keeps his ledger in the cool of a chapel that the priest left to him."
         }
       ]

@@ -14,20 +14,20 @@
       "label": "How you found the channel",
       "choices": [
         {
-          "name": "Inherited the radio",
-          "description": "It was your father's, or your aunt's, or a grandparent you barely remember. It came to you in a box of estate items along with a tin of paper clips and a folded shirt. You plugged it in because it was beautiful and because you were curious. The channel was the first thing it pulled in, as if the radio had been left on this frequency the whole time."
+          "name": "The Inheritance",
+          "description": "You inherited the radio. It was your father's, or your aunt's, or a grandparent you barely remember. It came to you in a box of estate items along with a tin of paper clips and a folded shirt. You plugged it in because it was beautiful and because you were curious. The channel was the first thing it pulled in, as if the radio had been left on this frequency the whole time."
         },
         {
-          "name": "Built it",
-          "description": "You sourced the parts over six months from estate sales and online auctions. You read three books on RF theory. You soldered every joint yourself. The first time you powered it up, the channel was there before you'd finished tuning, and you had not finished tuning, and you have not been able to design a circuit that doesn't pick it up since."
+          "name": "The Hand-Built Set",
+          "description": "You built it. You sourced the parts over six months from estate sales and online auctions. You read three books on RF theory. You soldered every joint yourself. The first time you powered it up, the channel was there before you'd finished tuning, and you had not finished tuning, and you have not been able to design a circuit that doesn't pick it up since."
         },
         {
-          "name": "Born with the ability",
-          "description": "You have been hearing it since you were small. You thought everyone heard it. You stopped mentioning it at seven, after your mother's face. You have spent your adult life calibrating around it — sleeping with white noise, avoiding tunnels, never working in a basement. Tonight, for the first time, the channel said something you understood."
+          "name": "Born Tuned-In",
+          "description": "Born with the ability. You have been hearing it since you were small. You thought everyone heard it. You stopped mentioning it at seven, after your mother's face. You have spent your adult life calibrating around it — sleeping with white noise, avoiding tunnels, never working in a basement. Tonight, for the first time, the channel said something you understood."
         },
         {
-          "name": "Hired by someone who already knew",
-          "description": "They paid in cash. They gave you the frequency, the times, and a list of words to listen for. They did not tell you what the words mean or who they work for. The first week's pay is in an envelope you have not yet opened. The contract is verbal. The deadline is when you stop being useful, which they will determine."
+          "name": "The Cash Envelope",
+          "description": "Hired by someone who already knew. They paid in cash. They gave you the frequency, the times, and a list of words to listen for. They did not tell you what the words mean or who they work for. The first week's pay is in an envelope you have not yet opened. The contract is verbal. The deadline is when you stop being useful, which they will determine."
         }
       ]
     },
@@ -35,20 +35,20 @@
       "label": "Where you listen",
       "choices": [
         {
-          "name": "A 1960s ham-radio shack in the basement",
-          "description": "Tube-warm and dust-fragrant. The QSL cards on the walls are from operators across three continents and two of them are dead. The logbook on the desk is in your father's handwriting and the last entry is from 1978 and there is a blank line under it that you have not been able to bring yourself to write on."
+          "name": "The Basement Shack",
+          "description": "A 1960s ham-radio setup. Tube-warm and dust-fragrant. The QSL cards on the walls are from operators across three continents and two of them are dead. The logbook on the desk is in your father's handwriting and the last entry is from 1978 and there is a blank line under it that you have not been able to bring yourself to write on."
         },
         {
-          "name": "A car at night, parked at a turnout",
-          "description": "The antenna on the roof is the only one for miles. The dashboard glows green and you have learned to keep your eyes on the road that isn't there in front of you instead of on the meters. The signal is stronger here than anywhere else you've tried. You have not figured out why. You have not asked why."
+          "name": "The Turnout",
+          "description": "A car at night, parked at a turnout. The antenna on the roof is the only one for miles. The dashboard glows green and you have learned to keep your eyes on the road that isn't there in front of you instead of on the meters. The signal is stronger here than anywhere else you've tried. You have not figured out why. You have not asked why."
         },
         {
-          "name": "A modern home studio",
-          "description": "A USB SDR, three monitors, headphones that cost more than your rent. The waterfall display shows the spectrum in real time and there is a smear of color in the dead band that should not be there and that does not appear on any other SDR within forty miles when you've checked. The smear is brighter when you say your name out loud."
+          "name": "The Home Studio",
+          "description": "A modern setup. A USB SDR, three monitors, headphones that cost more than your rent. The waterfall display shows the spectrum in real time and there is a smear of color in the dead band that should not be there and that does not appear on any other SDR within forty miles when you've checked. The smear is brighter when you say your name out loud."
         },
         {
-          "name": "A defunct radio station you're squatting in",
-          "description": "The building was condemned eight years ago. The transmitter still works because nobody told it to stop. You don't remember turning it on the first time. The on-air light flickers in a rhythm that has stopped feeling random. You sleep on a cot in the production booth and the channel is sometimes inside the room with you."
+          "name": "The Condemned Station",
+          "description": "A defunct radio station you're squatting in. The building was condemned eight years ago. The transmitter still works because nobody told it to stop. You don't remember turning it on the first time. The on-air light flickers in a rhythm that has stopped feeling random. You sleep on a cot in the production booth and the channel is sometimes inside the room with you."
         }
       ]
     }

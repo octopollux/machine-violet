@@ -12,19 +12,19 @@
       "label": "The scenario",
       "choices": [
         {
-          "name": "The student",
+          "name": "The Warm Stones",
           "description": "You're in your final year of thaumic engineering at a university that didn't exist fifty years ago. Your thesis project just produced an anomalous result: an equation that solves itself differently depending on who's holding the chalk. Your advisor wants to publish. The department wants it buried. The old stones on the campus quad — decorative, everyone thought — are warm to the touch for the first time in living memory."
         },
         {
-          "name": "The field engineer",
+          "name": "The Drift",
           "description": "You maintain the magical infrastructure for a rural district: ley-grid relays, ward pylons, a municipal water purification circle. Routine work. Except the relays are drifting out of calibration faster than you can fix them, the wards are responding to stimuli that aren't in the manual, and the farmers are telling you the old wells are flowing again — the ones that were sealed because of what the water used to do."
         },
         {
-          "name": "The antiquarian",
+          "name": "The Answered Incantation",
           "description": "You study the Old Magic period. Dead languages, ruined temples, oral histories from communities that remember. It's been a purely academic field — there was nothing left to practice. Until your translations started working. You read an incantation for the first time in a century and something answered. You haven't told anyone yet."
         },
         {
-          "name": "The regulator",
+          "name": "The Bureau",
           "description": "You work for the Bureau of Thaumic Standards, the agency that certifies all legal magic use. Your job is ensuring compliance, investigating anomalies, and shutting down unlicensed practice. The anomaly reports on your desk have tripled this quarter. Half of them describe phenomena that don't match any known new-magic signatures. Your superiors say it's instrument error. You've been in the field. It's not instrument error."
         }
       ]

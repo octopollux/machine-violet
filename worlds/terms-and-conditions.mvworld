@@ -14,20 +14,20 @@
       "label": "What you were trying to do",
       "choices": [
         {
-          "name": "Update your phone",
-          "description": "A routine software update. The terms popped up in a modal the player has dismissed a hundred times before. The new clauses were buried in subsection 4.7.b. The phone has been operating normally otherwise. Notifications have started arriving from senders whose names are not in the player's contacts."
+          "name": "Subsection 4.7.b",
+          "description": "Update your phone. A routine software update. The terms popped up in a modal the player has dismissed a hundred times before. The new clauses were buried in subsection 4.7.b. The phone has been operating normally otherwise. Notifications have started arriving from senders whose names are not in the player's contacts."
         },
         {
-          "name": "Sign up for a streaming free trial",
-          "description": "Thirty days free. The promotional banner had a smiling family on a couch. The player wanted to watch one specific show. The show was not actually on the platform. The platform has not refunded the trial fee, which was zero, which has nonetheless been collected."
+          "name": "The Free Trial",
+          "description": "Sign up for a streaming free trial. Thirty days free. The promotional banner had a smiling family on a couch. The player wanted to watch one specific show. The show was not actually on the platform. The platform has not refunded the trial fee, which was zero, which has nonetheless been collected."
         },
         {
-          "name": "Accept a job offer",
-          "description": "A new position at a company that was almost too good to be true. The onboarding packet was thick. HR was warm. The player signed at the bottom of every page they were asked to sign at the bottom of. The first paycheck cleared. The second one arrived in an envelope made of skin."
+          "name": "The Offer",
+          "description": "Accept a job offer. A new position at a company that was almost too good to be true. The onboarding packet was thick. HR was warm. The player signed at the bottom of every page they were asked to sign at the bottom of. The first paycheck cleared. The second one arrived in an envelope made of skin."
         },
         {
-          "name": "Cancel an old subscription you forgot you had",
-          "description": "Something the player signed up for years ago and never used. The cancellation flow had a confirmation page with a long block of text. The player clicked Confirm. The subscription has not actually been cancelled and the player is now subject to its updated terms, retroactive to original sign-up."
+          "name": "The Auto-Renew",
+          "description": "Cancel an old subscription you forgot you had. Something the player signed up for years ago and never used. The cancellation flow had a confirmation page with a long block of text. The player clicked Confirm. The subscription has not actually been cancelled and the player is now subject to its updated terms, retroactive to original sign-up."
         }
       ]
     },
@@ -35,20 +35,20 @@
       "label": "Your counsel",
       "choices": [
         {
-          "name": "A class-action lawyer",
+          "name": "The Class Action",
           "description": "She is assembling other signatories, dozens of them, and has a war chest. She thinks the player is lucky. The other signatories meet at a community center on Thursdays. Most of them have already lost something — a name, a finger, a marriage. She takes thirty percent."
         },
         {
-          "name": "A compliance officer from the company itself",
-          "description": "He is secretly on the player's side. He was the one who flagged the boilerplate years ago and was ignored. He cannot be seen helping. He communicates in margin notes inside other documents the player receives in the course of the dispute. His handwriting is excellent."
+          "name": "The Compliance Officer",
+          "description": "A compliance officer from the company itself. He is secretly on the player's side. He was the one who flagged the boilerplate years ago and was ignored. He cannot be seen helping. He communicates in margin notes inside other documents the player receives in the course of the dispute. His handwriting is excellent."
         },
         {
-          "name": "Yourself",
-          "description": "Nobody else can be trusted with the document. The player has to read it. The player has to understand it. The player has set up a card table and a lamp and is making notes. The document grows three pages for every one the player reads, and the player has begun underlining."
+          "name": "Pro Se",
+          "description": "Yourself. Nobody else can be trusted with the document. The player has to read it. The player has to understand it. The player has set up a card table and a lamp and is making notes. The document grows three pages for every one the player reads, and the player has begun underlining."
         },
         {
-          "name": "A small saint",
-          "description": "She handles these cases pro bono. She is patron of the inattentively damned. Her office is the back room of a parish hall in a neighborhood the player has never been to. She is tired but kind. She has won most of her cases. The ones she hasn't, she remembers by name."
+          "name": "Saint of the Inattentive",
+          "description": "A small saint. She handles these cases pro bono. She is patron of the inattentively damned. Her office is the back room of a parish hall in a neighborhood the player has never been to. She is tired but kind. She has won most of her cases. The ones she hasn't, she remembers by name."
         }
       ]
     }

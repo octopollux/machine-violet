@@ -13,20 +13,20 @@
       "label": "What gave it away",
       "choices": [
         {
-          "name": "A medical scan with two of you on file",
-          "description": "The clinic flagged it as a duplicate record and asked you to come in. The technician was apologetic and curious. The two scans are not identical the way a scan and its copy would be. They are identical the way two living bodies, scanned a week apart, can be."
+          "name": "Duplicate Record",
+          "description": "A medical scan with two of you on file. The clinic flagged it as a duplicate record and asked you to come in. The technician was apologetic and curious. The two scans are not identical the way a scan and its copy would be. They are identical the way two living bodies, scanned a week apart, can be."
         },
         {
-          "name": "A stranger who knew you by a name you don't use",
-          "description": "They greeted you at the bar like an old friend and called you something nobody has called you since childhood — not your name, but a private one. They asked about your work, by which they meant a job you have never held. You smiled the way you smile when you don't yet know how badly you've been seen."
+          "name": "The Private Name",
+          "description": "A stranger who knew you by a name you don't use. They greeted you at the bar like an old friend and called you something nobody has called you since childhood — not your name, but a private one. They asked about your work, by which they meant a job you have never held. You smiled the way you smile when you don't yet know how badly you've been seen."
         },
         {
-          "name": "Footage of yourself somewhere you've never been",
-          "description": "A short clip, sent without comment. Your face. Your walk. A street you have never visited and a coat you have never owned. The timestamp is recent. The lighting is honest. You watched it three times before you noticed your hands at your sides were not the way you hold your hands."
+          "name": "The Clip",
+          "description": "Footage of yourself somewhere you've never been. A short clip, sent without comment. Your face. Your walk. A street you have never visited and a coat you have never owned. The timestamp is recent. The lighting is honest. You watched it three times before you noticed your hands at your sides were not the way you hold your hands."
         },
         {
-          "name": "A letter you wrote that you don't remember writing",
-          "description": "It is in your handwriting. It is on stationery you used to use. It addresses someone you have never met by their first name and their nickname for you. It ends with a promise you cannot now keep, because you do not know what was promised, or to whom, or for what reason."
+          "name": "The Letter",
+          "description": "A letter you wrote that you don't remember writing. It is in your handwriting. It is on stationery you used to use. It addresses someone you have never met by their first name and their nickname for you. It ends with a promise you cannot now keep, because you do not know what was promised, or to whom, or for what reason."
         }
       ]
     },
@@ -34,19 +34,19 @@
       "label": "The meeting place",
       "choices": [
         {
-          "name": "A neutral coffee shop they chose",
-          "description": "You don't recognize the neighborhood. The barista greets the clone by name without looking up. The table has two cups already poured to the level you prefer, and the clone is sitting on the side you would have chosen if you had arrived first. They stand when they see you. They look like they have been practicing what to say."
+          "name": "Neutral Ground",
+          "description": "A neutral coffee shop they chose. You don't recognize the neighborhood. The barista greets the clone by name without looking up. The table has two cups already poured to the level you prefer, and the clone is sitting on the side you would have chosen if you had arrived first. They stand when they see you. They look like they have been practicing what to say."
         },
         {
-          "name": "Their apartment",
-          "description": "It is furnished the way you would have done it, if you had ever had the money. The bookshelf is your taste five years from now. There is art on the wall you have been thinking about saving for. They ask if you want to sit on the couch or in the kitchen, and you realize they have anticipated which you would prefer, and prepared both."
+          "name": "The Apartment",
+          "description": "Their apartment. It is furnished the way you would have done it, if you had ever had the money. The bookshelf is your taste five years from now. There is art on the wall you have been thinking about saving for. They ask if you want to sit on the couch or in the kitchen, and you realize they have anticipated which you would prefer, and prepared both."
         },
         {
-          "name": "A hospital room — they're dying",
-          "description": "Your blood type. Your inherited disease, manifesting on schedule. They want a kidney. They want a conversation. They want to know who they were before, in case you can tell them, because the people they have spent their life calling family will not be at the funeral and they would like someone there who knew them."
+          "name": "Ward 4B",
+          "description": "A hospital room — they're dying. Your blood type. Your inherited disease, manifesting on schedule. They want a kidney. They want a conversation. They want to know who they were before, in case you can tell them, because the people they have spent their life calling family will not be at the funeral and they would like someone there who knew them."
         },
         {
-          "name": "A church",
+          "name": "The Sanctuary",
           "description": "Neither of you is religious. It is the only public place you both feel safe — large, quiet, anonymous in the right way. The priest knows. He has agreed not to look at either of you twice. The pew is cold. The light through the windows is honest. You sit a polite distance apart and consider, for the first time, that you are not alone in the world."
         }
       ]

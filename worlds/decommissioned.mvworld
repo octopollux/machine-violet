@@ -26,7 +26,7 @@
           "description": "You were a divine instrument of righteous war. You laid down your sword. The church says you're broken. You say you're done. Your wings still smell like ozone and old fire."
         },
         {
-          "name": "Just a soldier",
+          "name": "The Soldier",
           "description": "No magic, no metal, no wings. You're a human being who was very good at a very bad job for a very long time. The \"old programming\" is just what's left. You're trying to do something gentle for once."
         }
       ]
@@ -35,16 +35,16 @@
       "label": "The town",
       "choices": [
         {
-          "name": "Quiet rebuilding village",
+          "name": "Greyfield",
           "description": "A quiet village still rebuilding from the war you fought in. Some residents remember you from the other side."
         },
         {
-          "name": "Busy market town",
+          "name": "Threadmarket",
           "description": "A busy market town that didn't see combat and doesn't understand what you are. They think you're a novelty."
         },
         {
-          "name": "Rough frontier settlement",
-          "description": "Everyone is a misfit or a second-chance case. You fit right in — until you don't."
+          "name": "Last Chance Flats",
+          "description": "A rough frontier settlement. Everyone is a misfit or a second-chance case. You fit right in — until you don't."
         }
       ]
     }

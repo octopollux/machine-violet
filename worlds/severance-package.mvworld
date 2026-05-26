@@ -26,8 +26,8 @@
           "description": "The whole department is dissolving. The player is one of forty people getting the same interview this week. The HR rep is on their nineteenth, and is becoming proficient at it. Some of the others were friends. The cubicles are already empty by the time the player gets to their floor."
         },
         {
-          "name": "You quit",
-          "description": "The player resigned. The player does not remember why and does not remember when. The resignation letter is in the player's own handwriting and the file is clear. HR is honoring a request the player no longer remembers making, and is being scrupulous about it."
+          "name": "Voluntary Separation",
+          "description": "You quit. The player resigned. The player does not remember why and does not remember when. The resignation letter is in the player's own handwriting and the file is clear. HR is honoring a request the player no longer remembers making, and is being scrupulous about it."
         }
       ]
     },
@@ -35,20 +35,20 @@
       "label": "The exit interview room",
       "choices": [
         {
-          "name": "Bland conference room",
-          "description": "Drop-ceiling tiles with one corner stain. A pitcher of water on the table that does not empty no matter how often it is poured. A phone in the center of the table that rings exactly once during the interview and is not answered. The HR rep slides a tissue box closer without looking up."
+          "name": "Conference Room B",
+          "description": "A bland conference room. Drop-ceiling tiles with one corner stain. A pitcher of water on the table that does not empty no matter how often it is poured. A phone in the center of the table that rings exactly once during the interview and is not answered. The HR rep slides a tissue box closer without looking up."
         },
         {
-          "name": "The roof",
+          "name": "The Rooftop",
           "description": "The city is laid out below in the orange of late afternoon. HR brought two coffees, and remembered how the player takes theirs. There is a helicopter in the conversation that may be hypothetical. The wind makes the paperwork hard to manage and HR keeps a hand on the folder."
         },
         {
-          "name": "Your own office, the day you started",
-          "description": "Everything is as the player left it on their first day. The orientation packet is still wrapped. The plant on the desk is dead — has been dead for a while. The calendar is correct. The HR rep is at the desk waiting; the player is standing in their own doorway."
+          "name": "Day One",
+          "description": "Your own office, the day you started. Everything is as the player left it on their first day. The orientation packet is still wrapped. The plant on the desk is dead — has been dead for a while. The calendar is correct. The HR rep is at the desk waiting; the player is standing in their own doorway."
         },
         {
-          "name": "A room you don't recognize but your body does",
-          "description": "The player has never been here. The player's hands know where the light switch is. The chair is at the height the player would have chosen. The HR rep watches the player navigate the room and writes a small note when the player sits down without looking."
+          "name": "Muscle Memory",
+          "description": "A room you don't recognize but your body does. The player has never been here. The player's hands know where the light switch is. The chair is at the height the player would have chosen. The HR rep watches the player navigate the room and writes a small note when the player sits down without looking."
         }
       ]
     }

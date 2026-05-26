@@ -14,20 +14,20 @@
       "label": "Your roommate",
       "choices": [
         {
-          "name": "Eight feet of polite, has hooves",
-          "description": "They ducked under the doorframe coming in and apologized for the dent. They brought soup, in a tureen of a metal you do not have a name for. They are scrupulously clean. The hooves are quiet on the laminate. They use \"thank you\" in a way that suggests they have studied the phrase."
+          "name": "The Tall Guest",
+          "description": "Eight feet of polite, has hooves. They ducked under the doorframe coming in and apologized for the dent. They brought soup, in a tureen of a metal you do not have a name for. They are scrupulously clean. The hooves are quiet on the laminate. They use \"thank you\" in a way that suggests they have studied the phrase."
         },
         {
-          "name": "A wisp of light who pays in stock tips",
-          "description": "They occupy the spare room without disturbing the dust. They pay rent in stock tips for a future that will not happen here, but the tickers map onto this market with delightful, illegal accuracy. They glow faintly when discussing the weather and brightly when discussing music."
+          "name": "The Luminary",
+          "description": "A wisp of light who pays in stock tips. They occupy the spare room without disturbing the dust. They pay rent in stock tips for a future that will not happen here, but the tickers map onto this market with delightful, illegal accuracy. They glow faintly when discussing the weather and brightly when discussing music."
         },
         {
-          "name": "A perfect human-looking person who fails one tell per week",
-          "description": "On Mondays they are flawless. By Wednesday something small has slipped — too many teeth in a smile, a shadow cast in the wrong direction, a meal eaten in the wrong order. By Friday they have noticed they have slipped, and by Saturday they have repaired it, and the cycle begins again on Monday."
+          "name": "The Weekly Tell",
+          "description": "A perfect human-looking person who fails one tell per week. On Mondays they are flawless. By Wednesday something small has slipped — too many teeth in a smile, a shadow cast in the wrong direction, a meal eaten in the wrong order. By Friday they have noticed they have slipped, and by Saturday they have repaired it, and the cycle begins again on Monday."
         },
         {
-          "name": "A small council of seven",
-          "description": "They insist they are one person. They use a single name. They sometimes argue with each other in a language only they speak, and then they reach consensus, and then they hand the player the rent. They eat seven different breakfasts. They are very respectful of the bathroom schedule."
+          "name": "The Council of Seven",
+          "description": "A small council that insists it is one person. They use a single name. They use a single name. They sometimes argue with each other in a language only they speak, and then they reach consensus, and then they hand the player the rent. They eat seven different breakfasts. They are very respectful of the bathroom schedule."
         }
       ]
     },
@@ -35,20 +35,20 @@
       "label": "The apartment",
       "choices": [
         {
-          "name": "Brownstone walkup, top floor",
-          "description": "The boards creak in a sequence you have memorized. The fire escape, since the roommate moved in, leads to a window that is not the window it used to lead to. The downstairs neighbor hears everything, and they have started leaving notes you cannot quite parse, slipped under the door at exactly the wrong hour."
+          "name": "The Top-Floor Walkup",
+          "description": "A brownstone, top floor. The boards creak in a sequence you have memorized. The fire escape, since the roommate moved in, leads to a window that is not the window it used to lead to. The downstairs neighbor hears everything, and they have started leaving notes you cannot quite parse, slipped under the door at exactly the wrong hour."
         },
         {
-          "name": "Suburban duplex with a shared wall",
-          "description": "The other side of the wall is silent and was empty when you moved in. It is still empty, technically. The silence on the other side has acquired a texture since the roommate arrived — not louder, exactly, but more present. The mailbox over there has begun accumulating mail addressed to no one."
+          "name": "The Shared Wall",
+          "description": "A suburban duplex. The other side of the wall is silent and was empty when you moved in. It is still empty, technically. The silence on the other side has acquired a texture since the roommate arrived — not louder, exactly, but more present. The mailbox over there has begun accumulating mail addressed to no one."
         },
         {
-          "name": "Studio in a high-rise",
+          "name": "The High-Rise Studio",
           "description": "One room, one bathroom, one of everything. The roommate's belongings are inside your belongings now, in a way that is not physically possible and is nevertheless tidy. The city outside the window sounds different when the roommate is home — closer in some directions and further in others."
         },
         {
-          "name": "A house you inherited from your grandmother",
-          "description": "Her things are still here. The roommate has moved into her bedroom and was apologetic when they realized whose it had been. They sometimes call you by her name, and stop themselves, and look sorry. The house seems easier with them in it, which is its own particular grief."
+          "name": "Grandmother's House",
+          "description": "Inherited. Her things are still here. The roommate has moved into her bedroom and was apologetic when they realized whose it had been. They sometimes call you by her name, and stop themselves, and look sorry. The house seems easier with them in it, which is its own particular grief."
         }
       ]
     }

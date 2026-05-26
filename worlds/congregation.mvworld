@@ -13,19 +13,19 @@
       "label": "Town",
       "choices": [
         {
-          "name": "Suburban subdivision",
+          "name": "Sycamore Run",
           "description": "Cul-de-sacs named for trees that don't grow here. Identical mailboxes at identical angles. The HOA newsletter mentions the church's bake sale as if you'd been planning to attend, and the church's parking lot is the only freshly paved one on the road. Your neighbor waves the way he always has, and now he waves once more, toward the steeple."
         },
         {
-          "name": "Failing rust-belt city",
+          "name": "Forge County",
           "description": "Shuttered plants, potholes the city can't fix, a tax base that left two decades ago. The church's parking lot is new asphalt, painted lines, and reserved spots for people you went to high school with. The pastor has hired locally for the maintenance staff and they are grateful for the work and they will not meet your eyes."
         },
         {
-          "name": "Mountain hamlet, road washed out",
+          "name": "Hollow's Pass",
           "description": "One general store, one gas pump, you know every truck by its tailgate. The church appeared the night before the snow closed the pass. Nobody can leave to check a county record. The church bell rings on the hour and the hour is correct."
         },
         {
-          "name": "Suburb already with a church on every corner",
+          "name": "Elm and the Cross-Street",
           "description": "This is just one more. Methodist on Vine, Baptist on Oak, Catholic on Main, and now this one on the corner of Elm and the cross-street nobody can quite remember the name of. Nobody can say what was on the lot before; everyone agrees it has always been a lovely little church."
         }
       ]
@@ -34,19 +34,19 @@
       "label": "Your faith",
       "choices": [
         {
-          "name": "Devout",
+          "name": "The Faithful",
           "description": "This troubles you doctrinally before it troubles you in any other way. The hymns are the right hymns and the sermon almost works. The pastor preaches scripture you know, with one verse you don't recognize at the end of each reading. You looked it up. It isn't there."
         },
         {
-          "name": "Lapsed",
+          "name": "The Lapsed",
           "description": "You came back recently and you can't say why. The pew fits you the way it used to. The pastor seems to remember you from before, from a parish you no longer believe you attended. You take communion on the third Sunday and you don't tell your spouse."
         },
         {
-          "name": "Atheist",
+          "name": "The Unbeliever",
           "description": "You can see what the others can't. The building has the wrong number of doors from inside. The stained glass has a panel that doesn't match. The shadows in the nave fall in directions that have nothing to do with the sun. You don't go in often. When you do, you count."
         },
         {
-          "name": "Clergy of a competing denomination",
+          "name": "The Rival Shepherd",
           "description": "Your parishioners are migrating. You watch them through the side window of your own church across the street, walking past your sign on Sunday morning to the new doors. You have not yet preached against the new church and you have not yet visited it. Both decisions feel like they are being made for you."
         }
       ]

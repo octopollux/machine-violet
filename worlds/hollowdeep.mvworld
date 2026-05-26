@@ -13,20 +13,20 @@
       "label": "Your role",
       "choices": [
         {
-          "name": "Foreman with three missing crews",
-          "description": "You signed off on the descent. You wrote the names in the book. You stood at the top of the shaft for the agreed-on hours and longer. The widows are not yet ready to look at you. The company has not yet decided whether you are the man to send down again, or the man to fire first."
+          "name": "The Foreman",
+          "description": "Three crews missing. You signed off on the descent. You wrote the names in the book. You stood at the top of the shaft for the agreed-on hours and longer. The widows are not yet ready to look at you. The company has not yet decided whether you are the man to send down again, or the man to fire first."
         },
         {
-          "name": "Investigator the company hired quietly",
-          "description": "Your papers say you are a geological surveyor. You are not. The company prefers you to find an explanation that does not involve the company. Your room at the boarding house is paid through the month, and the rate is more than the room is worth, and you have not asked about that."
+          "name": "The Surveyor",
+          "description": "Investigator the company hired quietly. Your papers say you are a geological surveyor. You are not. The company prefers you to find an explanation that does not involve the company. Your room at the boarding house is paid through the month, and the rate is more than the room is worth, and you have not asked about that."
         },
         {
-          "name": "Local kid whose dad was on shift",
-          "description": "You know the back ways into the headframe. You know which fence panels are loose. You know who is lying about what they heard the night the bell started. The town adults treat you with the careful gentleness reserved for the recently bereaved, which is a thing you are not yet sure you are."
+          "name": "The Headframe Kid",
+          "description": "Local kid whose dad was on shift. You know the back ways into the headframe. You know which fence panels are loose. You know who is lying about what they heard the night the bell started. The town adults treat you with the careful gentleness reserved for the recently bereaved, which is a thing you are not yet sure you are."
         },
         {
-          "name": "Cleric the diocese sent",
-          "description": "The bishop received the letter and read it twice. You were chosen because you are senior enough to be believed and junior enough to be expendable. You arrive with a small kit, a written rite for sealing a mine, and a confessor's license that the bishop expects you to use before the rite, not after."
+          "name": "The Bishop's Envoy",
+          "description": "Cleric the diocese sent. The bishop received the letter and read it twice. You were chosen because you are senior enough to be believed and junior enough to be expendable. You arrive with a small kit, a written rite for sealing a mine, and a confessor's license that the bishop expects you to use before the rite, not after."
         }
       ]
     },
@@ -34,19 +34,19 @@
       "label": "The town",
       "choices": [
         {
-          "name": "Dwarven, ancestral",
+          "name": "Karag-Vor",
           "description": "The mine is a cathedral. The galleries were carved before this mountain had its current name. The town's foundations are older than the peak above them. You are an outsider even after twenty years of residence, and the courtesy you receive is the kind of courtesy reserved for guests who have outstayed any reasonable visit."
         },
         {
-          "name": "Frontier human, debt-mortgaged",
+          "name": "Coffin Bend",
           "description": "A single rail line in, a single rail line out. One bank, one church, one saloon, and the company owns all three buildings if not the people inside them. The script the miners are paid in is good at the company store and acceptable, at a discount, at the saloon. The bank's loans are not optional."
         },
         {
-          "name": "Mixed and uneasy",
+          "name": "Two-Shift Town",
           "description": "Two factions of miners. They take separate shifts. They drink at the saloon on alternate nights by an understanding nobody wrote down. Their work songs are about each other. The accident in the shaft has, for the first time in a generation, given them something to coordinate on, and the coordination is not yet trust."
         },
         {
-          "name": "A company town owned outright",
+          "name": "Greenpaint",
           "description": "Every house is painted the same shade of green. The script is paid in numbered chits. The company's cemetery has uniform headstones in regular rows. The company's representative knows everyone by name and uses their names in conversation in a manner that feels rehearsed."
         }
       ]

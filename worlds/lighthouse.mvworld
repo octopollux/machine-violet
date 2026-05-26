@@ -13,19 +13,19 @@
       "label": "Your post",
       "choices": [
         {
-          "name": "Sole keeper, your choice",
-          "description": "You took the posting because you wanted the silence. The papers describe you as well-suited. The quartermaster shook your hand without quite meeting your eye. You've been here long enough to have rituals, and short enough to still remember why you came."
+          "name": "The Volunteer",
+          "description": "Sole keeper. You took the posting because you wanted the silence. The papers describe you as well-suited. The quartermaster shook your hand without quite meeting your eye. You've been here long enough to have rituals, and short enough to still remember why you came."
         },
         {
-          "name": "Sole keeper, your punishment",
-          "description": "You are here because the alternative was worse. A tribunal, a debt, a family decision — whatever it was, it ends with you alone at the edge of the chart. You signed because signing was the only door open. The beacon does not care what you did."
+          "name": "The Exile",
+          "description": "Sole keeper. You are here because the alternative was worse. A tribunal, a debt, a family decision — whatever it was, it ends with you alone at the edge of the chart. You signed because signing was the only door open. The beacon does not care what you did."
         },
         {
-          "name": "Two-person rotation",
-          "description": "There are supposed to be two of you. There were, until last week. Your partner stopped answering hails three rotations ago. Their quarters are still set up the way they left them. You have not yet walked down the corridor to check."
+          "name": "The Empty Bunk",
+          "description": "Two-person rotation. There are supposed to be two of you. There were, until last week. Your partner stopped answering hails three rotations ago. Their quarters are still set up the way they left them. You have not yet walked down the corridor to check."
         },
         {
-          "name": "The new arrival",
+          "name": "The Relief",
           "description": "You came in on the last supply run. The previous keeper went out on the same boat without speaking to you, except to hand you the keys and say not to open the bottom drawer. There was no briefing. You are still learning which lights on the console are normal."
         }
       ]
@@ -34,19 +34,19 @@
       "label": "The beacon",
       "choices": [
         {
-          "name": "Nav buoy at a trade lane edge",
+          "name": "The Outer Marker",
           "description": "Your station marks the outer edge of a shipping lane that has been empty for weeks. The supply boat comes monthly and not always on time. Every dial, every coil, every air scrubber is yours to keep alive. When something on the panel blinks wrong, there is nobody to ask but the manual."
         },
         {
-          "name": "Quarantine warning facing inward",
+          "name": "The Seal",
           "description": "The beacon does not point outward. It points back, at something that was sealed in long before you arrived. Your job is to remind whatever is in there that the seal is still watching. The orientation is the wrong way around for a ship coming from outside to even see your light."
         },
         {
-          "name": "Welcome mat for first contact",
+          "name": "The Hailing Light",
           "description": "The beacon transmits a greeting in a constructed tongue. Nobody you've met chose the language; it was specified in the founding charter and the charter is older than the agency that wrote it. You have never had to wonder, until now, what would answer back."
         },
         {
-          "name": "A lighthouse for the dead",
+          "name": "The Drowned Light",
           "description": "The waters around your station are a graveyard. Markers in the shallows. Bones in the rocks at low tide. The local fishermen will not approach within sight of your light. Your beacon is for the souls, not the ships, and you have always known that the difference might one day matter."
         }
       ]

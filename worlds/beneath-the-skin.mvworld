@@ -14,15 +14,15 @@
       "label": "The town",
       "choices": [
         {
-          "name": "Small-town Americana",
+          "name": "Millbrook",
           "description": "Everyone knows everyone. Diner, church, high school football. The \"different\" stands out because you've known these people your whole life."
         },
         {
-          "name": "Coastal village",
+          "name": "Saltwell Cove",
           "description": "Fishing community, salt air, tight-knit families. Isolation makes the changes harder to report and easier to deny. The sea is always watching."
         },
         {
-          "name": "Suburban enclave",
+          "name": "Cedar Heights",
           "description": "Gated community, HOA rules, manicured lawns. The \"different\" looks like people finally following the rules they always resented. Conformity was already the norm — now it's perfect."
         }
       ]

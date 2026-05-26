@@ -15,16 +15,16 @@
       "label": "The story you've inherited",
       "choices": [
         {
-          "name": "Space opera",
-          "description": "The bridge crew of a flagship is dead. All of them — captain, first officer, science lead, the one who was definitely going to betray everyone in episode 7. You're the B-shift. The ensigns, the cargo handlers, the person who fixes the coffee machine. The galaxy-ending threat is still out there and it does not care about your qualifications."
+          "name": "The B-Shift",
+          "description": "Space opera. The bridge crew of a flagship is dead. All of them — captain, first officer, science lead, the one who was definitely going to betray everyone in episode 7. You're the B-shift. The ensigns, the cargo handlers, the person who fixes the coffee machine. The galaxy-ending threat is still out there and it does not care about your qualifications."
         },
         {
-          "name": "Sitcom",
-          "description": "A literal three-camera television show. The laugh track is real. The set walls wobble if you lean on them. The main cast — the wacky neighbor, the will-they-won't-they couple, the sarcastic best friend — are dead. The network needs a new cast by Monday or the show gets cancelled. You're the extras who just got promoted. The audience can see you. You can hear them."
+          "name": "The Laugh Track",
+          "description": "Sitcom — a literal three-camera television show. The laugh track is real. The set walls wobble if you lean on them. The main cast — the wacky neighbor, the will-they-won't-they couple, the sarcastic best friend — are dead. The network needs a new cast by Monday or the show gets cancelled. You're the extras who just got promoted. The audience can see you. You can hear them."
         },
         {
-          "name": "Gothic horror",
-          "description": "The monster hunters are dead. The Van Helsing, the psychic, the one with the family curse and the silver bullets — all gone, taken by the thing in the manor on the hill. The village hired them. The village paid in advance. The village would like a refund or a replacement. You are the replacement. You are not qualified."
+          "name": "The Village's Refund",
+          "description": "Gothic horror. The monster hunters are dead. The Van Helsing, the psychic, the one with the family curse and the silver bullets — all gone, taken by the thing in the manor on the hill. The village hired them. The village paid in advance. The village would like a refund or a replacement. You are the replacement. You are not qualified."
         }
       ]
     },

@@ -13,19 +13,19 @@
       "label": "Your kitchen",
       "choices": [
         {
-          "name": "Mountaintop pastry chef",
+          "name": "The High Pastry",
           "description": "Snow accumulates on the lintel of your kitchen even in summer. One key ingredient is flown in weekly by a goat the locals refuse to discuss. Your rivals on the mountain are children you grew up with, now competitors who remember every cake you ever burned. The altitude does something to the gluten and you know it does."
         },
         {
-          "name": "Night-market hawker",
+          "name": "The Midnight Stall",
           "description": "Oil-drum heat against your shins, your line ten people deep by midnight. Every regular knows your face and is generous about it. A god eats at your stall incognito — has for years — and has never once told you which god, which has been a useful uncertainty until the invitation came."
         },
         {
-          "name": "Home baker",
-          "description": "Your grandmother left you the oven. The oven is older than the house. She also left you a notebook of instructions you cannot read — the alphabet is hers, the language is something else. You have been guessing for a decade and the dough has been forgiving."
+          "name": "Grandmother's Oven",
+          "description": "A home baker. Your grandmother left you the oven. The oven is older than the house. She also left you a notebook of instructions you cannot read — the alphabet is hers, the language is something else. You have been guessing for a decade and the dough has been forgiving."
         },
         {
-          "name": "Restaurant veteran",
+          "name": "The Line Cook",
           "description": "You entered the competition entirely to spite your old head chef, who said you would never compete. Your sous-chef has been sleeping with one of the judges and has not told you which. Your knives are good. Your hands shake only when you are not holding them."
         }
       ]
@@ -34,20 +34,20 @@
       "label": "Your signature ingredient",
       "choices": [
         {
-          "name": "A name",
+          "name": "Your Own Name",
           "description": "You cook with your own name folded into the dough. It is an old technique and the books warn against it. The dish carries some of you out of the kitchen with every plate served. The judges always know, and they are always patient about it."
         },
         {
-          "name": "A memory",
+          "name": "A Rendered Memory",
           "description": "A specific, recent, painful memory rendered down to its essential note. The dish tastes the way the day felt. Each use of the memory dulls it; by the showstopper you will not be able to recall the original event, only its flavor. The judges will eat it anyway."
         },
         {
-          "name": "A debt",
+          "name": "A Standing Debt",
           "description": "Something owed becomes yeast. A favor you never repaid, a kindness you cashed in, a promise you broke — they rise the bread without warmth. The dish is dense and rich and slightly hostile on the tongue, which the judges call complex."
         },
         {
-          "name": "A first-of",
-          "description": "First kiss, first lie, first dawn after a long night. Each first can only be used once, and once used is gone — you will not remember the first time you tasted the thing again. The dish carries the cleanness of an event nobody else witnessed."
+          "name": "A First Time",
+          "description": "A first-of. First kiss, first lie, first dawn after a long night. Each first can only be used once, and once used is gone — you will not remember the first time you tasted the thing again. The dish carries the cleanness of an event nobody else witnessed."
         }
       ]
     }

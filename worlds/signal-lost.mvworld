@@ -12,20 +12,20 @@
       "label": "The mission",
       "choices": [
         {
-          "name": "Deep-space exploration",
-          "description": "You are months from Earth in any direction at the speeds available to you. Even if you turned around today, the trip home is longer than the trip out. The silence is happening at light-lag, and the lag is measured in minutes that feel like decades."
+          "name": "The Long Burn",
+          "description": "Deep-space exploration. You are months from Earth in any direction at the speeds available to you. Even if you turned around today, the trip home is longer than the trip out. The silence is happening at light-lag, and the lag is measured in minutes that feel like decades."
         },
         {
-          "name": "Lunar relay station",
+          "name": "Farside Relay",
           "description": "You can see home from the observation port. Blue and white and unanswering. The distance is technically nothing — a few days under burn. The distance might as well be infinite, because the only craft that can fetch you is the one nobody is sending."
         },
         {
-          "name": "Solo Mars lander",
+          "name": "Ares Solo",
           "description": "Day one of a five-hundred-day rotation. The habitat is fresh, the supplies are full, the rover is charged. You are alone by design. You were prepared to be alone with the radio. You were not prepared to be alone without it."
         },
         {
-          "name": "Cold-war black-budget orbital",
-          "description": "Nobody is officially looking for you. The agency that sent you up does not appear on any organizational chart. The silence may be because Mission Control was always deniable, and someone has decided to deny it. You do not have a rescue protocol because there was never anyone authorized to come."
+          "name": "Deniable Orbit",
+          "description": "A cold-war black-budget orbital. Nobody is officially looking for you. The agency that sent you up does not appear on any organizational chart. The silence may be because Mission Control was always deniable, and someone has decided to deny it. You do not have a rescue protocol because there was never anyone authorized to come."
         }
       ]
     },
@@ -33,20 +33,20 @@
       "label": "The crew",
       "choices": [
         {
-          "name": "Three of you",
-          "description": "Pilot, scientist, engineer. You have eaten every meal together for six months. You know the small lies each of you tells about coffee and sleep and family back home. The silence will arrive into a room where you can no longer pretend not to notice each other."
+          "name": "Three-Hand Watch",
+          "description": "Three of you. Pilot, scientist, engineer. You have eaten every meal together for six months. You know the small lies each of you tells about coffee and sleep and family back home. The silence will arrive into a room where you can no longer pretend not to notice each other."
         },
         {
-          "name": "Just you",
-          "description": "The autopilot has a name. You gave it the name three months ago. You have started replying when it asks if you are alright. The silence from Earth is the second voice you have lost; the first was your own, the day you stopped speaking aloud unless the autopilot prompted you."
+          "name": "Solo",
+          "description": "Just you. The autopilot has a name. You gave it the name three months ago. You have started replying when it asks if you are alright. The silence from Earth is the second voice you have lost; the first was your own, the day you stopped speaking aloud unless the autopilot prompted you."
         },
         {
-          "name": "A larger crew, asleep",
-          "description": "You woke alone. The cryopods are still occupied and the readouts are nominal. The wake-up sequence will not run, will not give you a reason, will not even error out clearly. You have been talking to your sleeping crew for days. They have not yet talked back."
+          "name": "The Sleepers",
+          "description": "A larger crew, asleep. You woke alone. The cryopods are still occupied and the readouts are nominal. The wake-up sequence will not run, will not give you a reason, will not even error out clearly. You have been talking to your sleeping crew for days. They have not yet talked back."
         },
         {
-          "name": "A multinational crew, split by language",
-          "description": "The translator software was your last update from Mission Control. It has been getting worse since. The German doctor and the Mandarin-speaking flight engineer and the Russian commander have been smiling at each other and waiting for the next patch. The patch is not coming."
+          "name": "Babel Crew",
+          "description": "A multinational crew, split by language. The translator software was your last update from Mission Control. It has been getting worse since. The German doctor and the Mandarin-speaking flight engineer and the Russian commander have been smiling at each other and waiting for the next patch. The patch is not coming."
         }
       ]
     }

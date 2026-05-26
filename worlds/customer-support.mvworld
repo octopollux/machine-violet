@@ -14,20 +14,20 @@
       "label": "Tenure",
       "choices": [
         {
-          "name": "First day on the job",
-          "description": "The headset still has the previous wearer's sweat on the foam. Nobody has told the player where the bathrooms are. The training video skipped the section on what to do if the customer is on fire. The lunch lady knows the player's name already; nobody else does."
+          "name": "The New Hire",
+          "description": "First day on the job. The headset still has the previous wearer's sweat on the foam. Nobody has told the player where the bathrooms are. The training video skipped the section on what to do if the customer is on fire. The lunch lady knows the player's name already; nobody else does."
         },
         {
-          "name": "Five years in, dead inside",
-          "description": "The player has a coffee mug they have washed exactly once. They know the scripts so well they hear them in their dreams. They can identify a regional accent in three syllables and the type of wish in five. The work is easy and that is part of the problem."
+          "name": "The Lifer",
+          "description": "Five years in, dead inside. The player has a coffee mug they have washed exactly once. They know the scripts so well they hear them in their dreams. They can identify a regional accent in three syllables and the type of wish in five. The work is easy and that is part of the problem."
         },
         {
-          "name": "Promoted into supervision",
-          "description": "The player wrote the script they now enforce on others. They have a small office with a door. They sit in meetings where the metrics are explained slowly. Their direct reports include people who were hired the same week the player was, who do not call the player by their first name anymore."
+          "name": "The Supervisor",
+          "description": "Promoted into supervision. The player wrote the script they now enforce on others. They have a small office with a door. They sit in meetings where the metrics are explained slowly. Their direct reports include people who were hired the same week the player was, who do not call the player by their first name anymore."
         },
         {
-          "name": "Whistleblower in waiting",
-          "description": "The player has a notebook in a locker at the gym. They have been writing things down for a year. They have not yet decided who to send it to or whether sending it will accomplish anything. They smile during the morning huddle. Their hands have started to shake by Wednesday."
+          "name": "The Notebook in the Locker",
+          "description": "Whistleblower in waiting. The player has a notebook in a locker at the gym. They have been writing things down for a year. They have not yet decided who to send it to or whether sending it will accomplish anything. They smile during the morning huddle. Their hands have started to shake by Wednesday."
         }
       ]
     },
@@ -35,19 +35,19 @@
       "label": "Escalation path above you",
       "choices": [
         {
-          "name": "Middle management",
+          "name": "Middle Management",
           "description": "Human. Useless. Three of them on performance-improvement plans of their own. They have offices with windows and faces that have learned not to register surprise. They forward escalations to one another in a loop the player can trace if they pay attention."
         },
         {
-          "name": "A literal djinn-king",
+          "name": "The Djinn-King",
           "description": "Terrifying and polite. He sends pastries to the breakroom on holidays. He has met the player exactly once at orientation and remembers the player's first name and the names of the player's siblings. His decisions are final and his decisions are kind, and these two things together do not feel safe."
         },
         {
-          "name": "An algorithm",
+          "name": "OZ",
           "description": "The player has never met it. It routes everything. It assigns tickets, schedules breaks, calculates bonuses, terminates contracts. The intranet calls it OZ. Nobody in the office has spoken its full designation aloud since the rebrand. It does not answer email."
         },
         {
-          "name": "The original founder",
+          "name": "The Founder in the Portrait",
           "description": "Unseen for years. A large portrait in the lobby that everyone insists is fine. The portrait's eyes follow the player exactly the amount that paintings' eyes follow you. HR has a memo addressed from him every Monday. The memo is always signed in fresh ink."
         }
       ]

@@ -14,19 +14,19 @@
       "label": "Your stake",
       "choices": [
         {
-          "name": "Water department engineer",
+          "name": "The Reservoir Keeper",
           "description": "You know the reservoirs by name. You signed the seven-year drought protocols and you signed the amendments. If it rains, your infrastructure is a museum of plans that were never tested. If it doesn't, you keep being the person who tells people no."
         },
         {
-          "name": "Rain-cultist who's been waiting seven years",
+          "name": "The Rain Cultist",
           "description": "You kept the vestments folded in tissue paper. You met monthly with the others, in a basement off Sepulveda, and you read the old liturgies aloud to nobody. Tonight the smell is the answer to a prayer you stopped believing in around year four. You are the only one in the room who isn't surprised, and that is its own kind of terror."
         },
         {
-          "name": "Visitor from a wet city who doesn't understand",
+          "name": "The Outsider",
           "description": "You flew in for a wedding or a deposition or a funeral. The locals keep stopping mid-sentence and staring at the air. You can smell what they smell and to you it's just Tuesday. The horror is watching a whole city react to something you grew up inside."
         },
         {
-          "name": "Child who's never seen rain",
+          "name": "The Dry-Born Child",
           "description": "You know it from books, from the videos the teacher plays at the end of the unit on weather. You have never felt it on your face. Tonight the grown-ups won't go inside. Your mother is crying on the porch and laughing and you don't know which one to believe."
         }
       ]
@@ -35,19 +35,19 @@
       "label": "The city",
       "choices": [
         {
-          "name": "Sprawling LA-like metropolis",
+          "name": "The Brown Palms",
           "description": "The palm trees have been brown for years; nobody cuts them down because nobody can agree whose problem they are. The concrete riverbeds run with murals where the water was — community projects, gang tags, a memorial wall for the last big flood. Rooftop water-storage has been law since year three and the tanks throw long sharp shadows across every block."
         },
         {
-          "name": "Walled medieval city",
+          "name": "The Cistern Walls",
           "description": "Cisterns under every plaza, locked and ledgered. The wells are guarded by city militia who count buckets. The rain-gutters along every eave are kept obsessively clean by ordinance, even now, because the alderman who lifted the ordinance was hanged for it in year two and his replacement is superstitious."
         },
         {
-          "name": "Half-abandoned former port",
+          "name": "The Dry Harbor",
           "description": "The harbor is dry; ships sit on cradles where the tide used to lift them, and seabirds nest in the hulls. The desalination plant is the new downtown — three towers, a market, a tram. Whole neighborhoods near the old waterfront stand empty, the shutters banging in the dry wind, kept up by no one."
         },
         {
-          "name": "A floating city, drying out",
+          "name": "The Grounded Gondolas",
           "description": "Canals turning to alleys you can walk. Gondolas grounded at angles, painted by the children who use them as forts. The city's name used to mean something in the old tongue — a word for floating — and now it doesn't, quite, and nobody has decided what the new word is."
         }
       ]

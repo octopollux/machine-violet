@@ -13,19 +13,19 @@
       "label": "Your standing",
       "choices": [
         {
-          "name": "Acolyte of the tree, raised in its shade",
+          "name": "The Shaded Child",
           "description": "You were brought to the heart-grove as a child and you do not remember a season without its smell. The other acolytes are your siblings in every way that matters. The tree's dying feels, to you, like a parent's last illness — and you are the only one in your cohort willing to say the word out loud."
         },
         {
-          "name": "Forester whose livelihood is the new growth",
+          "name": "The Windfall Forester",
           "description": "You make your living from the saplings, the shed bark, the windfall. The forest's wild season has been the best year of your working life. You are the only one in the village asking the obvious uncomfortable question about where this bounty is coming from and what it costs."
         },
         {
-          "name": "Outsider sent to investigate",
+          "name": "The Crown Investigator",
           "description": "Crown agent, university naturalist, or representative of a foreign order — somebody noticed, from far away, and you drew the assignment. The locals tell you nothing in three different ways. The heart-grove smells wrong even to a nose that doesn't know what right smells like."
         },
         {
-          "name": "The tree's chosen, summoned in a dream",
+          "name": "The Dreamed Heir",
           "description": "You woke knowing the way to the grove and you have never been told it. You don't know what you're meant to do when you arrive. The tree spoke to you in something that wasn't language and the meaning is still settling in your chest. The acolytes will know you when they see you. They will not be glad."
         }
       ]
@@ -34,19 +34,19 @@
       "label": "The forest",
       "choices": [
         {
-          "name": "Continent's lung, famous and vast",
+          "name": "The Green Continent",
           "description": "Every kingdom maintains an embassy at the forest's edge. Pilgrims arrive year-round, from places that don't share a calendar. The heart-tree is visible from the next valley as a single dark crown above the canopy, and travelers in inns three days' ride away orient themselves by it. Its dying is a geopolitical event."
         },
         {
-          "name": "Local and beloved, one valley",
+          "name": "The Valley Tree",
           "description": "Everyone in the valley has touched the tree once, in some season of their life. Weddings happen at its roots. So do the funerals. The forest is a member of the community, with its own seat at the harvest table, and nobody who lives in the valley is unmoved by what is happening to it."
         },
         {
-          "name": "Forbidden and sacred, walled in",
+          "name": "The Walled Grove",
           "description": "A single gate, an order of guardians who do not leave, and a wall that has been kept up for generations. Outsiders who climb it die — not always quickly, not always by violence, but they die. What is happening to the tree is happening behind the wall, and the guardians are beginning to come out for the first time in any living memory."
         },
         {
-          "name": "Hidden, most don't know it exists",
+          "name": "The Denied Wood",
           "description": "There is no road. The locals deny the forest with a uniformity that is itself the giveaway. The maps show only mountains. To find the heart-tree you have to be told by someone who isn't supposed to tell you, and that person is risking something specific by saying."
         }
       ]

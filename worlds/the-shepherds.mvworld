@@ -12,20 +12,20 @@
       "label": "Role in the herd",
       "choices": [
         {
-          "name": "Junior shepherd, just earned your first bonded dragon",
-          "description": "You were apprenticed for years and last month you were given a name and a beast to learn it on. You sleep in the same loft and you wake when she does. You are the newest member of the only profession you have ever wanted, and the older shepherds are watching you for signs you can handle bad news."
+          "name": "The Junior Shepherd",
+          "description": "Just earned your first bonded dragon. You were apprenticed for years and last month you were given a name and a beast to learn it on. You sleep in the same loft and you wake when she does. You are the newest member of the only profession you have ever wanted, and the older shepherds are watching you for signs you can handle bad news."
         },
         {
-          "name": "Old hand, you remember when the herd was twice this size",
-          "description": "Forty years of this work. Your hands are the shape of a halter. You remember the great clutch, the year the foreman lost his arm, the winter four dragons died in a single storm. The current losses are not, to you, unprecedented. They are reminiscent — of something you have not yet let yourself name."
+          "name": "The Old Hand",
+          "description": "You remember when the herd was twice this size. Forty years of this work. Your hands are the shape of a halter. You remember the great clutch, the year the foreman lost his arm, the winter four dragons died in a single storm. The current losses are not, to you, unprecedented. They are reminiscent — of something you have not yet let yourself name."
         },
         {
-          "name": "Foreign buyer's agent, came for scales, stayed for love",
-          "description": "You arrived two seasons ago with a commission to buy and you have not gone home. You write your superiors increasingly evasive letters. The shepherds tolerate you because you are useful and because the foreman's daughter has been seen walking with you. You are the only outsider close enough to see the pattern."
+          "name": "The Buyer's Agent",
+          "description": "Came for scales, stayed for love. You arrived two seasons ago with a commission to buy and you have not gone home. You write your superiors increasingly evasive letters. The shepherds tolerate you because you are useful and because the foreman's daughter has been seen walking with you. You are the only outsider close enough to see the pattern."
         },
         {
-          "name": "Defector — you used to hunt them, the shepherds took you in",
-          "description": "You came from one of the border villages that still thinks dragons are vermin. You were good at it before you knew better. The shepherds know your history. They have given you a chance to be useful and you have taken it seriously. If the hunters are real, you will recognize their methods."
+          "name": "The Defector",
+          "description": "You used to hunt them; the shepherds took you in. You came from one of the border villages that still thinks dragons are vermin. You were good at it before you knew better. The shepherds know your history. They have given you a chance to be useful and you have taken it seriously. If the hunters are real, you will recognize their methods."
         }
       ]
     },
@@ -33,20 +33,20 @@
       "label": "Where the herd grazes",
       "choices": [
         {
-          "name": "High alpine pasture",
-          "description": "Cold thin air and a sky so clear at noon you can see the curve of the horizon. The dragons sun themselves on the south-facing rock faces, flat as cats, and the shepherds count them from below with brass spyglasses. In summer the lightning storms come in fast off the ridge and the bonded ones come down to the byres to wait it out."
+          "name": "The High Pasture",
+          "description": "Alpine. Cold thin air and a sky so clear at noon you can see the curve of the horizon. The dragons sun themselves on the south-facing rock faces, flat as cats, and the shepherds count them from below with brass spyglasses. In summer the lightning storms come in fast off the ridge and the bonded ones come down to the byres to wait it out."
         },
         {
-          "name": "Volcanic lowlands",
-          "description": "The ground is warm under your boots and the wind smells of sulfur most days. The dragons nest in the rims of dead calderas, and the village is half-buried in old ash that nobody bothers to dig out anymore. Eggs are kept in the bakery's banked coals. Funerals are quick because the ground is easy."
+          "name": "The Ashlands",
+          "description": "Volcanic lowlands. The ground is warm under your boots and the wind smells of sulfur most days. The dragons nest in the rims of dead calderas, and the village is half-buried in old ash that nobody bothers to dig out anymore. Eggs are kept in the bakery's banked coals. Funerals are quick because the ground is easy."
         },
         {
-          "name": "Coastal cliffs",
-          "description": "The dragons here fish. They fold their wings and drop, and come up trailing salt water, and the shepherds row out to the breeding rocks in flat-bottomed boats every spring. The scales taste of brine. The bonded ones smell like the sea even indoors. In storm season everyone helps lash the byres."
+          "name": "The Breeding Rocks",
+          "description": "Coastal cliffs. The dragons here fish. They fold their wings and drop, and come up trailing salt water, and the shepherds row out to the breeding rocks in flat-bottomed boats every spring. The scales taste of brine. The bonded ones smell like the sea even indoors. In storm season everyone helps lash the byres."
         },
         {
-          "name": "Deep forest clearings",
-          "description": "These dragons are smaller, smoke-and-shadow, no bigger than a deer at full growth. The canopy is burned in clean rings where they sun themselves on the moss. The shepherds know the clearings by memory and travel between them on paths only the bonded ones can find. The trees have grown used to the scorching."
+          "name": "The Scorched Clearings",
+          "description": "Deep forest. These dragons are smaller, smoke-and-shadow, no bigger than a deer at full growth. The canopy is burned in clean rings where they sun themselves on the moss. The shepherds know the clearings by memory and travel between them on paths only the bonded ones can find. The trees have grown used to the scorching."
         }
       ]
     }

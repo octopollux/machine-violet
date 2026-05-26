@@ -14,16 +14,16 @@
       "label": "The building",
       "choices": [
         {
-          "name": "Corporate tower",
-          "description": "A glass-and-steel office building, mid-week, mid-afternoon. Forty survivors across 26 floors, mostly cubicle workers, a security guard, and a physicist on-site. The horror is mundane people in an impossible situation."
+          "name": "Meridian Tower",
+          "description": "A corporate tower. A glass-and-steel office building, mid-week, mid-afternoon. Forty survivors across 26 floors, mostly cubicle workers, a security guard, and a physicist on-site. The horror is mundane people in an impossible situation."
         },
         {
-          "name": "Orbital habitat ring",
-          "description": "A rotating station module that just detached from the superstructure. The \"sky\" is naked vacuum behind failing radiation shielding. Forty crew, a malfunctioning AI, and a cutting-edge research lab. The horror is engineering and time pressure."
+          "name": "The Halo Ring",
+          "description": "An orbital habitat ring. A rotating station module that just detached from the superstructure. The \"sky\" is naked vacuum behind failing radiation shielding. Forty crew, a malfunctioning AI, and a cutting-edge research lab. The horror is engineering and time pressure."
         },
         {
-          "name": "Cathedral spire",
-          "description": "A mile-high temple to a god of boundaries, mid-festival, mid-prayer. The nave floor dissolved into luminous void. Forty pilgrims, a heretic scholar, and a central liturgy of the faith. The horror is faith tested by the literal."
+          "name": "The Threshold Spire",
+          "description": "A cathedral spire. A mile-high temple to a god of boundaries, mid-festival, mid-prayer. The nave floor dissolved into luminous void. Forty pilgrims, a heretic scholar, and a central liturgy of the faith. The horror is faith tested by the literal."
         }
       ]
     }

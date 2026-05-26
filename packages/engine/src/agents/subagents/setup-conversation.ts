@@ -61,7 +61,7 @@ const FINALIZE_TOOL: NormalizedTool = {
     properties: {
       genre: { type: "string", description: "Genre (e.g. 'Classic fantasy', 'Sci-fi', 'Modern supernatural')" },
       system: { type: "string", description: "Game system slug from the available systems list (e.g. 'dnd-5e', 'fate-accelerated'), or null for pure narrative. Use the slug, not the display name.", nullable: true },
-      campaign_name: { type: "string", description: "Short evocative campaign title" },
+      campaign_name: { type: "string", description: "Short evocative campaign title. When the player picked a suboption from a seeded world, suffix with that suboption's name: `<World Name> - <Suboption Name>` (e.g. 'Palimpsest - The Dreaming Souk'). Skip the suffix for fully custom campaigns or seeds without suboptions." },
       campaign_premise: { type: "string", description: "One-paragraph campaign hook" },
       mood: { type: "string", description: "Mood (e.g. 'Heroic', 'Grimdark', 'Whimsical', 'Tense')" },
       difficulty: { type: "string", description: "Difficulty ('Gentle', 'Balanced', 'Unforgiving')" },

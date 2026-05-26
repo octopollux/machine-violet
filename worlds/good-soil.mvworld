@@ -12,20 +12,20 @@
       "label": "Who you were before",
       "choices": [
         {
-          "name": "Pre-collapse agronomist",
-          "description": "You understand exactly what you found, or you can build the theory inside a week if you're allowed to read your old notes. You know that what's happening here is not natural and you know enough categories of unnatural to narrow it down. Your knowledge is your greatest asset and your most dangerous tell — anyone who watches you work will know you are not a peasant."
+          "name": "The Agronomist",
+          "description": "Pre-collapse agronomist. You understand exactly what you found, or you can build the theory inside a week if you're allowed to read your old notes. You know that what's happening here is not natural and you know enough categories of unnatural to narrow it down. Your knowledge is your greatest asset and your most dangerous tell — anyone who watches you work will know you are not a peasant."
         },
         {
-          "name": "Wanderer who got lucky",
-          "description": "You walked a long time. You stopped here because you were tired and the water tasted right and a stalk of grass beside the stream was the wrong color of green. You have been here three years. You don't know why the patch works. You have been very careful to not learn, in case knowing breaks it."
+          "name": "The Stopped Walker",
+          "description": "Wanderer who got lucky. You walked a long time. You stopped here because you were tired and the water tasted right and a stalk of grass beside the stream was the wrong color of green. You have been here three years. You don't know why the patch works. You have been very careful to not learn, in case knowing breaks it."
         },
         {
-          "name": "Local who inherited the land",
-          "description": "Your family was here before the poisoning. Your grandparents farmed this ground when it was no more remarkable than the next valley over. After the collapse, you came home to bury people, and the burying showed you that the dirt here was different. You have been keeping the secret out of family loyalty and out of a private suspicion you have not voiced to anyone."
+          "name": "The Inheritor",
+          "description": "Local who inherited the land. Your family was here before the poisoning. Your grandparents farmed this ground when it was no more remarkable than the next valley over. After the collapse, you came home to bury people, and the burying showed you that the dirt here was different. You have been keeping the secret out of family loyalty and out of a private suspicion you have not voiced to anyone."
         },
         {
-          "name": "Refugee leader; the patch is for your people",
-          "description": "You brought a group across hard country and you arrived here a year ago with fewer than you started with. The patch fed the survivors. It is feeding them now. You are responsible for them and for the patch and for the decision of whether to add the next group of refugees who arrive at the ridge tomorrow."
+          "name": "The Shepherd",
+          "description": "Refugee leader; the patch is for your people. You brought a group across hard country and you arrived here a year ago with fewer than you started with. The patch fed the survivors. It is feeding them now. You are responsible for them and for the patch and for the decision of whether to add the next group of refugees who arrive at the ridge tomorrow."
         }
       ]
     },
@@ -33,19 +33,19 @@
       "label": "The landscape",
       "choices": [
         {
-          "name": "Salt flats with one green valley",
+          "name": "The Green Tear",
           "description": "The wind is constant and it is loud and it carries grit. In every direction the ground is white and dead and the sky is bigger than is reasonable. The patch is shaped like a tear running down between two ridges, a corridor of green a few hundred meters long. From the high ground you can see it from twenty miles, which is the problem you have been trying not to think about."
         },
         {
-          "name": "Burn scar of an old forest",
+          "name": "The Burn",
           "description": "Charcoal and clay underfoot. The new growth follows the lines of root systems that burned decades ago — you can read the layout of the dead forest from the pattern of the living one. After rain, mushrooms come up overnight, in colors that don't have names you know. The patch is alive in a way that suggests the forest's ghost is doing the work."
         },
         {
-          "name": "Coastal marsh poisoned with runoff",
+          "name": "The Clearwater Reach",
           "description": "Your patch is upstream of the worst of it. The water arrives at your land brown and leaves it clear, and it arrives at the next farm downstream killing things again. The neighbors there have noticed. They have not yet asked how. The reeds at your borders grow tall and sweet and the seabirds nest only on your side of the channel."
         },
         {
-          "name": "Suburban cul-de-sac",
+          "name": "Larkspur Court",
           "description": "The lawns on the rest of the street are gray and matted. Yours is green and the tomatoes you planted out of desperation are six feet tall. Two of the neighbors are watching from their windows. One of them has stopped greeting you in the morning. The mailboxes still stand at the curb like nothing has changed and everything has."
         }
       ]
