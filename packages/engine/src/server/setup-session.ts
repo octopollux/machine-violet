@@ -24,7 +24,7 @@ import { promoteCharacter } from "../agents/subagents/character-promotion.js";
 import { processingPaths } from "../config/processing-paths.js";
 import { readBundledRuleCard } from "../config/systems.js";
 import { loadConnectionStore, buildEffectiveConnections } from "../config/connections.js";
-import { buildTierProviders } from "../config/tier-resolver.js";
+import { buildTierProvidersWithCache } from "../config/tier-resolver.js";
 import { createAnthropicProvider } from "../providers/index.js";
 import type { LLMProvider, TierProvider } from "../providers/types.js";
 import type { ModelTier } from "../config/models.js";
@@ -47,6 +47,13 @@ export class SetupSession {
    * (Large=OpenAI, Small=Anthropic) sends an Anthropic model ID to OpenAI.
    */
   private tierProviders: Record<ModelTier, TierProvider>;
+  /**
+   * Distinct provider instances backing the tier map, keyed by connection
+   * id. SessionManager calls `dispose()` on each one when the setup session
+   * is dropped — without this, an openai-chatgpt setup tier would leak its
+   * codex subprocess every time setup is started or torn down.
+   */
+  private providersByConnectionId: Map<string, LLMProvider>;
   private broadcast: (event: ServerEvent) => void;
   private campaignsDir: string;
   private homeDir: string;
@@ -69,9 +76,43 @@ export class SetupSession {
     // note + world framing benefits meaningfully.
     const appConfigDir = configDir();
     const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
-    this.tierProviders = buildTierProviders(connStore, () => createAnthropicProvider());
+    // configDir must be forwarded so openai-chatgpt connections get a
+    // token store backed by connections.json — without it the codex
+    // subprocess never sees the persisted ChatGPT tokens and the very
+    // first setup turn throws "no active ChatGPT login" before any
+    // model call. Game sessions (session-manager) already pass this;
+    // setup was missing it, breaking any campaign whose large tier
+    // resolves to an openai-chatgpt connection.
+    const resolution = buildTierProvidersWithCache(connStore, () => createAnthropicProvider(), appConfigDir);
+    this.tierProviders = resolution.tiers;
+    this.providersByConnectionId = resolution.byConnectionId;
     this.provider = this.tierProviders.large.provider;
     this.model = this.tierProviders.large.model;
+  }
+
+  /**
+   * Tear down per-tier providers. Called by SessionManager whenever the
+   * SetupSession is dropped — on successful handoff, on error, and on
+   * session end. Each provider's `dispose()` is idempotent and
+   * best-effort; failures are logged but never block teardown. The Map
+   * already dedupes providers shared across tiers, so a connection-backed
+   * codex subprocess is disposed exactly once even if two tiers point at
+   * it.
+   */
+  async dispose(): Promise<void> {
+    const providers = Array.from(this.providersByConnectionId.values());
+    this.providersByConnectionId.clear();
+    await Promise.all(providers.map(async (p) => {
+      if (!p.dispose) return;
+      try {
+        await p.dispose();
+      } catch (err) {
+        logEvent("provider:dispose_error", {
+          providerId: p.providerId,
+          message: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }));
   }
 
   /** Scan machine-scope players directory for returning player recognition. */

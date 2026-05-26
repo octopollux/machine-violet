@@ -293,6 +293,49 @@ export interface TokenUsageBreakdown {
 }
 
 // ---------------------------------------------------------------------------
+// rawResponseItem/completed (notification)
+//
+// Codex exposes the raw Responses-API items it received from OpenAI on this
+// secondary stream. We use it specifically to capture the opaque
+// `encrypted_content` blob on reasoning items — the sanitized `item/completed`
+// stream strips that field. Replaying the blob via thread/inject_items on
+// the next turn is what lets the model continue its chain-of-thought across
+// turn boundaries instead of re-deriving setup beat-to-beat. See issue #533.
+//
+// Source: codex-rs/app-server-protocol/schema/json/v2/RawResponseItemCompletedNotification.json
+// (codex 0.130.0+). Modeled minimally — we only read the reasoning variant.
+// ---------------------------------------------------------------------------
+
+export interface RawResponseItemCompletedNotification {
+  threadId: string;
+  turnId: string;
+  item: RawResponseItem;
+}
+
+/**
+ * Minimal model of the Responses-API item shape codex forwards on
+ * `rawResponseItem/completed`. The wire format mirrors the OpenAI Responses
+ * API item types (`message`, `function_call`, `reasoning`, …); we model the
+ * fields we read and leave everything else open.
+ */
+export interface RawResponseItem {
+  type: string;
+  id?: string;
+  /** Reasoning variant: opaque blob the API accepts back as input. Null when ZDR is off. */
+  encrypted_content?: string | null;
+  /** Reasoning variant: array of summary parts (text-only humans-readable). */
+  summary?: RawReasoningSummaryItem[];
+  // Other fields (content, role, call_id, name, arguments, …) exist on
+  // sibling variants; we don't decode them here.
+  [key: string]: unknown;
+}
+
+export interface RawReasoningSummaryItem {
+  type: string;
+  text?: string;
+}
+
+// ---------------------------------------------------------------------------
 // item/tool/call (server request)
 // ---------------------------------------------------------------------------
 

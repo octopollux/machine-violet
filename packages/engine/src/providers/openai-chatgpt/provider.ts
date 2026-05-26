@@ -49,6 +49,7 @@ import type {
   DynamicToolCallParams, DynamicToolCallResponse,
   DynamicToolSpec, ReasoningEffort,
   ChatgptAuthTokensRefreshParams, ChatgptAuthTokensRefreshResponse,
+  RawResponseItemCompletedNotification,
 } from "./protocol.js";
 
 // ---------------------------------------------------------------------------
@@ -442,6 +443,15 @@ export class OpenAIChatGptProvider implements LLMProvider {
       "item/reasoning/summaryTextDelta",
       (p) => { if (forThisThread(p)) collected.onReasoningDelta(p); },
     );
+    // Encrypted reasoning blob lives on the `rawResponseItem/completed`
+    // stream — the sanitized `item/completed` view strips it. Capturing it
+    // here lets us round-trip the blob via thread/inject_items on the next
+    // turn so the model keeps its reasoning across turn boundaries instead
+    // of re-deriving setup each round. See issue #533.
+    const unsubRawItem = client.onNotification<RawResponseItemCompletedNotification>(
+      "rawResponseItem/completed",
+      (p) => { if (forThisThread(p)) collected.onRawResponseItem(p); },
+    );
     const unsubTokenUsage = client.onNotification<TokenUsageUpdatedNotification>(
       "thread/tokenUsage/updated",
       (p) => { if (forThisThread(p)) collected.onTokenUsage(p); },
@@ -557,6 +567,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
       unsubItemCompleted();
       unsubReasoning();
       unsubReasoningSummary();
+      unsubRawItem();
       unsubTokenUsage();
       unsubToolCall();
       unsubCompleted();
@@ -716,8 +727,11 @@ function interleaveCallsAndOutputs(items: unknown[]): unknown[] {
  * minimal — the openai.ts version is keyed to a slightly different
  * SystemBlock convention. If they diverge meaningfully in the future,
  * extract to providers/openai-shared.ts.
+ *
+ * Exported for unit tests — production callers go through
+ * `splitHistoryAndUserInput`.
  */
-function messageToResponsesItems(msg: NormalizedMessage): unknown[] {
+export function messageToResponsesItems(msg: NormalizedMessage): unknown[] {
   // Codex's Responses-API deserializer is stricter than the OpenAI SDK:
   // `message.content` MUST be a sequence of typed content parts, never a
   // bare string. User text → `input_text`, assistant text → `output_text`.
@@ -735,6 +749,27 @@ function messageToResponsesItems(msg: NormalizedMessage): unknown[] {
 
   if (msg.role === "assistant") {
     const items: unknown[] = [];
+
+    // Reasoning items must precede the message/function_call items they
+    // reason about, per the Responses API contract. Emit them all up front
+    // in capture order. Mirrors `toResponsesInput` in openai.ts. Anthropic
+    // `thinking` blocks live in our normalized type for the Anthropic
+    // provider's round-trip; codex doesn't accept them on input, so we
+    // skip them silently if we encounter them on this provider (they would
+    // never be present in practice — only this provider emits/consumes
+    // reasoning items, and only the anthropic provider emits/consumes
+    // thinking blocks).
+    for (const part of msg.content) {
+      if (part.type === "reasoning") {
+        items.push({
+          type: "reasoning",
+          id: part.id,
+          encrypted_content: part.encryptedContent,
+          summary: part.summary.map((text) => ({ type: "summary_text", text })),
+        });
+      }
+    }
+
     let pendingText = "";
     for (const part of msg.content) {
       if (part.type === "text") {
@@ -751,7 +786,8 @@ function messageToResponsesItems(msg: NormalizedMessage): unknown[] {
           arguments: JSON.stringify(part.input),
         });
       }
-      // Skip thinking blocks — never sent back.
+      // reasoning already emitted above; thinking/redacted_thinking are
+      // Anthropic-shape and dropped (see comment above).
     }
     if (pendingText) {
       items.push({ type: "message", role: "assistant", content: [asstPart(pendingText)] });
@@ -785,6 +821,14 @@ export class TurnCollector {
   private reasoning: string[] = [];
   private assistantContent: ContentPart[] = [];
   private latestUsage: TokenUsageUpdatedNotification["tokenUsage"] | null = null;
+  /**
+   * Encrypted reasoning items captured from `rawResponseItem/completed`,
+   * keyed by item id. Last-write-wins on duplicate ids — codex shouldn't
+   * emit the same id twice, but if a retry or reconnect did, replaying both
+   * on the next turn would have the Responses API reject duplicate ids.
+   * See the mirror logic in `openai.ts` (`encryptedReasoningById`).
+   */
+  private encryptedReasoningById = new Map<string, { id: string; encryptedContent: string; summary: string[] }>();
 
   constructor(private readonly onDelta?: (text: string) => void) {}
 
@@ -800,6 +844,25 @@ export class TurnCollector {
   onItemStarted(_params: ItemStartedNotification): void {
     // Currently unused — tool-call items also fire as server requests
     // (handled separately) so we don't need to track them here.
+  }
+
+  onRawResponseItem(params: RawResponseItemCompletedNotification): void {
+    const item = params.item;
+    if (item.type !== "reasoning") return;
+    // `encrypted_content` is nullable on the wire — present only when codex
+    // is configured to forward it (typically when ZDR is on for the org).
+    // Without the blob there's nothing to round-trip, so skip the item;
+    // persisting an empty shell would replay back as an invalid input item.
+    if (!item.encrypted_content || !item.id) return;
+    const summary: string[] = [];
+    for (const part of item.summary ?? []) {
+      if (part.type === "summary_text" && part.text) summary.push(part.text);
+    }
+    this.encryptedReasoningById.set(item.id, {
+      id: item.id,
+      encryptedContent: item.encrypted_content,
+      summary,
+    });
   }
 
   onItemCompleted(params: ItemCompletedNotification): void {
@@ -870,6 +933,22 @@ export class TurnCollector {
     // item/completed never arrived (shouldn't happen, defensive).
     if (this.text && this.assistantContent.length === 0) {
       this.assistantContent.push({ type: "text", text: this.text });
+    }
+
+    // Append encrypted reasoning items to assistantContent so they round-trip
+    // through conversation persistence and get replayed on the next turn via
+    // `messageToResponsesItems`. The order within assistantContent is purely
+    // cosmetic — `messageToResponsesItems` re-sorts reasoning items ahead of
+    // text/tool_use when replaying, which is the order the Responses API
+    // requires. Map preserves insertion order, matching the order codex
+    // emitted the items on `rawResponseItem/completed`.
+    for (const r of this.encryptedReasoningById.values()) {
+      this.assistantContent.push({
+        type: "reasoning",
+        id: r.id,
+        encryptedContent: r.encryptedContent,
+        summary: r.summary,
+      });
     }
 
     return {

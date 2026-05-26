@@ -512,6 +512,17 @@ function mapResponsesUsage(usage?: OAIResponse["usage"]): NormalizedUsage {
 
 // =========================================================================
 // Chat Completions path (for custom / OpenAI-compatible endpoints)
+//
+// REASONING PRESERVATION: not supported on this path. The Chat Completions
+// API has no encrypted-blob equivalent the model accepts back on subsequent
+// turns. Vendor-specific reasoning surfaces that exist (DeepSeek's
+// `reasoning_content`, Ollama's `thinking` field, etc.) are display-only
+// text — there is no contract that says "send this back to preserve the
+// model's chain-of-thought." For custom endpoints, each turn's reasoning is
+// re-derived from history. This is a hard upstream API limitation, not a
+// gap in our adapter. If a future vendor exposes a round-trippable opaque
+// reasoning payload, capture it as a `reasoning` ContentPart here. See
+// issue #533 for context.
 // =========================================================================
 
 // ---------------------------------------------------------------------------

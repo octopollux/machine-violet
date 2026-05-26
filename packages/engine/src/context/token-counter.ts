@@ -35,6 +35,13 @@ export function estimateContentTokens(content: NormalizedMessage["content"]): nu
       for (const s of block.summary) {
         total += estimateTokens(s);
       }
+    } else if (block.type === "thinking") {
+      // Anthropic thinking blocks survive turn boundaries on Opus 4.5+ /
+      // Sonnet 4.6+. Both the visible text and the opaque signature get
+      // sent back, so both contribute to context pressure.
+      total += estimateTokens(block.text) + estimateTokens(block.signature);
+    } else if (block.type === "redacted_thinking") {
+      total += estimateTokens(block.data);
     }
   }
   return total;

@@ -445,10 +445,15 @@ export class SessionManager {
       // Tear down setup state so a new setup can be started. Setup has no
       // per-campaign persistence (the temp __setup__ dir is recreated on
       // every retry), so we skip the flush/checkpoint dance that the
-      // mid-game session_fatal path needs.
+      // mid-game session_fatal path needs. We do still need to dispose
+      // the tier providers — without that an openai-chatgpt setup that
+      // errored leaves its codex subprocess running, and repeated
+      // setups accumulate processes.
+      const oldSetup = this.setupSession;
       this.setupSession = null;
       this.turnManager = null;
       this.status = "idle";
+      void oldSetup?.dispose();
 
       // Session-fatal: setup has died for a reason the player must address
       // (auth, model, classifier refusal). Surfacing as `recoverable: false`
@@ -483,10 +488,15 @@ export class SessionManager {
     // reconnect after the new session is ready.
     this.broadcast({ type: "session:transition", data: { campaignId, campaignName: campaignName ?? campaignId } });
 
+    // Dispose the setup-session's tier providers before nulling the
+    // reference — otherwise an openai-chatgpt setup tier leaves its
+    // codex subprocess running for the rest of the process lifetime.
+    const oldSetup = this.setupSession;
     this.setupSession = null;
     this.turnManager = null;
     this.engine = null;
     this.gameState = null;
+    void oldSetup?.dispose();
     this.clearIdleTimer();
     this.status = "idle";
     this.campaignId = null;
@@ -1328,12 +1338,19 @@ export class SessionManager {
       }
     }));
 
+    // Dispose the setup-session's tier providers alongside the game
+    // session's. endSession is called when the user ends from either
+    // setup or play, so a lingering setup-session must shed its
+    // subprocess too.
+    const setupToDispose = this.setupSession;
+
     this.campaignId = null;
     this.turnManager = null;
     this.engine = null;
     this.gameState = null;
     this.setupSession = null;
     this.costTracker = null;
+    if (setupToDispose) await setupToDispose.dispose();
     this.currentMode = "play";
     this.persistedUI = {};
     this.status = "idle";

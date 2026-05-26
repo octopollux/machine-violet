@@ -159,12 +159,21 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
       return reply.status(404).send({ error: "Connection not found." });
     }
 
+    // configDir is required for openai-chatgpt: without it the provider
+    // builds with no token store and codex never sees the persisted
+    // ChatGPT tokens — health-check returns "no active ChatGPT login"
+    // immediately after the user signs in. dispose() in finally is also
+    // required for openai-chatgpt: healthCheck spawns a codex subprocess
+    // via ensureStarted, and without teardown repeated health checks
+    // accumulate subprocesses.
+    const provider = createProviderFromConnection(conn, { configDir: server.configDir });
     try {
-      const provider = createProviderFromConnection(conn);
       const result = await provider.healthCheck();
       return { id: conn.id, ...result };
     } catch (err) {
       return { id: conn.id, status: "error" as const, message: err instanceof Error ? err.message : String(err) };
+    } finally {
+      await provider.dispose?.().catch(() => { /* best-effort */ });
     }
   });
 
@@ -522,12 +531,16 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     if (!conn) {
       return reply.status(404).send({ error: "Connection not found." });
     }
+    // configDir required so openai-chatgpt connections get their token store;
+    // dispose() in finally avoids leaking the codex subprocess healthCheck spawns.
+    const provider = createProviderFromConnection(conn, { configDir: server.configDir });
     try {
-      const provider = createProviderFromConnection(conn);
       const result = await provider.healthCheck();
       return { id: conn.id, ...result };
     } catch (err) {
       return { id: conn.id, status: "error" as const, message: err instanceof Error ? err.message : String(err) };
+    } finally {
+      await provider.dispose?.().catch(() => { /* best-effort */ });
     }
   });
 

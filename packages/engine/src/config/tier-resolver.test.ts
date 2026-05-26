@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { buildTierProviders } from "./tier-resolver.js";
 import { loadModelConfig, getModel } from "./models.js";
 import { createAnthropicProvider } from "../providers/anthropic.js";
+import * as codex from "../providers/openai-chatgpt/index.js";
 import type { ConnectionStore } from "./connections.js";
 
 /**
@@ -87,6 +88,64 @@ describe("buildTierProviders", () => {
     buildTierProviders(store, fallbackThunk);
 
     expect(fallbackThunk).not.toHaveBeenCalled();
+  });
+
+  // ---------------------------------------------------------------------
+  // configDir forwarding (regression for the openai-chatgpt auth break)
+  //
+  // openai-chatgpt connections persist their ChatGPT refresh tokens on the
+  // connection record; the codex provider only sees them via a
+  // ChatGptTokenStore backed by connections.json. Without configDir the
+  // provider builds with `tokenStore: undefined`, codex never receives the
+  // pushed tokens, and `account/read` returns no account — the user's
+  // first turn throws "no active ChatGPT login". setup-session previously
+  // had this bug; this test keeps both setup and game-session paths honest.
+  // ---------------------------------------------------------------------
+  it("forwards configDir to openai-chatgpt connections so they get a token store", () => {
+    const store: ConnectionStore = {
+      connections: [
+        {
+          id: "chatgpt-1", provider: "openai-chatgpt", label: "ChatGPT",
+          apiKey: "", models: [], source: "oauth", addedAt: "",
+          chatgptAccount: {
+            id: "acct-1", accessToken: "tok", refreshToken: "ref",
+            expiresAtMs: Date.now() + 60_000,
+          },
+        },
+      ],
+      tierAssignments: {
+        large: { connectionId: "chatgpt-1", modelId: "gpt-5.5" },
+        medium: null,
+        small: null,
+      },
+    };
+    const fallbackThunk = vi.fn(() => createAnthropicProvider("sk-fallback"));
+    const spy = vi.spyOn(codex, "createOpenAIChatGptProvider");
+
+    try {
+      buildTierProviders(store, fallbackThunk, "/tmp/cfg");
+      // With configDir: a token store must be wired so codex receives the
+      // persisted ChatGPT tokens. Without it the first turn throws
+      // "no active ChatGPT login" — the exact regression this test guards.
+      expect(spy).toHaveBeenCalledWith(expect.objectContaining({
+        tokenStore: expect.objectContaining({
+          load: expect.any(Function),
+          save: expect.any(Function),
+        }),
+      }));
+
+      spy.mockClear();
+
+      buildTierProviders(store, fallbackThunk);
+      // Without configDir: documents the (broken) callsite shape — token
+      // store is undefined so the provider can't load persisted tokens.
+      // Any production callsite hitting this branch is a bug.
+      expect(spy).toHaveBeenCalledWith(expect.objectContaining({
+        tokenStore: undefined,
+      }));
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("falls back when an assignment references a connection that no longer exists", () => {
