@@ -39,9 +39,7 @@ import { getAccount, isChatGptAccount, pushChatGptAuthTokens } from "./auth.js";
 import { toUsageStatus, shouldWarn } from "./usage.js";
 import { log } from "./log.js";
 import { getCodexClientInfo } from "./client-info.js";
-import { refreshAccessToken } from "./oauth.js";
-import { tokensFromOAuth } from "./token-store.js";
-import type { ChatGptTokenStore, PersistedChatGptTokens } from "./token-store.js";
+import type { ChatGptTokenStore } from "./token-store.js";
 import type {
   InitializeResult, ThreadStartParams, ThreadStartResult,
   TurnStartParams, TurnCompletedNotification,
@@ -284,7 +282,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
     // 60 seconds of slack so we don't hand codex a token that expires
     // mid-turn. Codex's refresh request handles longer-running drift.
     if (tokens.expiresAtMs <= Date.now() + 60_000) {
-      tokens = await this.refreshAndStore(tokens.refreshToken);
+      tokens = await store.refresh();
       if (!tokens) {
         throw new Error("ChatGPT token refresh failed and no valid token available; please sign in again.");
       }
@@ -299,7 +297,8 @@ export class OpenAIChatGptProvider implements LLMProvider {
   /**
    * Handle codex's `account/chatgptAuthTokens/refresh` server request:
    * use the stored refresh_token to mint a new access_token, persist it,
-   * and return the new bundle to codex.
+   * and return the new bundle to codex. Coalesces with any concurrent
+   * refresh via the token-store mutex (see ChatGptTokenStore.refresh).
    */
   private async handleRefreshRequest(
     _params: ChatgptAuthTokensRefreshParams,
@@ -308,12 +307,8 @@ export class OpenAIChatGptProvider implements LLMProvider {
     if (!store) {
       throw new Error("Cannot refresh ChatGPT tokens: no token store configured");
     }
-    const current = store.load();
-    if (!current) {
-      throw new Error("Cannot refresh ChatGPT tokens: no stored tokens");
-    }
     log.tokenRefresh({ reason: _params.reason, previousAccountId: _params.previousAccountId ?? undefined });
-    const fresh = await this.refreshAndStore(current.refreshToken);
+    const fresh = await store.refresh();
     if (!fresh) {
       throw new Error("ChatGPT refresh_token rejected by OpenAI; please sign in again.");
     }
@@ -322,18 +317,6 @@ export class OpenAIChatGptProvider implements LLMProvider {
       chatgptAccountId: fresh.chatgptAccountId,
       chatgptPlanType: fresh.chatgptPlanType ?? null,
     };
-  }
-
-  /** Exchange a refresh_token for a fresh bundle and persist via tokenStore. */
-  private async refreshAndStore(refreshToken: string): Promise<PersistedChatGptTokens | null> {
-    const store = this.tokenStore;
-    if (!store) return null;
-    const oauth = await refreshAccessToken(refreshToken);
-    const existing = store.load();
-    const fresh = tokensFromOAuth(oauth, existing?.chatgptAccountId);
-    if (!fresh) return null;
-    store.save(fresh);
-    return fresh;
   }
 
   private onRateLimitsUpdated(limits: RateLimits): void {

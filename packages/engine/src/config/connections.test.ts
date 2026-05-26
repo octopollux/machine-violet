@@ -4,8 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   loadConnectionStore, saveConnectionStore, buildEffectiveConnections,
+  upsertChatGptConnection,
 } from "./connections.js";
-import type { AIConnection } from "./connections.js";
+import type { AIConnection, ConnectionStore, ChatGptAccountInfo } from "./connections.js";
 
 let tempDir: string;
 
@@ -110,5 +111,175 @@ describe("buildEffectiveConnections", () => {
     const env = effective.connections.find((c) => c.source === "env" && c.provider === "openai-apikey");
     expect(env).toBeDefined();
     expect(env?.apiKey).toBe("sk-test-env");
+  });
+});
+
+describe("upsertChatGptConnection", () => {
+  function freshAccount(overrides: Partial<ChatGptAccountInfo> = {}): ChatGptAccountInfo {
+    return {
+      id: "acct-new",
+      email: "new@example.com",
+      planType: "plus",
+      accessToken: "at-new",
+      refreshToken: "rt-new",
+      idToken: "id-new",
+      expiresAtMs: 9_000_000,
+      ...overrides,
+    };
+  }
+
+  it("mints a new connection when no prior chatgpt connection exists", () => {
+    const store: ConnectionStore = {
+      connections: [],
+      tierAssignments: { large: null, medium: null, small: null },
+    };
+    const result = upsertChatGptConnection(store, freshAccount(), [
+      { id: "gpt-5.5", displayName: "GPT-5.5", available: true },
+    ]);
+    expect(result.replacedInPlace).toBe(false);
+    expect(result.removedIds).toEqual([]);
+    expect(store.connections).toHaveLength(1);
+    expect(store.connections[0].id).toBe(result.connectionId);
+    expect(store.connections[0].provider).toBe("openai-chatgpt");
+    expect(store.connections[0].label).toBe("ChatGPT (new@example.com)");
+    expect(store.connections[0].chatgptAccount?.accessToken).toBe("at-new");
+  });
+
+  it("refreshes tokens in place when the same account signs in again, preserving connectionId", () => {
+    const store: ConnectionStore = {
+      connections: [{
+        id: "existing-conn",
+        provider: "openai-chatgpt",
+        label: "My Custom Label",
+        apiKey: "",
+        chatgptAccount: {
+          id: "acct-A",
+          email: "a@example.com",
+          accessToken: "at-old",
+          refreshToken: "rt-old",
+          expiresAtMs: 1000,
+        },
+        models: [{ id: "gpt-5.5", displayName: "GPT-5.5", available: true }],
+        source: "oauth",
+        addedAt: "2026-01-01",
+      }],
+      tierAssignments: {
+        large: { connectionId: "existing-conn", modelId: "gpt-5.5" },
+        medium: null,
+        small: null,
+      },
+    };
+    const result = upsertChatGptConnection(store, freshAccount({ id: "acct-A", email: "a@example.com" }), []);
+    expect(result.replacedInPlace).toBe(true);
+    expect(result.connectionId).toBe("existing-conn");
+    expect(result.removedIds).toEqual([]);
+    expect(store.connections).toHaveLength(1);
+    // Custom label preserved
+    expect(store.connections[0].label).toBe("My Custom Label");
+    // Tokens refreshed
+    expect(store.connections[0].chatgptAccount?.accessToken).toBe("at-new");
+    expect(store.connections[0].chatgptAccount?.refreshToken).toBe("rt-new");
+    // Tier assignment unchanged (same connectionId)
+    expect(store.tierAssignments.large).toEqual({ connectionId: "existing-conn", modelId: "gpt-5.5" });
+  });
+
+  it("refreshes the default-form label when the email changes for the same account", () => {
+    const store: ConnectionStore = {
+      connections: [{
+        id: "existing-conn",
+        provider: "openai-chatgpt",
+        label: "ChatGPT (old@example.com)",
+        apiKey: "",
+        chatgptAccount: {
+          id: "acct-A",
+          email: "old@example.com",
+          accessToken: "at",
+          refreshToken: "rt",
+          expiresAtMs: 1,
+        },
+        models: [],
+        source: "oauth",
+        addedAt: "",
+      }],
+      tierAssignments: { large: null, medium: null, small: null },
+    };
+    upsertChatGptConnection(store, freshAccount({ id: "acct-A", email: "renamed@example.com" }), []);
+    expect(store.connections[0].label).toBe("ChatGPT (renamed@example.com)");
+  });
+
+  it("preserves the connectionId across an account switch so live providers keep working", () => {
+    // Critical invariant: in-memory provider instances bind their token
+    // store to the connectionId at construction time. If we minted a new
+    // id on account switch, those providers would silently load null from
+    // disk and fail at the next chat() call. Keep the id stable; just
+    // replace the account fields.
+    const store: ConnectionStore = {
+      connections: [
+        {
+          id: "old-conn",
+          provider: "openai-chatgpt",
+          label: "ChatGPT (a@example.com)",
+          apiKey: "",
+          chatgptAccount: { id: "acct-A", email: "a@example.com", accessToken: "at-A", refreshToken: "rt-A", expiresAtMs: 1 },
+          models: [{ id: "gpt-5.5", displayName: "GPT-5.5", available: true }],
+          source: "oauth",
+          addedAt: "",
+        },
+        {
+          id: "anth-conn",
+          provider: "anthropic",
+          label: "Anthropic",
+          apiKey: "sk-ant",
+          models: [{ id: "claude", displayName: "Claude", available: true }],
+          source: "manual",
+          addedAt: "",
+        },
+      ],
+      tierAssignments: {
+        large: { connectionId: "old-conn", modelId: "gpt-5.5" },
+        medium: { connectionId: "anth-conn", modelId: "claude" },
+        small: { connectionId: "old-conn", modelId: "gpt-deprecated" },
+      },
+    };
+    const result = upsertChatGptConnection(store, freshAccount({ id: "acct-B", email: "b@example.com" }), [
+      { id: "gpt-5.5", displayName: "GPT-5.5", available: true },
+    ]);
+    expect(result.replacedInPlace).toBe(true);
+    expect(result.connectionId).toBe("old-conn");
+    expect(result.removedIds).toEqual([]);
+    // Account fields fully replaced, no leakage from acct-A.
+    const kept = store.connections.find((c) => c.id === "old-conn");
+    expect(kept?.chatgptAccount?.id).toBe("acct-B");
+    expect(kept?.chatgptAccount?.email).toBe("b@example.com");
+    expect(kept?.chatgptAccount?.accessToken).toBe("at-new");
+    // Default-form label refreshed.
+    expect(kept?.label).toBe("ChatGPT (b@example.com)");
+    // Tier assignments untouched (connectionId is stable).
+    expect(store.tierAssignments.large).toEqual({ connectionId: "old-conn", modelId: "gpt-5.5" });
+    expect(store.tierAssignments.medium).toEqual({ connectionId: "anth-conn", modelId: "claude" });
+    expect(store.tierAssignments.small).toEqual({ connectionId: "old-conn", modelId: "gpt-deprecated" });
+  });
+
+  it("dedupes multiple legacy chatgpt connections by keeping the matching account and dropping the rest", () => {
+    const store: ConnectionStore = {
+      connections: [
+        {
+          id: "dup-1", provider: "openai-chatgpt", label: "Old 1", apiKey: "",
+          chatgptAccount: { id: "acct-A", accessToken: "x", refreshToken: "y", expiresAtMs: 1 },
+          models: [], source: "oauth", addedAt: "",
+        },
+        {
+          id: "dup-2", provider: "openai-chatgpt", label: "Old 2", apiKey: "",
+          chatgptAccount: { id: "acct-A", accessToken: "x2", refreshToken: "y2", expiresAtMs: 2 },
+          models: [], source: "oauth", addedAt: "",
+        },
+      ],
+      tierAssignments: { large: null, medium: null, small: null },
+    };
+    const result = upsertChatGptConnection(store, freshAccount({ id: "acct-A" }), []);
+    expect(result.replacedInPlace).toBe(true);
+    expect(store.connections.map((c) => c.id)).toEqual([result.connectionId]);
+    // The kept one's tokens were refreshed
+    expect(store.connections[0].chatgptAccount?.accessToken).toBe("at-new");
   });
 });
