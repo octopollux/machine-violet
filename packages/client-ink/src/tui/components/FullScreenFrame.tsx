@@ -26,6 +26,22 @@ export interface FullScreenFrameProps {
    * padding. Add starfield-aware rendering here when a caller needs both.
    */
   bottomLeft?: React.ReactNode;
+  /**
+   * Optional content pinned to the top of the frame (just below the top
+   * border). Rendered whenever non-null; `topBannerRows` is a padding
+   * hint telling the frame how many rows to reserve from the top pad so
+   * the centered children's vertical position is preserved whether or
+   * not the banner is present. Caller is responsible for sizing
+   * `topBannerRows` to match the rendered content (pre-wrapped line
+   * count) — if omitted, the banner still renders but the centered
+   * children shift down by its height.
+   *
+   * Use case: out-of-band status surfaces like the session-fatal banner on
+   * the main menu (#529) that need to be prominent but must not shift the
+   * primary menu around when they toggle in and out.
+   */
+  topBanner?: React.ReactNode;
+  topBannerRows?: number;
   children: React.ReactNode;
 }
 
@@ -42,6 +58,8 @@ export function FullScreenFrame({
   contentRows,
   starfield,
   bottomLeft,
+  topBanner,
+  topBannerRows = 0,
   children,
 }: FullScreenFrameProps) {
   const sideWidth = theme.asset.components.edge_left.width;
@@ -56,6 +74,16 @@ export function FullScreenFrame({
   // disturb the vertical centering of the main children.
   const hasBottomLeft = bottomLeft != null && rawBottomPad >= 1;
   const bottomPad = hasBottomLeft ? rawBottomPad - 1 : rawBottomPad;
+  // Pinned top banner eats `topBannerRows` rows from the top padding so the
+  // centered children's Y position is preserved. The banner renders any
+  // time it's provided — callers who omit `topBannerRows` (or pass 0)
+  // still see the banner, they just don't get the layout-preservation
+  // benefit (menu shifts down by the banner's height). If the banner is
+  // taller than the available top pad (very small terminal), it overflows
+  // past the pad and shifts the menu — acceptable degradation versus
+  // hiding the message.
+  const hasTopBanner = topBanner != null;
+  const visibleTopPad = hasTopBanner ? Math.max(0, topPad - topBannerRows) : topPad;
 
   const sfEnabled = !!starfield;
   const sfConfig: StarfieldConfig = {
@@ -78,10 +106,21 @@ export function FullScreenFrame({
       <Box flexDirection="row" height={contentHeight}>
         <ThemedSideFrame theme={theme} side="left" height={contentHeight} />
         <Box flexDirection="column" width={contentWidth} alignItems="center">
-          {topPad > 0 && (
+          {hasTopBanner && (
+            <Box
+              width={contentWidth}
+              flexDirection="column"
+              alignItems="flex-start"
+              flexShrink={0}
+            >
+              {topBanner}
+            </Box>
+          )}
+
+          {visibleTopPad > 0 && (
             sfEnabled
-              ? <StarfieldRows grid={grid} startRow={0} rowCount={topPad} />
-              : <Box height={topPad} />
+              ? <StarfieldRows grid={grid} startRow={hasTopBanner ? topBannerRows : 0} rowCount={visibleTopPad} />
+              : <Box height={visibleTopPad} />
           )}
 
           <Box flexDirection="column" alignItems="flex-start">

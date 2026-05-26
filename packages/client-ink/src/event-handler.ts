@@ -23,6 +23,7 @@ import type {
   SessionEndedEvent,
   UsageUpdateEvent,
   ErrorEvent,
+  ErrorCategory,
   Turn,
   StateSnapshot,
   UsageStatus,
@@ -66,6 +67,10 @@ export interface ClientState {
      *  previous retry (the backoff caps at 12s, so successive attempts
      *  routinely look identical). */
     attemptId?: number;
+    /** Three-tier error category from the wire protocol. Absent on legacy
+     *  events; the dispatcher derives one from `recoverable` so downstream
+     *  consumers can always switch on `category`. */
+    category?: ErrorCategory;
   } | null;
   /** Per-character modeline text (character name → status string). */
   modelines: Record<string, string>;
@@ -521,6 +526,11 @@ function handleError(event: ErrorEvent, update: StateUpdater): void {
       attemptId: event.data.recoverable
         ? (prev.lastError?.attemptId ?? 0) + 1
         : undefined,
+      // Wire field is optional for backward compat. Synthesize a sensible
+      // category from the legacy `recoverable` flag so downstream consumers
+      // can always branch on `category` and ignore the boolean.
+      category: event.data.category
+        ?? (event.data.recoverable ? "retryable" : "session-fatal-recoverable"),
     },
   }));
 }

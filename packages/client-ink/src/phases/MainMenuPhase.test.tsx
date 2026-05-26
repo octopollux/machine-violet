@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render } from "ink-testing-library";
-import { MainMenuPhase } from "./MainMenuPhase.js";
+import { MainMenuPhase, wrapByWord } from "./MainMenuPhase.js";
 import type { MainMenuPhaseProps } from "./MainMenuPhase.js";
 import { resetThemeCache, resolveTheme, BUILTIN_DEFINITIONS } from "../tui/themes/index.js";
 
@@ -65,6 +65,52 @@ describe("MainMenuPhase", () => {
     const props = defaultProps({ errorMsg: "Something went wrong" });
     const { lastFrame } = render(<MainMenuPhase {...props} />);
     expect(lastFrame()).toContain("Something went wrong");
+  });
+
+  it("wraps long error messages so the banner stays inside the frame (#529)", () => {
+    // The verbatim provider error from the session-fatal-recoverable
+    // bucket is ~90 chars and used to overflow the frame, producing
+    // mangled layout. Wrap at word boundaries; render every wrapped
+    // line in full so nothing gets clipped at the right edge.
+    const longMsg = "openai-chatgpt connection has no active ChatGPT login. "
+      + "Run 'Sign in with ChatGPT' from the Connections menu.";
+    const props = defaultProps({ errorMsg: longMsg });
+    const frame = render(<MainMenuPhase {...props} />).lastFrame() ?? "";
+    // Every word of the message must appear in the output, even though
+    // the message itself is longer than the wrap width.
+    for (const word of longMsg.split(/\s+/)) {
+      expect(frame).toContain(word);
+    }
+  });
+
+  it("places the error banner above the menu items (#529)", () => {
+    // The banner used to sit below the menu; that wasted vertical space
+    // on the first thing the player needs to see.
+    const props = defaultProps({ errorMsg: "uniqueErrorMarker" });
+    const frame = render(<MainMenuPhase {...props} />).lastFrame() ?? "";
+    const errorIdx = frame.indexOf("uniqueErrorMarker");
+    const menuIdx = frame.indexOf("New Campaign");
+    expect(errorIdx).toBeGreaterThanOrEqual(0);
+    expect(menuIdx).toBeGreaterThanOrEqual(0);
+    expect(errorIdx).toBeLessThan(menuIdx);
+  });
+
+  it("does not shift the menu when the banner toggles (#529)", () => {
+    // The whole point of the topBanner slot: out-of-band messages don't
+    // jitter the menu when they appear/disappear. Render the same menu
+    // with and without a multi-line wrapped error; the "New Campaign"
+    // line must land on the same terminal row in both frames.
+    function rowOf(frame: string, marker: string): number {
+      return frame.split("\n").findIndex((l) => l.includes(marker));
+    }
+    const longMsg = "openai-chatgpt connection has no active ChatGPT login. "
+      + "Run 'Sign in with ChatGPT' from the Connections menu.";
+    const baseline = render(<MainMenuPhase {...defaultProps()} />).lastFrame() ?? "";
+    const withBanner = render(
+      <MainMenuPhase {...defaultProps({ errorMsg: longMsg })} />,
+    ).lastFrame() ?? "";
+    expect(rowOf(baseline, "New Campaign"))
+      .toBe(rowOf(withBanner, "New Campaign"));
   });
 
   it("calls onNewCampaign when New Campaign selected", () => {
@@ -175,5 +221,38 @@ describe("MainMenuPhase", () => {
     // Update Available is the first item
     stdin.write("\r");
     expect(onUpdate).toHaveBeenCalled();
+  });
+});
+
+describe("wrapByWord", () => {
+  it("returns short strings unchanged in a single line", () => {
+    expect(wrapByWord("hello world", 80)).toEqual(["hello world"]);
+  });
+
+  it("breaks at word boundaries when the line would exceed width", () => {
+    expect(wrapByWord("aaa bbb ccc", 7)).toEqual(["aaa bbb", "ccc"]);
+  });
+
+  it("emits an over-long single word on its own line rather than splitting it", () => {
+    // Splitting a URL / path token in the middle would hurt copy-paste more
+    // than wrapping past the edge. Pack what we can, then surrender.
+    expect(wrapByWord("short verylongtoken short", 10)).toEqual([
+      "short",
+      "verylongtoken",
+      "short",
+    ]);
+  });
+
+  it("collapses runs of whitespace", () => {
+    expect(wrapByWord("a   b\tc", 80)).toEqual(["a b c"]);
+  });
+
+  it("returns an empty array for whitespace-only input", () => {
+    expect(wrapByWord("   ", 80)).toEqual([]);
+  });
+
+  it("returns the original text in one line when width is non-positive (defensive)", () => {
+    expect(wrapByWord("hello", 0)).toEqual(["hello"]);
+    expect(wrapByWord("hello", -5)).toEqual(["hello"]);
   });
 });

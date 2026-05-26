@@ -899,10 +899,84 @@ export class TurnCollector {
 export { CodexRpcError } from "./rpc.js";
 
 /**
+ * Structured classification of a failed codex turn. Decided at the codex
+ * boundary so callers route on the `kind` (a stable enum) instead of
+ * pattern-matching the human-readable `codexMessage` (which drifts with
+ * upstream wording changes). New kinds may be added; consumers using a
+ * switch should treat unknown values as `"unknown"`.
+ *
+ *  - `auth_expired` — the refresh_token was rejected, or codex reported
+ *    an OAuth/auth failure. Player needs to re-sign-in.
+ *  - `model_not_found` — codex (or its backend) couldn't find the
+ *    requested model name. Player needs to pick a different model.
+ *  - `tools_schema_mismatch` — codex rejected the tool definitions at
+ *    thread start (usually a protocol-version drift between us and codex).
+ *  - `unknown` — anything else. Treated as session-fatal by the error
+ *    router; better to surface the real codex message and let the player
+ *    decide than to claim it's recoverable when it isn't.
+ */
+export type CodexFailureKind = "auth_expired" | "model_not_found" | "tools_schema_mismatch" | "unknown";
+
+/**
+ * Classify a raw codex error message into a {@link CodexFailureKind}.
+ *
+ * Pattern matches are deliberately broad — codex (and the OpenAI backend
+ * it speaks to) phrases the same condition multiple ways, so we look for
+ * stable substrings rather than exact strings. When in doubt, return
+ * `"unknown"` and let the human-readable message speak for itself.
+ *
+ * Exported for unit tests; production callers see only the
+ * `CodexTurnFailedError.kind` field populated from this function.
+ */
+export function classifyCodexFailure(message: string): CodexFailureKind {
+  const m = message.toLowerCase();
+  // Auth: the canonical case from issue #529 is a refresh-token rejection
+  // ("Your access token could not be refreshed because your refresh token
+  // was already used. Please log out and sign in again."). Also catch the
+  // bare 401 / unauthorized / token-expired phrasings codex uses when the
+  // access_token is rejected without a recoverable path.
+  if (
+    /refresh.*token/.test(m)
+    || /access[_ ]token.*(expired|invalid|rejected)/.test(m)
+    || /unauthorized/.test(m)
+    || /\b401\b/.test(m)
+    || /log\s*out.*sign\s*in/.test(m)
+  ) {
+    return "auth_expired";
+  }
+  // Model not found: codex / OpenAI both phrase this as "model … not found"
+  // or "unknown model" or "does not exist". The 404 status sometimes leaks
+  // into the message string too.
+  if (
+    /model.*not\s*found/.test(m)
+    || /unknown\s*model/.test(m)
+    || /model.*(does\s*not\s*exist|doesn'?t\s*exist)/.test(m)
+    || /no\s*such\s*model/.test(m)
+  ) {
+    return "model_not_found";
+  }
+  // Tools schema mismatch — codex rejects the dynamic-tool definitions
+  // before turn/start completes. Recognisable by "tool" + a validation /
+  // schema verb.
+  if (
+    /tool.*schema/.test(m)
+    || /tool.*(invalid|rejected|malformed)/.test(m)
+    || /invalid.*tool/.test(m)
+  ) {
+    return "tools_schema_mismatch";
+  }
+  return "unknown";
+}
+
+/**
  * Thrown when a Codex turn returns `status: "failed"`. Carries the
  * `turn.error.message` Codex reported alongside the failure — without it
  * callers see only `status: "failed"` in the engine log and can't tell why
  * (model not found, auth expired, rate limit, tools schema mismatch, …).
+ *
+ * The `kind` field is the *stable* classification consumers should branch
+ * on. `codexMessage` is the verbatim string codex returned and is intended
+ * for user-visible surfacing only — never pattern-match it in code.
  *
  * Why throw instead of returning an empty ChatResult? A failed turn is a
  * system-level error, not a content refusal. The previous behavior mapped
@@ -913,11 +987,13 @@ export { CodexRpcError } from "./rpc.js";
  * explicitly or surface it as an error event.
  */
 export class CodexTurnFailedError extends Error {
+  public readonly kind: CodexFailureKind;
   constructor(
     public readonly codexMessage: string,
     public readonly turnId: string,
   ) {
     super(`Codex turn ${turnId} failed: ${codexMessage}`);
     this.name = "CodexTurnFailedError";
+    this.kind = classifyCodexFailure(codexMessage);
   }
 }
