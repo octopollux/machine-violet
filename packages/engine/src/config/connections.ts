@@ -298,6 +298,124 @@ export function getConnection(store: ConnectionStore, connectionId: string): AIC
   return store.connections.find((c) => c.id === connectionId);
 }
 
+/**
+ * Result of merging a freshly-OAuthed ChatGPT account into the store.
+ * Mutates `store` in place; also returns metadata callers need (e.g. to
+ * dispose live providers for replaced connections, or to look up the
+ * resulting connectionId for the login-status poll).
+ */
+export interface UpsertChatGptResult {
+  /** Connection ID after merge — either the preserved one or a freshly-minted one. */
+  connectionId: string;
+  /** Connection IDs that were removed during the merge. */
+  removedIds: string[];
+  /** True when an existing connection was refreshed in place. */
+  replacedInPlace: boolean;
+}
+
+/**
+ * Reconcile a freshly-OAuthed ChatGPT account against the store's
+ * existing chatgpt connections. Three cases:
+ *
+ *   1. Exactly one prior chatgpt connection, regardless of whether
+ *      `chatgptAccount.id` matches → refresh that record in place.
+ *      Connection id is preserved, which is critical: in-memory provider
+ *      instances created earlier in the session bind their token store
+ *      to that id; minting a new id would orphan them. The `chatgptAccount`
+ *      object is fully replaced (no field leakage from the prior account
+ *      when the user switches accounts), but the connection id and any
+ *      user-customized label carry over.
+ *   2. Multiple prior chatgpt connections (legacy state from a pre-upsert
+ *      build) → keep the one referenced by a tier assignment if possible,
+ *      otherwise keep the first; drop the rest. Update the kept record's
+ *      account fields as above.
+ *   3. No prior chatgpt connection → mint a new one.
+ *
+ * Without this reconciliation, every "Sign in with ChatGPT" would
+ * append a new record and tier assignments would still point at the
+ * old (stale-tokened) one — defeating the purpose of re-signing in.
+ *
+ * Mutates `store` in place. The caller is responsible for persisting.
+ */
+export function upsertChatGptConnection(
+  store: ConnectionStore,
+  account: ChatGptAccountInfo,
+  discoveredModels: DiscoveredModel[],
+): UpsertChatGptResult {
+  const priorChatGpt = store.connections.filter((c) => c.provider === "openai-chatgpt");
+
+  let keepTarget: AIConnection | undefined;
+  if (priorChatGpt.length === 1) {
+    keepTarget = priorChatGpt[0];
+  } else if (priorChatGpt.length > 1) {
+    // Prefer a record referenced by any tier assignment — that's the one
+    // session providers were almost certainly built against. Falls back
+    // to the first record otherwise.
+    const tierReferencedIds = new Set<string>();
+    for (const tier of ["large", "medium", "small"] as const) {
+      const a = store.tierAssignments[tier];
+      if (a) tierReferencedIds.add(a.connectionId);
+    }
+    keepTarget = priorChatGpt.find((c) => tierReferencedIds.has(c.id)) ?? priorChatGpt[0];
+  }
+
+  let connectionId: string;
+  let removedIds: string[];
+  let replacedInPlace: boolean;
+
+  if (keepTarget) {
+    const oldEmail = keepTarget.chatgptAccount?.email;
+    keepTarget.chatgptAccount = { ...account };
+    if (discoveredModels.length > 0) keepTarget.models = discoveredModels;
+    // Refresh the email-derived label only if it still matches the default
+    // form (`ChatGPT (<old-email>)`) — preserves any custom label.
+    if (account.email) {
+      const oldLabel = oldEmail ? `ChatGPT (${oldEmail})` : "ChatGPT";
+      if (keepTarget.label === oldLabel || keepTarget.label === "ChatGPT") {
+        keepTarget.label = `ChatGPT (${account.email})`;
+      }
+    }
+    connectionId = keepTarget.id;
+    removedIds = priorChatGpt.filter((c) => c.id !== keepTarget.id).map((c) => c.id);
+    replacedInPlace = true;
+  } else {
+    connectionId = generateId();
+    const newConn: AIConnection = {
+      id: connectionId,
+      provider: "openai-chatgpt",
+      label: account.email ? `ChatGPT (${account.email})` : "ChatGPT",
+      apiKey: "",
+      chatgptAccount: { ...account },
+      models: discoveredModels,
+      source: "oauth",
+      addedAt: new Date().toISOString(),
+    };
+    removedIds = [];
+    store.connections.push(newConn);
+    replacedInPlace = false;
+  }
+
+  if (removedIds.length > 0) {
+    store.connections = store.connections.filter((c) => !removedIds.includes(c.id));
+  }
+
+  // Tier assignments pointing at any removed legacy record are migrated
+  // to the kept connection if the modelId is still available; otherwise
+  // nulled out so buildEffectiveConnections re-resolves a default.
+  const keptModels = store.connections.find((c) => c.id === connectionId)?.models ?? [];
+  for (const tier of ["large", "medium", "small"] as const) {
+    const assignment = store.tierAssignments[tier];
+    if (!assignment) continue;
+    if (!removedIds.includes(assignment.connectionId)) continue;
+    const hasModel = keptModels.some((m) => m.id === assignment.modelId);
+    store.tierAssignments[tier] = hasModel
+      ? { connectionId, modelId: assignment.modelId }
+      : null;
+  }
+
+  return { connectionId, removedIds, replacedInPlace };
+}
+
 /** Get the connection + model for a tier. Returns null if not assigned. */
 export function getTierProvider(
   store: ConnectionStore,
