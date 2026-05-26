@@ -70,17 +70,21 @@ describe("classifyServerError", () => {
     expect(classifyServerError(err)).toBe("session-fatal-recoverable");
   });
 
-  it("uses the caller's default for unknown error classes", () => {
-    // The retry path passes "retryable" as default; everything else passes
-    // (or inherits) "session-fatal-recoverable".
+  it("defaults unknown error classes to retryable (Copilot review)", () => {
+    // Per issue #529: "Conservative default: when in doubt, leave as
+    // retryable. Better to retry once than to lose session state to a
+    // transient blip." Callers that have no retry mechanism of their own
+    // (e.g. the setup-error broadcast — setup tears down on any failure)
+    // override with "session-fatal-recoverable".
     const plain = new Error("something boring");
-    expect(classifyServerError(plain)).toBe("session-fatal-recoverable");
-    expect(classifyServerError(plain, "retryable")).toBe("retryable");
+    expect(classifyServerError(plain)).toBe("retryable");
+    expect(classifyServerError(plain, "session-fatal-recoverable"))
+      .toBe("session-fatal-recoverable");
   });
 
-  it("survives non-Error throws", () => {
-    expect(classifyServerError("a string")).toBe("session-fatal-recoverable");
-    expect(classifyServerError(null)).toBe("session-fatal-recoverable");
+  it("survives non-Error throws (default: retryable)", () => {
+    expect(classifyServerError("a string")).toBe("retryable");
+    expect(classifyServerError(null)).toBe("retryable");
   });
 });
 

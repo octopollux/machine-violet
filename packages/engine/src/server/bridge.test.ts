@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { ServerEvent } from "@machine-violet/shared";
 import { createBridge } from "./bridge.js";
+import { CodexTurnFailedError } from "../providers/openai-chatgpt/provider.js";
 
 describe("createBridge onRollback", () => {
   // Issue #431: a streaming retry leaves partial deltas accumulated on the
@@ -74,14 +75,30 @@ describe("createBridge error categories (#529)", () => {
     expect((e.data as { recoverable: boolean }).recoverable).toBe(true);
   });
 
-  it("tags onError events as category=session-fatal-recoverable", () => {
-    // Defensive default — most thrown errors hit the session-manager
-    // catch and get classified there, but anything that escapes to the
-    // bridge callback should drop the client to menu (with the verbatim
-    // message), not silently retry forever.
+  it("tags plain Error events as category=retryable on the onError callback path", () => {
+    // GameEngine reports most failures via callbacks.onError without
+    // rethrowing — that path is the *primary* surface for transient /
+    // provider errors, so defaulting to retryable preserves the
+    // pre-existing retry-overlay UX for anything we don't explicitly
+    // recognise as session-fatal.
     const events: ServerEvent[] = [];
     const cb = createBridge({ broadcast: (e) => events.push(e) });
-    cb.onError(new Error("boom"));
+    cb.onError(new Error("transient blip"));
+    const e = events[0];
+    expect((e.data as { category?: string }).category).toBe("retryable");
+    expect((e.data as { recoverable: boolean }).recoverable).toBe(true);
+  });
+
+  it("still routes recognised session-fatal classes through onError to session-fatal-recoverable", () => {
+    // CodexTurnFailedError → auth_expired / model_not_found / etc. should
+    // drop to menu even when it arrives via the callback path rather than
+    // via the thrown-error catch in session-manager.
+    const events: ServerEvent[] = [];
+    const cb = createBridge({ broadcast: (e) => events.push(e) });
+    cb.onError(new CodexTurnFailedError(
+      "Your refresh token was already used. Please log out and sign in again.",
+      "t_xyz",
+    ));
     const e = events[0];
     expect((e.data as { category?: string }).category).toBe("session-fatal-recoverable");
     expect((e.data as { recoverable: boolean }).recoverable).toBe(false);

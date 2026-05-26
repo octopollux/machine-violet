@@ -454,12 +454,19 @@ export class SessionManager {
       // (auth, model, classifier refusal). Surfacing as `recoverable: false`
       // with the new category drops the client to the main menu with the
       // verbatim message in a red banner.
+      //
+      // Setup has no per-campaign persistence and no retry path of its
+      // own (we already tore down setupSession above), so pass
+      // "session-fatal-recoverable" as the explicit default — overriding
+      // classifyServerError's "retryable" fallback. Without this, an
+      // unknown error class would silently route to a retry UX that
+      // can't actually retry.
       this.broadcast({
         type: "error",
         data: {
           message: userMessageFor(err),
           recoverable: false,
-          category: classifyServerError(err),
+          category: classifyServerError(err, "session-fatal-recoverable"),
         },
       });
     });

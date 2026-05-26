@@ -16,6 +16,7 @@ import type {
 } from "@machine-violet/shared";
 import { logEvent } from "../context/engine-log.js";
 import { CostTracker } from "../context/cost-tracker.js";
+import { classifyServerError } from "./error-classify.js";
 /** Buffering config for narrative text. */
 const FLUSH_INTERVAL_MS = 50;
 
@@ -124,17 +125,20 @@ export function createBridge(
 
     onError(error: Error): void {
       logEvent("engine:error", { message: error.message });
-      // Defensive: this fires when the engine surfaces an error via the
-      // callback path rather than throwing — session-manager's
-      // engine.processInput catch is the primary route for thrown errors
-      // and already classifies them. Default here to session-fatal so the
-      // client drops to menu instead of staying wedged.
+      // GameEngine catches most failures and surfaces them via this
+      // callback rather than rethrowing — so the engine error path is the
+      // *primary* route for many transient/provider errors, not a
+      // defensive edge case. Default to "retryable" so a network blip or
+      // a 5xx doesn't drop the player to menu; only explicitly recognised
+      // session-fatal classes (e.g. CodexTurnFailedError → auth_expired)
+      // route to the new bucket via classifyServerError.
+      const category = classifyServerError(error, "retryable");
       broadcast({
         type: "error",
         data: {
           message: error.message,
-          recoverable: false,
-          category: "session-fatal-recoverable",
+          recoverable: category === "retryable",
+          category,
         },
       });
     },

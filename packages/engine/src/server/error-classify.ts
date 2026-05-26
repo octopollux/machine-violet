@@ -24,13 +24,23 @@ import { CodexTurnFailedError, type CodexFailureKind } from "../providers/openai
 /**
  * Decide which WS error category a thrown error belongs in.
  *
- * Returns one of the three values from `ErrorCategory`. Use the
- * `defaultCategory` to override the fallback in contexts where a softer
- * default is more appropriate (e.g. the retry path uses `"retryable"`).
+ * Returns one of the three values from `ErrorCategory`. The default
+ * fallback is `"retryable"` per the issue #529 guidance — "Conservative
+ * default: when in doubt, leave as `retryable`. Better to retry once
+ * than to lose session state to a transient blip." Critically, this
+ * means `isSessionFatal()` only returns true for error classes we have
+ * *explicitly* recognized (today: `CodexTurnFailedError`); a plain
+ * `Error` from `engine.processInput` rethrows to TurnManager's retry
+ * fallback the same way it did before this change.
+ *
+ * Callsites that have no retry path of their own (e.g. the setup error
+ * broadcast — setup tears down on any failure) override the default to
+ * `"session-fatal-recoverable"` so the client drops to menu with the
+ * verbatim message instead of pretending the error is transient.
  */
 export function classifyServerError(
   err: unknown,
-  defaultCategory: ErrorCategory = "session-fatal-recoverable",
+  defaultCategory: ErrorCategory = "retryable",
 ): ErrorCategory {
   if (err instanceof CodexTurnFailedError) {
     // Every codex failure we recognize today is session-fatal: the player

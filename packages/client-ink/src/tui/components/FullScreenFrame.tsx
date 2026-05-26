@@ -28,11 +28,13 @@ export interface FullScreenFrameProps {
   bottomLeft?: React.ReactNode;
   /**
    * Optional content pinned to the top of the frame (just below the top
-   * border). Lives in the top-padding region: consumes `topBannerRows` rows
-   * from the top pad so the centered children's vertical position is
-   * preserved whether or not the banner is present. Caller is responsible
-   * for sizing `topBannerRows` to match the rendered content (pre-wrapped
-   * line count); under-sizing clips, over-sizing leaves blank space.
+   * border). Rendered whenever non-null; `topBannerRows` is a padding
+   * hint telling the frame how many rows to reserve from the top pad so
+   * the centered children's vertical position is preserved whether or
+   * not the banner is present. Caller is responsible for sizing
+   * `topBannerRows` to match the rendered content (pre-wrapped line
+   * count) — if omitted, the banner still renders but the centered
+   * children shift down by its height.
    *
    * Use case: out-of-band status surfaces like the session-fatal banner on
    * the main menu (#529) that need to be prominent but must not shift the
@@ -73,11 +75,14 @@ export function FullScreenFrame({
   const hasBottomLeft = bottomLeft != null && rawBottomPad >= 1;
   const bottomPad = hasBottomLeft ? rawBottomPad - 1 : rawBottomPad;
   // Pinned top banner eats `topBannerRows` rows from the top padding so the
-  // centered children's Y position is preserved. If the banner is taller
-  // than the available top pad (very small terminal), it overflows past
-  // the pad and shifts the menu down — acceptable degradation versus
+  // centered children's Y position is preserved. The banner renders any
+  // time it's provided — callers who omit `topBannerRows` (or pass 0)
+  // still see the banner, they just don't get the layout-preservation
+  // benefit (menu shifts down by the banner's height). If the banner is
+  // taller than the available top pad (very small terminal), it overflows
+  // past the pad and shifts the menu — acceptable degradation versus
   // hiding the message.
-  const hasTopBanner = topBanner != null && topBannerRows > 0;
+  const hasTopBanner = topBanner != null;
   const visibleTopPad = hasTopBanner ? Math.max(0, topPad - topBannerRows) : topPad;
 
   const sfEnabled = !!starfield;

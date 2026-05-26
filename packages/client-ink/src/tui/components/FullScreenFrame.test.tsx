@@ -111,6 +111,30 @@ describe("FullScreenFrame", () => {
         .toBe(rowOfFirstMatch(withBanner, "CHILD_MARKER"));
     });
 
+    it("renders the banner even when topBannerRows is omitted (Copilot review)", () => {
+      // The previous gating (`topBanner != null && topBannerRows > 0`)
+      // silently dropped the banner if a caller forgot the rows prop —
+      // an easy API footgun. Render whenever provided; rows is a
+      // layout-preservation hint, not a render gate.
+      const theme = makeTheme();
+      const frame = render(
+        <FullScreenFrame
+          theme={theme}
+          columns={80}
+          rows={24}
+          contentRows={1}
+          topBanner={<Text>BANNER_MARKER</Text>}
+        >
+          <Text>CHILD_MARKER</Text>
+        </FullScreenFrame>,
+      ).lastFrame() ?? "";
+      expect(frame).toContain("BANNER_MARKER");
+      // Banner is above the child (layout-preservation is the caller's
+      // responsibility when rows is omitted).
+      expect(rowOfFirstMatch(frame, "BANNER_MARKER"))
+        .toBeLessThan(rowOfFirstMatch(frame, "CHILD_MARKER"));
+    });
+
     it("omits banner space when topBanner is null", () => {
       // Skip the slot's reservation entirely when there's nothing to show
       // (don't leave a phantom gap above the menu).
