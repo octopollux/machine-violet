@@ -43,6 +43,20 @@ body:
       required: true
 
   - type: dropdown
+    id: channel
+    attributes:
+      label: Channel
+      description: Which release channel is this installation on?
+      options:
+        - Stable
+        - Nightly
+        - Release candidate (RC)
+        - Built from source
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
     id: install-method
     attributes:
       label: Install method

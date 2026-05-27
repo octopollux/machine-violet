@@ -1,13 +1,31 @@
 name: Cut Release
 
+# Cuts a release tag from the `release` branch. Two kinds:
+#   - stable: tags `v$VERSION`, packaged to Velopack `stable` channel
+#   - rc:     tags `v$VERSION-rc.$N`, packaged to Velopack `rc` channel
+# Both trigger release.yml via workflow_call.
+#
+# `bump` rules:
+#   - patch/minor/major: runs `npm version` on the release branch and commits.
+#   - none: re-uses the current package.json version. Required when cutting
+#     additional RCs of the same version, or when promoting RC → stable.
+
 on:
   workflow_dispatch:
     inputs:
-      bump:
-        description: "Version bump type"
+      kind:
+        description: "Release kind"
         required: true
         type: choice
         options:
+          - stable
+          - rc
+      bump:
+        description: "Version bump (use 'none' to re-use current package.json version)"
+        required: true
+        type: choice
+        options:
+          - none
           - patch
           - minor
           - major
@@ -25,11 +43,19 @@ jobs:
   tag:
     runs-on: ubuntu-latest
     outputs:
-      tag: ${{ steps.bump.outputs.tag }}
+      tag: ${{ steps.compute.outputs.tag }}
       dry_run: ${{ inputs.dry_run }}
     steps:
+      - name: Refuse non-release source branch
+        if: github.ref != 'refs/heads/release'
+        run: |
+          echo "::error::cut-release must be dispatched against the 'release' branch (got ${{ github.ref }})."
+          echo "In the Actions UI, pick 'release' from the 'Use workflow from' branch selector."
+          exit 1
+
       - uses: actions/checkout@v4
         with:
+          ref: release
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
@@ -41,38 +67,59 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Bump version
-        id: bump
+      - name: Bump version (if requested)
+        if: inputs.bump != 'none'
         run: |
           OLD_VERSION=$(node -p "require('./package.json').version")
-          npm version ${{ inputs.bump }} --no-git-tag-version
+          npm version "${{ inputs.bump }}" --no-git-tag-version
           NEW_VERSION=$(node -p "require('./package.json').version")
-          echo "old=$OLD_VERSION" >> "$GITHUB_OUTPUT"
-          echo "new=$NEW_VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$NEW_VERSION" >> "$GITHUB_OUTPUT"
-          echo ""
           echo "Version: $OLD_VERSION → $NEW_VERSION"
-
-      - name: Commit and tag
-        run: |
           git add package.json package-lock.json
-          git commit -m "Release v${{ steps.bump.outputs.new }}"
-          git tag "v${{ steps.bump.outputs.new }}"
+          git commit -m "Bump version to $NEW_VERSION"
+
+      - name: Compute tag
+        id: compute
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+
+          if [ "${{ inputs.kind }}" = "stable" ]; then
+            TAG="v$VERSION"
+            # Fail if the stable tag already exists — we don't overwrite history.
+            if git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null 2>&1; then
+              echo "::error::Stable tag $TAG already exists. Pick a bump (patch/minor/major) instead."
+              exit 1
+            fi
+          else
+            # Find the highest existing rc counter for this version.
+            git fetch --tags
+            HIGHEST=$(git tag -l "v${VERSION}-rc.*" \
+              | sed -n "s/^v${VERSION}-rc\.\([0-9][0-9]*\)$/\1/p" \
+              | sort -n \
+              | tail -n1)
+            NEXT=$(( ${HIGHEST:-0} + 1 ))
+            TAG="v${VERSION}-rc.${NEXT}"
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Computed tag: $TAG"
+
+      - name: Tag
+        run: git tag "${{ steps.compute.outputs.tag }}"
 
       - name: Push
         if: ${{ !inputs.dry_run }}
         run: |
-          git push origin main
-          git push origin "v${{ steps.bump.outputs.new }}"
-          echo ""
-          echo "Tagged v${{ steps.bump.outputs.new }} — release build starting."
+          # Push the branch first (carries any bump commit), then the tag.
+          git push origin release
+          git push origin "${{ steps.compute.outputs.tag }}"
+          echo "Tagged ${{ steps.compute.outputs.tag }} — release build starting."
 
       - name: Dry run summary
         if: ${{ inputs.dry_run }}
         run: |
           echo "Dry run — no push."
-          echo "Would have tagged: v${{ steps.bump.outputs.new }}"
-          git log --oneline -1
+          echo "Would have tagged: ${{ steps.compute.outputs.tag }}"
+          git log --oneline -3
 
   build-and-release:
     needs: tag

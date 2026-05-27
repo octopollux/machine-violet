@@ -1,5 +1,14 @@
 name: Release
 
+# Builds and publishes a release for any pushed `v*` tag.
+#
+# Channel routing (sticky — each installer only updates within its own channel):
+#   - v$X.$Y.$Z         → Velopack channel `stable`, public GitHub release.
+#   - v$X.$Y.$Z-rc.$N   → Velopack channel `rc`, prerelease GitHub release,
+#                         no Discord post, no Homebrew formula bump.
+#
+# Nightlies are handled by nightly.yml on channel `nightly` (also sticky).
+
 on:
   push:
     tags: ["v*"]
@@ -14,7 +23,34 @@ permissions:
   id-token: write
 
 jobs:
+  prep:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.compute.outputs.tag }}
+      version: ${{ steps.compute.outputs.version }}
+      channel: ${{ steps.compute.outputs.channel }}
+      prerelease: ${{ steps.compute.outputs.prerelease }}
+    steps:
+      - name: Compute channel from tag
+        id: compute
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          if [[ "$TAG" == *-rc.* ]]; then
+            CHANNEL="rc"
+            PRERELEASE="true"
+          else
+            CHANNEL="stable"
+            PRERELEASE="false"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+          echo "Tag $TAG → channel=$CHANNEL prerelease=$PRERELEASE"
+
   build:
+    needs: prep
     strategy:
       matrix:
         include:
@@ -32,7 +68,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ needs.prep.outputs.tag }}
 
       - uses: actions/setup-node@v4
         with:
@@ -47,8 +83,7 @@ jobs:
       - name: Build distribution
         shell: bash
         run: |
-          TAG="${{ inputs.tag || github.ref_name }}"
-          VERSION="${TAG#v}"
+          VERSION="${{ needs.prep.outputs.version }}"
           RELEASE_DATE="$(date -u +'%Y-%m-%d %H:%M')"
           node scripts/build-dist.js --version="$VERSION" --release-date="$RELEASE_DATE"
 
@@ -68,13 +103,8 @@ jobs:
           curl -fSL -o wt-portable.zip "$WT_URL"
 
           # Verify integrity (update hash when bumping WT_VERSION)
-          WT_SHA256="SET_AFTER_FIRST_SUCCESSFUL_BUILD"
-          if [ "$WT_SHA256" != "SET_AFTER_FIRST_SUCCESSFUL_BUILD" ]; then
-            echo "$WT_SHA256  wt-portable.zip" | sha256sum -c -
-          else
-            echo "WARNING: SHA256 not pinned yet — skipping verification"
-            sha256sum wt-portable.zip
-          fi
+          WT_SHA256="ba5b75eb769e99221e68fe4bfb3580ed1ade81f24b70334de4cb4742edf1b017"
+          echo "$WT_SHA256  wt-portable.zip" | sha256sum -c -
 
           # Extract into dist/terminal/
           mkdir -p dist/terminal
@@ -109,25 +139,23 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: bash
         run: |
-          TAG="${{ inputs.tag || github.ref_name }}"
-          VERSION="${TAG#v}"
           vpk pack \
             --packId MachineViolet \
-            --packVersion "$VERSION" \
+            --packVersion "${{ needs.prep.outputs.version }}" \
             --packTitle "Machine Violet" \
             --packDir dist \
             --mainExe MachineViolet.exe \
             --icon assets/machine-violet.ico \
             --shortcuts StartMenuRoot \
             --azureTrustedSignFile assets/trusted-signing.json \
+            --channel "${{ needs.prep.outputs.channel }}" \
             --outputDir velopack-out
 
       - name: Package (tar.gz)
         if: matrix.archive == 'tar.gz'
         shell: bash
         run: |
-          TAG="${{ inputs.tag || github.ref_name }}"
-          VERSION="${TAG#v}"
+          VERSION="${{ needs.prep.outputs.version }}"
           tar -czf "machine-violet-${VERSION}-${{ matrix.asset_suffix }}.tar.gz" -C dist .
 
       - name: Upload artifact (Windows)
@@ -145,12 +173,12 @@ jobs:
           path: machine-violet-*.${{ matrix.archive }}
 
   release:
-    needs: build
+    needs: [prep, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ needs.prep.outputs.tag }}
           fetch-depth: 0
 
       - uses: actions/download-artifact@v4
@@ -161,10 +189,21 @@ jobs:
       - name: Determine previous tag
         id: tags
         run: |
-          TAG="${{ inputs.tag || github.ref_name }}"
-          # Find the most recent v* tag immediately before this one in version order
+          TAG="${{ needs.prep.outputs.tag }}"
+          CHANNEL="${{ needs.prep.outputs.channel }}"
+
+          # For stable releases, exclude RC tags from the "previous" search —
+          # users on stable haven't seen RCs, so changelog should be vs the
+          # previous stable. For RC releases, include all v* (stable + rc) so
+          # the changelog is vs whatever immediately preceded.
+          if [ "$CHANNEL" = "stable" ]; then
+            CANDIDATES=$(git tag -l 'v*' --sort=-version:refname | grep -v -- '-rc\.' || true)
+          else
+            CANDIDATES=$(git tag -l 'v*' --sort=-version:refname || true)
+          fi
+
           PREV_TAG=$(
-            git tag -l 'v*' --sort=-version:refname |
+            echo "$CANDIDATES" |
             awk -v current="$TAG" '
               $0 == current { seen=1; next }
               seen { print; exit }
@@ -176,7 +215,7 @@ jobs:
           if [ -n "$PREV_TAG" ]; then
             echo "Changelog range: ${PREV_TAG}..${TAG}"
           else
-            echo "No previous tag found — first release"
+            echo "No previous tag found — first release on channel $CHANNEL"
           fi
 
       - name: Collect changelog context
@@ -315,13 +354,14 @@ jobs:
           echo "$NOTES" >> "$GITHUB_OUTPUT"
           echo "NOTES_EOF" >> "$GITHUB_OUTPUT"
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release (stable)
+        if: needs.prep.outputs.channel == 'stable'
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_NOTES: ${{ steps.changelog.outputs.notes }}
         run: |
-          TAG="${{ steps.tags.outputs.tag }}"
-          VERSION="${TAG#v}"
+          TAG="${{ needs.prep.outputs.tag }}"
+          VERSION="${{ needs.prep.outputs.version }}"
 
           cat > release-body.md << BODYEOF
           ## Download
@@ -361,15 +401,71 @@ jobs:
             --notes-file release-body.md \
             artifacts/MachineViolet-* \
             artifacts/machine-violet-* \
-            artifacts/releases.win.json
+            artifacts/releases.stable.json \
+            artifacts/assets.stable.json
 
-      - name: Post to Discord
+      - name: Create GitHub Release (rc)
+        if: needs.prep.outputs.channel == 'rc'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_NOTES: ${{ steps.changelog.outputs.notes }}
+        run: |
+          TAG="${{ needs.prep.outputs.tag }}"
+          VERSION="${{ needs.prep.outputs.version }}"
+
+          cat > release-body.md << BODYEOF
+          > **Release candidate.** Auto-updates only to later RCs of the same
+          > line — installing this does NOT auto-upgrade to the eventual stable.
+          > Try it out and report issues; uninstall + reinstall the stable when
+          > it ships.
+
+          ## Download
+
+          ### Windows
+          | | File |
+          |---|---|
+          | **Installer** | [\`MachineViolet-Setup.exe\`](https://github.com/${{ github.repository }}/releases/download/${TAG}/MachineViolet-Setup.exe) |
+          | Portable | [\`MachineViolet-Portable.zip\`](https://github.com/${{ github.repository }}/releases/download/${TAG}/MachineViolet-Portable.zip) |
+
+          ### macOS (Apple Silicon)
+          | | File |
+          |---|---|
+          | Tarball | [\`machine-violet-${VERSION}-darwin-arm64.tar.gz\`](https://github.com/${{ github.repository }}/releases/download/${TAG}/machine-violet-${VERSION}-darwin-arm64.tar.gz) |
+
+          ### Linux (x64)
+          | | File |
+          |---|---|
+          | Tarball | [\`machine-violet-${VERSION}-linux-x64.tar.gz\`](https://github.com/${{ github.repository }}/releases/download/${TAG}/machine-violet-${VERSION}-linux-x64.tar.gz) |
+          BODYEOF
+          sed -i 's/^          //' release-body.md
+
+          {
+            echo ""
+            echo "---"
+            echo ""
+            echo "## Changes since previous RC / release"
+            echo ""
+            printf '%s\n' "$RELEASE_NOTES"
+          } >> release-body.md
+
+          gh release create "$TAG" \
+            --repo ${{ github.repository }} \
+            --title "Machine Violet ${VERSION}" \
+            --notes-file release-body.md \
+            --prerelease \
+            artifacts/MachineViolet-* \
+            artifacts/machine-violet-* \
+            artifacts/releases.rc.json \
+            artifacts/assets.rc.json
+
+      - name: Post to Discord (stable only)
+        if: needs.prep.outputs.channel == 'stable'
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
           RELEASE_NOTES: ${{ steps.changelog.outputs.notes }}
         run: |
-          TAG="${{ steps.tags.outputs.tag }}"
-          VERSION="${TAG#v}"
+          TAG="${{ needs.prep.outputs.tag }}"
+          VERSION="${{ needs.prep.outputs.version }}"
           RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/${TAG}"
 
           HEADER="**Machine Violet ${VERSION}** 🎉"
