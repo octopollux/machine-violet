@@ -52,6 +52,9 @@ jobs:
           WT_ZIP="Microsoft.WindowsTerminalPreview_${WT_VERSION}_x64.zip"
           WT_URL="https://github.com/microsoft/terminal/releases/download/${WT_TAG}/${WT_ZIP}"
           curl -fSL -o wt-portable.zip "$WT_URL"
+          # Verify integrity (update hash when bumping WT_VERSION)
+          WT_SHA256="ba5b75eb769e99221e68fe4bfb3580ed1ade81f24b70334de4cb4742edf1b017"
+          echo "$WT_SHA256  wt-portable.zip" | sha256sum -c -
           mkdir -p dist/terminal
           unzip -q wt-portable.zip -d dist/terminal
           touch dist/terminal/.portable

@@ -93,6 +93,18 @@ Launch it and continue with other work in the same turn (write the commit messag
 
 **Don't tail the background output in subsequent turns.** Just keep working. When the process exits, the harness re-invokes you with a `<task-notification>` containing the final output path. Read the tail of that file then — not before.
 
+## Release model
+
+Two long-lived branches: **`main`** (trunk, builds nightlies) and **`release`** (the released line, builds stable + RC). Three Velopack channels: `stable`, `rc`, `nightly` — all sticky (installers never auto-switch channels). Only the latest major is supported; no LTS.
+
+**`main` and `release` are not auto-merged into each other.** When fixing a bug:
+
+1. Pick the branch where the bug was reported. A 1.0 user's bug reproduces on `release`, not `main` — `main` may have rewritten the code path, and "can't repro" usually means "looking at the wrong tree."
+2. Fix on a branch from there, PR into that long-lived branch.
+3. Ask whether the *other* long-lived branch has the same code path. If yes, the fix needs to land there too — cherry-pick or re-apply by hand. Do this both directions (release→main *and* main→release as appropriate).
+
+Cuts go through the **Cut Release** workflow (kind=stable|rc, bump=none|patch|minor|major). Full flow + bootstrap notes in [docs/releases.md](docs/releases.md).
+
 ## Worktrees
 
 **Always use a worktree for code changes.** Multiple Claude instances may run concurrently against this repo. Working directly on `main` risks branch collisions and lost commits. Use `EnterWorktree` at the start of every task and `ExitWorktree` when done.
