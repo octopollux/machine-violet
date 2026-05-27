@@ -61,19 +61,6 @@ The workflow:
 
 RC releases are marked `--prerelease` on GitHub, skip Discord, and skip the Homebrew formula bump. Stable releases do all three.
 
-## First-time bootstrap (v1.0.0)
-
-Because `cut-release` bumps from current `package.json` (`1.0.1`), it cannot land *on* `1.0.0`. The first cut is manual:
-
-```bash
-git checkout release
-# Edit package.json version to 1.0.0 (committed in the branch setup PR)
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-`release.yml` fires on the tag push. Subsequent cuts go through `cut-release` normally.
-
 ## Velopack channel notes
 
 - `vpk pack --channel <name>` produces `releases.<name>.json` and `assets.<name>.json` alongside the installer. These are uploaded as release assets and form the auto-update manifest the installed app polls.
