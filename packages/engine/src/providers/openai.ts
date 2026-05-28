@@ -26,6 +26,7 @@ import type {
 import { GENERATE_IMAGE_TOOL_NAME } from "./types.js";
 import { patchOrphanedToolUses } from "./orphan-patch.js";
 import { supportsImageGeneration } from "../config/model-registry.js";
+import { logEvent } from "../context/engine-log.js";
 
 /**
  * Native `image_generation` tool config sent to the Responses API when the
@@ -33,20 +34,24 @@ import { supportsImageGeneration } from "../config/model-registry.js";
  * list. Hardcoded to the spec's defaults: 1024×1024 (accommodates
  * non-humanoid PCs in portraits and works for scene snapshots), medium
  * quality (HD-ish per user direction), PNG, no partial-image streaming
- * (MV never streams images). `gpt-image-2` is the latest output model;
- * passed as a string since the SDK's typed enum only knows through
- * `gpt-image-1.5` — the API still accepts any image-gen model id.
+ * (MV never streams images).
+ *
+ * We deliberately omit the `model` field. Earlier code pinned
+ * `gpt-image-2` based on a research note, but real-world smoke testing
+ * showed ~300s waits with no result — likely because the model name
+ * wasn't actually being recognized. Letting OpenAI pick the current
+ * default (today: gpt-image-1; the API silently picks newer as they
+ * ship) is the most forgiving path, at the cost of not being able to
+ * pin a specific gen model. Add `model` back here when we want a
+ * specific one and have confirmed access.
  *
  * Quality is `medium` rather than `high`. At TUI render sizes (sixel
  * scaling to ~60-80 columns) the visible difference is negligible, but
  * `high` regularly takes 60-180s wall-clock per image vs ~15-30s for
- * `medium` — a smoke-test deal-breaker. If a user explicitly wants
- * gallery-quality output they can render bigger later from the source
- * PNG; we optimize the inline loop for responsiveness.
+ * `medium` — a smoke-test deal-breaker.
  */
 const IMAGE_GENERATION_TOOL_CONFIG = {
   type: "image_generation" as const,
-  model: "gpt-image-2",
   size: "1024x1024" as const,
   quality: "medium" as const,
   output_format: "png" as const,
@@ -521,12 +526,13 @@ function fromResponsesResponseWithText(
       toolCalls.push({ id: item.call_id, name: item.name, input });
       assistantContent.push({ type: "tool_use", id: item.call_id, name: item.name, input });
     } else if (item.type === "image_generation_call") {
-      // Failures (refusal, network, quota) are silently skipped — the spec
-      // mandates that a failed image gen leaves no trace in the rendered
-      // output (no placeholder, no separator). The DM's next turn sees no
-      // image-input ContentPart and continues normally. revised_prompt is
-      // captured if surfaced (SDK at this version doesn't type it; cast
-      // through unknown to read it without losing strict types elsewhere).
+      // Failures (refusal, network, quota) are silently skipped from the
+      // rendered output per spec — but logged via engine-log so users
+      // debugging "no image appeared" have a breadcrumb. The DM's next
+      // turn sees no image-input ContentPart and continues normally.
+      // revised_prompt is captured if surfaced (SDK at this version
+      // doesn't type it; cast through unknown to read it without losing
+      // strict types elsewhere).
       if (item.status === "completed" && item.result) {
         const revisedPrompt = (item as unknown as { revised_prompt?: string }).revised_prompt;
         assistantContent.push({
@@ -536,6 +542,13 @@ function fromResponsesResponseWithText(
           mimeType: "image/png",
           intent: imageIntent,
           ...(revisedPrompt ? { revisedPrompt } : {}),
+        });
+      } else {
+        logEvent("image_gen:non_completed", {
+          id: item.id,
+          status: item.status,
+          hasResult: !!item.result,
+          intent: imageIntent,
         });
       }
     } else if (item.type === "reasoning" && accumulatedReasoning === undefined) {
