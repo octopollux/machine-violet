@@ -81,6 +81,12 @@ const FINALIZE_TOOL: NormalizedTool = {
       world_slug: { type: "string", description: "Slug of the world file used (from load_world). Omit for fully custom campaigns.", nullable: true },
       age_group: { type: "string", enum: ["child", "teenager", "adult"], description: "Player's age group. Set to 'child' or 'teenager' if the player clearly indicates so. Otherwise — including when age is not discussed or the player declines — set to 'adult'. Always include this field." },
       content_preferences: { type: "string", description: "Any content preferences or sensitivities the player mentioned during setup (one per line). Only include if the player volunteered them — never prompt for these.", nullable: true },
+      image_generation: {
+        type: "string",
+        enum: ["on", "off"],
+        description: "Player's answer to the image-generation consent question. 'on' if they said yes, 'off' if they said no. Only include this field if you actually asked the consent question (which only happens when the active provider/model supports image generation — see the Image generation section of your prompt). Omit when not asked.",
+        nullable: true,
+      },
       handoff_note: { type: "string", description: "Handoff postcard for the DM's first turn. Free-form prose — the DM sees this once as priming for the opening scene. Include: what the player said about their character IN THEIR OWN WORDS (quote or paraphrase closely, don't sanitize), any freeform remarks they made about the world / tone / things they want or don't want, and anything you (the setup agent) want to pass along to the DM — hooks you promised, tone cues the structured fields don't capture, unresolved ambiguities. Write it as a direct note to the DM, not as narration. A paragraph or two is usually right. Always include this field." },
     },
     required: [
@@ -186,13 +192,43 @@ function shuffle<T>(arr: readonly T[]): T[] {
  *
  * BP3 (tools) and BP4 (last message) are stamped via cacheHints in runTurn.
  */
-function buildSystemPrompt(model: string, existingPlayers?: KnownPlayer[], userWorldsDir?: string, userPersonalitiesDir?: string): SystemBlock[] {
+function buildSystemPrompt(
+  model: string,
+  existingPlayers?: KnownPlayer[],
+  userWorldsDir?: string,
+  userPersonalitiesDir?: string,
+  imageGenSupported?: boolean,
+): SystemBlock[] {
   const blocks: SystemBlock[] = [];
 
   // ── Tier 1: Global-stable (identical across all sessions) ──
 
   const base = loadPrompt("setup-conversation", model);
   blocks.push({ text: base });
+
+  // Image-generation consent guidance is conditionally appended ONLY when
+  // the active provider/model exposes image generation. Skipping it
+  // entirely when unsupported avoids the setup agent asking a question
+  // that can't be acted on — and keeps the cached prefix tighter for
+  // text-only tiers. The locked phrasing for the question itself is
+  // baked into the prompt text below per saved feedback memory.
+  if (imageGenSupported) {
+    blocks.push({
+      text: [
+        "## Image generation",
+        "",
+        "After the player has chosen a world (Quick Start) or finished system selection (Full Setup), and BEFORE you ask any character questions, present the image-generation consent question:",
+        "",
+        "Call `present_choices` with:",
+        "  prompt: \"Do you want images in your game? (you can change this in game settings later)\"",
+        "  choices: [\"Yes\", \"No\"]",
+        "",
+        "Pass the player's answer to `finalize_setup` as the `image_generation` field — `\"on\"` if they picked Yes, `\"off\"` if they picked No. If they answer freeform, interpret naturally. Do not editorialize or explain further; the parenthetical in the question already tells the player it's reversible.",
+        "",
+        "Use the locked phrasing verbatim — do not paraphrase, expand, or add caveats. The choice is reversible (the in-campaign ESC menu has a toggle for it), so don't agonize over it; one quick yes/no.",
+      ].join("\n"),
+    });
+  }
 
   const { light, crunchy } = groupByTier(KNOWN_SYSTEMS);
   const lightList = light.map(formatSystemLine).join("\n");
@@ -332,7 +368,10 @@ export function createSetupConversation(
   // Build per-session system prompt (randomizes seed/personality order).
   // Known players are injected right after the base prompt (before seeds/personalities)
   // so the model sees them close to the flow instructions that reference them.
-  const systemPrompt = buildSystemPrompt(model, existingPlayers, userWorldsDir, userPersonalitiesDir);
+  // imageGenSupported gates the image-consent prompt section so the setup
+  // agent doesn't ask the question on text-only tiers.
+  const imageGenSupported = provider.getCapabilities?.(model).imageGeneration ?? false;
+  const systemPrompt = buildSystemPrompt(model, existingPlayers, userWorldsDir, userPersonalitiesDir, imageGenSupported);
 
   const messages: NormalizedMessage[] = [];
   const totalUsage: NormalizedUsage = {
@@ -413,6 +452,9 @@ export function createSetupConversation(
       themeColor: generateThemeColor(characterName),
       ageGroup: (input.age_group as "child" | "teenager" | "adult" | undefined) ?? undefined,
       contentPreferences: (input.content_preferences as string) || undefined,
+      imageGeneration: input.image_generation === "on" || input.image_generation === "off"
+        ? (input.image_generation as "on" | "off")
+        : undefined,
       handoffNote: (typeof input.handoff_note === "string" && input.handoff_note.trim())
         ? input.handoff_note.trim() : undefined,
     };
