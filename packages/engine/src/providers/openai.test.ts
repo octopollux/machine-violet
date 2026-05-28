@@ -1041,3 +1041,167 @@ describe("health check", () => {
     expect(mockResponses.create).not.toHaveBeenCalled();
   });
 });
+
+// =========================================================================
+// Image generation (Responses API)
+// =========================================================================
+
+describe("Responses API image generation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("rewrites generate_image tool to native image_generation tool config", async () => {
+    mockResponses.create.mockResolvedValue(fakeResponse());
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    await provider.chat(baseChatParams({
+      tools: [
+        { name: "generate_image", description: "", inputSchema: { type: "object" } },
+        { name: "real_function", description: "stays put", inputSchema: { type: "object" } },
+      ],
+      dispatchTool: vi.fn(),
+    }));
+
+    const callArgs = mockResponses.create.mock.calls[0][0];
+    // generate_image stripped from function-tool list; image_generation appended.
+    expect(callArgs.tools).toHaveLength(2);
+    expect(callArgs.tools[0]).toMatchObject({ type: "function", name: "real_function" });
+    expect(callArgs.tools[1]).toMatchObject({
+      type: "image_generation",
+      size: "1024x1024",
+      quality: "high",
+      output_format: "png",
+      partial_images: 0,
+    });
+  });
+
+  it("translates image_input ContentParts to input_image content items", async () => {
+    mockResponses.create.mockResolvedValue(fakeResponse());
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    await provider.chat(baseChatParams({
+      messages: [{
+        role: "user",
+        content: [
+          { type: "text", text: "Party portraits:" },
+          { type: "image_input", base64: "AAAA", mimeType: "image/png", lowDetail: true, label: "Janey" },
+          { type: "image_input", base64: "BBBB", mimeType: "image/png", lowDetail: true, label: "Oros" },
+        ],
+      }],
+    }));
+
+    const callArgs = mockResponses.create.mock.calls[0][0];
+    const userMsg = callArgs.input[0];
+    expect(userMsg.role).toBe("user");
+    expect(userMsg.content).toEqual([
+      { type: "input_text", text: "Party portraits:" },
+      { type: "input_image", detail: "low", image_url: "data:image/png;base64,AAAA" },
+      { type: "input_image", detail: "low", image_url: "data:image/png;base64,BBBB" },
+    ]);
+  });
+
+  it("preserves the simple-string user message path when no images are present", async () => {
+    mockResponses.create.mockResolvedValue(fakeResponse());
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    await provider.chat(baseChatParams());
+
+    const callArgs = mockResponses.create.mock.calls[0][0];
+    expect(callArgs.input[0]).toEqual({ type: "message", role: "user", content: "Hello" });
+  });
+
+  it("parses completed image_generation_call into image_generated ContentPart with intent stamp", async () => {
+    mockResponses.create.mockResolvedValue(fakeResponse({
+      output: [{
+        type: "image_generation_call",
+        id: "ig_42",
+        status: "completed",
+        result: "PNGBASE64PAYLOAD",
+        revised_prompt: "An illuminated plate of the tavern at dawn.",
+      }],
+    }));
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    const result = await provider.chat(baseChatParams({ imageIntent: "scene_snapshot" }));
+
+    expect(result.toolCalls).toEqual([]);
+    expect(result.assistantContent).toEqual([{
+      type: "image_generated",
+      id: "ig_42",
+      base64: "PNGBASE64PAYLOAD",
+      mimeType: "image/png",
+      intent: "scene_snapshot",
+      revisedPrompt: "An illuminated plate of the tavern at dawn.",
+    }]);
+  });
+
+  it("defaults intent to player_request when not supplied", async () => {
+    mockResponses.create.mockResolvedValue(fakeResponse({
+      output: [{
+        type: "image_generation_call",
+        id: "ig_43",
+        status: "completed",
+        result: "PNG",
+      }],
+    }));
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    const result = await provider.chat(baseChatParams());
+
+    expect(result.assistantContent).toHaveLength(1);
+    expect(result.assistantContent[0]).toMatchObject({ type: "image_generated", intent: "player_request" });
+  });
+
+  it("silently skips failed image_generation_call — no ContentPart emitted", async () => {
+    mockResponses.create.mockResolvedValue(fakeResponse({
+      output: [
+        { type: "image_generation_call", id: "ig_44", status: "failed", result: null },
+        { id: "msg_1", type: "message", role: "assistant", status: "completed",
+          content: [{ type: "output_text", text: "I tried, no luck.", annotations: [] }] },
+      ],
+    }));
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    const result = await provider.chat(baseChatParams({ imageIntent: "scene_snapshot" }));
+
+    // Only the text message survives; no image_generated ContentPart.
+    expect(result.assistantContent).toEqual([{ type: "text", text: "I tried, no luck." }]);
+    expect(result.text).toBe("I tried, no luck.");
+  });
+
+  it("replays image_generated assistant content as image_generation_call input item", async () => {
+    mockResponses.create.mockResolvedValue(fakeResponse());
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    await provider.chat(baseChatParams({
+      messages: [
+        { role: "user", content: "Draw a fountain." },
+        {
+          role: "assistant",
+          content: [
+            { type: "text", text: "Here you go:" },
+            {
+              type: "image_generated",
+              id: "ig_prev",
+              base64: "PREVPNG",
+              mimeType: "image/png",
+              intent: "player_request",
+              revisedPrompt: "A baroque fountain at dusk.",
+            },
+          ],
+        },
+        { role: "user", content: "Make it brighter." },
+      ],
+    }));
+
+    const callArgs = mockResponses.create.mock.calls[0][0];
+    // Expect: user → assistant text → image_generation_call → user.
+    expect(callArgs.input).toEqual([
+      { type: "message", role: "user", content: "Draw a fountain." },
+      { type: "message", role: "assistant", content: "Here you go:" },
+      { type: "image_generation_call", id: "ig_prev", result: "PREVPNG", status: "completed" },
+      { type: "message", role: "user", content: "Make it brighter." },
+    ]);
+  });
+});

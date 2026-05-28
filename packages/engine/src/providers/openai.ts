@@ -23,8 +23,28 @@ import type {
   NormalizedMessage, NormalizedToolCall,
   NormalizedUsage, ContentPart, StopReason,
 } from "./types.js";
+import { GENERATE_IMAGE_TOOL_NAME } from "./types.js";
 import { patchOrphanedToolUses } from "./orphan-patch.js";
 import { supportsImageGeneration } from "../config/model-registry.js";
+
+/**
+ * Native `image_generation` tool config sent to the Responses API when the
+ * caller included {@link GENERATE_IMAGE_TOOL_NAME} in the normalized tool
+ * list. Hardcoded to the spec's defaults: 1024×1024 (accommodates
+ * non-humanoid PCs in portraits and works for scene snapshots), high
+ * quality (HD-ish per user direction), PNG, no partial-image streaming
+ * (MV never streams images). `gpt-image-2` is the latest output model;
+ * passed as a string since the SDK's typed enum only knows through
+ * `gpt-image-1.5` — the API still accepts any image-gen model id.
+ */
+const IMAGE_GENERATION_TOOL_CONFIG = {
+  type: "image_generation" as const,
+  model: "gpt-image-2",
+  size: "1024x1024" as const,
+  quality: "high" as const,
+  output_format: "png" as const,
+  partial_images: 0,
+};
 
 // ---------------------------------------------------------------------------
 // Routing
@@ -109,9 +129,10 @@ async function responsesChat(
   onDelta?: (text: string) => void,
 ): Promise<ChatResult> {
   const apiParams = toResponsesParams(params);
+  const imageIntent = params.imageIntent ?? "player_request";
 
   if (streaming && onDelta) {
-    return responsesStream(client, apiParams, onDelta);
+    return responsesStream(client, apiParams, onDelta, imageIntent);
   }
 
   const response = await client.responses.create({
@@ -119,7 +140,7 @@ async function responsesChat(
     stream: false,
   });
 
-  return fromResponsesResponse(response);
+  return fromResponsesResponse(response, imageIntent);
 }
 
 // ---------------------------------------------------------------------------
@@ -130,6 +151,7 @@ async function responsesStream(
   client: OpenAI,
   apiParams: ResponsesParams,
   onDelta: (text: string) => void,
+  imageIntent: "scene_snapshot" | "player_request" | "character_portrait",
 ): Promise<ChatResult> {
   const stream = client.responses.stream(apiParams);
 
@@ -190,7 +212,7 @@ async function responsesStream(
   // and parse tool calls from the output items directly. Reasoning is
   // passed in from the event-driven capture above. Map preserves insertion
   // order, which matches the order ids first appeared in the stream.
-  return fromResponsesResponseWithText(response, text, reasoningParts, [...encryptedReasoningById.values()]);
+  return fromResponsesResponseWithText(response, imageIntent, text, reasoningParts, [...encryptedReasoningById.values()]);
 }
 
 // ---------------------------------------------------------------------------
@@ -228,16 +250,32 @@ function toResponsesParams(params: ChatParams): ResponsesParams {
     input.push(...toResponsesInput(msg));
   }
 
-  // Tools
+  // Tools. The engine's `generate_image` sentinel is rewritten to the
+  // Responses API's native `image_generation` tool config; the model
+  // emits the resulting image as an `image_generation_call` output
+  // item rather than as a function call back to the caller (see
+  // fromResponsesResponseWithText for the inverse).
   let tools: OpenAI.Responses.Tool[] | undefined;
   if (params.tools?.length) {
-    tools = params.tools.map((t) => ({
-      type: "function" as const,
-      name: t.name,
-      description: t.description ?? undefined,
-      parameters: t.inputSchema as Record<string, unknown>,
-      strict: false,
-    }));
+    const functionTools: OpenAI.Responses.Tool[] = [];
+    let imageGenRequested = false;
+    for (const t of params.tools) {
+      if (t.name === GENERATE_IMAGE_TOOL_NAME) {
+        imageGenRequested = true;
+        continue;
+      }
+      functionTools.push({
+        type: "function" as const,
+        name: t.name,
+        description: t.description ?? undefined,
+        parameters: t.inputSchema as Record<string, unknown>,
+        strict: false,
+      });
+    }
+    if (imageGenRequested) {
+      functionTools.push(IMAGE_GENERATION_TOOL_CONFIG);
+    }
+    if (functionTools.length > 0) tools = functionTools;
   }
 
   // Reasoning config. When any effort is set we also opt into encrypted
@@ -308,7 +346,10 @@ function toResponsesInput(msg: NormalizedMessage): OpenAI.Responses.ResponseInpu
       }
     }
 
-    // Iterate in order to preserve text ↔ tool_use interleaving
+    // Iterate in order to preserve text ↔ tool_use ↔ image_generated
+    // interleaving. Image-generation calls are replayed as the
+    // ResponseItem.ImageGenerationCall variant — the Responses API accepts
+    // it as a valid input item alongside function_call, message, etc.
     let pendingText = "";
     for (const part of msg.content) {
       if (part.type === "text") {
@@ -324,6 +365,19 @@ function toResponsesInput(msg: NormalizedMessage): OpenAI.Responses.ResponseInpu
           call_id: part.id,
           name: part.name,
           arguments: JSON.stringify(part.input),
+        });
+      } else if (part.type === "image_generated") {
+        // Flush any accumulated text before the image item so order is
+        // preserved on replay.
+        if (pendingText) {
+          items.push({ type: "message", role: "assistant", content: pendingText });
+          pendingText = "";
+        }
+        items.push({
+          type: "image_generation_call",
+          id: part.id,
+          result: part.base64,
+          status: "completed",
         });
       }
       // Reasoning parts already emitted above.
@@ -349,6 +403,27 @@ function toResponsesInput(msg: NormalizedMessage): OpenAI.Responses.ResponseInpu
     });
   }
 
+  // User messages: if any image_input parts are present, emit a multimodal
+  // content array so the model receives the visual context (party
+  // portraits, etc.) alongside the text. When no images are present,
+  // stay on the simpler string-content path.
+  const hasImages = msg.content.some((p) => p.type === "image_input");
+  if (hasImages) {
+    const content: OpenAI.Responses.ResponseInputContent[] = [];
+    for (const part of msg.content) {
+      if (part.type === "text") {
+        content.push({ type: "input_text", text: part.text });
+      } else if (part.type === "image_input") {
+        content.push({
+          type: "input_image",
+          detail: part.lowDetail ? "low" : "auto",
+          image_url: `data:${part.mimeType};base64,${part.base64}`,
+        });
+      }
+    }
+    return [{ type: "message", role: "user", content }];
+  }
+
   // Regular user text
   const text = msg.content
     .filter((p) => p.type === "text")
@@ -361,8 +436,11 @@ function toResponsesInput(msg: NormalizedMessage): OpenAI.Responses.ResponseInpu
 // Response mapping: Responses API → normalized
 // ---------------------------------------------------------------------------
 
-function fromResponsesResponse(response: OAIResponse): ChatResult {
-  return fromResponsesResponseWithText(response);
+function fromResponsesResponse(
+  response: OAIResponse,
+  imageIntent: "scene_snapshot" | "player_request" | "character_portrait",
+): ChatResult {
+  return fromResponsesResponseWithText(response, imageIntent);
 }
 
 /**
@@ -392,6 +470,7 @@ function fromResponsesResponse(response: OAIResponse): ChatResult {
  */
 function fromResponsesResponseWithText(
   response: OAIResponse,
+  imageIntent: "scene_snapshot" | "player_request" | "character_portrait",
   accumulatedText?: string,
   accumulatedReasoning?: string[],
   accumulatedEncryptedReasoning?: { id: string; encryptedContent: string; summary: string[] }[],
@@ -434,6 +513,24 @@ function fromResponsesResponseWithText(
       const input = parseToolArgs(item.arguments);
       toolCalls.push({ id: item.call_id, name: item.name, input });
       assistantContent.push({ type: "tool_use", id: item.call_id, name: item.name, input });
+    } else if (item.type === "image_generation_call") {
+      // Failures (refusal, network, quota) are silently skipped — the spec
+      // mandates that a failed image gen leaves no trace in the rendered
+      // output (no placeholder, no separator). The DM's next turn sees no
+      // image-input ContentPart and continues normally. revised_prompt is
+      // captured if surfaced (SDK at this version doesn't type it; cast
+      // through unknown to read it without losing strict types elsewhere).
+      if (item.status === "completed" && item.result) {
+        const revisedPrompt = (item as unknown as { revised_prompt?: string }).revised_prompt;
+        assistantContent.push({
+          type: "image_generated",
+          id: item.id,
+          base64: item.result,
+          mimeType: "image/png",
+          intent: imageIntent,
+          ...(revisedPrompt ? { revisedPrompt } : {}),
+        });
+      }
     } else if (item.type === "reasoning" && accumulatedReasoning === undefined) {
       // Non-streaming path. The streaming path's SDK accumulator is
       // unreliable for reasoning items (see the responsesStream comment),
