@@ -163,13 +163,19 @@ async function walkSetupToPortraitVerdict({ harness, log }: ScenarioContext): Pr
       return;
     }
 
-    // Wait for the setup-agent to settle.
+    // Wait for the setup-agent to settle. Originally we also required
+    // `activeChoices != null || currentTurn open` so we knew there was
+    // something to act on, but that fights the post-portrait flow: after a
+    // successful image_gen + "look right?" continuation, the engine
+    // genuinely settles into idle (no open turn, no overlay) with
+    // narrative grown. The verdict has already been logged at this
+    // point — we just need to fall through and let readVerdict() catch
+    // it. If we need to drive another input, the dispatch below handles
+    // both shapes (overlay → pick, anything else → free-text).
     const snapshot = await harness.waitForState(
       (s) =>
         s.engineState === "waiting_input" &&
-        s.narrativeLines.length > baselineNarrative &&
-        (s.activeChoices !== null ||
-         (s.currentTurn !== null && s.currentTurn.status === "open")),
+        s.narrativeLines.length > baselineNarrative,
       {
         description: "setup-agent settled at waiting_input with new narrative",
         timeoutMs: DEFAULT_LONG_TIMEOUT_MS,
