@@ -27,6 +27,7 @@ import { handleImageGenerated } from "../image-handler.js";
 import { campaignPaths } from "../../tools/filesystem/index.js";
 import { norm } from "../../utils/paths.js";
 import { slugify } from "../../utils/slug.js";
+import { logEvent } from "../../context/engine-log.js";
 
 // --- Types ---
 
@@ -496,6 +497,18 @@ export function createSetupConversation(
     ? [...BASE_TOOLS, ...IMAGE_GEN_TOOLS]
     : BASE_TOOLS;
 
+  // Breadcrumb so the harness can confirm setup-agent actually believes it
+  // should be doing portraits. If this is false in a live image-gen smoke
+  // test, the consent gate or capability detection is the culprit, not
+  // the image API.
+  logEvent("setup:image_tools_registered", {
+    model,
+    imageGenSupported,
+    portraitLoopActive,
+    hasFileIO: !!fileIO,
+    hasSetupRoot: !!setupRoot,
+  });
+
   /**
    * Drafts persisted during this turn. Lifted into the SetupTurnResult so
    * the caller can broadcast a `display_image` TUI command for each.
@@ -510,16 +523,36 @@ export function createSetupConversation(
    * portrait loop is gated off.
    */
   async function captureImageDrafts(result: ChatResult): Promise<void> {
-    if (!portraitLoopActive || !fileIO || !setupRoot) return;
+    if (!portraitLoopActive || !fileIO || !setupRoot) {
+      // Useful for the harness to distinguish "loop off" from "loop on but
+      // model didn't emit": if the model called generate_image but we're
+      // gated off, captureImageDrafts won't fire — nothing on disk
+      // wouldn't necessarily mean the API failed.
+      const imageParts = result.assistantContent.filter((p) => p.type === "image_generated").length;
+      if (imageParts > 0) {
+        logEvent("setup:image_capture_gated", {
+          imageParts,
+          portraitLoopActive,
+          hasFileIO: !!fileIO,
+          hasSetupRoot: !!setupRoot,
+        });
+      }
+      return;
+    }
     for (const part of result.assistantContent) {
       if (part.type !== "image_generated") continue;
       try {
         const persisted = await handleImageGenerated(fileIO, setupRoot, null, part);
         const absPath = norm(`${setupRoot}/${persisted.relPath}`);
         turnImageDisplays.push({ filename: absPath, intent: "character_portrait" });
-      } catch {
+      } catch (e) {
         // Persist failure is non-fatal; the model can call generate_image
-        // again on the next turn if the player nudges.
+        // again on the next turn if the player nudges. Log so the harness
+        // can tell "we tried and threw" from "we never got an image_generated
+        // part at all".
+        logEvent("setup:image_capture_failed", {
+          error: e instanceof Error ? e.message : String(e),
+        });
       }
     }
   }

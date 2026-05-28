@@ -20,6 +20,7 @@ import { join, relative } from "node:path";
 import type { FileIO } from "./scene-manager.js";
 import { campaignPaths } from "../tools/filesystem/index.js";
 import { norm } from "../utils/paths.js";
+import { logEvent } from "../context/engine-log.js";
 
 export interface ImageHandlerScene {
   sceneNumber: number;
@@ -68,6 +69,14 @@ export async function handleImageGenerated(
   const absImage = paths.image(basename);
   const bytes = decodeBase64(part.base64);
   await fileIO.writeBinaryFile(absImage, bytes);
+  // Last hop in the on-disk chain — if image_gen:completed fired but this
+  // crumb doesn't appear, persistence (not generation) is at fault.
+  logEvent("image_gen:persisted", {
+    id: part.id,
+    intent: part.intent,
+    path: norm(absImage),
+    bytes: bytes.length,
+  });
 
   // Sidecar JSON — small audit record alongside the image. Never load-bearing
   // for rendering; purely for debugging ("what was the model actually asking

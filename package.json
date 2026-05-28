@@ -18,6 +18,7 @@
     "e2e": "node --import tsx/esm packages/test-harness/bin/run.ts",
     "e2e:golden-path": "npm run e2e -- golden-path",
     "e2e:boot": "npm run e2e -- boot-and-quit",
+    "e2e:image-setup": "npm run e2e -- image-setup",
     "dist": "node scripts/build-dist.js",
     "explorer": "node tools/campaign-explorer/scripts/dev.js",
     "theme-editor": "node tools/theme-editor/scripts/dev.js"

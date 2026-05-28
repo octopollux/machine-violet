@@ -18,7 +18,7 @@
  * requested. Long scenarios should put shutdown() in a `finally` block.
  */
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -32,6 +32,12 @@ import {
 } from "./wait.js";
 import type { ClientStateSnapshot, ActiveChoices } from "./client-state.js";
 import { choiceLabel } from "./client-state.js";
+import {
+  readEngineLog,
+  waitForEngineEvent,
+  formatEngineEvent,
+  type EngineLogEvent,
+} from "./engine-log.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "../../..");
@@ -428,6 +434,80 @@ export class Harness {
       const body = await res.text().catch(() => "");
       throw new Error(`endSession failed: ${res.status} ${body}`);
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Engine log + filesystem inspection
+  // -------------------------------------------------------------------------
+
+  /**
+   * Read all structured events the engine has written to `.debug/engine.jsonl`
+   * so far. Returns [] if the engine hasn't written anything yet.
+   *
+   * Use this when you need a punctual snapshot. For "wait until event X
+   * appears" use {@link waitForEngineEvent}.
+   */
+  readEngineLog(): EngineLogEvent[] {
+    return readEngineLog(this.campaignsDir);
+  }
+
+  /**
+   * Wait until the engine log contains at least one event matching `match`.
+   * `match` is either an event name (`"image_gen:completed"`) or a predicate.
+   * Resolves with the first matching event.
+   *
+   * Scenarios that drive a slow async path (image generation, DM turn) should
+   * use this instead of poking at ClientState — the engine log carries
+   * intent + payload, not just "narrative grew."
+   */
+  async waitForEngineEvent(
+    match: string | ((e: EngineLogEvent) => boolean),
+    opts: Omit<WaitOptions, "description"> & { description?: string } = {},
+  ): Promise<EngineLogEvent> {
+    return waitForEngineEvent(this.campaignsDir, match, opts);
+  }
+
+  /**
+   * Resolve the absolute path of a campaign on disk. `__setup__` is the
+   * synthetic scratch campaign used during new-campaign setup.
+   */
+  campaignPath(campaignId: string): string {
+    return join(this.campaignsDir, campaignId);
+  }
+
+  /**
+   * List files inside a campaign subdirectory (e.g. `"campaign/images"`,
+   * `"characters"`). Returns absolute paths, sorted. Returns [] if the
+   * directory doesn't exist.
+   *
+   * Useful for asserting "the image actually landed on disk" after a
+   * portrait-loop turn completes.
+   */
+  listCampaignFiles(campaignId: string, subdir: string): string[] {
+    const root = join(this.campaignPath(campaignId), ...subdir.split(/[\\/]/));
+    if (!existsSync(root)) return [];
+    try {
+      return readdirSync(root)
+        .filter((name) => {
+          try {
+            return statSync(join(root, name)).isFile();
+          } catch {
+            return false;
+          }
+        })
+        .sort()
+        .map((name) => join(root, name));
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Pretty-print the engine log tail. Useful in failure paths so the
+   * scenario runner dumps something diagnostic alongside /screen + /state.
+   */
+  engineLogTail(n = 50): string {
+    return this.readEngineLog().slice(-n).map(formatEngineEvent).join("\n");
   }
 
   // -------------------------------------------------------------------------

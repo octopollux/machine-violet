@@ -23,8 +23,9 @@ import { Harness } from "../src/harness.js";
 import type { Scenario, ScenarioContext } from "../src/scenarios/types.js";
 import { bootAndQuit } from "../src/scenarios/boot-and-quit.js";
 import { goldenPath } from "../src/scenarios/golden-path.js";
+import { imageSetup } from "../src/scenarios/image-setup.js";
 
-const ALL_SCENARIOS: Scenario[] = [bootAndQuit, goldenPath];
+const ALL_SCENARIOS: Scenario[] = [bootAndQuit, goldenPath, imageSetup];
 
 function usage(): never {
   process.stderr.write(
@@ -93,6 +94,14 @@ async function main(): Promise<void> {
     try {
       const screen = await harness.getScreen();
       process.stderr.write(`\n  /screen:\n${screen.split("\n").map((l) => "    " + l).join("\n")}\n`);
+    } catch { /* ignore */ }
+    // Engine log tail — surfaces structured events (image_gen:*, api:retry,
+    // engine:error, ...) that the launcher's stdout/stderr never carries.
+    try {
+      const tail = harness.engineLogTail(80);
+      if (tail) {
+        process.stderr.write(`\n  Engine log tail (last 80 events):\n${tail.split("\n").map((l) => "    " + l).join("\n")}\n`);
+      }
     } catch { /* ignore */ }
   } finally {
     await harness.shutdown({ cleanup: !keep });

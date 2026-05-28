@@ -22,3 +22,11 @@ export {
   DEFAULT_LONG_TIMEOUT_MS,
   type WaitOptions,
 } from "./wait.js";
+export {
+  engineLogPath,
+  readEngineLog,
+  findEngineEvents,
+  waitForEngineEvent,
+  formatEngineEvent,
+  type EngineLogEvent,
+} from "./engine-log.js";

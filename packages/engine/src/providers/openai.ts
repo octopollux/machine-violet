@@ -286,6 +286,16 @@ function toResponsesParams(params: ChatParams): ResponsesParams {
     }
     if (imageGenRequested) {
       functionTools.push(IMAGE_GENERATION_TOOL_CONFIG);
+      // Breadcrumb so a smoke test can prove the tool actually got attached
+      // to the request — the most common silent failure for "no image
+      // appeared" is the engine never registering generate_image in the
+      // first place (config off, capability false, etc).
+      logEvent("image_gen:tool_registered", {
+        model: params.model,
+        intent: params.imageIntent ?? "player_request",
+        quality: IMAGE_GENERATION_TOOL_CONFIG.quality,
+        size: IMAGE_GENERATION_TOOL_CONFIG.size,
+      });
     }
     if (functionTools.length > 0) tools = functionTools;
   }
@@ -542,6 +552,16 @@ function fromResponsesResponseWithText(
           mimeType: "image/png",
           intent: imageIntent,
           ...(revisedPrompt ? { revisedPrompt } : {}),
+        });
+        // Counterpart to image_gen:tool_registered. Lets the harness assert
+        // not just that we asked, but that the model produced something —
+        // and gives a rough byte-size to distinguish a real image from a
+        // zero-length stub. base64 length × 0.75 ≈ raw bytes.
+        logEvent("image_gen:completed", {
+          id: item.id,
+          intent: imageIntent,
+          base64Length: item.result.length,
+          ...(revisedPrompt ? { revisedPromptPreview: revisedPrompt.slice(0, 120) } : {}),
         });
       } else {
         logEvent("image_gen:non_completed", {

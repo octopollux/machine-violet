@@ -245,13 +245,19 @@ export class SetupSession {
     // handles it identically.
     if (result.imageDisplays) {
       for (const display of result.imageDisplays) {
+        // Same wire shape as bridge.ts uses for the DM-emitted display_image
+        // TuiCommand. Spreading a typed object literal sidesteps excess-property
+        // checks against ActivityUpdateEvent's strict data shape — the client's
+        // event-handler reads filename/intent off the resulting payload either
+        // way. Matching bridge.ts is what keeps both paths rendering identically.
+        const cmd = {
+          type: "display_image" as const,
+          filename: display.filename,
+          intent: display.intent,
+        };
         this.broadcast({
           type: "activity:update",
-          data: {
-            engineState: "tui:display_image",
-            filename: display.filename,
-            intent: display.intent,
-          },
+          data: { engineState: `tui:${cmd.type}`, ...cmd },
         });
       }
     }
