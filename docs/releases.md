@@ -61,6 +61,14 @@ The workflow:
 
 RC releases are marked `--prerelease` on GitHub, skip Discord, and skip the Homebrew formula bump. Stable releases do all three.
 
+## Release-list hygiene
+
+The release UI is kept lean so humans can scan it:
+
+- **Nightly** — exactly one release ever exists. Each nightly run purges every release whose tag is `nightly` or starts with `nightly-` (catches both the rolling release and any orphan drafts from earlier cycles), then publishes a single rolling `nightly` release with the day's full notes and artifacts. Dated `nightly-*` *tags* remain in git for `git checkout`/changelog reproducibility and are pruned at 30 days.
+- **RC** — every RC in an in-flight cycle stays visible (rc.1, rc.2, …) so testers can compare. They all vanish the moment the matching stable ships.
+- **Stable** — `v*` releases accumulate forever. Cutting `v$X.$Y.$Z` deletes any `v$X.$Y.$Z-rc.*` releases (their tags stay in git for reproducibility) but never touches releases for other versions.
+
 ## Velopack channel notes
 
 - `vpk pack --channel <name>` produces `releases.<name>.json` and `assets.<name>.json` alongside the installer. These are uploaded as release assets and form the auto-update manifest the installed app polls.
