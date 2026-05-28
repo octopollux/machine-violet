@@ -94,6 +94,14 @@ export interface FileIO {
    * the image bytes.
    */
   writeBinaryFile?(path: string, bytes: Uint8Array): Promise<void>;
+  /**
+   * Read raw bytes (e.g. a character portrait PNG to embed in the DM's
+   * cached prefix as an image_input ContentPart). Optional for the same
+   * reason as writeBinaryFile; production fileIO always provides it.
+   * Callers that need bytes for an optional feature (portraits in DM
+   * context) should skip gracefully when absent rather than throwing.
+   */
+  readBinaryFile?(path: string): Promise<Uint8Array>;
 }
 
 /** Ordered cascade steps for scene transitions. Used for resume logic. */

@@ -44,6 +44,7 @@ import { createChoiceGeneratorSession, shouldGenerateChoices } from "./subagents
 import type { ChoiceGeneratorSession } from "./subagents/choice-generator.js";
 import { campaignPaths, parseFrontMatter, serializeEntity, formatChangelogEntry } from "../tools/filesystem/index.js";
 import { handleImageGenerated } from "./image-handler.js";
+import { loadDmPortraitMessage } from "./dm-portraits.js";
 import { runScribe } from "./subagents/scribe.js";
 import { promoteCharacter } from "./subagents/character-promotion.js";
 import { searchCampaign } from "./subagents/search-campaign.js";
@@ -118,6 +119,16 @@ export class GameEngine {
   /** Long-lived Haiku session for generating suggested responses.
    *  Lazy-initialized on first use, reset on scene transitions. */
   private choiceSession: ChoiceGeneratorSession | null = null;
+
+  /**
+   * Cached synthetic prefix message carrying PC portraits as `image_input`
+   * ContentParts. Built lazily on first DM turn and held for the engine's
+   * lifetime so portrait bytes don't re-read from disk every turn. Null
+   * means "no portraits on disk for any PC" — the DM context proceeds
+   * text-only. Invalidate by setting to undefined to trigger a rebuild
+   * (e.g. after the setup agent writes a new portrait mid-campaign).
+   */
+  private cachedPortraitMessage: NormalizedMessage | null | undefined = undefined;
 
   constructor(params: {
     provider: LLMProvider;
@@ -517,8 +528,23 @@ export class GameEngine {
       turnHolder: characterName,
     });
 
-    // Build message list
-    const messages: NormalizedMessage[] = [...this.conversation.getMessages()];
+    // Build message list. When PC portraits exist on disk and the
+    // provider supports image input, prepend a synthetic non-ephemeral
+    // user message carrying them as image_input ContentParts. The
+    // message sits inside the BP4 cached prefix, so portraits cost
+    // tokens once per cache write rather than every turn. Helper
+    // tolerates missing portraits silently — campaigns that skipped
+    // chargen portraits run text-only without throwing.
+    if (this.cachedPortraitMessage === undefined) {
+      this.cachedPortraitMessage = await loadDmPortraitMessage(
+        this.gameState.config.players,
+        this.fileIO,
+        this.gameState.campaignRoot,
+      );
+    }
+    const messages: NormalizedMessage[] = this.cachedPortraitMessage
+      ? [this.cachedPortraitMessage, ...this.conversation.getMessages()]
+      : [...this.conversation.getMessages()];
 
     // Build the user message: player input with system-generated preamble.
     // All injections (volatile context, behavioral reminders, scene pacing,
