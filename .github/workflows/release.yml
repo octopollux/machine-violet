@@ -401,8 +401,8 @@ jobs:
           ### Windows
           | | File |
           |---|---|
-          | **Installer** (recommended) | [\`MachineViolet-Setup.exe\`](https://github.com/${{ github.repository }}/releases/download/${TAG}/MachineViolet-Setup.exe) |
-          | Portable (no install) | [\`MachineViolet-Portable.zip\`](https://github.com/${{ github.repository }}/releases/download/${TAG}/MachineViolet-Portable.zip) |
+          | **Installer** (recommended) | [\`MachineViolet-stable-Setup.exe\`](https://github.com/${{ github.repository }}/releases/download/${TAG}/MachineViolet-stable-Setup.exe) |
+          | Portable (no install) | [\`MachineViolet-stable-Portable.zip\`](https://github.com/${{ github.repository }}/releases/download/${TAG}/MachineViolet-stable-Portable.zip) |
 
           ### macOS (Apple Silicon)
           | | File |
@@ -456,8 +456,8 @@ jobs:
           ### Windows
           | | File |
           |---|---|
-          | **Installer** | [\`MachineViolet-Setup.exe\`](https://github.com/${{ github.repository }}/releases/download/${TAG}/MachineViolet-Setup.exe) |
-          | Portable | [\`MachineViolet-Portable.zip\`](https://github.com/${{ github.repository }}/releases/download/${TAG}/MachineViolet-Portable.zip) |
+          | **Installer** | [\`MachineViolet-rc-Setup.exe\`](https://github.com/${{ github.repository }}/releases/download/${TAG}/MachineViolet-rc-Setup.exe) |
+          | Portable | [\`MachineViolet-rc-Portable.zip\`](https://github.com/${{ github.repository }}/releases/download/${TAG}/MachineViolet-rc-Portable.zip) |
 
           ### macOS (Apple Silicon)
           | | File |
