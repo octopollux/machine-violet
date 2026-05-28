@@ -319,9 +319,13 @@ jobs:
             printf '%s\n' "$CHANGES"
           } > /tmp/user-prompt.txt
 
-          # Build JSON request body safely via jq (reads file, no shell interpolation)
+          # Build JSON request body safely via jq (reads file, no shell interpolation).
+          # Sonnet (not Haiku) — Haiku's player-facing summaries had noticeable
+          # intelligence regressions at this prompt size. Nightlies are frequent
+          # so cost adds up faster than for stable, but the daily-token budget
+          # is still small relative to user value.
           jq -n --rawfile prompt /tmp/user-prompt.txt \
-            '{model:"claude-haiku-4-5-20251001", max_tokens:1024,
+            '{model:"claude-sonnet-4-6", max_tokens:1024,
               messages:[{role:"user",content:$prompt}]}' > /tmp/api-request.json
 
           # Call the API
