@@ -66,7 +66,23 @@ export type NarrativeLine =
   | { kind: "dev"; text: string; tag?: string }
   | { kind: "system"; text: string; tag?: string }
   | { kind: "separator"; text: string; tag?: string }
-  | { kind: "spacer"; text: string; tag?: string };
+  | { kind: "spacer"; text: string; tag?: string }
+  /**
+   * Inline-rendered image, pushed when the engine emits a `display_image`
+   * TUI command after persisting a generated PNG. `text` is the absolute
+   * filesystem path the renderer hands to ink-picture (or the plain-text
+   * fallback when the terminal has no graphics protocol). `intent` lets
+   * the renderer choose framing (scene snapshot vs. player-requested vs.
+   * character portrait), though current rendering treats all three the
+   * same. Per spec, exactly one separator NarrativeLine precedes an
+   * image line; failed image generations never produce this kind.
+   */
+  | {
+      kind: "image";
+      text: string;
+      intent: "scene_snapshot" | "player_request" | "character_portrait";
+      tag?: string;
+    };
 
 /** A fully processed line ready for rendering — nodes are pre-parsed, healed, wrapped, and quote-highlighted. */
 export interface ProcessedLine {

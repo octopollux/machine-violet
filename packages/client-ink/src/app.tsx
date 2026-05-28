@@ -19,6 +19,7 @@ import {
   type ClientState,
 } from "./event-handler.js";
 import { GameProvider } from "./tui/game-context.js";
+import { TerminalInfoProvider } from "ink-picture";
 import { PlayingPhase } from "./phases/PlayingPhase.js";
 import { MainMenuPhase } from "./phases/MainMenuPhase.js";
 import type { CampaignEntry } from "./phases/MainMenuPhase.js";
@@ -694,7 +695,17 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
       onReturnToMenu: returnToMenu,
       reportViewport,
     }}>
-      <PlayingPhase key={`${activeCampaignId}-${sessionKey}`} />
+      {/*
+        TerminalInfoProvider supplies terminal-capability + dimension context
+        used by <Image> in NarrativeArea to pick the right graphics protocol
+        (sixel / kitty / iTerm2 / half-block / ASCII). Mounted unconditionally
+        — image gen may be off, but the provider does no work until an Image
+        component asks it for capabilities, so the cost is a single context
+        push at mount.
+      */}
+      <TerminalInfoProvider>
+        <PlayingPhase key={`${activeCampaignId}-${sessionKey}`} />
+      </TerminalInfoProvider>
     </GameProvider>
   );
 }

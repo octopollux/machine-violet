@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback, useMemo, forwardRef } 
 import { Text, Box } from "ink";
 import { ScrollView } from "ink-scroll-view";
 import type { ScrollViewRef } from "ink-scroll-view";
+import Image from "ink-picture";
 import type { NarrativeLine, ProcessedLine } from "@machine-violet/shared/types/tui.js";
 import { processNarrativeLines } from "../formatting.js";
 import { renderNodes } from "../render-nodes.js";
@@ -294,6 +295,24 @@ const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
   // but are invisible to the formatting/healing pipeline.
   if (line.kind === "spacer") {
     return <Text>{" "}</Text>;
+  }
+
+  // Image lines render the generated PNG via ink-picture, which handles
+  // terminal-protocol selection (sixel / kitty / iTerm2 inline) with
+  // half-block/braille/ASCII fallback. `text` is the absolute path the
+  // engine wrote the file to. Width caps at the narrative column so
+  // narrow terminals don't get a clipped image; ink-picture's resizer
+  // preserves aspect ratio. Wrapped in a Box with a min-width so the
+  // surrounding separator pair lays out predictably.
+  if (line.kind === "image") {
+    const path = typeof line.nodes[0] === "string" ? line.nodes[0] : "";
+    if (!path) return <Text dimColor>[image: missing path]</Text>;
+    const imgWidth = Math.max(40, Math.min(width ?? 80, 80));
+    return (
+      <Box flexDirection="column" alignItems="center">
+        <Image src={path} width={imgWidth} alt="generated image" />
+      </Box>
+    );
   }
 
   // Separator lines render with built-in blank lines above and below,

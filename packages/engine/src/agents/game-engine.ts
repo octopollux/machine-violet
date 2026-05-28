@@ -1482,7 +1482,10 @@ export class GameEngine {
         // Persist the image and emit a TUI command so the client can
         // render it inline between separators. Errors are caught and
         // logged — a write failure shouldn't kill the DM turn, and the
-        // model's next reply can acknowledge or ignore the loss.
+        // model's next reply can acknowledge or ignore the loss. We
+        // emit the absolute path so the client can hand it directly
+        // to ink-picture without re-resolving against the campaign
+        // root (which the client doesn't track in its own state).
         try {
           const scene = this.sceneManager.getScene();
           const result = await handleImageGenerated(
@@ -1491,9 +1494,11 @@ export class GameEngine {
             { sceneNumber: scene.sceneNumber, slug: scene.slug || "untitled" },
             part,
           );
+          const absPath = norm(`${this.gameState.campaignRoot}/${result.relPath}`);
           this.callbacks.onTuiCommand({
             type: "display_image",
-            filename: result.relPath,
+            filename: absPath,
+            relPath: result.relPath,
             intent: part.intent,
           });
         } catch (e) {
