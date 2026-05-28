@@ -86,6 +86,14 @@ export interface FileIO {
   deleteFile?(path: string): Promise<void>;
   /** Remove an empty directory. Rejects if the directory is not empty. */
   rmdir?(path: string): Promise<void>;
+  /**
+   * Write raw bytes (e.g. a generated PNG). Optional so existing test
+   * mocks that only need text I/O don't have to change; production
+   * implementations always provide this. The image-handler errors
+   * loudly if it's absent at runtime — better than silently dropping
+   * the image bytes.
+   */
+  writeBinaryFile?(path: string, bytes: Uint8Array): Promise<void>;
 }
 
 /** Ordered cascade steps for scene transitions. Used for resume logic. */

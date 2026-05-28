@@ -11,6 +11,7 @@ export function campaignDirs(root: string): string[] {
     join(root, "campaign"),
     join(root, "campaign", "scenes"),
     join(root, "campaign", "session-recaps"),
+    join(root, "campaign", "images"),
     join(root, "characters"),
     join(root, "locations"),
     join(root, "factions"),
@@ -80,6 +81,19 @@ export function campaignPaths(root: string) {
     dmNotes: join(root, "campaign", "dm-notes.md"),
     compendium: join(root, "campaign", "compendium.json"),
     playerNotes: join(root, "campaign", "player-notes.md"),
+    imagesDir: join(root, "campaign", "images"),
+    /**
+     * Path for a generated image file (PNG by convention). Caller picks
+     * the basename — see image-handler.ts for the naming scheme that
+     * encodes intent + scene + timestamp.
+     */
+    image: (filename: string) => join(root, "campaign", "images", filename),
+    /**
+     * Confirmed character portrait, sitting next to the character's `.md`
+     * file. Setup-agent writes to this path after the player accepts a
+     * draft from the show-and-confirm loop.
+     */
+    characterPortrait: (name: string) => join(root, "characters", `${slugify(name)}-portrait.png`),
   };
 }
 

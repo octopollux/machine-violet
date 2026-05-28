@@ -43,6 +43,7 @@ import { aiPlayerTurn } from "./subagents/ai-player.js";
 import { createChoiceGeneratorSession, shouldGenerateChoices } from "./subagents/choice-generator.js";
 import type { ChoiceGeneratorSession } from "./subagents/choice-generator.js";
 import { campaignPaths, parseFrontMatter, serializeEntity, formatChangelogEntry } from "../tools/filesystem/index.js";
+import { handleImageGenerated } from "./image-handler.js";
 import { runScribe } from "./subagents/scribe.js";
 import { promoteCharacter } from "./subagents/character-promotion.js";
 import { searchCampaign } from "./subagents/search-campaign.js";
@@ -1464,6 +1465,28 @@ export class GameEngine {
           this.dmProvidedChoicesThisTurn = true;
         }
         this.callbacks.onTuiCommand(cmd);
+      },
+      onImageGenerated: async (part) => {
+        // Persist the image and emit a TUI command so the client can
+        // render it inline between separators. Errors are caught and
+        // logged — a write failure shouldn't kill the DM turn, and the
+        // model's next reply can acknowledge or ignore the loss.
+        try {
+          const scene = this.sceneManager.getScene();
+          const result = await handleImageGenerated(
+            this.sceneManager.getFileIO(),
+            this.gameState.campaignRoot,
+            { sceneNumber: scene.sceneNumber, slug: scene.slug || "untitled" },
+            part,
+          );
+          this.callbacks.onTuiCommand({
+            type: "display_image",
+            filename: result.relPath,
+            intent: part.intent,
+          });
+        } catch (e) {
+          this.callbacks.onDevLog?.(`[image] persist failed: ${e instanceof Error ? e.message : String(e)}`);
+        }
       },
       onRetry: (status, delayMs) => this.callbacks.onRetry(status, delayMs),
       onRollback: () => this.callbacks.onRollback?.(),
