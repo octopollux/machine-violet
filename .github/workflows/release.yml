@@ -359,6 +359,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Default bash on ubuntu-latest is `-eo pipefail`, but state it
+          # explicitly so a `gh api` listing failure fails the step instead
+          # of silently leaving stale RC releases in the UI.
+          set -eo pipefail
+
           # Once stable v$VERSION ships, the v$VERSION-rc.* prereleases that
           # led up to it are dead weight in the release UI. Delete the GitHub
           # releases (their tags stay — useful for `git checkout v$VERSION-rc.N`
@@ -372,6 +377,7 @@ jobs:
                 case "$tag" in
                   "${PREFIX}"*)
                     echo "Deleting release $tag (id $id)"
+                    # Individual delete failures (404, race) are tolerated.
                     gh api -X DELETE "repos/${{ github.repository }}/releases/$id" || true
                     ;;
                 esac

@@ -344,6 +344,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Default bash on ubuntu-latest is `-eo pipefail`, but state it
+          # explicitly so a `gh api` failure (rate limit, auth, network) at
+          # the head of the pipe fails the step instead of silently leaving
+          # old releases behind.
+          set -eo pipefail
+
           # Delete every release whose tag is "nightly" or starts with "nightly-".
           # This includes the existing rolling release, all dated nightly releases
           # (success or draft), and any orphan drafts left behind when tags were
@@ -356,6 +362,8 @@ jobs:
                 case "$tag" in
                   nightly|nightly-*)
                     echo "Deleting release $tag (id $id)"
+                    # Individual delete failures (404, race) are tolerated —
+                    # we want partial progress, not all-or-nothing.
                     gh api -X DELETE "repos/${{ github.repository }}/releases/$id" || true
                     ;;
                 esac
