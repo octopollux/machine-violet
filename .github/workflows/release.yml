@@ -335,8 +335,11 @@ jobs:
             printf '%s\n' "$CHANGES"
           } > /tmp/user-prompt.txt
 
+          # Sonnet (not Haiku) — Haiku's player-facing summaries had noticeable
+          # intelligence regressions at this prompt size. The cost bump for the
+          # few hundred input tokens per release is negligible.
           jq -n --rawfile prompt /tmp/user-prompt.txt \
-            '{model:"claude-haiku-4-5-20251001", max_tokens:1024,
+            '{model:"claude-sonnet-4-6", max_tokens:1024,
               messages:[{role:"user",content:$prompt}]}' > /tmp/api-request.json
 
           RESPONSE=$(curl -sf https://api.anthropic.com/v1/messages \
