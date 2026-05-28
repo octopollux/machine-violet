@@ -30,7 +30,7 @@ import type { CampaignConfig, ChoiceFrequency } from "@machine-violet/shared/typ
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { useGameContext } from "../tui/game-context.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
-import { buildTranscriptHtml } from "../commands/transcript.js";
+import { buildTranscriptHtml, loadImageBytes } from "../commands/transcript.js";
 import { openPath, revealInExplorer } from "../commands/open-path.js";
 
 export function PlayingPhase() {
@@ -151,6 +151,11 @@ export function PlayingPhase() {
   const saveTranscript = useCallback(async () => {
     const playerColor = stateSnapshot?.players?.[activePlayerIndex]?.color ?? "#55ff55";
     const separatorColor = themeColor(theme, "separator") ?? "#666666";
+    // Pre-load image bytes referenced in the transcript so the exported
+    // HTML is self-contained (single file with inline base64 data: URIs).
+    // Read failures are silently skipped; the HTML renderer emits an
+    // "[image unavailable]" placeholder for any missing entry.
+    const imageBytes = await loadImageBytes(narrativeLines);
     const html = buildTranscriptHtml({
       narrativeLines,
       width: cols,
@@ -159,6 +164,7 @@ export function PlayingPhase() {
       separatorColor,
       playerColor,
       quoteColor: "#ffffff",
+      imageBytes,
     });
     try {
       const { path } = await apiClient.saveTranscript(html);
