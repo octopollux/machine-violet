@@ -114,7 +114,7 @@ All cuts dispatch GitHub workflows via `gh`. Common commands:
 | Promote RC → stable | `gh workflow run cut-release.yml --ref release -f kind=stable -f bump=none` | Tags the version that's been RC'd. Purges that line's RC releases as part of publish. |
 | Cut stable, no RC soak | `gh workflow run cut-release.yml --ref release -f kind=stable -f bump=patch` | For hotfixes / confident small changes. `minor`/`major` also valid. |
 | Force a nightly now | `gh workflow run nightly.yml --ref main` | Useful when you've changed the nightly pipeline and want immediate verification, or to refresh the release-list cleanup. |
-| Test a Windows build without releasing | `gh workflow run test-build.yml -f windows=true` | Per `feedback_test_build_workflow.md`, run this on any build/installer/signing PR before merge. |
+| Test a Windows build without releasing | `gh workflow run test-build.yml -f windows=true` | Run on any PR touching build/installer/signing before merging — the Windows signing path has no other pre-merge coverage. |
 
 `cut-release.yml` self-aborts if dispatched from any branch but `release` — the `--ref release` arg is mandatory.
 
