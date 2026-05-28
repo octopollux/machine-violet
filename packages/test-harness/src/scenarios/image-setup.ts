@@ -51,21 +51,23 @@ import { formatEngineEvent } from "../engine-log.js";
 // diagnostics — but the consent step won't be tested explicitly.
 const CONSENT_PROMPT_NEEDLE = "do you want images in your game";
 
-// Budget for the image-gen API call itself. medium quality typically
-// resolves in 15-45s; we give it 3x headroom because we'd rather wait than
-// false-fail the scenario.
-const IMAGE_GEN_TIMEOUT_MS = 180_000;
-
 // Outer ceiling for walking setup until we either see a portrait or
 // conclude one will never come. Generous — setup-agent text turns are
-// 30-60s each and we may need 4-6 of them before character details exist.
-const SETUP_PORTRAIT_BUDGET_MS = 12 * 60_000;
+// 30-60s each, the model typically only invokes generate_image after 4-8
+// turns of chargen, and one image_generation call itself takes 15-45s.
+const SETUP_PORTRAIT_BUDGET_MS = 14 * 60_000;
 
 // Fold a hint into free-text answers so the setup-agent settles on a
 // concrete character description quickly. Without this it tends to ask
 // 4-5 clarifying questions before generating, blowing the time budget.
+// Aggressively front-loaded: name, system pref, character description,
+// and the "stop asking, just generate" cue. The agent's prompt instructs
+// it to honor "you decide"-style answers.
 const FREE_TEXT_DEFAULT_ANSWER =
-  "you decide. Surprise me with a fantasy world. Make me a stoic human ranger with a green cloak. Skip any further questions.";
+  "You decide everything. Quick start in a classic-fantasy world, light system. " +
+  "My name is Player. Character name: Kade. Kade is a stoic human ranger in a green cloak, " +
+  "longbow at the ready, standing on a forest road at dusk. " +
+  "Don't ask me anything else — generate the portrait now and then finalize.";
 
 export const imageSetup: Scenario = {
   id: "image-setup",
@@ -187,25 +189,15 @@ async function walkSetupToPortraitVerdict({ harness, log }: ScenarioContext): Pr
     // waits for *further* growth.
     baselineNarrative = snapshot.narrativeLines.length;
 
-    // If we've seen image_gen:tool_registered, the next API roundtrip
-    // includes the image generation. Wait it out specifically rather than
-    // looping more text turns — gen takes 15-45s and can easily exceed a
-    // normal text-turn wait.
-    if (harness.readEngineLog().some((e) => e.event === "image_gen:tool_registered")) {
-      log(`  image_gen:tool_registered seen — waiting up to ${IMAGE_GEN_TIMEOUT_MS}ms for the call to settle`);
-      const v = await harness.waitForEngineEvent(
-        (e) => e.event === "image_gen:completed" || e.event === "image_gen:non_completed",
-        {
-          description: "image_gen call completes (success or known-failure)",
-          timeoutMs: IMAGE_GEN_TIMEOUT_MS,
-        },
-      );
-      log(`  Verdict: ${v.event}`);
-      assertVerdictArtifacts(harness, v.event, log);
-      return;
-    }
+    // image_gen:tool_registered fires on every request once the portrait
+    // loop is on — it just means the request *carried* the tool config,
+    // not that the model actually invoked it. The model only emits
+    // image_generation_call after a few turns of chargen, so we don't
+    // gate on tool_registered. Verdict checks happen at the top of each
+    // iteration via readVerdict(); if a verdict appeared during the
+    // waitForState above, we already returned.
 
-    // Otherwise drive the next agent turn.
+    // Drive the next agent turn.
     const fp = snapshot.activeChoices ? choiceFingerprint(snapshot.activeChoices) : null;
     const stale = fp !== null && submittedFingerprints.has(fp);
 
