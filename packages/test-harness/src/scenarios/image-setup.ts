@@ -281,6 +281,18 @@ function assertVerdictArtifacts(harness: Harness, event: string, log: (m: string
     }
   });
   log(`  ${pngs.length} PNG(s) on disk: ${sizes.join(", ")}`);
+
+  // Did the setup-agent's image-only continuation fire? Log either way;
+  // it's a strong signal whether the runTurn loop correctly re-prompted
+  // after the hosted image_generation call left text empty.
+  const continuations = harness
+    .readEngineLog()
+    .filter((e) => e.event === "setup:image_only_continuation");
+  if (continuations.length > 0) {
+    log(`  setup:image_only_continuation fired ${continuations.length}x — model produced image-only and the continuation loop re-prompted for the follow-up.`);
+  } else {
+    log("  setup:image_only_continuation did NOT fire — model either emitted prose alongside the image or the loop took a different path.");
+  }
 }
 
 // ---------------------------------------------------------------------------
