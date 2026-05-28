@@ -1153,6 +1153,33 @@ describe("Responses API image generation", () => {
     expect(result.assistantContent[0]).toMatchObject({ type: "image_generated", intent: "player_request" });
   });
 
+  it("surfaces image bytes when status is non-terminal but result is present", async () => {
+    // Regression: the Responses API empirically returns image_generation_call
+    // items with `status: "generating"` and a populated `result` field on
+    // some non-streaming responses. Gating on `status === "completed"` dropped
+    // those images on the floor. We now gate on `result` presence and just
+    // log the off-nominal status as a breadcrumb.
+    mockResponses.create.mockResolvedValue(fakeResponse({
+      output: [{
+        type: "image_generation_call",
+        id: "ig_99",
+        status: "generating",
+        result: "INTERMEDIATEBUTVALIDPNG",
+      }],
+    }));
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    const result = await provider.chat(baseChatParams({ imageIntent: "character_portrait" }));
+
+    expect(result.assistantContent).toEqual([{
+      type: "image_generated",
+      id: "ig_99",
+      base64: "INTERMEDIATEBUTVALIDPNG",
+      mimeType: "image/png",
+      intent: "character_portrait",
+    }]);
+  });
+
   it("silently skips failed image_generation_call — no ContentPart emitted", async () => {
     mockResponses.create.mockResolvedValue(fakeResponse({
       output: [
