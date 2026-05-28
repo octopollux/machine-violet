@@ -103,7 +103,26 @@ Two long-lived branches: **`main`** (trunk, builds nightlies) and **`release`** 
 2. Fix on a branch from there, PR into that long-lived branch.
 3. Ask whether the *other* long-lived branch has the same code path. If yes, the fix needs to land there too — cherry-pick or re-apply by hand. Do this both directions (release→main *and* main→release as appropriate).
 
-Cuts go through the **Cut Release** workflow (kind=stable|rc, bump=none|patch|minor|major). Full flow + bootstrap notes in [docs/releases.md](docs/releases.md).
+### Cutting releases
+
+All cuts dispatch GitHub workflows via `gh`. Common commands:
+
+| User asks | Command | Notes |
+|---|---|---|
+| Cut next RC (new patch) | `gh workflow run cut-release.yml --ref release -f kind=rc -f bump=patch` | Bumps `package.json` then tags `vX.Y.Z-rc.1`. Use `bump=minor`/`major` for new minor/major lines. |
+| Cut another RC, same line | `gh workflow run cut-release.yml --ref release -f kind=rc -f bump=none` | Tags `vX.Y.Z-rc.(N+1)` — counter auto-increments off existing tags. |
+| Promote RC → stable | `gh workflow run cut-release.yml --ref release -f kind=stable -f bump=none` | Tags the version that's been RC'd. Purges that line's RC releases as part of publish. |
+| Cut stable, no RC soak | `gh workflow run cut-release.yml --ref release -f kind=stable -f bump=patch` | For hotfixes / confident small changes. `minor`/`major` also valid. |
+| Force a nightly now | `gh workflow run nightly.yml --ref main` | Useful when you've changed the nightly pipeline and want immediate verification, or to refresh the release-list cleanup. |
+| Test a Windows build without releasing | `gh workflow run test-build.yml -f windows=true` | Run on any PR touching build/installer/signing before merging — the Windows signing path has no other pre-merge coverage. |
+
+`cut-release.yml` self-aborts if dispatched from any branch but `release` — the `--ref release` arg is mandatory.
+
+Once dispatched, watch with the background pattern: `gh run watch <run-id> --exit-status > /tmp/log 2>&1` via `Bash` with `run_in_background: true`. The harness re-invokes you on exit. Don't poll.
+
+After cutting an RC or stable, the workflow files you touch (`release.yml`, `cut-release.yml`) may have changes that need cherry-picking onto `release` if they were merged into `main` first. The bidirectional cherry-pick rule above applies.
+
+Full flow, Velopack manifest details, Azure OIDC notes, and bootstrap history in [docs/releases.md](docs/releases.md).
 
 ## Worktrees
 
