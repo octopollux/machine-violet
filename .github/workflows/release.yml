@@ -335,8 +335,11 @@ jobs:
             printf '%s\n' "$CHANGES"
           } > /tmp/user-prompt.txt
 
+          # Sonnet (not Haiku) for stable + RC release notes — we ship these
+          # to end users, the modest cost increase buys noticeably tighter
+          # phrasing and better signal/noise. Nightlies stay on Haiku.
           jq -n --rawfile prompt /tmp/user-prompt.txt \
-            '{model:"claude-haiku-4-5-20251001", max_tokens:1024,
+            '{model:"claude-sonnet-4-6", max_tokens:1024,
               messages:[{role:"user",content:$prompt}]}' > /tmp/api-request.json
 
           RESPONSE=$(curl -sf https://api.anthropic.com/v1/messages \
