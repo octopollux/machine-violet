@@ -24,6 +24,13 @@ export interface CampaignSettingsModalProps {
   /** Persists an edited DM turn length (percent). Called on Enter when the value changed. */
   onDmTurnLengthPctChange?: (value: number) => void | Promise<void>;
   /**
+   * Persists an edited image-generation preference. Called on Enter when
+   * the value changed. The setting takes effect on the next DM turn; the
+   * game-engine reads the preference per-turn when deciding whether to
+   * include the generate_image tool in the DM's tool list.
+   */
+  onImageGenerationChange?: (value: "on" | "off") => void | Promise<void>;
+  /**
    * Client-side global default applied when the campaign has no saved value.
    * Defaults to DM_TURN_LENGTH_PCT_DEFAULT (80).
    */
@@ -45,7 +52,12 @@ function normalize(value: string | undefined): ChoiceFrequency {
   return "never";
 }
 
-type FocusRow = "choices" | "length";
+type FocusRow = "choices" | "length" | "images";
+
+/** Image-gen preference normalization: only "off" is explicitly opt-out. */
+function imagesOnFromConfig(value: CampaignConfig["image_generation"]): boolean {
+  return value !== "off";
+}
 
 /**
  * Campaign settings shown from the in-campaign ESC menu.
@@ -64,6 +76,7 @@ export function CampaignSettingsModal({
   onDismiss,
   onChoicesFrequencyChange,
   onDmTurnLengthPctChange,
+  onImageGenerationChange,
   globalDmTurnLengthPctDefault,
 }: CampaignSettingsModalProps) {
   const initialFreq = normalize(config.choices?.campaign_default);
@@ -71,13 +84,16 @@ export function CampaignSettingsModal({
   const initialPct = clampDmTurnLengthPct(
     config.dm_turn_length_pct ?? globalDmTurnLengthPctDefault ?? DM_TURN_LENGTH_PCT_DEFAULT,
   );
+  const initialImages = imagesOnFromConfig(config.image_generation);
   const [freq, setFreq] = useState<ChoiceFrequency>(initialFreq);
   const [pct, setPct] = useState<number>(initialPct);
+  const [imagesOn, setImagesOn] = useState<boolean>(initialImages);
   const [focus, setFocus] = useState<FocusRow>("choices");
   const [saving, setSaving] = useState(false);
   const dirtyFreq = freq !== initialFreq;
   const dirtyPct = pct !== initialPct;
-  const dirty = dirtyFreq || dirtyPct;
+  const dirtyImages = imagesOn !== initialImages;
+  const dirty = dirtyFreq || dirtyPct || dirtyImages;
 
   const commit = useCallback(async () => {
     if (!dirty) {
@@ -93,25 +109,47 @@ export function CampaignSettingsModal({
       if (dirtyPct && onDmTurnLengthPctChange) {
         tasks.push(Promise.resolve(onDmTurnLengthPctChange(pct)));
       }
+      if (dirtyImages && onImageGenerationChange) {
+        tasks.push(Promise.resolve(onImageGenerationChange(imagesOn ? "on" : "off")));
+      }
       await Promise.all(tasks);
     } finally {
       setSaving(false);
     }
     onDismiss();
-  }, [dirty, dirtyFreq, dirtyPct, freq, pct, onChoicesFrequencyChange, onDmTurnLengthPctChange, onDismiss]);
+  }, [
+    dirty, dirtyFreq, dirtyPct, dirtyImages,
+    freq, pct, imagesOn,
+    onChoicesFrequencyChange, onDmTurnLengthPctChange, onImageGenerationChange,
+    onDismiss,
+  ]);
+
+  // Row order: choices → length → images. Up/down step through them;
+  // left/right adjust the focused row. The images toggle treats either
+  // left or right as a flip (binary state).
+  const FOCUS_ORDER: FocusRow[] = ["choices", "length", "images"];
+  const stepFocus = (delta: -1 | 1) => {
+    setFocus((f) => {
+      const idx = FOCUS_ORDER.indexOf(f);
+      const next = Math.max(0, Math.min(FOCUS_ORDER.length - 1, idx + delta));
+      return FOCUS_ORDER[next];
+    });
+  };
 
   useInput((_input, key) => {
     if (saving) return;
-    if (key.upArrow) { setFocus("choices"); return; }
-    if (key.downArrow) { setFocus("length"); return; }
+    if (key.upArrow) { stepFocus(-1); return; }
+    if (key.downArrow) { stepFocus(1); return; }
     if (key.leftArrow) {
       if (focus === "choices") {
         setFreq((f) => {
           const idx = CHOICE_FREQUENCY_LEVELS.indexOf(f);
           return CHOICE_FREQUENCY_LEVELS[Math.max(0, idx - 1)];
         });
-      } else {
+      } else if (focus === "length") {
         setPct((p) => Math.max(DM_TURN_LENGTH_PCT_MIN, p - DM_TURN_LENGTH_PCT_STEP));
+      } else {
+        setImagesOn((v) => !v);
       }
       return;
     }
@@ -121,8 +159,10 @@ export function CampaignSettingsModal({
           const idx = CHOICE_FREQUENCY_LEVELS.indexOf(f);
           return CHOICE_FREQUENCY_LEVELS[Math.min(CHOICE_FREQUENCY_LEVELS.length - 1, idx + 1)];
         });
-      } else {
+      } else if (focus === "length") {
         setPct((p) => Math.min(DM_TURN_LENGTH_PCT_MAX, p + DM_TURN_LENGTH_PCT_STEP));
+      } else {
+        setImagesOn((v) => !v);
       }
       return;
     }
@@ -144,6 +184,13 @@ export function CampaignSettingsModal({
   const pctArrowsR = focus === "length" ? "▸" : " ";
   const pctValue = focus === "length" ? `[${pct}%]` : ` ${pct}% `;
   const pctLine = `  ${pctArrows} ${pctValue} ${pctArrowsR}    (range ${DM_TURN_LENGTH_PCT_MIN}–${DM_TURN_LENGTH_PCT_MAX}%, default ${DM_TURN_LENGTH_PCT_DEFAULT}%)`;
+
+  // Image Generation toggle — shown as "[On]" / "[Off]" with arrows when focused.
+  const imgArrows = focus === "images" ? "◂" : " ";
+  const imgArrowsR = focus === "images" ? "▸" : " ";
+  const imgLabel = imagesOn ? "On" : "Off";
+  const imgValue = focus === "images" ? `[${imgLabel}]` : ` ${imgLabel} `;
+  const imgLine = `  ${imgArrows} ${imgValue} ${imgArrowsR}`;
 
   const hintLine = saving
     ? "  Saving..."
@@ -172,6 +219,12 @@ export function CampaignSettingsModal({
   lines.push("    100% = actual size. 80% is a useful starting nudge.");
   lines.push("");
   lines.push(pctLine);
+  lines.push("");
+  lines.push(focus === "images" ? "  ▶ Image Generation" : "    Image Generation");
+  lines.push("    When on, the DM can illustrate moments inline. Requires");
+  lines.push("    a provider/model that supports image generation.");
+  lines.push("");
+  lines.push(imgLine);
   lines.push("");
   lines.push(hintLine);
 

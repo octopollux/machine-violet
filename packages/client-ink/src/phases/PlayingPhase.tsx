@@ -586,6 +586,11 @@ export function PlayingPhase() {
               dm_turn_length_pct: value,
             }).catch(() => { /* ignore — same rationale as Choices Frequency above */ });
           }}
+          onImageGenerationChange={async (value: "on" | "off") => {
+            await apiClient.patchSettings({
+              image_generation: value,
+            }).catch(() => { /* ignore — same rationale as Choices Frequency above */ });
+          }}
           globalDmTurnLengthPctDefault={dmTurnLengthPctDefault}
         />
       )}
