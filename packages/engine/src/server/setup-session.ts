@@ -151,6 +151,13 @@ export class SetupSession {
   async start(): Promise<void> {
     const knownPlayers = await this.scanKnownPlayers();
     const paths = machinePaths(this.homeDir);
+    // The __setup__ scratch campaign is materialized by SessionManager
+    // before startSetup() is called. createSetupConversation uses it as
+    // the on-disk root for portrait drafts (__setup__/campaign/images/)
+    // and the confirmed portrait (__setup__/characters/<slug>-portrait.png),
+    // which world-builder picks up at finalize and ports into the new
+    // campaign.
+    const setupRoot = join(this.campaignsDir, "__setup__");
     this.conversation = createSetupConversation(this.provider, this.model, knownPlayers, (status, delayMs) => {
       this.broadcast({
         type: "error",
@@ -162,7 +169,7 @@ export class SetupSession {
           category: "retryable",
         },
       });
-    }, paths.worldsDir, paths.personalitiesDir);
+    }, paths.worldsDir, paths.personalitiesDir, this.fileIO, setupRoot);
     this.started = true;
 
     this.emitThinking();
@@ -231,6 +238,23 @@ export class SetupSession {
 
   private async handleResult(result: SetupTurnResult): Promise<{ finalized?: string; campaignName?: string }> {
     this.broadcast({ type: "narrative:complete", data: { text: result.text } });
+
+    // Portrait drafts: broadcast a display_image TUI command for each so
+    // the client renders the draft inline. Same wire shape as the DM
+    // playing-phase emits — the existing event-handler in client-ink
+    // handles it identically.
+    if (result.imageDisplays) {
+      for (const display of result.imageDisplays) {
+        this.broadcast({
+          type: "activity:update",
+          data: {
+            engineState: "tui:display_image",
+            filename: display.filename,
+            intent: display.intent,
+          },
+        });
+      }
+    }
 
     // Present choices to the client
     if (result.pendingChoices) {

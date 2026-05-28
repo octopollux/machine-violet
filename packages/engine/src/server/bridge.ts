@@ -246,6 +246,7 @@ function routeTuiCommand(
     case "set_resource_values":
     case "resource_refresh":
     case "set_theme":
+    case "display_image":
       broadcast({
         type: "activity:update",
         data: { engineState: `tui:${command.type}`, ...command },

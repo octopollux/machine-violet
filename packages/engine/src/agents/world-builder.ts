@@ -126,6 +126,25 @@ export async function buildCampaignWorld(
     }
   }
 
+  // 9. Copy the confirmed character portrait (if any) from the __setup__
+  // scratch campaign into the new campaign's characters/ dir. The setup
+  // agent's set_portrait tool wrote it to
+  // <campaignsDir>/__setup__/characters/<slug>-portrait.png. Missing file
+  // is the no-portraits case — proceed silently.
+  if (fileIO.readBinaryFile && fileIO.writeBinaryFile) {
+    const setupPortraitPath = norm(`${campaignsDir}/__setup__/characters/${charSlug}-portrait.png`);
+    const targetPortraitPath = norm(paths.characterPortrait(result.characterName));
+    if (await fileIO.exists(setupPortraitPath)) {
+      try {
+        const bytes = await fileIO.readBinaryFile(setupPortraitPath);
+        await fileIO.writeBinaryFile(targetPortraitPath, bytes);
+      } catch {
+        // Non-fatal: campaign succeeds without a portrait, DM context
+        // injection skips this PC, life goes on.
+      }
+    }
+  }
+
   return root;
 }
 
