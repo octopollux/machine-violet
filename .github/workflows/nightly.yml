@@ -340,11 +340,39 @@ jobs:
           echo "$NOTES" >> "$GITHUB_OUTPUT"
           echo "NOTES_EOF" >> "$GITHUB_OUTPUT"
 
-      - name: Create dated nightly release
+      - name: Purge previous nightly releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Default bash on ubuntu-latest is `-eo pipefail`, but state it
+          # explicitly so a `gh api` failure (rate limit, auth, network) at
+          # the head of the pipe fails the step instead of silently leaving
+          # old releases behind.
+          set -eo pipefail
+
+          # Delete every release whose tag is "nightly" or starts with "nightly-".
+          # This includes the existing rolling release, all dated nightly releases
+          # (success or draft), and any orphan drafts left behind when tags were
+          # pruned in earlier cycles. We always recreate exactly one rolling
+          # release in the next step, so the steady state is "1 nightly release
+          # visible in the UI."
+          gh api --paginate "repos/${{ github.repository }}/releases" \
+            --jq '.[] | "\(.id) \(.tag_name)"' \
+            | while read -r id tag; do
+                case "$tag" in
+                  nightly|nightly-*)
+                    echo "Deleting release $tag (id $id)"
+                    # Individual delete failures (404, race) are tolerated —
+                    # we want partial progress, not all-or-nothing.
+                    gh api -X DELETE "repos/${{ github.repository }}/releases/$id" || true
+                    ;;
+                esac
+              done
+
+      - name: Publish rolling nightly release
         env:
           GH_TOKEN: ${{ github.token }}
           NIGHTLY_TAG: ${{ steps.tags.outputs.tag }}
-          PREV_TAG: ${{ steps.tags.outputs.prev }}
           RELEASE_NOTES: ${{ steps.changelog.outputs.notes }}
         run: |
           DATE="${{ steps.tags.outputs.date }}"
@@ -355,29 +383,36 @@ jobs:
             RELEASE_NOTES="Internal improvements and maintenance."
           fi
 
+          # Force the rolling `nightly` git tag onto the build commit.
+          # The previous-step purge removed the corresponding release; the
+          # tag itself we re-point here so stable download URLs keep working.
+          git push --delete origin nightly 2>/dev/null || true
+          COMMIT=$(git rev-parse "$NIGHTLY_TAG")
+          git tag -f nightly "$COMMIT"
+          git push origin nightly
+
           cat > nightly-body.md << 'BODYEOF'
           ## Download
 
           ### Windows
           | | File |
           |---|---|
-          | **Installer** (recommended) | [`MachineViolet-nightly-Setup.exe`](https://github.com/REPO_PLACEHOLDER/releases/download/TAG_PLACEHOLDER/MachineViolet-nightly-Setup.exe) |
-          | Portable (no install) | [`MachineViolet-nightly-Portable.zip`](https://github.com/REPO_PLACEHOLDER/releases/download/TAG_PLACEHOLDER/MachineViolet-nightly-Portable.zip) |
+          | **Installer** (recommended) | [`MachineViolet-nightly-Setup.exe`](https://github.com/REPO_PLACEHOLDER/releases/download/nightly/MachineViolet-nightly-Setup.exe) |
+          | Portable (no install) | [`MachineViolet-nightly-Portable.zip`](https://github.com/REPO_PLACEHOLDER/releases/download/nightly/MachineViolet-nightly-Portable.zip) |
 
           ### macOS (Apple Silicon)
           | | File |
           |---|---|
-          | Tarball | [`machine-violet-nightly-darwin-arm64.tar.gz`](https://github.com/REPO_PLACEHOLDER/releases/download/TAG_PLACEHOLDER/machine-violet-nightly-darwin-arm64.tar.gz) |
+          | Tarball | [`machine-violet-nightly-darwin-arm64.tar.gz`](https://github.com/REPO_PLACEHOLDER/releases/download/nightly/machine-violet-nightly-darwin-arm64.tar.gz) |
 
           ### Linux (x64)
           | | File |
           |---|---|
-          | Tarball | [`machine-violet-nightly-linux-x64.tar.gz`](https://github.com/REPO_PLACEHOLDER/releases/download/TAG_PLACEHOLDER/machine-violet-nightly-linux-x64.tar.gz) |
+          | Tarball | [`machine-violet-nightly-linux-x64.tar.gz`](https://github.com/REPO_PLACEHOLDER/releases/download/nightly/machine-violet-nightly-linux-x64.tar.gz) |
 
           Also available via Homebrew: `brew install octopollux/mv-tap/machine-violet`
           BODYEOF
           sed -i 's/^          //' nightly-body.md
-          sed -i "s|TAG_PLACEHOLDER|${NIGHTLY_TAG}|g" nightly-body.md
           sed -i "s|REPO_PLACEHOLDER|${REPO}|g" nightly-body.md
 
           # Append release notes safely (no shell expansion of AI content)
@@ -391,40 +426,13 @@ jobs:
             echo ""
             echo "---"
             echo ""
-            echo "Automated nightly build from \`main\` · \`${NIGHTLY_TAG}\`. **Not a stable release.**"
+            echo "Automated nightly build from \`main\` · \`${NIGHTLY_TAG}\` (${DATE}). **Not a stable release.**"
           } >> nightly-body.md
 
-          # Attach artifacts to the dated tag (the real, permanent release)
-          gh release create "$NIGHTLY_TAG" \
+          gh release create nightly \
             --repo ${{ github.repository }} \
             --title "Nightly ($DATE)" \
             --notes-file nightly-body.md \
-            --prerelease \
-            artifacts/MachineViolet-* \
-            artifacts/machine-violet-nightly-* \
-            artifacts/releases.nightly.json \
-            artifacts/assets.nightly.json
-
-      - name: Update rolling nightly release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          NIGHTLY_TAG: ${{ steps.tags.outputs.tag }}
-        run: |
-          # Delete existing rolling release + tag, then recreate pointing
-          # at the same commit as the dated tag. This keeps stable download
-          # URLs (e.g. .../download/nightly/...) working.
-          gh release delete nightly --yes --repo ${{ github.repository }} 2>/dev/null || true
-          git push --delete origin nightly 2>/dev/null || true
-
-          COMMIT=$(git rev-parse "$NIGHTLY_TAG")
-          git tag -f nightly "$COMMIT"
-          git push origin nightly
-
-          # Clone the dated release body for the rolling release
-          gh release create nightly \
-            --repo ${{ github.repository }} \
-            --title "Nightly (latest)" \
-            --notes "See [${NIGHTLY_TAG}](https://github.com/${{ github.repository }}/releases/tag/${NIGHTLY_TAG}) for full release notes." \
             --prerelease \
             --target "$COMMIT" \
             artifacts/MachineViolet-* \
