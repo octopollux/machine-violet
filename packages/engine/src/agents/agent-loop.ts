@@ -53,6 +53,21 @@ export interface AgentLoopConfig {
   onToolEnd?: (name: string, result: ToolResult) => void;
   /** Called when the full response is complete */
   onComplete?: (usage: UsageStats) => void;
+  /**
+   * Called once per `image_generated` ContentPart emitted by the provider
+   * during this turn. The handler typically persists bytes to disk and
+   * pushes a visual cue to the client. Awaited per-image so a slow file
+   * write delays the next tool round (intentional — we don't want a
+   * second image queued before the first is on disk). Failed image
+   * generations never reach this callback.
+   */
+  onImageGenerated?: (part: {
+    id: string;
+    base64: string;
+    mimeType: string;
+    intent: "scene_snapshot" | "player_request" | "character_portrait";
+    revisedPrompt?: string;
+  }) => void | Promise<void>;
   /** Called on error */
   onError?: (error: Error) => void;
   /** Called when a retryable API error triggers a backoff wait */
@@ -147,6 +162,7 @@ async function runAgentLoopInternal(
     onToolStart: config.onToolStart,
     onToolEnd: config.onToolEnd,
     onComplete: config.onComplete,
+    onImageGenerated: config.onImageGenerated,
     onError: config.onError,
     onRetry: config.onRetry,
     onRollback: config.onRollback,
