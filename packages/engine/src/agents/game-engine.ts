@@ -1442,11 +1442,23 @@ export class GameEngine {
   }
 
   private buildAgentConfig(): AgentLoopConfig {
+    // Image gen is gated on BOTH provider capability and campaign
+    // preference. Treat any non-"off" preference (including unset and
+    // undefined for legacy campaigns) as opt-in for now — phase 8 wires
+    // the setup-agent's explicit consent question, after which "unset"
+    // shouldn't occur for new campaigns. Existing campaigns get image
+    // gen enabled by default when the provider supports it, which
+    // matches the spec's "default on when capability is present" intent.
+    const capability = this.provider.getCapabilities?.(this.model).imageGeneration ?? false;
+    const preference = this.gameState.config.image_generation;
+    const imageGenEnabled = capability && preference !== "off";
+
     return {
       model: this.model,
       provider: this.provider,
       maxTokens: getMaxOutput(this.model),
       maxToolRounds: 10,
+      imageGenEnabled,
       asyncToolHandler: (name, input) => this.handleAsyncToolInternal(name, input),
       onTextDelta: (delta) => this.callbacks.onNarrativeDelta(delta),
       onToolStart: (name) => {

@@ -1,7 +1,8 @@
 import type { ToolRegistry, ToolResult } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
 import { runProviderLoop } from "../providers/agent-loop-bridge.js";
-import type { LLMProvider, NormalizedMessage, SystemBlock } from "../providers/types.js";
+import type { LLMProvider, NormalizedMessage, NormalizedTool, SystemBlock } from "../providers/types.js";
+import { GENERATE_IMAGE_TOOL_NAME } from "../providers/types.js";
 
 // --- TUI tools ---
 
@@ -68,6 +69,17 @@ export interface AgentLoopConfig {
     intent: "scene_snapshot" | "player_request" | "character_portrait";
     revisedPrompt?: string;
   }) => void | Promise<void>;
+  /**
+   * When true, append the `generate_image` sentinel tool to the DM's
+   * tool list so providers with native image generation enable their
+   * built-in tool (OpenAI Responses API: `image_generation`; Codex:
+   * `ToolSpec::ImageGeneration`). When false or absent, the tool is
+   * omitted and the DM has no way to request an image. Caller is
+   * responsible for verifying both `provider.getCapabilities(model)
+   * .imageGeneration` AND the campaign preference before flipping
+   * this on — the agent loop trusts the flag verbatim.
+   */
+  imageGenEnabled?: boolean;
   /** Called on error */
   onError?: (error: Error) => void;
   /** Called when a retryable API error triggers a backoff wait */
@@ -146,6 +158,38 @@ async function runAgentLoopInternal(
     ? async (name: string, input: Record<string, unknown>) => (await asyncHandler(name, input)) ?? registry.dispatch(gameState, name, input)
     : (name: string, input: Record<string, unknown>) => registry.dispatch(gameState, name, input);
 
+  // Tool list: registry definitions (minus DM_EXCLUDED_TOOLS), plus the
+  // `generate_image` sentinel when image generation is gated on. The
+  // sentinel is never dispatched — providers with native image gen
+  // intercept the name in their request mapper and rewrite to the
+  // provider's built-in image-generation tool config. Providers without
+  // native support that somehow received this tool would surface it as a
+  // regular function_call back through ChatResult.toolCalls; the registry
+  // has no handler for it, so the dispatch would return an error result.
+  // Gating prevents that path from being reached.
+  const tools: NormalizedTool[] = registry.getDefinitions(DM_EXCLUDED_TOOLS);
+  if (config.imageGenEnabled) {
+    tools.push({
+      name: GENERATE_IMAGE_TOOL_NAME,
+      description:
+        "Generate one illustrated image rendered inline with this response. " +
+        "Provide a vivid descriptive prompt covering subject, composition, mood, " +
+        "and style. The caption (if any) should be composed into the image itself " +
+        "as a printed plate, not emitted as separate text. Use sparingly — at most " +
+        "one image per turn.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          prompt: {
+            type: "string",
+            description: "Vivid description of the image to render, including any in-image caption text.",
+          },
+        },
+        required: ["prompt"],
+      },
+    });
+  }
+
   const result = await runProviderLoop(provider, systemPrompt, messages, {
     name: "dm",
     model: config.model,
@@ -153,7 +197,7 @@ async function runAgentLoopInternal(
     maxToolRounds: config.maxToolRounds,
     effort: config.effort,
     stream,
-    tools: registry.getDefinitions(DM_EXCLUDED_TOOLS),
+    tools,
     toolHandler,
     cacheHints: [{ target: "tools", ttl: "1h" }, { target: "messages" }],
     tuiToolNames: TUI_TOOLS,
