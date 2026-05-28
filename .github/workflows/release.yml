@@ -335,9 +335,9 @@ jobs:
             printf '%s\n' "$CHANGES"
           } > /tmp/user-prompt.txt
 
-          # Sonnet (not Haiku) for stable + RC release notes — we ship these
-          # to end users, the modest cost increase buys noticeably tighter
-          # phrasing and better signal/noise. Nightlies stay on Haiku.
+          # Sonnet (not Haiku) — Haiku's player-facing summaries had noticeable
+          # intelligence regressions at this prompt size. The cost bump for the
+          # few hundred input tokens per release is negligible.
           jq -n --rawfile prompt /tmp/user-prompt.txt \
             '{model:"claude-sonnet-4-6", max_tokens:1024,
               messages:[{role:"user",content:$prompt}]}' > /tmp/api-request.json
