@@ -1197,7 +1197,11 @@ describe("Responses API image generation", () => {
     expect(result.text).toBe("I tried, no luck.");
   });
 
-  it("replays image_generated assistant content as image_generation_call input item", async () => {
+  it("drops image_generated assistant content on replay (avoids 404 under store:false)", async () => {
+    // Regression: replaying image_generation_call as an input item makes
+    // OpenAI 404 ("Items are not persisted when `store` is set to false")
+    // because the engine sets store:false. The fix drops the item from the
+    // replay; the assistant text around it is preserved.
     mockResponses.create.mockResolvedValue(fakeResponse());
 
     const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
@@ -1223,11 +1227,11 @@ describe("Responses API image generation", () => {
     }));
 
     const callArgs = mockResponses.create.mock.calls[0][0];
-    // Expect: user → assistant text → image_generation_call → user.
+    // Expect: user → assistant text → user. The image_generation_call is
+    // intentionally absent.
     expect(callArgs.input).toEqual([
       { type: "message", role: "user", content: "Draw a fountain." },
       { type: "message", role: "assistant", content: "Here you go:" },
-      { type: "image_generation_call", id: "ig_prev", result: "PREVPNG", status: "completed" },
       { type: "message", role: "user", content: "Make it brighter." },
     ]);
   });
