@@ -353,10 +353,18 @@ export class SessionManager {
 
     // Create a temp campaign directory for setup state.
     // Clean up any previous setup state first (inspectable between runs).
+    // Scaffold the full standard campaign dir tree (state/, characters/,
+    // campaign/images/, etc.) so the setup-conversation has a real
+    // campaign on disk for things like portrait-draft writes — keeps
+    // image-handler's mkdir(recursive) defensive but means tools that
+    // assume the tree exists never get a surprise on the setup path.
     const setupRoot = join(this.campaignsDir, "__setup__");
     const { mkdir, rm } = await import("node:fs/promises");
     await rm(setupRoot, { recursive: true, force: true });
-    await mkdir(join(setupRoot, "state"), { recursive: true });
+    const { campaignDirs } = await import("../tools/filesystem/index.js");
+    for (const dir of campaignDirs(setupRoot)) {
+      await mkdir(dir, { recursive: true });
+    }
 
     // Build a minimal GameState so turns, context dumps, etc. work
     const setupConfig: CampaignConfig = {
