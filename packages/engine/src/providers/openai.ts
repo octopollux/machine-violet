@@ -31,17 +31,24 @@ import { supportsImageGeneration } from "../config/model-registry.js";
  * Native `image_generation` tool config sent to the Responses API when the
  * caller included {@link GENERATE_IMAGE_TOOL_NAME} in the normalized tool
  * list. Hardcoded to the spec's defaults: 1024×1024 (accommodates
- * non-humanoid PCs in portraits and works for scene snapshots), high
+ * non-humanoid PCs in portraits and works for scene snapshots), medium
  * quality (HD-ish per user direction), PNG, no partial-image streaming
  * (MV never streams images). `gpt-image-2` is the latest output model;
  * passed as a string since the SDK's typed enum only knows through
  * `gpt-image-1.5` — the API still accepts any image-gen model id.
+ *
+ * Quality is `medium` rather than `high`. At TUI render sizes (sixel
+ * scaling to ~60-80 columns) the visible difference is negligible, but
+ * `high` regularly takes 60-180s wall-clock per image vs ~15-30s for
+ * `medium` — a smoke-test deal-breaker. If a user explicitly wants
+ * gallery-quality output they can render bigger later from the source
+ * PNG; we optimize the inline loop for responsiveness.
  */
 const IMAGE_GENERATION_TOOL_CONFIG = {
   type: "image_generation" as const,
   model: "gpt-image-2",
   size: "1024x1024" as const,
-  quality: "high" as const,
+  quality: "medium" as const,
   output_format: "png" as const,
   partial_images: 0,
 };

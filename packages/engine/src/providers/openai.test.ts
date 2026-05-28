@@ -1070,7 +1070,7 @@ describe("Responses API image generation", () => {
     expect(callArgs.tools[1]).toMatchObject({
       type: "image_generation",
       size: "1024x1024",
-      quality: "high",
+      quality: "medium",
       output_format: "png",
       partial_images: 0,
     });
