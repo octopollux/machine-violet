@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { getMaxOutput, loadModelRegistry } from "./model-registry.js";
+import { getMaxOutput, loadModelRegistry, supportsImageGeneration } from "./model-registry.js";
 
 /**
  * `getMaxOutput` is the single source of truth for `max_tokens` on every API
@@ -41,5 +41,26 @@ describe("getMaxOutput", () => {
       expect(max, `model ${id}`).toBeGreaterThan(0);
       expect(Number.isInteger(max), `model ${id}`).toBe(true);
     }
+  });
+});
+
+describe("supportsImageGeneration", () => {
+  beforeEach(() => {
+    loadModelRegistry(undefined, { reset: true });
+  });
+
+  it("returns true for shipped OpenAI flagship models", () => {
+    expect(supportsImageGeneration("gpt-5.5")).toBe(true);
+    expect(supportsImageGeneration("gpt-4o")).toBe(true);
+  });
+
+  it("returns false for current Anthropic models (no inline image gen yet)", () => {
+    expect(supportsImageGeneration("claude-opus-4-7")).toBe(false);
+    expect(supportsImageGeneration("claude-sonnet-4-6")).toBe(false);
+    expect(supportsImageGeneration("claude-haiku-4-5-20251001")).toBe(false);
+  });
+
+  it("returns false for unknown models — safer default than assuming yes", () => {
+    expect(supportsImageGeneration("model-that-does-not-exist")).toBe(false);
   });
 });

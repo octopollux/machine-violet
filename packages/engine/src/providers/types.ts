@@ -48,7 +48,44 @@ export type ContentPart =
    * (kept here only so a turn round-trips identically through persistence).
    * Anthropic ignores this variant when serializing back to its API.
    */
-  | { type: "reasoning"; id: string; encryptedContent: string; summary: string[] };
+  | { type: "reasoning"; id: string; encryptedContent: string; summary: string[] }
+  /**
+   * Image emitted by the provider's native image-generation tool as part of
+   * the assistant turn. Stored in conversation history so transcripts and
+   * compaction see the same content the model produced. Captions are
+   * composed inside the image itself (printed as part of the pixels — see
+   * the spec) so this variant carries no separate caption string.
+   *
+   * `revisedPrompt` is whatever string the provider exposes as the prompt
+   * it actually used (OpenAI's `image_generation_call.revised_prompt`).
+   * Stored for audit/debug; never rendered.
+   *
+   * `intent` distinguishes the three trigger sites so disk-naming and
+   * downstream behavior (e.g. portrait persistence) can branch without
+   * re-deriving it from context.
+   */
+  | {
+      type: "image_generated";
+      id: string;
+      base64: string;
+      mimeType: string;
+      revisedPrompt?: string;
+      intent: "scene_snapshot" | "player_request" | "character_portrait";
+    }
+  /**
+   * Image attached to a user/assistant message as input to the model.
+   * Used to embed character portraits in the DM's cached prefix so the
+   * model sees its party visually as well as textually. `lowDetail`
+   * requests the cheapest available detail tier (OpenAI: `detail: "low"`,
+   * flat 85 input tokens; other providers use their smallest tier).
+   */
+  | {
+      type: "image_input";
+      base64: string;
+      mimeType: "image/png" | "image/jpeg" | "image/webp";
+      lowDetail?: boolean;
+      label?: string;
+    };
 
 /** A conversation message in normalized form. */
 export interface NormalizedMessage {
@@ -76,6 +113,20 @@ export interface NormalizedTool {
   description: string;
   inputSchema: Record<string, unknown>;
 }
+
+/**
+ * Sentinel tool name the engine uses to request the provider's native
+ * image-generation capability for a turn. When a provider sees this name
+ * in `params.tools`, it removes it from the normalized tool list and
+ * substitutes the provider-specific native shape (OpenAI Responses API:
+ * `{ type: "image_generation" }`; Codex: `ToolSpec::ImageGeneration`).
+ * The model's resulting image lands in `assistantContent` as an
+ * `image_generated` ContentPart — never as a NormalizedToolCall.
+ *
+ * Providers without image-generation support strip this tool name
+ * silently so the model never sees it as an option.
+ */
+export const GENERATE_IMAGE_TOOL_NAME = "generate_image";
 
 /** A tool call extracted from a model response. */
 export interface NormalizedToolCall {
@@ -267,9 +318,33 @@ export interface HealthCheckResult {
 // Provider interface
 // ---------------------------------------------------------------------------
 
+/**
+ * Per-model capability surface. Synchronous, side-effect-free — providers
+ * answer from a static table (the model registry or a hardcoded predicate),
+ * never by calling the network. Used to gate prompt fragments and tool
+ * registrations before a chat() call is constructed.
+ */
+export interface ProviderCapabilities {
+  /**
+   * The model + provider can emit images inline as part of a chat turn
+   * via {@link GENERATE_IMAGE_TOOL_NAME}. When false, the engine omits
+   * the image-gen tool from the tool list and skips loading the
+   * image-related prompt fragments.
+   */
+  imageGeneration: boolean;
+}
+
 export interface LLMProvider {
   /** Provider identifier. */
   readonly providerId: string;
+
+  /**
+   * Capability lookup for a specific model id under this provider. Must be
+   * synchronous and pure — no network calls. Used by the agent loop / DM
+   * prompt assembly to decide whether to expose image-gen tooling and
+   * prompts for the upcoming turn.
+   */
+  getCapabilities(model: string): ProviderCapabilities;
 
   /** Send a message and get the full response. */
   chat(params: ChatParams): Promise<ChatResult>;

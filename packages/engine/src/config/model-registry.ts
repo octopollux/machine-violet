@@ -41,6 +41,12 @@ export interface ModelCapabilities {
   tools: boolean;
   streaming: boolean;
   caching: boolean;
+  /**
+   * Model supports inline image generation as part of a chat turn. When
+   * absent, treat as false — the field is opt-in so older registry entries
+   * don't have to be updated when a new capability bit is added.
+   */
+  imageGeneration?: boolean;
 }
 
 export interface TierDefaults {
@@ -196,4 +202,15 @@ export function getTierDefaults(provider: string, configDir?: string): TierDefau
  */
 export function listKnownModelIds(configDir?: string): string[] {
   return Object.keys(loadModelRegistry(configDir).models);
+}
+
+/**
+ * Whether the named model can emit inline image generation. Unknown models
+ * (custom OpenAI-compatible endpoints, off-registry overrides) default to
+ * false — the safer bet, since enabling the tool against a model that
+ * doesn't understand it produces noisy turn failures rather than a
+ * graceful skip.
+ */
+export function supportsImageGeneration(modelId: string, configDir?: string): boolean {
+  return getKnownModel(modelId, configDir)?.capabilities.imageGeneration === true;
 }

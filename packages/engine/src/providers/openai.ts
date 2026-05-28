@@ -24,6 +24,7 @@ import type {
   NormalizedUsage, ContentPart, StopReason,
 } from "./types.js";
 import { patchOrphanedToolUses } from "./orphan-patch.js";
+import { supportsImageGeneration } from "../config/model-registry.js";
 
 // ---------------------------------------------------------------------------
 // Routing
@@ -64,6 +65,12 @@ export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
 
   return {
     providerId,
+    getCapabilities: (model) => ({
+      // Only the Responses API path supports inline image generation. The
+      // Chat Completions fallback (custom OpenAI-compatible endpoints) has
+      // no `image_generation` tool, regardless of model.
+      imageGeneration: useResponsesAPI(providerId) && supportsImageGeneration(model),
+    }),
     chat: (params) => openaiChat(client, providerId, params, false),
     stream: (params, onDelta) => openaiChat(client, providerId, params, true, onDelta),
     healthCheck: (model) => openaiHealthCheck(client, providerId, model),

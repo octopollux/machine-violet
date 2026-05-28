@@ -23,6 +23,7 @@ export function makeMockProvider(textOrFn: string | (() => string)): LLMProvider
   });
   return {
     providerId: "test",
+    getCapabilities: () => ({ imageGeneration: false }),
     chat: vi.fn(async () => result()),
     stream: vi.fn(async (_p, onDelta) => { const r = result(); onDelta(r.text); return r; }),
     healthCheck: vi.fn(async () => ({ status: "valid" as const, message: "ok" })),
