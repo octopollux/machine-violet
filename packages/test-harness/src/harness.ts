@@ -84,19 +84,40 @@ export class Harness {
   /** Captured combined stdout/stderr from the child when stdio: "buffer". */
   readonly childLog: string[] = [];
 
+  /**
+   * Engine log start cutoff (ms since epoch). All readEngineLog /
+   * waitForEngineEvent reads filter to events with `t >= launchedAt`
+   * so stale entries from prior runs don't leak in.
+   *
+   * Why this matters: the engine log lives at
+   * `dirname(campaignsDir)/.debug/engine.jsonl`. With the harness's
+   * default ephemeral campaignsDir under `os.tmpdir()`, that resolves
+   * to a SHARED `tmpdir/.debug/engine.jsonl` across every harness run.
+   * Without the cutoff, a scenario could "pass" by finding an
+   * image_gen:completed event left over from yesterday's run.
+   */
+  readonly launchedAt: number;
+
   private constructor(
     private readonly child: ChildProcess,
     readonly serverPort: number,
     readonly agentPort: number,
     readonly campaignsDir: string,
     readonly ownsCampaignsDir: boolean,
-  ) {}
+    launchedAt: number,
+  ) {
+    this.launchedAt = launchedAt;
+  }
 
   // -------------------------------------------------------------------------
   // Launch + shutdown
   // -------------------------------------------------------------------------
 
   static async launch(opts: HarnessOptions = {}): Promise<Harness> {
+    // Capture the cutoff BEFORE we spawn so engine events emitted by the
+    // child are guaranteed to have `t >= launchedAt`. (Capturing later
+    // would race with the engine's startup events.)
+    const launchedAt = Date.now();
     const serverPort = opts.serverPort ?? pickEphemeralPort();
     const agentPort = opts.agentPort ?? pickEphemeralPort();
     const launchTimeoutMs = opts.launchTimeoutMs ?? 30_000;
@@ -198,7 +219,7 @@ export class Harness {
       throw err;
     }
 
-    const harness = new Harness(child, serverPort, agentPort, campaignsDir, ownsCampaignsDir);
+    const harness = new Harness(child, serverPort, agentPort, campaignsDir, ownsCampaignsDir, launchedAt);
     // Pipe captured log into the harness instance.
     if (stdio === "buffer") {
       for (const line of childLog) harness.childLog.push(line);
@@ -441,20 +462,25 @@ export class Harness {
   // -------------------------------------------------------------------------
 
   /**
-   * Read all structured events the engine has written to `.debug/engine.jsonl`
-   * so far. Returns [] if the engine hasn't written anything yet.
+   * Read structured events the engine has written to `.debug/engine.jsonl`
+   * since this harness instance was launched. Events from prior harness
+   * runs (the log file is shared across all runs that share a campaigns
+   * parent, including all e2e runs under `os.tmpdir()`) are filtered out
+   * via the {@link launchedAt} cutoff. Returns [] if the engine hasn't
+   * written anything yet.
    *
    * Use this when you need a punctual snapshot. For "wait until event X
    * appears" use {@link waitForEngineEvent}.
    */
   readEngineLog(): EngineLogEvent[] {
-    return readEngineLog(this.campaignsDir);
+    return readEngineLog(this.campaignsDir).filter((e) => e.t >= this.launchedAt);
   }
 
   /**
-   * Wait until the engine log contains at least one event matching `match`.
-   * `match` is either an event name (`"image_gen:completed"`) or a predicate.
-   * Resolves with the first matching event.
+   * Wait until the engine log contains at least one event matching `match`
+   * AND emitted after this harness instance launched. `match` is either an
+   * event name (`"image_gen:completed"`) or a predicate. Resolves with the
+   * first matching event.
    *
    * Scenarios that drive a slow async path (image generation, DM turn) should
    * use this instead of poking at ClientState — the engine log carries
@@ -464,7 +490,9 @@ export class Harness {
     match: string | ((e: EngineLogEvent) => boolean),
     opts: Omit<WaitOptions, "description"> & { description?: string } = {},
   ): Promise<EngineLogEvent> {
-    return waitForEngineEvent(this.campaignsDir, match, opts);
+    const namePredicate = typeof match === "function" ? match : (e: EngineLogEvent) => e.event === match;
+    const scopedPredicate = (e: EngineLogEvent) => e.t >= this.launchedAt && namePredicate(e);
+    return waitForEngineEvent(this.campaignsDir, scopedPredicate, opts);
   }
 
   /**
