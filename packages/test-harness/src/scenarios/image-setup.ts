@@ -294,7 +294,10 @@ function assertVerdictArtifacts(harness: Harness, event: string, log: (m: string
  */
 function pickChoiceIndex(labels: string[], promptLower: string, consentAlreadyAnswered: boolean): number {
   if (promptLower.includes(CONSENT_PROMPT_NEEDLE) && !consentAlreadyAnswered) {
-    const yesIdx = labels.findIndex((l) => l.trim().toLowerCase().startsWith("yes"));
+    // The setup-agent decorates choices with a glyph prefix (e.g. "✦ Yes"),
+    // so substring-match the word rather than startsWith. Match "no" as a
+    // whole token only so we don't trip on labels like "Yes, sometimes".
+    const yesIdx = labels.findIndex((l) => /\byes\b/i.test(l));
     if (yesIdx < 0) {
       throw new Error(`Consent overlay found but no "Yes" choice: ${JSON.stringify(labels)}`);
     }
