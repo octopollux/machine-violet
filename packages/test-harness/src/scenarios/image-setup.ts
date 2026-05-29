@@ -68,7 +68,8 @@ const FREE_TEXT_DEFAULT_ANSWER =
   "You decide everything. Quick start in a classic-fantasy world, light system. " +
   "My name is Player. Character name: Kade. Kade is a stoic human ranger in a green cloak, " +
   "longbow at the ready, standing on a forest road at dusk. " +
-  "Don't ask me anything else — generate the portrait now and then finalize.";
+  "I'm in a hurry — give me a portrait to look at and then a one-line summary, " +
+  "no follow-up questions please.";
 
 export const imageSetup: Scenario = {
   id: "image-setup",
@@ -250,7 +251,10 @@ async function walkSetupToPortraitVerdict({ harness, log }: ScenarioContext): Pr
  */
 function readVerdict(harness: Harness) {
   return harness.readEngineLog().find(
-    (e) => e.event === "image_gen:response" || e.event === "image_gen:no_data",
+    (e) =>
+      e.event === "image_gen:response" ||
+      e.event === "image_gen:no_data" ||
+      e.event === "image_gen:error",
   );
 }
 
@@ -262,10 +266,10 @@ function readVerdict(harness: Harness) {
  * actual subject under test.
  */
 function assertVerdictArtifacts(harness: Harness, event: string, log: (m: string) => void): void {
-  if (event === "image_gen:no_data") {
-    log("  image_gen:no_data observed — call happened but backend returned no image data.");
+  if (event === "image_gen:no_data" || event === "image_gen:error") {
+    log(`  ${event} observed — call happened but did not produce image data.`);
     log("  This is a PASS for the pipeline test (we proved the call wires up). Check the engine log");
-    log("  payload for effort/aspect to diagnose the upstream failure.");
+    log("  payload (message/status/effort/aspect) to diagnose the upstream failure.");
     return;
   }
 

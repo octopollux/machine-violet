@@ -132,13 +132,30 @@ async function openaiGenerateImage(
   // Letting OpenAI pick the default GPT image model keeps us from pinning
   // to a name (`gpt-image-1` today, but newer ones ship). Quality + size
   // + output_format are enough to identify what we want.
-  const response = await client.images.generate({
-    prompt: req.prompt,
-    quality,
-    size,
-    output_format: "png",
-    n: 1,
-  });
+  let response: Awaited<ReturnType<typeof client.images.generate>>;
+  try {
+    response = await client.images.generate({
+      prompt: req.prompt,
+      quality,
+      size,
+      output_format: "png",
+      n: 1,
+    });
+  } catch (e) {
+    // Without this breadcrumb, a thrown error is invisible — the harness sees
+    // image_gen:request fire but no terminal event, then the upstream
+    // dispatcher's catch turns the throw into a tool_result with is_error
+    // and the model continues. Surface the actual error.
+    const message = e instanceof Error ? e.message : String(e);
+    const status = (e as { status?: number } | null)?.status;
+    logEvent("image_gen:error", {
+      effort,
+      aspect,
+      message: message.slice(0, 400),
+      ...(typeof status === "number" ? { status } : {}),
+    });
+    throw e;
+  }
 
   const item = response.data?.[0];
   if (!item?.b64_json) {
