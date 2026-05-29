@@ -805,6 +805,16 @@ export function createSetupConversation(
         // never generates scene snapshots or player-requested images, so
         // this is unconditional rather than per-call.
         imageIntent: "character_portrait",
+        // Setup-agent runs a tight show-and-confirm loop: each draft is
+        // disposable, the player iterates 2-5 times, and total wall-clock
+        // dominates the new-campaign experience. `low` lands a 1024×1024
+        // portrait in ~10-15s vs ~45-90s for medium — much better feel
+        // when the player is on draft 3 trying to nail "more rugged."
+        // The final chosen draft is what ships to the campaign, so we
+        // accept that the canonical portrait is also low-quality. Players
+        // can always re-generate later via an in-campaign command at any
+        // quality.
+        imageQuality: "low",
         // Per-call dispatch for providers that own the tool loop internally
         // (openai-chatgpt). Codex sends tool calls as in-band server
         // requests that must be answered synchronously, so we can't let

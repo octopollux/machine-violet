@@ -1076,6 +1076,22 @@ describe("Responses API image generation", () => {
     });
   });
 
+  it("honors per-call imageQuality override (setup-agent uses low for fast drafts)", async () => {
+    mockResponses.create.mockResolvedValue(fakeResponse());
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    await provider.chat(baseChatParams({
+      tools: [
+        { name: "generate_image", description: "", inputSchema: { type: "object" } },
+      ],
+      dispatchTool: vi.fn(),
+      imageQuality: "low",
+    }));
+
+    const callArgs = mockResponses.create.mock.calls[0][0];
+    expect(callArgs.tools[0]).toMatchObject({ type: "image_generation", quality: "low" });
+  });
+
   it("translates image_input ContentParts to input_image content items", async () => {
     mockResponses.create.mockResolvedValue(fakeResponse());
 

@@ -31,10 +31,15 @@ import { logEvent } from "../context/engine-log.js";
 /**
  * Native `image_generation` tool config sent to the Responses API when the
  * caller included {@link GENERATE_IMAGE_TOOL_NAME} in the normalized tool
- * list. Hardcoded to the spec's defaults: 1024×1024 (accommodates
- * non-humanoid PCs in portraits and works for scene snapshots), medium
- * quality (HD-ish per user direction), PNG, no partial-image streaming
- * (MV never streams images).
+ * list. Fixed defaults: 1024×1024 (accommodates non-humanoid PCs in
+ * portraits and works for scene snapshots), PNG, no partial-image
+ * streaming (MV never streams images).
+ *
+ * Quality is per-call via `ChatParams.imageQuality` — see
+ * {@link buildImageGenerationToolConfig}. We accept the per-call shape
+ * because different agents have different cost/latency tradeoffs:
+ * setup-agent wants fast iteration drafts (`low`), DM wants nice scenes
+ * (`medium`+).
  *
  * We deliberately omit the `model` field. Earlier code pinned
  * `gpt-image-2` based on a research note, but real-world smoke testing
@@ -44,19 +49,16 @@ import { logEvent } from "../context/engine-log.js";
  * ship) is the most forgiving path, at the cost of not being able to
  * pin a specific gen model. Add `model` back here when we want a
  * specific one and have confirmed access.
- *
- * Quality is `medium` rather than `high`. At TUI render sizes (sixel
- * scaling to ~60-80 columns) the visible difference is negligible, but
- * `high` regularly takes 60-180s wall-clock per image vs ~15-30s for
- * `medium` — a smoke-test deal-breaker.
  */
-const IMAGE_GENERATION_TOOL_CONFIG = {
-  type: "image_generation" as const,
-  size: "1024x1024" as const,
-  quality: "medium" as const,
-  output_format: "png" as const,
-  partial_images: 0,
-};
+function buildImageGenerationToolConfig(quality: "low" | "medium" | "high") {
+  return {
+    type: "image_generation" as const,
+    size: "1024x1024" as const,
+    quality,
+    output_format: "png" as const,
+    partial_images: 0,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Routing
@@ -285,7 +287,9 @@ function toResponsesParams(params: ChatParams): ResponsesParams {
       });
     }
     if (imageGenRequested) {
-      functionTools.push(IMAGE_GENERATION_TOOL_CONFIG);
+      const quality = params.imageQuality ?? "medium";
+      const cfg = buildImageGenerationToolConfig(quality);
+      functionTools.push(cfg);
       // Breadcrumb so a smoke test can prove the tool actually got attached
       // to the request — the most common silent failure for "no image
       // appeared" is the engine never registering generate_image in the
@@ -293,8 +297,8 @@ function toResponsesParams(params: ChatParams): ResponsesParams {
       logEvent("image_gen:tool_registered", {
         model: params.model,
         intent: params.imageIntent ?? "player_request",
-        quality: IMAGE_GENERATION_TOOL_CONFIG.quality,
-        size: IMAGE_GENERATION_TOOL_CONFIG.size,
+        quality: cfg.quality,
+        size: cfg.size,
       });
     }
     if (functionTools.length > 0) tools = functionTools;
