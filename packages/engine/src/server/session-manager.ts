@@ -1123,8 +1123,22 @@ export class SessionManager {
       // Group consecutive same-kind lines and send each group as one chunk.
       // Separators (---) are sent as DM lines — the formatting pipeline
       // converts them to styled horizontal rules during rendering.
+      //
+      // Image lines are broadcast as `display_image` TUI commands instead
+      // of narrative chunks, mirroring the live-play wire shape: the
+      // event-handler appends an image NarrativeLine when it sees one,
+      // and that same handler runs on resume, so the image lands in
+      // scrollback at the right spot in turn order. Any in-flight
+      // narrative chunk is flushed first so kind grouping isn't broken
+      // across the image boundary.
       let currentKind = "";
       let currentText = "";
+      const flushChunk = (): void => {
+        if (currentText) {
+          this.broadcast({ type: "narrative:chunk", data: { text: currentText, kind: currentKind as "dm" | "player" | "system" | "dev" } });
+          currentText = "";
+        }
+      };
       for (const line of narrativeLines) {
         let kind = line.kind as string;
         let text = line.text;
@@ -1133,17 +1147,25 @@ export class SessionManager {
           kind = "dm";
           text = "---";
         }
-        if (kind !== "dm" && kind !== "player" && kind !== "system" && kind !== "dev") continue;
-        if (kind !== currentKind && currentText) {
-          this.broadcast({ type: "narrative:chunk", data: { text: currentText, kind: currentKind as "dm" | "player" | "system" | "dev" } });
-          currentText = "";
+        if (line.kind === "image") {
+          flushChunk();
+          currentKind = "";
+          // Same wire shape as bridge.ts and setup-session.ts use for the
+          // live display_image TuiCommand — keeps both paths rendering
+          // identically through the existing event-handler.
+          const cmd = { type: "display_image" as const, filename: line.text, intent: line.intent };
+          this.broadcast({
+            type: "activity:update",
+            data: { engineState: `tui:${cmd.type}`, ...cmd },
+          });
+          continue;
         }
+        if (kind !== "dm" && kind !== "player" && kind !== "system" && kind !== "dev") continue;
+        if (kind !== currentKind) flushChunk();
         currentKind = kind;
         currentText += (currentText ? "\n" : "") + text;
       }
-      if (currentText) {
-        this.broadcast({ type: "narrative:chunk", data: { text: currentText, kind: currentKind as "dm" | "player" | "system" | "dev" } });
-      }
+      flushChunk();
       this.broadcast({ type: "narrative:complete", data: { text: "" } });
     }
 

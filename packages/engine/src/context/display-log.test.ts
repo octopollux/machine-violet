@@ -96,6 +96,42 @@ describe("markdownToNarrativeLines", () => {
     expect(parsed).toEqual(original);
   });
 
+  it("parses [image:intent] path as image lines", () => {
+    const result = markdownToNarrativeLines([
+      "[image:scene_snapshot] /campaigns/foo/campaign/images/scene-1.png",
+      "[image:player_request] C:\\Users\\x\\img.png",
+      "[image:character_portrait] /tmp/portrait.png",
+    ]);
+    expect(result).toEqual([
+      { kind: "image", text: "/campaigns/foo/campaign/images/scene-1.png", intent: "scene_snapshot" },
+      { kind: "image", text: "C:\\Users\\x\\img.png", intent: "player_request" },
+      { kind: "image", text: "/tmp/portrait.png", intent: "character_portrait" },
+    ]);
+  });
+
+  it("falls back to dm for image markers with unknown intent", () => {
+    // Guards the parse against typos / future intents we don't yet know.
+    // The line still appears in scrollback as a DM line rather than
+    // vanishing or crashing — preferable to silent data loss.
+    const result = markdownToNarrativeLines(["[image:weird_new_intent] /tmp/x.png"]);
+    expect(result).toEqual([{ kind: "dm", text: "[image:weird_new_intent] /tmp/x.png" }]);
+  });
+
+  it("round-trips image lines through markdown", () => {
+    // Regression guard for the Palimpsest scene-image bug: without this
+    // roundtrip, images persist on disk but disappear from in-game
+    // scrollback after a session reload.
+    const original: NarrativeLine[] = [
+      { kind: "dm", text: "The door creaks open." },
+      { kind: "image", text: "/path/to/scene.png", intent: "scene_snapshot" },
+      { kind: "dm", text: "Inside, lamplight." },
+    ];
+    const md = narrativeLinesToMarkdown(original);
+    expect(md).toContain("[image:scene_snapshot] /path/to/scene.png");
+    const parsed = markdownToNarrativeLines(md.split("\n").slice(0, -1));
+    expect(parsed).toEqual(original);
+  });
+
   it("skipTranscript turns omit separator and player line", () => {
     // Session open/resume: only the DM response is logged
     const original: NarrativeLine[] = [

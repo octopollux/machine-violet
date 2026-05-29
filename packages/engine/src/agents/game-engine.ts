@@ -117,6 +117,12 @@ export class GameEngine {
    *  Used to suppress auto-generated choices for that turn. */
   private dmProvidedChoicesThisTurn = false;
 
+  /** Collected during a DM turn whenever a display_image TUI command fires
+   *  (from generate_image). Appended to the display-log alongside the DM's
+   *  text so the image survives session resume. Reset at the top of each
+   *  player input. */
+  private imagesEmittedThisTurn: { filename: string; intent: "scene_snapshot" | "player_request" | "character_portrait" }[] = [];
+
   /** Long-lived Haiku session for generating suggested responses.
    *  Lazy-initialized on first use, reset on scene transitions. */
   private choiceSession: ChoiceGeneratorSession | null = null;
@@ -504,6 +510,7 @@ export class GameEngine {
     this.setState("dm_thinking");
     const turnStartTime = Date.now();
     this.dmProvidedChoicesThisTurn = false;
+    this.imagesEmittedThisTurn = [];
     logEvent("turn:player_input", { character: characterName, textLength: text.length });
 
     // Tag the input with character name; prepend OOC summary if pending
@@ -692,6 +699,14 @@ export class GameEngine {
               logLines.push({ kind: "separator", text: "---" });
             }
             logLines.push({ kind: "dm", text: result.text });
+          }
+          // Images emitted during the turn (via generate_image's display_image
+          // TUI command) are appended after the DM's text so they sit at the
+          // visual end of the turn in scrollback. The actual mid-turn render
+          // order is preserved by the live broadcast; here we're just making
+          // sure the image survives a reload.
+          for (const img of this.imagesEmittedThisTurn) {
+            logLines.push({ kind: "image", text: img.filename, intent: img.intent });
           }
           logLines.push({ kind: "dm", text: "" }); // paragraph separator
           this.persister.appendDisplayLog(narrativeLinesToMarkdown(logLines));
@@ -1580,6 +1595,22 @@ export class GameEngine {
         // visual updates appear mid-narration instead of after the turn.
         if (cmd.type === "present_choices") {
           this.dmProvidedChoicesThisTurn = true;
+        } else if (cmd.type === "display_image") {
+          // Capture for display-log persistence at end-of-turn. The
+          // image lands in scrollback at the right ordinal position
+          // on session resume — without this, the bytes persist on
+          // disk but disappear from the in-game transcript after a
+          // reload. TuiCommand is a loose `{ type, [k]: unknown }`
+          // shape, so we narrow at the use site.
+          const filename = typeof cmd.filename === "string" ? cmd.filename : "";
+          const rawIntent = typeof cmd.intent === "string" ? cmd.intent : "";
+          const intent: "scene_snapshot" | "player_request" | "character_portrait" =
+            rawIntent === "scene_snapshot" || rawIntent === "player_request" || rawIntent === "character_portrait"
+              ? rawIntent
+              : "scene_snapshot";
+          if (filename) {
+            this.imagesEmittedThisTurn.push({ filename, intent });
+          }
         }
         this.callbacks.onTuiCommand(cmd);
       },
