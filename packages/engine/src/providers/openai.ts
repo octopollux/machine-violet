@@ -129,12 +129,16 @@ async function openaiGenerateImage(
     promptPreview: req.prompt.slice(0, 120),
   });
 
-  // Letting OpenAI pick the default GPT image model keeps us from pinning
-  // to a name (`gpt-image-1` today, but newer ones ship). Quality + size
-  // + output_format are enough to identify what we want.
+  // We must pass `model` — empirically OpenAI's images.generate 400s with
+  // "Missing required parameter: 'model'" when omitted on the GPT image
+  // family (the documented defaulting only kicks in for the older
+  // dall-e-2/3 path, which doesn't accept low/medium/high quality). Pin
+  // to `gpt-image-1`; when a newer one ships we'll bump this once and
+  // ride the same call surface.
   let response: Awaited<ReturnType<typeof client.images.generate>>;
   try {
     response = await client.images.generate({
+      model: "gpt-image-1",
       prompt: req.prompt,
       quality,
       size,
