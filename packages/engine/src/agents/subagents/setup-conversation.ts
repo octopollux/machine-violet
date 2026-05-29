@@ -1000,32 +1000,6 @@ export function createSetupConversation(
         };
       }
 
-      // Image-only turn: the model invoked the hosted image_generation tool but
-      // didn't emit any text and didn't call any function tools. Hosted-tool
-      // results live on `assistantContent` (as `image_generated`), NOT in
-      // `result.toolCalls` — so the `toolResults.length === 0` check below
-      // would break out of the loop, returning text:"" with the image
-      // attached. The player then sees a portrait pop in with no DM voice
-      // around it and a player-turn input. Push a synthetic continuation
-      // cue and loop once more so the model can do its "look right?"
-      // follow-up that the system prompt asks for. The image itself is
-      // already persisted + displayed; we just need the model's prose.
-      const producedImageOnly =
-        result.text.trim().length === 0
-        && toolResults.length === 0
-        && result.assistantContent.some((p) => p.type === "image_generated");
-      if (producedImageOnly) {
-        logEvent("setup:image_only_continuation", { round });
-        messages.push({
-          role: "user",
-          content: [{
-            type: "text",
-            text: "(The portrait was rendered to the player. Continue in your own voice — briefly ask whether it looks right or what to adjust. Don't describe the image; the player can see it.)",
-          }],
-        });
-        continue;
-      }
-
       // No tool calls → turn is done
       if (toolResults.length === 0) break;
 
