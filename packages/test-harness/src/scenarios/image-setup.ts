@@ -19,10 +19,11 @@
  *   3. On the next turn that exercises generate_image, OpenAI's
  *      `image_generation` tool gets attached to the request
  *      (`image_gen:tool_registered`).
- *   4. The API returns either `image_gen:completed` (success → bytes) or
- *      `image_gen:non_completed` (failure with status). Either way is a
- *      pass for this scenario — we're proving the *call happens*, not
- *      that the model is in a good mood.
+ *   4. The provider's `generateImage` returns either `image_gen:response`
+ *      (success → bytes) or `image_gen:no_data` (call happened but
+ *      backend returned nothing). Either way is a pass for this
+ *      scenario — we're proving the *call happens*, not that the
+ *      model is in a good mood.
  *   5. On success: the image lands at `__setup__/campaign/images/portrait-draft-*.png`
  *      with non-zero bytes.
  *
@@ -74,7 +75,7 @@ export const imageSetup: Scenario = {
   title: "Setup-agent portrait loop fires end-to-end against OpenAI image_generation",
   description:
     "Walk new-campaign setup to the consent question, pick Yes, watch the engine log " +
-    "for image_gen:tool_registered + image_gen:completed/non_completed, verify the PNG " +
+    "for image_gen:request + image_gen:response/no_data, verify the PNG " +
     "lands in __setup__/campaign/images/. Diagnostic dump on failure.",
   live: true,
   approxMinutes: 5,
@@ -146,7 +147,7 @@ async function walkSetupToPortraitVerdict({ harness, log }: ScenarioContext): Pr
   let consentAnswered = false;
 
   // We bail in three ways:
-  //  - verdict observed (image_gen:completed | image_gen:non_completed) → PASS
+  //  - verdict observed (image_gen:response | image_gen:no_data) → PASS
   //  - SETUP_PORTRAIT_BUDGET_MS elapses → throw with diagnostics
   //  - 30 setup-agent turns without a verdict → throw (sanity cap)
   for (let turn = 1; turn <= 30; turn++) {
@@ -236,38 +237,44 @@ async function walkSetupToPortraitVerdict({ harness, log }: ScenarioContext): Pr
 }
 
 /**
- * Returns the first `image_gen:completed` or `image_gen:non_completed`
- * event in the log, or null. These events are terminal verdicts — the
- * scenario can stop as soon as either appears.
+ * Returns the first terminal verdict for the new function-tool image-gen
+ * path:
+ *   - `image_gen:response` — provider.generateImage returned bytes (success).
+ *   - `image_gen:no_data` — provider.generateImage threw (call happened
+ *     but backend returned nothing).
+ *
+ * Either is a PASS for the pipeline test — we proved the dispatch wires
+ * up. `image_gen:request` (pre-call) is intentionally NOT a verdict
+ * because the request hasn't completed; readVerdict at the top of each
+ * loop iteration would short-circuit before the response lands.
  */
 function readVerdict(harness: Harness) {
   return harness.readEngineLog().find(
-    (e) => e.event === "image_gen:completed" || e.event === "image_gen:non_completed",
+    (e) => e.event === "image_gen:response" || e.event === "image_gen:no_data",
   );
 }
 
 /**
- * Post-verdict assertions. A `completed` verdict implies bytes on disk
- * (image_gen:persisted + a real PNG in __setup__/campaign/images/);
- * `non_completed` is logged for diagnostic visibility but the scenario
- * still passes — we proved the call happened, which is the actual
- * subject under test. If you want a stricter pass condition, raise it
- * here.
+ * Post-verdict assertions. A `image_gen:response` verdict implies bytes
+ * on disk (image_gen:persisted + a real PNG in __setup__/campaign/images/);
+ * `image_gen:no_data` is logged for diagnostic visibility but the
+ * scenario still passes — we proved the call happened, which is the
+ * actual subject under test.
  */
 function assertVerdictArtifacts(harness: Harness, event: string, log: (m: string) => void): void {
-  if (event === "image_gen:non_completed") {
-    log("  image_gen:non_completed observed — call happened but image generation failed.");
+  if (event === "image_gen:no_data") {
+    log("  image_gen:no_data observed — call happened but backend returned no image data.");
     log("  This is a PASS for the pipeline test (we proved the call wires up). Check the engine log");
-    log("  payload for status/intent to diagnose the upstream failure.");
+    log("  payload for effort/aspect to diagnose the upstream failure.");
     return;
   }
 
-  // event === "image_gen:completed"
+  // event === "image_gen:response"
   // Expect at least one image_gen:persisted event AND a real PNG on disk.
   const persistedEvents = harness.readEngineLog().filter((e) => e.event === "image_gen:persisted");
   if (persistedEvents.length === 0) {
     throw new Error(
-      "image_gen:completed observed but no image_gen:persisted event followed. " +
+      "image_gen:response observed but no image_gen:persisted event followed. " +
       "Persistence (image-handler.ts) silently dropped the bytes.",
     );
   }
