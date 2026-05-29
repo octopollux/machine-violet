@@ -58,19 +58,16 @@ const CONSENT_PROMPT_NEEDLE = "do you want images in your game";
 // turns of chargen, and one image_generation call itself takes 15-45s.
 const SETUP_PORTRAIT_BUDGET_MS = 14 * 60_000;
 
-// Fold a hint into free-text answers so the setup-agent settles on a
-// concrete character description quickly. Without this it tends to ask
-// 4-5 clarifying questions before generating, blowing the time budget.
-// Aggressively front-loaded: name, system pref, character description,
-// and the "stop asking, just generate" cue. The agent's prompt instructs
-// it to honor "you decide"-style answers.
-const FREE_TEXT_DEFAULT_ANSWER =
-  "You decide everything. Quick start in a classic-fantasy world, light system. " +
-  "My name is Player. Character name: Kade. Kade is a stoic human ranger in a green cloak, " +
-  "longbow at the ready, standing on a forest road at dusk. " +
-  "Please generate Kade's portrait now using the generate_image tool — I want to see " +
-  "him before we begin. Don't ask me any other questions; pick reasonable defaults " +
-  "for anything else.";
+// Minimal free-text answer. The setup-agent is good at driving Quick
+// Setup — picking world, system, character, etc. — when the player
+// just says "you decide." Earlier versions of this prompt tried to
+// front-load character details + nudge the agent toward portrait
+// generation, and the agent kept misreading those nudges (e.g.
+// interpreting "I'm in a hurry" as "skip the portrait"). Let the
+// agent do its job; the goal condition (image_gen:response in the
+// engine log) doesn't care which world / character / aesthetic the
+// agent picked.
+const FREE_TEXT_DEFAULT_ANSWER = "you decide";
 
 export const imageSetup: Scenario = {
   id: "image-setup",
