@@ -20,6 +20,12 @@ export const TUI_TOOLS = new Set([
   "scribe",
   "dm_notes",
   "promote_character",
+  // generate_image returns `_tui: { type: "display_image", ... }` on the
+  // ToolResult so the image broadcasts mid-turn (see GameEngine.dispatchGenerateImage).
+  // Without this entry the bridge skips _tui extraction entirely — the bytes
+  // still land on disk, but the client never receives display_image and the
+  // image silently fails to render in the TUI.
+  "generate_image",
 ]);
 
 /** Tools registered in the ToolRegistry but only exposed to OOC / Dev Mode agents. */

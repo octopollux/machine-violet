@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { LLMProvider, ChatResult, ContentPart, NormalizedUsage } from "../providers/types.js";
-import { agentLoop } from "./agent-loop.js";
+import { agentLoop, TUI_TOOLS } from "./agent-loop.js";
 import { extractStatus, retryDelay } from "../utils/retry.js";
 import type { AgentLoopConfig } from "./agent-loop.js";
 import { createTestRegistry } from "./tool-registry.js";
@@ -407,6 +407,20 @@ describe("agentLoop", () => {
       expect.objectContaining({ is_error: true }),
     );
     expect(result.text).toBe("I couldn't find that map.");
+  });
+});
+
+describe("TUI_TOOLS registry", () => {
+  // Regression for the silent "image lands on disk but never renders" bug
+  // (Palimpsest scene-transition image, 2026-05-29). The bridge gates
+  // `_tui` extraction on `tuiToolNames.has(tc.name)` in dispatchToolCall.
+  // generate_image returns `_tui: { type: "display_image", ... }` from
+  // GameEngine.dispatchGenerateImage; if the tool name isn't in
+  // TUI_TOOLS, onTuiCommand never fires, the client never receives
+  // display_image, and the image silently fails to render even though
+  // the bytes were correctly persisted.
+  it("includes generate_image so display_image broadcasts to the client", () => {
+    expect(TUI_TOOLS.has("generate_image")).toBe(true);
   });
 });
 
