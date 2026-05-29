@@ -330,7 +330,7 @@ const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
     const imgWidth = Math.max(20, width ?? 80);
     const imgHeight = Math.max(6, Math.round((imgWidth * 9) / 32));
     return (
-      <Box flexDirection="column" width={imgWidth} height={imgHeight}>
+      <Box flexDirection="column" width={imgWidth} height={imgHeight} marginTop={1} marginBottom={1}>
         <Image src={path} width={imgWidth} height={imgHeight} alt=" " />
       </Box>
     );
