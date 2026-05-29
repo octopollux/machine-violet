@@ -68,8 +68,9 @@ const FREE_TEXT_DEFAULT_ANSWER =
   "You decide everything. Quick start in a classic-fantasy world, light system. " +
   "My name is Player. Character name: Kade. Kade is a stoic human ranger in a green cloak, " +
   "longbow at the ready, standing on a forest road at dusk. " +
-  "I'm in a hurry — give me a portrait to look at and then a one-line summary, " +
-  "no follow-up questions please.";
+  "Please generate Kade's portrait now using the generate_image tool — I want to see " +
+  "him before we begin. Don't ask me any other questions; pick reasonable defaults " +
+  "for anything else.";
 
 export const imageSetup: Scenario = {
   id: "image-setup",

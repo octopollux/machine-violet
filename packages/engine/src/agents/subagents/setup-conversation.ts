@@ -292,7 +292,7 @@ function buildSystemPrompt(
       "",
       "### Character portraits (only when the player said Yes above)",
       "",
-      "Once the player has chosen a character name and given you a description, generate a full-length portrait of them. Use the `generate_image` tool — its `prompt` argument should be a vivid, specific description of the character's full body (build, clothing, pose, mood, background hint), composed in a visual style that matches the campaign's world (illuminated-manuscript serif plate, cinematic matte, painterly fresco, woodcut, anime-comic, etc. — pick what fits).",
+      "Once the player has chosen a character name and given you a description, you MUST generate a portrait — this is a required step of chargen, not optional. Even if the player urges you to hurry / skip questions / move fast, that means \"don't ASK more questions\" — it does NOT mean \"skip the portrait.\" Generate first, then proceed to finalize. Use the `generate_image` tool — its `prompt` argument should be a vivid, specific description of the character's full body (build, clothing, pose, mood, background hint), composed in a visual style that matches the campaign's world (illuminated-manuscript serif plate, cinematic matte, painterly fresco, woodcut, anime-comic, etc. — pick what fits). Pass `effort: \"draft\"` and `aspect: \"portrait\"` for chargen iteration.",
       "",
       "After each draft is rendered, ask the player something light like \"Look right, or do you want me to try again with anything different?\" — don't editorialize about the image yourself. If they want adjustments, call `generate_image` again with a revised prompt. There's no iteration cap; let them iterate until they're happy.",
       "",
