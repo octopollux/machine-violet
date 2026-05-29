@@ -80,23 +80,6 @@ export interface ProviderLoopConfig {
   onToolEnd?: (name: string, result: ToolResult) => void;
   onComplete?: (usage: NormalizedUsage) => void;
   onError?: (error: Error) => void;
-  /**
-   * Called once per `image_generated` ContentPart emitted by the provider
-   * during this loop. Fires after the assistant message has been recorded
-   * but before tool dispatch, so the handler can persist bytes and emit a
-   * visual cue without blocking the tool-result round-trip. Awaited — a
-   * slow file write delays the next tool round, which is what we want
-   * (we shouldn't queue tool calls against an image that hasn't been
-   * persisted yet). Failed image generations never produce a ContentPart
-   * (see openai.ts), so this callback only ever sees successful results.
-   */
-  onImageGenerated?: (part: {
-    id: string;
-    base64: string;
-    mimeType: string;
-    intent: "scene_snapshot" | "player_request" | "character_portrait";
-    revisedPrompt?: string;
-  }) => void | Promise<void>;
   /** Called when a retryable API error triggers a backoff wait. */
   onRetry?: (status: number, delayMs: number) => void;
   /**
@@ -453,18 +436,12 @@ export async function runProviderLoop(
       }
     }
 
-    // Fire image-generated callbacks before tool dispatch. Sequential
-    // because the handler typically does file I/O — we'd rather block the
-    // tool round briefly than let a second image_generated land before the
-    // first is on disk. Skipped entirely when no images came back (the
-    // common case), so this loop is free in normal turns.
-    if (config.onImageGenerated) {
-      for (const part of result.assistantContent) {
-        if (part.type === "image_generated") {
-          await config.onImageGenerated(part);
-        }
-      }
-    }
+    // image_generated content parts are no longer emitted by providers under
+    // function-tool dispatch (the model calls generate_image as a normal tool,
+    // and the asyncToolHandler chain runs provider.generateImage + persist +
+    // emit display_image as part of the tool result). If any provider somehow
+    // still surfaces them, we drop them silently — the downstream history
+    // doesn't need the bytes.
 
     // Process tool calls concurrently. Sync handlers still run sequentially
     // on the JS event loop; async handlers (subagent spawns, search) genuinely

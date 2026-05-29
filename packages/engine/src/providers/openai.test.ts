@@ -126,10 +126,14 @@ vi.mock("openai", () => {
   const mockCompletions = {
     create: vi.fn(),
   };
+  const mockImages = {
+    generate: vi.fn(),
+  };
 
   class MockOpenAI {
     responses = mockResponses;
     chat = { completions: mockCompletions };
+    images = mockImages;
 
     static AuthenticationError = class extends Error { };
     static PermissionDeniedError = class extends Error { };
@@ -140,12 +144,13 @@ vi.mock("openai", () => {
     default: MockOpenAI,
     __mockResponses: mockResponses,
     __mockCompletions: mockCompletions,
+    __mockImages: mockImages,
   };
 });
 
 // Get the mock handles
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const { __mockResponses: mockResponses, __mockCompletions: mockCompletions } = await import("openai") as any;
+const { __mockResponses: mockResponses, __mockCompletions: mockCompletions, __mockImages: mockImages } = await import("openai") as any;
 
 describe("Responses API integration", () => {
   beforeEach(() => {
@@ -1051,29 +1056,30 @@ describe("Responses API image generation", () => {
     vi.clearAllMocks();
   });
 
-  it("rewrites generate_image tool to native image_generation tool config", async () => {
+  it("passes generate_image through as a plain function tool (no hosted-tool rewrite)", async () => {
     mockResponses.create.mockResolvedValue(fakeResponse());
 
     const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
     await provider.chat(baseChatParams({
       tools: [
-        { name: "generate_image", description: "", inputSchema: { type: "object" } },
+        { name: "generate_image", description: "img", inputSchema: { type: "object" } },
         { name: "real_function", description: "stays put", inputSchema: { type: "object" } },
       ],
       dispatchTool: vi.fn(),
     }));
 
     const callArgs = mockResponses.create.mock.calls[0][0];
-    // generate_image stripped from function-tool list; image_generation appended.
+    // Both tools should be plain `function` entries — no `image_generation`
+    // hosted-tool config injected. The DM's asyncToolHandler is responsible
+    // for dispatching generate_image to provider.generateImage.
     expect(callArgs.tools).toHaveLength(2);
-    expect(callArgs.tools[0]).toMatchObject({ type: "function", name: "real_function" });
-    expect(callArgs.tools[1]).toMatchObject({
-      type: "image_generation",
-      size: "1024x1024",
-      quality: "medium",
-      output_format: "png",
-      partial_images: 0,
-    });
+    for (const tool of callArgs.tools) {
+      expect(tool.type).toBe("function");
+    }
+    expect(callArgs.tools.map((t: { name: string }) => t.name).sort()).toEqual([
+      "generate_image",
+      "real_function",
+    ]);
   });
 
   it("translates image_input ContentParts to input_image content items", async () => {
@@ -1111,66 +1117,7 @@ describe("Responses API image generation", () => {
     expect(callArgs.input[0]).toEqual({ type: "message", role: "user", content: "Hello" });
   });
 
-  it("parses completed image_generation_call into image_generated ContentPart with intent stamp", async () => {
-    mockResponses.create.mockResolvedValue(fakeResponse({
-      output: [{
-        type: "image_generation_call",
-        id: "ig_42",
-        status: "completed",
-        result: "PNGBASE64PAYLOAD",
-        revised_prompt: "An illuminated plate of the tavern at dawn.",
-      }],
-    }));
-
-    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
-    const result = await provider.chat(baseChatParams({ imageIntent: "scene_snapshot" }));
-
-    expect(result.toolCalls).toEqual([]);
-    expect(result.assistantContent).toEqual([{
-      type: "image_generated",
-      id: "ig_42",
-      base64: "PNGBASE64PAYLOAD",
-      mimeType: "image/png",
-      intent: "scene_snapshot",
-      revisedPrompt: "An illuminated plate of the tavern at dawn.",
-    }]);
-  });
-
-  it("defaults intent to player_request when not supplied", async () => {
-    mockResponses.create.mockResolvedValue(fakeResponse({
-      output: [{
-        type: "image_generation_call",
-        id: "ig_43",
-        status: "completed",
-        result: "PNG",
-      }],
-    }));
-
-    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
-    const result = await provider.chat(baseChatParams());
-
-    expect(result.assistantContent).toHaveLength(1);
-    expect(result.assistantContent[0]).toMatchObject({ type: "image_generated", intent: "player_request" });
-  });
-
-  it("silently skips failed image_generation_call — no ContentPart emitted", async () => {
-    mockResponses.create.mockResolvedValue(fakeResponse({
-      output: [
-        { type: "image_generation_call", id: "ig_44", status: "failed", result: null },
-        { id: "msg_1", type: "message", role: "assistant", status: "completed",
-          content: [{ type: "output_text", text: "I tried, no luck.", annotations: [] }] },
-      ],
-    }));
-
-    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
-    const result = await provider.chat(baseChatParams({ imageIntent: "scene_snapshot" }));
-
-    // Only the text message survives; no image_generated ContentPart.
-    expect(result.assistantContent).toEqual([{ type: "text", text: "I tried, no luck." }]);
-    expect(result.text).toBe("I tried, no luck.");
-  });
-
-  it("replays image_generated assistant content as image_generation_call input item", async () => {
+  it("drops image_generated assistant content on replay (no hosted-tool round-trip)", async () => {
     mockResponses.create.mockResolvedValue(fakeResponse());
 
     const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
@@ -1196,12 +1143,88 @@ describe("Responses API image generation", () => {
     }));
 
     const callArgs = mockResponses.create.mock.calls[0][0];
-    // Expect: user → assistant text → image_generation_call → user.
+    // Just user → assistant text → user. No image_generation_call in the
+    // round-trip — under function-tool dispatch the model never references
+    // the bytes by id on subsequent turns, so dropping the item keeps the
+    // cached prefix lean.
     expect(callArgs.input).toEqual([
       { type: "message", role: "user", content: "Draw a fountain." },
       { type: "message", role: "assistant", content: "Here you go:" },
-      { type: "image_generation_call", id: "ig_prev", result: "PREVPNG", status: "completed" },
       { type: "message", role: "user", content: "Make it brighter." },
     ]);
+  });
+});
+
+describe("OpenAI provider.generateImage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("maps draft + portrait to OpenAI low quality / 1024x1536 size", async () => {
+    mockImages.generate.mockResolvedValue({ data: [{ b64_json: "BYTES", revised_prompt: "rev" }] });
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    await provider.generateImage!({ prompt: "stoic ranger", effort: "draft", aspect: "portrait" });
+
+    expect(mockImages.generate).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: "stoic ranger",
+      quality: "low",
+      size: "1024x1536",
+      output_format: "png",
+      n: 1,
+    }));
+  });
+
+  it("maps showcase + landscape to high quality / 1536x1024", async () => {
+    mockImages.generate.mockResolvedValue({ data: [{ b64_json: "BYTES" }] });
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    await provider.generateImage!({ prompt: "hero shot", effort: "showcase", aspect: "landscape" });
+
+    expect(mockImages.generate).toHaveBeenCalledWith(expect.objectContaining({
+      quality: "high",
+      size: "1536x1024",
+    }));
+  });
+
+  it("defaults effort=standard / aspect=square when caller omits them", async () => {
+    mockImages.generate.mockResolvedValue({ data: [{ b64_json: "BYTES" }] });
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    await provider.generateImage!({ prompt: "icon" });
+
+    expect(mockImages.generate).toHaveBeenCalledWith(expect.objectContaining({
+      quality: "medium",
+      size: "1024x1024",
+    }));
+  });
+
+  it("returns base64 + revisedPrompt + effort/aspect used", async () => {
+    mockImages.generate.mockResolvedValue({
+      data: [{ b64_json: "ABCD", revised_prompt: "the actual prompt used" }],
+    });
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    const result = await provider.generateImage!({ prompt: "x", effort: "quality", aspect: "square" });
+
+    expect(result).toEqual({
+      base64: "ABCD",
+      mimeType: "image/png",
+      revisedPrompt: "the actual prompt used",
+      effortUsed: "quality",
+      aspectUsed: "square",
+    });
+  });
+
+  it("throws when the API returns no image data", async () => {
+    mockImages.generate.mockResolvedValue({ data: [] });
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    await expect(provider.generateImage!({ prompt: "x" })).rejects.toThrow(/no image data/i);
+  });
+
+  it("omits generateImage on the Chat Completions fallback (custom providers)", () => {
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "custom" });
+    expect(provider.generateImage).toBeUndefined();
   });
 });

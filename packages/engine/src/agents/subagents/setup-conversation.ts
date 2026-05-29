@@ -28,6 +28,7 @@ import { campaignPaths } from "../../tools/filesystem/index.js";
 import { norm } from "../../utils/paths.js";
 import { slugify } from "../../utils/slug.js";
 import { logEvent } from "../../context/engine-log.js";
+import { normalizeImageEffort, normalizeImageAspect } from "../../providers/image-coerce.js";
 
 // --- Types ---
 
@@ -160,13 +161,15 @@ const LOAD_WORLD_TOOL: NormalizedTool = {
 const GENERATE_IMAGE_TOOL: NormalizedTool = {
   name: "generate_image",
   description:
-    "Generate a full-length character portrait (1024×1024, full body, centered) for the player's character. " +
+    "Generate a full-length character portrait for the player's character. " +
     "Use ONLY for character portraits during chargen — never for scenes or other illustrations during setup. " +
     "The image is shown to the player automatically. After showing each draft, ask the player whether " +
     "the portrait looks right or what to adjust, then call this again with an updated prompt if needed. " +
     "When the player confirms a portrait, call `set_portrait` with that draft's filename to keep it. " +
     "Compose the prompt with the campaign's visual style cues drawn from the seed (illuminated manuscript, " +
-    "cinematic matte, painterly, etc. — match the world's tone).",
+    "cinematic matte, painterly, etc. — match the world's tone). " +
+    "ALWAYS pass `effort: \"draft\"` and `aspect: \"portrait\"` for these chargen drafts — the player iterates " +
+    "and we need the fast turnaround. Save higher effort for in-campaign portrait commands after chargen.",
   inputSchema: {
     type: "object" as const,
     properties: {
@@ -174,8 +177,18 @@ const GENERATE_IMAGE_TOOL: NormalizedTool = {
         type: "string",
         description: "Vivid description of the character's full-body appearance — clothing, build, pose, mood, background hint, art style. The model composes the image from this; be specific.",
       },
+      effort: {
+        type: "string",
+        enum: ["draft", "standard", "quality", "showcase"],
+        description: "Render effort. Use 'draft' for chargen iteration (fastest). 'standard' / 'quality' / 'showcase' are reserved for in-campaign use after setup completes.",
+      },
+      aspect: {
+        type: "string",
+        enum: ["portrait", "landscape", "square"],
+        description: "Aspect ratio. Use 'portrait' for character portraits during chargen.",
+      },
     },
-    required: ["prompt"],
+    required: ["prompt", "effort", "aspect"],
   },
 };
 
@@ -517,43 +530,61 @@ export function createSetupConversation(
   let turnImageDisplays: { filename: string; intent: "character_portrait" }[] = [];
 
   /**
-   * Persist any `image_generated` ContentParts from `result.assistantContent`
-   * to the __setup__ scratch campaign and record their absolute paths for
-   * the caller to broadcast. Called once per chat round. No-op when the
-   * portrait loop is gated off.
+   * Dispatch a `generate_image` function tool call.
+   *
+   * Flow: read effort/aspect/prompt from model args → call
+   * provider.generateImage → persist bytes to disk via handleImageGenerated
+   * → record path for the caller to broadcast as a display_image TUI
+   * command → return a text tool_result confirming the image was shown
+   * to the player and naming the draft filename so the model can
+   * subsequently call set_portrait with the right basename.
+   *
+   * Errors (no provider support, network failure, content refusal) bubble
+   * up as an isError tool_result so the model can apologize or retry.
    */
-  async function captureImageDrafts(result: ChatResult): Promise<void> {
+  async function dispatchGenerateImage(
+    callId: string,
+    input: Record<string, unknown>,
+  ): Promise<{ content: string; isError: boolean }> {
     if (!portraitLoopActive || !fileIO || !setupRoot) {
-      // Useful for the harness to distinguish "loop off" from "loop on but
-      // model didn't emit": if the model called generate_image but we're
-      // gated off, captureImageDrafts won't fire — nothing on disk
-      // wouldn't necessarily mean the API failed.
-      const imageParts = result.assistantContent.filter((p) => p.type === "image_generated").length;
-      if (imageParts > 0) {
-        logEvent("setup:image_capture_gated", {
-          imageParts,
-          portraitLoopActive,
-          hasFileIO: !!fileIO,
-          hasSetupRoot: !!setupRoot,
-        });
-      }
-      return;
+      return { content: "generate_image is not available (portrait loop gated off).", isError: true };
     }
-    for (const part of result.assistantContent) {
-      if (part.type !== "image_generated") continue;
-      try {
-        const persisted = await handleImageGenerated(fileIO, setupRoot, null, part);
-        const absPath = norm(`${setupRoot}/${persisted.relPath}`);
-        turnImageDisplays.push({ filename: absPath, intent: "character_portrait" });
-      } catch (e) {
-        // Persist failure is non-fatal; the model can call generate_image
-        // again on the next turn if the player nudges. Log so the harness
-        // can tell "we tried and threw" from "we never got an image_generated
-        // part at all".
-        logEvent("setup:image_capture_failed", {
-          error: e instanceof Error ? e.message : String(e),
-        });
-      }
+    if (!provider.generateImage) {
+      return { content: "The configured provider does not support image generation.", isError: true };
+    }
+    const promptText = typeof input.prompt === "string" ? input.prompt.trim() : "";
+    if (!promptText) {
+      return { content: "generate_image requires a non-empty prompt.", isError: true };
+    }
+    const effort = normalizeImageEffort(input.effort, "draft");
+    const aspect = normalizeImageAspect(input.aspect, "portrait");
+    try {
+      const result = await provider.generateImage({
+        prompt: promptText,
+        effort,
+        aspect,
+        intent: "character_portrait",
+      });
+      // Persist via image-handler — same path the old hosted-tool flow used,
+      // so disk naming, sidecar JSON, and downstream consumers (transcript
+      // export, world-builder finalize) stay identical.
+      const persisted = await handleImageGenerated(fileIO, setupRoot, null, {
+        id: callId,
+        base64: result.base64,
+        mimeType: result.mimeType,
+        intent: "character_portrait",
+        ...(result.revisedPrompt ? { revisedPrompt: result.revisedPrompt } : {}),
+      });
+      const absPath = norm(`${setupRoot}/${persisted.relPath}`);
+      turnImageDisplays.push({ filename: absPath, intent: "character_portrait" });
+      const basename = persisted.relPath.split("/").pop() ?? "portrait-draft.png";
+      return {
+        content: `Portrait rendered and shown to the player at ${basename} (effort: ${result.effortUsed}, aspect: ${result.aspectUsed}). Now check in with the player about it — and remember the filename if they want to keep this draft via set_portrait.`,
+        isError: false,
+      };
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return { content: `Image generation failed: ${message}`, isError: true };
     }
   }
 
@@ -730,6 +761,9 @@ export function createSetupConversation(
      * lands, `pendingChoices` is captured when present_choices lands, etc.
      */
     async function runToolDispatch(call: { id: string; name: string; input: Record<string, unknown> }): Promise<{ content: string; isError: boolean }> {
+      if (call.name === "generate_image") {
+        return dispatchGenerateImage(call.id, call.input);
+      }
       if (call.name === "set_portrait") {
         return dispatchSetPortrait(call.input);
       }
@@ -801,10 +835,6 @@ export function createSetupConversation(
         tools: TOOLS,
         thinking,
         cacheHints,
-        // Tag any images this turn produces as character_portrait — setup
-        // never generates scene snapshots or player-requested images, so
-        // this is unconditional rather than per-call.
-        imageIntent: "character_portrait",
         // Per-call dispatch for providers that own the tool loop internally
         // (openai-chatgpt). Codex sends tool calls as in-band server
         // requests that must be answered synchronously, so we can't let
@@ -829,11 +859,9 @@ export function createSetupConversation(
       };
 
       const result = await streamWithRetry(provider, params, onDelta, onRetry);
-
-      // Persist any portrait drafts the model emitted this round, recording
-      // their paths for the caller to broadcast as display_image events.
-      // No-op when the portrait loop is gated off.
-      await captureImageDrafts(result);
+      // Portrait drafts are now persisted directly inside dispatchGenerateImage
+      // when the model calls the generate_image function tool — no post-hoc
+      // assistantContent scrape needed.
 
       // Defense-in-depth: a refusal-stop with no usable output is a dead
       // end for setup. The previous behavior (silently continue with

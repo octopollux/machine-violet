@@ -55,29 +55,13 @@ export interface AgentLoopConfig {
   /** Called when the full response is complete */
   onComplete?: (usage: UsageStats) => void;
   /**
-   * Called once per `image_generated` ContentPart emitted by the provider
-   * during this turn. The handler typically persists bytes to disk and
-   * pushes a visual cue to the client. Awaited per-image so a slow file
-   * write delays the next tool round (intentional — we don't want a
-   * second image queued before the first is on disk). Failed image
-   * generations never reach this callback.
-   */
-  onImageGenerated?: (part: {
-    id: string;
-    base64: string;
-    mimeType: string;
-    intent: "scene_snapshot" | "player_request" | "character_portrait";
-    revisedPrompt?: string;
-  }) => void | Promise<void>;
-  /**
-   * When true, append the `generate_image` sentinel tool to the DM's
-   * tool list so providers with native image generation enable their
-   * built-in tool (OpenAI Responses API: `image_generation`; Codex:
-   * `ToolSpec::ImageGeneration`). When false or absent, the tool is
-   * omitted and the DM has no way to request an image. Caller is
-   * responsible for verifying both `provider.getCapabilities(model)
-   * .imageGeneration` AND the campaign preference before flipping
-   * this on — the agent loop trusts the flag verbatim.
+   * When true, append the `generate_image` function tool to the DM's
+   * tool list. The model invokes it like any other tool; the host's
+   * asyncToolHandler dispatches the call to `provider.generateImage`,
+   * persists the bytes, and broadcasts a `display_image` TUI command.
+   * Caller is responsible for verifying both `provider.getCapabilities
+   * (model).imageGeneration` AND the campaign preference before
+   * flipping this on — the agent loop trusts the flag verbatim.
    */
   imageGenEnabled?: boolean;
   /** Called on error */
@@ -159,14 +143,10 @@ async function runAgentLoopInternal(
     : (name: string, input: Record<string, unknown>) => registry.dispatch(gameState, name, input);
 
   // Tool list: registry definitions (minus DM_EXCLUDED_TOOLS), plus the
-  // `generate_image` sentinel when image generation is gated on. The
-  // sentinel is never dispatched — providers with native image gen
-  // intercept the name in their request mapper and rewrite to the
-  // provider's built-in image-generation tool config. Providers without
-  // native support that somehow received this tool would surface it as a
-  // regular function_call back through ChatResult.toolCalls; the registry
-  // has no handler for it, so the dispatch would return an error result.
-  // Gating prevents that path from being reached.
+  // `generate_image` function tool when image generation is gated on.
+  // The DM's asyncToolHandler (GameEngine.dispatchGenerateImage) routes
+  // the call through provider.generateImage and emits the display_image
+  // TUI command + bytes-on-disk side effects.
   const tools: NormalizedTool[] = registry.getDefinitions(DM_EXCLUDED_TOOLS);
   if (config.imageGenEnabled) {
     tools.push({
@@ -176,7 +156,11 @@ async function runAgentLoopInternal(
         "Provide a vivid descriptive prompt covering subject, composition, mood, " +
         "and style. The caption (if any) should be composed into the image itself " +
         "as a printed plate, not emitted as separate text. Use sparingly — at most " +
-        "one image per turn.",
+        "one image per turn. " +
+        "Default to `effort: \"standard\"` for ordinary scene snapshots. Reach for " +
+        "`effort: \"quality\"` or `\"showcase\"` only for once-per-arc set-pieces; " +
+        "they take longer and cost more. Use `aspect: \"landscape\"` for scenes, " +
+        "`\"portrait\"` for character close-ups, `\"square\"` for objects/symbols.",
       inputSchema: {
         type: "object",
         properties: {
@@ -184,8 +168,18 @@ async function runAgentLoopInternal(
             type: "string",
             description: "Vivid description of the image to render, including any in-image caption text.",
           },
+          effort: {
+            type: "string",
+            enum: ["draft", "standard", "quality", "showcase"],
+            description: "Render effort. Default 'standard'. 'showcase' for once-per-arc moments only.",
+          },
+          aspect: {
+            type: "string",
+            enum: ["portrait", "landscape", "square"],
+            description: "Aspect ratio. Match to the subject: landscape for scenes, portrait for characters, square for objects.",
+          },
         },
-        required: ["prompt"],
+        required: ["prompt", "effort", "aspect"],
       },
     });
   }
@@ -206,7 +200,6 @@ async function runAgentLoopInternal(
     onToolStart: config.onToolStart,
     onToolEnd: config.onToolEnd,
     onComplete: config.onComplete,
-    onImageGenerated: config.onImageGenerated,
     onError: config.onError,
     onRetry: config.onRetry,
     onRollback: config.onRollback,

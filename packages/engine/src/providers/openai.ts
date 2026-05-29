@@ -25,40 +25,9 @@ import type {
   GenerateImageRequest, GenerateImageResult,
   ImageEffort, ImageAspect,
 } from "./types.js";
-import { GENERATE_IMAGE_TOOL_NAME } from "./types.js";
 import { patchOrphanedToolUses } from "./orphan-patch.js";
 import { supportsImageGeneration } from "../config/model-registry.js";
 import { logEvent } from "../context/engine-log.js";
-
-/**
- * Native `image_generation` tool config sent to the Responses API when the
- * caller included {@link GENERATE_IMAGE_TOOL_NAME} in the normalized tool
- * list. Hardcoded to the spec's defaults: 1024×1024 (accommodates
- * non-humanoid PCs in portraits and works for scene snapshots), medium
- * quality (HD-ish per user direction), PNG, no partial-image streaming
- * (MV never streams images).
- *
- * We deliberately omit the `model` field. Earlier code pinned
- * `gpt-image-2` based on a research note, but real-world smoke testing
- * showed ~300s waits with no result — likely because the model name
- * wasn't actually being recognized. Letting OpenAI pick the current
- * default (today: gpt-image-1; the API silently picks newer as they
- * ship) is the most forgiving path, at the cost of not being able to
- * pin a specific gen model. Add `model` back here when we want a
- * specific one and have confirmed access.
- *
- * Quality is `medium` rather than `high`. At TUI render sizes (sixel
- * scaling to ~60-80 columns) the visible difference is negligible, but
- * `high` regularly takes 60-180s wall-clock per image vs ~15-30s for
- * `medium` — a smoke-test deal-breaker.
- */
-const IMAGE_GENERATION_TOOL_CONFIG = {
-  type: "image_generation" as const,
-  size: "1024x1024" as const,
-  quality: "medium" as const,
-  output_format: "png" as const,
-  partial_images: 0,
-};
 
 // ---------------------------------------------------------------------------
 // Routing
@@ -225,10 +194,9 @@ async function responsesChat(
   onDelta?: (text: string) => void,
 ): Promise<ChatResult> {
   const apiParams = toResponsesParams(params);
-  const imageIntent = params.imageIntent ?? "player_request";
 
   if (streaming && onDelta) {
-    return responsesStream(client, apiParams, onDelta, imageIntent);
+    return responsesStream(client, apiParams, onDelta);
   }
 
   const response = await client.responses.create({
@@ -236,7 +204,7 @@ async function responsesChat(
     stream: false,
   });
 
-  return fromResponsesResponse(response, imageIntent);
+  return fromResponsesResponse(response);
 }
 
 // ---------------------------------------------------------------------------
@@ -247,7 +215,6 @@ async function responsesStream(
   client: OpenAI,
   apiParams: ResponsesParams,
   onDelta: (text: string) => void,
-  imageIntent: "scene_snapshot" | "player_request" | "character_portrait",
 ): Promise<ChatResult> {
   const stream = client.responses.stream(apiParams);
 
@@ -308,7 +275,7 @@ async function responsesStream(
   // and parse tool calls from the output items directly. Reasoning is
   // passed in from the event-driven capture above. Map preserves insertion
   // order, which matches the order ids first appeared in the stream.
-  return fromResponsesResponseWithText(response, imageIntent, text, reasoningParts, [...encryptedReasoningById.values()]);
+  return fromResponsesResponseWithText(response, text, reasoningParts, [...encryptedReasoningById.values()]);
 }
 
 // ---------------------------------------------------------------------------
@@ -346,41 +313,24 @@ function toResponsesParams(params: ChatParams): ResponsesParams {
     input.push(...toResponsesInput(msg));
   }
 
-  // Tools. The engine's `generate_image` sentinel is rewritten to the
-  // Responses API's native `image_generation` tool config; the model
-  // emits the resulting image as an `image_generation_call` output
-  // item rather than as a function call back to the caller (see
-  // fromResponsesResponseWithText for the inverse).
+  // Tools — all flow through as plain function tools, including
+  // `generate_image`. The earlier design hijacked generate_image and
+  // substituted OpenAI's hosted `image_generation` tool config, which
+  // meant the model couldn't pick per-call quality/size and we had
+  // to compensate with several workarounds (replay-drop, status gates,
+  // image-only continuation loops). Function-tool dispatch lets the
+  // model pick effort + aspect per call via the tool args, and the
+  // host calls provider.generateImage() to fulfill — no provider-side
+  // hijack required.
   let tools: OpenAI.Responses.Tool[] | undefined;
   if (params.tools?.length) {
-    const functionTools: OpenAI.Responses.Tool[] = [];
-    let imageGenRequested = false;
-    for (const t of params.tools) {
-      if (t.name === GENERATE_IMAGE_TOOL_NAME) {
-        imageGenRequested = true;
-        continue;
-      }
-      functionTools.push({
-        type: "function" as const,
-        name: t.name,
-        description: t.description ?? undefined,
-        parameters: t.inputSchema as Record<string, unknown>,
-        strict: false,
-      });
-    }
-    if (imageGenRequested) {
-      functionTools.push(IMAGE_GENERATION_TOOL_CONFIG);
-      // Breadcrumb so a smoke test can prove the tool actually got attached
-      // to the request — the most common silent failure for "no image
-      // appeared" is the engine never registering generate_image in the
-      // first place (config off, capability false, etc).
-      logEvent("image_gen:tool_registered", {
-        model: params.model,
-        intent: params.imageIntent ?? "player_request",
-        quality: IMAGE_GENERATION_TOOL_CONFIG.quality,
-        size: IMAGE_GENERATION_TOOL_CONFIG.size,
-      });
-    }
+    const functionTools: OpenAI.Responses.Tool[] = params.tools.map((t) => ({
+      type: "function" as const,
+      name: t.name,
+      description: t.description ?? undefined,
+      parameters: t.inputSchema as Record<string, unknown>,
+      strict: false,
+    }));
     if (functionTools.length > 0) tools = functionTools;
   }
 
@@ -452,10 +402,13 @@ function toResponsesInput(msg: NormalizedMessage): OpenAI.Responses.ResponseInpu
       }
     }
 
-    // Iterate in order to preserve text ↔ tool_use ↔ image_generated
-    // interleaving. Image-generation calls are replayed as the
-    // ResponseItem.ImageGenerationCall variant — the Responses API accepts
-    // it as a valid input item alongside function_call, message, etc.
+    // Iterate in order to preserve text ↔ tool_use interleaving.
+    // image_generated parts are deliberately NOT replayed: under
+    // function-tool dispatch they're produced by our handler (not the
+    // model) and the model already saw the tool_call + tool_result
+    // pair carrying the path. Replaying the bytes would inflate the
+    // cached prefix for no model-visible benefit. The bytes still live
+    // on disk + in the transcript.
     let pendingText = "";
     for (const part of msg.content) {
       if (part.type === "text") {
@@ -472,21 +425,8 @@ function toResponsesInput(msg: NormalizedMessage): OpenAI.Responses.ResponseInpu
           name: part.name,
           arguments: JSON.stringify(part.input),
         });
-      } else if (part.type === "image_generated") {
-        // Flush any accumulated text before the image item so order is
-        // preserved on replay.
-        if (pendingText) {
-          items.push({ type: "message", role: "assistant", content: pendingText });
-          pendingText = "";
-        }
-        items.push({
-          type: "image_generation_call",
-          id: part.id,
-          result: part.base64,
-          status: "completed",
-        });
       }
-      // Reasoning parts already emitted above.
+      // Reasoning parts already emitted above; image_generated dropped intentionally.
     }
     // Flush trailing text
     if (pendingText) {
@@ -542,11 +482,8 @@ function toResponsesInput(msg: NormalizedMessage): OpenAI.Responses.ResponseInpu
 // Response mapping: Responses API → normalized
 // ---------------------------------------------------------------------------
 
-function fromResponsesResponse(
-  response: OAIResponse,
-  imageIntent: "scene_snapshot" | "player_request" | "character_portrait",
-): ChatResult {
-  return fromResponsesResponseWithText(response, imageIntent);
+function fromResponsesResponse(response: OAIResponse): ChatResult {
+  return fromResponsesResponseWithText(response);
 }
 
 /**
@@ -576,7 +513,6 @@ function fromResponsesResponse(
  */
 function fromResponsesResponseWithText(
   response: OAIResponse,
-  imageIntent: "scene_snapshot" | "player_request" | "character_portrait",
   accumulatedText?: string,
   accumulatedReasoning?: string[],
   accumulatedEncryptedReasoning?: { id: string; encryptedContent: string; summary: string[] }[],
@@ -620,41 +556,12 @@ function fromResponsesResponseWithText(
       toolCalls.push({ id: item.call_id, name: item.name, input });
       assistantContent.push({ type: "tool_use", id: item.call_id, name: item.name, input });
     } else if (item.type === "image_generation_call") {
-      // Failures (refusal, network, quota) are silently skipped from the
-      // rendered output per spec — but logged via engine-log so users
-      // debugging "no image appeared" have a breadcrumb. The DM's next
-      // turn sees no image-input ContentPart and continues normally.
-      // revised_prompt is captured if surfaced (SDK at this version
-      // doesn't type it; cast through unknown to read it without losing
-      // strict types elsewhere).
-      if (item.status === "completed" && item.result) {
-        const revisedPrompt = (item as unknown as { revised_prompt?: string }).revised_prompt;
-        assistantContent.push({
-          type: "image_generated",
-          id: item.id,
-          base64: item.result,
-          mimeType: "image/png",
-          intent: imageIntent,
-          ...(revisedPrompt ? { revisedPrompt } : {}),
-        });
-        // Counterpart to image_gen:tool_registered. Lets the harness assert
-        // not just that we asked, but that the model produced something —
-        // and gives a rough byte-size to distinguish a real image from a
-        // zero-length stub. base64 length × 0.75 ≈ raw bytes.
-        logEvent("image_gen:completed", {
-          id: item.id,
-          intent: imageIntent,
-          base64Length: item.result.length,
-          ...(revisedPrompt ? { revisedPromptPreview: revisedPrompt.slice(0, 120) } : {}),
-        });
-      } else {
-        logEvent("image_gen:non_completed", {
-          id: item.id,
-          status: item.status,
-          hasResult: !!item.result,
-          intent: imageIntent,
-        });
-      }
+      // Legacy hosted-tool output. Should never appear under the
+      // function-tool dispatch design (we no longer register the hosted
+      // tool config), but if a future stale tool config slips through
+      // we drop the item silently rather than crash. Log so the seam is
+      // visible if it ever fires.
+      logEvent("image_gen:legacy_hosted_item_ignored", { id: item.id });
     } else if (item.type === "reasoning" && accumulatedReasoning === undefined) {
       // Non-streaming path. The streaming path's SDK accumulator is
       // unreliable for reasoning items (see the responsesStream comment),

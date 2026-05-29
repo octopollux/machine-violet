@@ -294,17 +294,6 @@ interface ChatParamsBase {
    * out of cache-miss attribution; the call itself behaves identically.
    */
   conversationId?: string;
-  /**
-   * Intent tag the provider stamps onto every `image_generated` ContentPart
-   * emitted during this turn. The image-generation API surface itself
-   * doesn't expose an intent field, so the caller — which knows whether
-   * this is a scene-snapshot turn, a player-request turn, or a setup-agent
-   * portrait turn — has to thread the answer through. Defaults to
-   * `"player_request"` if absent (the most benign assumption for a normal
-   * DM turn). Scene-manager may re-tag post-hoc when it sees an image
-   * arrive in the same turn as a `scene_transition` tool call.
-   */
-  imageIntent?: "scene_snapshot" | "player_request" | "character_portrait";
 }
 
 interface ChatParamsToolless extends ChatParamsBase {

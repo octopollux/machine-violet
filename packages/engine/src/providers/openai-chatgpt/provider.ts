@@ -35,7 +35,6 @@ import type {
 } from "../types.js";
 import type { UsageStatus } from "@machine-violet/shared";
 import { CodexRpcClient } from "./rpc.js";
-import { supportsImageGeneration } from "../../config/model-registry.js";
 import { getAccount, isChatGptAccount, pushChatGptAuthTokens } from "./auth.js";
 import { toUsageStatus, shouldWarn } from "./usage.js";
 import { log } from "./log.js";
@@ -125,12 +124,13 @@ export class OpenAIChatGptProvider implements LLMProvider {
   // LLMProvider surface
   // -----------------------------------------------------------------------
 
-  getCapabilities(model: string): { imageGeneration: boolean } {
-    // Codex's image_generation hosted tool is supported on the same
-    // GPT-5.x / GPT-4o family that the OpenAI Responses API supports it
-    // on. The capability bit lives in the model registry so a single
-    // edit there flips both code paths.
-    return { imageGeneration: supportsImageGeneration(model) };
+  getCapabilities(_model: string): { imageGeneration: boolean } {
+    // Phase 7 wiring not yet landed — until this provider implements
+    // generateImage (probably by spawning a fresh REST images.generate
+    // call alongside the codex JSON-RPC stream), image gen for
+    // ChatGPT-account users is unavailable. Report false unconditionally
+    // so subagents don't register the generate_image function tool.
+    return { imageGeneration: false };
   }
 
   async chat(params: ChatParams): Promise<ChatResult> {

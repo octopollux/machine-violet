@@ -44,6 +44,7 @@ import { createChoiceGeneratorSession, shouldGenerateChoices } from "./subagents
 import type { ChoiceGeneratorSession } from "./subagents/choice-generator.js";
 import { campaignPaths, parseFrontMatter, serializeEntity, formatChangelogEntry } from "../tools/filesystem/index.js";
 import { handleImageGenerated } from "./image-handler.js";
+import { normalizeImageEffort, normalizeImageAspect } from "../providers/image-coerce.js";
 import { loadDmPortraitMessage } from "./dm-portraits.js";
 import { runScribe } from "./subagents/scribe.js";
 import { promoteCharacter } from "./subagents/character-promotion.js";
@@ -1206,6 +1207,78 @@ export class GameEngine {
    * the natural-language request. Otherwise, dispatches directly.
    */
   /**
+   * Dispatch the DM's `generate_image` function tool. Calls the active
+   * provider's generateImage method, persists the bytes via the shared
+   * image-handler, and emits a display_image TUI command on the same
+   * tool result so the client renders the image inline as soon as the
+   * tool fires (not at end-of-turn). Returns a textual tool_result the
+   * model can riff off in its continuation.
+   *
+   * Errors (no provider support, content refusal, network) surface as
+   * an isError tool_result so the model can apologize, retry, or skip.
+   */
+  private async dispatchGenerateImage(
+    input: Record<string, unknown>,
+  ): Promise<import("./tool-registry.js").ToolResult> {
+    if (!this.provider.generateImage) {
+      return {
+        content: "Image generation is not available on the configured provider.",
+        is_error: true,
+      };
+    }
+    const promptText = typeof input.prompt === "string" ? input.prompt.trim() : "";
+    if (!promptText) {
+      return { content: "generate_image requires a non-empty prompt.", is_error: true };
+    }
+    const effort = normalizeImageEffort(input.effort);
+    const aspect = normalizeImageAspect(input.aspect);
+    const rawIntent = typeof input.intent === "string" ? input.intent : "";
+    const intent: "scene_snapshot" | "player_request" | "character_portrait" =
+      rawIntent === "scene_snapshot" || rawIntent === "character_portrait"
+        ? rawIntent
+        : "player_request";
+    try {
+      const result = await this.provider.generateImage({
+        prompt: promptText,
+        effort,
+        aspect,
+        intent,
+      });
+      const scene = this.sceneManager.getScene();
+      const persisted = await handleImageGenerated(
+        this.sceneManager.getFileIO(),
+        this.gameState.campaignRoot,
+        { sceneNumber: scene.sceneNumber, slug: scene.slug || "untitled" },
+        {
+          // Use the response's revised_prompt as a stable id surrogate
+          // (it's not used by the API anymore — just the on-disk sidecar).
+          id: `img-${Date.now()}`,
+          base64: result.base64,
+          mimeType: result.mimeType,
+          intent,
+          ...(result.revisedPrompt ? { revisedPrompt: result.revisedPrompt } : {}),
+        },
+      );
+      const absPath = norm(`${this.gameState.campaignRoot}/${persisted.relPath}`);
+      return {
+        content: `Image rendered and displayed to the player (${result.effortUsed} effort, ${result.aspectUsed} aspect). The model's next narrative can reference it.`,
+        // _tui field attaches a TUI command to the tool result so it
+        // broadcasts immediately, before the DM's continuation runs.
+        _tui: {
+          type: "display_image",
+          filename: absPath,
+          relPath: persisted.relPath,
+          intent,
+        },
+      } as import("./tool-registry.js").ToolResult;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.callbacks.onDevLog?.(`[image] generate failed: ${msg}`);
+      return { content: `Image generation failed: ${msg}`, is_error: true };
+    }
+  }
+
+  /**
    * Handle style_scene as an async tool — runs the theme-styler subagent
    * during tool execution so the theme update broadcasts immediately
    * (via _tui on the ToolResult) instead of after the DM turn.
@@ -1504,33 +1577,6 @@ export class GameEngine {
         }
         this.callbacks.onTuiCommand(cmd);
       },
-      onImageGenerated: async (part) => {
-        // Persist the image and emit a TUI command so the client can
-        // render it inline between separators. Errors are caught and
-        // logged — a write failure shouldn't kill the DM turn, and the
-        // model's next reply can acknowledge or ignore the loss. We
-        // emit the absolute path so the client can hand it directly
-        // to ink-picture without re-resolving against the campaign
-        // root (which the client doesn't track in its own state).
-        try {
-          const scene = this.sceneManager.getScene();
-          const result = await handleImageGenerated(
-            this.sceneManager.getFileIO(),
-            this.gameState.campaignRoot,
-            { sceneNumber: scene.sceneNumber, slug: scene.slug || "untitled" },
-            part,
-          );
-          const absPath = norm(`${this.gameState.campaignRoot}/${result.relPath}`);
-          this.callbacks.onTuiCommand({
-            type: "display_image",
-            filename: absPath,
-            relPath: result.relPath,
-            intent: part.intent,
-          });
-        } catch (e) {
-          this.callbacks.onDevLog?.(`[image] persist failed: ${e instanceof Error ? e.message : String(e)}`);
-        }
-      },
       onRetry: (status, delayMs) => this.callbacks.onRetry(status, delayMs),
       onRollback: () => this.callbacks.onRollback?.(),
     };
@@ -1566,6 +1612,18 @@ export class GameEngine {
     if (ENTITY_TOOL_NAME_SET.has(name)) {
       return this.getEntityToolDispatcher()(name, input);
     }
+
+    if (name === "generate_image") {
+      return this.dispatchGenerateImage(input);
+    }
+
+    /**
+     * Inlined to keep the dispatch table flat. Mirrors setup-conversation's
+     * dispatchGenerateImage but with DM-side context: scene number/slug for
+     * the on-disk basename, scene_snapshot intent default (DM usually
+     * generates scenes, not portraits).
+     */
+    // (see private dispatchGenerateImage method below)
 
     if (name === "resolve_turn") {
       if (!this.resolveSession) {
