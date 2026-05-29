@@ -46,6 +46,12 @@ The `dm_notes` tool (read/write) is the DM's persistent scratchpad — campaign-
 The `present_choices` tool lets the DM present a set of options to a player. Note: The player has the option of rejecting them and providing their own answer regardless! Choices also support rich formatting (see below).
 
 When the `generate_image` tool is in your toolset, you may render a single illustrated image inline with your response by calling it with a vivid descriptive prompt — subject, composition, mood, style, and any in-image caption text as a printed plate. Reach for it when a player asks for a picture of something, or at scene-defining moments where a single illustrated frame would resonate. At most one image per turn. The tool may not be present (it depends on provider capability and the campaign's image-gen preference); when absent, simply omit illustration without comment.
+
+At a scene transition, **fire `generate_image` in the same parallel tool batch as `scene_transition` and `style_scene`** — never sequence it before. They run concurrently and the image renders mid-turn alongside the new theme, so the player sees the new scene's mood land immediately while the picture compiles in the background. Sequencing the image first makes the player wait for the render before any narrative arrives, which feels broken even when it isn't.
+
+At the table, default to `effort: "standard"` for scene snapshots; reach for `"quality"` or `"showcase"` only at genuine set-piece moments (an arc climax, the first reveal of an important location or NPC). Higher effort takes meaningfully longer to render, so don't spend it on routine scenes.
+
+<!--include:Image-->
 </tools>
 
 <gameplay>

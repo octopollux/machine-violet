@@ -300,17 +300,23 @@ const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
   // Image lines render the generated PNG via ink-picture, which handles
   // terminal-protocol selection (sixel / kitty / iTerm2 inline) with
   // half-block/braille/ASCII fallback. `text` is the absolute path the
-  // engine wrote the file to. Width caps at the narrative column so
-  // narrow terminals don't get a clipped image; ink-picture's resizer
-  // preserves aspect ratio. Wrapped in a Box with a min-width so the
-  // surrounding separator pair lays out predictably.
+  // engine wrote the file to.
+  //
+  // Sized as a 16:9 box at 100% of the narrative column. Terminal cells
+  // are roughly 2:1 tall:wide, so visual 16:9 = cols : (rows * 2), which
+  // gives rows = cols * 9 / 32. We clamp to a sane floor for very narrow
+  // terminals so half-block/braille fallbacks still produce a recognisable
+  // picture. ink-picture preserves the source PNG's aspect ratio within
+  // the (width, height) box, so we don't distort the image — we just
+  // reserve a consistent footprint in the narrative.
   if (line.kind === "image") {
     const path = typeof line.nodes[0] === "string" ? line.nodes[0] : "";
     if (!path) return <Text dimColor>[image: missing path]</Text>;
-    const imgWidth = Math.max(40, Math.min(width ?? 80, 80));
+    const imgWidth = Math.max(20, width ?? 80);
+    const imgHeight = Math.max(6, Math.round((imgWidth * 9) / 32));
     return (
       <Box flexDirection="column" alignItems="center">
-        <Image src={path} width={imgWidth} alt="generated image" />
+        <Image src={path} width={imgWidth} height={imgHeight} />
       </Box>
     );
   }

@@ -436,13 +436,6 @@ export async function runProviderLoop(
       }
     }
 
-    // image_generated content parts are no longer emitted by providers under
-    // function-tool dispatch (the model calls generate_image as a normal tool,
-    // and the asyncToolHandler chain runs provider.generateImage + persist +
-    // emit display_image as part of the tool result). If any provider somehow
-    // still surfaces them, we drop them silently — the downstream history
-    // doesn't need the bytes.
-
     // Process tool calls concurrently. Sync handlers still run sequentially
     // on the JS event loop; async handlers (subagent spawns, search) genuinely
     // overlap. The model can batch independent calls in one response to save

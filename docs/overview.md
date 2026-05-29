@@ -143,6 +143,7 @@ The live prompt is split across [packages/engine/src/prompts/dm-identity.md](../
 | [Context Management](context-management.md) | Token economics, retention policy, cost modeling |
 | [Clocks and Alarms](clocks-and-alarms.md) | Calendar, combat rounds, alarm system |
 | [Game Initialization](game-initialization.md) | Setup flow, campaign seeds, DM personalities |
+| [Image Generation](image-generation.md) | Inline DM-generated images: capability + consent, dispatch, knobs, transcript embedding |
 | [Multiplayer and Initiative](multiplayer-and-initiative.md) | Hot-seat, AI players, turn order |
 | [Error Recovery](error-recovery.md) | Git snapshots, rollback, validation |
 | [TUI Design](tui-design.md) | Layout, themes, responsive design, DM formatting |

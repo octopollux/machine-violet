@@ -166,8 +166,11 @@ const GENERATE_IMAGE_TOOL: NormalizedTool = {
     "The image is shown to the player automatically. After showing each draft, ask the player whether " +
     "the portrait looks right or what to adjust, then call this again with an updated prompt if needed. " +
     "When the player confirms a portrait, call `set_portrait` with that draft's filename to keep it. " +
-    "Compose the prompt with the campaign's visual style cues drawn from the seed (illuminated manuscript, " +
-    "cinematic matte, painterly, etc. — match the world's tone). " +
+    "ALWAYS render setup portraits in the style: **simple digital art, plain black background**. " +
+    "Do not match the campaign's visual style during chargen — the black-background style is " +
+    "the canonical character-card look, and it stays consistent across worlds. Describe the " +
+    "character (build, clothing, pose, mood, expression) in the prompt, then end with " +
+    "\"Simple digital art, plain black background.\" Save campaign-styled imagery for in-game scenes. " +
     "ALWAYS pass `effort: \"draft\"` and `aspect: \"portrait\"` for these chargen drafts — the player iterates " +
     "and we need the fast turnaround. Save higher effort for in-campaign portrait commands after chargen.",
   inputSchema: {
@@ -460,7 +463,7 @@ export function createSetupConversation(
    * `<setupRoot>/characters/<slug>-portrait.png`. world-builder picks that
    * up at finalize and copies it into the freshly-scaffolded campaign.
    * When either is absent (e.g. test paths), image-gen tools are not
-   * registered and any incoming image_generated ContentPart is dropped.
+   * registered and portraits are skipped entirely.
    */
   fileIO?: FileIO,
   setupRoot?: string,
@@ -572,9 +575,10 @@ export function createSetupConversation(
         aspect,
         intent: "character_portrait",
       });
-      // Persist via image-handler — same path the old hosted-tool flow used,
-      // so disk naming, sidecar JSON, and downstream consumers (transcript
-      // export, world-builder finalize) stay identical.
+      // Persist via image-handler — shared with the DM-side dispatch in
+      // game-engine.ts, so disk naming, sidecar JSON, and downstream
+      // consumers (transcript export, world-builder finalize) are uniform
+      // across both call sites.
       const persisted = await handleImageGenerated(fileIO, setupRoot, null, {
         id: callId,
         base64: result.base64,

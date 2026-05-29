@@ -182,7 +182,7 @@ Categories worth knowing about:
 | `turn:*` | `player_input`, `dm_complete` | Turn boundaries with token counts + duration. |
 | `api:*` | `call`, `retry` | Provider HTTP calls — model, tokens, duration, tool_use count. |
 | `subagent:*` | `start`, `end` | Scribe, theme-styler, promote_character, etc. |
-| `image_gen:*` | `request`, `response`, `no_data`, `error`, `persisted`, `dispatch_failed`, `tool_registered` | Image-generation pipeline. |
+| `image_gen:*` | `request`, `response`, `no_data`, `error`, `persisted`, `dispatch_failed`, `legacy_hosted_item_ignored` | Image-generation pipeline. |
 | `setup:*` | `image_tools_registered` | Setup-agent capability snapshots. |
 
 The harness scopes engine-log reads to events with `t >= launchedAt`, so

@@ -16,9 +16,9 @@ npm run e2e:boot
 npm run smoketest
 ```
 
-Both probes are standalone TypeScript files under `bin/`. There is no
-scenario registry — for ad-hoc walks, write your own script following
-the same shape.
+Both probes are standalone TypeScript files under `bin/`. For ad-hoc
+walks (a specific personality, save/load round-trip, image consent flow,
+etc.), write your own script using `runProbe` — see Library usage below.
 
 ## Library usage
 

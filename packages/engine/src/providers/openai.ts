@@ -91,11 +91,9 @@ export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
 /**
  * Map the abstract effort knob to OpenAI's quality param.
  *
- * `showcase` would ideally also boost `input_fidelity`, but that's a
- * Responses-API hosted-tool param — not exposed on the standalone
- * `images.generate` endpoint. We accept the duplication with `quality`
- * here; future backends that genuinely have a separate fidelity dial
- * can distinguish them.
+ * `showcase` collapses to the same `high` quality as `quality` —
+ * `images.generate` doesn't expose a separate fidelity dial. Future
+ * backends that genuinely distinguish them can pick a different mapping.
  */
 const EFFORT_TO_QUALITY: Record<ImageEffort, "low" | "medium" | "high"> = {
   draft: "low",
@@ -429,12 +427,12 @@ function toResponsesInput(msg: NormalizedMessage): OpenAI.Responses.ResponseInpu
     }
 
     // Iterate in order to preserve text ↔ tool_use interleaving.
-    // image_generated parts are deliberately NOT replayed: under
-    // function-tool dispatch they're produced by our handler (not the
-    // model) and the model already saw the tool_call + tool_result
-    // pair carrying the path. Replaying the bytes would inflate the
-    // cached prefix for no model-visible benefit. The bytes still live
-    // on disk + in the transcript.
+    // `image_generated` ContentParts (produced by the host when an image
+    // is rendered) are stripped from replay: the model already saw the
+    // tool_call + tool_result pair that carries the on-disk path, so
+    // re-sending the base64 bytes would inflate the cached prefix for
+    // zero model-visible benefit. Bytes still live on disk and in the
+    // transcript export.
     let pendingText = "";
     for (const part of msg.content) {
       if (part.type === "text") {
@@ -452,7 +450,7 @@ function toResponsesInput(msg: NormalizedMessage): OpenAI.Responses.ResponseInpu
           arguments: JSON.stringify(part.input),
         });
       }
-      // Reasoning parts already emitted above; image_generated dropped intentionally.
+      // Reasoning parts already emitted above; image_generated stripped (see above).
     }
     // Flush trailing text
     if (pendingText) {
@@ -582,11 +580,11 @@ function fromResponsesResponseWithText(
       toolCalls.push({ id: item.call_id, name: item.name, input });
       assistantContent.push({ type: "tool_use", id: item.call_id, name: item.name, input });
     } else if (item.type === "image_generation_call") {
-      // Legacy hosted-tool output. Should never appear under the
-      // function-tool dispatch design (we no longer register the hosted
-      // tool config), but if a future stale tool config slips through
-      // we drop the item silently rather than crash. Log so the seam is
-      // visible if it ever fires.
+      // Tripwire. We never register the hosted `image_generation` tool
+      // (image-gen is a function tool dispatched through provider.generateImage),
+      // so this item type should not appear in normal operation. Drop
+      // silently rather than crash, but log so an accidental future
+      // re-registration of the hosted tool surfaces immediately.
       logEvent("image_gen:legacy_hosted_item_ignored", { id: item.id });
     } else if (item.type === "reasoning" && accumulatedReasoning === undefined) {
       // Non-streaming path. The streaming path's SDK accumulator is
