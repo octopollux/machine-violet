@@ -24,7 +24,7 @@ function mockFileIO(
       throw new Error(`ENOENT: ${p}`);
     }),
     deleteFile: vi.fn(async (p: string) => {
-      delete filesState[p];
+      Reflect.deleteProperty(filesState, p);
       const parent = p.split("/").slice(0, -1).join("/");
       const name = p.split("/").pop();
       if (name && parent in dirsState) {
@@ -35,7 +35,7 @@ function mockFileIO(
       if ((dirsState[p] ?? []).length > 0) {
         throw new Error(`ENOTEMPTY: ${p}`);
       }
-      delete dirsState[p];
+      Reflect.deleteProperty(dirsState, p);
       const parent = p.split("/").slice(0, -1).join("/");
       const name = p.split("/").pop();
       if (name && parent in dirsState) {
