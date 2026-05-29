@@ -912,4 +912,4 @@ describe("runProviderLoop round-boundary rollback", () => {
 // surfaces image_generated ContentParts anymore, so there's no bridge-level
 // callback to test. Coverage lives in:
 //   - openai.test.ts → provider.generateImage unit tests
-//   - test-harness image-setup scenario → end-to-end
+//   - ad-hoc test-harness probe → end-to-end

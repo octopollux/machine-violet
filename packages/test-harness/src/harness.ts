@@ -15,7 +15,7 @@
  *
  * The harness owns one child process. It always cleans up: shutdown() kills
  * the process tree and removes any temporary campaigns dir if `cleanup` was
- * requested. Long scenarios should put shutdown() in a `finally` block.
+ * requested. Long probes should put shutdown() in a `finally` block.
  */
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -93,7 +93,7 @@ export class Harness {
    * `dirname(campaignsDir)/.debug/engine.jsonl`. With the harness's
    * default ephemeral campaignsDir under `os.tmpdir()`, that resolves
    * to a SHARED `tmpdir/.debug/engine.jsonl` across every harness run.
-   * Without the cutoff, a scenario could "pass" by finding an
+   * Without the cutoff, a probe could "pass" by finding an
    * image_gen:completed event left over from yesterday's run.
    */
   readonly launchedAt: number;
@@ -148,7 +148,7 @@ export class Harness {
     // engine uses dotenv without override:true, so an empty value blocks
     // .env from populating the real key. Here we treat empty as "unset" and
     // explicitly load any *_API_KEY from the configDir's .env so the
-    // harness can run live scenarios from inside such shells.
+    // harness can run live probes from inside such shells.
 
     const launcherPath = join(REPO_ROOT, "scripts", "launcher.ts");
     const args = ["--max-semi-space-size=16", "--import", "tsx/esm", launcherPath];
@@ -322,7 +322,7 @@ export class Harness {
    * no choice is currently presented or no candidate matches.
    *
    * Implementation: assumes the overlay opens with selection at index 0.
-   * If your scenario navigates choices between presentations, drive arrow
+   * If your probe navigates choices between presentations, drive arrow
    * keys directly with sendKey.
    */
   async selectChoice(query: string | { index: number }): Promise<void> {
@@ -445,7 +445,7 @@ export class Harness {
    * scene to disk, creates a git checkpoint, generates the session recap,
    * and broadcasts `session:ended`. Equivalent to selecting "Save & Exit"
    * in the in-game menu, minus the keystroke navigation. Use this when
-   * your scenario isn't specifically testing menu nav.
+   * your probe isn't specifically testing menu nav.
    */
   async endSession(): Promise<void> {
     const res = await fetch(`http://127.0.0.1:${this.serverPort}/session/end`, {
@@ -482,7 +482,7 @@ export class Harness {
    * event name (`"image_gen:completed"`) or a predicate. Resolves with the
    * first matching event.
    *
-   * Scenarios that drive a slow async path (image generation, DM turn) should
+   * Probes that drive a slow async path (image generation, DM turn) should
    * use this instead of poking at ClientState — the engine log carries
    * intent + payload, not just "narrative grew."
    */
@@ -532,7 +532,7 @@ export class Harness {
 
   /**
    * Pretty-print the engine log tail. Useful in failure paths so the
-   * scenario runner dumps something diagnostic alongside /screen + /state.
+   * probe runner dumps something diagnostic alongside /screen + /state.
    */
   engineLogTail(n = 50): string {
     return this.readEngineLog().slice(-n).map(formatEngineEvent).join("\n");
@@ -647,5 +647,5 @@ async function terminateChild(child: ChildProcess): Promise<void> {
   }
 }
 
-// Convenient default-timeout constants for scenarios.
+// Convenient default-timeout constants for probes.
 export { DEFAULT_SHORT_TIMEOUT_MS, DEFAULT_LONG_TIMEOUT_MS };

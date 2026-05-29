@@ -1,9 +1,9 @@
 /**
- * Engine log reader for scenarios.
+ * Engine log reader for probes.
  *
  * The engine appends a JSONL event stream to `<dirname(campaignsDir)>/.debug/engine.jsonl`
  * (see packages/engine/src/context/engine-log.ts). This module reads + parses
- * that file so scenarios can assert against structured events — far more
+ * that file so probes can assert against structured events — far more
  * reliable than scraping stdout, and far more diagnostic than scraping
  * ClientState.
  *
@@ -11,7 +11,7 @@
  *   {"event":"image_gen:tool_registered","t":1716800000000,"model":"gpt-5.5",...}
  *
  * Reads are best-effort: a missing file returns `[]` (the engine hasn't
- * logged anything yet), malformed lines are skipped silently. Scenarios
+ * logged anything yet), malformed lines are skipped silently. Probes
  * should `waitForEngineEvent` rather than reading once and asserting,
  * because the engine writes asynchronously.
  */

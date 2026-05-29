@@ -15,10 +15,8 @@
     "lint": "eslint --cache --cache-location node_modules/.cache/eslint packages/shared/src/ packages/engine/src/ packages/client-ink/src/ packages/test-harness/src/ packages/test-harness/bin/",
     "typecheck": "tsc -b",
     "check": "concurrently -n lint,test --kill-others-on-fail \"npm run lint\" \"npm test\"",
-    "e2e": "node --import tsx/esm packages/test-harness/bin/run.ts",
-    "e2e:golden-path": "npm run e2e -- golden-path",
-    "e2e:boot": "npm run e2e -- boot-and-quit",
-    "e2e:image-setup": "npm run e2e -- image-setup",
+    "smoketest": "node --import tsx/esm packages/test-harness/bin/smoketest.ts",
+    "e2e:boot": "node --import tsx/esm packages/test-harness/bin/boot-and-quit.ts",
     "dist": "node scripts/build-dist.js",
     "explorer": "node tools/campaign-explorer/scripts/dev.js",
     "theme-editor": "node tools/theme-editor/scripts/dev.js"

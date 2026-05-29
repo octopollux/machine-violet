@@ -81,22 +81,21 @@ This project maintains a closed loop between code and documentation. When you ch
 7. Add it to `PROVIDER_OPTIONS` in `packages/client-ink/src/phases/ConnectionsPhase.tsx` (or, for OAuth-style providers, add a dedicated menu entry that doesn't go through the API-key wizard)
 8. If the provider implements `getUsageStatus` / `subscribeUsage`, the existing `/manage/connections/:id/usage` endpoint surfaces it automatically
 
-### Adding or changing an e2e scenario
+### Changing what the `smoketest` probe walks through
 
-1. Add the scenario file under `packages/test-harness/src/scenarios/`
-2. Register it in `ALL_SCENARIOS` in `packages/test-harness/bin/run.ts`
-3. Append a row to the scenarios table in [e2e-harness.md](e2e-harness.md)
-4. If you change the golden path's contract (what it proves, what it walks through), update the "The golden path" section in both [e2e-harness.md](e2e-harness.md) and the "Validating changes end-to-end" section in [CLAUDE.md](../CLAUDE.md)
-5. If the new scenario is a candidate default (rare), update the `/smoketest` skill description in `.claude/skills/smoketest/SKILL.md`. Most scenarios don't need a skill edit — they're reachable via `/smoketest <id>` without any changes.
+The smoketest contract — walk setup once, observe two in-game turns — is documented in [e2e-harness.md](e2e-harness.md) ("What `smoketest` actually does") and in [CLAUDE.md](../CLAUDE.md) ("Validating changes end-to-end"). If you change what the probe does (extra setup steps, different turn count, an added assertion), update both.
 
-### Changing harness primitives (wait helpers, input methods, state shape)
+The probe source itself is at `packages/test-harness/bin/smoketest.ts`. There is no registry — it's a standalone script invoked by `npm run smoketest`.
+
+### Changing harness primitives (wait helpers, input methods, state shape, engine-log breadcrumbs)
 
 1. Update the method on `Harness` / re-export from `packages/test-harness/src/index.ts`
 2. Update the "State-driven waiting" table in [e2e-harness.md](e2e-harness.md)
+3. If you added a new engine-log event category, append a row to the "Engine-log breadcrumbs" table in the same doc
 
 ### Changing what `/smoketest` does
 
-The skill at `.claude/skills/smoketest/SKILL.md` is the single source of truth for how agents and users invoke the harness. If you change which scenario it defaults to, the argument convention, or the "do/don't delegate to a subagent" guidance, edit that file. The skill's description field is what triggers it for agents — keep it specific about the trigger phrases ("smoke test", "validate end-to-end", "did I break it", etc.) so it fires when it should.
+The skill at `.claude/skills/smoketest/SKILL.md` is the single source of truth for how agents and users invoke the harness. If you change the argument convention, the "do/don't delegate to a subagent" guidance, or the set of long-lived probes, edit that file. The skill's description field is what triggers it for agents — keep it specific about the trigger phrases ("smoke test", "validate end-to-end", "did I break it", etc.) so it fires when it should.
 
 ### Adding a `codex:*` event
 
@@ -128,7 +127,7 @@ The openai-chatgpt provider emits its own operational events (subprocess lifecyc
 | REST API (auto-generated) | `/docs` endpoint | OpenAPI spec from TypeBox route schemas |
 | Conventions | [CLAUDE.md](../CLAUDE.md) | Code style, testing, imports |
 | openai-chatgpt provider | [openai-chatgpt-provider.md](openai-chatgpt-provider.md) | Codex app-server integration, OAuth flow, usage tracking |
-| E2E test harness | [e2e-harness.md](e2e-harness.md) | Golden path, scenario catalogue, harness primitives, how to add scenarios |
+| E2E test harness | [e2e-harness.md](e2e-harness.md) | Smoketest contract, harness primitives, engine-state gotchas, engine-log breadcrumbs, how to write a probe |
 
 ## Principles
 
