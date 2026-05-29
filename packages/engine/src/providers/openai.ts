@@ -22,6 +22,8 @@ import type {
   LLMProvider, ChatParams, ChatResult, HealthCheckResult,
   NormalizedMessage, NormalizedToolCall,
   NormalizedUsage, ContentPart, StopReason,
+  GenerateImageRequest, GenerateImageResult,
+  ImageEffort, ImageAspect,
 } from "./types.js";
 import { GENERATE_IMAGE_TOOL_NAME } from "./types.js";
 import { patchOrphanedToolUses } from "./orphan-patch.js";
@@ -106,6 +108,88 @@ export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
     chat: (params) => openaiChat(client, providerId, params, false),
     stream: (params, onDelta) => openaiChat(client, providerId, params, true, onDelta),
     healthCheck: (model) => openaiHealthCheck(client, providerId, model),
+    // Only the Responses API path supports image generation; the Chat
+    // Completions fallback (custom OpenAI-compatible endpoints) has no
+    // Images API equivalent, so leave generateImage undefined there.
+    ...(useResponsesAPI(providerId) ? { generateImage: (req) => openaiGenerateImage(client, req) } : {}),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Image generation
+// ---------------------------------------------------------------------------
+
+/**
+ * Map the abstract effort knob to OpenAI's quality param.
+ *
+ * `showcase` would ideally also boost `input_fidelity`, but that's a
+ * Responses-API hosted-tool param — not exposed on the standalone
+ * `images.generate` endpoint. We accept the duplication with `quality`
+ * here; future backends that genuinely have a separate fidelity dial
+ * can distinguish them.
+ */
+const EFFORT_TO_QUALITY: Record<ImageEffort, "low" | "medium" | "high"> = {
+  draft: "low",
+  standard: "medium",
+  quality: "high",
+  showcase: "high",
+};
+
+const ASPECT_TO_SIZE: Record<ImageAspect, "1024x1024" | "1024x1536" | "1536x1024"> = {
+  square: "1024x1024",
+  portrait: "1024x1536",
+  landscape: "1536x1024",
+};
+
+async function openaiGenerateImage(
+  client: OpenAI,
+  req: GenerateImageRequest,
+): Promise<GenerateImageResult> {
+  const effort = req.effort ?? "standard";
+  const aspect = req.aspect ?? "square";
+  const quality = EFFORT_TO_QUALITY[effort];
+  const size = ASPECT_TO_SIZE[aspect];
+
+  // Diagnostic breadcrumb. The harness asserts on these.
+  logEvent("image_gen:request", {
+    effort,
+    aspect,
+    quality,
+    size,
+    intent: req.intent ?? "player_request",
+    promptPreview: req.prompt.slice(0, 120),
+  });
+
+  // Letting OpenAI pick the default GPT image model keeps us from pinning
+  // to a name (`gpt-image-1` today, but newer ones ship). Quality + size
+  // + output_format are enough to identify what we want.
+  const response = await client.images.generate({
+    prompt: req.prompt,
+    quality,
+    size,
+    output_format: "png",
+    n: 1,
+  });
+
+  const item = response.data?.[0];
+  if (!item?.b64_json) {
+    logEvent("image_gen:no_data", { effort, aspect });
+    throw new Error("OpenAI images.generate returned no image data");
+  }
+
+  logEvent("image_gen:response", {
+    effort,
+    aspect,
+    base64Length: item.b64_json.length,
+    ...(item.revised_prompt ? { revisedPromptPreview: item.revised_prompt.slice(0, 120) } : {}),
+  });
+
+  return {
+    base64: item.b64_json,
+    mimeType: "image/png",
+    ...(item.revised_prompt ? { revisedPrompt: item.revised_prompt } : {}),
+    effortUsed: effort,
+    aspectUsed: aspect,
   };
 }
 
