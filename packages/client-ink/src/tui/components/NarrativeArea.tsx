@@ -217,8 +217,26 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
     atBottomRef.current = below <= 0;
   }, []);
 
+  // Scroll-settle key: bumps ~150ms after the last scroll event so visible
+  // image lines remount and ink-picture re-paints any pixels the terminal
+  // cleared when text scrolled into their cells. Same mechanism as the
+  // overlay-close imageRefreshKey from PlayingPhase — combined below into
+  // one key per render. Debounced so a fast scroll only pays one decode
+  // when it settles, not one per intermediate tick.
+  const [scrollSettleKey, setScrollSettleKey] = useState(0);
+  const scrollSettleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (scrollSettleTimer.current) clearTimeout(scrollSettleTimer.current);
+    };
+  }, []);
+
   const handleScroll = useCallback((_offset: number) => {
     updateScrollState();
+    if (scrollSettleTimer.current) clearTimeout(scrollSettleTimer.current);
+    scrollSettleTimer.current = setTimeout(() => {
+      setScrollSettleKey((k) => k + 1);
+    }, 150);
   }, [updateScrollState]);
 
   // Auto-scroll to bottom when new content arrives (only if user was at bottom)
@@ -272,7 +290,10 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
             width={width}
             themeAsset={themeAsset}
             separatorColor={separatorColor}
-            imageRefreshKey={imageRefreshKey}
+            // Combine the overlay-close key from the parent with the
+            // internal scroll-settle key. Either trigger forces image
+            // lines to remount.
+            imageRefreshKey={(imageRefreshKey ?? 0) * 1_000_000 + scrollSettleKey}
           />
         ))}
       </ScrollView>
