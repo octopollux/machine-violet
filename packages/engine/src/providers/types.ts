@@ -242,23 +242,6 @@ interface ChatParamsBase {
    * arrive in the same turn as a `scene_transition` tool call.
    */
   imageIntent?: "scene_snapshot" | "player_request" | "character_portrait";
-  /**
-   * Render quality for any image_generation calls made on this turn.
-   * Higher = slower + more expensive but visibly nicer (mostly at large
-   * render sizes). The provider hands this through to the hosted image
-   * tool's `quality` field.
-   *
-   * Why per-call rather than per-provider:
-   *   - The setup-agent's portrait-iteration loop wants `"low"` so each
-   *     draft lands in ~15s and the player can riff quickly.
-   *   - The DM defaults to `"medium"` — at sixel/iTerm2 render sizes the
-   *     visible diff to `"high"` is negligible and `"high"` regularly
-   *     takes 60-180s.
-   *   - A future "frame this scene" command might justify `"high"` per call.
-   *
-   * Defaults to `"medium"` when absent.
-   */
-  imageQuality?: "low" | "medium" | "high";
 }
 
 interface ChatParamsToolless extends ChatParamsBase {
