@@ -6,20 +6,42 @@ function mockFileIO(
   files: Record<string, string> = {},
   dirs: Record<string, string[]> = {},
 ): FileIO {
+  // Mutable copies so deleteFile/rmdir actually update state during a test run.
+  const filesState = { ...files };
+  const dirsState: Record<string, string[]> = {};
+  for (const k of Object.keys(dirs)) dirsState[k] = [...dirs[k]];
   return {
     readFile: vi.fn(async (p: string) => {
-      if (p in files) return files[p];
+      if (p in filesState) return filesState[p];
       throw new Error(`ENOENT: ${p}`);
     }),
     writeFile: vi.fn(async () => {}),
     appendFile: vi.fn(async () => {}),
     mkdir: vi.fn(async () => {}),
-    exists: vi.fn(async (p: string) => p in files || p in dirs),
+    exists: vi.fn(async (p: string) => p in filesState || p in dirsState),
     listDir: vi.fn(async (p: string) => {
-      if (p in dirs) return dirs[p];
+      if (p in dirsState) return dirsState[p];
       throw new Error(`ENOENT: ${p}`);
     }),
-    deleteFile: vi.fn(async () => {}),
+    deleteFile: vi.fn(async (p: string) => {
+      delete filesState[p];
+      const parent = p.split("/").slice(0, -1).join("/");
+      const name = p.split("/").pop();
+      if (name && parent in dirsState) {
+        dirsState[parent] = dirsState[parent].filter((e) => e !== name);
+      }
+    }),
+    rmdir: vi.fn(async (p: string) => {
+      if ((dirsState[p] ?? []).length > 0) {
+        throw new Error(`ENOTEMPTY: ${p}`);
+      }
+      delete dirsState[p];
+      const parent = p.split("/").slice(0, -1).join("/");
+      const name = p.split("/").pop();
+      if (name && parent in dirsState) {
+        dirsState[parent] = dirsState[parent].filter((e) => e !== name);
+      }
+    }),
   };
 }
 
@@ -151,6 +173,50 @@ describe("renameEntity", () => {
 
     // Should delete old entity file
     expect(fio.deleteFile).toHaveBeenCalledWith("/camp/characters/kael.md");
+  });
+
+  it("removes the now-empty source directory after renaming a nested entity", async () => {
+    // Repro: rename_entity moved locations/starting-location/index.md →
+    // locations/dovecote-relay-station/index.md but left
+    // locations/starting-location/ behind as an empty placeholder dir.
+    const fio = mockFileIO(
+      {
+        "/camp/locations/starting-location/index.md": "# Placeholder",
+      },
+      {
+        "/camp/locations": ["starting-location"],
+        "/camp/locations/starting-location": ["index.md"],
+      },
+    );
+
+    await renameEntity(
+      "/camp",
+      fio,
+      "locations/starting-location/index.md",
+      "locations/dovecote-relay-station/index.md",
+      false,
+    );
+
+    expect(fio.rmdir).toHaveBeenCalledWith("/camp/locations/starting-location");
+    // Top-level category dir must NEVER be removed.
+    expect(fio.rmdir).not.toHaveBeenCalledWith("/camp/locations");
+  });
+
+  it("does not call rmdir when renaming a top-level entity file", async () => {
+    const fio = mockFileIO(
+      {
+        "/camp/characters/kael.md": "# Kael",
+      },
+      {
+        "/camp/characters": ["kael.md"],
+      },
+    );
+
+    await renameEntity(
+      "/camp", fio, "characters/kael.md", "characters/kael-ranger.md", false,
+    );
+
+    expect(fio.rmdir).not.toHaveBeenCalled();
   });
 
   it("updates links from multiple files", async () => {

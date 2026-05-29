@@ -123,6 +123,31 @@ export async function renameEntity(
     if (fileIO.deleteFile) {
       await fileIO.deleteFile(absOld);
     }
+
+    // Prune now-empty source directories. Walk up from the old file's parent,
+    // removing empty dirs, but never touch the top-level category dir (e.g.
+    // "locations/", "characters/") — only nested placeholder dirs created by
+    // an earlier mkdir during scene/entity bootstrap.
+    if (fileIO.rmdir) {
+      const oldSegments = oldPath.split("/").slice(0, -1); // drop filename
+      // Stop walking once we reach the first segment (the category dir).
+      while (oldSegments.length > 1) {
+        const dirPath = normalizedRoot + "/" + oldSegments.join("/");
+        let entries: string[];
+        try {
+          entries = await fileIO.listDir(dirPath);
+        } catch {
+          break;
+        }
+        if (entries.length > 0) break;
+        try {
+          await fileIO.rmdir(dirPath);
+        } catch {
+          break;
+        }
+        oldSegments.pop();
+      }
+    }
   }
 
   return {
