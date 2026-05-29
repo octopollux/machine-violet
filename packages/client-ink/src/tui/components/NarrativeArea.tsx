@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback, useMemo, forwardRef } 
 import { Text, Box } from "ink";
 import { ScrollView } from "ink-scroll-view";
 import type { ScrollViewRef } from "ink-scroll-view";
+import Image from "ink-picture";
 import type { NarrativeLine, ProcessedLine } from "@machine-violet/shared/types/tui.js";
 import { processNarrativeLines } from "../formatting.js";
 import { renderNodes } from "../render-nodes.js";
@@ -153,6 +154,15 @@ interface NarrativeAreaProps {
   mouseScrollOverrideRef?: React.RefObject<ScrollHandle | null>;
   /** When true, dev/debug lines are shown in the narrative. */
   showVerbose?: boolean;
+  /**
+   * Bumped by PlayingPhase whenever an overlay (modal, menu, choices,
+   * retry) transitions from open → closed. Used as a React `key` on
+   * image-line wrappers so the Image component unmounts + remounts,
+   * triggering ink-picture to re-decode and re-paint pixel data that
+   * the terminal cleared when the overlay drew over those cells. No-op
+   * when no images are visible.
+   */
+  imageRefreshKey?: number;
 }
 
 /** Compute scroll step: 25% of viewport, min 2 if <25, min 1 if <12 */
@@ -168,7 +178,7 @@ export function scrollAmount(viewportRows: number): number {
  * Exposes scrollBy via ref for keyboard scrolling.
  */
 export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>(
-  function NarrativeArea({ lines, maxRows, quoteColor, playerColor, width, themeAsset, separatorColor, mouseScrollOverrideRef, showVerbose }, ref) {
+  function NarrativeArea({ lines, maxRows, quoteColor, playerColor, width, themeAsset, separatorColor, mouseScrollOverrideRef, showVerbose, imageRefreshKey }, ref) {
   const scrollRef = useRef<ScrollViewRef>(null);
   const localHandleRef = useRef<ScrollHandle>(null);
   const [linesBelow, setLinesBelow] = useState(0);
@@ -211,6 +221,30 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
     updateScrollState();
   }, [updateScrollState]);
 
+  // Image-visibility tick: every 1s, snapshot the current scroll offset and
+  // re-evaluate which images are inside the viewport. Throttled because the
+  // previous attempt (remount-on-scroll-settle) re-decoded the PNG via sharp
+  // on every scroll movement, saturating the CPU. 1s is the user-visible
+  // upper bound on "image fails to come back / lingers stale after I scroll
+  // away" — acceptable for the photo-mode style images we generate.
+  //
+  // The tick only commits when the scroll offset actually changed since
+  // the previous tick; idle viewports do no work.
+  const [imageTickKey, setImageTickKey] = useState(0);
+  const lastTickScrollOffset = useRef(0);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const sv = scrollRef.current;
+      if (!sv) return;
+      const offset = sv.getScrollOffset();
+      if (offset !== lastTickScrollOffset.current) {
+        lastTickScrollOffset.current = offset;
+        setImageTickKey((k) => k + 1);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Auto-scroll to bottom when new content arrives (only if user was at bottom)
   const lastLine = lines[lines.length - 1]?.text ?? "";
   useEffect(() => {
@@ -245,6 +279,49 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
   // Incremental pipeline: frozen prefix cached, only tail reprocessed
   const processedLines = useProcessedLines(visibleLines, width ?? 0, quoteColor);
 
+  // Image dimensions (kept in sync with NarrativeLineComponent's image
+  // branch — see the matching formula there). Computed here too so the
+  // visibility check below can model image rows in the cumulative-height
+  // calculation.
+  const imgWidth = Math.max(20, width ?? 80);
+  const imgHeight = Math.max(6, Math.round((imgWidth * 9) / 32));
+
+  // Which image lines are currently inside the viewport. Recomputed only
+  // when imageTickKey changes (once per second at most, only on actual
+  // scroll movement) — `processedLines` is included in deps so newly
+  // arrived content recomputes immediately. Off-screen images render a
+  // blank placeholder of the same dimensions instead of ink-picture, which
+  // (a) skips the sharp PNG decode and (b) lets ink-picture's unmount
+  // cleanup write spaces over any pixels the terminal had painted, so
+  // stale image bytes don't follow the user up the scrollback.
+  const imageVisibilityByIndex = useMemo(() => {
+    const visible = new Map<number, boolean>();
+    const scrollOffset = lastTickScrollOffset.current;
+    const viewportEnd = scrollOffset + maxRows;
+    let cumHeight = 0;
+    for (let i = 0; i < processedLines.length; i++) {
+      const line = processedLines[i];
+      // Heights match NarrativeLineComponent's output: image lines reserve
+      // imgHeight + 2 (marginTop + marginBottom), separators take 3 rows,
+      // everything else is 1 wrapped row.
+      let lineHeight = 1;
+      if (line.kind === "image") lineHeight = imgHeight + 2;
+      else if (line.kind === "separator") lineHeight = 3;
+      if (line.kind === "image") {
+        const top = cumHeight;
+        const bottom = cumHeight + lineHeight;
+        // Visible iff the image's vertical extent overlaps the viewport.
+        // Strict inequality both sides so a row that's exactly at the edge
+        // (zero overlap) counts as off-screen.
+        visible.set(i, bottom > scrollOffset && top < viewportEnd);
+      }
+      cumHeight += lineHeight;
+    }
+    return visible;
+    // imageTickKey is the explicit trigger; reading lastTickScrollOffset.current
+    // inside is intentional throttling and isn't in the deps array on purpose.
+  }, [imageTickKey, processedLines, maxRows, imgHeight]);
+
   // Bottom-right overlay: the scroll indicator (when there's content
   // below) takes priority over the usage gauge. They share the same row,
   // and rendering both would risk visual bleed through the absolute
@@ -262,6 +339,12 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
             width={width}
             themeAsset={themeAsset}
             separatorColor={separatorColor}
+            imageRefreshKey={imageRefreshKey}
+            // Non-image lines pass through with `true`; the flag only
+            // gates the image branch. Defaulting to `true` for image
+            // lines without an entry is safe — it just means a brief
+            // false-positive render until the next 1s tick corrects it.
+            imageVisible={line.kind !== "image" || (imageVisibilityByIndex.get(i) ?? true)}
           />
         ))}
       </ScrollView>
@@ -284,16 +367,86 @@ interface NarrativeLineProps {
   width?: number;
   themeAsset?: ThemeAsset;
   separatorColor?: string;
+  imageRefreshKey?: number;
+  /**
+   * When false, an image-kind line renders a blank placeholder Box of
+   * the same dimensions instead of the ink-picture Image. This (a) skips
+   * the sharp PNG decode (the expensive part), (b) lets ink-picture's
+   * unmount cleanup write spaces over any previously-painted terminal
+   * pixels, and (c) prevents stale image bytes from following the user
+   * around as they scroll. Non-image kinds ignore this flag.
+   */
+  imageVisible?: boolean;
 }
 
 /** A single narrative line rendered based on its kind. */
 const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
-  line, playerColor, width, themeAsset, separatorColor,
+  line, playerColor, width, themeAsset, separatorColor, imageRefreshKey, imageVisible,
 }: NarrativeLineProps) {
   // Spacer lines render as visual blank lines (paragraph spacing)
   // but are invisible to the formatting/healing pipeline.
   if (line.kind === "spacer") {
     return <Text>{" "}</Text>;
+  }
+
+  // Image lines render the generated PNG via ink-picture, which handles
+  // terminal-protocol selection (sixel / kitty / iTerm2 inline) with
+  // half-block/braille/ASCII fallback. `text` is the absolute path the
+  // engine wrote the file to.
+  //
+  // Sized as a 16:9 box at 100% of the narrative column. Terminal cells
+  // are roughly 2:1 tall:wide, so visual 16:9 = cols : (rows * 2), which
+  // gives rows = cols * 9 / 32. We clamp to a sane floor for very narrow
+  // terminals so half-block/braille fallbacks still produce a recognisable
+  // picture. ink-picture preserves the source PNG's aspect ratio within
+  // the (width, height) box, so we don't distort the image — we just
+  // reserve a consistent footprint in the narrative.
+  //
+  // The outer Box pins both width AND height explicitly. ink-picture's
+  // renderers (HalfBlock, Braille, etc.) call `measureElement(containerRef)`
+  // against THEIR own Box to decide pixel dimensions for the sharp resize.
+  // If our wrapping Box has no fixed dimensions, that inner Box collapses
+  // to its content size during async PNG decoding (sharp on a 2-3 MB
+  // file takes hundreds of ms), the measurement reads tiny, and the
+  // rendered image is correspondingly tiny. Pinning the wrapper reserves
+  // the full footprint at the React-render step before any layout pass.
+  //
+  // alt=" " (non-empty whitespace) suppresses ink-picture's hardcoded
+  // "Loading..." placeholder, which the renderers fall back to when
+  // `props.alt` is empty/undefined. The string is intentionally a single
+  // space — empty string is JS-falsy and would let the placeholder
+  // through (`props.alt || "Loading..."`).
+  if (line.kind === "image") {
+    const path = typeof line.nodes[0] === "string" ? line.nodes[0] : "";
+    if (!path) return <Text dimColor>[image: missing path]</Text>;
+    const imgWidth = Math.max(20, width ?? 80);
+    const imgHeight = Math.max(6, Math.round((imgWidth * 9) / 32));
+    // Off-screen: render an empty Box reserving the same footprint. This
+    // unmounts the ink-picture Image (whose Sixel/Kitty/iTerm2 renderers
+    // write spaces over their previously-painted bounding box during
+    // unmount cleanup), so we don't leave stale pixels at terminal
+    // positions the user has scrolled away from.
+    if (imageVisible === false) {
+      return (
+        <Box flexDirection="column" width={imgWidth} height={imgHeight} marginTop={1} marginBottom={1} />
+      );
+    }
+    // On-screen: `key` bumps when an overlay closes (see PlayingPhase
+    // imageRefreshKey — terminal graphics protocols clear pixel data when
+    // text draws over image cells). React unmounts + remounts on key
+    // change, which fires ink-picture's useEffect and re-paints the bytes.
+    return (
+      <Box
+        key={imageRefreshKey ?? 0}
+        flexDirection="column"
+        width={imgWidth}
+        height={imgHeight}
+        marginTop={1}
+        marginBottom={1}
+      >
+        <Image src={path} width={imgWidth} height={imgHeight} alt=" " />
+      </Box>
+    );
   }
 
   // Separator lines render with built-in blank lines above and below,

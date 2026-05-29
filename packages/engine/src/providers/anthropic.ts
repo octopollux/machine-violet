@@ -11,7 +11,7 @@ import type {
   NormalizedMessage, NormalizedToolCall,
   NormalizedUsage, ContentPart, StopReason, CacheDiagnostics,
 } from "./types.js";
-import { getKnownModel } from "../config/model-registry.js";
+import { getKnownModel, supportsImageGeneration } from "../config/model-registry.js";
 import { logEvent } from "../context/engine-log.js";
 import { patchOrphanedToolUses, reorderAssistantToolUseBlocksLast } from "./orphan-patch.js";
 
@@ -45,6 +45,7 @@ export function createAnthropicProvider(apiKey?: string): LLMProvider {
 
   return {
     providerId: "anthropic",
+    getCapabilities: (model) => ({ imageGeneration: supportsImageGeneration(model) }),
     chat: (params) => anthropicChat(client, params, false, undefined, previousIdByConversation),
     stream: (params, onDelta) => anthropicChat(client, params, true, onDelta, previousIdByConversation),
     healthCheck: (model) => anthropicHealthCheck(client, model),

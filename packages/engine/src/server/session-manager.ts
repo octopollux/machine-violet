@@ -39,7 +39,7 @@ import { createClocksState } from "../tools/clocks/index.js";
 import { createCombatState } from "../tools/combat/index.js";
 import { createDecksState } from "../tools/cards/index.js";
 import { createObjectivesState } from "../tools/objectives/index.js";
-import { markdownToNarrativeLines } from "../context/display-log.js";
+import { markdownToNarrativeLines, iterDisplayLogReplay } from "../context/display-log.js";
 import { CostTracker } from "../context/cost-tracker.js";
 import { TurnManager } from "./turn-manager.js";
 import type { StyleVariant } from "@machine-violet/shared/types/tui.js";
@@ -353,10 +353,18 @@ export class SessionManager {
 
     // Create a temp campaign directory for setup state.
     // Clean up any previous setup state first (inspectable between runs).
+    // Scaffold the full standard campaign dir tree (state/, characters/,
+    // campaign/images/, etc.) so the setup-conversation has a real
+    // campaign on disk for things like portrait-draft writes — keeps
+    // image-handler's mkdir(recursive) defensive but means tools that
+    // assume the tree exists never get a surprise on the setup path.
     const setupRoot = join(this.campaignsDir, "__setup__");
     const { mkdir, rm } = await import("node:fs/promises");
     await rm(setupRoot, { recursive: true, force: true });
-    await mkdir(join(setupRoot, "state"), { recursive: true });
+    const { campaignDirs } = await import("../tools/filesystem/index.js");
+    for (const dir of campaignDirs(setupRoot)) {
+      await mkdir(dir, { recursive: true });
+    }
 
     // Build a minimal GameState so turns, context dumps, etc. work
     const setupConfig: CampaignConfig = {
@@ -1097,11 +1105,15 @@ export class SessionManager {
     // Broadcast state snapshot — carries sessionRecap exactly once when set.
     this.broadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
 
-    // Send display history from previous session as a single chunk per kind-group.
-    // Joining lines with \n lets appendDelta handle paragraph spacing correctly.
+    // Send display history from previous session by replaying it through
+    // the broadcast pipeline. The grouping + image-broadcast logic lives
+    // in iterDisplayLogReplay (display-log.ts) so it's testable in
+    // isolation; passing the campaign root means relative image paths
+    // in the display-log resolve to absolute on the way out (and absolute
+    // paths from legacy display-logs flow through unchanged).
     const historyLines = await persister.loadDisplayLogFull();
     if (historyLines.length > 0) {
-      const narrativeLines = markdownToNarrativeLines(historyLines);
+      const narrativeLines = markdownToNarrativeLines(historyLines, engine.getGameState().campaignRoot);
       // Seed the committed transcript with dm/player lines from history so a
       // mid-session rollback after resume produces a snapshot that contains
       // the prior session's text — not just lines accumulated since this load.
@@ -1112,29 +1124,8 @@ export class SessionManager {
           this.committedNarrative.push({ kind: line.kind, text: line.text });
         }
       }
-      // Group consecutive same-kind lines and send each group as one chunk.
-      // Separators (---) are sent as DM lines — the formatting pipeline
-      // converts them to styled horizontal rules during rendering.
-      let currentKind = "";
-      let currentText = "";
-      for (const line of narrativeLines) {
-        let kind = line.kind as string;
-        let text = line.text;
-        // Convert separators to DM lines with --- text for the formatting pipeline
-        if (kind === "separator") {
-          kind = "dm";
-          text = "---";
-        }
-        if (kind !== "dm" && kind !== "player" && kind !== "system" && kind !== "dev") continue;
-        if (kind !== currentKind && currentText) {
-          this.broadcast({ type: "narrative:chunk", data: { text: currentText, kind: currentKind as "dm" | "player" | "system" | "dev" } });
-          currentText = "";
-        }
-        currentKind = kind;
-        currentText += (currentText ? "\n" : "") + text;
-      }
-      if (currentText) {
-        this.broadcast({ type: "narrative:chunk", data: { text: currentText, kind: currentKind as "dm" | "player" | "system" | "dev" } });
+      for (const event of iterDisplayLogReplay(narrativeLines)) {
+        this.broadcast(event);
       }
       this.broadcast({ type: "narrative:complete", data: { text: "" } });
     }

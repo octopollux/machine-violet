@@ -124,6 +124,15 @@ export class OpenAIChatGptProvider implements LLMProvider {
   // LLMProvider surface
   // -----------------------------------------------------------------------
 
+  getCapabilities(_model: string): { imageGeneration: boolean } {
+    // Phase 7 wiring not yet landed — until this provider implements
+    // generateImage (probably by spawning a fresh REST images.generate
+    // call alongside the codex JSON-RPC stream), image gen for
+    // ChatGPT-account users is unavailable. Report false unconditionally
+    // so subagents don't register the generate_image function tool.
+    return { imageGeneration: false };
+  }
+
   async chat(params: ChatParams): Promise<ChatResult> {
     return this.runTurn(params, undefined);
   }

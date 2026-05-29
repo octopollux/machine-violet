@@ -1,7 +1,8 @@
 import type { ToolRegistry, ToolResult } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
 import { runProviderLoop } from "../providers/agent-loop-bridge.js";
-import type { LLMProvider, NormalizedMessage, SystemBlock } from "../providers/types.js";
+import type { LLMProvider, NormalizedMessage, NormalizedTool, SystemBlock } from "../providers/types.js";
+import { GENERATE_IMAGE_TOOL_NAME } from "../providers/types.js";
 
 // --- TUI tools ---
 
@@ -19,6 +20,12 @@ export const TUI_TOOLS = new Set([
   "scribe",
   "dm_notes",
   "promote_character",
+  // generate_image returns `_tui: { type: "display_image", ... }` on the
+  // ToolResult so the image broadcasts mid-turn (see GameEngine.dispatchGenerateImage).
+  // Without this entry the bridge skips _tui extraction entirely — the bytes
+  // still land on disk, but the client never receives display_image and the
+  // image silently fails to render in the TUI.
+  "generate_image",
 ]);
 
 /** Tools registered in the ToolRegistry but only exposed to OOC / Dev Mode agents. */
@@ -53,6 +60,16 @@ export interface AgentLoopConfig {
   onToolEnd?: (name: string, result: ToolResult) => void;
   /** Called when the full response is complete */
   onComplete?: (usage: UsageStats) => void;
+  /**
+   * When true, append the `generate_image` function tool to the DM's
+   * tool list. The model invokes it like any other tool; the host's
+   * asyncToolHandler dispatches the call to `provider.generateImage`,
+   * persists the bytes, and broadcasts a `display_image` TUI command.
+   * Caller is responsible for verifying both `provider.getCapabilities
+   * (model).imageGeneration` AND the campaign preference before
+   * flipping this on — the agent loop trusts the flag verbatim.
+   */
+  imageGenEnabled?: boolean;
   /** Called on error */
   onError?: (error: Error) => void;
   /** Called when a retryable API error triggers a backoff wait */
@@ -131,6 +148,58 @@ async function runAgentLoopInternal(
     ? async (name: string, input: Record<string, unknown>) => (await asyncHandler(name, input)) ?? registry.dispatch(gameState, name, input)
     : (name: string, input: Record<string, unknown>) => registry.dispatch(gameState, name, input);
 
+  // Tool list: registry definitions (minus DM_EXCLUDED_TOOLS), plus the
+  // `generate_image` function tool when image generation is gated on.
+  // The DM's asyncToolHandler (GameEngine.dispatchGenerateImage) routes
+  // the call through provider.generateImage and emits the display_image
+  // TUI command + bytes-on-disk side effects.
+  const tools: NormalizedTool[] = registry.getDefinitions(DM_EXCLUDED_TOOLS);
+  if (config.imageGenEnabled) {
+    tools.push({
+      name: GENERATE_IMAGE_TOOL_NAME,
+      description:
+        "Generate one illustrated image rendered inline with this response. " +
+        "Provide a vivid descriptive prompt covering subject, composition, mood, " +
+        "and style. The caption (if any) should be composed into the image itself " +
+        "as a printed plate, not emitted as separate text. Use sparingly — at most " +
+        "one image per turn. " +
+        "Default to `effort: \"standard\"` for ordinary scene snapshots. Reach for " +
+        "`effort: \"quality\"` or `\"showcase\"` only for once-per-arc set-pieces; " +
+        "they take longer and cost more. Use `aspect: \"landscape\"` for scenes, " +
+        "`\"portrait\"` for character close-ups, `\"square\"` for objects/symbols. " +
+        "Set `intent` to `\"scene_snapshot\"` for scenes (the usual case), " +
+        "`\"character_portrait\"` for character close-ups, or `\"player_request\"` " +
+        "when the player explicitly asked for an illustration of something. The " +
+        "intent steers on-disk naming and the engine-log breadcrumb — it does not " +
+        "affect the rendered image.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          prompt: {
+            type: "string",
+            description: "Vivid description of the image to render, including any in-image caption text.",
+          },
+          effort: {
+            type: "string",
+            enum: ["draft", "standard", "quality", "showcase"],
+            description: "Render effort. Default 'standard'. 'showcase' for once-per-arc moments only.",
+          },
+          aspect: {
+            type: "string",
+            enum: ["portrait", "landscape", "square"],
+            description: "Aspect ratio. Match to the subject: landscape for scenes, portrait for characters, square for objects.",
+          },
+          intent: {
+            type: "string",
+            enum: ["scene_snapshot", "player_request", "character_portrait"],
+            description: "Steers on-disk naming and the engine-log breadcrumb. 'scene_snapshot' is the right default for in-narrative renders. Omit to default to scene_snapshot.",
+          },
+        },
+        required: ["prompt", "effort", "aspect"],
+      },
+    });
+  }
+
   const result = await runProviderLoop(provider, systemPrompt, messages, {
     name: "dm",
     model: config.model,
@@ -138,7 +207,7 @@ async function runAgentLoopInternal(
     maxToolRounds: config.maxToolRounds,
     effort: config.effort,
     stream,
-    tools: registry.getDefinitions(DM_EXCLUDED_TOOLS),
+    tools,
     toolHandler,
     cacheHints: [{ target: "tools", ttl: "1h" }, { target: "messages" }],
     tuiToolNames: TUI_TOOLS,

@@ -48,7 +48,47 @@ export type ContentPart =
    * (kept here only so a turn round-trips identically through persistence).
    * Anthropic ignores this variant when serializing back to its API.
    */
-  | { type: "reasoning"; id: string; encryptedContent: string; summary: string[] };
+  | { type: "reasoning"; id: string; encryptedContent: string; summary: string[] }
+  /**
+   * Image produced during a turn by dispatching the `generate_image`
+   * function tool to {@link LLMProvider.generateImage}. Persisted with
+   * the assistant turn for audit + transcripts; the actual model history
+   * (round-trip serialization) sees the tool call + tool_result pair
+   * and never replays the bytes, so the model-side prompt cache stays
+   * lean. Captions are composed inside the image itself (printed as
+   * part of the pixels — see the spec) so this variant carries no
+   * separate caption string.
+   *
+   * `revisedPrompt` is whatever string the backend exposes as the
+   * prompt it actually used (e.g. OpenAI's `revised_prompt`). Stored
+   * for audit/debug; never rendered.
+   *
+   * `intent` distinguishes the trigger sites so disk-naming and
+   * downstream behavior (portrait persistence vs scene snapshots) can
+   * branch without re-deriving it from context.
+   */
+  | {
+      type: "image_generated";
+      id: string;
+      base64: string;
+      mimeType: string;
+      revisedPrompt?: string;
+      intent: "scene_snapshot" | "player_request" | "character_portrait";
+    }
+  /**
+   * Image attached to a user/assistant message as input to the model.
+   * Used to embed character portraits in the DM's cached prefix so the
+   * model sees its party visually as well as textually. `lowDetail`
+   * requests the cheapest available detail tier (OpenAI: `detail: "low"`,
+   * flat 85 input tokens; other providers use their smallest tier).
+   */
+  | {
+      type: "image_input";
+      base64: string;
+      mimeType: "image/png" | "image/jpeg" | "image/webp";
+      lowDetail?: boolean;
+      label?: string;
+    };
 
 /** A conversation message in normalized form. */
 export interface NormalizedMessage {
@@ -67,6 +107,66 @@ export interface NormalizedMessage {
 }
 
 // ---------------------------------------------------------------------------
+// Image generation (provider-agnostic)
+// ---------------------------------------------------------------------------
+
+/**
+ * Abstract render effort knob. Higher = slower + more expensive but
+ * visibly nicer. Provider implementations map to their backend's nearest
+ * equivalent — see openai-apikey for the canonical mapping.
+ *
+ * The four levels are deliberately named for *use case*, not backend
+ * parameters, so we don't tie the schema to OpenAI's specific quality
+ * tiers as those evolve:
+ *   - `draft`    — fastest. Iteration loops (setup-agent portraits
+ *                  during chargen). Acceptable thumbnail quality.
+ *   - `standard` — balanced. Typical DM scene snapshots.
+ *   - `quality`  — nice. Pinned scenes the player will likely revisit,
+ *                  player-requested illustrations.
+ *   - `showcase` — max effort. End-of-arc moments, hero shots.
+ *
+ * The model picks per-call from the `generate_image` tool's `effort` arg
+ * (each subagent's system prompt directs the model on when to pick what).
+ */
+export type ImageEffort = "draft" | "standard" | "quality" | "showcase";
+
+/**
+ * Abstract aspect ratio. Provider implementations map to the nearest
+ * supported dimensions (OpenAI: portrait → 1024×1536, landscape →
+ * 1536×1024, square → 1024×1024). Future backends pick their own
+ * canonical sizes without breaking the schema.
+ */
+export type ImageAspect = "portrait" | "landscape" | "square";
+
+/** Args accepted by {@link LLMProvider.generateImage}. */
+export interface GenerateImageRequest {
+  prompt: string;
+  /** Default: `"standard"`. */
+  effort?: ImageEffort;
+  /** Default: `"square"`. */
+  aspect?: ImageAspect;
+  /**
+   * Tag stamped onto the produced ContentPart for downstream routing
+   * (disk naming via image-handler, persistence policy). Defaults to
+   * `"player_request"`.
+   */
+  intent?: "scene_snapshot" | "player_request" | "character_portrait";
+}
+
+/** Result returned by {@link LLMProvider.generateImage}. */
+export interface GenerateImageResult {
+  /** Base64-encoded image bytes. */
+  base64: string;
+  mimeType: "image/png" | "image/jpeg" | "image/webp";
+  /** What the backend says it actually drew (e.g. OpenAI's revised_prompt). */
+  revisedPrompt?: string;
+  /** Effort the provider actually used (after mapping / clamping). */
+  effortUsed: ImageEffort;
+  /** Aspect the provider actually used. */
+  aspectUsed: ImageAspect;
+}
+
+// ---------------------------------------------------------------------------
 // Tools
 // ---------------------------------------------------------------------------
 
@@ -76,6 +176,20 @@ export interface NormalizedTool {
   description: string;
   inputSchema: Record<string, unknown>;
 }
+
+/**
+ * Canonical name for the image-generation function tool. Agents register
+ * a NormalizedTool with this name when image-gen is enabled for the
+ * subagent; the model invokes it like any other function tool. When the
+ * tool fires, the host dispatches to {@link LLMProvider.generateImage}
+ * and returns a text tool_result confirming the image was displayed —
+ * the bytes flow out-of-band into TUI display + disk persistence.
+ *
+ * No provider-level interception: this is just a tool name like any
+ * other. The constant exists to prevent typo drift between the
+ * registration site and the dispatch handler.
+ */
+export const GENERATE_IMAGE_TOOL_NAME = "generate_image";
 
 /** A tool call extracted from a model response. */
 export interface NormalizedToolCall {
@@ -267,9 +381,33 @@ export interface HealthCheckResult {
 // Provider interface
 // ---------------------------------------------------------------------------
 
+/**
+ * Per-model capability surface. Synchronous, side-effect-free — providers
+ * answer from a static table (the model registry or a hardcoded predicate),
+ * never by calling the network. Used to gate prompt fragments and tool
+ * registrations before a chat() call is constructed.
+ */
+export interface ProviderCapabilities {
+  /**
+   * The model + provider can emit images inline as part of a chat turn
+   * via {@link GENERATE_IMAGE_TOOL_NAME}. When false, the engine omits
+   * the image-gen tool from the tool list and skips loading the
+   * image-related prompt fragments.
+   */
+  imageGeneration: boolean;
+}
+
 export interface LLMProvider {
   /** Provider identifier. */
   readonly providerId: string;
+
+  /**
+   * Capability lookup for a specific model id under this provider. Must be
+   * synchronous and pure — no network calls. Used by the agent loop / DM
+   * prompt assembly to decide whether to expose image-gen tooling and
+   * prompts for the upcoming turn.
+   */
+  getCapabilities(model: string): ProviderCapabilities;
 
   /** Send a message and get the full response. */
   chat(params: ChatParams): Promise<ChatResult>;
@@ -282,6 +420,23 @@ export interface LLMProvider {
 
   /** Minimal API call to validate credentials. */
   healthCheck(model?: string): Promise<HealthCheckResult>;
+
+  /**
+   * Generate an image from a textual prompt + abstract knobs (effort,
+   * aspect). Optional — providers that don't support image generation
+   * simply omit this method (and report `imageGeneration: false` from
+   * getCapabilities for every model).
+   *
+   * Engine-side dispatch invokes this when the model calls the
+   * `generate_image` function tool. The caller persists the bytes (see
+   * `agents/image-handler.ts`), emits the TUI `display_image` command,
+   * and returns a tool_result for the model's continuation.
+   *
+   * Throws on transport/backend errors. Callers translate the throw
+   * into a tool_result with isError:true so the model can decide
+   * whether to retry, apologize, or move on.
+   */
+  generateImage?(req: GenerateImageRequest): Promise<GenerateImageResult>;
 
   /**
    * Return the provider's current remaining-usage snapshot, or null if the

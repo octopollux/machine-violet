@@ -118,6 +118,16 @@ export interface CampaignConfig {
    * Range 50–150 in 5% steps.
    */
   dm_turn_length_pct?: number;
+  /**
+   * Player preference for inline image generation in this campaign.
+   * "on"/"off" reflect an explicit choice; "unset" or absent means the
+   * setup agent hasn't asked yet (or the campaign predates the feature)
+   * and the setup flow should drive the choice when the active provider
+   * + model expose the capability. When the effective provider/model
+   * lacks image generation, this field is silently ignored — the feature
+   * is gated by capability AND preference, not preference alone.
+   */
+  image_generation?: "on" | "off" | "unset";
 }
 
 export const DM_TURN_LENGTH_PCT_DEFAULT = 80;

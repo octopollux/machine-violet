@@ -22,8 +22,12 @@ import type {
   LLMProvider, ChatParams, ChatResult, HealthCheckResult,
   NormalizedMessage, NormalizedToolCall,
   NormalizedUsage, ContentPart, StopReason,
+  GenerateImageRequest, GenerateImageResult,
+  ImageEffort, ImageAspect,
 } from "./types.js";
 import { patchOrphanedToolUses } from "./orphan-patch.js";
+import { supportsImageGeneration } from "../config/model-registry.js";
+import { logEvent } from "../context/engine-log.js";
 
 // ---------------------------------------------------------------------------
 // Routing
@@ -64,9 +68,121 @@ export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
 
   return {
     providerId,
+    getCapabilities: (model) => ({
+      // Only the Responses API path supports inline image generation. The
+      // Chat Completions fallback (custom OpenAI-compatible endpoints) has
+      // no `image_generation` tool, regardless of model.
+      imageGeneration: useResponsesAPI(providerId) && supportsImageGeneration(model),
+    }),
     chat: (params) => openaiChat(client, providerId, params, false),
     stream: (params, onDelta) => openaiChat(client, providerId, params, true, onDelta),
     healthCheck: (model) => openaiHealthCheck(client, providerId, model),
+    // Only the Responses API path supports image generation; the Chat
+    // Completions fallback (custom OpenAI-compatible endpoints) has no
+    // Images API equivalent, so leave generateImage undefined there.
+    ...(useResponsesAPI(providerId) ? { generateImage: (req) => openaiGenerateImage(client, req) } : {}),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Image generation
+// ---------------------------------------------------------------------------
+
+/**
+ * Map the abstract effort knob to OpenAI's quality param.
+ *
+ * `showcase` collapses to the same `high` quality as `quality` —
+ * `images.generate` doesn't expose a separate fidelity dial. Future
+ * backends that genuinely distinguish them can pick a different mapping.
+ */
+const EFFORT_TO_QUALITY: Record<ImageEffort, "low" | "medium" | "high"> = {
+  draft: "low",
+  standard: "medium",
+  quality: "high",
+  showcase: "high",
+};
+
+const ASPECT_TO_SIZE: Record<ImageAspect, "1024x1024" | "1024x1536" | "1536x1024"> = {
+  square: "1024x1024",
+  portrait: "1024x1536",
+  landscape: "1536x1024",
+};
+
+async function openaiGenerateImage(
+  client: OpenAI,
+  req: GenerateImageRequest,
+): Promise<GenerateImageResult> {
+  const effort = req.effort ?? "standard";
+  const aspect = req.aspect ?? "square";
+  const quality = EFFORT_TO_QUALITY[effort];
+  const size = ASPECT_TO_SIZE[aspect];
+
+  // Diagnostic breadcrumb. The harness asserts on these.
+  logEvent("image_gen:request", {
+    effort,
+    aspect,
+    quality,
+    size,
+    intent: req.intent ?? "player_request",
+    promptPreview: req.prompt.slice(0, 120),
+  });
+
+  // We must pass `model` — OpenAI's images.generate 400s with "Missing
+  // required parameter: 'model'" when omitted (the documented defaulting
+  // only kicks in for the older dall-e-2/3 path, which doesn't accept
+  // low/medium/high quality).
+  //
+  // We pin to `gpt-image-2`. It's a direct upgrade over gpt-image-1 /
+  // 1.5 at the same quality tiers — same call surface, sharper output,
+  // better prompt adherence. Launched 2026-04-21; SDK support added in
+  // openai@6.37. Rolling pointer rather than the dated snapshot
+  // (`gpt-image-2-2026-04-21`) so we ride future quality bumps without
+  // a code change.
+  let response: Awaited<ReturnType<typeof client.images.generate>>;
+  try {
+    response = await client.images.generate({
+      model: "gpt-image-2",
+      prompt: req.prompt,
+      quality,
+      size,
+      output_format: "png",
+      n: 1,
+    });
+  } catch (e) {
+    // Without this breadcrumb, a thrown error is invisible — the harness sees
+    // image_gen:request fire but no terminal event, then the upstream
+    // dispatcher's catch turns the throw into a tool_result with is_error
+    // and the model continues. Surface the actual error.
+    const message = e instanceof Error ? e.message : String(e);
+    const status = (e as { status?: number } | null)?.status;
+    logEvent("image_gen:error", {
+      effort,
+      aspect,
+      message: message.slice(0, 400),
+      ...(typeof status === "number" ? { status } : {}),
+    });
+    throw e;
+  }
+
+  const item = response.data?.[0];
+  if (!item?.b64_json) {
+    logEvent("image_gen:no_data", { effort, aspect });
+    throw new Error("OpenAI images.generate returned no image data");
+  }
+
+  logEvent("image_gen:response", {
+    effort,
+    aspect,
+    base64Length: item.b64_json.length,
+    ...(item.revised_prompt ? { revisedPromptPreview: item.revised_prompt.slice(0, 120) } : {}),
+  });
+
+  return {
+    base64: item.b64_json,
+    mimeType: "image/png",
+    ...(item.revised_prompt ? { revisedPrompt: item.revised_prompt } : {}),
+    effortUsed: effort,
+    aspectUsed: aspect,
   };
 }
 
@@ -221,16 +337,25 @@ function toResponsesParams(params: ChatParams): ResponsesParams {
     input.push(...toResponsesInput(msg));
   }
 
-  // Tools
+  // Tools — all flow through as plain function tools, including
+  // `generate_image`. The earlier design hijacked generate_image and
+  // substituted OpenAI's hosted `image_generation` tool config, which
+  // meant the model couldn't pick per-call quality/size and we had
+  // to compensate with several workarounds (replay-drop, status gates,
+  // image-only continuation loops). Function-tool dispatch lets the
+  // model pick effort + aspect per call via the tool args, and the
+  // host calls provider.generateImage() to fulfill — no provider-side
+  // hijack required.
   let tools: OpenAI.Responses.Tool[] | undefined;
   if (params.tools?.length) {
-    tools = params.tools.map((t) => ({
+    const functionTools: OpenAI.Responses.Tool[] = params.tools.map((t) => ({
       type: "function" as const,
       name: t.name,
       description: t.description ?? undefined,
       parameters: t.inputSchema as Record<string, unknown>,
       strict: false,
     }));
+    if (functionTools.length > 0) tools = functionTools;
   }
 
   // Reasoning config. When any effort is set we also opt into encrypted
@@ -301,7 +426,13 @@ function toResponsesInput(msg: NormalizedMessage): OpenAI.Responses.ResponseInpu
       }
     }
 
-    // Iterate in order to preserve text ↔ tool_use interleaving
+    // Iterate in order to preserve text ↔ tool_use interleaving.
+    // `image_generated` ContentParts (produced by the host when an image
+    // is rendered) are stripped from replay: the model already saw the
+    // tool_call + tool_result pair that carries the on-disk path, so
+    // re-sending the base64 bytes would inflate the cached prefix for
+    // zero model-visible benefit. Bytes still live on disk and in the
+    // transcript export.
     let pendingText = "";
     for (const part of msg.content) {
       if (part.type === "text") {
@@ -319,7 +450,7 @@ function toResponsesInput(msg: NormalizedMessage): OpenAI.Responses.ResponseInpu
           arguments: JSON.stringify(part.input),
         });
       }
-      // Reasoning parts already emitted above.
+      // Reasoning parts already emitted above; image_generated stripped (see above).
     }
     // Flush trailing text
     if (pendingText) {
@@ -340,6 +471,27 @@ function toResponsesInput(msg: NormalizedMessage): OpenAI.Responses.ResponseInpu
         output: tr.content,
       };
     });
+  }
+
+  // User messages: if any image_input parts are present, emit a multimodal
+  // content array so the model receives the visual context (party
+  // portraits, etc.) alongside the text. When no images are present,
+  // stay on the simpler string-content path.
+  const hasImages = msg.content.some((p) => p.type === "image_input");
+  if (hasImages) {
+    const content: OpenAI.Responses.ResponseInputContent[] = [];
+    for (const part of msg.content) {
+      if (part.type === "text") {
+        content.push({ type: "input_text", text: part.text });
+      } else if (part.type === "image_input") {
+        content.push({
+          type: "input_image",
+          detail: part.lowDetail ? "low" : "auto",
+          image_url: `data:${part.mimeType};base64,${part.base64}`,
+        });
+      }
+    }
+    return [{ type: "message", role: "user", content }];
   }
 
   // Regular user text
@@ -427,6 +579,13 @@ function fromResponsesResponseWithText(
       const input = parseToolArgs(item.arguments);
       toolCalls.push({ id: item.call_id, name: item.name, input });
       assistantContent.push({ type: "tool_use", id: item.call_id, name: item.name, input });
+    } else if (item.type === "image_generation_call") {
+      // Tripwire. We never register the hosted `image_generation` tool
+      // (image-gen is a function tool dispatched through provider.generateImage),
+      // so this item type should not appear in normal operation. Drop
+      // silently rather than crash, but log so an accidental future
+      // re-registration of the hosted tool surfaces immediately.
+      logEvent("image_gen:legacy_hosted_item_ignored", { id: item.id });
     } else if (item.type === "reasoning" && accumulatedReasoning === undefined) {
       // Non-streaming path. The streaming path's SDK accumulator is
       // unreliable for reasoning items (see the responsesStream comment),

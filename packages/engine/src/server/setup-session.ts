@@ -151,6 +151,13 @@ export class SetupSession {
   async start(): Promise<void> {
     const knownPlayers = await this.scanKnownPlayers();
     const paths = machinePaths(this.homeDir);
+    // The __setup__ scratch campaign is materialized by SessionManager
+    // before startSetup() is called. createSetupConversation uses it as
+    // the on-disk root for portrait drafts (__setup__/campaign/images/)
+    // and the confirmed portrait (__setup__/characters/<slug>-portrait.png),
+    // which world-builder picks up at finalize and ports into the new
+    // campaign.
+    const setupRoot = join(this.campaignsDir, "__setup__");
     this.conversation = createSetupConversation(this.provider, this.model, knownPlayers, (status, delayMs) => {
       this.broadcast({
         type: "error",
@@ -162,7 +169,7 @@ export class SetupSession {
           category: "retryable",
         },
       });
-    }, paths.worldsDir, paths.personalitiesDir);
+    }, paths.worldsDir, paths.personalitiesDir, this.fileIO, setupRoot);
     this.started = true;
 
     this.emitThinking();
@@ -231,6 +238,29 @@ export class SetupSession {
 
   private async handleResult(result: SetupTurnResult): Promise<{ finalized?: string; campaignName?: string }> {
     this.broadcast({ type: "narrative:complete", data: { text: result.text } });
+
+    // Portrait drafts: broadcast a display_image TUI command for each so
+    // the client renders the draft inline. Same wire shape as the DM
+    // playing-phase emits — the existing event-handler in client-ink
+    // handles it identically.
+    if (result.imageDisplays) {
+      for (const display of result.imageDisplays) {
+        // Same wire shape as bridge.ts uses for the DM-emitted display_image
+        // TuiCommand. Spreading a typed object literal sidesteps excess-property
+        // checks against ActivityUpdateEvent's strict data shape — the client's
+        // event-handler reads filename/intent off the resulting payload either
+        // way. Matching bridge.ts is what keeps both paths rendering identically.
+        const cmd = {
+          type: "display_image" as const,
+          filename: display.filename,
+          intent: display.intent,
+        };
+        this.broadcast({
+          type: "activity:update",
+          data: { engineState: `tui:${cmd.type}`, ...cmd },
+        });
+      }
+    }
 
     // Present choices to the client
     if (result.pendingChoices) {

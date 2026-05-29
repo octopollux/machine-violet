@@ -22,6 +22,13 @@ import type {
   NormalizedMessage, NormalizedTool, NormalizedUsage,
   SystemBlock, ContentPart,
 } from "../../providers/types.js";
+import type { FileIO } from "../scene-manager.js";
+import { handleImageGenerated } from "../image-handler.js";
+import { campaignPaths } from "../../tools/filesystem/index.js";
+import { norm } from "../../utils/paths.js";
+import { slugify } from "../../utils/slug.js";
+import { logEvent } from "../../context/engine-log.js";
+import { normalizeImageEffort, normalizeImageAspect } from "../../providers/image-coerce.js";
 
 // --- Types ---
 
@@ -30,6 +37,14 @@ export interface SetupTurnResult extends SubagentResult {
   finalized?: SetupResult;
   /** Non-null when the agent called present_choices — must be resolved before continuing */
   pendingChoices?: { prompt: string; choices: string[]; descriptions?: string[] };
+  /**
+   * Portrait drafts the setup agent generated during this turn (persisted
+   * to the __setup__ scratch campaign by the time this returns). The
+   * caller is expected to broadcast a `display_image` TUI event for each
+   * so the client renders the draft inline. Empty/absent means no
+   * portraits were emitted this turn.
+   */
+  imageDisplays?: { filename: string; intent: "character_portrait" }[];
 }
 
 /**
@@ -81,6 +96,12 @@ const FINALIZE_TOOL: NormalizedTool = {
       world_slug: { type: "string", description: "Slug of the world file used (from load_world). Omit for fully custom campaigns.", nullable: true },
       age_group: { type: "string", enum: ["child", "teenager", "adult"], description: "Player's age group. Set to 'child' or 'teenager' if the player clearly indicates so. Otherwise — including when age is not discussed or the player declines — set to 'adult'. Always include this field." },
       content_preferences: { type: "string", description: "Any content preferences or sensitivities the player mentioned during setup (one per line). Only include if the player volunteered them — never prompt for these.", nullable: true },
+      image_generation: {
+        type: "string",
+        enum: ["on", "off"],
+        description: "Player's answer to the image-generation consent question. 'on' if they said yes, 'off' if they said no. Only include this field if you actually asked the consent question (which only happens when the active provider/model supports image generation — see the Image generation section of your prompt). Omit when not asked.",
+        nullable: true,
+      },
       handoff_note: { type: "string", description: "Handoff postcard for the DM's first turn. Free-form prose — the DM sees this once as priming for the opening scene. Include: what the player said about their character IN THEIR OWN WORDS (quote or paraphrase closely, don't sanitize), any freeform remarks they made about the world / tone / things they want or don't want, and anything you (the setup agent) want to pass along to the DM — hooks you promised, tone cues the structured fields don't capture, unresolved ambiguities. Write it as a direct note to the DM, not as narration. A paragraph or two is usually right. Always include this field." },
     },
     required: [
@@ -137,7 +158,69 @@ const LOAD_WORLD_TOOL: NormalizedTool = {
   },
 };
 
-const TOOLS = [FINALIZE_TOOL, PRESENT_CHOICES_TOOL, LOAD_WORLD_TOOL];
+const GENERATE_IMAGE_TOOL: NormalizedTool = {
+  name: "generate_image",
+  description:
+    "Generate a full-length character portrait for the player's character. " +
+    "Use ONLY for character portraits during chargen — never for scenes or other illustrations during setup. " +
+    "The image is shown to the player automatically. After showing each draft, ask the player whether " +
+    "the portrait looks right or what to adjust, then call this again with an updated prompt if needed. " +
+    "When the player confirms a portrait, call `set_portrait` with that draft's filename to keep it. " +
+    "ALWAYS render setup portraits in the style: **simple digital art, plain black background**. " +
+    "Do not match the campaign's visual style during chargen — the black-background style is " +
+    "the canonical character-card look, and it stays consistent across worlds. Describe the " +
+    "character (build, clothing, pose, mood, expression) in the prompt, then end with " +
+    "\"Simple digital art, plain black background.\" Save campaign-styled imagery for in-game scenes. " +
+    "ALWAYS pass `effort: \"draft\"` and `aspect: \"portrait\"` for these chargen drafts — the player iterates " +
+    "and we need the fast turnaround. Save higher effort for in-campaign portrait commands after chargen.",
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      prompt: {
+        type: "string",
+        description: "Vivid description of the character's full-body appearance — clothing, build, pose, mood, background hint, art style. The model composes the image from this; be specific.",
+      },
+      effort: {
+        type: "string",
+        enum: ["draft", "standard", "quality", "showcase"],
+        description: "Render effort. Use 'draft' for chargen iteration (fastest). 'standard' / 'quality' / 'showcase' are reserved for in-campaign use after setup completes.",
+      },
+      aspect: {
+        type: "string",
+        enum: ["portrait", "landscape", "square"],
+        description: "Aspect ratio. Use 'portrait' for character portraits during chargen.",
+      },
+    },
+    required: ["prompt", "effort", "aspect"],
+  },
+};
+
+const SET_PORTRAIT_TOOL: NormalizedTool = {
+  name: "set_portrait",
+  description:
+    "Keep one of the generated portrait drafts as the final character portrait. Call this once the " +
+    "player has confirmed they're happy with a draft (or call it on the latest draft if the player " +
+    "is moving on without explicit love). Pass the character's name and the filename of the draft " +
+    "to keep — the engine copies it to the canonical character portrait path. Drafts not chosen " +
+    "are left in place for audit; they don't follow the campaign forward.",
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      character_name: {
+        type: "string",
+        description: "The character's name as established during chargen. Must match the name you'll pass to finalize_setup.",
+      },
+      draft_filename: {
+        type: "string",
+        description: "Filename of the draft to promote (e.g. 'portrait-draft-1716800000000.png'). Just the basename, not a full path.",
+      },
+    },
+    required: ["character_name", "draft_filename"],
+  },
+};
+
+const BASE_TOOLS = [FINALIZE_TOOL, PRESENT_CHOICES_TOOL, LOAD_WORLD_TOOL];
+const IMAGE_GEN_TOOLS = [GENERATE_IMAGE_TOOL, SET_PORTRAIT_TOOL];
 
 // --- System prompt ---
 
@@ -186,13 +269,58 @@ function shuffle<T>(arr: readonly T[]): T[] {
  *
  * BP3 (tools) and BP4 (last message) are stamped via cacheHints in runTurn.
  */
-function buildSystemPrompt(model: string, existingPlayers?: KnownPlayer[], userWorldsDir?: string, userPersonalitiesDir?: string): SystemBlock[] {
+function buildSystemPrompt(
+  model: string,
+  existingPlayers?: KnownPlayer[],
+  userWorldsDir?: string,
+  userPersonalitiesDir?: string,
+  imageGenSupported?: boolean,
+  portraitLoopActive?: boolean,
+): SystemBlock[] {
   const blocks: SystemBlock[] = [];
 
   // ── Tier 1: Global-stable (identical across all sessions) ──
 
   const base = loadPrompt("setup-conversation", model);
   blocks.push({ text: base });
+
+  // Image-generation consent guidance is conditionally appended ONLY when
+  // the active provider/model exposes image generation. Skipping it
+  // entirely when unsupported avoids the setup agent asking a question
+  // that can't be acted on — and keeps the cached prefix tighter for
+  // text-only tiers. The locked phrasing for the question itself is
+  // baked into the prompt text below per saved feedback memory.
+  if (imageGenSupported) {
+    const portraitSection = portraitLoopActive ? [
+      "",
+      "### Character portraits (only when the player said Yes above)",
+      "",
+      "Once the player has chosen a character name and given you a description, generate a full-length portrait of them. Use the `generate_image` tool — its `prompt` argument should be a vivid, specific description of the character's full body (build, clothing, pose, mood, background hint), composed in a visual style that matches the campaign's world (illuminated-manuscript serif plate, cinematic matte, painterly fresco, woodcut, anime-comic, etc. — pick what fits). Pass `effort: \"draft\"` and `aspect: \"portrait\"` for chargen iteration.",
+      "",
+      "After each draft is rendered, ask the player something light like \"Look right, or do you want me to try again with anything different?\" — don't editorialize about the image yourself. If they want adjustments, call `generate_image` again with a revised prompt. There's no iteration cap; let them iterate until they're happy.",
+      "",
+      "When the player confirms (or moves on without enthusiasm), call `set_portrait` with the character's name and the latest draft's filename. The filename comes back as the tool result of `generate_image` — record it and pass it through verbatim. Do this BEFORE calling `finalize_setup`.",
+      "",
+      "If the player said No to images at the consent step above, skip this entire section. Don't generate a portrait, don't call set_portrait, just continue with character creation and finalize.",
+    ].join("\n") : "";
+
+    blocks.push({
+      text: [
+        "## Image generation",
+        "",
+        "After the player has chosen a world (Quick Start) or finished system selection (Full Setup), and BEFORE you ask any character questions, present the image-generation consent question:",
+        "",
+        "Call `present_choices` with:",
+        "  prompt: \"Do you want images in your game? (you can change this in game settings later)\"",
+        "  choices: [\"Yes\", \"No\"]",
+        "",
+        "Pass the player's answer to `finalize_setup` as the `image_generation` field — `\"on\"` if they picked Yes, `\"off\"` if they picked No. If they answer freeform, interpret naturally. Do not editorialize or explain further; the parenthetical in the question already tells the player it's reversible.",
+        "",
+        "Use the locked phrasing verbatim — do not paraphrase, expand, or add caveats. The choice is reversible (the in-campaign ESC menu has a toggle for it), so don't agonize over it; one quick yes/no.",
+        portraitSection,
+      ].join("\n"),
+    });
+  }
 
   const { light, crunchy } = groupByTier(KNOWN_SYSTEMS);
   const lightList = light.map(formatSystemLine).join("\n");
@@ -328,11 +456,35 @@ export function createSetupConversation(
   onRetry?: (status: number, delayMs: number) => void,
   userWorldsDir?: string,
   userPersonalitiesDir?: string,
+  /**
+   * FileIO + setupRoot enable the portrait loop: drafts land at
+   * `<setupRoot>/campaign/images/portrait-draft-*.png` via handleImageGenerated,
+   * and set_portrait copies a chosen draft to
+   * `<setupRoot>/characters/<slug>-portrait.png`. world-builder picks that
+   * up at finalize and copies it into the freshly-scaffolded campaign.
+   * When either is absent (e.g. test paths), image-gen tools are not
+   * registered and portraits are skipped entirely.
+   */
+  fileIO?: FileIO,
+  setupRoot?: string,
 ): SetupConversation {
   // Build per-session system prompt (randomizes seed/personality order).
   // Known players are injected right after the base prompt (before seeds/personalities)
   // so the model sees them close to the flow instructions that reference them.
-  const systemPrompt = buildSystemPrompt(model, existingPlayers, userWorldsDir, userPersonalitiesDir);
+  // imageGenSupported gates the image-consent prompt section so the setup
+  // agent doesn't ask the question on text-only tiers.
+  const imageGenSupported = provider.getCapabilities?.(model).imageGeneration ?? false;
+  /**
+   * Full portrait loop requires capability + on-disk scratch space.
+   * Test paths typically omit fileIO/setupRoot, so they get the consent
+   * question (if imageGenSupported) but no portrait tools — finalize
+   * still records the player's preference.
+   */
+  const portraitLoopActive = imageGenSupported && !!fileIO && !!setupRoot;
+  const systemPrompt = buildSystemPrompt(
+    model, existingPlayers, userWorldsDir, userPersonalitiesDir,
+    imageGenSupported, portraitLoopActive,
+  );
 
   const messages: NormalizedMessage[] = [];
   const totalUsage: NormalizedUsage = {
@@ -350,6 +502,151 @@ export function createSetupConversation(
   // They must be flushed with the choice resolution — otherwise their tool_use
   // blocks are left orphaned and Anthropic 400s on the next request.
   let pendingExtraToolResults: ContentPart[] = [];
+  /**
+   * Active tool list this conversation will offer the model. When the
+   * portrait loop is gated on, add generate_image (intercepted by the
+   * provider) + set_portrait (dispatched here in runToolDispatch / the
+   * legacy loop). When off, only the base tools are exposed so models
+   * on text-only tiers don't see calls they can't service.
+   */
+  const TOOLS: NormalizedTool[] = portraitLoopActive
+    ? [...BASE_TOOLS, ...IMAGE_GEN_TOOLS]
+    : BASE_TOOLS;
+
+  // Breadcrumb so the harness can confirm setup-agent actually believes it
+  // should be doing portraits. If this is false in a live image-gen smoke
+  // test, the consent gate or capability detection is the culprit, not
+  // the image API.
+  logEvent("setup:image_tools_registered", {
+    model,
+    providerId: provider.providerId,
+    // Raw return so we can spot a provider returning a surprising shape
+    // (e.g. `imageGeneration: "true"` as a string, or a model-registry
+    // fallback path returning true on a provider whose dispatch can't
+    // actually serve it).
+    rawCapabilities: provider.getCapabilities?.(model),
+    hasGenerateImage: typeof provider.generateImage === "function",
+    imageGenSupported,
+    portraitLoopActive,
+    hasFileIO: !!fileIO,
+    hasSetupRoot: !!setupRoot,
+  });
+
+  /**
+   * Drafts persisted during this turn. Lifted into the SetupTurnResult so
+   * the caller can broadcast a `display_image` TUI command for each.
+   * Reset at the top of runTurn.
+   */
+  let turnImageDisplays: { filename: string; intent: "character_portrait" }[] = [];
+
+  /**
+   * Dispatch a `generate_image` function tool call.
+   *
+   * Flow: read effort/aspect/prompt from model args → call
+   * provider.generateImage → persist bytes to disk via handleImageGenerated
+   * → record path for the caller to broadcast as a display_image TUI
+   * command → return a text tool_result confirming the image was shown
+   * to the player and naming the draft filename so the model can
+   * subsequently call set_portrait with the right basename.
+   *
+   * Errors (no provider support, network failure, content refusal) bubble
+   * up as an isError tool_result so the model can apologize or retry.
+   */
+  async function dispatchGenerateImage(
+    callId: string,
+    input: Record<string, unknown>,
+  ): Promise<{ content: string; isError: boolean }> {
+    if (!portraitLoopActive || !fileIO || !setupRoot) {
+      return { content: "generate_image is not available (portrait loop gated off).", isError: true };
+    }
+    if (!provider.generateImage) {
+      return { content: "The configured provider does not support image generation.", isError: true };
+    }
+    const promptText = typeof input.prompt === "string" ? input.prompt.trim() : "";
+    if (!promptText) {
+      return { content: "generate_image requires a non-empty prompt.", isError: true };
+    }
+    const effort = normalizeImageEffort(input.effort, "draft");
+    const aspect = normalizeImageAspect(input.aspect, "portrait");
+    try {
+      const result = await provider.generateImage({
+        prompt: promptText,
+        effort,
+        aspect,
+        intent: "character_portrait",
+      });
+      // Persist via image-handler — shared with the DM-side dispatch in
+      // game-engine.ts, so disk naming, sidecar JSON, and downstream
+      // consumers (transcript export, world-builder finalize) are uniform
+      // across both call sites.
+      const persisted = await handleImageGenerated(fileIO, setupRoot, null, {
+        id: callId,
+        base64: result.base64,
+        mimeType: result.mimeType,
+        intent: "character_portrait",
+        ...(result.revisedPrompt ? { revisedPrompt: result.revisedPrompt } : {}),
+      });
+      const absPath = norm(`${setupRoot}/${persisted.relPath}`);
+      turnImageDisplays.push({ filename: absPath, intent: "character_portrait" });
+      const basename = persisted.relPath.split("/").pop() ?? "portrait-draft.png";
+      return {
+        content: `Portrait rendered and shown to the player at ${basename} (effort: ${result.effortUsed}, aspect: ${result.aspectUsed}). Now check in with the player about it — and remember the filename if they want to keep this draft via set_portrait.`,
+        isError: false,
+      };
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      logEvent("image_gen:dispatch_failed", {
+        agent: "setup",
+        message: message.slice(0, 400),
+      });
+      return { content: `Image generation failed: ${message}`, isError: true };
+    }
+  }
+
+  /**
+   * Copy a draft from `<setupRoot>/campaign/images/<draft_filename>` to
+   * `<setupRoot>/characters/<slug>-portrait.png`. The world-builder
+   * picks up the latter at finalize and ports it into the new campaign.
+   * Returns content for the tool_result body.
+   */
+  async function dispatchSetPortrait(input: Record<string, unknown>): Promise<{ content: string; isError: boolean }> {
+    if (!fileIO || !setupRoot || !fileIO.readBinaryFile || !fileIO.writeBinaryFile) {
+      return { content: "set_portrait is not available — fileIO or setupRoot missing.", isError: true };
+    }
+    const characterName = typeof input.character_name === "string" ? input.character_name.trim() : "";
+    const draftFilename = typeof input.draft_filename === "string" ? input.draft_filename.trim() : "";
+    if (!characterName || !draftFilename) {
+      return { content: "set_portrait requires both character_name and draft_filename.", isError: true };
+    }
+    // Sanitize the draft filename to a basename — defense against an agent
+    // accidentally emitting an absolute or relative path with separators.
+    const safeBasename = draftFilename.replace(/[\\/]/g, "").trim();
+    if (!safeBasename) {
+      return { content: `Invalid draft_filename: ${draftFilename}`, isError: true };
+    }
+    const srcPath = norm(`${setupRoot}/campaign/images/${safeBasename}`);
+    if (!(await fileIO.exists(srcPath))) {
+      return { content: `Draft not found: ${safeBasename}`, isError: true };
+    }
+    const charSlug = slugify(characterName);
+    const destPath = norm(campaignPaths(setupRoot).characterPortrait(characterName));
+    try {
+      const bytes = await fileIO.readBinaryFile(srcPath);
+      // Ensure characters/ exists — campaignDirs() created it for the new
+      // campaign but the __setup__ scratch tree was minimal at startup.
+      await fileIO.mkdir(norm(`${setupRoot}/characters`));
+      await fileIO.writeBinaryFile(destPath, bytes);
+      return {
+        content: `Portrait set for ${characterName} (slug: ${charSlug}). The campaign will use this image when setup completes.`,
+        isError: false,
+      };
+    } catch (e) {
+      return {
+        content: `Failed to set portrait: ${e instanceof Error ? e.message : String(e)}`,
+        isError: true,
+      };
+    }
+  }
 
   function handleFinalize(input: Record<string, unknown>): void {
     const personalityName = (input.dm_personality as string) || "The Unknown";
@@ -413,6 +710,9 @@ export function createSetupConversation(
       themeColor: generateThemeColor(characterName),
       ageGroup: (input.age_group as "child" | "teenager" | "adult" | undefined) ?? undefined,
       contentPreferences: (input.content_preferences as string) || undefined,
+      imageGeneration: input.image_generation === "on" || input.image_generation === "off"
+        ? (input.image_generation as "on" | "off")
+        : undefined,
       handoffNote: (typeof input.handoff_note === "string" && input.handoff_note.trim())
         ? input.handoff_note.trim() : undefined,
     };
@@ -436,6 +736,7 @@ export function createSetupConversation(
   async function runTurn(onDelta: (delta: string) => void): Promise<SetupTurnResult> {
     finalized = undefined;
     pendingToolUseId = null;
+    turnImageDisplays = [];
 
     const ec = getEffortConfig("setup");
     const thinking = ec.effort ? { effort: ec.effort } : undefined;
@@ -474,7 +775,13 @@ export function createSetupConversation(
      * the same side effects: `handleFinalize` fires when finalize_setup
      * lands, `pendingChoices` is captured when present_choices lands, etc.
      */
-    function runToolDispatch(call: { id: string; name: string; input: Record<string, unknown> }): { content: string; isError: boolean } {
+    async function runToolDispatch(call: { id: string; name: string; input: Record<string, unknown> }): Promise<{ content: string; isError: boolean }> {
+      if (call.name === "generate_image") {
+        return dispatchGenerateImage(call.id, call.input);
+      }
+      if (call.name === "set_portrait") {
+        return dispatchSetPortrait(call.input);
+      }
       if (call.name === "present_choices") {
         const input = call.input as { prompt?: string; choices?: unknown; descriptions?: unknown };
         const rawChoices = Array.isArray(input.choices) ? input.choices : [];
@@ -550,7 +857,7 @@ export function createSetupConversation(
         // API-key providers do. Other providers ignore this field.
         dispatchTool: async (call) => {
           internalDispatchUsed = true;
-          const dispatched = runToolDispatch({ id: call.id, name: call.name, input: call.input });
+          const dispatched = await runToolDispatch({ id: call.id, name: call.name, input: call.input });
           // Record tool_result for non-suspending tools. present_choices
           // produces no recorded result here — its tool_result is synthesized
           // later from the player's selection in resolveChoice/send.
@@ -567,6 +874,9 @@ export function createSetupConversation(
       };
 
       const result = await streamWithRetry(provider, params, onDelta, onRetry);
+      // Portrait drafts are now persisted directly inside dispatchGenerateImage
+      // when the model calls the generate_image function tool — no post-hoc
+      // assistantContent scrape needed.
 
       // Defense-in-depth: a refusal-stop with no usable output is a dead
       // end for setup. The previous behavior (silently continue with
@@ -613,6 +923,7 @@ export function createSetupConversation(
             text,
             usage: { ...totalUsage },
             pendingChoices: internalPendingChoices,
+            ...(turnImageDisplays.length > 0 ? { imageDisplays: turnImageDisplays } : {}),
           };
         }
         // No suspension: push tool_results as a synthetic user message so the
@@ -704,6 +1015,37 @@ export function createSetupConversation(
             tool_use_id: tc.id,
             content: "Setup finalized. Say a brief farewell (don't narrate on behalf of the DM!) and finish with a separator: `---`",
           });
+        } else if (tc.name === "set_portrait") {
+          // Promote a draft to the canonical character-portrait path. The
+          // world-builder picks it up at finalize and copies into the new
+          // campaign. Failures surface as error tool_results so the agent
+          // can retry or move on.
+          const dispatched = await dispatchSetPortrait(tc.input);
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: tc.id,
+            content: dispatched.content,
+            ...(dispatched.isError ? { is_error: true } : {}),
+          });
+        } else if (tc.name === "generate_image") {
+          // Function-tool dispatch for the portrait loop. Without this
+          // branch the call is silently dropped: toolResults stays empty,
+          // line 1043's `if (toolResults.length === 0) break;` fires, the
+          // turn ends, and the model never gets a tool_result back —
+          // user-facing symptom is "the agent talks about the portrait
+          // and then yields back to the player without one ever
+          // appearing." The openai-chatgpt path doesn't hit this because
+          // it dispatches via the dispatchTool closure on chatParams,
+          // which routes through runToolDispatch (which DOES handle
+          // generate_image). This branch is the missing legacy-path
+          // counterpart.
+          const dispatched = await dispatchGenerateImage(tc.id, tc.input);
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: tc.id,
+            content: dispatched.content,
+            ...(dispatched.isError ? { is_error: true } : {}),
+          });
         }
       }
 
@@ -716,6 +1058,7 @@ export function createSetupConversation(
           text,
           usage: { ...totalUsage },
           pendingChoices,
+          ...(turnImageDisplays.length > 0 ? { imageDisplays: turnImageDisplays } : {}),
         };
       }
 
@@ -767,6 +1110,7 @@ export function createSetupConversation(
       text,
       usage: { ...totalUsage },
       finalized,
+      ...(turnImageDisplays.length > 0 ? { imageDisplays: turnImageDisplays } : {}),
     };
   }
 

@@ -1,7 +1,7 @@
 /**
  * Machine Violet end-to-end test harness.
  *
- * See `docs/e2e-harness.md` for the full reference and the scenario catalogue.
+ * See `docs/e2e-harness.md` for the full reference and the probe catalogue.
  */
 export { Harness } from "./harness.js";
 export type { HarnessOptions, ShutdownOptions } from "./harness.js";
@@ -22,3 +22,12 @@ export {
   DEFAULT_LONG_TIMEOUT_MS,
   type WaitOptions,
 } from "./wait.js";
+export {
+  engineLogPath,
+  readEngineLog,
+  findEngineEvents,
+  waitForEngineEvent,
+  formatEngineEvent,
+  type EngineLogEvent,
+} from "./engine-log.js";
+export { runProbe, type ProbeContext, type RunProbeOptions } from "./run-probe.js";

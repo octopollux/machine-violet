@@ -11,6 +11,8 @@ export function createBaseFileIO(): FileIO {
   return {
     readFile: (path: string) => readFile(path, "utf-8"),
     writeFile: (path: string, content: string) => writeFile(path, content, "utf-8"),
+    writeBinaryFile: (path: string, bytes: Uint8Array) => writeFile(path, bytes),
+    readBinaryFile: (path: string) => readFile(path).then((buf) => new Uint8Array(buf)),
     appendFile: (path: string, content: string) => appendFile(path, content, "utf-8"),
     mkdir: (path: string) => mkdir(path, { recursive: true }).then(() => { /* void */ }),
     exists: async (path: string) => {

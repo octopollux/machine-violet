@@ -30,7 +30,7 @@ import type { CampaignConfig, ChoiceFrequency } from "@machine-violet/shared/typ
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { useGameContext } from "../tui/game-context.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
-import { buildTranscriptHtml } from "../commands/transcript.js";
+import { buildTranscriptHtml, loadImageBytes } from "../commands/transcript.js";
 import { openPath, revealInExplorer } from "../commands/open-path.js";
 
 export function PlayingPhase() {
@@ -84,6 +84,28 @@ export function PlayingPhase() {
   const narrativeRef = useRef<NarrativeAreaHandle>(null);
   const modalScrollRef = useRef<CenteredModalHandle>(null);
   const escTimestamps = useRef<number[]>([]);
+
+  // Force-remount image lines whenever an overlay (modal, menu, choices,
+  // retry) transitions from open → closed. Terminal graphics protocols
+  // (sixel / kitty / iTerm2) write pixel data into specific cells; when an
+  // overlay draws text over those cells the pixel data is destroyed by
+  // the terminal itself, not by React. Ink only re-runs render diffs on
+  // prop changes, and ink-picture's useEffect only re-decodes when src /
+  // width / height / allowPartial change — so closing the overlay leaves
+  // the image cells blank. Bumping a key on the image's wrapping Box
+  // forces React to unmount + remount, which triggers ink-picture to
+  // re-fetch, re-decode (sharp), and re-paint the bytes into the
+  // terminal. Cheap when no images are visible (no work) and only the
+  // visible image pays the decode cost on each refresh.
+  const overlayOpen = !!activeModal || !!activeChoices || !!retryOverlay || menuOpen;
+  const prevOverlayOpen = useRef(overlayOpen);
+  const [imageRefreshKey, setImageRefreshKey] = useState(0);
+  useEffect(() => {
+    if (prevOverlayOpen.current && !overlayOpen) {
+      setImageRefreshKey((k) => k + 1);
+    }
+    prevOverlayOpen.current = overlayOpen;
+  }, [overlayOpen]);
 
   // Clear the dismissal latch whenever the retry overlay goes away so the
   // next outage shows the modal again — even if the new attemptId numerically
@@ -151,6 +173,11 @@ export function PlayingPhase() {
   const saveTranscript = useCallback(async () => {
     const playerColor = stateSnapshot?.players?.[activePlayerIndex]?.color ?? "#55ff55";
     const separatorColor = themeColor(theme, "separator") ?? "#666666";
+    // Pre-load image bytes referenced in the transcript so the exported
+    // HTML is self-contained (single file with inline base64 data: URIs).
+    // Read failures are silently skipped; the HTML renderer emits an
+    // "[image unavailable]" placeholder for any missing entry.
+    const imageBytes = await loadImageBytes(narrativeLines);
     const html = buildTranscriptHtml({
       narrativeLines,
       width: cols,
@@ -159,6 +186,7 @@ export function PlayingPhase() {
       separatorColor,
       playerColor,
       quoteColor: "#ffffff",
+      imageBytes,
     });
     try {
       const { path } = await apiClient.saveTranscript(html);
@@ -479,6 +507,7 @@ export function PlayingPhase() {
         playerFrameColor={engineState === "waiting_input" ? stateSnapshot?.players?.[activePlayerIndex]?.color : "#808080"}
         showVerbose={showVerbose}
         narrativeRef={narrativeRef}
+        imageRefreshKey={imageRefreshKey}
         mouseScrollOverrideRef={modalScrollRef}
         hideInputLine={!!activeChoices}
         playerPaneOverlay={choiceOverlay}
@@ -578,6 +607,11 @@ export function PlayingPhase() {
           onDmTurnLengthPctChange={async (value: number) => {
             await apiClient.patchSettings({
               dm_turn_length_pct: value,
+            }).catch(() => { /* ignore — same rationale as Choices Frequency above */ });
+          }}
+          onImageGenerationChange={async (value: "on" | "off") => {
+            await apiClient.patchSettings({
+              image_generation: value,
             }).catch(() => { /* ignore — same rationale as Choices Frequency above */ });
           }}
           globalDmTurnLengthPctDefault={dmTurnLengthPctDefault}

@@ -1,5 +1,6 @@
+#!/usr/bin/env node
 /**
- * Boot-and-quit: the cheapest smoke test.
+ * Boot-and-quit probe: the cheapest end-to-end smoke probe.
  *
  * Proves:
  *   - Launcher spins up server + client without crashing
@@ -7,19 +8,19 @@
  *   - Main menu renders and is visible in /screen
  *   - Process tears down cleanly on shutdown
  *
- * No LLM API calls. Runs in ~10 seconds. Use this as the precondition for
- * everything else — if it fails, no other scenario can pass.
+ * No LLM API calls. Runs in ~10 seconds. The precondition for every
+ * other probe — if this fails, nothing else can pass.
+ *
+ * Run with:
+ *   npm run e2e:boot
+ *   or: node --import tsx/esm packages/test-harness/bin/boot-and-quit.ts
  */
-import type { Scenario } from "./types.js";
+import { runProbe } from "../src/run-probe.js";
 
-export const bootAndQuit: Scenario = {
-  id: "boot-and-quit",
-  title: "Boot to main menu and exit",
-  description: "Launches the full stack, confirms the main menu renders, and shuts down. No LLM calls.",
-  live: false,
-  approxMinutes: 0.5,
-
-  async run({ harness, log }) {
+await runProbe({
+  name: "boot-and-quit",
+  title: "Boot to main menu and exit (~10s, no API key)",
+  body: async ({ harness, log }) => {
     log("Waiting for main menu to render...");
     await harness.waitForScreen("Machine Violet", { timeoutMs: 15_000 });
     log("Title bar rendered.");
@@ -28,4 +29,4 @@ export const bootAndQuit: Scenario = {
     await harness.waitForScreen("New Campaign", { timeoutMs: 15_000 });
     log("Menu visible: 'New Campaign' present.");
   },
-};
+});

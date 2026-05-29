@@ -111,4 +111,35 @@ describe("buildTranscriptHtml", () => {
     expect(html).toContain("Menlo");
     expect(html).toContain("monospace");
   });
+
+  it("inlines image lines as base64 data: URIs when bytes are supplied", () => {
+    const lines: NarrativeLine[] = [
+      { kind: "image", text: "/path/to/scene-001-tavern-1234.png", intent: "scene_snapshot" },
+    ];
+    const opts: TranscriptOptions = {
+      ...buildOpts(lines),
+      imageBytes: {
+        "/path/to/scene-001-tavern-1234.png": {
+          mimeType: "image/png",
+          base64: "PNG-FAKE-BYTES",
+        },
+      },
+    };
+    const html = buildTranscriptHtml(opts);
+    expect(html).toContain(`<img src="data:image/png;base64,PNG-FAKE-BYTES"`);
+    expect(html).toContain('class="image"');
+    expect(html).not.toContain("image-missing");
+  });
+
+  it("emits an [image unavailable] placeholder when bytes are missing", () => {
+    const lines: NarrativeLine[] = [
+      { kind: "image", text: "/path/that/was/deleted.png", intent: "player_request" },
+    ];
+    // No imageBytes supplied — simulates the file having been moved/deleted
+    // between when the DM generated it and when the user exported the
+    // transcript.
+    const html = buildTranscriptHtml(buildOpts(lines));
+    expect(html).toContain("[image unavailable]");
+    expect(html).not.toContain("<img");
+  });
 });

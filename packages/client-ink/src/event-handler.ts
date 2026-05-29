@@ -273,7 +273,10 @@ function withTurnSeparators(
 
 function handleNarrativeChunk(event: NarrativeChunkEvent, update: StateUpdater): void {
   const { text, kind } = event.data;
-  const lineKind = (kind ?? "dm") as NarrativeLine["kind"];
+  // Narrative chunks never carry image lines — those arrive whole via the
+  // `display_image` TUI command (see below). Excluding "image" from the
+  // cast matches appendDelta's StreamableKind requirement.
+  const lineKind = (kind ?? "dm") as Exclude<NarrativeLine["kind"], "image">;
 
   update((prev) => {
     let lines = prev.narrativeLines;
@@ -447,6 +450,28 @@ function handleActivityUpdate(event: ActivityUpdateEvent, update: StateUpdater):
       if (character && values) {
         const prevValues = next.resourceValues[character] ?? {};
         next = { ...next, resourceValues: { ...next.resourceValues, [character]: { ...prevValues, ...values } } };
+      }
+    } else if (tuiType === "display_image") {
+      // Inline image emitted by the DM via generate_image. Per spec, push
+      // ONE separator above the image (we add this one); the existing
+      // turn-end separator at the bottom of the DM's turn provides the
+      // other side of the wrap naturally. Failed image generations never
+      // produce a display_image command, so this path is always success.
+      const filename = data.filename as string | undefined;
+      const rawIntent = data.intent as string | undefined;
+      const intent: Extract<NarrativeLine, { kind: "image" }>["intent"] | undefined =
+        rawIntent === "scene_snapshot" || rawIntent === "player_request" || rawIntent === "character_portrait"
+          ? rawIntent
+          : undefined;
+      if (filename && intent) {
+        next = {
+          ...next,
+          narrativeLines: [
+            ...next.narrativeLines,
+            { kind: "separator" as const, text: "" },
+            { kind: "image" as const, text: filename, intent },
+          ],
+        };
       }
     }
 

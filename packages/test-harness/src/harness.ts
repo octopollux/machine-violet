@@ -15,10 +15,10 @@
  *
  * The harness owns one child process. It always cleans up: shutdown() kills
  * the process tree and removes any temporary campaigns dir if `cleanup` was
- * requested. Long scenarios should put shutdown() in a `finally` block.
+ * requested. Long probes should put shutdown() in a `finally` block.
  */
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -32,6 +32,12 @@ import {
 } from "./wait.js";
 import type { ClientStateSnapshot, ActiveChoices } from "./client-state.js";
 import { choiceLabel } from "./client-state.js";
+import {
+  readEngineLog,
+  waitForEngineEvent,
+  formatEngineEvent,
+  type EngineLogEvent,
+} from "./engine-log.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "../../..");
@@ -78,19 +84,40 @@ export class Harness {
   /** Captured combined stdout/stderr from the child when stdio: "buffer". */
   readonly childLog: string[] = [];
 
+  /**
+   * Engine log start cutoff (ms since epoch). All readEngineLog /
+   * waitForEngineEvent reads filter to events with `t >= launchedAt`
+   * so stale entries from prior runs don't leak in.
+   *
+   * Why this matters: the engine log lives at
+   * `dirname(campaignsDir)/.debug/engine.jsonl`. With the harness's
+   * default ephemeral campaignsDir under `os.tmpdir()`, that resolves
+   * to a SHARED `tmpdir/.debug/engine.jsonl` across every harness run.
+   * Without the cutoff, a probe could "pass" by finding an
+   * image_gen:completed event left over from yesterday's run.
+   */
+  readonly launchedAt: number;
+
   private constructor(
     private readonly child: ChildProcess,
     readonly serverPort: number,
     readonly agentPort: number,
     readonly campaignsDir: string,
     readonly ownsCampaignsDir: boolean,
-  ) {}
+    launchedAt: number,
+  ) {
+    this.launchedAt = launchedAt;
+  }
 
   // -------------------------------------------------------------------------
   // Launch + shutdown
   // -------------------------------------------------------------------------
 
   static async launch(opts: HarnessOptions = {}): Promise<Harness> {
+    // Capture the cutoff BEFORE we spawn so engine events emitted by the
+    // child are guaranteed to have `t >= launchedAt`. (Capturing later
+    // would race with the engine's startup events.)
+    const launchedAt = Date.now();
     const serverPort = opts.serverPort ?? pickEphemeralPort();
     const agentPort = opts.agentPort ?? pickEphemeralPort();
     const launchTimeoutMs = opts.launchTimeoutMs ?? 30_000;
@@ -121,7 +148,7 @@ export class Harness {
     // engine uses dotenv without override:true, so an empty value blocks
     // .env from populating the real key. Here we treat empty as "unset" and
     // explicitly load any *_API_KEY from the configDir's .env so the
-    // harness can run live scenarios from inside such shells.
+    // harness can run live probes from inside such shells.
 
     const launcherPath = join(REPO_ROOT, "scripts", "launcher.ts");
     const args = ["--max-semi-space-size=16", "--import", "tsx/esm", launcherPath];
@@ -192,7 +219,7 @@ export class Harness {
       throw err;
     }
 
-    const harness = new Harness(child, serverPort, agentPort, campaignsDir, ownsCampaignsDir);
+    const harness = new Harness(child, serverPort, agentPort, campaignsDir, ownsCampaignsDir, launchedAt);
     // Pipe captured log into the harness instance.
     if (stdio === "buffer") {
       for (const line of childLog) harness.childLog.push(line);
@@ -295,7 +322,7 @@ export class Harness {
    * no choice is currently presented or no candidate matches.
    *
    * Implementation: assumes the overlay opens with selection at index 0.
-   * If your scenario navigates choices between presentations, drive arrow
+   * If your probe navigates choices between presentations, drive arrow
    * keys directly with sendKey.
    */
   async selectChoice(query: string | { index: number }): Promise<void> {
@@ -418,7 +445,7 @@ export class Harness {
    * scene to disk, creates a git checkpoint, generates the session recap,
    * and broadcasts `session:ended`. Equivalent to selecting "Save & Exit"
    * in the in-game menu, minus the keystroke navigation. Use this when
-   * your scenario isn't specifically testing menu nav.
+   * your probe isn't specifically testing menu nav.
    */
   async endSession(): Promise<void> {
     const res = await fetch(`http://127.0.0.1:${this.serverPort}/session/end`, {
@@ -428,6 +455,87 @@ export class Harness {
       const body = await res.text().catch(() => "");
       throw new Error(`endSession failed: ${res.status} ${body}`);
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Engine log + filesystem inspection
+  // -------------------------------------------------------------------------
+
+  /**
+   * Read structured events the engine has written to `.debug/engine.jsonl`
+   * since this harness instance was launched. Events from prior harness
+   * runs (the log file is shared across all runs that share a campaigns
+   * parent, including all e2e runs under `os.tmpdir()`) are filtered out
+   * via the {@link launchedAt} cutoff. Returns [] if the engine hasn't
+   * written anything yet.
+   *
+   * Use this when you need a punctual snapshot. For "wait until event X
+   * appears" use {@link waitForEngineEvent}.
+   */
+  readEngineLog(): EngineLogEvent[] {
+    return readEngineLog(this.campaignsDir).filter((e) => e.t >= this.launchedAt);
+  }
+
+  /**
+   * Wait until the engine log contains at least one event matching `match`
+   * AND emitted after this harness instance launched. `match` is either an
+   * event name (`"image_gen:completed"`) or a predicate. Resolves with the
+   * first matching event.
+   *
+   * Probes that drive a slow async path (image generation, DM turn) should
+   * use this instead of poking at ClientState — the engine log carries
+   * intent + payload, not just "narrative grew."
+   */
+  async waitForEngineEvent(
+    match: string | ((e: EngineLogEvent) => boolean),
+    opts: Omit<WaitOptions, "description"> & { description?: string } = {},
+  ): Promise<EngineLogEvent> {
+    const namePredicate = typeof match === "function" ? match : (e: EngineLogEvent) => e.event === match;
+    const scopedPredicate = (e: EngineLogEvent) => e.t >= this.launchedAt && namePredicate(e);
+    return waitForEngineEvent(this.campaignsDir, scopedPredicate, opts);
+  }
+
+  /**
+   * Resolve the absolute path of a campaign on disk. `__setup__` is the
+   * synthetic scratch campaign used during new-campaign setup.
+   */
+  campaignPath(campaignId: string): string {
+    return join(this.campaignsDir, campaignId);
+  }
+
+  /**
+   * List files inside a campaign subdirectory (e.g. `"campaign/images"`,
+   * `"characters"`). Returns absolute paths, sorted. Returns [] if the
+   * directory doesn't exist.
+   *
+   * Useful for asserting "the image actually landed on disk" after a
+   * portrait-loop turn completes.
+   */
+  listCampaignFiles(campaignId: string, subdir: string): string[] {
+    const root = join(this.campaignPath(campaignId), ...subdir.split(/[\\/]/));
+    if (!existsSync(root)) return [];
+    try {
+      return readdirSync(root)
+        .filter((name) => {
+          try {
+            return statSync(join(root, name)).isFile();
+          } catch {
+            return false;
+          }
+        })
+        .sort()
+        .map((name) => join(root, name));
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Pretty-print the engine log tail. Useful in failure paths so the
+   * probe runner dumps something diagnostic alongside /screen + /state.
+   */
+  engineLogTail(n = 50): string {
+    return this.readEngineLog().slice(-n).map(formatEngineEvent).join("\n");
   }
 
   // -------------------------------------------------------------------------
@@ -539,5 +647,5 @@ async function terminateChild(child: ChildProcess): Promise<void> {
   }
 }
 
-// Convenient default-timeout constants for scenarios.
+// Convenient default-timeout constants for probes.
 export { DEFAULT_SHORT_TIMEOUT_MS, DEFAULT_LONG_TIMEOUT_MS };

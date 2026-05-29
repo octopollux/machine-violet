@@ -31,6 +31,14 @@ export interface SetupResult {
   /** Freeform content preferences captured during setup (one per line). */
   contentPreferences?: string;
   /**
+   * Player's answer to the image-generation consent question. Only set
+   * when the question was actually asked (provider+model supports image
+   * generation). Omitted when image gen is unsupported by the active
+   * tier, in which case the buildCampaignConfig leaves the field unset
+   * — the ESC-menu toggle can flip it later.
+   */
+  imageGeneration?: "on" | "off";
+  /**
    * Handoff postcard for the DM's first turn. Written by the setup agent
    * as free-form prose summarising what the player actually said (character
    * in their own words, freeform world/tone notes, anything else useful),
@@ -62,6 +70,7 @@ export function buildCampaignConfig(result: SetupResult): CampaignConfig {
     mood: result.mood,
     difficulty: result.difficulty,
     campaign_scope: result.campaignScope,
+    image_generation: result.imageGeneration,
     premise: result.campaignPremise,
     campaign_detail: result.campaignDetail ?? undefined,
     setup_handoff: result.handoffNote ?? undefined,

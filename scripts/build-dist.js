@@ -233,6 +233,16 @@ for (const { src, dest, filter } of assets) {
 console.log("  Vendoring codex runtime...");
 vendorCodex(ROOT, DIST);
 
+// Vendor sharp's per-platform native prebuild (libvips DLLs + .node) so
+// inline image rendering works in the SEA binary. esbuild bundles sharp's
+// JS wrapper into bundle.js, but the wrapper's `require('@img/sharp-...')`
+// resolves at runtime through Node's standard module search — which only
+// finds the package if it sits at `node_modules/@img/sharp-{triple}/`
+// somewhere Node can walk up to from cwd. We mirror it under
+// `dist/node_modules/` so an installed user has it next to the binary.
+console.log("  Vendoring sharp prebuild...");
+vendorSharp(ROOT, DIST);
+
 // Copy license
 const licensePath = join(ROOT, "LICENSE");
 if (existsSync(licensePath)) {
@@ -314,6 +324,52 @@ function vendorCodex(rootDir, distDir) {
   // Log a size summary so build output makes the ~250MB Rust binary visible.
   const bytes = dirSizeBytes(destRoot);
   console.log(`    codex/ vendored: ${(bytes / 1024 / 1024).toFixed(1)} MB (${entry.triple})`);
+}
+
+/**
+ * Copy the platform-matching `@img/sharp-*` prebuild into
+ * `dist/node_modules/@img/`.
+ *
+ * Sharp resolves its native binary via its wrapper's
+ * `require('@img/sharp-{platform}-{arch}/sharp.node')`. esbuild inlines
+ * the wrapper into bundle.js, but the require call is preserved and
+ * Node's standard resolver runs at runtime — climbing up from cwd
+ * looking for `node_modules/`. We colocate the prebuild under
+ * `dist/node_modules/` so an installed user (Velopack runs the app
+ * from `%LOCALAPPDATA%\MachineViolet\current\` or platform equivalent)
+ * has cwd somewhere the resolver can find it.
+ *
+ * The package directory carries libvips DLLs/dylibs/.so next to the
+ * `.node` file; copy the whole tree (with `package.json`'s exports map
+ * intact, which is what sharp's `require` honors).
+ *
+ * We don't hardcode the platform→package map — `npm install` only fetches
+ * the optional-dep package matching the current platform, so whatever
+ * `@img/sharp-*` directory is present on the build runner is the one we
+ * want. Throws if nothing is present (optional deps got skipped).
+ */
+function vendorSharp(rootDir, distDir) {
+  const imgDir = join(rootDir, "node_modules", "@img");
+  if (!existsSync(imgDir)) {
+    throw new Error(
+      `vendorSharp: ${imgDir} not found — install ink-picture / sharp first.`,
+    );
+  }
+  const sharpPkgs = readdirSync(imgDir).filter((e) => e.startsWith("sharp-"));
+  if (sharpPkgs.length === 0) {
+    throw new Error(
+      `vendorSharp: no @img/sharp-* prebuild found in ${imgDir}. ` +
+      `Optional deps may have been skipped — re-run \`npm install\` without --no-optional.`,
+    );
+  }
+  for (const pkg of sharpPkgs) {
+    const src = join(imgDir, pkg);
+    const dest = join(distDir, "node_modules", "@img", pkg);
+    mkdirSync(dirname(dest), { recursive: true });
+    cpSync(src, dest, { recursive: true });
+    const bytes = dirSizeBytes(dest);
+    console.log(`    @img/${pkg} vendored: ${(bytes / 1024 / 1024).toFixed(1)} MB`);
+  }
 }
 
 /** Recursive byte-count for a directory tree. */

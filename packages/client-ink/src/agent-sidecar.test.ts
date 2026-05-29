@@ -135,7 +135,7 @@ describe("agent sidecar HTTP", () => {
 // wrapper so /screen returns rendered terminal content. We don't try to
 // drive a real write through it here — vitest intercepts process.stdout
 // in a way that bypasses our wrapper for test-emitted writes. Full
-// coverage of the tee lives in the test-harness `boot-and-quit` scenario,
+// coverage of the tee lives in the test-harness `boot-and-quit` probe,
 // which spawns a real subprocess.
 // ---------------------------------------------------------------------------
 

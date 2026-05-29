@@ -112,6 +112,47 @@ describe("buildEffectiveConnections", () => {
     expect(env).toBeDefined();
     expect(env?.apiKey).toBe("sk-test-env");
   });
+
+  it("refreshes a manual openai-apikey connection's models against the current registry", () => {
+    // Simulate a connection saved before gpt-5.5 was added: its stored
+    // `models` array is missing the new flagship. The loader should
+    // rebuild from the registry so the picker surfaces all current
+    // models — otherwise users have to delete and re-add their key
+    // every time we ship a new model.
+    const effective = buildEffectiveConnections({
+      connections: [{
+        id: "stale-openai", provider: "openai-apikey", label: "OpenAI",
+        apiKey: "sk-test", models: [
+          { id: "gpt-5.4", displayName: "GPT-5.4", available: true },
+        ],
+        source: "manual", addedAt: "2026-01-01",
+      }],
+      tierAssignments: { large: null, medium: null, small: null },
+    });
+    const conn = effective.connections.find((c) => c.id === "stale-openai");
+    expect(conn).toBeDefined();
+    const ids = conn!.models.map((m) => m.id);
+    expect(ids).toContain("gpt-5.5");
+    // Sanity check: other shipped models are also present.
+    expect(ids).toContain("gpt-4o-mini");
+  });
+
+  it("leaves a manual custom-provider connection's models alone (no registry entries to refresh against)", () => {
+    // Custom OpenAI-compatible endpoints (Ollama, vLLM, llama.cpp, …)
+    // have no registry entries, so we must preserve whatever the user
+    // configured rather than blanking the list.
+    const effective = buildEffectiveConnections({
+      connections: [{
+        id: "custom-1", provider: "custom", label: "Local llama.cpp",
+        apiKey: "", baseUrl: "http://localhost:8080",
+        models: [{ id: "llama-3-70b", displayName: "Llama 3 70B", available: true }],
+        source: "manual", addedAt: "2026-01-01",
+      }],
+      tierAssignments: { large: null, medium: null, small: null },
+    });
+    const conn = effective.connections.find((c) => c.id === "custom-1");
+    expect(conn?.models).toEqual([{ id: "llama-3-70b", displayName: "Llama 3 70B", available: true }]);
+  });
 });
 
 describe("upsertChatGptConnection", () => {
