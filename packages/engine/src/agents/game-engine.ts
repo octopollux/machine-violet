@@ -709,7 +709,9 @@ export class GameEngine {
             logLines.push({ kind: "image", text: img.filename, intent: img.intent });
           }
           logLines.push({ kind: "dm", text: "" }); // paragraph separator
-          this.persister.appendDisplayLog(narrativeLinesToMarkdown(logLines));
+          // Pass campaignRoot so image paths land relative — keeps the
+          // display-log portable across machines if the campaign is moved.
+          this.persister.appendDisplayLog(narrativeLinesToMarkdown(logLines, this.gameState.campaignRoot));
         }
         const scene = this.sceneManager.getScene();
         this.persister.persistScene({

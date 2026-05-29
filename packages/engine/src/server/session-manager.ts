@@ -39,7 +39,7 @@ import { createClocksState } from "../tools/clocks/index.js";
 import { createCombatState } from "../tools/combat/index.js";
 import { createDecksState } from "../tools/cards/index.js";
 import { createObjectivesState } from "../tools/objectives/index.js";
-import { markdownToNarrativeLines } from "../context/display-log.js";
+import { markdownToNarrativeLines, iterDisplayLogReplay } from "../context/display-log.js";
 import { CostTracker } from "../context/cost-tracker.js";
 import { TurnManager } from "./turn-manager.js";
 import type { StyleVariant } from "@machine-violet/shared/types/tui.js";
@@ -1105,11 +1105,15 @@ export class SessionManager {
     // Broadcast state snapshot — carries sessionRecap exactly once when set.
     this.broadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
 
-    // Send display history from previous session as a single chunk per kind-group.
-    // Joining lines with \n lets appendDelta handle paragraph spacing correctly.
+    // Send display history from previous session by replaying it through
+    // the broadcast pipeline. The grouping + image-broadcast logic lives
+    // in iterDisplayLogReplay (display-log.ts) so it's testable in
+    // isolation; passing the campaign root means relative image paths
+    // in the display-log resolve to absolute on the way out (and absolute
+    // paths from legacy display-logs flow through unchanged).
     const historyLines = await persister.loadDisplayLogFull();
     if (historyLines.length > 0) {
-      const narrativeLines = markdownToNarrativeLines(historyLines);
+      const narrativeLines = markdownToNarrativeLines(historyLines, engine.getGameState().campaignRoot);
       // Seed the committed transcript with dm/player lines from history so a
       // mid-session rollback after resume produces a snapshot that contains
       // the prior session's text — not just lines accumulated since this load.
@@ -1120,52 +1124,9 @@ export class SessionManager {
           this.committedNarrative.push({ kind: line.kind, text: line.text });
         }
       }
-      // Group consecutive same-kind lines and send each group as one chunk.
-      // Separators (---) are sent as DM lines — the formatting pipeline
-      // converts them to styled horizontal rules during rendering.
-      //
-      // Image lines are broadcast as `display_image` TUI commands instead
-      // of narrative chunks, mirroring the live-play wire shape: the
-      // event-handler appends an image NarrativeLine when it sees one,
-      // and that same handler runs on resume, so the image lands in
-      // scrollback at the right spot in turn order. Any in-flight
-      // narrative chunk is flushed first so kind grouping isn't broken
-      // across the image boundary.
-      let currentKind = "";
-      let currentText = "";
-      const flushChunk = (): void => {
-        if (currentText) {
-          this.broadcast({ type: "narrative:chunk", data: { text: currentText, kind: currentKind as "dm" | "player" | "system" | "dev" } });
-          currentText = "";
-        }
-      };
-      for (const line of narrativeLines) {
-        let kind = line.kind as string;
-        let text = line.text;
-        // Convert separators to DM lines with --- text for the formatting pipeline
-        if (kind === "separator") {
-          kind = "dm";
-          text = "---";
-        }
-        if (line.kind === "image") {
-          flushChunk();
-          currentKind = "";
-          // Same wire shape as bridge.ts and setup-session.ts use for the
-          // live display_image TuiCommand — keeps both paths rendering
-          // identically through the existing event-handler.
-          const cmd = { type: "display_image" as const, filename: line.text, intent: line.intent };
-          this.broadcast({
-            type: "activity:update",
-            data: { engineState: `tui:${cmd.type}`, ...cmd },
-          });
-          continue;
-        }
-        if (kind !== "dm" && kind !== "player" && kind !== "system" && kind !== "dev") continue;
-        if (kind !== currentKind) flushChunk();
-        currentKind = kind;
-        currentText += (currentText ? "\n" : "") + text;
+      for (const event of iterDisplayLogReplay(narrativeLines)) {
+        this.broadcast(event);
       }
-      flushChunk();
       this.broadcast({ type: "narrative:complete", data: { text: "" } });
     }
 
