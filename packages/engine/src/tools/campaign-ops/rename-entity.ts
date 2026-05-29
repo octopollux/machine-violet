@@ -129,7 +129,14 @@ export async function renameEntity(
     // "locations/", "characters/") — only nested placeholder dirs created by
     // an earlier mkdir during scene/entity bootstrap.
     if (fileIO.rmdir) {
-      const oldSegments = oldPath.split("/").slice(0, -1); // drop filename
+      // Normalize: strip leading/trailing slashes, convert backslashes, drop
+      // empty segments. Prevents a stray leading "/" or "\" from producing an
+      // empty first segment that would slip past the `length > 1` guard.
+      const oldSegments = oldPath
+        .replace(/\\/g, "/")
+        .split("/")
+        .filter(Boolean)
+        .slice(0, -1); // drop filename
       // Stop walking once we reach the first segment (the category dir).
       while (oldSegments.length > 1) {
         const dirPath = normalizedRoot + "/" + oldSegments.join("/");
