@@ -309,14 +309,29 @@ const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
   // picture. ink-picture preserves the source PNG's aspect ratio within
   // the (width, height) box, so we don't distort the image — we just
   // reserve a consistent footprint in the narrative.
+  //
+  // The outer Box pins both width AND height explicitly. ink-picture's
+  // renderers (HalfBlock, Braille, etc.) call `measureElement(containerRef)`
+  // against THEIR own Box to decide pixel dimensions for the sharp resize.
+  // If our wrapping Box has no fixed dimensions, that inner Box collapses
+  // to its content size during async PNG decoding (sharp on a 2-3 MB
+  // file takes hundreds of ms), the measurement reads tiny, and the
+  // rendered image is correspondingly tiny. Pinning the wrapper reserves
+  // the full footprint at the React-render step before any layout pass.
+  //
+  // alt=" " (non-empty whitespace) suppresses ink-picture's hardcoded
+  // "Loading..." placeholder, which the renderers fall back to when
+  // `props.alt` is empty/undefined. The string is intentionally a single
+  // space — empty string is JS-falsy and would let the placeholder
+  // through (`props.alt || "Loading..."`).
   if (line.kind === "image") {
     const path = typeof line.nodes[0] === "string" ? line.nodes[0] : "";
     if (!path) return <Text dimColor>[image: missing path]</Text>;
     const imgWidth = Math.max(20, width ?? 80);
     const imgHeight = Math.max(6, Math.round((imgWidth * 9) / 32));
     return (
-      <Box flexDirection="column" alignItems="center">
-        <Image src={path} width={imgWidth} height={imgHeight} />
+      <Box flexDirection="column" width={imgWidth} height={imgHeight}>
+        <Image src={path} width={imgWidth} height={imgHeight} alt=" " />
       </Box>
     );
   }
