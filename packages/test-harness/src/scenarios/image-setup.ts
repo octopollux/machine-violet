@@ -58,16 +58,18 @@ const CONSENT_PROMPT_NEEDLE = "do you want images in your game";
 // turns of chargen, and one image_generation call itself takes 15-45s.
 const SETUP_PORTRAIT_BUDGET_MS = 14 * 60_000;
 
-// Minimal free-text answer. The setup-agent is good at driving Quick
-// Setup — picking world, system, character, etc. — when the player
-// just says "you decide." Earlier versions of this prompt tried to
-// front-load character details + nudge the agent toward portrait
-// generation, and the agent kept misreading those nudges (e.g.
-// interpreting "I'm in a hurry" as "skip the portrait"). Let the
-// agent do its job; the goal condition (image_gen:response in the
-// engine log) doesn't care which world / character / aesthetic the
-// agent picked.
-const FREE_TEXT_DEFAULT_ANSWER = "you decide";
+// Minimal free-text answer. The setup-agent drives Quick Setup well when
+// the player says "you decide" — but pure "you decide" lets the agent
+// roam into worlds where a portrait wouldn't naturally come up (a smoke
+// run landed in a coffee-shop slice-of-life, and the agent reasonably
+// skipped portrait generation since a barista chargen doesn't need
+// one). For repeatable image-pipeline coverage, the harness biases
+// toward a fantasy adventurer — that's a *player preference* the
+// setup-agent honors, not a directive about HOW to run setup. We don't
+// say "use the generate_image tool" or "you must generate" — that's
+// the agent's call from its own prompt.
+const FREE_TEXT_DEFAULT_ANSWER =
+  "you decide. I'd like a classic-fantasy adventurer with a portrait, please.";
 
 export const imageSetup: Scenario = {
   id: "image-setup",
