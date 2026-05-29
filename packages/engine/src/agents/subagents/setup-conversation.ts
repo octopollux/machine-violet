@@ -1023,6 +1023,25 @@ export function createSetupConversation(
             content: dispatched.content,
             ...(dispatched.isError ? { is_error: true } : {}),
           });
+        } else if (tc.name === "generate_image") {
+          // Function-tool dispatch for the portrait loop. Without this
+          // branch the call is silently dropped: toolResults stays empty,
+          // line 1043's `if (toolResults.length === 0) break;` fires, the
+          // turn ends, and the model never gets a tool_result back —
+          // user-facing symptom is "the agent talks about the portrait
+          // and then yields back to the player without one ever
+          // appearing." The openai-chatgpt path doesn't hit this because
+          // it dispatches via the dispatchTool closure on chatParams,
+          // which routes through runToolDispatch (which DOES handle
+          // generate_image). This branch is the missing legacy-path
+          // counterpart.
+          const dispatched = await dispatchGenerateImage(tc.id, tc.input);
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: tc.id,
+            content: dispatched.content,
+            ...(dispatched.isError ? { is_error: true } : {}),
+          });
         }
       }
 
