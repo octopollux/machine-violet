@@ -543,23 +543,7 @@ function fromResponsesResponseWithText(
       // revised_prompt is captured if surfaced (SDK at this version
       // doesn't type it; cast through unknown to read it without losing
       // strict types elsewhere).
-      //
-      // Why we gate on `result` rather than `status === "completed"`:
-      // empirically the non-streaming Responses API can return the final
-      // bytes with `status: "generating"` even though the response object
-      // is the terminal one — see engine.jsonl `image_gen:non_completed`
-      // with hasResult:true. Treating any item with bytes as a successful
-      // gen is the only path that surfaces real images; we still log a
-      // breadcrumb when status is anything but "completed" so the drift
-      // doesn't hide behind a green path.
-      if (item.result) {
-        if (item.status !== "completed") {
-          logEvent("image_gen:non_terminal_status", {
-            id: item.id,
-            status: item.status,
-            intent: imageIntent,
-          });
-        }
+      if (item.status === "completed" && item.result) {
         const revisedPrompt = (item as unknown as { revised_prompt?: string }).revised_prompt;
         assistantContent.push({
           type: "image_generated",
