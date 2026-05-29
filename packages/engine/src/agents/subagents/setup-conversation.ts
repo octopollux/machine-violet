@@ -584,6 +584,10 @@ export function createSetupConversation(
       };
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
+      logEvent("image_gen:dispatch_failed", {
+        agent: "setup",
+        message: message.slice(0, 400),
+      });
       return { content: `Image generation failed: ${message}`, isError: true };
     }
   }

@@ -1273,6 +1273,12 @@ export class GameEngine {
       } as import("./tool-registry.js").ToolResult;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      // Engine log: visible to the harness + post-mortem dumps. onDevLog
+      // alone goes to the TUI dev pane and disappears with the process.
+      logEvent("image_gen:dispatch_failed", {
+        agent: "dm",
+        message: msg.slice(0, 400),
+      });
       this.callbacks.onDevLog?.(`[image] generate failed: ${msg}`);
       return { content: `Image generation failed: ${msg}`, is_error: true };
     }
