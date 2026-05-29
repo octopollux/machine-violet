@@ -389,26 +389,18 @@ function toResponsesInput(msg: NormalizedMessage): OpenAI.Responses.ResponseInpu
           arguments: JSON.stringify(part.input),
         });
       } else if (part.type === "image_generated") {
-        // Deliberately not replayed.
-        //
-        // OpenAI returns a 404 if we replay an image_generation_call as an
-        // input item under `store: false`: the server tries to look up the
-        // original item by id, fails, and rejects the request with
-        // "Items are not persisted when `store` is set to false." We can't
-        // omit the id either — image_generation_call requires it.
-        //
-        // Engine-wide policy is `store: false` (we own conversation
-        // history, not OpenAI), so the only path that doesn't 400 is to
-        // drop the item. The model loses access to its own raw bytes on
-        // subsequent turns; for the immediate "look right?" continuation
-        // that's fine (no bytes needed) and for redo loops the model can
-        // riff off its own revised_prompt or generate fresh.
-        //
-        // Mirrors the openai-chatgpt provider's messageToResponsesItems
-        // which has always silently dropped image_generated on replay.
-        // The matching codex path will need its own visual-context
-        // strategy when Phase 7 lands.
-        logEvent("image_gen:replay_dropped", { id: part.id });
+        // Flush any accumulated text before the image item so order is
+        // preserved on replay.
+        if (pendingText) {
+          items.push({ type: "message", role: "assistant", content: pendingText });
+          pendingText = "";
+        }
+        items.push({
+          type: "image_generation_call",
+          id: part.id,
+          result: part.base64,
+          status: "completed",
+        });
       }
       // Reasoning parts already emitted above.
     }
