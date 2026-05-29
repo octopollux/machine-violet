@@ -1,8 +1,10 @@
 /**
- * Image-generated ContentPart → disk + relative-path resolution.
+ * Generated-image bytes → disk + relative-path resolution.
  *
- * Called from the agent loop's `onImageGenerated` callback (see
- * agent-loop-bridge.ts) once per image the provider emits. Decodes the
+ * Called inline from the two function-tool dispatchers
+ * (`setup-conversation.ts` for chargen portraits, `game-engine.ts` for
+ * gameplay scene snapshots / portraits / player-requested illustrations)
+ * once per image the provider returns from `generateImage`. Decodes the
  * base64 payload to raw bytes, picks a filename keyed off the image's
  * intent + scene context, and writes both the binary file and a small
  * JSON sidecar carrying `revisedPrompt` + intent + timestamp for audit.

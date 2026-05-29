@@ -1249,11 +1249,17 @@ export class GameEngine {
     }
     const effort = normalizeImageEffort(input.effort);
     const aspect = normalizeImageAspect(input.aspect);
+    // Default to scene_snapshot: that's the DM's overwhelmingly common case
+    // (in-narrative scene rendering) and matches the on-disk naming the
+    // image-handler picks (scene-NNN-slug-…). player_request is only the
+    // right tag when the player explicitly asked for an illustration, and
+    // character_portrait is for character close-ups (rare in gameplay —
+    // setup-conversation owns the chargen portrait loop).
     const rawIntent = typeof input.intent === "string" ? input.intent : "";
     const intent: "scene_snapshot" | "player_request" | "character_portrait" =
-      rawIntent === "scene_snapshot" || rawIntent === "character_portrait"
+      rawIntent === "scene_snapshot" || rawIntent === "character_portrait" || rawIntent === "player_request"
         ? rawIntent
-        : "player_request";
+        : "scene_snapshot";
     try {
       const result = await this.provider.generateImage({
         prompt: promptText,
@@ -1267,8 +1273,11 @@ export class GameEngine {
         this.gameState.campaignRoot,
         { sceneNumber: scene.sceneNumber, slug: scene.slug || "untitled" },
         {
-          // Use the response's revised_prompt as a stable id surrogate
-          // (it's not used by the API anymore — just the on-disk sidecar).
+          // Timestamp-based surrogate id — never sent to the API. Lives in
+          // the on-disk sidecar JSON so each generation has a stable handle
+          // for log correlation. (Earlier hosted-tool path used the
+          // response's revised_prompt here; the function-tool path no
+          // longer surfaces that, so we synthesize instead.)
           id: `img-${Date.now()}`,
           base64: result.base64,
           mimeType: result.mimeType,

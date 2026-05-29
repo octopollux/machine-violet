@@ -166,7 +166,12 @@ async function runAgentLoopInternal(
         "Default to `effort: \"standard\"` for ordinary scene snapshots. Reach for " +
         "`effort: \"quality\"` or `\"showcase\"` only for once-per-arc set-pieces; " +
         "they take longer and cost more. Use `aspect: \"landscape\"` for scenes, " +
-        "`\"portrait\"` for character close-ups, `\"square\"` for objects/symbols.",
+        "`\"portrait\"` for character close-ups, `\"square\"` for objects/symbols. " +
+        "Set `intent` to `\"scene_snapshot\"` for scenes (the usual case), " +
+        "`\"character_portrait\"` for character close-ups, or `\"player_request\"` " +
+        "when the player explicitly asked for an illustration of something. The " +
+        "intent steers on-disk naming and the engine-log breadcrumb — it does not " +
+        "affect the rendered image.",
       inputSchema: {
         type: "object",
         properties: {
@@ -183,6 +188,11 @@ async function runAgentLoopInternal(
             type: "string",
             enum: ["portrait", "landscape", "square"],
             description: "Aspect ratio. Match to the subject: landscape for scenes, portrait for characters, square for objects.",
+          },
+          intent: {
+            type: "string",
+            enum: ["scene_snapshot", "player_request", "character_portrait"],
+            description: "Steers on-disk naming and the engine-log breadcrumb. 'scene_snapshot' is the right default for in-narrative renders. Omit to default to scene_snapshot.",
           },
         },
         required: ["prompt", "effort", "aspect"],
