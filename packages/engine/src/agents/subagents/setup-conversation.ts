@@ -516,6 +516,13 @@ export function createSetupConversation(
   // the image API.
   logEvent("setup:image_tools_registered", {
     model,
+    providerId: provider.providerId,
+    // Raw return so we can spot a provider returning a surprising shape
+    // (e.g. `imageGeneration: "true"` as a string, or a model-registry
+    // fallback path returning true on a provider whose dispatch can't
+    // actually serve it).
+    rawCapabilities: provider.getCapabilities?.(model),
+    hasGenerateImage: typeof provider.generateImage === "function",
     imageGenSupported,
     portraitLoopActive,
     hasFileIO: !!fileIO,
