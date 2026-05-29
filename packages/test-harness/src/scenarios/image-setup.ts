@@ -58,18 +58,16 @@ const CONSENT_PROMPT_NEEDLE = "do you want images in your game";
 // turns of chargen, and one image_generation call itself takes 15-45s.
 const SETUP_PORTRAIT_BUDGET_MS = 14 * 60_000;
 
-// Minimal free-text answer. The setup-agent drives Quick Setup well when
-// the player says "you decide" — but pure "you decide" lets the agent
-// roam into worlds where a portrait wouldn't naturally come up (a smoke
-// run landed in a coffee-shop slice-of-life, and the agent reasonably
-// skipped portrait generation since a barista chargen doesn't need
-// one). For repeatable image-pipeline coverage, the harness biases
-// toward a fantasy adventurer — that's a *player preference* the
-// setup-agent honors, not a directive about HOW to run setup. We don't
-// say "use the generate_image tool" or "you must generate" — that's
-// the agent's call from its own prompt.
-const FREE_TEXT_DEFAULT_ANSWER =
-  "you decide. I'd like a classic-fantasy adventurer with a portrait, please.";
+// Thin-player free-text. The harness picks Quick Setup organically off the
+// "Quick Start / Customize" overlay and picks Yes off the consent overlay
+// — that already covers "follow Quick Setup" + "choose to use images".
+// Free-text answers just need to be the kind of thing a real player
+// would type when they want the agent to drive. "you decide" is enough;
+// any further bias is co-authoring (see feedback_harness_design.md).
+// If the agent fails to reach the portrait under this, the fix is
+// upstream in the setup-agent's prompt/tools — not a stronger harness
+// directive.
+const FREE_TEXT_DEFAULT_ANSWER = "you decide";
 
 export const imageSetup: Scenario = {
   id: "image-setup",

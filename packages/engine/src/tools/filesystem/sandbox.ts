@@ -37,5 +37,7 @@ export function sandboxFileIO(inner: FileIO, allowedRoots: string[]): FileIO {
     listDir: async (p) => inner.listDir(guard(p)),
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by ternary
     ...(inner.deleteFile ? { deleteFile: async (p: string) => inner.deleteFile!(guard(p)) } : {}),
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by ternary
+    ...(inner.writeBinaryFile ? { writeBinaryFile: async (p: string, b: Uint8Array) => inner.writeBinaryFile!(guard(p), b) } : {}),
   };
 }
