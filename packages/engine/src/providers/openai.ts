@@ -129,16 +129,21 @@ async function openaiGenerateImage(
     promptPreview: req.prompt.slice(0, 120),
   });
 
-  // We must pass `model` — empirically OpenAI's images.generate 400s with
-  // "Missing required parameter: 'model'" when omitted on the GPT image
-  // family (the documented defaulting only kicks in for the older
-  // dall-e-2/3 path, which doesn't accept low/medium/high quality). Pin
-  // to `gpt-image-1`; when a newer one ships we'll bump this once and
-  // ride the same call surface.
+  // We must pass `model` — OpenAI's images.generate 400s with "Missing
+  // required parameter: 'model'" when omitted (the documented defaulting
+  // only kicks in for the older dall-e-2/3 path, which doesn't accept
+  // low/medium/high quality).
+  //
+  // We pin to `gpt-image-2`. It's a direct upgrade over gpt-image-1 /
+  // 1.5 at the same quality tiers — same call surface, sharper output,
+  // better prompt adherence. Launched 2026-04-21; SDK support added in
+  // openai@6.37. Rolling pointer rather than the dated snapshot
+  // (`gpt-image-2-2026-04-21`) so we ride future quality bumps without
+  // a code change.
   let response: Awaited<ReturnType<typeof client.images.generate>>;
   try {
     response = await client.images.generate({
-      model: "gpt-image-1",
+      model: "gpt-image-2",
       prompt: req.prompt,
       quality,
       size,
