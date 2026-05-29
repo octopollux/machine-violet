@@ -85,6 +85,28 @@ export function PlayingPhase() {
   const modalScrollRef = useRef<CenteredModalHandle>(null);
   const escTimestamps = useRef<number[]>([]);
 
+  // Force-remount image lines whenever an overlay (modal, menu, choices,
+  // retry) transitions from open → closed. Terminal graphics protocols
+  // (sixel / kitty / iTerm2) write pixel data into specific cells; when an
+  // overlay draws text over those cells the pixel data is destroyed by
+  // the terminal itself, not by React. Ink only re-runs render diffs on
+  // prop changes, and ink-picture's useEffect only re-decodes when src /
+  // width / height / allowPartial change — so closing the overlay leaves
+  // the image cells blank. Bumping a key on the image's wrapping Box
+  // forces React to unmount + remount, which triggers ink-picture to
+  // re-fetch, re-decode (sharp), and re-paint the bytes into the
+  // terminal. Cheap when no images are visible (no work) and only the
+  // visible image pays the decode cost on each refresh.
+  const overlayOpen = !!activeModal || !!activeChoices || !!retryOverlay || menuOpen;
+  const prevOverlayOpen = useRef(overlayOpen);
+  const [imageRefreshKey, setImageRefreshKey] = useState(0);
+  useEffect(() => {
+    if (prevOverlayOpen.current && !overlayOpen) {
+      setImageRefreshKey((k) => k + 1);
+    }
+    prevOverlayOpen.current = overlayOpen;
+  }, [overlayOpen]);
+
   // Clear the dismissal latch whenever the retry overlay goes away so the
   // next outage shows the modal again — even if the new attemptId numerically
   // matches what was dismissed previously (attemptId resets to 1 after the
@@ -485,6 +507,7 @@ export function PlayingPhase() {
         playerFrameColor={engineState === "waiting_input" ? stateSnapshot?.players?.[activePlayerIndex]?.color : "#808080"}
         showVerbose={showVerbose}
         narrativeRef={narrativeRef}
+        imageRefreshKey={imageRefreshKey}
         mouseScrollOverrideRef={modalScrollRef}
         hideInputLine={!!activeChoices}
         playerPaneOverlay={choiceOverlay}

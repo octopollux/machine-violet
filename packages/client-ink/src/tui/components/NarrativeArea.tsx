@@ -154,6 +154,15 @@ interface NarrativeAreaProps {
   mouseScrollOverrideRef?: React.RefObject<ScrollHandle | null>;
   /** When true, dev/debug lines are shown in the narrative. */
   showVerbose?: boolean;
+  /**
+   * Bumped by PlayingPhase whenever an overlay (modal, menu, choices,
+   * retry) transitions from open → closed. Used as a React `key` on
+   * image-line wrappers so the Image component unmounts + remounts,
+   * triggering ink-picture to re-decode and re-paint pixel data that
+   * the terminal cleared when the overlay drew over those cells. No-op
+   * when no images are visible.
+   */
+  imageRefreshKey?: number;
 }
 
 /** Compute scroll step: 25% of viewport, min 2 if <25, min 1 if <12 */
@@ -169,7 +178,7 @@ export function scrollAmount(viewportRows: number): number {
  * Exposes scrollBy via ref for keyboard scrolling.
  */
 export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>(
-  function NarrativeArea({ lines, maxRows, quoteColor, playerColor, width, themeAsset, separatorColor, mouseScrollOverrideRef, showVerbose }, ref) {
+  function NarrativeArea({ lines, maxRows, quoteColor, playerColor, width, themeAsset, separatorColor, mouseScrollOverrideRef, showVerbose, imageRefreshKey }, ref) {
   const scrollRef = useRef<ScrollViewRef>(null);
   const localHandleRef = useRef<ScrollHandle>(null);
   const [linesBelow, setLinesBelow] = useState(0);
@@ -263,6 +272,7 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
             width={width}
             themeAsset={themeAsset}
             separatorColor={separatorColor}
+            imageRefreshKey={imageRefreshKey}
           />
         ))}
       </ScrollView>
@@ -285,11 +295,12 @@ interface NarrativeLineProps {
   width?: number;
   themeAsset?: ThemeAsset;
   separatorColor?: string;
+  imageRefreshKey?: number;
 }
 
 /** A single narrative line rendered based on its kind. */
 const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
-  line, playerColor, width, themeAsset, separatorColor,
+  line, playerColor, width, themeAsset, separatorColor, imageRefreshKey,
 }: NarrativeLineProps) {
   // Spacer lines render as visual blank lines (paragraph spacing)
   // but are invisible to the formatting/healing pipeline.
@@ -329,8 +340,19 @@ const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
     if (!path) return <Text dimColor>[image: missing path]</Text>;
     const imgWidth = Math.max(20, width ?? 80);
     const imgHeight = Math.max(6, Math.round((imgWidth * 9) / 32));
+    // `key` bumps when an overlay closes (see PlayingPhase imageRefreshKey
+     // — terminal graphics protocols clear pixel data when text draws over
+     // image cells). React unmounts + remounts on key change, which fires
+     // ink-picture's useEffect and re-paints the bytes.
     return (
-      <Box flexDirection="column" width={imgWidth} height={imgHeight} marginTop={1} marginBottom={1}>
+      <Box
+        key={imageRefreshKey ?? 0}
+        flexDirection="column"
+        width={imgWidth}
+        height={imgHeight}
+        marginTop={1}
+        marginBottom={1}
+      >
         <Image src={path} width={imgWidth} height={imgHeight} alt=" " />
       </Box>
     );

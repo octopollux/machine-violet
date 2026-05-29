@@ -78,6 +78,11 @@ export interface LayoutProps {
   /** Ref to NarrativeArea scroll handle */
   narrativeRef?: React.Ref<NarrativeAreaHandle>;
 
+  /** Forwarded to NarrativeArea to remount image lines when overlays close.
+   *  See PlayingPhase for the rationale (terminal graphics protocol clears
+   *  pixel data when modals draw over the image cells). */
+  imageRefreshKey?: number;
+
   /** When set, mouse scroll targets this handle instead of the narrative area */
   mouseScrollOverrideRef?: React.RefObject<ScrollHandle | null>;
 
@@ -124,6 +129,7 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
     playerFrameColor = playerColor,
     turnIndicatorColor,
     narrativeRef,
+    imageRefreshKey,
     mouseScrollOverrideRef,
     hideInputLine,
     playerPaneOverlay,
@@ -254,6 +260,7 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
             themeAsset={theme.asset}
             separatorColor={separatorColor}
             showVerbose={showVerbose}
+            imageRefreshKey={imageRefreshKey}
             mouseScrollOverrideRef={mouseScrollOverrideRef}
           />
 
