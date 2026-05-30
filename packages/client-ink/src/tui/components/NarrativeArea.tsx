@@ -431,6 +431,16 @@ const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
         <Box flexDirection="column" width={imgWidth} height={imgHeight} marginTop={1} marginBottom={1} />
       );
     }
+    // Portrait-aspect images (setup-loop character portraits) are far taller
+    // than this wide 16:9 footprint. Passing BOTH width+height makes
+    // ink-picture's calculateImageSize force the box dims and ignore the
+    // source aspect — a tall portrait either distorts or, on graphics
+    // protocols, overflows the reserved rows. Passing ONLY height lands in the
+    // "only height specified" branch, which preserves aspect AND clamps to
+    // both the box width and height — so the portrait renders small and
+    // narrow, fully contained, and can never exceed imgHeight rows. Scenes /
+    // landscape keep the full-width fill that looks best for wide art.
+    const isPortrait = line.intent === "character_portrait";
     // On-screen: `key` bumps when an overlay closes (see PlayingPhase
     // imageRefreshKey — terminal graphics protocols clear pixel data when
     // text draws over image cells). React unmounts + remounts on key
@@ -439,12 +449,15 @@ const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
       <Box
         key={imageRefreshKey ?? 0}
         flexDirection="column"
+        alignItems={isPortrait ? "center" : undefined}
         width={imgWidth}
         height={imgHeight}
         marginTop={1}
         marginBottom={1}
       >
-        <Image src={path} width={imgWidth} height={imgHeight} alt=" " />
+        {isPortrait
+          ? <Image src={path} height={imgHeight} alt=" " />
+          : <Image src={path} width={imgWidth} height={imgHeight} alt=" " />}
       </Box>
     );
   }

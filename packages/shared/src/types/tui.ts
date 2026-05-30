@@ -89,6 +89,12 @@ export interface ProcessedLine {
   kind: NarrativeLine["kind"];
   nodes: FormattingNode[];
   alignment?: "center" | "right";
+  /**
+   * Carried through from the source `image` NarrativeLine so the renderer can
+   * pick framing — notably, portrait-aspect character portraits are contained
+   * (fit-to-height, narrow) rather than filling the wide scene footprint.
+   */
+  intent?: Extract<NarrativeLine, { kind: "image" }>["intent"];
 }
 
 export interface ActivityIndicator {
