@@ -6,7 +6,7 @@ The DM can render illustrated images inline with its responses — character por
 
 Image-gen is enabled for a turn iff:
 
-- **Provider capability** — `provider.getCapabilities(model).imageGeneration === true`. Currently true for `openai-apikey` + `gpt-5` family (which routes to `gpt-image-2` for the actual render) and false for everything else.
+- **Provider capability** — `provider.getCapabilities(model).imageGeneration === true`. True for `openai-apikey` + `gpt-5` family (routes to `gpt-image-2` via the Images API) and for `openai-chatgpt` (routes to codex's built-in `image_gen` skill — see [Provider backends](#provider-backends)). False for everything else (Anthropic, and the Chat Completions fallback used by custom OpenAI-compatible endpoints).
 - **Campaign preference** — `gameState.config.image_generation !== "off"`. The setup-agent asks the player a yes/no consent question right after world + system selection ([game-initialization.md](game-initialization.md)). The choice is stored in `config.json` and can be flipped per-campaign from the ESC menu's "Image generation" toggle.
 
 When either is false, the `generate_image` tool is omitted from the DM's toolset and the model has no way to invoke it. There is no "graceful fallback" path on the model side — the model simply doesn't see the tool.
@@ -25,6 +25,25 @@ Two call sites:
 Both share `handleImageGenerated` in `packages/engine/src/agents/image-handler.ts` for on-disk persistence — same naming, same sidecar JSON, same downstream consumers.
 
 The legacy hosted-tool path (`image_generation_call` items in the Responses API) is explicitly **not** used. The provider has a tripwire (`image_gen:legacy_hosted_item_ignored`) that fires if such an item ever shows up — see [the dispatch memory](../packages/engine/src/providers/openai.ts) for context.
+
+## Provider backends
+
+`provider.generateImage(req)` is the single seam the dispatchers call. Two providers implement it, with very different mechanics behind the same `GenerateImageRequest → GenerateImageResult` contract:
+
+| Provider | Mechanism | Auth / billing |
+|---|---|---|
+| `openai-apikey` | One `client.images.generate({ model: "gpt-image-2", quality, size })` REST call (`openai.ts` `openaiGenerateImage`). | Platform API key + credits. |
+| `openai-chatgpt` | Drives a **scoped codex turn** that calls codex's built-in `image_gen` skill, then harvests the `imageGeneration` item codex emits (`provider.ts` `generateImage`). | ChatGPT subscription — **no API key**; billed to the plan's Codex allocation. |
+
+The `openai-chatgpt` path is the happy path for most users (sign in with a ChatGPT subscription, no metered API spend). There is **no fallback** between providers: a ChatGPT-account DM never silently routes image-gen to a metered API-key provider. If the codex render fails, the dispatcher returns an `isError` tool_result the DM recovers from — it does not escalate to a more expensive backend.
+
+Why the codex path looks the way it does (all spike-confirmed on codex 0.133.0):
+
+- **No direct RPC for image_gen.** It's a model-driven skill, not an app-server method. So `generateImage` issues its own `thread/start` + `turn/start`, separate from the DM's conversation thread, asking the model to render the prompt.
+- **The bytes arrive inline.** Codex emits an `item/completed` with `type: "imageGeneration"` whose `result` field holds the raw base64 PNG (it also writes a copy under `~/.codex/generated_images/`, which we ignore). `extractGeneratedImage` reads `result` + `revisedPrompt`; the on-disk copy is never load-bearing.
+- **Tightly scoped.** The turn runs `sandbox: "read-only"` with terse `developerInstructions` ("call image_gen once, no shell, no file ops, no prose"). Without this the model treats the request as a coding task and wastes a round trying to `Copy-Item` the file to satisfy "save it" phrasing (harmless under read-only, but slow).
+- **Nested-turn safe.** `generateImage` runs *while the DM turn that called `generate_image` is paused* awaiting our tool reply. Codex processes the two threads independently over the JSON-RPC pipe, so the inner render turn completes and the outer turn resumes — no global serialization / deadlock.
+- **Knobs are best-effort.** The built-in `image_gen` tool takes no explicit size/quality params over the wire, so `effort`/`aspect` are folded into the prompt text (`buildImagePromptText`) as natural-language steering rather than hard parameters. `effortUsed`/`aspectUsed` echo the *requested* values.
 
 ## Abstract knobs
 
