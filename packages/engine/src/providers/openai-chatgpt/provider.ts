@@ -32,22 +32,25 @@ import type {
   LLMProvider, ChatParams, ChatResult, HealthCheckResult,
   NormalizedMessage, NormalizedToolCall, NormalizedTool,
   NormalizedUsage, ContentPart, StopReason, SystemBlock,
+  ProviderCapabilities, GenerateImageRequest, GenerateImageResult,
+  ImageEffort, ImageAspect,
 } from "../types.js";
 import type { UsageStatus } from "@machine-violet/shared";
 import { CodexRpcClient } from "./rpc.js";
 import { getAccount, isChatGptAccount, pushChatGptAuthTokens } from "./auth.js";
 import { toUsageStatus, shouldWarn } from "./usage.js";
 import { log } from "./log.js";
+import { logEvent } from "../../context/engine-log.js";
 import { getCodexClientInfo } from "./client-info.js";
 import type { ChatGptTokenStore } from "./token-store.js";
 import type {
   InitializeResult, ThreadStartParams, ThreadStartResult,
   TurnStartParams, TurnCompletedNotification,
   AgentMessageDeltaNotification, ItemStartedNotification,
-  ItemCompletedNotification, TokenUsageUpdatedNotification,
+  ItemCompletedNotification, ItemBase, TokenUsageUpdatedNotification,
   RateLimitsUpdatedNotification, RateLimits,
   DynamicToolCallParams, DynamicToolCallResponse,
-  DynamicToolSpec, ReasoningEffort,
+  DynamicToolSpec, ReasoningEffort, ModelListResult,
   ChatgptAuthTokensRefreshParams, ChatgptAuthTokensRefreshResponse,
   RawResponseItemCompletedNotification,
 } from "./protocol.js";
@@ -114,6 +117,19 @@ export class OpenAIChatGptProvider implements LLMProvider {
    */
   private readonly toolDispatchers = new Map<string, ThreadToolDispatcher>();
 
+  /**
+   * Cached `model/list` default-model lookup for `generateImage`. The
+   * image-render thread needs *a* model id for `thread/start`, but codex's
+   * `image_gen` skill is model-agnostic — the driving model doesn't affect
+   * the rendered bytes. We deliberately resolve the account default here
+   * rather than reusing the DM's current model: `generateImage` can run
+   * concurrently with theme-styler turns on a smaller model, and reading a
+   * shared "last model seen" field would race — a styler turn could leave
+   * the small model behind and the image would render under it. The account
+   * default is stable and never the wrong-tier surprise.
+   */
+  private defaultModelPromise: Promise<string> | null = null;
+
   constructor(opts: OpenAIChatGptProviderOptions) {
     this.sessionId = opts.sessionId;
     this.cwd = opts.cwd ?? process.cwd();
@@ -124,13 +140,16 @@ export class OpenAIChatGptProvider implements LLMProvider {
   // LLMProvider surface
   // -----------------------------------------------------------------------
 
-  getCapabilities(_model: string): { imageGeneration: boolean } {
-    // Phase 7 wiring not yet landed — until this provider implements
-    // generateImage (probably by spawning a fresh REST images.generate
-    // call alongside the codex JSON-RPC stream), image gen for
-    // ChatGPT-account users is unavailable. Report false unconditionally
-    // so subagents don't register the generate_image function tool.
-    return { imageGeneration: false };
+  getCapabilities(_model: string): ProviderCapabilities {
+    // Image gen for ChatGPT-account users routes through codex's built-in
+    // `image_gen` skill (gpt-image-2, billed to the ChatGPT plan — no API
+    // key). `generateImage` drives a scoped codex turn and harvests the
+    // `imageGeneration` item it emits. The skill ships with codex and is
+    // available across the gpt-5.x model family, so report true regardless
+    // of model — a model that somehow lacked it would simply fail the
+    // render turn, surfacing as an isError tool_result the DM can recover
+    // from (same as any other generate_image failure).
+    return { imageGeneration: true };
   }
 
   async chat(params: ChatParams): Promise<ChatResult> {
@@ -174,6 +193,168 @@ export class OpenAIChatGptProvider implements LLMProvider {
     this.rpc = null;
     this.startPromise = null;
     await rpc.stop();
+  }
+
+  // -----------------------------------------------------------------------
+  // Image generation
+  // -----------------------------------------------------------------------
+
+  /**
+   * Render one image via codex's built-in `image_gen` skill (gpt-image-2,
+   * billed to the ChatGPT plan — no API key). Unlike the openai-apikey
+   * provider (a single `images.generate` REST call), there is no direct
+   * RPC for image_gen: it's a model-driven tool. So we drive a dedicated,
+   * tightly-scoped codex turn whose only job is to call image_gen, then
+   * harvest the `imageGeneration` item codex emits — its `result` field
+   * carries the raw base64 PNG inline (spike-confirmed on codex 0.133.0).
+   *
+   * The turn runs `sandbox: "read-only"` + terse instructions so the model
+   * can't wander off into shell/file-copy steps (it tried to in the spike;
+   * read-only blocks them harmlessly, but we'd rather it not try). The
+   * effort/aspect knobs are folded into the prompt text as best-effort
+   * steering — the built-in tool doesn't take explicit size/quality params
+   * over the wire the way the REST path does.
+   *
+   * Runs as a nested turn on the shared codex subprocess (the DM turn that
+   * called generate_image is paused awaiting our tool reply). Codex handles
+   * concurrent threads — they're independent tasks over the JSON-RPC pipe —
+   * so this doesn't deadlock against the outer turn.
+   */
+  async generateImage(req: GenerateImageRequest): Promise<GenerateImageResult> {
+    const effort: ImageEffort = req.effort ?? "standard";
+    const aspect: ImageAspect = req.aspect ?? "square";
+    const intent = req.intent ?? "player_request";
+
+    logEvent("image_gen:request", {
+      provider: this.providerId,
+      effort,
+      aspect,
+      intent,
+      promptPreview: req.prompt.slice(0, 120),
+    });
+
+    const client = await this.ensureStarted();
+
+    const acct = await getAccount(client);
+    if (!isChatGptAccount(acct)) {
+      throw new Error(
+        "openai-chatgpt connection has no active ChatGPT login. " +
+        "Run 'Sign in with ChatGPT' from the Connections menu.",
+      );
+    }
+
+    const model = await this.resolveDefaultModel(client);
+
+    const thread = await client.call<ThreadStartResult>("thread/start", {
+      model,
+      cwd: this.cwd,
+      sandbox: "read-only",
+      approvalPolicy: "never",
+      developerInstructions: IMAGE_RENDERER_INSTRUCTIONS,
+      // Throwaway thread — we only harvest the inline bytes. Marking it
+      // ephemeral keeps codex from persisting session/thread artifacts,
+      // which would otherwise pile up fast in the portrait draft loop.
+      ephemeral: true,
+    });
+    const threadId = thread.thread.id;
+
+    // Harvest the first imageGeneration item that carries bytes. Codex emits
+    // it on `item/completed` (status "generating" but `result` already full —
+    // see spike). Filter by threadId so a concurrent DM/theme turn can't
+    // bleed in.
+    // Boxed so the declared union type survives — TS control-flow can't see
+    // the closure assignment and would otherwise narrow a bare `let` to never.
+    const harvested: { value: { base64: string; revisedPrompt?: string } | null } = { value: null };
+    const unsubItem = client.onNotification<ItemCompletedNotification>(
+      "item/completed",
+      (p) => {
+        if (p.threadId !== threadId) return;
+        if (harvested.value) return;
+        const img = extractGeneratedImage(p.item);
+        if (img) harvested.value = img;
+      },
+    );
+
+    let completionResolve: ((p: TurnCompletedNotification) => void) | null = null;
+    const completion = new Promise<TurnCompletedNotification>((resolve) => { completionResolve = resolve; });
+    const unsubCompleted = client.onNotification<TurnCompletedNotification>(
+      "turn/completed",
+      (p) => {
+        if (p.threadId !== threadId) return;
+        completionResolve?.(p);
+        completionResolve = null;
+      },
+    );
+
+    try {
+      await client.call("turn/start", {
+        threadId,
+        input: [{ type: "text", text: buildImagePromptText(req.prompt, aspect, effort) }],
+        // Minimal reasoning — the model only needs to call one tool. Summaries
+        // off; we don't surface thinking from image turns.
+        effort: "low",
+        summary: "none",
+      } satisfies TurnStartParams);
+
+      const completed = await Promise.race([
+        completion,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("image render turn timed out after 180s")), 180_000).unref(),
+        ),
+      ]);
+
+      // Any terminal status other than "completed" (failed, interrupted, or
+      // some future status) means the render didn't finish — treat it as an
+      // error and surface the actual status so it's debuggable, rather than
+      // falling through to the misleading "completed without emitting" below.
+      if (completed.turn.status !== "completed") {
+        throw new CodexTurnFailedError(
+          completed.turn.error?.message ??
+            `image render turn ended with status "${completed.turn.status}"`,
+          completed.turn.id,
+        );
+      }
+
+      const captured = harvested.value;
+      if (!captured) {
+        logEvent("image_gen:no_data", { provider: this.providerId, effort, aspect });
+        throw new Error("codex image_gen turn completed without emitting an imageGeneration item");
+      }
+
+      logEvent("image_gen:response", {
+        provider: this.providerId,
+        effort,
+        aspect,
+        base64Length: captured.base64.length,
+        ...(captured.revisedPrompt ? { revisedPromptPreview: captured.revisedPrompt.slice(0, 120) } : {}),
+      });
+
+      return {
+        base64: captured.base64,
+        mimeType: "image/png",
+        ...(captured.revisedPrompt ? { revisedPrompt: captured.revisedPrompt } : {}),
+        effortUsed: effort,
+        aspectUsed: aspect,
+      };
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      logEvent("image_gen:error", { provider: this.providerId, effort, aspect, message: message.slice(0, 400) });
+      throw e;
+    } finally {
+      unsubItem();
+      unsubCompleted();
+    }
+  }
+
+  /** Lazily resolve + cache the account's default model id for image turns. */
+  private resolveDefaultModel(client: CodexRpcClient): Promise<string> {
+    if (!this.defaultModelPromise) {
+      this.defaultModelPromise = client
+        .call<ModelListResult>("model/list", { limit: 50, includeHidden: true })
+        .then((r) => r.data.find((m) => m.isDefault)?.id ?? r.data[0]?.id ?? "gpt-5.5")
+        .catch(() => "gpt-5.5");
+    }
+    return this.defaultModelPromise;
   }
 
   // -----------------------------------------------------------------------
@@ -591,6 +772,61 @@ export class OpenAIChatGptProvider implements LLMProvider {
 function systemPromptToString(systemPrompt: string | SystemBlock[]): string {
   if (typeof systemPrompt === "string") return systemPrompt;
   return systemPrompt.map((b) => b.text).join("\n\n");
+}
+
+/**
+ * Developer instructions for the scoped image-render turn. Keeps the model
+ * on rails: call image_gen once, no shell, no file ops, no prose. Without
+ * this the model treats the request like a coding task — in the spike it
+ * read SKILL.md and tried `Copy-Item`/`Get-ChildItem` to "save" the file
+ * (all blocked by read-only sandbox, but a waste of tokens and latency).
+ */
+const IMAGE_RENDERER_INSTRUCTIONS =
+  "You are a silent image-rendering backend. The user message is a single " +
+  "image description. Call the built-in image_gen tool exactly once to render " +
+  "it. Do NOT run shell commands. Do NOT save, copy, move, or list files — the " +
+  "caller harvests the rendered bytes directly. Do NOT write any explanatory " +
+  "prose, captions, or follow-up. Render the image and stop.";
+
+const ASPECT_GUIDANCE: Record<ImageAspect, string> = {
+  portrait: "Use a tall vertical portrait orientation (roughly 1024x1536).",
+  landscape: "Use a wide landscape orientation (roughly 1536x1024).",
+  square: "Use a square 1:1 orientation (roughly 1024x1024).",
+};
+
+/**
+ * Fold the abstract aspect/effort knobs into the prompt text. The built-in
+ * image_gen tool doesn't accept explicit size/quality params over the RPC
+ * (the SKILL.md's CLI fallback does, but that path needs OPENAI_API_KEY and
+ * we deliberately never touch it), so we steer in natural language.
+ *
+ * Exported for unit tests.
+ */
+export function buildImagePromptText(prompt: string, aspect: ImageAspect, effort: ImageEffort): string {
+  const detail =
+    effort === "quality" || effort === "showcase"
+      ? "Render at maximum detail and fidelity. "
+      : "";
+  return `${ASPECT_GUIDANCE[aspect]} ${detail}${prompt}`;
+}
+
+/**
+ * Extract image bytes from an `item/completed` payload, if it's a populated
+ * `imageGeneration` item. Returns null for any other item type or an
+ * imageGeneration item that hasn't produced bytes yet (the `item/started`
+ * placeholder has `result: ""`). Spike-confirmed: codex emits the bytes on
+ * `item/completed` with `status: "generating"` but `result` already full, so
+ * we key off a non-empty `result` rather than the status string.
+ *
+ * Exported for unit tests.
+ */
+export function extractGeneratedImage(item: ItemBase): { base64: string; revisedPrompt?: string } | null {
+  if (item.type !== "imageGeneration") return null;
+  if (typeof item.result !== "string" || item.result.length === 0) return null;
+  return {
+    base64: item.result,
+    ...(item.revisedPrompt ? { revisedPrompt: item.revisedPrompt } : {}),
+  };
 }
 
 function toolToDynamicSpec(tool: NormalizedTool): DynamicToolSpec {

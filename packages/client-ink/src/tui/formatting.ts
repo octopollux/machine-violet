@@ -314,14 +314,20 @@ export function processNarrativeLines(
   // Phase 1: Heal cross-line tags on raw strings, then parse into AST.
   // Healing must happen before parsing because parseFormatting treats
   // unclosed tags as plain text.
-  const parsed: { kind: NarrativeLine["kind"]; nodes: FormattingNode[]; isSourceBoundary: boolean }[] = [];
+  const parsed: { kind: NarrativeLine["kind"]; nodes: FormattingNode[]; isSourceBoundary: boolean; intent?: Extract<NarrativeLine, { kind: "image" }>["intent"] }[] = [];
 
   // Track open tags across DM source lines for cross-line healing
   const openStack: { raw: string; name: string }[] = [];
 
   for (const srcLine of expandedLines) {
     if (srcLine.kind !== "dm") {
-      parsed.push({ kind: srcLine.kind, nodes: [srcLine.text], isSourceBoundary: true });
+      parsed.push({
+        kind: srcLine.kind,
+        nodes: [srcLine.text],
+        isSourceBoundary: true,
+        // Carry image framing intent through the pipeline (only image lines have it).
+        ...(srcLine.kind === "image" ? { intent: srcLine.intent } : {}),
+      });
       continue;
     }
 
@@ -367,7 +373,7 @@ export function processNarrativeLines(
   }
 
   // Phase 2: Wrap each line
-  const wrapped: { kind: NarrativeLine["kind"]; nodes: FormattingNode[]; isSourceBoundary: boolean }[] = [];
+  const wrapped: { kind: NarrativeLine["kind"]; nodes: FormattingNode[]; isSourceBoundary: boolean; intent?: Extract<NarrativeLine, { kind: "image" }>["intent"] }[] = [];
   for (const line of parsed) {
     if (line.kind === "dm" || line.kind === "player") {
       const wLines = wrapNodes(line.nodes, width);
@@ -386,7 +392,7 @@ export function processNarrativeLines(
   }
 
   // Phase 3: Pad alignment lines
-  const padded: { kind: NarrativeLine["kind"]; nodes: FormattingNode[]; isSourceBoundary: boolean }[] = [];
+  const padded: { kind: NarrativeLine["kind"]; nodes: FormattingNode[]; isSourceBoundary: boolean; intent?: Extract<NarrativeLine, { kind: "image" }>["intent"] }[] = [];
   for (let i = 0; i < wrapped.length; i++) {
     const line = wrapped[i];
     const isAlign = line.kind === "dm" && isAlignmentNode(line.nodes);
@@ -438,7 +444,11 @@ export function processNarrativeLines(
 
       result.push({ kind: "dm", nodes, alignment });
     } else {
-      result.push({ kind: line.kind, nodes: line.nodes });
+      result.push({
+        kind: line.kind,
+        nodes: line.nodes,
+        ...(line.intent ? { intent: line.intent } : {}),
+      });
     }
   }
 
