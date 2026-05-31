@@ -62,6 +62,8 @@ The bridge's `_tui` extraction is gated on `tuiToolNames.has(toolName)` — tool
 
 DM prompt guidance instructs the model to fire `generate_image` in the **same parallel tool batch** as `scene_transition` and `style_scene`, never sequenced before — otherwise the player waits for the (potentially slow) render before any narrative arrives.
 
+Crucially, the guidance points a scene-transition image at **the DM's favorite moment from the scene that *just finished***, not the scene being entered. At the boundary turn the departing scene's full transcript is still alive in the model's context (the transition's compaction runs *after* the agent loop, so the rich detail hasn't been pruned yet), whereas the entering scene is still nothing but a title. Aiming the image at the departing scene is what gives it the context to be good. This is also why a transition image files under the *departing* scene's `scene-NNN-slug`: `dispatchGenerateImage` reads `sceneManager.getScene()` before the deferred transition fires, so the image is correctly named for the scene it depicts.
+
 ## Visual style guidance
 
 Style direction for `generate_image` prompts lives in the `<Image>` include at `packages/engine/src/prompts/include/Image.md`, pulled into `dm-directives.md` via `<!--include:Image-->`. The default block defines the campaign-wide art direction; campaign seeds can override via the `processIncludes` cascade either by selecting a named variant (`<!--include:Image.VariantName-->`) or by redefining `<Image>...</Image>` inline. Setup-agent portraits don't use the include — they hardcode a neutral "simple digital art, plain black background" style so the portrait can serve as a consistent visual reference for the DM in any campaign's art direction.
