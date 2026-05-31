@@ -2,8 +2,11 @@ import {
   parseSixelFromDeviceAttributes,
   parseKittyGraphics,
   parseCellPixelSize,
+  parseColorRegisters,
   detectIterm2FromEnv,
   pickProtocol,
+  sixelPaletteSize,
+  type GraphicsCapabilities,
 } from "./capabilities.js";
 
 describe("parseSixelFromDeviceAttributes", () => {
@@ -60,14 +63,47 @@ describe("detectIterm2FromEnv", () => {
   });
 });
 
+describe("parseColorRegisters", () => {
+  it("parses an XTSMGRAPHICS success reply", () => {
+    expect(parseColorRegisters("\x1b[?1;0;1024S")).toBe(1024);
+  });
+  it("returns null on an error status (Ps != 0)", () => {
+    expect(parseColorRegisters("\x1b[?1;1;0S")).toBeNull();
+  });
+  it("returns null on absent reply", () => {
+    expect(parseColorRegisters("\x1b[?62;4c")).toBeNull();
+  });
+});
+
 describe("pickProtocol", () => {
-  const base = { kitty: false, iterm2: false, sixel: false, cellPixels: null };
+  const base: GraphicsCapabilities = { kitty: false, iterm2: false, sixel: false, cellPixels: null, sixelColorRegisters: null };
   it("prefers kitty > iterm2 > sixel", () => {
-    expect(pickProtocol({ ...base, kitty: true, iterm2: true, sixel: true })).toBe("kitty");
-    expect(pickProtocol({ ...base, iterm2: true, sixel: true })).toBe("iterm2");
-    expect(pickProtocol({ ...base, sixel: true })).toBe("sixel");
+    expect(pickProtocol({ ...base, kitty: true, iterm2: true, sixel: true, sixelColorRegisters: 1024 })).toBe("kitty");
+    expect(pickProtocol({ ...base, iterm2: true, sixel: true, sixelColorRegisters: 1024 })).toBe("iterm2");
+    expect(pickProtocol({ ...base, sixel: true, sixelColorRegisters: 1024 })).toBe("sixel");
+  });
+  it("allows sixel when register count is unreported (assumes 256 floor)", () => {
+    expect(pickProtocol({ ...base, sixel: true, sixelColorRegisters: null })).toBe("sixel");
+    expect(pickProtocol({ ...base, sixel: true, sixelColorRegisters: 256 })).toBe("sixel");
+  });
+  it("disables sixel when the terminal reports < 256 registers", () => {
+    expect(pickProtocol({ ...base, sixel: true, sixelColorRegisters: 16 })).toBeNull();
   });
   it("returns null when none supported", () => {
     expect(pickProtocol(base)).toBeNull();
+  });
+});
+
+describe("sixelPaletteSize", () => {
+  const base: GraphicsCapabilities = { kitty: false, iterm2: false, sixel: true, cellPixels: null, sixelColorRegisters: null };
+  it("defaults to 256 when unreported", () => {
+    expect(sixelPaletteSize(base)).toBe(256);
+  });
+  it("uses the reported count up to the 1024 cap", () => {
+    expect(sixelPaletteSize({ ...base, sixelColorRegisters: 512 })).toBe(512);
+    expect(sixelPaletteSize({ ...base, sixelColorRegisters: 65536 })).toBe(1024);
+  });
+  it("floors at 256", () => {
+    expect(sixelPaletteSize({ ...base, sixelColorRegisters: 64 })).toBe(256);
   });
 });

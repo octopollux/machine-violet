@@ -130,12 +130,13 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
   // consuming stdin. Non-TTY / agent mode resolves to no graphics.
   const graphicsCaps = !mockStdin && activeStdin.isTTY
     ? await detectGraphicsCapabilities(activeStdin, process.stdout)
-    : { kitty: false, iterm2: false, sixel: false, cellPixels: null };
+    : { kitty: false, iterm2: false, sixel: false, cellPixels: null, sixelColorRegisters: null };
   logInputEvent("graphics-caps", {
     kitty: graphicsCaps.kitty,
     iterm2: graphicsCaps.iterm2,
     sixel: graphicsCaps.sixel,
     cellPixels: graphicsCaps.cellPixels,
+    sixelColorRegisters: graphicsCaps.sixelColorRegisters,
   });
 
   // alternateScreen: TUI renders in the alt buffer so exit restores whatever

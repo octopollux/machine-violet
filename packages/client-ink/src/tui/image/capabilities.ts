@@ -16,10 +16,28 @@ export type GraphicsProtocol = "kitty" | "iterm2" | "sixel";
 
 export interface GraphicsCapabilities {
   kitty: boolean;
+  /** Raw DA "attribute 4" — sixel-capable. Gate usage via pickProtocol (needs >=256 registers). */
   iterm2: boolean;
   sixel: boolean;
   /** Terminal cell size in pixels; null when the terminal didn't report it. */
   cellPixels: { width: number; height: number } | null;
+  /**
+   * Max sixel color registers from XTSMGRAPHICS, or null if unreported.
+   * <256 means the terminal's sixel palette is too small to look good, so we
+   * disable sixel entirely (render nothing → the export keeps full fidelity).
+   */
+  sixelColorRegisters: number | null;
+}
+
+/** Universal floor: terminals below this many registers don't get sixel. */
+export const MIN_SIXEL_REGISTERS = 256;
+/** Cap palette size: 1024 kills most banding; bigger payloads aren't worth it at thumbnail sizes. */
+export const MAX_SIXEL_REGISTERS = 1024;
+
+/** Effective sixel palette size for a terminal: clamp(reported ?? 256, 256, 1024). */
+export function sixelPaletteSize(caps: GraphicsCapabilities): number {
+  const regs = caps.sixelColorRegisters ?? MIN_SIXEL_REGISTERS;
+  return Math.max(MIN_SIXEL_REGISTERS, Math.min(MAX_SIXEL_REGISTERS, regs));
 }
 
 // --- Pure parsers -----------------------------------------------------------
@@ -59,6 +77,19 @@ export function parseCellPixelSize(response: string): { width: number; height: n
 }
 
 /**
+ * Max sixel color registers from an XTSMGRAPHICS reply:
+ * `CSI ? 1 ; 0 ; <max> S` (Pi=1 color registers, Ps=0 success). Returns null on
+ * error status / absent reply.
+ */
+export function parseColorRegisters(response: string): number | null {
+  // eslint-disable-next-line no-control-regex -- intentional: parsing ANSI escape sequences
+  const m = response.match(/\x1b\[\?1;0;(\d+)S/);
+  if (!m) return null;
+  const n = Number.parseInt(m[1], 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
  * iTerm2 inline-image support is detected from environment, not a query
  * (iTerm2 has no capability handshake). Mirrors ink-picture's TerminalInfo
  * sniffing: iTerm2 itself, recent WezTerm, recent Konsole, recent Rio.
@@ -85,7 +116,10 @@ export function detectIterm2FromEnv(env: NodeJS.ProcessEnv): boolean {
 export function pickProtocol(caps: GraphicsCapabilities): GraphicsProtocol | null {
   if (caps.kitty) return "kitty";
   if (caps.iterm2) return "iterm2";
-  if (caps.sixel) return "sixel";
+  // Sixel only if the palette is big enough to look decent. A terminal that
+  // reports <256 registers is treated as not supporting images (a null/
+  // unreported count is assumed to be the 256 floor and allowed through).
+  if (caps.sixel && (caps.sixelColorRegisters ?? MIN_SIXEL_REGISTERS) >= MIN_SIXEL_REGISTERS) return "sixel";
   return null;
 }
 
@@ -128,7 +162,7 @@ export async function detectGraphicsCapabilities(
 ): Promise<GraphicsCapabilities> {
   const iterm2 = detectIterm2FromEnv(env);
   if (!stdin.isTTY) {
-    return { kitty: false, iterm2, sixel: false, cellPixels: null };
+    return { kitty: false, iterm2, sixel: false, cellPixels: null, sixelColorRegisters: null };
   }
   return await new Promise<GraphicsCapabilities>((resolve) => {
     let buf = "";
@@ -143,6 +177,7 @@ export async function detectGraphicsCapabilities(
         iterm2,
         sixel: parseSixelFromDeviceAttributes(buf),
         cellPixels: parseCellPixelSize(buf),
+        sixelColorRegisters: parseColorRegisters(buf),
       });
     };
     const onReadable = () => {
@@ -155,9 +190,11 @@ export async function detectGraphicsCapabilities(
     };
     const timer = setTimeout(finish, timeoutMs);
     stdin.on("readable", onReadable);
-    // cell size, then kitty graphics probe, then DA (terminator).
+    // cell size, kitty graphics probe, XTSMGRAPHICS max color registers, then
+    // DA (terminator — sent last so its reply means the others are in).
     stdout.write("\x1b[16t");
     stdout.write("\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\");
+    stdout.write("\x1b[?1;4;0S");
     stdout.write("\x1b[c");
   });
 }

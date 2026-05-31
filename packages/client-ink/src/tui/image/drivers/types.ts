@@ -35,7 +35,8 @@ export interface ImageDriver {
   readonly expensiveEncode: boolean;
   /**
    * Cache (and for kitty, transmit) the resized RGBA raster. `write` lets a
-   * driver emit out-of-band transmit escapes once at prepare time.
+   * driver emit out-of-band transmit escapes once at prepare time. `paletteSize`
+   * is the sixel color-register budget (ignored by non-palettized protocols).
    */
-  prepare(rgba: Buffer, widthPx: number, heightPx: number, write: (s: string) => void): PreparedImage;
+  prepare(rgba: Buffer, widthPx: number, heightPx: number, write: (s: string) => void, paletteSize: number): PreparedImage;
 }

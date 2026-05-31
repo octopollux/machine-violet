@@ -24,7 +24,7 @@ import React, { useEffect, useId, useLayoutEffect, useRef } from "react";
 import { Box, useStdout, type DOMElement } from "ink";
 import sharp from "sharp";
 import type { GraphicsCapabilities } from "./capabilities.js";
-import { pickProtocol } from "./capabilities.js";
+import { pickProtocol, sixelPaletteSize } from "./capabilities.js";
 import { selectDriver } from "./drivers/index.js";
 import type { PreparedImage } from "./drivers/types.js";
 import { registerPainter } from "./painterRegistry.js";
@@ -72,6 +72,7 @@ export function InlineImage({
 
   const protocol = graphicsCaps ? pickProtocol(graphicsCaps) : null;
   const driver = protocol ? selectDriver(protocol) : null;
+  const paletteSize = graphicsCaps ? sixelPaletteSize(graphicsCaps) : 256;
   const cell = graphicsCaps?.cellPixels ?? FALLBACK_CELL;
   const widthPx = cols * cell.width;
   const heightPx = rows * cell.height;
@@ -125,14 +126,14 @@ export function InlineImage({
           .raw()
           .toBuffer({ resolveWithObject: true });
         if (cancelled) return;
-        preparedRef.current = driver.prepare(data, widthPx, heightPx, (s) => stdout.write(s));
+        preparedRef.current = driver.prepare(data, widthPx, heightPx, (s) => stdout.write(s), paletteSize);
         scheduleEncode(); // first band
       } catch {
         // Missing/unreadable file: render nothing inline (export still has it).
       }
     })();
     return () => { cancelled = true; preparedRef.current?.dispose(); preparedRef.current = null; };
-  }, [path, widthPx, heightPx, driver]);
+  }, [path, widthPx, heightPx, driver, paletteSize]);
 
   // Debounced (blit) or immediate (kitty) band encode.
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -168,14 +169,23 @@ export function InlineImage({
     debounceRef.current = setTimeout(encodeNow, ENCODE_DEBOUNCE_MS);
   };
 
-  // After every render (incl. scroll re-renders): re-measure, and re-encode if
-  // the visible band actually changed.
+  // After every render (incl. scroll re-renders): re-measure, then either
+  // re-encode (band pixels changed — clipped differently at an edge) or, when
+  // a fully-visible image merely moved, cheaply re-blit the cached payload at
+  // the new row. Without the reposition branch a scrolling, unclipped image
+  // would stay frozen at its old position (and never un-hide after passing an
+  // occluder), since its band identity is unchanged.
   useLayoutEffect(() => {
     posRef.current = measure();
     const want = desiredBand();
     const cur = cachedRef.current;
-    const changed = (!want && cur) || (!!want && (!cur || cur.srcTopRows !== want.srcTopRows || cur.visRows !== want.visRows));
-    if (changed) scheduleEncode();
+    const bandChanged = (!want && !!cur)
+      || (!!want && (!cur || cur.srcTopRows !== want.srcTopRows || cur.visRows !== want.visRows));
+    if (bandChanged) { scheduleEncode(); return; }
+    if (want && cur && cur.box.row !== want.box.row) {
+      cachedRef.current = { ...cur, box: want.box }; // same pixels, new position
+      forceRepaint();
+    }
   });
 
   // Register the per-frame painter once; it reads the live refs above.
