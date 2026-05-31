@@ -84,6 +84,8 @@ Each image gets a `.json` sidecar alongside it with `id`, `intent`, `timestamp`,
 
 HTML transcript export (`packages/client-ink/src/commands/transcript.ts` — `loadImageBytes` + `buildTranscriptHtml`) reads each referenced PNG and embeds it as a `data:image/png;base64,...` URI inline in the output HTML. The exported file is fully self-contained — no sidecar PNGs, no external links, full on-disk quality. Missing files (moved/deleted between gameplay and export) degrade gracefully to `[image unavailable]` placeholders.
 
+Inlined images are clickable: a small vanilla-JS shadowbox (no dependencies) fills the viewport with the image on a black backdrop. Esc or a click on the backdrop closes it; clicks and right-clicks *on the image itself* are left to the browser so the reader can save it / open it in a new tab. The overlay scaffold (`#shadowbox` + handler) is always emitted; image elements get a `zoomable` class.
+
 ## Engine-log breadcrumbs
 
 For harness probes + post-mortem debugging:

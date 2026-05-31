@@ -131,6 +131,29 @@ describe("buildTranscriptHtml", () => {
     expect(html).not.toContain("image-missing");
   });
 
+  it("marks inlined images as zoomable for the shadowbox", () => {
+    const lines: NarrativeLine[] = [
+      { kind: "image", text: "/path/to/scene-001-tavern-1234.png", intent: "scene_snapshot" },
+    ];
+    const opts: TranscriptOptions = {
+      ...buildOpts(lines),
+      imageBytes: {
+        "/path/to/scene-001-tavern-1234.png": { mimeType: "image/png", base64: "X" },
+      },
+    };
+    const html = buildTranscriptHtml(opts);
+    expect(html).toContain('class="zoomable"');
+  });
+
+  it("includes the shadowbox overlay scaffold and handler", () => {
+    const html = buildTranscriptHtml(buildOpts([]));
+    expect(html).toContain('id="shadowbox"');
+    expect(html).toContain("#shadowbox.open");
+    // Esc + backdrop-click close, image-click left to the browser.
+    expect(html).toContain("'Escape'");
+    expect(html).toContain("e.target !== boxImg");
+  });
+
   it("emits an [image unavailable] placeholder when bytes are missing", () => {
     const lines: NarrativeLine[] = [
       { kind: "image", text: "/path/that/was/deleted.png", intent: "player_request" },
@@ -140,6 +163,8 @@ describe("buildTranscriptHtml", () => {
     // transcript.
     const html = buildTranscriptHtml(buildOpts(lines));
     expect(html).toContain("[image unavailable]");
-    expect(html).not.toContain("<img");
+    // No image element for the missing file. (The shadowbox scaffold emits a
+    // src-less <img alt="">, so match on a sourced <img> specifically.)
+    expect(html).not.toContain("<img src=");
   });
 });
