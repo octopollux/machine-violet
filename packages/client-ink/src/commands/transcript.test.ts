@@ -143,6 +143,10 @@ describe("buildTranscriptHtml", () => {
     };
     const html = buildTranscriptHtml(opts);
     expect(html).toContain('class="zoomable"');
+    // Keyboard/screen-reader access: focusable + actionable semantics.
+    expect(html).toContain('tabindex="0"');
+    expect(html).toContain('role="button"');
+    expect(html).toContain('aria-label="View image full screen"');
   });
 
   it("includes the shadowbox overlay scaffold and handler", () => {
@@ -152,6 +156,8 @@ describe("buildTranscriptHtml", () => {
     // Esc + backdrop-click close, image-click left to the browser.
     expect(html).toContain("'Escape'");
     expect(html).toContain("e.target !== boxImg");
+    // Enter/Space open the shadowbox for keyboard-only users.
+    expect(html).toContain("'Enter'");
   });
 
   it("emits an [image unavailable] placeholder when bytes are missing", () => {

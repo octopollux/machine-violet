@@ -100,7 +100,7 @@ function lineToHtml(
       if (!bytes) {
         return `<div class="image-missing" style="text-align:center;opacity:0.4;font-style:italic">[image unavailable]</div>`;
       }
-      return `<div class="image" style="text-align:center;margin:1em 0"><img src="data:${bytes.mimeType};base64,${bytes.base64}" alt="" class="zoomable" style="max-width:100%;height:auto;cursor:zoom-in"/></div>`;
+      return `<div class="image" style="text-align:center;margin:1em 0"><img src="data:${bytes.mimeType};base64,${bytes.base64}" alt="" class="zoomable" role="button" tabindex="0" aria-label="View image full screen" style="max-width:100%;height:auto;cursor:zoom-in"/></div>`;
     }
 
     case "dev":
@@ -258,6 +258,7 @@ u { text-decoration: underline; }
   object-fit: contain;
   cursor: default;
 }
+.zoomable:focus { outline: 2px solid #888; outline-offset: 2px; }
 </style>
 </head>
 <body>
@@ -279,9 +280,15 @@ ${bodyLines}
   box.addEventListener('click', function (e) {
     if (e.target !== boxImg) close();
   });
-  // Esc closes.
+  // Keyboard: Esc closes the shadowbox; Enter/Space opens it when a zoomable
+  // image is focused (the images carry tabindex + role="button").
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && box.classList.contains('open')) close();
+    if (e.key === 'Escape' && box.classList.contains('open')) { close(); return; }
+    var t = e.target;
+    if ((e.key === 'Enter' || e.key === ' ') && t && t.classList && t.classList.contains('zoomable')) {
+      e.preventDefault();
+      open(t.getAttribute('src'));
+    }
   });
 })();
 </script>

@@ -118,15 +118,16 @@ export class OpenAIChatGptProvider implements LLMProvider {
   private readonly toolDispatchers = new Map<string, ThreadToolDispatcher>();
 
   /**
-   * Most recent model id seen by `runTurn`. `generateImage` reuses it for
-   * its scoped image-rendering turn so the image is rendered by the same
-   * model family the DM is running on (codex's `image_gen` skill is
-   * model-agnostic, but thread/start still requires a model id). In
-   * production `generateImage` is always called mid-DM-turn so this is set;
-   * the `resolveDefaultModel` fallback covers direct/test calls.
+   * Cached `model/list` default-model lookup for `generateImage`. The
+   * image-render thread needs *a* model id for `thread/start`, but codex's
+   * `image_gen` skill is model-agnostic — the driving model doesn't affect
+   * the rendered bytes. We deliberately resolve the account default here
+   * rather than reusing the DM's current model: `generateImage` can run
+   * concurrently with theme-styler turns on a smaller model, and reading a
+   * shared "last model seen" field would race — a styler turn could leave
+   * the small model behind and the image would render under it. The account
+   * default is stable and never the wrong-tier surprise.
    */
-  private lastModel: string | null = null;
-  /** Cached `model/list` default-model lookup for `generateImage` fallback. */
   private defaultModelPromise: Promise<string> | null = null;
 
   constructor(opts: OpenAIChatGptProviderOptions) {
@@ -242,7 +243,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
       );
     }
 
-    const model = this.lastModel ?? (await this.resolveDefaultModel(client));
+    const model = await this.resolveDefaultModel(client);
 
     const thread = await client.call<ThreadStartResult>("thread/start", {
       model,
@@ -250,6 +251,10 @@ export class OpenAIChatGptProvider implements LLMProvider {
       sandbox: "read-only",
       approvalPolicy: "never",
       developerInstructions: IMAGE_RENDERER_INSTRUCTIONS,
+      // Throwaway thread — we only harvest the inline bytes. Marking it
+      // ephemeral keeps codex from persisting session/thread artifacts,
+      // which would otherwise pile up fast in the portrait draft loop.
+      ephemeral: true,
     });
     const threadId = thread.thread.id;
 
@@ -298,9 +303,14 @@ export class OpenAIChatGptProvider implements LLMProvider {
         ),
       ]);
 
-      if (completed.turn.status === "failed") {
+      // Any terminal status other than "completed" (failed, interrupted, or
+      // some future status) means the render didn't finish — treat it as an
+      // error and surface the actual status so it's debuggable, rather than
+      // falling through to the misleading "completed without emitting" below.
+      if (completed.turn.status !== "completed") {
         throw new CodexTurnFailedError(
-          completed.turn.error?.message ?? "(no error message from codex)",
+          completed.turn.error?.message ??
+            `image render turn ended with status "${completed.turn.status}"`,
           completed.turn.id,
         );
       }
@@ -537,8 +547,6 @@ export class OpenAIChatGptProvider implements LLMProvider {
   // -----------------------------------------------------------------------
 
   private async runTurn(params: ChatParams, onDelta?: (text: string) => void): Promise<ChatResult> {
-    // Remember the model so generateImage can render on the same family.
-    this.lastModel = params.model;
     if (params.tools?.length && !params.dispatchTool) {
       throw new Error(
         "openai-chatgpt provider requires params.dispatchTool when params.tools is non-empty " +
