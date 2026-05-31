@@ -248,6 +248,63 @@ describe("messageToResponsesItems: reasoning replay (issue #533)", () => {
   });
 });
 
+describe("messageToResponsesItems: image_input (party portraits)", () => {
+  it("folds text + image_input into one user message with input_image parts", () => {
+    // The portrait prefix: a label line followed by one image_input per PC.
+    // Both must ride in a single message so each image stays with its label.
+    const msg: NormalizedMessage = {
+      role: "user",
+      content: [
+        { type: "text", text: "Party portraits:" },
+        { type: "image_input", base64: "AAAA", mimeType: "image/png", lowDetail: true, label: "Wendy" },
+      ],
+    };
+    const items = messageToResponsesItems(msg);
+    expect(items).toEqual([
+      {
+        type: "message",
+        role: "user",
+        content: [
+          { type: "input_text", text: "Party portraits:" },
+          // detail maps to codex's enum (high|original), NOT the OpenAI
+          // SDK's low/auto — codex rejects those. lowDetail:true → "high".
+          { type: "input_image", detail: "high", image_url: "data:image/png;base64,AAAA" },
+        ],
+      },
+    ]);
+  });
+
+  it("maps lowDetail:false to detail \"original\"", () => {
+    const msg: NormalizedMessage = {
+      role: "user",
+      content: [
+        { type: "image_input", base64: "BBBB", mimeType: "image/jpeg", lowDetail: false, label: "x" },
+      ],
+    };
+    const items = messageToResponsesItems(msg);
+    expect(items).toEqual([
+      {
+        type: "message",
+        role: "user",
+        content: [
+          { type: "input_image", detail: "original", image_url: "data:image/jpeg;base64,BBBB" },
+        ],
+      },
+    ]);
+  });
+
+  it("keeps tool_result blocks as standalone function_call_output items", () => {
+    const msg: NormalizedMessage = {
+      role: "user",
+      content: [{ type: "tool_result", tool_use_id: "call_9", content: "ok" }],
+    };
+    const items = messageToResponsesItems(msg);
+    expect(items).toEqual([
+      { type: "function_call_output", call_id: "call_9", output: "ok" },
+    ]);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Image generation (Phase 7 — codex built-in image_gen skill)
 // ---------------------------------------------------------------------------
