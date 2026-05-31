@@ -20,6 +20,7 @@ import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, narrativeRows, choiceRowBudget } from "../tui/responsive.js";
 import { useRawModeGuardian } from "../tui/hooks/useRawModeGuardian.js";
 import { Layout } from "../tui/layout.js";
+import { OcclusionProvider } from "../tui/image/occlusion.js";
 import {
   ChoiceOverlay, DESCRIPTION_ROWS, GameMenu, ApiErrorModal,
   CharacterSheetModal, CompendiumModal, PlayerNotesModal, SwatchModal,
@@ -85,27 +86,11 @@ export function PlayingPhase() {
   const modalScrollRef = useRef<CenteredModalHandle>(null);
   const escTimestamps = useRef<number[]>([]);
 
-  // Force-remount image lines whenever an overlay (modal, menu, choices,
-  // retry) transitions from open → closed. Terminal graphics protocols
-  // (sixel / kitty / iTerm2) write pixel data into specific cells; when an
-  // overlay draws text over those cells the pixel data is destroyed by
-  // the terminal itself, not by React. Ink only re-runs render diffs on
-  // prop changes, and ink-picture's useEffect only re-decodes when src /
-  // width / height / allowPartial change — so closing the overlay leaves
-  // the image cells blank. Bumping a key on the image's wrapping Box
-  // forces React to unmount + remount, which triggers ink-picture to
-  // re-fetch, re-decode (sharp), and re-paint the bytes into the
-  // terminal. Cheap when no images are visible (no work) and only the
-  // visible image pays the decode cost on each refresh.
-  const overlayOpen = !!activeModal || !!activeChoices || !!retryOverlay || menuOpen;
-  const prevOverlayOpen = useRef(overlayOpen);
-  const [imageRefreshKey, setImageRefreshKey] = useState(0);
-  useEffect(() => {
-    if (prevOverlayOpen.current && !overlayOpen) {
-      setImageRefreshKey((k) => k + 1);
-    }
-    prevOverlayOpen.current = overlayOpen;
-  }, [overlayOpen]);
+  // Inline images no longer need a remount-on-overlay-close hack: the
+  // InlineImage renderer repaints every frame inside the sync-output block and
+  // hides via the live occlusion gate (OcclusionProvider below). Modals report
+  // their row-spans through CenteredModal/OverlayPane; an overlay that doesn't
+  // cover the image leaves it visible.
 
   // Clear the dismissal latch whenever the retry overlay goes away so the
   // next outage shows the modal again — even if the new attemptId numerically
@@ -483,6 +468,7 @@ export function PlayingPhase() {
   ) : undefined;
 
   return (
+    <OcclusionProvider>
     <Box flexDirection="column" width={cols} height={rows}>
       <Layout
         dimensions={{ columns: cols, rows }}
@@ -507,7 +493,7 @@ export function PlayingPhase() {
         playerFrameColor={engineState === "waiting_input" ? stateSnapshot?.players?.[activePlayerIndex]?.color : "#808080"}
         showVerbose={showVerbose}
         narrativeRef={narrativeRef}
-        imageRefreshKey={imageRefreshKey}
+        conversationPaneTop={conversationPaneTop}
         mouseScrollOverrideRef={modalScrollRef}
         hideInputLine={!!activeChoices}
         playerPaneOverlay={choiceOverlay}
@@ -641,5 +627,6 @@ export function PlayingPhase() {
         />
       )}
     </Box>
+    </OcclusionProvider>
   );
 }

@@ -19,7 +19,6 @@ import {
   type ClientState,
 } from "./event-handler.js";
 import { GameProvider } from "./tui/game-context.js";
-import { TerminalInfoProvider } from "ink-picture";
 import { PlayingPhase } from "./phases/PlayingPhase.js";
 import { MainMenuPhase } from "./phases/MainMenuPhase.js";
 import type { CampaignEntry } from "./phases/MainMenuPhase.js";
@@ -64,6 +63,8 @@ export interface AppProps {
   hasKittyProtocol?: boolean;
   /** Stdin filter chain for registering/unregistering input filters. */
   stdinFilterChain?: import("./tui/hooks/stdinFilterChain.js").StdinFilterChain | null;
+  /** Detected terminal graphics-protocol support + cell-pixel size for inline images. */
+  graphicsCaps?: import("./tui/image/capabilities.js").GraphicsCapabilities | null;
 }
 
 type AppPhase =
@@ -90,7 +91,7 @@ function ErrorScreen({ message, onReturnToMenu }: { message: string; onReturnToM
 
 // --- Main App ---
 
-export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFilterChain }: AppProps) {
+export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFilterChain, graphicsCaps }: AppProps) {
   const [phase, setPhase] = useState<AppPhase>("connecting");
   const [errorMessage, setErrorMessage] = useState("");
   const [clientState, setClientState] = useState<ClientState>(initialClientState);
@@ -689,6 +690,7 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
       usageStatus: clientState.usageStatus,
       hasKittyProtocol,
       stdinFilterChain,
+      graphicsCaps,
       devModeEnabled,
       showVerbose,
       dmTurnLengthPctDefault,
@@ -696,16 +698,12 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
       reportViewport,
     }}>
       {/*
-        TerminalInfoProvider supplies terminal-capability + dimension context
-        used by <Image> in NarrativeArea to pick the right graphics protocol
-        (sixel / kitty / iTerm2 / half-block / ASCII). Mounted unconditionally
-        — image gen may be off, but the provider does no work until an Image
-        component asks it for capabilities, so the cost is a single context
-        push at mount.
+        Terminal graphics capabilities are detected once at startup
+        (start-client.ts) and threaded through GameContext.graphicsCaps; the
+        inline-image renderer in NarrativeArea reads them to pick a protocol
+        (kitty / iTerm2 / sixel) or render nothing. No provider needed.
       */}
-      <TerminalInfoProvider>
-        <PlayingPhase key={`${activeCampaignId}-${sessionKey}`} />
-      </TerminalInfoProvider>
+      <PlayingPhase key={`${activeCampaignId}-${sessionKey}`} />
     </GameProvider>
   );
 }
