@@ -11,9 +11,10 @@
  *  - repaint trigger: the painter is registered with painterRegistry and the
  *    sync-write combiner re-blits it inside the same DEC-2026 synchronized
  *    block as Ink's frame — flicker-free (validated by the #552 spikes);
- *  - blit protocols (sixel/iTerm2) debounce the expensive band re-encode to
- *    scroll-settle and reblit the cached payload each frame; the image lags
- *    a beat during fast scroll then snaps (no overflow, just lag);
+ *  - band re-encode strategy is per-driver: cheap encoders (sixel — one shared
+ *    quantization up front, then ~3-8ms/band) re-encode immediately for
+ *    real-time scroll; any expensive encoder debounces to scroll-settle and
+ *    reblits the cached payload each frame (lags a beat then snaps);
  *  - occlusion is checked LIVE in the painter (cheap), so opening a modal that
  *    covers the image hides it that very frame; an overlay that doesn't cover
  *    it (e.g. inline choices below the narrative) leaves it visible;
@@ -135,7 +136,7 @@ export function InlineImage({
     return () => { cancelled = true; preparedRef.current?.dispose(); preparedRef.current = null; };
   }, [path, widthPx, heightPx, driver, paletteSize]);
 
-  // Debounced (blit) or immediate (kitty) band encode.
+  // Immediate (cheap encoders: sixel, kitty) or debounced (expensive encoders) band encode.
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const desiredBand = (): { box: PaintBox; srcTopRows: number; visRows: number } | null => {
     const pos = posRef.current;
