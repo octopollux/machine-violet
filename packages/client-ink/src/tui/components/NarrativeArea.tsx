@@ -183,6 +183,9 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
   const localHandleRef = useRef<ScrollHandle>(null);
   const [linesBelow, setLinesBelow] = useState(0);
   const atBottomRef = useRef(true);
+  // Incremented every render; fed to visible image lines as `paintNonce` so they
+  // re-render (and ink-picture repaints) each frame. See the comment at its use.
+  const paintNonceRef = useRef(0);
 
   // Build a clamped ScrollHandle and expose it to both parent and local refs
   useScrollHandle(ref, scrollRef);
@@ -322,6 +325,29 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
     // inside is intentional throttling and isn't in the deps array on purpose.
   }, [imageTickKey, processedLines, maxRows, imgHeight]);
 
+  // Per-render repaint nonce for visible images. ink-picture's graphics
+  // renderers (sixel/kitty/iTerm2) paint pixels to absolute screen positions
+  // OUT OF BAND — not part of Ink's text frame. Their repaint is a
+  // `useLayoutEffect` with NO dependency array, so it re-emits after every
+  // render of the <Image> component: Ink rewrites the whole text frame each
+  // cycle and clobbers the image's cells, so ink-picture must repaint after
+  // each one.
+  //
+  // NarrativeLineComponent is React.memo'd, so unless an image line's props
+  // change it never re-renders — Ink keeps clobbering the image but ink-picture
+  // never repaints, and the image stays blanked until some prop happens to flip
+  // (overlay close, scrolling to its exact row). That's the "image vanishes at
+  // the slightest provocation" bug.
+  //
+  // Bumping this nonce every render forces the memo to re-render visible image
+  // lines, so ink-picture repaints. This is the "dodgy but workable" sixel
+  // path — it has known residual flicker/draw-over (terminal graphics fighting
+  // a live TUI); the real fix is a custom crop-aware renderer (issue #552). The
+  // Image is NOT remounted (no key change), so the PNG isn't re-decoded — only
+  // the cheap escape-sequence re-emit runs.
+  paintNonceRef.current += 1;
+  const paintNonce = paintNonceRef.current;
+
   // Bottom-right overlay: the scroll indicator (when there's content
   // below) takes priority over the usage gauge. They share the same row,
   // and rendering both would risk visual bleed through the absolute
@@ -345,6 +371,10 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
             // lines without an entry is safe — it just means a brief
             // false-positive render until the next 1s tick corrects it.
             imageVisible={line.kind !== "image" || (imageVisibilityByIndex.get(i) ?? true)}
+            // Only image lines get the changing nonce (forcing a repaint each
+            // render); text lines get a constant 0 so the memo keeps skipping
+            // them. See the paintNonce comment above.
+            paintNonce={line.kind === "image" ? paintNonce : 0}
           />
         ))}
       </ScrollView>
@@ -377,6 +407,14 @@ interface NarrativeLineProps {
    * around as they scroll. Non-image kinds ignore this flag.
    */
   imageVisible?: boolean;
+  /**
+   * Changes on every NarrativeArea render for image lines (constant for other
+   * kinds). Its only job is to defeat React.memo so a visible image re-renders
+   * each frame, letting ink-picture's no-deps repaint effect re-emit the image
+   * after Ink rewrites (and clobbers) the text frame. Not read in the body —
+   * its presence in props is what drives the memo comparison.
+   */
+  paintNonce?: number;
 }
 
 /** A single narrative line rendered based on its kind. */
