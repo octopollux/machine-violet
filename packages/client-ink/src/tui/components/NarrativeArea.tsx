@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback, useMemo, forwardRef } 
 import { Text, Box } from "ink";
 import { ScrollView } from "ink-scroll-view";
 import type { ScrollViewRef } from "ink-scroll-view";
-import Image from "ink-picture";
+import { InlineImage } from "../image/InlineImage.js";
 import type { NarrativeLine, ProcessedLine } from "@machine-violet/shared/types/tui.js";
 import { processNarrativeLines } from "../formatting.js";
 import { renderNodes } from "../render-nodes.js";
@@ -155,14 +155,11 @@ interface NarrativeAreaProps {
   /** When true, dev/debug lines are shown in the narrative. */
   showVerbose?: boolean;
   /**
-   * Bumped by PlayingPhase whenever an overlay (modal, menu, choices,
-   * retry) transitions from open → closed. Used as a React `key` on
-   * image-line wrappers so the Image component unmounts + remounts,
-   * triggering ink-picture to re-decode and re-paint pixel data that
-   * the terminal cleared when the overlay drew over those cells. No-op
-   * when no images are visible.
+   * Absolute top row of the narrative viewport (where the ScrollView clips).
+   * Passed to InlineImage so it can crop the out-of-band graphics to the
+   * viewport. Equals PlayingPhase's `conversationPaneTop`.
    */
-  imageRefreshKey?: number;
+  viewportTop?: number;
 }
 
 /** Compute scroll step: 25% of viewport, min 2 if <25, min 1 if <12 */
@@ -178,14 +175,11 @@ export function scrollAmount(viewportRows: number): number {
  * Exposes scrollBy via ref for keyboard scrolling.
  */
 export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>(
-  function NarrativeArea({ lines, maxRows, quoteColor, playerColor, width, themeAsset, separatorColor, mouseScrollOverrideRef, showVerbose, imageRefreshKey }, ref) {
+  function NarrativeArea({ lines, maxRows, quoteColor, playerColor, width, themeAsset, separatorColor, mouseScrollOverrideRef, showVerbose, viewportTop }, ref) {
   const scrollRef = useRef<ScrollViewRef>(null);
   const localHandleRef = useRef<ScrollHandle>(null);
   const [linesBelow, setLinesBelow] = useState(0);
   const atBottomRef = useRef(true);
-  // Incremented every render; fed to visible image lines as `paintNonce` so they
-  // re-render (and ink-picture repaints) each frame. See the comment at its use.
-  const paintNonceRef = useRef(0);
 
   // Build a clamped ScrollHandle and expose it to both parent and local refs
   useScrollHandle(ref, scrollRef);
@@ -224,30 +218,6 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
     updateScrollState();
   }, [updateScrollState]);
 
-  // Image-visibility tick: every 1s, snapshot the current scroll offset and
-  // re-evaluate which images are inside the viewport. Throttled because the
-  // previous attempt (remount-on-scroll-settle) re-decoded the PNG via sharp
-  // on every scroll movement, saturating the CPU. 1s is the user-visible
-  // upper bound on "image fails to come back / lingers stale after I scroll
-  // away" — acceptable for the photo-mode style images we generate.
-  //
-  // The tick only commits when the scroll offset actually changed since
-  // the previous tick; idle viewports do no work.
-  const [imageTickKey, setImageTickKey] = useState(0);
-  const lastTickScrollOffset = useRef(0);
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const sv = scrollRef.current;
-      if (!sv) return;
-      const offset = sv.getScrollOffset();
-      if (offset !== lastTickScrollOffset.current) {
-        lastTickScrollOffset.current = offset;
-        setImageTickKey((k) => k + 1);
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
   // Auto-scroll to bottom when new content arrives (only if user was at bottom)
   const lastLine = lines[lines.length - 1]?.text ?? "";
   useEffect(() => {
@@ -282,71 +252,8 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
   // Incremental pipeline: frozen prefix cached, only tail reprocessed
   const processedLines = useProcessedLines(visibleLines, width ?? 0, quoteColor);
 
-  // Image dimensions (kept in sync with NarrativeLineComponent's image
-  // branch — see the matching formula there). Computed here too so the
-  // visibility check below can model image rows in the cumulative-height
-  // calculation.
-  const imgWidth = Math.max(20, width ?? 80);
-  const imgHeight = Math.max(6, Math.round((imgWidth * 9) / 32));
-
-  // Which image lines are currently inside the viewport. Recomputed only
-  // when imageTickKey changes (once per second at most, only on actual
-  // scroll movement) — `processedLines` is included in deps so newly
-  // arrived content recomputes immediately. Off-screen images render a
-  // blank placeholder of the same dimensions instead of ink-picture, which
-  // (a) skips the sharp PNG decode and (b) lets ink-picture's unmount
-  // cleanup write spaces over any pixels the terminal had painted, so
-  // stale image bytes don't follow the user up the scrollback.
-  const imageVisibilityByIndex = useMemo(() => {
-    const visible = new Map<number, boolean>();
-    const scrollOffset = lastTickScrollOffset.current;
-    const viewportEnd = scrollOffset + maxRows;
-    let cumHeight = 0;
-    for (let i = 0; i < processedLines.length; i++) {
-      const line = processedLines[i];
-      // Heights match NarrativeLineComponent's output: image lines reserve
-      // imgHeight + 2 (marginTop + marginBottom), separators take 3 rows,
-      // everything else is 1 wrapped row.
-      let lineHeight = 1;
-      if (line.kind === "image") lineHeight = imgHeight + 2;
-      else if (line.kind === "separator") lineHeight = 3;
-      if (line.kind === "image") {
-        const top = cumHeight;
-        const bottom = cumHeight + lineHeight;
-        // Visible iff the image's vertical extent overlaps the viewport.
-        // Strict inequality both sides so a row that's exactly at the edge
-        // (zero overlap) counts as off-screen.
-        visible.set(i, bottom > scrollOffset && top < viewportEnd);
-      }
-      cumHeight += lineHeight;
-    }
-    return visible;
-    // imageTickKey is the explicit trigger; reading lastTickScrollOffset.current
-    // inside is intentional throttling and isn't in the deps array on purpose.
-  }, [imageTickKey, processedLines, maxRows, imgHeight]);
-
-  // Per-render repaint nonce for visible images. ink-picture's graphics
-  // renderers (sixel/kitty/iTerm2) paint pixels to absolute screen positions
-  // OUT OF BAND — not part of Ink's text frame. Their repaint is a
-  // `useLayoutEffect` with NO dependency array, so it re-emits after every
-  // render of the <Image> component: Ink rewrites the whole text frame each
-  // cycle and clobbers the image's cells, so ink-picture must repaint after
-  // each one.
-  //
-  // NarrativeLineComponent is React.memo'd, so unless an image line's props
-  // change it never re-renders — Ink keeps clobbering the image but ink-picture
-  // never repaints, and the image stays blanked until some prop happens to flip
-  // (overlay close, scrolling to its exact row). That's the "image vanishes at
-  // the slightest provocation" bug.
-  //
-  // Bumping this nonce every render forces the memo to re-render visible image
-  // lines, so ink-picture repaints. This is the "dodgy but workable" sixel
-  // path — it has known residual flicker/draw-over (terminal graphics fighting
-  // a live TUI); the real fix is a custom crop-aware renderer (issue #552). The
-  // Image is NOT remounted (no key change), so the PNG isn't re-decoded — only
-  // the cheap escape-sequence re-emit runs.
-  paintNonceRef.current += 1;
-  const paintNonce = paintNonceRef.current;
+  // Graphics capabilities for inline images (null → render nothing inline).
+  const graphicsCaps = gameCtx?.graphicsCaps ?? null;
 
   // Bottom-right overlay: the scroll indicator (when there's content
   // below) takes priority over the usage gauge. They share the same row,
@@ -365,16 +272,9 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
             width={width}
             themeAsset={themeAsset}
             separatorColor={separatorColor}
-            imageRefreshKey={imageRefreshKey}
-            // Non-image lines pass through with `true`; the flag only
-            // gates the image branch. Defaulting to `true` for image
-            // lines without an entry is safe — it just means a brief
-            // false-positive render until the next 1s tick corrects it.
-            imageVisible={line.kind !== "image" || (imageVisibilityByIndex.get(i) ?? true)}
-            // Only image lines get the changing nonce (forcing a repaint each
-            // render); text lines get a constant 0 so the memo keeps skipping
-            // them. See the paintNonce comment above.
-            paintNonce={line.kind === "image" ? paintNonce : 0}
+            viewportTop={viewportTop ?? 0}
+            viewportRows={maxRows}
+            graphicsCaps={graphicsCaps}
           />
         ))}
       </ScrollView>
@@ -397,29 +297,17 @@ interface NarrativeLineProps {
   width?: number;
   themeAsset?: ThemeAsset;
   separatorColor?: string;
-  imageRefreshKey?: number;
-  /**
-   * When false, an image-kind line renders a blank placeholder Box of
-   * the same dimensions instead of the ink-picture Image. This (a) skips
-   * the sharp PNG decode (the expensive part), (b) lets ink-picture's
-   * unmount cleanup write spaces over any previously-painted terminal
-   * pixels, and (c) prevents stale image bytes from following the user
-   * around as they scroll. Non-image kinds ignore this flag.
-   */
-  imageVisible?: boolean;
-  /**
-   * Changes on every NarrativeArea render for image lines (constant for other
-   * kinds). Its only job is to defeat React.memo so a visible image re-renders
-   * each frame, letting ink-picture's no-deps repaint effect re-emit the image
-   * after Ink rewrites (and clobbers) the text frame. Not read in the body —
-   * its presence in props is what drives the memo comparison.
-   */
-  paintNonce?: number;
+  /** Absolute top row of the narrative viewport (for image cropping). */
+  viewportTop?: number;
+  /** Narrative viewport height in rows. */
+  viewportRows?: number;
+  /** Terminal graphics capabilities (null → image renders nothing inline). */
+  graphicsCaps?: import("../image/capabilities.js").GraphicsCapabilities | null;
 }
 
 /** A single narrative line rendered based on its kind. */
 const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
-  line, playerColor, width, themeAsset, separatorColor, imageRefreshKey, imageVisible,
+  line, playerColor, width, themeAsset, separatorColor, viewportTop, viewportRows, graphicsCaps,
 }: NarrativeLineProps) {
   // Spacer lines render as visual blank lines (paragraph spacing)
   // but are invisible to the formatting/healing pipeline.
@@ -427,75 +315,38 @@ const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
     return <Text>{" "}</Text>;
   }
 
-  // Image lines render the generated PNG via ink-picture, which handles
-  // terminal-protocol selection (sixel / kitty / iTerm2 inline) with
-  // half-block/braille/ASCII fallback. `text` is the absolute path the
-  // engine wrote the file to.
+  // Image lines render the generated PNG via our MV-owned InlineImage, which
+  // composes correctly with the live TUI (vertical crop, atomic repaint,
+  // occlusion-gated hide, no-graphics → nothing). `nodes[0]` is the absolute
+  // path the engine wrote.
   //
-  // Sized as a 16:9 box at 100% of the narrative column. Terminal cells
-  // are roughly 2:1 tall:wide, so visual 16:9 = cols : (rows * 2), which
-  // gives rows = cols * 9 / 32. We clamp to a sane floor for very narrow
-  // terminals so half-block/braille fallbacks still produce a recognisable
-  // picture. ink-picture preserves the source PNG's aspect ratio within
-  // the (width, height) box, so we don't distort the image — we just
-  // reserve a consistent footprint in the narrative.
-  //
-  // The outer Box pins both width AND height explicitly. ink-picture's
-  // renderers (HalfBlock, Braille, etc.) call `measureElement(containerRef)`
-  // against THEIR own Box to decide pixel dimensions for the sharp resize.
-  // If our wrapping Box has no fixed dimensions, that inner Box collapses
-  // to its content size during async PNG decoding (sharp on a 2-3 MB
-  // file takes hundreds of ms), the measurement reads tiny, and the
-  // rendered image is correspondingly tiny. Pinning the wrapper reserves
-  // the full footprint at the React-render step before any layout pass.
-  //
-  // alt=" " (non-empty whitespace) suppresses ink-picture's hardcoded
-  // "Loading..." placeholder, which the renderers fall back to when
-  // `props.alt` is empty/undefined. The string is intentionally a single
-  // space — empty string is JS-falsy and would let the placeholder
-  // through (`props.alt || "Loading..."`).
+  // Footprint: a 16:9 box at 100% of the narrative column. Terminal cells are
+  // ~2:1 tall:wide, so visual 16:9 = cols : (rows*2) → rows = cols*9/32, with
+  // a floor for narrow terminals. The footprint is reserved with margins so
+  // text flows around it; InlineImage letterboxes the source within it.
   if (line.kind === "image") {
     const path = typeof line.nodes[0] === "string" ? line.nodes[0] : "";
     if (!path) return <Text dimColor>[image: missing path]</Text>;
     const imgWidth = Math.max(20, width ?? 80);
     const imgHeight = Math.max(6, Math.round((imgWidth * 9) / 32));
-    // Off-screen: render an empty Box reserving the same footprint. This
-    // unmounts the ink-picture Image (whose Sixel/Kitty/iTerm2 renderers
-    // write spaces over their previously-painted bounding box during
-    // unmount cleanup), so we don't leave stale pixels at terminal
-    // positions the user has scrolled away from.
-    if (imageVisible === false) {
-      return (
-        <Box flexDirection="column" width={imgWidth} height={imgHeight} marginTop={1} marginBottom={1} />
-      );
-    }
-    // Portrait-aspect images (setup-loop character portraits) are far taller
-    // than this wide 16:9 footprint. Passing BOTH width+height makes
-    // ink-picture's calculateImageSize force the box dims and ignore the
-    // source aspect — a tall portrait either distorts or, on graphics
-    // protocols, overflows the reserved rows. Passing ONLY height lands in the
-    // "only height specified" branch, which preserves aspect AND clamps to
-    // both the box width and height — so the portrait renders small and
-    // narrow, fully contained, and can never exceed imgHeight rows. Scenes /
-    // landscape keep the full-width fill that looks best for wide art.
+    // Character portraits (setup-loop) are far taller than the wide 16:9 scene
+    // footprint. Give them a narrow footprint so the portrait fills it rather
+    // than sitting letterboxed across the full width — on sixel the contain
+    // bars would otherwise flatten to black side-bars. InlineImage preserves
+    // aspect via fit:"contain", so an approximate portrait footprint is fine;
+    // `intent` is carried through from #550 (scenes/landscape keep full width).
     const isPortrait = line.intent === "character_portrait";
-    // On-screen: `key` bumps when an overlay closes (see PlayingPhase
-    // imageRefreshKey — terminal graphics protocols clear pixel data when
-    // text draws over image cells). React unmounts + remounts on key
-    // change, which fires ink-picture's useEffect and re-paints the bytes.
+    const footprintWidth = isPortrait ? Math.max(12, Math.round((imgHeight * 3) / 2)) : imgWidth;
     return (
-      <Box
-        key={imageRefreshKey ?? 0}
-        flexDirection="column"
-        alignItems={isPortrait ? "center" : undefined}
-        width={imgWidth}
-        height={imgHeight}
-        marginTop={1}
-        marginBottom={1}
-      >
-        {isPortrait
-          ? <Image src={path} height={imgHeight} alt=" " />
-          : <Image src={path} width={imgWidth} height={imgHeight} alt=" " />}
+      <Box flexDirection="column" marginTop={1} marginBottom={1}>
+        <InlineImage
+          path={path}
+          cols={footprintWidth}
+          rows={imgHeight}
+          viewportTop={viewportTop ?? 0}
+          viewportRows={viewportRows ?? imgHeight}
+          graphicsCaps={graphicsCaps}
+        />
       </Box>
     );
   }

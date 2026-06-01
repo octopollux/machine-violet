@@ -12,16 +12,33 @@
  * buffers all subsequent writes until ESU, then flushes the
  * accumulated buffer as a **single** `write()` call, ensuring the
  * terminal receives the entire synchronized update atomically.
+ *
+ * Optional `getPreEsuInjection` lets a caller splice extra escape sequences
+ * into every synchronized block *just before* the ESU — used by the inline
+ * image renderer to re-blit out-of-band graphics (sixel/iTerm2) inside the
+ * same atomic frame Ink just drew, so the terminal never shows the blanked
+ * intermediate state (see ../image/painterRegistry.ts). Returns "" when there
+ * is nothing to inject, which is a no-op.
  */
 
 const BSU = "\x1b[?2026h";
 const ESU = "\x1b[?2026l";
 
+/** Insert `injection` immediately before the (last) ESU in `block`. */
+function spliceBeforeEsu(block: string, injection: string): string {
+  if (!injection) return block;
+  const i = block.lastIndexOf(ESU);
+  if (i === -1) return block;
+  return block.slice(0, i) + injection + block.slice(i);
+}
+
 export function installSyncWriteCombiner(
   stream: NodeJS.WriteStream,
+  getPreEsuInjection?: () => string,
 ): () => void {
   // Keep the true write and guard against double-install.
   const originalWrite: NodeJS.WriteStream["write"] = stream.write;
+  const inject = getPreEsuInjection ?? (() => "");
 
   let syncChunks: string[] = [];
   let inSync = false;
@@ -38,11 +55,12 @@ export function installSyncWriteCombiner(
       inSync = true;
       syncChunks = [str];
 
-      // Edge case: BSU + content + ESU all in one chunk — pass through.
+      // Edge case: BSU + content + ESU all in one chunk — splice + pass through.
       if (str.includes(ESU)) {
         inSync = false;
         syncChunks = [];
-        return originalWrite.call(stream, chunk, encodingOrCb as BufferEncoding, cb) as boolean;
+        const block = spliceBeforeEsu(str, inject());
+        return originalWrite.call(stream, block, encodingOrCb as BufferEncoding, cb) as boolean;
       }
       return true; // signal "accepted" to callers
     }
@@ -51,8 +69,9 @@ export function installSyncWriteCombiner(
       syncChunks.push(str);
 
       if (str.includes(ESU)) {
-        // Flush the entire synchronized block as one write.
-        const combined = syncChunks.join("");
+        // Flush the entire synchronized block as one write, splicing any
+        // pre-ESU injection (inline-image escapes) inside the atomic frame.
+        const combined = spliceBeforeEsu(syncChunks.join(""), inject());
         syncChunks = [];
         inSync = false;
         return originalWrite.call(stream, combined, encodingOrCb as BufferEncoding, cb) as boolean;

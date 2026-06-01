@@ -19,6 +19,8 @@ import {
   kittyKeyToLegacy,
 } from "./tui/hooks/kittyProtocol.js";
 import { installStdinFilterChain } from "./tui/hooks/stdinFilterChain.js";
+import { compositePainters } from "./tui/image/painterRegistry.js";
+import { detectGraphicsCapabilities } from "./tui/image/capabilities.js";
 import { logInputEvent, bytesToHex, getInputDebugLogPath } from "./tui/hooks/inputDebugLog.js";
 import { getAgentClientState } from "./agent-state-ref.js";
 
@@ -87,8 +89,10 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
   const unlockRawMode = installRawModeGuard(activeStdin);
 
   // Combine Ink's separate BSU/content/ESU writes into single atomic stdout
-  // writes so the terminal never displays intermediate states.
-  const removeCombiner = installSyncWriteCombiner(process.stdout);
+  // writes so the terminal never displays intermediate states. The pre-ESU
+  // injector re-blits inline-image graphics (sixel/iTerm2) inside the same
+  // atomic frame Ink just drew — see tui/image/painterRegistry.ts.
+  const removeCombiner = installSyncWriteCombiner(process.stdout, compositePainters);
 
   // Install the stdin filter chain — a single read() wrapper that runs
   // all registered filters (kitty, mouse) in order.
@@ -119,6 +123,21 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
       if (legacy !== null) activeStdin.push(legacy);
     }));
   }
+
+  // Probe terminal graphics-protocol support (kitty/iTerm2/sixel) + cell-pixel
+  // size for the inline-image renderer. Sequenced AFTER the kitty-keyboard
+  // probe so the two don't race on stdin, and before render() so Ink isn't yet
+  // consuming stdin. Non-TTY / agent mode resolves to no graphics.
+  const graphicsCaps = !mockStdin && activeStdin.isTTY
+    ? await detectGraphicsCapabilities(activeStdin, process.stdout)
+    : { kitty: false, iterm2: false, sixel: false, cellPixels: null, sixelColorRegisters: null };
+  logInputEvent("graphics-caps", {
+    kitty: graphicsCaps.kitty,
+    iterm2: graphicsCaps.iterm2,
+    sixel: graphicsCaps.sixel,
+    cellPixels: graphicsCaps.cellPixels,
+    sixelColorRegisters: graphicsCaps.sixelColorRegisters,
+  });
 
   // alternateScreen: TUI renders in the alt buffer so exit restores whatever
   // the terminal showed before launch instead of leaving the final frame
@@ -155,7 +174,7 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
   }
 
   const { unmount, waitUntilExit: inkWaitUntilExit } = render(
-    React.createElement(App, { serverUrl, playerId, campaignId, hasKittyProtocol: hasKitty, stdinFilterChain: filterChain }),
+    React.createElement(App, { serverUrl, playerId, campaignId, hasKittyProtocol: hasKitty, stdinFilterChain: filterChain, graphicsCaps }),
     renderOpts,
   );
 

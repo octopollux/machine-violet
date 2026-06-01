@@ -70,8 +70,9 @@ export type NarrativeLine =
   /**
    * Inline-rendered image, pushed when the engine emits a `display_image`
    * TUI command after persisting a generated PNG. `text` is the absolute
-   * filesystem path the renderer hands to ink-picture (or the plain-text
-   * fallback when the terminal has no graphics protocol). `intent` lets
+   * filesystem path the inline-image renderer loads (rendered via the
+   * terminal's graphics protocol, or nothing inline when it has none —
+   * the full-res image still lives in the HTML transcript export). `intent` lets
    * the renderer choose framing (scene snapshot vs. player-requested vs.
    * character portrait), though current rendering treats all three the
    * same. Per spec, exactly one separator NarrativeLine precedes an

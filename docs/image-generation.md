@@ -64,6 +64,22 @@ DM prompt guidance instructs the model to fire `generate_image` in the **same pa
 
 Crucially, the guidance points a scene-transition image at **the DM's favorite moment from the scene that *just finished***, not the scene being entered. At the boundary turn the departing scene's full transcript is still alive in the model's context (the transition's compaction runs *after* the agent loop, so the rich detail hasn't been pruned yet), whereas the entering scene is still nothing but a title. Aiming the image at the departing scene is what gives it the context to be good. This is also why a transition image files under the *departing* scene's `scene-NNN-slug`: `dispatchGenerateImage` reads `sceneManager.getScene()` before the deferred transition fires, so the image is correctly named for the scene it depicts.
 
+## Inline rendering (TUI)
+
+The client draws `display_image` lines inline with an MV-owned renderer (`packages/client-ink/src/tui/image/`), which replaced `ink-picture`. Terminal graphics protocols paint pixels out-of-band at absolute screen positions with no clipping and no z-ordering against Ink's text grid, so the renderer owns composition with the live, scrolling, layered TUI.
+
+**Protocol selection.** At startup `start-client.ts` probes the terminal (`detectGraphicsCapabilities` in `tui/image/capabilities.ts`) and picks the best of three real graphics protocols — **kitty > iTerm2 > sixel** (`pickProtocol`). The detection path is layered: pure per-query parsers → a pure assembler → a declarative `TERMINAL_QUIRKS` table → `pickProtocol`. Per-terminal workarounds are one table entry each (e.g. iTerm.app's partial kitty emulation is suppressed in favor of its native protocol). A terminal with **no** graphics protocol renders nothing inline — the image still exists at full resolution in the HTML transcript export (see Disk + transcript).
+
+**Drivers** (`tui/image/drivers/`) implement a small `ImageDriver` interface in two families:
+
+| Protocol | Family | Mechanism |
+|---|---|---|
+| kitty | placement | transmit raw RGBA once by image id, display any band via a native source-rect crop; true-color, flicker-free re-place |
+| iTerm2 | blit | per-band PNG (`OSC 1337`), sized in **cells** so it lands on the text grid; true-color |
+| sixel | blit | per-band, one shared quantized palette (no requantize-on-scroll); **alpha flattened to opaque before quantizing** — a transparent letterbox otherwise scatters the whole palette into noise |
+
+**Composition.** The image decodes + resizes once (sharp), then a painter registered with the sync-write combiner re-blits the visible band inside the same DEC-2026 synchronized-output frame Ink just drew — flicker-free. Only the rows inside the narrative viewport are encoded (vertical crop), so the image never overflows the modeline above or the input line below. An overlapping modal's registered row-span hides the band (`OcclusionProvider` / `useRegisterOcclusion`, registered by `CenteredModal` + `OverlayPane`); an overlay that doesn't cover it (the inline `ChoiceOverlay`) leaves it visible.
+
 ## Visual style guidance
 
 Style direction for `generate_image` prompts lives in the `<Image>` include at `packages/engine/src/prompts/include/Image.md`, pulled into `dm-directives.md` via `<!--include:Image-->`. The default block defines the campaign-wide art direction; campaign seeds can override via the `processIncludes` cascade either by selecting a named variant (`<!--include:Image.VariantName-->`) or by redefining `<Image>...</Image>` inline. Setup-agent portraits don't use the include — they hardcode a neutral "simple digital art, plain black background" style so the portrait can serve as a consistent visual reference for the DM in any campaign's art direction.
