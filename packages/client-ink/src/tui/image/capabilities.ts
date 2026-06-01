@@ -161,6 +161,13 @@ export async function detectGraphicsCapabilities(
   timeoutMs = 250,
 ): Promise<GraphicsCapabilities> {
   const iterm2 = detectIterm2FromEnv(env);
+  // iTerm2 ships a partial kitty-graphics implementation that mis-scales source
+  // crops (it scales a band into a fixed box instead of cropping 1:1) and drops
+  // image data on placement delete. Its native inline-image protocol is far
+  // better supported on its own terminal, so never route iTerm.app through
+  // kitty. Other multi-protocol terminals (e.g. WezTerm) have solid kitty
+  // support and keep the normal kitty > iterm2 preference.
+  const suppressKitty = env.TERM_PROGRAM === "iTerm.app";
   if (!stdin.isTTY) {
     return { kitty: false, iterm2, sixel: false, cellPixels: null, sixelColorRegisters: null };
   }
@@ -173,7 +180,7 @@ export async function detectGraphicsCapabilities(
       clearTimeout(timer);
       stdin.removeListener("readable", onReadable);
       resolve({
-        kitty: parseKittyGraphics(buf),
+        kitty: suppressKitty ? false : parseKittyGraphics(buf),
         iterm2,
         sixel: parseSixelFromDeviceAttributes(buf),
         cellPixels: parseCellPixelSize(buf),

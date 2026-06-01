@@ -6,7 +6,9 @@ import {
   detectIterm2FromEnv,
   pickProtocol,
   sixelPaletteSize,
+  detectGraphicsCapabilities,
   type GraphicsCapabilities,
+  type ProbeStdin,
 } from "./capabilities.js";
 
 describe("parseSixelFromDeviceAttributes", () => {
@@ -105,5 +107,49 @@ describe("sixelPaletteSize", () => {
   });
   it("floors at 256", () => {
     expect(sixelPaletteSize({ ...base, sixelColorRegisters: 64 })).toBe(256);
+  });
+});
+
+describe("detectGraphicsCapabilities", () => {
+  // A terminal reply carrying: kitty OK, cell size, max registers, sixel DA.
+  const REPLY =
+    "\x1b_Gi=31;OK\x1b\\" + // kitty graphics OK
+    "\x1b[6;20;10t" + // cell size 10x20
+    "\x1b[?1;0;1024S" + // 1024 color registers
+    "\x1b[?62;4c"; // DA with sixel (attribute 4) — terminator
+
+  /** Minimal ProbeStdin that delivers REPLY once after the queries are sent. */
+  function mockStdin(reply: string): ProbeStdin {
+    let pending: string | null = reply;
+    return {
+      isTTY: true,
+      on(_event, listener) {
+        // Fire after the synchronous probe body (queries) completes.
+        queueMicrotask(() => listener());
+      },
+      removeListener() {},
+      read() {
+        const out = pending;
+        pending = null;
+        return out;
+      },
+    };
+  }
+  const sink = { write: () => true };
+
+  it("detects kitty on a kitty-capable terminal", async () => {
+    const caps = await detectGraphicsCapabilities(mockStdin(REPLY), sink, {} as NodeJS.ProcessEnv);
+    expect(caps.kitty).toBe(true);
+    expect(caps.sixel).toBe(true);
+    expect(caps.cellPixels).toEqual({ width: 10, height: 20 });
+    expect(caps.sixelColorRegisters).toBe(1024);
+  });
+
+  it("suppresses kitty on iTerm.app even when it answers the kitty query", async () => {
+    const env = { TERM_PROGRAM: "iTerm.app" } as NodeJS.ProcessEnv;
+    const caps = await detectGraphicsCapabilities(mockStdin(REPLY), sink, env);
+    expect(caps.kitty).toBe(false); // forced off → use native iTerm2 protocol
+    expect(caps.iterm2).toBe(true);
+    expect(pickProtocol(caps)).toBe("iterm2");
   });
 });
