@@ -18,6 +18,14 @@ export function selectDriver(protocol: GraphicsProtocol): ImageDriver | null {
       return iterm2Driver;
     case "kitty":
       return kittyDriver;
+    default: {
+      // Exhaustiveness guard: a newly added GraphicsProtocol without a case here
+      // is a compile error (assigning it to `never` fails); untyped runtime
+      // input falls through to null.
+      const _exhaustive: never = protocol;
+      void _exhaustive;
+      return null;
+    }
   }
 }
 

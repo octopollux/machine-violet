@@ -28,8 +28,9 @@ export type GraphicsProtocol = "kitty" | "iterm2" | "sixel";
 
 export interface GraphicsCapabilities {
   kitty: boolean;
-  /** Raw DA "attribute 4" — sixel-capable. Gate usage via pickProtocol (needs >=256 registers). */
+  /** iTerm2 inline-image (OSC 1337) support, sniffed from env (no query handshake). */
   iterm2: boolean;
+  /** Raw DA "attribute 4" — sixel-capable. Gate usage via pickProtocol (needs >=256 registers). */
   sixel: boolean;
   /** Terminal cell size in pixels; null when the terminal didn't report it. */
   cellPixels: { width: number; height: number } | null;
@@ -135,8 +136,8 @@ export function parseColorRegisters(response: string): number | null {
 
 /**
  * iTerm2 inline-image support is detected from environment, not a query
- * (iTerm2 has no capability handshake). Mirrors ink-picture's TerminalInfo
- * sniffing: iTerm2 itself, recent WezTerm, recent Konsole, recent Rio.
+ * (iTerm2 has no capability handshake): iTerm2 itself, recent WezTerm, recent
+ * Konsole. (Add new terminals here as their env signatures are confirmed.)
  */
 export function detectIterm2FromEnv(env: NodeJS.ProcessEnv): boolean {
   const prog = env.TERM_PROGRAM;
