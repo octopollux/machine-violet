@@ -122,7 +122,18 @@ TUI tools are **fire-and-forget**: their results drive engine/UI state but the D
 
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
-| `switch_player` | T1 | DM | `({ player })` | Switch the active player character during free play (outside combat). During combat, initiative controls turn order automatically. |
+| `switch_player` | T1 | DM | `({ player })` | Pass the turn between characters **already in the roster** during free play (outside combat). During combat, initiative controls turn order automatically. Rejects a name not in `config.players` — use `swap_pc` to hand control to a new/existing character. |
+| `swap_pc` | T1 | DM / OOC | `({ character, replaces?, color?, player_name? })` | Reassign a roster slot to `character` and make it the active PC (a "PC swap" / handoff). The only tool that edits `config.players`, and it persists `config.json` so the new PC survives reload. Moves the pointer only — pair with `howto_swap_pc` to also fix sheets, party.md, resources, modeline, theme. |
+
+---
+
+## How-To / Knowledge Tools ("skills")
+
+`howto_*` tools take no arguments and change nothing. They load a procedure into context — call one before a multi-step operation so you touch every piece of state.
+
+| Tool | Tier | Caller | Signature | Effect |
+|---|---|---|---|---|
+| `howto_swap_pc` | T1 | DM / OOC | `()` | Returns the step-by-step playbook for swapping the player character with a new or existing character (roster, character sheets, party.md, resources, modeline, theme). Backed by `prompts/howto-swap-pc.md`. |
 
 ---
 

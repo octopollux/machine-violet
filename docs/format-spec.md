@@ -147,7 +147,9 @@ Everything else is created during play.
     "detail": "Hidden tuning notes..."    // DM-only detail block.
   },
 
-  // Players
+  // Players — the PC roster. Normally written once at creation, but the
+  // `swap_pc` tool may rewrite a slot's `character`/`color`/`name` in-session
+  // (a PC handoff) and persists config.json so it survives reload.
   "players": [
     {
       "name": "Alex",                     // Required. Player display name.

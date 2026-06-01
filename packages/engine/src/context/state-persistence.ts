@@ -9,8 +9,17 @@ import type { MapData } from "@machine-violet/shared/types/maps.js";
 import type { SceneState } from "../agents/scene-manager.js";
 import type { ConversationExchange } from "./conversation.js";
 import type { StyleVariant } from "@machine-violet/shared/types/tui.js";
+import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
 import type { TokenBreakdown } from "./cost-tracker.js";
 import { tailLines } from "./display-log.js";
+
+/**
+ * Campaign config file, at the campaign root (NOT under `state/`).
+ * Deliberately kept out of `STATE_FILES` — that set is contractually the
+ * `state/` directory the Campaign Explorer categorizes, and config.json is a
+ * different category (campaign manifest, normally written only at creation).
+ */
+export const CONFIG_FILE = "config.json";
 
 /** Paths within campaign root for persisted state files */
 export const STATE_FILES = {
@@ -183,6 +192,20 @@ export class StatePersister {
 
   persistUsage(breakdown: TokenBreakdown): void {
     this.enqueueWrite(STATE_FILES.usage, JSON.stringify(breakdown, null, 2));
+  }
+
+  /**
+   * Write the campaign config back to `config.json`.
+   *
+   * `config.json` is normally treated as read-only after creation — it's the
+   * source of truth loaded fresh at every session start. The one mutation we
+   * support in-session is the PC roster (`players[]`): swapping which character
+   * a player controls. That change has to round-trip to disk or the next load
+   * resurrects the old PC. `state.config` is the full parsed object, so
+   * stringifying it preserves every field (premise, dm_personality, etc.).
+   */
+  persistConfig(config: CampaignConfig): void {
+    this.enqueueWrite(CONFIG_FILE, JSON.stringify(config, null, 2));
   }
 
   /** Append text to the rolling display log (human-readable, never cleared). */

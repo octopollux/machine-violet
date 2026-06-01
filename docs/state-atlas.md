@@ -78,7 +78,7 @@ GameState
 │   ├── campaign_scope?: CampaignScope       const ("one-shot" | "few-sessions" | "grand-campaign" | "open-ended")
 │   ├── setup_handoff?: string               const (postcard from setup agent, injected once into the first-turn priming; persists for resume-from-disk after a mid-first-turn crash)
 │   ├── dm_personality: DMPersonality
-│   ├── players: PlayerConfig[]
+│   ├── players: PlayerConfig[]              mut   → config.json            DM/OOC (swap_pc) — PC roster handoff
 │   ├── combat: CombatConfig
 │   ├── context: ContextConfig
 │   ├── recovery: RecoveryConfig
@@ -86,7 +86,7 @@ GameState
 │   └── calendar_display_format?: string
 │
 ├── campaignRoot: string                   const                          Session init
-├── activePlayerIndex: number              mut   → state/scene.json      DM (switch_player)
+├── activePlayerIndex: number              mut   → state/scene.json      DM (switch_player, swap_pc)
 ├── displayResources: Record<string, string[]>     mut   → state/resources.json (via React effect)  DM (set_display_resources)
 └── resourceValues: Record<string, Record<string, string>>  mut   → state/resources.json (via React effect)  DM (set_resource_values)
 ```
@@ -174,7 +174,7 @@ All state files live under `<campaignRoot>/state/`.
 | `state/conversation.json` | `ConversationExchange[]` | `StatePersister.persistConversation` | After each exchange | [§4.7](format-spec.md#47-conversation-stateconversationjson) |
 | `state/resources.json` | `PersistedResourceState` | `StatePersister.persistResources` | React effect on `resources` state change (same pattern as modelines in `ui.json`) | [§4.10](format-spec.md#410-resources-stateresourcesjson) |
 | `state/ui.json` | `PersistedUIState` | `StatePersister.persistUI` | After theme/style/modeline changes | [§4.8](format-spec.md#48-ui-stateuijson) |
-| `config.json` | `CampaignConfig` | `buildCampaignConfig` / `createDefaultCampaignConfig` | Campaign creation only. Read-only during play. Includes `version` (`CAMPAIGN_FORMAT_VERSION`) and `createdAt` (ISO 8601) manifest fields. | |
+| `config.json` | `CampaignConfig` | `buildCampaignConfig` / `createDefaultCampaignConfig`; `StatePersister.persistConfig` | Written at campaign creation. During play it is otherwise read-only — the **one** in-session mutation is the PC roster (`players[]`) via `swap_pc`, which calls `persistConfig` from `GameEngine.onToolSuccess`. Includes `version` (`CAMPAIGN_FORMAT_VERSION`) and `createdAt` (ISO 8601) manifest fields. | |
 | `pending-operation.json` | `PendingOperation` | `SceneManager` | During scene transition cascade steps | [§4.11](format-spec.md#411-pending-operation-pending-operationjson) |
 
 `StatePersister` uses write-through: each `persist*` call is fire-and-forget with error swallowing. Recovery on next session load reads `loadAll()` and hydrates `GameState`.
