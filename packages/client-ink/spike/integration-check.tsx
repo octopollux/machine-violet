@@ -14,9 +14,15 @@
  *
  * The header shows the detected `proto=` so you can confirm which driver ran.
  *
- *   ↑/↓ slide   o toggle occluder   q quit
+ *   ↑/↓ slide   o toggle occluder   p cycle sixel palette (256/512/1024)   q quit
  *
- * Run:  npx tsx packages/client-ink/spike/integration-check.tsx
+ * `p` only affects sixel (kitty/iTerm2 are true-color) — use it on Windows
+ * Terminal to see whether more color registers reduce gradient banding.
+ *
+ * Run:  npx tsx packages/client-ink/spike/integration-check.tsx [imagePath]
+ *   - pass a real image path to test a photographic scene (the case sixel
+ *     dithering handles well); with no arg it uses a synthetic gradient, which
+ *     is the WORST case for palette dithering.
  *   - sixel  → Windows Terminal, foot, recent xterm
  *   - kitty  → kitty, Ghostty, WezTerm (kitty wins when multiple are supported)
  *   - iTerm2 → iTerm2 (and WezTerm if kitty is somehow unavailable)
@@ -62,28 +68,36 @@ function Filler({ label, n }: { label: string; n: number }): React.ReactElement 
   return <>{Array.from({ length: n }, (_, i) => <Text key={i} dimColor>{label} line {i + 1}</Text>)}</>;
 }
 
+// Palette sizes to cycle with `p` — lets you see on WT whether more sixel color
+// registers cut the gradient banding (WT doesn't report its real ceiling).
+const PALETTES = [256, 512, 1024];
+
 function App({ caps, path, cols, rows }: { caps: GraphicsCapabilities; path: string; cols: number; rows: number }): React.ReactElement {
   const { exit } = useApp();
   const scrollRef = useRef<ScrollViewRef>(null);
   const [occ, setOcc] = useState(false);
+  const [palIdx, setPalIdx] = useState(0);
   const [, force] = useState(0);
   // ScrollView's scrollBy updates its internal offset but doesn't re-render us;
   // InlineImage re-measures only on re-render. Production's NarrativeArea
   // re-renders on scroll via setLinesBelow — mirror that with onScroll here.
   const onScroll = () => force((x) => x + 1);
+  // Override the detected register count so `p` can A/B the sixel palette size.
+  const effCaps: GraphicsCapabilities = { ...caps, sixelColorRegisters: PALETTES[palIdx] };
   // Real ScrollView reproduces production (marginTop:-scrollOffset), so the
   // image slot genuinely moves above the viewport top → top-clipping works.
   useInput((input, key) => {
     if (input === "q") return exit();
     if (input === "o") setOcc((v) => !v);
+    if (input === "p") setPalIdx((i) => (i + 1) % PALETTES.length);
     if (key.upArrow) scrollRef.current?.scrollBy(-1);
     if (key.downArrow) scrollRef.current?.scrollBy(1);
   });
   return (
     <OcclusionProvider>
       <Box flexDirection="column">
-        <Text bold>#552 integration-check. proto={pickProtocol(caps) ?? "NONE"} cell={caps.cellPixels ? `${caps.cellPixels.width}x${caps.cellPixels.height}` : "?"} registers={caps.sixelColorRegisters ?? "unreported"} palette={sixelPaletteSize(caps)}</Text>
-        <Text dimColor>↑/↓ scroll   o occluder({occ ? "ON" : "off"})   q quit</Text>
+        <Text bold>#552 integration-check. proto={pickProtocol(effCaps) ?? "NONE"} cell={effCaps.cellPixels ? `${effCaps.cellPixels.width}x${effCaps.cellPixels.height}` : "?"} registers={caps.sixelColorRegisters ?? "unreported"} palette={sixelPaletteSize(effCaps)}</Text>
+        <Text dimColor>↑/↓ scroll   o occluder({occ ? "ON" : "off"})   p palette({sixelPaletteSize(effCaps)})   q quit</Text>
         <Text color="magenta">{"━".repeat(cols)} TOP BOUNDARY</Text>
         <Box height={VIEW_ROWS} flexDirection="column">
           <ScrollView ref={scrollRef} onScroll={onScroll}>
@@ -92,7 +106,7 @@ function App({ caps, path, cols, rows }: { caps: GraphicsCapabilities; path: str
                 (bottom-clip), the middle, then off the top edge (top-clip). */}
             <Filler label="above" n={VIEW_ROWS + 4} />
             <Box flexDirection="column" marginTop={1} marginBottom={1}>
-              <InlineImage path={path} cols={cols} rows={rows} viewportTop={HEADER_ROWS} viewportRows={VIEW_ROWS} graphicsCaps={caps} />
+              <InlineImage path={path} cols={cols} rows={rows} viewportTop={HEADER_ROWS} viewportRows={VIEW_ROWS} graphicsCaps={effCaps} />
             </Box>
             <Filler label="below" n={VIEW_ROWS + 4} />
           </ScrollView>
@@ -114,18 +128,23 @@ async function main(): Promise<void> {
   // instead of being echoed. This standalone probe must do the same.
   process.stdin.setRawMode?.(true);
   const caps = await detectGraphicsCapabilities(process.stdin, process.stdout);
-  // Build a recognizable gridded/striped sample PNG.
-  const w = 480, h = 270;
-  const raw = Buffer.alloc(w * h * 3);
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const i = (y * w + x) * 3;
-    const grid = x % 40 === 0 || y % 30 === 0;
-    raw[i] = grid ? 255 : Math.floor((x / w) * 255);
-    raw[i + 1] = grid ? 255 : Math.floor((y / h) * 255);
-    raw[i + 2] = grid ? 0 : 128;
+  // Pass a real image path as the first arg to test a photographic scene
+  // (the dithering "works great on real pictures" case); otherwise fall back to
+  // a synthetic gradient — the WORST case for sixel dithering on a palette.
+  let path = process.argv[2];
+  if (!path) {
+    const w = 480, h = 270;
+    const raw = Buffer.alloc(w * h * 3);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 3;
+      const grid = x % 40 === 0 || y % 30 === 0;
+      raw[i] = grid ? 255 : Math.floor((x / w) * 255);
+      raw[i + 1] = grid ? 255 : Math.floor((y / h) * 255);
+      raw[i + 2] = grid ? 0 : 128;
+    }
+    path = join(tmpdir(), "mv-552-sample.png");
+    writeFileSync(path, await sharp(raw, { raw: { width: w, height: h, channels: 3 } }).png().toBuffer());
   }
-  const path = join(tmpdir(), "mv-552-sample.png");
-  writeFileSync(path, await sharp(raw, { raw: { width: w, height: h, channels: 3 } }).png().toBuffer());
   const cols = Math.max(20, Math.min(44, (process.stdout.columns ?? 80) - 6));
   const rows = Math.max(6, Math.round((cols * 9) / 32));
   const { waitUntilExit } = render(<App caps={caps} path={path} cols={cols} rows={rows} />);
