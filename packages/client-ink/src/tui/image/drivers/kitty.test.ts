@@ -6,6 +6,7 @@
 import { kittyDriver } from "./kitty.js";
 
 const W = 8, H = 24;
+const CELL = { width: 4, height: 6 }; // kitty ignores this; required by prepare
 const rgba = (): Buffer => Buffer.alloc(W * H * 4, 0x7f);
 
 /** APC graphics escapes: `\x1b_G<keys>\x1b\\` or `\x1b_G<keys>;<payload>\x1b\\`. */
@@ -23,7 +24,7 @@ describe("kittyDriver", () => {
 
   it("transmits the raster once at prepare: f=32, correct dims, terminated by m=0", () => {
     let out = "";
-    kittyDriver.prepare(rgba(), W, H, (s) => { out += s; }, 256);
+    kittyDriver.prepare(rgba(), W, H, (s) => { out += s; }, 256, CELL);
     const escs = apcs(out);
     expect(escs.length).toBeGreaterThan(0);
     const first = kv(escs[0].keys);
@@ -38,7 +39,7 @@ describe("kittyDriver", () => {
   });
 
   it("places a native source crop for a band (x=0,y=top,w,h, single placement, no cursor move)", () => {
-    const p = kittyDriver.prepare(rgba(), W, H, () => {}, 256);
+    const p = kittyDriver.prepare(rgba(), W, H, () => {}, 256, CELL);
     const place = kv(apcs(p.encodeBand(6, 12))[0].keys);
     expect(place.a).toBe("p");
     expect(place.x).toBe("0");
@@ -50,12 +51,12 @@ describe("kittyDriver", () => {
   });
 
   it("returns empty string for a zero-height band", () => {
-    const p = kittyDriver.prepare(rgba(), W, H, () => {}, 256);
+    const p = kittyDriver.prepare(rgba(), W, H, () => {}, 256, CELL);
     expect(p.encodeBand(0, 0)).toBe("");
   });
 
   it("clear() deletes placements but keeps image data (d=i)", () => {
-    const p = kittyDriver.prepare(rgba(), W, H, () => {}, 256);
+    const p = kittyDriver.prepare(rgba(), W, H, () => {}, 256, CELL);
     const del = kv(apcs(p.clear!())[0].keys);
     expect(del.a).toBe("d");
     expect(del.d).toBe("i"); // lowercase → keep transmitted data
@@ -63,7 +64,7 @@ describe("kittyDriver", () => {
 
   it("dispose() deletes the image data (d=I)", () => {
     const writes: string[] = [];
-    const p = kittyDriver.prepare(rgba(), W, H, (s) => writes.push(s), 256);
+    const p = kittyDriver.prepare(rgba(), W, H, (s) => writes.push(s), 256, CELL);
     writes.length = 0; // discard transmit; capture only dispose's write
     p.dispose();
     const del = kv(apcs(writes.join(""))[0].keys);
@@ -74,8 +75,8 @@ describe("kittyDriver", () => {
   it("assigns a distinct image id to each prepared image", () => {
     const idOf = (s: string) => kv(apcs(s)[0].keys).i;
     let a = "", b = "";
-    kittyDriver.prepare(rgba(), W, H, (s) => { a += s; }, 256);
-    kittyDriver.prepare(rgba(), W, H, (s) => { b += s; }, 256);
+    kittyDriver.prepare(rgba(), W, H, (s) => { a += s; }, 256, CELL);
+    kittyDriver.prepare(rgba(), W, H, (s) => { b += s; }, 256, CELL);
     expect(idOf(a)).not.toBe(idOf(b));
   });
 });

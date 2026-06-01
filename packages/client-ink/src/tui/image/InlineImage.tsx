@@ -127,7 +127,7 @@ export function InlineImage({
           .raw()
           .toBuffer({ resolveWithObject: true });
         if (cancelled) return;
-        preparedRef.current = driver.prepare(data, widthPx, heightPx, (s) => stdout.write(s), paletteSize);
+        preparedRef.current = driver.prepare(data, widthPx, heightPx, (s) => stdout.write(s), paletteSize, cell);
         scheduleEncode(); // first band
       } catch {
         // Missing/unreadable file: render nothing inline (export still has it).

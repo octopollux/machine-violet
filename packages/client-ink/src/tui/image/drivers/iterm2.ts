@@ -17,9 +17,15 @@
 import { encodePng } from "../png.js";
 import type { ImageDriver, PreparedImage } from "./types.js";
 
-/** OSC 1337 inline image: display `png` at exactly width×height device pixels. */
-function iterm2Escape(png: Buffer, widthPx: number, heightPx: number): string {
-  const header = `size=${png.length};width=${widthPx}px;height=${heightPx}px;preserveAspectRatio=0;inline=1`;
+/**
+ * OSC 1337 inline image: display `png` at exactly `cols`×`rows` character cells.
+ * Sizing in cells (no `px` suffix) — rather than pixels — makes the image
+ * occupy exactly the text rows the renderer reserved, so it stays aligned with
+ * the scroll/occlusion math even when the terminal's pixel cell height is only
+ * approximate (iTerm2 answers 14t, not 16t, so our cell size is derived).
+ */
+function iterm2Escape(png: Buffer, cols: number, rows: number): string {
+  const header = `size=${png.length};width=${cols};height=${rows};preserveAspectRatio=0;inline=1`;
   return `\x1b]1337;File=${header}:${png.toString("base64")}\x07`;
 }
 
@@ -27,13 +33,15 @@ export const iterm2Driver: ImageDriver = {
   protocol: "iterm2",
   // PNG-deflate per band is ~1-3ms → cheap enough to re-encode in real time.
   expensiveEncode: false,
-  prepare(rgba: Buffer, widthPx: number, _heightPx: number, _write: (s: string) => void, _paletteSize: number): PreparedImage {
+  prepare(rgba: Buffer, widthPx: number, _heightPx: number, _write: (s: string) => void, _paletteSize: number, cellPixels: { width: number; height: number }): PreparedImage {
     const stride = widthPx * 4;
+    const cols = Math.round(widthPx / cellPixels.width);
     return {
       encodeBand(topPx: number, bandPx: number): string {
         if (bandPx <= 0) return "";
         const band = rgba.subarray(topPx * stride, (topPx + bandPx) * stride);
-        return iterm2Escape(encodePng(band, widthPx, bandPx), widthPx, bandPx);
+        const rows = Math.round(bandPx / cellPixels.height);
+        return iterm2Escape(encodePng(band, widthPx, bandPx), cols, rows);
       },
       dispose() {
         /* iTerm2 holds no addressable terminal-side resource */

@@ -46,6 +46,16 @@ export interface ImageDriver {
    * Cache (and for kitty, transmit) the resized RGBA raster. `write` lets a
    * driver emit out-of-band transmit escapes once at prepare time. `paletteSize`
    * is the sixel color-register budget (ignored by non-palettized protocols).
+   * `cellPixels` is the terminal cell size — iTerm2 uses it to express the
+   * display size in cells (so the footprint lands exactly on the text grid even
+   * when the pixel cell height is only approximate); other drivers ignore it.
    */
-  prepare(rgba: Buffer, widthPx: number, heightPx: number, write: (s: string) => void, paletteSize: number): PreparedImage;
+  prepare(
+    rgba: Buffer,
+    widthPx: number,
+    heightPx: number,
+    write: (s: string) => void,
+    paletteSize: number,
+    cellPixels: { width: number; height: number },
+  ): PreparedImage;
 }

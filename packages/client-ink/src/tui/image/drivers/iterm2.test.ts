@@ -7,6 +7,7 @@ import sharp from "sharp";
 import { iterm2Driver } from "./iterm2.js";
 
 const W = 12, H = 18;
+const CELL = { width: 6, height: 6 }; // → cols=2; a 6px band = 1 row, 12px = 2 rows
 
 function sampleRgba(): Buffer {
   const rgba = Buffer.alloc(W * H * 4);
@@ -34,20 +35,21 @@ describe("iterm2Driver", () => {
   });
 
   it("returns empty string for a zero-height band", () => {
-    const p = iterm2Driver.prepare(sampleRgba(), W, H, () => {}, 256);
+    const p = iterm2Driver.prepare(sampleRgba(), W, H, () => {}, 256, CELL);
     expect(p.encodeBand(0, 0)).toBe("");
   });
 
-  it("carries the band's display size in the escape header", () => {
-    const p = iterm2Driver.prepare(sampleRgba(), W, H, () => {}, 256);
-    const esc = p.encodeBand(6, 6);
-    expect(esc).toContain(`width=${W}px;height=6px`);
+  it("sizes the display in CELLS, not pixels, so it lands on the text grid", () => {
+    const p = iterm2Driver.prepare(sampleRgba(), W, H, () => {}, 256, CELL);
+    const esc = p.encodeBand(6, 12); // 12px band ÷ 6px cell = 2 rows; W/6 = 2 cols
+    expect(esc).toContain("width=2;height=2"); // cells (no "px")
+    expect(esc).not.toContain("px");
     expect(esc).toContain("inline=1");
   });
 
   it("embeds a PNG that decodes to exactly the requested band", async () => {
     const src = sampleRgba();
-    const p = iterm2Driver.prepare(src, W, H, () => {}, 256);
+    const p = iterm2Driver.prepare(src, W, H, () => {}, 256, CELL);
     const top = 6, rows = 6;
     const png = pngFromEscape(p.encodeBand(top, rows));
     const { data, info } = await sharp(png).raw().ensureAlpha().toBuffer({ resolveWithObject: true });

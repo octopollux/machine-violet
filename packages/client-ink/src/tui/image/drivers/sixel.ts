@@ -34,7 +34,7 @@ export const sixelDriver: ImageDriver = {
   protocol: "sixel",
   // One quantization up front, then cheap per-band encodes from cached indices.
   expensiveEncode: false,
-  prepare(rgba: Buffer, widthPx: number, _heightPx: number, _write: (s: string) => void, paletteSize: number): PreparedImage {
+  prepare(rgba: Buffer, widthPx: number, _heightPx: number, _write: (s: string) => void, paletteSize: number, _cellPixels: { width: number; height: number }): PreparedImage {
     // reduce dithers its input IN PLACE — pass a copy so the caller's cached
     // RGBA (reused across re-prepares) is never mutated. Returns frozen indices
     // (row-major Uint16Array, length w*h) + the shared RGBA8888 palette.

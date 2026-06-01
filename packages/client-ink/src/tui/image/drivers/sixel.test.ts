@@ -10,6 +10,7 @@ import { sixelDriver } from "./sixel.js";
 
 const W = 60; // px wide
 const H = 48; // px tall (multiple of 6 → clean sixel bands)
+const CELL = { width: 8, height: 16 }; // sixel ignores this; required by prepare
 
 /** A gradient with a few hard color planes — enough to populate a palette. */
 function sampleRgba(): Buffer {
@@ -46,14 +47,14 @@ function bandData(full: string): string[] {
 
 describe("sixelDriver", () => {
   it("emits a well-formed sixel sequence (introducer … finalizer)", () => {
-    const prepared = sixelDriver.prepare(sampleRgba(), W, H, () => {}, 256);
+    const prepared = sixelDriver.prepare(sampleRgba(), W, H, () => {}, 256, CELL);
     const band = prepared.encodeBand(0, 12);
     expect(band.startsWith("\x1bP")).toBe(true); // DCS introducer
     expect(band.endsWith("\x1b\\")).toBe(true); // ST finalizer
   });
 
   it("returns empty string for a zero-height band", () => {
-    const prepared = sixelDriver.prepare(sampleRgba(), W, H, () => {}, 256);
+    const prepared = sixelDriver.prepare(sampleRgba(), W, H, () => {}, 256, CELL);
     expect(prepared.encodeBand(0, 0)).toBe("");
     expect(prepared.encodeBand(10, 0)).toBe("");
   });
@@ -63,7 +64,7 @@ describe("sixelDriver", () => {
   });
 
   it("decodes a band back to roughly the source colors", () => {
-    const prepared = sixelDriver.prepare(sampleRgba(), W, H, () => {}, 256);
+    const prepared = sixelDriver.prepare(sampleRgba(), W, H, () => {}, 256, CELL);
     const dec = decodeRows(prepared.encodeBand(0, 6));
     // Top-left is near-black-green (x≈0,y≈0); bottom region is greener. Sanity:
     // decoded pixel exists and alpha is opaque (high byte set).
@@ -72,7 +73,7 @@ describe("sixelDriver", () => {
   });
 
   it("uses a stable palette across crops (the whole point of #6)", () => {
-    const prepared = sixelDriver.prepare(sampleRgba(), W, H, () => {}, 256);
+    const prepared = sixelDriver.prepare(sampleRgba(), W, H, () => {}, 256, CELL);
     // Crop A = source rows [0,24); crop B = source rows [12,36). The overlap is
     // source rows [12,24): A's 6-row bands 2,3 and B's bands 0,1.
     const a = prepared.encodeBand(0, 24);
@@ -91,14 +92,14 @@ describe("sixelDriver", () => {
   });
 
   it("encodes a given band deterministically across repeated calls", () => {
-    const prepared = sixelDriver.prepare(sampleRgba(), W, H, () => {}, 256);
+    const prepared = sixelDriver.prepare(sampleRgba(), W, H, () => {}, 256, CELL);
     expect(prepared.encodeBand(6, 18)).toBe(prepared.encodeBand(6, 18));
   });
 
   it("does not mutate the caller's RGBA buffer (reduce dithers in place)", () => {
     const rgba = sampleRgba();
     const snapshot = Buffer.from(rgba);
-    sixelDriver.prepare(rgba, W, H, () => {}, 256).encodeBand(0, 12);
+    sixelDriver.prepare(rgba, W, H, () => {}, 256, CELL).encodeBand(0, 12);
     expect(rgba.equals(snapshot)).toBe(true);
   });
 });

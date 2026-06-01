@@ -43,7 +43,7 @@ export const kittyDriver: ImageDriver = {
   protocol: "kitty",
   // Placement is a tiny escape; encode per frame is fine.
   expensiveEncode: false,
-  prepare(rgba: Buffer, widthPx: number, heightPx: number, write: (s: string) => void, _paletteSize: number): PreparedImage {
+  prepare(rgba: Buffer, widthPx: number, heightPx: number, write: (s: string) => void, _paletteSize: number, _cellPixels: { width: number; height: number }): PreparedImage {
     const id = nextId++;
     transmit(write, id, rgba, widthPx, heightPx);
     return {
