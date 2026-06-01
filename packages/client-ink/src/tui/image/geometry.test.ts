@@ -1,6 +1,5 @@
 import {
-  spansOverlap, isOccluded, visibleBand, bandPixels, vacatedRows,
-  subtractOcclusion, fitImage, type VisibleBand,
+  spansOverlap, isOccluded, visibleBand, bandPixels, vacatedRows, fitImage,
 } from "./geometry.js";
 
 describe("spansOverlap", () => {
@@ -62,50 +61,6 @@ describe("visibleBand", () => {
 describe("bandPixels", () => {
   it("scales rows to pixels by the real cell height", () => {
     expect(bandPixels(3, 7, 20)).toEqual({ topPx: 60, bandPx: 140 });
-  });
-});
-
-describe("subtractOcclusion", () => {
-  const band: VisibleBand = { visTop: 10, visRows: 12, srcTopRows: 0 };
-
-  it("returns the band unchanged when no overlay touches it", () => {
-    expect(subtractOcclusion(band, [{ top: 24, rows: 4 }])).toEqual(band);
-  });
-
-  it("returns null when an overlay covers the whole band", () => {
-    expect(subtractOcclusion(band, [{ top: 8, rows: 20 }])).toBeNull();
-  });
-
-  it("pushes the top down and advances srcTopRows when covered from the top", () => {
-    // band [10,22), overlay [6,14) → visible [14,22), 4 source rows trimmed
-    expect(subtractOcclusion(band, [{ top: 6, rows: 8 }])).toEqual({
-      visTop: 14, visRows: 8, srcTopRows: 4,
-    });
-  });
-
-  it("pulls the bottom up when covered from the bottom (srcTopRows unchanged)", () => {
-    // band [10,22), overlay [18,30) → visible [10,18)
-    expect(subtractOcclusion(band, [{ top: 18, rows: 12 }])).toEqual({
-      visTop: 10, visRows: 8, srcTopRows: 0,
-    });
-  });
-
-  it("keeps the larger surviving segment on an interior split (top larger)", () => {
-    // band [10,22), overlay [18,20) → top [10,18)=8 vs bottom [20,22)=2 → keep top
-    expect(subtractOcclusion(band, [{ top: 18, rows: 2 }])).toEqual({
-      visTop: 10, visRows: 8, srcTopRows: 0,
-    });
-  });
-
-  it("keeps the larger surviving segment on an interior split (bottom larger)", () => {
-    // band [10,22), overlay [12,14) → top [10,12)=2 vs bottom [14,22)=8 → keep bottom
-    expect(subtractOcclusion(band, [{ top: 12, rows: 2 }])).toEqual({
-      visTop: 14, visRows: 8, srcTopRows: 4,
-    });
-  });
-
-  it("ignores zero-height overlays", () => {
-    expect(subtractOcclusion(band, [{ top: 12, rows: 0 }])).toEqual(band);
   });
 });
 

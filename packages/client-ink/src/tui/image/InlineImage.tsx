@@ -11,13 +11,15 @@
  *    meltdown);
  *  - vertical band crop: only the rows inside the narrative viewport are
  *    encoded/displayed (graphics protocols don't clip), so the image never
- *    overflows the modeline above or the input line below;
- *  - occlusion is part of that same band: rows an opaque modal covers are
- *    subtracted from the band (geometry.ts `subtractOcclusion`), so the image
- *    keeps showing the part the modal leaves free instead of vanishing whole.
- *    A modal opening/closing bumps the occlusion store (occlusion.tsx), which
- *    re-renders this component and re-encodes the trimmed band; the painter also
- *    hides live (same frame) if the cached band is stale vs current occluders.
+ *    overflows the modeline above or the input line below — this partial crop
+ *    is for the viewport's top/bottom edges only;
+ *  - modal occlusion is all-or-nothing: if an opaque modal's row-span overlaps
+ *    the band at all, the painter hides the whole image that frame and restores
+ *    it (cached band intact) when the modal closes. Modal open/close each emit
+ *    an Ink frame, so the live painter check suffices — no re-encode, no store
+ *    subscription. (Partial *modal* cropping was tried and dropped: interior
+ *    splits and re-encode timing weren't worth the complexity.) An overlay that
+ *    doesn't register a span (the inline ChoiceOverlay) leaves the image visible.
  *  - repaint trigger: the painter is registered with painterRegistry and the
  *    sync-write combiner re-blits it inside the same DEC-2026 synchronized
  *    block as Ink's frame — flicker-free (validated by the #552 spikes);
@@ -37,10 +39,8 @@ import { selectDriver } from "./drivers/index.js";
 import type { PreparedImage } from "./drivers/types.js";
 import { registerPainter } from "./painterRegistry.js";
 import { composePaint, type PaintBox } from "./paint.js";
-import {
-  visibleBand, subtractOcclusion, bandPixels, fitImage, isOccluded,
-} from "./geometry.js";
-import { useOcclusionSpans, useOcclusionVersion } from "./occlusion.js";
+import { visibleBand, bandPixels, fitImage, isOccluded } from "./geometry.js";
+import { useOcclusionSpans } from "./occlusion.js";
 
 /** Fallback cell size when the terminal didn't answer `\x1b[16t`. */
 const FALLBACK_CELL = { width: 10, height: 20 };
@@ -78,10 +78,6 @@ export function InlineImage({
   const { stdout } = useStdout();
   const slotRef = useRef<DOMElement>(null);
   const getOcclusionSpans = useOcclusionSpans();
-  // Re-render (→ re-measure → re-encode the occlusion-trimmed band) whenever a
-  // modal opens, closes, or moves. Without this the band would only recompute
-  // on scroll, so a modal opening over part of an image wouldn't crop it.
-  useOcclusionVersion();
   const painterKey = useId();
 
   const protocol = graphicsCaps ? pickProtocol(graphicsCaps) : null;
@@ -134,30 +130,12 @@ export function InlineImage({
     return () => { cancelled = true; };
   }, [path, driver]);
 
-  // Force a repaint that doesn't depend on Ink emitting a frame. Ink skips the
-  // stdout write when its render output is unchanged (our slot Box only changes
-  // on the one metadata reflow), so after an async encode we write an empty
-  // synchronized block; the sync-write combiner splices the composite painter
-  // (this image's escapes) inside it, painting atomically.
-  //
-  // Coalesced onto a microtask, and this matters for correctness, not just
-  // batching: a modal opening re-encodes this image, but the modal registers
-  // its occlusion span in a sibling layout effect that runs AFTER ours (JSX
-  // order). A synchronous write here would paint the full, un-trimmed band
-  // against not-yet-registered occluders — straight over the modal — and only a
-  // second write would correct it (the visible "image redraws on top of the
-  // modal" flash). Deferring to a microtask lets every synchronous layout effect
-  // (the modal's registration) and the reactive re-encode settle first, so the
-  // single flushed write paints the already-trimmed band.
-  const repaintPendingRef = useRef(false);
-  const forceRepaint = () => {
-    if (!mountedRef.current || repaintPendingRef.current) return;
-    repaintPendingRef.current = true;
-    queueMicrotask(() => {
-      repaintPendingRef.current = false;
-      if (mountedRef.current) stdout.write(BSU + ESU);
-    });
-  };
+  // Force an immediate repaint that doesn't depend on Ink emitting a frame.
+  // Ink skips the stdout write when its render output is unchanged (our slot
+  // Box only changes on the one metadata reflow), so after an async encode we
+  // write an empty synchronized block; the sync-write combiner splices the
+  // composite painter (this image's escapes) inside it, painting atomically.
+  const forceRepaint = () => { if (mountedRef.current) stdout.write(BSU + ESU); };
 
   // Measure slot position from the yoga tree (accounts for ScrollView's
   // marginTop:-scrollOffset, so this is the live on-screen row). slotLeft is
@@ -211,16 +189,16 @@ export function InlineImage({
 
   // Immediate (cheap encoders: sixel, kitty) or debounced (expensive encoders) band encode.
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // The band to display now: the image's footprint clipped to the viewport,
-  // then trimmed by the rows any open modal covers.
+  // The band to display now: the image's footprint clipped to the narrative
+  // viewport (top/bottom edges). Modal occlusion is NOT applied here — it's an
+  // all-or-nothing live hide in the painter, so the cached band survives intact
+  // while a modal covers it and reappears the moment it closes (no re-encode).
   const desiredBand = (): { box: PaintBox; srcTopRows: number; visRows: number } | null => {
     const pos = posRef.current;
     const vp = viewportRef.current;
     const prep = preparedRef.current;
     if (!pos || !prep) return null;
-    const clipped = visibleBand(pos.slotTop, prep.rows, vp.top, vp.rows);
-    if (!clipped) return null;
-    const band = subtractOcclusion(clipped, occlusionRef.current());
+    const band = visibleBand(pos.slotTop, prep.rows, vp.top, vp.rows);
     if (!band) return null;
     return {
       box: { row: band.visTop, col: pos.slotLeft, rows: band.visRows, cols: prep.cols },
@@ -283,10 +261,10 @@ export function InlineImage({
         return clear + composePaint("", null, prev, 0, occluders);
       }
       let shown: PaintBox | null = cached?.box ?? null;
-      // Live occlusion gate: the cached band was encoded to avoid occluders, so
-      // if it now overlaps one, occlusion changed since the last encode (modal
-      // just opened) and the band is stale — hide this frame; the reactive
-      // re-encode lands the trimmed band on the next.
+      // Live occlusion gate (all-or-nothing): if any open modal's row-span
+      // overlaps the band at all, hide the whole image. Modal open/close each
+      // emit an Ink frame, so this re-evaluates the same frame the modal appears
+      // — no re-encode, and the cached band reappears intact when it closes.
       if (shown && isOccluded({ top: shown.row, rows: shown.rows }, occluders)) shown = null;
       const payload = shown && cached ? cached.payload : "";
       // Placement protocols (kitty) leave a persistent placement a covering modal

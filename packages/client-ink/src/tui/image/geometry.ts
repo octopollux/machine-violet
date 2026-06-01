@@ -119,62 +119,6 @@ export function fitImage(
 }
 
 /**
- * Trim a visible band by the rows opaque overlays cover — the "vertical-only
- * partial occlusion" that lets an image keep showing the part a modal doesn't
- * cover, instead of vanishing whole.
- *
- * Out-of-band graphics have no z-order against Ink's text grid, so any row a
- * modal paints is a row the image must NOT paint. We model the image as one
- * contiguous band (a single blit), so:
- *  - an overlay covering the band's TOP edge pushes `visTop` down (and advances
- *    `srcTopRows`, so the source crop starts lower — the bookkeeping that keeps
- *    the remaining pixels aligned);
- *  - an overlay covering the BOTTOM edge pulls the bottom up;
- *  - an overlay strictly INSIDE the band splits it in two — we can't paint a
- *    doughnut, so we keep the larger half;
- *  - an overlay covering the whole band (e.g. a full-height side pane) hides it
- *    (returns null).
- *
- * Overlays are processed top-to-bottom so stacked trims compose. This is the
- * same coordinate space and return shape as `visibleBand`, so callers chain
- * them: viewport clip first, then occlusion.
- */
-export function subtractOcclusion(
-  band: VisibleBand,
-  overlays: readonly RowSpan[],
-): VisibleBand | null {
-  let { visTop, srcTopRows } = band;
-  let visBottom = visTop + band.visRows;
-  const sorted = [...overlays].filter((o) => o.rows > 0).sort((a, b) => a.top - b.top);
-  for (const o of sorted) {
-    const oTop = o.top;
-    const oBottom = o.top + o.rows;
-    if (oBottom <= visTop || oTop >= visBottom) continue; // no overlap
-    const coversTop = oTop <= visTop;
-    const coversBottom = oBottom >= visBottom;
-    if (coversTop && coversBottom) return null; // fully covered
-    if (coversTop) {
-      srcTopRows += oBottom - visTop;
-      visTop = oBottom;
-    } else if (coversBottom) {
-      visBottom = oTop;
-    } else {
-      // Strictly interior: keep the larger of the two surviving segments.
-      const topRows = oTop - visTop;
-      const bottomRows = visBottom - oBottom;
-      if (topRows >= bottomRows) {
-        visBottom = oTop;
-      } else {
-        srcTopRows += oBottom - visTop;
-        visTop = oBottom;
-      }
-    }
-    if (visBottom <= visTop) return null;
-  }
-  return { visTop, visRows: visBottom - visTop, srcTopRows };
-}
-
-/**
  * Rows occupied by `prev` that `next` no longer covers — these must be erased
  * (overwritten with spaces) so a shrinking/moving image leaves no ghost band.
  * `next` of `null` means the image vanished entirely (erase all of `prev`).
