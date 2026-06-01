@@ -87,11 +87,14 @@ function App({ caps, path, cols, rows }: { caps: GraphicsCapabilities; path: str
         <Text color="magenta">{"━".repeat(cols)} TOP BOUNDARY</Text>
         <Box height={VIEW_ROWS} flexDirection="column">
           <ScrollView ref={scrollRef} onScroll={onScroll}>
-            <Filler label="above" n={6} />
+            {/* Above-filler exceeds the viewport so the image starts BELOW it:
+                scroll down to bring the image up through the bottom edge
+                (bottom-clip), the middle, then off the top edge (top-clip). */}
+            <Filler label="above" n={VIEW_ROWS + 4} />
             <Box flexDirection="column" marginTop={1} marginBottom={1}>
               <InlineImage path={path} cols={cols} rows={rows} viewportTop={HEADER_ROWS} viewportRows={VIEW_ROWS} graphicsCaps={caps} />
             </Box>
-            <Filler label="below" n={12} />
+            <Filler label="below" n={VIEW_ROWS + 4} />
           </ScrollView>
         </Box>
         <Text color="magenta">{"━".repeat(cols)} INPUT BOUNDARY (nothing below)</Text>
