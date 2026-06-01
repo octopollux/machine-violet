@@ -2,6 +2,8 @@ import {
   parseSixelFromDeviceAttributes,
   parseKittyGraphics,
   parseCellPixelSize,
+  parseTextAreaPixelSize,
+  deriveCellPixels,
   parseColorRegisters,
   detectIterm2FromEnv,
   pickProtocol,
@@ -48,6 +50,26 @@ describe("parseCellPixelSize", () => {
   it("returns null on absent/garbled reply", () => {
     expect(parseCellPixelSize("")).toBeNull();
     expect(parseCellPixelSize("\x1b[6;0;0t")).toBeNull();
+  });
+});
+
+describe("parseTextAreaPixelSize", () => {
+  it("parses a 14t reply (height;width)", () => {
+    expect(parseTextAreaPixelSize("\x1b[4;480;700t")).toEqual({ width: 700, height: 480 });
+  });
+  it("returns null for the 16t cell-size reply and garbage", () => {
+    expect(parseTextAreaPixelSize("\x1b[6;20;10t")).toBeNull();
+    expect(parseTextAreaPixelSize("")).toBeNull();
+  });
+});
+
+describe("deriveCellPixels", () => {
+  it("divides text-area pixels by char dimensions", () => {
+    expect(deriveCellPixels({ width: 700, height: 480 }, 100, 30)).toEqual({ width: 7, height: 16 });
+  });
+  it("returns null on missing text area or degenerate dimensions", () => {
+    expect(deriveCellPixels(null, 100, 30)).toBeNull();
+    expect(deriveCellPixels({ width: 700, height: 480 }, 0, 30)).toBeNull();
   });
 });
 
@@ -151,5 +173,19 @@ describe("detectGraphicsCapabilities", () => {
     expect(caps.kitty).toBe(false); // forced off → use native iTerm2 protocol
     expect(caps.iterm2).toBe(true);
     expect(pickProtocol(caps)).toBe("iterm2");
+  });
+
+  it("keeps the 16t cell size when present, ignoring 14t (no change for existing terminals)", async () => {
+    // Both replies present: 16t says 10x20, 14t says 700x480 — 16t must win.
+    const reply = "\x1b[6;20;10t" + "\x1b[4;480;700t" + "\x1b[?62;4c";
+    const caps = await detectGraphicsCapabilities(mockStdin(reply), sink, {} as NodeJS.ProcessEnv, 250, 100, 30);
+    expect(caps.cellPixels).toEqual({ width: 10, height: 20 });
+  });
+
+  it("falls back to 14t-derived cell size only when 16t is absent (iTerm2)", async () => {
+    // No 16t; 14t text area 700x480 over a 100x30 grid → 7x16 cells.
+    const reply = "\x1b[4;480;700t" + "\x1b[?62;4c";
+    const caps = await detectGraphicsCapabilities(mockStdin(reply), sink, {} as NodeJS.ProcessEnv, 250, 100, 30);
+    expect(caps.cellPixels).toEqual({ width: 7, height: 16 });
   });
 });

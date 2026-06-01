@@ -77,6 +77,38 @@ export function parseCellPixelSize(response: string): { width: number; height: n
 }
 
 /**
+ * Text-area pixel size from a `\x1b[14t` reply: `\x1b[4;{height};{width}t`.
+ * Dividing by the terminal's char dimensions yields the cell size on terminals
+ * that answer 14t but not 16t (notably iTerm2). Returns null when absent.
+ */
+export function parseTextAreaPixelSize(response: string): { width: number; height: number } | null {
+  // eslint-disable-next-line no-control-regex -- intentional: parsing ANSI escape sequences
+  const m = response.match(/\x1b\[4;(\d+);(\d+)t/);
+  if (!m) return null;
+  const height = Number.parseInt(m[1], 10);
+  const width = Number.parseInt(m[2], 10);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
+  return { width, height };
+}
+
+/**
+ * Derive cell pixel size from a text-area pixel report (`14t`) divided by the
+ * terminal's char dimensions — the fallback when a terminal doesn't answer the
+ * direct cell-size query (`16t`). Returns null on missing/degenerate input.
+ */
+export function deriveCellPixels(
+  textArea: { width: number; height: number } | null,
+  cols: number,
+  rows: number,
+): { width: number; height: number } | null {
+  if (!textArea || cols <= 0 || rows <= 0) return null;
+  const width = Math.round(textArea.width / cols);
+  const height = Math.round(textArea.height / rows);
+  if (width <= 0 || height <= 0) return null;
+  return { width, height };
+}
+
+/**
  * Max sixel color registers from an XTSMGRAPHICS reply:
  * `CSI ? 1 ; 0 ; <max> S` (Pi=1 color registers, Ps=0 success). Returns null on
  * error status / absent reply.
@@ -159,6 +191,8 @@ export async function detectGraphicsCapabilities(
   stdout: ProbeStdout,
   env: NodeJS.ProcessEnv = process.env,
   timeoutMs = 250,
+  cols: number = process.stdout.columns ?? 80,
+  rows: number = process.stdout.rows ?? 24,
 ): Promise<GraphicsCapabilities> {
   const iterm2 = detectIterm2FromEnv(env);
   // iTerm2 ships a partial kitty-graphics implementation that mis-scales source
@@ -183,7 +217,9 @@ export async function detectGraphicsCapabilities(
         kitty: suppressKitty ? false : parseKittyGraphics(buf),
         iterm2,
         sixel: parseSixelFromDeviceAttributes(buf),
-        cellPixels: parseCellPixelSize(buf),
+        // Prefer the direct cell-size report (16t); fall back to text-area
+        // pixels (14t) ÷ char dims for terminals that only answer 14t (iTerm2).
+        cellPixels: parseCellPixelSize(buf) ?? deriveCellPixels(parseTextAreaPixelSize(buf), cols, rows),
         sixelColorRegisters: parseColorRegisters(buf),
       });
     };
@@ -197,9 +233,11 @@ export async function detectGraphicsCapabilities(
     };
     const timer = setTimeout(finish, timeoutMs);
     stdin.on("readable", onReadable);
-    // cell size, kitty graphics probe, XTSMGRAPHICS max color registers, then
-    // DA (terminator — sent last so its reply means the others are in).
+    // cell size (16t), text-area pixels (14t, cell-size fallback), kitty
+    // graphics probe, XTSMGRAPHICS max color registers, then DA (terminator —
+    // sent last so its reply means the others are in).
     stdout.write("\x1b[16t");
+    stdout.write("\x1b[14t");
     stdout.write("\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\");
     stdout.write("\x1b[?1;4;0S");
     stdout.write("\x1b[c");
