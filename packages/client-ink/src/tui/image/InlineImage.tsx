@@ -13,33 +13,37 @@
  *    encoded/displayed (graphics protocols don't clip), so the image never
  *    overflows the modeline above or the input line below — this partial crop
  *    is for the viewport's top/bottom edges only;
- *  - modal occlusion is all-or-nothing: if an opaque modal's row-span overlaps
- *    the band at all, the painter hides the whole image that frame and restores
- *    it (cached band intact) when the modal closes. Modal open/close each emit
- *    an Ink frame, so the live painter check suffices — no re-encode, no store
- *    subscription. (Partial *modal* cropping was tried and dropped: interior
- *    splits and re-encode timing weren't worth the complexity.) An overlay that
- *    doesn't register a span (the inline ChoiceOverlay) leaves the image visible.
- *  - repaint trigger: the painter is registered with painterRegistry and the
- *    sync-write combiner re-blits it inside the same DEC-2026 synchronized
- *    block as Ink's frame — flicker-free (validated by the #552 spikes). A
- *    scroll or reflow changes Ink's own output, so Ink is already writing that
- *    frame and the painter rides it — pinned to the position resolved at frame
- *    time, exactly once. We emit our OWN write (`requestRepaint`) only when a
- *    band encode lands OFF the render path (async decode/settle), where Ink
- *    dedupes (our slot Boxes didn't change) and would write nothing. That write
- *    is DEFERRED to a microtask so it lands after every layout effect in the
- *    commit (modal occlusion registration included → no flash) and COALESCED to
- *    one write per checkpoint;
+ *  - the painter is the single authority for position AND pixels, and it runs
+ *    at the only correct moment: the sync-write combiner splices it into Ink's
+ *    frame just before ESU, which Ink emits from onRender AFTER calculateLayout
+ *    — so a fresh measure() there reads the slot row for the frame being drawn.
+ *    Measuring in useLayoutEffect instead (React commit, BEFORE Ink lays out)
+ *    lags one frame: invisible on a 1-row scroll, but a multi-row PgDn jump
+ *    paints the image a full page behind the text and strands it there once the
+ *    scroll settles. So there is no layout-effect repositioning and no changing
+ *    prop to break the line's React.memo — the painter, which already runs every
+ *    Ink frame, re-measures and re-clips itself;
  *  - band re-encode is cheap (sixel: one shared quantization up front, then
- *    ~3-8ms/band from frozen indices), so a clipped band re-encodes immediately
- *    on scroll for real-time tracking; any future expensive encoder debounces to
- *    scroll-settle and reblits the cached payload each frame (lags a beat then
- *    snaps), and because it lands async it repaints itself;
+ *    ~3-8ms/band from frozen indices; iTerm2/kitty similar), so the painter
+ *    re-encodes the clipped band in-frame whenever its identity changes and
+ *    reuses the cached payload when it hasn't (a static image never re-encodes).
+ *    A future expensive encoder would need a debounce reintroduced in the
+ *    painter (re-blit the stale band until the encode settles);
+ *  - modal occlusion is all-or-nothing: if an opaque modal's row-span overlaps
+ *    the band at all, the painter hides the whole image and restores it when the
+ *    modal closes. The hide/show is edge-triggered via useOcclusionChange (a
+ *    dropped sixel frame must not strand the image over a modal — see
+ *    occlusion.tsx); the repaint it schedules is DEFERRED to a microtask so it
+ *    lands after the modal registered its span (no flash) and COALESCED. An
+ *    overlay that registers no span (the inline ChoiceOverlay) leaves the image
+ *    visible. (Partial *modal* cropping was tried and dropped.)
+ *  - off-render-path repaints (async decode completion, occlusion edge) emit an
+ *    empty DEC-2026 block (`requestRepaint`); Ink would otherwise dedupe (our
+ *    slot Boxes are unchanged) and write nothing;
  *  - no graphics protocol → renders nothing (the full-res PNG still lives in
  *    the HTML transcript export).
  */
-import React, { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 import { Box, useStdout, type DOMElement } from "ink";
 import sharp from "sharp";
 import type { GraphicsCapabilities } from "./capabilities.js";
@@ -53,16 +57,18 @@ import { useOcclusionSpans, useOcclusionChange } from "./occlusion.js";
 
 /** Fallback cell size when the terminal didn't answer `\x1b[16t`. */
 const FALLBACK_CELL = { width: 10, height: 20 };
-/** Debounce for the expensive blit re-encode (scroll-settle). */
-const ENCODE_DEBOUNCE_MS = 60;
 /** DEC-2026 synchronized output — an empty BSU/ESU block forces an atomic repaint. */
 const BSU = "\x1b[?2026h";
 const ESU = "\x1b[?2026l";
 
+/**
+ * The last encoded band. Position is NOT stored — the painter measures the slot
+ * row fresh each frame (post-layout) and computes the box there. We keep only
+ * the payload and its band identity so a static image (band unchanged frame to
+ * frame) reuses the encode instead of re-encoding every frame.
+ */
 interface CachedBand {
   payload: string;
-  box: PaintBox;
-  /** Band identity, to detect when a re-encode is actually needed. */
   srcTopRows: number;
   visRows: number;
 }
@@ -219,7 +225,8 @@ export function InlineImage({
         if (cancelled) return;
         const img = driver.prepare(data, widthPx, heightPx, (s) => stdout.write(s), paletteSize, cell);
         preparedRef.current = { img, cols, rows };
-        scheduleEncode(/* rideInkFrame */ false); // first band, off the render path → repaint ourselves
+        cachedRef.current = null;        // force a fresh encode on the next paint
+        requestRepaint();                // off the render path → ask for a paint; the painter encodes + blits
       } catch {
         // Missing/unreadable file: render nothing inline (export still has it).
       }
@@ -227,105 +234,55 @@ export function InlineImage({
     return () => { cancelled = true; preparedRef.current?.img.dispose(); preparedRef.current = null; };
   }, [path, widthPx, heightPx, driver, paletteSize]);
 
-  // Immediate (cheap encoders: sixel, kitty) or debounced (expensive encoders) band encode.
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // The band to display now: the image's footprint clipped to the narrative
-  // viewport (top/bottom edges). Modal occlusion is NOT applied here — it's an
-  // all-or-nothing live hide in the painter, so the cached band survives intact
-  // while a modal covers it and reappears the moment it closes (no re-encode).
-  const desiredBand = (): { box: PaintBox; srcTopRows: number; visRows: number } | null => {
-    const pos = posRef.current;
-    const vp = viewportRef.current;
-    const prep = preparedRef.current;
-    if (!pos || !prep) return null;
-    const band = visibleBand(pos.slotTop, prep.rows, vp.top, vp.rows);
-    if (!band) return null;
-    return {
-      box: { row: band.visTop, col: pos.slotLeft, rows: band.visRows, cols: prep.cols },
-      srcTopRows: band.srcTopRows,
-      visRows: band.visRows,
-    };
-  };
-  // `repaint` controls whether this encode emits its own out-of-band write.
-  // When the encode happens inside a render Ink is already writing (scroll /
-  // reflow changed Ink's output), we ride that frame instead: the combiner
-  // splices the painter with the fresh cache, so a separate write would just be
-  // a redundant second blit at a possibly-different position. Off the render
-  // path (async decode/settle) Ink writes nothing, so we must repaint ourselves.
-  const encodeNow = (repaint: boolean) => {
-    const prepared = preparedRef.current;
-    const want = desiredBand();
-    if (!prepared || !want) { cachedRef.current = null; if (repaint) requestRepaint(); return; }
-    const { topPx, bandPx } = bandPixels(want.srcTopRows, want.visRows, cell.height);
-    cachedRef.current = {
-      payload: prepared.img.encodeBand(topPx, bandPx),
-      box: want.box,
-      srcTopRows: want.srcTopRows,
-      visRows: want.visRows,
-    };
-    if (repaint) requestRepaint();
-  };
-  // `rideInkFrame` true ⇒ this fires from a render Ink is already writing, so a
-  // synchronous (cheap) encode can ride that frame with no extra write. An
-  // expensive encoder always debounces, and the deferred encode can never ride
-  // the current frame, so it repaints itself regardless.
-  const scheduleEncode = (rideInkFrame: boolean) => {
-    if (!driver) return;
-    if (!driver.expensiveEncode) { encodeNow(/* repaint */ !rideInkFrame); return; }
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => encodeNow(true), ENCODE_DEBOUNCE_MS);
-  };
-
-  // After every render (scroll, metadata reflow, modal open/close): re-measure,
-  // then either re-encode (band pixels changed — clipped differently) or, when a
-  // fully-visible image merely moved, update the cached box to the new row.
-  // Without the reposition branch a scrolling, unclipped image would stay frozen
-  // at its old position (its band identity is unchanged), since the painter
-  // blits cachedRef.box.
-  //
-  // Neither branch emits its own write: a render that moved or re-clipped the
-  // image necessarily changed Ink's output (the surrounding text scrolled /
-  // reflowed), so Ink is already writing this frame and the combiner splices the
-  // painter — at the position resolved at frame time — for free. Emitting our
-  // own write here would be a redundant second blit, and (since it can race the
-  // frame) is exactly what painted a stale band over the scrolled text.
-  useLayoutEffect(() => {
-    posRef.current = measure();
-    const want = desiredBand();
-    const cur = cachedRef.current;
-    const bandChanged = (!want && !!cur)
-      || (!!want && (!cur || cur.srcTopRows !== want.srcTopRows || cur.visRows !== want.visRows));
-    if (bandChanged) { scheduleEncode(/* rideInkFrame */ true); return; }
-    if (want && cur && cur.box.row !== want.box.row) {
-      cachedRef.current = { ...cur, box: want.box }; // same pixels, new position; Ink's frame re-blits
-    }
-  });
-
-  // Register the per-frame painter once; it reads the live refs above.
+  // Register the per-frame painter once. It is the SINGLE authority for both
+  // position and pixels, and it runs at the right moment: the combiner splices
+  // it into Ink's frame just before ESU, which is emitted from Ink's onRender
+  // AFTER Ink's calculateLayout() — so a fresh measure() here reads the slot row
+  // for the frame currently being drawn. (useLayoutEffect runs during React's
+  // commit, BEFORE Ink lays out, so measuring there lags one frame: invisible on
+  // a 1-row scroll, but a multi-row PgDn jump paints the image a full page behind
+  // the text and — if the scroll settles — strands it there. Measuring in the
+  // painter eliminates the lag entirely.)
   useEffect(() => {
     if (!driver) return;
     mountedRef.current = true;
     const off = registerPainter(painterKey, () => {
-      const pos = posRef.current;
-      const cached = cachedRef.current;
+      const prep = preparedRef.current;
       const prev = prevPaintedRef.current;
       const occluders = occlusionRef.current();
-      if (!pos) {
-        // No live position yet: clear any prior placement, erase prior pixels.
-        const clear = prev ? (preparedRef.current?.img.clear?.() ?? "") : "";
+      const pos = measure();
+      posRef.current = pos;
+      if (!pos || !prep) {
+        const clear = prev ? (prep?.img.clear?.() ?? "") : "";
         prevPaintedRef.current = null;
-        return clear + composePaint("", null, prev, 0, occluders);
+        return clear + composePaint("", null, prev, pos?.appHeight ?? 0, occluders);
       }
-      let shown: PaintBox | null = cached?.box ?? null;
-      // Live occlusion gate (all-or-nothing): if any open modal's row-span
-      // overlaps the band at all, hide the whole image. Modal open/close each
-      // emit an Ink frame, so this re-evaluates the same frame the modal appears
-      // — no re-encode, and the cached band reappears intact when it closes.
-      if (shown && isOccluded({ top: shown.row, rows: shown.rows }, occluders)) shown = null;
-      const payload = shown && cached ? cached.payload : "";
+      // Clip the footprint to the viewport at the fresh row.
+      const vp = viewportRef.current;
+      const band = visibleBand(pos.slotTop, prep.rows, vp.top, vp.rows);
+      let shown: PaintBox | null = null;
+      let payload = "";
+      if (band) {
+        const cached = cachedRef.current;
+        if (cached && cached.srcTopRows === band.srcTopRows && cached.visRows === band.visRows) {
+          payload = cached.payload; // band identity unchanged (static image) → reuse, no re-encode
+        } else {
+          // Band changed (scrolled / clipped differently): re-encode now. All
+          // current drivers are cheap (~1-8ms/band from a cached raster), so
+          // this is real-time. A future expensive encoder would need a debounce
+          // reintroduced here (re-blit the stale band meanwhile).
+          const { topPx, bandPx } = bandPixels(band.srcTopRows, band.visRows, cell.height);
+          payload = prep.img.encodeBand(topPx, bandPx);
+          cachedRef.current = { payload, srcTopRows: band.srcTopRows, visRows: band.visRows };
+        }
+        shown = { row: band.visTop, col: pos.slotLeft, rows: band.visRows, cols: prep.cols };
+      }
+      // All-or-nothing modal occlusion: if any open modal's row-span overlaps the
+      // band, hide the whole image (useOcclusionChange repaints on that edge).
+      if (shown && isOccluded({ top: shown.row, rows: shown.rows }, occluders)) { shown = null; payload = ""; }
       // Placement protocols (kitty) leave a persistent placement a covering modal
       // won't overwrite — on the shown→hidden edge, explicitly delete it.
-      const clear = prev && !shown ? (preparedRef.current?.img.clear?.() ?? "") : "";
+      const clear = prev && !shown ? (prep.img.clear?.() ?? "") : "";
       // Pass occluders so vacated-row erase never blanks a row a modal owns.
       const out = clear + composePaint(payload, shown, prev, pos.appHeight, occluders);
       prevPaintedRef.current = shown;
@@ -333,7 +290,6 @@ export function InlineImage({
     });
     return () => {
       mountedRef.current = false;
-      if (debounceRef.current) clearTimeout(debounceRef.current);
       off();
       // Erase whatever we last painted so no stale pixels linger. Wrap in a
       // synchronized block so the erase (and any sibling images the combiner
