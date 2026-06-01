@@ -22,16 +22,20 @@
  *    doesn't register a span (the inline ChoiceOverlay) leaves the image visible.
  *  - repaint trigger: the painter is registered with painterRegistry and the
  *    sync-write combiner re-blits it inside the same DEC-2026 synchronized
- *    block as Ink's frame — flicker-free (validated by the #552 spikes). Ink
- *    dedupes/throttles frames and our slot Boxes don't change when only the
- *    out-of-band pixels do, so an async band encode emits its own empty
- *    synchronized block (`requestRepaint`), DEFERRED to a microtask so it lands
- *    after every layout effect in the commit (modal occlusion registration
- *    included → no flash) and COALESCED to one write per checkpoint;
- *  - band re-encode strategy is per-driver: cheap encoders (sixel — one shared
- *    quantization up front, then ~3-8ms/band) re-encode immediately for
- *    real-time scroll; any expensive encoder debounces to scroll-settle and
- *    reblits the cached payload each frame (lags a beat then snaps);
+ *    block as Ink's frame — flicker-free (validated by the #552 spikes). A
+ *    scroll or reflow changes Ink's own output, so Ink is already writing that
+ *    frame and the painter rides it — pinned to the position resolved at frame
+ *    time, exactly once. We emit our OWN write (`requestRepaint`) only when a
+ *    band encode lands OFF the render path (async decode/settle), where Ink
+ *    dedupes (our slot Boxes didn't change) and would write nothing. That write
+ *    is DEFERRED to a microtask so it lands after every layout effect in the
+ *    commit (modal occlusion registration included → no flash) and COALESCED to
+ *    one write per checkpoint;
+ *  - band re-encode is cheap (sixel: one shared quantization up front, then
+ *    ~3-8ms/band from frozen indices), so a clipped band re-encodes immediately
+ *    on scroll for real-time tracking; any future expensive encoder debounces to
+ *    scroll-settle and reblits the cached payload each frame (lags a beat then
+ *    snaps), and because it lands async it repaints itself;
  *  - no graphics protocol → renders nothing (the full-res PNG still lives in
  *    the HTML transcript export).
  */
@@ -206,7 +210,7 @@ export function InlineImage({
         if (cancelled) return;
         const img = driver.prepare(data, widthPx, heightPx, (s) => stdout.write(s), paletteSize, cell);
         preparedRef.current = { img, cols, rows };
-        scheduleEncode(); // first band
+        scheduleEncode(/* rideInkFrame */ false); // first band, off the render path → repaint ourselves
       } catch {
         // Missing/unreadable file: render nothing inline (export still has it).
       }
@@ -233,10 +237,16 @@ export function InlineImage({
       visRows: band.visRows,
     };
   };
-  const encodeNow = () => {
+  // `repaint` controls whether this encode emits its own out-of-band write.
+  // When the encode happens inside a render Ink is already writing (scroll /
+  // reflow changed Ink's output), we ride that frame instead: the combiner
+  // splices the painter with the fresh cache, so a separate write would just be
+  // a redundant second blit at a possibly-different position. Off the render
+  // path (async decode/settle) Ink writes nothing, so we must repaint ourselves.
+  const encodeNow = (repaint: boolean) => {
     const prepared = preparedRef.current;
     const want = desiredBand();
-    if (!prepared || !want) { cachedRef.current = null; requestRepaint(); return; }
+    if (!prepared || !want) { cachedRef.current = null; if (repaint) requestRepaint(); return; }
     const { topPx, bandPx } = bandPixels(want.srcTopRows, want.visRows, cell.height);
     cachedRef.current = {
       payload: prepared.img.encodeBand(topPx, bandPx),
@@ -244,31 +254,41 @@ export function InlineImage({
       srcTopRows: want.srcTopRows,
       visRows: want.visRows,
     };
-    requestRepaint();
+    if (repaint) requestRepaint();
   };
-  const scheduleEncode = () => {
+  // `rideInkFrame` true ⇒ this fires from a render Ink is already writing, so a
+  // synchronous (cheap) encode can ride that frame with no extra write. An
+  // expensive encoder always debounces, and the deferred encode can never ride
+  // the current frame, so it repaints itself regardless.
+  const scheduleEncode = (rideInkFrame: boolean) => {
     if (!driver) return;
-    if (!driver.expensiveEncode) { encodeNow(); return; }
+    if (!driver.expensiveEncode) { encodeNow(/* repaint */ !rideInkFrame); return; }
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(encodeNow, ENCODE_DEBOUNCE_MS);
+    debounceRef.current = setTimeout(() => encodeNow(true), ENCODE_DEBOUNCE_MS);
   };
 
   // After every render (scroll, metadata reflow, modal open/close): re-measure,
-  // then either re-encode (band pixels changed — clipped/occluded differently)
-  // or, when a fully-visible image merely moved, cheaply re-blit the cached
-  // payload at the new row. Without the reposition branch a scrolling, unclipped
-  // image would stay frozen at its old position (and never un-hide after passing
-  // an occluder), since its band identity is unchanged.
+  // then either re-encode (band pixels changed — clipped differently) or, when a
+  // fully-visible image merely moved, update the cached box to the new row.
+  // Without the reposition branch a scrolling, unclipped image would stay frozen
+  // at its old position (its band identity is unchanged), since the painter
+  // blits cachedRef.box.
+  //
+  // Neither branch emits its own write: a render that moved or re-clipped the
+  // image necessarily changed Ink's output (the surrounding text scrolled /
+  // reflowed), so Ink is already writing this frame and the combiner splices the
+  // painter — at the position resolved at frame time — for free. Emitting our
+  // own write here would be a redundant second blit, and (since it can race the
+  // frame) is exactly what painted a stale band over the scrolled text.
   useLayoutEffect(() => {
     posRef.current = measure();
     const want = desiredBand();
     const cur = cachedRef.current;
     const bandChanged = (!want && !!cur)
       || (!!want && (!cur || cur.srcTopRows !== want.srcTopRows || cur.visRows !== want.visRows));
-    if (bandChanged) { scheduleEncode(); return; }
+    if (bandChanged) { scheduleEncode(/* rideInkFrame */ true); return; }
     if (want && cur && cur.box.row !== want.box.row) {
-      cachedRef.current = { ...cur, box: want.box }; // same pixels, new position
-      requestRepaint();
+      cachedRef.current = { ...cur, box: want.box }; // same pixels, new position; Ink's frame re-blits
     }
   });
 
