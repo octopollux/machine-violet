@@ -5,10 +5,22 @@
  * kitty > iTerm2 > sixel. Terminals with none render no inline image (the
  * full-res PNG still lives in the HTML transcript export).
  *
- * The pure parsers (response → capability) are unit-tested; the async probe
- * orchestration (`detectGraphicsCapabilities`) writes queries and reads stdin
- * responses in raw mode, modeled on `detectKittySupport` in
- * ../hooks/kittyProtocol.ts. It is sequenced after the kitty-keyboard probe at
+ * The path is layered so each concern stays small and adding a terminal is
+ * additive, not a new branch in the middle of the logic:
+ *
+ *   1. Pure PARSERS    — one per query reply (`parseKittyGraphics`, …). Add a
+ *                        new query → add a parser. Unit-tested in isolation.
+ *   2. parseGraphicsCapabilities — assembles raw caps from the probe buffer +
+ *                        env. Pure; the async probe just feeds it the buffer.
+ *   3. TERMINAL_QUIRKS — a declarative table of per-terminal workarounds for
+ *                        terminals that lie about / botch a capability. Adding a
+ *                        weird terminal is one entry (name/reason/match/apply),
+ *                        composed over the raw caps — never an inline special case.
+ *   4. pickProtocol    — the priority ladder over the (quirk-adjusted) caps.
+ *
+ * Only the probe ORCHESTRATION (`detectGraphicsCapabilities`) is impure: it
+ * writes queries and reads stdin in raw mode (modeled on `detectKittySupport`
+ * in ../hooks/kittyProtocol.ts), sequenced after the kitty-keyboard probe at
  * startup so the two don't race on stdin.
  */
 
@@ -141,6 +153,72 @@ export function detectIterm2FromEnv(env: NodeJS.ProcessEnv): boolean {
 }
 
 /**
+ * Assemble raw capabilities from a collected probe-reply buffer + env, before
+ * any per-terminal quirks. Pure and unit-testable; the async probe orchestration
+ * just feeds it the buffer it gathered. (iTerm2 has no query handshake, so it's
+ * sniffed from env; everything else comes from the reply buffer.)
+ */
+export function parseGraphicsCapabilities(
+  buf: string,
+  env: NodeJS.ProcessEnv,
+  cols: number,
+  rows: number,
+): GraphicsCapabilities {
+  return {
+    kitty: parseKittyGraphics(buf),
+    iterm2: detectIterm2FromEnv(env),
+    sixel: parseSixelFromDeviceAttributes(buf),
+    // Prefer the direct cell-size report (16t); fall back to text-area pixels
+    // (14t) ÷ char dims for terminals that only answer 14t (iTerm2).
+    cellPixels: parseCellPixelSize(buf) ?? deriveCellPixels(parseTextAreaPixelSize(buf), cols, rows),
+    sixelColorRegisters: parseColorRegisters(buf),
+  };
+}
+
+// --- Terminal quirks (per-terminal workarounds) -----------------------------
+
+/**
+ * A workaround for one terminal whose advertised capabilities don't match
+ * reality. `match` identifies it (usually from env); `apply` returns adjusted
+ * capabilities. Quirks COMPOSE — every matching quirk's `apply` runs in order —
+ * so supporting another weird terminal is a single entry in TERMINAL_QUIRKS,
+ * never a new branch in the detection/resolution logic.
+ *
+ * Keep `reason` specific: it's the only record of why each workaround exists.
+ */
+export interface TerminalQuirk {
+  /** Terminal name, for documentation and debugging. */
+  readonly name: string;
+  /** Why this workaround exists. */
+  readonly reason: string;
+  /** True when this quirk applies to the current terminal. */
+  match(env: NodeJS.ProcessEnv): boolean;
+  /** Return adjusted capabilities — do not mutate the input. */
+  apply(caps: GraphicsCapabilities): GraphicsCapabilities;
+}
+
+export const TERMINAL_QUIRKS: readonly TerminalQuirk[] = [
+  {
+    name: "iTerm2",
+    reason:
+      "Ships a partial kitty-graphics implementation that mis-scales source " +
+      "crops (scales a band into a fixed box instead of cropping 1:1) and drops " +
+      "image data on placement delete. Its native inline-image protocol is solid " +
+      "on its own terminal, so disable kitty and let pickProtocol fall to iterm2.",
+    match: (env) => env.TERM_PROGRAM === "iTerm.app",
+    apply: (caps) => ({ ...caps, kitty: false }),
+  },
+];
+
+/** Compose every matching terminal quirk over the raw detected capabilities. */
+export function applyTerminalQuirks(
+  caps: GraphicsCapabilities,
+  env: NodeJS.ProcessEnv,
+): GraphicsCapabilities {
+  return TERMINAL_QUIRKS.reduce((c, quirk) => (quirk.match(env) ? quirk.apply(c) : c), caps);
+}
+
+/**
  * Pick the best protocol. kitty is cheapest/best (transmit-once, native crop,
  * flicker-free re-place); iTerm2 and sixel are the blit family. Returns null
  * when the terminal supports none.
@@ -194,16 +272,13 @@ export async function detectGraphicsCapabilities(
   cols: number = process.stdout.columns ?? 80,
   rows: number = process.stdout.rows ?? 24,
 ): Promise<GraphicsCapabilities> {
-  const iterm2 = detectIterm2FromEnv(env);
-  // iTerm2 ships a partial kitty-graphics implementation that mis-scales source
-  // crops (it scales a band into a fixed box instead of cropping 1:1) and drops
-  // image data on placement delete. Its native inline-image protocol is far
-  // better supported on its own terminal, so never route iTerm.app through
-  // kitty. Other multi-protocol terminals (e.g. WezTerm) have solid kitty
-  // support and keep the normal kitty > iterm2 preference.
-  const suppressKitty = env.TERM_PROGRAM === "iTerm.app";
+  // Resolve raw capabilities from a probe buffer, then apply per-terminal
+  // quirks. "" → no replies (non-TTY / timeout): env-sniffed caps only.
+  const resolveCaps = (buf: string): GraphicsCapabilities =>
+    applyTerminalQuirks(parseGraphicsCapabilities(buf, env, cols, rows), env);
+
   if (!stdin.isTTY) {
-    return { kitty: false, iterm2, sixel: false, cellPixels: null, sixelColorRegisters: null };
+    return resolveCaps("");
   }
   return await new Promise<GraphicsCapabilities>((resolve) => {
     let buf = "";
@@ -213,15 +288,7 @@ export async function detectGraphicsCapabilities(
       settled = true;
       clearTimeout(timer);
       stdin.removeListener("readable", onReadable);
-      resolve({
-        kitty: suppressKitty ? false : parseKittyGraphics(buf),
-        iterm2,
-        sixel: parseSixelFromDeviceAttributes(buf),
-        // Prefer the direct cell-size report (16t); fall back to text-area
-        // pixels (14t) ÷ char dims for terminals that only answer 14t (iTerm2).
-        cellPixels: parseCellPixelSize(buf) ?? deriveCellPixels(parseTextAreaPixelSize(buf), cols, rows),
-        sixelColorRegisters: parseColorRegisters(buf),
-      });
+      resolve(resolveCaps(buf));
     };
     const onReadable = () => {
       if (settled) return;

@@ -8,6 +8,9 @@ import {
   detectIterm2FromEnv,
   pickProtocol,
   sixelPaletteSize,
+  parseGraphicsCapabilities,
+  applyTerminalQuirks,
+  TERMINAL_QUIRKS,
   detectGraphicsCapabilities,
   type GraphicsCapabilities,
   type ProbeStdin,
@@ -129,6 +132,51 @@ describe("sixelPaletteSize", () => {
   });
   it("floors at 256", () => {
     expect(sixelPaletteSize({ ...base, sixelColorRegisters: 64 })).toBe(256);
+  });
+});
+
+describe("parseGraphicsCapabilities", () => {
+  const REPLY =
+    "\x1b_Gi=31;OK\x1b\\" + "\x1b[6;20;10t" + "\x1b[?1;0;1024S" + "\x1b[?62;4c";
+
+  it("assembles raw caps from the probe buffer + env", () => {
+    const caps = parseGraphicsCapabilities(REPLY, {} as NodeJS.ProcessEnv, 100, 30);
+    expect(caps).toEqual({
+      kitty: true,
+      iterm2: false,
+      sixel: true,
+      cellPixels: { width: 10, height: 20 },
+      sixelColorRegisters: 1024,
+    });
+  });
+
+  it("reports only env-sniffed caps for an empty buffer (non-TTY/timeout)", () => {
+    const caps = parseGraphicsCapabilities("", { TERM_PROGRAM: "iTerm.app" } as NodeJS.ProcessEnv, 100, 30);
+    expect(caps).toEqual({ kitty: false, iterm2: true, sixel: false, cellPixels: null, sixelColorRegisters: null });
+  });
+});
+
+describe("terminal quirks", () => {
+  const rawKitty: GraphicsCapabilities = { kitty: true, iterm2: true, sixel: false, cellPixels: null, sixelColorRegisters: null };
+
+  it("every quirk documents a name and reason (the only record of why)", () => {
+    for (const q of TERMINAL_QUIRKS) {
+      expect(q.name.length).toBeGreaterThan(0);
+      expect(q.reason.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("disables kitty on iTerm.app (its kitty impl is broken) without mutating input", () => {
+    const env = { TERM_PROGRAM: "iTerm.app" } as NodeJS.ProcessEnv;
+    const out = applyTerminalQuirks(rawKitty, env);
+    expect(out.kitty).toBe(false);
+    expect(out.iterm2).toBe(true);
+    expect(rawKitty.kitty).toBe(true); // input untouched
+  });
+
+  it("leaves capabilities untouched for terminals with no matching quirk", () => {
+    const env = { TERM_PROGRAM: "WezTerm" } as NodeJS.ProcessEnv;
+    expect(applyTerminalQuirks(rawKitty, env)).toEqual(rawKitty);
   });
 });
 
