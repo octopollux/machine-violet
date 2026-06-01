@@ -272,6 +272,14 @@ export interface ItemBase {
   contentItems?: unknown[];
   success?: boolean;
   durationMs?: number;
+  // `imageGeneration` variant (codex's built-in image_gen skill). Spike-
+  // confirmed on codex 0.133.0: `result` carries the raw base64 image bytes
+  // inline (no data: prefix), `revisedPrompt` is the backend-rewritten prompt,
+  // and `savedPath` is where codex also wrote the PNG under ~/.codex/
+  // generated_images/. We harvest `result` directly and ignore the file.
+  result?: string;
+  revisedPrompt?: string | null;
+  savedPath?: string;
 }
 
 export interface TokenUsageUpdatedNotification {

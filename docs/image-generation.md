@@ -6,7 +6,7 @@ The DM can render illustrated images inline with its responses — character por
 
 Image-gen is enabled for a turn iff:
 
-- **Provider capability** — `provider.getCapabilities(model).imageGeneration === true`. Currently true for `openai-apikey` + `gpt-5` family (which routes to `gpt-image-2` for the actual render) and false for everything else.
+- **Provider capability** — `provider.getCapabilities(model).imageGeneration === true`. True for `openai-apikey` + `gpt-5` family (routes to `gpt-image-2` via the Images API) and for `openai-chatgpt` (routes to codex's built-in `image_gen` skill — see [Provider backends](#provider-backends)). False for everything else (Anthropic, and the Chat Completions fallback used by custom OpenAI-compatible endpoints).
 - **Campaign preference** — `gameState.config.image_generation !== "off"`. The setup-agent asks the player a yes/no consent question right after world + system selection ([game-initialization.md](game-initialization.md)). The choice is stored in `config.json` and can be flipped per-campaign from the ESC menu's "Image generation" toggle.
 
 When either is false, the `generate_image` tool is omitted from the DM's toolset and the model has no way to invoke it. There is no "graceful fallback" path on the model side — the model simply doesn't see the tool.
@@ -26,6 +26,25 @@ Both share `handleImageGenerated` in `packages/engine/src/agents/image-handler.t
 
 The legacy hosted-tool path (`image_generation_call` items in the Responses API) is explicitly **not** used. The provider has a tripwire (`image_gen:legacy_hosted_item_ignored`) that fires if such an item ever shows up — see [the dispatch memory](../packages/engine/src/providers/openai.ts) for context.
 
+## Provider backends
+
+`provider.generateImage(req)` is the single seam the dispatchers call. Two providers implement it, with very different mechanics behind the same `GenerateImageRequest → GenerateImageResult` contract:
+
+| Provider | Mechanism | Auth / billing |
+|---|---|---|
+| `openai-apikey` | One `client.images.generate({ model: "gpt-image-2", quality, size })` REST call (`openai.ts` `openaiGenerateImage`). | Platform API key + credits. |
+| `openai-chatgpt` | Drives a **scoped codex turn** that calls codex's built-in `image_gen` skill, then harvests the `imageGeneration` item codex emits (`provider.ts` `generateImage`). | ChatGPT subscription — **no API key**; billed to the plan's Codex allocation. |
+
+The `openai-chatgpt` path is the happy path for most users (sign in with a ChatGPT subscription, no metered API spend). There is **no fallback** between providers: a ChatGPT-account DM never silently routes image-gen to a metered API-key provider. If the codex render fails, the dispatcher returns an `isError` tool_result the DM recovers from — it does not escalate to a more expensive backend.
+
+Why the codex path looks the way it does (all spike-confirmed on codex 0.133.0):
+
+- **No direct RPC for image_gen.** It's a model-driven skill, not an app-server method. So `generateImage` issues its own `thread/start` + `turn/start`, separate from the DM's conversation thread, asking the model to render the prompt.
+- **The bytes arrive inline.** Codex emits an `item/completed` with `type: "imageGeneration"` whose `result` field holds the raw base64 PNG (it also writes a copy under `~/.codex/generated_images/`, which we ignore). `extractGeneratedImage` reads `result` + `revisedPrompt`; the on-disk copy is never load-bearing.
+- **Tightly scoped.** The turn runs `sandbox: "read-only"` with terse `developerInstructions` ("call image_gen once, no shell, no file ops, no prose"). Without this the model treats the request as a coding task and wastes a round trying to `Copy-Item` the file to satisfy "save it" phrasing (harmless under read-only, but slow).
+- **Nested-turn safe.** `generateImage` runs *while the DM turn that called `generate_image` is paused* awaiting our tool reply. Codex processes the two threads independently over the JSON-RPC pipe, so the inner render turn completes and the outer turn resumes — no global serialization / deadlock.
+- **Knobs are best-effort.** The built-in `image_gen` tool takes no explicit size/quality params over the wire, so `effort`/`aspect` are folded into the prompt text (`buildImagePromptText`) as natural-language steering rather than hard parameters. `effortUsed`/`aspectUsed` echo the *requested* values.
+
 ## Abstract knobs
 
 `packages/engine/src/providers/types.ts` defines two abstract enums the model picks from:
@@ -42,6 +61,8 @@ The bridge dispatches all of a turn's tool calls concurrently via `Promise.all` 
 The bridge's `_tui` extraction is gated on `tuiToolNames.has(toolName)` — tools not in `TUI_TOOLS` (`packages/engine/src/agents/agent-loop.ts`) have their `_tui` field silently ignored. `generate_image` is in the set; removing it would cause images to land on disk but never render in the client, with no error anywhere. A regression test in `agent-loop.test.ts` guards against this.
 
 DM prompt guidance instructs the model to fire `generate_image` in the **same parallel tool batch** as `scene_transition` and `style_scene`, never sequenced before — otherwise the player waits for the (potentially slow) render before any narrative arrives.
+
+Crucially, the guidance points a scene-transition image at **the DM's favorite moment from the scene that *just finished***, not the scene being entered. At the boundary turn the departing scene's full transcript is still alive in the model's context (the transition's compaction runs *after* the agent loop, so the rich detail hasn't been pruned yet), whereas the entering scene is still nothing but a title. Aiming the image at the departing scene is what gives it the context to be good. This is also why a transition image files under the *departing* scene's `scene-NNN-slug`: `dispatchGenerateImage` reads `sceneManager.getScene()` before the deferred transition fires, so the image is correctly named for the scene it depicts.
 
 ## Inline rendering (TUI)
 
@@ -78,6 +99,8 @@ All generated bytes land in `<campaignRoot>/campaign/images/` (or `<setupRoot>/c
 Each image gets a `.json` sidecar alongside it with `id`, `intent`, `timestamp`, `mimeType`, optional `sceneNumber` / `sceneSlug`, and the OpenAI `revisedPrompt` if the provider returned one. The sidecar is never load-bearing for rendering — it exists purely as an audit record for debugging.
 
 HTML transcript export (`packages/client-ink/src/commands/transcript.ts` — `loadImageBytes` + `buildTranscriptHtml`) reads each referenced PNG and embeds it as a `data:image/png;base64,...` URI inline in the output HTML. The exported file is fully self-contained — no sidecar PNGs, no external links, full on-disk quality. Missing files (moved/deleted between gameplay and export) degrade gracefully to `[image unavailable]` placeholders.
+
+Inlined images are clickable: a small vanilla-JS shadowbox (no dependencies) fills the viewport with the image on a black backdrop. Esc or a click on the backdrop closes it; clicks and right-clicks *on the image itself* are left to the browser so the reader can save it / open it in a new tab. The overlay scaffold (`#shadowbox` + handler) is always emitted; image elements get a `zoomable` class. The images are also keyboard/screen-reader accessible — `tabindex="0"` + `role="button"` + an `aria-label`, with Enter/Space opening the shadowbox when one is focused.
 
 ## Engine-log breadcrumbs
 

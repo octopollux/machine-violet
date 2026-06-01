@@ -1,8 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { TurnCollector, CodexTurnFailedError, messageToResponsesItems } from "./provider.js";
+import {
+  TurnCollector, CodexTurnFailedError, messageToResponsesItems,
+  buildImagePromptText, extractGeneratedImage, createOpenAIChatGptProvider,
+} from "./provider.js";
 import type {
   AgentMessageDeltaNotification, ItemCompletedNotification,
   TurnCompletedNotification, RawResponseItemCompletedNotification,
+  ItemBase,
 } from "./protocol.js";
 import type { NormalizedMessage } from "../types.js";
 
@@ -241,6 +245,87 @@ describe("messageToResponsesItems: reasoning replay (issue #533)", () => {
     expect(items).toEqual([
       { type: "message", role: "assistant", content: [{ type: "output_text", text: "Hi." }] },
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Image generation (Phase 7 — codex built-in image_gen skill)
+// ---------------------------------------------------------------------------
+
+describe("getCapabilities", () => {
+  it("reports imageGeneration: true regardless of model", () => {
+    // Image gen routes through codex's built-in image_gen skill (no API key,
+    // billed to the ChatGPT plan), which ships with codex across the gpt-5.x
+    // family. Construction is sync + cheap — no subprocess spawned.
+    const provider = createOpenAIChatGptProvider();
+    expect(provider.getCapabilities!("gpt-5.5").imageGeneration).toBe(true);
+    expect(provider.getCapabilities!("gpt-5.4-mini").imageGeneration).toBe(true);
+  });
+
+  it("exposes generateImage as a defined method", () => {
+    const provider = createOpenAIChatGptProvider();
+    expect(typeof provider.generateImage).toBe("function");
+  });
+});
+
+describe("buildImagePromptText", () => {
+  it("prepends landscape guidance for landscape aspect", () => {
+    const text = buildImagePromptText("a red cube", "landscape", "standard");
+    expect(text).toContain("landscape orientation");
+    expect(text).toContain("1536x1024");
+    expect(text).toContain("a red cube");
+  });
+
+  it("prepends portrait guidance for portrait aspect", () => {
+    const text = buildImagePromptText("a hero", "portrait", "standard");
+    expect(text).toContain("vertical portrait");
+    expect(text).toContain("1024x1536");
+  });
+
+  it("prepends square guidance for square aspect", () => {
+    const text = buildImagePromptText("a sigil", "square", "draft");
+    expect(text).toContain("square 1:1");
+    expect(text).toContain("1024x1024");
+  });
+
+  it("adds a max-fidelity nudge for quality/showcase effort but not draft/standard", () => {
+    expect(buildImagePromptText("x", "square", "quality")).toContain("maximum detail");
+    expect(buildImagePromptText("x", "square", "showcase")).toContain("maximum detail");
+    expect(buildImagePromptText("x", "square", "standard")).not.toContain("maximum detail");
+    expect(buildImagePromptText("x", "square", "draft")).not.toContain("maximum detail");
+  });
+});
+
+describe("extractGeneratedImage", () => {
+  const imageItem = (overrides: Partial<ItemBase>): ItemBase =>
+    ({ id: "ig_1", type: "imageGeneration", ...overrides }) as ItemBase;
+
+  it("extracts base64 bytes + revisedPrompt from a populated imageGeneration item", () => {
+    const got = extractGeneratedImage(imageItem({
+      status: "generating",
+      result: "iVBORw0KGgoABASE64",
+      revisedPrompt: "A wide landscape painting of a red cube.",
+    }));
+    expect(got).toEqual({
+      base64: "iVBORw0KGgoABASE64",
+      revisedPrompt: "A wide landscape painting of a red cube.",
+    });
+  });
+
+  it("omits revisedPrompt when codex returned null", () => {
+    const got = extractGeneratedImage(imageItem({ result: "iVBORw0KGgo", revisedPrompt: null }));
+    expect(got).toEqual({ base64: "iVBORw0KGgo" });
+    expect(got).not.toHaveProperty("revisedPrompt");
+  });
+
+  it("returns null for the in_progress placeholder (empty result)", () => {
+    // item/started fires first with result: "" — must not be harvested.
+    expect(extractGeneratedImage(imageItem({ status: "in_progress", result: "" }))).toBeNull();
+  });
+
+  it("returns null for non-imageGeneration items", () => {
+    expect(extractGeneratedImage({ id: "msg_1", type: "agentMessage", text: "hi" } as ItemBase)).toBeNull();
+    expect(extractGeneratedImage({ id: "c_1", type: "commandExecution" } as ItemBase)).toBeNull();
   });
 });
 

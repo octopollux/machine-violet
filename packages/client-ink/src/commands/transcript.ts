@@ -100,7 +100,7 @@ function lineToHtml(
       if (!bytes) {
         return `<div class="image-missing" style="text-align:center;opacity:0.4;font-style:italic">[image unavailable]</div>`;
       }
-      return `<div class="image" style="text-align:center;margin:1em 0"><img src="data:${bytes.mimeType};base64,${bytes.base64}" alt="" style="max-width:100%;height:auto"/></div>`;
+      return `<div class="image" style="text-align:center;margin:1em 0"><img src="data:${bytes.mimeType};base64,${bytes.base64}" alt="" class="zoomable" role="button" tabindex="0" aria-label="View image full screen" style="max-width:100%;height:auto;cursor:zoom-in"/></div>`;
     }
 
     case "dev":
@@ -238,10 +238,60 @@ div {
 b { font-weight: bold; }
 i { font-style: italic; }
 u { text-decoration: underline; }
+/* Image shadowbox: clicking a narrative image fills the viewport on black. */
+#shadowbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 1000;
+  cursor: zoom-out;
+  align-items: center;
+  justify-content: center;
+}
+#shadowbox.open { display: flex; }
+#shadowbox img {
+  max-width: 100vw;
+  max-height: 100vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  cursor: default;
+}
+.zoomable:focus { outline: 2px solid #888; outline-offset: 2px; }
 </style>
 </head>
 <body>
 ${bodyLines}
+<div id="shadowbox"><img alt=""></div>
+<script>
+(function () {
+  var box = document.getElementById('shadowbox');
+  var boxImg = box.querySelector('img');
+  function open(src) { boxImg.src = src; box.classList.add('open'); }
+  function close() { box.classList.remove('open'); boxImg.removeAttribute('src'); }
+  // Open on click of any narrative image.
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (t && t.classList && t.classList.contains('zoomable')) open(t.getAttribute('src'));
+  });
+  // Click the black backdrop closes; clicks/right-clicks ON the image are
+  // left to the browser (save image, open in new tab, etc.).
+  box.addEventListener('click', function (e) {
+    if (e.target !== boxImg) close();
+  });
+  // Keyboard: Esc closes the shadowbox; Enter/Space opens it when a zoomable
+  // image is focused (the images carry tabindex + role="button").
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && box.classList.contains('open')) { close(); return; }
+    var t = e.target;
+    if ((e.key === 'Enter' || e.key === ' ') && t && t.classList && t.classList.contains('zoomable')) {
+      e.preventDefault();
+      open(t.getAttribute('src'));
+    }
+  });
+})();
+</script>
 </body>
 </html>`;
 }

@@ -329,11 +329,19 @@ const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
     if (!path) return <Text dimColor>[image: missing path]</Text>;
     const imgWidth = Math.max(20, width ?? 80);
     const imgHeight = Math.max(6, Math.round((imgWidth * 9) / 32));
+    // Character portraits (setup-loop) are far taller than the wide 16:9 scene
+    // footprint. Give them a narrow footprint so the portrait fills it rather
+    // than sitting letterboxed across the full width — on sixel the contain
+    // bars would otherwise flatten to black side-bars. InlineImage preserves
+    // aspect via fit:"contain", so an approximate portrait footprint is fine;
+    // `intent` is carried through from #550 (scenes/landscape keep full width).
+    const isPortrait = line.intent === "character_portrait";
+    const footprintWidth = isPortrait ? Math.max(12, Math.round((imgHeight * 3) / 2)) : imgWidth;
     return (
       <Box flexDirection="column" marginTop={1} marginBottom={1}>
         <InlineImage
           path={path}
-          cols={imgWidth}
+          cols={footprintWidth}
           rows={imgHeight}
           viewportTop={viewportTop ?? 0}
           viewportRows={viewportRows ?? imgHeight}
