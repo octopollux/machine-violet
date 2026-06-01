@@ -83,6 +83,42 @@ export function bandPixels(srcTopRows: number, visRows: number, cellHeightPx: nu
 }
 
 /**
+ * Fit an image inside a cell bounding box at its true aspect ratio, returning
+ * the footprint (in cells) to reserve and paint.
+ *
+ * The parent passes BOUNDS (max cols, max rows), not a fixed footprint, so the
+ * image — not the parent — owns aspect: it grows to fill width, and only when
+ * that would overflow the row cap does it switch to filling height instead.
+ * This removes the old double-letterbox (parent reserved a 16:9 box, the
+ * component then `fit:contain`-ed the source into it, padding twice).
+ *
+ * Terminal cells are taller than wide, so a pixel aspect must be converted to a
+ * cell aspect: a WxH-pixel image wants `usedCols·cellW / (usedRows·cellH) = W/H`.
+ */
+export function fitImage(
+  natWidthPx: number,
+  natHeightPx: number,
+  maxCols: number,
+  maxRows: number,
+  cell: { width: number; height: number },
+): { cols: number; rows: number } {
+  if (natWidthPx <= 0 || natHeightPx <= 0 || maxCols <= 0 || maxRows <= 0) {
+    return { cols: Math.max(1, maxCols), rows: Math.max(1, Math.min(maxRows, maxCols)) };
+  }
+  // Fill width first; fall back to filling height when that overflows the cap.
+  let cols = maxCols;
+  let rows = Math.round((cols * cell.width * natHeightPx) / (cell.height * natWidthPx));
+  if (rows > maxRows) {
+    rows = maxRows;
+    cols = Math.round((rows * cell.height * natWidthPx) / (cell.width * natHeightPx));
+  }
+  return {
+    cols: Math.max(1, Math.min(cols, maxCols)),
+    rows: Math.max(1, Math.min(rows, maxRows)),
+  };
+}
+
+/**
  * Rows occupied by `prev` that `next` no longer covers — these must be erased
  * (overwritten with spaces) so a shrinking/moving image leaves no ghost band.
  * `next` of `null` means the image vanished entirely (erase all of `prev`).

@@ -1040,19 +1040,52 @@ export function messageToResponsesItems(msg: NormalizedMessage): unknown[] {
     return items;
   }
 
-  // user message with array content
+  // user message with array content. tool_result blocks become standalone
+  // function_call_output items; text + image_input blocks fold into a single
+  // `message` item so each image stays attached to its surrounding text
+  // (e.g. the party-portrait prefix — a label line followed by one
+  // image_input per PC). Without the image_input branch the portraits were
+  // silently dropped and the DM never saw the players' faces. Mirrors the
+  // `input_image` translation on the openai-apikey path (`toResponsesInput`
+  // in openai.ts).
   const items: unknown[] = [];
+  let messageContent: unknown[] = [];
+  // Flush accumulated text/image into a `message` item. Called before each
+  // `function_call_output` so that if a single user message ever interleaves
+  // text/image with tool_result blocks (e.g. imported / hand-edited history),
+  // source order is preserved — otherwise all text/image would fold into one
+  // trailing message after every function_call_output, reordering the turn.
+  const flushMessage = (): void => {
+    if (messageContent.length > 0) {
+      items.push({ type: "message", role: "user", content: messageContent });
+      messageContent = [];
+    }
+  };
   for (const part of msg.content) {
     if (part.type === "tool_result") {
+      flushMessage();
       items.push({
         type: "function_call_output",
         call_id: part.tool_use_id,
         output: part.content,
       });
     } else if (part.type === "text") {
-      items.push({ type: "message", role: "user", content: [userPart(part.text)] });
+      messageContent.push(userPart(part.text));
+    } else if (part.type === "image_input") {
+      // Codex's Responses deserializer is stricter than the OpenAI SDK on the
+      // image `detail` enum: it accepts only "high" or "original" (NOT the
+      // Responses API's "low"/"high"/"auto" — spike-confirmed, it rejects the
+      // turn with `unknown variant 'auto'`). Map our abstract lowDetail flag
+      // onto that: "high" is codex's cheaper/downscaled floor (right for the
+      // low-cost cached portrait prefix), "original" is full resolution.
+      messageContent.push({
+        type: "input_image",
+        detail: part.lowDetail ? "high" : "original",
+        image_url: `data:${part.mimeType};base64,${part.base64}`,
+      });
     }
   }
+  flushMessage();
   return items;
 }
 

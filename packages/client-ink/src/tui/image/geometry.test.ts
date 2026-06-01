@@ -1,4 +1,6 @@
-import { spansOverlap, isOccluded, visibleBand, bandPixels, vacatedRows } from "./geometry.js";
+import {
+  spansOverlap, isOccluded, visibleBand, bandPixels, vacatedRows, fitImage,
+} from "./geometry.js";
 
 describe("spansOverlap", () => {
   it("detects overlap", () => {
@@ -59,6 +61,30 @@ describe("visibleBand", () => {
 describe("bandPixels", () => {
   it("scales rows to pixels by the real cell height", () => {
     expect(bandPixels(3, 7, 20)).toEqual({ topPx: 60, bandPx: 140 });
+  });
+});
+
+describe("fitImage", () => {
+  const cell = { width: 10, height: 20 }; // cells are 2:1 tall:wide
+
+  it("fills width for a landscape image", () => {
+    // 1600x900 (16:9) into 40 cols: rows = 40 * 10 * 900 / (20 * 1600) = 11.25 → 11
+    expect(fitImage(1600, 900, 40, 60, cell)).toEqual({ cols: 40, rows: 11 });
+  });
+
+  it("fills height (capped) for a portrait image", () => {
+    // 900x1600 into 40x20: width-fill rows = 40*10*1600/(20*900)=35.6 > 20 cap →
+    // rows=20, cols = 20*20*900/(10*1600) = 22.5 → 23, clamped to maxCols 40
+    expect(fitImage(900, 1600, 40, 20, cell)).toEqual({ cols: 23, rows: 20 });
+  });
+
+  it("renders a square image as a square on screen (half the rows of cols)", () => {
+    // square pixels → usedRows = usedCols * cellW/cellH = cols * 0.5
+    expect(fitImage(512, 512, 40, 60, cell)).toEqual({ cols: 40, rows: 20 });
+  });
+
+  it("falls back to a safe footprint for degenerate inputs", () => {
+    expect(fitImage(0, 0, 40, 60, cell)).toEqual({ cols: 40, rows: 40 });
   });
 });
 

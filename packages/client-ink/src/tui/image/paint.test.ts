@@ -45,4 +45,19 @@ describe("composePaint", () => {
     // Nothing vacated, nothing painted → just save/restore.
     expect(out).toBe(SAVE + RESTORE);
   });
+
+  it("does not erase vacated rows that an occluding modal owns", () => {
+    // Image hidden (box null) — all 4 prev rows [5,9) would normally be erased,
+    // but a modal covers [5,9), so erasing would punch a hole in it. None erased.
+    const out = composePaint("", null, box(5, 4), 30, [{ top: 5, rows: 4 }]);
+    const eraseCount = (out.match(/ {10}/g) ?? []).length;
+    expect(eraseCount).toBe(0);
+  });
+
+  it("erases only the vacated rows the modal does not cover", () => {
+    // prev [5,9), modal covers [5,7); rows 5,6 owned by modal, 7,8 free → 2 erased
+    const out = composePaint("", null, box(5, 4), 30, [{ top: 5, rows: 2 }]);
+    const eraseCount = (out.match(/ {10}/g) ?? []).length;
+    expect(eraseCount).toBe(2);
+  });
 });
