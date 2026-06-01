@@ -49,7 +49,7 @@ import type { PreparedImage } from "./drivers/types.js";
 import { registerPainter } from "./painterRegistry.js";
 import { composePaint, type PaintBox } from "./paint.js";
 import { visibleBand, bandPixels, fitImage, isOccluded } from "./geometry.js";
-import { useOcclusionSpans } from "./occlusion.js";
+import { useOcclusionSpans, useOcclusionChange } from "./occlusion.js";
 
 /** Fallback cell size when the terminal didn't answer `\x1b[16t`. */
 const FALLBACK_CELL = { width: 10, height: 20 };
@@ -167,6 +167,15 @@ export function InlineImage({
       if (mountedRef.current) stdout.write(BSU + ESU);
     });
   };
+
+  // Repaint on the occlusion edge: when any modal opens or closes, re-derive
+  // shown/hidden and blit. Without this the hide/show would depend on Ink
+  // happening to emit (and not coalesce away) a frame for that exact render —
+  // and slow sixel drops frames, so the edge gets missed (image hides on the
+  // first modal open, then stays stranded over the modal on later opens). The
+  // write is deferred + coalesced, so it lands after the modal's own occlusion
+  // registration (no flash) and at most once per burst.
+  useOcclusionChange(requestRepaint);
 
   // Measure slot position from the yoga tree (accounts for ScrollView's
   // marginTop:-scrollOffset, so this is the live on-screen row). slotLeft is
