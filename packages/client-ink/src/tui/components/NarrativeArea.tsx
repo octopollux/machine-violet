@@ -179,6 +179,14 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
   const scrollRef = useRef<ScrollViewRef>(null);
   const localHandleRef = useRef<ScrollHandle>(null);
   const [linesBelow, setLinesBelow] = useState(0);
+  // Live ScrollView offset. Threaded to image lines (below) purely to break
+  // their React.memo when scrolling: ink-scroll-view scrolls by setting
+  // marginTop:-scrollOffset on its content box, so an image's true on-screen
+  // row changes on scroll even though its own props don't. Without a changing
+  // prop the memo'd line never re-renders, InlineImage's layout-effect never
+  // re-measures, and the painter is frozen at the mount-time (pre-auto-scroll)
+  // position — which reads as "image generated but never displayed".
+  const [scrollOffset, setScrollOffset] = useState(0);
   const atBottomRef = useRef(true);
 
   // Build a clamped ScrollHandle and expose it to both parent and local refs
@@ -211,6 +219,7 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
     const bottom = sv.getBottomOffset();
     const below = Math.max(0, bottom - offset);
     setLinesBelow(below);
+    setScrollOffset(offset);
     atBottomRef.current = below <= 0;
   }, []);
 
@@ -275,6 +284,7 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
             viewportTop={viewportTop ?? 0}
             viewportRows={maxRows}
             graphicsCaps={graphicsCaps}
+            scrollOffset={line.kind === "image" ? scrollOffset : 0}
           />
         ))}
       </ScrollView>
@@ -303,6 +313,13 @@ interface NarrativeLineProps {
   viewportRows?: number;
   /** Terminal graphics capabilities (null → image renders nothing inline). */
   graphicsCaps?: import("../image/capabilities.js").GraphicsCapabilities | null;
+  /**
+   * Live ScrollView offset, passed (changing) only for image lines. The
+   * component doesn't read it — it exists solely to break React.memo on scroll
+   * so InlineImage's layout-effect re-measures the image's on-screen row.
+   * Non-image lines receive a constant 0 and keep their memo optimization.
+   */
+  scrollOffset?: number;
 }
 
 /** A single narrative line rendered based on its kind. */
