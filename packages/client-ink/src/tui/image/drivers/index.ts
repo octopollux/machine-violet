@@ -1,21 +1,23 @@
 /**
  * Driver registry: maps a chosen graphics protocol to its driver.
  *
- * Returns null when the protocol has no driver yet, so the caller renders
- * nothing inline rather than crashing. (kitty + iTerm2 land in a follow-up
- * step; until then only sixel is wired.)
+ * Returns null when the protocol has no driver, so the caller renders nothing
+ * inline rather than crashing.
  */
 import type { GraphicsProtocol } from "../capabilities.js";
 import type { ImageDriver } from "./types.js";
 import { sixelDriver } from "./sixel.js";
+import { iterm2Driver } from "./iterm2.js";
+import { kittyDriver } from "./kitty.js";
 
 export function selectDriver(protocol: GraphicsProtocol): ImageDriver | null {
   switch (protocol) {
     case "sixel":
       return sixelDriver;
-    case "kitty":
     case "iterm2":
-      return null; // implemented in step 4
+      return iterm2Driver;
+    case "kitty":
+      return kittyDriver;
   }
 }
 

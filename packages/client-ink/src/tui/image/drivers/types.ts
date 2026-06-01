@@ -22,6 +22,15 @@ export interface PreparedImage {
    * is the encoded band (sixel/PNG); for kitty it is a crop placement command.
    */
   encodeBand(topPx: number, bandPx: number): string;
+  /**
+   * Escapes to remove a currently-displayed band when it stops being shown
+   * (scrolled off, occluded by a modal). Blit protocols (sixel/iTerm2) return
+   * nothing — their pixels are simply not re-blitted and the covering content
+   * overwrites them. Kitty's placement persists independently of the text grid,
+   * so it must explicitly delete the placement here (keeping the transmitted
+   * image data so it can be re-placed when shown again). Optional; absent ≡ "".
+   */
+  clear?(): string;
   /** Release any terminal-side resources (kitty deletes its transmitted image). */
   dispose(): void;
 }

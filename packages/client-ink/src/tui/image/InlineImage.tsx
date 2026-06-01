@@ -196,7 +196,13 @@ export function InlineImage({
     const off = registerPainter(painterKey, () => {
       const pos = posRef.current;
       const cached = cachedRef.current;
-      if (!pos) return composePaint("", null, prevPaintedRef.current, 0);
+      const prev = prevPaintedRef.current;
+      if (!pos) {
+        // No live position yet: clear any prior placement, erase prior pixels.
+        const clear = prev ? (preparedRef.current?.clear?.() ?? "") : "";
+        prevPaintedRef.current = null;
+        return clear + composePaint("", null, prev, 0);
+      }
       let shown: PaintBox | null = cached?.box ?? null;
       // Live occlusion gate — hide the frame a covering modal opens.
       if (shown) {
@@ -204,7 +210,10 @@ export function InlineImage({
         if (isOccluded(span, occlusionRef.current())) shown = null;
       }
       const payload = shown && cached ? cached.payload : "";
-      const out = composePaint(payload, shown, prevPaintedRef.current, pos.appHeight);
+      // Placement protocols (kitty) leave a persistent placement a covering modal
+      // won't overwrite — on the shown→hidden edge, explicitly delete it.
+      const clear = prev && !shown ? (preparedRef.current?.clear?.() ?? "") : "";
+      const out = clear + composePaint(payload, shown, prev, pos.appHeight);
       prevPaintedRef.current = shown;
       return out;
     });
