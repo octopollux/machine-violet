@@ -84,6 +84,11 @@ function App({ caps, path, cols, rows }: { caps: GraphicsCapabilities; path: str
   const onScroll = () => force((x) => x + 1);
   // Override the detected register count so `p` can A/B the sixel palette size.
   const effCaps: GraphicsCapabilities = { ...caps, sixelColorRegisters: PALETTES[palIdx] };
+  const proto = pickProtocol(effCaps);
+  // kitty/iTerm2 are true-color — the palette size only applies to sixel.
+  const colorInfo = proto === "sixel"
+    ? `palette=${sixelPaletteSize(effCaps)} (registers=${caps.sixelColorRegisters ?? "unreported"})`
+    : "color=truecolor";
   // Real ScrollView reproduces production (marginTop:-scrollOffset), so the
   // image slot genuinely moves above the viewport top → top-clipping works.
   useInput((input, key) => {
@@ -96,8 +101,8 @@ function App({ caps, path, cols, rows }: { caps: GraphicsCapabilities; path: str
   return (
     <OcclusionProvider>
       <Box flexDirection="column">
-        <Text bold>#552 integration-check. proto={pickProtocol(effCaps) ?? "NONE"} cell={effCaps.cellPixels ? `${effCaps.cellPixels.width}x${effCaps.cellPixels.height}` : "?"} registers={caps.sixelColorRegisters ?? "unreported"} palette={sixelPaletteSize(effCaps)}</Text>
-        <Text dimColor>↑/↓ scroll   o occluder({occ ? "ON" : "off"})   p palette({sixelPaletteSize(effCaps)})   q quit</Text>
+        <Text bold>#552 integration-check. proto={proto ?? "NONE"} cell={effCaps.cellPixels ? `${effCaps.cellPixels.width}x${effCaps.cellPixels.height}` : "?"} {colorInfo}</Text>
+        <Text dimColor>↑/↓ scroll   o occluder({occ ? "ON" : "off"})   {proto === "sixel" ? `p palette(${sixelPaletteSize(effCaps)})   ` : ""}q quit</Text>
         <Text color="magenta">{"━".repeat(cols)} TOP BOUNDARY</Text>
         <Box height={VIEW_ROWS} flexDirection="column">
           <ScrollView ref={scrollRef} onScroll={onScroll}>
