@@ -16,10 +16,15 @@ import { UsageGauge } from "./UsageGauge.js";
 
 /**
  * Tallest an inline image may stand, as a fraction of the narrative viewport.
- * Caps portraits (which fill height) so one image can't swallow the whole pane
- * and bury the surrounding narration. Landscapes fill width and rarely hit this.
+ * The model is "fill width, grow taller until you'd run past the visible pane":
+ * an image fills the content width and only switches to filling height (leaving
+ * symmetric side pillars) when that would push it past this cap. So the cap is
+ * deliberately near the full viewport — it's a safety against an image taller
+ * than the pane (which `visibleBand` would crop, forcing a scroll to see it
+ * whole), not a stylistic budget. Set lower only if images should leave more
+ * room for surrounding narration on screen.
  */
-const IMAGE_HEIGHT_CAP_FRACTION = 0.7;
+const IMAGE_HEIGHT_CAP_FRACTION = 0.9;
 
 
 // ---------------------------------------------------------------------------

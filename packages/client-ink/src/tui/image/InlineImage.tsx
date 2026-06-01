@@ -134,12 +134,30 @@ export function InlineImage({
     return () => { cancelled = true; };
   }, [path, driver]);
 
-  // Force an immediate repaint that doesn't depend on Ink emitting a frame.
-  // Ink skips the stdout write when its render output is unchanged (our slot
-  // Box only changes on the one metadata reflow), so after an async encode we
-  // write an empty synchronized block; the sync-write combiner splices the
-  // composite painter (this image's escapes) inside it, painting atomically.
-  const forceRepaint = () => { if (mountedRef.current) stdout.write(BSU + ESU); };
+  // Force a repaint that doesn't depend on Ink emitting a frame. Ink skips the
+  // stdout write when its render output is unchanged (our slot Box only changes
+  // on the one metadata reflow), so after an async encode we write an empty
+  // synchronized block; the sync-write combiner splices the composite painter
+  // (this image's escapes) inside it, painting atomically.
+  //
+  // Coalesced onto a microtask, and this matters for correctness, not just
+  // batching: a modal opening re-encodes this image, but the modal registers
+  // its occlusion span in a sibling layout effect that runs AFTER ours (JSX
+  // order). A synchronous write here would paint the full, un-trimmed band
+  // against not-yet-registered occluders — straight over the modal — and only a
+  // second write would correct it (the visible "image redraws on top of the
+  // modal" flash). Deferring to a microtask lets every synchronous layout effect
+  // (the modal's registration) and the reactive re-encode settle first, so the
+  // single flushed write paints the already-trimmed band.
+  const repaintPendingRef = useRef(false);
+  const forceRepaint = () => {
+    if (!mountedRef.current || repaintPendingRef.current) return;
+    repaintPendingRef.current = true;
+    queueMicrotask(() => {
+      repaintPendingRef.current = false;
+      if (mountedRef.current) stdout.write(BSU + ESU);
+    });
+  };
 
   // Measure slot position from the yoga tree (accounts for ScrollView's
   // marginTop:-scrollOffset, so this is the live on-screen row). slotLeft is
@@ -296,7 +314,17 @@ export function InlineImage({
 
   // Reserve the footprint so layout is stable (text wraps around it) even when
   // the image paints out of band. Nothing renders here when there's no driver.
-  return <Box ref={slotRef} width={cols} height={rows} />;
+  // The slot is centered within the full bounds, so when an image can't fill
+  // width (a height-capped portrait) the unavoidable slack splits into symmetric
+  // side pillars instead of piling up on the right; for a width-filling image
+  // (cols === maxCols) the wrapper is a no-op and slotLeft stays frame-aligned.
+  // The painter reads slotLeft from the yoga tree, so it tracks the centering
+  // for free — no paint-side offset needed.
+  return (
+    <Box width={maxCols} justifyContent="center">
+      <Box ref={slotRef} width={cols} height={rows} />
+    </Box>
+  );
 }
 
 // Minimal structural types for the yoga parent-walk (Ink doesn't export these).
