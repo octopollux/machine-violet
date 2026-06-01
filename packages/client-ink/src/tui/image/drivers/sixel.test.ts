@@ -96,6 +96,19 @@ describe("sixelDriver", () => {
     expect(prepared.encodeBand(6, 18)).toBe(prepared.encodeBand(6, 18));
   });
 
+  it("flattens transparency before quantizing (letterbox alpha can't corrupt the palette)", () => {
+    // The quantizer scatters the whole palette into noise when fed a varying
+    // alpha channel. The driver forces alpha opaque first, so a transparent
+    // letterbox must yield the SAME encoding as the already-opaque image.
+    const transparent = sampleRgba();
+    for (let i = 3; i < W * 6 * 4; i += 4) transparent[i] = 0; // top 6 rows transparent
+    const opaque = Buffer.from(transparent);
+    for (let i = 3; i < opaque.length; i += 4) opaque[i] = 255;
+    const fromTransparent = sixelDriver.prepare(transparent, W, H, () => {}, 256, CELL).encodeBand(0, H);
+    const fromOpaque = sixelDriver.prepare(opaque, W, H, () => {}, 256, CELL).encodeBand(0, H);
+    expect(fromTransparent).toBe(fromOpaque);
+  });
+
   it("does not mutate the caller's RGBA buffer (reduce dithers in place)", () => {
     const rgba = sampleRgba();
     const snapshot = Buffer.from(rgba);

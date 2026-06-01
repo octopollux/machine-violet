@@ -35,10 +35,18 @@ export const sixelDriver: ImageDriver = {
   // One quantization up front, then cheap per-band encodes from cached indices.
   expensiveEncode: false,
   prepare(rgba: Buffer, widthPx: number, _heightPx: number, _write: (s: string) => void, paletteSize: number, _cellPixels: { width: number; height: number }): PreparedImage {
-    // reduce dithers its input IN PLACE — pass a copy so the caller's cached
-    // RGBA (reused across re-prepares) is never mutated. Returns frozen indices
-    // (row-major Uint16Array, length w*h) + the shared RGBA8888 palette.
-    const { indices, palette } = reduce(new Uint8Array(rgba), widthPx, paletteSize);
+    // Flatten to opaque before quantizing. The quantizer mishandles a varying
+    // alpha channel — the transparent letterbox from fit:"contain" — and
+    // scatters the WHOLE palette into colored noise, not just the letterbox.
+    // Sixel has no usable partial transparency anyway (the lib ignores it), so
+    // force alpha to 255: the letterbox (RGB 0) becomes black bars, invisible on
+    // a dark terminal. kitty/iTerm2 keep the real alpha for true transparency.
+    // (This copy also protects the caller's cached RGBA — reduce dithers its
+    // input in place.) Returns frozen indices (row-major Uint16Array, w*h) + the
+    // shared RGBA8888 palette.
+    const opaque = new Uint8Array(rgba);
+    for (let i = 3; i < opaque.length; i += 4) opaque[i] = 255;
+    const { indices, palette } = reduce(opaque, widthPx, paletteSize);
     return {
       encodeBand(topPx: number, bandPx: number): string {
         if (bandPx <= 0) return "";
