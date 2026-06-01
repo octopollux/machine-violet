@@ -108,10 +108,16 @@ export function InlineImage({
   viewportRef.current = { top: viewportTop, rows: viewportRows };
   const occlusionRef = useRef(getOcclusionSpans);
   occlusionRef.current = getOcclusionSpans;
-  const sizeRef = useRef({ cols, rows });
-  sizeRef.current = { cols, rows };
 
-  const preparedRef = useRef<PreparedImage | null>(null);
+  // The prepared raster is the SINGLE SOURCE OF TRUTH for band geometry — its
+  // baked-in cols/rows are what the band is computed against, never the live
+  // footprint. The footprint reflows synchronously when metadata lands, but the
+  // raster is re-decoded asynchronously (passive effect); if the band were sized
+  // off the live footprint it could ask for more rows than the current raster
+  // holds, and sixel's `subarray` would come up short ("wrong geometry of
+  // data"). Sizing off the raster lags the reflow by one decode — cosmetically
+  // invisible — but can never overflow it.
+  const preparedRef = useRef<{ img: PreparedImage; cols: number; rows: number } | null>(null);
   const mountedRef = useRef(true);
 
   // Read the image's intrinsic size once so we can reserve its true aspect.
@@ -164,7 +170,7 @@ export function InlineImage({
   useEffect(() => {
     if (!driver) return;
     let cancelled = false;
-    preparedRef.current?.dispose();
+    preparedRef.current?.img.dispose();
     preparedRef.current = null;
     cachedRef.current = null;
     void (async () => {
@@ -175,13 +181,14 @@ export function InlineImage({
           .raw()
           .toBuffer({ resolveWithObject: true });
         if (cancelled) return;
-        preparedRef.current = driver.prepare(data, widthPx, heightPx, (s) => stdout.write(s), paletteSize, cell);
+        const img = driver.prepare(data, widthPx, heightPx, (s) => stdout.write(s), paletteSize, cell);
+        preparedRef.current = { img, cols, rows };
         scheduleEncode(); // first band
       } catch {
         // Missing/unreadable file: render nothing inline (export still has it).
       }
     })();
-    return () => { cancelled = true; preparedRef.current?.dispose(); preparedRef.current = null; };
+    return () => { cancelled = true; preparedRef.current?.img.dispose(); preparedRef.current = null; };
   }, [path, widthPx, heightPx, driver, paletteSize]);
 
   // Immediate (cheap encoders: sixel, kitty) or debounced (expensive encoders) band encode.
@@ -191,14 +198,14 @@ export function InlineImage({
   const desiredBand = (): { box: PaintBox; srcTopRows: number; visRows: number } | null => {
     const pos = posRef.current;
     const vp = viewportRef.current;
-    const { cols: c, rows: r } = sizeRef.current;
-    if (!pos) return null;
-    const clipped = visibleBand(pos.slotTop, r, vp.top, vp.rows);
+    const prep = preparedRef.current;
+    if (!pos || !prep) return null;
+    const clipped = visibleBand(pos.slotTop, prep.rows, vp.top, vp.rows);
     if (!clipped) return null;
     const band = subtractOcclusion(clipped, occlusionRef.current());
     if (!band) return null;
     return {
-      box: { row: band.visTop, col: pos.slotLeft, rows: band.visRows, cols: c },
+      box: { row: band.visTop, col: pos.slotLeft, rows: band.visRows, cols: prep.cols },
       srcTopRows: band.srcTopRows,
       visRows: band.visRows,
     };
@@ -209,7 +216,7 @@ export function InlineImage({
     if (!prepared || !want) { cachedRef.current = null; forceRepaint(); return; }
     const { topPx, bandPx } = bandPixels(want.srcTopRows, want.visRows, cell.height);
     cachedRef.current = {
-      payload: prepared.encodeBand(topPx, bandPx),
+      payload: prepared.img.encodeBand(topPx, bandPx),
       box: want.box,
       srcTopRows: want.srcTopRows,
       visRows: want.visRows,
@@ -253,7 +260,7 @@ export function InlineImage({
       const occluders = occlusionRef.current();
       if (!pos) {
         // No live position yet: clear any prior placement, erase prior pixels.
-        const clear = prev ? (preparedRef.current?.clear?.() ?? "") : "";
+        const clear = prev ? (preparedRef.current?.img.clear?.() ?? "") : "";
         prevPaintedRef.current = null;
         return clear + composePaint("", null, prev, 0, occluders);
       }
@@ -266,7 +273,7 @@ export function InlineImage({
       const payload = shown && cached ? cached.payload : "";
       // Placement protocols (kitty) leave a persistent placement a covering modal
       // won't overwrite — on the shown→hidden edge, explicitly delete it.
-      const clear = prev && !shown ? (preparedRef.current?.clear?.() ?? "") : "";
+      const clear = prev && !shown ? (preparedRef.current?.img.clear?.() ?? "") : "";
       // Pass occluders so vacated-row erase never blanks a row a modal owns.
       const out = clear + composePaint(payload, shown, prev, pos.appHeight, occluders);
       prevPaintedRef.current = shown;
