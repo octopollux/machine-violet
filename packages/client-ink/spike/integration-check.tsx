@@ -37,8 +37,16 @@ import { OcclusionProvider, useRegisterOcclusion } from "../src/tui/image/occlus
 
 const VIEW_ROWS = 18;
 const HEADER_ROWS = 3; // title + help + TOP boundary → viewport starts at row 3
+// OCC.top is an ABSOLUTE screen row (occlusion spans are absolute, like prod
+// modals). The viewport starts at HEADER_ROWS, so this sits 12 rows into it.
 const OCC = { top: HEADER_ROWS + 12, rows: 6 };
 
+// Must be rendered as a root-level absolute overlay so its marginTop is measured
+// from the screen top — i.e. the rendered row equals the registered row. (A real
+// modal does exactly this: CenteredModal registers top:topMargin and renders at
+// marginTop:topMargin from a root position:absolute box.) Nesting it inside the
+// viewport box would offset the visual position by HEADER_ROWS from what it
+// registers, blanking the image early.
 function Occluder(): React.ReactElement {
   useRegisterOcclusion({ top: OCC.top, rows: OCC.rows });
   return (
@@ -85,10 +93,11 @@ function App({ caps, path, cols, rows }: { caps: GraphicsCapabilities; path: str
             </Box>
             <Filler label="below" n={12} />
           </ScrollView>
-          {occ && <Occluder />}
         </Box>
         <Text color="magenta">{"━".repeat(cols)} INPUT BOUNDARY (nothing below)</Text>
         <Text color="greenBright">{"> "}input line</Text>
+        {/* Root-level absolute overlay: rendered row == registered row. */}
+        {occ && <Occluder />}
       </Box>
     </OcclusionProvider>
   );
