@@ -79,7 +79,7 @@ export function InlineImage({
   const heightPx = rows * cell.height;
 
   // --- live refs the painter reads (painter runs outside React, per frame) ---
-  const posRef = useRef<{ slotTop: number; appHeight: number } | null>(null);
+  const posRef = useRef<{ slotTop: number; slotLeft: number; appHeight: number } | null>(null);
   const cachedRef = useRef<CachedBand | null>(null);
   const prevPaintedRef = useRef<PaintBox | null>(null);
   const viewportRef = useRef({ top: viewportTop, rows: viewportRows });
@@ -99,18 +99,27 @@ export function InlineImage({
   const forceRepaint = () => { if (mountedRef.current) stdout.write(BSU + ESU); };
 
   // Measure slot position from the yoga tree (accounts for ScrollView's
-  // marginTop:-scrollOffset, so this is the live on-screen row).
-  const measure = (): { slotTop: number; appHeight: number } | null => {
+  // marginTop:-scrollOffset, so this is the live on-screen row). slotLeft is
+  // the absolute column the narrative content starts at — the side frame +
+  // Layout's paddingLeft — so the out-of-band graphics land aligned with the
+  // text instead of at terminal column 0 (which would paint the image's left
+  // edge over the frame border).
+  const measure = (): { slotTop: number; slotLeft: number; appHeight: number } | null => {
     const node = slotRef.current as unknown as { yogaNode?: YogaNode; parentNode?: ParentLike } | null;
     if (!node?.yogaNode) return null;
     let top = 0;
+    let left = 0;
     let appHeight = 0;
     let cur: ParentLike | null = node as ParentLike;
     while (cur) {
-      if (cur.yogaNode) { top += cur.yogaNode.getComputedTop(); appHeight = cur.yogaNode.getComputedHeight(); }
+      if (cur.yogaNode) {
+        top += cur.yogaNode.getComputedTop();
+        left += cur.yogaNode.getComputedLeft();
+        appHeight = cur.yogaNode.getComputedHeight();
+      }
       cur = cur.parentNode ?? null;
     }
-    return { slotTop: top, appHeight };
+    return { slotTop: top, slotLeft: left, appHeight };
   };
 
   // Decode + resize once, cache RGBA, prepare the driver.
@@ -145,7 +154,7 @@ export function InlineImage({
     const band = visibleBand(pos.slotTop, rows, vp.top, vp.rows);
     if (!band) return null;
     return {
-      box: { row: band.visTop, col: 0, rows: band.visRows, cols },
+      box: { row: band.visTop, col: pos.slotLeft, rows: band.visRows, cols },
       srcTopRows: band.srcTopRows,
       visRows: band.visRows,
     };
@@ -238,5 +247,5 @@ export function InlineImage({
 }
 
 // Minimal structural types for the yoga parent-walk (Ink doesn't export these).
-interface YogaNode { getComputedTop(): number; getComputedHeight(): number }
+interface YogaNode { getComputedTop(): number; getComputedLeft(): number; getComputedHeight(): number }
 interface ParentLike { yogaNode?: YogaNode; parentNode?: ParentLike | null }
