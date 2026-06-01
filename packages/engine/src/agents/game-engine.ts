@@ -239,6 +239,12 @@ export class GameEngine {
       if (toolName === "switch_player") {
         this.persistCurrentScene();
       }
+      if (toolName === "swap_pc") {
+        // swap_pc rewrites the PC roster (config.players) and the active
+        // index. Both must reach disk or the next load resurrects the old PC.
+        this.persister?.persistConfig(state.config);
+        this.persistCurrentScene();
+      }
       if (toolName === "start_combat") {
         void this.initResolveSession(state);
       } else if (toolName === "end_combat") {

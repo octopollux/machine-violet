@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { StatePersister, STATE_FILES } from "./state-persistence.js";
+import { StatePersister, STATE_FILES, CONFIG_FILE } from "./state-persistence.js";
 import type { FileIO } from "../agents/scene-manager.js";
 import type { CombatState } from "@machine-violet/shared/types/combat.js";
 import type { MapData } from "@machine-violet/shared/types/maps.js";
@@ -195,6 +195,28 @@ describe("StatePersister", () => {
 
     const loaded = await persister.loadAll();
     expect(loaded.resources).toEqual(resources);
+  });
+
+  it("persistConfig writes config.json at campaign root", async () => {
+    const fio = mockFileIO();
+    const persister = new StatePersister("/tmp/campaign", fio);
+    const config = {
+      name: "Test Campaign",
+      dm_personality: { name: "DM", prompt_fragment: "be a DM" },
+      players: [{ name: "Beep", character: "Maren", type: "human" as const }],
+      combat: { initiative_method: "d20_dex", round_structure: "individual", surprise_rules: false },
+      context: { retention_exchanges: 5, max_conversation_tokens: 0 },
+      recovery: { auto_commit_interval: 3, max_commits: 500, enable_git: true },
+      choices: { campaign_default: "never" as const, player_overrides: {} },
+    };
+
+    persister.persistConfig(config);
+    await persister.flush();
+
+    const written = files[norm("/tmp/campaign/config.json")];
+    expect(written).toBeDefined();
+    expect(JSON.parse(written)).toEqual(config);
+    expect(CONFIG_FILE).toBe("config.json");
   });
 
   it("loadAll returns undefined for missing files", async () => {

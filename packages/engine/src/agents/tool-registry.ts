@@ -53,6 +53,7 @@ import {
 import { manageObjectives } from "../tools/objectives/index.js";
 import type { ManageObjectivesInput } from "../tools/objectives/index.js";
 import { ENTITY_TOOLS } from "../entities/tools.js";
+import { loadPrompt } from "../prompts/load-prompt.js";
 
 // --- Helpers ---
 
@@ -674,10 +675,92 @@ const TOOL_DEFS: RegisteredTool[] = [
       const idx = state.config.players.findIndex(
         (p) => p.character.toLowerCase() === target,
       );
-      if (idx === -1) return err(`Player '${input.player}' not found.`);
+      if (idx === -1) {
+        const roster = state.config.players.map((p) => p.character).join(", ") || "(none)";
+        return err(
+          `Player '${input.player}' not found. switch_player only passes the turn between characters already in the roster (${roster}). ` +
+          `To make a character that ISN'T in the roster the player's PC — a handoff to a new or existing character — use swap_pc instead (see howto_swap_pc for the full procedure).`,
+        );
+      }
       state.activePlayerIndex = idx;
       const p = state.config.players[idx];
       return ok(`Active player: ${p.character} (${p.type})`);
+    },
+  },
+  {
+    definition: {
+      name: "swap_pc",
+      description:
+        "Hand player control from the current PC to a different character (a 'PC swap'). Reassigns a player slot in the roster to `character` and makes it the active PC — this is the only tool that edits config.players, and it persists the change so the new PC survives a reload. Use for retiring a PC and continuing as an NPC/ally, or introducing a brand-new PC. Run howto_swap_pc first: this tool only moves the roster pointer — you must also create/locate the character sheet, demote the outgoing PC, and refresh party.md, resources, modeline, and theme.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          character: { type: "string", description: "Name of the character who becomes the player's PC (new or existing)." },
+          replaces: { type: "string", description: "Name of the current PC being handed off. Defaults to the active player's current character." },
+          color: { type: "string", description: "Theme/display color for the new PC as a hex string (e.g. #b33f5d). Optional." },
+          player_name: { type: "string", description: "New label for the human player behind this slot. Optional — defaults to keeping the existing player name." },
+        },
+        required: ["character"],
+      },
+    },
+    handler: (state, input) => {
+      const players = state.config.players;
+      if (players.length === 0) return err("No players in the roster to reassign.");
+
+      const character = (input.character as string).trim();
+      if (!character) return err("`character` is required.");
+
+      // Resolve which roster slot to reassign. `replaces` names the outgoing
+      // character explicitly; otherwise we hand off the active slot.
+      let idx: number;
+      const replaces = (input.replaces as string | undefined)?.trim();
+      if (replaces) {
+        idx = players.findIndex((p) => p.character.toLowerCase() === replaces.toLowerCase());
+        if (idx === -1) {
+          const roster = players.map((p) => p.character).join(", ") || "(none)";
+          return err(`Cannot swap: no player currently controls '${replaces}'. Current PCs: ${roster}.`);
+        }
+      } else {
+        idx = state.activePlayerIndex;
+      }
+
+      const slot = players[idx];
+      const outgoing = slot.character;
+
+      // Warn (but allow) if another slot already controls the incoming
+      // character — two players sharing one PC is almost always a mistake.
+      const dup = players.findIndex(
+        (p, i) => i !== idx && p.character.toLowerCase() === character.toLowerCase(),
+      );
+
+      slot.character = character;
+      if (typeof input.color === "string" && input.color.trim()) slot.color = input.color.trim();
+      if (typeof input.player_name === "string" && input.player_name.trim()) slot.name = input.player_name.trim();
+      state.activePlayerIndex = idx;
+
+      const note = dup !== -1
+        ? ` Warning: '${players[dup].name}' also controls '${character}' — you likely want to swap or retire that slot too.`
+        : "";
+      return ok(
+        `PC swapped: '${slot.name}' now plays ${character} (was ${outgoing}). ` +
+        `${outgoing} is no longer player-controlled. Active PC set to ${character}.${note} ` +
+        `Reminder: demote ${outgoing}'s sheet to a character/NPC, set up ${character}'s sheet + party.md + resources + modeline + theme (see howto_swap_pc).`,
+      );
+    },
+  },
+  {
+    definition: {
+      name: "howto_swap_pc",
+      description:
+        "Knowledge tool (a 'skill'): returns the step-by-step procedure for swapping the player character with a new or existing character. Takes no arguments and changes nothing — it just loads the playbook into context. Call this BEFORE doing a PC swap so you touch every piece of state (config roster, character sheets, party.md, resources, modeline, theme) and nothing loads stale.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {},
+        required: [],
+      },
+    },
+    handler: () => {
+      return ok(loadPrompt("howto-swap-pc"));
     },
   },
 
@@ -958,6 +1041,10 @@ export const TOOL_STATE_MAP: Record<string, StateSlice[]> = {
   deck: ["decks"],
   manage_objectives: ["objectives"],
   switch_player: [],
+  // swap_pc mutates config.players, which isn't a StateSlice — persistence is
+  // handled out-of-band by GameEngine.onToolSuccess (persistConfig). Listed
+  // here for completeness so the tool is recognized as state-mutating.
+  swap_pc: [],
   resolve_turn: [],
 };
 

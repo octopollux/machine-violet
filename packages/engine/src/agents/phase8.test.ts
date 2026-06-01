@@ -65,7 +65,10 @@ function makeConfig(players: PlayerConfig[]): CampaignConfig {
   return {
     name: "Test Campaign",
     dm_personality: { name: "Test", prompt_fragment: "Test DM" },
-    players,
+    // Clone slots so swap_pc (which mutates players in place, mirroring a
+    // freshly-parsed config per session) can't leak into the shared module-
+    // level player constants across tests.
+    players: players.map((p) => ({ ...p })),
     combat: {
       initiative_method: "d20_dex",
       round_structure: "individual",
@@ -437,6 +440,68 @@ describe("new Phase 8 tools", () => {
     expect(result.content).toContain("not found");
   });
 
+  it("switch_player's unknown-player error points at swap_pc", () => {
+    const state = makeState([humanPlayer]);
+    const registry = createTestRegistry();
+    const result = registry.dispatch(state, "switch_player", { player: "Maren" });
+
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("swap_pc");
+  });
+
+  it("swap_pc reassigns the active slot to a character not in the roster", () => {
+    const state = makeState([humanPlayer]); // Alex plays Aldric
+    const registry = createTestRegistry();
+    const result = registry.dispatch(state, "swap_pc", { character: "Maren", color: "#b33f5d" });
+
+    expect(result.is_error).toBeFalsy();
+    expect(state.config.players[0].character).toBe("Maren");
+    expect(state.config.players[0].color).toBe("#b33f5d");
+    expect(state.config.players[0].name).toBe("Alex"); // player label unchanged
+    expect(state.activePlayerIndex).toBe(0);
+  });
+
+  it("swap_pc with `replaces` targets the slot controlling that character", () => {
+    const state = makeState([humanPlayer, secondHuman], 0); // Alex/Aldric, Sam/Sable
+    const registry = createTestRegistry();
+    const result = registry.dispatch(state, "swap_pc", { character: "Vesper", replaces: "Sable" });
+
+    expect(result.is_error).toBeFalsy();
+    expect(state.config.players[0].character).toBe("Aldric"); // untouched
+    expect(state.config.players[1].character).toBe("Vesper");
+    expect(state.activePlayerIndex).toBe(1); // active follows the swap
+  });
+
+  it("swap_pc errors when `replaces` names no current PC", () => {
+    const state = makeState([humanPlayer]);
+    const registry = createTestRegistry();
+    const result = registry.dispatch(state, "swap_pc", { character: "Maren", replaces: "Ghost" });
+
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("Ghost");
+  });
+
+  it("swap_pc can relabel the human player", () => {
+    const state = makeState([humanPlayer]);
+    const registry = createTestRegistry();
+    registry.dispatch(state, "swap_pc", { character: "Maren", player_name: "Beep" });
+
+    expect(state.config.players[0].name).toBe("Beep");
+    expect(state.config.players[0].character).toBe("Maren");
+  });
+
+  it("howto_swap_pc returns the playbook and changes nothing", () => {
+    const state = makeState([humanPlayer]);
+    const before = JSON.stringify(state);
+    const registry = createTestRegistry();
+    const result = registry.dispatch(state, "howto_swap_pc", {});
+
+    expect(result.is_error).toBeFalsy();
+    expect(result.content).toContain("swap_pc");
+    expect(result.content.toLowerCase()).toContain("player character");
+    expect(JSON.stringify(state)).toBe(before); // pure knowledge tool
+  });
+
   it("registers resolve_turn tool", () => {
     const registry = createTestRegistry();
     expect(registry.has("resolve_turn")).toBe(true);
@@ -447,10 +512,11 @@ describe("new Phase 8 tools", () => {
     expect(registry.has("promote_character")).toBe(true);
   });
 
-  it("registry has 35 tools total", () => {
+  it("registry has 37 tools total", () => {
     const registry = createTestRegistry();
     // Bumped from 29 → 35 by the entity-tool rework: entity, describe_entity_type,
     // list_entity_types, validate_entity, find_schema_drift, detect_orphans.
-    expect(registry.size).toBe(35);
+    // 35 → 37 by the PC-swap work: swap_pc, howto_swap_pc.
+    expect(registry.size).toBe(37);
   });
 });
