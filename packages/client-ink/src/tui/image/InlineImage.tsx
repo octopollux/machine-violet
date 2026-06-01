@@ -22,7 +22,12 @@
  *    doesn't register a span (the inline ChoiceOverlay) leaves the image visible.
  *  - repaint trigger: the painter is registered with painterRegistry and the
  *    sync-write combiner re-blits it inside the same DEC-2026 synchronized
- *    block as Ink's frame — flicker-free (validated by the #552 spikes);
+ *    block as Ink's frame — flicker-free (validated by the #552 spikes). Ink
+ *    dedupes/throttles frames and our slot Boxes don't change when only the
+ *    out-of-band pixels do, so an async band encode emits its own empty
+ *    synchronized block (`requestRepaint`), DEFERRED to a microtask so it lands
+ *    after every layout effect in the commit (modal occlusion registration
+ *    included → no flash) and COALESCED to one write per checkpoint;
  *  - band re-encode strategy is per-driver: cheap encoders (sixel — one shared
  *    quantization up front, then ~3-8ms/band) re-encode immediately for
  *    real-time scroll; any expensive encoder debounces to scroll-settle and
@@ -130,12 +135,34 @@ export function InlineImage({
     return () => { cancelled = true; };
   }, [path, driver]);
 
-  // Force an immediate repaint that doesn't depend on Ink emitting a frame.
-  // Ink skips the stdout write when its render output is unchanged (our slot
-  // Box only changes on the one metadata reflow), so after an async encode we
-  // write an empty synchronized block; the sync-write combiner splices the
-  // composite painter (this image's escapes) inside it, painting atomically.
-  const forceRepaint = () => { if (mountedRef.current) stdout.write(BSU + ESU); };
+  // Repaint that doesn't depend on Ink emitting a frame. Ink DEDUPES identical
+  // frames (ink.js `renderInteractiveFrame`: it only writes when
+  // `output !== lastOutput`) and throttles the writes it does make; our slot
+  // Boxes don't change when only the out-of-band pixels change, so after an
+  // async band encode Ink would write nothing and the image would freeze. We
+  // emit an empty synchronized block and let the sync-write combiner splice the
+  // composite painter inside it, painting atomically.
+  //
+  // The write is DEFERRED to a microtask and COALESCED (at most one per
+  // checkpoint):
+  //  - deferral lands the paint AFTER every layout effect in this commit has
+  //    run, so a modal that registers its occlusion span in its own layout
+  //    effect is already visible to the painter — no one-frame flash of the
+  //    image over the modal. (Sibling layout effects run in JSX order and
+  //    <Layout> precedes the modals in PlayingPhase, so a synchronous write
+  //    here would paint before the modal registered.)
+  //  - coalescing caps image writes at one per microtask checkpoint, so a burst
+  //    of requests (rapid scroll) can't issue more out-of-band writes than
+  //    there are frames.
+  const repaintScheduledRef = useRef(false);
+  const requestRepaint = () => {
+    if (!mountedRef.current || repaintScheduledRef.current) return;
+    repaintScheduledRef.current = true;
+    queueMicrotask(() => {
+      repaintScheduledRef.current = false;
+      if (mountedRef.current) stdout.write(BSU + ESU);
+    });
+  };
 
   // Measure slot position from the yoga tree (accounts for ScrollView's
   // marginTop:-scrollOffset, so this is the live on-screen row). slotLeft is
@@ -209,7 +236,7 @@ export function InlineImage({
   const encodeNow = () => {
     const prepared = preparedRef.current;
     const want = desiredBand();
-    if (!prepared || !want) { cachedRef.current = null; forceRepaint(); return; }
+    if (!prepared || !want) { cachedRef.current = null; requestRepaint(); return; }
     const { topPx, bandPx } = bandPixels(want.srcTopRows, want.visRows, cell.height);
     cachedRef.current = {
       payload: prepared.img.encodeBand(topPx, bandPx),
@@ -217,7 +244,7 @@ export function InlineImage({
       srcTopRows: want.srcTopRows,
       visRows: want.visRows,
     };
-    forceRepaint();
+    requestRepaint();
   };
   const scheduleEncode = () => {
     if (!driver) return;
@@ -241,7 +268,7 @@ export function InlineImage({
     if (bandChanged) { scheduleEncode(); return; }
     if (want && cur && cur.box.row !== want.box.row) {
       cachedRef.current = { ...cur, box: want.box }; // same pixels, new position
-      forceRepaint();
+      requestRepaint();
     }
   });
 
