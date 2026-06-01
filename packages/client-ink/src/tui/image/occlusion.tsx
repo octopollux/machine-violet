@@ -18,7 +18,9 @@
  * that already compute their absolute marginTop + height, so registration lives
  * at just those two call sites — no per-modal geometry duplication.
  */
-import React, { createContext, useContext, useId, useLayoutEffect, useMemo, useRef } from "react";
+import React, {
+  createContext, useContext, useId, useLayoutEffect, useMemo, useRef, useSyncExternalStore,
+} from "react";
 import type { RowSpan } from "./geometry.js";
 
 interface OcclusionRegistry {
@@ -26,17 +28,31 @@ interface OcclusionRegistry {
   unregister: (id: string) => void;
   /** Live snapshot of all registered spans (read each frame by the painter). */
   getSpans: () => RowSpan[];
+  /** Subscribe to span-set changes (a modal opening/closing or resizing). */
+  subscribe: (cb: () => void) => () => void;
+  /** Monotonic version, bumped on every change — the useSyncExternalStore snapshot. */
+  getVersion: () => number;
 }
 
 const OcclusionContext = createContext<OcclusionRegistry | null>(null);
 
 export function OcclusionProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   const mapRef = useRef<Map<string, RowSpan>>(new Map());
-  const registry = useMemo<OcclusionRegistry>(() => ({
-    register: (id, span) => { mapRef.current.set(id, span); },
-    unregister: (id) => { mapRef.current.delete(id); },
-    getSpans: () => Array.from(mapRef.current.values()),
-  }), []);
+  const versionRef = useRef(0);
+  const listenersRef = useRef<Set<() => void>>(new Set());
+  const registry = useMemo<OcclusionRegistry>(() => {
+    const notify = () => {
+      versionRef.current += 1;
+      for (const cb of listenersRef.current) cb();
+    };
+    return {
+      register: (id, span) => { mapRef.current.set(id, span); notify(); },
+      unregister: (id) => { if (mapRef.current.delete(id)) notify(); },
+      getSpans: () => Array.from(mapRef.current.values()),
+      subscribe: (cb) => { listenersRef.current.add(cb); return () => { listenersRef.current.delete(cb); }; },
+      getVersion: () => versionRef.current,
+    };
+  }, []);
   return <OcclusionContext.Provider value={registry}>{children}</OcclusionContext.Provider>;
 }
 
@@ -64,4 +80,19 @@ export function useRegisterOcclusion(span: RowSpan | null): void {
 export function useOcclusionSpans(): () => RowSpan[] {
   const registry = useContext(OcclusionContext);
   return useMemo(() => registry?.getSpans ?? (() => []), [registry]);
+}
+
+/**
+ * Re-renders the caller whenever the occlusion span-set changes. InlineImage
+ * uses this so a modal opening/closing triggers a fresh band computation and
+ * re-encode (cropping the image to the rows the modal leaves free) — not just a
+ * live painter hide. Returns a version number that is otherwise opaque.
+ */
+export function useOcclusionVersion(): number {
+  const registry = useContext(OcclusionContext);
+  return useSyncExternalStore(
+    useMemo(() => registry?.subscribe ?? (() => () => undefined), [registry]),
+    registry?.getVersion ?? (() => 0),
+    registry?.getVersion ?? (() => 0),
+  );
 }

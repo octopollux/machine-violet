@@ -2,12 +2,22 @@
  * MV-owned inline image renderer (issue #552). Replaces ink-picture's <Image>.
  *
  * Composes correctly with the live, scrolling, layered TUI:
+ *  - sizing: the parent passes BOUNDS (max cols, max rows). This component reads
+ *    the image's true aspect (sharp metadata, header-only — cheap) and reserves
+ *    EXACTLY the scaled footprint — landscapes fill width, portraits fill height
+ *    up to the row cap. No letterbox bars, no double padding (see geometry.ts
+ *    `fitImage`). One reflow when metadata lands.
  *  - decode + resize ONCE (sharp), cache raw RGBA (avoids the re-decode CPU
- *    meltdown); letterbox to a stable footprint with fit:"contain" so aspect is
- *    preserved and the reserved Box never jumps;
+ *    meltdown);
  *  - vertical band crop: only the rows inside the narrative viewport are
  *    encoded/displayed (graphics protocols don't clip), so the image never
  *    overflows the modeline above or the input line below;
+ *  - occlusion is part of that same band: rows an opaque modal covers are
+ *    subtracted from the band (geometry.ts `subtractOcclusion`), so the image
+ *    keeps showing the part the modal leaves free instead of vanishing whole.
+ *    A modal opening/closing bumps the occlusion store (occlusion.tsx), which
+ *    re-renders this component and re-encodes the trimmed band; the painter also
+ *    hides live (same frame) if the cached band is stale vs current occluders.
  *  - repaint trigger: the painter is registered with painterRegistry and the
  *    sync-write combiner re-blits it inside the same DEC-2026 synchronized
  *    block as Ink's frame — flicker-free (validated by the #552 spikes);
@@ -15,13 +25,10 @@
  *    quantization up front, then ~3-8ms/band) re-encode immediately for
  *    real-time scroll; any expensive encoder debounces to scroll-settle and
  *    reblits the cached payload each frame (lags a beat then snaps);
- *  - occlusion is checked LIVE in the painter (cheap), so opening a modal that
- *    covers the image hides it that very frame; an overlay that doesn't cover
- *    it (e.g. inline choices below the narrative) leaves it visible;
  *  - no graphics protocol → renders nothing (the full-res PNG still lives in
  *    the HTML transcript export).
  */
-import React, { useEffect, useId, useLayoutEffect, useRef } from "react";
+import React, { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Box, useStdout, type DOMElement } from "ink";
 import sharp from "sharp";
 import type { GraphicsCapabilities } from "./capabilities.js";
@@ -30,8 +37,10 @@ import { selectDriver } from "./drivers/index.js";
 import type { PreparedImage } from "./drivers/types.js";
 import { registerPainter } from "./painterRegistry.js";
 import { composePaint, type PaintBox } from "./paint.js";
-import { visibleBand, bandPixels, isOccluded, type RowSpan } from "./geometry.js";
-import { useOcclusionSpans } from "./occlusion.js";
+import {
+  visibleBand, subtractOcclusion, bandPixels, fitImage, isOccluded,
+} from "./geometry.js";
+import { useOcclusionSpans, useOcclusionVersion } from "./occlusion.js";
 
 /** Fallback cell size when the terminal didn't answer `\x1b[16t`. */
 const FALLBACK_CELL = { width: 10, height: 20 };
@@ -52,9 +61,9 @@ interface CachedBand {
 export interface InlineImageProps {
   /** Absolute path to the on-disk image the engine wrote. */
   path: string;
-  /** Reserved footprint in cells. */
-  cols: number;
-  rows: number;
+  /** Max footprint in cells — the image fits its true aspect inside this box. */
+  maxCols: number;
+  maxRows: number;
   /** Absolute top row of the narrative viewport (where the ScrollView clips). */
   viewportTop: number;
   /** Narrative viewport height in rows. */
@@ -64,17 +73,30 @@ export interface InlineImageProps {
 }
 
 export function InlineImage({
-  path, cols, rows, viewportTop, viewportRows, graphicsCaps,
+  path, maxCols, maxRows, viewportTop, viewportRows, graphicsCaps,
 }: InlineImageProps): React.ReactElement {
   const { stdout } = useStdout();
   const slotRef = useRef<DOMElement>(null);
   const getOcclusionSpans = useOcclusionSpans();
+  // Re-render (→ re-measure → re-encode the occlusion-trimmed band) whenever a
+  // modal opens, closes, or moves. Without this the band would only recompute
+  // on scroll, so a modal opening over part of an image wouldn't crop it.
+  useOcclusionVersion();
   const painterKey = useId();
 
   const protocol = graphicsCaps ? pickProtocol(graphicsCaps) : null;
   const driver = protocol ? selectDriver(protocol) : null;
   const paletteSize = graphicsCaps ? sixelPaletteSize(graphicsCaps) : 256;
   const cell = graphicsCaps?.cellPixels ?? FALLBACK_CELL;
+
+  // True image dimensions (header-only read). Null until the metadata lands; we
+  // reserve a wide default in the meantime, so non-portrait images don't reflow
+  // and portraits reflow exactly once.
+  const [natural, setNatural] = useState<{ width: number; height: number } | null>(null);
+  const { cols, rows } = natural
+    ? fitImage(natural.width, natural.height, maxCols, maxRows, cell)
+    : { cols: maxCols, rows: Math.max(1, Math.min(maxRows, Math.round((maxCols * 9) / 32))) };
+
   const widthPx = cols * cell.width;
   const heightPx = rows * cell.height;
 
@@ -86,16 +108,31 @@ export function InlineImage({
   viewportRef.current = { top: viewportTop, rows: viewportRows };
   const occlusionRef = useRef(getOcclusionSpans);
   occlusionRef.current = getOcclusionSpans;
+  const sizeRef = useRef({ cols, rows });
+  sizeRef.current = { cols, rows };
 
   const preparedRef = useRef<PreparedImage | null>(null);
   const mountedRef = useRef(true);
 
+  // Read the image's intrinsic size once so we can reserve its true aspect.
+  useEffect(() => {
+    if (!driver) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const meta = await sharp(path).metadata();
+        if (cancelled || !meta.width || !meta.height) return;
+        setNatural({ width: meta.width, height: meta.height });
+      } catch { /* unreadable: keep the default footprint, decode will no-op */ }
+    })();
+    return () => { cancelled = true; };
+  }, [path, driver]);
+
   // Force an immediate repaint that doesn't depend on Ink emitting a frame.
   // Ink skips the stdout write when its render output is unchanged (our slot
-  // Box never changes), so after an async encode we write an empty
-  // synchronized block; the sync-write combiner splices the composite painter
-  // (this image's escapes) inside it, painting atomically. Ink-initiated
-  // frames are handled by the same combiner injection.
+  // Box only changes on the one metadata reflow), so after an async encode we
+  // write an empty synchronized block; the sync-write combiner splices the
+  // composite painter (this image's escapes) inside it, painting atomically.
   const forceRepaint = () => { if (mountedRef.current) stdout.write(BSU + ESU); };
 
   // Measure slot position from the yoga tree (accounts for ScrollView's
@@ -122,10 +159,12 @@ export function InlineImage({
     return { slotTop: top, slotLeft: left, appHeight };
   };
 
-  // Decode + resize once, cache RGBA, prepare the driver.
+  // Decode + resize once, cache RGBA, prepare the driver. Re-runs if the
+  // footprint changes (the metadata reflow) so the raster matches the cells.
   useEffect(() => {
     if (!driver) return;
     let cancelled = false;
+    preparedRef.current?.dispose();
     preparedRef.current = null;
     cachedRef.current = null;
     void (async () => {
@@ -147,14 +186,19 @@ export function InlineImage({
 
   // Immediate (cheap encoders: sixel, kitty) or debounced (expensive encoders) band encode.
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The band to display now: the image's footprint clipped to the viewport,
+  // then trimmed by the rows any open modal covers.
   const desiredBand = (): { box: PaintBox; srcTopRows: number; visRows: number } | null => {
     const pos = posRef.current;
     const vp = viewportRef.current;
+    const { cols: c, rows: r } = sizeRef.current;
     if (!pos) return null;
-    const band = visibleBand(pos.slotTop, rows, vp.top, vp.rows);
+    const clipped = visibleBand(pos.slotTop, r, vp.top, vp.rows);
+    if (!clipped) return null;
+    const band = subtractOcclusion(clipped, occlusionRef.current());
     if (!band) return null;
     return {
-      box: { row: band.visTop, col: pos.slotLeft, rows: band.visRows, cols },
+      box: { row: band.visTop, col: pos.slotLeft, rows: band.visRows, cols: c },
       srcTopRows: band.srcTopRows,
       visRows: band.visRows,
     };
@@ -179,12 +223,12 @@ export function InlineImage({
     debounceRef.current = setTimeout(encodeNow, ENCODE_DEBOUNCE_MS);
   };
 
-  // After every render (incl. scroll re-renders): re-measure, then either
-  // re-encode (band pixels changed — clipped differently at an edge) or, when
-  // a fully-visible image merely moved, cheaply re-blit the cached payload at
-  // the new row. Without the reposition branch a scrolling, unclipped image
-  // would stay frozen at its old position (and never un-hide after passing an
-  // occluder), since its band identity is unchanged.
+  // After every render (scroll, metadata reflow, modal open/close): re-measure,
+  // then either re-encode (band pixels changed — clipped/occluded differently)
+  // or, when a fully-visible image merely moved, cheaply re-blit the cached
+  // payload at the new row. Without the reposition branch a scrolling, unclipped
+  // image would stay frozen at its old position (and never un-hide after passing
+  // an occluder), since its band identity is unchanged.
   useLayoutEffect(() => {
     posRef.current = measure();
     const want = desiredBand();
@@ -206,23 +250,25 @@ export function InlineImage({
       const pos = posRef.current;
       const cached = cachedRef.current;
       const prev = prevPaintedRef.current;
+      const occluders = occlusionRef.current();
       if (!pos) {
         // No live position yet: clear any prior placement, erase prior pixels.
         const clear = prev ? (preparedRef.current?.clear?.() ?? "") : "";
         prevPaintedRef.current = null;
-        return clear + composePaint("", null, prev, 0);
+        return clear + composePaint("", null, prev, 0, occluders);
       }
       let shown: PaintBox | null = cached?.box ?? null;
-      // Live occlusion gate — hide the frame a covering modal opens.
-      if (shown) {
-        const span: RowSpan = { top: shown.row, rows: shown.rows };
-        if (isOccluded(span, occlusionRef.current())) shown = null;
-      }
+      // Live occlusion gate: the cached band was encoded to avoid occluders, so
+      // if it now overlaps one, occlusion changed since the last encode (modal
+      // just opened) and the band is stale — hide this frame; the reactive
+      // re-encode lands the trimmed band on the next.
+      if (shown && isOccluded({ top: shown.row, rows: shown.rows }, occluders)) shown = null;
       const payload = shown && cached ? cached.payload : "";
       // Placement protocols (kitty) leave a persistent placement a covering modal
       // won't overwrite — on the shown→hidden edge, explicitly delete it.
       const clear = prev && !shown ? (preparedRef.current?.clear?.() ?? "") : "";
-      const out = clear + composePaint(payload, shown, prev, pos.appHeight);
+      // Pass occluders so vacated-row erase never blanks a row a modal owns.
+      const out = clear + composePaint(payload, shown, prev, pos.appHeight, occluders);
       prevPaintedRef.current = shown;
       return out;
     });
@@ -235,7 +281,7 @@ export function InlineImage({
       // re-blits) lands atomically.
       const pos = posRef.current;
       if (prevPaintedRef.current && pos) {
-        stdout.write(BSU + composePaint("", null, prevPaintedRef.current, pos.appHeight) + ESU);
+        stdout.write(BSU + composePaint("", null, prevPaintedRef.current, pos.appHeight, occlusionRef.current()) + ESU);
         prevPaintedRef.current = null;
       }
     };

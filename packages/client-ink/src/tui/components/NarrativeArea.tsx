@@ -14,6 +14,13 @@ import { composeTurnSeparator } from "../themes/composer.js";
 import type { ThemeAsset } from "../themes/types.js";
 import { UsageGauge } from "./UsageGauge.js";
 
+/**
+ * Tallest an inline image may stand, as a fraction of the narrative viewport.
+ * Caps portraits (which fill height) so one image can't swallow the whole pane
+ * and bury the surrounding narration. Landscapes fill width and rarely hit this.
+ */
+const IMAGE_HEIGHT_CAP_FRACTION = 0.7;
+
 
 // ---------------------------------------------------------------------------
 // Incremental narrative processing hook
@@ -333,35 +340,29 @@ const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
   }
 
   // Image lines render the generated PNG via our MV-owned InlineImage, which
-  // composes correctly with the live TUI (vertical crop, atomic repaint,
-  // occlusion-gated hide, no-graphics → nothing). `nodes[0]` is the absolute
-  // path the engine wrote.
+  // composes correctly with the live TUI (aspect-true sizing, vertical crop,
+  // atomic repaint, occlusion-aware band, no-graphics → nothing). `nodes[0]` is
+  // the absolute path the engine wrote.
   //
-  // Footprint: a 16:9 box at 100% of the narrative column. Terminal cells are
-  // ~2:1 tall:wide, so visual 16:9 = cols : (rows*2) → rows = cols*9/32, with
-  // a floor for narrow terminals. The footprint is reserved with margins so
-  // text flows around it; InlineImage letterboxes the source within it.
+  // We pass BOUNDS, not a footprint: the full content width, and a height cap of
+  // ~70% of the narrative viewport so even a tall portrait can't swallow the
+  // pane. InlineImage reads the image's true aspect and reserves exactly the
+  // scaled footprint inside these bounds — no letterboxing here, no `isPortrait`
+  // guesswork (landscapes fill width, portraits fill height up to the cap).
   if (line.kind === "image") {
     const path = typeof line.nodes[0] === "string" ? line.nodes[0] : "";
     if (!path) return <Text dimColor>[image: missing path]</Text>;
-    const imgWidth = Math.max(20, width ?? 80);
-    const imgHeight = Math.max(6, Math.round((imgWidth * 9) / 32));
-    // Character portraits (setup-loop) are far taller than the wide 16:9 scene
-    // footprint. Give them a narrow footprint so the portrait fills it rather
-    // than sitting letterboxed across the full width — on sixel the contain
-    // bars would otherwise flatten to black side-bars. InlineImage preserves
-    // aspect via fit:"contain", so an approximate portrait footprint is fine;
-    // `intent` is carried through from #550 (scenes/landscape keep full width).
-    const isPortrait = line.intent === "character_portrait";
-    const footprintWidth = isPortrait ? Math.max(12, Math.round((imgHeight * 3) / 2)) : imgWidth;
+    const maxCols = Math.max(20, width ?? 80);
+    const viewRows = viewportRows ?? maxCols;
+    const maxRows = Math.max(6, Math.round(viewRows * IMAGE_HEIGHT_CAP_FRACTION));
     return (
       <Box flexDirection="column" marginTop={1} marginBottom={1}>
         <InlineImage
           path={path}
-          cols={footprintWidth}
-          rows={imgHeight}
+          maxCols={maxCols}
+          maxRows={maxRows}
           viewportTop={viewportTop ?? 0}
-          viewportRows={viewportRows ?? imgHeight}
+          viewportRows={viewRows}
           graphicsCaps={graphicsCaps}
         />
       </Box>
