@@ -333,10 +333,11 @@ const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
   // the absolute path the engine wrote.
   //
   // We pass BOUNDS, not a footprint: the full content width, and a height cap of
-  // ~70% of the narrative viewport so even a tall portrait can't swallow the
-  // pane. InlineImage reads the image's true aspect and reserves exactly the
-  // scaled footprint inside these bounds — no letterboxing here, no `isPortrait`
-  // guesswork (landscapes fill width, portraits fill height up to the cap).
+  // IMAGE_HEIGHT_CAP_FRACTION (0.9) of the narrative viewport so even a tall
+  // portrait can't swallow the pane. InlineImage reads the image's true aspect
+  // and reserves exactly the scaled footprint inside these bounds — no
+  // letterboxing here, no `isPortrait` guesswork (landscapes fill width,
+  // portraits fill height up to the cap).
   if (line.kind === "image") {
     const path = typeof line.nodes[0] === "string" ? line.nodes[0] : "";
     if (!path) return <Text dimColor>[image: missing path]</Text>;

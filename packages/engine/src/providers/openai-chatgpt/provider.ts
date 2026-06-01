@@ -1049,9 +1049,21 @@ export function messageToResponsesItems(msg: NormalizedMessage): unknown[] {
   // `input_image` translation on the openai-apikey path (`toResponsesInput`
   // in openai.ts).
   const items: unknown[] = [];
-  const messageContent: unknown[] = [];
+  let messageContent: unknown[] = [];
+  // Flush accumulated text/image into a `message` item. Called before each
+  // `function_call_output` so that if a single user message ever interleaves
+  // text/image with tool_result blocks (e.g. imported / hand-edited history),
+  // source order is preserved — otherwise all text/image would fold into one
+  // trailing message after every function_call_output, reordering the turn.
+  const flushMessage = (): void => {
+    if (messageContent.length > 0) {
+      items.push({ type: "message", role: "user", content: messageContent });
+      messageContent = [];
+    }
+  };
   for (const part of msg.content) {
     if (part.type === "tool_result") {
+      flushMessage();
       items.push({
         type: "function_call_output",
         call_id: part.tool_use_id,
@@ -1073,9 +1085,7 @@ export function messageToResponsesItems(msg: NormalizedMessage): unknown[] {
       });
     }
   }
-  if (messageContent.length > 0) {
-    items.push({ type: "message", role: "user", content: messageContent });
-  }
+  flushMessage();
   return items;
 }
 

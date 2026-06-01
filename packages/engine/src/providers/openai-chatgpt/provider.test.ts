@@ -303,6 +303,26 @@ describe("messageToResponsesItems: image_input (party portraits)", () => {
       { type: "function_call_output", call_id: "call_9", output: "ok" },
     ]);
   });
+
+  it("preserves source order when text/image interleave with tool_result", () => {
+    // Edge case (imported / hand-edited history): a single user message mixing
+    // text and a tool_result. Text before the result must stay before its
+    // function_call_output, and text after it must come after.
+    const msg: NormalizedMessage = {
+      role: "user",
+      content: [
+        { type: "text", text: "before" },
+        { type: "tool_result", tool_use_id: "call_1", content: "ok" },
+        { type: "text", text: "after" },
+      ],
+    };
+    const items = messageToResponsesItems(msg);
+    expect(items).toEqual([
+      { type: "message", role: "user", content: [{ type: "input_text", text: "before" }] },
+      { type: "function_call_output", call_id: "call_1", output: "ok" },
+      { type: "message", role: "user", content: [{ type: "input_text", text: "after" }] },
+    ]);
+  });
 });
 
 // ---------------------------------------------------------------------------
