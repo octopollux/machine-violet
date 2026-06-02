@@ -21,28 +21,6 @@ import type {
 
 export type { ChatGptLoginStartResponse, ChatGptLoginStatusResponse, UsageResponse };
 
-export interface ApiKeyInfo {
-  id: string;
-  label: string;
-  masked: string;
-  source: "env" | "manual";
-  addedAt?: string;
-  tokenBudget?: number;
-  isActive: boolean;
-}
-
-export interface ApiKeyListResponse {
-  keys: ApiKeyInfo[];
-  activeKeyId: string | null;
-}
-
-export interface KeyHealthResponse {
-  id: string;
-  status: "valid" | "invalid" | "error" | "rate_limited" | "checking";
-  message: string;
-  rateLimits: string | null;
-}
-
 export interface CampaignDeleteInfo {
   campaignName: string;
   characterNames: string[];
@@ -224,28 +202,6 @@ export class ApiClient {
 
   async endSession(): Promise<SessionEndResponse> {
     return this.post("/session/end");
-  }
-
-  // --- Management (pre-session) ---
-
-  async listKeys(): Promise<ApiKeyListResponse> {
-    return this.get("/manage/keys");
-  }
-
-  async addKey(key: string, label?: string): Promise<ApiKeyListResponse> {
-    return this.post("/manage/keys", { key, label });
-  }
-
-  async removeKey(id: string): Promise<ApiKeyListResponse> {
-    return this.fetch(`/manage/keys/${encodeURIComponent(id)}`, { method: "DELETE" });
-  }
-
-  async activateKey(id: string): Promise<{ ok: boolean; activeKeyId: string }> {
-    return this.post(`/manage/keys/${encodeURIComponent(id)}/activate`);
-  }
-
-  async checkKeyHealth(id: string): Promise<KeyHealthResponse> {
-    return this.post(`/manage/keys/${encodeURIComponent(id)}/check`);
   }
 
   // --- Connections (multi-provider) ---

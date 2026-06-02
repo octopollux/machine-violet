@@ -18,7 +18,7 @@
  * a turn failure. The image-generation success path is meaningful enough
  * that silent loss would be worse than a visible exception.
  */
-import { join, relative } from "node:path";
+import { relative } from "node:path";
 import type { FileIO } from "./scene-manager.js";
 import { campaignPaths } from "../tools/filesystem/index.js";
 import { norm } from "../utils/paths.js";
@@ -135,6 +135,3 @@ function decodeBase64(b64: string): Uint8Array {
   // byte which then needs char-code unrolling).
   return new Uint8Array(Buffer.from(b64, "base64"));
 }
-
-// Re-export for callers building absolute paths against the same root.
-export { join };

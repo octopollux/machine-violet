@@ -45,7 +45,7 @@ export const KNOWN_SYSTEMS: SystemEntry[] = [
  * Works from both src/ (dev via tsx) and dist/ (built).
  * Layout: repo-root/systems/<slug>/rule-card.md
  */
-export function getBundledSystemsDir(): string {
+function getBundledSystemsDir(): string {
   return assetDir("systems");
 }
 

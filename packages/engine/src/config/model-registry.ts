@@ -159,13 +159,6 @@ export function modelFamilyFor(connectionProvider: string): string {
 }
 
 /**
- * Get pricing for a model. Returns undefined for unknown models.
- */
-export function getModelPricing(modelId: string, configDir?: string): ModelPricing | undefined {
-  return getKnownModel(modelId, configDir)?.pricing;
-}
-
-/**
  * Fallback `max_tokens` value for models not present in the registry.
  *
  * Generous enough that the DM, scribe, and any plausible subagent can run
@@ -195,13 +188,6 @@ export function getMaxOutput(modelId: string, configDir?: string): number {
  */
 export function getTierDefaults(provider: string, configDir?: string): TierDefaults | undefined {
   return loadModelRegistry(configDir).tierDefaults[provider];
-}
-
-/**
- * List all known model IDs.
- */
-export function listKnownModelIds(configDir?: string): string[] {
-  return Object.keys(loadModelRegistry(configDir).models);
 }
 
 /**

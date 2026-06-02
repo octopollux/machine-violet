@@ -11,7 +11,7 @@ export function estimateTokens(text: string): number {
 }
 
 /** Estimate tokens for a message content block */
-export function estimateContentTokens(content: NormalizedMessage["content"]): number {
+function estimateContentTokens(content: NormalizedMessage["content"]): number {
   if (typeof content === "string") {
     return estimateTokens(content);
   }

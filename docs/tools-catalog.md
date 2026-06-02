@@ -52,6 +52,16 @@ All T1. All called by DM.
 
 ---
 
+## Objectives Tools → [state-atlas.md](state-atlas.md)
+
+All T1. Called by DM. Objectives are long-lifecycle, player-facing goals (quests, missions) that span scenes and surface in game context.
+
+| Tool | Signature | Effect |
+|---|---|---|
+| `manage_objectives` | `({ action, id?, title?, description? })` | Manage long-term objectives. Actions: `create`, `update`, `complete`, `fail`, `abandon`, `list`. Pair with `alarm` for deadlines; for hidden DM goals use DM notes + alarms instead. |
+
+---
+
 ## Combat / Initiative Tools → [multiplayer-and-initiative.md](multiplayer-and-initiative.md)
 
 All T1 (initiative rolling may delegate to T2 for complex systems). Called by DM.
@@ -98,6 +108,7 @@ Dev Mode additionally exposes `raw_entity_io` (`read`/`write`/`delete` against a
 |---|---|---|---|---|
 | `scribe` | T2 (Haiku) | DM | `({ updates: [{ visibility, content }] })` | Batch entity creation/updates. Each update tagged `private` or `player-facing`. Spawns Haiku subagent with `list_entities`, `read_entity`, `write_entity`, and `rename_entity` tools for autonomous entity file management. Handles deduplication, front matter, changelogs, and placeholder rename. |
 | `search_campaign` | T2 (Haiku) | DM | `({ query })` | Search across all campaign files — entities, scene summaries, transcripts, session recaps, logs. Spawns Haiku subagent with `grep_campaign` and `read_campaign_file` tools. Returns terse excerpts with `[[wikilinks]]` and source references. |
+| `search_content` | T2 (Haiku) | DM | `({ query })` | Search the game system's ingested content library — monsters, spells, equipment, rules — by mechanical criteria (CR, level, type, rarity). Spawns a search subagent that queries faceted indexes and returns matching entities with key stats. Async-dispatched (the handler delegates to the game engine). Requires ingested system content. |
 
 Note: `promote_character` is not a registered tool — it's a subagent function called internally. See [subagents-catalog.md](subagents-catalog.md) #7.
 
