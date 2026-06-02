@@ -127,7 +127,6 @@ Model selection, campaign init, DM personalities, campaign seeds.
 | `main-menu.ts` | Campaign listing and selection |
 | `tokens.ts` | `TOKEN_LIMITS` — model token capacity constants |
 | `machine-settings.ts` | Machine-scoped settings persistence (`machine-settings.json`) — feature flags like `devModeEnabled` |
-| `file-io-logger.ts` | FileIO wrapper for debug read/write/append logging |
 
 ## Shared: types/ — Type Definitions
 
