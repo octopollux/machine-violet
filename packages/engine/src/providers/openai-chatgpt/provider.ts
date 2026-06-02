@@ -1088,7 +1088,9 @@ export class CodexTurnFailedError extends Error {
 /**
  * Thrown when the stored ChatGPT sign-in can no longer be turned into a
  * usable access_token — the refresh_token was rejected (revoked, or rotated
- * out from under us and unrecoverable) or no tokens are stored at all.
+ * out from under us and unrecoverable), or the token store returned no usable
+ * tokens. (`pushInitialTokens` returns early when *nothing* is stored, so the
+ * "no usable tokens" case here means `refresh()` itself yielded null.)
  *
  * Unlike a {@link CodexTurnFailedError}, this is raised *outside* a codex
  * turn — during `pushInitialTokens` at provider startup, where a plain
