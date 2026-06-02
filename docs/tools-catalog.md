@@ -140,11 +140,11 @@ TUI tools are **fire-and-forget**: their results drive engine/UI state but the D
 
 ## How-To / Knowledge Tools ("skills")
 
-`howto_*` tools take no arguments and change nothing. They load a procedure into context — call one before a multi-step operation so you touch every piece of state.
+`howto_*` tools take an empty arguments object and change nothing. They load a procedure into context — call one before a multi-step operation so you touch every piece of state.
 
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
-| `howto_swap_pc` | T1 | DM / OOC | `()` | Returns the step-by-step playbook for swapping the player character with a new or existing character (roster, character sheets, party.md, resources, modeline, theme). Backed by `prompts/howto-swap-pc.md`. |
+| `howto_swap_pc` | T1 | DM / OOC | `({})` | Returns the step-by-step playbook for swapping the player character with a new or existing character (roster, character sheets, party.md, resources, modeline, theme). Backed by `prompts/howto-swap-pc.md`. |
 
 ---
 

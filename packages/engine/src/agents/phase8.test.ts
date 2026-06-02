@@ -481,6 +481,16 @@ describe("new Phase 8 tools", () => {
     expect(result.content).toContain("Ghost");
   });
 
+  it("swap_pc tolerates an out-of-range activePlayerIndex", () => {
+    const state = makeState([humanPlayer], 5); // index past the end
+    const registry = createTestRegistry();
+    const result = registry.dispatch(state, "swap_pc", { character: "Maren" });
+
+    expect(result.is_error).toBeFalsy();
+    expect(state.config.players[0].character).toBe("Maren");
+    expect(state.activePlayerIndex).toBe(0);
+  });
+
   it("swap_pc can relabel the human player", () => {
     const state = makeState([humanPlayer]);
     const registry = createTestRegistry();
