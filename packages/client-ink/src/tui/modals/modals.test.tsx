@@ -9,6 +9,9 @@ import type { MenuGroup } from "./GameMenu.js";
 import { CharacterSheetModal } from "./CharacterSheetModal.js";
 import { SessionRecapModal } from "./SessionRecapModal.js";
 import { SwatchModal } from "./SwatchModal.js";
+import { RollbackPickerModal } from "./RollbackPickerModal.js";
+import { RollbackConfirmModal } from "./RollbackConfirmModal.js";
+import type { Savepoint } from "@machine-violet/shared";
 import { resolveTheme } from "../themes/resolver.js";
 import { resetThemeCache } from "../themes/loader.js";
 import { BUILTIN_DEFINITIONS } from "../themes/builtin-definitions.js";
@@ -724,5 +727,103 @@ describe("SwatchModal", () => {
       </Box>,
     );
     expect(lastFrame()).toContain("border:");
+  });
+});
+
+describe("RollbackPickerModal", () => {
+  const savepoints: Savepoint[] = [
+    { oid: "aaaaaaa", type: "auto", message: "I draw my sword", timestamp: 1_700_000_400 },
+    { oid: "bbbbbbb", type: "auto", message: "I open the door", timestamp: 1_700_000_200 },
+    { oid: "ccccccc", type: "scene", message: "scene: The Caves", timestamp: 1_700_000_000 },
+  ];
+
+  it("lists savepoint messages and tags non-auto commits", () => {
+    const { lastFrame } = render(
+      <Box width={100} height={30}>
+        <RollbackPickerModal theme={theme} width={100} height={30} savepoints={savepoints} gitEnabled onSelect={noop} onCancel={noop} />
+      </Box>,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("I draw my sword");
+    expect(frame).toContain("I open the door");
+    expect(frame).toContain("[scene]");
+  });
+
+  it("Enter selects the cursored savepoint with its index after moving down", async () => {
+    const onSelect = vi.fn();
+    const { stdin, lastFrame } = render(
+      <Box width={100} height={30}>
+        <RollbackPickerModal theme={theme} width={100} height={30} savepoints={savepoints} gitEnabled onSelect={onSelect} onCancel={noop} />
+      </Box>,
+    );
+    stdin.write("\x1b[B"); // DOWN → index 1
+    // Wait for the cursor to land on index 1 before pressing Enter — otherwise
+    // the Enter handler closes over the stale (pre-move) selectedIndex.
+    await vi.waitFor(() => {
+      expect(lastFrame()!).toContain("◆ I open the door");
+    });
+    stdin.write("\r");
+    await vi.waitFor(() => {
+      expect(onSelect).toHaveBeenCalledWith(savepoints[1], 1);
+    });
+  });
+
+  it("shows a disabled message when git is off", () => {
+    const { lastFrame } = render(
+      <Box width={100} height={30}>
+        <RollbackPickerModal theme={theme} width={100} height={30} savepoints={[]} gitEnabled={false} onSelect={noop} onCancel={noop} />
+      </Box>,
+    );
+    expect(lastFrame()).toContain("git is disabled");
+  });
+});
+
+describe("RollbackConfirmModal", () => {
+  const savepoint: Savepoint = { oid: "aaaaaaa", type: "auto", message: "I open the door", timestamp: 1_700_000_000 };
+
+  it("shows the target and discard count, and notes the backup", () => {
+    const { lastFrame } = render(
+      <Box width={100} height={30}>
+        <RollbackConfirmModal theme={theme} width={100} height={30} savepoint={savepoint} discardCount={3} onConfirm={noop} onCancel={noop} />
+      </Box>,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("I open the door");
+    expect(frame).toContain("Discards 3 later savepoints");
+    expect(frame).toContain("Archived");
+  });
+
+  it("defaults to Cancel; Enter cancels", async () => {
+    const onConfirm = vi.fn();
+    const onCancel = vi.fn();
+    const { stdin } = render(
+      <Box width={100} height={30}>
+        <RollbackConfirmModal theme={theme} width={100} height={30} savepoint={savepoint} discardCount={1} onConfirm={onConfirm} onCancel={onCancel} />
+      </Box>,
+    );
+    stdin.write("\r");
+    await vi.waitFor(() => {
+      expect(onCancel).toHaveBeenCalledOnce();
+    });
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("arrow to Roll Back then Enter confirms", async () => {
+    const onConfirm = vi.fn();
+    const onCancel = vi.fn();
+    const { stdin, lastFrame } = render(
+      <Box width={100} height={30}>
+        <RollbackConfirmModal theme={theme} width={100} height={30} savepoint={savepoint} discardCount={1} onConfirm={onConfirm} onCancel={onCancel} />
+      </Box>,
+    );
+    stdin.write("\x1b[D"); // LEFT → toggles selection to Roll Back
+    await vi.waitFor(() => {
+      expect(lastFrame()!).toContain("[Roll Back]");
+    });
+    stdin.write("\r");
+    await vi.waitFor(() => {
+      expect(onConfirm).toHaveBeenCalledOnce();
+    });
+    expect(onCancel).not.toHaveBeenCalled();
   });
 });

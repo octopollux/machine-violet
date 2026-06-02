@@ -6,6 +6,13 @@
  * Git is invisible infrastructure; the player never interacts with it.
  */
 
+import { dirname } from "node:path";
+import {
+  snapshotCampaign,
+  createArchiveFileIO,
+  type ArchiveFileIO,
+} from "../../config/campaign-archive.js";
+
 // --- Types ---
 
 export type CommitType = "auto" | "scene" | "session" | "checkpoint" | "character";
@@ -372,15 +379,30 @@ interface PruneFileIO {
 }
 
 /**
- * Canonical rollback: git restore + ghost-dir cleanup.
+ * Canonical rollback: pre-rollback backup → git restore → ghost-dir cleanup.
  * All callsites must use this — callers handle process.exit themselves.
+ *
+ * Before touching git, the entire campaign (including `.git`) is snapshotted to
+ * a `pre-rollback` zip in archivedcampaigns/, so the turns about to be discarded
+ * remain recoverable from the Archived Campaigns list. This is the single
+ * chokepoint every rollback entry point funnels through (command, DM tool,
+ * OOC, dev), so the backup is guaranteed without per-callsite wiring. If the
+ * backup fails we abort rather than perform a destructive reset with no safety
+ * net. `archiveIO`/`campaignsDir` default to the production fs factory and the
+ * campaign's parent dir; tests inject in-memory mocks.
  */
 export async function performRollback(
   repo: CampaignRepo,
   target: string,
   campaignRoot: string,
   fileIO: PruneFileIO,
+  archiveIO: ArchiveFileIO = createArchiveFileIO(),
+  campaignsDir: string = dirname(campaignRoot),
 ): Promise<RollbackResult> {
+  const backup = await snapshotCampaign(campaignRoot, campaignsDir, archiveIO, { label: "pre-rollback" });
+  if (!backup.ok) {
+    throw new Error(`Rollback aborted — pre-rollback backup failed: ${backup.error}`);
+  }
   const result = await repo.rollback(target);
   await pruneEmptyDirs(campaignRoot, fileIO);
   return result;

@@ -11,6 +11,8 @@ export { ApiErrorModal } from "./ApiErrorModal.js";
 export { SwatchModal } from "./SwatchModal.js";
 export { CampaignSettingsModal } from "./CampaignSettingsModal.js";
 export { RollbackSummaryModal } from "./RollbackSummaryModal.js";
+export { RollbackPickerModal } from "./RollbackPickerModal.js";
+export { RollbackConfirmModal } from "./RollbackConfirmModal.js";
 export { PlayerNotesModal } from "./PlayerNotesModal.js";
 export { DeleteCampaignModal } from "./DeleteCampaignModal.js";
 export { OverlayPane } from "./OverlayPane.js";

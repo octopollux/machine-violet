@@ -35,6 +35,8 @@ export interface CampaignSettingsModalProps {
    * Defaults to DM_TURN_LENGTH_PCT_DEFAULT (80).
    */
   globalDmTurnLengthPctDefault?: number;
+  /** Opens the Roll Back Game savepoint picker (Enter on the rollback row). */
+  onOpenRollback?: () => void;
 }
 
 const FREQUENCY_LABELS: Record<ChoiceFrequency, string> = {
@@ -52,7 +54,7 @@ function normalize(value: string | undefined): ChoiceFrequency {
   return "never";
 }
 
-type FocusRow = "choices" | "length" | "images";
+type FocusRow = "choices" | "length" | "images" | "rollback";
 
 /** Image-gen preference normalization: only "off" is explicitly opt-out. */
 function imagesOnFromConfig(value: CampaignConfig["image_generation"]): boolean {
@@ -78,6 +80,7 @@ export function CampaignSettingsModal({
   onDmTurnLengthPctChange,
   onImageGenerationChange,
   globalDmTurnLengthPctDefault,
+  onOpenRollback,
 }: CampaignSettingsModalProps) {
   const initialFreq = normalize(config.choices?.campaign_default);
   // Initial pct: saved per-campaign value → client global default → hard 80.
@@ -127,7 +130,7 @@ export function CampaignSettingsModal({
   // Row order: choices → length → images. Up/down step through them;
   // left/right adjust the focused row. The images toggle treats either
   // left or right as a flip (binary state).
-  const FOCUS_ORDER: FocusRow[] = ["choices", "length", "images"];
+  const FOCUS_ORDER: FocusRow[] = ["choices", "length", "images", "rollback"];
   const stepFocus = (delta: -1 | 1) => {
     setFocus((f) => {
       const idx = FOCUS_ORDER.indexOf(f);
@@ -148,9 +151,10 @@ export function CampaignSettingsModal({
         });
       } else if (focus === "length") {
         setPct((p) => Math.max(DM_TURN_LENGTH_PCT_MIN, p - DM_TURN_LENGTH_PCT_STEP));
-      } else {
+      } else if (focus === "images") {
         setImagesOn((v) => !v);
       }
+      // "rollback" is an action row — left/right do nothing.
       return;
     }
     if (key.rightArrow) {
@@ -161,12 +165,17 @@ export function CampaignSettingsModal({
         });
       } else if (focus === "length") {
         setPct((p) => Math.min(DM_TURN_LENGTH_PCT_MAX, p + DM_TURN_LENGTH_PCT_STEP));
-      } else {
+      } else if (focus === "images") {
         setImagesOn((v) => !v);
       }
       return;
     }
-    if (key.return) { void commit(); return; }
+    if (key.return) {
+      // Enter on the rollback row opens the picker; on any value row it saves.
+      if (focus === "rollback") { onOpenRollback?.(); return; }
+      void commit();
+      return;
+    }
     if (key.escape) { onDismiss(); return; }
   });
 
@@ -225,6 +234,12 @@ export function CampaignSettingsModal({
   lines.push("    a provider/model that supports image generation.");
   lines.push("");
   lines.push(imgLine);
+  lines.push("");
+  lines.push(focus === "rollback" ? "  ▶ Roll Back Game" : "    Roll Back Game");
+  lines.push("    Restore an earlier savepoint. The current game is backed");
+  lines.push("    up to Archived Campaigns first, so it stays recoverable.");
+  lines.push("");
+  lines.push(focus === "rollback" ? "    Enter to choose a savepoint…" : "");
   lines.push("");
   lines.push(hintLine);
 

@@ -463,7 +463,9 @@ Standard navigation (arrow keys + Enter). "Resume" dismisses the menu. "Return t
 
 ### Campaign Settings
 
-Player-accessible via ESC menu → Settings → Campaign Settings. Modal that shows campaign identity fields (read-only) and editable per-campaign player settings — currently the Choices Frequency slider (←/→ to adjust, Enter to save). Changes round-trip to the engine via REST and persist to `config.json`.
+Player-accessible via ESC menu → Settings → Campaign Settings. Modal that shows campaign identity fields (read-only) and editable per-campaign player settings: Choices Frequency, DM Turn Length, and Image Generation (←/→ to adjust, Enter to save). Changes round-trip to the engine via REST and persist to `config.json`.
+
+The last row, **Roll Back Game**, is an action rather than a setting: Enter opens a savepoint picker (`RollbackPickerModal`, fed by `GET /session/savepoints`) → confirmation (`RollbackConfirmModal`) → the `/rollback` command with the chosen commit oid. See [error-recovery.md](error-recovery.md#rollback) for the full rollback flow (incl. the pre-rollback backup).
 
 **Code:** `packages/client-ink/src/tui/modals/CampaignSettingsModal.tsx`
 

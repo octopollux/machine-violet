@@ -10,6 +10,7 @@ import {
   NameParams, CharacterResponse, CompendiumResponse,
   NotesResponse, NotesUpdateRequest, OkResponse,
   SettingsResponse, SettingsPatch, CostResponse, ErrorResponse,
+  SavepointsResponse,
   TranscriptSaveRequest, TranscriptSaveResponse,
   DiagnosticsResponse,
 } from "@machine-violet/shared";
@@ -161,6 +162,33 @@ export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) =>
     const gs = server.sessionManager.getGameState();
     if (!gs) return reply.status(400).send({ error: "No game state." });
     return { config: gs.config };
+  });
+
+  /** List rollback savepoints (git commit log), newest-first. */
+  server.get("/savepoints", {
+    schema: {
+      tags: ["Data"],
+      response: { 200: SavepointsResponse, 400: ErrorResponse },
+    },
+  }, async (_request, reply) => {
+    const engine = server.sessionManager.getEngine();
+    if (!engine) return reply.status(400).send({ error: "No active engine." });
+
+    const repo = engine.getRepo();
+    if (!repo || !repo.isEnabled()) {
+      return { gitEnabled: false, savepoints: [] };
+    }
+    // getLog clamps internally; 500 matches the repo's default maxCommits ceiling.
+    const log = await repo.getLog(500);
+    return {
+      gitEnabled: true,
+      savepoints: log.map((c) => ({
+        oid: c.oid,
+        type: c.type,
+        message: c.message,
+        timestamp: c.timestamp,
+      })),
+    };
   });
 
   /** Patch campaign settings. */
