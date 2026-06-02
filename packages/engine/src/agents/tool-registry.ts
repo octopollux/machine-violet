@@ -818,17 +818,25 @@ const TOOL_DEFS: RegisteredTool[] = [
       const promptFragment = (input.prompt_fragment as string | undefined)?.trim();
       const userDir = state.homeDir ? join(state.homeDir, "personalities") : undefined;
 
+      const detail = (input.detail as string | undefined)?.trim();
+      const description = (input.description as string | undefined)?.trim();
+
       let next: DMPersonality;
       const preset = getPersonality(name, userDir);
       if (preset) {
-        // Named an existing persona — use it verbatim. A stray prompt_fragment
-        // is ignored: presets are canonical, edit the .mvdm to change one.
+        // Named an existing persona. Custom-only fields alongside a preset are
+        // contradictory intent — reject rather than silently using the preset
+        // unchanged, which would leave the caller thinking they'd customized it.
+        if (promptFragment || detail || description) {
+          return err(
+            `'${name}' is an existing preset, so prompt_fragment/detail/description don't apply. ` +
+            `Pass just { name: "${name}" } to use it, or choose a different name to invent a custom persona.`,
+          );
+        }
         next = preset;
       } else if (promptFragment) {
         // Inventing a custom persona on the fly (setup's invent path).
         next = { name, prompt_fragment: promptFragment };
-        const detail = (input.detail as string | undefined)?.trim();
-        const description = (input.description as string | undefined)?.trim();
         if (description) next.description = description;
         if (detail) next.detail = detail;
       } else {

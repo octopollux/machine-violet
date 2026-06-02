@@ -555,6 +555,23 @@ describe("new Phase 8 tools", () => {
     expect(state.config.dm_personality.detail).toContain("distant light");
   });
 
+  it("swap_dm_personality rejects custom fields when name matches a preset", () => {
+    const state = makeState([humanPlayer]);
+    const registry = createTestRegistry();
+    const preset = (JSON.parse(
+      registry.dispatch(state, "list_dm_personalities", {}).content,
+    ).personalities as { name: string }[])[0].name;
+
+    const result = registry.dispatch(state, "swap_dm_personality", {
+      name: preset,
+      prompt_fragment: "You are something else entirely.",
+    });
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("preset");
+    // The preset was not silently applied.
+    expect(state.config.dm_personality?.name).not.toBe(preset);
+  });
+
   it("swap_dm_personality errors on an unknown preset with no prompt_fragment", () => {
     const state = makeState([humanPlayer]);
     const registry = createTestRegistry();
