@@ -75,7 +75,7 @@ export class CampaignRepo {
     this.dir = params.dir;
     this.git = params.git;
     this.enabled = params.enabled ?? true;
-    this.autoCommitInterval = params.autoCommitInterval ?? 3;
+    this.autoCommitInterval = params.autoCommitInterval ?? 1;
     this.maxCommits = params.maxCommits ?? 500;
   }
 
