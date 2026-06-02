@@ -25,6 +25,7 @@ import {
   ChoiceOverlay, DESCRIPTION_ROWS, GameMenu, ApiErrorModal,
   CharacterSheetModal, CompendiumModal, PlayerNotesModal, SwatchModal,
   SessionRecapModal, CenteredModal, CharacterPane, CampaignSettingsModal,
+  RollbackSummaryModal,
 } from "../tui/modals/index.js";
 import type { MenuGroup, MenuItem } from "../tui/modals/index.js";
 import type { CampaignConfig, ChoiceFrequency } from "@machine-violet/shared/types/config.js";
@@ -558,6 +559,16 @@ export function PlayingPhase() {
           lines={(am.lines as string[]) ?? []}
           onDismiss={() => setActiveModal(null)}
           scrollRef={modalScrollRef}
+          topOffset={conversationPaneTop}
+        />
+      )}
+      {am?.kind === "rollback" && (
+        <RollbackSummaryModal
+          theme={theme}
+          width={cols}
+          height={narRows}
+          summary={String(am.summary ?? "")}
+          onDismiss={onReturnToMenu}
           topOffset={conversationPaneTop}
         />
       )}

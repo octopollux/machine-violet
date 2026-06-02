@@ -61,6 +61,40 @@ describe("createBridge onRollback", () => {
   });
 });
 
+describe("createBridge onTuiCommand routing", () => {
+  // Issue #559: show_rollback_summary must spread its payload onto the
+  // activity:update event so the `summary` survives to the client. Without an
+  // explicit case it falls to the default branch, which broadcasts only the
+  // engineState discriminant and silently drops the summary.
+  it("forwards show_rollback_summary with the summary payload intact", () => {
+    const events: ServerEvent[] = [];
+    const cb = createBridge({ broadcast: (e) => events.push(e) });
+
+    cb.onTuiCommand?.({ type: "show_rollback_summary", summary: "Restored to scene 3 (4 turns undone)." });
+
+    const e = events.find((ev) => ev.type === "activity:update");
+    expect(e).toBeDefined();
+    const data = e!.data as { engineState?: string; summary?: string };
+    expect(data.engineState).toBe("tui:show_rollback_summary");
+    expect(data.summary).toBe("Restored to scene 3 (4 turns undone).");
+  });
+
+  it("drops the summary on the default branch when no case matches (regression guard)", () => {
+    // Sanity check that the default branch really does omit extra payload —
+    // this is the bug the explicit case above fixes.
+    const events: ServerEvent[] = [];
+    const cb = createBridge({ broadcast: (e) => events.push(e) });
+
+    cb.onTuiCommand?.({ type: "some_unhandled_command", summary: "dropped" } as never);
+
+    const e = events.find((ev) => ev.type === "activity:update");
+    expect(e).toBeDefined();
+    const data = e!.data as { engineState?: string; summary?: string };
+    expect(data.engineState).toBe("tui:some_unhandled_command");
+    expect(data.summary).toBeUndefined();
+  });
+});
+
 describe("createBridge error categories (#529)", () => {
   // The three-tier taxonomy is decided server-side; every WS error event
   // the bridge emits must carry the right discriminant so the client UX

@@ -261,6 +261,16 @@ function routeTuiCommand(
       });
       break;
 
+    // Rollback summary — emitted right before the engine throws
+    // RollbackCompleteError and the session ends. Spread the command so the
+    // `summary` payload survives to the client (the default branch drops it).
+    case "show_rollback_summary":
+      broadcast({
+        type: "activity:update",
+        data: { engineState: `tui:${command.type}`, ...command },
+      });
+      break;
+
     // --- Commands we can safely ignore ---
     case "dm_notes":
       // Engine-internal — don't forward

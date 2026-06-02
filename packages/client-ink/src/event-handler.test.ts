@@ -531,6 +531,35 @@ describe("event-handler", () => {
     });
   });
 
+  describe("show_rollback_summary (#559)", () => {
+    it("stashes the rollback summary from the TUI command", () => {
+      const h = makeHarness();
+      expect(h.state.rollbackSummary).toBeNull();
+
+      h.dispatch({
+        type: "activity:update",
+        data: { engineState: "tui:show_rollback_summary", summary: "Restored to scene 3 (4 turns undone)." },
+      });
+
+      expect(h.state.rollbackSummary).toBe("Restored to scene 3 (4 turns undone).");
+    });
+
+    it("does not override engineState (tui:* values are data carriers)", () => {
+      const h = makeHarness();
+      h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
+      const stampBefore = h.state.engineStateSince;
+
+      h.dispatch({
+        type: "activity:update",
+        data: { engineState: "tui:show_rollback_summary", summary: "Restored." },
+      });
+
+      expect(h.state.engineState).toBe("dm_thinking");
+      expect(h.state.engineStateSince).toBe(stampBefore);
+      expect(h.state.rollbackSummary).toBe("Restored.");
+    });
+  });
+
   describe("session mode", () => {
     it("updates mode and variant", () => {
       const h = makeHarness();

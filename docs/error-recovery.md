@@ -33,7 +33,7 @@ rollback({
 })
 ```
 
-After rollback completes, a `RollbackSummaryModal` displays what was restored and waits for the player to press Enter. Internally, rollback throws a `RollbackCompleteError` (from `src/teardown.ts`) which propagates through the agent loop and sets the rollback modal. On dismissal, a dedicated `doRollbackReturn()` path resets caches and UI state without calling `gracefulShutdown()` — this prevents in-memory state from being written back to disk and undoing the rollback. Re-entering the campaign loads the restored state via `session_resume`.
+After rollback completes, a `RollbackSummaryModal` displays what was restored and waits for the player to press Enter. Internally, rollback restores the target commit, emits a `show_rollback_summary` TUI command, then throws a `RollbackCompleteError` (from `@machine-violet/shared/types/errors.ts`). The session-manager catches it and calls `endSession("rollback")`, which **skips the usual flush + checkpoint** — disk has just been reset to the target commit, but the engine's in-memory state is still ahead by the rolled-back turns, so persisting it would silently undo the rollback. The `show_rollback_summary` command rides the `activity:update` channel to the client ahead of `session:ended`; the client stashes the summary, and when `session:ended` lands it raises `RollbackSummaryModal` (over the now-defunct playing phase) instead of bouncing straight to the menu. Dismissing the modal returns to the main menu; re-entering the campaign loads the restored state via `session_resume`.
 
 ### Configuration
 
