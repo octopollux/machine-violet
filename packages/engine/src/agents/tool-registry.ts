@@ -870,6 +870,21 @@ const TOOL_DEFS: RegisteredTool[] = [
       return ok(loadPrompt("howto-swap-dm-personality"));
     },
   },
+  {
+    definition: {
+      name: "howto_campaign_state",
+      description:
+        "Knowledge tool (a 'skill'): the catch-all reference for campaign state. Returns a map of where everything lives on disk and WHICH TOOL edits each thing. Takes no arguments and changes nothing. Call this when you need to change something and there's no obvious dedicated tool for it — it routes you to the right tool (or tells you the change needs Dev mode).",
+      inputSchema: {
+        type: "object" as const,
+        properties: {},
+        required: [],
+      },
+    },
+    handler: () => {
+      return ok(loadPrompt("howto-campaign-state"));
+    },
+  },
 
   // ====== SCENE/SESSION ======
   {
