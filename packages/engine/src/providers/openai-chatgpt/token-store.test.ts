@@ -121,6 +121,38 @@ describe("ChatGptTokenStore.refresh", () => {
     expect(refreshFn).toHaveBeenCalledTimes(2);
   });
 
+  it("recovers from disk when the exchange is rejected but another actor already rotated the RT", async () => {
+    // Cross-process double-refresh (issue #558): a separate MV launch
+    // POSTed the same RT first, OpenAI rotated it, and our exchange now
+    // 400s with "refresh token already used". The winner wrote a valid
+    // bundle to disk, so we should adopt it rather than forcing re-auth.
+    writeConnectionWithTokens("rt-original", "at-original", 1);
+    const refreshFn = vi.fn<(rt: string) => Promise<OAuthTokens>>().mockImplementation(async () => {
+      // Simulate the other launch having won the race: by the time our
+      // exchange is rejected, fresh tokens are already on disk.
+      writeConnectionWithTokens("rt-rotated-by-other", "at-rotated-by-other", 9_999_999);
+      throw new Error("token endpoint returned 400: refresh token already used");
+    });
+
+    const store = createConnectionTokenStore(tempDir, "conn-1", refreshFn);
+    const result = await store.refresh();
+
+    expect(result?.accessToken).toBe("at-rotated-by-other");
+    expect(result?.refreshToken).toBe("rt-rotated-by-other");
+  });
+
+  it("propagates the failure when the exchange is rejected and the on-disk RT is unchanged", async () => {
+    // No other actor rotated the RT — the sign-in is genuinely dead, so the
+    // rejection must surface (caller re-prompts sign-in) rather than being
+    // swallowed by the recovery path.
+    writeConnectionWithTokens("rt-dead", "at-dead", 1);
+    const refreshFn = vi.fn<(rt: string) => Promise<OAuthTokens>>()
+      .mockRejectedValue(new Error("token endpoint returned 400: refresh token already used"));
+
+    const store = createConnectionTokenStore(tempDir, "conn-1", refreshFn);
+    await expect(store.refresh()).rejects.toThrow("refresh token already used");
+  });
+
   it("defers to disk when the refreshToken changes mid-exchange (sign-in vs refresh race)", async () => {
     // upsertChatGptConnection writes directly to the connection store
     // and doesn't go through the mutex. If a refresh is in flight when
