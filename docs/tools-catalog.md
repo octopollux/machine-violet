@@ -155,6 +155,7 @@ TUI tools are **fire-and-forget**: their results drive engine/UI state but the D
 |---|---|---|---|---|
 | `howto_swap_pc` | T1 | DM / OOC | `({})` | Returns the step-by-step playbook for swapping the player character with a new or existing character (roster, character sheets, party.md, resources, modeline, theme). Backed by `prompts/howto-swap-pc.md`. |
 | `howto_swap_dm_personality` | T1 | DM / OOC | `({})` | Returns the playbook for changing the DM personality mid-campaign (list → present → swap → required in-fiction voice handoff). Backed by `prompts/howto-swap-dm-personality.md`. |
+| `howto_campaign_state` | T1 | DM / OOC | `({})` | Catch-all: returns a map of campaign on-disk state and **which tool edits which thing** — the fallback when no dedicated tool obviously fits a change (routes to the right tool, or flags that the edit needs Dev mode). Distilled from [format-spec.md](format-spec.md); backed by `prompts/howto-campaign-state.md`. |
 
 ---
 

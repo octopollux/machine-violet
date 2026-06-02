@@ -592,6 +592,19 @@ describe("new Phase 8 tools", () => {
     expect(JSON.stringify(state)).toBe(before); // pure knowledge tool
   });
 
+  it("howto_campaign_state returns the catch-all layout and changes nothing", () => {
+    const state = makeState([humanPlayer]);
+    const before = JSON.stringify(state);
+    const registry = createTestRegistry();
+    const result = registry.dispatch(state, "howto_campaign_state", {});
+
+    expect(result.is_error).toBeFalsy();
+    // Routes to tools and names the state dir — the catch-all's core job.
+    expect(result.content.toLowerCase()).toContain("which tool edits");
+    expect(result.content).toContain("state/");
+    expect(JSON.stringify(state)).toBe(before); // pure knowledge tool
+  });
+
   it("registers resolve_turn tool", () => {
     const registry = createTestRegistry();
     expect(registry.has("resolve_turn")).toBe(true);
@@ -602,13 +615,14 @@ describe("new Phase 8 tools", () => {
     expect(registry.has("promote_character")).toBe(true);
   });
 
-  it("registry has 40 tools total", () => {
+  it("registry has 41 tools total", () => {
     const registry = createTestRegistry();
     // Bumped from 29 → 35 by the entity-tool rework: entity, describe_entity_type,
     // list_entity_types, validate_entity, find_schema_drift, detect_orphans.
     // 35 → 37 by the PC-swap work: swap_pc, howto_swap_pc.
     // 37 → 40 by the DM-personality work: list_dm_personalities,
     // swap_dm_personality, howto_swap_dm_personality.
-    expect(registry.size).toBe(40);
+    // 40 → 41 by the catch-all: howto_campaign_state.
+    expect(registry.size).toBe(41);
   });
 });
