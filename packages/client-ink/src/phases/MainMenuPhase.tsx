@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useInput, Text, Box, useWindowSize } from "ink";
 import type { ResolvedTheme } from "../tui/themes/types.js";
 import { TerminalTooSmall, FullScreenFrame } from "../tui/components/index.js";
@@ -12,12 +12,6 @@ export interface CampaignEntry {
   name: string;
   path: string;
   id?: string;
-}
-
-export interface UpdateInfo {
-  available: boolean;
-  currentVersion: string;
-  latestVersion: string;
 }
 
 /** Column indices for campaign sub-list navigation. */
@@ -46,10 +40,6 @@ export interface MainMenuPhaseProps {
   onSettings: () => void;
   /** Navigate to Settings with API Keys pre-focused (deep link). */
   onSettingsApiKeys: () => void;
-  /** Update info when a newer version is available. */
-  updateInfo?: UpdateInfo | null;
-  /** Navigate to the update detail screen. */
-  onUpdate?: () => void;
   /** Whether Dev Mode is enabled (gates advanced features like content ingest). */
   devModeEnabled?: boolean;
   onQuit: () => void;
@@ -74,8 +64,6 @@ export function MainMenuPhase({
   onAddContent,
   onSettings,
   onSettingsApiKeys,
-  updateInfo,
-  onUpdate,
   devModeEnabled,
   onQuit,
 }: MainMenuPhaseProps) {
@@ -86,20 +74,7 @@ export function MainMenuPhase({
   /** Which column is active: 0=name (resume), 1=archive, 2=delete */
   const [campaignColumn, setCampaignColumn] = useState(COL_NAME);
 
-  // Track whether the update item was present on previous render so we can
-  // adjust mainMenuIndex when it appears asynchronously (avoids highlight jump).
-  const showUpdateItem = !!(updateInfo?.available && onUpdate);
-  const hadUpdateItem = useRef(showUpdateItem);
-  useEffect(() => {
-    if (showUpdateItem && !hadUpdateItem.current) {
-      // Update item just appeared mid-session — bump index so the user's selection stays put
-      setMainMenuIndex((i) => i + 1);
-    }
-    hadUpdateItem.current = showUpdateItem;
-  }, [showUpdateItem]);
-
   const mainMenuItems: string[] = [];
-  if (showUpdateItem) mainMenuItems.push("Update Available");
   mainMenuItems.push("New Campaign");
   if (campaigns.length > 0) mainMenuItems.push("Continue Campaign");
   if (devModeEnabled) mainMenuItems.push("Add Content");
@@ -176,9 +151,7 @@ export function MainMenuPhase({
     if (key.return) {
       const selected = mainMenuItems[mainMenuIndex];
       if (isItemDisabled(selected)) return; // blocked
-      if (selected === "Update Available") {
-        onUpdate?.();
-      } else if (selected === "New Campaign") {
+      if (selected === "New Campaign") {
         onNewCampaign();
       } else if (selected === "Continue Campaign") {
         setExpandedCampaigns(true);
@@ -219,14 +192,12 @@ export function MainMenuPhase({
     const marker = isSelected ? "◆" : "○";
     const markerColor = disabled ? "#555555" : isSelected ? accentColor : dimColor;
 
-    const isUpdateItem = item === "Update Available";
     // API Keys appears in the main menu only when the active key is
     // broken — colour it yellow so the eye lands on the actionable nudge.
     const isApiKeyNudge = item === "API Keys";
-    const emphasis = isUpdateItem || isApiKeyNudge;
+    const emphasis = isApiKeyNudge;
     let description = "";
-    if (isUpdateItem && updateInfo) description = `v${updateInfo.currentVersion} → v${updateInfo.latestVersion}`;
-    else if (item === "New Campaign") description = "Start a new adventure";
+    if (item === "New Campaign") description = "Start a new adventure";
     else if (item === "Continue Campaign" && campaigns.length > 0) description = `${campaigns.length} saved`;
     else if (item === "Add Content") description = "Import PDFs for game systems";
     else if (item === "API Keys") description = apiKeyStatus ?? "";

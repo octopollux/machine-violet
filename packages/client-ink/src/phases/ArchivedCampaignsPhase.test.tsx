@@ -4,11 +4,9 @@ import { render } from "ink-testing-library";
 import { ArchivedCampaignsPhase } from "./ArchivedCampaignsPhase.js";
 import type { ArchivedCampaignsPhaseProps } from "./ArchivedCampaignsPhase.js";
 import { resetThemeCache, resolveTheme, BUILTIN_DEFINITIONS } from "../tui/themes/index.js";
-import { resetPromptCache } from "../prompts/load-prompt.js";
 import type { ArchivedCampaignEntry } from "../config/campaign-archive.js";
 
 beforeEach(() => {
-  resetPromptCache();
   resetThemeCache();
 });
 
