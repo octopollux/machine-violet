@@ -1029,7 +1029,7 @@ const READ_ONLY_OPS: Record<string, Set<string>> = {
 };
 
 /** Maps tool names to which state slices they mutate */
-export const TOOL_STATE_MAP: Record<string, StateSlice[]> = {
+const TOOL_STATE_MAP: Record<string, StateSlice[]> = {
   start_combat: ["combat", "clocks"],
   end_combat: ["combat", "clocks"],
   advance_turn: ["combat"],

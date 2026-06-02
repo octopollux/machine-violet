@@ -178,8 +178,3 @@ export function applyLayeredOverrides(layers: string[]): string[] {
     }),
   );
 }
-
-/** Clear the include-file cache. For tests. */
-export function resetIncludeCache(): void {
-  fileCache.clear();
-}
