@@ -13,9 +13,7 @@
   "exclude": [
     "node_modules", "dist",
     "src/**/*.test.ts", "src/**/*.test.tsx",
-    "src/phases/index.ts",
-    "src/phases/AddContentPhase.tsx",
-    "src/tui/game-context.test.tsx"
+    "src/phases/AddContentPhase.tsx"
   ],
   "references": [
     { "path": "../shared" }
