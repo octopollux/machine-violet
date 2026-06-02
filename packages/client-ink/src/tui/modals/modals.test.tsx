@@ -768,6 +768,27 @@ describe("RollbackPickerModal", () => {
     });
   });
 
+  it("truncates long messages to one line (prevents wrap → background bleed-through)", () => {
+    const longMessage = "I tell the whole long rambling story of how we got here, every single beat of it, without pausing for breath even once";
+    const { lastFrame } = render(
+      <Box width={80} height={20}>
+        <RollbackPickerModal
+          theme={theme}
+          width={80}
+          height={20}
+          savepoints={[{ oid: "ddddddd", type: "auto", message: longMessage, timestamp: 1_700_000_000 }]}
+          gitEnabled
+          onSelect={noop}
+          onCancel={noop}
+        />
+      </Box>,
+    );
+    const frame = lastFrame()!;
+    // Clipped with an ellipsis rather than wrapping to a second (unpadded) line.
+    expect(frame).toContain("…");
+    expect(frame).not.toContain("without pausing for breath");
+  });
+
   it("shows a disabled message when git is off", () => {
     const { lastFrame } = render(
       <Box width={100} height={30}>

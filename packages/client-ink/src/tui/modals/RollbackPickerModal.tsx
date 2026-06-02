@@ -4,7 +4,21 @@ import type { Savepoint } from "@machine-violet/shared";
 import type { FormattingNode } from "@machine-violet/shared/types/tui.js";
 import type { ResolvedTheme } from "../themes/types.js";
 import { themeColor, deriveModalTheme } from "../themes/color-resolve.js";
-import { CenteredModal, type CenteredModalHandle } from "./CenteredModal.js";
+import { stringWidth } from "../frames/index.js";
+import { CenteredModal, computeModalInnerWidth, type CenteredModalHandle } from "./CenteredModal.js";
+
+const MIN_WIDTH = 48;
+const MAX_WIDTH = 72;
+const WIDTH_FRACTION = 0.7;
+
+/** Truncate `s` to fit `max` columns, adding an ellipsis when clipped. */
+function fitWidth(s: string, max: number): string {
+  if (stringWidth(s) <= max) return s;
+  if (max <= 1) return "";
+  let out = s;
+  while (out.length > 0 && stringWidth(out) + 1 > max) out = out.slice(0, -1);
+  return out + "…";
+}
 
 export interface RollbackPickerModalProps {
   theme: ResolvedTheme;
@@ -69,25 +83,37 @@ export function RollbackPickerModal({
 
   const accentColor = useMemo(() => themeColor(deriveModalTheme(theme), "title"), [theme]);
 
+  const footer = empty ? "Esc to go back" : "↑ / ↓ select · Enter to roll back · Esc cancels";
+
+  // Compute the modal's inner width so each row is built as a SINGLE non-wrapping
+  // line (message truncated to fit). CenteredModal pads each line full-width and
+  // opaque; letting a row wrap leaves the unpadded continuation transparent
+  // (background bleed-through) and also desyncs ensureLineVisible(selectedIndex).
+  const innerWidth = useMemo(
+    () => computeModalInnerWidth(theme, width, { minWidth: MIN_WIDTH, maxWidth: MAX_WIDTH, widthFraction: WIDTH_FRACTION, footer }),
+    [theme, width, footer],
+  );
+
   const styledLines: FormattingNode[][] = useMemo(() => {
     if (empty) {
-      return [[gitEnabled ? "  No savepoints yet." : "  Rollback unavailable — git is disabled for this campaign."]];
+      return [[fitWidth(gitEnabled ? "  No savepoints yet." : "  Rollback unavailable — git is disabled for this campaign.", innerWidth)]];
     }
     return savepoints.map((sp, i) => {
       const isSelected = i === selectedIndex;
       const marker = isSelected ? "◆" : "○";
       const tag = sp.type !== "auto" ? `[${sp.type}] ` : "";
-      const when = relativeTime(sp.timestamp, now);
-      const text = `${marker} ${tag}${sp.message}  (${when})`;
+      const when = `  (${relativeTime(sp.timestamp, now)})`;
+      const head = `  ${marker} ${tag}`;
+      // Truncate the message so the whole row fits on one line within innerWidth.
+      const msg = fitWidth(sp.message, innerWidth - stringWidth(head) - stringWidth(when));
+      const text = `${head}${msg}${when}`;
       if (isSelected) {
         const bolded: FormattingNode = { type: "bold", content: [text] };
-        return ["  ", accentColor ? { type: "color", color: accentColor, content: [bolded] } : bolded];
+        return [accentColor ? { type: "color", color: accentColor, content: [bolded] } : bolded];
       }
-      return [`  ${text}`];
+      return [text];
     });
-  }, [savepoints, selectedIndex, empty, gitEnabled, accentColor, now]);
-
-  const footer = empty ? "Esc to go back" : "↑ / ↓ select · Enter to roll back · Esc cancels";
+  }, [savepoints, selectedIndex, empty, gitEnabled, accentColor, now, innerWidth]);
 
   return (
     <CenteredModal
@@ -98,9 +124,9 @@ export function RollbackPickerModal({
       title="Roll Back Game"
       styledLines={styledLines}
       footer={footer}
-      minWidth={48}
-      maxWidth={72}
-      widthFraction={0.7}
+      minWidth={MIN_WIDTH}
+      maxWidth={MAX_WIDTH}
+      widthFraction={WIDTH_FRACTION}
       topOffset={topOffset}
     />
   );
