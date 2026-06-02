@@ -13,7 +13,6 @@
   "exclude": [
     "node_modules", "dist",
     "src/**/*.test.ts", "src/**/*.test.tsx",
-    "src/phases/index.ts",
     "src/phases/AddContentPhase.tsx",
     "src/phases/UpdatePhase.tsx",
     "src/tui/game-context.test.tsx"
