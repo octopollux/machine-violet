@@ -512,6 +512,69 @@ describe("new Phase 8 tools", () => {
     expect(JSON.stringify(state)).toBe(before); // pure knowledge tool
   });
 
+  it("list_dm_personalities returns the bundled persona catalog", () => {
+    const state = makeState([humanPlayer]);
+    const registry = createTestRegistry();
+    const result = registry.dispatch(state, "list_dm_personalities", {});
+
+    expect(result.is_error).toBeFalsy();
+    const parsed = JSON.parse(result.content);
+    expect(Array.isArray(parsed.personalities)).toBe(true);
+    expect(parsed.personalities.length).toBeGreaterThan(0);
+    expect(parsed.personalities[0]).toHaveProperty("name");
+  });
+
+  it("swap_dm_personality switches to a bundled preset by name", () => {
+    const state = makeState([humanPlayer]);
+    const registry = createTestRegistry();
+    // Pull a real preset name from the catalog so the test isn't brittle.
+    const catalog = JSON.parse(
+      registry.dispatch(state, "list_dm_personalities", {}).content,
+    ).personalities as { name: string }[];
+    const target = catalog[0].name;
+
+    const result = registry.dispatch(state, "swap_dm_personality", { name: target });
+    expect(result.is_error).toBeFalsy();
+    expect(state.config.dm_personality.name).toBe(target);
+    expect(state.config.dm_personality.prompt_fragment.length).toBeGreaterThan(0);
+    // Reminds the caller about the required in-fiction handoff.
+    expect(result.content.toLowerCase()).toContain("handoff");
+  });
+
+  it("swap_dm_personality invents a custom persona from a prompt_fragment", () => {
+    const state = makeState([humanPlayer]);
+    const registry = createTestRegistry();
+    const result = registry.dispatch(state, "swap_dm_personality", {
+      name: "The Lighthouse Keeper",
+      prompt_fragment: "You are The Lighthouse Keeper. You narrate in slow, salt-worn sentences.",
+      detail: "Signature: end scenes on a distant light.",
+    });
+
+    expect(result.is_error).toBeFalsy();
+    expect(state.config.dm_personality.name).toBe("The Lighthouse Keeper");
+    expect(state.config.dm_personality.detail).toContain("distant light");
+  });
+
+  it("swap_dm_personality errors on an unknown preset with no prompt_fragment", () => {
+    const state = makeState([humanPlayer]);
+    const registry = createTestRegistry();
+    const result = registry.dispatch(state, "swap_dm_personality", { name: "Nobody In The List" });
+
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("prompt_fragment");
+  });
+
+  it("howto_swap_dm_personality returns the playbook and changes nothing", () => {
+    const state = makeState([humanPlayer]);
+    const before = JSON.stringify(state);
+    const registry = createTestRegistry();
+    const result = registry.dispatch(state, "howto_swap_dm_personality", {});
+
+    expect(result.is_error).toBeFalsy();
+    expect(result.content.toLowerCase()).toContain("handoff");
+    expect(JSON.stringify(state)).toBe(before); // pure knowledge tool
+  });
+
   it("registers resolve_turn tool", () => {
     const registry = createTestRegistry();
     expect(registry.has("resolve_turn")).toBe(true);
@@ -522,11 +585,13 @@ describe("new Phase 8 tools", () => {
     expect(registry.has("promote_character")).toBe(true);
   });
 
-  it("registry has 37 tools total", () => {
+  it("registry has 40 tools total", () => {
     const registry = createTestRegistry();
     // Bumped from 29 → 35 by the entity-tool rework: entity, describe_entity_type,
     // list_entity_types, validate_entity, find_schema_drift, detect_orphans.
     // 35 → 37 by the PC-swap work: swap_pc, howto_swap_pc.
-    expect(registry.size).toBe(37);
+    // 37 → 40 by the DM-personality work: list_dm_personalities,
+    // swap_dm_personality, howto_swap_dm_personality.
+    expect(registry.size).toBe(40);
   });
 });

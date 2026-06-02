@@ -138,6 +138,15 @@ TUI tools are **fire-and-forget**: their results drive engine/UI state but the D
 
 ---
 
+## DM Personality Tools → [game-initialization.md](game-initialization.md#dm-personalities)
+
+| Tool | Tier | Caller | Signature | Effect |
+|---|---|---|---|---|
+| `list_dm_personalities` | T1 | DM / OOC | `({})` | List the personas available to swap to (bundled `.mvdm` presets + user additions), each with name + description, plus which is current. Borrows the setup agent's persona catalog (`loadAllPersonalities`) — the in-game agent doesn't otherwise have it in context. |
+| `swap_dm_personality` | T1 | DM / OOC | `({ name, prompt_fragment?, detail?, description? })` | Change the DM's narrative voice for the rest of the campaign. `name` matches a preset, or names a custom persona when `prompt_fragment` is supplied. The only tool that edits `config.dm_personality`; persists `config.json`. Read live each DM turn, so it takes effect next turn (no reload). Pair with `howto_swap_dm_personality` — the new voice must open with an in-fiction handoff. |
+
+---
+
 ## How-To / Knowledge Tools ("skills")
 
 `howto_*` tools take an empty arguments object and change nothing. They load a procedure into context — call one before a multi-step operation so you touch every piece of state.
@@ -145,6 +154,7 @@ TUI tools are **fire-and-forget**: their results drive engine/UI state but the D
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
 | `howto_swap_pc` | T1 | DM / OOC | `({})` | Returns the step-by-step playbook for swapping the player character with a new or existing character (roster, character sheets, party.md, resources, modeline, theme). Backed by `prompts/howto-swap-pc.md`. |
+| `howto_swap_dm_personality` | T1 | DM / OOC | `({})` | Returns the playbook for changing the DM personality mid-campaign (list → present → swap → required in-fiction voice handoff). Backed by `prompts/howto-swap-dm-personality.md`. |
 
 ---
 
