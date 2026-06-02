@@ -1,6 +1,6 @@
 import { defaultCampaignRoot } from "../tools/filesystem/platform.js";
 import { join, dirname } from "node:path";
-import { existsSync, mkdirSync, copyFileSync, chmodSync, readFileSync as fsReadFileSync } from "node:fs";
+import { existsSync, mkdirSync, copyFileSync, chmodSync } from "node:fs";
 import { config as dotenvConfig } from "dotenv";
 import { isCompiled, configDir } from "../utils/paths.js";
 
@@ -132,24 +132,4 @@ export function loadEnv(): void {
 
   // Fall back to cwd (dev mode, or compiled without config-dir .env)
   dotenvConfig();
-}
-
-/**
- * Get the app version. Uses MV_VERSION define (set at build time),
- * falling back to package.json.
- */
-export function getAppVersion(): string {
-  // Build script injects this via --define
-  if (typeof process.env.MV_VERSION === "string" && process.env.MV_VERSION) {
-    return process.env.MV_VERSION;
-  }
-
-  // Dev fallback: read package.json
-  try {
-    const pkgPath = join(dirname(dirname(import.meta.dirname)), "package.json");
-    const pkg = JSON.parse(fsReadFileSync(pkgPath, "utf-8"));
-    return pkg.version ?? "dev";
-  } catch {
-    return "dev";
-  }
 }
