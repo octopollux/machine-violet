@@ -212,10 +212,3 @@ export function buildCachedPrefix(
     hardStats: sections.hardStats ?? "",
   };
 }
-
-/**
- * Build a simple string system prompt (for non-DM agents like subagents).
- */
-export function buildSimplePrefix(prompt: string): string {
-  return prompt;
-}

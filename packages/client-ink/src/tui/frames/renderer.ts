@@ -1,8 +1,4 @@
-import React from "react";
-import { Text } from "ink";
-import type { FormattingNode, FrameStyleVariant } from "@machine-violet/shared/types/tui.js";
-import { toPlainText, parseFormatting } from "../formatting.js";
-import { renderNodes } from "../render-nodes.js";
+import type { FrameStyleVariant } from "@machine-violet/shared/types/tui.js";
 import { stringWidth, truncateToWidth } from "./string-width.js";
 
 export { stringWidth, truncateToWidth };
@@ -201,45 +197,4 @@ export function renderVerticalFrame(
   }
   // Width 2: border char + padding space (inside edge)
   return side === "left" ? `${v.vertical} ` : ` ${v.vertical}`;
-}
-
-/**
- * Render a styled content line with left/right vertical borders.
- * Like renderContentLine but accepts FormattingNode[] for styled content.
- */
-export function renderStyledContentLine(
-  variant: FrameStyleVariant,
-  nodes: FormattingNode[],
-  width: number,
-  ascii = false,
-): React.ReactElement {
-  const v = ascii ? ASCII_VARIANT : variant;
-
-  if (width < 4) {
-    return React.createElement(Text, null, ...renderNodes(nodes));
-  }
-
-  const innerWidth = width - 4; // 2 for borders + 2 for padding spaces
-  const plainText = toPlainText(nodes);
-  const contentLen = stringWidth(plainText);
-
-  // If content fits, use nodes directly; if too long, truncate plain text and re-parse
-  let styledNodes: FormattingNode[];
-  let pad: number;
-  if (contentLen > innerWidth) {
-    const truncated = truncateToWidth(plainText, innerWidth);
-    styledNodes = parseFormatting(truncated);
-    pad = 0;
-  } else {
-    styledNodes = nodes;
-    pad = Math.max(0, innerWidth - contentLen);
-  }
-
-  return React.createElement(
-    React.Fragment,
-    null,
-    React.createElement(Text, { color: variant.color }, `${v.vertical} `),
-    React.createElement(Text, null, ...renderNodes(styledNodes)),
-    React.createElement(Text, { color: variant.color }, `${" ".repeat(pad)} ${v.vertical}`),
-  );
 }

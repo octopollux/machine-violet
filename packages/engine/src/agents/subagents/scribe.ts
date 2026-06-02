@@ -16,8 +16,6 @@ import { EntityStore } from "../../entities/store.js";
 import { isFileBackedEntityType } from "@machine-violet/shared/schemas/entities/index.js";
 import type { FileIO } from "../scene-manager.js";
 
-// Re-export slugify from world-builder so the game engine doesn't need a separate import
-export { slugify } from "../world-builder.js";
 import { slugify } from "../world-builder.js";
 
 // --- Types ---

@@ -34,7 +34,7 @@ import {
   AddConnectionRequest, ConnectionsListResponse, HealthCheckResponse,
   UpdateModelsRequest, OkResponse, TiersResponse, SetTiersRequest,
   ModelsResponse, ArchiveResponse, ArchivedListResponse, RestoreRequest,
-  DiscordSettings, MachineSettingsResponse, KeysListResponse, DeleteInfoResponse, ErrorResponse,
+  DiscordSettings, MachineSettingsResponse, DeleteInfoResponse, ErrorResponse,
   ChatGptLoginStartResponse, ChatGptLoginStatusResponse,
   UsageResponse,
 } from "@machine-violet/shared";
@@ -493,55 +493,6 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   }, async () => {
     const registry = loadModelRegistry(server.configDir);
     return { models: registry.models };
-  });
-
-  // -----------------------------------------------------------------------
-  // Legacy key endpoints (backward compat for existing client)
-  // -----------------------------------------------------------------------
-
-  server.get("/keys", {
-    schema: {
-      tags: ["Management"],
-      response: { 200: KeysListResponse },
-    },
-  }, async () => {
-    const store = getConnections();
-    return {
-      keys: store.connections.map((c) => ({
-        id: c.id,
-        label: c.label,
-        masked: maskKey(c.apiKey),
-        source: c.source,
-        addedAt: c.addedAt,
-        isActive: false,
-      })),
-      activeKeyId: store.connections[0]?.id ?? null,
-    };
-  });
-
-  server.post("/keys/:id/check", {
-    schema: {
-      tags: ["Management"],
-      params: IdParams,
-      response: { 200: HealthCheckResponse, 404: ErrorResponse },
-    },
-  }, async (request, reply) => {
-    const store = getConnections();
-    const conn = store.connections.find((c) => c.id === (request.params as { id: string }).id);
-    if (!conn) {
-      return reply.status(404).send({ error: "Connection not found." });
-    }
-    // configDir required so openai-chatgpt connections get their token store;
-    // dispose() in finally avoids leaking the codex subprocess healthCheck spawns.
-    const provider = createProviderFromConnection(conn, { configDir: server.configDir });
-    try {
-      const result = await provider.healthCheck();
-      return { id: conn.id, ...result };
-    } catch (err) {
-      return { id: conn.id, status: "error" as const, message: err instanceof Error ? err.message : String(err) };
-    } finally {
-      await provider.dispose?.().catch(() => { /* best-effort */ });
-    }
   });
 
   // -----------------------------------------------------------------------

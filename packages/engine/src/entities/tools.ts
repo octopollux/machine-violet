@@ -28,7 +28,7 @@ import {
 
 // --- Tool name list (single source of truth) ---
 
-export const ENTITY_TOOL_NAMES = [
+const ENTITY_TOOL_NAMES = [
   "entity",
   "describe_entity_type",
   "list_entity_types",
@@ -37,7 +37,7 @@ export const ENTITY_TOOL_NAMES = [
   "detect_orphans",
 ] as const;
 
-export type EntityToolName = (typeof ENTITY_TOOL_NAMES)[number];
+type EntityToolName = (typeof ENTITY_TOOL_NAMES)[number];
 
 export const ENTITY_TOOL_NAME_SET: ReadonlySet<string> = new Set(ENTITY_TOOL_NAMES);
 

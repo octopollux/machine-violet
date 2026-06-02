@@ -4,11 +4,9 @@ import { render } from "ink-testing-library";
 import { DeleteCampaignModal } from "./DeleteCampaignModal.js";
 import type { DeleteCampaignModalProps } from "./DeleteCampaignModal.js";
 import { resetThemeCache, resolveTheme, BUILTIN_DEFINITIONS } from "../themes/index.js";
-import { resetPromptCache } from "../../prompts/load-prompt.js";
 import type { CampaignDeleteInfo } from "../../config/campaign-archive.js";
 
 beforeEach(() => {
-  resetPromptCache();
   resetThemeCache();
 });
 

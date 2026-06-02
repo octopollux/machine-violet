@@ -314,11 +314,6 @@ export function updateConnectionModels(
   };
 }
 
-/** Find a connection by ID. */
-export function getConnection(store: ConnectionStore, connectionId: string): AIConnection | undefined {
-  return store.connections.find((c) => c.id === connectionId);
-}
-
 /**
  * Result of merging a freshly-OAuthed ChatGPT account into the store.
  * Mutates `store` in place; also returns metadata callers need (e.g. to
