@@ -19,7 +19,7 @@
  * the player can't escape without a relaunch.
  */
 import type { ErrorCategory, ServerEvent } from "@machine-violet/shared";
-import { CodexTurnFailedError, type CodexFailureKind } from "../providers/openai-chatgpt/provider.js";
+import { CodexTurnFailedError, ChatGptAuthError, type CodexFailureKind } from "../providers/openai-chatgpt/provider.js";
 
 /**
  * Decide which WS error category a thrown error belongs in.
@@ -48,6 +48,12 @@ export function classifyServerError(
     // dead. If a future kind turns out to be transient, special-case it
     // here.
     return categoryForCodexKind(err.kind);
+  }
+  if (err instanceof ChatGptAuthError) {
+    // A dead ChatGPT sign-in raised outside a codex turn (provider startup).
+    // The player must re-auth in Connections; the session can't continue,
+    // but the process is fine — drop to menu rather than retry (issue #558).
+    return "session-fatal-recoverable";
   }
   return defaultCategory;
 }

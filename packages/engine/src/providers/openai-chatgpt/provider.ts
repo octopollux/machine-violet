@@ -39,7 +39,7 @@ import { getAccount, isChatGptAccount, pushChatGptAuthTokens } from "./auth.js";
 import { toUsageStatus, shouldWarn } from "./usage.js";
 import { log } from "./log.js";
 import { getCodexClientInfo } from "./client-info.js";
-import type { ChatGptTokenStore } from "./token-store.js";
+import type { ChatGptTokenStore, PersistedChatGptTokens } from "./token-store.js";
 import type {
   InitializeResult, ThreadStartParams, ThreadStartResult,
   TurnStartParams, TurnCompletedNotification,
@@ -283,10 +283,28 @@ export class OpenAIChatGptProvider implements LLMProvider {
     // 60 seconds of slack so we don't hand codex a token that expires
     // mid-turn. Codex's refresh request handles longer-running drift.
     if (tokens.expiresAtMs <= Date.now() + 60_000) {
-      tokens = await store.refresh();
-      if (!tokens) {
-        throw new Error("ChatGPT token refresh failed and no valid token available; please sign in again.");
+      // store.refresh() self-heals the cross-process double-refresh race
+      // (it re-reads disk when its own exchange is rejected, adopting a
+      // bundle another launch already rotated — see token-store.ts). A
+      // throw or null here therefore means the sign-in is genuinely dead,
+      // not merely raced. Raise a ChatGptAuthError so classifyServerError
+      // drops the session to the main menu rather than into a dead retry
+      // overlay (issue #558).
+      let refreshed: PersistedChatGptTokens | null;
+      try {
+        refreshed = await store.refresh();
+      } catch (err) {
+        throw new ChatGptAuthError(
+          "ChatGPT sign-in could not be refreshed; please sign in again in Connections.",
+          { cause: err },
+        );
       }
+      if (!refreshed) {
+        throw new ChatGptAuthError(
+          "ChatGPT sign-in could not be refreshed; please sign in again in Connections.",
+        );
+      }
+      tokens = refreshed;
     }
     await pushChatGptAuthTokens(client, {
       accessToken: tokens.accessToken,
@@ -1064,5 +1082,27 @@ export class CodexTurnFailedError extends Error {
     super(`Codex turn ${turnId} failed: ${codexMessage}`);
     this.name = "CodexTurnFailedError";
     this.kind = classifyCodexFailure(codexMessage);
+  }
+}
+
+/**
+ * Thrown when the stored ChatGPT sign-in can no longer be turned into a
+ * usable access_token — the refresh_token was rejected (revoked, or rotated
+ * out from under us and unrecoverable), or the token store returned no usable
+ * tokens. (`pushInitialTokens` returns early when *nothing* is stored, so the
+ * "no usable tokens" case here means `refresh()` itself yielded null.)
+ *
+ * Unlike a {@link CodexTurnFailedError}, this is raised *outside* a codex
+ * turn — during `pushInitialTokens` at provider startup, where a plain
+ * `Error` would fall through `classifyServerError`'s "retryable" default and
+ * surface as a dead retry overlay. It exists as a distinct class so
+ * `classifyServerError` can route it to `session-fatal-recoverable` (drop to
+ * menu) by *class*, per that module's by-class routing contract. The
+ * `.message` is user-facing — keep it actionable. See issue #558.
+ */
+export class ChatGptAuthError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "ChatGptAuthError";
   }
 }
