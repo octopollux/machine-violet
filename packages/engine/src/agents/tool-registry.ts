@@ -722,6 +722,10 @@ const TOOL_DEFS: RegisteredTool[] = [
         }
       } else {
         idx = state.activePlayerIndex;
+        // activePlayerIndex can drift out of range (config edited externally,
+        // scene/config mismatch). Fall back to the first slot rather than
+        // dereferencing undefined — mirrors getActivePlayer's guard.
+        if (idx < 0 || idx >= players.length) idx = 0;
       }
 
       const slot = players[idx];

@@ -171,12 +171,18 @@ export function resolveEntityTypeField(
   category: FileBackedEntityType,
   incoming: unknown,
 ): string {
+  // Only character sheets carry a role in `type`. Every other entity type
+  // keeps `type` pinned to its directory category — there's no role concept
+  // for a location/faction/lore/item/rule, so a stray value is corruption.
+  if (category !== "character") return category;
   if (typeof incoming !== "string" || !incoming.trim()) return category;
   const value = incoming.trim();
+  const lower = value.toLowerCase();
+  // The generic role coincides with the category name — normalize its casing.
+  if (lower === category) return category;
   // Mislabeled as a different file-backed category → force back to ours.
-  if (value.toLowerCase() !== category && isFileBackedEntityType(value.toLowerCase())) {
-    return category;
-  }
+  if (isFileBackedEntityType(lower)) return category;
+  // A legitimate role value (PC, NPC, …).
   return value;
 }
 

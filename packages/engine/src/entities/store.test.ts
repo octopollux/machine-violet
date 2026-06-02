@@ -253,6 +253,36 @@ describe("EntityStore type safety", () => {
     expect(rec.frontMatter.type).toBe("character");
   });
 
+  it("normalizes display-cased patch keys so the role lands and no duplicate lines appear", async () => {
+    // Agents echo the casing they see on disk (`**Type:**`, `**Display
+    // Resources:**`). Those must map to the storage keys the parser produces,
+    // or they shadow the canonical field and serialize duplicate lines.
+    const io = inMemoryFileIO({
+      "/root/characters/arvid.md": character("Arvid"),
+    });
+    const store = new EntityStore(ROOT, io);
+    const rec = await store.update("character", "arvid", {
+      frontMatter: { Type: "PC", "Display Resources": "HP, Memory", Player: "Beep" },
+    });
+
+    expect(rec.frontMatter.type).toBe("PC");
+    expect(rec.frontMatter.display_resources).toBe("HP, Memory");
+    expect(rec.frontMatter.player).toBe("Beep");
+    // Exactly one Type line, holding the role — not a stale "character" too.
+    expect(rec.raw.match(/^\*\*Type:\*\*/gm)).toHaveLength(1);
+    expect(rec.raw).toContain("**Type:** PC");
+    expect(rec.raw).not.toContain("**Type:** character");
+  });
+
+  it("keeps type pinned for non-character entities (a location ignores a stray role)", async () => {
+    const io = inMemoryFileIO({
+      "/root/locations/north-keep/index.md": location("North Keep"),
+    });
+    const store = new EntityStore(ROOT, io);
+    const rec = await store.update("location", "north-keep", { frontMatter: { type: "PC" } });
+    expect(rec.frontMatter.type).toBe("location");
+  });
+
   it("repairs malformed `**Type:** character` keys via sanitizeFrontMatter", async () => {
     // Reproduces the small-model corruption pattern that scribe's
     // sanitizeFrontMatter was added for. The store must apply the same
