@@ -76,6 +76,12 @@ persists `config.json`. Everything else is ordinary sheet/UI editing.
 
 ## Notes
 
+- The character sheet's `**Type:**` field holds the role — `PC`, `NPC`, or
+  `character` — and the `entity` tool accepts those values (it only blocks
+  relabeling a sheet as a *different* entity category like `location`). This
+  field is documentary: the functional PC roster is `config.json` → `players[]`,
+  changed by `swap_pc`. Keep them consistent, but `swap_pc` is what actually
+  hands off control.
 - The DM's in-context PC sheet block (`pcSheets`) is loaded once at session
   start and is intentionally not refreshed mid-session. After a swap it will
   still show the old sheet until the next reload — that's expected. You can see

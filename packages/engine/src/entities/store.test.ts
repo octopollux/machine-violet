@@ -200,24 +200,56 @@ describe("EntityStore CRUD roundtrip", () => {
 });
 
 describe("EntityStore type safety", () => {
-  it("pins type to the directory category on create even if patch tries to override", async () => {
+  it("blocks relabeling as a different category on create (type: location → character)", async () => {
     const io = inMemoryFileIO();
     const store = new EntityStore(ROOT, io);
     const rec = await store.create("character", {
       displayName: "Arvid",
-      // Adversarial patch trying to mislabel the entity.
+      // Adversarial patch trying to mislabel the entity as another category.
       frontMatter: { type: "location" },
     });
     expect(rec.frontMatter.type).toBe("character");
   });
 
-  it("pins type on update even when patch tries to delete or change it", async () => {
+  it("backfills a missing/cleared type to the directory category on update", async () => {
     const io = inMemoryFileIO({
       "/root/characters/arvid.md": character("Arvid"),
     });
     const store = new EntityStore(ROOT, io);
     await store.update("character", "arvid", { frontMatter: { type: null } });
     const rec = await store.read("character", "arvid");
+    expect(rec.frontMatter.type).toBe("character");
+  });
+
+  it("preserves the PC/NPC role on a character's type field (the PC-swap case)", async () => {
+    const io = inMemoryFileIO({
+      "/root/characters/arvid.md": character("Arvid"),
+    });
+    const store = new EntityStore(ROOT, io);
+
+    // Promote to PC — must stick, not get rewritten back to "character".
+    const promoted = await store.update("character", "arvid", { frontMatter: { type: "PC" } });
+    expect(promoted.frontMatter.type).toBe("PC");
+    expect(promoted.raw).toContain("**Type:** PC");
+
+    // Demote to NPC — also a legitimate role value.
+    const demoted = await store.update("character", "arvid", { frontMatter: { type: "NPC" } });
+    expect(demoted.frontMatter.type).toBe("NPC");
+
+    // A brand-new sheet created straight as a PC keeps the role.
+    const created = await store.create("character", {
+      displayName: "Heura Ketelsen",
+      frontMatter: { type: "PC" },
+    });
+    expect(created.frontMatter.type).toBe("PC");
+  });
+
+  it("still blocks relabeling a character as another category on update (type: item → character)", async () => {
+    const io = inMemoryFileIO({
+      "/root/characters/arvid.md": character("Arvid"),
+    });
+    const store = new EntityStore(ROOT, io);
+    const rec = await store.update("character", "arvid", { frontMatter: { type: "item" } });
     expect(rec.frontMatter.type).toBe("character");
   });
 

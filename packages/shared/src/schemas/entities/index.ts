@@ -97,6 +97,13 @@ const TYPE_CATEGORY: SchemaField = {
   description: "Entity category marker (\"character\", \"location\", \"faction\", \"lore\", or \"item\"). Set automatically by the store from the on-disk directory; do not override.",
 };
 
+const TYPE_CHARACTER_ROLE: SchemaField = {
+  required: true,
+  kind: "string",
+  source: "frontmatter",
+  description: "Character role marker: \"PC\" for a player character, \"NPC\" for a named non-player character, or \"character\" (generic). Documentary — the functional PC roster lives in config.json; use swap_pc to change who is actually played. The store accepts these role values but will reject any attempt to relabel the sheet as a different entity category (e.g. \"location\").",
+};
+
 // --- Per-type schemas ---
 
 export const CHARACTER_SCHEMA: EntitySchema = {
@@ -106,7 +113,7 @@ export const CHARACTER_SCHEMA: EntitySchema = {
   fields: {
     displayName: DISPLAY_NAME,
     additional_names: ADDITIONAL_NAMES,
-    type: TYPE_CATEGORY,
+    type: TYPE_CHARACTER_ROLE,
     location: {
       required: false,
       kind: "wikilink",
@@ -116,7 +123,7 @@ export const CHARACTER_SCHEMA: EntitySchema = {
   },
   conventions: [
     ...SHARED_CONVENTIONS,
-    "PCs and named NPCs both live here. The `type` field is fixed to \"character\" — PC vs NPC is conventionally noted in the body or via promote_character's sheet status, not via type.",
+    "PCs and named NPCs both live here. The `type` field carries the role — \"PC\", \"NPC\", or \"character\" — and is editable via the `entity` tool. It's documentary: the functional PC roster is config.json's players[]; use swap_pc to actually hand off control. The store still blocks relabeling a sheet as a different entity category.",
     "Promoted character sheets follow `promote_character`'s sheet format under `## Stats`/`## Abilities`.",
   ],
 };
