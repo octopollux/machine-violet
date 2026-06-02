@@ -113,7 +113,26 @@ export function createConnectionTokenStore(
     const promise = (async (): Promise<PersistedChatGptTokens | null> => {
       const current = load();
       if (!current) return null;
-      const oauth = await refreshFn(current.refreshToken);
+      let oauth: OAuthTokens;
+      try {
+        oauth = await refreshFn(current.refreshToken);
+      } catch (err) {
+        // Cross-process / consecutive-launch double-refresh recovery. OpenAI
+        // rotates the refresh_token on every exchange, so a second actor that
+        // POSTs the *same* RT gets a hard "refresh token already used" 400.
+        // The in-process `inflightRefresh` mutex only coalesces refreshes
+        // within this process — a separate MV launch (the failure mode in
+        // issue #558) bypasses it entirely. But if another actor already
+        // rotated the RT, a *valid* fresh bundle is on disk right now. Re-read:
+        // if the on-disk RT has moved on from the one we just tried, someone
+        // else succeeded — adopt their result rather than forcing the user to
+        // re-authenticate. Only genuine failures (RT unchanged) propagate.
+        const recovered = load();
+        if (recovered && recovered.refreshToken !== current.refreshToken) {
+          return recovered;
+        }
+        throw err;
+      }
       const fresh = tokensFromOAuth(oauth, current.chatgptAccountId);
       if (!fresh) return null;
       // Sign-in vs refresh race: the user can re-sign-in while our OAuth

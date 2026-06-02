@@ -1009,10 +1009,27 @@ export class SessionManager {
     });
 
     // --- Resume or start new ---
-    if (isResume) {
-      await this.resumeSession(engine, config, gs, scene);
-    } else {
-      await this.startNewGame(engine, config, gs, entityTree);
+    // startNewGame runs the opening DM turn inline here — outside the
+    // player-input commit handler that classifies session-fatal failures and
+    // drops to menu. An auth failure on that very first turn (a dead ChatGPT
+    // sign-in, a missing model) would otherwise bubble to startSession's
+    // catch and surface as a dead "retry" overlay over an already-torn-down
+    // session. Route session-fatal errors through the same graceful teardown
+    // the mid-game path uses; non-fatal errors rethrow to preserve the
+    // existing start-failure handling (REST 400 / retryable overlay). See
+    // issue #558.
+    try {
+      if (isResume) {
+        await this.resumeSession(engine, config, gs, scene);
+      } else {
+        await this.startNewGame(engine, config, gs, entityTree);
+      }
+    } catch (err) {
+      if (this.isSessionFatal(err)) {
+        await this.handleSessionFatal(err, scopedBroadcast);
+        return;
+      }
+      throw err;
     }
   }
 
