@@ -245,6 +245,12 @@ export class GameEngine {
         this.persister?.persistConfig(state.config);
         this.persistCurrentScene();
       }
+      if (toolName === "swap_dm_personality") {
+        // swap_dm_personality rewrites config.dm_personality. buildDMPrefix
+        // reads it live each turn, so the new voice is in play next turn;
+        // persist so it also survives a reload.
+        this.persister?.persistConfig(state.config);
+      }
       if (toolName === "start_combat") {
         void this.initResolveSession(state);
       } else if (toolName === "end_combat") {

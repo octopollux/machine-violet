@@ -155,7 +155,17 @@ The "Enter your own" option in setup lets the player describe a DM personality i
 
 ### Storage
 
-The selected personality fragment is stored in `config.json` and loaded into the DM system prompt at session start. Changing personality mid-campaign is possible (via OOC mode) but unusual.
+The selected personality fragment is stored in `config.json` and woven into the DM system prompt by `buildDMPrefix`, which reads `config.dm_personality` **live at the start of every DM turn**.
+
+### Changing personality mid-campaign
+
+Supported via three registry tools (available to the DM and OOC):
+
+- `list_dm_personalities` — the same persona catalog the setup agent sees (`loadAllPersonalities`), surfaced in-game so the agent knows the options.
+- `swap_dm_personality({ name, prompt_fragment?, detail?, description? })` — switch to a preset by `name`, or invent a custom persona by also passing `prompt_fragment`. Writes `config.dm_personality` and persists `config.json`.
+- `howto_swap_dm_personality` — the playbook (list → present → swap → in-fiction handoff).
+
+Because the personality is read live each turn (not snapshotted like `pcSheets`), the swap takes effect on the **next** DM turn with no reload — that turn pays a one-time prompt-cache recreation, then re-caches at BP1. The incoming persona is expected to open with an in-fiction voice handoff so the shift reads as intentional. See [tools-catalog.md](tools-catalog.md#dm-personality-tools).
 
 ```jsonc
 // config.json (partial)
