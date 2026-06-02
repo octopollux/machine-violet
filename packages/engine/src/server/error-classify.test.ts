@@ -13,7 +13,7 @@ import {
   performSessionFatalTeardown,
   userMessageFor,
 } from "./error-classify.js";
-import { CodexTurnFailedError, classifyCodexFailure } from "../providers/openai-chatgpt/provider.js";
+import { CodexTurnFailedError, ChatGptAuthError, classifyCodexFailure } from "../providers/openai-chatgpt/provider.js";
 
 describe("classifyCodexFailure", () => {
   it("classifies the canonical refresh-token failure (#529) as auth_expired", () => {
@@ -85,6 +85,17 @@ describe("classifyServerError", () => {
   it("survives non-Error throws (default: retryable)", () => {
     expect(classifyServerError("a string")).toBe("retryable");
     expect(classifyServerError(null)).toBe("retryable");
+  });
+
+  it("routes ChatGptAuthError to session-fatal-recoverable (#558)", () => {
+    // A dead ChatGPT sign-in raised at provider startup (outside a codex
+    // turn) must drop to menu, not into a dead retry overlay. It's a plain
+    // Error subclass, so without this branch it would hit the retryable
+    // default.
+    const err = new ChatGptAuthError("ChatGPT sign-in could not be refreshed; please sign in again in Connections.");
+    expect(classifyServerError(err)).toBe("session-fatal-recoverable");
+    // Even when the caller's default is retryable, the class wins.
+    expect(classifyServerError(err, "retryable")).toBe("session-fatal-recoverable");
   });
 });
 
