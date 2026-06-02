@@ -10,6 +10,14 @@ import { CenteredModal, computeModalInnerWidth, type CenteredModalHandle } from 
 const MIN_WIDTH = 48;
 const MAX_WIDTH = 72;
 const WIDTH_FRACTION = 0.7;
+// Columns of slack left at the right edge of every row. We truncate rows to
+// innerWidth so CenteredModal pads them opaque, but several glyphs we use —
+// the ○/◆ markers, the … ellipsis, an em dash in a title — are East-Asian
+// *ambiguous* width: stringWidth counts them as 1, yet some terminals draw
+// them double-width. Filling to the exact edge would then overflow by a
+// column or two on those terminals and wrap (→ background bleed-through). The
+// margin absorbs that; the cost is a few opaque pad spaces on the right.
+const ROW_SAFETY = 3;
 
 /** Truncate `s` to fit `max` columns, adding an ellipsis when clipped. */
 function fitWidth(s: string, max: number): string {
@@ -94,9 +102,11 @@ export function RollbackPickerModal({
     [theme, width, footer],
   );
 
+  const maxRowWidth = innerWidth - ROW_SAFETY;
+
   const styledLines: FormattingNode[][] = useMemo(() => {
     if (empty) {
-      return [[fitWidth(gitEnabled ? "  No savepoints yet." : "  Rollback unavailable — git is disabled for this campaign.", innerWidth)]];
+      return [[fitWidth(gitEnabled ? "  No savepoints yet." : "  Rollback unavailable — git is disabled for this campaign.", maxRowWidth)]];
     }
     return savepoints.map((sp, i) => {
       const isSelected = i === selectedIndex;
@@ -104,8 +114,8 @@ export function RollbackPickerModal({
       const tag = sp.type !== "auto" ? `[${sp.type}] ` : "";
       const when = `  (${relativeTime(sp.timestamp, now)})`;
       const head = `  ${marker} ${tag}`;
-      // Truncate the message so the whole row fits on one line within innerWidth.
-      const msg = fitWidth(sp.message, innerWidth - stringWidth(head) - stringWidth(when));
+      // Truncate the message so the whole row fits on one line within maxRowWidth.
+      const msg = fitWidth(sp.message, maxRowWidth - stringWidth(head) - stringWidth(when));
       const text = `${head}${msg}${when}`;
       if (isSelected) {
         const bolded: FormattingNode = { type: "bold", content: [text] };
@@ -113,7 +123,7 @@ export function RollbackPickerModal({
       }
       return [text];
     });
-  }, [savepoints, selectedIndex, empty, gitEnabled, accentColor, now, innerWidth]);
+  }, [savepoints, selectedIndex, empty, gitEnabled, accentColor, now, maxRowWidth]);
 
   return (
     <CenteredModal
