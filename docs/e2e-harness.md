@@ -181,6 +181,7 @@ Categories worth knowing about:
 | `session:*` | `start`, `end`, `mode` | Campaign session lifecycle (incl. setup → live handoff). |
 | `turn:*` | `player_input`, `dm_complete` | Turn boundaries with token counts + duration. |
 | `api:*` | `call`, `retry` | Provider HTTP calls — model, tokens, duration, tool_use count. |
+| `cache:*` | `miss` | Anthropic cache-prefix divergence (cache-diagnosis beta). Fields: `messageId`, `model`, `reasonType` (`system_changed` / `tools_changed` / `messages_changed` / `model_changed`), optional `missedInputTokens`. Only the `*_changed` types are emitted; `previous_message_not_found` / `unavailable` are suppressed. Anthropic-provider calls with a `conversationId` only. |
 | `subagent:*` | `start`, `end` | Scribe, theme-styler, promote_character, etc. |
 | `image_gen:*` | `request`, `response`, `no_data`, `error`, `persisted`, `dispatch_failed`, `legacy_hosted_item_ignored` | Image-generation pipeline. |
 | `setup:*` | `image_tools_registered` | Setup-agent capability snapshots. |

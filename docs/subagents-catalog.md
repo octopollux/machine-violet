@@ -165,6 +165,29 @@ With `max_conversation_tokens` disabled (default), the precis updater never fire
 
 ---
 
+### 5c. Discord Status Subagent
+
+| Property | Value |
+|---|---|
+| **Model** | Haiku (`small` tier) |
+| **Visibility** | Silent |
+| **Trigger** | Every 8th DM narrative completion within a session (`DISCORD_STATUS_INTERVAL = 8` in `session-manager.ts`); counter resets per `startSession` call |
+| **Source** | `src/agents/subagents/discord-status.ts`, `src/prompts/discord-status.md` |
+
+One-shot subagent that generates a punchy ≤40-character status string for Discord Rich Presence. Fires fire-and-forget inside the `onDmNarrative` closure in `session-manager.ts`, routed through the small tier's connection so heterogeneous setups send the right model ID.
+
+**Context**: The latest DM narrative text, passed as the user message via `oneShot()`.
+
+**Returns**: `DiscordStatusResult` — `{ status: string; usage: UsageStats | null }`. The `status` is trimmed, stripped of surrounding single/double quotes, and hard-clamped to 40 characters.
+
+**Fallback**: Never throws. On any failure (or empty model output) the status falls back to `"Adventuring..."`; on a thrown error `usage` is `null`.
+
+**Cost attribution**: When `usage` is non-null, `session-manager.ts` records it against the session's `CostTracker` at the `"small"` tier.
+
+**Wire event**: Broadcast as a `discord:presence` `{ action: "update", details: status }` WebSocket event. Each frontend independently decides whether to forward it to its local Discord IPC based on its own opt-in setting. See [websocket-api.md](websocket-api.md) for the full event shape.
+
+---
+
 ### 6. Changelog Updater
 
 | Property | Value |
@@ -238,6 +261,31 @@ Agentic search across the entire campaign filesystem. Walks all campaign files i
 **Max tool rounds**: 5 (grep → read → refine → read → summarize).
 
 **Returns**: Terse summary of findings with `[[wikilinks]]` and `(source: path)` references. Results go back to the DM as the tool_result (not fire-and-forget).
+
+---
+
+### 6d. Search Content Subagent
+
+| Property | Value |
+|---|---|
+| **Model** | Haiku (`small` tier) |
+| **Visibility** | Silent |
+| **Trigger** | DM calls `search_content` tool; also exposed as a last-resort fallback tool inside the Resolve Session subagent during combat |
+| **Source** | `src/agents/subagents/search-content.ts`, `src/prompts/search-content.md` |
+
+Agentic search over the game system's ingested content library (monsters, spells, equipment, rules). Queries the faceted JSON indexes built by the document-ingestion pipeline and returns matching entities with key stats to the caller.
+
+**Context**: Search query string (passed as `Search query: <query>`). ~20 tokens input.
+
+**Tools**: `list_categories` (list available entity categories), `search_facets(category, filters, limit?)` (filter a category's faceted index; substring match on any field plus `min_`/`max_`-prefixed numeric range filters, with fractional-value parsing for CR values like `"1/4"`; default limit 20), `read_entity(category, slug)` (read the full markdown content of a specific entity).
+
+**Max tool rounds**: 5.
+
+**Returns**: `SearchContentResult` — text summary of matching entities plus usage stats. Returned to the DM as the `search_content` tool result, or inline to the Resolve Session as a fallback lookup.
+
+**Caching**: Sets `cacheTools: true` so tool definitions are cached across rounds (same as scribe and search-campaign); the system prompt is wrapped via `cacheSystemPrompt()`.
+
+**No-content behavior**: When a system has no ingested facets, the tools return graceful "no categories / no facets index found" messages to the subagent rather than throwing. The DM-level dispatcher only hard-errors when no game system is configured for the campaign.
 
 ---
 
@@ -420,10 +468,12 @@ Haiku, silent. Summarizes campaign book structure for DM cached prefix. See [doc
 | 3 | Choice Generation | Haiku | Silent | Runtime — player choice options |
 | 4 | Scene Summarizer | Haiku | Silent | Runtime — scene transition |
 | 5 | Precis Updater + PlayerRead | Haiku | Silent | Runtime — context pruning + lightweight player signals |
+| 5c | Discord Status | Haiku | Silent | Runtime — Discord Rich Presence update every 8 DM narratives |
 | 6 | Changelog Updater | Haiku | Silent | Runtime — scene transition |
 | 6a | Compendium Updater | Haiku | Silent | Runtime — scene transition |
 | 6b | Scribe | Haiku | Silent | Runtime — entity file management |
 | 6c | Campaign Search | Haiku | Silent | Runtime — agentic campaign search |
+| 6d | Search Content | Haiku | Silent | Runtime — game system content lookup (DM tool + combat fallback) |
 | 7 | Character Promotion | Haiku | Silent | Runtime — on demand |
 | 8 | AI Player | Haiku/Sonnet | Silent | Runtime — AI player turns |
 | 9 | Setup Agent | Sonnet | Player-facing | Init — game setup (orchestrator) |
