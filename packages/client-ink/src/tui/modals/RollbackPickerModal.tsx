@@ -67,7 +67,12 @@ const SYNTHETIC = new Set(["initial state", "exchanges"]);
 function describeSavepoint(sp: Savepoint): { quote: boolean; text: string } {
   if (sp.type === "auto") {
     const subject = sp.message.replace(/^auto:\s*/, "").trim();
-    if (subject && !SYNTHETIC.has(subject.toLowerCase())) return { quote: true, text: subject };
+    if (subject && !SYNTHETIC.has(subject.toLowerCase())) {
+      // Player turns often contain their own dialogue quotes; fold any double
+      // quotes (straight or curly) to single quotes so the row carries just
+      // the one outer pair we wrap it in — no confusing nested quotes.
+      return { quote: true, text: subject.replace(/["“”]/g, "'") };
+    }
   }
   return { quote: false, text: "autosave" };
 }

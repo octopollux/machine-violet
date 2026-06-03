@@ -807,6 +807,19 @@ describe("RollbackPickerModal", () => {
     expect(lastFrame()).toContain("git is disabled");
   });
 
+  it("folds inner quotes in player turns to a single outer pair", () => {
+    const quoted: Savepoint[] = [
+      { oid: "9999999", type: "auto", message: 'auto: I whisper, "the device works"', timestamp: 1_700_000_000 },
+    ];
+    const { lastFrame } = render(
+      <Box width={100} height={30}>
+        <RollbackPickerModal theme={theme} width={100} height={30} savepoints={quoted} gitEnabled onSelect={noop} onCancel={noop} />
+      </Box>,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain(`"I whisper, 'the device works'"`);
+  });
+
   it("flattens newlines in multi-line player turns to one row (no background bleed-through)", () => {
     // Verbatim player turns are multi-line; a raw newline would break the row
     // onto a second physical line that CenteredModal can't pad opaque.
