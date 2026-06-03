@@ -19,6 +19,77 @@ complete.**
 The harness is the only honest "did I break it?" signal for cross-cutting
 changes.
 
+## Two ways to use it: scripted probes vs. interactive play
+
+The harness has two modes, built on the same launcher + sidecar:
+
+- **Scripted probes** (`runProbe`) — spawn the game, run a fixed body, assert,
+  hard-kill. This is the right tool for a **pass/fail** check (`smoketest`,
+  `boot-and-quit`, any ad-hoc one-shot). Covered in the rest of this doc.
+- **Interactive play** (`mvplay`) — a **persistent** session you drive
+  turn-for-turn, one command per turn, with *you* (a coding agent or a human)
+  in the loop deciding each move. Use it to actually *play* the game, feel out
+  in-game behavior, or manually reproduce something a scripted probe can't
+  express. See [Interactive play](#interactive-play-mvplay) below.
+
+If you want "did I break it?", reach for a probe. If you want "let me play a few
+turns and see," reach for `mvplay`.
+
+## Interactive play (mvplay)
+
+`mvplay` ([`packages/test-harness/bin/mvplay.ts`](../packages/test-harness/bin/mvplay.ts))
+keeps the launcher + sidecar alive in a **detached background process** that
+outlives each command, so you submit one turn per invocation across as many
+invocations as the game lasts. State (ports, pid, and a read cursor) lives in a
+session file under the system temp dir — one session at a time.
+
+This exists because `runProbe` kills the process the moment its scripted body
+returns; nothing survives between an agent's tool calls, so there's no session
+to *play*. `mvplay` is the persistent counterpart.
+
+The canonical handle is the **`/play` skill** (`.claude/skills/play/`). Under the
+hood it's just:
+
+```bash
+node --import tsx/esm packages/test-harness/bin/mvplay.ts <cmd> [args]
+# or: npm run play -- <cmd> [args]
+```
+
+| Command | What it does |
+|---|---|
+| `start [--player NAME] [--fresh]` | Boot the game in the background; print the main menu. |
+| `status` | Is a session alive? Show engine/turn/choices vitals. |
+| `screen [--ansi]` | Print the rendered terminal screen. |
+| `state` | Compact summary: engineState, mode, current turn, choices, narrative count. |
+| `narrative [--all]` | Print narrative since you last looked (`--all` = everything). |
+| `say "<text>"` | Submit a player action / free-text answer + Enter (confirms + retries once). |
+| `key <name>` | Send a key (`return up down left right escape tab space pageup ...`). |
+| `pick <N\|text>` | Select a choice by 1-based number or label substring. |
+| `wait [--for beat\|handoff\|choices] [--timeout SEC]` | Block until a new beat lands, print it, exit. |
+| `log [--tail N]` | Tail the launcher log (crash diagnostics). |
+| `stop` | Kill the session. |
+
+**The loop:** submit (`say`/`pick`/`key`), then `wait`, then react to what it
+prints. `wait` settles on the next beat you must act on — a free-text prompt, a
+choice overlay, a setup→live handoff, or a completed DM turn — and prints only
+the new narrative plus any choices, advancing an internal read cursor so you
+never re-read what you've seen.
+
+**Run `wait` in the background.** A DM turn is 1-5 minutes. Launch `wait` with
+`run_in_background: true` and keep working; the harness re-invokes you when it
+exits. Don't foreground-block a tool call for minutes, and don't poll `state` in
+a loop — that's what `wait` is for. (This is the same background pattern the
+smoketest uses for the live probe.)
+
+`wait` distinguishes a genuinely-new beat from a stale overlay the engine left
+on screen by comparing against the session file's read cursor + last-acted choice
+fingerprint — the same signal-picking logic the scripted probes use, packaged so
+you don't have to re-derive it each turn.
+
+Read-back is over the sidecar's HTTP `/screen` + `/state` (non-blocking — there
+is no stdin/stdout pipe to block on). The detached launcher's own stdout/stderr
+is tee'd to a log file for crash diagnostics (`mvplay log`).
+
 ## The two long-lived probes
 
 | ID | Live API? | ~Time | What it proves |
@@ -202,6 +273,22 @@ These are non-obvious facts about how `ClientState` actually moves during gamepl
 **A probe must not re-submit the same choice on a stale overlay.** The flip side of the above: when the agent leaves `activeChoices` populated but is actually asking for free text, a naive "if activeChoices, pick a choice" loop will pick the same first item every iteration and the test runs in circles. Track the fingerprints of choices you've already submitted (`prompt + "::" + labels.join("|")` is fine). When a non-null `activeChoices` matches a previously-submitted fingerprint, treat the overlay as stale and submit free text instead — navigating up to the "Enter your own" custom-input row first. The `smoketest` probe implements this; mirror it in any new conversational probe.
 
 **After a DM response in single-player auto-commit, `currentTurn` is null.** When the DM finishes a turn and the engine returns to `engineState === "waiting_input"`, the next turn doesn't open until the player contributes again. Predicates that wait for "DM done" must NOT require `currentTurn !== null` + `seq > baseline` — they'll time out indefinitely. Use `engineState === "waiting_input" && narrativeLines.length > baseline` instead. (The very first turn after handoff is different: waiting on `currentTurn != null` correctly catches the opening DM turn because it DOES open the player's first turn before pausing.)
+
+**`engineState === "waiting_input"` does NOT guarantee the input box will
+accept a keystroke.** Right after a DM turn, the scribe subagent keeps running
+(renaming entities, patching records) and emits more narrative while the engine
+already reports `waiting_input`. A re-render in that window can drop the Enter of
+a submission — the typed *text* lands in the input buffer but never submits, then
+silently concatenates onto your next `say`, producing a merged double-action.
+Input is not gated on engine state (the client deliberately never blocks on it,
+to avoid wedging — see `PlayingPhase.tsx` `textInputDisabled`), so `/state`
+gives no warning. The reliable confirmation that a submit registered is that
+`narrativeLines.length` grew: the client appends an optimistic player line the
+instant it accepts the keystrokes. `mvplay`'s `say`/`pick` use exactly this —
+confirm the optimistic line appeared within a few seconds, and on miss, clear the
+buffer (`ctrl+u`) and resend once. Any probe that submits a turn immediately
+after a previous DM turn settles should do the same rather than trusting
+`waiting_input` alone.
 
 **Choice-overlay submission needs a normalization dance.** The overlay opens with "Enter your own" at UI index 0, with `customInputActive` true for short lists (<5 options) and false for longer ones. The reliable normalization is: press UP (force selectedIndex=0 + customInputActive=true regardless of length), press DOWN once (move to first real choice), then DOWN `pickIndex` more times, then Return. Bare DOWN sequences from an unknown starting state are fragile.
 

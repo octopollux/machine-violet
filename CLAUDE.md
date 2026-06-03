@@ -92,6 +92,10 @@ Launch it and continue with other work in the same turn (write the commit messag
 
 **Don't tail the background output in subsequent turns.** Just keep working. When the process exits, the harness re-invokes you with a `<task-notification>` containing the final output path. Read the tail of that file then — not before.
 
+### Playing the game interactively (not just pass/fail)
+
+The smoketest answers "did I break it?" — a scripted pass/fail. When the value is instead in **you being in the loop**, playing turn-for-turn (exercising a personality live, feeling out setup-agent behavior, reproducing an in-game bug by hand), use the **`/play` skill** (`mvplay`). It keeps a persistent launcher+sidecar running in the background so you submit one turn per tool call — `start` → `key`/`say`/`pick` → `wait` (run in background) → react → repeat → `stop`. Drive it yourself; do **not** delegate to a subagent or write a one-shot `runProbe` for this — both discard the point, which is your per-turn judgement. See [docs/e2e-harness.md](docs/e2e-harness.md) "Interactive play (mvplay)".
+
 ## Release model
 
 Two long-lived branches: **`main`** (trunk, builds nightlies) and **`release`** (the released line, builds stable + RC). Three Velopack channels: `stable`, `rc`, `nightly` — all sticky (installers never auto-switch channels). Only the latest major is supported; no LTS.
