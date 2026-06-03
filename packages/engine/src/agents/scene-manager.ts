@@ -627,12 +627,27 @@ export class SceneManager {
       type: entry.type,
       path: entry.path,
     };
+    this.refreshEntityTreeSnapshot();
   }
 
   /** Remove an entry from the entity tree (e.g. after rename). */
   removeEntity(slug: string): void {
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete this.entityTree[slug];
+    this.refreshEntityTreeSnapshot();
+  }
+
+  /**
+   * Re-render the entity-tree snapshot string that feeds the DM's "Entity
+   * Registry" context (via `sessionState.entityIndex` in `getSystemPrompt`).
+   * Must run on every tree mutation: without it the snapshot stayed frozen
+   * at the per-scene render (constructor / scene reset), so entities the
+   * scribe created or renamed mid-scene never reached the DM. The DM then
+   * kept seeing the stale placeholder and re-issued the same rename every
+   * turn — wasting an expensive high-effort reasoning round each time.
+   */
+  private refreshEntityTreeSnapshot(): void {
+    this.entityTreeSnapshot = renderEntityTree(this.entityTree);
   }
 
   /** Get the current entity tree (for passing to subagents). */

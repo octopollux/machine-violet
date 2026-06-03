@@ -765,6 +765,44 @@ describe("SceneManager", () => {
     expect(volatile).toContain("Flood Street Watcher (character) aka The Watcher");
   });
 
+  it("entity tree mutations mid-scene refresh the volatile registry (regression: stale snapshot)", () => {
+    // Regression: the DM re-issued the same location rename every turn because
+    // the registry snapshot stayed frozen at the per-scene render. Scribe
+    // renamed a location mid-scene (remove old slug + upsert new), but the
+    // snapshot wasn't re-rendered, so the DM kept seeing the deleted placeholder.
+    const sessionState = mockSessionState();
+    const initialTree = {
+      "starting-location": { name: "Starting Location", aliases: [], type: "location", path: "locations/starting-location/index.md" },
+    };
+    const mgr = new SceneManager(
+      mockState(),
+      mockScene(),
+      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
+      sessionState,
+      mockFileIO(),
+      undefined,
+      initialTree,
+    );
+
+    // Placeholder is present before the rename.
+    expect(mgr.getSystemPrompt().volatile).toContain("Starting Location");
+
+    // Scribe renames the location: remove the placeholder slug, add the real one.
+    mgr.removeEntity("starting-location");
+    mgr.upsertEntity({
+      slug: "foggy-bottom-annex",
+      name: "Foggy Bottom Annex",
+      aliases: [],
+      type: "location",
+      path: "locations/foggy-bottom-annex/index.md",
+    });
+
+    // The next turn's context reflects the rename: new entity in, placeholder out.
+    const { volatile } = mgr.getSystemPrompt();
+    expect(volatile).toContain("Foggy Bottom Annex");
+    expect(volatile).not.toContain("Starting Location");
+  });
+
   it("getSystemPrompt omits entity registry when tree is empty", () => {
     const sessionState = mockSessionState();
     const mgr = new SceneManager(
@@ -812,7 +850,7 @@ describe("SceneManager", () => {
     expect(hardStats).not.toContain("Turn:");
   });
 
-  it("mid-scene upserts update the tree but not the DM snapshot", () => {
+  it("mid-scene upserts update both the tree and the DM snapshot", () => {
     const sessionState = mockSessionState();
     const mgr = new SceneManager(
       mockState(),
@@ -826,9 +864,10 @@ describe("SceneManager", () => {
 
     // In-memory tree has the entry
     expect(mgr.getEntityTree()["grimjaw"]).toBeDefined();
-    // But the DM snapshot (frozen at construction) does not
+    // And the DM snapshot refreshes immediately, so the next turn's context
+    // surfaces it (previously the snapshot stayed frozen until scene reset).
     const { volatile } = mgr.getSystemPrompt();
-    expect(volatile).not.toContain("Grimjaw");
+    expect(volatile).toContain("Grimjaw");
   });
 
   it("entity tree snapshot refreshes after scene transition", async () => {
@@ -846,14 +885,16 @@ describe("SceneManager", () => {
       mockFileIO(),
     );
 
-    // Upsert mid-scene — not in snapshot yet
+    // Upsert mid-scene — now reflected immediately (previously the snapshot
+    // stayed stale until the next scene transition, which made the DM re-issue
+    // the same entity mutations every turn).
     mgr.upsertEntity({ slug: "grimjaw", name: "Grimjaw", aliases: [], type: "character", path: "characters/grimjaw.md" });
     let { volatile } = mgr.getSystemPrompt();
-    expect(volatile).not.toContain("Grimjaw");
+    expect(volatile).toContain("Grimjaw");
 
     await mgr.sceneTransition(provider, "End of scene");
 
-    // After transition, snapshot is refreshed — now includes Grimjaw
+    // Still present after a transition refreshes the snapshot.
     ({ volatile } = mgr.getSystemPrompt());
     expect(volatile).toContain("Grimjaw");
   });
