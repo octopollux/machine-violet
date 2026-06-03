@@ -120,7 +120,11 @@ export function injectApiKeysFromEnvFile(env: NodeJS.ProcessEnv, envPath: string
     // about for provider connections. Don't dump arbitrary .env contents
     // into the spawn env.
     if (!/^[A-Z0-9_]+_(API_KEY|BASE_URL)$/.test(key)) continue;
-    if (!env[key]) env[key] = value;
+    // Inject only when the target is genuinely missing or blank — an
+    // explicit value (even "0") is respected. Whitespace-only counts as
+    // blank since that's what the sandbox-clobber case looks like.
+    const current = env[key];
+    if (current === undefined || current.trim() === "") env[key] = value;
   }
 }
 

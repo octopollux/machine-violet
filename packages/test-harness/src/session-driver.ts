@@ -287,7 +287,10 @@ export async function start(opts: StartOptions = {}): Promise<void> {
   mkdirSync(CAMPAIGNS_DIR, { recursive: true });
 
   const serverPort = pickEphemeralPort();
-  const agentPort = pickEphemeralPort();
+  let agentPort = pickEphemeralPort();
+  // Distinct ports — a collision would make the second listener fail to bind
+  // (or the sidecar check attach to the engine). 1-in-10000, but cheap to rule out.
+  while (agentPort === serverPort) agentPort = pickEphemeralPort();
   const player = opts.player ?? "Player";
   const launchedAt = Date.now();
 
@@ -544,7 +547,12 @@ export interface WaitOptions {
 export async function wait(opts: WaitOptions = {}): Promise<void> {
   const s = requireSession();
   const forWhat = opts.for ?? "beat";
-  const timeoutSec = opts.timeoutSec ?? 360;
+  // Guard against NaN/Infinity/<=0 sneaking in from CLI parsing — any of those
+  // would make the deadline NaN and trip an immediate bogus timeout.
+  const timeoutSec =
+    typeof opts.timeoutSec === "number" && Number.isFinite(opts.timeoutSec) && opts.timeoutSec > 0
+      ? opts.timeoutSec
+      : 360;
   const deadline = Date.now() + timeoutSec * 1000;
 
   const baselineCursor = s.readCursor;
@@ -599,6 +607,7 @@ export async function wait(opts: WaitOptions = {}): Promise<void> {
     try { snap = await getState(s); } catch { /* ignore */ }
     process.stdout.write(`⏳ timed out after ${timeoutSec}s waiting for a new beat.\n`);
     if (snap) process.stdout.write(summarizeState(snap, baselineCursor) + "\n");
+    process.stdout.write("\nlauncher log tail:\n" + tailFile(s.launcherLog, 20) + "\n");
     process.exitCode = 1;
     return;
   }
