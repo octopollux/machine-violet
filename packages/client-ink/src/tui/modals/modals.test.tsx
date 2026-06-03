@@ -732,21 +732,29 @@ describe("SwatchModal", () => {
 
 describe("RollbackPickerModal", () => {
   const savepoints: Savepoint[] = [
-    { oid: "aaaaaaa", type: "auto", message: "I draw my sword", timestamp: 1_700_000_400 },
-    { oid: "bbbbbbb", type: "auto", message: "I open the door", timestamp: 1_700_000_200 },
+    { oid: "aaaaaaa", type: "auto", message: "auto: I draw my sword", timestamp: 1_700_000_400 },
+    { oid: "bbbbbbb", type: "auto", message: "auto: I open the door", timestamp: 1_700_000_200 },
     { oid: "ccccccc", type: "scene", message: "scene: The Caves", timestamp: 1_700_000_000 },
+    { oid: "ddddddd", type: "auto", message: "auto: exchanges", timestamp: 1_699_999_800 },
   ];
 
-  it("lists savepoint messages and tags non-auto commits", () => {
+  it("quotes player turns and collapses predictable commits to 'autosave'", () => {
     const { lastFrame } = render(
       <Box width={100} height={30}>
         <RollbackPickerModal theme={theme} width={100} height={30} savepoints={savepoints} gitEnabled onSelect={noop} onCancel={noop} />
       </Box>,
     );
     const frame = lastFrame()!;
-    expect(frame).toContain("I draw my sword");
-    expect(frame).toContain("I open the door");
-    expect(frame).toContain("[scene]");
+    // Player turns: quoted excerpt, no "auto:" prefix.
+    expect(frame).toContain('"I draw my sword"');
+    expect(frame).toContain('"I open the door"');
+    expect(frame).not.toContain("auto:");
+    // Scene commit and the synthetic "exchanges" auto-commit both collapse.
+    expect(frame).toContain("autosave");
+    expect(frame).not.toContain("[scene]");
+    // Stamp format "<DOW> dd/MM hh:mm" — no "ago" suffix.
+    expect(frame).toMatch(/(Sun|Mon|Tue|Wed|Thu|Fri|Sat) \d{2}\/\d{2} \d{2}:\d{2}/);
+    expect(frame).not.toContain("ago");
   });
 
   it("Enter selects the cursored savepoint with its index after moving down", async () => {
@@ -758,9 +766,10 @@ describe("RollbackPickerModal", () => {
     );
     stdin.write("\x1b[B"); // DOWN → index 1
     // Wait for the cursor to land on index 1 before pressing Enter — otherwise
-    // the Enter handler closes over the stale (pre-move) selectedIndex.
+    // the Enter handler closes over the stale (pre-move) selectedIndex. The ◆
+    // marker now sits before the stamp, so match the selected row by line.
     await vi.waitFor(() => {
-      expect(lastFrame()!).toContain("◆ I open the door");
+      expect(lastFrame()!).toMatch(/◆[^\n]*"I open the door"/);
     });
     stdin.write("\r");
     await vi.waitFor(() => {

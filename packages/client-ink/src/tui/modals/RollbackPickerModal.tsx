@@ -46,24 +46,38 @@ export interface RollbackPickerModalProps {
   topOffset?: number;
 }
 
-/** Relative time like "2m ago", "3h ago", "5d ago" from epoch seconds. */
-function relativeTime(epochSeconds: number, now: number): string {
-  const sec = Math.max(0, Math.floor(now / 1000) - epochSeconds);
-  if (sec < 60) return "just now";
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const day = Math.floor(hr / 24);
-  return `${day}d ago`;
+const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** Local-time stamp "Tue 03/06 14:22" (DOW dd/MM hh:mm) from epoch seconds. */
+function formatStamp(epochSeconds: number): string {
+  const d = new Date(epochSeconds * 1000);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${DOW[d.getDay()]} ${p(d.getDate())}/${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/** Auto-commit subjects that are synthetic markers, not real player turns. */
+const SYNTHETIC = new Set(["initial state", "exchanges"]);
+
+/**
+ * Classify a savepoint for display. A real player turn (an `auto` commit whose
+ * subject isn't a synthetic fallback) renders as a quoted excerpt; scene /
+ * checkpoint / session / character commits and the synthetic auto markers all
+ * collapse to a plain "autosave" to keep the list scannable.
+ */
+function describeSavepoint(sp: Savepoint): { quote: boolean; text: string } {
+  if (sp.type === "auto") {
+    const subject = sp.message.replace(/^auto:\s*/, "").trim();
+    if (subject && !SYNTHETIC.has(subject.toLowerCase())) return { quote: true, text: subject };
+  }
+  return { quote: false, text: "autosave" };
 }
 
 /**
  * Roll Back Game — a scrollable, selectable list of git savepoints (newest
- * first). Each row shows the commit message (for `auto` commits this is the
- * player's verbatim turn) plus a relative time; non-`auto` commits are tagged
- * with their type. Selection cursor mirrors GameMenu; scrolling reuses
- * CenteredModal's ScrollView via ensureLineVisible (as CompendiumModal does).
+ * first). Each row is `<bullet> <stamp>  <body>`, where body is a double-quoted
+ * excerpt of the player's turn or the word "autosave" for predictable commit
+ * types. Selection cursor mirrors GameMenu; scrolling reuses CenteredModal's
+ * ScrollView via ensureLineVisible (as CompendiumModal does).
  */
 export function RollbackPickerModal({
   theme,
@@ -77,9 +91,6 @@ export function RollbackPickerModal({
 }: RollbackPickerModalProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const scrollRef = useRef<CenteredModalHandle>(null);
-  // Stamped once on mount so the relative-time labels don't churn between
-  // renders (Date.now() in render would recompute on every keypress).
-  const now = useMemo(() => Date.now(), []);
   const empty = !gitEnabled || savepoints.length === 0;
 
   useInput((_input, key) => {
@@ -116,20 +127,22 @@ export function RollbackPickerModal({
     return savepoints.map((sp, i) => {
       const isSelected = i === selectedIndex;
       const marker = isSelected ? "◆" : "○";
-      const tag = sp.type !== "auto" ? `[${sp.type}] ` : "";
-      const when = `  (${relativeTime(sp.timestamp, now)})`;
-      const head = `  ${marker} ${tag}`;
-      // Flatten newlines first (player turns are multi-line), then truncate so
-      // the whole row fits on one physical line within innerWidth.
-      const msg = fitWidth(oneLine(sp.message), innerWidth - stringWidth(head) - stringWidth(when));
-      const text = `${head}${msg}${when}`;
+      const head = `  ${marker} ${formatStamp(sp.timestamp)}  `;
+      const { quote, text: subject } = describeSavepoint(sp);
+      // Player turns render as a double-quoted excerpt (truncate inside the
+      // quotes so the closing quote survives); predictable types show as-is.
+      // Flatten newlines first so the whole row stays on one physical line.
+      const body = quote
+        ? `"${fitWidth(oneLine(subject), Math.max(1, innerWidth - stringWidth(head) - 2))}"`
+        : fitWidth(subject, innerWidth - stringWidth(head));
+      const text = `${head}${body}`;
       if (isSelected) {
         const bolded: FormattingNode = { type: "bold", content: [text] };
         return [accentColor ? { type: "color", color: accentColor, content: [bolded] } : bolded];
       }
       return [text];
     });
-  }, [savepoints, selectedIndex, empty, gitEnabled, accentColor, now, innerWidth]);
+  }, [savepoints, selectedIndex, empty, gitEnabled, accentColor, innerWidth]);
 
   return (
     <CenteredModal
