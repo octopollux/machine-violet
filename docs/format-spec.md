@@ -201,6 +201,22 @@ Everything else is created during play.
                                           // tracking still uses the real row count. Range 50–150 in
                                           // 5% steps; default 80. Editable from the in-game Campaign
                                           // Settings modal (Esc → Settings).
+
+  // Image generation consent
+  "image_generation": "on"                // Optional. "on" | "off" | "unset".
+                                          // Player consent for inline image generation. Set by the
+                                          // setup agent after an explicit yes/no question. "on" and
+                                          // "off" reflect a recorded choice; "unset" (or absent, for
+                                          // pre-feature campaigns) means the question hasn't been
+                                          // asked yet. The engine gates image gen on BOTH provider
+                                          // capability AND this preference: it is enabled only when
+                                          // the active provider/model exposes image generation and
+                                          // the preference is not "off" — so "unset"/absent is
+                                          // treated as opt-in once the capability is present. When
+                                          // the effective provider/model can't generate images, this
+                                          // field is silently ignored. Reversible at any time from the
+                                          // in-game Campaign Settings modal's "Image Generation"
+                                          // toggle (Esc → Settings; persisted via PATCH /settings).
 }
 ```
 

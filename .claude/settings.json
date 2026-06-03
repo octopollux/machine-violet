@@ -10,6 +10,18 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/doc-sync-reminder.mjs",
+            "timeout": 15
+          }
+        ]
+      }
     ]
   },
   "permissions": {
@@ -27,6 +39,9 @@
       "Bash(npx tsx scripts/dump-state.ts:*)",
       "Bash(npm run e2e:*)",
       "Bash(npm run e2e -- :*)",
+      "Bash(npm run play:*)",
+      "Bash(npm run play -- :*)",
+      "Bash(node --import tsx/esm packages/test-harness/bin/mvplay.ts:*)",
       "Edit(src/**)",
       "Edit(design-docs/**)",
       "Write(src/**)",

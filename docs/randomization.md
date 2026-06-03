@@ -38,6 +38,7 @@ Notation support:
 - Exploding: `3d6!` (reroll and add on max)
 - Success counting: `6d10>=7` (count dice showing 7+; World of Darkness)
 - FATE dice: `4dF` (each die is -1, 0, or +1)
+- Percentile shorthand: `1d%` (alias for `1d100`; supports modifiers, e.g. `1d%+10`)
 - Multiple expressions: `1d20+5; 1d8+3` (attack and damage in one call)
 
 For truly exotic dice (FFG narrative dice with symbols, etc.), game init registers custom roll handlers. The notation parser is extensible.
@@ -54,6 +55,45 @@ roll_dice({
 ```
 
 The tool validates the claim is *possible* (a die showing 18 on a d20 is valid). It protests if the claim is impossible ("You can't roll 25 on 1d20+5"). It still fires hooks regardless of who rolled — the turn counter doesn't care who threw the dice.
+
+### Custom-Face Dice — `rollCustomDice`
+
+Tier 1, stateless. A shipped primitive for symbol-face dice (Genesys, Year Zero, and any other system where die faces carry named symbols rather than numbers).
+
+```typescript
+rollCustomDice(definition: CustomDieDefinition, count: number, rng?: RNG): CustomDiceResult
+```
+
+**Types** (in `packages/shared/src/types/dice.ts`):
+
+```typescript
+interface CustomDieDefinition {
+  name: string;
+  faces: string[];   // each face is "" (blank) or "+"-delimited symbols, e.g. "success+advantage"
+}
+
+interface CustomDiceResult {
+  die: string;                     // definition.name
+  count: number;
+  faces: string[];                 // face rolled on each die
+  symbols: Record<string, number>; // aggregated symbol counts across all dice
+}
+```
+
+**Example — Genesys Boost die:**
+
+```typescript
+const boostDie: CustomDieDefinition = {
+  name: "boost",
+  faces: ["", "", "success", "success+advantage", "advantage+advantage", "advantage"],
+};
+rollCustomDice(boostDie, 2, rng);
+// → { die: "boost", count: 2, faces: ["success+advantage", "advantage"], symbols: { success: 1, advantage: 2 } }
+```
+
+Symbols on a face are `+`-delimited strings. Blank faces (`""`) produce no symbols. The function throws if the definition has no faces or if `count` is negative.
+
+**Status: library primitive only.** `rollCustomDice` is exported from `packages/engine/src/tools/dice/index.ts` but is NOT registered as a callable DM tool — there is no `roll_custom_dice` entry in `tool-registry.ts`. To use it in a campaign, the setup agent must code-generate a thin tool wrapper that calls this function and registers it (the extension-point approach in [Exotic Systems and Code Generation](#exotic-systems-and-code-generation) below). The primitive exists so custom handlers do not need to reimplement symbol aggregation or RNG integration.
 
 ### Cards — `deck`
 

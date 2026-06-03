@@ -16,7 +16,7 @@ Every subagent pattern specified across the design docs. A subagent is a nested 
 | **Visibility** | Silent |
 | **Trigger** | DM calls `resolve_turn` during active combat |
 | **Lifecycle** | Created at `start_combat`, torn down at `end_combat` |
-| **Source** | `src/agents/resolve-session.ts`, `src/prompts/resolve-session.md` |
+| **Source** | `packages/engine/src/agents/resolve-session.ts`, `packages/engine/src/prompts/resolve-session.md` |
 
 **Persistent** combat resolution engine. Unlike fire-and-forget subagents, the resolve session accumulates context across all turns and rounds within a combat encounter. Messages are never pruned — Sonnet's 1M context window handles even marathon combats.
 
@@ -151,7 +151,7 @@ The most recent `PlayerRead` is synthesized into the DM prefix as a `Player Read
 | **Model** | Haiku |
 | **Visibility** | Silent |
 | **Trigger** | Every 4 player exchanges (configurable via `SCENE_TRACKER_CADENCE`) |
-| **Source** | `src/agents/subagents/scene-tracker.ts`, `src/prompts/scene-tracker.md` |
+| **Source** | `packages/engine/src/agents/subagents/scene-tracker.ts`, `packages/engine/src/prompts/scene-tracker.md` |
 
 Periodic scene housekeeping subagent. Currently maintains open narrative threads and NPC intentions from recent transcript. Designed to be extensible for future housekeeping tasks.
 
@@ -162,6 +162,29 @@ With `max_conversation_tokens` disabled (default), the precis updater never fire
 **Returns**: `SceneTrackerResult` with `openThreads` (comma-separated wikilinks) and optional `npcIntents` (semicolon-separated).
 
 **Consumed by**: `buildScenePacing()` → `ScenePacingInjection` (unopinionated scene-length and thread-count readout for the DM).
+
+---
+
+### 5c. Discord Status Subagent
+
+| Property | Value |
+|---|---|
+| **Model** | Haiku (`small` tier) |
+| **Visibility** | Silent |
+| **Trigger** | Every 8th DM narrative completion within a session (`DISCORD_STATUS_INTERVAL = 8` in `session-manager.ts`); counter resets per `startSession` call |
+| **Source** | `packages/engine/src/agents/subagents/discord-status.ts`, `packages/engine/src/prompts/discord-status.md` |
+
+One-shot subagent that generates a punchy ≤40-character status string for Discord Rich Presence. Fires fire-and-forget inside the `onDmNarrative` closure in `session-manager.ts`, routed through the small tier's connection so heterogeneous setups send the right model ID.
+
+**Context**: The latest DM narrative text, passed as the user message via `oneShot()`.
+
+**Returns**: `DiscordStatusResult` — `{ status: string; usage: UsageStats | null }`. The `status` is trimmed, stripped of surrounding single/double quotes, and hard-clamped to 40 characters.
+
+**Fallback**: Never throws. On any failure (or empty model output) the status falls back to `"Adventuring..."`; on a thrown error `usage` is `null`.
+
+**Cost attribution**: When `usage` is non-null, `session-manager.ts` records it against the session's `CostTracker` at the `"small"` tier.
+
+**Wire event**: Broadcast as a `discord:presence` `{ action: "update", details: status }` WebSocket event. Each frontend independently decides whether to forward it to its local Discord IPC based on its own opt-in setting. See [websocket-api.md](websocket-api.md) for the full event shape.
 
 ---
 
@@ -189,7 +212,7 @@ Scans the completed scene transcript. Identifies every entity meaningfully invol
 | **Model** | Haiku |
 | **Visibility** | Silent |
 | **Trigger** | `scene_transition` cascade (parallel with summarizer + changelog) |
-| **Source** | `src/agents/subagents/compendium-updater.ts`, `src/prompts/compendium-updater.md` |
+| **Source** | `packages/engine/src/agents/subagents/compendium-updater.ts`, `packages/engine/src/prompts/compendium-updater.md` |
 
 Maintains the player-facing campaign compendium (`campaign/compendium.json`). Reads only the player-facing transcript (tool results filtered out), ensuring no DM secrets leak. Updates existing entries when new information is revealed; tracks identity shifts via `aliases` to prevent duplicates when NPCs are renamed.
 
@@ -227,7 +250,7 @@ Autonomous entity file manager. Receives batched natural-language updates tagged
 | **Model** | Haiku |
 | **Visibility** | Silent |
 | **Trigger** | DM calls `search_campaign` tool |
-| **Source** | `src/agents/subagents/search-campaign.ts` |
+| **Source** | `packages/engine/src/agents/subagents/search-campaign.ts` |
 
 Agentic search across the entire campaign filesystem. Walks all campaign files into memory once, then uses code-backed grep/read tools to find and cross-reference information. Returns terse excerpts with wikilinks and source references to the DM.
 
@@ -238,6 +261,31 @@ Agentic search across the entire campaign filesystem. Walks all campaign files i
 **Max tool rounds**: 5 (grep → read → refine → read → summarize).
 
 **Returns**: Terse summary of findings with `[[wikilinks]]` and `(source: path)` references. Results go back to the DM as the tool_result (not fire-and-forget).
+
+---
+
+### 6d. Search Content Subagent
+
+| Property | Value |
+|---|---|
+| **Model** | Haiku (`small` tier) |
+| **Visibility** | Silent |
+| **Trigger** | DM calls `search_content` tool; also exposed as a last-resort fallback tool inside the Resolve Session subagent during combat |
+| **Source** | `packages/engine/src/agents/subagents/search-content.ts`, `packages/engine/src/prompts/search-content.md` |
+
+Agentic search over the game system's ingested content library (monsters, spells, equipment, rules). Queries the faceted JSON indexes built by the document-ingestion pipeline and returns matching entities with key stats to the caller.
+
+**Context**: Search query string (passed as `Search query: <query>`). ~20 tokens input.
+
+**Tools**: `list_categories` (list available entity categories), `search_facets(category, filters, limit?)` (filter a category's faceted index; substring match on any field plus `min_`/`max_`-prefixed numeric range filters, with fractional-value parsing for CR values like `"1/4"`; default limit 20), `read_entity(category, slug)` (read the full markdown content of a specific entity).
+
+**Max tool rounds**: 5.
+
+**Returns**: `SearchContentResult` — text summary of matching entities plus usage stats. Returned to the DM as the `search_content` tool result, or inline to the Resolve Session as a fallback lookup.
+
+**Caching**: Sets `cacheTools: true` so tool definitions are cached across rounds (same as scribe and search-campaign); the system prompt is wrapped via `cacheSystemPrompt()`.
+
+**No-content behavior**: When a system has no ingested facets, the tools return graceful "no categories / no facets index found" messages to the subagent rather than throwing. The DM-level dispatcher only hard-errors when no game system is configured for the campaign.
 
 ---
 
@@ -282,7 +330,7 @@ Replaces human input for an AI-controlled character. Responds in character, conc
 | **Model** | Sonnet |
 | **Visibility** | Player-facing |
 | **Trigger** | Toggled from game menu |
-| **Source doc** | Implementation-only (`src/agents/subagents/dev-mode.ts`) |
+| **Source doc** | Implementation-only (`packages/engine/src/agents/subagents/dev-mode.ts`) |
 
 Developer console for power users — inspects and manipulates the running game. Uses the dedicated "dev" frame variant. Workflow is read-before-write: always inspect current state and show findings before mutating.
 
@@ -341,7 +389,7 @@ Multi-turn conversational subagent for interactive campaign setup. The setup age
 | **Model** | Haiku |
 | **Visibility** | Silent |
 | **Trigger** | Session resume — converts bullet recap to prose |
-| **Source** | `src/agents/subagents/narrative-recap.ts` |
+| **Source** | `packages/engine/src/agents/subagents/narrative-recap.ts` |
 
 Converts bullet-point session recap to narrative prose for the "Previously on..." modal at session start.
 
@@ -358,7 +406,7 @@ Converts bullet-point session recap to narrative prose for the "Previously on...
 | **Model** | Haiku |
 | **Visibility** | Silent |
 | **Trigger** | Campaign operations — scans for missing entities |
-| **Source** | `src/agents/subagents/repair-state.ts` |
+| **Source** | `packages/engine/src/agents/subagents/repair-state.ts` |
 
 Scans scene transcripts for wikilink targets and generates missing entity files. Ensures the entity filesystem stays consistent with what's been narrated.
 
@@ -375,7 +423,7 @@ Scans scene transcripts for wikilink targets and generates missing entity files.
 | **Model** | Haiku |
 | **Visibility** | Silent |
 | **Trigger** | DM calls `style_scene({ description })` |
-| **Source** | `src/agents/subagents/theme-styler.ts` |
+| **Source** | `packages/engine/src/agents/subagents/theme-styler.ts` |
 
 Translates natural-language theme requests (e.g., "cyberpunk neon") into structured theme commands. Interprets the DM's aesthetic intent and maps it to the theme system.
 
@@ -420,10 +468,12 @@ Haiku, silent. Summarizes campaign book structure for DM cached prefix. See [doc
 | 3 | Choice Generation | Haiku | Silent | Runtime — player choice options |
 | 4 | Scene Summarizer | Haiku | Silent | Runtime — scene transition |
 | 5 | Precis Updater + PlayerRead | Haiku | Silent | Runtime — context pruning + lightweight player signals |
+| 5c | Discord Status | Haiku | Silent | Runtime — Discord Rich Presence update every 8 DM narratives |
 | 6 | Changelog Updater | Haiku | Silent | Runtime — scene transition |
 | 6a | Compendium Updater | Haiku | Silent | Runtime — scene transition |
 | 6b | Scribe | Haiku | Silent | Runtime — entity file management |
 | 6c | Campaign Search | Haiku | Silent | Runtime — agentic campaign search |
+| 6d | Search Content | Haiku | Silent | Runtime — game system content lookup (DM tool + combat fallback) |
 | 7 | Character Promotion | Haiku | Silent | Runtime — on demand |
 | 8 | AI Player | Haiku/Sonnet | Silent | Runtime — AI player turns |
 | 9 | Setup Agent | Sonnet | Player-facing | Init — game setup (orchestrator) |
@@ -441,10 +491,10 @@ Most subagents are wired for prompt caching. For subagents whose system prompts 
 
 Subagents with heavily dynamic system prompts (e.g. AI Player, whose prompt includes character sheet and situation context unique to each call) intentionally skip caching to avoid the cache-write surcharge with no reuse. Narrative Recap's prompt varies only by campaign name, so it caches well within a session.
 
-**Infrastructure** (`src/agents/subagent.ts`):
+**Infrastructure** (`packages/engine/src/agents/subagent.ts`):
 - `cacheSystemPrompt(text)` wraps a string as `TextBlockParam[]` with `cache_control: { type: "ephemeral", ttl: "1h" }`.
 - `oneShot()` auto-wraps its system prompt via `cacheSystemPrompt()`, so one-shot Haiku agents with static system prompts get caching automatically. Agents with fully dynamic prompts should call `spawnSubagent` directly instead.
-- `SubagentConfig.cacheTools` stamps `cache_control` on the last tool definition (1h TTL) via the `cacheHints` system in `src/providers/agent-loop-bridge.ts`.
+- `SubagentConfig.cacheTools` stamps `cache_control` on the last tool definition (1h TTL) via the `cacheHints` system in `packages/engine/src/providers/agent-loop-bridge.ts`.
 
 **Sonnet agents** (OOC, Dev Mode) use structured `TextBlockParam[]` system prompts with breakpoints separating stable (cached) and dynamic (uncached) content — the same pattern as the DM's cached prefix.
 

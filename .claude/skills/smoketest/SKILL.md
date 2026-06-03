@@ -45,7 +45,10 @@ When you're finishing a cross-cutting change, kick off `npm run check` (lint + t
 
 ## Custom walks
 
-`smoketest` is deliberately rigid: walk setup with `"you decide"` + first-choice, then two turns. That's it. It does NOT take args, env-var hooks, or a "with The Crossroads as personality" tweak. If you need to exercise a different path — a specific personality, a specific world, image generation, save/load, ESC menu, anything — write your own one-shot probe inline.
+`smoketest` is deliberately rigid: walk setup with `"you decide"` + first-choice, then two turns. That's it. It does NOT take args, env-var hooks, or a "with The Crossroads as personality" tweak. If you need a different path, pick by what you're actually after:
+
+- **To interactively *play* / feel out a path** — a specific personality, a particular world, reproducing an in-game bug by hand — use the **`/play` skill** (`mvplay`). It's a persistent session you drive turn-for-turn; you stay in the loop. Don't write a rigid scripted probe (and don't hand it to a subagent) just to watch the game behave — that throws away your per-turn judgement. See [docs/e2e-harness.md](../../../docs/e2e-harness.md) "Interactive play (mvplay)".
+- **For a repeatable pass/fail assertion** on a path — save/load round-trip, image-gen persisted, a deterministic regression guard — write your own one-shot probe inline.
 
 A probe is just a `runProbe` call with a body function:
 

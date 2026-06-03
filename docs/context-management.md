@@ -83,6 +83,47 @@ G2: 3/12 HP. G3: 12/12 HP, prone. Party in center of room, G3 near east door.
 
 Dense, wikilinked, mechanically precise. ~150 tokens for 6 rounds of combat. The DM can narrate from this even if the verbatim conversation for those rounds has been dropped.
 
+## Name Inspiration Sample
+
+A fresh multicultural name sample is injected into the DM's cached prefix at the start of every session, emitted as a `## Name Inspiration` block by the prefix builder. Its sole purpose is **entropy injection**: LLMs tend to reuse a small set of names across sessions; exposing a different random sample each session shifts the model's priors without prescribing specific choices.
+
+**Pool** (`packages/engine/src/assets/names/names.json`): a static JSON file with two string arrays — `given` (given names) and `family` (family names) — drawn from a broad range of cultural and linguistic origins.
+
+**Sampling** (`packages/engine/src/agents/name-inspiration.ts`): at session start, `buildNameInspiration()` selects 30 given names and 30 family names (its default counts) via a partial Fisher-Yates shuffle over an index array. Selection is without replacement within each list. The sample is clamped to the pool size if a list is shorter than the requested count.
+
+**Prompt framing**: the rendered block opens with "AI agents like you tend to favor the same names when creating characters" and presents the sample as "For inspiration only — don't feel bound to this list". This framing keeps the DM from treating the list as authoritative.
+
+**Caching**: `buildNameInspiration()` is called once in `session-manager.ts` and stored in `DMSessionState.nameInspiration`. The value rides the Tier 2 cached prefix for the whole session — it does not regenerate per turn. Because `Math.random` is used (not a seeded PRNG), the sample differs across sessions even for the same campaign; the `rng` parameter is overridden only in tests for determinism.
+
+## Per-Turn Ephemeral Messages and BP4 Cache Stamping
+
+Each turn, `game-engine.ts` builds **two** versions of the user message:
+
+- **`apiUserMessage`** — sent to the provider; the player's tagged input prefixed with a volatile per-turn `<context>` preamble (active state, behavioral reminders, scene pacing, length steering). Marked `ephemeral: true` whenever a preamble is present (`ephemeral: preamble.length > 0`).
+- **`storedUserMessage`** — persisted to conversation history; the bare tagged player input only, no preamble.
+
+The `ephemeral` flag is an optional field on the `NormalizedMessage` interface (`packages/engine/src/providers/types.ts`). Its contract: *this message's bytes will not be present on subsequent turns*, because the stored version is the preamble-stripped one.
+
+### Why this matters for BP4 caching
+
+The Anthropic provider stamps the BP4 (`messages`-target) cache breakpoint on a position whose bytes are **identical across turns**. If it stamped on an ephemeral message (the current turn's preamble-bearing user message), the next turn would send the stripped variant at that position, the cached prefix would diverge there, and the entire conversation tail would need to be rewritten at full input cost.
+
+To avoid this, `toAnthropicParams` in `packages/engine/src/providers/anthropic.ts` walks backwards from the last message, skipping any ephemeral messages, and stamps BP4 on the last non-ephemeral message:
+
+```
+let stampMsgIdx = messages.length - 1;
+while (stampMsgIdx >= 0 && patchedMessages[stampMsgIdx]?.ephemeral) {
+  stampMsgIdx--;
+}
+// stamp cache_control on messages[stampMsgIdx]
+```
+
+Within a tool-use loop, newly appended `tool_use` / `tool_result` messages are non-ephemeral and stable, so BP4 stamps on them as usual and within-round caching is preserved.
+
+### Orphan-patch propagation
+
+When `orphan-patch.ts` re-emits a user message — consolidating tool-result blocks into one message and re-emitting any non-result blocks as a following message — both output messages inherit the original message's `ephemeral` flag (`ephemeral: next.ephemeral`). This preserves the BP4 skip invariant through the patch: if the original message was ephemeral, the split fragments are too.
+
 ## Terseness as a Design Discipline
 
 Every boundary where tokens cross into the DM's context must be optimized for minimum tokens.
@@ -167,6 +208,41 @@ The app should track and optionally display:
 - Estimated cost per turn
 - Session running total
 - A warning if conversation is growing faster than expected (e.g., tool-heavy turns)
-- Anthropic cache-miss reasons attributed per turn — `system_changed`, `tools_changed`, `messages_changed`, `model_changed` — surfaced inline in the campaign-explorer dump viewer and in `.debug/engine.jsonl`. Cache misses are disproportionately expensive (re-paying cache-write rate for the whole prefix), so attribution is critical when chasing cost regressions.
 
 This helps users understand costs and helps us tune the retention window.
+
+### Anthropic cache-miss attribution (`cache-diagnosis-2026-04-07` beta)
+
+The Anthropic provider sends the `cache-diagnosis-2026-04-07` beta header on every call where the caller supplies a `conversationId`. That is the opt-in signal: without a `conversationId` neither the header nor the `diagnostics` request field is attached, so the feature is inert for callers that omit it. In practice `conversationId` is set on DM and subagent calls, so attribution is active on that traffic.
+
+**Threading mechanism.** The provider maintains an in-process `previousIdByConversation: Map<string, string>` keyed by `conversationId` (the value is the most recent successful response `id` on that chain). On each call it passes `diagnostics: { previous_message_id: <last known id or null> }` alongside the model parameters. On a successful response the cursor advances to `response.id`. A thrown error leaves the prior id in place so a retry-then-success doesn't break the chain. The map is process-scoped and lost on restart; the API treats a `null` `previous_message_id` as a first turn (no comparison, but it anchors the next turn).
+
+**Response parsing — four states.** `extractCacheDiagnostics(response)` (`packages/engine/src/providers/anthropic.ts`, exported for tests) handles the four documented states of the `diagnostics.cache_miss_reason` field:
+
+| State | Shape | Meaning | Result |
+|---|---|---|---|
+| Absent | `diagnostics` field missing | Feature not enabled | `undefined` |
+| Null | `diagnostics` present, `cache_miss_reason: null` | First turn, or comparison ran and found no divergence | `undefined` |
+| Pending | `cache_miss_reason` is an object with no `type` | Comparison still running when the response was serialized | `undefined` |
+| Populated | `cache_miss_reason: { type, cache_missed_input_tokens? }` | Divergence located | `CacheDiagnostics` |
+
+Only the populated state produces an actionable result.
+
+**`CacheDiagnostics` struct** (`packages/engine/src/providers/types.ts`):
+
+```ts
+interface CacheDiagnostics {
+  reasonType: string;           // e.g. "system_changed", "tools_changed",
+                                //      "messages_changed", "model_changed",
+                                //      "previous_message_not_found", "unavailable"
+  missedInputTokens?: number;   // estimated tokens after the divergence point
+}
+```
+
+`reasonType` is kept as `string` (not a union) so newly added API types don't break parsing.
+
+**Engine-log events.** When `reasonType` ends in `_changed` (the actionable subset indicating an actual prompt-prefix divergence), `extractCacheDiagnostics` emits a `cache:miss` event to `engine.jsonl` with fields `messageId`, `model`, `reasonType`, and optional `missedInputTokens`. The `previous_message_not_found` and `unavailable` types are not logged — they mean the API couldn't produce a comparison, not that the prompt structure is wrong.
+
+Every `api:call` event in `engine.jsonl` also conditionally carries the diagnosis as `cacheMissReason` and (when known) `cacheMissedInputTokens`. These fields are omitted entirely when `cacheDiagnostics` is absent.
+
+Cache misses are disproportionately expensive (the whole prefix re-pays cache-write rates), so attribution is the primary tool for chasing cost regressions.

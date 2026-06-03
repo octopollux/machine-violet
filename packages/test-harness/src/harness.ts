@@ -18,11 +18,10 @@
  * requested. Long probes should put shutdown() in a `finally` block.
  */
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
 import {
   pollUntil,
@@ -30,6 +29,11 @@ import {
   DEFAULT_SHORT_TIMEOUT_MS,
   DEFAULT_LONG_TIMEOUT_MS,
 } from "./wait.js";
+import {
+  buildLaunchEnv,
+  pickEphemeralPort,
+  LAUNCHER_NODE_ARGS,
+} from "./launch-env.js";
 import type { ClientStateSnapshot, ActiveChoices } from "./client-state.js";
 import { choiceLabel } from "./client-state.js";
 import {
@@ -38,9 +42,6 @@ import {
   formatEngineEvent,
   type EngineLogEvent,
 } from "./engine-log.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = resolve(__dirname, "../../..");
 
 export interface HarnessOptions {
   /** Port for the engine REST + WS server. Default: ephemeral high port. */
@@ -132,31 +133,19 @@ export class Harness {
       ownsCampaignsDir = true;
     }
 
-    const env: NodeJS.ProcessEnv = {
-      ...process.env,
-      MV_PORT: String(serverPort),
-      MV_AGENT_PORT: String(agentPort),
-      MV_CAMPAIGNS: campaignsDir,
-      MV_PLAYER: opts.player ?? "TestPlayer",
-      NODE_ENV: process.env.NODE_ENV ?? "development",
-      ...opts.env,
-    };
-    if (opts.campaign) env.MV_CAMPAIGN = opts.campaign;
-
-    // Some embedded shells (Claude Code) pre-set sensitive env vars like
-    // ANTHROPIC_API_KEY="" as an empty string to sandbox subprocesses. The
-    // engine uses dotenv without override:true, so an empty value blocks
-    // .env from populating the real key. Here we treat empty as "unset" and
-    // explicitly load any *_API_KEY from the configDir's .env so the
-    // harness can run live probes from inside such shells.
-
-    const launcherPath = join(REPO_ROOT, "scripts", "launcher.ts");
-    const args = ["--max-semi-space-size=16", "--import", "tsx/esm", launcherPath];
-    // configDir() in dev = process.cwd(); pick the nearest dir that actually
-    // has connections so the spawned launcher finds an API key without us
-    // having to materialize one in the worktree.
-    const cwd = opts.cwd ?? findConfigDir(REPO_ROOT);
-    injectApiKeysFromEnvFile(env, join(cwd, ".env"));
+    // buildLaunchEnv handles the env assembly, the worktree-credential
+    // walk-up (configDir() == process.cwd() in dev), and the empty-env-var
+    // dotenv workaround for embedded shells. See launch-env.ts.
+    const { env, cwd } = buildLaunchEnv({
+      serverPort,
+      agentPort,
+      campaignsDir,
+      player: opts.player,
+      campaign: opts.campaign,
+      cwd: opts.cwd,
+      extraEnv: opts.env,
+    });
+    const args = [...LAUNCHER_NODE_ARGS];
 
     const childLog: string[] = [];
     const child = spawn(process.execPath, args, {
@@ -561,63 +550,6 @@ function findChoiceIndex(choices: ActiveChoices, query: string): number {
     if (labels[i].toLowerCase().includes(lower)) return i;
   }
   return -1;
-}
-
-function pickEphemeralPort(): number {
-  // Pick a port in the 30000-39999 range; we re-check after spawn via the
-  // sidecar-ready probe, so collisions just look like a launch timeout.
-  return 30000 + Math.floor(Math.random() * 10000);
-}
-
-/**
- * Pull `*_API_KEY` and `*_BASE_URL` values out of the .env file and stuff
- * them into `env` if the corresponding key is missing or empty. We don't
- * use dotenv because dotenv refuses to overwrite already-present empty
- * keys without `override: true`, and we don't want to modify the engine's
- * loadEnv() to set override:true globally — that'd surprise normal users
- * whose .env values should *not* clobber explicitly-set process env vars.
- */
-function injectApiKeysFromEnvFile(env: NodeJS.ProcessEnv, envPath: string): void {
-  if (!existsSync(envPath)) return;
-  const content = readFileSync(envPath, "utf8");
-  for (const rawLine of content.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) continue;
-    const eq = line.indexOf("=");
-    if (eq <= 0) continue;
-    const key = line.slice(0, eq).trim();
-    let value = line.slice(eq + 1).trim();
-    // Strip surrounding quotes per common .env conventions.
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-      value = value.slice(1, -1);
-    }
-    // Only inject API keys and base URLs — those are what the engine cares
-    // about for provider connections. Don't dump arbitrary .env contents
-    // into the spawn env.
-    if (!/^[A-Z0-9_]+_(API_KEY|BASE_URL)$/.test(key)) continue;
-    if (!env[key]) env[key] = value;
-  }
-}
-
-/**
- * Walk up from `start` looking for the first directory that contains a
- * `connections.json`. Falls back to `start` if none is found in 12 levels.
- *
- * Background: in dev mode, the engine's `configDir()` returns `process.cwd()`
- * — so when a worktree spawns the launcher with cwd=worktree, the launcher
- * reads connections from the worktree (which is empty), then refuses to
- * start a campaign. Walking up lets a worktree pick up the main repo's
- * existing credentials without copies.
- */
-function findConfigDir(start: string): string {
-  let dir = resolve(start);
-  for (let i = 0; i < 12; i++) {
-    if (existsSync(join(dir, "connections.json"))) return dir;
-    const parent = dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return start;
 }
 
 async function terminateChild(child: ChildProcess): Promise<void> {

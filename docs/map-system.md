@@ -75,7 +75,7 @@ Simple rectangles only. If the fiction requires organic cave boundaries or windi
 
 The DM interacts with maps through tools. The tools handle spatial computation; the DM handles game-rule adjudication.
 
-Three consolidated tools cover all map operations. Each uses an `operation` discriminator.
+Three consolidated tools cover the day-to-day map operations. Each uses an `operation` discriminator. One field of the storage format — `links` — has no tool coverage; see [Link management](#link-management) below.
 
 ### `map` — the board itself
 Create, view, modify terrain and annotations.
@@ -102,6 +102,15 @@ Software does the math, returns facts. The DM adjudicates.
 - **`path`** — shortest path, optionally respecting terrain costs or impassable tiles. Returns the path and its length.
 - **`line_of_sight`** — tiles and contents along the line between two points. Does **not** adjudicate vision — the DM decides.
 - **`tiles_in_range`** — all tiles within N steps, optionally filtered (e.g., "entities only" or "terrain type = lava").
+
+### Link management
+
+The `links` array (inter-map connections — stairs, portals, exits, documented under [Storage Format](#storage-format) and [Verticality](#verticality)) is part of the map storage format but is **not manageable via any tool at runtime**. None of the three map tools touch it:
+
+- `map create` always initializes a new map with an empty `links` array and exposes no parameter for seeding links.
+- There is no `add_link`, `remove_link`, or `list_links` operation on `map`, `map_entity`, or `map_query`.
+
+Links can therefore only be added, edited, or removed by editing the map JSON file on disk directly. To navigate between connected maps the DM reads the `links` array straight from the map JSON (map files are plain JSON the DM can read as a fallback). A practical workflow is to record a cross-map connection with the `annotate` operation — which puts a human-readable note on the source tile that surfaces in `view` — alongside a corresponding `links` entry added to the JSON file by hand.
 
 ## Token Economics
 

@@ -54,11 +54,39 @@ Subsequent launches skip Step 0 entirely.
 
 The main menu uses the full themed frame (same border components as the playing UI). Campaign titles are read from each campaign's `config.json`.
 
-- **Continue** → expands an inline sub-list of campaigns (by title), player picks one → `session_resume` → gameplay.
+- **Continue** → expands an inline sub-list of campaigns (by title). Each row is column-navigable (see below) → resume → gameplay.
 - **New Campaign** → setup conversation (see below).
 - **Quit** → exits the process.
 
+"Continue Campaign" only appears in the main menu when at least one campaign exists.
+
 Returning from a game via "Save & Exit" or "End Session" runs teardown (graceful shutdown + cache reset) and transitions back to this menu.
+
+#### Campaign sub-list columns
+
+When "Continue Campaign" is selected and campaigns exist, the menu expands an inline sub-list. Each campaign row has three keyboard-navigable columns:
+
+| Column | Default | Enter action |
+|---|---|---|
+| Name | yes (◆) | Resume the campaign, collapse the sub-list |
+| Archive (yellow) | — | Archive the campaign immediately, collapse the sub-list |
+| Delete (red) | — | Open the Delete Campaign confirmation modal |
+
+- **Left/Right** arrows cycle columns within the selected row (clamped at the ends).
+- **Up/Down** arrows move between campaign rows. Up from the first row collapses the sub-list back to the main menu.
+- **ESC** collapses the sub-list.
+
+The archive action calls `archiveCampaign()` from [campaign-archive.ts](../packages/engine/src/config/campaign-archive.ts) — zip → verify round-trip → move → verify → delete source. The delete action opens the confirmation modal (below), populated with summary data from `getCampaignDeleteInfo()` before any files are removed. Source: [packages/client-ink/src/phases/MainMenuPhase.tsx](../packages/client-ink/src/phases/MainMenuPhase.tsx).
+
+#### Delete Campaign modal
+
+Opened from the Delete column. It shows a read-back of what is about to be removed and requires explicit confirmation:
+
+- **Campaign name**, character list (comma-separated, or `(none)`), and an approximate DM turn count (`getCampaignDeleteInfo` counts DM turn-blocks in the display log).
+- The line "This cannot be undone."
+- `[Delete]` / `[Cancel]` buttons — Left/Right arrows toggle between them; the selection **defaults to Cancel**.
+
+Enter confirms the selected button; **ESC always cancels**. While the modal is open it owns keyboard input, so the underlying menu does not navigate. Source: [packages/client-ink/src/tui/modals/DeleteCampaignModal.tsx](../packages/client-ink/src/tui/modals/DeleteCampaignModal.tsx).
 
 ### Step 2: Setup Conversation
 
@@ -105,6 +133,10 @@ Once the setup agent has enough information, it builds the campaign. This is mos
 9. **Write campaign log** — first entry
 10. **Generate custom tools** — exotic dice, card decks, if needed by the system
 11. **Write party file** — `characters/party.md` with initial shared resources
+12. **Write or update the machine-scope player file** — `~/.machine-violet/players/<player-slug>.md` persists across campaigns and is touched on every campaign creation (only when `homeDir` is available). See [Player file](#player-file-machine-scope) below.
+13. **Copy character portrait** — if the setup agent confirmed a portrait during chargen (its `set_portrait` tool wrote one), copy it from the `__setup__` scratch campaign into the new campaign's `characters/` directory. The no-portrait case (player declined image generation, or `set_portrait` was never called) is silently skipped. See [Portrait handoff](#portrait-handoff-at-campaign-creation) below.
+
+`buildCampaignWorld` in [packages/engine/src/agents/world-builder.ts](../packages/engine/src/agents/world-builder.ts) performs all of these steps. The character file, party file, player file, and portrait copy are emitted alongside the directory scaffold and `config.json`.
 
 ### Step 4: Handoff to the DM
 
@@ -115,6 +147,24 @@ The setup agent's work is done. The app starts the main DM agent loop (Opus) wit
 - Empty conversation history
 
 The DM's first message is the opening narration. The game begins.
+
+### Player file (machine-scope)
+
+The player file at `~/.machine-violet/players/<player-slug>.md` lives outside any campaign directory and persists across campaigns. `buildCampaignWorld` touches it on every campaign creation, provided a `homeDir` is available. Its `## Content Boundaries` section is built from the captured age group plus any content preferences: a `child` age group seeds the section with no profanity / no sexual content / no graphic violence; a `teenager` age group seeds a discretion cut on sexual content; freeform content preferences are appended as bullet lines.
+
+- **New player (no file yet):** creates the file with `type: Player` front matter. `age_group` is written to front matter only if it was captured during this setup run. A `## Content Boundaries` body section is written only if it would be non-empty (the age group implies defaults, or preferences were captured); otherwise the body is left empty.
+- **Returning player (file exists):** the existing file is read with `parseFrontMatter`, and two conditional updates are applied:
+  - `age_group` is added to front matter only if it is not already present **and** was provided in this run.
+  - A `## Content Boundaries` section is appended to the body only if no such section already exists **and** this run captured preferences or an age group (and the resulting section is non-empty). Existing content boundaries are never overwritten — this preserves accumulated cross-campaign knowledge while backfilling newly captured metadata.
+  - The file is rewritten (via `serializeEntity`) only if at least one of these changes applied; otherwise it is left untouched.
+
+This step is handled by `buildCampaignWorld` → `updateReturningPlayer` in [packages/engine/src/agents/world-builder.ts](../packages/engine/src/agents/world-builder.ts). See [entity-filesystem.md](entity-filesystem.md) for the player-file format.
+
+### Portrait handoff at campaign creation
+
+The setup agent's `set_portrait` tool writes the confirmed character portrait into the `__setup__` scratch campaign's `characters/` directory (as `<character-slug>-portrait.png`) — not directly into the real campaign. The transfer to the live campaign happens inside `buildCampaignWorld`: after scaffolding the new campaign directory, it reads `<campaignsDir>/__setup__/characters/<character-slug>-portrait.png` and writes it to the new campaign's `characters/<character-slug>-portrait.png` (the path returned by `campaignPaths(...).characterPortrait`). This copy only runs when the FileIO implementation exposes binary read/write.
+
+If the source file is absent — the player declined image generation, or `set_portrait` was never called — the copy is silently skipped and the campaign starts without a portrait. A read/write failure mid-copy is likewise non-fatal: the campaign succeeds and the DM context injection simply finds no portrait to inject for that PC. This copy is the bridge between the setup agent's chargen path and the canonical portrait location that the DM-context portrait injection reads.
 
 ## Campaign Seeds
 
@@ -155,7 +205,17 @@ The "Enter your own" option in setup lets the player describe a DM personality i
 
 ### Storage
 
-The selected personality fragment is stored in `config.json` and loaded into the DM system prompt at session start. Changing personality mid-campaign is possible (via OOC mode) but unusual.
+The selected personality fragment is stored in `config.json` and woven into the DM system prompt by `buildDMPrefix`, which reads `config.dm_personality` **live at the start of every DM turn**.
+
+### Changing personality mid-campaign
+
+Supported via three registry tools (available to the DM and OOC):
+
+- `list_dm_personalities` — the same persona catalog the setup agent sees (`loadAllPersonalities`), surfaced in-game so the agent knows the options.
+- `swap_dm_personality({ name, prompt_fragment?, detail?, description? })` — switch to a preset by `name`, or invent a custom persona by also passing `prompt_fragment`. Writes `config.dm_personality` and persists `config.json`.
+- `howto_swap_dm_personality` — the playbook (list → present → swap → in-fiction handoff).
+
+Because the personality is read live each turn (not snapshotted like `pcSheets`), the swap takes effect on the **next** DM turn with no reload — that turn pays a one-time prompt-cache recreation, then re-caches at BP1. The incoming persona is expected to open with an in-fiction voice handoff so the shift reads as intentional. See [tools-catalog.md](tools-catalog.md#dm-personality-tools).
 
 ```jsonc
 // config.json (partial)

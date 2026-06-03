@@ -127,6 +127,7 @@ The openai-chatgpt provider emits its own operational events (subprocess lifecyc
 | REST API (auto-generated) | `/docs` endpoint | OpenAPI spec from TypeBox route schemas |
 | Conventions | [CLAUDE.md](../CLAUDE.md) | Code style, testing, imports |
 | openai-chatgpt provider | [openai-chatgpt-provider.md](openai-chatgpt-provider.md) | Codex app-server integration, OAuth flow, usage tracking |
+| openai.ts provider | [openai-provider.md](openai-provider.md) | Direct-API adapter for openai-apikey/openrouter/custom: Responses-vs-Completions routing, streaming reasoning workaround, encrypted-reasoning replay |
 | E2E test harness | [e2e-harness.md](e2e-harness.md) | Smoketest contract, harness primitives, engine-state gotchas, engine-log breadcrumbs, how to write a probe |
 
 ## Principles
