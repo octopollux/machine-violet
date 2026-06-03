@@ -12,7 +12,7 @@
     "start": "node --max-semi-space-size=16 dist/index.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.91.1",
+    "@anthropic-ai/sdk": "^0.100.1",
     "@fastify/cors": "^11.0.0",
     "@fastify/swagger": "^9.7.0",
     "@fastify/websocket": "^11.0.0",
@@ -20,7 +20,7 @@
     "@openai/codex": ">=0.130.0",
     "@scalar/fastify-api-reference": "^1.49.7",
     "@sinclair/typebox": "^0.34.0",
-    "dotenv": "^16.4.5",
+    "dotenv": "^17.4.2",
     "fastify": "^5.8.5",
     "fflate": "^0.8.2",
     "isomorphic-git": "^1.37.1",
@@ -30,7 +30,7 @@
   },
   "devDependencies": {
     "@types/ws": "^8.18.0",
-    "typescript": "^5.3.3",
+    "typescript": "^6.0.3",
     "vitest": "^4.0.18"
   }
 }

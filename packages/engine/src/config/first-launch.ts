@@ -118,18 +118,20 @@ export function loadEnv(): void {
 
     const cfgEnv = join(configDir(), ".env");
     if (existsSync(cfgEnv)) {
-      dotenvConfig({ path: cfgEnv });
+      dotenvConfig({ path: cfgEnv, quiet: true });
       return;
     }
 
     // Legacy fallback: check next to the executable
     const exeEnv = join(dirname(process.execPath), ".env");
     if (existsSync(exeEnv)) {
-      dotenvConfig({ path: exeEnv });
+      dotenvConfig({ path: exeEnv, quiet: true });
       return;
     }
   }
 
   // Fall back to cwd (dev mode, or compiled without config-dir .env)
-  dotenvConfig();
+  // quiet: true keeps dotenv@17's injection banner off stdout (it would
+  // otherwise corrupt the Ink TUI render — see modal bleed-through notes).
+  dotenvConfig({ quiet: true });
 }
