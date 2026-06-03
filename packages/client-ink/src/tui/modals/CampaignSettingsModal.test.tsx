@@ -257,6 +257,17 @@ describe("CampaignSettingsModal", () => {
   // commit wiring is covered by the "not dirty" test below + the prop
   // forwarding in PlayingPhase, which patches /settings directly.
 
+  it("groups rows under tinted section headers (About / Preferences / Recovery)", () => {
+    const { lastFrame } = renderModal(minimalConfig({ system: "Spire" }));
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("── About");
+    expect(frame).toContain("── Preferences");
+    expect(frame).toContain("── Recovery");
+    // The grouped rows still render under their headers.
+    expect(frame).toContain("Choices Frequency");
+    expect(frame).toContain("Roll Back Game");
+  });
+
   it("does not call onImageGenerationChange when the toggle is not dirty", async () => {
     const onImages = vi.fn();
     const { stdin } = renderModal(minimalConfig(), undefined, undefined, undefined, onImages);

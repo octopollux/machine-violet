@@ -1,6 +1,7 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { useInput } from "ink";
 import type { ResolvedTheme } from "../themes/types.js";
+import type { FormattingNode } from "@machine-violet/shared/types/tui.js";
 import type { CampaignConfig, ChoiceFrequency } from "@machine-violet/shared/types/config.js";
 import {
   CHOICE_FREQUENCY_LEVELS,
@@ -11,7 +12,11 @@ import {
   DM_TURN_LENGTH_PCT_STEP,
   clampDmTurnLengthPct,
 } from "@machine-violet/shared/types/config.js";
+import { themeColor, deriveModalTheme } from "../themes/color-resolve.js";
 import { CenteredModal } from "./CenteredModal.js";
+
+/** Fixed visual width for a group-header rule, in columns of `─`. */
+const GROUP_RULE_WIDTH = 18;
 
 export interface CampaignSettingsModalProps {
   theme: ResolvedTheme;
@@ -63,12 +68,15 @@ function imagesOnFromConfig(value: CampaignConfig["image_generation"]): boolean 
 
 /**
  * Campaign settings shown from the in-campaign ESC menu.
- * Identity fields are read-only; Choices Frequency and DM Turn Length are
- * editable. ↑ / ↓ move between rows; ← / → adjust the focused row.
+ * Identity fields are read-only; Choices Frequency, DM Turn Length, and Image
+ * Generation are editable; Roll Back Game is an action. ↑ / ↓ move between
+ * rows; ← / → adjust the focused row.
  *
- * Uses CenteredModal's plain-text `lines` mode so every row is padded to
- * innerWidth and rendered opaque — the children-with-short-Text path leaves
- * gaps to the right of each line, which shows the narrative through the modal.
+ * Laid out in colour-tinted groups (About / Preferences / Recovery), mirroring
+ * the ESC menu's group-header pattern, with the focused row's label tinted +
+ * bold. Uses CenteredModal's `styledLines` mode so every row is padded to
+ * innerWidth and rendered opaque (a short-Text path would leave gaps that show
+ * the narrative through the modal).
  */
 export function CampaignSettingsModal({
   theme,
@@ -97,6 +105,10 @@ export function CampaignSettingsModal({
   const dirtyPct = pct !== initialPct;
   const dirtyImages = imagesOn !== initialImages;
   const dirty = dirtyFreq || dirtyPct || dirtyImages;
+
+  // Modal accent (the "title" colour of the complementary modal theme) — used
+  // to tint group-header rules and the focused row label, matching GameMenu.
+  const accentColor = useMemo(() => themeColor(deriveModalTheme(theme), "title"), [theme]);
 
   const commit = useCallback(async () => {
     if (!dirty) {
@@ -207,41 +219,60 @@ export function CampaignSettingsModal({
       ? "  Enter saves · ESC cancels · ↑ / ↓ rows · ← / → adjust"
       : "  ↑ / ↓ rows · ← / → adjust · Enter to close";
 
-  const lines: string[] = [];
-  lines.push(`  Campaign:   ${config.name}`);
-  if (config.system) lines.push(`  System:     ${config.system}`);
-  if (config.genre) lines.push(`  Genre:      ${config.genre}`);
-  if (config.mood) lines.push(`  Mood:       ${config.mood}`);
-  if (config.difficulty) lines.push(`  Difficulty: ${config.difficulty}`);
+  // --- Styled layout: colour-tinted group headers + focus-highlighted labels,
+  // mirroring the ESC menu (GameMenu). Plain strings are valid FormattingNodes,
+  // so only the header rules and focused labels carry styling. ---
+  const lines: FormattingNode[][] = [];
+  const plain = (text: string) => lines.push([text]);
+  /** A `── Title ─────` rule tinted in the modal accent, like GameMenu groups. */
+  const header = (title: string) => {
+    const tail = Math.max(2, GROUP_RULE_WIDTH - title.length);
+    const text = `  ── ${title} ${"─".repeat(tail)}`;
+    lines.push(accentColor ? [{ type: "color", color: accentColor, content: [text] }] : [text]);
+  };
+  /** A setting/action label, prefixed with ▶ and tinted+bold when focused. */
+  const label = (text: string, focused: boolean) => {
+    const row = focused ? `  ▶ ${text}` : `    ${text}`;
+    if (focused && accentColor) {
+      lines.push([{ type: "color", color: accentColor, content: [{ type: "bold", content: [row] }] }]);
+    } else {
+      lines.push([row]);
+    }
+  };
+
+  header("About");
+  plain(`  Campaign:   ${config.name}`);
+  if (config.system) plain(`  System:     ${config.system}`);
+  if (config.genre) plain(`  Genre:      ${config.genre}`);
+  if (config.mood) plain(`  Mood:       ${config.mood}`);
+  if (config.difficulty) plain(`  Difficulty: ${config.difficulty}`);
   if (config.campaign_scope) {
     const scopeLabel = CAMPAIGN_SCOPE_LABELS[config.campaign_scope];
-    if (scopeLabel) lines.push(`  Scope:      ${scopeLabel}`);
+    if (scopeLabel) plain(`  Scope:      ${scopeLabel}`);
   }
-  lines.push("");
-  lines.push(focus === "choices" ? "  ▶ Choices Frequency" : "    Choices Frequency");
-  lines.push("    How often the DM offers you a set of suggested responses.");
-  lines.push("");
-  lines.push(freqLine);
-  lines.push("");
-  lines.push(focus === "length" ? "  ▶ DM Turn Length" : "    DM Turn Length");
-  lines.push("    Page size the DM is told about. Lower = tighter prose;");
-  lines.push("    100% = actual size. 80% is a useful starting nudge.");
-  lines.push("");
-  lines.push(pctLine);
-  lines.push("");
-  lines.push(focus === "images" ? "  ▶ Image Generation" : "    Image Generation");
-  lines.push("    When on, the DM can illustrate moments inline. Requires");
-  lines.push("    a provider/model that supports image generation.");
-  lines.push("");
-  lines.push(imgLine);
-  lines.push("");
-  lines.push(focus === "rollback" ? "  ▶ Roll Back Game" : "    Roll Back Game");
-  lines.push("    Restore an earlier savepoint. The current game is backed");
-  lines.push("    up to Archived Campaigns first, so it stays recoverable.");
-  lines.push("");
-  lines.push(focus === "rollback" ? "    Enter to choose a savepoint…" : "");
-  lines.push("");
-  lines.push(hintLine);
+  plain("");
+
+  header("Preferences");
+  label("Choices Frequency", focus === "choices");
+  plain("    How often the DM offers suggested replies.");
+  plain(freqLine);
+  plain("");
+  label("DM Turn Length", focus === "length");
+  plain("    Page-size hint — lower = tighter prose.");
+  plain(pctLine);
+  plain("");
+  label("Image Generation", focus === "images");
+  plain("    Let the DM illustrate scenes inline.");
+  plain(imgLine);
+  plain("");
+
+  header("Recovery");
+  label("Roll Back Game", focus === "rollback");
+  plain("    Restore an earlier savepoint. Your game is");
+  plain("    archived first, so it stays recoverable.");
+  plain(focus === "rollback" ? "    Enter to choose a savepoint…" : "");
+  plain("");
+  plain(hintLine);
 
   return (
     <CenteredModal
@@ -252,7 +283,7 @@ export function CampaignSettingsModal({
       minWidth={56}
       maxWidth={72}
       widthFraction={0.7}
-      lines={lines}
+      styledLines={lines}
     />
   );
 }
