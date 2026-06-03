@@ -482,7 +482,7 @@ Standard navigation (arrow keys + Enter). "Resume" dismisses the menu. "Return t
 
 ### Campaign Settings
 
-Player-accessible via ESC menu → Settings → Campaign Settings. The modal shows campaign identity fields (read-only: name, system, genre, mood, difficulty, scope) and three editable per-campaign settings.
+Player-accessible via ESC menu → Settings → Campaign Settings. The modal shows campaign identity fields (read-only: name, system, genre, mood, difficulty, scope) and three editable per-campaign settings. Rows are organized into colour-tinted groups — **About** (identity), **Preferences** (the editable settings), **Recovery** (Roll Back Game) — mirroring the ESC menu's group-header pattern, with the focused row's label tinted and bold.
 
 | Row | Setting | Controls | Persists to |
 |---|---|---|---|
