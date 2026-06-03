@@ -15,7 +15,11 @@ import {
 import { themeColor, deriveModalTheme } from "../themes/color-resolve.js";
 import { CenteredModal } from "./CenteredModal.js";
 
-/** Fixed visual width for a group-header rule, in columns of `─`. */
+/**
+ * Target column width for the `Title ─────` span of a group header: the
+ * trailing rule fills out to this so headers line up regardless of title
+ * length (with a 2-dash floor; titles longer than this just get the floor).
+ */
 const GROUP_RULE_WIDTH = 18;
 
 export interface CampaignSettingsModalProps {
@@ -230,14 +234,17 @@ export function CampaignSettingsModal({
     const text = `  ── ${title} ${"─".repeat(tail)}`;
     lines.push(accentColor ? [{ type: "color", color: accentColor, content: [text] }] : [text]);
   };
-  /** A setting/action label, prefixed with ▶ and tinted+bold when focused. */
+  /** A setting/action label, prefixed with ▶ and bold (+ accent-tinted) when focused. */
   const label = (text: string, focused: boolean) => {
     const row = focused ? `  ▶ ${text}` : `    ${text}`;
-    if (focused && accentColor) {
-      lines.push([{ type: "color", color: accentColor, content: [{ type: "bold", content: [row] }] }]);
-    } else {
+    if (!focused) {
       lines.push([row]);
+      return;
     }
+    // Bold always conveys focus; the accent tint is layered on when the theme
+    // resolves a "title" colour (it can be undefined — don't drop bold with it).
+    const bolded: FormattingNode = { type: "bold", content: [row] };
+    lines.push([accentColor ? { type: "color", color: accentColor, content: [bolded] } : bolded]);
   };
 
   header("About");
