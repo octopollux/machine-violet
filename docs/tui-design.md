@@ -490,6 +490,8 @@ Player-accessible via ESC menu → Settings → Campaign Settings. The modal sho
 | **DM Turn Length** | Page-size multiplier reported to the DM each turn. Lower = tighter prose; 100% = actual terminal size. | ←/→ adjust in 5% steps (range 50–150%, default 80%) | `config.json` `dm_turn_length_pct` |
 | **Image Generation** | Whether the DM can illustrate moments inline. Takes effect from the next DM turn; requires a provider/model with image-generation capability. | ←/→ (either arrow toggles On/Off) | `config.json` `image_generation` |
 
+A final row, **Roll Back Game**, is an action rather than a setting: Enter opens a savepoint picker (`RollbackPickerModal`, fed by `GET /session/savepoints`) → confirmation (`RollbackConfirmModal`) → the `/rollback` command with the chosen commit oid. See [error-recovery.md](error-recovery.md#rollback) for the full rollback flow (incl. the pre-rollback backup).
+
 **Navigation:** ↑/↓ move between rows; ←/→ adjust the focused row. Enter commits all dirty changes and returns to the Game Menu. ESC cancels any unsaved changes and returns to the Game Menu. Changes round-trip to the engine via `PATCH /session/settings` and persist to `config.json`.
 
 **Code:** `packages/client-ink/src/tui/modals/CampaignSettingsModal.tsx`, wired in `packages/client-ink/src/phases/PlayingPhase.tsx` (callbacks `onChoicesFrequencyChange`, `onDmTurnLengthPctChange`, `onImageGenerationChange`). The bounds constants `DM_TURN_LENGTH_PCT_MIN` (50), `DM_TURN_LENGTH_PCT_MAX` (150), `DM_TURN_LENGTH_PCT_DEFAULT` (80), and `DM_TURN_LENGTH_PCT_STEP` (5) are exported from `packages/shared/src/types/config.ts`.

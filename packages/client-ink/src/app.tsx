@@ -202,9 +202,19 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
       setErrorMessage("This session was saved and exited.");
       returnToMenu();
     } else if (clientState.sessionEnded) {
-      returnToMenu();
+      // A rollback ends the session too, but here we want the player to see
+      // what was restored before leaving play. The show_rollback_summary
+      // activity:update arrives before session:ended over the ordered socket,
+      // so rollbackSummary is already set. Raise the modal and stay in the
+      // playing phase; its onDismiss runs returnToMenu (re-entry then loads
+      // the restored state via session_resume).
+      if (clientState.rollbackSummary) {
+        setActiveModal({ kind: "rollback", summary: clientState.rollbackSummary });
+      } else {
+        returnToMenu();
+      }
     }
-  }, [clientState.sessionStale, clientState.sessionEnded, phase]);
+  }, [clientState.sessionStale, clientState.sessionEnded, clientState.rollbackSummary, phase]);
 
   // Session-fatal-recoverable (issue #529): the active session is dead
   // (auth expired, model not found, classifier refusal) but the player can

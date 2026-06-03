@@ -118,6 +118,9 @@ export type ActiveModal =
   | { kind: "compendium"; data: import("./compendium.js").Compendium }
   | { kind: "swatch" }
   | { kind: "rollback"; summary: string }
+  // Roll Back Game flow (client-local): pick a savepoint, then confirm.
+  | { kind: "rollback_picker"; savepoints: import("../protocol/rest.js").Savepoint[]; gitEnabled: boolean }
+  | { kind: "rollback_confirm"; savepoint: import("../protocol/rest.js").Savepoint; discardCount: number }
   | { kind: "notes"; content: string }
   | { kind: "saving" }
   | null;

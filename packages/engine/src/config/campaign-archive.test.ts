@@ -1,5 +1,6 @@
 import {
   archiveCampaign,
+  snapshotCampaign,
   unarchiveCampaign,
   listArchivedCampaigns,
   deleteCampaign,
@@ -160,6 +161,50 @@ describe("archiveCampaign", () => {
     expect(result.ok).toBe(true);
     expect(result.zipPath).toContain("Test Campaign (");
     expect(result.zipPath).toContain(").zip");
+  });
+});
+
+describe("snapshotCampaign", () => {
+  it("backs up the campaign without deleting the source", async () => {
+    const io = createMockIO();
+    const campaignsDir = "/home/user/campaigns";
+    const campaignPath = `${campaignsDir}/test-campaign`;
+    seedCampaign(io, campaignPath);
+
+    const result = await snapshotCampaign(campaignPath, campaignsDir, io, { label: "pre-rollback" });
+    expect(result.ok).toBe(true);
+    // Source folder is left intact (unlike archiveCampaign).
+    expect(await io.exists(norm(campaignPath + "/config.json"))).toBe(true);
+    // Zip is always timestamped + labeled, so it's self-describing and unique.
+    expect(result.zipPath).toContain("Test Campaign (pre-rollback ");
+    expect(result.zipPath).toContain(").zip");
+    expect(await io.exists(result.zipPath!)).toBe(true);
+  });
+
+  it("produces distinct files for repeated backups (no clobber)", async () => {
+    const io = createMockIO();
+    const campaignsDir = "/home/user/campaigns";
+    const campaignPath = `${campaignsDir}/test-campaign`;
+    seedCampaign(io, campaignPath);
+
+    const a = await snapshotCampaign(campaignPath, campaignsDir, io, { label: "pre-rollback" });
+    const b = await snapshotCampaign(campaignPath, campaignsDir, io, { label: "pre-rollback" });
+    expect(a.ok && b.ok).toBe(true);
+    expect(a.zipPath).not.toBe(b.zipPath);
+    expect(await io.exists(a.zipPath!)).toBe(true);
+    expect(await io.exists(b.zipPath!)).toBe(true);
+  });
+
+  it("the backup round-trips through unarchive", async () => {
+    const io = createMockIO();
+    const campaignsDir = "/home/user/campaigns";
+    const campaignPath = `${campaignsDir}/test-campaign`;
+    seedCampaign(io, campaignPath);
+
+    const snap = await snapshotCampaign(campaignPath, campaignsDir, io, { label: "pre-rollback" });
+    const restored = await unarchiveCampaign(snap.zipPath!, campaignsDir, io);
+    expect(restored.ok).toBe(true);
+    expect(await io.exists(norm(`${restored.zipPath}/config.json`))).toBe(true);
   });
 });
 

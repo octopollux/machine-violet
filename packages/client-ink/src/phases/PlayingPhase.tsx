@@ -25,6 +25,7 @@ import {
   ChoiceOverlay, DESCRIPTION_ROWS, GameMenu, ApiErrorModal,
   CharacterSheetModal, CompendiumModal, PlayerNotesModal, SwatchModal,
   SessionRecapModal, CenteredModal, CharacterPane, CampaignSettingsModal,
+  RollbackSummaryModal, RollbackPickerModal, RollbackConfirmModal,
 } from "../tui/modals/index.js";
 import type { MenuGroup, MenuItem } from "../tui/modals/index.js";
 import type { CampaignConfig, ChoiceFrequency } from "@machine-violet/shared/types/config.js";
@@ -316,6 +317,16 @@ export function PlayingPhase() {
     } catch { /* fail quietly — menu reopens on next ESC */ }
   }, [apiClient, setActiveModal]);
 
+  const openRollbackPicker = useCallback(async () => {
+    try {
+      const { savepoints, gitEnabled } = await apiClient.getSavepoints();
+      setActiveModal({ kind: "rollback_picker", savepoints, gitEnabled } as never);
+    } catch {
+      // Surface an empty/disabled picker rather than silently swallowing.
+      setActiveModal({ kind: "rollback_picker", savepoints: [], gitEnabled: false } as never);
+    }
+  }, [apiClient, setActiveModal]);
+
   const toggleEngineConsole = useCallback(() => {
     // Silent catch matches the triple-ESC and direct-ESC mode-toggle handlers
     // elsewhere in this component — a transient command failure shouldn't
@@ -561,6 +572,16 @@ export function PlayingPhase() {
           topOffset={conversationPaneTop}
         />
       )}
+      {am?.kind === "rollback" && (
+        <RollbackSummaryModal
+          theme={theme}
+          width={cols}
+          height={narRows}
+          summary={String(am.summary ?? "")}
+          onDismiss={onReturnToMenu}
+          topOffset={conversationPaneTop}
+        />
+      )}
       {am?.kind === "swatch" && (
         <SwatchModal
           theme={theme}
@@ -601,6 +622,38 @@ export function PlayingPhase() {
             }).catch(() => { /* ignore — same rationale as Choices Frequency above */ });
           }}
           globalDmTurnLengthPctDefault={dmTurnLengthPctDefault}
+          onOpenRollback={() => void openRollbackPicker()}
+        />
+      )}
+      {am?.kind === "rollback_picker" && (
+        <RollbackPickerModal
+          theme={theme}
+          width={cols}
+          height={narRows}
+          savepoints={(am.savepoints as never) ?? []}
+          gitEnabled={am.gitEnabled !== false}
+          onSelect={(savepoint, index) =>
+            setActiveModal({ kind: "rollback_confirm", savepoint, discardCount: index } as never)}
+          onCancel={() => void openCampaignSettings()}
+          topOffset={conversationPaneTop}
+        />
+      )}
+      {am?.kind === "rollback_confirm" && (
+        <RollbackConfirmModal
+          theme={theme}
+          width={cols}
+          height={narRows}
+          savepoint={am.savepoint as never}
+          discardCount={Number(am.discardCount ?? 0)}
+          onConfirm={() => {
+            // Fire the rollback; don't set a modal — the server ends the session
+            // and the stashed rollbackSummary drives RollbackSummaryModal via the
+            // app.tsx sessionEnded effect, then Enter returns to the menu.
+            const oid = (am.savepoint as { oid: string }).oid;
+            apiClient.command("rollback", oid).catch(() => { /* no-op; surfaced as system msg */ });
+          }}
+          onCancel={() => void openRollbackPicker()}
+          topOffset={conversationPaneTop}
         />
       )}
       {am?.kind === "saving" && (

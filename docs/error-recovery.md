@@ -20,10 +20,11 @@ These are local-only commits — nothing is pushed anywhere. The campaign direct
 
 ### Rollback
 
-In OOC mode, the player can ask to roll back:
+There are three player-facing ways to roll back, all routing through the same engine path:
 
-- "Roll back to before the last combat" → the OOC agent searches git log for the right commit, restores files, then `session_resume` reloads the DM's context from the restored state.
-- "Undo the last few turns" → restore to the most recent auto-commit before the problem.
+1. **Roll Back Game (UI)** — Campaign Settings (ESC menu → Settings) has a **Roll Back Game** row. It opens a scrollable picker of every git savepoint (newest first; for per-turn `auto` commits the label is the verbatim player turn), then a confirmation step before executing. The picker fetches `GET /session/savepoints` and submits the chosen commit oid via the `/rollback` command.
+2. **OOC** — the player asks in natural language ("roll back to before the last combat" / "undo the last few turns") and the OOC agent searches the git log and calls the `rollback` tool.
+3. **`/rollback` slash command** — `/rollback <N>` undoes N exchanges; the picker uses the same command with a commit oid.
 
 The engine provides a `rollback` tool available to the OOC agent, dev mode, and the `/rollback` slash command:
 
@@ -33,7 +34,9 @@ rollback({
 })
 ```
 
-After rollback completes, a `RollbackSummaryModal` displays what was restored and waits for the player to press Enter. Internally, rollback throws a `RollbackCompleteError` (from `src/teardown.ts`) which propagates through the agent loop and sets the rollback modal. On dismissal, a dedicated `doRollbackReturn()` path resets caches and UI state without calling `gracefulShutdown()` — this prevents in-memory state from being written back to disk and undoing the rollback. Re-entering the campaign loads the restored state via `session_resume`.
+**Every rollback backs the campaign up first.** `performRollback` (the single canonical entry every path funnels through) calls `snapshotCampaign` before touching git — a verified zip of the whole campaign (including `.git`) written to `archivedcampaigns/` with an always-timestamped `pre-rollback` name. So the discarded turns are never lost: the backup appears in the **Archived Campaigns** list and restores via the normal unarchive path. If the backup fails, the rollback aborts rather than performing a destructive reset with no safety net.
+
+After rollback completes, a `RollbackSummaryModal` displays what was restored and waits for the player to press Enter. Internally, rollback restores the target commit, emits a `show_rollback_summary` TUI command, then throws a `RollbackCompleteError` (from `@machine-violet/shared/types/errors.ts`). The session-manager catches it and calls `endSession("rollback")`, which **skips the usual flush + checkpoint** — disk has just been reset to the target commit, but the engine's in-memory state is still ahead by the rolled-back turns, so persisting it would silently undo the rollback. The `show_rollback_summary` command rides the `activity:update` channel to the client ahead of `session:ended`; the client stashes the summary, and when `session:ended` lands it raises `RollbackSummaryModal` (over the now-defunct playing phase) instead of bouncing straight to the menu. Dismissing the modal returns to the main menu; re-entering the campaign loads the restored state via `session_resume`.
 
 ### Configuration
 

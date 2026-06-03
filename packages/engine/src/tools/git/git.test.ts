@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { CampaignRepo, queryCommitLog } from "./campaign-repo.js";
+import { CampaignRepo, queryCommitLog, performRollback } from "./campaign-repo.js";
 import type { GitIO } from "./campaign-repo.js";
+import type { ArchiveFileIO } from "../../config/campaign-archive.js";
+import { norm } from "../../utils/paths.js";
 
 // --- Mock GitIO ---
 
@@ -86,6 +88,69 @@ function mockGitIO(): GitIO & {
 
   return io;
 }
+
+// --- In-memory ArchiveFileIO for the performRollback backup tests ---
+
+function mockArchiveIO(seed: Record<string, string>): ArchiveFileIO & { fs: Record<string, string | Uint8Array> } {
+  const fs: Record<string, string | Uint8Array> = {};
+  for (const [k, v] of Object.entries(seed)) fs[norm(k)] = v;
+  return {
+    fs,
+    async readFile(p) { const v = fs[norm(p)]; if (v === undefined) throw new Error("ENOENT"); return v instanceof Uint8Array ? new TextDecoder().decode(v) : v; },
+    async readBinary(p) { const v = fs[norm(p)]; if (v === undefined) throw new Error("ENOENT"); return v instanceof Uint8Array ? v : new TextEncoder().encode(v); },
+    async writeFile(p, c) { fs[norm(p)] = c; },
+    async writeBinary(p, d) { fs[norm(p)] = d; },
+    async mkdir() {},
+    async exists(p) { const n = norm(p); if (n in fs) return true; const pre = n + "/"; return Object.keys(fs).some((k) => k.startsWith(pre)); },
+    async listDir(p) {
+      const n = norm(p).replace(/\/$/, "");
+      const out = new Set<string>();
+      for (const k of Object.keys(fs)) if (k.startsWith(n + "/")) out.add(k.slice(n.length + 1).split("/")[0]);
+      return [...out];
+    },
+    async deleteFile(p) { delete fs[norm(p)]; }, // eslint-disable-line @typescript-eslint/no-dynamic-delete
+    async rmdir() {},
+    async fileMtime() { return "2026-06-01T00:00:00.000Z"; },
+    async isDirectory(p) { const n = norm(p); for (const k of Object.keys(fs)) if (k.startsWith(n + "/")) return true; return false; },
+  };
+}
+
+const noopPruneIO = { exists: async () => false, listDir: async () => [], rmdir: async () => {} };
+
+describe("performRollback pre-rollback backup", () => {
+  it("snapshots the campaign before resetting, leaving the source intact", async () => {
+    const archiveIO = mockArchiveIO({
+      "/campaigns/test/config.json": JSON.stringify({ name: "Test Campaign" }),
+      "/campaigns/test/state/scene.json": "{}",
+    });
+    const repo = {
+      rollback: vi.fn(async () => ({ restoredTo: "abc1234", timestamp: 1, summary: "auto: a turn" })),
+    } as unknown as CampaignRepo;
+
+    const result = await performRollback(repo, "abc1234", "/campaigns/test", noopPruneIO, archiveIO, "/campaigns");
+
+    // A pre-rollback zip landed in archivedcampaigns/ …
+    const zipKeys = Object.keys(archiveIO.fs).filter((k) => k.includes("archivedcampaigns") && k.endsWith(".zip"));
+    expect(zipKeys).toHaveLength(1);
+    expect(zipKeys[0]).toContain("pre-rollback");
+    // … the source is untouched (snapshot, not move) …
+    expect(archiveIO.fs[norm("/campaigns/test/config.json")]).toBeDefined();
+    // … and the git reset still ran.
+    expect(repo.rollback).toHaveBeenCalledWith("abc1234");
+    expect(result.summary).toBe("auto: a turn");
+  });
+
+  it("aborts the rollback (no git reset) when the backup fails", async () => {
+    const archiveIO = mockArchiveIO({ "/campaigns/test/config.json": JSON.stringify({ name: "Test" }) });
+    archiveIO.writeBinary = async () => { throw new Error("disk full"); };
+    const repo = { rollback: vi.fn() } as unknown as CampaignRepo;
+
+    await expect(
+      performRollback(repo, "abc1234", "/campaigns/test", noopPruneIO, archiveIO, "/campaigns"),
+    ).rejects.toThrow(/backup failed/i);
+    expect(repo.rollback).not.toHaveBeenCalled();
+  });
+});
 
 // --- Tests ---
 

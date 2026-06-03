@@ -17,6 +17,7 @@ import type {
   ChatGptLoginStartResponse,
   ChatGptLoginStatusResponse,
   UsageResponse,
+  SavepointsResponse,
 } from "@machine-violet/shared";
 
 export type { ChatGptLoginStartResponse, ChatGptLoginStatusResponse, UsageResponse };
@@ -190,6 +191,10 @@ export class ApiClient {
 
   async getSettings(): Promise<{ config: unknown }> {
     return this.get("/session/settings");
+  }
+
+  async getSavepoints(): Promise<SavepointsResponse> {
+    return this.get("/session/savepoints");
   }
 
   async cyclePlayer(): Promise<{ activePlayerIndex: number; character: string }> {

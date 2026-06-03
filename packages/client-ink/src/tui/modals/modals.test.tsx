@@ -9,6 +9,9 @@ import type { MenuGroup } from "./GameMenu.js";
 import { CharacterSheetModal } from "./CharacterSheetModal.js";
 import { SessionRecapModal } from "./SessionRecapModal.js";
 import { SwatchModal } from "./SwatchModal.js";
+import { RollbackPickerModal } from "./RollbackPickerModal.js";
+import { RollbackConfirmModal } from "./RollbackConfirmModal.js";
+import type { Savepoint } from "@machine-violet/shared";
 import { resolveTheme } from "../themes/resolver.js";
 import { resetThemeCache } from "../themes/loader.js";
 import { BUILTIN_DEFINITIONS } from "../themes/builtin-definitions.js";
@@ -724,5 +727,172 @@ describe("SwatchModal", () => {
       </Box>,
     );
     expect(lastFrame()).toContain("border:");
+  });
+});
+
+describe("RollbackPickerModal", () => {
+  const savepoints: Savepoint[] = [
+    { oid: "aaaaaaa", type: "auto", message: "auto: I draw my sword", timestamp: 1_700_000_400 },
+    { oid: "bbbbbbb", type: "auto", message: "auto: I open the door", timestamp: 1_700_000_200 },
+    { oid: "ccccccc", type: "scene", message: "scene: The Caves", timestamp: 1_700_000_000 },
+    { oid: "ddddddd", type: "auto", message: "auto: exchanges", timestamp: 1_699_999_800 },
+  ];
+
+  it("quotes player turns and collapses predictable commits to 'autosave'", () => {
+    const { lastFrame } = render(
+      <Box width={100} height={30}>
+        <RollbackPickerModal theme={theme} width={100} height={30} savepoints={savepoints} gitEnabled onSelect={noop} onCancel={noop} />
+      </Box>,
+    );
+    const frame = lastFrame()!;
+    // Player turns: quoted excerpt, no "auto:" prefix.
+    expect(frame).toContain('"I draw my sword"');
+    expect(frame).toContain('"I open the door"');
+    expect(frame).not.toContain("auto:");
+    // Scene commit and the synthetic "exchanges" auto-commit both collapse.
+    expect(frame).toContain("autosave");
+    expect(frame).not.toContain("[scene]");
+    // Stamp format "<DOW> dd/MM hh:mm" — no "ago" suffix.
+    expect(frame).toMatch(/(Sun|Mon|Tue|Wed|Thu|Fri|Sat) \d{2}\/\d{2} \d{2}:\d{2}/);
+    expect(frame).not.toContain("ago");
+  });
+
+  it("Enter selects the cursored savepoint with its index after moving down", async () => {
+    const onSelect = vi.fn();
+    const { stdin, lastFrame } = render(
+      <Box width={100} height={30}>
+        <RollbackPickerModal theme={theme} width={100} height={30} savepoints={savepoints} gitEnabled onSelect={onSelect} onCancel={noop} />
+      </Box>,
+    );
+    stdin.write("\x1b[B"); // DOWN → index 1
+    // Wait for the cursor to land on index 1 before pressing Enter — otherwise
+    // the Enter handler closes over the stale (pre-move) selectedIndex. The ◆
+    // marker now sits before the stamp, so match the selected row by line.
+    await vi.waitFor(() => {
+      expect(lastFrame()!).toMatch(/◆[^\n]*"I open the door"/);
+    });
+    stdin.write("\r");
+    await vi.waitFor(() => {
+      expect(onSelect).toHaveBeenCalledWith(savepoints[1], 1);
+    });
+  });
+
+  it("truncates long messages to one line (prevents wrap → background bleed-through)", () => {
+    const longMessage = "I tell the whole long rambling story of how we got here, every single beat of it, without pausing for breath even once";
+    const { lastFrame } = render(
+      <Box width={80} height={20}>
+        <RollbackPickerModal
+          theme={theme}
+          width={80}
+          height={20}
+          savepoints={[{ oid: "ddddddd", type: "auto", message: longMessage, timestamp: 1_700_000_000 }]}
+          gitEnabled
+          onSelect={noop}
+          onCancel={noop}
+        />
+      </Box>,
+    );
+    const frame = lastFrame()!;
+    // Clipped with an ellipsis rather than wrapping to a second (unpadded) line.
+    expect(frame).toContain("…");
+    expect(frame).not.toContain("without pausing for breath");
+  });
+
+  it("shows a disabled message when git is off", () => {
+    const { lastFrame } = render(
+      <Box width={100} height={30}>
+        <RollbackPickerModal theme={theme} width={100} height={30} savepoints={[]} gitEnabled={false} onSelect={noop} onCancel={noop} />
+      </Box>,
+    );
+    expect(lastFrame()).toContain("git is disabled");
+  });
+
+  it("folds inner quotes in player turns to a single outer pair", () => {
+    const quoted: Savepoint[] = [
+      { oid: "9999999", type: "auto", message: 'auto: I whisper, "the device works"', timestamp: 1_700_000_000 },
+    ];
+    const { lastFrame } = render(
+      <Box width={100} height={30}>
+        <RollbackPickerModal theme={theme} width={100} height={30} savepoints={quoted} gitEnabled onSelect={noop} onCancel={noop} />
+      </Box>,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain(`"I whisper, 'the device works'"`);
+  });
+
+  it("flattens newlines in multi-line player turns to one row (no background bleed-through)", () => {
+    // Verbatim player turns are multi-line; a raw newline would break the row
+    // onto a second physical line that CenteredModal can't pad opaque.
+    const multiline: Savepoint[] = [
+      { oid: "eeeeeee", type: "auto", message: "First half\nSecond half of the turn", timestamp: 1_700_000_000 },
+    ];
+    const { lastFrame } = render(
+      <Box width={100} height={30}>
+        <RollbackPickerModal theme={theme} width={100} height={30} savepoints={multiline} gitEnabled onSelect={noop} onCancel={noop} />
+      </Box>,
+    );
+    const frame = lastFrame()!;
+    // Collapsed onto a single line — the two halves are joined by a space.
+    expect(frame).toContain("First half Second half of the turn");
+  });
+});
+
+describe("RollbackConfirmModal", () => {
+  const savepoint: Savepoint = { oid: "aaaaaaa", type: "auto", message: "I open the door", timestamp: 1_700_000_000 };
+
+  it("shows the target and discard count, and notes the backup", () => {
+    const { lastFrame } = render(
+      <Box width={100} height={30}>
+        <RollbackConfirmModal theme={theme} width={100} height={30} savepoint={savepoint} discardCount={3} onConfirm={noop} onCancel={noop} />
+      </Box>,
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("I open the door");
+    expect(frame).toContain("Discards 3 later savepoints");
+    expect(frame).toContain("Archived");
+  });
+
+  it("flattens newlines in the target message (no background bleed-through)", () => {
+    const multiline: Savepoint = { oid: "fffffff", type: "auto", message: "Strike\nthen retreat", timestamp: 1_700_000_000 };
+    const { lastFrame } = render(
+      <Box width={100} height={30}>
+        <RollbackConfirmModal theme={theme} width={100} height={30} savepoint={multiline} discardCount={1} onConfirm={noop} onCancel={noop} />
+      </Box>,
+    );
+    expect(lastFrame()!).toContain("Strike then retreat");
+  });
+
+  it("defaults to Cancel; Enter cancels", async () => {
+    const onConfirm = vi.fn();
+    const onCancel = vi.fn();
+    const { stdin } = render(
+      <Box width={100} height={30}>
+        <RollbackConfirmModal theme={theme} width={100} height={30} savepoint={savepoint} discardCount={1} onConfirm={onConfirm} onCancel={onCancel} />
+      </Box>,
+    );
+    stdin.write("\r");
+    await vi.waitFor(() => {
+      expect(onCancel).toHaveBeenCalledOnce();
+    });
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("arrow to Roll Back then Enter confirms", async () => {
+    const onConfirm = vi.fn();
+    const onCancel = vi.fn();
+    const { stdin, lastFrame } = render(
+      <Box width={100} height={30}>
+        <RollbackConfirmModal theme={theme} width={100} height={30} savepoint={savepoint} discardCount={1} onConfirm={onConfirm} onCancel={onCancel} />
+      </Box>,
+    );
+    stdin.write("\x1b[D"); // LEFT → toggles selection to Roll Back
+    await vi.waitFor(() => {
+      expect(lastFrame()!).toContain("[Roll Back]");
+    });
+    stdin.write("\r");
+    await vi.waitFor(() => {
+      expect(onConfirm).toHaveBeenCalledOnce();
+    });
+    expect(onCancel).not.toHaveBeenCalled();
   });
 });

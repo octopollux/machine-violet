@@ -146,6 +146,33 @@ export const CostResponse = Type.Object({
   formatted: Type.String(),
 });
 
+/** One git savepoint (commit) the player can roll back to. */
+export const Savepoint = Type.Object({
+  oid: Type.String(),
+  /** Commit type, parsed from the message prefix (closed set — mirrors the engine's `CommitType`). */
+  type: Type.Union([
+    Type.Literal("auto"),
+    Type.Literal("scene"),
+    Type.Literal("session"),
+    Type.Literal("checkpoint"),
+    Type.Literal("character"),
+  ]),
+  /**
+   * Commit subject, including its type prefix — e.g. `auto: <verbatim player
+   * turn>`, `scene: <title>`, `checkpoint: before <label>`.
+   */
+  message: Type.String(),
+  /** Commit time, epoch seconds. */
+  timestamp: Type.Number(),
+});
+
+export const SavepointsResponse = Type.Object({
+  /** False when git is disabled for the campaign (then `savepoints` is empty). */
+  gitEnabled: Type.Boolean(),
+  /** Newest-first. */
+  savepoints: Type.Array(Savepoint),
+});
+
 // --- Management schemas ---
 
 export const ConnectionModel = Type.Object({
@@ -303,6 +330,8 @@ export type TranscriptSaveResponse = Static<typeof TranscriptSaveResponse>;
 export type DiagnosticsResponse = Static<typeof DiagnosticsResponse>;
 export type SettingsResponse = Static<typeof SettingsResponse>;
 export type CostResponse = Static<typeof CostResponse>;
+export type Savepoint = Static<typeof Savepoint>;
+export type SavepointsResponse = Static<typeof SavepointsResponse>;
 export type ConnectionModel = Static<typeof ConnectionModel>;
 export type SerializedConnection = Static<typeof SerializedConnection>;
 export type TierAssignmentSchema = Static<typeof TierAssignmentSchema>;

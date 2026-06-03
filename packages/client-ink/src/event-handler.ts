@@ -81,6 +81,11 @@ export interface ClientState {
   /** Latest provider usage snapshot. Null until a provider with a usage
    *  concept (currently only openai-chatgpt) has reported one. */
   usageStatus: UsageStatus | null;
+  /** Summary text from a completed rollback, carried so app.tsx can raise the
+   *  RollbackSummaryModal when the (expected) session:ended arrives instead of
+   *  silently bouncing to the menu. Null until the engine emits
+   *  show_rollback_summary; cleared on the full reset in returnToMenu. */
+  rollbackSummary: string | null;
 }
 
 export function initialClientState(): ClientState {
@@ -103,6 +108,7 @@ export function initialClientState(): ClientState {
     displayResources: {},
     resourceValues: {},
     usageStatus: null,
+    rollbackSummary: null,
   };
 }
 
@@ -473,6 +479,10 @@ function handleActivityUpdate(event: ActivityUpdateEvent, update: StateUpdater):
           ],
         };
       }
+    } else if (tuiType === "show_rollback_summary") {
+      // Stash the summary; app.tsx raises the modal when session:ended lands.
+      const summary = data.summary as string | undefined;
+      if (summary) next = { ...next, rollbackSummary: summary };
     }
 
     return next;
