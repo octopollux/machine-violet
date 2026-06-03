@@ -66,7 +66,10 @@ npm run smoketest    # 7-12 min, real LLM calls — walk setup + two in-game tur
 
 The harness auto-detects an existing `connections.json` by walking up from the worktree (so any worktree can run the live smoketest without copying credentials around).
 
-For anything other than these two probes — exercising a specific personality, a save/load round-trip, image generation, the ESC menu, anything — **write your own one-shot probe** under `packages/test-harness/bin/` (or anywhere) using `runProbe` from `@machine-violet/test-harness`. No registry. See [docs/e2e-harness.md](docs/e2e-harness.md) for primitives, engine-state gotchas, engine-log breadcrumbs, and the signal-picking cheatsheet — read it before writing your first probe.
+For anything other than these two probes, pick by what you actually need:
+
+- **You want to feel out / exercise behavior live** — a specific personality, walking a particular world, reproducing an in-game bug by hand, "does this still play right?" — **drive it yourself with the `/play` skill** (`mvplay`). It's a persistent session you play turn-for-turn, one tool call per turn. Don't reach for a subagent or a scripted probe here — being in the loop *is* the point. (`mvplay` details below and in [docs/e2e-harness.md](docs/e2e-harness.md) "Interactive play".)
+- **You want a repeatable pass/fail assertion** on a specific path — save/load round-trip, image-gen persisted, a deterministic regression guard — **write your own one-shot probe** under `packages/test-harness/bin/` (or anywhere) using `runProbe` from `@machine-violet/test-harness`. No registry. See [docs/e2e-harness.md](docs/e2e-harness.md) for primitives, engine-state gotchas, engine-log breadcrumbs, and the signal-picking cheatsheet — read it before writing your first probe.
 
 Do not bypass the harness with a hand-rolled `setTimeout` or a "give it 5 minutes" wait — every wait is anchored to an observable state change. If you find yourself reaching for a timer, look in `Harness` for the `waitFor*` helper that fits.
 
