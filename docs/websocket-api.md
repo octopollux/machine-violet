@@ -93,6 +93,12 @@ Clients should track `campaignId` and `seq` to detect staleness:
 
 Clients may also include `campaignId` and `turnSeq` in `POST /session/turn/contribute` requests. The server returns **409 Conflict** on mismatch, allowing the client to silently discard the stale contribution and restore the player's input for resubmission.
 
+##### Server-side processing wait on contribute
+
+When a contribution arrives while the current turn is in `"processing"` status (the DM is actively running), the server busy-waits up to **5 seconds** (50 polls × 100 ms) for the turn to transition to `"open"` before responding. If the turn opens within that window, the contribution proceeds normally. If it does not — or if there is no current turn — the server returns **400** with `{ "error": "No open turn. (status: <status>)" }`, where `<status>` is the turn's status after the wait window (typically `processing`) or the literal `null` when there is no current turn at all.
+
+This grace window silently absorbs the common race where a client submits immediately after the previous turn commits (the new turn may not have opened yet). A 400 after the full window has elapsed is a definitive rejection, not a transient error to retry immediately — if the DM is still running it will emit `turn:opened` when ready. This 400 path is distinct from the **409 Conflict** staleness check above, which fires only after the turn is confirmed open.
+
 **TurnContribution** (nested in turn events):
 
 | Field       | Type    | Description |
@@ -174,6 +180,10 @@ The `data` payload may also include TUI command fields (forwarded from the engin
 - `tui:update_modeline` — modeline text update for a character
 - `tui:set_display_resources` — configure which resources to show per character
 - `tui:set_resource_values` — update resource values per character
+- `tui:resource_refresh` — no additional fields beyond `engineState`. Fired by the engine after a `resolve_turn` produces `hp_change` or `resource_spend` deltas, signalling the client to re-render resource gauges from current state. The reference client has no dedicated branch for this type; its purpose is to trigger a re-render via any state update on the `activity:update` path.
+- `tui:set_theme` — carries optional `theme` (theme name), `key_color` (hex color override), and `variant` (style variant). Fired by `handleStyleSceneTool` (via the `style_scene` tool) and by the theme-styler subagent. The reference client applies theme changes from the post-turn `state:snapshot` (which carries `themeName`, `keyColor`, `variant`); the live `tui:set_theme` command is forwarded for alternative frontends that want to apply theme changes immediately rather than waiting for the snapshot.
+- `tui:display_image` — carries `filename` (the image path the client renders) and `intent` (`"scene_snapshot"`, `"player_request"`, or `"character_portrait"`). The live `generate_image` tool path also includes `relPath` (the campaign-relative path), but the display-log replay path (`context/display-log.ts`, which re-emits images on reconnect/scrollback) emits only `{ filename, intent }` — so treat `relPath` as optional and don't depend on it. The reference client appends a separator and an `image` narrative line to the log immediately (mid-turn, before the DM continuation runs) and keys off `filename`, not `relPath`. A valid `intent` is required; if `intent` is not one of the three values the client silently ignores the command.
+- `tui:show_character_sheet` — carries `character` (character name). Fired by the OOC/Dev Mode agent via the `show_character_sheet` tool (excluded from DM tool access) to open the character sheet modal programmatically. The reference client surfaces this as a tool-activity indicator but has no dedicated event-handler branch — the modal open is handled by the OOC/Dev mode's own UI path rather than the event stream.
 
 ---
 
@@ -248,6 +258,27 @@ The campaign session has ended.
 
 Immediately before `session:ended`, the server broadcasts a final `state:snapshot` carrying `mode: "play"` (and otherwise-empty campaign fields). This is the canonical "you are back in play mode" signal for clients that were in OOC/Dev mode — without it, paths that null the engine's mode session as part of teardown (e.g. OOC rollback) would leave clients believing they're still in a mode session, and the next ESC would call `/exit_mode` against a dead session.
 
+#### Poll-and-wait after session exit
+
+After receiving `session:ended`, the server may still be completing async teardown (flushing the recap, resetting state). Clients that need to re-enable session-starting UI (New Campaign / Continue) should poll a REST endpoint until the status is `"idle"` before allowing a new session to start — this prevents a race condition where a quick exit + re-enter outruns backend teardown.
+
+**Endpoint:** `GET /campaigns/session-status`
+
+**Response (200):**
+
+```json
+{ "status": "idle" }
+```
+
+| `status` | Meaning |
+|---|---|
+| `"idle"` | No session is running; safe to start a new one. |
+| `"starting"` | Session startup is in progress. |
+| `"active"` | A session is fully running. |
+| `"stopping"` | Teardown is in progress; wait before re-entering. |
+
+The reference client's `waitForIdle()` helper polls this endpoint with backoff (starting at 100 ms, growing 1.5× per poll, capping at 500 ms) for up to 10 seconds. The poll is best-effort — a timeout is non-fatal. The call is made immediately after the end-session request resolves, while a saving overlay is shown to the user.
+
 ---
 
 ### Discord Presence
@@ -261,10 +292,75 @@ The `data.action` discriminator selects the payload shape:
 | `action` | Additional fields | When emitted |
 |---|---|---|
 | `"start"` | `campaignName: string`, `dmPersona: string` | Once at session start. |
-| `"update"` | `details: string` | Every 8th DM narrative completion. `details` is a punchy ≤40-char status line generated by a small-model subagent from the latest narrative. |
+| `"update"` | `details: string` | Every 8th DM narrative completion. `details` is a punchy ≤40-char status line generated by the `discord-status` small-tier subagent from the latest narrative. |
 | `"stop"` | — | Once on session end. |
 
-The DM-narrative counter resets per backend session (i.e. each call to `startSession`).
+The DM-narrative counter resets per backend session (i.e. each call to `startSession`). The interval is a fixed constant (`DISCORD_STATUS_INTERVAL = 8`) in `packages/engine/src/server/session-manager.ts`.
+
+`details` always carries a non-empty string: the `discord-status` subagent never throws and falls back to `"Adventuring..."` on any failure, so an `update` is still emitted (the subagent's token usage is recorded against the session cost tracker under the small tier when the call succeeds). See the `discord-status` entry in [subagents-catalog.md](subagents-catalog.md).
+
+#### How a frontend consumes these events
+
+The reference client forwards each `discord:presence` event to a `DiscordPresenceController` (`packages/client-ink/src/services/discord/`), which acts only when the local opt-in is on:
+
+- `"start"` records the session info and (if enabled) opens a Rich Presence connection: the `details` line shows the AI-generated status, the `state` line shows `{campaignName} — {dmPersona}`, an elapsed-time timestamp starts, and the large image is the `mv-logo` asset registered under Discord application ID `1485029427468435646`.
+- `"update"` patches only the `details` line on the live presence.
+- `"stop"` clears the activity and closes the connection.
+
+The controller guards `start`/`stop` races with a generation counter, so a `stop` (or a mid-session opt-out) that arrives while a `start` is still connecting tears the connection back down instead of leaking it. The underlying `DiscordIPCClient` speaks Discord's named-pipe RPC framing — an 8-byte header (opcode `u32LE` + payload length `u32LE`) followed by UTF-8 JSON — over `\\?\pipe\discord-ipc-{0-9}` on win32 or `$XDG_RUNTIME_DIR/discord-ipc-{0-9}` on POSIX, and silently no-ops when Discord is not running. Other frontends are free to handle the same events however they like, or ignore them.
+
+#### Configuring the Discord opt-in
+
+The per-frontend opt-in is persisted in the engine's `configDir` as `discord-settings.json` (default: enabled). Two management REST endpoints read and write it:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/manage/discord` | Returns the current setting: `{ "enabled": boolean }`. If the file is absent, defaults to `enabled: true`. |
+| `PUT` | `/manage/discord` | Accepts `{ "enabled": boolean }` and persists it. Returns the saved value. |
+
+The client reads this setting on startup and after the user changes it in the Discord settings UI. When `enabled` is `false`, the client suppresses forwarding of `discord:presence` events to the OS Discord IPC even though the engine continues emitting them.
+
+---
+
+### Provider Usage
+
+#### `usage:update`
+
+Broadcasts the current provider quota snapshot to all connected clients. Powers the bottom-right usage gauge and the Esc-menu percentage in the TUI.
+
+**When emitted:**
+- On initial WebSocket connect, if a cached snapshot exists from a prior provider push.
+- On every push from the active DM-tier provider's `subscribeUsage` callback (including the initial seed from `getUsageStatus` at session start).
+
+Only providers that implement `subscribeUsage` (currently openai-chatgpt) emit this event. Sessions backed by providers without that interface never send `usage:update`.
+
+| Field        | Type    | Description |
+|--------------|---------|-------------|
+| `segments`   | array   | One or more `UsageSegment` objects (see below). |
+| `snapshotAt` | number  | Epoch milliseconds when this snapshot was captured. |
+| `fresh`      | boolean | `false` when the data is cached/stale (e.g. no successful request yet). |
+
+**UsageSegment** (element of `segments`):
+
+The `kind` field selects the shape:
+- `"percentage"` — window used as 0–100 (e.g. Codex 5-hour / 7-day windows).
+- `"balance"` — currency credits (`used` / `total` with a unit such as `"USD"`).
+- `"tokens"` — token counts (`used` / `total` with unit `"tokens"`).
+
+| Field         | Type     | Description |
+|---------------|----------|-------------|
+| `id`          | string   | Stable identifier within the provider (e.g. `"primary"`, `"credits"`). |
+| `label`       | string   | Short human-readable label (e.g. `"5-hour window"`, `"Credit balance"`). |
+| `kind`        | string   | `"percentage"`, `"balance"`, or `"tokens"`. |
+| `usedPercent` | number?  | 0–100. Populated when `kind === "percentage"`. |
+| `used`        | number?  | Populated when `kind === "balance"` or `"tokens"`. |
+| `total`       | number?  | Populated when `kind === "balance"` or `"tokens"`. |
+| `unit`        | string?  | Display unit (e.g. `"USD"`, `"tokens"`, `"%"`). |
+| `resetsAt`    | number?  | Epoch seconds when this window resets, if it resets at all. |
+| `status`      | string   | `"ok"`, `"warning"`, `"critical"`, or `"exceeded"`. |
+| `detail`      | string?  | Optional free-text annotation (tooltip / aria-label material). |
+| `liveUpdates` | boolean? | `true` when the provider pushes updates in real time vs. polling. |
+| `source`      | string?  | Diagnostic origin: `"request-header"`, `"api"`, `"local-budget"`, or `"rpc-notification"`. |
 
 ---
 
@@ -277,9 +373,22 @@ Error or retry notification.
 | Field         | Type    | Description |
 |---------------|---------|-------------|
 | `message`     | string  | Human-readable error description. |
-| `recoverable` | boolean | If true, the client should wait and retry. |
+| `recoverable` | boolean | If true, the client should wait and retry. (Derived from `category`; present for backward compatibility.) |
 | `status`      | number? | HTTP-style status code, if applicable. |
 | `delayMs`     | number? | Suggested wait time before retry (ms). |
+| `category`    | string? | Three-tier UX discriminant (see below). Absent means `"retryable"` for backward compatibility. |
+
+##### Error category taxonomy
+
+The optional `category` field is the canonical discriminant for which client UX to show — it is set server-side by `classifyServerError` (`packages/engine/src/server/error-classify.ts`) and must never be inferred from `message`. The union is closed (`packages/shared/src/protocol/events.ts`) so new buckets force both the type and the matching client handler to change.
+
+| Value | Client behaviour |
+|-------|-----------------|
+| `"retryable"` | Transient failure (429, network blip). Server will retry; show the existing retry/wait overlay. Default value when `category` is absent. |
+| `"session-fatal-recoverable"` | This session cannot continue (auth expired, forbidden model, classifier refusal) but the process is healthy. Client drops to the main menu and shows `message` verbatim in a red banner. The player must re-authenticate, change model config, or fix config, then start a new session. |
+| `"process-fatal"` | Catastrophic failure; the process cannot continue. Show the hard-exit error screen. Reserved for extreme conditions; rarely emitted in practice. |
+
+`recoverable` is `true` when `category` is `"retryable"` and `false` for the other two buckets, preserving backward compatibility for clients that have not yet adopted `category`.
 
 ## Client Events
 

@@ -30,6 +30,8 @@ The game loop, state management, and AI session handling.
 | `world-builder.ts` | Campaign scaffolding, entity creation helpers |
 | `player-manager.ts` | Turn switching, active player tracking |
 | `subagent.ts` | `spawnSubagent()`, `oneShot()` — subagent spawning infrastructure |
+| `injections.ts` | `InjectionRegistry` + per-turn `Injection`s (`BehaviorInjection`, `ScenePacingInjection`, `LengthSteeringInjection`, `HardStatsInjection`) — synthetic per-turn DM context steering |
+| `name-inspiration.ts` | `buildNameInspiration()` — entropy injection seeding NPC/place name variety |
 
 ### Engine: agents/subagents/ — Specialized agents
 
@@ -46,6 +48,8 @@ Each file is an isolated Claude conversation for a specific task. All use `spawn
 | `character-promotion.ts` | Haiku | Expand minimal NPC → full character sheet |
 | `scribe.ts` | Haiku | Autonomous entity file manager (list/read/write tools, 8 rounds) |
 | `search-campaign.ts` | Haiku | Agentic campaign search (grep/read tools, 5 rounds) |
+| `search-content.ts` | Haiku | Agentic game system content search (list/search/read facet tools, 5 rounds) |
+| `discord-status.ts` | Haiku | Generate ≤40-char Discord Rich Presence status string from latest DM narrative; degrades to `"Adventuring..."` on failure |
 | `narrative-recap.ts` | Haiku | Bullet recap → prose for "Previously on..." modal |
 | `repair-state.ts` | Haiku | Scan transcripts, generate missing entity files |
 | `theme-styler.ts` | Haiku | Natural-language theme description → theme commands |
@@ -87,6 +91,21 @@ Token tracking, conversation window, prompt caching, state persistence.
 | `display-log.ts` | Narrative line ↔ markdown conversion |
 | `engine-log.ts` | Structured append-only JSONL event log at `../.debug/engine.jsonl` (relative to campaigns dir): server/session/turn lifecycle, API calls, errors. Non-blocking fire-and-forget |
 
+## Engine: providers/ — LLM Provider Adapters
+
+Abstract provider layer: normalizes Anthropic, OpenAI (API key), OpenAI ChatGPT (Codex), OpenRouter, and custom Chat-Completions endpoints behind a single `LLMProvider` interface. All model calls in the engine go through this layer.
+
+| File | Purpose |
+|---|---|
+| `index.ts` | `createProviderFromConnection()` — factory that constructs the right provider from a stored `AIConnection` record |
+| `types.ts` | `LLMProvider` and `TierProvider` interfaces, `ChatParams`, `GenerateImageRequest`/`GenerateImageResult`, `ImageEffort` (`draft`/`standard`/`quality`/`showcase`), `ImageAspect` (`portrait`/`landscape`/`square`) |
+| `anthropic.ts` | `createAnthropicProvider()` — Anthropic SDK adapter; streaming, tool use, prompt caching, thinking blocks |
+| `openai.ts` | `createOpenAIProvider()` — `openai-apikey` / `openrouter` / `custom` adapter; Responses API vs Chat Completions routing, streaming, tool use, image generation — see [openai-provider.md](openai-provider.md) |
+| `agent-loop-bridge.ts` | `runProviderLoop()` — provider-agnostic version of the agent turn loop: concurrent tool dispatch, TUI broadcast, deferred-sentinel logic, `cacheHints` for tool-definition cache_control. Returns normalized (not Anthropic-specific) types |
+| `orphan-patch.ts` | Heals conversation history with orphaned `tool_use` blocks by inserting deterministic synthetic `tool_result` stubs before replay 400s — see [error-recovery.md](error-recovery.md) |
+| `image-coerce.ts` | `normalizeImageEffort()` / `normalizeImageAspect()` — defensive coercion of the model's `generate_image` tool args into valid `ImageEffort` / `ImageAspect` values |
+| `openai-chatgpt/` | Codex app-server integration (OAuth, subprocess lifecycle, internal tool dispatch, usage tracking) — see [openai-chatgpt-provider.md](openai-chatgpt-provider.md) |
+
 ## Client: agent-sidecar.ts — Dev-only Agent API
 
 Dev-only HTTP server for AI agent integration testing (`--agent-port` or `MV_AGENT_PORT`). Embeds in the TUI client, provides screen capture via `@xterm/headless`, state inspection, and keystroke injection. Endpoints: `GET /screen` (plain text or `?ansi=true`), `GET /state` (JSON), `POST /input` (raw bytes), `POST /input/key` (named key via KEY_MAP). Excluded from release builds.
@@ -103,7 +122,7 @@ Ink (React for CLI) components, formatting pipeline, theme system.
 | `responsive.ts` | Terminal size detection and layout tier selection |
 | `activity.ts` | Activity/status bar state management |
 | `game-context.ts` | React context for game engine callbacks |
-| `components/` | Reusable: `Modeline`, `InputLine`, `NarrativeArea`, `PlayerSelector`, `ActivityLine`, `FrameBorder`, `FullScreenFrame` |
+| `components/` | Reusable: `Modeline`, `InputLine`, `NarrativeArea`, `PlayerSelector`, `ActivityLine`, `FrameBorder`, `FullScreenFrame`, `KeyHints` (hotkey indicator, active = yellow / inactive = dim gray), `UsageGauge` (5-cell gem provider-usage indicator, bottom-right of conversation pane) |
 | `modals/` | `CenteredModal`, `ChoiceModal`, `CharacterSheetModal`, `CompendiumModal`, `DiceRollModal`, `SessionRecapModal`, `GameMenu`, `ApiErrorModal`, `SwatchModal`, `CampaignSettingsModal`, `RollbackSummaryModal`, `PlayerNotesModal`, `DeleteCampaignModal`, `CharacterPane` (right-side overlay for active character stats/inventory, lazy-fetched), `OverlayPane` (reusable right-aligned overlay base with themed borders, scrolling, word-wrap) |
 | `themes/` | Theme parser, loader, resolver. Built-in themes in `themes/assets/` |
 | `color/` | OKLCH color space utilities, gradient generation |
@@ -160,7 +179,7 @@ PDF ingestion and content processing. **Completely separate from the rest of the
 
 ## Client: phases/ — App Lifecycle
 
-State machine for the application: main menu → playing (setup or gameplay) / add content → returning_to_menu → main menu (loop). On first launch, config.json is auto-created with defaults. Setup runs as a pseudo-campaign session inside PlayingPhase (SetupPhase was removed in #311).
+State machine for the application: main menu → playing (setup or gameplay) / add content → returning_to_menu → main menu (loop). The main menu also branches into settings and its sub-phases (api_keys, discord_settings, archived_campaigns). On first launch, config.json is auto-created with defaults. Setup runs as a pseudo-campaign session inside PlayingPhase (SetupPhase was removed in #311).
 
 | File | Purpose |
 |---|---|
@@ -168,6 +187,9 @@ State machine for the application: main menu → playing (setup or gameplay) / a
 | `ArchivedCampaignsPhase.tsx` | List archived campaign zips with dates, select to unarchive |
 | `AddContentPhase.tsx` | PDF import flow: name collection → drop files → validate → extract → cache |
 | `PlayingPhase.tsx` | Main game loop — handles both gameplay and setup (setup runs as a pseudo-campaign session) |
+| `SettingsPhase.tsx` | Full-screen out-of-game Settings menu (title: "Settings"). Five items: API Keys (→ ConnectionsPhase), Discord (→ DiscordSettingsPhase), Archived Campaigns (→ ArchivedCampaignsPhase), Enable Dev Mode (ON/OFF toggle, persists via `setMachineSettings` to `machine-settings.json`), Show Debug Info (ON/OFF toggle for verbose narrative lines, session-scoped) |
+| `ConnectionsPhase.tsx` | Full-screen AI provider management wizard (title: "AI Connections"). Sub-screens: Connections list (health indicators, per-connection usage segments, R = recheck / D = delete), Model Assignments (large/medium/small tier picker), Add Connection wizard (provider → API key → label → optional base URL), Sign in with ChatGPT (OAuth via codex app-server) |
+| `DiscordSettingsPhase.tsx` | Full-screen Discord Rich Presence Enable/Disable toggle (title: "Discord"). Saves the choice to `discord-settings.json`; ESC returns without saving |
 
 ## Engine: prompts/ — Prompt Templates
 

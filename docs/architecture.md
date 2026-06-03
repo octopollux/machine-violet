@@ -43,6 +43,21 @@ Model selection: `packages/engine/src/config/models.ts` — `getModel("large" | 
 
 **Provider routing:** every model call is paired `{provider, model}` — a `TierProvider` (`packages/engine/src/providers/types.ts`). At session start, `buildTierProviders` (`src/config/tier-resolver.ts`) reads the connection store and produces `Record<ModelTier, TierProvider>`, which threads through `GameEngine`, `SceneManager`, and `ResolveSession` to every subagent dispatch site. This guarantees that a heterogeneous setup (e.g. Large=OpenAI, Medium=Anthropic) routes each tier's call through its own connection — sending an Anthropic model ID through an OpenAI client would crash. Subagents accept `model` as a required parameter; there is no silent fallback to `getModel(tier)`.
 
+## Anthropic Provider: Thinking and Reasoning Preservation
+
+The Anthropic adapter (`packages/engine/src/providers/anthropic.ts`) implements extended thinking for capable models via `ThinkingConfigParam`.
+
+**Thinking config** (`toAnthropicParams`): thinking is enabled only for models whose `capabilities.thinking` flag is true in `known-models.json` (looked up via `getKnownModel`). When `ChatParams.thinking.effort` is set and the model supports thinking, the adapter sends `thinking: { type: 'adaptive' }` to the API; otherwise it sends `{ type: 'disabled' }`. For Opus models specifically (model id contains `opus`), an `output_config: { effort }` block is added alongside the thinking param. When thinking is active, `max_tokens` is boosted to `Math.max(params.maxTokens, model maxOutput)` (falling back to 16384 if the model has no `maxOutput`) so thinking tokens don't starve the response.
+
+**Cross-turn reasoning state** (`fromAnthropicResponse` + `toAnthropicMessage`): The API returns `thinking` and `redacted_thinking` content blocks in its response. Both are captured verbatim into `assistantContent`:
+
+- `thinking` blocks: persisted with their `thinking` text and opaque `signature` field.
+- `redacted_thinking` blocks: persisted with their opaque `data` payload (no visible text).
+
+On subsequent turns, `toAnthropicMessage` emits both block types back to the API as `ThinkingBlockParam` and `RedactedThinkingBlockParam`, signature and data fields unchanged. The API auto-filters which blocks it needs and bills accordingly, so the adapter passes back everything captured rather than pruning manually. This round-trip is what lets the model continue its reasoning chain across turn boundaries rather than re-deriving context from scratch (issue #533). OpenAI `reasoning` blocks that may exist in shared history are skipped here — the Anthropic API rejects them.
+
+This cross-provider reasoning-preservation contract is pinned by `packages/engine/src/providers/preserves-thinking.contract.test.ts`, which tests the capture + replay path for the `anthropic`, `openai-apikey` (Responses API), and `openai-chatgpt` providers; `openrouter` and `custom` are registered as explicitly unsupported with documented rationale.
+
 ## State Architecture
 
 **GameState** (`src/agents/game-state.ts`) is the single mutable source of truth. Passed to every tool handler. Contains:

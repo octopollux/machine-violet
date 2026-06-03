@@ -83,6 +83,7 @@ GameState
 │   ├── context: ContextConfig
 │   ├── recovery: RecoveryConfig
 │   ├── choices: ChoicesConfig
+│   ├── image_generation?: "on"|"off"|"unset"  mut   → config.json  set at setup; Player (ESC menu image toggle) → persistConfig. "unset"/absent ⇒ opt-in when the provider supports image gen.
 │   └── calendar_display_format?: string
 │
 ├── campaignRoot: string                   const                          Session init
@@ -128,7 +129,7 @@ DMSessionState
 ├── entityIndex?: string                   Built from entity filesystem scan
 ├── uiState?: string                       Built from modelines + style info
 ├── compendiumSummary?: string             Rendered from campaign/compendium.json
-└── nameInspiration?: string                Sampled at session start from src/assets/names/names.json
+└── nameInspiration?: string                Multicultural sample (30 given + 30 family) from src/assets/names/names.json; session-fresh entropy injection — see context-management.md § Name Inspiration Sample
 ```
 
 #### Conversation (`src/context/conversation.ts`)
@@ -262,6 +263,14 @@ Legend: **R** = reads, **W** = writes (triggers persistence), **UI** = returns T
 | Tool | maps | clocks | combat | decks | config | activePlayerIndex | Notes |
 |------|------|--------|--------|-------|--------|-------------------|-------|
 | `rollback` | | | | | | | Returns **E**. Git-based. |
+
+### Objectives
+
+| Tool | maps | clocks | combat | decks | objectives | config | activePlayerIndex | Notes |
+|------|------|--------|--------|-------|------------|--------|-------------------|-------|
+| `manage_objectives` | | | | | R/**W** | | | `list` reads; `create`, `update`, `complete`, `fail`, `abandon` write. |
+
+The `objectives` column appears only in this table because no other tool touches that slice.
 
 ### TOOL_STATE_MAP (`src/agents/tool-registry.ts:989`)
 
@@ -609,9 +618,22 @@ In addition to campaign-scoped state, Machine Violet maintains machine-scoped co
 ├── connections.json           AI provider connections: Anthropic, OpenAI (API key), OpenAI (ChatGPT), OpenRouter, custom.
 │                              Each connection: id, provider (anthropic | openai-apikey | openai-chatgpt | openrouter | custom), label,
 │                              apiKey (empty for openai-chatgpt — Codex owns its own token store at ~/.codex/auth.json),
-│                              optional baseUrl, optional chatgptAccount {id, email?, planType?}, discovered models,
+│                              optional baseUrl, optional chatgptAccount, discovered models,
 │                              source (env/manual/oauth). Tier assignments (large/medium/small → connectionId + modelId).
+│                              chatgptAccount = {id, email?, planType?,
+│                                accessToken? (JWT — pushed to codex at session start via account/login/start type "chatgptAuthTokens"),
+│                                refreshToken? (mints a new accessToken when the current one expires; OpenAI rotates it on every refresh exchange),
+│                                expiresAtMs? (epoch ms when accessToken expires — used to decide whether to refresh before spawning codex),
+│                                idToken? (from the last OAuth token response; retained for debugging and claim re-parse)}.
+│                              The four token fields are written after every OAuth flow and token refresh by token-store.ts;
+│                              they are absent for connections created before MV owned its own OAuth flow. Stored in plaintext
+│                              at the same trust boundary as the apiKey fields for key-based providers.
 ├── discord-settings.json      Discord integration: enabled (true) or disabled (false). On by default; absent file means enabled.
+├── machine-settings.json      Machine-scoped feature flags. Absent file means all flags use defaults.
+│                              devModeEnabled (boolean, default false): enables advanced/dev features — the in-session
+│                              Engine Console (ESC → Engine Console) and other dev-only menu entries on the main screen.
+│                              Toggled via the Settings screen ("Enable Dev Mode" toggle) or REST PUT /manage/settings
+│                              { "devModeEnabled": true }; readable via GET /manage/settings.
 └── model-overrides.json       User overrides merged on top of shipped known-models.json.
                                Per-model: pricing, capabilities, context window, tier defaults.
 ```
@@ -620,7 +642,7 @@ Additionally, `dev-config.jsonc` (read from the process working directory, not t
 
 **Tier resolution:** at session start, `buildTierProviders` (`src/config/tier-resolver.ts`) reads `connections.json` and emits a `Record<ModelTier, TierProvider>` — three `{provider, model}` pairs, one per tier. The map threads through `GameEngine`, `SceneManager`, and `ResolveSession` so every subagent call routes through the connection assigned to its tier. Heterogeneous setups (e.g. Large=OpenAI, Medium=Anthropic) just work; subagents accept `model` as a required parameter and never fall back to `getModel(tier)` silently.
 
-**Code:** `packages/engine/src/config/connections.ts`, `packages/engine/src/config/tier-resolver.ts`, `packages/engine/src/config/discord.ts`, `packages/engine/src/config/model-registry.ts`, `packages/engine/src/config/first-launch.ts`
+**Code:** `packages/engine/src/config/connections.ts`, `packages/engine/src/config/tier-resolver.ts`, `packages/engine/src/config/discord.ts`, `packages/engine/src/config/machine-settings.ts`, `packages/engine/src/config/model-registry.ts`, `packages/engine/src/config/first-launch.ts`
 
 ## 9. Debug Output
 
