@@ -10,14 +10,20 @@ import { CenteredModal, computeModalInnerWidth, type CenteredModalHandle } from 
 const MIN_WIDTH = 48;
 const MAX_WIDTH = 72;
 const WIDTH_FRACTION = 0.7;
-// Columns of slack left at the right edge of every row. We truncate rows to
-// innerWidth so CenteredModal pads them opaque, but several glyphs we use —
-// the ○/◆ markers, the … ellipsis, an em dash in a title — are East-Asian
-// *ambiguous* width: stringWidth counts them as 1, yet some terminals draw
-// them double-width. Filling to the exact edge would then overflow by a
-// column or two on those terminals and wrap (→ background bleed-through). The
-// margin absorbs that; the cost is a few opaque pad spaces on the right.
-const ROW_SAFETY = 3;
+
+/**
+ * Flatten a commit message to a single physical line. Savepoint messages are
+ * verbatim player turns, which routinely contain newlines (and tabs, and runs
+ * of spaces). A raw `\n` inside a styledLines row makes Ink break the row into
+ * two physical lines: CenteredModal sizes its opaque right-pad for the *whole*
+ * string, so each broken line is under-padded, and Ink trims the surviving
+ * trailing spaces — leaving the narrative behind the modal showing through
+ * (full-width background bleed-through). Collapsing whitespace first keeps
+ * every row to exactly one line so the opaque padding lands where it should.
+ */
+function oneLine(s: string): string {
+  return s.replace(/\s+/g, " ").trim();
+}
 
 /** Truncate `s` to fit `max` columns, adding an ellipsis when clipped. */
 function fitWidth(s: string, max: number): string {
@@ -93,20 +99,19 @@ export function RollbackPickerModal({
 
   const footer = empty ? "Esc to go back" : "↑ / ↓ select · Enter to roll back · Esc cancels";
 
-  // Compute the modal's inner width so each row is built as a SINGLE non-wrapping
-  // line (message truncated to fit). CenteredModal pads each line full-width and
-  // opaque; letting a row wrap leaves the unpadded continuation transparent
+  // Compute the modal's inner width so each row is built as a SINGLE physical
+  // line (newlines flattened by oneLine, then message truncated to fit).
+  // CenteredModal pads each line full-width and opaque; a row that breaks onto
+  // a second physical line leaves the unpadded continuation transparent
   // (background bleed-through) and also desyncs ensureLineVisible(selectedIndex).
   const innerWidth = useMemo(
     () => computeModalInnerWidth(theme, width, { minWidth: MIN_WIDTH, maxWidth: MAX_WIDTH, widthFraction: WIDTH_FRACTION, footer }),
     [theme, width, footer],
   );
 
-  const maxRowWidth = innerWidth - ROW_SAFETY;
-
   const styledLines: FormattingNode[][] = useMemo(() => {
     if (empty) {
-      return [[fitWidth(gitEnabled ? "  No savepoints yet." : "  Rollback unavailable — git is disabled for this campaign.", maxRowWidth)]];
+      return [[fitWidth(gitEnabled ? "  No savepoints yet." : "  Rollback unavailable — git is disabled for this campaign.", innerWidth)]];
     }
     return savepoints.map((sp, i) => {
       const isSelected = i === selectedIndex;
@@ -114,8 +119,9 @@ export function RollbackPickerModal({
       const tag = sp.type !== "auto" ? `[${sp.type}] ` : "";
       const when = `  (${relativeTime(sp.timestamp, now)})`;
       const head = `  ${marker} ${tag}`;
-      // Truncate the message so the whole row fits on one line within maxRowWidth.
-      const msg = fitWidth(sp.message, maxRowWidth - stringWidth(head) - stringWidth(when));
+      // Flatten newlines first (player turns are multi-line), then truncate so
+      // the whole row fits on one physical line within innerWidth.
+      const msg = fitWidth(oneLine(sp.message), innerWidth - stringWidth(head) - stringWidth(when));
       const text = `${head}${msg}${when}`;
       if (isSelected) {
         const bolded: FormattingNode = { type: "bold", content: [text] };
@@ -123,7 +129,7 @@ export function RollbackPickerModal({
       }
       return [text];
     });
-  }, [savepoints, selectedIndex, empty, gitEnabled, accentColor, now, maxRowWidth]);
+  }, [savepoints, selectedIndex, empty, gitEnabled, accentColor, now, innerWidth]);
 
   return (
     <CenteredModal

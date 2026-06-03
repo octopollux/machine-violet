@@ -58,9 +58,14 @@ export function RollbackConfirmModal({
   const rollbackLabel = selectedIndex === 0 ? "[Roll Back]" : " Roll Back ";
   const cancelLabel = selectedIndex === 1 ? "[Cancel]" : " Cancel ";
 
+  // Flatten the (potentially multi-line) player-turn message to one line so a
+  // raw newline can't break the row and expose the narrative behind the modal
+  // (background bleed-through). CenteredModal then wraps/pads it opaquely.
+  const message = savepoint.message.replace(/\s+/g, " ").trim();
+
   const lines = [
     `Roll back to:`,
-    `  ${savepoint.message}`,
+    `  ${message}`,
     `  ${localTime(savepoint.timestamp)}`,
     "",
     `Discards ${discardCount} later ${stepLabel}.`,

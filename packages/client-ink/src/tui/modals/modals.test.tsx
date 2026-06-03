@@ -797,6 +797,22 @@ describe("RollbackPickerModal", () => {
     );
     expect(lastFrame()).toContain("git is disabled");
   });
+
+  it("flattens newlines in multi-line player turns to one row (no background bleed-through)", () => {
+    // Verbatim player turns are multi-line; a raw newline would break the row
+    // onto a second physical line that CenteredModal can't pad opaque.
+    const multiline: Savepoint[] = [
+      { oid: "eeeeeee", type: "auto", message: "First half\nSecond half of the turn", timestamp: 1_700_000_000 },
+    ];
+    const { lastFrame } = render(
+      <Box width={100} height={30}>
+        <RollbackPickerModal theme={theme} width={100} height={30} savepoints={multiline} gitEnabled onSelect={noop} onCancel={noop} />
+      </Box>,
+    );
+    const frame = lastFrame()!;
+    // Collapsed onto a single line — the two halves are joined by a space.
+    expect(frame).toContain("First half Second half of the turn");
+  });
 });
 
 describe("RollbackConfirmModal", () => {
@@ -812,6 +828,16 @@ describe("RollbackConfirmModal", () => {
     expect(frame).toContain("I open the door");
     expect(frame).toContain("Discards 3 later savepoints");
     expect(frame).toContain("Archived");
+  });
+
+  it("flattens newlines in the target message (no background bleed-through)", () => {
+    const multiline: Savepoint = { oid: "fffffff", type: "auto", message: "Strike\nthen retreat", timestamp: 1_700_000_000 };
+    const { lastFrame } = render(
+      <Box width={100} height={30}>
+        <RollbackConfirmModal theme={theme} width={100} height={30} savepoint={multiline} discardCount={1} onConfirm={noop} onCancel={noop} />
+      </Box>,
+    );
+    expect(lastFrame()!).toContain("Strike then retreat");
   });
 
   it("defaults to Cancel; Enter cancels", async () => {
