@@ -125,6 +125,14 @@ describe("handleCommand /rollback", () => {
     expect(result.endSession).toBe(true);
     expect(result.endSessionReason).toBe("rollback");
   });
+
+  it("treats an all-digit arg as a count, not a hex oid (e.g. /rollback 1000)", async () => {
+    const engine = makeMockEngine();
+    const repo = engine.getRepo() as unknown as { rollback: ReturnType<typeof vi.fn> };
+    await handleCommand("rollback", "1000", engine, makeMockGameState(), vi.fn());
+    // "1000" is all digits → exchanges_ago:1000, NOT a literal oid "1000".
+    expect(repo.rollback).toHaveBeenCalledWith("exchanges_ago:1000");
+  });
 });
 
 describe("handleCommand /exit_mode", () => {

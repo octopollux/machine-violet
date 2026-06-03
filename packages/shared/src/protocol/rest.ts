@@ -149,9 +149,18 @@ export const CostResponse = Type.Object({
 /** One git savepoint (commit) the player can roll back to. */
 export const Savepoint = Type.Object({
   oid: Type.String(),
-  /** Commit type: auto | scene | session | checkpoint | character. */
-  type: Type.String(),
-  /** Commit message — for `auto` commits this is the verbatim player turn. */
+  /** Commit type, parsed from the message prefix (closed set — mirrors the engine's `CommitType`). */
+  type: Type.Union([
+    Type.Literal("auto"),
+    Type.Literal("scene"),
+    Type.Literal("session"),
+    Type.Literal("checkpoint"),
+    Type.Literal("character"),
+  ]),
+  /**
+   * Commit subject, including its type prefix — e.g. `auto: <verbatim player
+   * turn>`, `scene: <title>`, `checkpoint: before <label>`.
+   */
   message: Type.String(),
   /** Commit time, epoch seconds. */
   timestamp: Type.Number(),
