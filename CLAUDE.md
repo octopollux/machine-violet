@@ -27,6 +27,9 @@ All documentation lives in `docs/`. Start at `docs/index.md` for navigation, `do
 - Tool results use `ok(data)` / `err(message)` helpers.
 - Content pipeline (`packages/engine/src/content/`) is **completely separate** from the rest of the game engine. Never import between them.
 
+### TUI modals
+- **Background bleed-through:** new modals tend to "leak" the narrative behind them. Each row must be a **single physical line padded full-width**, rendered via `CenteredModal`'s `styledLines`/`lines` (which pad opaque) — never raw React children. The usual trap: **free-form/user text containing newlines** (e.g. verbatim player-turn commit messages) breaks a row onto a second, unpadded line that Ink's `trimEnd` then exposes. Collapse whitespace (`s.replace(/\s+/g, " ").trim()`) before truncating. See `RollbackPickerModal.tsx`'s `oneLine` and `docs/tui-design.md#modals`.
+
 ### Testing
 - Tests are **co-located** with source (`foo.ts` + `foo.test.ts`).
 - **Cross-platform paths:** use `norm()` helper for all path assertions (backslash → forward slash).
