@@ -82,7 +82,7 @@ function main() {
 
   const context =
     `📝 Doc-sync reminder — the commit you just made changed application code under ` +
-    `packages/*/src but updated no docs/ files:\n${fileList}\n\n` +
+    `\`packages/*/src\` but updated no \`docs/\` files:\n${fileList}\n\n` +
     `Per docs/maintenance.md, changes to game behavior, tool/subagent contracts, state shape, ` +
     `REST/WebSocket contracts, or on-disk formats should update the matching doc in the same commit.\n\n` +
     `This is only a nudge — use your judgment. If this change is an internal refactor, bug fix, ` +
