@@ -66,7 +66,10 @@ npm run smoketest    # 7-12 min, real LLM calls — walk setup + two in-game tur
 
 The harness auto-detects an existing `connections.json` by walking up from the worktree (so any worktree can run the live smoketest without copying credentials around).
 
-For anything other than these two probes — exercising a specific personality, a save/load round-trip, image generation, the ESC menu, anything — **write your own one-shot probe** under `packages/test-harness/bin/` (or anywhere) using `runProbe` from `@machine-violet/test-harness`. No registry. See [docs/e2e-harness.md](docs/e2e-harness.md) for primitives, engine-state gotchas, engine-log breadcrumbs, and the signal-picking cheatsheet — read it before writing your first probe.
+For anything other than these two probes, pick by what you actually need:
+
+- **You want to feel out / exercise behavior live** — a specific personality, walking a particular world, reproducing an in-game bug by hand, "does this still play right?" — **drive it yourself with the `/play` skill** (`mvplay`). It's a persistent session you play turn-for-turn, one tool call per turn. Don't reach for a subagent or a scripted probe here — being in the loop *is* the point. (`mvplay` details below and in [docs/e2e-harness.md](docs/e2e-harness.md) "Interactive play".)
+- **You want a repeatable pass/fail assertion** on a specific path — save/load round-trip, image-gen persisted, a deterministic regression guard — **write your own one-shot probe** under `packages/test-harness/bin/` (or anywhere) using `runProbe` from `@machine-violet/test-harness`. No registry. See [docs/e2e-harness.md](docs/e2e-harness.md) for primitives, engine-state gotchas, engine-log breadcrumbs, and the signal-picking cheatsheet — read it before writing your first probe.
 
 Do not bypass the harness with a hand-rolled `setTimeout` or a "give it 5 minutes" wait — every wait is anchored to an observable state change. If you find yourself reaching for a timer, look in `Harness` for the `waitFor*` helper that fits.
 
@@ -91,6 +94,10 @@ Launch it and continue with other work in the same turn (write the commit messag
 **Do NOT delegate the live smoke test to a subagent.** The subagent's Bash tool has a 10-minute hard ceiling. A 12-minute golden path hits that ceiling mid-poll, the agent sees the bash timeout, and returns with "the test is making progress, I'll wait for the notification" — but there is no notification, and the test gets orphaned. Burned an entire test run finding this out the hard way. The main-thread background pattern doesn't share that cap.
 
 **Don't tail the background output in subsequent turns.** Just keep working. When the process exits, the harness re-invokes you with a `<task-notification>` containing the final output path. Read the tail of that file then — not before.
+
+### Playing the game interactively (not just pass/fail)
+
+The smoketest answers "did I break it?" — a scripted pass/fail. When the value is instead in **you being in the loop**, playing turn-for-turn (exercising a personality live, feeling out setup-agent behavior, reproducing an in-game bug by hand), use the **`/play` skill** (`mvplay`). It keeps a persistent launcher+sidecar running in the background so you submit one turn per tool call — `start` → `key`/`say`/`pick` → `wait` (run in background) → react → repeat → `stop`. Drive it yourself; do **not** delegate to a subagent or write a one-shot `runProbe` for this — both discard the point, which is your per-turn judgement. See [docs/e2e-harness.md](docs/e2e-harness.md) "Interactive play (mvplay)".
 
 ## Release model
 

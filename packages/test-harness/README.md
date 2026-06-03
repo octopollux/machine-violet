@@ -3,6 +3,12 @@
 End-to-end test harness. Drives the full Machine Violet stack like a human
 player via the agent sidecar's HTTP endpoints.
 
+Two modes, same launcher + sidecar:
+- **Scripted probes** (`runProbe`) — spawn, run a fixed body, assert, kill.
+  For pass/fail checks (`smoketest`, `boot-and-quit`, ad-hoc one-shots).
+- **Interactive play** (`mvplay`) — a persistent session you drive turn-for-turn,
+  one command per turn. For actually *playing* the game. See below.
+
 See [docs/e2e-harness.md](../../docs/e2e-harness.md) for the primitives
 reference, gotchas, and engine-log breadcrumb catalogue.
 
@@ -49,3 +55,27 @@ await runProbe({
 Run with `node --import tsx/esm path/to/my-probe.ts`. `runProbe` handles
 launch, the error dump on failure (stack + launcher tail + /state +
 /screen + engine-log tail), and clean shutdown.
+
+## Interactive play (mvplay)
+
+When you want to *play* rather than assert, `bin/mvplay.ts` keeps a persistent
+launcher + sidecar alive in the background so you submit one turn per command:
+
+```bash
+npm run play -- start              # boot to the main menu
+npm run play -- key return         # select "New Campaign"
+npm run play -- wait               # (run in background) settle on the next beat
+npm run play -- pick 1             # answer a choice
+npm run play -- say "you decide"   # answer a free-text prompt
+# ... walk setup to handoff, then play in-game turns ...
+npm run play -- say "I open the door and step through"
+npm run play -- wait               # (run in background) → prints the DM's reply
+npm run play -- stop
+```
+
+`say`/`pick` confirm the input registered and retry once (the engine can drop a
+keystroke during the scribe's post-turn finalization — see the gotcha in the
+doc). `wait` is the slow one (a DM turn is 1-5 min); run it with
+`run_in_background` so you're re-invoked on exit. Full command table and the
+turn loop are in [docs/e2e-harness.md](../../docs/e2e-harness.md) under
+"Interactive play (mvplay)"; the `/play` skill is the canonical agent handle.
