@@ -157,7 +157,7 @@ TUI tools are **fire-and-forget**: their results drive engine/UI state but the D
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
 | `switch_player` | T1 | DM | `({ player })` | Pass the turn between characters **already in the roster** during free play (outside combat). During combat, initiative controls turn order automatically. Rejects a name not in `config.players` — use `swap_pc` to hand control to a new/existing character. |
-| `swap_pc` | T1 | DM / OOC | `({ character, replaces?, color?, player_name? })` | Reassign a roster slot to `character` and make it the active PC (a "PC swap" / handoff). The only tool that edits `config.players`, and it persists `config.json` so the new PC survives reload. Moves the pointer only — pair with `howto_swap_pc` to also fix sheets, party.md, resources, modeline, theme. |
+| `swap_pc` | T1 | OOC, Dev | `({ character, replaces?, color?, player_name? })` | Reassign a roster slot to `character` and make it the active PC (a "PC swap" / handoff). The only tool that edits `config.players`, and it persists `config.json` so the new PC survives reload. Moves the pointer only — pair with `howto_swap_pc` to also fix sheets, party.md, resources, modeline, theme. |
 
 ---
 
@@ -165,8 +165,8 @@ TUI tools are **fire-and-forget**: their results drive engine/UI state but the D
 
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
-| `list_dm_personalities` | T1 | DM / OOC | `({})` | List the personas available to swap to (bundled `.mvdm` presets + user additions), each with name + description, plus which is current. Borrows the setup agent's persona catalog (`loadAllPersonalities`) — the in-game agent doesn't otherwise have it in context. |
-| `swap_dm_personality` | T1 | DM / OOC | `({ name, prompt_fragment?, detail?, description? })` | Change the DM's narrative voice for the rest of the campaign. `name` matches a preset, or names a custom persona when `prompt_fragment` is supplied. The only tool that edits `config.dm_personality`; persists `config.json`. Read live each DM turn, so it takes effect next turn (no reload). Pair with `howto_swap_dm_personality` — the new voice must open with an in-fiction handoff. |
+| `list_dm_personalities` | T1 | OOC, Dev | `({})` | List the personas available to swap to (bundled `.mvdm` presets + user additions), each with name + description, plus which is current. Borrows the setup agent's persona catalog (`loadAllPersonalities`) — the in-game agent doesn't otherwise have it in context. |
+| `swap_dm_personality` | T1 | OOC, Dev | `({ name, prompt_fragment?, detail?, description? })` | Change the DM's narrative voice for the rest of the campaign. `name` matches a preset, or names a custom persona when `prompt_fragment` is supplied. The only tool that edits `config.dm_personality`; persists `config.json`. Read live each DM turn, so it takes effect next turn (no reload). Pair with `howto_swap_dm_personality` — the new voice must open with an in-fiction handoff. |
 
 ---
 
@@ -176,9 +176,9 @@ TUI tools are **fire-and-forget**: their results drive engine/UI state but the D
 
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
-| `howto_swap_pc` | T1 | DM / OOC | `({})` | Returns the step-by-step playbook for swapping the player character with a new or existing character (roster, character sheets, party.md, resources, modeline, theme). Backed by `prompts/howto-swap-pc.md`. |
-| `howto_swap_dm_personality` | T1 | DM / OOC | `({})` | Returns the playbook for changing the DM personality mid-campaign (list → present → swap → required in-fiction voice handoff). Backed by `prompts/howto-swap-dm-personality.md`. |
-| `howto_campaign_state` | T1 | DM / OOC | `({})` | Catch-all: returns a map of campaign on-disk state and **which tool edits which thing** — the fallback when no dedicated tool obviously fits a change (routes to the right tool, or flags that the edit needs Dev mode). Distilled from [format-spec.md](format-spec.md); backed by `prompts/howto-campaign-state.md`. |
+| `howto_swap_pc` | T1 | OOC, Dev | `({})` | Returns the step-by-step playbook for swapping the player character with a new or existing character (roster, character sheets, party.md, resources, modeline, theme). Backed by `prompts/howto-swap-pc.md`. |
+| `howto_swap_dm_personality` | T1 | OOC, Dev | `({})` | Returns the playbook for changing the DM personality mid-campaign (list → present → swap → required in-fiction voice handoff). Backed by `prompts/howto-swap-dm-personality.md`. |
+| `howto_campaign_state` | T1 | OOC, Dev | `({})` | Catch-all: returns a map of campaign on-disk state and **which tool edits which thing** — the fallback when no dedicated tool obviously fits a change (routes to the right tool, or flags that the edit needs Dev mode). Distilled from [format-spec.md](format-spec.md); backed by `prompts/howto-campaign-state.md`. |
 
 ---
 
