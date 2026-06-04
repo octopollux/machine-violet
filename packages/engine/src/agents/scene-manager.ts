@@ -1,4 +1,4 @@
-import type { LLMProvider, TierProvider } from "../providers/types.js";
+import type { ContentPart, LLMProvider, NormalizedMessage, TierProvider } from "../providers/types.js";
 import { getModel, type ModelTier } from "../config/models.js";
 import type { GameState } from "./game-state.js";
 import type { ConversationManager, DroppedExchange } from "../context/index.js";
@@ -111,6 +111,15 @@ const STEP_ORDER: PendingStep[] = [
   "reset_precis", "prune_context", "checkpoint", "done",
 ];
 
+/** Join the text blocks of a message's content (string content passes through). */
+function narrationText(content: NormalizedMessage["content"]): string {
+  if (typeof content === "string") return content;
+  return content
+    .filter((b: ContentPart): b is Extract<ContentPart, { type: "text" }> => b.type === "text")
+    .map((b) => b.text)
+    .join("");
+}
+
 // --- Scene Manager ---
 
 export class SceneManager {
@@ -222,13 +231,13 @@ export class SceneManager {
     provider: LLMProvider,
     dropped: DroppedExchange,
   ): Promise<UsageStats> {
-    // Format the dropped exchange as text
+    // Format the dropped exchange as text. The stored assistant message is the
+    // canonical turn's final message, whose content is an array of blocks, so
+    // pull the narration out of its text block(s).
     const userContent = typeof dropped.exchange.user.content === "string"
       ? dropped.exchange.user.content
-      : "[complex content]";
-    const assistantContent = typeof dropped.exchange.assistant.content === "string"
-      ? dropped.exchange.assistant.content
-      : "[complex content]";
+      : narrationText(dropped.exchange.user.content);
+    const assistantContent = narrationText(dropped.exchange.assistant.content);
     const exchangeText = `Player: ${userContent}\nDM: ${assistantContent}`;
 
     const pcIdent = this.state.config.players

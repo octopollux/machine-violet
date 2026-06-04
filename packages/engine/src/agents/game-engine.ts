@@ -658,35 +658,17 @@ export class GameEngine {
         this.sceneManager.appendDMResponse(result.text);
       }
 
-      // Split round messages into tool interactions and final assistant.
-      // When truncated, roundMessages may end with a user tool_result (no final assistant).
-      const roundMsgs = result.roundMessages;
-      let toolMessages: NormalizedMessage[] = [];
-      let finalAssistantText = result.text;
-      if (roundMsgs.length > 0) {
-        const lastMsg = roundMsgs[roundMsgs.length - 1];
-        if (roundMsgs.length > 1 && lastMsg.role === "assistant") {
-          toolMessages = roundMsgs.slice(0, -1);
-          // Extract text from only the final assistant to avoid duplicating
-          // text that appeared in intermediate tool-use rounds
-          finalAssistantText = typeof lastMsg.content === "string"
-            ? lastMsg.content
-            : (lastMsg.content as ContentPart[])
-                .filter((b): b is ContentPart & { type: "text" } => b.type === "text")
-                .map((b) => b.text)
-                .join("");
-        } else {
-          // Truncated or single-message: keep all as tool context
-          toolMessages = roundMsgs;
-          finalAssistantText = "";
-        }
-      }
-
-      // Add exchange to conversation manager (assistant kept as string for handleDroppedExchange compat)
-      const assistantMessage: NormalizedMessage = {
-        role: "assistant",
-        content: finalAssistantText || result.text,
-      };
+      // `turnMessages` is the bridge's canonical turn: tool_use ↔ tool_result
+      // pairs ending in an assistant message whose content is the narration.
+      // It always ends on an assistant message (the bridge guarantees this), so
+      // decompose into the existing exchange model unconditionally — no shape
+      // sniffing. The final assistant message is the DM response; everything
+      // before it is the tool interaction context.
+      const turn = result.turnMessages;
+      const assistantMessage: NormalizedMessage = turn.length > 0
+        ? turn[turn.length - 1]
+        : { role: "assistant", content: result.text };
+      const toolMessages = turn.slice(0, -1);
       const dropped = this.conversation.addExchange(storedUserMessage, assistantMessage, toolMessages);
 
       // Persist display log and scene state after each exchange.
@@ -787,7 +769,7 @@ export class GameEngine {
       logEvent("turn:dm_complete", {
         textLength: result.text.length,
         toolCalls: toolCallCount,
-        rounds: result.roundMessages.filter((m) => m.role === "assistant").length,
+        rounds: result.turnMessages.filter((m) => m.role === "assistant").length,
         durationMs: Date.now() - turnStartTime,
       });
 

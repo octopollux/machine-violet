@@ -210,8 +210,8 @@ export class ResolveSession {
       },
     );
 
-    // Append round messages to our persistent messages array
-    for (const msg of result.roundMessages) {
+    // Append the canonical turn to our persistent messages array
+    for (const msg of result.turnMessages) {
       this.messages.push(msg);
     }
 

@@ -87,11 +87,13 @@ export interface AgentLoopResult {
   /** Whether the loop was cut short by maxToolRounds */
   truncated: boolean;
   /**
-   * All messages appended during this loop (assistant + tool_result pairs).
-   * Normally ends with the final assistant message, but when `truncated` is
-   * true it may end with a user tool_result instead.
+   * The complete turn as one canonical, self-consistent message sequence
+   * (see `normalizeTurn`): `assistant([…, tool_use*])` → `user([tool_result*])`
+   * pairs ending in an `assistant` message whose content is the narration.
+   * Provider-agnostic and always ends on an assistant message — the engine
+   * stores it verbatim without inspecting its shape.
    */
-  roundMessages: NormalizedMessage[];
+  turnMessages: NormalizedMessage[];
 }
 
 // --- Agent Loop ---
@@ -227,6 +229,6 @@ async function runAgentLoopInternal(
       cacheCreationTokens: result.usage.cacheCreationTokens,
     },
     truncated: result.truncated,
-    roundMessages: result.roundMessages,
+    turnMessages: result.turnMessages,
   };
 }

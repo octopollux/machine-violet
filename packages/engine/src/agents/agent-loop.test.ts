@@ -318,7 +318,7 @@ describe("agentLoop", () => {
     }));
   });
 
-  it("passes through roundMessages from agent session", async () => {
+  it("passes through turnMessages from agent session", async () => {
     const provider = mockProvider([
       toolUseResult("roll_dice", { expression: "1d20" }),
       textResult("You rolled a 15!"),
@@ -334,10 +334,10 @@ describe("agentLoop", () => {
     );
 
     // Should have: assistant(tool_use), user(tool_result), assistant(text)
-    expect(result.roundMessages).toHaveLength(3);
-    expect(result.roundMessages[0].role).toBe("assistant");
-    expect(result.roundMessages[1].role).toBe("user");
-    expect(result.roundMessages[2].role).toBe("assistant");
+    expect(result.turnMessages).toHaveLength(3);
+    expect(result.turnMessages[0].role).toBe("assistant");
+    expect(result.turnMessages[1].role).toBe("user");
+    expect(result.turnMessages[2].role).toBe("assistant");
   });
 
   it("executes multiple tool calls from a single response", async () => {
