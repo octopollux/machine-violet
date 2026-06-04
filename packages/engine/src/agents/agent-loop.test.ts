@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import type { LLMProvider, ChatResult, ContentPart, NormalizedUsage } from "../providers/types.js";
-import { agentLoop, TUI_TOOLS } from "./agent-loop.js";
+import { agentLoop, TUI_TOOLS, DM_EXCLUDED_TOOLS } from "./agent-loop.js";
 import { extractStatus, retryDelay } from "../utils/retry.js";
 import type { AgentLoopConfig } from "./agent-loop.js";
-import { createTestRegistry } from "./tool-registry.js";
+import { createTestRegistry, registry } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
 import { createClocksState } from "../tools/clocks/index.js";
 import { createCombatState, createDefaultConfig } from "../tools/combat/index.js";
@@ -470,6 +470,34 @@ describe("thinking block filtering", () => {
     );
     expect(blockTypes).not.toContain("thinking");
     expect(blockTypes).toContain("tool_use");
+  });
+});
+
+describe("DM_EXCLUDED_TOOLS", () => {
+  // The operator-facing meta tools (PC handoff, DM-voice swap, campaign-state
+  // catch-all) live on the OOC/Dev surface, not the in-character narrator's.
+  const META_TOOLS = [
+    "swap_pc",
+    "howto_swap_pc",
+    "list_dm_personalities",
+    "swap_dm_personality",
+    "howto_swap_dm_personality",
+    "howto_campaign_state",
+  ];
+
+  it("excludes the swap_*/howto_* meta tools from the DM tool list", () => {
+    const dmTools = registry.getDefinitions(DM_EXCLUDED_TOOLS).map((t) => t.name);
+    for (const name of META_TOOLS) {
+      expect(dmTools).not.toContain(name);
+    }
+  });
+
+  it("still registers the meta tools (they remain available to OOC/Dev)", () => {
+    // Excluding from the DM view must not unregister them — OOC pulls the
+    // whole registry, so they have to stay in it.
+    for (const name of META_TOOLS) {
+      expect(registry.has(name)).toBe(true);
+    }
   });
 });
 

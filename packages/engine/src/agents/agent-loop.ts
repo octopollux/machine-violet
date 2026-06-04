@@ -28,8 +28,20 @@ export const TUI_TOOLS = new Set([
   "generate_image",
 ]);
 
-/** Tools registered in the ToolRegistry but only exposed to OOC / Dev Mode agents. */
-const DM_EXCLUDED_TOOLS = new Set(["show_character_sheet", "rollback"]);
+/** Tools registered in the ToolRegistry but only exposed to OOC / Dev Mode agents.
+ *  The `swap_*` / `howto_*` family are operator-facing meta tools (PC handoff,
+ *  DM-voice swap, campaign-state catch-all) — they belong to the OOC surface,
+ *  not the in-character narrator's tool list. */
+export const DM_EXCLUDED_TOOLS = new Set([
+  "show_character_sheet",
+  "rollback",
+  "swap_pc",
+  "howto_swap_pc",
+  "list_dm_personalities",
+  "swap_dm_personality",
+  "howto_swap_dm_personality",
+  "howto_campaign_state",
+]);
 
 // --- Types (canonical definitions) ---
 

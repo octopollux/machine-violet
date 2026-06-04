@@ -682,7 +682,7 @@ const TOOL_DEFS: RegisteredTool[] = [
         const roster = state.config.players.map((p) => p.character).join(", ") || "(none)";
         return err(
           `Player '${input.player}' not found. switch_player only passes the turn between characters already in the roster (${roster}). ` +
-          `To make a character that ISN'T in the roster the player's PC — a handoff to a new or existing character — use swap_pc instead (see howto_swap_pc for the full procedure).`,
+          `Making a character that ISN'T in the roster the player's PC — a handoff to a new or existing character — is a PC swap, performed with swap_pc on the OOC surface (see howto_swap_pc). If you're the DM, hand off to OOC to do it.`,
         );
       }
       state.activePlayerIndex = idx;

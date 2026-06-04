@@ -389,6 +389,14 @@ describe("enterOOC with gameState + DM registry", () => {
     expect(names).not.toContain("enter_ooc");
     expect(names).toContain("rollback");
     expect(names).toContain("show_character_sheet");
+    // The swap_*/howto_* meta tools are excluded from the DM list but must
+    // remain on the OOC surface — that's where the operator drives them.
+    expect(names).toContain("swap_pc");
+    expect(names).toContain("swap_dm_personality");
+    expect(names).toContain("list_dm_personalities");
+    expect(names).toContain("howto_swap_pc");
+    expect(names).toContain("howto_swap_dm_personality");
+    expect(names).toContain("howto_campaign_state");
     // Entity surface replaces raw read_file in OOC.
     expect(names).toContain("entity");
     expect(names).toContain("describe_entity_type");
