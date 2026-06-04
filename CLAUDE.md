@@ -110,7 +110,7 @@ Two long-lived branches: **`main`** (trunk, builds nightlies) and **`release`** 
 
 1. Pick the branch where the bug was reported. A 1.0 user's bug reproduces on `release`, not `main` — `main` may have rewritten the code path, and "can't repro" usually means "looking at the wrong tree."
 2. Fix on a branch from there, PR into that long-lived branch.
-3. Ask whether the *other* long-lived branch has the same code path. If yes, the fix needs to land there too — cherry-pick or re-apply by hand. Do this both directions (release→main *and* main→release as appropriate).
+3. Port the fix to the *other* long-lived branch **only** when the bug was also reported there, or it's a regression in a shipped (released) version — then cherry-pick or re-apply by hand (both directions as appropriate). Otherwise default to the reported branch alone; don't raise porting routinely. When it *is* warranted, just do it and say so rather than asking.
 
 ### Cutting releases
 
