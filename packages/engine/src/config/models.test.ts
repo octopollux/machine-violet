@@ -47,7 +47,7 @@ describe("model config", () => {
     expect(getModel("small")).toBe("claude-haiku-4-5-20251001");
   });
 
-  it("defaults effort with dev high", () => {
+  it("defaults effort map (dm low; ooc/setup/dev-mode high)", () => {
     const config = loadModelConfig({ cwd: testDir, reset: true });
     expect(config.effort).toEqual({
       "default": null,

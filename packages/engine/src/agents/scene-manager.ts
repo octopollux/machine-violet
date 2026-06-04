@@ -124,8 +124,14 @@ export class SceneManager {
   private pcSummaries: string[];
   private aliasContext = "";
   private entityTree: EntityTree;
-  /** Rendered entity tree snapshot — refreshed at session start and scene transitions only. */
+  /**
+   * Rendered entity-registry snapshot fed to the DM (via `entityIndex`).
+   * Recomputed lazily: a tree mutation marks it dirty and the next read
+   * re-renders once — so a scribe turn applying many deltas doesn't re-sort
+   * and re-render the whole registry per delta.
+   */
   private entityTreeSnapshot: string | undefined;
+  private entityTreeDirty = false;
   /** Content boundaries snapshot — refreshed at scene transitions only. */
   private contentBoundariesSnapshot: string | undefined;
   /**
@@ -187,7 +193,7 @@ export class SceneManager {
     });
     this.sessionState.scenePrecis = buildScenePrecis(this.scene);
     this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);
-    this.sessionState.entityIndex = this.entityTreeSnapshot;
+    this.sessionState.entityIndex = this.entityRegistrySnapshot();
     this.sessionState.contentBoundaries = this.contentBoundariesSnapshot;
     // Use the runtime tier-resolved model for prompt conditionals
     // (`<!--if:gpt-->` etc.) so the DM prompt branches match the provider
@@ -627,27 +633,33 @@ export class SceneManager {
       type: entry.type,
       path: entry.path,
     };
-    this.refreshEntityTreeSnapshot();
+    this.entityTreeDirty = true;
   }
 
   /** Remove an entry from the entity tree (e.g. after rename). */
   removeEntity(slug: string): void {
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete this.entityTree[slug];
-    this.refreshEntityTreeSnapshot();
+    this.entityTreeDirty = true;
   }
 
   /**
-   * Re-render the entity-tree snapshot string that feeds the DM's "Entity
+   * Current entity-registry snapshot string that feeds the DM's "Entity
    * Registry" context (via `sessionState.entityIndex` in `getSystemPrompt`).
-   * Must run on every tree mutation: without it the snapshot stayed frozen
-   * at the per-scene render (constructor / scene reset), so entities the
-   * scribe created or renamed mid-scene never reached the DM. The DM then
-   * kept seeing the stale placeholder and re-issued the same rename every
-   * turn — wasting an expensive high-effort reasoning round each time.
+   * Recomputes only when the tree changed since the last render. This has to
+   * pick up mid-scene mutations: a previous version rendered only at
+   * construction / scene reset, so entities the scribe created or renamed
+   * mid-scene never reached the DM — it kept seeing the stale placeholder and
+   * re-issued the same rename every turn, wasting a whole DM reasoning round
+   * each time. Marking dirty (rather than rendering per mutation) keeps a
+   * many-delta scribe turn to a single re-render; `renderEntityTree` sorts keys.
    */
-  private refreshEntityTreeSnapshot(): void {
-    this.entityTreeSnapshot = renderEntityTree(this.entityTree);
+  private entityRegistrySnapshot(): string {
+    if (this.entityTreeDirty || this.entityTreeSnapshot === undefined) {
+      this.entityTreeSnapshot = renderEntityTree(this.entityTree);
+      this.entityTreeDirty = false;
+    }
+    return this.entityTreeSnapshot ?? "";
   }
 
   /** Get the current entity tree (for passing to subagents). */
@@ -893,8 +905,8 @@ export class SceneManager {
     this.scene.openThreads = "";
     this.scene.npcIntents = "";
     this.scene.playerReads = [];
-    // Refresh entity tree snapshot for the new scene
-    this.entityTreeSnapshot = renderEntityTree(this.entityTree);
+    // Entity registry may have changed during the scene; refresh on next read.
+    this.entityTreeDirty = true;
     // Refresh content boundaries snapshot (picks up any Scribe updates)
     await this.refreshContentBoundaries();
   }
