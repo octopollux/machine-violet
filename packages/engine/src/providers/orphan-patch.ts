@@ -2,14 +2,18 @@
  * Heal conversation history with orphaned `tool_use` blocks by inserting
  * synthetic `tool_result` stubs.
  *
+ * **Defensive net, not load-bearing.** Fresh turns are emitted already-paired
+ * and tool_use-last by `normalizeTurn` (the bridge captures even in-band
+ * providers' real tool results), so both functions here are no-ops on
+ * current-shape history. This module exists to keep *legacy* on-disk histories
+ * (written before turn normalization), aborted turns, and crashes between tool
+ * dispatch and persist replayable rather than 400-ing the campaign forever.
+ *
  * Provider APIs (Anthropic, OpenAI Responses, OpenAI Chat Completions) all
  * require every assistant `tool_use` / `function_call` to be matched by a
  * corresponding `tool_result` / `function_call_output` in the next user
- * message. Real histories occasionally violate this — an aborted turn, a
- * crash between tool dispatch and tool_result persist, or a provider
- * (e.g. openai-chatgpt) that owns tool dispatch in-band and persists only
- * the assistant's tool_use blocks. Without healing, every subsequent turn
- * 400s and the campaign becomes unrecoverable.
+ * message; older openai-chatgpt history persisted only the assistant's
+ * tool_use blocks (in `[tool_use, text]` order), violating this.
  *
  * The patch is deterministic: same input → same output, byte-for-byte. The
  * stub content is a fixed string, stubs are emitted in the same order as

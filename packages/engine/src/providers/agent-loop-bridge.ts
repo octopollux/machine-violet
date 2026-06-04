@@ -45,6 +45,7 @@ const DEFERRED_TUI_TYPES = new Set([
   // queued present_choices commands via onTuiCommand after the loop.
   "present_choices",
 ]);
+import { normalizeTurn, type CapturedToolResult } from "./normalize-turn.js";
 import { dumpContext, dumpThinking } from "../config/context-dump.js";
 import { logEvent } from "../context/engine-log.js";
 import { ContentRefusalError } from "@machine-violet/shared/types/errors.js";
@@ -103,7 +104,15 @@ export interface ProviderLoopResult {
   tuiCommands: TuiCommand[];
   usage: NormalizedUsage;
   truncated: boolean;
-  roundMessages: NormalizedMessage[];
+  /**
+   * The complete turn as one canonical, self-consistent message sequence,
+   * identical in shape across providers (see `normalizeTurn`): tool
+   * interactions are `assistant([…, tool_use*])` → `user([tool_result*])`
+   * pairs, every `tool_use` has a matching `tool_result`, and the turn ends
+   * with an `assistant` message whose content is the narration. The engine
+   * stores this verbatim — it must never re-inspect the shape.
+   */
+  turnMessages: NormalizedMessage[];
 }
 
 // ---------------------------------------------------------------------------
@@ -238,6 +247,13 @@ export async function runProviderLoop(
   const loopStartIndex = workingMessages.length;
   const tuiToolNames = config.tuiToolNames ?? new Set<string>();
 
+  // Tool results from providers that dispatch tools in-band (openai-chatgpt):
+  // the model already consumed these during the turn, but the bridge never
+  // sees them as surfaced tool calls, so capture them here to rebuild the
+  // canonical tool_use ↔ tool_result pairs in `normalizeTurn`. Stays empty for
+  // loop-style providers (they ignore `dispatchTool` and surface tool calls).
+  const inBandResults: CapturedToolResult[] = [];
+
   const priorAssistantCount = messages.filter((m) => m.role === "assistant").length;
 
   for (let round = 0; round < maxToolRounds; round++) {
@@ -262,6 +278,13 @@ export async function runProviderLoop(
           }
         },
       );
+      // Record the result so the canonical turn can pair it with its tool_use
+      // block — this provider won't surface the call back through toolCalls.
+      inBandResults.push({
+        tool_use_id: call.id,
+        content: dispatched.content,
+        is_error: dispatched.isError,
+      });
       return { content: dispatched.content, isError: dispatched.isError };
     };
 
@@ -515,7 +538,11 @@ export async function runProviderLoop(
     tuiCommands,
     usage: totalUsage,
     truncated,
-    roundMessages: workingMessages.slice(loopStartIndex),
+    turnMessages: normalizeTurn(
+      workingMessages.slice(loopStartIndex),
+      inBandResults,
+      fullText,
+    ),
   };
 }
 
