@@ -156,7 +156,7 @@ TUI tools are **fire-and-forget**: their results drive engine/UI state but the D
 
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
-| `switch_player` | T1 | DM | `({ player })` | Pass the turn between characters **already in the roster** during free play (outside combat). During combat, initiative controls turn order automatically. Rejects a name not in `config.players` — use `swap_pc` to hand control to a new/existing character. |
+| `switch_player` | T1 | DM | `({ player })` | Pass the turn between characters **already in the roster** during free play (outside combat). During combat, initiative controls turn order automatically. Rejects a name not in `config.players` — handing control to a new/existing character is a PC swap, done via `swap_pc` on the OOC surface (the DM hands off to OOC to perform it). |
 | `swap_pc` | T1 | OOC, Dev | `({ character, replaces?, color?, player_name? })` | Reassign a roster slot to `character` and make it the active PC (a "PC swap" / handoff). The only tool that edits `config.players`, and it persists `config.json` so the new PC survives reload. Moves the pointer only — pair with `howto_swap_pc` to also fix sheets, party.md, resources, modeline, theme. |
 
 ---
