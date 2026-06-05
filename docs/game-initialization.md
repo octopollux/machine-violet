@@ -175,20 +175,14 @@ Seeds are injected into the setup conversation's system prompt so the agent can 
 
 ### Seed format
 
-Each seed has a public face (name, premise, genres) and an optional `detail` field containing DM-only instructions hidden from the player:
+Seeds are `.mvworld` files (canonical schema: [format-spec.md §10](format-spec.md)). Each has a public face (name, summary, genres) and optional DM-only material: a fork-invariant `detail` base and named **forks** — the decision points by which one seed encodes many possible campaigns ([format-spec.md §10.6](format-spec.md)).
 
-- **`<suboptions label="...">`** — Labeled choice groups within a seed. Each group offers 3-5 bullet options (name + em-dash + description). Multiple suboption groups per seed are supported. Example: a seed might offer both a starting faction and a starting location.
-- **The `detail` field** — Hidden DM-only instructions such as secret rolls, texture, and pacing guidance, plus optional `<suboptions>` groups. DM-only instructions are never shown to the player; only `<suboptions>` content may be presented as structured choices during setup.
+**Forks resolve entirely at setup.** Via `load_world`, the setup agent receives a world's forks split by `chooser`:
 
-```markdown
-<suboptions label="Your starting faction">
-- Iron Circle — Mercenary order. Direct, brutal, effective.
-- Gilded Compact — Merchant house. Money talks, silence is expensive.
-- Hallowed See — Religious authority. Faith is power.
-</suboptions>
-```
+- **Player forks** (`chooser: "player"`) — presented to the player via `present_choices` (starting faction, who-you-are picks, tone dials).
+- **Agent forks** (`chooser: "agent"`) — decided by the setup agent itself, DM-only (the genre wrapper, secret variants). The agent uses the `roll_dice` tool (`1dN`) to pick at random or chooses to fit the player; the player never sees these.
 
-The setup agent presents suboptions as structured choices during campaign creation. The player's selection shapes the initial world state.
+The setup agent reports every resolution in `finalize_setup.fork_selections` (`forkId → optionId`). `load_world` does **not** return the DM-only premise prose — `handleFinalize` assembles `campaign_detail` in code from the seed's base + the selected branches (`assembleCampaignDetail`), so the agent never carries it and the DM is born into a single collapsed variant with no unchosen branches in context. The selections persist as `config.fork_selections`. Legacy `suboptions` are folded into player forks on load.
 
 ## DM Personalities
 

@@ -909,9 +909,9 @@ A campaign seed is a world file with only the identity and DM-only fields:
 
 ### 10.4 Setup agent integration
 
-The setup agent receives world summaries (name, summary, genres, slug) in its system prompt. It uses the `load_world` tool to fetch the full detail and suboptions for a specific world by slug. Suboptions are presented to the player as structured choices. The detail block passes through to `campaign_detail` in config.json.
+The setup agent receives world summaries (name, summary, genres, slug) in its system prompt. It uses the `load_world` tool to fetch a world's **forks** and config hints by slug (§10.6) — player forks to present, agent forks for it to decide (rolling the `roll_dice` tool). It resolves every fork and reports the choices in `finalize_setup.fork_selections`.
 
-The setup agent only ever sees this **thin slice** — `detail`, `suboptions`, and the suggested `system`/`mood`/`difficulty`/`campaign_scope`. A world's rich inline content (`entities`, `maps`, `rules`, `calendar`) is **never loaded into the setup agent's context**; it is materialized in code at build time (§10.5).
+The setup agent only ever sees this **thin slice** — the forks (labels/options/ids) and the suggested `system`/`mood`/`difficulty`/`campaign_scope`. It does **not** receive the DM-only premise prose: `campaign_detail` is assembled in code at finalize from the seed's base + the selected branches (§10.6). A world's rich inline content (`entities`, `maps`, `rules`, `calendar`) is likewise never loaded into the agent's context; it is materialized in code at build time (§10.5).
 
 ### 10.5 Importing rich worlds (materialization)
 
@@ -950,7 +950,7 @@ A single seed often encodes **many possible campaigns** — a "genre wrapper", a
 
 The legacy `suboptions` shape (player-facing only) is **folded into `forks`** (`chooser: "player"`) by `normalizeForks` for any consumer that calls it, so older/user-authored files keep working; new seeds author `forks` directly.
 
-> **Status (staged rollout).** The `forks` / `fork_selections` *format* and the `world-forks.ts` helpers (`normalizeForks`, `assembleCampaignDetail`) are in place. The *consumption* lands in later phases: the setup agent resolving forks (presenting player ones, rolling agent ones) and writing `fork_selections`, the build assembling `campaign_detail`, and the bundled seeds being migrated from prose forks to structured `forks`. Until then, `load_world` still surfaces `detail` + `suboptions` and the whole `detail` blob passes through to `campaign_detail` as before. §10.4 describes that current behavior; this section describes the target format.
+> **Status (staged rollout).** Live now: the `forks` / `fork_selections` format, the `world-forks.ts` helpers (`normalizeForks`, `assembleCampaignDetail`), and setup-agent consumption — `load_world` surfaces forks, the agent resolves them (rolling agent forks via `roll_dice`), and `handleFinalize` assembles `campaign_detail` from the seed base + selected branches and persists `fork_selections`. Still pending: migrating the bundled seeds from prose forks to structured `forks` (until a seed is migrated, its prose forks remain in its `detail` base and assemble through unchanged — no regression), and fork-scoped inline-content materialization (§10.5 currently materializes all inline entities regardless of selection).
 
 ---
 

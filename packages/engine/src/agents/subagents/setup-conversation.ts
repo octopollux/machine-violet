@@ -4,12 +4,14 @@ import { generateThemeColor } from "../setup-agent.js";
 import { CAMPAIGN_SCOPES, type CampaignScope } from "@machine-violet/shared/types/config.js";
 import { loadAllPersonalities, getPersonality } from "../../config/personality-loader.js";
 import { loadAllWorlds, worldSummaries, loadWorldBySlug } from "../../config/world-loader.js";
+import { normalizeForks, assembleCampaignDetail } from "../../config/world-forks.js";
+import type { WorldFile, WorldFork } from "@machine-violet/shared/types/world.js";
+import { rollDice } from "../../tools/dice/index.js";
 import { KNOWN_SYSTEMS, readChargenSection } from "../../config/systems.js";
 import type { SystemComplexity } from "../../config/systems.js";
 import { getEffortConfig } from "../../config/models.js";
 import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
-import { processIncludes } from "../../prompts/process-includes.js";
 import { dumpContext, dumpThinking } from "../../config/context-dump.js";
 import {
   extractStatus,
@@ -77,7 +79,7 @@ const FINALIZE_TOOL: NormalizedTool = {
     properties: {
       genre: { type: "string", description: "Genre (e.g. 'Classic fantasy', 'Sci-fi', 'Modern supernatural')" },
       system: { type: "string", description: "Game system slug from the available systems list (e.g. 'dnd-5e', 'fate-accelerated'), or null for pure narrative. Use the slug, not the display name.", nullable: true },
-      campaign_name: { type: "string", description: "Short evocative campaign title. When the player picked a suboption from a seeded world, suffix with that suboption's name: `<World Name> - <Suboption Name>` (e.g. 'Palimpsest - The Dreaming Souk'). Skip the suffix for fully custom campaigns or seeds without suboptions." },
+      campaign_name: { type: "string", description: "Short evocative campaign title. When the player picked a player-facing fork option from a seeded world, you may suffix with that option's name: `<World Name> - <Option Name>` (e.g. 'Palimpsest - The Dreaming Souk'). Skip the suffix for fully custom campaigns or seeds without player forks." },
       campaign_premise: { type: "string", description: "One-paragraph campaign hook" },
       mood: { type: "string", description: "Mood (e.g. 'Heroic', 'Grimdark', 'Whimsical', 'Tense')" },
       difficulty: { type: "string", description: "Difficulty ('Gentle', 'Balanced', 'Unforgiving')" },
@@ -92,8 +94,14 @@ const FINALIZE_TOOL: NormalizedTool = {
       character_name: { type: "string", description: "Player character's name" },
       character_description: { type: "string", description: "One-sentence character concept" },
       character_details: { type: "string", description: "Mechanical character details gathered during setup (class, skills, approaches, etc). Free-form text. Omit or null for pure narrative.", nullable: true },
-      campaign_detail: { type: "string", description: "The world's hidden detail block (from load_world), passed through verbatim for the DM. Omit if the chosen world has no detail or the campaign is fully custom.", nullable: true },
-      world_slug: { type: "string", description: "Slug of the world file used (from load_world). Omit for fully custom campaigns.", nullable: true },
+      campaign_detail: { type: "string", description: "DM-only detail for a FULLY CUSTOM campaign (no seeded world). For seeded worlds leave this out — the DM detail is assembled in code from the seed's base premise plus your fork_selections, so you don't pass it. Omit if the campaign is custom with no special DM notes.", nullable: true },
+      world_slug: { type: "string", description: "Slug of the world file used (from load_world). Required when the campaign is built from a seeded world — it's how the engine re-loads the world to assemble DM detail and materialize content. Omit only for fully custom campaigns.", nullable: true },
+      fork_selections: {
+        type: "object",
+        description: "How you resolved the chosen world's forks (from load_world), as a map of forkId → optionId. Include an entry for EVERY fork the world declared: player forks (the option the player picked) and agent forks (the option you rolled or chose). Use the exact ids shown by load_world. Omit for fully custom campaigns or worlds with no forks.",
+        additionalProperties: { type: "string" },
+        nullable: true,
+      },
       age_group: { type: "string", enum: ["child", "teenager", "adult"], description: "Player's age group. Set to 'child' or 'teenager' if the player clearly indicates so. Otherwise — including when age is not discussed or the player declines — set to 'adult'. Always include this field." },
       content_preferences: { type: "string", description: "Any content preferences or sensitivities the player mentioned during setup (one per line). Only include if the player volunteered them — never prompt for these.", nullable: true },
       image_generation: {
@@ -145,10 +153,12 @@ const PRESENT_CHOICES_TOOL: NormalizedTool = {
 const LOAD_WORLD_TOOL: NormalizedTool = {
   name: "load_world",
   description:
-    "Load the full detail and suboptions for a world file by slug. " +
-    "Use this when you want to learn more about a specific campaign world " +
-    "(e.g., after the player picks one, or to preview its options). " +
-    "Returns the world's detail block, suboptions, and any config hints.",
+    "Load a world's forks (variant decision points) and config hints by slug. " +
+    "Use this after the player shows interest in a specific seeded world. " +
+    "Returns the world's forks — player forks to present, agent forks for you to " +
+    "decide — and any system/mood/difficulty/scope hints. The DM-only premise is " +
+    "NOT returned: it is assembled in code from your fork_selections, so you never " +
+    "carry it. Resolve every fork and report your choices in finalize_setup.fork_selections.",
   inputSchema: {
     type: "object" as const,
     properties: {
@@ -157,6 +167,85 @@ const LOAD_WORLD_TOOL: NormalizedTool = {
     required: ["slug"],
   },
 };
+
+const ROLL_DICE_TOOL: NormalizedTool = {
+  name: "roll_dice",
+  description:
+    "Roll dice during setup. Primary use: resolve an agent-decided fork at random — " +
+    "roll `1dN` to pick uniformly among a fork's N options (option 1 = result 1, etc.), " +
+    "which avoids biasing every campaign toward the first/most-obvious branch. " +
+    "Returns the individual rolls and the total.",
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      expression: { type: "string", description: "Dice expression, e.g. \"1d4\", \"2d6+1\", \"1d20\"." },
+      reason: { type: "string", description: "Optional short reason (e.g. 'genre-wrapper fork').", nullable: true },
+    },
+    required: ["expression"],
+  },
+};
+
+/**
+ * Render a world's forks + config hints for the setup agent. Deliberately
+ * omits the DM-only premise prose (base `detail` and each option's `detail`) —
+ * that is assembled in code at finalize from the agent's `fork_selections`, so
+ * the setup agent never carries the DM's secrets in its context.
+ */
+function renderWorldForAgent(world: WorldFile): string {
+  const parts: string[] = [];
+  const forks = normalizeForks(world);
+  const playerForks = forks.filter((f) => f.chooser === "player");
+  const agentForks = forks.filter((f) => f.chooser === "agent");
+
+  const renderFork = (f: WorldFork): string =>
+    `- Fork \`${f.id}\` — ${f.label}${f.prompt ? ` _(${f.prompt})_` : ""}\n` +
+    f.options.map((o) => `    - \`${o.id}\`: **${o.name}** — ${o.description}`).join("\n");
+
+  if (playerForks.length) {
+    parts.push(
+      "## Player forks — present each to the player via present_choices\n" +
+      "Use each option's **name** as the choice label and its description as the choice description. " +
+      "When the player picks, record it in finalize_setup.fork_selections as `{ \"<forkId>\": \"<optionId>\" }`.\n\n" +
+      playerForks.map(renderFork).join("\n"),
+    );
+  }
+  if (agentForks.length) {
+    parts.push(
+      "## Agent forks — you decide these (DM-only; never shown to the player)\n" +
+      "For each, roll `roll_dice` with `1dN` (N = number of options) to pick at random, or choose the option " +
+      "that best fits the player's stated preferences. Record each in finalize_setup.fork_selections.\n\n" +
+      agentForks.map(renderFork).join("\n"),
+    );
+  }
+  if (!forks.length) {
+    parts.push("This world declares no forks — nothing to resolve here.");
+  }
+
+  if (world.system) parts.push(`Suggested system: ${world.system}`);
+  if (world.mood) parts.push(`Suggested mood: ${world.mood}`);
+  if (world.difficulty) parts.push(`Suggested difficulty: ${world.difficulty}`);
+  if (world.campaign_scope) {
+    parts.push(`Required campaign_scope: ${world.campaign_scope}`);
+    parts.push("(The world above defines a required campaign scope. Use the slug exactly as shown — no extra text — in finalize_setup, and do NOT ask the player about campaign length.)");
+  }
+  return parts.length > 0 ? parts.join("\n\n") : "World loaded but has no additional detail.";
+}
+
+/** Dispatch a setup-time `roll_dice` call. */
+function renderRollDice(input: Record<string, unknown>): { content: string; isError: boolean } {
+  const expression = typeof input.expression === "string" ? input.expression.trim() : "";
+  if (!expression) return { content: "roll_dice requires an `expression` (e.g. \"1d4\").", isError: true };
+  try {
+    const reason = typeof input.reason === "string" && input.reason.trim() ? input.reason.trim() : undefined;
+    const out = rollDice({ expression, reason });
+    const rendered = out.results
+      .map((r) => `${r.expression} → [${r.rolls.join(", ")}] = ${r.total}`)
+      .join("; ");
+    return { content: rendered, isError: false };
+  } catch (e) {
+    return { content: `roll_dice error: ${e instanceof Error ? e.message : String(e)}`, isError: true };
+  }
+}
 
 const GENERATE_IMAGE_TOOL: NormalizedTool = {
   name: "generate_image",
@@ -219,7 +308,7 @@ const SET_PORTRAIT_TOOL: NormalizedTool = {
   },
 };
 
-const BASE_TOOLS = [FINALIZE_TOOL, PRESENT_CHOICES_TOOL, LOAD_WORLD_TOOL];
+const BASE_TOOLS = [FINALIZE_TOOL, PRESENT_CHOICES_TOOL, LOAD_WORLD_TOOL, ROLL_DICE_TOOL];
 const IMAGE_GEN_TOOLS = [GENERATE_IMAGE_TOOL, SET_PORTRAIT_TOOL];
 
 // --- System prompt ---
@@ -679,16 +768,48 @@ export function createSetupConversation(
     const rawWorldSlug = typeof input.world_slug === "string" ? input.world_slug.trim().toLowerCase() : "";
     const worldSlug = rawWorldSlug.replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
 
+    // Parse the agent's fork resolutions (forkId → optionId). Validated
+    // against the seed's actual forks below before anything is stored.
+    const rawForkSel = input.fork_selections;
+    let reportedSelections: Record<string, string> | undefined;
+    if (rawForkSel && typeof rawForkSel === "object" && !Array.isArray(rawForkSel)) {
+      const fs: Record<string, string> = {};
+      for (const [k, v] of Object.entries(rawForkSel as Record<string, unknown>)) {
+        if (typeof v === "string" && v.trim()) fs[k] = v.trim();
+      }
+      if (Object.keys(fs).length) reportedSelections = fs;
+    }
+
     const rawDetail = input.campaign_detail;
     let campaignDetail: string | null = typeof rawDetail === "string" && rawDetail.trim()
       ? rawDetail : null;
-    if (rawDetail === undefined || rawDetail === null) {
-      // Primary: use world_slug if the agent passed it (reliable — came from load_world)
-      // Fallback: derive slug from campaign_name (fragile — agent may rename the campaign)
-      const fallbackSlug = campaignName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-      const slug = worldSlug || fallbackSlug;
-      const world = loadWorldBySlug(slug, userWorldsDir);
-      if (world?.detail) campaignDetail = world.detail;
+
+    // For a seeded campaign, CODE owns the DM detail: assemble it from the
+    // seed's fork-invariant base plus the *selected* fork branches, so the DM
+    // sees one collapsed variant and the unchosen branches never reach its
+    // context. Precedence: an explicit world_slug always assembles from the
+    // seed; otherwise (only when the agent supplied no detail) we fall back to
+    // a campaign-name-derived slug for back-compat with agents that forget the
+    // slug. An agent-supplied detail with no slug = a fully custom campaign.
+    const fallbackSlug = campaignName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    const seedSlug = worldSlug || (campaignDetail === null ? fallbackSlug : "");
+    let forkSelections: Record<string, string> | undefined;
+    if (seedSlug) {
+      const world = loadWorldBySlug(seedSlug, userWorldsDir);
+      if (world) {
+        const forks = normalizeForks(world);
+        // Keep only selections that name a real fork + a real option of it.
+        if (reportedSelections) {
+          const valid: Record<string, string> = {};
+          for (const fork of forks) {
+            const optId = reportedSelections[fork.id];
+            if (optId && fork.options.some((o) => o.id === optId)) valid[fork.id] = optId;
+          }
+          if (Object.keys(valid).length) forkSelections = valid;
+        }
+        const assembled = assembleCampaignDetail(world.detail, forks, forkSelections);
+        if (assembled) campaignDetail = assembled;
+      }
     }
 
     // The setup prompt + tool description document `few-sessions` as the
@@ -723,6 +844,7 @@ export function createSetupConversation(
       handoffNote: (typeof input.handoff_note === "string" && input.handoff_note.trim())
         ? input.handoff_note.trim() : undefined,
       worldSlug: worldSlug || undefined,
+      forkSelections,
     };
   }
 
@@ -810,28 +932,11 @@ export function createSetupConversation(
       if (call.name === "load_world") {
         const slug = (call.input as { slug?: string }).slug ?? "";
         const world = loadWorldBySlug(slug, userWorldsDir);
-        let content: string;
-        if (world) {
-          const parts: string[] = [];
-          if (world.detail) parts.push(`## Detail\n${processIncludes(world.detail)}`);
-          if (world.suboptions?.length) {
-            for (const sub of world.suboptions) {
-              parts.push(`## Suboption: ${sub.label}\n` +
-                sub.choices.map((c: { name: string; description: string }) => `- **${c.name}** — ${c.description}`).join("\n"));
-            }
-          }
-          if (world.system) parts.push(`Suggested system: ${world.system}`);
-          if (world.mood) parts.push(`Suggested mood: ${world.mood}`);
-          if (world.difficulty) parts.push(`Suggested difficulty: ${world.difficulty}`);
-          if (world.campaign_scope) {
-            parts.push(`Required campaign_scope: ${world.campaign_scope}`);
-            parts.push("(The world above defines a required campaign scope. Use the slug exactly as shown — no extra text — in finalize_setup, and do NOT ask the player about campaign length.)");
-          }
-          content = parts.length > 0 ? parts.join("\n\n") : "World loaded but has no additional detail.";
-        } else {
-          content = `No world found with slug "${slug}".`;
-        }
+        const content = world ? renderWorldForAgent(world) : `No world found with slug "${slug}".`;
         return { content, isError: false };
+      }
+      if (call.name === "roll_dice") {
+        return renderRollDice(call.input);
       }
       if (call.name === "finalize_setup") {
         if (call.input._parse_error) {
@@ -975,31 +1080,19 @@ export function createSetupConversation(
         } else if (tc.name === "load_world") {
           const slug = (tc.input as { slug?: string }).slug ?? "";
           const world = loadWorldBySlug(slug, userWorldsDir);
-          let content: string;
-          if (world) {
-            const parts: string[] = [];
-            if (world.detail) parts.push(`## Detail\n${processIncludes(world.detail)}`);
-            if (world.suboptions?.length) {
-              for (const sub of world.suboptions) {
-                parts.push(`## Suboption: ${sub.label}\n` +
-                  sub.choices.map((c: { name: string; description: string }) => `- **${c.name}** — ${c.description}`).join("\n"));
-              }
-            }
-            if (world.system) parts.push(`Suggested system: ${world.system}`);
-            if (world.mood) parts.push(`Suggested mood: ${world.mood}`);
-            if (world.difficulty) parts.push(`Suggested difficulty: ${world.difficulty}`);
-            if (world.campaign_scope) {
-              parts.push(`Required campaign_scope: ${world.campaign_scope}`);
-              parts.push("(The world above defines a required campaign scope. Use the slug exactly as shown — no extra text — in finalize_setup, and do NOT ask the player about campaign length.)");
-            }
-            content = parts.length > 0 ? parts.join("\n\n") : "World loaded but has no additional detail.";
-          } else {
-            content = `No world found with slug "${slug}".`;
-          }
+          const content = world ? renderWorldForAgent(world) : `No world found with slug "${slug}".`;
           toolResults.push({
             type: "tool_result",
             tool_use_id: tc.id,
             content,
+          });
+        } else if (tc.name === "roll_dice") {
+          const dispatched = renderRollDice(tc.input);
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: tc.id,
+            content: dispatched.content,
+            ...(dispatched.isError ? { is_error: true } : {}),
           });
         } else if (tc.name === "finalize_setup") {
           // The provider returns `_parse_error` when tool-call JSON is

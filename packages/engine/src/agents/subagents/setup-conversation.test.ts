@@ -13,6 +13,22 @@ vi.mock("../../config/world-loader.js", async (importOriginal) => {
       if (slug === "scoped-seed") {
         return { name: "Scoped Seed", summary: "A seed with a baked-in scope.", genres: ["fantasy"], detail: "Some detail.", campaign_scope: "open-ended" };
       }
+      if (slug === "forked-seed") {
+        return {
+          name: "Forked Seed", summary: "A seed with forks.", genres: ["fantasy"],
+          detail: "Base premise.",
+          forks: [
+            { id: "wrapper", label: "Genre wrapper", chooser: "agent", options: [
+              { id: "fantasy", name: "Fantasy", description: "stone", detail: "Temples of stone." },
+              { id: "scifi", name: "Sci-Fi", description: "servers", detail: "Server farms." },
+            ] },
+            { id: "faction", label: "Your faction", chooser: "player", options: [
+              { id: "iron", name: "Iron", description: "military" },
+              { id: "gold", name: "Gold", description: "merchants" },
+            ] },
+          ],
+        };
+      }
       return undefined;
     }),
   };
@@ -893,5 +909,48 @@ describe("createSetupConversation", () => {
 
     expect(result.finalized).toBeDefined();
     expect(result.finalized!.campaignDetail).toBeNull();
+  });
+
+  it("finalize_setup assembles campaign_detail from base + selected fork branches", async () => {
+    const input = {
+      ...FINALIZE_INPUT,
+      campaign_name: "Forked - Iron",
+      world_slug: "forked-seed",
+      fork_selections: { wrapper: "scifi", faction: "iron" },
+    };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Your adventure begins!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    // Base + the SELECTED wrapper branch's detail. The faction (player fork)
+    // carries no detail, so it adds nothing — and the unchosen "fantasy"
+    // branch ("Temples of stone.") is absent.
+    expect(result.finalized!.campaignDetail).toBe("Base premise.\n\nServer farms.");
+    expect(result.finalized!.campaignDetail).not.toContain("Temples of stone");
+    expect(result.finalized!.forkSelections).toEqual({ wrapper: "scifi", faction: "iron" });
+  });
+
+  it("finalize_setup drops fork selections that name unknown forks or options", async () => {
+    const input = {
+      ...FINALIZE_INPUT,
+      campaign_name: "Forked",
+      world_slug: "forked-seed",
+      fork_selections: { wrapper: "nonexistent", bogus: "x" },
+    };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Your adventure begins!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    // No valid selection → base only, and nothing stored.
+    expect(result.finalized!.campaignDetail).toBe("Base premise.");
+    expect(result.finalized!.forkSelections).toBeUndefined();
   });
 });
