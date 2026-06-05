@@ -99,23 +99,47 @@ A single JSON file, `worlds/<slug>.mvworld` (bundled) or dropped into the user's
 `mood`, `difficulty`, `campaign_scope`, `calendar_display_format`,
 `dm_personality`.
 
-**`detail`** (DM-only, never shown to the player) — this is where the
-*projection* happens. Do **not** transcribe what happened. Instead:
-- State the **standing situation** as a fresh starting point.
+**`detail`** (DM-only, never shown to the player) — the **fork-invariant base**.
+This is where the *projection* happens. Do **not** transcribe what happened, and
+do **not** put branch choices here as prose. Instead:
+- State the **standing situation** true for *every* variant as a fresh start.
 - Recast resolved plot as latent tension or open questions.
-- Add a "crucial question (DM only)" with 2-3 secret directions, the way the
-  bundled seeds do (see [`worlds/the-salt-wedding.mvworld`](../../../worlds/the-salt-wedding.mvworld)
-  or [`worlds/three-histories.mvworld`](../../../worlds/three-histories.mvworld)).
-- Include pacing/tone guidance.
+- Include pacing/tone guidance that applies regardless of which branch is taken.
 
-**`suboptions`** (player-facing) — optional structured starting choices (e.g.
-"Who are you to this?"). Each shapes the new player's entry into the world.
+**`forks`** — the named decision points by which one seed encodes many campaigns.
+This is the modern replacement for prose "crucial question (DM only — roll or
+choose)" / "genre wrapper" blocks **and** for legacy `suboptions`. Each fork is
+`{ id, label, chooser, prompt?, options: [{ id, name, description, detail? }] }`:
+- `chooser: "player"` — presented to the player (starting faction, who-you-are).
+  `description` is player-safe.
+- `chooser: "agent"` — the setup agent decides (rolls or chooses) and keeps it
+  secret: the genre wrapper, the crucial-question variant. `description` is
+  DM-facing guidance.
+- An option's `detail` is the **branch-specific** DM prose, spliced into the
+  campaign's `campaign_detail` only when that option is selected. This is how a
+  variant's worldbuilding reaches the DM without the unchosen branches.
+- **All forks resolve at setup** — there are no play-time forks. Everything the
+  DM needs is decided before turn 1.
+
+See [`worlds/the-salt-wedding.mvworld`](../../../worlds/the-salt-wedding.mvworld)
+for shape. (`suboptions` still loads — it folds into player forks — but author
+new seeds with `forks`.)
 
 **`entities`** — keyed by category then slug. Each entity is
-`{ title, frontMatter, body }`, mapping 1:1 to an on-disk entity file. **Include
-NPCs; never include the old PC** (the importer skips any `type: PC` entity, but
-don't author one in the first place). Slugs are kebab-case, articles stripped
-("The City" → `city`). Wikilinks in bodies use `[[Display Name]]`.
+`{ title, frontMatter, body, appliesWhen? }`, mapping 1:1 to an on-disk entity
+file. **Include NPCs; never include the old PC** (the importer skips any
+`type: PC` entity, but don't author one in the first place). Slugs are
+kebab-case, articles stripped ("The City" → `city`). Wikilinks in bodies use
+`[[Display Name]]`.
+
+Per entity, decide how it relates to the forks — this is the core judgment call:
+- **Genericize → universal.** Strip branch-specific texture so it fits every
+  variant; omit `appliesWhen`. (Most NPCs/factions/lore.)
+- **Tag → branch-scoped.** Set `appliesWhen: { fork, option }` so it materializes
+  only when that branch is chosen (e.g. a data-hall location only in the sci-fi
+  wrapper). The referenced fork + option must exist.
+- **Bake closed.** Drop the fork entirely and ship one concrete variant — loses
+  open-endedness but every asset applies.
 
 **`maps`** — keyed by map ID, same schema as
 [`docs/format-spec.md` §4.3](../../../docs/format-spec.md). Seed verbatim.

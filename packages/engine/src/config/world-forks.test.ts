@@ -127,6 +127,21 @@ function bundledWorldsDir(): string {
   return join(import.meta.dirname, "../../../../worlds");
 }
 
+/** Tell-tale phrases of a *prose* fork that should have been lifted into a
+ *  structured fork during migration. Heuristic — only enforced once a seed
+ *  declares structured `forks` (i.e. has been migrated). */
+const PROSE_FORK_PATTERNS = [
+  /roll or choose/i,
+  /do not reveal early/i,
+  /genre wrapper \(/i,
+  /crucial question \(/i,
+];
+
+/** Flatten every inline entity of a world (across categories). */
+function allEntities(world: WorldFile) {
+  return Object.values(world.entities ?? {}).flatMap((cat) => Object.values(cat ?? {}));
+}
+
 describe("bundled seed forks are well-formed", () => {
   const dir = bundledWorldsDir();
   const files = readdirSync(dir).filter((f) => f.endsWith(".mvworld"));
@@ -134,26 +149,59 @@ describe("bundled seed forks are well-formed", () => {
   for (const file of files) {
     const world = JSON.parse(readFileSync(join(dir, file), "utf-8")) as WorldFile;
     const forks = normalizeForks(world);
-    if (forks.length === 0) continue; // seeds without forks are fine
 
-    it(`${file}: forks and options are named with unique ids`, () => {
-      const forkIds = new Set<string>();
-      for (const fork of forks) {
-        expect(fork.id, `fork id in ${file}`).toBeTruthy();
-        expect(fork.label, `fork label in ${file}`).toBeTruthy();
-        expect(["player", "agent"]).toContain(fork.chooser);
-        expect(forkIds.has(fork.id), `duplicate fork id "${fork.id}" in ${file}`).toBe(false);
-        forkIds.add(fork.id);
+    if (forks.length > 0) {
+      it(`${file}: forks and options are named with unique ids`, () => {
+        const forkIds = new Set<string>();
+        for (const fork of forks) {
+          expect(fork.id, `fork id in ${file}`).toBeTruthy();
+          expect(fork.label, `fork label in ${file}`).toBeTruthy();
+          expect(["player", "agent"]).toContain(fork.chooser);
+          expect(forkIds.has(fork.id), `duplicate fork id "${fork.id}" in ${file}`).toBe(false);
+          forkIds.add(fork.id);
 
-        expect(fork.options.length, `fork "${fork.id}" in ${file} needs options`).toBeGreaterThanOrEqual(2);
-        const optionIds = new Set<string>();
-        for (const option of fork.options) {
-          expect(option.id, `option id in fork "${fork.id}" of ${file}`).toBeTruthy();
-          expect(option.name, `option name in fork "${fork.id}" of ${file}`).toBeTruthy();
-          expect(optionIds.has(option.id), `duplicate option id "${option.id}" in fork "${fork.id}" of ${file}`).toBe(false);
-          optionIds.add(option.id);
+          expect(fork.options.length, `fork "${fork.id}" in ${file} needs options`).toBeGreaterThanOrEqual(2);
+          const optionIds = new Set<string>();
+          for (const option of fork.options) {
+            expect(option.id, `option id in fork "${fork.id}" of ${file}`).toBeTruthy();
+            expect(option.name, `option name in fork "${fork.id}" of ${file}`).toBeTruthy();
+            expect(optionIds.has(option.id), `duplicate option id "${option.id}" in fork "${fork.id}" of ${file}`).toBe(false);
+            optionIds.add(option.id);
+          }
         }
-      }
-    });
+      });
+    }
+
+    // Every fork-scoped entity must reference a real fork + option.
+    const scoped = allEntities(world).filter((e) => e.appliesWhen);
+    if (scoped.length > 0) {
+      it(`${file}: appliesWhen references resolve to a real fork + option`, () => {
+        for (const e of scoped) {
+          const aw = e.appliesWhen!;
+          const fork = forks.find((f) => f.id === aw.fork);
+          expect(fork, `entity "${e.title}" in ${file} references unknown fork "${aw.fork}"`).toBeDefined();
+          expect(
+            fork!.options.some((o) => o.id === aw.option),
+            `entity "${e.title}" in ${file} references unknown option "${aw.option}" of fork "${aw.fork}"`,
+          ).toBe(true);
+        }
+      });
+    }
+
+    // Once a seed declares STRUCTURED forks (i.e. has been migrated), its
+    // fork-invariant base `detail` must not still carry prose forks. Triggers
+    // on raw `world.forks` (not folded suboptions), so unmigrated suboption-only
+    // seeds are not flagged prematurely.
+    if (world.forks?.length) {
+      it(`${file}: migrated seed's base detail has no leftover prose forks`, () => {
+        const base = world.detail ?? "";
+        for (const pat of PROSE_FORK_PATTERNS) {
+          expect(
+            pat.test(base),
+            `base detail in ${file} still contains a prose fork (${pat}) — lift it into a structured fork`,
+          ).toBe(false);
+        }
+      });
+    }
   }
 });
