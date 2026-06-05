@@ -266,3 +266,38 @@ export class StatePersister {
     return { combat, clocks, maps, decks, objectives, scene, conversation, ui, usage, resources };
   }
 }
+
+/**
+ * True when a campaign shows durable evidence of prior play, independent of any
+ * single scene's transcript. `conversation.json` (the DM's persisted memory) and
+ * `display-log.md` (the human scrollback) outlast individual scene files: either
+ * being non-empty means the campaign has been played and must be RESUMED, never
+ * reopened as a fresh game over existing data.
+ *
+ * The resume decision otherwise keys solely on the *current* scene's transcript
+ * (`detectSceneState`), which a crash between opening narration and the first
+ * transcript flush — or a hand-checked-out commit, or a missing scene dir — can
+ * leave empty while the campaign plainly has history. Treating those as new
+ * games silently grafts a fresh opening onto the existing campaign, which
+ * players experience as a "completely missing narrative log." This is the
+ * durable backstop against that whole class of failure.
+ *
+ * Best-effort: missing / unreadable / malformed files read as "no prior play".
+ */
+export async function hasPriorPlay(campaignRoot: string, io: FileIO): Promise<boolean> {
+  // conversation.json — a non-empty JSON array of exchanges is the strongest
+  // signal (it's literally what the DM resumes from).
+  try {
+    const raw = await io.readFile(norm(join(campaignRoot, STATE_FILES.conversation)));
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (Array.isArray(parsed) && parsed.length > 0) return true;
+  } catch { /* missing / unreadable / invalid JSON — fall through */ }
+
+  // display-log.md — any non-whitespace scrollback means turns were narrated.
+  try {
+    const raw = await io.readFile(norm(join(campaignRoot, STATE_FILES.displayLog)));
+    if (raw && raw.trim().length > 0) return true;
+  } catch { /* missing / unreadable — fall through */ }
+
+  return false;
+}

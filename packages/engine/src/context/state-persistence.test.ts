@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { StatePersister, STATE_FILES, CONFIG_FILE } from "./state-persistence.js";
+import { StatePersister, STATE_FILES, CONFIG_FILE, hasPriorPlay } from "./state-persistence.js";
 import type { FileIO } from "../agents/scene-manager.js";
 import type { CombatState } from "@machine-violet/shared/types/combat.js";
 import type { MapData } from "@machine-violet/shared/types/maps.js";
@@ -863,5 +863,40 @@ describe("format spec compliance: JSON formatting (§4)", () => {
     const raw = files[norm(`/tmp/campaign/${STATE_FILES.conversation}`)];
     // Compact JSON has no newlines (single line)
     expect(raw.split("\n")).toHaveLength(1);
+  });
+});
+
+describe("hasPriorPlay", () => {
+  const ROOT = "/tmp/campaign";
+  const convPath = norm(`${ROOT}/${STATE_FILES.conversation}`);
+  const logPath = norm(`${ROOT}/${STATE_FILES.displayLog}`);
+
+  it("returns false for a fresh campaign with no state files", async () => {
+    expect(await hasPriorPlay(ROOT, mockFileIO())).toBe(false);
+  });
+
+  it("returns true when conversation.json has exchanges", async () => {
+    files[convPath] = JSON.stringify([{ user: { role: "user", content: "hi" } }]);
+    expect(await hasPriorPlay(ROOT, mockFileIO())).toBe(true);
+  });
+
+  it("returns true when display-log.md has scrollback (even with no transcript)", async () => {
+    files[logPath] = "The tavern door creaks open.\n> I step inside.\n";
+    expect(await hasPriorPlay(ROOT, mockFileIO())).toBe(true);
+  });
+
+  it("treats an empty conversation array as no prior play", async () => {
+    files[convPath] = "[]";
+    expect(await hasPriorPlay(ROOT, mockFileIO())).toBe(false);
+  });
+
+  it("treats whitespace-only display-log as no prior play", async () => {
+    files[logPath] = "  \n\n";
+    expect(await hasPriorPlay(ROOT, mockFileIO())).toBe(false);
+  });
+
+  it("does not throw on malformed conversation.json — reads as no prior play", async () => {
+    files[convPath] = "{not valid json";
+    expect(await hasPriorPlay(ROOT, mockFileIO())).toBe(false);
   });
 });

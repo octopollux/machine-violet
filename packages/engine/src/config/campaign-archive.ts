@@ -96,6 +96,12 @@ async function walkAllBinary(
   }
 
   for (const entry of entries) {
+    // Skip the regenerable `.debug/` dir at the campaign root — gitignored
+    // context dumps + crash traces that bloat the (synchronous, rollback-
+    // blocking) snapshot and aren't part of the campaign. Unarchive simply
+    // omits it; the engine recreates it on demand. The /diagnostics bundler
+    // has its own walk (server/diagnostics.ts) and still captures it.
+    if (prefix === "" && entry === ".debug") continue;
     const abs = norm(join(root, entry));
     const rel = prefix ? `${prefix}/${entry}` : entry;
     if (await io.isDirectory(abs)) {
@@ -152,7 +158,8 @@ function fileStamp(): string {
  * Walk → zip → verify-in-memory → write → read-back-verify. Does NOT modify the
  * source folder. Shared by `archiveCampaign` (which then deletes the source)
  * and `snapshotCampaign` (which leaves it in place). `.git` is included, so a
- * round-tripped zip restores the full repo history.
+ * round-tripped zip restores the full repo history; the regenerable `.debug/`
+ * dir is excluded (see `walkAllBinary`).
  */
 async function buildAndWriteVerifiedZip(
   campaignPath: string,
