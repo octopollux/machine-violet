@@ -34,7 +34,9 @@ rollback({
 })
 ```
 
-**Every rollback backs the campaign up first.** `performRollback` (the single canonical entry every path funnels through) calls `snapshotCampaign` before touching git — a verified zip of the whole campaign (including `.git`) written to `archivedcampaigns/` with an always-timestamped `pre-rollback` name. So the discarded turns are never lost: the backup appears in the **Archived Campaigns** list and restores via the normal unarchive path. If the backup fails, the rollback aborts rather than performing a destructive reset with no safety net.
+**Every rollback backs the campaign up first.** `performRollback` (the single canonical entry every path funnels through) calls `snapshotCampaign` before touching git — a verified zip of the whole campaign (including `.git`, but excluding the regenerable `.debug/` dir) written to `archivedcampaigns/` with an always-timestamped `pre-rollback` name. So the discarded turns are never lost: the backup appears in the **Archived Campaigns** list and restores via the normal unarchive path. Because the zip captures `.git` at the pre-rollback tip (before the reset), restoring it yields a fully working campaign in a fresh slot where the rollback never happened. If the backup fails, the rollback aborts rather than performing a destructive reset with no safety net.
+
+**Don't roll back by hand.** A campaign's on-disk files are a *serialization* of the game, not the game itself — the engine reconstructs "where we are" by inference over the directory tree and replays the narrative log only on the resume path. A bare `git checkout <commit>` leaves HEAD detached (the branch ref doesn't move, so the "future" is still canonical and the next turn either strands work on a dangling commit or overwrites your checkout) and can leave the tree in a shape the resume inference doesn't recognize (blank narrative pane). Use the in-app rollback above to go back, and restore a `pre-rollback` zip from Archived Campaigns to undo one.
 
 After rollback completes, a `RollbackSummaryModal` displays what was restored and waits for the player to press Enter. Internally, rollback restores the target commit, emits a `show_rollback_summary` TUI command, then throws a `RollbackCompleteError` (from `@machine-violet/shared/types/errors.ts`). The session-manager catches it and calls `endSession("rollback")`, which **skips the usual flush + checkpoint** — disk has just been reset to the target commit, but the engine's in-memory state is still ahead by the rolled-back turns, so persisting it would silently undo the rollback. The `show_rollback_summary` command rides the `activity:update` channel to the client ahead of `session:ended`; the client stashes the summary, and when `session:ended` lands it raises `RollbackSummaryModal` (over the now-defunct playing phase) instead of bouncing straight to the menu. Dismissing the modal returns to the main menu; re-entering the campaign loads the restored state via `session_resume`.
 
@@ -50,6 +52,14 @@ After rollback completes, a `RollbackSummaryModal` displays what was restored an
   }
 }
 ```
+
+## Resume vs. new game
+
+On session start the engine decides whether to **resume** an existing campaign (load persisted state, seed the DM's conversation, replay the narrative log) or **start a new game** (generate a fresh opening scene). Getting this wrong in the new-game direction is destructive: the opening narration is appended and committed *on top of* the existing campaign, grafting a new beginning onto old history. Players experience the various ways this can trigger as a single symptom — a **completely missing narrative log**.
+
+The primary signal is the current scene's transcript (`detectSceneState` → `scene.transcript.length > 0`). But that's the *weakest* durable evidence of prior play: a crash between the opening narration and the first transcript flush, a hand-checked-out commit, or a missing scene directory can leave it empty while the campaign plainly has history.
+
+So the decision has a backstop: `hasPriorPlay` ([state-persistence.ts](../packages/engine/src/context/state-persistence.ts)) checks the two signals that outlast any single scene file — `state/conversation.json` (the DM's persisted memory, what resume literally seeds from) and `state/display-log.md` (the human scrollback). If either is non-empty, the session resumes regardless of the transcript, and a `session:resume_recovered` event is logged. Neither file is written during setup, so a genuinely new campaign (no conversation, no scrollback) still starts fresh. This makes narrative-log population robust against the whole class of partial/inconsistent on-disk states, rather than depending on one fragile signal.
 
 ## API Failures
 

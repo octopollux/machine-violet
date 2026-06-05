@@ -206,6 +206,24 @@ describe("snapshotCampaign", () => {
     expect(restored.ok).toBe(true);
     expect(await io.exists(norm(`${restored.zipPath}/config.json`))).toBe(true);
   });
+
+  it("excludes the regenerable .debug/ dir from the snapshot", async () => {
+    const io = createMockIO();
+    const campaignsDir = "/home/user/campaigns";
+    const campaignPath = `${campaignsDir}/test-campaign`;
+    seedCampaign(io, campaignPath);
+    // Seed a .debug/ dir as the live app would (gitignored context dumps).
+    io.fs[norm(`${campaignPath}/.debug/context/dump-1.txt`)] = "huge context dump";
+    io.fs[norm(`${campaignPath}/.debug/crash-1.txt`)] = "stack trace";
+
+    const snap = await snapshotCampaign(campaignPath, campaignsDir, io, { label: "pre-rollback" });
+    const restored = await unarchiveCampaign(snap.zipPath!, campaignsDir, io);
+    expect(restored.ok).toBe(true);
+    // Real campaign content survives; the .debug/ dir is dropped.
+    expect(await io.exists(norm(`${restored.zipPath}/config.json`))).toBe(true);
+    expect(await io.exists(norm(`${restored.zipPath}/.debug/context/dump-1.txt`))).toBe(false);
+    expect(await io.exists(norm(`${restored.zipPath}/.debug/crash-1.txt`))).toBe(false);
+  });
 });
 
 describe("unarchiveCampaign", () => {
