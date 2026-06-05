@@ -1,0 +1,166 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "The Salt Wedding",
+  "summary": "On the eve of a marriage meant to end a generations-long feud, the bride has vanished — and the tide is coming in.",
+  "genres": [
+    "fantasy",
+    "mystery"
+  ],
+  "campaign_scope": "few-sessions",
+  "mood": "Tense, salt-and-candlelight",
+  "difficulty": "Balanced",
+  "calendar_display_format": "fantasy",
+  "detail": "A worked example of a *rich* seed — it ships inline NPCs, locations, factions, lore, an item, a small map, and a starting calendar, all of which the engine materializes into the campaign directory at creation. Treat it as a template you can copy when converting a played campaign into a seed.\n\nThe situation: two coastal houses, Holt and Vane, have feuded since the night of the Drowning Pact two generations ago. A marriage between Saoirse Holt and Edric Vane is supposed to end it. The wedding is tonight, at the Tideward Hall on the saltmarsh, and the bride is gone. The causeway floods within hours. Everyone has a reason to want the wedding stopped and a reason to want it to proceed, and nobody is telling the whole truth.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. SHE RAN — Saoirse left of her own will, because she learned what the Salt Ring really is and what the Pact actually demands of a Holt bride. She is hiding on the marsh and can be found, talked to, and helped — or dragged back. The campaign turns on whether the players honor her choice or the houses' peace.\n2. SHE WAS TAKEN — Someone inside the wedding party removed her to stop the union and reignite the feud (DM picks who, secretly — Dunmore Vane is the obvious suspect and may be a decoy). A kidnapping with the tide as a clock.\n3. SHE IS UNDER THE HALL — The Drowning Pact was never metaphor. The marsh keeps what it was promised, and the Tideward Hall sits on top of the debt. Saoirse is closer than anyone wants to say. The least mundane reading; lean here only if the table wants the uncanny.\n\nDM approach:\n- Tone: candlelit, brackish, intimate. A locked-room mystery where the room is a flooding hall full of people who hate each other and have dressed up to pretend otherwise.\n- Pacing: few-sessions. The tide is the clock — describe it rising. Escalate from \"the bride is late\" to \"the bride is missing\" to \"the causeway is underwater.\"\n- The seeded NPCs all lie, but each lies about a different thing. Let the players catch them in it.\n- The starting location placeholder will be the Tideward Hall — begin the opening scene there.",
+  "suboptions": [
+    {
+      "label": "Who are you to this wedding?",
+      "choices": [
+        {
+          "name": "A Holt cousin",
+          "description": "Family by blood, here to see Saoirse wed. You know the Holt side's grievances in your bones — and you've been told, your whole life, never to trust a Vane."
+        },
+        {
+          "name": "A Vane retainer",
+          "description": "Sworn to Edric's house. You were sent to make sure tonight goes smoothly, which means you've already noticed three things that aren't smooth at all."
+        },
+        {
+          "name": "The hired investigator",
+          "description": "Someone paid — quietly, before the wedding — for a discreet professional to be present. You don't yet know which house hired you, or what they were afraid of."
+        },
+        {
+          "name": "The stranger from the tide",
+          "description": "You washed up on the causeway this evening with salt in your lungs and no invitation. The hall took you in out of superstition: turning away a stranger on a wedding night is bad luck here."
+        }
+      ]
+    }
+  ],
+  "entities": {
+    "characters": {
+      "maren-holt": {
+        "title": "Maren Holt",
+        "frontMatter": {
+          "type": "NPC",
+          "location": "[[The Tideward Hall]]",
+          "disposition": "guarded",
+          "additional_names": "The Sister"
+        },
+        "body": "Saoirse's younger sister, in a grey dress she clearly chose to disappear in. She is the last person who spoke to the bride and the first to insist nothing is wrong.\n\n## Relationships\n- Sister to [[Saoirse Holt]] (the missing bride). Closer to her than anyone.\n- Cold toward [[Dunmore Vane]] — and watches him more than grief alone would explain.\n\n## What she's hiding (DM only)\nMaren knows *why* Saoirse is gone, even if not where. She helped her, or failed to stop her, and the guilt reads as evasiveness. She will not betray her sister to either house — but she might to someone who convinces her they'd protect Saoirse rather than the peace."
+      },
+      "father-crail": {
+        "title": "Father Crail",
+        "frontMatter": {
+          "type": "NPC",
+          "location": "[[The Tideward Hall]]",
+          "disposition": "unctuous"
+        },
+        "body": "The officiant, brought in to bless a union neither house's own clergy would touch. Soft-spoken, sweating, keen to begin before the tide.\n\n## What he's hiding (DM only)\nCrail knows the true origin of the [[The Drowning Pact]] — he's read the marsh records both houses think were lost. He wants the wedding done because he believes it *closes* the Pact's debt. He is wrong about how."
+      },
+      "dunmore-vane": {
+        "title": "Dunmore Vane",
+        "frontMatter": {
+          "type": "NPC",
+          "location": "[[The Tideward Hall]]",
+          "disposition": "hostile"
+        },
+        "body": "Edric's father and the man who reopened the feud a generation ago. He agreed to this marriage in public and has told three people in private that it will never happen.\n\n## What he's hiding (DM only)\nThe obvious suspect — which is exactly why the DM should decide carefully whether he's guilty (crucial-question option 2) or a loud decoy for someone quieter. He genuinely opposes the union. Whether he acted on it is the table's mystery to uncover."
+      }
+    },
+    "locations": {
+      "the-tideward-hall": {
+        "title": "The Tideward Hall",
+        "frontMatter": {
+          "type": "Location",
+          "theme": "gothic",
+          "additional_names": "The Hall"
+        },
+        "body": "A long stone wedding hall raised on pilings over the saltmarsh, reached only by the [[The Saltmarsh Causeway]]. Candlelit, garlanded, and slowly filling with the smell of the rising tide through the floorboards. Two long tables — Holt on one side, Vane on the other, the aisle between them like a border.\n\nThe opening scene begins here. (If this campaign's starting-location placeholder still exists, it should be renamed to point at this hall.)"
+      },
+      "the-saltmarsh-causeway": {
+        "title": "The Saltmarsh Causeway",
+        "frontMatter": {
+          "type": "Location"
+        },
+        "body": "The single raised track of stone and packed shell that connects the [[The Tideward Hall]] to the mainland. It floods at high tide — tonight, within hours. Once it's under, no one leaves the hall and no one arrives. The marsh on either side is deep, dark, and older than either house."
+      }
+    },
+    "factions": {
+      "house-holt": {
+        "title": "House Holt",
+        "frontMatter": {
+          "type": "Faction"
+        },
+        "body": "The bride's house. Old marsh-money, salt-farmers and pilots who know the tides. They want the wedding to proceed — it buys them peace and the Vane vineyards. Most of them have never been told what the Holt brides of the Pact were actually for."
+      },
+      "house-vane": {
+        "title": "House Vane",
+        "frontMatter": {
+          "type": "Faction"
+        },
+        "body": "The groom's house. Hill-stock and vineyards, contemptuous of the marsh and its superstitions. Edric wants the marriage; his father [[Dunmore Vane]] does not. The house is split down the middle and dressed in its finest."
+      }
+    },
+    "lore": {
+      "the-drowning-pact": {
+        "title": "The Drowning Pact",
+        "frontMatter": {
+          "type": "Lore"
+        },
+        "body": "Two generations ago, the marsh took the whole Holt fishing fleet in a single night — except for the boats that, the stories say, were spared by a promise. The feud between Holt and Vane began over what that promise cost and who was made to pay it. Both houses tell the story as metaphor. The marsh records, which [[Father Crail]] has read, do not."
+      }
+    },
+    "items": {
+      "the-salt-ring": {
+        "title": "The Salt Ring",
+        "frontMatter": {
+          "type": "Item",
+          "location": "[[The Tideward Hall]]"
+        },
+        "body": "The Holt wedding ring — pale, rough, cut from a single block of hardened marsh-salt rather than metal. Worn by every Holt bride of the Pact. It is meant to be slipped onto the bride's finger at the vow.\n\n## DM only\nWhat the ring *is*, and what putting it on a bride actually does, is the heart of crucial-question option 1. Saoirse learned it. That's why she's gone."
+      }
+    }
+  },
+  "maps": {
+    "tideward-hall-floor": {
+      "id": "tideward-hall-floor",
+      "gridType": "square",
+      "bounds": {
+        "width": 16,
+        "height": 8
+      },
+      "defaultTerrain": "stone-floor",
+      "regions": [
+        {
+          "x1": 0,
+          "y1": 0,
+          "x2": 15,
+          "y2": 0,
+          "terrain": "high-table"
+        },
+        {
+          "x1": 7,
+          "y1": 1,
+          "x2": 8,
+          "y2": 7,
+          "terrain": "aisle"
+        }
+      ],
+      "terrain": {
+        "0,7": "causeway-door"
+      },
+      "annotations": {
+        "0,7": "The door to the causeway. Water is already seeping under it.",
+        "7,0": "Where the vows would be spoken."
+      },
+      "meta": {
+        "lighting": "candlelight",
+        "tide": "rising"
+      }
+    }
+  },
+  "calendar": {
+    "current": 1170,
+    "epoch": "The night of the Salt Wedding",
+    "display_format": "fantasy"
+  }
+}

@@ -669,15 +669,22 @@ export function createSetupConversation(
     // Only fall back when the field is truly absent (undefined/null) — an explicit
     // empty string means the agent intentionally omitted it.
     const campaignName = (input.campaign_name as string) || "A New Story";
+
+    // The explicit seed slug the agent passed (came from load_world — reliable).
+    // Sanitized to a clean slug to prevent path traversal. Empty when the
+    // campaign is fully custom (no world chosen). This is the *only* slug used
+    // to materialize a seed's inline content — we never fall back to a
+    // campaign-name-derived slug for materialization, which could pull in an
+    // unrelated bundled world that happens to share the name.
+    const rawWorldSlug = typeof input.world_slug === "string" ? input.world_slug.trim().toLowerCase() : "";
+    const worldSlug = rawWorldSlug.replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+
     const rawDetail = input.campaign_detail;
     let campaignDetail: string | null = typeof rawDetail === "string" && rawDetail.trim()
       ? rawDetail : null;
     if (rawDetail === undefined || rawDetail === null) {
       // Primary: use world_slug if the agent passed it (reliable — came from load_world)
       // Fallback: derive slug from campaign_name (fragile — agent may rename the campaign)
-      // Sanitize world_slug to prevent path traversal (strip non-slug chars)
-      const rawWorldSlug = typeof input.world_slug === "string" ? input.world_slug.trim().toLowerCase() : "";
-      const worldSlug = rawWorldSlug.replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
       const fallbackSlug = campaignName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
       const slug = worldSlug || fallbackSlug;
       const world = loadWorldBySlug(slug, userWorldsDir);
@@ -715,6 +722,7 @@ export function createSetupConversation(
         : undefined,
       handoffNote: (typeof input.handoff_note === "string" && input.handoff_note.trim())
         ? input.handoff_note.trim() : undefined,
+      worldSlug: worldSlug || undefined,
     };
   }
 

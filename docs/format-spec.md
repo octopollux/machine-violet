@@ -894,6 +894,29 @@ A campaign seed is a world file with only the identity and DM-only fields:
 
 The setup agent receives world summaries (name, summary, genres, slug) in its system prompt. It uses the `load_world` tool to fetch the full detail and suboptions for a specific world by slug. Suboptions are presented to the player as structured choices. The detail block passes through to `campaign_detail` in config.json.
 
+The setup agent only ever sees this **thin slice** — `detail`, `suboptions`, and the suggested `system`/`mood`/`difficulty`/`campaign_scope`. A world's rich inline content (`entities`, `maps`, `rules`, `calendar`) is **never loaded into the setup agent's context**; it is materialized in code at build time (§10.5).
+
+### 10.5 Importing rich worlds (materialization)
+
+When a campaign is built from a world that carries inline content, `buildCampaignWorld` → `materializeWorldContent` ([`packages/engine/src/agents/world-builder.ts`](../packages/engine/src/agents/world-builder.ts)) re-loads the world by slug (`SetupResult.worldSlug`, set only when the setup agent passed an explicit `world_slug` to `finalize_setup`) and writes its content directly to disk:
+
+| World field | On-disk target |
+|---|---|
+| `entities.characters` | `characters/<slug>.md` — **NPCs only**; any `type: PC` entity is skipped (the PC comes from chargen) |
+| `entities.locations` | `locations/<slug>/index.md` |
+| `entities.factions` | `factions/<slug>.md` |
+| `entities.lore` | `lore/<slug>.md` |
+| `entities.items` | `items/<slug>.md` |
+| `rules` | `rules/<slug>.md` (verbatim) |
+| `maps` | `state/maps.json` (authoritative runtime store) |
+| `calendar` | `state/clocks.json` (calendar time + epoch; idle clocks, no alarms) |
+
+Entity filenames come from the canonical `campaignPaths` helpers (which slugify the entity title), so a correctly authored seed round-trips.
+
+**Deliberately not seeded:** `campaign/compendium.json` (the *player-facing* knowledge base — must start empty so the player discovers the world; a pre-filled compendium spoils novelty and misinforms the DM about player knowledge), the PC character sheet (chargen), and `campaign/log.json` entries (a seed carries no episodic record). The bootstrap `starting-location` placeholder is still written; the DM/Scribe renames it to the real opening locale (§6.6, scribe prompt).
+
+Authoring a `.mvworld` from a played campaign is a manual, brain-in-the-loop task — see the `build-mvworld` skill ([`.claude/skills/build-mvworld/SKILL.md`](../.claude/skills/build-mvworld/SKILL.md)) and the worked example [`worlds/the-salt-wedding.mvworld`](../worlds/the-salt-wedding.mvworld).
+
 ---
 
 ## 11. Known Deviations from Spec (Bugs)

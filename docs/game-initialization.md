@@ -135,8 +135,9 @@ Once the setup agent has enough information, it builds the campaign. This is mos
 11. **Write party file** — `characters/party.md` with initial shared resources
 12. **Write or update the machine-scope player file** — `~/.machine-violet/players/<player-slug>.md` persists across campaigns and is touched on every campaign creation (only when `homeDir` is available). See [Player file](#player-file-machine-scope) below.
 13. **Copy character portrait** — if the setup agent confirmed a portrait during chargen (its `set_portrait` tool wrote one), copy it from the `__setup__` scratch campaign into the new campaign's `characters/` directory. The no-portrait case (player declined image generation, or `set_portrait` was never called) is silently skipped. See [Portrait handoff](#portrait-handoff-at-campaign-creation) below.
+14. **Materialize rich seed content** — if the campaign was built from a `.mvworld` that ships inline content (NPCs, locations, factions, lore, items, maps, rules, calendar), re-load it by slug and write it straight to disk via `materializeWorldContent`. This runs entirely in code — the entity tree never passes through the setup agent's context. The player-facing compendium and the PC sheet are deliberately *not* seeded. See [format-spec.md §10.5](format-spec.md) for the field-by-field mapping and the `build-mvworld` skill for authoring seeds from played campaigns.
 
-`buildCampaignWorld` in [packages/engine/src/agents/world-builder.ts](../packages/engine/src/agents/world-builder.ts) performs all of these steps. The character file, party file, player file, and portrait copy are emitted alongside the directory scaffold and `config.json`.
+`buildCampaignWorld` in [packages/engine/src/agents/world-builder.ts](../packages/engine/src/agents/world-builder.ts) performs all of these steps. The character file, party file, player file, and portrait copy are emitted alongside the directory scaffold and `config.json`; rich seed content (step 14) is materialized last.
 
 ### Step 4: Handoff to the DM
 

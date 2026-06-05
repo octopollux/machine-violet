@@ -47,6 +47,16 @@ export interface SetupResult {
    * survives a mid-first-turn crash and restart.
    */
   handoffNote?: string;
+  /**
+   * Slug of the `.mvworld` seed this campaign was built from, when the player
+   * chose a bundled/imported world (vs. a fully custom premise). Set only when
+   * the setup agent passed an explicit `world_slug` to `finalize_setup` — never
+   * derived from the campaign name. `buildCampaignWorld` re-loads the world by
+   * this slug to materialize its inline content (NPCs, locations, factions,
+   * lore, items, maps, rules, calendar) directly to disk, bypassing the setup
+   * agent's context entirely. Omitted for custom campaigns.
+   */
+  worldSlug?: string;
 }
 
 /**
