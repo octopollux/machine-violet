@@ -930,6 +930,8 @@ When a campaign is built from a world that carries inline content, `buildCampaig
 
 Entity filenames come from the canonical `campaignPaths` helpers (which slugify the entity title), so a correctly authored seed round-trips.
 
+**Fork-scoped entities.** An entity may carry `appliesWhen: { fork, option }` (§10.6). It is materialized only if the campaign's `fork_selections` resolved that fork to that option — so a branch-specific NPC/location (e.g. a data-hall that exists only in the sci-fi wrapper) stays out of campaigns that took a different branch. Entities without `appliesWhen` are universal and always materialized.
+
 **Deliberately not seeded:** `campaign/compendium.json` (the *player-facing* knowledge base — must start empty so the player discovers the world; a pre-filled compendium spoils novelty and misinforms the DM about player knowledge), the PC character sheet (chargen), and `campaign/log.json` entries (a seed carries no episodic record). The bootstrap `starting-location` placeholder is still written; the DM/Scribe renames it to the real opening locale (§6.6, scribe prompt).
 
 Authoring a `.mvworld` from a played campaign is a manual, brain-in-the-loop task — see the `build-mvworld` skill ([`.claude/skills/build-mvworld/SKILL.md`](../.claude/skills/build-mvworld/SKILL.md)) and the worked example [`worlds/the-salt-wedding.mvworld`](../worlds/the-salt-wedding.mvworld).
@@ -950,7 +952,7 @@ A single seed often encodes **many possible campaigns** — a "genre wrapper", a
 
 The legacy `suboptions` shape (player-facing only) is **folded into `forks`** (`chooser: "player"`) by `normalizeForks` for any consumer that calls it, so older/user-authored files keep working; new seeds author `forks` directly.
 
-> **Status (staged rollout).** Live now: the `forks` / `fork_selections` format, the `world-forks.ts` helpers (`normalizeForks`, `assembleCampaignDetail`), and setup-agent consumption — `load_world` surfaces forks, the agent resolves them (rolling agent forks via `roll_dice`), and `handleFinalize` assembles `campaign_detail` from the seed base + selected branches and persists `fork_selections`. Still pending: migrating the bundled seeds from prose forks to structured `forks` (until a seed is migrated, its prose forks remain in its `detail` base and assemble through unchanged — no regression), and fork-scoped inline-content materialization (§10.5 currently materializes all inline entities regardless of selection).
+> **Status (staged rollout).** Live now: the `forks` / `fork_selections` format and `appliesWhen` scoping; the `world-forks.ts` helpers (`normalizeForks`, `assembleCampaignDetail`); setup-agent consumption — `load_world` surfaces forks, the agent resolves them (rolling agent forks via `roll_dice`), and `handleFinalize` assembles `campaign_detail` from the seed base + selected branches and persists `fork_selections`; and fork-scoped materialization (§10.5 gates `appliesWhen` entities on the selection). Still pending: migrating the bundled seeds from prose forks to structured `forks` (until a seed is migrated, its prose forks remain in its `detail` base and assemble through unchanged — no regression).
 
 ---
 

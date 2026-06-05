@@ -84,6 +84,15 @@ export interface WorldEntity {
   frontMatter: Record<string, string | string[] | null>;
   /** Markdown body (below the front matter + title). */
   body: string;
+  /**
+   * Optional fork scoping. When present, this entity is materialized into the
+   * campaign **only if** the named fork resolved to the named option (i.e.
+   * `config.fork_selections[fork] === option`). Absent = universal: the entity
+   * applies to every variant and is always materialized. Lets a seed ship
+   * branch-specific NPCs/locations (e.g. a data-hall that exists only in the
+   * sci-fi wrapper) without leaking other branches' content into the campaign.
+   */
+  appliesWhen?: { fork: string; option: string };
 }
 
 /** Calendar state carried in a world file (stripped of alarms). */

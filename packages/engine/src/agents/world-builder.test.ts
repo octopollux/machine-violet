@@ -166,6 +166,47 @@ describe("materializeWorldContent", () => {
     expect(paths(store)).not.toContain(norm(`${ROOT}/campaign/log.json`));
   });
 
+  it("materializes a fork-scoped entity only when its branch is selected", async () => {
+    const scoped: WorldFile = {
+      ...richWorld(),
+      entities: {
+        characters: {
+          "data-archivist": {
+            title: "Data Archivist",
+            frontMatter: { type: "NPC" },
+            body: "Tends the server farm.",
+            appliesWhen: { fork: "wrapper", option: "scifi" },
+          },
+          "temple-scribe": {
+            title: "Temple Scribe",
+            frontMatter: { type: "NPC" },
+            body: "Tends the oil lamps.",
+            appliesWhen: { fork: "wrapper", option: "fantasy" },
+          },
+          "always-here": {
+            title: "Always Here",
+            frontMatter: { type: "NPC" },
+            body: "Universal NPC.",
+          },
+        },
+      },
+    };
+
+    // Sci-fi branch selected → only the scifi-scoped + universal NPCs.
+    const a = mockFileIO();
+    await materializeWorldContent(ROOT, scoped, a.io, { wrapper: "scifi" });
+    expect(paths(a.store)).toContain(norm(`${ROOT}/characters/data-archivist.md`));
+    expect(paths(a.store)).toContain(norm(`${ROOT}/characters/always-here.md`));
+    expect(paths(a.store)).not.toContain(norm(`${ROOT}/characters/temple-scribe.md`));
+
+    // No selection → scoped entities are withheld; universal still written.
+    const b = mockFileIO();
+    await materializeWorldContent(ROOT, scoped, b.io);
+    expect(paths(b.store)).toContain(norm(`${ROOT}/characters/always-here.md`));
+    expect(paths(b.store)).not.toContain(norm(`${ROOT}/characters/data-archivist.md`));
+    expect(paths(b.store)).not.toContain(norm(`${ROOT}/characters/temple-scribe.md`));
+  });
+
   it("is a no-op-safe for a minimal seed with no inline content", async () => {
     const { io, store } = mockFileIO();
     const minimal: WorldFile = {

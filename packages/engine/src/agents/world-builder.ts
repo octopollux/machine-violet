@@ -8,7 +8,7 @@ import { slugify } from "../utils/slug.js";
 import { findSystem, readBundledRuleCard } from "../config/systems.js";
 import { processingPaths } from "../config/processing-paths.js";
 import { loadWorldBySlug } from "../config/world-loader.js";
-import type { WorldFile } from "@machine-violet/shared/types/world.js";
+import type { WorldFile, WorldEntity } from "@machine-violet/shared/types/world.js";
 import type { ClocksState } from "@machine-violet/shared/types/clocks.js";
 
 /**
@@ -141,7 +141,7 @@ export async function buildCampaignWorld(
     const userWorldsDir = homeDir ? machinePaths(homeDir).worldsDir : undefined;
     const world = loadWorldBySlug(result.worldSlug, userWorldsDir);
     if (world) {
-      await materializeWorldContent(root, world, fileIO);
+      await materializeWorldContent(root, world, fileIO, result.forkSelections);
     }
   }
 
@@ -196,19 +196,31 @@ export async function buildCampaignWorld(
  * slugify the entity title — so a correctly authored seed (record key ==
  * slugify(title)) round-trips, and a mismatched key still lands on the
  * engine-canonical path rather than a parallel orphan file.
+ *
+ * `selections` (the campaign's resolved `fork_selections`) gates fork-scoped
+ * entities: one carrying `appliesWhen` is written only if its fork resolved to
+ * its option. Entities without `appliesWhen` are universal and always written.
  */
 export async function materializeWorldContent(
   root: string,
   world: WorldFile,
   fileIO: FileIO,
+  selections?: Record<string, string>,
 ): Promise<void> {
   const paths = campaignPaths(root);
   const ents = world.entities;
+
+  // A scoped entity (appliesWhen) is materialized only if its fork resolved to
+  // its option; universal entities (no appliesWhen) always are. This keeps a
+  // branch-specific NPC/location out of campaigns that took a different fork.
+  const applies = (e: WorldEntity): boolean =>
+    !e.appliesWhen || selections?.[e.appliesWhen.fork] === e.appliesWhen.option;
 
   if (ents) {
     for (const entity of Object.values(ents.characters ?? {})) {
       // The PC comes from chargen — never materialize one from the seed.
       if (String(entity.frontMatter?.type ?? "").toLowerCase() === "pc") continue;
+      if (!applies(entity)) continue;
       await fileIO.writeFile(
         norm(paths.character(entity.title)),
         serializeEntity(entity.title, entity.frontMatter, entity.body, []),
@@ -216,6 +228,7 @@ export async function materializeWorldContent(
     }
 
     for (const entity of Object.values(ents.locations ?? {})) {
+      if (!applies(entity)) continue;
       // Locations live in their own subdirectory (index.md) — mkdir first.
       const locPath = norm(paths.location(entity.title));
       await fileIO.mkdir(locPath.replace(/\/index\.md$/, ""));
@@ -226,18 +239,21 @@ export async function materializeWorldContent(
     }
 
     for (const entity of Object.values(ents.factions ?? {})) {
+      if (!applies(entity)) continue;
       await fileIO.writeFile(
         norm(paths.faction(entity.title)),
         serializeEntity(entity.title, entity.frontMatter, entity.body, []),
       );
     }
     for (const entity of Object.values(ents.lore ?? {})) {
+      if (!applies(entity)) continue;
       await fileIO.writeFile(
         norm(paths.lore(entity.title)),
         serializeEntity(entity.title, entity.frontMatter, entity.body, []),
       );
     }
     for (const entity of Object.values(ents.items ?? {})) {
+      if (!applies(entity)) continue;
       await fileIO.writeFile(
         norm(paths.item(entity.title)),
         serializeEntity(entity.title, entity.frontMatter, entity.body, []),
