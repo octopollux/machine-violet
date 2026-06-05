@@ -42,19 +42,19 @@ describe("agent sidecar HTTP", () => {
     }
   });
 
-  async function start(port: number): Promise<void> {
+  // Bind port 0 so the OS assigns a free ephemeral port — avoids collisions
+  // with other tests / processes under parallel execution. The actual port is
+  // read back from the handle.
+  async function start(): Promise<void> {
     const state = initialClientState();
     state.engineState = "idle";
     state.mode = "play";
-    handle = await startAgentSidecar(port, () => state);
-    baseUrl = `http://127.0.0.1:${port}`;
+    handle = await startAgentSidecar(0, () => state);
+    baseUrl = `http://127.0.0.1:${handle.port}`;
   }
 
-  // Use a random high port to minimize collisions.
-  const TEST_PORT = 19876;
-
   it("GET /screen returns 200 with text content", async () => {
-    await start(TEST_PORT);
+    await start();
     const res = await fetch(`${baseUrl}/screen`);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/plain");
@@ -63,7 +63,7 @@ describe("agent sidecar HTTP", () => {
   });
 
   it("GET /screen?ansi=true returns 200", async () => {
-    await start(TEST_PORT);
+    await start();
     const res = await fetch(`${baseUrl}/screen?ansi=true`);
     expect(res.status).toBe(200);
     const text = await res.text();
@@ -71,7 +71,7 @@ describe("agent sidecar HTTP", () => {
   });
 
   it("GET /state returns valid ClientState JSON", async () => {
-    await start(TEST_PORT);
+    await start();
     const res = await fetch(`${baseUrl}/state`);
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -81,7 +81,7 @@ describe("agent sidecar HTTP", () => {
   });
 
   it("POST /input/key with known key returns 204", async () => {
-    await start(TEST_PORT);
+    await start();
     const res = await fetch(`${baseUrl}/input/key`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -91,7 +91,7 @@ describe("agent sidecar HTTP", () => {
   });
 
   it("POST /input/key with unknown key returns 400 with known list", async () => {
-    await start(TEST_PORT);
+    await start();
     const res = await fetch(`${baseUrl}/input/key`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -105,7 +105,7 @@ describe("agent sidecar HTTP", () => {
   });
 
   it("POST /input/key with invalid JSON returns 400", async () => {
-    await start(TEST_PORT);
+    await start();
     const res = await fetch(`${baseUrl}/input/key`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -115,7 +115,7 @@ describe("agent sidecar HTTP", () => {
   });
 
   it("POST /input with raw body returns 204", async () => {
-    await start(TEST_PORT);
+    await start();
     const res = await fetch(`${baseUrl}/input`, {
       method: "POST",
       body: "hello",
@@ -124,7 +124,7 @@ describe("agent sidecar HTTP", () => {
   });
 
   it("unknown route returns 404", async () => {
-    await start(TEST_PORT);
+    await start();
     const res = await fetch(`${baseUrl}/nope`);
     expect(res.status).toBe(404);
   });
@@ -150,9 +150,8 @@ describe("agent sidecar stdout tee", () => {
   });
 
   it("installs and restores the process.stdout.write wrapper", async () => {
-    const TEST_PORT = 19877;
     const originalWrite = process.stdout.write;
-    handle = await startAgentSidecar(TEST_PORT, () => initialClientState());
+    handle = await startAgentSidecar(0, () => initialClientState());
 
     // After startAgentSidecar, process.stdout.write must be a different
     // function — that's our tee. If this assertion ever flips back to

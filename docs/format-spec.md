@@ -135,7 +135,12 @@ Everything else is created during play.
   "mood": "gritty",                       // Freeform mood tag.
   "difficulty": "hard",                   // Freeform difficulty tag.
   "premise": "A frontier town...",        // Player-visible campaign premise.
-  "campaign_detail": "Hidden DM notes...",// DM-only campaign instructions.
+  "campaign_detail": "Hidden DM notes...",// DM-only instructions. For seed-built campaigns this is the
+                                          // ASSEMBLED detail: fork-invariant base + selected fork-option
+                                          // detail, flattened at finalize (§10.6). No unchosen branches.
+  "fork_selections": {                    // Optional. forkId → optionId — which seed variant was resolved
+    "starting-faction": "iron-circle"     // at setup. First-class record; drives scoped materialization. Absent for custom campaigns.
+  },
   "campaign_scope": "few-sessions",       // Optional. "one-shot" | "few-sessions" | "grand-campaign" | "open-ended". Shapes DM pacing.
   "setup_handoff": "Player wants to...",  // Optional. Postcard from the setup agent for the DM's first-turn priming. Injected once.
 
@@ -845,18 +850,30 @@ Bundled seeds are validated strictly (malformed files fail the build). User worl
   "calendar_display_format": "fantasy",
 
   // --- DM-only content ---
-  "detail": "Roll the throne's secret: ...",   // Never shown to the player.
+  "detail": "The throne sits empty...",   // Fork-INVARIANT base prose (§10.6). Never shown to the player.
 
-  // --- Player-facing choices ---
-  "suboptions": [                        // Structured choice groups.
+  // --- Forks: named decision points, resolved at setup (§10.6) ---
+  "forks": [
     {
+      "id": "starting-faction",          // Stable kebab-case id. Referenced by config.fork_selections.
       "label": "Your starting faction",
-      "choices": [
-        { "name": "The Iron Circle", "description": "Start entangled with the military..." },
-        { "name": "The Gilded Compact", "description": "Start among the merchants..." }
+      "chooser": "player",               // "player" (presented) | "agent" (setup agent rolls/chooses; DM-only)
+      "options": [
+        { "id": "iron-circle", "name": "The Iron Circle", "description": "Start entangled with the military..." },
+        { "id": "gilded-compact", "name": "The Gilded Compact", "description": "Start among the merchants..." }
+      ]
+    },
+    {
+      "id": "the-secret",
+      "label": "The throne's secret",
+      "chooser": "agent",                // The setup agent decides (often by rolling the dice tool).
+      "options": [
+        { "id": "heir-lives", "name": "The heir lives", "description": "...", "detail": "DM-only prose spliced into campaign_detail iff selected." },
+        { "id": "heir-dead", "name": "The heir is truly dead", "description": "...", "detail": "..." }
       ]
     }
   ],
+  // "suboptions": [...]                  // DEPRECATED legacy player-choice groups; folded into `forks` on load.
 
   // --- Inline content (optional — empty for seeds, rich for exports) ---
   "entities": {                          // Keyed by category, then slug.
@@ -916,6 +933,24 @@ Entity filenames come from the canonical `campaignPaths` helpers (which slugify 
 **Deliberately not seeded:** `campaign/compendium.json` (the *player-facing* knowledge base — must start empty so the player discovers the world; a pre-filled compendium spoils novelty and misinforms the DM about player knowledge), the PC character sheet (chargen), and `campaign/log.json` entries (a seed carries no episodic record). The bootstrap `starting-location` placeholder is still written; the DM/Scribe renames it to the real opening locale (§6.6, scribe prompt).
 
 Authoring a `.mvworld` from a played campaign is a manual, brain-in-the-loop task — see the `build-mvworld` skill ([`.claude/skills/build-mvworld/SKILL.md`](../.claude/skills/build-mvworld/SKILL.md)) and the worked example [`worlds/the-salt-wedding.mvworld`](../worlds/the-salt-wedding.mvworld).
+
+### 10.6 Forks (seed variants)
+
+A single seed often encodes **many possible campaigns** — a "genre wrapper", a secret "crucial question", a starting faction. These are **forks**: named decision points, each with named **options** (branches).
+
+**Forks resolve entirely at setup.** Player-facing forks (`chooser: "player"`) are presented to the player; agent-decided forks (`chooser: "agent"`) are rolled or chosen by the setup agent (DM-only — the genre wrapper, secret rolls). By the time the DM runs, every fork is collapsed to a single selected option; **the unchosen branches never enter the DM's context.** There are no deferred/play-time forks — the DM is never handed a "pick the whole campaign variant" decision.
+
+| Concept | Where | Shape |
+|---|---|---|
+| Fork definitions | `.mvworld` `forks[]` | `{ id, label, chooser, prompt?, options[] }` |
+| Option | `forks[].options[]` | `{ id, name, description, detail? }` |
+| The selection (hard data) | `config.json` `fork_selections` | `{ forkId: optionId }` |
+
+**`detail` splits in two.** The seed's top-level `detail` is the **fork-invariant base** — prose true for every variant. Each option's `detail` is the **branch-specific** prose, spliced into the campaign's `campaign_detail` only when that option is selected. The campaign's final detail is `assembleCampaignDetail(detail, normalizeForks(world), fork_selections)` ([`packages/engine/src/config/world-forks.ts`](../packages/engine/src/config/world-forks.ts)), flattened once at finalize.
+
+The legacy `suboptions` shape (player-facing only) is **folded into `forks`** (`chooser: "player"`) by `normalizeForks` for any consumer that calls it, so older/user-authored files keep working; new seeds author `forks` directly.
+
+> **Status (staged rollout).** The `forks` / `fork_selections` *format* and the `world-forks.ts` helpers (`normalizeForks`, `assembleCampaignDetail`) are in place. The *consumption* lands in later phases: the setup agent resolving forks (presenting player ones, rolling agent ones) and writing `fork_selections`, the build assembling `campaign_detail`, and the bundled seeds being migrated from prose forks to structured `forks`. Until then, `load_world` still surfaces `detail` + `suboptions` and the whole `detail` blob passes through to `campaign_detail` as before. §10.4 describes that current behavior; this section describes the target format.
 
 ---
 

@@ -57,6 +57,14 @@ export interface SetupResult {
    * agent's context entirely. Omitted for custom campaigns.
    */
   worldSlug?: string;
+  /**
+   * How the seed's forks were resolved during setup, as `forkId → optionId`.
+   * Every fork (player-facing and agent-decided) is collapsed to one option by
+   * the time setup finalizes; this records the chosen branches. Drives scoped
+   * content materialization and `campaign_detail` assembly. Omitted for custom
+   * campaigns and seeds without forks.
+   */
+  forkSelections?: Record<string, string>;
 }
 
 /**
@@ -83,6 +91,9 @@ export function buildCampaignConfig(result: SetupResult): CampaignConfig {
     image_generation: result.imageGeneration,
     premise: result.campaignPremise,
     campaign_detail: result.campaignDetail ?? undefined,
+    fork_selections: result.forkSelections && Object.keys(result.forkSelections).length > 0
+      ? result.forkSelections
+      : undefined,
     setup_handoff: result.handoffNote ?? undefined,
     dm_personality: result.personality,
     players: [player],

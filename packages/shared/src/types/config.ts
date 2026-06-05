@@ -92,8 +92,22 @@ export interface CampaignConfig {
   /** Intended campaign scope, set at build time. Shapes DM pacing decisions. */
   campaign_scope?: CampaignScope;
   premise?: string;
-  /** Hidden campaign detail — DM-only instructions (variants, secrets, pacing notes). */
+  /**
+   * Hidden campaign detail — DM-only instructions. When the campaign was built
+   * from a seed with forks, this is the **assembled** result: the seed's
+   * fork-invariant base prose plus the `detail` of each *selected* fork option,
+   * flattened once at finalize. Unchosen branches are never present — the DM
+   * sees a single, fully-resolved campaign variant.
+   */
   campaign_detail?: string;
+  /**
+   * Which fork option was selected for each of the seed's forks, as
+   * `forkId → optionId`. First-class hard record of how this campaign's
+   * variant was resolved at setup — used by the rich importer to materialize
+   * the selected branch's scoped content, and for reproducibility. Absent for
+   * fully custom campaigns and seeds without forks.
+   */
+  fork_selections?: Record<string, string>;
   /**
    * Handoff postcard written by the setup agent for the DM's first turn.
    * Free-form prose: player's words about their character, any freeform intent

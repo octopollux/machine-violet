@@ -10,7 +10,57 @@ import type { CampaignScope } from "./config.js";
  * On-disk format: format-spec.md §10.
  */
 
-/** A player-facing suboption group (e.g., "Your starting faction"). */
+/**
+ * A decision point baked into a seed — one of the named ways a single
+ * `.mvworld` can branch into many possible campaigns. Forks are resolved
+ * **entirely at setup time** (never deferred to the DM): player-facing forks
+ * are presented to the player, agent-decided forks are rolled/chosen by the
+ * setup agent. By the time the DM starts, every fork is collapsed to a single
+ * selected option and the unchosen branches are gone — they never enter the
+ * DM's context. The selection survives as hard data in `config.fork_selections`.
+ */
+export interface WorldFork {
+  /** Stable kebab-case identifier — the load-bearing "name" of the fork.
+   *  Referenced by `config.fork_selections` and by scoped inline content. */
+  id: string;
+  /** Human label ("Your discipline", "Genre wrapper"). */
+  label: string;
+  /**
+   * Who resolves this fork at setup:
+   * - `"player"` — presented to the player as a structured choice.
+   * - `"agent"`  — decided by the setup agent (often by rolling the dice tool,
+   *   e.g. a "roll or choose" secret). DM-only; never shown to the player.
+   */
+  chooser: "player" | "agent";
+  /** Optional guidance for whoever presents or decides (e.g. "roll to fit the
+   *  player's stated preference"). */
+  prompt?: string;
+  /** The branches. At least two. */
+  options: WorldForkOption[];
+}
+
+export interface WorldForkOption {
+  /** Stable kebab-case identifier — the "name" of the branch. Unique within
+   *  the fork. Referenced by scoped inline content. */
+  id: string;
+  /** Short display name (e.g., "The Iron Circle", "Near-Future Sci-Fi"). */
+  name: string;
+  /** Longer description. Player-safe when the fork's `chooser` is `"player"`;
+   *  otherwise DM-facing guidance for the agent's decision. */
+  description: string;
+  /**
+   * DM-only prose spliced into the campaign's assembled `campaign_detail` when
+   * (and only when) this option is the selected branch. This is how a branch's
+   * worldbuilding reaches the DM without the unchosen branches tagging along.
+   */
+  detail?: string;
+}
+
+/**
+ * @deprecated Legacy player-facing choice group. Superseded by {@link WorldFork}
+ * (`chooser: "player"`). Still accepted on disk for back-compat; `normalizeForks`
+ * folds any `suboptions` into the unified `forks` list on load.
+ */
 export interface WorldSuboption {
   /** Group label shown to the player. */
   label: string;
@@ -18,6 +68,7 @@ export interface WorldSuboption {
   choices: WorldSuboptionChoice[];
 }
 
+/** @deprecated See {@link WorldSuboption}. */
 export interface WorldSuboptionChoice {
   /** Short choice name (e.g., "The Iron Circle"). */
   name: string;
@@ -87,12 +138,25 @@ export interface WorldFile {
 
   // --- DM-only content ---
 
-  /** Rich DM instructions — secrets, pacing, NPC guidance. Never shown to the player. */
+  /**
+   * Rich DM instructions — secrets, pacing, NPC guidance. Never shown to the
+   * player. This is the **fork-invariant base**: prose that applies to every
+   * possible campaign this seed can produce. Branch-specific worldbuilding does
+   * NOT live here — it lives in each fork option's `detail` (see {@link WorldFork})
+   * and is spliced in only when that branch is selected. The campaign's final
+   * `campaign_detail` is `assembleCampaignDetail(detail, forks, selections)`.
+   */
   detail?: string;
 
-  // --- Player-facing choices ---
+  // --- Forks: the seed's named decision points (resolved at setup) ---
 
-  /** Structured suboption groups (e.g., starting faction, setting variant). */
+  /** The seed's decision points. See {@link WorldFork}. */
+  forks?: WorldFork[];
+
+  /**
+   * @deprecated Legacy player-facing choice groups. Folded into `forks`
+   * (`chooser: "player"`) by `normalizeForks` on load. New seeds use `forks`.
+   */
   suboptions?: WorldSuboption[];
 
   // --- Inline content (optional — empty for seeds, rich for exports) ---

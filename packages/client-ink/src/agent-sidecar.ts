@@ -66,6 +66,9 @@ function readBody(req: IncomingMessage): Promise<Buffer> {
 // ---------------------------------------------------------------------------
 
 export interface SidecarHandle {
+  /** The actual bound port. Differs from the requested port when 0 was passed
+   *  (OS-assigned ephemeral port) — callers that pass 0 read it back from here. */
+  port: number;
   close(): Promise<void>;
 }
 
@@ -198,6 +201,7 @@ export async function startAgentSidecar(
   process.stderr.write(`Agent sidecar listening on http://127.0.0.1:${boundPort}\n`);
 
   return {
+    port: boundPort,
     async close() {
       process.stdout.write = originalWrite;
       process.stdout.removeListener("resize", onResize);
