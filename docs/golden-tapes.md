@@ -113,6 +113,22 @@ which:
 
 Activated by `npm install` (the root `prepare` runs `lefthook install`).
 
+## Deferred / open edges
+
+- **Full-stack replay-runner** — capturing a setup→game tape works (`mvplay
+  save-tape`); replaying one deterministically in-process does not exist yet. The
+  in-process corpus is the backbone; full-stack tapes are capture-only until a
+  runner that drives `SetupSession` + `GameEngine` from a tape is built (and
+  handles the `"default"` setup bucket).
+- **CI enforcement** of `golden:verify` on PRs — deferred until the pre-commit
+  hook has proven stable in practice.
+- **Freshness guard** — a periodic real-API *structural* re-pilot (tool calls /
+  state transitions still match though text drifts) so tapes can't silently lie.
+  Designed later.
+- **Image bytes out-of-line** — `generateImage` base64 is inline; move to a
+  content-addressed sidecar before image-bearing goldens land (see
+  [tape-format.md](tape-format.md)).
+
 ## Related
 
 - [tape-format.md](tape-format.md) — the on-disk tape schema and matching rules.
