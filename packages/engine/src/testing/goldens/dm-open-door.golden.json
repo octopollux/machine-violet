@@ -1,0 +1,94 @@
+{
+  "tape": {
+    "version": 1,
+    "scenario": "dm-open-door",
+    "capabilities": {
+      "claude-haiku-4-5-20251001": {
+        "imageGeneration": false
+      }
+    },
+    "entries": [
+      {
+        "kind": "chat",
+        "bucket": "dm",
+        "ordinal": 0,
+        "request": {
+          "model": "claude-haiku-4-5-20251001",
+          "messageCount": 1,
+          "systemHash": "77871a277edd",
+          "tools": [
+            "advance_turn",
+            "alarm",
+            "deck",
+            "describe_entity_type",
+            "detect_orphans",
+            "dm_notes",
+            "end_combat",
+            "enter_ooc",
+            "entity",
+            "find_schema_drift",
+            "list_entity_types",
+            "manage_objectives",
+            "map",
+            "map_entity",
+            "map_query",
+            "modify_initiative",
+            "present_choices",
+            "promote_character",
+            "resolve_turn",
+            "roll_dice",
+            "scene_transition",
+            "scribe",
+            "search_campaign",
+            "search_content",
+            "session_end",
+            "set_display_resources",
+            "set_resource_values",
+            "start_combat",
+            "style_scene",
+            "switch_player",
+            "time",
+            "update_modeline",
+            "validate_entity"
+          ],
+          "lastMessagePreview": "<context> ## Current State PCs: Aldric [length] Terminal: 80 cols × 16 visible rows. [stats] Turn: Aldric </context> [Al"
+        },
+        "result": {
+          "text": "I need context about where you are and what door you're opening. Let me check what's already been established.\n\nIt seems we're starting fresh! Let me set the scene.\n\n---\n\nYou push against the heavy wooden door. It swings inward with a creak, revealing a dimly lit <color=#009de5>tavern</color> that smells of spiced ale and woodsmoke. The common room stretches before you—rough-hewn beams overhead, a long bar along one wall where a <color=#cc8844>barkeep</color> with a scarred jaw wipes a glass. A few patrons nurse drinks in the corner booths, but most of the tables sit empty for this hour of the afternoon.\n\nThe door closes behind you with a soft *thud*. Warm air wraps around you.\n\nWhat do you do?",
+          "toolCalls": [],
+          "usage": {
+            "inputTokens": 380,
+            "outputTokens": 191,
+            "cacheReadTokens": 0,
+            "cacheCreationTokens": 9321,
+            "reasoningTokens": 0
+          },
+          "stopReason": "end",
+          "assistantContent": [
+            {
+              "type": "text",
+              "text": "I need context about where you are and what door you're opening. Let me check what's already been established.\n\nIt seems we're starting fresh! Let me set the scene.\n\n---\n\nYou push against the heavy wooden door. It swings inward with a creak, revealing a dimly lit <color=#009de5>tavern</color> that smells of spiced ale and woodsmoke. The common room stretches before you—rough-hewn beams overhead, a long bar along one wall where a <color=#cc8844>barkeep</color> with a scarred jaw wipes a glass. A few patrons nurse drinks in the corner booths, but most of the tables sit empty for this hour of the afternoon.\n\nThe door closes behind you with a soft *thud*. Warm air wraps around you.\n\nWhat do you do?"
+            }
+          ]
+        },
+        "streamDeltas": [
+          "I",
+          " need context about where you are and what door you're opening. Let me check what's already been established.\n\nIt",
+          " seems we're starting fresh! Let me set the scene.",
+          "\n\n---\n\nYou push against the heavy wooden door. It swings inward with a cr",
+          "eak, revealing a dimly lit <color=#009de5>tavern</color> that smells of spiced",
+          " ale and woodsmoke. The common room stretches before you—rough-hewn beams overhead, a long",
+          " bar along one wall where a <color=#cc8844>barkeep</color> with",
+          " a scarred jaw wipes a glass. A few patrons nurse",
+          " drinks in the corner booths, but most of the tables sit",
+          " empty for this hour of the afternoon.\n\nThe door closes behind you with a soft *",
+          "thud*. Warm air wraps around you.\n\nWhat",
+          " do you do?"
+        ]
+      }
+    ]
+  },
+  "expectedNarrative": [
+    "I need context about where you are and what door you're opening. Let me check what's already been established.\n\nIt seems we're starting fresh! Let me set the scene.\n\n---\n\nYou push against the heavy wooden door. It swings inward with a creak, revealing a dimly lit <color=#009de5>tavern</color> that smells of spiced ale and woodsmoke. The common room stretches before you—rough-hewn beams overhead, a long bar along one wall where a <color=#cc8844>barkeep</color> with a scarred jaw wipes a glass. A few patrons nurse drinks in the corner booths, but most of the tables sit empty for this hour of the afternoon.\n\nThe door closes behind you with a soft *thud*. Warm air wraps around you.\n\nWhat do you do?"
+  ]
+}
