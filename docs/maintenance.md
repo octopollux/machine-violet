@@ -81,11 +81,17 @@ This project maintains a closed loop between code and documentation. When you ch
 7. Add it to `PROVIDER_OPTIONS` in `packages/client-ink/src/phases/ConnectionsPhase.tsx` (or, for OAuth-style providers, add a dedicated menu entry that doesn't go through the API-key wizard)
 8. If the provider implements `getUsageStatus` / `subscribeUsage`, the existing `/manage/connections/:id/usage` endpoint surfaces it automatically
 
-### Changing what the `smoketest` probe walks through
+### Changing the tape format (Tier-2 record/replay)
 
-The smoketest contract — walk setup once, observe two in-game turns — is documented in [e2e-harness.md](e2e-harness.md) ("What `smoketest` actually does") and in [CLAUDE.md](../CLAUDE.md) ("Validating changes end-to-end"). If you change what the probe does (extra setup steps, different turn count, an added assertion), update both.
+The tape schema (`packages/engine/src/providers/tape.ts`) is the data contract for golden replay. If you change the shape, bucketing, matching, or determinism normalization, update [tape-format.md](tape-format.md) **and** bump `TAPE_VERSION` with a matching re-record of the corpus (`npm run golden:record`). `deserializeTape` rejects version mismatches, so a stale corpus fails loudly rather than mis-replaying.
 
-The probe source itself is at `packages/test-harness/bin/smoketest.ts`. There is no registry — it's a standalone script invoked by `npm run smoketest`.
+### Changing the golden corpus / record-replay wiring
+
+The corpus lives in `packages/engine/src/testing/corpus.golden.test.ts` (+ `goldens/`). The record seam is `wrapForRecording` in `packages/engine/src/providers/tape-mode.ts`, called at `session-manager.ts` / `setup-session.ts`; the full-stack readback is `GET /tape` (`packages/engine/src/server/routes/dev.ts`) + `mvplay record`/`save-tape`. If you change the operating model (record paths, when to re-record, hooks), update [golden-tapes.md](golden-tapes.md) and the `/record-tape` + `/replay-goldens` skills.
+
+### Changing what the live `smoketest` probe walks through
+
+The smoketest is the **Tier-3 live smoke** (not the regression gate — that's Tier-2 golden replay). Its contract — walk setup once, observe two in-game turns — is in [e2e-harness.md](e2e-harness.md) ("What `smoketest` actually does") and [CLAUDE.md](../CLAUDE.md) ("Validating changes end-to-end"). If you change what the probe does, update both. The source is `packages/test-harness/bin/smoketest.ts` (no registry; `npm run smoketest`).
 
 ### Changing harness primitives (wait helpers, input methods, state shape, engine-log breadcrumbs)
 
@@ -93,9 +99,9 @@ The probe source itself is at `packages/test-harness/bin/smoketest.ts`. There is
 2. Update the "State-driven waiting" table in [e2e-harness.md](e2e-harness.md)
 3. If you added a new engine-log event category, append a row to the "Engine-log breadcrumbs" table in the same doc
 
-### Changing what `/smoketest` does
+### Changing what the e2e skills do
 
-The skill at `.claude/skills/smoketest/SKILL.md` is the single source of truth for how agents and users invoke the harness. If you change the argument convention, the "do/don't delegate to a subagent" guidance, or the set of long-lived probes, edit that file. The skill's description field is what triggers it for agents — keep it specific about the trigger phrases ("smoke test", "validate end-to-end", "did I break it", etc.) so it fires when it should.
+The skills are the single source of truth for how agents/users invoke each tier: `.claude/skills/replay-goldens/` (the regression gate), `.claude/skills/record-tape/` (recording), `.claude/skills/smoketest/` (live Tier-3), `.claude/skills/play/` (live-pilot + record substrate). If you change an invocation convention or the tier roles, edit the matching skill — its `description` field is what triggers it, so keep the trigger phrases accurate (e.g. "did I break it" must point at `replay-goldens`, not `smoketest`).
 
 ### Adding a `codex:*` event
 
@@ -128,7 +134,9 @@ The openai-chatgpt provider emits its own operational events (subprocess lifecyc
 | Conventions | [CLAUDE.md](../CLAUDE.md) | Code style, testing, imports |
 | openai-chatgpt provider | [openai-chatgpt-provider.md](openai-chatgpt-provider.md) | Codex app-server integration, OAuth flow, usage tracking |
 | openai.ts provider | [openai-provider.md](openai-provider.md) | Direct-API adapter for openai-apikey/openrouter/custom: Responses-vs-Completions routing, streaming reasoning workaround, encrypted-reasoning replay |
-| E2E test harness | [e2e-harness.md](e2e-harness.md) | Smoketest contract, harness primitives, engine-state gotchas, engine-log breadcrumbs, how to write a probe |
+| E2E strategy / live harness | [e2e-harness.md](e2e-harness.md) | Three-tier strategy; Tier-3 live harness — probes, mvplay, engine-state gotchas, engine-log breadcrumbs |
+| Golden tapes (Tier-2) | [golden-tapes.md](golden-tapes.md) | Record/replay operating model, corpus, record paths, when to re-record |
+| Tape format | [tape-format.md](tape-format.md) | On-disk tape schema, bucketing, ordinal matching, determinism normalization |
 
 ## Principles
 

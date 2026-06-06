@@ -44,7 +44,7 @@ Multiple agents often run in parallel against this repo; `npm test` is ~80s CPU/
 
 For mid-iteration validation, prefer targeted vitest over the full suite:
 - **`npx vitest run --changed`** — only tests for files changed since HEAD. ~3s CPU on a clean tree.
-- **`npx vitest run related <files>`** — only tests reachable from the given files.
+- **`npx vitest related --run <files>`** — only tests reachable from the given files. (Note the order: `vitest run related <files>` parses `related` as a name-filter and finds nothing — the `related` command needs `--run`, not `run related`. This is also what the pre-commit hook runs on staged files.)
 
 Reserve `npm run check` for the pre-commit / pre-PR gate. Use your judgement: full suite for risk-sensitive or cross-cutting changes, targeted for routine iteration.
 
@@ -54,18 +54,24 @@ Live API key in `.env` with limited credit. Default dev override uses Sonnet for
 
 ## Validating changes end-to-end
 
-Type checks and unit tests do not prove a cross-cutting flow works — anything touching UI flow, session lifecycle, the setup agent, the DM loop, save/load, or a path that spans server + client + WebSocket needs to be exercised against a running system.
+Type checks and unit tests do not prove a cross-cutting flow works — anything touching UI flow, session lifecycle, the setup agent, the DM loop, save/load, or a path that spans server + client + WebSocket. The e2e strategy is **three tiers, deterministic-first** (full picture: [docs/e2e-harness.md](docs/e2e-harness.md), [docs/golden-tapes.md](docs/golden-tapes.md)):
 
-The cheap precondition for everything else:
+1. **Tier 1 — component/render:** `ink-testing-library`, co-located in `packages/client-ink`.
+2. **Tier 2 — deterministic golden replay (the regression backbone):** real `GameEngine` replaying recorded **golden tapes**, offline, ~4s. **This is the everyday "did I break it?" gate.**
 
-```bash
-npm run e2e:boot     # 10s, no API key — boots the two-tier stack and quits
-```
+   ```bash
+   npm run golden:verify     # replay goldens offline (no API key)
+   ```
 
-Beyond that, pick by what you actually need:
+   When a replay fails: decide whether it's a real regression (fix the code) or an intended behavior change (re-record with `npm run golden:record` / the `/record-tape` skill, then review the diff). Never hand-edit a tape. Skills: `/replay-goldens`, `/record-tape`.
+3. **Tier 3 — live smoke (rare):** the real launcher stack against the real API. Only when you specifically need the live flow (setup agent, handoff, boot path).
 
-- **You want to feel out / exercise behavior live** — a specific personality, walking a particular world, reproducing an in-game bug by hand, "does this still play right?" — **drive it yourself with the `/play` skill** (`mvplay`). It's a persistent session you play turn-for-turn, one tool call per turn: `start` → `key`/`say`/`pick` → `wait` (run in background) → react → repeat → `stop`. Don't reach for a subagent or a scripted probe here — being in the loop *is* the point. See [docs/e2e-harness.md](docs/e2e-harness.md) "Interactive play (mvplay)".
-- **You want a repeatable pass/fail assertion** on a specific path — save/load round-trip, image-gen persisted, a deterministic regression guard — **write your own one-shot probe** under `packages/test-harness/bin/` (or anywhere) using `runProbe` from `@machine-violet/test-harness`. No registry. See [docs/e2e-harness.md](docs/e2e-harness.md) for primitives, engine-state gotchas, engine-log breadcrumbs, and the signal-picking cheatsheet — read it before writing your first probe.
+   ```bash
+   npm run e2e:boot     # 10s, no API key — boots the stack and quits (cheap precondition)
+   npm run smoketest    # 7-12 min, live API — full setup→game walk
+   ```
+
+For **live exploration** (feel out a personality/world, reproduce a bug by hand, or record a full-stack golden) drive the **`/play` skill** (`mvplay`) yourself turn-for-turn — being in the loop is the point; don't delegate to a subagent or a scripted probe. For a **repeatable live pass/fail** on one path (save/load round-trip, image-gen persisted), write a one-shot `runProbe` under `packages/test-harness/bin/`.
 
 Do not bypass the harness with a hand-rolled `setTimeout` or a "give it 5 minutes" wait — every wait is anchored to an observable state change. If you find yourself reaching for a timer, look in `Harness` for the `waitFor*` helper that fits.
 
