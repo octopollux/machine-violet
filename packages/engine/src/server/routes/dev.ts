@@ -1,8 +1,11 @@
 /**
  * Dev-only routes — session-tape recorder readback (Tier-2 goldens).
  *
- * `GET /tape` returns the tape recorded so far this process, or 404 when the
- * process isn't recording (`MV_TAPE_MODE` unset — i.e. always, in production).
+ * `GET /tape` returns the tape recorded so far this process. These routes are
+ * registered by `createServer` ONLY when `MV_TAPE_MODE=record`, so in replay or
+ * production the route doesn't exist at all (the gate keeps `getRecordedTape`'s
+ * own null→404 path for the case where recording is on but nothing's captured
+ * yet).
  *
  * The test-harness recorder pulls the tape here AFTER a live pilot finishes,
  * rather than having the engine flush on exit: the harness force-kills the

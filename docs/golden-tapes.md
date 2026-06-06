@@ -92,6 +92,10 @@ one process-global writer, deduped by provider identity. Production never sets
 `MV_TAPE_MODE`, so it's an identity pass-through. In-process corpus tests skip
 this and wrap the provider directly.
 
+The readback route is gated the same way: `createServer` registers `GET /tape`
+**only** when `MV_TAPE_MODE=record`, so in replay/production the endpoint doesn't
+exist at all.
+
 ## When to re-record vs. fix the code
 
 A failing replay means the engine produced different narrative (or a different
