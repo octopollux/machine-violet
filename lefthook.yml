@@ -1,7 +1,7 @@
 # Git hooks (lefthook), matched to the e2e tiers — see docs/e2e-harness.md "Hooks".
 #
 #   pre-commit — fast + offline. Lint (cached) + Tier-1/unit tests for the
-#                staged files only (`vitest run related`). A few seconds. NOT
+#                staged files only (`vitest related --run`). A few seconds. NOT
 #                the Tier-2 goldens: cold-importing the engine module graph is
 #                ~20-30s, too heavy to pay on every commit.
 #   pre-push   — the real gate. Full `npm run check` (lint + the entire vitest

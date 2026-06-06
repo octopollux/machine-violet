@@ -685,17 +685,17 @@ export async function status(): Promise<void> {
 
 /**
  * Pull the session tape recorded so far (via the engine's dev-only `GET /tape`)
- * and write it to `outPath` as a golden `{ tape, expectedNarrative }`, where
- * `expectedNarrative` is the DM/non-player narrative captured this session — the
- * deterministic replay target. The session must have been started with
- * `mvplay record --scenario <name>`; pull the tape BEFORE `mvplay stop`, since
- * teardown force-kills the engine and its in-memory tape with it.
+ * and write it to `outPath` as a golden `{ scenario, tape, expectedNarrative }`,
+ * where `expectedNarrative` is the DM/non-player narrative captured this session
+ * — the deterministic replay target. The session must have been started with
+ * `mvplay record <scenario>`; pull the tape BEFORE `mvplay stop`, since teardown
+ * force-kills the engine and its in-memory tape with it.
  */
 export async function saveTape(outPath: string): Promise<void> {
   const s = requireSession();
   if (!s.recording) {
     throw new Error(
-      "This session is not recording. Start it with `mvplay record --scenario <name>` to capture a tape.",
+      "This session is not recording. Start it with `mvplay record <scenario>` to capture a tape.",
     );
   }
   let tape: unknown;

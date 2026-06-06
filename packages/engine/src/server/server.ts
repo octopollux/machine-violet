@@ -16,6 +16,7 @@ import { sessionRoutes } from "./routes/session.js";
 import { dataRoutes } from "./routes/data.js";
 import { managementRoutes } from "./routes/management.js";
 import { devRoutes } from "./routes/dev.js";
+import { recordingActive } from "../providers/tape-mode.js";
 import { wsHandler } from "./ws.js";
 import { SessionManager } from "./session-manager.js";
 import { initEngineLog, logEvent, closeEngineLog } from "../context/engine-log.js";
@@ -172,7 +173,12 @@ export async function createServer(
   await server.register(sessionRoutes, { prefix: "/session" });
   await server.register(dataRoutes, { prefix: "/session" });
   await server.register(wsHandler, { prefix: "/session" });
-  await server.register(devRoutes);
+  // Dev-only tape readback — registered ONLY while recording, so the `/tape`
+  // route (and its Swagger entry) never exists in replay or production, even
+  // if the server is bound off-localhost.
+  if (recordingActive()) {
+    await server.register(devRoutes);
+  }
 
   // --- Lifecycle ---
 
