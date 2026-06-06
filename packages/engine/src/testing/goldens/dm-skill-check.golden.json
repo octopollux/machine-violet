@@ -1,0 +1,172 @@
+{
+  "scenario": "dm-skill-check",
+  "tape": {
+    "version": 1,
+    "scenario": "dm-skill-check",
+    "capabilities": {
+      "claude-haiku-4-5-20251001": {
+        "imageGeneration": false
+      }
+    },
+    "entries": [
+      {
+        "kind": "chat",
+        "bucket": "dm",
+        "ordinal": 0,
+        "request": {
+          "model": "claude-haiku-4-5-20251001",
+          "messageCount": 1,
+          "systemHash": "9d270259c954",
+          "tools": [
+            "advance_turn",
+            "alarm",
+            "deck",
+            "describe_entity_type",
+            "detect_orphans",
+            "dm_notes",
+            "end_combat",
+            "enter_ooc",
+            "entity",
+            "find_schema_drift",
+            "list_entity_types",
+            "manage_objectives",
+            "map",
+            "map_entity",
+            "map_query",
+            "modify_initiative",
+            "present_choices",
+            "promote_character",
+            "resolve_turn",
+            "roll_dice",
+            "scene_transition",
+            "scribe",
+            "search_campaign",
+            "search_content",
+            "session_end",
+            "set_display_resources",
+            "set_resource_values",
+            "start_combat",
+            "style_scene",
+            "switch_player",
+            "time",
+            "update_modeline",
+            "validate_entity"
+          ],
+          "lastMessagePreview": "<context> ## Current State PCs: Aldric [length] Terminal: 80 cols × 16 visible rows. [stats] Turn: Aldric </context> [Al"
+        },
+        "result": {
+          "text": "You crouch before the <color=#20b2aa>iron-banded oak door</color>, rainwater dripping from your cloak onto the warped wood. The lock is old—brass, pitted, crusted with verdigris. Your lockpicks rasp against the mechanism.\n\nBehind you, <color=#44cc44>Mella</color>'s wiping slows. You hear her weight shift.\n\nMake a <u>Sleight of Hand</u> check.",
+          "toolCalls": [
+            {
+              "id": "toolu_01JF5Y4YVmWNZD8yBe6wzCL8",
+              "name": "present_choices",
+              "input": {
+                "prompt": "Roll for the lockpick attempt.",
+                "choices": [
+                  "Roll a d20 + your modifier"
+                ]
+              }
+            }
+          ],
+          "usage": {
+            "inputTokens": 390,
+            "outputTokens": 194,
+            "cacheReadTokens": 9506,
+            "cacheCreationTokens": 0,
+            "reasoningTokens": 0
+          },
+          "stopReason": "tool_use",
+          "assistantContent": [
+            {
+              "type": "text",
+              "text": "You crouch before the <color=#20b2aa>iron-banded oak door</color>, rainwater dripping from your cloak onto the warped wood. The lock is old—brass, pitted, crusted with verdigris. Your lockpicks rasp against the mechanism.\n\nBehind you, <color=#44cc44>Mella</color>'s wiping slows. You hear her weight shift.\n\nMake a <u>Sleight of Hand</u> check."
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01JF5Y4YVmWNZD8yBe6wzCL8",
+              "name": "present_choices",
+              "input": {
+                "prompt": "Roll for the lockpick attempt.",
+                "choices": [
+                  "Roll a d20 + your modifier"
+                ]
+              }
+            }
+          ]
+        },
+        "streamDeltas": [
+          "You",
+          " crouch before the <color=#20b2aa>iron-banded oak door</color>, rainwater dripping from your cl",
+          "oak onto the warped wood. The lock is old—brass, p",
+          "itted, crusted with verdigris. Your lockpicks rasp against the mechanism.",
+          "\n\nBehind you, <color=#44cc44>Mella</color>'s wiping sl",
+          "ows. You hear her weight shift.\n\nMake a ",
+          "<u>Sleight of Hand</u> check."
+        ]
+      },
+      {
+        "kind": "chat",
+        "bucket": "dm",
+        "ordinal": 1,
+        "request": {
+          "model": "claude-haiku-4-5-20251001",
+          "messageCount": 3,
+          "systemHash": "9d270259c954",
+          "tools": [
+            "advance_turn",
+            "alarm",
+            "deck",
+            "describe_entity_type",
+            "detect_orphans",
+            "dm_notes",
+            "end_combat",
+            "enter_ooc",
+            "entity",
+            "find_schema_drift",
+            "list_entity_types",
+            "manage_objectives",
+            "map",
+            "map_entity",
+            "map_query",
+            "modify_initiative",
+            "present_choices",
+            "promote_character",
+            "resolve_turn",
+            "roll_dice",
+            "scene_transition",
+            "scribe",
+            "search_campaign",
+            "search_content",
+            "session_end",
+            "set_display_resources",
+            "set_resource_values",
+            "start_combat",
+            "style_scene",
+            "switch_player",
+            "time",
+            "update_modeline",
+            "validate_entity"
+          ],
+          "lastMessagePreview": "[tool_result]"
+        },
+        "result": {
+          "text": "",
+          "toolCalls": [],
+          "usage": {
+            "inputTokens": 5,
+            "outputTokens": 2,
+            "cacheReadTokens": 9506,
+            "cacheCreationTokens": 645,
+            "reasoningTokens": 0
+          },
+          "stopReason": "end",
+          "assistantContent": []
+        },
+        "streamDeltas": []
+      }
+    ]
+  },
+  "expectedNarrative": [
+    "You crouch before the <color=#20b2aa>iron-banded oak door</color>, rainwater dripping from your cloak onto the warped wood. The lock is old—brass, pitted, crusted with verdigris. Your lockpicks rasp against the mechanism.\n\nBehind you, <color=#44cc44>Mella</color>'s wiping slows. You hear her weight shift.\n\nMake a <u>Sleight of Hand</u> check."
+  ]
+}
