@@ -20,7 +20,7 @@ import type { LLMProvider, TierProvider } from "./types.js";
 import { TapeWriter, type Tape } from "./tape.js";
 import { createTapingProvider } from "./tape-provider.js";
 
-function recordingActive(): boolean {
+export function recordingActive(): boolean {
   return process.env.MV_TAPE_MODE === "record";
 }
 

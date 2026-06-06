@@ -1,0 +1,102 @@
+{
+  "scenario": "dm-look-around",
+  "tape": {
+    "version": 1,
+    "scenario": "dm-look-around",
+    "capabilities": {
+      "claude-haiku-4-5-20251001": {
+        "imageGeneration": false
+      }
+    },
+    "entries": [
+      {
+        "kind": "chat",
+        "bucket": "dm",
+        "ordinal": 0,
+        "request": {
+          "model": "claude-haiku-4-5-20251001",
+          "messageCount": 1,
+          "systemHash": "9d270259c954",
+          "tools": [
+            "advance_turn",
+            "alarm",
+            "deck",
+            "describe_entity_type",
+            "detect_orphans",
+            "dm_notes",
+            "end_combat",
+            "enter_ooc",
+            "entity",
+            "find_schema_drift",
+            "list_entity_types",
+            "manage_objectives",
+            "map",
+            "map_entity",
+            "map_query",
+            "modify_initiative",
+            "present_choices",
+            "promote_character",
+            "resolve_turn",
+            "roll_dice",
+            "scene_transition",
+            "scribe",
+            "search_campaign",
+            "search_content",
+            "session_end",
+            "set_display_resources",
+            "set_resource_values",
+            "start_combat",
+            "style_scene",
+            "switch_player",
+            "time",
+            "update_modeline",
+            "validate_entity"
+          ],
+          "lastMessagePreview": "<context> ## Current State PCs: Aldric [length] Terminal: 80 cols × 16 visible rows. [stats] Turn: Aldric </context> [Al"
+        },
+        "result": {
+          "text": "Rain drums the shutters. Smoke coils lazy through lamplight.\n\nThe <u>Gilded Stag</u> is all dark wood and darker stains — floorboards scarred by boots and spilled ale, a stone hearth where a low fire grudgingly burns. Maybe a dozen folk scattered about: dockworkers nursing their cups, a merchant couple in a corner, two farmhands playing cards with more concentration than skill.\n\nThe <color=#cc8844>hooded figure</color> sits motionless by the hearth, back to the wall, face hidden. They've barely touched their drink. Their hands, when they move to grip the tankard, are calloused but pale — not a laborer's hands.\n\n<color=#44cc44>Mella</color> behind the bar catches your eye for a moment too long, then looks away. She's stronger than she pretends — her forearms could bend iron. There's a key hanging on a nail behind her, well within reach, dark with age.\n\nThe <color=#20b2aa>iron-banded oak door</color> to the cellar stands in the far wall, locked tight. The wood around the lock is splintered in places, like someone's tried to force it before. It smells faintly wrong — not rot, not quite. Something chemical. Medicinal.\n\nWhat do you do?",
+          "toolCalls": [],
+          "usage": {
+            "inputTokens": 387,
+            "outputTokens": 309,
+            "cacheReadTokens": 9506,
+            "cacheCreationTokens": 0,
+            "reasoningTokens": 0
+          },
+          "stopReason": "end",
+          "assistantContent": [
+            {
+              "type": "text",
+              "text": "Rain drums the shutters. Smoke coils lazy through lamplight.\n\nThe <u>Gilded Stag</u> is all dark wood and darker stains — floorboards scarred by boots and spilled ale, a stone hearth where a low fire grudgingly burns. Maybe a dozen folk scattered about: dockworkers nursing their cups, a merchant couple in a corner, two farmhands playing cards with more concentration than skill.\n\nThe <color=#cc8844>hooded figure</color> sits motionless by the hearth, back to the wall, face hidden. They've barely touched their drink. Their hands, when they move to grip the tankard, are calloused but pale — not a laborer's hands.\n\n<color=#44cc44>Mella</color> behind the bar catches your eye for a moment too long, then looks away. She's stronger than she pretends — her forearms could bend iron. There's a key hanging on a nail behind her, well within reach, dark with age.\n\nThe <color=#20b2aa>iron-banded oak door</color> to the cellar stands in the far wall, locked tight. The wood around the lock is splintered in places, like someone's tried to force it before. It smells faintly wrong — not rot, not quite. Something chemical. Medicinal.\n\nWhat do you do?"
+            }
+          ]
+        },
+        "streamDeltas": [
+          "Rain",
+          " drums the shutters. Smoke coils lazy through lamp",
+          "light.\n\nThe <u>Gilded Stag</u> is all",
+          " dark wood and darker stains — floorboards scarred by boots",
+          " and spilled ale, a stone hearth where a",
+          " low fire grudgingly burns. Maybe a dozen folk scattered about:",
+          " dockworkers nursing their cups, a merchant couple in",
+          " a corner, two farmhands playing cards with more concentration",
+          " than skill.\n\nThe <color=#cc8844>hooded figure</color> sits motionless by the hearth, back to the wall,",
+          " face hidden. They've barely touched their drink. Their hands,",
+          " when they move to grip the tankard, are calloused but pale — not",
+          " a laborer's hands.\n\n<color=#44cc44>Mella</color> behind the bar catches your",
+          " eye for a moment too long, then looks away. She's stronger than she pretends — her fore",
+          "arms could bend iron. There's a key hanging on",
+          " a nail behind her, well within reach, dark with",
+          " age.\n\nThe <color=#20b2aa>iron-banded oak door</color> to the cellar stands in the far wall",
+          ", locked tight. The wood around the lock is splintered in places, like someone's tried to force it before",
+          ". It smells faintly wrong — not rot, not quite",
+          ". Something chemical. Medicinal.\n\nWhat do you do?"
+        ]
+      }
+    ]
+  },
+  "expectedNarrative": [
+    "Rain drums the shutters. Smoke coils lazy through lamplight.\n\nThe <u>Gilded Stag</u> is all dark wood and darker stains — floorboards scarred by boots and spilled ale, a stone hearth where a low fire grudgingly burns. Maybe a dozen folk scattered about: dockworkers nursing their cups, a merchant couple in a corner, two farmhands playing cards with more concentration than skill.\n\nThe <color=#cc8844>hooded figure</color> sits motionless by the hearth, back to the wall, face hidden. They've barely touched their drink. Their hands, when they move to grip the tankard, are calloused but pale — not a laborer's hands.\n\n<color=#44cc44>Mella</color> behind the bar catches your eye for a moment too long, then looks away. She's stronger than she pretends — her forearms could bend iron. There's a key hanging on a nail behind her, well within reach, dark with age.\n\nThe <color=#20b2aa>iron-banded oak door</color> to the cellar stands in the far wall, locked tight. The wood around the lock is splintered in places, like someone's tried to force it before. It smells faintly wrong — not rot, not quite. Something chemical. Medicinal.\n\nWhat do you do?"
+  ]
+}

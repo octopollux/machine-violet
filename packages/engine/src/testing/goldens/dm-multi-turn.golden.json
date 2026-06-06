@@ -1,0 +1,174 @@
+{
+  "scenario": "dm-multi-turn",
+  "tape": {
+    "version": 1,
+    "scenario": "dm-multi-turn",
+    "capabilities": {
+      "claude-haiku-4-5-20251001": {
+        "imageGeneration": false
+      }
+    },
+    "entries": [
+      {
+        "kind": "chat",
+        "bucket": "dm",
+        "ordinal": 0,
+        "request": {
+          "model": "claude-haiku-4-5-20251001",
+          "messageCount": 1,
+          "systemHash": "9d270259c954",
+          "tools": [
+            "advance_turn",
+            "alarm",
+            "deck",
+            "describe_entity_type",
+            "detect_orphans",
+            "dm_notes",
+            "end_combat",
+            "enter_ooc",
+            "entity",
+            "find_schema_drift",
+            "list_entity_types",
+            "manage_objectives",
+            "map",
+            "map_entity",
+            "map_query",
+            "modify_initiative",
+            "present_choices",
+            "promote_character",
+            "resolve_turn",
+            "roll_dice",
+            "scene_transition",
+            "scribe",
+            "search_campaign",
+            "search_content",
+            "session_end",
+            "set_display_resources",
+            "set_resource_values",
+            "start_combat",
+            "style_scene",
+            "switch_player",
+            "time",
+            "update_modeline",
+            "validate_entity"
+          ],
+          "lastMessagePreview": "<context> ## Current State PCs: Aldric [length] Terminal: 80 cols × 16 visible rows. [stats] Turn: Aldric </context> [Al"
+        },
+        "result": {
+          "text": "The <color=#009de5>Gilded Stag</color> is half-full on a wet evening. Besides yourself, there are perhaps a dozen souls scattered among the tables and the bar: dockworkers nursing cheap ale, a pair of merchants haggling quietly over ledgers, a gray-bearded man playing solitaire with worn cards. Mella tends the bar with practiced efficiency, and the hooded figure by the hearth—cloaked, face turned from the room—sits motionless, one hand wrapped around a pewter tankard.\n\nThe air is thick with smoke and the smell of wet leather. Rain drumming the shutters is the loudest sound besides the crackle of the hearth. The <color=#20b2aa>iron-banded oak door</color> to the cellar is dark and locked, set into the stone wall beneath the stairs—conspicuously ignored by everyone in the room.\n\nThe hooded figure hasn't moved or acknowledged your entrance. Mella glances at you from behind the bar with the flat appraisal she reserves for strangers.\n\nWhat do you do?",
+          "toolCalls": [],
+          "usage": {
+            "inputTokens": 388,
+            "outputTokens": 249,
+            "cacheReadTokens": 9506,
+            "cacheCreationTokens": 0,
+            "reasoningTokens": 0
+          },
+          "stopReason": "end",
+          "assistantContent": [
+            {
+              "type": "text",
+              "text": "The <color=#009de5>Gilded Stag</color> is half-full on a wet evening. Besides yourself, there are perhaps a dozen souls scattered among the tables and the bar: dockworkers nursing cheap ale, a pair of merchants haggling quietly over ledgers, a gray-bearded man playing solitaire with worn cards. Mella tends the bar with practiced efficiency, and the hooded figure by the hearth—cloaked, face turned from the room—sits motionless, one hand wrapped around a pewter tankard.\n\nThe air is thick with smoke and the smell of wet leather. Rain drumming the shutters is the loudest sound besides the crackle of the hearth. The <color=#20b2aa>iron-banded oak door</color> to the cellar is dark and locked, set into the stone wall beneath the stairs—conspicuously ignored by everyone in the room.\n\nThe hooded figure hasn't moved or acknowledged your entrance. Mella glances at you from behind the bar with the flat appraisal she reserves for strangers.\n\nWhat do you do?"
+            }
+          ]
+        },
+        "streamDeltas": [
+          "The",
+          " <color=#009de5>Gilded Stag</color> is half-full",
+          " on a wet evening. Besides yourself, there are perhaps",
+          " a dozen souls scattered among the tables and the bar: dock",
+          "workers nursing cheap ale, a pair of merchants haggling quietly over led",
+          "gers, a gray-bearded man playing solitaire with worn cards. Mella tends the bar",
+          " with practiced efficiency, and the hooded figure by the hearth—cloaked, face turned from",
+          " the room—sits motionless, one hand wrapped around a pewter tankard.\n\nThe air",
+          " is thick with smoke and the smell of wet leather. Rain drumming the shutters is",
+          " the loudest sound besides the crackle of the hearth. The <color=#20b2aa>iron",
+          "-banded oak door</color> to the cellar is dark and locked, set into the stone wall beneath the stairs",
+          "—conspicuously ignored by everyone in the room.\n\nThe hooded figure hasn't moved or",
+          " acknowledged your entrance. Mella glances at you from behind the bar with",
+          " the flat appraisal she reserves for strangers.\n\nWhat do you do?"
+        ]
+      },
+      {
+        "kind": "chat",
+        "bucket": "dm",
+        "ordinal": 1,
+        "request": {
+          "model": "claude-haiku-4-5-20251001",
+          "messageCount": 3,
+          "systemHash": "9d270259c954",
+          "tools": [
+            "advance_turn",
+            "alarm",
+            "deck",
+            "describe_entity_type",
+            "detect_orphans",
+            "dm_notes",
+            "end_combat",
+            "enter_ooc",
+            "entity",
+            "find_schema_drift",
+            "list_entity_types",
+            "manage_objectives",
+            "map",
+            "map_entity",
+            "map_query",
+            "modify_initiative",
+            "present_choices",
+            "promote_character",
+            "resolve_turn",
+            "roll_dice",
+            "scene_transition",
+            "scribe",
+            "search_campaign",
+            "search_content",
+            "session_end",
+            "set_display_resources",
+            "set_resource_values",
+            "start_combat",
+            "style_scene",
+            "switch_player",
+            "time",
+            "update_modeline",
+            "validate_entity"
+          ],
+          "lastMessagePreview": "<context> ## Current State PCs: Aldric </context> [Aldric] I make my way toward the hooded figure by the hearth."
+        },
+        "result": {
+          "text": "You cross the common room. Heads don't turn—the tavern's noise swallows your footsteps. As you draw near, the hooded figure becomes more distinct: a cloak of dark wool, frayed at the hem, hands that speak of labor. You catch the faint scent of wet horse and something else—a chemical tang, like metals left to rust.\n\nThe figure doesn't look up as you approach, but their shoulders tense. A subtle shift. They're aware of you.\n\nThe hearth crackles. Rain hammers the shutters. The rest of the tavern continues its low murmur, indifferent.\n\nHow do you approach them?",
+          "toolCalls": [],
+          "usage": {
+            "inputTokens": 45,
+            "outputTokens": 150,
+            "cacheReadTokens": 9506,
+            "cacheCreationTokens": 587,
+            "reasoningTokens": 0
+          },
+          "stopReason": "end",
+          "assistantContent": [
+            {
+              "type": "text",
+              "text": "You cross the common room. Heads don't turn—the tavern's noise swallows your footsteps. As you draw near, the hooded figure becomes more distinct: a cloak of dark wool, frayed at the hem, hands that speak of labor. You catch the faint scent of wet horse and something else—a chemical tang, like metals left to rust.\n\nThe figure doesn't look up as you approach, but their shoulders tense. A subtle shift. They're aware of you.\n\nThe hearth crackles. Rain hammers the shutters. The rest of the tavern continues its low murmur, indifferent.\n\nHow do you approach them?"
+            }
+          ]
+        },
+        "streamDeltas": [
+          "You",
+          " cross the common room. Heads don't turn—the tav",
+          "ern's noise swallows your footsteps. As you draw",
+          " near, the hooded figure becomes more distinct: a cloak of dark wool, fr",
+          "ayed at the hem, hands that speak of labor. You catch the",
+          " faint scent of wet horse and something else—a chemical tang, like metals left",
+          " to rust.\n\nThe figure doesn't look up as you approach, but their shoulders t",
+          "ense. A subtle shift. They're aware of you.\n\nThe hear",
+          "th crackles. Rain hammers the shutters. The rest of the tavern continues its low murmur, ind",
+          "ifferent.\n\nHow do you approach them?"
+        ]
+      }
+    ]
+  },
+  "expectedNarrative": [
+    "The <color=#009de5>Gilded Stag</color> is half-full on a wet evening. Besides yourself, there are perhaps a dozen souls scattered among the tables and the bar: dockworkers nursing cheap ale, a pair of merchants haggling quietly over ledgers, a gray-bearded man playing solitaire with worn cards. Mella tends the bar with practiced efficiency, and the hooded figure by the hearth—cloaked, face turned from the room—sits motionless, one hand wrapped around a pewter tankard.\n\nThe air is thick with smoke and the smell of wet leather. Rain drumming the shutters is the loudest sound besides the crackle of the hearth. The <color=#20b2aa>iron-banded oak door</color> to the cellar is dark and locked, set into the stone wall beneath the stairs—conspicuously ignored by everyone in the room.\n\nThe hooded figure hasn't moved or acknowledged your entrance. Mella glances at you from behind the bar with the flat appraisal she reserves for strangers.\n\nWhat do you do?",
+    "You cross the common room. Heads don't turn—the tavern's noise swallows your footsteps. As you draw near, the hooded figure becomes more distinct: a cloak of dark wool, frayed at the hem, hands that speak of labor. You catch the faint scent of wet horse and something else—a chemical tang, like metals left to rust.\n\nThe figure doesn't look up as you approach, but their shoulders tense. A subtle shift. They're aware of you.\n\nThe hearth crackles. Rain hammers the shutters. The rest of the tavern continues its low murmur, indifferent.\n\nHow do you approach them?"
+  ]
+}

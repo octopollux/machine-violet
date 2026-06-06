@@ -39,12 +39,17 @@ import {
   log,
   status,
   stop,
+  saveTape,
 } from "../src/session-driver.js";
 
 const USAGE = `mvplay — interactive Machine Violet driver
 
 Commands:
   start [--player NAME] [--fresh]   Boot the game in the background, print the menu.
+  record <scenario> [--player NAME] [--fresh]
+                                    Like start, but tape every LLM call (MV_TAPE_MODE=record).
+                                    Play the scenario, then \`save-tape\`.
+  save-tape <path>                  Pull the recorded tape and write a golden to <path>.
   status                            Is a session alive? Show its vitals.
   screen [--ansi]                   Print the rendered terminal screen.
   state                             Print a compact state summary (engine/turn/choices).
@@ -95,6 +100,18 @@ async function main(): Promise<void> {
     case "start":
       await start({ player: opt(rest, "player"), fresh: flag(rest, "fresh") });
       break;
+    case "record": {
+      const scenario = pos[0];
+      if (!scenario) throw new Error(`record needs a scenario name: mvplay record open-door`);
+      await start({ record: scenario, player: opt(rest, "player"), fresh: flag(rest, "fresh") });
+      break;
+    }
+    case "save-tape": {
+      const out = pos[0];
+      if (!out) throw new Error(`save-tape needs an output path: mvplay save-tape path/to/scene.golden.json`);
+      await saveTape(out);
+      break;
+    }
     case "status":
       await status();
       break;

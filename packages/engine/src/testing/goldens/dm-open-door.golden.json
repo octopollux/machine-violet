@@ -1,4 +1,5 @@
 {
+  "scenario": "dm-open-door",
   "tape": {
     "version": 1,
     "scenario": "dm-open-door",
@@ -15,7 +16,7 @@
         "request": {
           "model": "claude-haiku-4-5-20251001",
           "messageCount": 1,
-          "systemHash": "77871a277edd",
+          "systemHash": "9d270259c954",
           "tools": [
             "advance_turn",
             "alarm",
@@ -54,41 +55,39 @@
           "lastMessagePreview": "<context> ## Current State PCs: Aldric [length] Terminal: 80 cols × 16 visible rows. [stats] Turn: Aldric </context> [Al"
         },
         "result": {
-          "text": "I need context about where you are and what door you're opening. Let me check what's already been established.\n\nIt seems we're starting fresh! Let me set the scene.\n\n---\n\nYou push against the heavy wooden door. It swings inward with a creak, revealing a dimly lit <color=#009de5>tavern</color> that smells of spiced ale and woodsmoke. The common room stretches before you—rough-hewn beams overhead, a long bar along one wall where a <color=#cc8844>barkeep</color> with a scarred jaw wipes a glass. A few patrons nurse drinks in the corner booths, but most of the tables sit empty for this hour of the afternoon.\n\nThe door closes behind you with a soft *thud*. Warm air wraps around you.\n\nWhat do you do?",
+          "text": "The handle is cold, slick with condensation. You pull—it doesn't budge. The lock is old but sturdy, a heavy iron mechanism set deep into the oak frame. Behind you, the tavern falls quieter. The rain batters on. <color=#44cc44>Mella</color> has stopped wiping that mug.\n\n\"That door stays locked,\" she says flatly, not looking at you. \"Cellar's not for guests.\"\n\nThe <color=#cc8844>hooded figure</color> by the hearth shifts slightly, as if considering whether this is the moment to leave.\n\nWhat do you do?",
           "toolCalls": [],
           "usage": {
-            "inputTokens": 380,
-            "outputTokens": 191,
-            "cacheReadTokens": 0,
-            "cacheCreationTokens": 9321,
+            "inputTokens": 391,
+            "outputTokens": 144,
+            "cacheReadTokens": 9321,
+            "cacheCreationTokens": 185,
             "reasoningTokens": 0
           },
           "stopReason": "end",
           "assistantContent": [
             {
               "type": "text",
-              "text": "I need context about where you are and what door you're opening. Let me check what's already been established.\n\nIt seems we're starting fresh! Let me set the scene.\n\n---\n\nYou push against the heavy wooden door. It swings inward with a creak, revealing a dimly lit <color=#009de5>tavern</color> that smells of spiced ale and woodsmoke. The common room stretches before you—rough-hewn beams overhead, a long bar along one wall where a <color=#cc8844>barkeep</color> with a scarred jaw wipes a glass. A few patrons nurse drinks in the corner booths, but most of the tables sit empty for this hour of the afternoon.\n\nThe door closes behind you with a soft *thud*. Warm air wraps around you.\n\nWhat do you do?"
+              "text": "The handle is cold, slick with condensation. You pull—it doesn't budge. The lock is old but sturdy, a heavy iron mechanism set deep into the oak frame. Behind you, the tavern falls quieter. The rain batters on. <color=#44cc44>Mella</color> has stopped wiping that mug.\n\n\"That door stays locked,\" she says flatly, not looking at you. \"Cellar's not for guests.\"\n\nThe <color=#cc8844>hooded figure</color> by the hearth shifts slightly, as if considering whether this is the moment to leave.\n\nWhat do you do?"
             }
           ]
         },
         "streamDeltas": [
-          "I",
-          " need context about where you are and what door you're opening. Let me check what's already been established.\n\nIt",
-          " seems we're starting fresh! Let me set the scene.",
-          "\n\n---\n\nYou push against the heavy wooden door. It swings inward with a cr",
-          "eak, revealing a dimly lit <color=#009de5>tavern</color> that smells of spiced",
-          " ale and woodsmoke. The common room stretches before you—rough-hewn beams overhead, a long",
-          " bar along one wall where a <color=#cc8844>barkeep</color> with",
-          " a scarred jaw wipes a glass. A few patrons nurse",
-          " drinks in the corner booths, but most of the tables sit",
-          " empty for this hour of the afternoon.\n\nThe door closes behind you with a soft *",
-          "thud*. Warm air wraps around you.\n\nWhat",
-          " do you do?"
+          "The",
+          " handle is cold, slick with condensation. You",
+          " pull—it doesn't budge. The lock is old but sturdy, a",
+          " heavy iron mechanism set deep into the oak frame. Behind you",
+          ", the tavern falls quieter. The rain batters on.",
+          " <color=#44cc44>Mella</color> has stopped wiping that mug.",
+          "\n\n\"That door stays locked,\" she says flatly, not looking at",
+          " you. \"Cellar's not for guests.\"\n\nThe <color=#cc8844>ho",
+          "oded figure</color> by the hearth shifts slightly, as if considering whether this is the moment to",
+          " leave.\n\nWhat do you do?"
         ]
       }
     ]
   },
   "expectedNarrative": [
-    "I need context about where you are and what door you're opening. Let me check what's already been established.\n\nIt seems we're starting fresh! Let me set the scene.\n\n---\n\nYou push against the heavy wooden door. It swings inward with a creak, revealing a dimly lit <color=#009de5>tavern</color> that smells of spiced ale and woodsmoke. The common room stretches before you—rough-hewn beams overhead, a long bar along one wall where a <color=#cc8844>barkeep</color> with a scarred jaw wipes a glass. A few patrons nurse drinks in the corner booths, but most of the tables sit empty for this hour of the afternoon.\n\nThe door closes behind you with a soft *thud*. Warm air wraps around you.\n\nWhat do you do?"
+    "The handle is cold, slick with condensation. You pull—it doesn't budge. The lock is old but sturdy, a heavy iron mechanism set deep into the oak frame. Behind you, the tavern falls quieter. The rain batters on. <color=#44cc44>Mella</color> has stopped wiping that mug.\n\n\"That door stays locked,\" she says flatly, not looking at you. \"Cellar's not for guests.\"\n\nThe <color=#cc8844>hooded figure</color> by the hearth shifts slightly, as if considering whether this is the moment to leave.\n\nWhat do you do?"
   ]
 }

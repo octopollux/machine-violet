@@ -1,0 +1,98 @@
+{
+  "scenario": "dm-examine",
+  "tape": {
+    "version": 1,
+    "scenario": "dm-examine",
+    "capabilities": {
+      "claude-haiku-4-5-20251001": {
+        "imageGeneration": false
+      }
+    },
+    "entries": [
+      {
+        "kind": "chat",
+        "bucket": "dm",
+        "ordinal": 0,
+        "request": {
+          "model": "claude-haiku-4-5-20251001",
+          "messageCount": 1,
+          "systemHash": "9d270259c954",
+          "tools": [
+            "advance_turn",
+            "alarm",
+            "deck",
+            "describe_entity_type",
+            "detect_orphans",
+            "dm_notes",
+            "end_combat",
+            "enter_ooc",
+            "entity",
+            "find_schema_drift",
+            "list_entity_types",
+            "manage_objectives",
+            "map",
+            "map_entity",
+            "map_query",
+            "modify_initiative",
+            "present_choices",
+            "promote_character",
+            "resolve_turn",
+            "roll_dice",
+            "scene_transition",
+            "scribe",
+            "search_campaign",
+            "search_content",
+            "session_end",
+            "set_display_resources",
+            "set_resource_values",
+            "start_combat",
+            "style_scene",
+            "switch_player",
+            "time",
+            "update_modeline",
+            "validate_entity"
+          ],
+          "lastMessagePreview": "<context> ## Current State PCs: Aldric [length] Terminal: 80 cols × 16 visible rows. [stats] Turn: Aldric </context> [Al"
+        },
+        "result": {
+          "text": "You crouch and run your fingers along the oak, feeling the grain. The <color=#20b2aa>iron bands</color> are ancient, rust-flecked but solid—driven deep into the wood with nails the size of your thumb. No weakness here. The lock itself is a heavy mortise, the keyhole clogged with a century of grime.\n\nAs you work, the tavern's ambient noise—the hiss of the hearth, the rain's drumming rhythm—drops away. You realize the <color=#cc8844>hooded figure</color> has gone silent. When you glance up, they're watching you. Not obviously—a slight tilt of the head, one eye visible beneath the cowl. The gaze holds for a breath, then slides away.\n\n<color=#44cc44>Mella</color> sets down her mug with deliberate force. \"That door stays locked,\" she says flatly. \"Has since before you were born, most like. Nothing down there worth bothering.\"\n\nThe lie is obvious. Her jaw's tight. She's waiting to see if you'll push.\n\nWhat do you do?",
+          "toolCalls": [],
+          "usage": {
+            "inputTokens": 389,
+            "outputTokens": 255,
+            "cacheReadTokens": 9506,
+            "cacheCreationTokens": 0,
+            "reasoningTokens": 0
+          },
+          "stopReason": "end",
+          "assistantContent": [
+            {
+              "type": "text",
+              "text": "You crouch and run your fingers along the oak, feeling the grain. The <color=#20b2aa>iron bands</color> are ancient, rust-flecked but solid—driven deep into the wood with nails the size of your thumb. No weakness here. The lock itself is a heavy mortise, the keyhole clogged with a century of grime.\n\nAs you work, the tavern's ambient noise—the hiss of the hearth, the rain's drumming rhythm—drops away. You realize the <color=#cc8844>hooded figure</color> has gone silent. When you glance up, they're watching you. Not obviously—a slight tilt of the head, one eye visible beneath the cowl. The gaze holds for a breath, then slides away.\n\n<color=#44cc44>Mella</color> sets down her mug with deliberate force. \"That door stays locked,\" she says flatly. \"Has since before you were born, most like. Nothing down there worth bothering.\"\n\nThe lie is obvious. Her jaw's tight. She's waiting to see if you'll push.\n\nWhat do you do?"
+            }
+          ]
+        },
+        "streamDeltas": [
+          "You",
+          " crouch and run your fingers along the oak, feeling the grain. The ",
+          "<color=#20b2aa>iron bands</color> are ancient, rust-flecked but solid—driven",
+          " deep into the wood with nails the size of your thumb. No weakness here. The lock",
+          " itself is a heavy mortise, the keyhole c",
+          "logged with a century of grime.\n\nAs you work, the tavern's ambient noise—the h",
+          "iss of the hearth, the rain's drumming rhythm—drops away. You realize the <color=#cc8",
+          "844>hooded figure</color> has gone silent. When you glance up, they're watching you. Not",
+          " obviously—a slight tilt of the head, one eye visible beneath",
+          " the cowl. The gaze holds for a breath,",
+          " then slides away.\n\n<color=#44cc44>Mella</color> sets down her mug with deliberate force. \"That",
+          " door stays locked,\" she says flatly. \"Has since before you were born, most like. Nothing",
+          " down there worth bothering.\"\n\nThe lie is obvious. Her",
+          " jaw's tight. She's waiting to see if you'll push.\n\nWhat",
+          " do you do?"
+        ]
+      }
+    ]
+  },
+  "expectedNarrative": [
+    "You crouch and run your fingers along the oak, feeling the grain. The <color=#20b2aa>iron bands</color> are ancient, rust-flecked but solid—driven deep into the wood with nails the size of your thumb. No weakness here. The lock itself is a heavy mortise, the keyhole clogged with a century of grime.\n\nAs you work, the tavern's ambient noise—the hiss of the hearth, the rain's drumming rhythm—drops away. You realize the <color=#cc8844>hooded figure</color> has gone silent. When you glance up, they're watching you. Not obviously—a slight tilt of the head, one eye visible beneath the cowl. The gaze holds for a breath, then slides away.\n\n<color=#44cc44>Mella</color> sets down her mug with deliberate force. \"That door stays locked,\" she says flatly. \"Has since before you were born, most like. Nothing down there worth bothering.\"\n\nThe lie is obvious. Her jaw's tight. She's waiting to see if you'll push.\n\nWhat do you do?"
+  ]
+}

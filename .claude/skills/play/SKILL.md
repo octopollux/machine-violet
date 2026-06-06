@@ -27,6 +27,8 @@ node --import tsx/esm packages/test-harness/bin/mvplay.ts <cmd> [args]
 | Command | What it does |
 |---|---|
 | `start [--player NAME] [--fresh]` | Boot the game in the background; print the main menu. |
+| `record <scenario> [--player NAME] [--fresh]` | Like `start`, but tape every LLM call (records a golden — see /record-tape). |
+| `save-tape <path>` | Pull the recorded tape and write a golden to `<path>` (record sessions only). |
 | `status` | Is a session alive? Show engine/turn/choices vitals. |
 | `screen [--ansi]` | Print the rendered terminal screen (use for menu phase). |
 | `state` | Compact summary: engineState, mode, current turn, choices, narrative count. |
@@ -101,7 +103,20 @@ in [docs/e2e-harness.md](../../../docs/e2e-harness.md) under "Engine-state
 surprises" and "Interactive play". The `mvplay` driver already handles the input
 normalization for you; read the doc only if you're driving raw keys.
 
-## When to use the probe instead
+## Recording a golden while you play
 
-If you want a **fixed pass/fail** end-to-end check ("did I break it?"), that's
-`/smoketest`, not this. Interactive play is for when *you* are the player.
+The same turn-for-turn loop, in record mode, is how you capture a full-stack /
+setup golden tape: `mvplay record <scenario>` instead of `start`, play through,
+then `mvplay save-tape <path>` before `mvplay stop`. Your turn-by-turn judgement
+*is* the recording. See the **/record-tape** skill for the full discipline (and
+the caveat that full-stack auto-replay is still an open edge).
+
+## When to reach for something else
+
+- **"Did I break it?" / regression check** → `/replay-goldens` (offline, ~4s).
+  That's the gate, not this.
+- **Record/refresh a golden** → `/record-tape` (uses `mvplay record` under the hood).
+- **A live behavioral smoke against the real API** → `/smoketest` (Tier-3, rare).
+
+Interactive play is for when *you* are the player and the value is your
+turn-by-turn judgement against live game state.

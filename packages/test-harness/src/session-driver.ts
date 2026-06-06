@@ -36,7 +36,7 @@ import {
   rmSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 
 import { buildLaunchEnv, pickEphemeralPort, LAUNCHER_NODE_ARGS } from "./launch-env.js";
 import { choiceLabel, type ClientStateSnapshot, type ActiveChoices } from "./client-state.js";
@@ -67,6 +67,8 @@ interface SessionFile {
   lastTurnSeq: number | null;
   /** currentTurn.campaignId the agent last observed (handoff detection). */
   lastCampaignId: string | null;
+  /** Tape scenario name if this session is recording (MV_TAPE_MODE=record), else null. */
+  recording: string | null;
 }
 
 function readSession(): SessionFile | null {
@@ -262,6 +264,12 @@ export interface StartOptions {
   fresh?: boolean;
   /** Max ms to wait for the sidecar to come up. Default 30s. */
   launchTimeoutMs?: number;
+  /**
+   * Record a session tape under this scenario name (sets `MV_TAPE_MODE=record`
+   * + `MV_TAPE_SCENARIO` on the launcher). Pull the tape afterward with
+   * `saveTape()`. Omit for a normal play session.
+   */
+  record?: string;
 }
 
 /**
@@ -299,6 +307,9 @@ export async function start(opts: StartOptions = {}): Promise<void> {
     agentPort,
     campaignsDir: CAMPAIGNS_DIR,
     player,
+    extraEnv: opts.record
+      ? { MV_TAPE_MODE: "record", MV_TAPE_SCENARIO: opts.record }
+      : undefined,
   });
 
   // Detached: the child must outlive THIS cli process. Its stdout/stderr go
@@ -331,6 +342,7 @@ export async function start(opts: StartOptions = {}): Promise<void> {
     lastChoiceFp: null,
     lastTurnSeq: null,
     lastCampaignId: null,
+    recording: opts.record ?? null,
   };
 
   // Wait for the sidecar to answer.
@@ -360,7 +372,13 @@ export async function start(opts: StartOptions = {}): Promise<void> {
 
   writeSession(session);
 
-  process.stdout.write(`✔ session started (pid ${child.pid}, sidecar :${agentPort})\n\n`);
+  process.stdout.write(`✔ session started (pid ${child.pid}, sidecar :${agentPort})\n`);
+  if (opts.record) {
+    process.stdout.write(
+      `● recording tape "${opts.record}" — play the scenario, then \`mvplay save-tape <path>\`.\n`,
+    );
+  }
+  process.stdout.write("\n");
   const screen = await getScreen(session);
   process.stdout.write(screen.replace(/\n+$/, "") + "\n");
   process.stdout.write(
@@ -652,7 +670,8 @@ export async function status(): Promise<void> {
   const alive = isAlive(s.pid);
   process.stdout.write(
     `session: pid ${s.pid} (${alive ? "alive" : "DEAD"}), sidecar :${s.agentPort}, ` +
-    `player ${JSON.stringify(s.player)}, seen ${s.readCursor} narrative lines\n`,
+    `player ${JSON.stringify(s.player)}, seen ${s.readCursor} narrative lines` +
+    (s.recording ? `, ● recording "${s.recording}"` : "") + "\n",
   );
   if (alive) {
     try {
@@ -662,6 +681,55 @@ export async function status(): Promise<void> {
       process.stdout.write(`(sidecar unreachable: ${String(err)})\n`);
     }
   }
+}
+
+/**
+ * Pull the session tape recorded so far (via the engine's dev-only `GET /tape`)
+ * and write it to `outPath` as a golden `{ scenario, tape, expectedNarrative }`,
+ * where `expectedNarrative` is the DM/non-player narrative captured this session
+ * — the deterministic replay target. The session must have been started with
+ * `mvplay record <scenario>`; pull the tape BEFORE `mvplay stop`, since teardown
+ * force-kills the engine and its in-memory tape with it.
+ */
+export async function saveTape(outPath: string): Promise<void> {
+  const s = requireSession();
+  if (!s.recording) {
+    throw new Error(
+      "This session is not recording. Start it with `mvplay record <scenario>` to capture a tape.",
+    );
+  }
+  let tape: unknown;
+  try {
+    const res = await fetch(`http://127.0.0.1:${s.serverPort}/tape`);
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`GET /tape returned ${res.status} ${body}`);
+    }
+    tape = await res.json();
+  } catch (err) {
+    throw new Error(
+      `Could not pull the tape from the engine on port ${s.serverPort}: ` +
+      `${err instanceof Error ? err.message : String(err)}`,
+      { cause: err },
+    );
+  }
+
+  // Capture the narrative produced this session as the replay assertion target.
+  let expectedNarrative: string[] = [];
+  try {
+    const snap = await getState(s);
+    expectedNarrative = snap.narrativeLines
+      .filter((l) => l.kind !== "player")
+      .map((l) => l.text);
+  } catch { /* tape alone is still useful */ }
+
+  const golden = { scenario: s.recording, tape, expectedNarrative };
+  mkdirSync(dirname(outPath), { recursive: true });
+  writeFileSync(outPath, JSON.stringify(golden, null, 2) + "\n");
+  process.stdout.write(
+    `✔ saved golden "${s.recording}" → ${outPath}\n` +
+    `  (${expectedNarrative.length} narrative lines captured; review the diff before committing)\n`,
+  );
 }
 
 /** Kill the session process tree and remove the session file. */
