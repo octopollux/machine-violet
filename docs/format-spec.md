@@ -850,7 +850,10 @@ Bundled seeds are validated strictly (malformed files fail the build). User worl
   "calendar_display_format": "fantasy",
 
   // --- DM-only content ---
-  "detail": "The throne sits empty...",   // Fork-INVARIANT base prose (§10.6). Never shown to the player.
+  "detail": "The throne sits empty...",   // Fork-INVARIANT base prose (§10.6). DM-only, assembled in code.
+
+  // --- Setup-agent-only content ---
+  "setup_detail": "<!--include:Pacing.EndlessCampaigns-->",  // Surfaced to the setup agent (includes expanded); NEVER reaches the DM (§10.7).
 
   // --- Forks: named decision points, resolved at setup (§10.6) ---
   "forks": [
@@ -953,6 +956,18 @@ A single seed often encodes **many possible campaigns** — a "genre wrapper", a
 The legacy `suboptions` shape (player-facing only) is **folded into `forks`** (`chooser: "player"`) by `normalizeForks` for any consumer that calls it, so older/user-authored files keep working; new seeds author `forks` directly.
 
 > **Status (staged rollout).** Live now: the `forks` / `fork_selections` format and `appliesWhen` scoping; the `world-forks.ts` helpers (`normalizeForks`, `assembleCampaignDetail`); setup-agent consumption — `load_world` surfaces forks, the agent resolves them (rolling agent forks via `roll_dice`), and `handleFinalize` assembles `campaign_detail` from the seed base + selected branches and persists `fork_selections`; and fork-scoped materialization (§10.5 gates `appliesWhen` entities on the selection). Still pending: migrating the bundled seeds from prose forks to structured `forks` (until a seed is migrated, its prose forks remain in its `detail` base and assemble through unchanged — no regression).
+
+### 10.7 The three channels out of a seed
+
+Seed content reaches three different audiences, and a field belongs to exactly one channel:
+
+| Channel | Field(s) | How it flows | Sees it |
+|---|---|---|---|
+| **DM** | `detail` + selected fork-option `detail` | code: `assembleCampaignDetail` → `config.campaign_detail` → DM prompt (includes expanded at DM-prompt time) | DM only |
+| **Setup agent** | `forks` (labels/options), config hints, and **`setup_detail`** | `load_world` → `renderWorldForAgent` (includes expanded here) | setup agent only |
+| **Player** | player-fork option `name`/`description`, `suboptions` | the setup agent presents them via `present_choices` | player |
+
+`setup_detail` is the **setup-agent-only** channel. The setup agent acts on it (e.g. presents a scope/pacing variant) but it is **never assembled into `campaign_detail`** — the exclusion is by omission (`assembleCampaignDetail` only reads `detail` + selected option `detail`), so it is structurally impossible for it to reach the DM. This is the home for content that is neither DM-facing nor directly player-facing: scope/rhythm presentation (e.g. `<!--include:Pacing.EndlessCampaigns-->`), chargen hints, alternate hooks the agent should weigh. **Setup-only includes (notably the `Pacing.*` scope blocks) belong here, not in `detail`** — in `detail` they would expand into the DM's context and make it re-ask the scope question on turn 1.
 
 ---
 

@@ -157,6 +157,21 @@ export interface WorldFile {
    */
   detail?: string;
 
+  /**
+   * Setup-agent-only material — the third channel out of a seed (alongside the
+   * DM-only `detail` and the forks). `load_world` surfaces it to the setup agent
+   * **with includes expanded**, but it is NEVER assembled into the DM's
+   * `campaign_detail`. Use it for content the setup agent should act on yet the
+   * DM must not see: a scope/pacing variant to present
+   * (e.g. `<!--include:Pacing.EndlessCampaigns-->`), chargen hints, alternate
+   * hooks to weigh. Semantics are prompt-driven — the setup prompt tells the
+   * agent how to use it. The DM-side exclusion is by *omission*:
+   * `assembleCampaignDetail` only reads `detail` + selected option `detail`, so
+   * nothing here can reach the DM. Includes (and dot-noted variants) resolve
+   * here because `renderWorldForAgent` runs `processIncludes` on it.
+   */
+  setup_detail?: string;
+
   // --- Forks: the seed's named decision points (resolved at setup) ---
 
   /** The seed's decision points. See {@link WorldFork}. */

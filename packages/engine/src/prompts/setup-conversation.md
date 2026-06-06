@@ -40,9 +40,10 @@ For Quick Start, default to pure narrative (no system) unless the seed implies o
 
 The standard options live in the `<Pacing>` block at the bottom of this prompt. Present those via `present_choices` using each label as the choice label, and pass the matching slug to `finalize_setup` as `campaign_scope`. Default to `few-sessions` if the player declines to choose.
 
-A seed-layer override applies:
+Two seed-layer signals can apply:
 
 - **Required scope (hard):** if `load_world` returned a `Required campaign_scope`, use that slug verbatim and SKIP this question entirely — the seed has a baked-in length.
+- **Setup-only guidance (soft):** if `load_world` returned a `Setup-only guidance` section that describes scope/pacing/rhythm options, present THOSE to the player instead of the standard block (frame them naturally, follow any slug mapping they note), and pass the resulting slug to `finalize_setup`. This is how a seed flavors the scope question (e.g. an open-ended world offering Open-Ended / Serialized / Unstructured rhythms). Never show the guidance text itself to the player.
 
 ## Pre-finalize review (MANDATORY)
 

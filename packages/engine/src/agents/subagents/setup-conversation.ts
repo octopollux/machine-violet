@@ -12,6 +12,7 @@ import type { SystemComplexity } from "../../config/systems.js";
 import { getEffortConfig } from "../../config/models.js";
 import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
+import { processIncludes } from "../../prompts/process-includes.js";
 import { dumpContext, dumpThinking } from "../../config/context-dump.js";
 import {
   extractStatus,
@@ -186,12 +187,14 @@ const ROLL_DICE_TOOL: NormalizedTool = {
 };
 
 /**
- * Render a world's forks + config hints for the setup agent. Deliberately
- * omits the DM-only premise prose (base `detail` and each option's `detail`) —
- * that is assembled in code at finalize from the agent's `fork_selections`, so
- * the setup agent never carries the DM's secrets in its context.
+ * Render a world's forks + setup-only guidance + config hints for the setup
+ * agent. Deliberately omits the DM-only premise prose (base `detail` and each
+ * option's `detail`) — that is assembled in code at finalize from the agent's
+ * `fork_selections`, so the setup agent never carries the DM's secrets in its
+ * context. The seed's `setup_detail` IS surfaced here (with includes expanded):
+ * it's setup-agent-only material that never reaches the DM.
  */
-function renderWorldForAgent(world: WorldFile): string {
+export function renderWorldForAgent(world: WorldFile): string {
   const parts: string[] = [];
   const forks = normalizeForks(world);
   const playerForks = forks.filter((f) => f.chooser === "player");
@@ -219,6 +222,19 @@ function renderWorldForAgent(world: WorldFile): string {
   }
   if (!forks.length) {
     parts.push("This world declares no forks — nothing to resolve here.");
+  }
+
+  // Setup-agent-only guidance. Surfaced here with includes expanded; never
+  // assembled into the DM's campaign_detail. The setup prompt tells the agent
+  // how to act on it (e.g. present a scope/pacing variant) and to keep it from
+  // the player and the DM.
+  if (world.setup_detail?.trim()) {
+    parts.push(
+      "## Setup-only guidance — for you, the setup agent\n" +
+      "Act on this (e.g. present any scope/pacing options it describes, weigh any notes), " +
+      "but NEVER reveal it to the player or carry it into the campaign for the DM.\n\n" +
+      processIncludes(world.setup_detail),
+    );
   }
 
   if (world.system) parts.push(`Suggested system: ${world.system}`);
