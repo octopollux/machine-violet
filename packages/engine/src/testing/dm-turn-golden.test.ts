@@ -146,7 +146,7 @@ async function runScenario(provider: LLMProvider): Promise<{ narrative: string[]
 }
 
 describe("golden: dm-open-door", () => {
-  it.skipIf(!process.env.RECORD_GOLDENS)("records the golden (live API)", async () => {
+  it.skipIf(process.env.RECORD_GOLDENS !== "1")("records the golden (live API)", async () => {
     loadEnv();
     const writer = new TapeWriter("dm-open-door");
     const { narrative, errors } = await runScenario(createTapingProvider(createAnthropicProvider(), writer));

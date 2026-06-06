@@ -154,7 +154,9 @@ export class TapeWriter {
   }
 
   build(): Tape {
-    return { version: TAPE_VERSION, scenario: this.scenario, capabilities: this.caps, entries: this.entries };
+    // Snapshot: copy the array + object so a stored tape doesn't mutate if
+    // recording continues (e.g. getRecordedTape() read mid-session).
+    return { version: TAPE_VERSION, scenario: this.scenario, capabilities: { ...this.caps }, entries: [...this.entries] };
   }
 }
 
