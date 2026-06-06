@@ -13,24 +13,33 @@ tape and review the diff. **Never hand-edit a tape.** If a tape is wrong, re-rec
 
 There are two kinds of golden, with two record paths.
 
-## A. In-process engine goldens (the corpus) — the common case
+## A. In-process corpora (the common case)
 
-These drive the real `GameEngine` directly (DM turns, tool loops, multi-turn
-context). They live in
-[`packages/engine/src/testing/corpus.golden.test.ts`](../../../packages/engine/src/testing/corpus.golden.test.ts),
-one entry per scenario in the `SCENARIOS` array, each with its tape under
-`goldens/<name>.golden.json`.
+Two co-located corpora inject a provider directly and replay offline. Both gate
+their record half behind `RECORD_GOLDENS=1` (without it, normal `npm test` runs
+only the offline replay); the key is sourced from `.env`.
 
-**Re-record a stale golden** (you changed DM behavior on purpose):
+**The DM corpus** —
+[`corpus.golden.test.ts`](../../../packages/engine/src/testing/corpus.golden.test.ts):
+drives the real `GameEngine` (DM turns, tool loops, multi-turn context), one
+entry per scenario in `SCENARIOS`, tape at `goldens/<name>.golden.json`.
+
+**The setup corpus** —
+[`setup-corpus.golden.test.ts`](../../../packages/engine/src/testing/setup-corpus.golden.test.ts):
+drives the real `createSetupConversation` to `finalize_setup`, then the real
+`buildCampaignWorld` handoff. One entry per scenario in `SETUP_SCENARIOS`.
+
+**Re-record a stale golden** (you changed behavior on purpose):
 
 ```bash
-npm run golden:record                       # re-records ALL goldens (live)
+npm run golden:record                       # re-records ALL goldens, both corpora (live)
 # or a subset:
 npx cross-env RECORD_GOLDENS=1 npx vitest run golden -t "dm-skill-check"
+npx cross-env RECORD_GOLDENS=1 npx vitest run setup-corpus -t "setup-custom-noir"
 ```
 
-Then **review the git diff** on the `.golden.json` files — confirm the narrative
-change is what you intended — and verify it replays:
+Then **review the git diff** on the `.golden.json` files — confirm the change is
+what you intended — and verify it replays:
 
 ```bash
 npm run golden:verify     # offline, must pass
@@ -38,20 +47,21 @@ npm run golden:verify     # offline, must pass
 
 Commit the test + the regenerated tapes together.
 
-**Add a new scenario:** add one entry to `SCENARIOS` (a `name` + a `play(engine)`
-that drives `processInput`), record it (`-t "<name>"`), verify, commit. Keep the
-mock scene/state coherent with the player input so the DM narrates in character
-rather than asking for context — see the seeded scene at the top of the file.
+**Add a DM scenario:** one entry in `SCENARIOS` (a `name` + a `play(engine)` that
+drives `processInput`); keep the mock scene/state coherent with the input so the
+DM narrates in character. **Add a setup scenario:** one entry in
+`SETUP_SCENARIOS` — front-load the content the agent gates on (crucially the
+player's *name*); the bounded finalize loop confirms until the tool fires. Set
+`MV_SETUP_TRACE=1` to print the turn-by-turn flow when authoring/recording.
+Record (`-t "<name>"`), verify, commit.
 
-> The record half is gated behind `RECORD_GOLDENS=1`; without it (i.e. in normal
-> `npm test`) only the offline replay runs. The key is sourced from `.env`.
+## B. Full-stack goldens — live-pilot with mvplay
 
-## B. Full-stack / setup goldens — live-pilot with mvplay
-
-The in-process path can't reach the **setup agent**, the setup→game handoff, or
-the TUI. To capture those you live-pilot the real stack in record mode and pull
-the tape out afterward. This is the load-bearing "a Claude live-pilots once to
-record" capability.
+The in-process corpora cover the setup *agent conversation* and the DM loop. What
+they can't reach is the live stack: the setup→game handoff through the real
+`SessionManager` loader, the WebSocket events, the TUI render. To capture those
+you live-pilot the real stack in record mode and pull the tape out afterward.
+This is the load-bearing "a Claude live-pilots once to record" capability.
 
 ```bash
 mvplay record <scenario> [--player NAME] [--fresh]   # boots in record mode
@@ -68,12 +78,12 @@ expectedNarrative }`. Pull the tape **before** `mvplay stop` — teardown
 force-kills the engine and its in-memory tape with it.
 
 > **Capture works today; deterministic auto-replay of full-stack tapes is the
-> open edge.** The in-process corpus is the replay backbone. A captured
-> full-stack tape is a real artifact (inspect it, seed a future replay test from
-> it), but there is not yet an in-process driver that replays a setup→game tape
-> end to end. Setup-agent calls currently bucket as `"default"` (no
-> `conversationId`) — the future replay-runner must account for that. Don't
-> commit a full-stack tape as a passing golden until that runner exists.
+> open edge.** The in-process corpora are the replay backbone (the setup agent
+> now replays offline via the setup corpus). A captured full-stack tape is a real
+> artifact (inspect it, seed a future test from it), but there is not yet a
+> driver that replays one through the server stack — the capture records neither
+> the player inputs nor a replayable narrative segmentation. Don't commit a
+> full-stack tape as a passing golden until that runner exists.
 
 ## The discipline (both paths)
 

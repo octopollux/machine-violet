@@ -282,7 +282,7 @@ The **Tier-3 live** harness (the regression backbone is Tier-2 golden replay —
 | `src/engine-log.ts` | Engine-log breadcrumb reader (`image_gen:*`, `subagent:*`, `api:call`, ...). |
 | `src/client-state.ts` | Mirror of client-side state for assertion. |
 
-The **Tier-2 record/replay** code lives in `engine`, not here: `packages/engine/src/providers/{tape,tape-provider,tape-mode}.ts` (format + record/replay shims + record wiring), `packages/engine/src/server/routes/dev.ts` (`GET /tape` readback), and the corpus at `packages/engine/src/testing/corpus.golden.test.ts` (+ `goldens/`).
+The **Tier-2 record/replay** code lives in `engine`, not here: `packages/engine/src/providers/{tape,tape-provider,tape-mode}.ts` (format + record/replay shims + record wiring), `packages/engine/src/server/routes/dev.ts` (`GET /tape` readback), and the corpora at `packages/engine/src/testing/{corpus,setup-corpus}.golden.test.ts` (DM loop + setup agent; shared `goldens/`).
 
 See [e2e-harness.md](e2e-harness.md) (three-tier strategy, live harness), [golden-tapes.md](golden-tapes.md) (record/replay model), and [tape-format.md](tape-format.md) (tape schema).
 

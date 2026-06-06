@@ -22,14 +22,27 @@ engine.
 }
 ```
 
-A committed golden file wraps the tape with its replay assertion:
+A committed golden file wraps the tape with its replay assertion. The DM corpus
+asserts the narrative:
 
 ```jsonc
 { "scenario": "...", "tape": { /* Tape */ }, "expectedNarrative": ["...", "..."] }
 ```
 
-`expectedNarrative` is the DM/non-player narrative the scenario produced at record
-time — the deterministic replay target.
+The setup corpus adds the finalized blueprint, since a setup scenario's payoff is
+the campaign it produces, not just the prose:
+
+```jsonc
+{ "scenario": "...", "tape": { /* Tape */ },
+  "expectedNarrative": ["...", "..."],   // per-turn setup-agent narrative
+  "expectedSetup": { /* SetupResult */ } // finalize_setup output, replayed verbatim
+}
+```
+
+`expectedNarrative` is the non-player narrative the scenario produced at record
+time — the deterministic replay target. `expectedSetup` (setup goldens only) is
+the `SetupResult` the agent finalized; replay re-derives it and the handoff
+scaffolds a campaign from it.
 
 ## Bucketing + matching
 
@@ -37,8 +50,9 @@ Every chat call is filed into a **bucket** and matched **ordinally** within it:
 
 - **Bucket** = `ChatParams.conversationId` (the agent name — `"dm"`, `"scribe"`,
   …) or `"default"` when absent. `generateImage` calls use the `"__image__"`
-  bucket. (Setup-agent calls currently carry no `conversationId`, so they land in
-  `"default"`.)
+  bucket. Setup-agent calls carry no `conversationId`, so an entire setup
+  conversation lands in `"default"` and matches ordinally — which is exactly what
+  the setup corpus relies on (its calls are a single in-order sequence).
 - **Ordinal** = position within the bucket. The Nth chat call in bucket B during
   replay returns the Nth recorded entry for B.
 
