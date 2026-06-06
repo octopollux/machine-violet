@@ -1,6 +1,8 @@
 # E2E Harness v2 — Implementation Plan
 
-> **Status:** in progress (started 2026-06-04). This is a temporary implementation tracker.
+> **Status:** in progress (started 2026-06-04). Record→replay loop **CLOSED 2026-06-05** — first
+> golden (`dm-open-door`) recorded live and replaying offline through the real `GameEngine`. This is a
+> temporary implementation tracker.
 > When the slices land, its content folds into a rewritten `e2e-harness.md` and this file is removed.
 
 ## Why
