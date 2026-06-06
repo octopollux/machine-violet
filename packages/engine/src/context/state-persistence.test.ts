@@ -508,15 +508,19 @@ describe("write serialization", () => {
   });
 
   it("concurrent writes to different files proceed independently", async () => {
-    const callTimes: Record<string, number[]> = {};
+    // Record a start/end event log instead of wall-clock timestamps: a
+    // wall-clock delta threshold flakes under load (GC pauses, parallel test
+    // workers) and on coarse clocks. Event ordering distinguishes concurrent
+    // from serialized deterministically.
+    const events: string[] = [];
     const fio = mockFileIO();
     (fio.writeFile as ReturnType<typeof vi.fn>).mockImplementation(
       async (path: string, content: string) => {
         const key = norm(path);
-        if (!callTimes[key]) callTimes[key] = [];
-        callTimes[key].push(Date.now());
+        events.push(`start:${key}`);
         await new Promise((r) => setTimeout(r, 20));
         files[key] = content;
+        events.push(`end:${key}`);
       },
     );
 
@@ -525,13 +529,15 @@ describe("write serialization", () => {
     persister.persistClocks(createClocksState());
 
     await persister.flush();
-    // Both files were written
+    // Both files were written exactly once.
     const combatKey = norm("/tmp/campaign/state/combat.json");
     const clocksKey = norm("/tmp/campaign/state/clocks.json");
-    expect(callTimes[combatKey]).toHaveLength(1);
-    expect(callTimes[clocksKey]).toHaveLength(1);
-    // They started concurrently (within 5ms of each other)
-    expect(Math.abs(callTimes[combatKey][0] - callTimes[clocksKey][0])).toBeLessThan(15);
+    expect(events.filter((e) => e === `start:${combatKey}`)).toHaveLength(1);
+    expect(events.filter((e) => e === `start:${clocksKey}`)).toHaveLength(1);
+    // Writes to different files are concurrent, not per-file serialized: both
+    // START before either FINISHES. A serialized scheduler would instead
+    // produce start→end→start→end.
+    expect(events.slice(0, 2).every((e) => e.startsWith("start:"))).toBe(true);
   });
 
   it("error in one write does not block subsequent writes", async () => {
