@@ -26,6 +26,7 @@ import { getActivePlayer } from "../agents/player-manager.js";
 import { loadEnv } from "../config/first-launch.js";
 import { loadConnectionStore, buildEffectiveConnections } from "../config/connections.js";
 import { buildTierProvidersWithCache } from "../config/tier-resolver.js";
+import { wrapForRecording } from "../providers/tape-mode.js";
 import type { LLMProvider } from "../providers/types.js";
 import { configDir, norm } from "../utils/paths.js";
 import { processingPaths } from "../config/processing-paths.js";
@@ -574,7 +575,8 @@ export class SessionManager {
     const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
     const { createAnthropicProvider } = await import("../providers/anthropic.js");
     const tierResolution = buildTierProvidersWithCache(connStore, () => createAnthropicProvider(), appConfigDir);
-    const tierProviders = tierResolution.tiers;
+    // Tapes every LLM call when MV_TAPE_MODE=record; identity pass-through otherwise.
+    const tierProviders = wrapForRecording(tierResolution.tiers);
 
     // Track unique providers for end-of-session disposal. Stateful providers
     // (openai-chatgpt) own subprocesses that linger across sessions otherwise.

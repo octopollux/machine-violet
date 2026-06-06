@@ -58,8 +58,8 @@ working pattern; reuse its `ChatResult` fixtures as the tape schema reference.
 ## Hooks (final)
 
 - **pre-commit** (lefthook — net-new tooling): lint `--cache` + `vitest related $(git diff --cached
-  --name-only)` (Tier-1 + in-process Tier-2). Scoped, **blocking**, offline, seconds.
-- **pre-push:** full `npm run check` + `golden:verify`. ~80s, once before sharing.
+  --name-only)` — **Tier-1 + unit only** (cheap, a few seconds, offline). NOT Tier-2 goldens: cold-importing the engine module graph is ~20–30s, too heavy per commit.
+- **pre-push:** full `npm run check` (which includes Tier-2 `golden:verify`). This is where goldens run — ~80s+, once before sharing.
 - **No per-edit / per-turn hooks.** Live tiers (`smoketest`, `golden:record`) **never** auto-run.
 - npm scripts: `golden:record` (live, taping), `golden:verify` + `golden:verify:changed` (deterministic).
   Fold `golden:verify` into `check`, gated on tape existence.

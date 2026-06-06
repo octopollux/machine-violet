@@ -25,6 +25,7 @@ import { processingPaths } from "../config/processing-paths.js";
 import { readBundledRuleCard } from "../config/systems.js";
 import { loadConnectionStore, buildEffectiveConnections } from "../config/connections.js";
 import { buildTierProvidersWithCache } from "../config/tier-resolver.js";
+import { wrapForRecording } from "../providers/tape-mode.js";
 import { createAnthropicProvider } from "../providers/index.js";
 import type { LLMProvider, TierProvider } from "../providers/types.js";
 import type { ModelTier } from "../config/models.js";
@@ -84,7 +85,8 @@ export class SetupSession {
     // setup was missing it, breaking any campaign whose large tier
     // resolves to an openai-chatgpt connection.
     const resolution = buildTierProvidersWithCache(connStore, () => createAnthropicProvider(), appConfigDir);
-    this.tierProviders = resolution.tiers;
+    // Tapes every LLM call when MV_TAPE_MODE=record; identity pass-through otherwise.
+    this.tierProviders = wrapForRecording(resolution.tiers);
     this.providersByConnectionId = resolution.byConnectionId;
     this.provider = this.tierProviders.large.provider;
     this.model = this.tierProviders.large.model;
