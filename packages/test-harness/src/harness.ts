@@ -446,6 +446,28 @@ export class Harness {
     }
   }
 
+  /**
+   * Fetch the session tape recorded so far via the engine's dev-only
+   * `GET /tape` route. Only meaningful when the launcher was spawned with
+   * `env: { MV_TAPE_MODE: "record", MV_TAPE_SCENARIO: "<name>" }`; otherwise
+   * the route 404s and this throws. Returned verbatim (engine-owned `Tape`
+   * shape) so the caller can serialize it as a golden without test-harness
+   * taking a dependency on the engine package. Call before `shutdown()` —
+   * the force-kill teardown skips the engine's exit handlers, so the tape
+   * must be pulled while the process is still alive.
+   */
+  async fetchTape(): Promise<unknown> {
+    const res = await fetch(`http://127.0.0.1:${this.serverPort}/tape`);
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(
+        `fetchTape failed: ${res.status} ${body} ` +
+        `(was the launcher spawned with MV_TAPE_MODE=record?)`,
+      );
+    }
+    return await res.json();
+  }
+
   // -------------------------------------------------------------------------
   // Engine log + filesystem inspection
   // -------------------------------------------------------------------------

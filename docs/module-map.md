@@ -5,7 +5,7 @@ The codebase is split across four packages:
 - **`packages/engine/`** — Game engine, AI agents, tools, state, prompts, Fastify server
 - **`packages/client-ink/`** — Ink TUI, themes, modals, formatting, phases, Discord IPC
 - **`packages/shared/`** — Shared types and protocol schemas
-- **`packages/test-harness/`** — End-to-end smoke harness (state-driven probes over the real WebSocket). See [e2e-harness.md](e2e-harness.md).
+- **`packages/test-harness/`** — Tier-3 live harness + interactive driver (`mvplay`) + full-stack tape recorder. The deterministic Tier-2 backbone lives in `engine` (golden tapes). See [e2e-harness.md](e2e-harness.md) and [golden-tapes.md](golden-tapes.md).
 
 Most directories have `index.ts` barrel exports — check those before reaching into subdirectories. Paths below are relative to their package root (e.g. `agents/game-engine.ts` = `packages/engine/src/agents/game-engine.ts`).
 
@@ -269,18 +269,22 @@ Platform abstractions and helpers that don't belong to any single domain.
 
 ## Test Harness Package (`packages/test-harness/`)
 
-End-to-end smoke testing. Boots the real engine as a subprocess, drives it over the WebSocket, and asserts against observable state (no timer-based waits).
+The **Tier-3 live** harness (the regression backbone is Tier-2 golden replay — see below). Boots the real engine as a subprocess, drives it over the WebSocket, asserts against observable state (no timer-based waits). Also hosts the interactive driver (`mvplay`) and the full-stack tape recorder.
 
 | Path | Purpose |
 |---|---|
-| `bin/smoketest.ts` | Long-lived smoke probe — walk setup + two in-game turns. Run via `npm run smoketest`. |
-| `bin/boot-and-quit.ts` | Long-lived precondition probe — main menu renders. Run via `npm run e2e:boot`. |
-| `src/run-probe.ts` | `runProbe(opts)` helper — launches harness, runs body, dumps diagnostics on failure, cleans up. Use it for ad-hoc one-shot probes. |
-| `src/harness.ts` | `Harness` class — process lifecycle, WS connect, `waitForEngineState`, `waitForState`, `waitForEngineEvent`, input helpers. |
+| `bin/smoketest.ts` | Live smoke probe — walk setup + two in-game turns. `npm run smoketest`. |
+| `bin/boot-and-quit.ts` | Precondition probe — main menu renders. `npm run e2e:boot`. |
+| `bin/mvplay.ts` | Interactive turn-for-turn driver + tape recorder (`record`/`save-tape`). `npm run play`. |
+| `src/session-driver.ts` | `mvplay` backend — persistent detached session, record-mode start, `saveTape` (pulls `GET /tape`). |
+| `src/run-probe.ts` | `runProbe(opts)` helper — launches harness, runs body, dumps diagnostics on failure, cleans up. |
+| `src/harness.ts` | `Harness` class — process lifecycle, WS connect, `waitFor*`, input helpers, `endSession`, `fetchTape`. |
 | `src/engine-log.ts` | Engine-log breadcrumb reader (`image_gen:*`, `subagent:*`, `api:call`, ...). |
 | `src/client-state.ts` | Mirror of client-side state for assertion. |
 
-See [e2e-harness.md](e2e-harness.md) for the full primitives table, engine-state gotchas, breadcrumb catalogue, and the smoketest contract.
+The **Tier-2 record/replay** code lives in `engine`, not here: `packages/engine/src/providers/{tape,tape-provider,tape-mode}.ts` (format + record/replay shims + record wiring), `packages/engine/src/server/routes/dev.ts` (`GET /tape` readback), and the corpora at `packages/engine/src/testing/{corpus,setup-corpus}.golden.test.ts` (DM loop + setup agent; shared `goldens/`).
+
+See [e2e-harness.md](e2e-harness.md) (three-tier strategy, live harness), [golden-tapes.md](golden-tapes.md) (record/replay model), and [tape-format.md](tape-format.md) (tape schema).
 
 ## Client Entry Points
 

@@ -15,12 +15,15 @@
     "lint": "eslint --cache --cache-location node_modules/.cache/eslint packages/shared/src/ packages/engine/src/ packages/client-ink/src/ packages/test-harness/src/ packages/test-harness/bin/",
     "typecheck": "tsc -b",
     "check": "concurrently -n lint,test --kill-others-on-fail \"npm run lint\" \"npm test\"",
+    "golden:record": "cross-env RECORD_GOLDENS=1 vitest run golden",
+    "golden:verify": "vitest run golden",
     "smoketest": "node --import tsx/esm packages/test-harness/bin/smoketest.ts",
     "e2e:boot": "node --import tsx/esm packages/test-harness/bin/boot-and-quit.ts",
     "play": "node --import tsx/esm packages/test-harness/bin/mvplay.ts",
     "dist": "node scripts/build-dist.js",
     "explorer": "node tools/campaign-explorer/scripts/dev.js",
-    "theme-editor": "node tools/theme-editor/scripts/dev.js"
+    "theme-editor": "node tools/theme-editor/scripts/dev.js",
+    "prepare": "lefthook install"
   },
   "keywords": [
     "rpg",
@@ -56,6 +59,7 @@
     "eslint": "^10.0.0",
     "ink-testing-library": "^4.0.0",
     "knip": "^6.15.0",
+    "lefthook": "^1.13.6",
     "rcedit": "^5.0.2",
     "react-devtools-core": "^7.0.1",
     "tsx": "^4.7.0",

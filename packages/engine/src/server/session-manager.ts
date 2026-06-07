@@ -26,6 +26,7 @@ import { getActivePlayer } from "../agents/player-manager.js";
 import { loadEnv } from "../config/first-launch.js";
 import { loadConnectionStore, buildEffectiveConnections } from "../config/connections.js";
 import { buildTierProvidersWithCache } from "../config/tier-resolver.js";
+import { wrapForRecording } from "../providers/tape-mode.js";
 import type { LLMProvider } from "../providers/types.js";
 import { configDir, norm } from "../utils/paths.js";
 import { processingPaths } from "../config/processing-paths.js";
@@ -40,6 +41,7 @@ import { createCombatState } from "../tools/combat/index.js";
 import { createDecksState } from "../tools/cards/index.js";
 import { createObjectivesState } from "../tools/objectives/index.js";
 import { markdownToNarrativeLines, iterDisplayLogReplay } from "../context/display-log.js";
+import { hasPriorPlay } from "../context/state-persistence.js";
 import { CostTracker } from "../context/cost-tracker.js";
 import { TurnManager } from "./turn-manager.js";
 import type { StyleVariant } from "@machine-violet/shared/types/tui.js";
@@ -574,7 +576,8 @@ export class SessionManager {
     const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
     const { createAnthropicProvider } = await import("../providers/anthropic.js");
     const tierResolution = buildTierProvidersWithCache(connStore, () => createAnthropicProvider(), appConfigDir);
-    const tierProviders = tierResolution.tiers;
+    // Tapes every LLM call when MV_TAPE_MODE=record; identity pass-through otherwise.
+    const tierProviders = wrapForRecording(tierResolution.tiers);
 
     // Track unique providers for end-of-session disposal. Stateful providers
     // (openai-chatgpt) own subprocesses that linger across sessions otherwise.
@@ -660,6 +663,20 @@ export class SessionManager {
         sessionNumber: 1,
         sessionRecapPending: false,
       };
+    }
+
+    // The current-scene transcript is the weakest signal of prior play. If it's
+    // empty but conversation.json / display-log.md show history — a crash before
+    // the first transcript flush, a hand-checked-out commit, a missing scene dir
+    // — RESUME anyway. Starting a fresh opening over an existing campaign
+    // silently grafts a new beginning onto old history, which players see as a
+    // vanished narrative log. See hasPriorPlay() and docs/error-recovery.md.
+    if (!isResume && await hasPriorPlay(campaignRoot, fileIO)) {
+      isResume = true;
+      logEvent("session:resume_recovered", {
+        campaignId,
+        reason: "prior-play-without-current-scene-transcript",
+      });
     }
 
     // --- Load DM session state ---

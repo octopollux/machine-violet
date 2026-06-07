@@ -376,6 +376,8 @@ interface PruneFileIO {
   exists(path: string): Promise<boolean>;
   listDir(path: string): Promise<string[]>;
   rmdir?(path: string): Promise<void>;
+  /** Real directory check, used when available in place of a name heuristic. */
+  isDirectory?(path: string): Promise<boolean>;
 }
 
 /**
@@ -440,8 +442,14 @@ export async function pruneEmptyDirs(root: string, io: PruneFileIO): Promise<num
       const child = norm(dir) + "/" + entry;
       // Skip dotfiles/dirs (e.g. .git)
       if (entry.startsWith(".")) continue;
-      // Heuristic: entries without a dot extension are likely directories
-      if (!entry.includes(".")) {
+      // Prefer a real directory check; fall back to a name heuristic (entries
+      // without a dot extension). The heuristic is safe for campaign data —
+      // all directory names are slugified, hence dot-free — but a real check
+      // is used whenever the IO exposes one.
+      const isDir = io.isDirectory
+        ? await io.isDirectory(child)
+        : !entry.includes(".");
+      if (isDir) {
         await walk(child);
       }
     }

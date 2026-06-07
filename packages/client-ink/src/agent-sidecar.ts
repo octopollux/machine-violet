@@ -66,9 +66,8 @@ function readBody(req: IncomingMessage): Promise<Buffer> {
 // ---------------------------------------------------------------------------
 
 export interface SidecarHandle {
-  /** The actual bound port. Differs from the requested port when 0 was passed
-   *  (OS-assigned ephemeral port) — callers that pass 0 read it back from here. */
-  port: number;
+  /** Port the server actually bound to — authoritative when `port: 0` (OS-assigned) is passed. */
+  readonly port: number;
   close(): Promise<void>;
 }
 
@@ -99,19 +98,6 @@ export async function startAgentSidecar(
   // Track terminal resize.
   const onResize = () => term.resize(process.stdout.columns || 80, process.stdout.rows || 24);
   process.stdout.on("resize", onResize);
-
-  // --- Stdout tee ---
-  // Installed AFTER syncWriteCombiner so we see atomic frames.
-  const originalWrite: NodeJS.WriteStream["write"] = process.stdout.write;
-  process.stdout.write = function (
-    chunk: string | Uint8Array,
-    encodingOrCb?: BufferEncoding | ((err?: Error | null) => void),
-    cb?: (err?: Error | null) => void,
-  ): boolean {
-    const str = typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf-8");
-    term.write(str);
-    return originalWrite.call(process.stdout, chunk, encodingOrCb as BufferEncoding, cb) as boolean;
-  } as NodeJS.WriteStream["write"];
 
   // --- Screen reading ---
   function readScreen(): string {
@@ -188,17 +174,41 @@ export async function startAgentSidecar(
     }
   });
 
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(port, "127.0.0.1", () => {
-      server.removeListener("error", reject);
-      resolve();
+  // Bind BEFORE touching global process.stdout. A failed listen (e.g. the port
+  // is briefly held in TIME_WAIT after a previous server on the same port
+  // closed) must not leave the stdout tee — or the resize listener — installed
+  // process-wide, which would silently corrupt unrelated renders/output.
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(port, "127.0.0.1", () => {
+        server.removeListener("error", reject);
+        resolve();
+      });
     });
-  });
+  } catch (err) {
+    process.stdout.removeListener("resize", onResize);
+    term.dispose();
+    throw err;
+  }
 
   const addr = server.address();
   const boundPort = typeof addr === "object" && addr ? addr.port : port;
   process.stderr.write(`Agent sidecar listening on http://127.0.0.1:${boundPort}\n`);
+
+  // --- Stdout tee ---
+  // Installed only AFTER a successful listen (and AFTER syncWriteCombiner) so
+  // we see atomic frames and never leak the global wrapper on a failed start.
+  const originalWrite: NodeJS.WriteStream["write"] = process.stdout.write;
+  process.stdout.write = function (
+    chunk: string | Uint8Array,
+    encodingOrCb?: BufferEncoding | ((err?: Error | null) => void),
+    cb?: (err?: Error | null) => void,
+  ): boolean {
+    const str = typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf-8");
+    term.write(str);
+    return originalWrite.call(process.stdout, chunk, encodingOrCb as BufferEncoding, cb) as boolean;
+  } as NodeJS.WriteStream["write"];
 
   return {
     port: boundPort,

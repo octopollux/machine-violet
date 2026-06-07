@@ -1,0 +1,95 @@
+{
+  "scenario": "dm-move",
+  "tape": {
+    "version": 1,
+    "scenario": "dm-move",
+    "capabilities": {
+      "claude-haiku-4-5-20251001": {
+        "imageGeneration": false
+      }
+    },
+    "entries": [
+      {
+        "kind": "chat",
+        "bucket": "dm",
+        "ordinal": 0,
+        "request": {
+          "model": "claude-haiku-4-5-20251001",
+          "messageCount": 1,
+          "systemHash": "9d270259c954",
+          "tools": [
+            "advance_turn",
+            "alarm",
+            "deck",
+            "describe_entity_type",
+            "detect_orphans",
+            "dm_notes",
+            "end_combat",
+            "enter_ooc",
+            "entity",
+            "find_schema_drift",
+            "list_entity_types",
+            "manage_objectives",
+            "map",
+            "map_entity",
+            "map_query",
+            "modify_initiative",
+            "present_choices",
+            "promote_character",
+            "resolve_turn",
+            "roll_dice",
+            "scene_transition",
+            "scribe",
+            "search_campaign",
+            "search_content",
+            "session_end",
+            "set_display_resources",
+            "set_resource_values",
+            "start_combat",
+            "style_scene",
+            "switch_player",
+            "time",
+            "update_modeline",
+            "validate_entity"
+          ],
+          "lastMessagePreview": "<context> ## Current State PCs: Aldric [length] Terminal: 80 cols × 16 visible rows. [stats] Turn: Aldric </context> [Al"
+        },
+        "result": {
+          "text": "The floorboards creak under your boot—not loud, but in the hush of the tavern, enough. <color=#44cc44>Mella</color>'s head snaps up. She sets down her mug with a deliberate clink.\n\n\"That door's not for customers,\" she says flatly, stepping out from behind the bar. Her bulk fills the space between you and the stairs. \"Cellar's locked. Inventory storage. Nothing interesting down there.\"\n\nThe way she says it—the firmness, the *speed* of her response—tells you she was waiting for exactly this question. Behind her, the <color=#20b2aa>hooded figure</color> by the fire hasn't moved, but you catch the faintest shift in posture. Listening.\n\nRain hammers the shutters. The common room smells of wet wool and old ale.\n\nWhat do you do?",
+          "toolCalls": [],
+          "usage": {
+            "inputTokens": 394,
+            "outputTokens": 203,
+            "cacheReadTokens": 9506,
+            "cacheCreationTokens": 0,
+            "reasoningTokens": 0
+          },
+          "stopReason": "end",
+          "assistantContent": [
+            {
+              "type": "text",
+              "text": "The floorboards creak under your boot—not loud, but in the hush of the tavern, enough. <color=#44cc44>Mella</color>'s head snaps up. She sets down her mug with a deliberate clink.\n\n\"That door's not for customers,\" she says flatly, stepping out from behind the bar. Her bulk fills the space between you and the stairs. \"Cellar's locked. Inventory storage. Nothing interesting down there.\"\n\nThe way she says it—the firmness, the *speed* of her response—tells you she was waiting for exactly this question. Behind her, the <color=#20b2aa>hooded figure</color> by the fire hasn't moved, but you catch the faintest shift in posture. Listening.\n\nRain hammers the shutters. The common room smells of wet wool and old ale.\n\nWhat do you do?"
+            }
+          ]
+        },
+        "streamDeltas": [
+          "The",
+          " floorboards creak under your boot—not loud, but in",
+          " the hush of the tavern, enough. <color=#44cc44>Mella</color>'s head",
+          " snaps up. She sets down her mug with a deliberate clink.\n\n\"That door",
+          "'s not for customers,\" she says flatly, stepping out from behind the bar. Her bulk",
+          " fills the space between you and the stairs. \"Cellar's locked. Inventory",
+          " storage. Nothing interesting down there.\"\n\nThe way she says it—",
+          "the firmness, the *speed* of her response—tells you she was",
+          " waiting for exactly this question. Behind her, the <color=#20b2aa>hooded figure</color> by",
+          " the fire hasn't moved, but you catch the faintest shift in",
+          " posture. Listening.\n\nRain hammers the shutters. The common room sm",
+          "ells of wet wool and old ale.\n\nWhat do you do?"
+        ]
+      }
+    ]
+  },
+  "expectedNarrative": [
+    "The floorboards creak under your boot—not loud, but in the hush of the tavern, enough. <color=#44cc44>Mella</color>'s head snaps up. She sets down her mug with a deliberate clink.\n\n\"That door's not for customers,\" she says flatly, stepping out from behind the bar. Her bulk fills the space between you and the stairs. \"Cellar's locked. Inventory storage. Nothing interesting down there.\"\n\nThe way she says it—the firmness, the *speed* of her response—tells you she was waiting for exactly this question. Behind her, the <color=#20b2aa>hooded figure</color> by the fire hasn't moved, but you catch the faintest shift in posture. Listening.\n\nRain hammers the shutters. The common room smells of wet wool and old ale.\n\nWhat do you do?"
+  ]
+}

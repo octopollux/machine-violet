@@ -13,8 +13,16 @@ vi.mock("node:fs/promises", () => ({
   mkdir: vi.fn(async () => {}),
 }));
 
-beforeEach(() => {
+beforeEach(async () => {
   resetContextDump();
+  // The mocked fs/promises module exposes ONE writeFile/mkdir spy shared by the
+  // whole file. dump*() records its writeFile call synchronously, so a prior
+  // test's call lingers in mock.calls. Clear here — not just in the tests that
+  // remember to — so the no-op guards that assert `not.toHaveBeenCalled()` pass
+  // regardless of execution order (shuffle-safe).
+  const fs = await import("node:fs/promises");
+  (fs.writeFile as ReturnType<typeof vi.fn>).mockClear();
+  (fs.mkdir as ReturnType<typeof vi.fn>).mockClear();
 });
 
 // --- dumpContext guards ---

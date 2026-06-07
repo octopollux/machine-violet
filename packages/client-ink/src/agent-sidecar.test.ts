@@ -42,13 +42,13 @@ describe("agent sidecar HTTP", () => {
     }
   });
 
-  // Bind port 0 so the OS assigns a free ephemeral port — avoids collisions
-  // with other tests / processes under parallel execution. The actual port is
-  // read back from the handle.
   async function start(): Promise<void> {
     const state = initialClientState();
     state.engineState = "idle";
     state.mode = "play";
+    // Port 0 → OS assigns a free port. Hardcoding a fixed port made these
+    // sequential bind/close cycles flake under load: a rebind could hit
+    // EADDRINUSE while the prior server's port lingered in TIME_WAIT.
     handle = await startAgentSidecar(0, () => state);
     baseUrl = `http://127.0.0.1:${handle.port}`;
   }

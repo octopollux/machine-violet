@@ -1,39 +1,43 @@
-# End-to-End Test Harness
+# End-to-End Testing
 
-The end-to-end (e2e) test harness drives the full Machine Violet stack like a
-human player: launches the engine server, mounts the Ink TUI client, drives
-it via the agent sidecar's HTTP endpoints, and asserts on observed state
-transitions. It exists so coding agents can prove a long-running task
-*actually works* without asking the developer to smoke-test.
+Machine Violet's e2e strategy is **three tiers, deterministic-first**. The old
+keystroke-injection + HTTP-polling harness driven through the live model is no
+longer the regression gate — it raced real async LLM/subagent activity and was
+flaky by construction. The fix was architectural: stop driving non-deterministic
+LLM flows through keystroke injection as the verification layer.
 
-The harness lives in [`packages/test-harness`](../packages/test-harness/).
+| Tier | What | Where | Speed / API |
+|---|---|---|---|
+| **1 — component/render** | Ink render + interaction (modals, overlays, layout) | `ink-testing-library`, co-located in `packages/client-ink` | fast, offline |
+| **2 — full-stack deterministic** | Real `GameEngine` + `createSetupConversation` replaying recorded **golden tapes** | `packages/engine/src/testing/{corpus,setup-corpus}.golden.test.ts` | ~4s, **offline** |
+| **3 — live smoke** | The real launcher stack against the real API | `packages/test-harness` (this doc) | 7-12 min, **live** |
 
-## Why use it
+**Tier 2 is the regression backbone** — the honest "did I break it?" signal.
+See [golden-tapes.md](golden-tapes.md) (operating model) and
+[tape-format.md](tape-format.md) (schema). Run it with `/replay-goldens`.
 
-You're a coding agent that just finished a change that touches UI flow,
-session lifecycle, the setup agent, the DM loop, or any code path that
-spans server + client + WebSocket. Type checks and unit tests can't prove
-the flow works end-to-end. **Run a probe before reporting the task
-complete.**
+**This doc is Tier 3 (+ the interactive/record substrate):** the live harness in
+[`packages/test-harness`](../packages/test-harness/). Reach for it only when you
+specifically need the *live* stack — the setup→game handoff through the real
+`SessionManager` loader, server+client+WebSocket boot, the TUI render — against
+the real model. (The setup *agent conversation* itself now has deterministic
+offline coverage via the Tier-2 setup corpus.) It is **not** the everyday gate;
+that's Tier 2.
 
-The harness is the only honest "did I break it?" signal for cross-cutting
-changes.
+## Two ways to use the live harness: scripted probes vs. interactive play
 
-## Two ways to use it: scripted probes vs. interactive play
-
-The harness has two modes, built on the same launcher + sidecar:
+Built on the same launcher + sidecar:
 
 - **Scripted probes** (`runProbe`) — spawn the game, run a fixed body, assert,
-  hard-kill. This is the right tool for a **pass/fail** check (`smoketest`,
-  `boot-and-quit`, any ad-hoc one-shot). Covered in the rest of this doc.
+  hard-kill. For a live **pass/fail** check (`smoketest`, `boot-and-quit`, any
+  ad-hoc one-shot). Covered in the rest of this doc.
 - **Interactive play** (`mvplay`) — a **persistent** session you drive
-  turn-for-turn, one command per turn, with *you* (a coding agent or a human)
-  in the loop deciding each move. Use it to actually *play* the game, feel out
-  in-game behavior, or manually reproduce something a scripted probe can't
-  express. See [Interactive play](#interactive-play-mvplay) below.
+  turn-for-turn, *you* in the loop each move. Use it to *play* the game, feel out
+  behavior, reproduce a bug by hand — or, in **record mode**, to capture a
+  full-stack golden tape (`mvplay record` / `save-tape`; see
+  [golden-tapes.md](golden-tapes.md)). See [Interactive play](#interactive-play-mvplay).
 
-If you want "did I break it?", reach for a probe. If you want "let me play a few
-turns and see," reach for `mvplay`.
+For "did I break it?", reach for **Tier 2** (`/replay-goldens`), not a live probe.
 
 ## Interactive play (mvplay)
 
@@ -58,6 +62,8 @@ node --import tsx/esm packages/test-harness/bin/mvplay.ts <cmd> [args]
 | Command | What it does |
 |---|---|
 | `start [--player NAME] [--fresh]` | Boot the game in the background; print the main menu. |
+| `record <scenario> [--player NAME] [--fresh]` | Like `start`, but tape every LLM call (`MV_TAPE_MODE=record`) for a golden. |
+| `save-tape <path>` | Pull the recorded tape (via `GET /tape`) and write a golden to `<path>` (record sessions only). |
 | `status` | Is a session alive? Show engine/turn/choices vitals. |
 | `screen [--ansi]` | Print the rendered terminal screen. |
 | `state` | Compact summary: engineState, mode, current turn, choices, narrative count. |
@@ -68,6 +74,13 @@ node --import tsx/esm packages/test-harness/bin/mvplay.ts <cmd> [args]
 | `wait [--for beat\|handoff\|choices] [--timeout SEC]` | Block until a new beat lands, print it, exit. |
 | `log [--tail N]` | Tail the launcher log (crash diagnostics). |
 | `stop` | Kill the session. |
+
+`record`/`save-tape` capture a full-stack golden tape: boot in record mode, play
+the scenario turn-for-turn, then `save-tape` before `stop` (teardown force-kills
+the engine and its in-memory tape). The tape comes out over the engine's
+dev-only `GET /tape` route (`packages/engine/src/server/routes/dev.ts`), which
+returns the process-global tape or 404 when not recording. See
+[golden-tapes.md](golden-tapes.md).
 
 **The loop:** submit (`say`/`pick`/`key`), then `wait`, then react to what it
 prints. `wait` settles on the next beat you must act on — a free-text prompt, a
@@ -95,7 +108,7 @@ is tee'd to a log file for crash diagnostics (`mvplay log`).
 | ID | Live API? | ~Time | What it proves |
 |---|---|---|---|
 | `boot-and-quit` | no | ~10 s | Launcher boots, sidecar reachable, main menu renders, process tears down cleanly. The precondition for everything else. |
-| `smoketest` | **yes** | 7-12 min | New campaign → setup-agent walk → handoff → two in-game player/DM turn cycles. The baseline every cross-cutting change should clear. Hard-killed on exit; Save & Exit is deliberately skipped. |
+| `smoketest` | **yes** | 7-12 min | New campaign → setup-agent walk → handoff → two in-game player/DM turn cycles. The rare *live* confirmation — the everyday regression gate is Tier-2 golden replay, not this. Hard-killed on exit; Save & Exit is deliberately skipped. |
 
 Each probe is a standalone TypeScript file under
 [`packages/test-harness/bin/`](../packages/test-harness/bin/). No registry.

@@ -1,0 +1,93 @@
+{
+  "scenario": "dm-open-door",
+  "tape": {
+    "version": 1,
+    "scenario": "dm-open-door",
+    "capabilities": {
+      "claude-haiku-4-5-20251001": {
+        "imageGeneration": false
+      }
+    },
+    "entries": [
+      {
+        "kind": "chat",
+        "bucket": "dm",
+        "ordinal": 0,
+        "request": {
+          "model": "claude-haiku-4-5-20251001",
+          "messageCount": 1,
+          "systemHash": "9d270259c954",
+          "tools": [
+            "advance_turn",
+            "alarm",
+            "deck",
+            "describe_entity_type",
+            "detect_orphans",
+            "dm_notes",
+            "end_combat",
+            "enter_ooc",
+            "entity",
+            "find_schema_drift",
+            "list_entity_types",
+            "manage_objectives",
+            "map",
+            "map_entity",
+            "map_query",
+            "modify_initiative",
+            "present_choices",
+            "promote_character",
+            "resolve_turn",
+            "roll_dice",
+            "scene_transition",
+            "scribe",
+            "search_campaign",
+            "search_content",
+            "session_end",
+            "set_display_resources",
+            "set_resource_values",
+            "start_combat",
+            "style_scene",
+            "switch_player",
+            "time",
+            "update_modeline",
+            "validate_entity"
+          ],
+          "lastMessagePreview": "<context> ## Current State PCs: Aldric [length] Terminal: 80 cols × 16 visible rows. [stats] Turn: Aldric </context> [Al"
+        },
+        "result": {
+          "text": "The handle is cold, slick with condensation. You pull—it doesn't budge. The lock is old but sturdy, a heavy iron mechanism set deep into the oak frame. Behind you, the tavern falls quieter. The rain batters on. <color=#44cc44>Mella</color> has stopped wiping that mug.\n\n\"That door stays locked,\" she says flatly, not looking at you. \"Cellar's not for guests.\"\n\nThe <color=#cc8844>hooded figure</color> by the hearth shifts slightly, as if considering whether this is the moment to leave.\n\nWhat do you do?",
+          "toolCalls": [],
+          "usage": {
+            "inputTokens": 391,
+            "outputTokens": 144,
+            "cacheReadTokens": 9321,
+            "cacheCreationTokens": 185,
+            "reasoningTokens": 0
+          },
+          "stopReason": "end",
+          "assistantContent": [
+            {
+              "type": "text",
+              "text": "The handle is cold, slick with condensation. You pull—it doesn't budge. The lock is old but sturdy, a heavy iron mechanism set deep into the oak frame. Behind you, the tavern falls quieter. The rain batters on. <color=#44cc44>Mella</color> has stopped wiping that mug.\n\n\"That door stays locked,\" she says flatly, not looking at you. \"Cellar's not for guests.\"\n\nThe <color=#cc8844>hooded figure</color> by the hearth shifts slightly, as if considering whether this is the moment to leave.\n\nWhat do you do?"
+            }
+          ]
+        },
+        "streamDeltas": [
+          "The",
+          " handle is cold, slick with condensation. You",
+          " pull—it doesn't budge. The lock is old but sturdy, a",
+          " heavy iron mechanism set deep into the oak frame. Behind you",
+          ", the tavern falls quieter. The rain batters on.",
+          " <color=#44cc44>Mella</color> has stopped wiping that mug.",
+          "\n\n\"That door stays locked,\" she says flatly, not looking at",
+          " you. \"Cellar's not for guests.\"\n\nThe <color=#cc8844>ho",
+          "oded figure</color> by the hearth shifts slightly, as if considering whether this is the moment to",
+          " leave.\n\nWhat do you do?"
+        ]
+      }
+    ]
+  },
+  "expectedNarrative": [
+    "The handle is cold, slick with condensation. You pull—it doesn't budge. The lock is old but sturdy, a heavy iron mechanism set deep into the oak frame. Behind you, the tavern falls quieter. The rain batters on. <color=#44cc44>Mella</color> has stopped wiping that mug.\n\n\"That door stays locked,\" she says flatly, not looking at you. \"Cellar's not for guests.\"\n\nThe <color=#cc8844>hooded figure</color> by the hearth shifts slightly, as if considering whether this is the moment to leave.\n\nWhat do you do?"
+  ]
+}

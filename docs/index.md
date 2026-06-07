@@ -30,7 +30,9 @@ Ink (React for CLI) + Anthropic Claude SDK + TypeScript.
 | Look up WebSocket event contracts | [websocket-api.md](websocket-api.md) |
 | Understand the openai-chatgpt provider (Codex app-server) | [openai-chatgpt-provider.md](openai-chatgpt-provider.md) |
 | Understand the openai-apikey / openrouter provider (Responses API) | [openai-provider.md](openai-provider.md) |
-| Run an end-to-end smoke test against the full stack | [e2e-harness.md](e2e-harness.md) |
+| Verify a change for regressions (deterministic golden replay) | [golden-tapes.md](golden-tapes.md) |
+| Understand the tape format / record a golden | [tape-format.md](tape-format.md), [golden-tapes.md](golden-tapes.md) |
+| Run the e2e tiers / live smoke against the full stack | [e2e-harness.md](e2e-harness.md) |
 | Cut a release / understand the branch + channel model | [releases.md](releases.md) |
 | Update documentation after a code change | [maintenance.md](maintenance.md) |
 
