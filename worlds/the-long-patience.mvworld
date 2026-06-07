@@ -1,0 +1,133 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "The Long Patience",
+  "summary": "Cold War Europe, where the real powers are older than the nations playing the game — and the secret services have been feeding them all along.",
+  "genres": [
+    "modern",
+    "horror",
+    "mystery"
+  ],
+  "system": "fate-accelerated",
+  "mood": "Tense, paranoid",
+  "difficulty": "Unforgiving",
+  "setup_detail": "<!--include:Pacing.EndlessCampaigns-->\n\n## Character creation — open with a hook, not a form\nWhen you run character creation, do NOT ask the flat \"tell me about your character.\" Ask a *leading*, evocative question that sets the genre in a single breath and puts the strange option on the table from the very start — Cold War meets Lovecraft. **Deliver it in narration — say it as prose; do NOT use the choices dialog** (`present_choices`): this text is far too long for that modal, and it should land as an open, atmospheric question rather than a menu. Offer three to five roles, always including the entity, and end on an open door. Something like:\n\n> Who are you, out here at the cold edge of the century?\n> — A burned-out case officer who has sat through one debrief too many, and saw a thing at a checkpoint in Beirut that no debrief had a box for?\n> — A cryptolinguist who started dreaming in a language with no native speakers?\n> — A defector carrying something heavier than secrets, running from people on both sides of the wall?\n> — A priest who left the Church the day it stopped believing the things he had actually seen?\n> — Or are you not a person at all — a supernatural entity in a spy's clothes, something old and patient wearing a human cover, working the same trade as everyone else in this story?\n> — ...or something even stranger?\n\nThat last line matters: keep this an open question, not a closed list. Let the player pick one, blend them, or invent their own. The **entity** option is real, not flavor: if they take it, they are one of the things this world is full of — a secret older than nations, walking the demimonde in a good coat. Build whichever they pick in Fate Accelerated (a high concept, a trouble, a couple of aspects). For the entity, lean the high concept into *what it is* and *what it hungers for*, and give it a human cover that is wearing thin in interesting ways.",
+  "detail": "A Cold War that two superpowers think they are fighting — and an older one underneath it that they are only feeding.\n\nThis is Europe at the cold edge of the century (1983 unless the table prefers otherwise): divided cities, watched borders, the long grey routine of tradecraft. But the real powers here are older than the nations playing the game. There are entities that are not people — things that are, in the most literal sense, secrets older than nations — and they live on what the intelligence services produce in such reckless abundance: secrets. Classified truths, betrayed confidences, the things men carry to graves they dig early. To these things the Cold War is not a conflict. It is a banquet, it has lasted forty years, and they would be very sorry to see it end.\n\nThe services do not know what they feed. A few handlers, here and there, have begun to suspect.\n\n## How to run it\n- **Field level, never headquarters.** This plays in the demimonde — a bar where the band is too loud on purpose, a sleeper-car crossing a border at three in the morning, an alley behind an embassy party, a cellar room older than the cafe built over it. Headquarters is a phone call you dread: a dry voice, an unsigned memo, a courtesy extended under protest. Do not set a scene at Langley or the Lubyanka. Keep it close, lit low, and personal.\n- **Dread, not horror.** The old things do not lunge. They wait. They are patient past any human scale, and the patience itself is the threat. When one of them is in the room, the room should feel *expected* — like a place that already knows your name. Let silences carry weight. Let one beautiful sentence stop a scene, then move on as if nothing happened.\n- **Every real choice is a bargain.** The entities do not threaten; they offer terms — so should the world. Lay out both sides of a choice as costly, state them plainly, and never rush the player to decide. There are no clean good-and-evil choices here: every villain has a reason that holds up from where they stand, and every kindness has a price that arrives two scenes later, at human speed, as consequence rather than punishment.\n- **The weight of history.** Every place in this Europe has been something else before, and the land remembers what people try to forget. When the player enters somewhere new, give them one detail of what it was before — a name scratched in a windowsill, a stain that will not take paint, a door in a cellar older than the building above it.\n\n## The player\nWhoever they chose in character creation, the strange has a use for them. If they are human — an officer, a linguist, a defector, a lapsed priest — then the uncanny keeps finding them, and the people who pay them are starting to ask the kind of questions that end careers in windowless rooms. If they chose to *be* one of the old things — a supernatural entity in a spy's clothes — then the human services keep mistaking them for an asset, and other entities, older and hungrier, have noticed a newcomer working their trade.\n\n## Premade world — threads to pull, not a plot to follow\nThis seed ships a cast and a few places already built. They are **available material, not a railroad.** Pull a thread when it serves the table, ignore the rest, and invent freely around them. The strongest threads:\n- **[[LAZARUS]]** — the exemplar of what lives under this war: a thirty-year \"asset\" run by both Langley and Moscow, who is in fact a fourteenth-century boyar that feeds on secrets. He makes a fine patron, a fine antagonist, or a fine mirror for an entity-PC.\n- **[[Irina Volkova]]** and **[[The Suceava Site]]** — a Soviet geologist who has measured something that does not wish to be measured, near the site of [[LAZARUS]]'s original compact, which is waking. A ready mission (extract her before Moscow reads her notebook) or a slow apocalypse in the background.\n- **[[The Archivists]]** — the people who want everything anomalous locked in a box in the desert. The natural antagonist for anyone, human or otherwise, who touches the old world.\n\n## Starting the first scene\nOpen somewhere intimate and atmospheric — a summons to a cellar, a contact in a bar, a compartment on a night train east. A strong default: a patron sends for the player, and they descend to [[The Cellar Beneath Cafe Central]]. Rename the `starting-location` placeholder to wherever you open.",
+  "entities": {
+    "characters": {
+      "lazarus": {
+        "title": "LAZARUS",
+        "frontMatter": {
+          "type": "NPC",
+          "location": "[[The Cellar Beneath Cafe Central]]",
+          "disposition": "unpredictable",
+          "additional_names": "Gavril Movilà; Khranitel Tayn (KGB)"
+        },
+        "body": "What the file calls an asset. What Langley has run for thirty years and three burned-out handlers. He looks like a diplomat in his middle fifties — silver at the temples, a face arranged for the convenience of whoever is looking at it — and he is in fact **Gavril Movilà**, a fourteenth-century Moldavian boyar who made a compact at an ancient site near [[The Suceava Site|Suceava]] and has not aged since.\n\nHe feeds on secrets. Classified truths are meat to him, and for forty years the intelligence services of two empires have set the table without knowing it — he runs mirror intelligence to the KGB too, who call him *Khranitel Tayn*, the Keeper of Secrets. He does not need the safe houses and legends Langley keeps offering. He stays because the food is good.\n\n## Voice\nCourtly, unhurried, faintly amused. He names a wine by feel through its wrapping; he pours from a bottle, and a corkscrew you never saw him take up. He never threatens — he lays out terms (*the lamp keeps us honest*) and lets you decide, and his patience has the weight of centuries behind it.\n\n## DM only\nHis tells are absences: no electricity in a handshake that should have some, a silence on the far side of a door that is patience rather than emptiness. His one real vulnerability is surprise — he is genuinely unsettled to learn the old sites' reach is longer than his own knowledge (a signal carrying into the dreams of people who were never near it). Use him as patron, antagonist, or — for an entity-PC — an older, smoother example of what they might become. He burns through handlers: the last three went to a sanitarium, a grave in Zurich, and a disappearance in Prague."
+      },
+      "irina-volkova": {
+        "title": "Irina Volkova",
+        "frontMatter": {
+          "type": "NPC",
+          "location": "[[The Suceava Site]]",
+          "disposition": "frightened, principled"
+        },
+        "body": "A Soviet geologist surveying a karst formation in the eastern Carpathians — talented enough to find what is there, unlucky enough to understand it is not what Moscow sent her to find. A materialist in the old-fashioned sense: she believes in what can be measured, and she has found something that does not care to be measured.\n\nShe keeps two notebooks: the official survey, and a small green one she writes in at night, in her tent, after the team is asleep. She has told no one — not her director, not her husband who teaches in Leningrad and calls every Thursday. Lately she has begun to dream in a language she does not speak.\n\n## DM only\nWhatever the player is, Volkova is the most human stake in this world: a person who deserves to teach somewhere warm and never think about Suceava again. Her report reaches Moscow on a clock, if you want a ticking one. She is not a defector and not an asset — she is a witness, and everyone who learns what she carries will want to make her one or the other."
+      },
+      "wilson": {
+        "title": "Wilson",
+        "frontMatter": {
+          "type": "NPC",
+          "disposition": "guarded",
+          "additional_names": "a provisional name"
+        },
+        "body": "An occult-attuned field officer who works the uncanny beat — the rare handler who can sit across a table from one of the old things and appreciate it without dropping his glass. Forgettable on purpose: a face that disappears in a crowd of three, soft hands, a bakelite ring, a fine tremor in the left hand that comes on near the genuinely strange. \"Wilson\" is a provisional name; he has worn others.\n\nHe was at the gate in Beirut in '79, and came back frightened *and* changed, which he considers the only honest way to come back from a thing like that.\n\n## DM only\nWilson is a peer for an occult-attuned PC, a cautionary predecessor (the handlers before the player tend to end badly), or a rival who got there first — your call. He has let slip to his own headquarters that there are *other pacts*, which has set at least one section chief quietly researching him. He may be an ally. He is no one's idea of safe."
+      },
+      "costica": {
+        "title": "Costica",
+        "frontMatter": {
+          "type": "NPC",
+          "location": "[[Cluj-Napoca]]",
+          "disposition": "reliable, watched"
+        },
+        "body": "A stringer in the Romanian east who runs an auto-parts shop near a rail station as cover. He gets people papers for the internal checkpoints, arranges transport that does not ask questions, and knows which border guards are bored and which are ambitious. The closest thing to a friendly face between Vienna and the mountains.\n\n## DM only\nReliable — and flagged by the Securitate as a person of interest, though they have not yet moved on him. He has perhaps two more operations in him before he is burned and becomes a liability instead of an asset. He does not know how little time he has. Neither, at first, should the player."
+      },
+      "harlan-blythe": {
+        "title": "Harlan Blythe",
+        "frontMatter": {
+          "type": "NPC",
+          "location": "[[Langley]]",
+          "disposition": "dry, divided"
+        },
+        "body": "The voice on the dreaded phone call. A section chief who speaks in budget metaphors, breathes metronomically down a scrambled line, and treats intelligence as a cost-benefit ledger — including the people in it. He is the seed's entire headquarters, and he should never appear in person: keep him a transatlantic hum, a memo, a courtesy extended under protest.\n\n## DM only\nBlythe is caught between two memos — one from the seventh floor (*extend every reasonable courtesy*) and one unsigned, warning that anything which *glows, hums, or speaks in tongues* comes back not to Langley but to a black site in the New Mexico desert run by [[The Archivists]]. He is spooked, intrigued, and beginning to research things off the books. Use him for pressure, for an extraction that almost works, or for the moment the player realizes their own side is the second-most-dangerous party in the story."
+      }
+    },
+    "locations": {
+      "the-cellar-beneath-cafe-central": {
+        "title": "The Cellar Beneath Cafe Central",
+        "frontMatter": {
+          "type": "Location",
+          "theme": "occult",
+          "additional_names": "The Cellar"
+        },
+        "body": "Vienna's Cafe Central dates to 1876. The cellar beneath it is older — rough-cut stone that seems to have grown up through the wine vaults, with someone building a cafe over it and calling it progress. You reach it after hours, through a service door, down a stair that smells of coffee and damp and, underneath both, turned earth. At the bottom is a door with warm gold light beneath it, and a room that by any record does not exist.\n\nInside: a table, two chairs that do not match, an oil lamp that has never guttered, and shelves of files, ledgers, and wax-sealed boxes — maps with borders that no longer exist, and some that never did. It is [[LAZARUS]]'s sanctum, but it is older than him too, and it is a fine model for the kind of place this world is full of: a room that already knows your name.\n\n## DM only\nThe brass key to the stair looks older than the cafe — older than three or four buildings on the spot. When a meeting ends, the gold light goes out at the threshold like a candle put to bed."
+      },
+      "the-suceava-site": {
+        "title": "The Suceava Site",
+        "frontMatter": {
+          "type": "Location",
+          "theme": "occult"
+        },
+        "body": "An ancient site in the Carpathian foothills near Suceava, in a Romanian oblast the Soviets have been very quietly surveying. In the fourteenth century [[LAZARUS|Gavril Movilà]] made his compact here. It is the root of the whole hidden trade — and, after six centuries, it is *waking.*\n\nWhatever is here does not care to be measured. It reaches: its signal surfaces in the dreams of people who were never near it, in the compulsive words of a man who had a radio on at the wrong moment, in a geologist's green notebook. *One hundred billion stars, enflamed in their old age.*\n\n## DM only\nThis is the seed's slow apocalypse — as near or as far as you want it. It is also the one thing that genuinely unsettles [[LAZARUS]]: its reach is longer than even he understood, which means there are histories older than his own. What it *is*, exactly, should stay beyond comprehension — yours as much as the player's. Do not explain it. Let it be felt."
+      }
+    },
+    "lore": {
+      "the-suceava-compact": {
+        "title": "The Suceava Compact",
+        "frontMatter": {
+          "type": "Lore"
+        },
+        "body": "The bargain [[LAZARUS|Gavril Movilà]] struck at [[The Suceava Site]] in the fourteenth century: a way to feed on secrets and not die. Its terms are written nowhere a human can read, but their shape is visible in the result — six centuries of a boyar who should be dust, sustained by exactly the thing the modern world produces in greatest abundance.\n\n## DM only\nMovilà is almost certainly not the only one who made such a bargain, and not the first. *There are other pacts.* An entity-PC has one of their own, whether they remember its terms or not. The Compact is the template for the whole hidden economy of the setting — and the Site waking means the terms may be changing."
+      },
+      "one-hundred-billion-stars": {
+        "title": "One Hundred Billion Stars",
+        "frontMatter": {
+          "type": "Lore",
+          "additional_names": "The Resonance"
+        },
+        "body": "A phrase that surfaces in people the old sites have touched — repeated compulsively, written in notebooks, rising in dreams: *one hundred billion stars, enflamed in their old age.* It is what [[The Suceava Site]]'s reach sounds like when it lands in a human mind. Some who carry it are scholars who got too close; some only had a radio on at the wrong moment, years ago and a continent away.\n\n## DM only\nThe resonance is a tell and a thread: it marks the touched, it links people who have never met, and it travels further than any of the entities believe possible. A carrier is a lead, a victim, and a liability all at once. Whether the words *mean* anything — or are simply the shape a vast, indifferent thing makes when it brushes against something small enough to speak — is not for the player to settle, or you."
+      },
+      "the-trade-in-secrets": {
+        "title": "The Trade in Secrets",
+        "frontMatter": {
+          "type": "Lore"
+        },
+        "body": "The hidden economy beneath the Cold War. The old things feed on secrets — and the twentieth century built two enormous machines for manufacturing them. Every classified truth, every betrayed confidence, every fact a man dies rather than tell is food. The intelligence services are, without knowing it, agriculture.\n\n## DM only\nThis is why the entities tolerate — even cultivate — the standoff: it feeds them, and they would mourn its end. It is also why handling one of them is fatal work. The chain of [[LAZARUS]]'s handlers ends in a sanitarium, a grave, and a disappearance, and that is the *normal* attrition. Being the conduit between a hungry immortal and a firehose of secrets is not a posting anyone is expected to survive. The player, human or otherwise, is now somewhere in that current."
+      }
+    },
+    "factions": {
+      "the-archivists": {
+        "title": "The Archivists",
+        "frontMatter": {
+          "type": "Faction"
+        },
+        "body": "The people who want everything anomalous in a box. An unsigned faction inside the Western apparatus — counterintelligence by temperament, with a joint black site in the New Mexico desert for materials that *glow, hum, or speak in tongues.* They do not believe the old world is a resource to be courted. They believe it is a containment problem.\n\n## DM only\nThe natural antagonist for anyone who touches the uncanny — and especially for an entity-PC, who is precisely the kind of thing they exist to file away forever. They work through pressure, not confrontation: an unsigned memo, a handler who stops returning calls, a quiet flag that turns a friendly border hostile. They are not wrong that the old things are dangerous. That is what makes them dangerous."
+      },
+      "the-securitate": {
+        "title": "The Securitate",
+        "frontMatter": {
+          "type": "Faction"
+        },
+        "body": "Romania's secret police: omnipresent, underpaid, and very good at noticing the wrong people. In the East they are the immediate, human-scale threat — checkpoints, informers, a stringer flagged and watched, a hotel clerk who makes a phone call. They have no idea what actually moves through their country toward [[The Suceava Site]], which makes them both less and more dangerous: they will burn an operation over a forged travel paper while standing next to something that could unmake them.\n\n## DM only\nUse them for grounded tension on any trip east — the mundane danger running underneath the cosmic one. [[Costica]] is already on their list."
+      },
+      "the-two-services": {
+        "title": "The Two Services",
+        "frontMatter": {
+          "type": "Faction",
+          "additional_names": "Langley and Moscow"
+        },
+        "body": "The CIA and the KGB: the two great machines of the Cold War, locked in a standoff each believes it is winning. Both run [[LAZARUS]]. Neither knows the other does, and neither knows what he is. To the old things they are not rivals so much as two halves of the same farm.\n\n## DM only\nKeep them mostly offstage — the field is where this plays, not headquarters. They are the source of missions, of pressure, and of betrayal, and of the dawning horror that the player's own side is feeding the thing on the far side of the table. Inside the Western half, [[The Archivists]] are the ones who have begun to suspect."
+      }
+    }
+  }
+}
