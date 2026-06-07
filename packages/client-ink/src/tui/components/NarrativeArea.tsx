@@ -18,13 +18,24 @@ import { UsageGauge } from "./UsageGauge.js";
  * Tallest an inline image may stand, as a fraction of the narrative viewport.
  * The model is "fill width, grow taller until you'd run past the visible pane":
  * an image fills the content width and only switches to filling height (leaving
- * symmetric side pillars) when that would push it past this cap. So the cap is
- * deliberately near the full viewport — it's a safety against an image taller
- * than the pane (which `visibleBand` would crop, forcing a scroll to see it
- * whole), not a stylistic budget. Set lower only if images should leave more
- * room for surrounding narration on screen.
+ * symmetric side pillars) when that would push it past this cap. The cap is a
+ * stylistic budget: an image takes at most this fraction of the narrative pane
+ * so surrounding narration stays on screen alongside it (a taller source is
+ * shrunk to fit, not cropped — landscapes lose width to side pillars, portraits
+ * cap their height).
+ *
+ * The budget is keyed off image intent (see {@link imageHeightCapFraction}):
+ * character portraits are tall and would otherwise dominate, so they get a
+ * smaller slice of the pane; scene snapshots / player-requested illustrations
+ * are the focus of the moment and get nearly the whole pane.
  */
-const IMAGE_HEIGHT_CAP_FRACTION = 0.9;
+const IMAGE_HEIGHT_CAP_PORTRAIT = 0.6;
+const IMAGE_HEIGHT_CAP_SCENE = 0.9;
+
+/** Fraction of the narrative pane an image may occupy, by its display intent. */
+function imageHeightCapFraction(intent: ProcessedLine["intent"]): number {
+  return intent === "character_portrait" ? IMAGE_HEIGHT_CAP_PORTRAIT : IMAGE_HEIGHT_CAP_SCENE;
+}
 
 
 // ---------------------------------------------------------------------------
@@ -332,9 +343,10 @@ const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
   // atomic repaint, occlusion-aware band, no-graphics → nothing). `nodes[0]` is
   // the absolute path the engine wrote.
   //
-  // We pass BOUNDS, not a footprint: the full content width, and a height cap of
-  // IMAGE_HEIGHT_CAP_FRACTION (0.9) of the narrative viewport so even a tall
-  // portrait can't swallow the pane. InlineImage reads the image's true aspect
+  // We pass BOUNDS, not a footprint: the full content width, and a height cap —
+  // a fraction of the narrative viewport keyed off the image's intent (portraits
+  // 0.6, scenes 0.9) so an image leaves room for surrounding narration without a
+  // tall portrait swallowing the pane. InlineImage reads the image's true aspect
   // and reserves exactly the scaled footprint inside these bounds — no
   // letterboxing here, no `isPortrait` guesswork (landscapes fill width,
   // portraits fill height up to the cap).
@@ -343,7 +355,7 @@ const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
     if (!path) return <Text dimColor>[image: missing path]</Text>;
     const maxCols = Math.max(20, width ?? 80);
     const viewRows = viewportRows ?? maxCols;
-    const maxRows = Math.max(6, Math.round(viewRows * IMAGE_HEIGHT_CAP_FRACTION));
+    const maxRows = Math.max(6, Math.round(viewRows * imageHeightCapFraction(line.intent)));
     return (
       <Box flexDirection="column" marginTop={1} marginBottom={1}>
         <InlineImage

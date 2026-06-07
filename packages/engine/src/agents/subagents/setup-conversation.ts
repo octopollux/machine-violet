@@ -276,8 +276,9 @@ const GENERATE_IMAGE_TOOL: NormalizedTool = {
     "the canonical character-card look, and it stays consistent across worlds. Describe the " +
     "character (build, clothing, pose, mood, expression) in the prompt, then end with " +
     "\"Simple digital art, plain black background.\" Save campaign-styled imagery for in-game scenes. " +
-    "ALWAYS pass `effort: \"draft\"` and `aspect: \"portrait\"` for these chargen drafts — the player iterates " +
-    "and we need the fast turnaround. Save higher effort for in-campaign portrait commands after chargen.",
+    "ALWAYS pass `effort: \"standard\"` and `aspect: \"portrait\"` for these chargen portraits — `standard` is a " +
+    "medium-quality render that comes back reasonably fast for iteration. A portrait never needs more than `standard`; " +
+    "do not reach for `quality`/`showcase` here (they're slower and meant for in-campaign scenes).",
   inputSchema: {
     type: "object" as const,
     properties: {
@@ -288,7 +289,7 @@ const GENERATE_IMAGE_TOOL: NormalizedTool = {
       effort: {
         type: "string",
         enum: ["draft", "standard", "quality", "showcase"],
-        description: "Render effort. Use 'draft' for chargen iteration (fastest). 'standard' / 'quality' / 'showcase' are reserved for in-campaign use after setup completes.",
+        description: "Render effort. Use 'standard' (medium quality) for chargen portraits — it's the ceiling for a portrait. 'quality' / 'showcase' are slower and reserved for in-campaign scenes.",
       },
       aspect: {
         type: "string",
@@ -400,7 +401,7 @@ function buildSystemPrompt(
       "",
       "### Character portraits (only when the player said Yes above)",
       "",
-      "Once the player has chosen a character name and given you a description, generate a full-length portrait of them. Use the `generate_image` tool — its `prompt` argument should be a vivid, specific description of the character's full body (build, clothing, pose, mood, background hint), composed in a visual style that matches the campaign's world (illuminated-manuscript serif plate, cinematic matte, painterly fresco, woodcut, anime-comic, etc. — pick what fits). Pass `effort: \"draft\"` and `aspect: \"portrait\"` for chargen iteration.",
+      "Once the player has chosen a character name and given you a description, generate a full-length portrait of them. Use the `generate_image` tool — its `prompt` argument should be a vivid, specific description of the character's full body (build, clothing, pose, mood, background hint), composed in a visual style that matches the campaign's world (illuminated-manuscript serif plate, cinematic matte, painterly fresco, woodcut, anime-comic, etc. — pick what fits). Pass `effort: \"standard\"` (medium quality — plenty for a portrait, and fast enough to iterate) and `aspect: \"portrait\"`.",
       "",
       "After each draft is rendered, ask the player something light like \"Look right, or do you want me to try again with anything different?\" — don't editorialize about the image yourself. If they want adjustments, call `generate_image` again with a revised prompt. There's no iteration cap; let them iterate until they're happy.",
       "",
@@ -671,7 +672,7 @@ export function createSetupConversation(
     if (!promptText) {
       return { content: "generate_image requires a non-empty prompt.", isError: true };
     }
-    const effort = normalizeImageEffort(input.effort, "draft");
+    const effort = normalizeImageEffort(input.effort, "standard");
     const aspect = normalizeImageAspect(input.aspect, "portrait");
     try {
       const result = await provider.generateImage({

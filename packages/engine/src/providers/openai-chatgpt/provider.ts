@@ -813,19 +813,48 @@ const ASPECT_GUIDANCE: Record<ImageAspect, string> = {
 };
 
 /**
+ * Natural-language steering for the abstract `effort` knob.
+ *
+ * The built-in image_gen tool takes no explicit quality/size params over the
+ * RPC — codex configures it with `size`/`quality` unset, so the backend runs
+ * at `auto` and infers both from the prompt text. That makes the prompt our
+ * ONLY lever, but a real one: the same channel that already steers orientation
+ * also steers fidelity. So each effort level emits an explicit quality + speed
+ * directive rather than leaving the model on its slow `auto` default.
+ *
+ * Deliberately render-time-aware: even the top routine tier (`quality`) tells
+ * the model NOT to engage gpt-image's slowest maximum-fidelity pass — that
+ * "ultra" mode is where a render balloons to multiple minutes, and we never
+ * want the player waiting on it for ordinary play. `showcase` allows a little
+ * more time for a rare hero shot but still stops short of the exhaustive pass.
+ *
+ * Exported for unit tests.
+ */
+const EFFORT_GUIDANCE: Record<ImageEffort, string> = {
+  draft:
+    "Render quickly at low fidelity — a rough draft thumbnail is fine; favor speed over fine detail.",
+  standard:
+    "Render at medium quality — a clean, good-looking image with a balanced, reasonably fast render.",
+  quality:
+    "Render at high quality with rich detail, but keep the render time reasonable: " +
+    "do NOT engage the slowest maximum-fidelity mode.",
+  showcase:
+    "Render at the highest standard quality for a hero-shot moment — extra polish is worth " +
+    "a little more time, but still avoid the slowest exhaustive ultra-detail pass.",
+};
+
+/**
  * Fold the abstract aspect/effort knobs into the prompt text. The built-in
  * image_gen tool doesn't accept explicit size/quality params over the RPC
  * (the SKILL.md's CLI fallback does, but that path needs OPENAI_API_KEY and
- * we deliberately never touch it), so we steer in natural language.
+ * we deliberately never touch it), so we steer in natural language —
+ * orientation via {@link ASPECT_GUIDANCE}, fidelity/speed via
+ * {@link EFFORT_GUIDANCE}.
  *
  * Exported for unit tests.
  */
 export function buildImagePromptText(prompt: string, aspect: ImageAspect, effort: ImageEffort): string {
-  const detail =
-    effort === "quality" || effort === "showcase"
-      ? "Render at maximum detail and fidelity. "
-      : "";
-  return `${ASPECT_GUIDANCE[aspect]} ${detail}${prompt}`;
+  return `${ASPECT_GUIDANCE[aspect]} ${EFFORT_GUIDANCE[effort]} ${prompt}`;
 }
 
 /**
