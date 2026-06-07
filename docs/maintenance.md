@@ -87,7 +87,7 @@ The tape schema (`packages/engine/src/providers/tape.ts`) is the data contract f
 
 ### Changing the golden corpus / record-replay wiring
 
-The corpus lives in `packages/engine/src/testing/corpus.golden.test.ts` (+ `goldens/`). The record seam is `wrapForRecording` in `packages/engine/src/providers/tape-mode.ts`, called at `session-manager.ts` / `setup-session.ts`; the full-stack readback is `GET /tape` (`packages/engine/src/server/routes/dev.ts`) + `mvplay record`/`save-tape`. If you change the operating model (record paths, when to re-record, hooks), update [golden-tapes.md](golden-tapes.md) and the `/record-tape` + `/replay-goldens` skills.
+Two co-located corpora: the DM corpus (`packages/engine/src/testing/corpus.golden.test.ts`) and the setup corpus (`setup-corpus.golden.test.ts`), sharing `goldens/`. Both inject a provider directly (record via `createTapingProvider`, replay via `createReplayProvider`) — the in-process path skips the `wrapForRecording` seam. That seam (`packages/engine/src/providers/tape-mode.ts`, called at `session-manager.ts` / `setup-session.ts`) plus `GET /tape` (`packages/engine/src/server/routes/dev.ts`) + `mvplay record`/`save-tape` is the *full-stack* capture path. Adding a setup scenario = one `SetupScenario` entry + a record run (front-load the player name; `MV_SETUP_TRACE=1` prints the flow). If you change the operating model (record paths, when to re-record, hooks), update [golden-tapes.md](golden-tapes.md) and the `/record-tape` + `/replay-goldens` skills.
 
 ### Changing what the live `smoketest` probe walks through
 

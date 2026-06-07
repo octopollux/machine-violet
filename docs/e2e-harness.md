@@ -9,7 +9,7 @@ LLM flows through keystroke injection as the verification layer.
 | Tier | What | Where | Speed / API |
 |---|---|---|---|
 | **1 — component/render** | Ink render + interaction (modals, overlays, layout) | `ink-testing-library`, co-located in `packages/client-ink` | fast, offline |
-| **2 — full-stack deterministic** | Real `GameEngine` replaying recorded **golden tapes** | `packages/engine/src/testing/corpus.golden.test.ts` | ~4s, **offline** |
+| **2 — full-stack deterministic** | Real `GameEngine` + `createSetupConversation` replaying recorded **golden tapes** | `packages/engine/src/testing/{corpus,setup-corpus}.golden.test.ts` | ~4s, **offline** |
 | **3 — live smoke** | The real launcher stack against the real API | `packages/test-harness` (this doc) | 7-12 min, **live** |
 
 **Tier 2 is the regression backbone** — the honest "did I break it?" signal.
@@ -18,9 +18,11 @@ See [golden-tapes.md](golden-tapes.md) (operating model) and
 
 **This doc is Tier 3 (+ the interactive/record substrate):** the live harness in
 [`packages/test-harness`](../packages/test-harness/). Reach for it only when you
-specifically need the *live* stack — exercising the setup agent, the setup→game
-handoff, server+client+WebSocket boot — against the real model. It is **not** the
-everyday gate; that's Tier 2.
+specifically need the *live* stack — the setup→game handoff through the real
+`SessionManager` loader, server+client+WebSocket boot, the TUI render — against
+the real model. (The setup *agent conversation* itself now has deterministic
+offline coverage via the Tier-2 setup corpus.) It is **not** the everyday gate;
+that's Tier 2.
 
 ## Two ways to use the live harness: scripted probes vs. interactive play
 

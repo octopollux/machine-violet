@@ -33,27 +33,46 @@ review a readable git diff. **Never hand-edit a tape.**
 
 ### A. In-process engine goldens (the corpus)
 
-The common case. Scenarios drive the real `GameEngine` directly — DM turns, tool
-loops, multi-turn context — in
-[`packages/engine/src/testing/corpus.golden.test.ts`](../packages/engine/src/testing/corpus.golden.test.ts).
-Each entry in the `SCENARIOS` array is a `name` + a `play(engine)` that calls
-`processInput`, with its tape at `goldens/<name>.golden.json`.
+The common case — and the offline backbone for **both** halves of a session.
+Two co-located corpora drive the real engine objects directly with an injected
+provider (taping at record time, replay otherwise); the record half of each is
+gated behind `RECORD_GOLDENS=1` (it spends API), and without it only the offline
+replay runs. A taping decorator (`createTapingProvider`) captures the I/O;
+replay uses `createReplayProvider` over the saved tape.
 
-Recording: the test's record half is gated behind `RECORD_GOLDENS=1` (it spends
-API); without it, only the offline replay runs. A taping decorator
-(`createTapingProvider`) wraps a real provider and captures the I/O; replay uses
-`createReplayProvider` over the saved tape.
+**The DM corpus** —
+[`corpus.golden.test.ts`](../packages/engine/src/testing/corpus.golden.test.ts).
+Scenarios drive the real `GameEngine` — DM turns, tool loops, multi-turn context.
+Each `SCENARIOS` entry is a `name` + a `play(engine)` that calls `processInput`.
+Subagents (scribe / scene-tracker / ai-player / character-promotion) are mocked
+to no-ops so each golden is a single deterministic `"dm"` bucket — the golden's
+job is the DM turn and its tool loop, not subagent behavior (which has its own
+tests). Keep the seeded scene coherent with each player input so the DM narrates
+in character rather than asking for context.
+
+**The setup corpus** —
+[`setup-corpus.golden.test.ts`](../packages/engine/src/testing/setup-corpus.golden.test.ts).
+The setup-side complement: scenarios drive the real `createSetupConversation`
+through a scripted sequence of player turns to `finalize_setup`, then run the
+real `buildCampaignWorld` handoff against an in-memory `FileIO`. Replay asserts
+the conversation reproduces verbatim, the finalized `SetupResult` derives
+identically, *and* the scaffolded campaign config matches. This is the
+in-process setup→handoff replay — the setup agent had no offline coverage
+before. No subagents to mock (the conversation only calls the provider +
+dispatches its tools locally); setup calls carry no `conversationId`, so they
+all land in the `"default"` bucket and match ordinally. Each `SetupScenario`
+front-loads the content the agent gates on (crucially the player's name) and a
+bounded finalize loop confirms until the tool fires; set `MV_SETUP_TRACE=1` to
+print the turn-by-turn flow when re-recording.
 
 ```bash
-npm run golden:record                                   # all
-npx cross-env RECORD_GOLDENS=1 npx vitest run golden -t "dm-skill-check"   # one
+npm run golden:record                                          # all corpora
+npx cross-env RECORD_GOLDENS=1 npx vitest run golden -t "dm-skill-check"      # one DM golden
+npx cross-env RECORD_GOLDENS=1 npx vitest run setup-corpus -t "setup-custom-noir"   # one setup golden
 ```
 
-Subagents (scribe / scene-tracker / ai-player / character-promotion) are mocked
-to no-ops in the corpus so each golden is a single deterministic DM bucket — the
-golden's job is the DM turn and its tool loop, not subagent behavior (which has
-its own tests). Keep the seeded scene coherent with each player input so the DM
-narrates in character rather than asking for context.
+Setup goldens record against the **large** tier (Sonnet) so the conversation
+finalizes coherently; replay is model-agnostic and free.
 
 ### B. Full-stack / setup goldens (live-pilot via mvplay)
 
@@ -74,13 +93,16 @@ teardown force-kills the engine (and its in-memory tape) without running exit
 handlers, which is exactly why the tape is read over an HTTP route rather than
 flushed on exit (see `packages/engine/src/providers/tape-mode.ts`).
 
-> **Capture works; deterministic auto-replay of full-stack tapes is the open
-> edge.** A captured full-stack tape is a real artifact you can inspect or seed a
-> future replay test from, but there is not yet an in-process driver that
-> replays a setup→game tape end to end. Setup-agent calls currently carry no
-> `conversationId`, so they bucket as `"default"` — the future replay-runner must
-> account for that. Don't commit a full-stack tape as a passing golden until that
-> runner exists; the in-process corpus is the replay backbone.
+> **The setup *agent* now replays offline via the in-process setup corpus
+> (path A).** Reach for `mvplay record` only when you need the parts the
+> in-process path can't construct: the actual TUI render, the WebSocket events,
+> or the setup→game handoff through the **real** `SessionManager` loader.
+> Auto-replaying *those* captured full-stack tapes is the remaining edge — the
+> capture records neither the player inputs nor a replayable narrative
+> segmentation (its `expectedNarrative` is the sidecar's accumulated
+> `narrativeLines`), so re-driving the HTTP/sidecar session isn't wired. A
+> captured full-stack tape is still a real artifact to inspect or seed a future
+> test from; just don't commit one as a passing golden yet.
 
 ## How recording is wired
 
@@ -119,11 +141,15 @@ Activated by `npm install` (the root `prepare` runs `lefthook install`).
 
 ## Deferred / open edges
 
-- **Full-stack replay-runner** — capturing a setup→game tape works (`mvplay
-  save-tape`); replaying one deterministically in-process does not exist yet. The
-  in-process corpus is the backbone; full-stack tapes are capture-only until a
-  runner that drives `SetupSession` + `GameEngine` from a tape is built (and
-  handles the `"default"` setup bucket).
+- **Full-stack capture replay** — the setup *agent* and the DM loop both replay
+  offline via the in-process corpora. What's still capture-only is the *mvplay
+  full-stack tape*: replaying a real setup→game session through the **server
+  stack** (TUI render, WebSocket events, the `SessionManager` campaign loader at
+  the handoff) isn't wired, because the capture records neither the player inputs
+  nor a replayable narrative segmentation. Building that runner means adding
+  input capture to `mvplay record` + a replay-provider seam in the stack
+  (symmetric to `wrapForRecording`); Tier-3 live smoke covers that path in the
+  meantime.
 - **CI enforcement** of `golden:verify` on PRs — deferred until the pre-commit
   hook has proven stable in practice.
 - **Freshness guard** — a periodic real-API *structural* re-pilot (tool calls /

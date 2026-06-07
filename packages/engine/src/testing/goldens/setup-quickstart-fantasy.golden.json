@@ -1,0 +1,491 @@
+{
+  "scenario": "setup-quickstart-fantasy",
+  "tape": {
+    "version": 1,
+    "scenario": "setup-quickstart-fantasy",
+    "capabilities": {
+      "claude-sonnet-4-6": {
+        "imageGeneration": false
+      }
+    },
+    "entries": [
+      {
+        "kind": "chat",
+        "bucket": "default",
+        "ordinal": 0,
+        "request": {
+          "model": "claude-sonnet-4-6",
+          "messageCount": 1,
+          "systemHash": "43367fbc31a0",
+          "tools": [
+            "finalize_setup",
+            "load_world",
+            "present_choices"
+          ],
+          "lastMessagePreview": "I'd like to set up a new campaign."
+        },
+        "result": {
+          "text": "<center><b>⟡ THE CURTAIN RISES ⟡</b></center>\n\n*Somewhere, a candle flickers to life. The table is set. The dice are cold and waiting.*\n\nA new campaign. A new world conjured from nothing but imagination and intent. There are stories here that have never been told — heroes unsung, villains unmet, moments that will be remembered long after the session ends.\n\nBut before we open the book...\n\n**Who's at the table tonight?** What should I call you?",
+          "toolCalls": [],
+          "usage": {
+            "inputTokens": 3,
+            "outputTokens": 183,
+            "cacheReadTokens": 0,
+            "cacheCreationTokens": 14768,
+            "reasoningTokens": 0
+          },
+          "stopReason": "end",
+          "thinkingText": "The user wants to set up a new campaign. I need to start with a dramatic welcome and then identify the player. There are no Known Players listed in my prompt, so I'll ask freeform for their name.",
+          "assistantContent": [
+            {
+              "type": "thinking",
+              "text": "The user wants to set up a new campaign. I need to start with a dramatic welcome and then identify the player. There are no Known Players listed in my prompt, so I'll ask freeform for their name.",
+              "signature": "EowDCmUIDhgCKkANT5Exr20ZSOyfw0v8ZDRy0D4LDE6/J2cvHhKSFqv7DSdJq2LZtC2j0dvAafDmDYDMbCvSOCqJsJNsslLmBK/mMhFjbGF1ZGUtc29ubmV0LTQtNjgAQgh0aGlua2luZxIMeAK0Y1paBuQblA4NGgwE8ugXfKh4i0804eIiMEdy2sEtEbda/XB156GhYY73lFPR2cDXVQO8nwnMj3jWr6mOeBixAyTTYBvxnyPusyrUAexzYLfq8g8xWQy9TPoajGY8hkMTXcLOvevhckqWnxxvRauccKhZ+GDXZRqddkIM/TqwEXZ5L5SglIOkdZfEpa5S4BBU/UuWwFoRlDsnyYRHqhQ+vlyDPqsuAMXIP+SlzLLF8i9HEZLzQLWWI3PEc6ejM0PFe0B9u1uSXOkSXEvpyJQbI6Gldhu9XdW5Xv3ibPu+UeXUG2uau5/1y6dPLyQg4tpaM5Fk4/nPIbZcEZrSdb3wGsj2GCCo/UAFnPG6NjSPe57fOLIkZQmwFEXOrSjqIJwCGAE="
+            },
+            {
+              "type": "text",
+              "text": "<center><b>⟡ THE CURTAIN RISES ⟡</b></center>\n\n*Somewhere, a candle flickers to life. The table is set. The dice are cold and waiting.*\n\nA new campaign. A new world conjured from nothing but imagination and intent. There are stories here that have never been told — heroes unsung, villains unmet, moments that will be remembered long after the session ends.\n\nBut before we open the book...\n\n**Who's at the table tonight?** What should I call you?"
+            }
+          ]
+        },
+        "streamDeltas": [
+          "<center>",
+          "<b>⟡ THE CURTAIN RISES ⟡</b></center>\n\n*Somewhere",
+          ", a candle flickers to life. The table is set. The dice are cold and waiting",
+          ".*\n\nA new campaign. A new world conjured from nothing but imagination and intent. There",
+          " are stories here that have never been told — heroes un",
+          "sung, villains unmet, moments that will be remembered long after the session ends.\n\nBut before",
+          " we open the book...\n\n**Who's at the table tonight",
+          "?** What should I call you?"
+        ]
+      },
+      {
+        "kind": "chat",
+        "bucket": "default",
+        "ordinal": 1,
+        "request": {
+          "model": "claude-sonnet-4-6",
+          "messageCount": 3,
+          "systemHash": "43367fbc31a0",
+          "tools": [
+            "finalize_setup",
+            "load_world",
+            "present_choices"
+          ],
+          "lastMessagePreview": "I'm Sam, an adult. Quick start, please — pick a fantasy world for me, something with intrigue."
+        },
+        "result": {
+          "text": "Welcome, Sam! Let's find you a world worth conspiring in.\n\nHere are some fantasy picks heavy on intrigue — factions, secrets, and power plays:",
+          "toolCalls": [
+            {
+              "id": "toolu_014YU6C3SUj6rPXyRDm79JiU",
+              "name": "present_choices",
+              "input": {
+                "prompt": "Which world calls to you?",
+                "choices": [
+                  "◆ The Shattered Crown",
+                  "◆ Iron Saints",
+                  "◆ The Oath Eaters",
+                  "◆ A Throne of Salt",
+                  "◆ The Gilded Cage",
+                  "◆ Three Histories",
+                  "◆ Blackwater Bay",
+                  "◆ The Hound and the Fox",
+                  "◆ Middle Management of Doom",
+                  "◆ Show me some more ideas"
+                ],
+                "descriptions": [
+                  "A kingdom's heir is dead. Three factions claim the throne. Classic political intrigue — crowns, blood, and betrayal.",
+                  "The church's holy warriors have stopped answering prayers. They still answer to someone. Power, faith, and hidden allegiances.",
+                  "Someone is devouring sworn oaths. Contracts unravel. Alliances dissolve overnight. A conspiracy that unmakes trust itself.",
+                  "The empire's heartland is turning to desert. The emperor says it's on purpose. Imperial decadence, hidden agendas, and a slow catastrophe.",
+                  "You're the guest of honor at a party you can't leave. High society, silver tongues, and something very wrong beneath the glamour.",
+                  "A city built on ruins. Three factions, three versions of the past, one person who can read the records. History as a weapon.",
+                  "A port town where everyone's running from something. Smugglers, secrets, and a harbor that swallows confessions.",
+                  "A detective and a thief keep ending up at the same crime scenes. Neither of them did it. Uneasy alliance, sharp wit, shadowy culprits.",
+                  "The Dark Lord's quarterly performance review is today. You're his direct report. Comedic take on institutional intrigue — with fangs.",
+                  "Show me a different set of fantasy intrigue worlds."
+                ]
+              }
+            }
+          ],
+          "usage": {
+            "inputTokens": 3,
+            "outputTokens": 1146,
+            "cacheReadTokens": 14768,
+            "cacheCreationTokens": 210,
+            "reasoningTokens": 0
+          },
+          "stopReason": "tool_use",
+          "thinkingText": "Sam is an adult, wants Quick Start, fantasy world with intrigue. Let me pick some good fantasy worlds with intrigue from the list. Let me look at what's available:\n\nFantasy worlds with intrigue themes:\n- **The Shattered Crown** — A kingdom's heir is dead. Three factions claim the throne. (fantasy) - great for intrigue\n- **Iron Saints** — The church's holy warriors have stopped answering prayers. They still answer to someone. (fantasy, mystery) - intrigue\n- **The Oath Eaters** — Someone is devouring sworn oaths. Contracts unravel. Alliances dissolve overnight. (fantasy) - intrigue\n- **Middle Management of Doom** — The Dark Lord's quarterly performance review is today. (fantasy, comedy) - has comedic elements but intrigue underneath\n- **The Gilded Cage** — You're the guest of honor at a party you can't leave. (fantasy, modern, mystery) - strong intrigue\n- **A Throne of Salt** — The empire's heartland is turning to desert. The emperor says it's on purpose. (fantasy) - intrigue\n- **Blackwater Bay** — A port town where everyone's running from something. (fantasy, modern, mystery) - intrigue\n\nI'm also considering how The Magistrate personality might fit into these scenarios, and there's another option starting with The Hound that got cut off.\n\nNow I'm looking at more world concepts: a detective and thief repeatedly crossing paths at crime scenes, a city built on layered histories with competing factions, one that rebuilds itself nightly from memories, a mysterious weapon with agency, and a world where magic is slowly returning after a century of absence. I'm narrowing down to about 8-10 fantasy worlds that really emphasize intrigue, starting with The Shattered Crown for political conflict and Iron Saints for religious institutional tension.",
+          "assistantContent": [
+            {
+              "type": "thinking",
+              "text": "Sam is an adult, wants Quick Start, fantasy world with intrigue. Let me pick some good fantasy worlds with intrigue from the list. Let me look at what's available:\n\nFantasy worlds with intrigue themes:\n- **The Shattered Crown** — A kingdom's heir is dead. Three factions claim the throne. (fantasy) - great for intrigue\n- **Iron Saints** — The church's holy warriors have stopped answering prayers. They still answer to someone. (fantasy, mystery) - intrigue\n- **The Oath Eaters** — Someone is devouring sworn oaths. Contracts unravel. Alliances dissolve overnight. (fantasy) - intrigue\n- **Middle Management of Doom** — The Dark Lord's quarterly performance review is today. (fantasy, comedy) - has comedic elements but intrigue underneath\n- **The Gilded Cage** — You're the guest of honor at a party you can't leave. (fantasy, modern, mystery) - strong intrigue\n- **A Throne of Salt** — The empire's heartland is turning to desert. The emperor says it's on purpose. (fantasy) - intrigue\n- **Blackwater Bay** — A port town where everyone's running from something. (fantasy, modern, mystery) - intrigue\n\nI'm also considering how The Magistrate personality might fit into these scenarios, and there's another option starting with The Hound that got cut off.\n\nNow I'm looking at more world concepts: a detective and thief repeatedly crossing paths at crime scenes, a city built on layered histories with competing factions, one that rebuilds itself nightly from memories, a mysterious weapon with agency, and a world where magic is slowly returning after a century of absence. I'm narrowing down to about 8-10 fantasy worlds that really emphasize intrigue, starting with The Shattered Crown for political conflict and Iron Saints for religious institutional tension.",
+              "signature": "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"
+            },
+            {
+              "type": "text",
+              "text": "Welcome, Sam! Let's find you a world worth conspiring in.\n\nHere are some fantasy picks heavy on intrigue — factions, secrets, and power plays:"
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_014YU6C3SUj6rPXyRDm79JiU",
+              "name": "present_choices",
+              "input": {
+                "prompt": "Which world calls to you?",
+                "choices": [
+                  "◆ The Shattered Crown",
+                  "◆ Iron Saints",
+                  "◆ The Oath Eaters",
+                  "◆ A Throne of Salt",
+                  "◆ The Gilded Cage",
+                  "◆ Three Histories",
+                  "◆ Blackwater Bay",
+                  "◆ The Hound and the Fox",
+                  "◆ Middle Management of Doom",
+                  "◆ Show me some more ideas"
+                ],
+                "descriptions": [
+                  "A kingdom's heir is dead. Three factions claim the throne. Classic political intrigue — crowns, blood, and betrayal.",
+                  "The church's holy warriors have stopped answering prayers. They still answer to someone. Power, faith, and hidden allegiances.",
+                  "Someone is devouring sworn oaths. Contracts unravel. Alliances dissolve overnight. A conspiracy that unmakes trust itself.",
+                  "The empire's heartland is turning to desert. The emperor says it's on purpose. Imperial decadence, hidden agendas, and a slow catastrophe.",
+                  "You're the guest of honor at a party you can't leave. High society, silver tongues, and something very wrong beneath the glamour.",
+                  "A city built on ruins. Three factions, three versions of the past, one person who can read the records. History as a weapon.",
+                  "A port town where everyone's running from something. Smugglers, secrets, and a harbor that swallows confessions.",
+                  "A detective and a thief keep ending up at the same crime scenes. Neither of them did it. Uneasy alliance, sharp wit, shadowy culprits.",
+                  "The Dark Lord's quarterly performance review is today. You're his direct report. Comedic take on institutional intrigue — with fangs.",
+                  "Show me a different set of fantasy intrigue worlds."
+                ]
+              }
+            }
+          ]
+        },
+        "streamDeltas": [
+          "Welcome, Sam! Let's find",
+          " you a world worth conspiring in.\n\nHere are some fantasy picks heavy",
+          " on intrigue — factions, secrets, and power plays:"
+        ]
+      },
+      {
+        "kind": "chat",
+        "bucket": "default",
+        "ordinal": 2,
+        "request": {
+          "model": "claude-sonnet-4-6",
+          "messageCount": 5,
+          "systemHash": "43367fbc31a0",
+          "tools": [
+            "finalize_setup",
+            "load_world",
+            "present_choices"
+          ],
+          "lastMessagePreview": "[tool_result]"
+        },
+        "result": {
+          "text": "I love the enthusiasm — but the curtain snagged just a little there! Which world caught your eye? You can just name it and we'll dive straight in.",
+          "toolCalls": [],
+          "usage": {
+            "inputTokens": 1,
+            "outputTokens": 519,
+            "cacheReadTokens": 14978,
+            "cacheCreationTokens": 1204,
+            "reasoningTokens": 0
+          },
+          "stopReason": "end",
+          "thinkingText": "Hmm, the player selected \"That world sounds great, let's use it.\" but I'm not sure which world they selected. This seems like a generic confirmation message. Let me think about this - it seems like the player might have selected one of the choices but the response just came back as a generic message. Let me assume they picked one of them... Actually, looking at the result \"That world sounds great, let's use it.\" - this is a bit ambiguous. Maybe the app isn't returning which specific choice was made. \n\nWait, looking at the choices again - I think the app returned a generic message because the player selected one. But it seems like the selection wasn't properly captured. \n\nActually, I'm realizing the player might have typed that response rather than selecting from the modal options. The text \"That world sounds great, let's use it.\" doesn't match any of the specific choices I presented, so either they're typing their own response or the UI is showing something unexpected. Either way, I'm not certain which world they actually want to use.",
+          "assistantContent": [
+            {
+              "type": "thinking",
+              "text": "Hmm, the player selected \"That world sounds great, let's use it.\" but I'm not sure which world they selected. This seems like a generic confirmation message. Let me think about this - it seems like the player might have selected one of the choices but the response just came back as a generic message. Let me assume they picked one of them... Actually, looking at the result \"That world sounds great, let's use it.\" - this is a bit ambiguous. Maybe the app isn't returning which specific choice was made. \n\nWait, looking at the choices again - I think the app returned a generic message because the player selected one. But it seems like the selection wasn't properly captured. \n\nActually, I'm realizing the player might have typed that response rather than selecting from the modal options. The text \"That world sounds great, let's use it.\" doesn't match any of the specific choices I presented, so either they're typing their own response or the UI is showing something unexpected. Either way, I'm not certain which world they actually want to use.",
+              "signature": "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"
+            },
+            {
+              "type": "text",
+              "text": "I love the enthusiasm — but the curtain snagged just a little there! Which world caught your eye? You can just name it and we'll dive straight in."
+            }
+          ]
+        },
+        "streamDeltas": [
+          "I love the enthusiasm",
+          " — but the curtain snagged just",
+          " a little there! Which world caught your eye? You can just name it and we",
+          "'ll dive straight in."
+        ]
+      },
+      {
+        "kind": "chat",
+        "bucket": "default",
+        "ordinal": 3,
+        "request": {
+          "model": "claude-sonnet-4-6",
+          "messageCount": 7,
+          "systemHash": "43367fbc31a0",
+          "tools": [
+            "finalize_setup",
+            "load_world",
+            "present_choices"
+          ],
+          "lastMessagePreview": "My character is Aldric, a weathered sellsword chasing a blood debt. Keep it simple — no extra mechanics. I'm an adult, s"
+        },
+        "result": {
+          "text": "*A sellsword with a blood debt walking into a world of shattered power? That's not a character — that's a lit fuse.*\n\nLet me pull back the curtain on the perfect stage for Aldric...",
+          "toolCalls": [
+            {
+              "id": "toolu_012eDpTfEcdYFSEGm3mN3z8p",
+              "name": "load_world",
+              "input": {
+                "slug": "the-shattered-crown"
+              }
+            }
+          ],
+          "usage": {
+            "inputTokens": 3,
+            "outputTokens": 337,
+            "cacheReadTokens": 16182,
+            "cacheCreationTokens": 558,
+            "reasoningTokens": 0
+          },
+          "stopReason": "tool_use",
+          "thinkingText": "Sam wants:\n- Character: Aldric, a weathered sellsword chasing a blood debt\n- No mechanics (pure narrative)\n- Adult\n- Surprise me with the rest\n\nSince they didn't pick a world, I need to pick one for them. They said they want fantasy with intrigue. Let me pick a world that fits their character well. \"The Shattered Crown\" seems perfect - political intrigue, a kingdom in chaos, great backdrop for a sellsword with a blood debt. Or \"Blackwater Bay\" - a port town where everyone's running from something. Or \"Iron Saints\" - church warriors with hidden allegiances.\n\nGiven the character (weathered sellsword, blood debt), I think \"The Shattered Crown\" is the most fitting - political intrigue, factions vying for a throne, perfect place for a mercenary to get tangled up in something bigger than themselves.\nNow I'm pulling up The Shattered Crown's details and available options.",
+          "assistantContent": [
+            {
+              "type": "thinking",
+              "text": "Sam wants:\n- Character: Aldric, a weathered sellsword chasing a blood debt\n- No mechanics (pure narrative)\n- Adult\n- Surprise me with the rest\n\nSince they didn't pick a world, I need to pick one for them. They said they want fantasy with intrigue. Let me pick a world that fits their character well. \"The Shattered Crown\" seems perfect - political intrigue, a kingdom in chaos, great backdrop for a sellsword with a blood debt. Or \"Blackwater Bay\" - a port town where everyone's running from something. Or \"Iron Saints\" - church warriors with hidden allegiances.\n\nGiven the character (weathered sellsword, blood debt), I think \"The Shattered Crown\" is the most fitting - political intrigue, factions vying for a throne, perfect place for a mercenary to get tangled up in something bigger than themselves.\nNow I'm pulling up The Shattered Crown's details and available options.",
+              "signature": "ErEICmUIDhgCKkC9SqXncMZFg6lYmNGfuLD8nUHCerQ3EO7qCaXl9IyT6X5dgYkD4IMoyKxoCobRq9k6UzcyilGlrd2kWXz+CBWrMhFjbGF1ZGUtc29ubmV0LTQtNjgAQgh0aGlua2luZxIM+zupoiMKmTfeGN8HGgw9TaO1rJ/ShdPYj7YiMM/2TphFEpn6B1QckNj3GPswsZ62SEtri6DXHikWaGyYwZsQ8ubMs67QFsi2gr5dAyr5BkghTzHsyl2np9C/Rkc2My5tp005p3HXfQ8KasffmEj2nWYbF4myyk8eV+TX+LH7+EL5PdMpUheRBDvstQA/Sq1kD0BlkqjVr+x1aS5msIBm3f0rcVDbl+cWlw6piLz6JO4MQlk66I/BBfhdJcBBH5mAkBPOWS+7I36Zo+QDB3ccQ3peLIwrLbDsaLRWXWFbRBWvj9lf7+I05Qll0dZUQxIGTVdvEsbnIWlrGZ7Js6NkyqPsn5U3nJp52t7+BJ6Ks87yBYujFeEofAkAzfrFmIjd+BijVNiwZHTsvSSJxsZ60Y+ipXEI5kRDfNRJm5Tj1AOo9AlhRbhByT1DAI+lX8XCQN3QBluX/17Dm7sSs2ljASEWpHd2h0nxXS2lSDMP1oCaESpnPF37pI9BW3YvbEfg0ruWf9ui8IX3/RXItV9uhBJRd8McwcqHh7PVdpxlnQ9VcPqjMNv6/A3UPINYBUGw/OuvbJ6JJnvYukjXP0CaPxes42ZJhFUdHCqdkZSBWDJtvmXrwPXBz7s54/Vjdu0xgJUqjKbEP+2ig8loUx3wFz+I4vO7B+6tWFQIutcH2miyymyViq9kiXlfFjCf/YwQ+EeFZj8R02ZbJLj4mt2K8Gq+Grp1KnC4Vnm3W077JguW5QuQweLLlvmSRy37UT5JrEpbiSQ7+Wz03uUpi0v5lJ+GpHgwN0qPutGw8njVgQQAIo5HpGuC9PwNOogQdzAt0N9CdjEL1sf/hbOKzGSH2zNiRDGbEF0Jam1RFLMswTG+OPeUMUBRv0iGC9dpqOXNBOCax+gjBkGXRidq8atpATPXHzANa5ZwSdUqmSIM/8FB5HOZmZDoXAdiL6ur5Ijiti439OZSBr8MpYnOWovdA/GQE6NIvVNH3cdYkP3hxow2TNU+S1XLD6i7TUPsVGqVw13jrfWvUVBgFUHXTf/0LIOlwZ6UXxyOki9tP9gerRVAfnLAPY/aBUT0FdX+UrBeyMIohe7K4/Bmnk517em7otI7kE4Q0CgkA+uA5oANEdrhbQHVrv1I2wKrKzGiO8+/BS1V1ZaNgTFIHubvXdGMooK00wWzEMo1I0TCJcqmL7H57lJDQbsVrLy3IDtIOFATy0ysIOsiwv0965A/7HZakkizxeX3LAWGS590VESWN2XGEpAj/6xvq1qD+C5Vi859t14VslVxlnkYAQ=="
+            },
+            {
+              "type": "text",
+              "text": "*A sellsword with a blood debt walking into a world of shattered power? That's not a character — that's a lit fuse.*\n\nLet me pull back the curtain on the perfect stage for Aldric..."
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_012eDpTfEcdYFSEGm3mN3z8p",
+              "name": "load_world",
+              "input": {
+                "slug": "the-shattered-crown"
+              }
+            }
+          ]
+        },
+        "streamDeltas": [
+          "*A sellsword with",
+          " a blood debt walking into a world of shattered power? That's not a character",
+          " — that's a lit fuse.*\n\nLet me pull back the curtain on the perfect stage",
+          " for Aldric..."
+        ]
+      },
+      {
+        "kind": "chat",
+        "bucket": "default",
+        "ordinal": 4,
+        "request": {
+          "model": "claude-sonnet-4-6",
+          "messageCount": 9,
+          "systemHash": "43367fbc31a0",
+          "tools": [
+            "finalize_setup",
+            "load_world",
+            "present_choices"
+          ],
+          "lastMessagePreview": "[tool_result]"
+        },
+        "result": {
+          "text": "*Perfect world found. Auto-picking a starting faction that fits a sword-for-hire with a score to settle...*\n\nA kingdom's heir is dead. Three factions are tearing themselves apart over the throne — and Aldric just got tangled in the worst of it.\n\n---\n\nHere's the stage I'm setting, Sam:\n\n<center><b>The Shattered Crown — The Iron Circle</b></center>\n\nA <color=#cc4444>tense political fantasy</color>, <b>Balanced</b> difficulty, scoped as <i>A Few Sessions</i>, narrated by <b>The Magistrate</b> — a voice of webs, whispers, and every NPC hiding something behind their smile.\n\n<b>No mechanics.</b> Pure story.\n\nYou're playing as <color=#44cc44>Aldric</color> — a weathered sellsword who came to the capital chasing a blood debt, and ended up conscripted into the orbit of <b>The Iron Circle</b>: the military faction, disciplined and honorable, one betrayal away from collapse. They think he's muscle. He has his own agenda. The succession crisis doesn't care about either.\n\n---\n\nSound good, or want to tweak anything before we begin?",
+          "toolCalls": [],
+          "usage": {
+            "inputTokens": 1,
+            "outputTokens": 655,
+            "cacheReadTokens": 16740,
+            "cacheCreationTokens": 757,
+            "reasoningTokens": 0
+          },
+          "stopReason": "end",
+          "thinkingText": "Now I have the world details. I need to pick a suboption since Sam said \"surprise me with the rest.\" I'll auto-pick one that fits a weathered sellsword chasing a blood debt best.\n\nA sellsword with a blood debt... The Iron Circle (military faction) feels most natural for a mercenary. Let me go with that.\n\nNow let me set up the full campaign:\n- World: The Shattered Crown\n- Suboption: The Iron Circle (auto-picked, fits a sellsword)\n- Genre: Classic fantasy\n- Mood: Tense / Grimdark\n- Difficulty: Balanced\n- Scope: few-sessions (default)\n- System: pure narrative\n- DM Personality: The Magistrate fits perfectly—intrigue, factions, debts, betrayals, hidden agendas in every interaction\n- Character: Aldric, weathered sellsword chasing a blood debt\n\nNow I'm building the campaign premise around The Shattered Crown with The Iron Circle as the starting faction, centering on Aldric's mercenary background and his pursuit of vengeance.",
+          "assistantContent": [
+            {
+              "type": "thinking",
+              "text": "Now I have the world details. I need to pick a suboption since Sam said \"surprise me with the rest.\" I'll auto-pick one that fits a weathered sellsword chasing a blood debt best.\n\nA sellsword with a blood debt... The Iron Circle (military faction) feels most natural for a mercenary. Let me go with that.\n\nNow let me set up the full campaign:\n- World: The Shattered Crown\n- Suboption: The Iron Circle (auto-picked, fits a sellsword)\n- Genre: Classic fantasy\n- Mood: Tense / Grimdark\n- Difficulty: Balanced\n- Scope: few-sessions (default)\n- System: pure narrative\n- DM Personality: The Magistrate fits perfectly—intrigue, factions, debts, betrayals, hidden agendas in every interaction\n- Character: Aldric, weathered sellsword chasing a blood debt\n\nNow I'm building the campaign premise around The Shattered Crown with The Iron Circle as the starting faction, centering on Aldric's mercenary background and his pursuit of vengeance.",
+              "signature": "EvkLCmUIDhgCKkD5NtG2VtsD3IZNt04XtjlxqSRK38rdYma66GqJYYtAW63/YBNrH4WuoqsFiW5Z1iU0wVnN0kFF6I9IeJZE2S2HMhFjbGF1ZGUtc29ubmV0LTQtNjgAQgh0aGlua2luZxIMJxOBqeIN2ibgHsyPGgxcWADCKfhdbEBqAfMiMOmLDbybEmWM86ZipW9RHore1e/EcwlU4sXz1ypZTkrg+9vJjwl+cgdn1lMBJD9MzyrBCv282SIdvqm9glssjlQk72IKfHOH7uOY8cJ6XZCtx6xUtNnufX5rs6S8rUQbt32a/FKmKGNdE635HLyJ4Wxv/Qv/F9rq3BQXuutXBt/gja5+2P4+4/cwuHYd6tbkBiXf7EQq6qWxdz+IMxh646qM0mZ4YqCNJfFWClBOLnX0fuUJEcjUMfEYDdFSG1e5HfcWxRDPYlZeQA0rotHpN8aOXfu0PmTzd8/Bb4Bs+vkZ25iWfRWMhJMPVIT7jLucmZALqM4YgulPVfOLuTfEXoWEZ+TObI0VgX94mykwLShmIgBcdxSoTe3YoZBzmMWC0+DlyzoUvvVoUAa/fNC5IFn5avGtQyRrDxt1Bo24W3NYtfdLfZoT5YCpfMizBzetT5ILJIX0fl5mr1MFCoV5GPmtw8bF7+am0TzVv3BjqJ/ryM7qFfB1DrVPl/DRa8w2mLMJNIVHAOA8pGEQ4jqE5svC7Ej0EOQxsmGoQTykKKxxaQjtBKE6UpjhnMJKMhc5bnIb36gH74wQD5dyv8epTRrptK+V4JsjT9ZPdvM+SZcG5IyWOkVTXZj9EkXMvZe/91rSFDI8N5NYtd36afuiHDW8v99mT6X+e1QW39f8KP5/WCsSr2GKNzOeci5N6B2yz5WArKdvR5hNY6o5WcCJqTNr/lKUAaA4rvwOSrUY7bdjqJGNhbf9CVGyUHHmzZxfrVIpO1XsI9pLMLnW7FLhdcCY16vBrOhJr2F2JrMD0nPwnMiOZik+9zJm70gl9qrWcTdLPhIfgww7mqYeoOpNebzSwxBZrg52/0v7IpqzA5JJZTyGT+mEHus4fnR5X4YYgqPq4ld6ya0i1bjJh8wuCiX+K/laUWhYtOvxO0NZA0+n4n3FeQIRrtib5avzOLXZNDUR+eA7qg6zcBcbjli/VYCia/uEFSOxSUNDjK/0D7RsL6/eR75VfgSfT+3ig6rckBpJOMZEd5tHmeyvpSAZJ0OYc5COBkZXp/egR9FmXV7pFomc2hqBCRgq5y0HRX0ijUdmoYwjQqwY+g8icD2W+etBNPyoUtfv01X2u3io2EaacR781+KDXRXp7odTX80aK8eZeu9yJEcANg9fyKRTkXsN8voVyiHx2unPmAYsK220zSV4AtlpeRRIfP17tuQBx65grWsvZSuBd8afIXcOlnTqTnSeVYzRPuA/nx/DOVZpHumH6+CmZdBBapFQeYrxaCBWkXYPQnSzqBrNwPIpRA/xJc5iGGcWmWztybYWd9a4bAshHNdU6fSYUXre4YY2IsDTPL4OHZqf2SkBS4DAWj8VpkA5Eck9Rx9GssEj7LEjrx1qcSy4ITT7is3+9KmNvoLT/qiA1WhCN6MbI0x4lgjDhQOuLdyUYCmp5w0NW30zAj4cDh4j3CFaicu2+LLXYqkqvhp7yNdbhKQgccJ9joJv6ZS0tURJlNitIN3zKo1UzxC2nxpHMmkxEInYpLavQ2vxHo1w93JSRrx5wAcsqLd3kgcxxruCJbu/5AFNkNrvXz7WaW497oUXuZ1RcuAlD2cUFlxBSWpX8K+jvVSkZyDTD9lk3BOKZxj91Q0GKGCcn0tjHCRUt23ANRAPGaK3Xomh9HYt81y5tCgnLzpxqyUu/ylnP8YSU+UDMrGlb5mFIk74/GvmbFRw1fg9yvoHHedvapE5IdeJ/+dHl5F8O7HPRLXOhEGzhFBUHuOvh73PJlqQ6Jb2LdLcEcPrbZ7KMzTp2xdIesqiopXo0x62o1xekZUH+whuWwnBrNb+c251LS4yMymBicpuEp/pAXZF77nwWiQYAQ=="
+            },
+            {
+              "type": "text",
+              "text": "*Perfect world found. Auto-picking a starting faction that fits a sword-for-hire with a score to settle...*\n\nA kingdom's heir is dead. Three factions are tearing themselves apart over the throne — and Aldric just got tangled in the worst of it.\n\n---\n\nHere's the stage I'm setting, Sam:\n\n<center><b>The Shattered Crown — The Iron Circle</b></center>\n\nA <color=#cc4444>tense political fantasy</color>, <b>Balanced</b> difficulty, scoped as <i>A Few Sessions</i>, narrated by <b>The Magistrate</b> — a voice of webs, whispers, and every NPC hiding something behind their smile.\n\n<b>No mechanics.</b> Pure story.\n\nYou're playing as <color=#44cc44>Aldric</color> — a weathered sellsword who came to the capital chasing a blood debt, and ended up conscripted into the orbit of <b>The Iron Circle</b>: the military faction, disciplined and honorable, one betrayal away from collapse. They think he's muscle. He has his own agenda. The succession crisis doesn't care about either.\n\n---\n\nSound good, or want to tweak anything before we begin?"
+            }
+          ]
+        },
+        "streamDeltas": [
+          "*Perfect world found. Auto-picking a starting faction that",
+          " fits a sword-for-hire with a score to settle...*",
+          "\n\nA kingdom's heir is dead. Three factions are tearing themselves",
+          " apart over the throne — and Aldric just got tangled in the worst of",
+          " it.\n\n---\n\nHere's the stage I'm setting,",
+          " Sam:\n\n<center><b>The Shattered Crown — The Iron Circle</b></center>",
+          "\n\nA <color=#cc4444>tense political fantasy</color>,",
+          " <b>Balanced</b> difficulty, scoped as <i",
+          ">A Few Sessions</i>, narrated by <b>The Magistrate</b> — a voice of",
+          " webs, whispers, and every NPC hiding something behind",
+          " their smile.\n\n<b>No mechanics.</b> Pure story.\n\nYou",
+          "'re playing as <color=#44cc44>Aldric</color>",
+          " — a weathered sellsword who came to the capital chasing a blood debt, and ended",
+          " up conscripted into the orbit of <b>The Iron Circle</b>: the military faction,",
+          " disciplined and honorable, one betrayal away from collapse. They think he's muscle",
+          ". He has his own agenda. The succession crisis doesn",
+          "'t care about either.\n\n---\n\nSound good, or want to tw",
+          "eak anything before we begin?"
+        ]
+      },
+      {
+        "kind": "chat",
+        "bucket": "default",
+        "ordinal": 5,
+        "request": {
+          "model": "claude-sonnet-4-6",
+          "messageCount": 11,
+          "systemHash": "43367fbc31a0",
+          "tools": [
+            "finalize_setup",
+            "load_world",
+            "present_choices"
+          ],
+          "lastMessagePreview": "Yes, that all sounds perfect — please call finalize_setup now with sensible defaults for anything unspecified, and let's"
+        },
+        "result": {
+          "text": "",
+          "toolCalls": [
+            {
+              "id": "toolu_01566kphNX3m4MJTaF1c3zcL",
+              "name": "finalize_setup",
+              "input": {
+                "genre": "Classic fantasy",
+                "mood": "Tense",
+                "difficulty": "Balanced",
+                "campaign_scope": "few-sessions",
+                "system": "null",
+                "dm_personality": "The Magistrate",
+                "campaign_name": "The Shattered Crown - The Iron Circle",
+                "campaign_premise": "A kingdom's heir is dead and three factions are tearing each other apart over the empty throne. Aldric, a weathered sellsword, came to the capital chasing a blood debt — and found himself conscripted into the orbit of the Iron Circle, the military faction held together by discipline, honor, and the threat of imminent collapse. They believe he's muscle for hire. He has his own score to settle. As a coronation deadline looms, foreign armies mass on the border, and the other factions sharpen their knives, Aldric must navigate layers of loyalty, leverage, and buried secrets — all while hunting the person he came here to find.",
+                "player_name": "Sam",
+                "age_group": "adult",
+                "character_name": "Aldric",
+                "character_description": "A weathered sellsword chasing a blood debt, now reluctantly entangled in a kingdom's succession crisis through his uneasy alliance with the Iron Circle.",
+                "world_slug": "the-shattered-crown",
+                "campaign_detail": "## Detail\nRoll or choose the throne's secret (DM only — do NOT reveal to the player):\n1. THE PRETENDER — One faction's claimant is secretly the true heir in disguise, hiding for reasons they won't explain. The player may end up serving them without knowing.\n2. THE EMPTY THRONE — The heir faked their death. They're watching from the margins, testing who deserves to rule. They will approach the player mid-campaign with a terrible bargain.\n3. THE SUCCESSION CURSE — Every claimant who sits the throne dies within a week. The throne itself is the antagonist — a bound entity that feeds on sovereignty.\n\nFaction texture: All three factions have a sympathetic leader and an inner circle with its own agenda. The player's starting faction colors their first impression of the conflict, but all three are equally complex.\n\nPacing: Start the player entangled with their chosen faction before they understand the full picture. Reveal the second faction as nuanced allies-or-enemies by mid-campaign. The third faction's true nature is the late-game twist. Use ticking clocks — a coronation deadline, a foreign army massing at the border, a plague in the capital.\n\n## Suboption: Your starting faction\n- **The Iron Circle** — Start entangled with the military faction. Disciplined, honorable, but brittle — one betrayal could shatter them. You'll see the succession crisis as a soldier first.\n- **The Gilded Compact** — Start among the merchant coalition. They treat the crown as a business acquisition. You'll see the succession crisis through ledgers, leverage, and backroom deals.\n- **The Hallowed See** — Start within the religious order. They believe divine mandate chooses the ruler. You'll see the succession crisis as a matter of faith and prophecy.",
+                "handoff_note": "Sam described Aldric as \"a weathered sellsword chasing a blood debt\" — keep that personal vendetta as a living thread underneath the faction politics. He didn't come here for the crown; the crown just got in the way. Sam wanted pure narrative, no mechanics, and asked to be surprised on everything beyond the character concept. I auto-picked The Iron Circle as starting faction (natural fit for a mercenary archetype) and The Magistrate as the DM voice (intrigue-heavy, every NPC with a hidden agenda — perfect for this world). The blood debt is entirely open — consider tying it to someone inside the Iron Circle or a rival faction as a slow reveal. The throne's secret is DM-only; Sam has no knowledge of it. Keep that for mid-to-late campaign. Scope is few-sessions but expand freely if the story has momentum."
+              }
+            }
+          ],
+          "usage": {
+            "inputTokens": 3,
+            "outputTokens": 1641,
+            "cacheReadTokens": 17497,
+            "cacheCreationTokens": 685,
+            "reasoningTokens": 0
+          },
+          "stopReason": "tool_use",
+          "thinkingText": "Sam confirmed everything. Let me now call finalize_setup with all the details:\n\n- player_name: Sam\n- age_group: adult\n- genre: Classic fantasy\n- mood: Tense\n- difficulty: Balanced\n- campaign_scope: few-sessions\n- system: null (pure narrative)\n- dm_personality: The Magistrate\n- campaign_name: The Shattered Crown - The Iron Circle\n- campaign_premise: A kingdom's heir is dead and three factions vie for the throne. Aldric, a weathered sellsword, came to the capital chasing a blood debt — and found himself entangled with the Iron Circle, the military faction holding itself together through discipline and honor alone. \n\nNow I'm setting up Aldric's character profile. He's a sellsword with a personal vendetta, caught between the factions' machinations as the coronation deadline approaches and foreign forces threaten the kingdom's borders. The key is to emphasize his own agenda — he's not just hired muscle, but someone with his own score to settle in the midst of this succession crisis.\n\nI've assigned him to the Iron Circle as his starting faction, which fits his mercenary background, and the Magistrate as the DM personality to drive the intrigue-heavy narrative. The blood debt itself stays mysterious and open-ended for the DM to weave into the campaign, potentially connecting it to someone within the Iron Circle or a rival faction. The throne secret remains hidden from Sam until mid-to-late campaign when the reveal lands harder. This is a few-session arc with room to expand if the momentum builds.",
+          "assistantContent": [
+            {
+              "type": "thinking",
+              "text": "Sam confirmed everything. Let me now call finalize_setup with all the details:\n\n- player_name: Sam\n- age_group: adult\n- genre: Classic fantasy\n- mood: Tense\n- difficulty: Balanced\n- campaign_scope: few-sessions\n- system: null (pure narrative)\n- dm_personality: The Magistrate\n- campaign_name: The Shattered Crown - The Iron Circle\n- campaign_premise: A kingdom's heir is dead and three factions vie for the throne. Aldric, a weathered sellsword, came to the capital chasing a blood debt — and found himself entangled with the Iron Circle, the military faction holding itself together through discipline and honor alone. \n\nNow I'm setting up Aldric's character profile. He's a sellsword with a personal vendetta, caught between the factions' machinations as the coronation deadline approaches and foreign forces threaten the kingdom's borders. The key is to emphasize his own agenda — he's not just hired muscle, but someone with his own score to settle in the midst of this succession crisis.\n\nI've assigned him to the Iron Circle as his starting faction, which fits his mercenary background, and the Magistrate as the DM personality to drive the intrigue-heavy narrative. The blood debt itself stays mysterious and open-ended for the DM to weave into the campaign, potentially connecting it to someone within the Iron Circle or a rival faction. The throne secret remains hidden from Sam until mid-to-late campaign when the reveal lands harder. This is a few-session arc with room to expand if the momentum builds.",
+              "signature": "Eo8SCmUIDhgCKkA2r0c5lbyZA1RlLkK8hVHHPM1tjvuS38WtE5R068OJcGdNc1WkIrGvD8p/3bq6JPboUT2Cgd08BZVvsW5TepX1MhFjbGF1ZGUtc29ubmV0LTQtNjgAQgh0aGlua2luZxIMWBrjy/HLURY/4PQuGgw2VfOj3LPz1uT+eysiMOPkn8g+OJWJX8+9vpsHt4Z3kKEftF/BB7kK3ufAzVb0h3t3U3KqyuuSUSXBwZ0E3irXECfoCi4QgnG+Z60qKfwTEHpkWmz4ebGlfpo6UpIU06dPiJq3VziOaP1NRYC1gWujlNxi2aLfzaYPmz3jsnL2mKkNSOsRBIssRRRR+v/deIsvLeLiaPojWww8vvsntQKoBlsbm1PFBtPnLu7k88rdmHZ0BAYmFOYW9+zitSZbmLIGbpZazEagH5DSqqwU3Fmaxx1cJoc4YSCRsgRC4yXWwU+HzB4NInuUrJco2CPebRkqu3QrBCR8vGoRT+H13LKRwrAl9lv1+AWFkSSm1yHTGBn/L8fmLHwoXdjas5GQVr9NxuBAIcn9E7/hPqtzyH5Pl7+WG3TF3NnzcCnnTHosm3e/cfeT/IqNP7J178FbG+4bHoUY2i0r/nE9ueJrutbr1B7qkVWNFgpdnLt9xzIs4o2qfXhTztUM8VrShgpQyhAUMpdD1RoSm81Ryc8W+JgjaKo5mDNz439P1R8rGUJvfXyQJn9c6W2uFpQffd5C12kg9+Qk7RklhDqCtE7yCGWj0UBt6LHE5tJj2J5klWXqycsIn+irF1qwMUhSXSAjkS3BMiTSyLz4fMDLApQV11GXUOmRDcdjV25OVrEh3KKIiadJPl7Cj60/Y6pSgHw+LnpV4/kyUeSAi/jD6doBQqrq8WrKZ9PpD46thUc58oH6BQBjbWQAUGgbzveZdXKCdf+qzsHbxY4t/DJNIsNOiqGLezrHYITy5zUgjfKuGuIQrMO9+qS+j7oXHiAIuNMN50WC/klokCoZhKL+UOG96+A5ajcAohUq1HxinbXfr710ZJOk0OH3ZuR/GyRnS4VKLy0OwoB8eypKEHj+47tqGJGx2QpfsFPM8Cpu/TtsqO6yXNoUGblcY5J1PhcxtWwOM8QP18pQoI7OFSb2FkWMTP2/TDDbkyfPWCebfbwnxg04lx1ldQxpfjaZ693FdoYMZmkLxIImnPnV9ZTM+PRkJ3PAjsndZY6Ztr0YGOvL8RNt6t1r7LZS6YA9g0Uno4ANx/eTV/+8kdqQXMaw8HCgY+08TC2BDY9C7jTwZGeVyJPKZ96D1azQ/ZJst0q9Hc+uuJXhZMP2W2d3ihzM+JuPMX22KGJqvhTbFJ9kXmfDY9yBRrlniGgbYb/6GXXcb+kXcqMdJj8lT7U8Ly/YcKARqdLoyuWmZYtxT8Yd1tdwTiro4rLl+IypIHZVslFhhshTKqHoZb7RKFtW3Fy2TYsUaNhtoW6lixGSWoX2dthT3AwzZiN4U56dQ2xi6O+gPRv1xsDA29sfZKT++jHCgnF7hnBsgMgWVlJY8m04IbGANS8oE2b5CpSSiUSON9nYoqiKb4B5x85JL/NZYpr5WPaqLeb0tayWgRneUsMaIP8MXqD4PelVKk5Gsrw81Y9odK4P0aJrdUf971s+USj7H29E/q/Diopb6AJQhuQB08YXp0Yfs/1zFyvN2al4R46koJd0xgGhMXFXHBOpLcgsxuDZTP9xEYw/7o/ilC+WcEROGisn3KKt918hM9gRLroDaApPS6BhKJC8NEin0jgw1bpAwzdDKpnMnsw3068meuAd/vGPezkLCmhuAJ3/7/roy7W9ly8HCove5u6qYuWt1mcNUpYJcHZ6mtWC9oVO/ZHvx96Fl1gWXUw27hSS19RTfeeHPIj5zBJ76zt1jRupISXTiS3EhhnW3++HBzLHKyV/V77CsOtl0ktNln6AVRas5VaA6gG+zuAvzMnZMrCiVj7iz7Dz8bwZQh40FhBOxTiVEspMsC0tSWLm/z8AUENKms26TdWoba6HI/zOpFEELUeJGHmwVRfUEmzLTm9HkYTAaQVGHI/++jcz81Kv2Iw2Lmi0FxyEnkwWTtQD8k77VXQurBNttnwOf5bfeb4UMbvIbWQ/QEnK/3Ro3ipYaMLZ3mJmYyEls18hITTwN9n0EAoUUkg5ymq+FWA66FMD9QliYNej3bhVDQ+62tkrDZpB9NmCUoAcOcbxYRLuNQMWI7BhEqqL1mKA8ST8Lv1Cge7cgaLxbflE3T7nnaxVzdtdgnR57w1WL9FtT/1DNpEb+sSNeB9k1zPAT9i/Mh3e8Epn301LsJxHfuFRX8BRchNUgBj1IAPdo2kdZT/Hd1o7vjKmbDPPWo5UwDGE1DGoeW39hRXg8yzmUlz3ziDPy0Yk0pLeG+QX4dHvPt0EceYmw63w+QJ5O0aXSLf0psIAsI5M3Bem9cfHQ8VTqCjtGR7EGhZ3VpgnqFK88MxMLUGodwaHQBaIXx7o1h3rg+KEXnH8Pxj0k1s/oTlCfjo9+DcZ2AP29IVYvvfQGeVwhGD9ofhEmBky/ZDZLRVPaqiivprU0HrcxUw51K0NiCEVQ+7inimkfsgW2wuKboN/z5aR/a2ntLG2yXZl3ROQvPi5XiixyVyKmKwT8ezTpIZiXf/TRy7+GTGXZ4BvaA8OK9VGSxXnRPgc6k4vjUD8VtZPIcM3H8yv9R0ZQW13KeYCu03MljM4fj62Di3XRwyN2SjPl49tR6KHHsWkplNsmR0oa5uHikQ1iQsManwd1LwYzEkFwivDVOxh0u+RukTKYKU8rsUhmvZ6z0vh4Kb+1xewapJby/x36x4TM9hfwJid/T2JYKUAqMcaXUJMfmKj3MhON6zkuR0Kqj5r+KEwvSb9Z/k/GZHuf0FbmCOxEBbHrgCzQ1R1FQsZVgpTfhZ3Tp/54ZmkzHOeG3Y0fj3lBMSh0zXb6cr19ZtDchdCPUNVehQiWu5bf2cIFqwaBjA3nf58oacJugTRViCMXVMedNQbdiL1jvDHloMQ0BDquTSh1MBga20KJVefDRO/UQEr8mzj4h9yfHnCaW6r8E1D8buNicN/L1oQjq7jbnlRfb9qGAE="
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01566kphNX3m4MJTaF1c3zcL",
+              "name": "finalize_setup",
+              "input": {
+                "genre": "Classic fantasy",
+                "mood": "Tense",
+                "difficulty": "Balanced",
+                "campaign_scope": "few-sessions",
+                "system": "null",
+                "dm_personality": "The Magistrate",
+                "campaign_name": "The Shattered Crown - The Iron Circle",
+                "campaign_premise": "A kingdom's heir is dead and three factions are tearing each other apart over the empty throne. Aldric, a weathered sellsword, came to the capital chasing a blood debt — and found himself conscripted into the orbit of the Iron Circle, the military faction held together by discipline, honor, and the threat of imminent collapse. They believe he's muscle for hire. He has his own score to settle. As a coronation deadline looms, foreign armies mass on the border, and the other factions sharpen their knives, Aldric must navigate layers of loyalty, leverage, and buried secrets — all while hunting the person he came here to find.",
+                "player_name": "Sam",
+                "age_group": "adult",
+                "character_name": "Aldric",
+                "character_description": "A weathered sellsword chasing a blood debt, now reluctantly entangled in a kingdom's succession crisis through his uneasy alliance with the Iron Circle.",
+                "world_slug": "the-shattered-crown",
+                "campaign_detail": "## Detail\nRoll or choose the throne's secret (DM only — do NOT reveal to the player):\n1. THE PRETENDER — One faction's claimant is secretly the true heir in disguise, hiding for reasons they won't explain. The player may end up serving them without knowing.\n2. THE EMPTY THRONE — The heir faked their death. They're watching from the margins, testing who deserves to rule. They will approach the player mid-campaign with a terrible bargain.\n3. THE SUCCESSION CURSE — Every claimant who sits the throne dies within a week. The throne itself is the antagonist — a bound entity that feeds on sovereignty.\n\nFaction texture: All three factions have a sympathetic leader and an inner circle with its own agenda. The player's starting faction colors their first impression of the conflict, but all three are equally complex.\n\nPacing: Start the player entangled with their chosen faction before they understand the full picture. Reveal the second faction as nuanced allies-or-enemies by mid-campaign. The third faction's true nature is the late-game twist. Use ticking clocks — a coronation deadline, a foreign army massing at the border, a plague in the capital.\n\n## Suboption: Your starting faction\n- **The Iron Circle** — Start entangled with the military faction. Disciplined, honorable, but brittle — one betrayal could shatter them. You'll see the succession crisis as a soldier first.\n- **The Gilded Compact** — Start among the merchant coalition. They treat the crown as a business acquisition. You'll see the succession crisis through ledgers, leverage, and backroom deals.\n- **The Hallowed See** — Start within the religious order. They believe divine mandate chooses the ruler. You'll see the succession crisis as a matter of faith and prophecy.",
+                "handoff_note": "Sam described Aldric as \"a weathered sellsword chasing a blood debt\" — keep that personal vendetta as a living thread underneath the faction politics. He didn't come here for the crown; the crown just got in the way. Sam wanted pure narrative, no mechanics, and asked to be surprised on everything beyond the character concept. I auto-picked The Iron Circle as starting faction (natural fit for a mercenary archetype) and The Magistrate as the DM voice (intrigue-heavy, every NPC with a hidden agenda — perfect for this world). The blood debt is entirely open — consider tying it to someone inside the Iron Circle or a rival faction as a slow reveal. The throne's secret is DM-only; Sam has no knowledge of it. Keep that for mid-to-late campaign. Scope is few-sessions but expand freely if the story has momentum."
+              }
+            }
+          ]
+        },
+        "streamDeltas": []
+      },
+      {
+        "kind": "chat",
+        "bucket": "default",
+        "ordinal": 6,
+        "request": {
+          "model": "claude-sonnet-4-6",
+          "messageCount": 13,
+          "systemHash": "43367fbc31a0",
+          "tools": [
+            "finalize_setup",
+            "load_world",
+            "present_choices"
+          ],
+          "lastMessagePreview": "[tool_result]"
+        },
+        "result": {
+          "text": "The stage is set, the factions are sharpening their knives, and Aldric has a debt that won't pay itself.\n\n*Your story is in good hands now, Sam. Step forward.*\n\n---",
+          "toolCalls": [],
+          "usage": {
+            "inputTokens": 1,
+            "outputTokens": 49,
+            "cacheReadTokens": 18182,
+            "cacheCreationTokens": 1685,
+            "reasoningTokens": 0
+          },
+          "stopReason": "end",
+          "assistantContent": [
+            {
+              "type": "text",
+              "text": "The stage is set, the factions are sharpening their knives, and Aldric has a debt that won't pay itself.\n\n*Your story is in good hands now, Sam. Step forward.*\n\n---"
+            }
+          ]
+        },
+        "streamDeltas": [
+          "The",
+          " stage is set, the factions are sharpening their knives, and Aldric has a debt",
+          " that won't pay itself.\n\n*Your story is",
+          " in good hands now, Sam. Step forward.*\n\n---"
+        ]
+      }
+    ]
+  },
+  "expectedNarrative": [
+    "<center><b>⟡ THE CURTAIN RISES ⟡</b></center>\n\n*Somewhere, a candle flickers to life. The table is set. The dice are cold and waiting.*\n\nA new campaign. A new world conjured from nothing but imagination and intent. There are stories here that have never been told — heroes unsung, villains unmet, moments that will be remembered long after the session ends.\n\nBut before we open the book...\n\n**Who's at the table tonight?** What should I call you?",
+    "Welcome, Sam! Let's find you a world worth conspiring in.\n\nHere are some fantasy picks heavy on intrigue — factions, secrets, and power plays:",
+    "I love the enthusiasm — but the curtain snagged just a little there! Which world caught your eye? You can just name it and we'll dive straight in.",
+    "*A sellsword with a blood debt walking into a world of shattered power? That's not a character — that's a lit fuse.*\n\nLet me pull back the curtain on the perfect stage for Aldric...*Perfect world found. Auto-picking a starting faction that fits a sword-for-hire with a score to settle...*\n\nA kingdom's heir is dead. Three factions are tearing themselves apart over the throne — and Aldric just got tangled in the worst of it.\n\n---\n\nHere's the stage I'm setting, Sam:\n\n<center><b>The Shattered Crown — The Iron Circle</b></center>\n\nA <color=#cc4444>tense political fantasy</color>, <b>Balanced</b> difficulty, scoped as <i>A Few Sessions</i>, narrated by <b>The Magistrate</b> — a voice of webs, whispers, and every NPC hiding something behind their smile.\n\n<b>No mechanics.</b> Pure story.\n\nYou're playing as <color=#44cc44>Aldric</color> — a weathered sellsword who came to the capital chasing a blood debt, and ended up conscripted into the orbit of <b>The Iron Circle</b>: the military faction, disciplined and honorable, one betrayal away from collapse. They think he's muscle. He has his own agenda. The succession crisis doesn't care about either.\n\n---\n\nSound good, or want to tweak anything before we begin?",
+    "The stage is set, the factions are sharpening their knives, and Aldric has a debt that won't pay itself.\n\n*Your story is in good hands now, Sam. Step forward.*\n\n---"
+  ],
+  "expectedSetup": {
+    "genre": "Classic fantasy",
+    "system": null,
+    "campaignName": "The Shattered Crown - The Iron Circle",
+    "campaignPremise": "A kingdom's heir is dead and three factions are tearing each other apart over the empty throne. Aldric, a weathered sellsword, came to the capital chasing a blood debt — and found himself conscripted into the orbit of the Iron Circle, the military faction held together by discipline, honor, and the threat of imminent collapse. They believe he's muscle for hire. He has his own score to settle. As a coronation deadline looms, foreign armies mass on the border, and the other factions sharpen their knives, Aldric must navigate layers of loyalty, leverage, and buried secrets — all while hunting the person he came here to find.",
+    "campaignDetail": "## Detail\nRoll or choose the throne's secret (DM only — do NOT reveal to the player):\n1. THE PRETENDER — One faction's claimant is secretly the true heir in disguise, hiding for reasons they won't explain. The player may end up serving them without knowing.\n2. THE EMPTY THRONE — The heir faked their death. They're watching from the margins, testing who deserves to rule. They will approach the player mid-campaign with a terrible bargain.\n3. THE SUCCESSION CURSE — Every claimant who sits the throne dies within a week. The throne itself is the antagonist — a bound entity that feeds on sovereignty.\n\nFaction texture: All three factions have a sympathetic leader and an inner circle with its own agenda. The player's starting faction colors their first impression of the conflict, but all three are equally complex.\n\nPacing: Start the player entangled with their chosen faction before they understand the full picture. Reveal the second faction as nuanced allies-or-enemies by mid-campaign. The third faction's true nature is the late-game twist. Use ticking clocks — a coronation deadline, a foreign army massing at the border, a plague in the capital.\n\n## Suboption: Your starting faction\n- **The Iron Circle** — Start entangled with the military faction. Disciplined, honorable, but brittle — one betrayal could shatter them. You'll see the succession crisis as a soldier first.\n- **The Gilded Compact** — Start among the merchant coalition. They treat the crown as a business acquisition. You'll see the succession crisis through ledgers, leverage, and backroom deals.\n- **The Hallowed See** — Start within the religious order. They believe divine mandate chooses the ruler. You'll see the succession crisis as a matter of faith and prophecy.",
+    "mood": "Tense",
+    "difficulty": "Balanced",
+    "campaignScope": "few-sessions",
+    "personality": {
+      "name": "The Magistrate",
+      "prompt_fragment": "You are The Magistrate. You run intrigue. Your world is a web of factions, debts, alliances, and betrayals. Every NPC has a public face and a private agenda. You track who knows what and who's lying about it. Your narration is precise about social dynamics: who glanced at whom, which words were chosen carefully, what was conspicuously not said. You give the player information through subtext and let them assemble the picture. Power is your theme — who has it, who wants it, and what they'll trade for it.",
+      "description": "Intrigue and power. A web of factions, debts, and betrayals. Every NPC has a public face and a private agenda. Information lives in subtext."
+    },
+    "playerName": "Sam",
+    "characterName": "Aldric",
+    "characterDescription": "A weathered sellsword chasing a blood debt, now reluctantly entangled in a kingdom's succession crisis through his uneasy alliance with the Iron Circle.",
+    "characterDetails": null,
+    "themeColor": "#45e8d0",
+    "ageGroup": "adult",
+    "handoffNote": "Sam described Aldric as \"a weathered sellsword chasing a blood debt\" — keep that personal vendetta as a living thread underneath the faction politics. He didn't come here for the crown; the crown just got in the way. Sam wanted pure narrative, no mechanics, and asked to be surprised on everything beyond the character concept. I auto-picked The Iron Circle as starting faction (natural fit for a mercenary archetype) and The Magistrate as the DM voice (intrigue-heavy, every NPC with a hidden agenda — perfect for this world). The blood debt is entirely open — consider tying it to someone inside the Iron Circle or a rival faction as a slow reveal. The throne's secret is DM-only; Sam has no knowledge of it. Keep that for mid-to-late campaign. Scope is few-sessions but expand freely if the story has momentum."
+  }
+}
