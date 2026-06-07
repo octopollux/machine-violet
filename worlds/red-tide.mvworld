@@ -8,7 +8,36 @@
     "horror",
     "mystery"
   ],
-  "detail": "The catch goes into the hold alive and comes out wrong. By yesterday it was the fish — slack-eyed, soft, smelling old. This morning it was the gulls who wouldn't go near them. Tonight the harbormaster did not come home and they found him at the tide line at dawn, swollen with what the fish have been swollen with, and the village has run out of fresh ice.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. SOMETHING IN THE DEEP IS DYING — A leviathan, an old god, a thing that should not have been mortal. The bay is downstream of its blood. The rot is its decay propagating through the food chain. The fish nearest the body are worst. The village has been fishing closer to it every year because the inshore stocks failed; they did not know they were fishing on a wound.\n2. THE FISH THEMSELVES ARE WRONG — They are rotting before they are caught. They swim dead and let themselves be netted. The village has eaten them for weeks. The villagers are beginning to walk a little wrong, and the harbormaster was simply the first to lie down. The fish are not the disease. The fish are the messengers.\n3. THE TIDE IS GRIEF — A kraken or worse is mourning. The bay is its funeral. The blooms that look like algae are flowers. The rot is the smell of an offering being prepared, and the village is in it. The mourner does not know the village is there and would not stop if it did.\n\nDM approach:\n- Tone: cold wind, fish-oil, the wrong silence on the water at low tide.\n- The harbormaster: dead before the campaign starts. His widow keeps his log; the last week's entries are in a different hand and she will not say whose.\n- The priest or the cannery foreman, whichever the setting requires: knows the most and will say the least. Has the village's trust and is using it to protect a particular silence.\n- Seed early: one fish that looks normal and isn't; one gull that won't fly; one child who refuses dinner and won't say why.\n- Pacing: the smell strengthens by a notch every dawn. Day seven the smell is inside the houses.\n\nThe clock is the smell. The villagers stop noticing it first, the outsiders gag at the dock, and at some point the player will wake in a bed that smells like the bay and will not be able to wash it off. Count dawns. Mark the doorways where the smell has crossed the threshold.\n\n<!--include:Pacing.ShortCampaigns-->",
+  "setup_detail": "<!--include:Pacing.ShortCampaigns-->",
+  "detail": "The catch goes into the hold alive and comes out wrong. By yesterday it was the fish — slack-eyed, soft, smelling old. This morning it was the gulls who wouldn't go near them. Tonight the harbormaster did not come home and they found him at the tide line at dawn, swollen with what the fish have been swollen with, and the village has run out of fresh ice.\n\nDM approach:\n- Tone: cold wind, fish-oil, the wrong silence on the water at low tide.\n- The harbormaster: dead before the campaign starts. His widow keeps his log; the last week's entries are in a different hand and she will not say whose.\n- The priest or the cannery foreman, whichever the setting requires: knows the most and will say the least. Has the village's trust and is using it to protect a particular silence.\n- Seed early: one fish that looks normal and isn't; one gull that won't fly; one child who refuses dinner and won't say why.\n- Pacing: the smell strengthens by a notch every dawn. Day seven the smell is inside the houses.\n\nThe clock is the smell. The villagers stop noticing it first, the outsiders gag at the dock, and at some point the player will wake in a bed that smells like the bay and will not be able to wash it off. Count dawns. Mark the doorways where the smell has crossed the threshold.",
+  "forks": [
+    {
+      "id": "crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early — this is the campaign's hidden truth.",
+      "options": [
+        {
+          "id": "something-in-the-deep-is-dying",
+          "name": "Something in the Deep Is Dying",
+          "description": "A dying leviathan or old god upstream; the bay is downstream of its blood and the rot is its decay.",
+          "detail": "SOMETHING IN THE DEEP IS DYING — A leviathan, an old god, a thing that should not have been mortal. The bay is downstream of its blood. The rot is its decay propagating through the food chain. The fish nearest the body are worst. The village has been fishing closer to it every year because the inshore stocks failed; they did not know they were fishing on a wound."
+        },
+        {
+          "id": "the-fish-themselves-are-wrong",
+          "name": "The Fish Themselves Are Wrong",
+          "description": "The fish swim dead and let themselves be netted; the village has eaten them for weeks and is turning.",
+          "detail": "THE FISH THEMSELVES ARE WRONG — They are rotting before they are caught. They swim dead and let themselves be netted. The village has eaten them for weeks. The villagers are beginning to walk a little wrong, and the harbormaster was simply the first to lie down. The fish are not the disease. The fish are the messengers."
+        },
+        {
+          "id": "the-tide-is-grief",
+          "name": "The Tide Is Grief",
+          "description": "A kraken or worse is mourning; the bay is its funeral and the village is caught in the offering.",
+          "detail": "THE TIDE IS GRIEF — A kraken or worse is mourning. The bay is its funeral. The blooms that look like algae are flowers. The rot is the smell of an offering being prepared, and the village is in it. The mourner does not know the village is there and would not stop if it did."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Your boat",

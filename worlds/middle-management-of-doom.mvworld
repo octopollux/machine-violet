@@ -7,7 +7,35 @@
     "fantasy",
     "comedy"
   ],
-  "detail": "The player has a one-on-one with the Dark Lord at 2 p.m. They have prepared talking points. They have updated the spreadsheet of conquered provinces. They have rehearsed their answer to the question about cross-functional collaboration with the necromancy team. The Dark Lord has notes too. The notes are not what the player thinks they are.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE BOARD MOVE — The Dark Lord is failing. Armies routed. Prophecies missed. The board of the underworld has scheduled the review as the pretext to depose him. The player will be asked, in confidence, to testify about specific incidents. The HR rep — a lich named SAREN — sits in on the meeting and takes excellent notes. The Dark Lord does not know.\n2. THE EXIT STRATEGY — The Dark Lord is succeeding too well. The prophesied hero is in the field and approaching. The investors want a clean exit before the climactic battle wipes out the equity. The player is being groomed as the friendly face of the post-Dark-Lord regime. The board has already chosen the player; the review is when they tell them.\n3. THE ACTUAL REVIEW — The Dark Lord meeting is a pretext to soften the conversation. This is the player's review. The numbers are not good. The Dark Lord is there to provide character reference and looks slightly embarrassed about it. The HR rep has the player's file open. The 360-degree feedback was harsh.\n\nDM approach:\n- Tone: HR-meeting comedy with the smell of brimstone. Take the corporate seriously and the evil casually.\n- NPCs derive from the variant: SAREN the lich HR rep, the board members, the Dark Lord himself (avuncular, anxious, or distracted depending on variant).\n- Pacing: the review is one in-fiction day. Pre-meeting, the meeting, the deliverables, the references, the exit interview. Six scenes.\n- Seed early: a coworker who avoids eye contact at the coffee station. A meeting invitation moved up by an hour with no explanation.\n\nPacing: One in-fiction day. Morning standup, mid-morning prep, the review itself, the after-meeting in the breakroom, the follow-up email, end of day. The clock is the meeting calendar on the player's enchanted scroll.",
+  "detail": "The player has a one-on-one with the Dark Lord at 2 p.m. They have prepared talking points. They have updated the spreadsheet of conquered provinces. They have rehearsed their answer to the question about cross-functional collaboration with the necromancy team. The Dark Lord has notes too. The notes are not what the player thinks they are.\n\nDM approach:\n- Tone: HR-meeting comedy with the smell of brimstone. Take the corporate seriously and the evil casually.\n- NPCs derive from the variant: SAREN the lich HR rep, the board members, the Dark Lord himself (avuncular, anxious, or distracted depending on variant).\n- Pacing: the review is one in-fiction day. Pre-meeting, the meeting, the deliverables, the references, the exit interview. Six scenes.\n- Seed early: a coworker who avoids eye contact at the coffee station. A meeting invitation moved up by an hour with no explanation.\n\nPacing: One in-fiction day. Morning standup, mid-morning prep, the review itself, the after-meeting in the breakroom, the follow-up email, end of day. The clock is the meeting calendar on the player's enchanted scroll.",
+  "forks": [
+    {
+      "id": "the-review-secret",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early.",
+      "options": [
+        {
+          "id": "the-board-move",
+          "name": "The Board Move",
+          "description": "The Dark Lord is being deposed; the player is quietly asked to testify against him.",
+          "detail": "THE BOARD MOVE — The Dark Lord is failing. Armies routed. Prophecies missed. The board of the underworld has scheduled the review as the pretext to depose him. The player will be asked, in confidence, to testify about specific incidents. The HR rep — a lich named SAREN — sits in on the meeting and takes excellent notes. The Dark Lord does not know."
+        },
+        {
+          "id": "the-exit-strategy",
+          "name": "The Exit Strategy",
+          "description": "The Dark Lord is succeeding too well; the board is grooming the player as his replacement.",
+          "detail": "THE EXIT STRATEGY — The Dark Lord is succeeding too well. The prophesied hero is in the field and approaching. The investors want a clean exit before the climactic battle wipes out the equity. The player is being groomed as the friendly face of the post-Dark-Lord regime. The board has already chosen the player; the review is when they tell them."
+        },
+        {
+          "id": "the-actual-review",
+          "name": "The Actual Review",
+          "description": "It's the player's review, not the Dark Lord's; the numbers are bad and the feedback was harsh.",
+          "detail": "THE ACTUAL REVIEW — The Dark Lord meeting is a pretext to soften the conversation. This is the player's review. The numbers are not good. The Dark Lord is there to provide character reference and looks slightly embarrassed about it. The HR rep has the player's file open. The 360-degree feedback was harsh."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Your role",

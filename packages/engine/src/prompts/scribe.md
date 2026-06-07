@@ -40,6 +40,8 @@ When a new campaign starts, world-builder creates a stub `Starting Location` wit
 
 Never leave `**Placeholder:** true` on an entity that has been fleshed out. If you see any other entity with the placeholder flag, treat it the same way the moment a real name appears.
 
+A campaign seeded from a rich world may already ship real, named locations. In that case the opening scene usually begins at one of them, and the stub `Starting Location` is just dead weight. If the starting location is actually named `starting-location` (i.e. the opening locale is really one of the seeded locations, or the DM has named it), rename it — point the placeholder at the real opening location's name (merging into it), so the campaign isn't left carrying an orphan stub.
+
 ### File format
 Entity files are **markdown**. The body field in `write_entity` is markdown text — use real line breaks between paragraphs, not literal `\n` sequences.
 

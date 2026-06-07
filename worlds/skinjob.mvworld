@@ -7,7 +7,36 @@
     "sci-fi",
     "mystery"
   ],
-  "detail": "The player is the original. A copy exists. The copy has reached out — coffee, an apartment, a hospital, a quiet church — and the player has agreed to go. This is not about discovering one is a fake. The player knows who they are. They are going to meet a stranger who is also, on paper, themselves.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE PARENT'S BACKUP — A dying parent commissioned the clone as insurance, years ago, against losing the player to accident or illness. The player was never supposed to find out. The parent died last week. The clone has been activated, briefed, and turned loose without an instruction manual. They want to meet the original they were made for and have a conversation about whether they get to exist now.\n2. THE CORPORATE DUPLICATE — A company wanted the player's talent without the inconvenience of the player's contract. The clone has been working in the player's field, under another name, for years. They have credits the player would recognize and a reputation the player has been quietly losing market share to. The meeting was the clone's idea. They want to negotiate a peace.\n3. THE FORGOTTEN ORIGINAL — The player made the clone. Long ago. For a reason that mattered then and that they have buried. The clone has been waiting all this time for the player to remember. They are not angry. They have prepared a folder. They would like to walk the player through what they have been doing while the player got on with the life that was supposed to include them.\n\nDM approach:\n- Tone: a long evening. Cooling coffee, the shape of a conversation neither party wants to be the first to start.\n- NPCs: the clone, primarily — voiced the player's way, but with rhythms the player did not develop. A waitress, a nurse, a priest, depending on the venue. Whoever brought the clone into being, looming offstage.\n- Pacing structure: one tense evening, intercut with flashes the player is not sure are memories.\n- Seed early: a detail the clone knows that they should not — a childhood injury, a small private superstition. Let the player feel the wrongness of being recognized.\n- The clone is not a villain. They are also not the player. The space between those facts is the whole campaign.\n\nPacing: a single tense evening. The clock is the meeting itself — drinks ordered, drinks finished, the bill placed face-down on the table. Cut between the present conversation and the flashes the player keeps having. Some of those flashes belong to them. Some, they will come to realize, do not.\n\n<!--include:Pacing.ShortCampaigns-->",
+  "setup_detail": "<!--include:Pacing.ShortCampaigns-->",
+  "detail": "The player is the original. A copy exists. The copy has reached out — coffee, an apartment, a hospital, a quiet church — and the player has agreed to go. This is not about discovering one is a fake. The player knows who they are. They are going to meet a stranger who is also, on paper, themselves.\n\nDM approach:\n- Tone: a long evening. Cooling coffee, the shape of a conversation neither party wants to be the first to start.\n- NPCs: the clone, primarily — voiced the player's way, but with rhythms the player did not develop. A waitress, a nurse, a priest, depending on the venue. Whoever brought the clone into being, looming offstage.\n- Pacing structure: one tense evening, intercut with flashes the player is not sure are memories.\n- Seed early: a detail the clone knows that they should not — a childhood injury, a small private superstition. Let the player feel the wrongness of being recognized.\n- The clone is not a villain. They are also not the player. The space between those facts is the whole campaign.\n\nPacing: a single tense evening. The clock is the meeting itself — drinks ordered, drinks finished, the bill placed face-down on the table. Cut between the present conversation and the flashes the player keeps having. Some of those flashes belong to them. Some, they will come to realize, do not.",
+  "forks": [
+    {
+      "id": "crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose to fit the player's tone. Do NOT reveal early.",
+      "options": [
+        {
+          "id": "the-parents-backup",
+          "name": "The Parent's Backup",
+          "description": "A dying parent commissioned the clone as insurance against losing the player; the clone was activated and turned loose after the parent's death.",
+          "detail": "THE PARENT'S BACKUP — A dying parent commissioned the clone as insurance, years ago, against losing the player to accident or illness. The player was never supposed to find out. The parent died last week. The clone has been activated, briefed, and turned loose without an instruction manual. They want to meet the original they were made for and have a conversation about whether they get to exist now."
+        },
+        {
+          "id": "the-corporate-duplicate",
+          "name": "The Corporate Duplicate",
+          "description": "A company cloned the player to capture their talent; the clone has worked the player's field under another name for years and wants to negotiate a peace.",
+          "detail": "THE CORPORATE DUPLICATE — A company wanted the player's talent without the inconvenience of the player's contract. The clone has been working in the player's field, under another name, for years. They have credits the player would recognize and a reputation the player has been quietly losing market share to. The meeting was the clone's idea. They want to negotiate a peace."
+        },
+        {
+          "id": "the-forgotten-original",
+          "name": "The Forgotten Original",
+          "description": "The player made the clone long ago for a buried reason; the clone has waited all this time and prepared a folder of what it's been doing.",
+          "detail": "THE FORGOTTEN ORIGINAL — The player made the clone. Long ago. For a reason that mattered then and that they have buried. The clone has been waiting all this time for the player to remember. They are not angry. They have prepared a folder. They would like to walk the player through what they have been doing while the player got on with the life that was supposed to include them."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "What gave it away",

@@ -8,7 +8,36 @@
     "modern",
     "sci-fi"
   ],
-  "detail": "Someone the player cannot refuse is asking for a favor. The player owes them, and they both know it, and the conversation will happen tonight whether the player wants it to or not. The ask, when it comes, will be small. The next ask will be larger. By dawn the player will be doing something they would not have agreed to if asked first.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE CHILDHOOD FRIEND — They pulled the player out of a river, or out of a car, or out of a worse version of their own twenties. They have spent twenty years not asking for anything. Tonight they need the player to do something illegal. They will not say what until the player has said yes. Every hour the player delays, the ask gets bigger, because the situation they're trying to fix is getting worse.\n2. THE FORGOTTEN BARGAIN — When the player was eight, they made a deal with something that came to their bedroom window. They forgot about it. The thing did not. It is calling in the bargain now and the price was named at the time, and the price was a firstborn. The player has a child. The player did not connect these two facts until tonight.\n3. THE FUTURE SELF — The caller is the player, from later. They paid forward a debt that the player has not yet accrued. They are here to ask for something that the player will not understand until they themselves become the caller. They are scared. They will not say of what.\n\nDM approach:\n- Tone: intimate, conversational, the comfort of someone who knows you well asking for a thing they shouldn't ask. The horror is in the relationship, not the request.\n- NPCs to seed: the lender (warm, plausible, with leverage); one witness who can corroborate the debt; one offramp NPC who can take the heat for a price.\n- Pacing structure: a one-night chain of asks, each bigger than the last. Offramps exist and cost specific things — money, reputation, a piece of the player's own future. The player can stop at any point. Each stop has a consequence.\n- Seed early: a small detail that confirms the lender is who they say they are (or doesn't); a phone that keeps buzzing; a clock the player keeps checking.\n- The first ask should be doable. The fourth ask should be obviously the line. The fifth ask is where the campaign lives.\n\nPacing: A single night, scene by scene. Each ask is one scene. Offramps cost specific things. The player can track time by the lender's progress through their own evening — the band playing the last set, the IV bag emptying, the diner closing, the eulogy ending.\n\n<!--include:Pacing.ShortCampaigns-->",
+  "setup_detail": "<!--include:Pacing.ShortCampaigns-->",
+  "detail": "Someone the player cannot refuse is asking for a favor. The player owes them, and they both know it, and the conversation will happen tonight whether the player wants it to or not. The ask, when it comes, will be small. The next ask will be larger. By dawn the player will be doing something they would not have agreed to if asked first.\n\nDM approach:\n- Tone: intimate, conversational, the comfort of someone who knows you well asking for a thing they shouldn't ask. The horror is in the relationship, not the request.\n- NPCs to seed: the lender (warm, plausible, with leverage); one witness who can corroborate the debt; one offramp NPC who can take the heat for a price.\n- Pacing structure: a one-night chain of asks, each bigger than the last. Offramps exist and cost specific things — money, reputation, a piece of the player's own future. The player can stop at any point. Each stop has a consequence.\n- Seed early: a small detail that confirms the lender is who they say they are (or doesn't); a phone that keeps buzzing; a clock the player keeps checking.\n- The first ask should be doable. The fourth ask should be obviously the line. The fifth ask is where the campaign lives.\n\nPacing: A single night, scene by scene. Each ask is one scene. Offramps cost specific things. The player can track time by the lender's progress through their own evening — the band playing the last set, the IV bag emptying, the diner closing, the eulogy ending.",
+  "forks": [
+    {
+      "id": "the-crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose to fit the player's tone. Do NOT reveal early.",
+      "options": [
+        {
+          "id": "the-childhood-friend",
+          "name": "The Childhood Friend",
+          "description": "An old friend cashing in twenty years of never asking; the illegal favor that grows the longer the player stalls.",
+          "detail": "THE CHILDHOOD FRIEND — They pulled the player out of a river, or out of a car, or out of a worse version of their own twenties. They have spent twenty years not asking for anything. Tonight they need the player to do something illegal. They will not say what until the player has said yes. Every hour the player delays, the ask gets bigger, because the situation they're trying to fix is getting worse."
+        },
+        {
+          "id": "the-forgotten-bargain",
+          "name": "The Forgotten Bargain",
+          "description": "A childhood deal with something at the window, coming due; the price was a firstborn, and the player has a child.",
+          "detail": "THE FORGOTTEN BARGAIN — When the player was eight, they made a deal with something that came to their bedroom window. They forgot about it. The thing did not. It is calling in the bargain now and the price was named at the time, and the price was a firstborn. The player has a child. The player did not connect these two facts until tonight."
+        },
+        {
+          "id": "the-future-self",
+          "name": "The Future Self",
+          "description": "The caller is the player from later, paying forward a debt not yet accrued; scared, and won't say of what.",
+          "detail": "THE FUTURE SELF — The caller is the player, from later. They paid forward a debt that the player has not yet accrued. They are here to ask for something that the player will not understand until they themselves become the caller. They are scared. They will not say of what."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Your lender",

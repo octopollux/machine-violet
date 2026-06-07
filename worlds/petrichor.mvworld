@@ -8,7 +8,36 @@
     "fantasy",
     "mystery"
   ],
-  "detail": "Seven years of dry. The reservoirs are scheduled to the spoonful. Children have grown up not knowing what the word storm means in the mouth. And tonight, from no cloud anyone can see, the air carries that specific green-cement-and-warm-dust smell that means it is about to rain. Nobody says anything at first. Then everyone is on their stoop at once, sniffing like dogs.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE BARGAIN — A century ago the city paid a god something terrible in exchange for permanent fair weather; the god has come back asking for the next installment, and the comptroller's office is hiding the invoice. The cult that brokered the deal still exists, vestigial, reduced to one office in city hall and an elderly woman who knows the right phone number. The smell is the god clearing its throat.\n2. THE WEAPON — Someone with reasons turned the weather off; a sealed device under the old observatory holds the city in its dry pocket, and tonight the seal is failing. The original engineers are dead, their notes redacted by a federal agency that no longer technically exists. The smell rises from the basement of a building nobody is allowed to enter.\n3. THE GRIEF — A single person was crying for everyone, and they died, and the city dried. Tonight someone new has started crying — quietly, in a studio apartment, over something small — and the sky is responding to them. They don't know. They don't even know they're crying.\n\nDM approach:\n- Tone: parched, hopeful, frightened of hope. Every scene starts with whether the smell is stronger or weaker.\n- NPCs by variant: the city comptroller who keeps a private umbrella in her desk (1); the federal liaison who arrives unannounced with a clipboard and no agency name (2); the apartment neighbor who hears a stranger weeping through the wall and doesn't know what to do (3).\n- The smell is the clock. Track it in ticks — five notches from a memory to a downpour.\n- Seed early: a child asks what rain smells like and someone answers wrong; a black-market vendor sells petrichor in vials; the storm drains have been cathedrals for cats.\n- Restraint. A scene where rain almost falls and doesn't is more powerful than one where it does.\n\nPacing: The smell strengthens or weakens by one tick per scene. The player can track it on their own skin, in the breath of the dogs, in the way the elderly tilt their heads. Five ticks up and it rains. Five ticks down and the city forgets again.\n\n<!--include:Pacing.ShortCampaigns-->",
+  "setup_detail": "<!--include:Pacing.ShortCampaigns-->",
+  "detail": "Seven years of dry. The reservoirs are scheduled to the spoonful. Children have grown up not knowing what the word storm means in the mouth. And tonight, from no cloud anyone can see, the air carries that specific green-cement-and-warm-dust smell that means it is about to rain. Nobody says anything at first. Then everyone is on their stoop at once, sniffing like dogs.\n\nDM approach:\n- Tone: parched, hopeful, frightened of hope. Every scene starts with whether the smell is stronger or weaker.\n- NPCs by variant: the city comptroller who keeps a private umbrella in her desk (1); the federal liaison who arrives unannounced with a clipboard and no agency name (2); the apartment neighbor who hears a stranger weeping through the wall and doesn't know what to do (3).\n- The smell is the clock. Track it in ticks — five notches from a memory to a downpour.\n- Seed early: a child asks what rain smells like and someone answers wrong; a black-market vendor sells petrichor in vials; the storm drains have been cathedrals for cats.\n- Restraint. A scene where rain almost falls and doesn't is more powerful than one where it does.\n\nPacing: The smell strengthens or weakens by one tick per scene. The player can track it on their own skin, in the breath of the dogs, in the way the elderly tilt their heads. Five ticks up and it rains. Five ticks down and the city forgets again.",
+  "forks": [
+    {
+      "id": "crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early.",
+      "options": [
+        {
+          "id": "the-bargain",
+          "name": "The Bargain",
+          "description": "A century-old debt to a god of fair weather has come due; the cult that brokered it survives in one city-hall office.",
+          "detail": "THE BARGAIN — A century ago the city paid a god something terrible in exchange for permanent fair weather; the god has come back asking for the next installment, and the comptroller's office is hiding the invoice. The cult that brokered the deal still exists, vestigial, reduced to one office in city hall and an elderly woman who knows the right phone number. The smell is the god clearing its throat."
+        },
+        {
+          "id": "the-weapon",
+          "name": "The Weapon",
+          "description": "A sealed weather-suppression device under the old observatory is failing tonight; its engineers are dead and their notes redacted.",
+          "detail": "THE WEAPON — Someone with reasons turned the weather off; a sealed device under the old observatory holds the city in its dry pocket, and tonight the seal is failing. The original engineers are dead, their notes redacted by a federal agency that no longer technically exists. The smell rises from the basement of a building nobody is allowed to enter."
+        },
+        {
+          "id": "the-grief",
+          "name": "The Grief",
+          "description": "One person was crying for everyone; they died, the city dried, and now a stranger has quietly started crying again.",
+          "detail": "THE GRIEF — A single person was crying for everyone, and they died, and the city dried. Tonight someone new has started crying — quietly, in a studio apartment, over something small — and the sky is responding to them. They don't know. They don't even know they're crying."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Your stake",

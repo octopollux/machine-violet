@@ -6,7 +6,35 @@
   "genres": [
     "sci-fi"
   ],
-  "detail": "The ship is huge and old and the player has lived in its lower decks their entire life. There is school, there is work, there is a hydroponics rotation, there is a calendar of festivals. There is a future they are told about. The destination is a planet that they will arrive at, and their children will arrive at, and their grandchildren will inherit. This is the story. The story is at least forty years out of date.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. UNINHABITABLE — The destination was reached and the destination was wrong. Atmosphere failed analysis. Surface conditions unsurvivable. The upper decks have been negotiating among themselves for decades about who admits this to whom, and they have not reached consensus. The player's discovery is the kind of thing that decides the negotiation.\n2. THE COLONY EXISTS — The upper decks disembarked. A colony is on the surface. Steerage is the labor reservoir from which the colony draws — new workers shipped down on a schedule, return shipments of finished goods. The ship is a factory dorm in orbit. The hierarchy is generational, biological, and very old.\n3. THERE IS NO DESTINATION — There never was. The ship has been in cruise for centuries with no target. The mission was a fiction designed to keep generations productive. The truth has now leaked, partially, through channels someone tried to plug and failed. The player is one of the people who is starting to put it together.\n\nDM approach:\n- Tone: industrial fluorescent, the rhythm of a working community, the specific suspicions of a place where everyone knows their neighbors and nobody knows their grandparents' real biographies.\n- NPCs to seed: a foreman who knows something but won't say; a school friend who has gotten access to upper-deck systems; an elder who keeps a private logbook of inconsistencies.\n- Pacing structure: reaching upper decks should take Act 1. Each deck transition costs something specific — a key, a bribe, a forgery, a death. The deeper the player goes, the harder it is to come back to a normal shift.\n- Seed early: a discrepancy the player notices in their own work (a harvest yield, a passenger count, a maintenance log); a sealed bulkhead the player has walked past their whole life.\n- The ship's geography should be precise. Decks named. The smells different on each level. The lights wrong above a certain threshold.\n\nPacing: Reaching upper decks should take Act 1; each deck transition costs something specific. The player can track time by their work shifts, by the lights-on schedule, by the calendar of festivals that mark a destination that may or may not exist.",
+  "detail": "The ship is huge and old and the player has lived in its lower decks their entire life. There is school, there is work, there is a hydroponics rotation, there is a calendar of festivals. There is a future they are told about. The destination is a planet that they will arrive at, and their children will arrive at, and their grandchildren will inherit. This is the story. The story is at least forty years out of date.\n\nDM approach:\n- Tone: industrial fluorescent, the rhythm of a working community, the specific suspicions of a place where everyone knows their neighbors and nobody knows their grandparents' real biographies.\n- NPCs to seed: a foreman who knows something but won't say; a school friend who has gotten access to upper-deck systems; an elder who keeps a private logbook of inconsistencies.\n- Pacing structure: reaching upper decks should take Act 1. Each deck transition costs something specific — a key, a bribe, a forgery, a death. The deeper the player goes, the harder it is to come back to a normal shift.\n- Seed early: a discrepancy the player notices in their own work (a harvest yield, a passenger count, a maintenance log); a sealed bulkhead the player has walked past their whole life.\n- The ship's geography should be precise. Decks named. The smells different on each level. The lights wrong above a certain threshold.\n\nPacing: Reaching upper decks should take Act 1; each deck transition costs something specific. The player can track time by their work shifts, by the lights-on schedule, by the calendar of festivals that mark a destination that may or may not exist.",
+  "forks": [
+    {
+      "id": "the-crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early — this is the campaign's hidden truth.",
+      "options": [
+        {
+          "id": "uninhabitable",
+          "name": "Uninhabitable",
+          "description": "The destination was reached and was wrong; the upper decks have argued for decades over who admits it.",
+          "detail": "UNINHABITABLE — The destination was reached and the destination was wrong. Atmosphere failed analysis. Surface conditions unsurvivable. The upper decks have been negotiating among themselves for decades about who admits this to whom, and they have not reached consensus. The player's discovery is the kind of thing that decides the negotiation."
+        },
+        {
+          "id": "the-colony-exists",
+          "name": "The Colony Exists",
+          "description": "The upper decks disembarked; steerage is the orbital labor reservoir feeding a surface colony.",
+          "detail": "THE COLONY EXISTS — The upper decks disembarked. A colony is on the surface. Steerage is the labor reservoir from which the colony draws — new workers shipped down on a schedule, return shipments of finished goods. The ship is a factory dorm in orbit. The hierarchy is generational, biological, and very old."
+        },
+        {
+          "id": "there-is-no-destination",
+          "name": "There Is No Destination",
+          "description": "There never was one; the mission was a fiction, and the truth is now leaking.",
+          "detail": "THERE IS NO DESTINATION — There never was. The ship has been in cruise for centuries with no target. The mission was a fiction designed to keep generations productive. The truth has now leaked, partially, through channels someone tried to plug and failed. The player is one of the people who is starting to put it together."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Your role in steerage",

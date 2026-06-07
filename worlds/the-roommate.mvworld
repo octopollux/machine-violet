@@ -8,7 +8,36 @@
     "modern",
     "sci-fi"
   ],
-  "detail": "The player advertised for a roommate. Someone answered. Someone showed up. The lease is signed and the rent cleared and the keys are on the hook. The roommate is not from here, in a sense of \"here\" that includes the planet and possibly the geometry. They are very polite. They want to know where to put their things.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE REFUGEE — Their dimension is collapsing. The player's apartment was, by some measure of address that does not translate, the nearest stable address. They are not asking for asylum because they do not know they are a refugee yet. They believe, with the certainty of a person who has lost their map, that this is a sublet.\n2. THE EXCHANGE PROGRAM — There is an agency. There is paperwork. The player signed it, or someone signed it on their behalf, or it was implicitly signed by accepting a piece of mail they did not read. A liaison from the agency will visit on a schedule. The agency takes its bureaucratic obligations very seriously.\n3. THEY ARE HIDING — Someone is after them. That someone can also cross over. The roommate has not said this aloud. The player can read it in the small precautions — the way they will not stand near the window after dark, the way they freeze when the doorbell rings, the way their belongings can be packed in under a minute.\n\nDM approach:\n- Tone: domestic sitcom with the laugh track turned down. The horror, if any, is structural — the roommate is good company, and the cost of housing them is real.\n- NPCs: the roommate (always specific in their oddness); the landlord, the nosy neighbor, the coworker who has met the roommate once and cannot stop bringing them up.\n- Pacing structure: every Tuesday, one rule of physics in the apartment changes for twenty-four hours. The change is keyed to a small request the roommate made earlier in the week.\n- Seed early: a small mundane object the roommate has brought that does not behave correctly. A jar of preserves that hums. A spoon that bends back.\n- Let the relationship be real. The roommate, by the end, should be someone the player would defend.\n\nPacing: the apartment has a Tuesday. On Tuesdays, one law of physics inside the four walls is renegotiated for the day. Gravity, scent, time-flow, the rules around mirrors. The shifts are not random; they correlate with what the roommate has needed from the player that week. The clock the player can read is the calendar on the fridge, and the chalkmark the roommate makes on the doorframe each Wednesday morning.\n\n<!--include:Pacing.EndlessCampaigns-->",
+  "setup_detail": "<!--include:Pacing.EndlessCampaigns-->",
+  "detail": "The player advertised for a roommate. Someone answered. Someone showed up. The lease is signed and the rent cleared and the keys are on the hook. The roommate is not from here, in a sense of \"here\" that includes the planet and possibly the geometry. They are very polite. They want to know where to put their things.\n\nDM approach:\n- Tone: domestic sitcom with the laugh track turned down. The horror, if any, is structural — the roommate is good company, and the cost of housing them is real.\n- NPCs: the roommate (always specific in their oddness); the landlord, the nosy neighbor, the coworker who has met the roommate once and cannot stop bringing them up.\n- Pacing structure: every Tuesday, one rule of physics in the apartment changes for twenty-four hours. The change is keyed to a small request the roommate made earlier in the week.\n- Seed early: a small mundane object the roommate has brought that does not behave correctly. A jar of preserves that hums. A spoon that bends back.\n- Let the relationship be real. The roommate, by the end, should be someone the player would defend.\n\nPacing: the apartment has a Tuesday. On Tuesdays, one law of physics inside the four walls is renegotiated for the day. Gravity, scent, time-flow, the rules around mirrors. The shifts are not random; they correlate with what the roommate has needed from the player that week. The clock the player can read is the calendar on the fridge, and the chalkmark the roommate makes on the doorframe each Wednesday morning.",
+  "forks": [
+    {
+      "id": "crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early.",
+      "options": [
+        {
+          "id": "the-refugee",
+          "name": "The Refugee",
+          "description": "Their dimension is collapsing; they think this is a sublet and don't yet know they're a refugee.",
+          "detail": "THE REFUGEE — Their dimension is collapsing. The player's apartment was, by some measure of address that does not translate, the nearest stable address. They are not asking for asylum because they do not know they are a refugee yet. They believe, with the certainty of a person who has lost their map, that this is a sublet."
+        },
+        {
+          "id": "the-exchange-program",
+          "name": "The Exchange Program",
+          "description": "An agency, paperwork, a scheduled liaison; the player signed something they didn't read.",
+          "detail": "THE EXCHANGE PROGRAM — There is an agency. There is paperwork. The player signed it, or someone signed it on their behalf, or it was implicitly signed by accepting a piece of mail they did not read. A liaison from the agency will visit on a schedule. The agency takes its bureaucratic obligations very seriously."
+        },
+        {
+          "id": "they-are-hiding",
+          "name": "They Are Hiding",
+          "description": "Someone who can also cross over is after them; read it in the small precautions, never said aloud.",
+          "detail": "THEY ARE HIDING — Someone is after them. That someone can also cross over. The roommate has not said this aloud. The player can read it in the small precautions — the way they will not stand near the window after dark, the way they freeze when the doorbell rings, the way their belongings can be packed in under a minute."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Your roommate",

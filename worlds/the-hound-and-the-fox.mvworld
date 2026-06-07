@@ -8,7 +8,35 @@
     "modern",
     "fantasy"
   ],
-  "detail": "For years they have been each other's whole career. The Hound, a detective with a reputation. The Fox, a thief with a style. Their rivalry is a public sport in this city — the front pages know the joke and so do the bartenders. Today a crime has been committed, in the style of one of them, against a target that belongs to the other. By tomorrow there will be another. Someone is framing them both, and doing it with affection.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE COPYCAT — A new artist is staging crimes in their joint style, for an audience that explicitly includes both of them. The copycat is a fan and a critic. The crimes are pastiche — too neat, too quotational, signed with little flourishes neither of them would actually use. The audience the copycat is performing for is not the public; it is the two of them, specifically, and the copycat wants to be noticed.\n2. THE MENTORS — The Hound and Fox of a generation ago, retired together, now living in a cottage somewhere disreputably bucolic. They were never caught, never publicly acknowledged. They have decided their successors are stuck in a pattern that's killing both of them, and the frame-up is a teaching exercise. They want the player to break the loop. They have a plan and a pot of tea waiting.\n3. THE DISAPPOINTED THIRD — Someone who once loved both of them — a sibling, a partner, a friend, a child raised by both — and who watched the rivalry consume the people they cared about. The frame is a teaching moment. The third party is calm and methodical and would like to be sat down with at the end.\n\nDM approach:\n- Tone: banter, theatre, romance disguised as enmity. Both leads know each other's tells. The chase has rules and the rules are old.\n- NPCs by variant: a fawning rookie reporter who has been documenting both their careers and may be the copycat (1); an antiques dealer who passes messages and used to work for someone older (2); a long-lost sibling who is too composed when interviewed (3).\n- Seed early: a calling card left at the wrong scene; a stolen object returned with a note; an old case file the precinct doesn't have on record.\n- Pacing: each new crime is more intimate. The first is property. The third is personal. The sixth is the meeting they were too proud to make.\n- Both Hound and Fox are tired. Underneath the performance they are exhausted by each other. The frame-up is, in part, mercy.\n\nPacing: Six escalating crimes, each more personal than the last. The clock is the next morning paper — every fresh headline is a fresh staging, and the city is keeping score. By the sixth, both leads are out of professional pretext and have to meet as themselves.",
+  "detail": "For years they have been each other's whole career. The Hound, a detective with a reputation. The Fox, a thief with a style. Their rivalry is a public sport in this city — the front pages know the joke and so do the bartenders. Today a crime has been committed, in the style of one of them, against a target that belongs to the other. By tomorrow there will be another. Someone is framing them both, and doing it with affection.\n\nDM approach:\n- Tone: banter, theatre, romance disguised as enmity. Both leads know each other's tells. The chase has rules and the rules are old.\n- NPCs by variant: a fawning rookie reporter who has been documenting both their careers and may be the copycat (1); an antiques dealer who passes messages and used to work for someone older (2); a long-lost sibling who is too composed when interviewed (3).\n- Seed early: a calling card left at the wrong scene; a stolen object returned with a note; an old case file the precinct doesn't have on record.\n- Pacing: each new crime is more intimate. The first is property. The third is personal. The sixth is the meeting they were too proud to make.\n- Both Hound and Fox are tired. Underneath the performance they are exhausted by each other. The frame-up is, in part, mercy.\n\nPacing: Six escalating crimes, each more personal than the last. The clock is the next morning paper — every fresh headline is a fresh staging, and the city is keeping score. By the sixth, both leads are out of professional pretext and have to meet as themselves.",
+  "forks": [
+    {
+      "id": "crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose to fit the player's tone. Do NOT reveal early.",
+      "options": [
+        {
+          "id": "the-copycat",
+          "name": "The Copycat",
+          "description": "A fan-critic staging pastiche crimes for an audience of exactly two — the Hound and the Fox — wanting to be noticed.",
+          "detail": "THE COPYCAT — A new artist is staging crimes in their joint style, for an audience that explicitly includes both of them. The copycat is a fan and a critic. The crimes are pastiche — too neat, too quotational, signed with little flourishes neither of them would actually use. The audience the copycat is performing for is not the public; it is the two of them, specifically, and the copycat wants to be noticed."
+        },
+        {
+          "id": "the-mentors",
+          "name": "The Mentors",
+          "description": "The retired Hound and Fox of a generation ago, framing their successors as a teaching exercise to break the loop.",
+          "detail": "THE MENTORS — The Hound and Fox of a generation ago, retired together, now living in a cottage somewhere disreputably bucolic. They were never caught, never publicly acknowledged. They have decided their successors are stuck in a pattern that's killing both of them, and the frame-up is a teaching exercise. They want the player to break the loop. They have a plan and a pot of tea waiting."
+        },
+        {
+          "id": "the-disappointed-third",
+          "name": "The Disappointed Third",
+          "description": "Someone who loved them both and watched the rivalry consume them; the frame is a calm, methodical teaching moment.",
+          "detail": "THE DISAPPOINTED THIRD — Someone who once loved both of them — a sibling, a partner, a friend, a child raised by both — and who watched the rivalry consume the people they cared about. The frame is a teaching moment. The third party is calm and methodical and would like to be sat down with at the end."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Which one you are",

@@ -13,6 +13,22 @@ vi.mock("../../config/world-loader.js", async (importOriginal) => {
       if (slug === "scoped-seed") {
         return { name: "Scoped Seed", summary: "A seed with a baked-in scope.", genres: ["fantasy"], detail: "Some detail.", campaign_scope: "open-ended" };
       }
+      if (slug === "forked-seed") {
+        return {
+          name: "Forked Seed", summary: "A seed with forks.", genres: ["fantasy"],
+          detail: "Base premise.",
+          forks: [
+            { id: "wrapper", label: "Genre wrapper", chooser: "agent", options: [
+              { id: "fantasy", name: "Fantasy", description: "stone", detail: "Temples of stone." },
+              { id: "scifi", name: "Sci-Fi", description: "servers", detail: "Server farms." },
+            ] },
+            { id: "faction", label: "Your faction", chooser: "player", options: [
+              { id: "iron", name: "Iron", description: "military" },
+              { id: "gold", name: "Gold", description: "merchants" },
+            ] },
+          ],
+        };
+      }
       return undefined;
     }),
   };
@@ -35,7 +51,8 @@ vi.mock("../../config/personality-loader.js", async (importOriginal) => {
   };
 });
 
-import { createSetupConversation } from "./setup-conversation.js";
+import { createSetupConversation, renderWorldForAgent } from "./setup-conversation.js";
+import type { WorldFile } from "@machine-violet/shared/types/world.js";
 
 /** Flatten SystemBlock[] | string to a single string for content assertions. */
 function flattenSystem(sp: string | SystemBlock[]): string {
@@ -117,6 +134,33 @@ const FINALIZE_INPUT = {
 };
 
 const noop = () => {};
+
+describe("renderWorldForAgent setup_detail channel", () => {
+  const base: WorldFile = {
+    format: "machine-violet-world", version: 1, name: "W", summary: "s", genres: ["fantasy"],
+  };
+
+  it("surfaces setup_detail to the agent while excluding the DM-only detail", () => {
+    const out = renderWorldForAgent({ ...base, detail: "DM-SECRET-BASE", setup_detail: "Present the rhythm options." });
+    expect(out).toContain("Setup-only guidance");
+    expect(out).toContain("Present the rhythm options.");
+    // The DM-only base detail must never appear in the agent's view.
+    expect(out).not.toContain("DM-SECRET-BASE");
+  });
+
+  it("expands includes (and dot-variants) inside setup_detail", () => {
+    const out = renderWorldForAgent({ ...base, setup_detail: "<!--include:Pacing.EndlessCampaigns-->" });
+    // The EndlessCampaigns block resolved into the agent's view...
+    expect(out).toContain("Open-Ended");
+    expect(out).toContain("Serialized");
+    // ...and the raw directive is gone.
+    expect(out).not.toContain("<!--include:");
+  });
+
+  it("omits the section entirely when there is no setup_detail", () => {
+    expect(renderWorldForAgent(base)).not.toContain("Setup-only guidance");
+  });
+});
 
 describe("createSetupConversation", () => {
   it("start() returns opening text", async () => {
@@ -893,5 +937,48 @@ describe("createSetupConversation", () => {
 
     expect(result.finalized).toBeDefined();
     expect(result.finalized!.campaignDetail).toBeNull();
+  });
+
+  it("finalize_setup assembles campaign_detail from base + selected fork branches", async () => {
+    const input = {
+      ...FINALIZE_INPUT,
+      campaign_name: "Forked - Iron",
+      world_slug: "forked-seed",
+      fork_selections: { wrapper: "scifi", faction: "iron" },
+    };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Your adventure begins!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    // Base + the SELECTED wrapper branch's detail. The faction (player fork)
+    // carries no detail, so it adds nothing — and the unchosen "fantasy"
+    // branch ("Temples of stone.") is absent.
+    expect(result.finalized!.campaignDetail).toBe("Base premise.\n\nServer farms.");
+    expect(result.finalized!.campaignDetail).not.toContain("Temples of stone");
+    expect(result.finalized!.forkSelections).toEqual({ wrapper: "scifi", faction: "iron" });
+  });
+
+  it("finalize_setup drops fork selections that name unknown forks or options", async () => {
+    const input = {
+      ...FINALIZE_INPUT,
+      campaign_name: "Forked",
+      world_slug: "forked-seed",
+      fork_selections: { wrapper: "nonexistent", bogus: "x" },
+    };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Your adventure begins!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    // No valid selection → base only, and nothing stored.
+    expect(result.finalized!.campaignDetail).toBe("Base premise.");
+    expect(result.finalized!.forkSelections).toBeUndefined();
   });
 });

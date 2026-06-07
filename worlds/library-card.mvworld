@@ -6,7 +6,36 @@
   "genres": [
     "post-apocalyptic"
   ],
-  "detail": "The library is the only one left. The player is at the gate. Behind the player is the world that broke; in front of the player is a procedure for entry, a desk, a librarian who is not in a hurry. The player has come because there is nothing else to come to, and the library has been refusing more applicants than it admits for a long time now.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. BOOKS ARE CONTRABAND — Outside, possession of paper is a capital matter. The librarians are an order with reading lists, drills, and a small armed cadre. The library admits only those who can be trusted with what's inside, and trust is measured in tests the applicant doesn't know they are taking. The librarians will eventually expect the player to act in defense of the holdings.\n2. THE SEED BANK OF CIVILIZATION — Collapse erased the cloud. Paper is what survived. The library is the canonical record of how to make antibiotics, how to grow wheat, how to forge steel, how to govern. Other libraries existed; this is the one that wasn't burned. The librarians are slowly publishing curricula to the surviving world and they argue daily about what to release next.\n3. INFORMATION IS A RESOURCE THAT IS CONSUMED — Pages here feed something. Reading a book costs the book — it goes blank, then it goes brittle, then it goes. Outside, the hunger is general; the air is thinner where the books used to be. The librarians ration. The librarians eat last.\n\nDM approach:\n- Tone: monastic, hushed, the smell of old paper and oiled hinges. The world outside is loud and the library is the room where you can hear yourself think.\n- NPCs to seed: the librarian at the desk (decides admission); a long-resident scholar with a private project; one supplicant in line ahead of the player who has been here several days.\n- Pacing structure: admission is conditional and timed. The player has to prove their worth or pay their tribute on a schedule. Outside the doors, the world is at the gate.\n- Seed early: the one book the player brought (or stole, or carries in their head); the question the librarian asks that the player wasn't expecting; the sound of the wind against the outer doors.\n- The library should be physical. Floors, hallways, the smell at each level. Make the geography load-bearing.\n\nPacing: Admission is conditional and timed. The player can track time by the queue outside, the rotation of librarians at the desk, the level of oil in the lamps. Outside the doors, the world is at the gate.\n\n<!--include:Pacing.EndlessCampaigns-->",
+  "setup_detail": "<!--include:Pacing.EndlessCampaigns-->",
+  "detail": "The library is the only one left. The player is at the gate. Behind the player is the world that broke; in front of the player is a procedure for entry, a desk, a librarian who is not in a hurry. The player has come because there is nothing else to come to, and the library has been refusing more applicants than it admits for a long time now.\n\nDM approach:\n- Tone: monastic, hushed, the smell of old paper and oiled hinges. The world outside is loud and the library is the room where you can hear yourself think.\n- NPCs to seed: the librarian at the desk (decides admission); a long-resident scholar with a private project; one supplicant in line ahead of the player who has been here several days.\n- Pacing structure: admission is conditional and timed. The player has to prove their worth or pay their tribute on a schedule. Outside the doors, the world is at the gate.\n- Seed early: the one book the player brought (or stole, or carries in their head); the question the librarian asks that the player wasn't expecting; the sound of the wind against the outer doors.\n- The library should be physical. Floors, hallways, the smell at each level. Make the geography load-bearing.\n\nPacing: Admission is conditional and timed. The player can track time by the queue outside, the rotation of librarians at the desk, the level of oil in the lamps. Outside the doors, the world is at the gate.",
+  "forks": [
+    {
+      "id": "the-crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose to fit the player's tone. Do NOT reveal early.",
+      "options": [
+        {
+          "id": "books-are-contraband",
+          "name": "Books Are Contraband",
+          "description": "Paper is a capital matter outside; the librarians are an armed order admitting only the trustworthy.",
+          "detail": "BOOKS ARE CONTRABAND — Outside, possession of paper is a capital matter. The librarians are an order with reading lists, drills, and a small armed cadre. The library admits only those who can be trusted with what's inside, and trust is measured in tests the applicant doesn't know they are taking. The librarians will eventually expect the player to act in defense of the holdings."
+        },
+        {
+          "id": "the-seed-bank-of-civilization",
+          "name": "The Seed Bank of Civilization",
+          "description": "Collapse erased the cloud; the library is the canonical record of how to rebuild, and the librarians argue over what to release.",
+          "detail": "THE SEED BANK OF CIVILIZATION — Collapse erased the cloud. Paper is what survived. The library is the canonical record of how to make antibiotics, how to grow wheat, how to forge steel, how to govern. Other libraries existed; this is the one that wasn't burned. The librarians are slowly publishing curricula to the surviving world and they argue daily about what to release next."
+        },
+        {
+          "id": "information-is-a-resource-that-is-consumed",
+          "name": "Information Is a Resource That Is Consumed",
+          "description": "Reading a book costs the book; the librarians ration the holdings and eat last.",
+          "detail": "INFORMATION IS A RESOURCE THAT IS CONSUMED — Pages here feed something. Reading a book costs the book — it goes blank, then it goes brittle, then it goes. Outside, the hunger is general; the air is thinner where the books used to be. The librarians ration. The librarians eat last."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Your claim to entry",

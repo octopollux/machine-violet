@@ -8,7 +8,36 @@
     "sci-fi",
     "mystery"
   ],
-  "detail": "The badge stops working at the third turnstile. The HR rep is friendly and has a folder with the player's name on it. The exit interview takes place over multiple floors. Each floor takes one category of memory. The player can negotiate the order but not the totals. The severance package is generous and final.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE ARTIFACTS REMEMBER — The player worked for an occult intelligence agency, handling objects that don't want to be handled. The objects know the player's name. Once the wards in the building come off, the objects can find them. HR is not telling the player this. HR is explaining the dental continuation plan.\n2. THE PEOPLE NOTICED — The player erased timelines for a temporal cleanup crew. Most of the people in those timelines stayed erased. A small number did not. They have begun to remember. They are looking for the person who did it, and the agency is taking the player's memory in part because the agency does not want to be looked for.\n3. THE GOD UPGRADED — The player worked customer service for a god. The god has decided to upgrade staff. The exit interview is the upgrade — the player will be replaced, gently, with someone who will not get tired or forget the script. The HR rep is the previous incumbent and is sympathetic about all of this.\n\nDM approach:\n- Tone: airless corporate civility around an irreversible procedure. The HR rep is a good person doing this respectfully.\n- NPCs derive from the variant: an old artifact-handler colleague who tries to warn the player (1), a person from one of the erased timelines waiting in the lobby (2), the predecessor HR rep, deeply tired (3).\n- Pacing: each floor takes one category of memory. What the player loses on Floor 3 should be load-bearing for the puzzle on Floor 4.\n- Seed early: a coworker's farewell card with too many signatures, including some names the player doesn't recognize but their handwriting does.\n\nPacing: Floor by floor. The player can count the elevator buttons. Each floor takes one category. By the lobby, the player will not remember what they have lost — they will know only that there are gaps shaped like furniture.\n\n<!--include:Pacing.TimedCampaigns-->",
+  "setup_detail": "<!--include:Pacing.TimedCampaigns-->",
+  "detail": "The badge stops working at the third turnstile. The HR rep is friendly and has a folder with the player's name on it. The exit interview takes place over multiple floors. Each floor takes one category of memory. The player can negotiate the order but not the totals. The severance package is generous and final.\n\nDM approach:\n- Tone: airless corporate civility around an irreversible procedure. The HR rep is a good person doing this respectfully.\n- NPCs derive from the variant: an old artifact-handler colleague who tries to warn the player (1), a person from one of the erased timelines waiting in the lobby (2), the predecessor HR rep, deeply tired (3).\n- Pacing: each floor takes one category of memory. What the player loses on Floor 3 should be load-bearing for the puzzle on Floor 4.\n- Seed early: a coworker's farewell card with too many signatures, including some names the player doesn't recognize but their handwriting does.\n\nPacing: Floor by floor. The player can count the elevator buttons. Each floor takes one category. By the lobby, the player will not remember what they have lost — they will know only that there are gaps shaped like furniture.",
+  "forks": [
+    {
+      "id": "the-crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose to fit the player's tone. Do NOT reveal early.",
+      "options": [
+        {
+          "id": "the-artifacts-remember",
+          "name": "The Artifacts Remember",
+          "description": "The player handled occult objects that now know their name and can find them once the wards drop.",
+          "detail": "THE ARTIFACTS REMEMBER — The player worked for an occult intelligence agency, handling objects that don't want to be handled. The objects know the player's name. Once the wards in the building come off, the objects can find them. HR is not telling the player this. HR is explaining the dental continuation plan."
+        },
+        {
+          "id": "the-people-noticed",
+          "name": "The People Noticed",
+          "description": "The player erased timelines; a few survivors remember and are hunting the person who did it.",
+          "detail": "THE PEOPLE NOTICED — The player erased timelines for a temporal cleanup crew. Most of the people in those timelines stayed erased. A small number did not. They have begun to remember. They are looking for the person who did it, and the agency is taking the player's memory in part because the agency does not want to be looked for."
+        },
+        {
+          "id": "the-god-upgraded",
+          "name": "The God Upgraded",
+          "description": "The player did customer service for a god; the exit interview is the god replacing them, and the HR rep is the tired predecessor.",
+          "detail": "THE GOD UPGRADED — The player worked customer service for a god. The god has decided to upgrade staff. The exit interview is the upgrade — the player will be replaced, gently, with someone who will not get tired or forget the script. The HR rep is the previous incumbent and is sympathetic about all of this."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Why fired",

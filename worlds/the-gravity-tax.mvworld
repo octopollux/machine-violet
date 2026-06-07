@@ -6,7 +6,35 @@
   "genres": [
     "sci-fi"
   ],
-  "detail": "Gravity has a vendor. The vendor has a billing department. The billing department has been patient. The patience is over. In the lobby of every habitat, the gravity meter reads slightly lower than it did last month, and the elevators have begun to require a deposit.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE GRACE PERIOD — Has expired. The corporation has begun reducing service at the contractually permitted rate. Things drift. Then things fall sideways. The new tax rate is being applied retroactively. The corporation's customer service line is responsive and apologetic and has no authority. The collections office is across town and uphill, which is a problem.\n2. THE AUDITOR — Has arrived in person with a private army in matching uniforms. He travels with the new gravity calibration tools and a small staff of accountants. Non-compliant habitats are being re-zoned, which sometimes means demolished and sometimes means rotated. He is polite at every meeting. His name is on the indictment.\n3. THE REPOSSESSION — The well has been sold to a rival corporation. The tenants were not notified before service changed. The new vendor uses different calibrations and a different billing cycle. The old vendor's customer service has been redirected to a number that only plays music. The transition is the player's problem.\n\nDM approach:\n- Tone: corporate dystopia with the texture of an unpaid utility bill. Comedy where it can fit. Mostly weight.\n- NPCs derive from the variant: the apologetic collections agent and the angry tenants' association (1), the auditor and his accountants (2), the new vendor's smiling rep and the old vendor's unreachable predecessor (3).\n- Pacing: the gravity meter in the lobby ticks down weekly. Below 0.3 G the player cannot walk to the corner store. Below 0.1 G the player cannot keep dishes on the table.\n- Seed early: a small object that has begun to drift. A neighbor packing because their floor isn't a floor anymore.\n\nPacing: The lobby gravity meter is the visible clock. It ticks down by week. Tenants name the weeks by what they could no longer do — \"that was the week the kettle wouldn't boil straight.\" Below 0.3 G the corner store is unreachable; below 0.1 G the player is not walking, they are aiming.",
+  "detail": "Gravity has a vendor. The vendor has a billing department. The billing department has been patient. The patience is over. In the lobby of every habitat, the gravity meter reads slightly lower than it did last month, and the elevators have begun to require a deposit.\n\nDM approach:\n- Tone: corporate dystopia with the texture of an unpaid utility bill. Comedy where it can fit. Mostly weight.\n- NPCs derive from the variant: the apologetic collections agent and the angry tenants' association (1), the auditor and his accountants (2), the new vendor's smiling rep and the old vendor's unreachable predecessor (3).\n- Pacing: the gravity meter in the lobby ticks down weekly. Below 0.3 G the player cannot walk to the corner store. Below 0.1 G the player cannot keep dishes on the table.\n- Seed early: a small object that has begun to drift. A neighbor packing because their floor isn't a floor anymore.\n\nPacing: The lobby gravity meter is the visible clock. It ticks down by week. Tenants name the weeks by what they could no longer do — \"that was the week the kettle wouldn't boil straight.\" Below 0.3 G the corner store is unreachable; below 0.1 G the player is not walking, they are aiming.",
+  "forks": [
+    {
+      "id": "crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose to fit the player's tone. Do NOT reveal early.",
+      "options": [
+        {
+          "id": "the-grace-period",
+          "name": "The Grace Period",
+          "description": "The grace period has expired; the corporation reduces service at the contractually permitted rate and applies the new tax retroactively.",
+          "detail": "THE GRACE PERIOD — Has expired. The corporation has begun reducing service at the contractually permitted rate. Things drift. Then things fall sideways. The new tax rate is being applied retroactively. The corporation's customer service line is responsive and apologetic and has no authority. The collections office is across town and uphill, which is a problem."
+        },
+        {
+          "id": "the-auditor",
+          "name": "The Auditor",
+          "description": "An auditor has arrived in person with a private army and accountants, re-zoning non-compliant habitats; polite at every meeting.",
+          "detail": "THE AUDITOR — Has arrived in person with a private army in matching uniforms. He travels with the new gravity calibration tools and a small staff of accountants. Non-compliant habitats are being re-zoned, which sometimes means demolished and sometimes means rotated. He is polite at every meeting. His name is on the indictment."
+        },
+        {
+          "id": "the-repossession",
+          "name": "The Repossession",
+          "description": "The well has been sold to a rival corporation with different calibrations and billing; the transition is the player's problem.",
+          "detail": "THE REPOSSESSION — The well has been sold to a rival corporation. The tenants were not notified before service changed. The new vendor uses different calibrations and a different billing cycle. The old vendor's customer service has been redirected to a number that only plays music. The transition is the player's problem."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Habitat tier",

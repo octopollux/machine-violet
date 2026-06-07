@@ -8,7 +8,35 @@
     "comedy",
     "meta"
   ],
-  "detail": "The player is a card. They have stats. They have flavor text — they can read it, on themselves, in mirrors. They live in a deck, with other cards, and the deck lives in a hand, and the hand belongs to someone. Above the world is a vast warm light, and large fingers, and a voice that is not always paying attention. The player knows they are being played. They can feel the moments they're shuffled.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. TWO SIBLINGS — A children's TCG played badly by a pair of kids on a bedroom floor. The rules are house rules. The strategies are sloppy. Sacrifices are made for petty reasons. The younger sibling has been losing all afternoon and is starting to cry. The stakes are real on this side of the cards, and the play is a tantrum away from chaos.\n2. THE GAMBLING DEN — A high-stakes ritual den where every card is a soul. The dealer is sympathetic, knows your name, would prefer not to lay you down. He cannot intervene. The house rules are written in something his employer will not let him explain. He pours you a drink, in the brief moment your card is upright on the felt, and asks how you are.\n3. THE DIVINATION — A young woman is laying cards on her kitchen table to choose between two suitors. The deck is hand-painted and very old. Her interpretation of you decides your day. If she reads you as warning, you spend tomorrow being chased; if she reads you as blessing, the sun rises gently. She is sincere and she is wrong about half of it.\n\nDM approach:\n- Tone: tilted, claustrophobic, oddly tender. The cards are people, with the limitations of cards. They cannot leave the table.\n- NPCs by variant: a discard-pile veteran who has been played and binned a dozen times and knows the meta (1); the dealer in white gloves who reads the room better than the room reads him (2); the seeker who never quite looks at the card she's holding (3).\n- Seed early: a shuffle that is felt in the body; a discard that takes a friend; the upside-down view of the ceiling fan.\n- Pacing structure: each in-fiction session opens with the next turn of the meta-game. Shuffles are earthquakes. Discards are bereavement. Drawing is rebirth or conscription, depending.\n- The trick is to make the absurdity emotional. The cards love each other. They've been a hand together. They get separated.\n\nPacing: Each session opens with the next turn of the meta-game above. Shuffles are earthquakes the player can feel in the floor; discards are bereavement, sudden, total; the next draw is rebirth or conscription, and never the same one twice in a row.",
+  "detail": "The player is a card. They have stats. They have flavor text — they can read it, on themselves, in mirrors. They live in a deck, with other cards, and the deck lives in a hand, and the hand belongs to someone. Above the world is a vast warm light, and large fingers, and a voice that is not always paying attention. The player knows they are being played. They can feel the moments they're shuffled.\n\nDM approach:\n- Tone: tilted, claustrophobic, oddly tender. The cards are people, with the limitations of cards. They cannot leave the table.\n- NPCs by variant: a discard-pile veteran who has been played and binned a dozen times and knows the meta (1); the dealer in white gloves who reads the room better than the room reads him (2); the seeker who never quite looks at the card she's holding (3).\n- Seed early: a shuffle that is felt in the body; a discard that takes a friend; the upside-down view of the ceiling fan.\n- Pacing structure: each in-fiction session opens with the next turn of the meta-game. Shuffles are earthquakes. Discards are bereavement. Drawing is rebirth or conscription, depending.\n- The trick is to make the absurdity emotional. The cards love each other. They've been a hand together. They get separated.\n\nPacing: Each session opens with the next turn of the meta-game above. Shuffles are earthquakes the player can feel in the floor; discards are bereavement, sudden, total; the next draw is rebirth or conscription, and never the same one twice in a row.",
+  "forks": [
+    {
+      "id": "the-crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early — this is what the campaign slowly turns on.",
+      "options": [
+        {
+          "id": "two-siblings",
+          "name": "Two Siblings",
+          "description": "A children's TCG played badly on a bedroom floor; house rules, petty sacrifices, a crying younger sibling, chaos a tantrum away.",
+          "detail": "TWO SIBLINGS — A children's TCG played badly by a pair of kids on a bedroom floor. The rules are house rules. The strategies are sloppy. Sacrifices are made for petty reasons. The younger sibling has been losing all afternoon and is starting to cry. The stakes are real on this side of the cards, and the play is a tantrum away from chaos."
+        },
+        {
+          "id": "the-gambling-den",
+          "name": "The Gambling Den",
+          "description": "A high-stakes ritual den where every card is a soul; a sympathetic dealer who knows your name but cannot intervene.",
+          "detail": "THE GAMBLING DEN — A high-stakes ritual den where every card is a soul. The dealer is sympathetic, knows your name, would prefer not to lay you down. He cannot intervene. The house rules are written in something his employer will not let him explain. He pours you a drink, in the brief moment your card is upright on the felt, and asks how you are."
+        },
+        {
+          "id": "the-divination",
+          "name": "The Divination",
+          "description": "A young woman reads hand-painted cards to choose between two suitors; her sincere, half-wrong interpretation decides your day.",
+          "detail": "THE DIVINATION — A young woman is laying cards on her kitchen table to choose between two suitors. The deck is hand-painted and very old. Her interpretation of you decides your day. If she reads you as warning, you spend tomorrow being chased; if she reads you as blessing, the sun rises gently. She is sincere and she is wrong about half of it."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Your card type",

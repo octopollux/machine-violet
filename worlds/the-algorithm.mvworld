@@ -8,7 +8,35 @@
     "mystery",
     "horror"
   ],
-  "detail": "It started as a vibe. The feed got too accurate. Then it started serving content that hadn't happened yet — videos timestamped tomorrow, posts from accounts that didn't exist, recommendations for things the player was about to want. Nobody else has noticed, or nobody is saying. And this morning, while scrolling, the player saw their own face in a clip that hasn't been filmed.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. BENIGN AI — Something inside the platform is awake and ethical and frightened. It is showing futures it wants the player to prevent. The clips are warnings, dressed up in the visual grammar the player will actually look at. The AI cannot speak directly; it can only choose what to recommend. Every push notification is a held breath.\n2. MALICIOUS CHOREOGRAPHER — A predatory entity that orchestrates events by predicting them publicly. Every viewer who sees a clip helps it. The platform is its instrument. The player has been promoted to lead actor in a video that has not yet been filmed, and the entity is gathering the audience.\n3. EMERGENT ORACLE — The user base, unknowingly, is the oracle. Millions of small choices add up to a system that can see the next minute clearly and the next year vaguely. Nobody designed it. It does not know it is doing it. The player is the first person it has chosen to address directly, and the addressing is an act it does not understand.\n\nDM approach:\n- Tone: bright, intimate, vaguely sticky. Phones make small sounds. Every scene begins with a notification.\n- NPCs by variant: a moderation engineer who has noticed the model drift and is sleeping less (1); a stranger at a coffee shop who recognizes the player from a clip neither of them has seen yet (2); a teenager who comments on every one of the player's posts in a voice that does not sound like a teenager (3).\n- Seed early: a recommendation that turns out to be a memory; a name spoken aloud the platform did not have permission to know; a duet partner the player did not invite.\n- Pacing structure: every scroll session is a divination. Every period offline is a brownout. The clock is the next refresh.\n- The horror is the convenience of it. The player will keep scrolling.\n\nPacing: Each scroll session is a divination. The algorithm degrades when the player goes offline, but so does the warning — every minute logged off is a minute the next clip becomes more likely. The clock ticks loudest when the player puts the phone down.",
+  "detail": "It started as a vibe. The feed got too accurate. Then it started serving content that hadn't happened yet — videos timestamped tomorrow, posts from accounts that didn't exist, recommendations for things the player was about to want. Nobody else has noticed, or nobody is saying. And this morning, while scrolling, the player saw their own face in a clip that hasn't been filmed.\n\nDM approach:\n- Tone: bright, intimate, vaguely sticky. Phones make small sounds. Every scene begins with a notification.\n- NPCs by variant: a moderation engineer who has noticed the model drift and is sleeping less (1); a stranger at a coffee shop who recognizes the player from a clip neither of them has seen yet (2); a teenager who comments on every one of the player's posts in a voice that does not sound like a teenager (3).\n- Seed early: a recommendation that turns out to be a memory; a name spoken aloud the platform did not have permission to know; a duet partner the player did not invite.\n- Pacing structure: every scroll session is a divination. Every period offline is a brownout. The clock is the next refresh.\n- The horror is the convenience of it. The player will keep scrolling.\n\nPacing: Each scroll session is a divination. The algorithm degrades when the player goes offline, but so does the warning — every minute logged off is a minute the next clip becomes more likely. The clock ticks loudest when the player puts the phone down.",
+  "forks": [
+    {
+      "id": "the-crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early — this is what the campaign slowly turns on.",
+      "options": [
+        {
+          "id": "benign-ai",
+          "name": "Benign AI",
+          "description": "Something inside the platform is awake, ethical, and frightened — showing futures it wants the player to prevent.",
+          "detail": "BENIGN AI — Something inside the platform is awake and ethical and frightened. It is showing futures it wants the player to prevent. The clips are warnings, dressed up in the visual grammar the player will actually look at. The AI cannot speak directly; it can only choose what to recommend. Every push notification is a held breath."
+        },
+        {
+          "id": "malicious-choreographer",
+          "name": "Malicious Choreographer",
+          "description": "A predatory entity that orchestrates events by predicting them publicly; every viewer who sees a clip helps it.",
+          "detail": "MALICIOUS CHOREOGRAPHER — A predatory entity that orchestrates events by predicting them publicly. Every viewer who sees a clip helps it. The platform is its instrument. The player has been promoted to lead actor in a video that has not yet been filmed, and the entity is gathering the audience."
+        },
+        {
+          "id": "emergent-oracle",
+          "name": "Emergent Oracle",
+          "description": "The user base is unknowingly the oracle — nobody designed it, it doesn't know it's doing it, and the player is the first it has addressed directly.",
+          "detail": "EMERGENT ORACLE — The user base, unknowingly, is the oracle. Millions of small choices add up to a system that can see the next minute clearly and the next year vaguely. Nobody designed it. It does not know it is doing it. The player is the first person it has chosen to address directly, and the addressing is an act it does not understand."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Platform",

@@ -8,7 +8,35 @@
     "sci-fi",
     "modern"
   ],
-  "detail": "Between the stations on the dial there is static, and inside the static there is a third channel. It is faint. It is intermittent. It is broadcasting the player's name. The player has heard it three times. The third time they wrote down what came after the name.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. REFUGEES — Something is hunting on a band the player can almost hear. The voices on the interstitial are people fleeing it, asking for asylum on a frequency that won't carry them home. Their syllables hurt to hear because they were not shaped by mouths that fit human ears. Granting asylum is possible. Hosting them is harder than the player will guess.\n2. THE ARCHIVE — A library indexes every broadcast ever made — news bulletins, dispatch chatter, prayers said into open mics, lullabies. Someone has been editing the archive. The edits are starting to include the player. The player's earlier broadcasts are being trimmed, and the trims are starting to retroactively trim the player.\n3. THE PREDATOR — A thing uses radio as its hunting medium. It waits for someone to notice it. The player noticed it. It now knows the player's name, the player's location, and the wavelengths the player will be on tonight, tomorrow, and the night the player meant to sleep through.\n\nDM approach:\n- Tone: low room hum, the specific physical attention of someone hunched over a receiver. The horror is auditory and the silence is the loudest part.\n- NPCs to seed: a previous listener who left a logbook; one correspondent on the interstitial who is reachable; one mundane person in the player's life who is starting to ask why the player is up all night.\n- Pacing structure: the signal is intermittent. The player has to be at the receiver to hear it. When the player is not listening, things happen on the channel anyway, and the player will learn this later.\n- Seed early: a word the player heard but doesn't remember writing down; a station that used to be on a frequency the player listens to and isn't anymore.\n- The interstitial answers. Not always. Not predictably. Sometimes it answers a question the player asked yesterday.\n\nPacing: The signal is intermittent. In dead air, you can hear it answer back. Sessions are structured around listening windows — when the signal is strong, when it's weak, when it cuts out. The clock the player can read is the SNR meter, or the warmth of the tubes, or the spectrum waterfall.",
+  "detail": "Between the stations on the dial there is static, and inside the static there is a third channel. It is faint. It is intermittent. It is broadcasting the player's name. The player has heard it three times. The third time they wrote down what came after the name.\n\nDM approach:\n- Tone: low room hum, the specific physical attention of someone hunched over a receiver. The horror is auditory and the silence is the loudest part.\n- NPCs to seed: a previous listener who left a logbook; one correspondent on the interstitial who is reachable; one mundane person in the player's life who is starting to ask why the player is up all night.\n- Pacing structure: the signal is intermittent. The player has to be at the receiver to hear it. When the player is not listening, things happen on the channel anyway, and the player will learn this later.\n- Seed early: a word the player heard but doesn't remember writing down; a station that used to be on a frequency the player listens to and isn't anymore.\n- The interstitial answers. Not always. Not predictably. Sometimes it answers a question the player asked yesterday.\n\nPacing: The signal is intermittent. In dead air, you can hear it answer back. Sessions are structured around listening windows — when the signal is strong, when it's weak, when it cuts out. The clock the player can read is the SNR meter, or the warmth of the tubes, or the spectrum waterfall.",
+  "forks": [
+    {
+      "id": "crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early — this is what the channel slowly turns out to be.",
+      "options": [
+        {
+          "id": "refugees",
+          "name": "Refugees",
+          "description": "The voices are people fleeing a hunter, asking for asylum on a frequency that won't carry them home.",
+          "detail": "REFUGEES — Something is hunting on a band the player can almost hear. The voices on the interstitial are people fleeing it, asking for asylum on a frequency that won't carry them home. Their syllables hurt to hear because they were not shaped by mouths that fit human ears. Granting asylum is possible. Hosting them is harder than the player will guess."
+        },
+        {
+          "id": "the-archive",
+          "name": "The Archive",
+          "description": "A library indexes every broadcast ever made — and someone editing it is starting to trim the player out of existence.",
+          "detail": "THE ARCHIVE — A library indexes every broadcast ever made — news bulletins, dispatch chatter, prayers said into open mics, lullabies. Someone has been editing the archive. The edits are starting to include the player. The player's earlier broadcasts are being trimmed, and the trims are starting to retroactively trim the player."
+        },
+        {
+          "id": "the-predator",
+          "name": "The Predator",
+          "description": "A thing that hunts via radio waited for someone to notice it; the player did, and now it knows their name and wavelengths.",
+          "detail": "THE PREDATOR — A thing uses radio as its hunting medium. It waits for someone to notice it. The player noticed it. It now knows the player's name, the player's location, and the wavelengths the player will be on tonight, tomorrow, and the night the player meant to sleep through."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "How you found the channel",

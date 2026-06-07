@@ -7,7 +7,35 @@
     "sci-fi",
     "comedy"
   ],
-  "detail": "The letter arrived through a radio telescope in West Virginia at 3:47 a.m. on a Tuesday. It was addressed to humanity, generally. It used the word Whereas. It was signed by a partnership of three names humans cannot pronounce. The Earth has ninety days to respond. The Earth does not have a lawyer.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE VOYAGER PLAQUE — The figures etched on the Voyager probes infringe trademarked iconography belonging to an interstellar guild. The depicted figures are protected IP and the Voyagers are infringing copies leaving the system. Damages calculated since launch. The licensors are amenable to settlement and to a public apology.\n2. THE LICENSED MUSIC — Human radio has been leaking licensed music into the galaxy for over a century without rights. Royalties since Marconi, compounded. The rightsholders represent artists humanity has never met whose work humanity has been broadcasting since first electrification. The list of infringed works includes Happy Birthday.\n3. THE PATENT — The concept of heliocentrism is patented in this region of the galaxy. Humanity is approximately five hundred years overdue on its license fee. The patent holder is willing to discuss a payment plan. The patent does not expire for another nine thousand years.\n\nDM approach:\n- Tone: legal procedural with the camera occasionally panning up to the sky. Underplay the alienness. Lean into the paperwork.\n- NPCs derive from the variant: the curator who has to defend the plaque (1), the original radio broadcaster's heirs and the music industry (2), the team of historians trying to date the patent infringement (3).\n- Pacing: filings have deadlines in Earth weeks. Depositions happen by appointment. First in-person contact is in ninety days.\n- Seed early: one filing in legalese the UN is still translating. The discovery the aliens have been quietly observing Earth's contract law and respect it.\n\nPacing: Ninety days to first contact. The deadlines are in the inbox. The wall in the situation room has a calendar with red dates. Each scene is a filing, a deposition, or a press leak.",
+  "detail": "The letter arrived through a radio telescope in West Virginia at 3:47 a.m. on a Tuesday. It was addressed to humanity, generally. It used the word Whereas. It was signed by a partnership of three names humans cannot pronounce. The Earth has ninety days to respond. The Earth does not have a lawyer.\n\nDM approach:\n- Tone: legal procedural with the camera occasionally panning up to the sky. Underplay the alienness. Lean into the paperwork.\n- NPCs derive from the variant: the curator who has to defend the plaque (1), the original radio broadcaster's heirs and the music industry (2), the team of historians trying to date the patent infringement (3).\n- Pacing: filings have deadlines in Earth weeks. Depositions happen by appointment. First in-person contact is in ninety days.\n- Seed early: one filing in legalese the UN is still translating. The discovery the aliens have been quietly observing Earth's contract law and respect it.\n\nPacing: Ninety days to first contact. The deadlines are in the inbox. The wall in the situation room has a calendar with red dates. Each scene is a filing, a deposition, or a press leak.",
+  "forks": [
+    {
+      "id": "the-crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early — this is the case's hidden truth.",
+      "options": [
+        {
+          "id": "the-voyager-plaque",
+          "name": "The Voyager Plaque",
+          "description": "The figures etched on the Voyager probes are infringing copies of trademarked interstellar-guild iconography.",
+          "detail": "THE VOYAGER PLAQUE — The figures etched on the Voyager probes infringe trademarked iconography belonging to an interstellar guild. The depicted figures are protected IP and the Voyagers are infringing copies leaving the system. Damages calculated since launch. The licensors are amenable to settlement and to a public apology."
+        },
+        {
+          "id": "the-licensed-music",
+          "name": "The Licensed Music",
+          "description": "A century of human radio has leaked licensed music into the galaxy; royalties since Marconi, compounded.",
+          "detail": "THE LICENSED MUSIC — Human radio has been leaking licensed music into the galaxy for over a century without rights. Royalties since Marconi, compounded. The rightsholders represent artists humanity has never met whose work humanity has been broadcasting since first electrification. The list of infringed works includes Happy Birthday."
+        },
+        {
+          "id": "the-patent",
+          "name": "The Patent",
+          "description": "Heliocentrism is patented in this region of the galaxy; humanity is ~500 years overdue on its license fee.",
+          "detail": "THE PATENT — The concept of heliocentrism is patented in this region of the galaxy. Humanity is approximately five hundred years overdue on its license fee. The patent holder is willing to discuss a payment plan. The patent does not expire for another nine thousand years."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Role",

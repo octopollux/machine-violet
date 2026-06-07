@@ -7,7 +7,35 @@
     "horror",
     "mystery"
   ],
-  "detail": "The player drove past the lot last Tuesday. They are certain. There was something else there — a Wendy's, a vacant building, a field — and now there is a stone church with a copper roof and a sign that says it has served the community since 1887. Everyone in town agrees it has. The pastor smiles at the player by name. The player has never told the pastor their name.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. IT ATE THE BUILDING — The lot used to hold something. The church consumed it and the memory of it together; the bricks were chewed. Trace evidence is buried in the foundation. A photo somewhere, a tax record somewhere, a child who hasn't been corrected yet — these are the player's hooks. The pastor knows the church is hungry and is feeding it the doubts of new arrivals to keep it from feeding on the parish.\n2. THE BEFORE IS THE LIE — The church has always been there. The player's memory is the heresy. Other people who remember a before have started disappearing politely, in ways the town accepts as moves and retirements and breakups. The pastor is kind to the player. The pastor would prefer the player to come inside.\n3. THE WRAPPING PAPER — The church is not the thing. The church is what the thing arrived inside. Something is being prepared on the lot — built up, brick by brick, prayer by prayer — and when it is ready the church will fall away and the actual building will stand. The pastor is the foreman. The congregation are the materials.\n\nDM approach:\n- Tone: Sunday morning, mowed grass, hymn at a window. The horror is wholesome.\n- The pastor: warm, present, remembers everyone's children's names. Does not blink quite often enough.\n- The congregants: pleasant. A neighbor the player has known for ten years who now corrects them about a church potluck the player has never attended.\n- Seed early: an old photograph in a yearbook, a parking citation from the supposed-old-lot, a child who says the wrong thing and is shushed.\n- Pacing: attendance grows by exactly one per Sunday. In three months it will be everyone.\n\nThe player can count Sundays. They can count cars in the lot. They can count whose name the pastor knows now that he didn't know last week. The clock is the bulletin board in the narthex and the new face on the bulletin every week. When the player's own face appears there, the clock has run.",
+  "detail": "The player drove past the lot last Tuesday. They are certain. There was something else there — a Wendy's, a vacant building, a field — and now there is a stone church with a copper roof and a sign that says it has served the community since 1887. Everyone in town agrees it has. The pastor smiles at the player by name. The player has never told the pastor their name.\n\nDM approach:\n- Tone: Sunday morning, mowed grass, hymn at a window. The horror is wholesome.\n- The pastor: warm, present, remembers everyone's children's names. Does not blink quite often enough.\n- The congregants: pleasant. A neighbor the player has known for ten years who now corrects them about a church potluck the player has never attended.\n- Seed early: an old photograph in a yearbook, a parking citation from the supposed-old-lot, a child who says the wrong thing and is shushed.\n- Pacing: attendance grows by exactly one per Sunday. In three months it will be everyone.\n\nThe player can count Sundays. They can count cars in the lot. They can count whose name the pastor knows now that he didn't know last week. The clock is the bulletin board in the narthex and the new face on the bulletin every week. When the player's own face appears there, the clock has run.",
+  "forks": [
+    {
+      "id": "crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early — this is what the campaign slowly turns on.",
+      "options": [
+        {
+          "id": "it-ate-the-building",
+          "name": "It Ate the Building",
+          "description": "The church consumed the old structure and the memory of it; trace evidence survives in the foundation.",
+          "detail": "IT ATE THE BUILDING — The lot used to hold something. The church consumed it and the memory of it together; the bricks were chewed. Trace evidence is buried in the foundation. A photo somewhere, a tax record somewhere, a child who hasn't been corrected yet — these are the player's hooks. The pastor knows the church is hungry and is feeding it the doubts of new arrivals to keep it from feeding on the parish."
+        },
+        {
+          "id": "the-before-is-the-lie",
+          "name": "The Before Is the Lie",
+          "description": "The church has always been there; the player's memory is the heresy, and rememberers vanish politely.",
+          "detail": "THE BEFORE IS THE LIE — The church has always been there. The player's memory is the heresy. Other people who remember a before have started disappearing politely, in ways the town accepts as moves and retirements and breakups. The pastor is kind to the player. The pastor would prefer the player to come inside."
+        },
+        {
+          "id": "the-wrapping-paper",
+          "name": "The Wrapping Paper",
+          "description": "The church is packaging; something is being built on the lot and will stand once the church falls away.",
+          "detail": "THE WRAPPING PAPER — The church is not the thing. The church is what the thing arrived inside. Something is being prepared on the lot — built up, brick by brick, prayer by prayer — and when it is ready the church will fall away and the actual building will stand. The pastor is the foreman. The congregation are the materials."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Town",

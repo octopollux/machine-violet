@@ -7,7 +7,35 @@
     "fantasy",
     "meta"
   ],
-  "detail": "Somewhere in the canon, in small print, in a chapter most readers skim, there is a sentence about the player. It names them, or almost names them. It tells a story about something they did, or did not do. It is read in temples in a dozen languages, and the people who read it pause at the player's name for a second and then move on. The player has lived their life around this fact. Today, somebody is going to ask them about it.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE FOOTNOTE GOT YOU WRONG — You did the thing in the text. The text is wrong about why. The canon describes a betrayal, a miracle, a death, a refusal — and the canon ascribes a motive that is the opposite of the one you had. You have spent your life as the wrong kind of villain or the wrong kind of saint. Correcting the record is a kind of resurrection. It is also a kind of suicide.\n2. YOU NEVER EXISTED — Someone wrote you into the text to hide a real person. The footnote is camouflage. The real person, the one your name is covering for, is alive, and aware, and angry that the camouflage is now walking around. They are hunting you to put the record back in order. They are well-funded and patient and they have the inside of the scripture memorized.\n3. THE FOOTNOTE IS CORRECT — Everything else in the holy text is the lie. The footnote, with its mundane sentence about you, is the only honest line. You know this because you remember the events. Nobody else does. Telling anyone the truth would unmake their world, which is the only world they have.\n\nDM approach:\n- Tone: a long quiet, the weight of words other people memorized.\n- NPCs: a priest who has been waiting all their life to meet you; a scholar with a worn copy of the chapter; an inquisitor whose manual quotes you; the real subject of the footnote, in variant 2.\n- Pacing structure: your existence creates small escalating breaks in the world — a hill that should not be there, a saint's statue that no longer matches its description, a holy day whose date has begun to slip.\n- Seed early: someone misquoting you to your face, and almost recognizing you while they do it.\n- The text is doing the player's work for them, and against them, every day. Use that.\n\nPacing: each session, a small thing in the world goes wrong in proportion to the player's continued presence in it. A relic loses its provenance. A pilgrim route loses a stop. A holy day shifts by one. The player can read the clock by walking into any temple and asking what day it is.",
+  "detail": "Somewhere in the canon, in small print, in a chapter most readers skim, there is a sentence about the player. It names them, or almost names them. It tells a story about something they did, or did not do. It is read in temples in a dozen languages, and the people who read it pause at the player's name for a second and then move on. The player has lived their life around this fact. Today, somebody is going to ask them about it.\n\nDM approach:\n- Tone: a long quiet, the weight of words other people memorized.\n- NPCs: a priest who has been waiting all their life to meet you; a scholar with a worn copy of the chapter; an inquisitor whose manual quotes you; the real subject of the footnote, in variant 2.\n- Pacing structure: your existence creates small escalating breaks in the world — a hill that should not be there, a saint's statue that no longer matches its description, a holy day whose date has begun to slip.\n- Seed early: someone misquoting you to your face, and almost recognizing you while they do it.\n- The text is doing the player's work for them, and against them, every day. Use that.\n\nPacing: each session, a small thing in the world goes wrong in proportion to the player's continued presence in it. A relic loses its provenance. A pilgrim route loses a stop. A holy day shifts by one. The player can read the clock by walking into any temple and asking what day it is.",
+  "forks": [
+    {
+      "id": "the-crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early — this is the hidden truth the campaign turns on.",
+      "options": [
+        {
+          "id": "the-footnote-got-you-wrong",
+          "name": "The Footnote Got You Wrong",
+          "description": "You did the thing, but the canon ascribes the opposite motive; correcting the record is resurrection and suicide both.",
+          "detail": "THE FOOTNOTE GOT YOU WRONG — You did the thing in the text. The text is wrong about why. The canon describes a betrayal, a miracle, a death, a refusal — and the canon ascribes a motive that is the opposite of the one you had. You have spent your life as the wrong kind of villain or the wrong kind of saint. Correcting the record is a kind of resurrection. It is also a kind of suicide."
+        },
+        {
+          "id": "you-never-existed",
+          "name": "You Never Existed",
+          "description": "The footnote is camouflage for a real person — alive, aware, and hunting you to put the record back in order.",
+          "detail": "YOU NEVER EXISTED — Someone wrote you into the text to hide a real person. The footnote is camouflage. The real person, the one your name is covering for, is alive, and aware, and angry that the camouflage is now walking around. They are hunting you to put the record back in order. They are well-funded and patient and they have the inside of the scripture memorized."
+        },
+        {
+          "id": "the-footnote-is-correct",
+          "name": "The Footnote Is Correct",
+          "description": "The mundane footnote is the only honest line in the canon; telling the truth would unmake everyone else's world.",
+          "detail": "THE FOOTNOTE IS CORRECT — Everything else in the holy text is the lie. The footnote, with its mundane sentence about you, is the only honest line. You know this because you remember the events. Nobody else does. Telling anyone the truth would unmake their world, which is the only world they have."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "The footnote",

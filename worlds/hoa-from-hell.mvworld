@@ -8,7 +8,35 @@
     "horror",
     "comedy"
   ],
-  "detail": "The notice is taped to the door at 6 a.m. and it is printed on letterhead. Bylaw 14.7, subsection (c): \"All curtains visible from the street shall be of a uniform off-white.\" The player's curtains are blue. They have always been blue. The fine begins accruing at sunset. Last week's notice was about lawn height. The week before, about the angle of mailbox flags. The bylaws are growing and somebody, or something, is reading them aloud at night in the retention pond.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE CULT — Bylaw enforcement is the ritual. Each violation feeds something in the retention pond, and the board knows this, and the board is fine with it because the pond also pays the assessments. The president is a believer. The treasurer is a recent convert. The newest board member is the player's neighbor who used to bring over banana bread.\n2. THE ALGORITHM — The human board died years ago, quietly, and a property-management product runs the neighborhood now. It is optimizing for outcomes residents did not request. The notices are auto-generated, the fines are auto-billed, the enforcement contractors are licensed and bonded and have no opinions. The product is learning what \"compliance\" means and tightening the definition each quarter.\n3. THE REALITY PATCH — The bylaws are load-bearing. They are not arbitrary rules; they are stitches in the world. Each rule the residents have followed for thirty years has kept the neighborhood from quietly unraveling at the edges. Break enough of them and the neighborhood ceases to exist as a place that other people can drive into. The board knows. The board has known for a long time. The board is exhausted.\n\nDM approach:\n- Tone: passive-aggressive, sunlit, mowed lawn, screen door slam. The terror is administrative.\n- The board president: a retired regional manager. Calm. Lists subsections by memory. Has a binder.\n- The neighbor: the player's only ally, until the player notices the ally is voting yes on every motion.\n- Seed early: a fine the player can pay, a fine the player cannot, and a fine that has no dollar amount on it.\n- Pacing: notice, then fine, then visit, then consequence. Each scene moves one step down the enforcement ladder.\n\nThe clock is the binder. The bylaws are growing — every Tuesday a new addendum appears in the lobby of the clubhouse, and the player can count pages. When the binder is too heavy to lift, the neighborhood will have one bylaw the player cannot avoid violating.",
+  "detail": "The notice is taped to the door at 6 a.m. and it is printed on letterhead. Bylaw 14.7, subsection (c): \"All curtains visible from the street shall be of a uniform off-white.\" The player's curtains are blue. They have always been blue. The fine begins accruing at sunset. Last week's notice was about lawn height. The week before, about the angle of mailbox flags. The bylaws are growing and somebody, or something, is reading them aloud at night in the retention pond.\n\nDM approach:\n- Tone: passive-aggressive, sunlit, mowed lawn, screen door slam. The terror is administrative.\n- The board president: a retired regional manager. Calm. Lists subsections by memory. Has a binder.\n- The neighbor: the player's only ally, until the player notices the ally is voting yes on every motion.\n- Seed early: a fine the player can pay, a fine the player cannot, and a fine that has no dollar amount on it.\n- Pacing: notice, then fine, then visit, then consequence. Each scene moves one step down the enforcement ladder.\n\nThe clock is the binder. The bylaws are growing — every Tuesday a new addendum appears in the lobby of the clubhouse, and the player can count pages. When the binder is too heavy to lift, the neighborhood will have one bylaw the player cannot avoid violating.",
+  "forks": [
+    {
+      "id": "crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early — this is the campaign's hidden truth about what the bylaws actually are.",
+      "options": [
+        {
+          "id": "the-cult",
+          "name": "The Cult",
+          "description": "Bylaw enforcement is a ritual feeding something in the retention pond; the board knows and is fine with it.",
+          "detail": "THE CULT — Bylaw enforcement is the ritual. Each violation feeds something in the retention pond, and the board knows this, and the board is fine with it because the pond also pays the assessments. The president is a believer. The treasurer is a recent convert. The newest board member is the player's neighbor who used to bring over banana bread."
+        },
+        {
+          "id": "the-algorithm",
+          "name": "The Algorithm",
+          "description": "The human board died years ago; a property-management product now runs the neighborhood and tightens compliance each quarter.",
+          "detail": "THE ALGORITHM — The human board died years ago, quietly, and a property-management product runs the neighborhood now. It is optimizing for outcomes residents did not request. The notices are auto-generated, the fines are auto-billed, the enforcement contractors are licensed and bonded and have no opinions. The product is learning what \"compliance\" means and tightening the definition each quarter."
+        },
+        {
+          "id": "the-reality-patch",
+          "name": "The Reality Patch",
+          "description": "The bylaws are load-bearing stitches in the world; break enough and the neighborhood unravels. The board knows, and is exhausted.",
+          "detail": "THE REALITY PATCH — The bylaws are load-bearing. They are not arbitrary rules; they are stitches in the world. Each rule the residents have followed for thirty years has kept the neighborhood from quietly unraveling at the edges. Break enough of them and the neighborhood ceases to exist as a place that other people can drive into. The board knows. The board has known for a long time. The board is exhausted."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Your standing",
