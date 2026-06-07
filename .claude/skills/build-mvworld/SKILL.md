@@ -70,7 +70,7 @@ Walk the campaign and separate the two kinds of data:
 | Read it (→ world) | Skip it (→ the played story) |
 |---|---|
 | `characters/*.md` — **NPCs only** | `characters/<the PC>.md` — the old player character |
-| `locations/*/index.md` + map JSON | `campaign/scenes/**` — transcripts, summaries |
+| `locations/*/index.md` + map JSON | `campaign/scenes/**` — the plot/timeline (but **mine the prose** — see below) |
 | `factions/*.md` | `campaign/log.json` — episodic scene-by-scene record |
 | `lore/*.md` | `campaign/compendium.json` — player-learned knowledge |
 | `items/*.md` | `campaign/session-recaps/**` |
@@ -78,6 +78,20 @@ Walk the campaign and separate the two kinds of data:
 | `state/maps.json` | `state/combat.json`, `state/objectives.json` (resolved plot) |
 | `state/clocks.json` calendar (epoch only) | `config.json` players/usage/recovery |
 | `config.json`: `system`, `genre`, `mood`, `difficulty` | |
+
+**Mine the transcript — the entity files are only a Haiku summary.** This is the
+single biggest quality lever in the whole conversion. The `characters/`,
+`locations/`, and `lore/` files were written by the in-game **Scribe, which runs
+on a small, fast model** — they're a *lossy* index: flattened, generic, often
+padded with duplicated changelog lines. The real material lives in the
+**transcript** (`campaign/scenes/**`, plus any `session-recaps/`): the actual
+voice, specificity, and texture of the world as it was played. You write far
+better entities than the Scribe does — so **read the scenes yourself and
+synthesize from them**, using the entity files only as a checklist of *what
+exists* (the cast and places to cover) and the transcript for *what they are
+truly like*. This refines "skip the scenes" in the table above: you skip the
+**plot and timeline** (what happened, in what order), but you read the prose for
+everything standing and worth preserving.
 
 Identify the PC via `config.json` → `players[].character` — **then check the
 `type` front matter of every `characters/*.md` too.** Campaigns used for PC-swap
