@@ -104,7 +104,7 @@ const SETUP_SCENARIOS: SetupScenario[] = [
   {
     name: "setup-quickstart-fantasy",
     inputs: [
-      "I'm Sam. Quick start, please — pick a fantasy world for me, something with intrigue.",
+      "I'm Sam, an adult. Quick start, please — pick a fantasy world for me, something with intrigue.",
       "That world sounds great, let's use it.",
       "My character is Aldric, a weathered sellsword chasing a blood debt. Keep it simple — no extra mechanics. I'm an adult, surprise me with the rest.",
     ],
