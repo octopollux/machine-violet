@@ -79,12 +79,23 @@ Walk the campaign and separate the two kinds of data:
 | `state/clocks.json` calendar (epoch only) | `config.json` players/usage/recovery |
 | `config.json`: `system`, `genre`, `mood`, `difficulty` | |
 
-Identify the PC by cross-referencing `config.json` → `players[].character`. Every
-*other* character file is an NPC and is fair game.
+Identify the PC via `config.json` → `players[].character` — **then check the
+`type` front matter of every `characters/*.md` too.** Campaigns used for PC-swap
+testing leave *orphaned* `type: PC` files the config no longer lists; exclude any
+`type: PC`, not just the one config names. Skip `party.md` (`type: Party` — a
+roster, not an entity). Everything else (`type: character`/`NPC`) is fair game.
 
 **Read entity bodies for their DM-facing truth.** NPC files carry dispositions
 and secrets in their body/front matter — that's exactly what a seed should
-preserve so a *new* player can rediscover them.
+preserve so a *new* player can rediscover them. Two cautions from real
+conversions: (1) bodies are thick with **episodic accretion** — a `## Changelog`
+and scene-numbered, PC-named events; keep the standing profile and drop/recast
+those into latent tendencies ("has watched the city consume a prior arrival" —
+not "told Oros X in scene 2"). (2) Much of `lore/` and `items/` is actually **PC
+backstory**, not world — front matter like `Owner:` / `Associated Character:
+[[ThePC]]`, or bodies that say "carried by X". A fresh amnesiac arrival must not
+inherit the old PC's heirlooms or private memory-motifs; exclude them (or
+genericize into a standalone world fact).
 
 ---
 
@@ -137,7 +148,13 @@ Per entity, decide how it relates to the forks — this is the core judgment cal
   variant; omit `appliesWhen`. (Most NPCs/factions/lore.)
 - **Tag → branch-scoped.** Set `appliesWhen: { fork, option }` so it materializes
   only when that branch is chosen (e.g. a data-hall location only in the sci-fi
-  wrapper). The referenced fork + option must exist.
+  wrapper). The ids must match what the engine *resolves*, not what you'd guess:
+  for a fork lifted from a legacy `suboption`, the fork id is `slugify(label)` and
+  the option id is `slugify(name)`, and **`slugify` strips a leading article**. So
+  the `"The city"` suboption with a `"The Dreaming Souk"` choice is
+  `appliesWhen: { fork: "city", option: "dreaming-souk" }` — *not* `the-city` /
+  `the-dreaming-souk`. The honesty test (`world-forks.test.ts`) fails loudly if a
+  ref doesn't resolve, so run it after scoping.
 - **Bake closed.** Drop the fork entirely and ship one concrete variant — loses
   open-endedness but every asset applies.
 
@@ -187,3 +204,16 @@ play-state).
 - **Scope is small and manual.** This is meant for a few dozen conversions, done
   with care, not a batch pipeline. Spend the effort on the `detail` projection —
   that's the part only judgement can do.
+- **Enriching an existing seed** (vs. authoring a new one). A played campaign is
+  always *one* variant of the seed it came from. To fold its world back into a
+  multi-variant bundled seed, leave the existing premise / `forks` / `suboptions`
+  untouched and layer the discovered NPCs and locations on as `entities`, each
+  `appliesWhen`-scoped to the suboption that was actually played — so the other
+  variants stay clean. Worked example: [`worlds/palimpsest.mvworld`](../../../worlds/palimpsest.mvworld)
+  enriched from a Dreaming-Souk playthrough, every entity scoped to
+  `{ fork: "city", option: "dreaming-souk" }`.
+- **Don't seed empty stubs.** A blank `maps.json` grid (no regions/terrain) or a
+  thin, variant-dependent calendar adds nothing — skip it rather than carry a
+  hollow shell. And non-ASCII names slugify poorly (`Mizân` → `miz-n`); key the
+  entity with a clean ASCII slug and accept that `[[Mizân]]` wikilinks won't
+  resolve to it.
