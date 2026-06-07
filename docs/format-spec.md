@@ -143,6 +143,8 @@ Everything else is created during play.
   },
   "campaign_scope": "few-sessions",       // Optional. "one-shot" | "few-sessions" | "grand-campaign" | "open-ended". Shapes DM pacing.
   "setup_handoff": "Player wants to...",  // Optional. Postcard from the setup agent for the DM's first-turn priming. Injected once.
+  "opening_scene": "Open with the PC...",  // Optional. One-sentence opening-scene directive the setup agent composes at finalize — where/how the DM opens turn 1
+                                          // (a character-grounded beat, not the main objective). Injected once into first-turn priming alongside setup_handoff.
 
   // DM personality
   "dm_personality": {
@@ -915,6 +917,8 @@ A campaign seed is a world file with only the identity and DM-only fields:
 The setup agent receives world summaries (name, summary, genres, slug) in its system prompt. It uses the `load_world` tool to fetch a world's **forks** and config hints by slug (§10.6) — player forks to present, agent forks for it to decide (rolling the `roll_dice` tool). It resolves every fork and reports the choices in `finalize_setup.fork_selections`.
 
 The setup agent only ever sees this **thin slice** — the forks (labels/options/ids) and the suggested `system`/`mood`/`difficulty`/`campaign_scope`. It does **not** receive the DM-only premise prose: `campaign_detail` is assembled in code at finalize from the seed's base + the selected branches (§10.6). A world's rich inline content (`entities`, `maps`, `rules`, `calendar`) is likewise never loaded into the agent's context; it is materialized in code at build time (§10.5).
+
+At finalize the setup agent also composes a one-sentence **opening-scene directive** (`finalize_setup.opening_scene` → `config.opening_scene`) telling the DM where/how to open turn 1. This is deliberately the setup agent's job, not the DM's: the DM's "you are a DM" framing biases it toward dropping the player straight onto the main objective, whereas a good campaign usually opens on a character-grounded beat. A seed can nudge the chosen opening by putting a "begins in…" hint in `setup_detail` (the setup-agent-only channel, §10.7); the agent honors it if present. The directive is injected once into the DM's first-turn priming ([game-initialization.md](game-initialization.md#step-4-handoff-to-the-dm)) and never reaches the cached DM prefix.
 
 ### 10.5 Importing rich worlds (materialization)
 

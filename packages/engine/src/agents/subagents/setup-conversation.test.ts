@@ -326,6 +326,46 @@ describe("createSetupConversation", () => {
     expect(result.finalized!.handoffNote).toBeUndefined();
   });
 
+  it("finalize_setup passes through opening_scene", async () => {
+    const scene = "Open with Kael asleep in a hayloft, woken by a stranger saddling a horse below.";
+    const input = { ...FINALIZE_INPUT, opening_scene: scene };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Onward!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.openingScene).toBe(scene);
+  });
+
+  it("finalize_setup leaves openingScene undefined when the model omits it", async () => {
+    // Defensive: the schema marks opening_scene required, but handleFinalize
+    // must not crash if the model misbehaves.
+    const provider = mockProvider([
+      finalizeResponse(FINALIZE_INPUT),
+      textResponse("Onward!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.openingScene).toBeUndefined();
+  });
+
+  it("finalize_setup trims whitespace-only opening_scene to undefined", async () => {
+    const input = { ...FINALIZE_INPUT, opening_scene: "   \n  \t  " };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Onward!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized!.openingScene).toBeUndefined();
+  });
+
   it("finalize_setup passes through a valid campaign_scope", async () => {
     const input = { ...FINALIZE_INPUT, campaign_scope: "grand-campaign" };
     const provider = mockProvider([

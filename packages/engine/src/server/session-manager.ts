@@ -1190,11 +1190,16 @@ export class SessionManager {
     // Priming message layout:
     //   1. Bracketed stage direction: "[Session begins. Set the scene. <premise>. <PC>.]"
     //      This is the cue the DM is trained to react to.
-    //   2. If the setup agent wrote a handoff note, a blank line + the note verbatim.
+    //   2. If the setup agent declared an opening scene, a blank line + the
+    //      one-sentence directive. This is where/how to open turn 1 — a
+    //      character-grounded beat the setup agent chose so the DM doesn't
+    //      default to dropping the player onto the main objective. One-shot
+    //      read; persists in config.json for resume only.
+    //   3. If the setup agent wrote a handoff note, a blank line + the note verbatim.
     //      The note carries the player's own words and any setup-agent notes that
     //      don't survive into structured config. It's a one-shot read; after the
     //      opening turn succeeds it remains in config.json purely for resume.
-    //   3. A "Pre-existing entities" block listing every entity file already on
+    //   4. A "Pre-existing entities" block listing every entity file already on
     //      disk after setup scaffolding. This is the "chain of custody" the DM
     //      relies on to avoid creating duplicate files (e.g. writing a fresh
     //      character sheet at `Janey Bruce.md` when `janey-bruce.md` already
@@ -1205,6 +1210,10 @@ export class SessionManager {
     const pc = config.players[0];
     if (pc) openingParts.push(`The player character is ${pc.character}.`);
     let priming = openingParts.join(" ") + "]";
+    if (config.opening_scene && config.opening_scene.trim()) {
+      priming += "\n\nOpen on this beat, then let the scene develop naturally:\n"
+        + config.opening_scene.trim();
+    }
     if (config.setup_handoff && config.setup_handoff.trim()) {
       priming += "\n\nSetup agent's handoff note:\n" + config.setup_handoff.trim();
     }

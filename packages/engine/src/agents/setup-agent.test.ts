@@ -75,6 +75,18 @@ describe("buildCampaignConfig", () => {
     expect(config.setup_handoff).toBeUndefined();
   });
 
+  it("passes openingScene through as opening_scene", () => {
+    const result = makeSetupResult({ openingScene: "Open with Kael asleep in a hayloft, woken by a stranger saddling a horse below." });
+    const config = buildCampaignConfig(result);
+    expect(config.opening_scene).toBe("Open with Kael asleep in a hayloft, woken by a stranger saddling a horse below.");
+  });
+
+  it("omits opening_scene when openingScene is undefined", () => {
+    const result = makeSetupResult();
+    const config = buildCampaignConfig(result);
+    expect(config.opening_scene).toBeUndefined();
+  });
+
   it("passes personality detail through to config", () => {
     const result = makeSetupResult({
       personality: { name: "Test", prompt_fragment: "Terse.", detail: "Use callbacks." },

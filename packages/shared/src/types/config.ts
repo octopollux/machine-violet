@@ -117,6 +117,18 @@ export interface CampaignConfig {
    * succeeds.
    */
   setup_handoff?: string;
+  /**
+   * One-sentence opening-scene directive composed by the setup agent, telling
+   * the DM where/how to open the campaign's first turn (e.g. "The PC wakes in
+   * a warm bed to hammering at the door" or "Begins mid-flight on the back of
+   * their pet dragon"). Counters the DM's default pull toward dropping the
+   * player straight onto the main objective — most stories should open on a
+   * character-grounded beat, then let plot ensue. Injected once into the
+   * first-turn priming message alongside `setup_handoff`; persists here for
+   * resume-from-disk after a mid-first-turn crash. Never re-injected after the
+   * opening narration succeeds.
+   */
+  opening_scene?: string;
   dm_personality: DMPersonality;
   players: PlayerConfig[];
   combat: CombatConfig;
