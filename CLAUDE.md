@@ -57,7 +57,7 @@ Live API key in `.env` with limited credit. Default dev override uses Sonnet for
 Type checks and unit tests do not prove a cross-cutting flow works — anything touching UI flow, session lifecycle, the setup agent, the DM loop, save/load, or a path that spans server + client + WebSocket. The e2e strategy is **three tiers, deterministic-first** (full picture: [docs/e2e-harness.md](docs/e2e-harness.md), [docs/golden-tapes.md](docs/golden-tapes.md)):
 
 1. **Tier 1 — component/render:** `ink-testing-library`, co-located in `packages/client-ink`.
-2. **Tier 2 — deterministic golden replay (the regression backbone):** real `GameEngine` replaying recorded **golden tapes**, offline, ~4s. **This is the everyday "did I break it?" gate.**
+2. **Tier 2 — deterministic golden replay (the regression backbone):** the real `GameEngine` (DM loop) and `createSetupConversation` (setup agent → finalize → handoff) replaying recorded **golden tapes**, offline, ~4s. **This is the everyday "did I break it?" gate.** Touch the DM loop or the setup agent → expect to re-record the matching corpus.
 
    ```bash
    npm run golden:verify     # replay goldens offline (no API key)
