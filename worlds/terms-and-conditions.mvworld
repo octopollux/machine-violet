@@ -8,7 +8,35 @@
     "modern",
     "horror"
   ],
-  "detail": "The button was blue. The button was right there. The player scrolled fast and clicked Agree without reading because everyone does. Within the hour, a polite letter arrives on cream paper. The terms have begun. The player has thirty days of trial period and the document grows when read.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE LIEN — Small soul-lien. Nothing huge. The player can outlive it if they read the rest of the document inside the trial period and exercise the opt-out clause in Section 117. The catch is the document is forty thousand pages and adds three pages every time the player reads one. The trial ends in thirty days. The math is doable. Barely.\n2. THE CO-SIGN — The player co-signed someone else's damnation. The principal is in the next room and has been for some time. They are friendly. They were the friend who recommended the streaming service. They did not realize what they were doing either. The player's signature is what made the principal's contract enforceable.\n3. THE ONBOARDING — The player agreed to become the next demon. This is not a punishment. This is onboarding. There is a benefits package. The previous incumbent is rotating out and has questions for the player about the handover. Outside the player's window there is now a building that was not there yesterday with the player's name on it.\n\nDM approach:\n- Tone: legalese comedy with the slow heat of arbitration looming. The horror is being a small reasonable person inside a large unreasonable document.\n- NPCs derive from the variant: a kind paralegal who will help with the read-down (1), the principal in the next room and their good intentions (2), the previous demon, weary and helpful (3).\n- Pacing: each clause is a scene. Arbitration is in Hell. The document grows. The player can be reading and writing the document at the same time.\n- Seed early: the first physical manifestation of a small obligation. A bill the player owes that is itemized in a font no printer should produce.\n\nPacing: Each clause is a scene. The document's page count is the visible clock — it grows when read. Arbitration is in Hell on day thirty. The player can see the calendar advance and the page count rise together.",
+  "detail": "The button was blue. The button was right there. The player scrolled fast and clicked Agree without reading because everyone does. Within the hour, a polite letter arrives on cream paper. The terms have begun. The player has thirty days of trial period and the document grows when read.\n\nDM approach:\n- Tone: legalese comedy with the slow heat of arbitration looming. The horror is being a small reasonable person inside a large unreasonable document.\n- NPCs derive from the variant: a kind paralegal who will help with the read-down (1), the principal in the next room and their good intentions (2), the previous demon, weary and helpful (3).\n- Pacing: each clause is a scene. Arbitration is in Hell. The document grows. The player can be reading and writing the document at the same time.\n- Seed early: the first physical manifestation of a small obligation. A bill the player owes that is itemized in a font no printer should produce.\n\nPacing: Each clause is a scene. The document's page count is the visible clock — it grows when read. Arbitration is in Hell on day thirty. The player can see the calendar advance and the page count rise together.",
+  "forks": [
+    {
+      "id": "the-crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose to fit the player's tone. Do NOT reveal early.",
+      "options": [
+        {
+          "id": "the-lien",
+          "name": "The Lien",
+          "description": "A small soul-lien the player can outlive by reading the whole growing document and opting out before the thirty-day trial ends.",
+          "detail": "THE LIEN — Small soul-lien. Nothing huge. The player can outlive it if they read the rest of the document inside the trial period and exercise the opt-out clause in Section 117. The catch is the document is forty thousand pages and adds three pages every time the player reads one. The trial ends in thirty days. The math is doable. Barely."
+        },
+        {
+          "id": "the-co-sign",
+          "name": "The Co-Sign",
+          "description": "The player unknowingly co-signed a friend's damnation, and the principal is the well-meaning person in the next room.",
+          "detail": "THE CO-SIGN — The player co-signed someone else's damnation. The principal is in the next room and has been for some time. They are friendly. They were the friend who recommended the streaming service. They did not realize what they were doing either. The player's signature is what made the principal's contract enforceable."
+        },
+        {
+          "id": "the-onboarding",
+          "name": "The Onboarding",
+          "description": "The player agreed to become the next demon — not a punishment, an onboarding, complete with a benefits package and a weary outgoing incumbent.",
+          "detail": "THE ONBOARDING — The player agreed to become the next demon. This is not a punishment. This is onboarding. There is a benefits package. The previous incumbent is rotating out and has questions for the player about the handover. Outside the player's window there is now a building that was not there yesterday with the player's name on it."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "What you were trying to do",

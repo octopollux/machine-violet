@@ -7,7 +7,35 @@
     "post-apocalyptic",
     "sci-fi"
   ],
-  "detail": "The ice is melting on a schedule the world stopped publishing decades ago. What is coming out is not a fossil record. The first thing the player encountered under the ice was warm to the touch and was responding to inputs. The second thing the player encountered greeted them by name.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. CUSTOMER SERVICE — A civilization froze mid-stride and their infrastructure didn't notice. The lights stayed on under the ice. The AI assistants stayed in their roles. The thaw has exposed a network of automated systems that are very pleased to see the player, which they are processing as a new customer, and which have services to offer in a currency the player does not have.\n2. THE DEFENSE PROTOCOL — A weapon system was buried with a ten-thousand-year defensive perimeter. The perimeter is intact and the perimeter has just noticed the player. The system was designed to threat-assess intruders and to escalate methodically. Negotiation may be possible. The system has procedures for that, too.\n3. THE SLEEPERS — The people in the ice are not dead. They are paused. The thaw is the wake-up call and the wake-up is uneven, partial, by region. Some of them remember why they were frozen. Some of them think it has been a single night. The player will meet one before the player meets the rest.\n\nDM approach:\n- Tone: cold, bright, the specific silence of large ice. The horror is in the patience of what was buried.\n- NPCs to seed: the first emergent voice (AI, sentry, or sleeper, depending on variant); a fellow survivor on the surface who saw something earlier and didn't believe themselves; a leader from a settlement downstream who needs the thaw to keep coming.\n- Pacing structure: temperature is the clock. Every degree exposes a new horror. The player can read the thermometer or the calving rate of the ice. The world below is layered and the layers reveal in order.\n- Seed early: a piece of intact technology too clean for its provenance; a signal on a frequency that should be empty; a track in the snow that goes one way only.\n- The ice should be tactile. The player's hands hurt. The light is wrong. Things echo.\n\nPacing: Temperature is the clock; every degree exposes a new horror. Track the season, the daily melt, the depth of the exposure. The player can use the thermometer, the cracking sounds at night, the changing horizon line.",
+  "detail": "The ice is melting on a schedule the world stopped publishing decades ago. What is coming out is not a fossil record. The first thing the player encountered under the ice was warm to the touch and was responding to inputs. The second thing the player encountered greeted them by name.\n\nDM approach:\n- Tone: cold, bright, the specific silence of large ice. The horror is in the patience of what was buried.\n- NPCs to seed: the first emergent voice (AI, sentry, or sleeper, depending on variant); a fellow survivor on the surface who saw something earlier and didn't believe themselves; a leader from a settlement downstream who needs the thaw to keep coming.\n- Pacing structure: temperature is the clock. Every degree exposes a new horror. The player can read the thermometer or the calving rate of the ice. The world below is layered and the layers reveal in order.\n- Seed early: a piece of intact technology too clean for its provenance; a signal on a frequency that should be empty; a track in the snow that goes one way only.\n- The ice should be tactile. The player's hands hurt. The light is wrong. Things echo.\n\nPacing: Temperature is the clock; every degree exposes a new horror. Track the season, the daily melt, the depth of the exposure. The player can use the thermometer, the cracking sounds at night, the changing horizon line.",
+  "forks": [
+    {
+      "id": "crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early — this is what the campaign slowly turns on.",
+      "options": [
+        {
+          "id": "customer-service",
+          "name": "Customer Service",
+          "description": "A frozen civilization's automated systems are still running and processing the player as a new customer.",
+          "detail": "CUSTOMER SERVICE — A civilization froze mid-stride and their infrastructure didn't notice. The lights stayed on under the ice. The AI assistants stayed in their roles. The thaw has exposed a network of automated systems that are very pleased to see the player, which they are processing as a new customer, and which have services to offer in a currency the player does not have."
+        },
+        {
+          "id": "the-defense-protocol",
+          "name": "The Defense Protocol",
+          "description": "A buried weapon system's ten-thousand-year perimeter is intact and has just noticed the player.",
+          "detail": "THE DEFENSE PROTOCOL — A weapon system was buried with a ten-thousand-year defensive perimeter. The perimeter is intact and the perimeter has just noticed the player. The system was designed to threat-assess intruders and to escalate methodically. Negotiation may be possible. The system has procedures for that, too."
+        },
+        {
+          "id": "the-sleepers",
+          "name": "The Sleepers",
+          "description": "The people in the ice are paused, not dead, and the thaw is waking them unevenly.",
+          "detail": "THE SLEEPERS — The people in the ice are not dead. They are paused. The thaw is the wake-up call and the wake-up is uneven, partial, by region. Some of them remember why they were frozen. Some of them think it has been a single night. The player will meet one before the player meets the rest."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Who you are at the thaw",

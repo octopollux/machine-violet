@@ -7,7 +7,36 @@
     "fantasy",
     "horror"
   ],
-  "detail": "The heart-tree at the center of the forest is dying. The bark is sloughing in plates the size of doors. The leaves at the crown have gone the wrong color for the wrong season. And in every direction from its trunk, the rest of the forest is going mad with growth — saplings as thick as a man's leg in a week, fruit ripening on branches that shouldn't bear, paths closing over behind anyone who walks them.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. MAKING ROOM — The new growth is the heart-tree's children, vying for the throne. The tree is shedding itself outward, and what germinates from those seeds is a generation of small contenders, each more like the parent than the last, each willing to grow over the others. By the time the heart-tree falls, one of them will be ready, and only one. The forest is a slow election.\n2. EATEN FROM BELOW — Something is feeding on the heart-tree's roots from a chamber the surface forest has known about and protected for centuries. The wild growth is the forest's panic — pulling up nutrients, throwing out seed, getting its succession plans in order before the eater finishes. The druids of the inner ring have always known. They've been hiding the eater, and now they're losing the secret.\n3. THE OLD AXE-MARK — A century ago someone struck the heart-tree once, badly, and walked away. The wound healed over and was forgotten. The tree has been dying ever since, slowly. The killer is still alive, high in the order that tends the forest, and the wound has just reached the cambium. The forest knows now. The forest is naming the killer in the only language it has, which is overgrowth.\n\nDM approach:\n- Tone: green, suffocating, fertile in a way that is no longer comforting. Sap smells like something rotting. Bird calls overlap.\n- NPCs by variant: a sapling-priest who has begun to speak in the voice of the tree (1); a druid of the inner ring whose hands shake when asked about the lower chambers (2); an aged forester who refuses to enter the heart-grove anymore, and won't say what year he stopped (3).\n- Pacing structure: the forest's wrongness arrives in specific small wrongnesses — a path that wasn't there yesterday, a tree that bore fruit out of season, an animal that should be hibernating awake at noon.\n- Seed early: the heart-tree's bark scattered like discarded clothing; the bees behaving as if it were spring; an apple from the wrong month, tasting correct.\n- The horror is not the dying. The horror is the speed of replacement.\n\nPacing: The forest's mood is wrong in specific ways the player can catalog — animals louder, paths shifting, fruit ripening out of season. Each session, the wrongness escalates by one named symptom. By the fifth, the heart-tree's crown is bare and the new growth is taller than the cottages at the wood's edge.\n\n<!--include:Pacing.TimedCampaigns-->",
+  "setup_detail": "<!--include:Pacing.TimedCampaigns-->",
+  "detail": "The heart-tree at the center of the forest is dying. The bark is sloughing in plates the size of doors. The leaves at the crown have gone the wrong color for the wrong season. And in every direction from its trunk, the rest of the forest is going mad with growth — saplings as thick as a man's leg in a week, fruit ripening on branches that shouldn't bear, paths closing over behind anyone who walks them.\n\nDM approach:\n- Tone: green, suffocating, fertile in a way that is no longer comforting. Sap smells like something rotting. Bird calls overlap.\n- NPCs by variant: a sapling-priest who has begun to speak in the voice of the tree (1); a druid of the inner ring whose hands shake when asked about the lower chambers (2); an aged forester who refuses to enter the heart-grove anymore, and won't say what year he stopped (3).\n- Pacing structure: the forest's wrongness arrives in specific small wrongnesses — a path that wasn't there yesterday, a tree that bore fruit out of season, an animal that should be hibernating awake at noon.\n- Seed early: the heart-tree's bark scattered like discarded clothing; the bees behaving as if it were spring; an apple from the wrong month, tasting correct.\n- The horror is not the dying. The horror is the speed of replacement.\n\nPacing: The forest's mood is wrong in specific ways the player can catalog — animals louder, paths shifting, fruit ripening out of season. Each session, the wrongness escalates by one named symptom. By the fifth, the heart-tree's crown is bare and the new growth is taller than the cottages at the wood's edge.",
+  "forks": [
+    {
+      "id": "the-crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early — this is what the campaign slowly turns on.",
+      "options": [
+        {
+          "id": "making-room",
+          "name": "Making Room",
+          "description": "The wild growth is the heart-tree's children vying for the throne; the forest is a slow election.",
+          "detail": "MAKING ROOM — The new growth is the heart-tree's children, vying for the throne. The tree is shedding itself outward, and what germinates from those seeds is a generation of small contenders, each more like the parent than the last, each willing to grow over the others. By the time the heart-tree falls, one of them will be ready, and only one. The forest is a slow election."
+        },
+        {
+          "id": "eaten-from-below",
+          "name": "Eaten From Below",
+          "description": "Something feeds on the roots from a hidden chamber; the inner-ring druids have always known and are losing the secret.",
+          "detail": "EATEN FROM BELOW — Something is feeding on the heart-tree's roots from a chamber the surface forest has known about and protected for centuries. The wild growth is the forest's panic — pulling up nutrients, throwing out seed, getting its succession plans in order before the eater finishes. The druids of the inner ring have always known. They've been hiding the eater, and now they're losing the secret."
+        },
+        {
+          "id": "the-old-axe-mark",
+          "name": "The Old Axe-Mark",
+          "description": "A century-old wound from a killer still high in the order; the forest is now naming them in overgrowth.",
+          "detail": "THE OLD AXE-MARK — A century ago someone struck the heart-tree once, badly, and walked away. The wound healed over and was forgotten. The tree has been dying ever since, slowly. The killer is still alive, high in the order that tends the forest, and the wound has just reached the cambium. The forest knows now. The forest is naming the killer in the only language it has, which is overgrowth."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Your standing",

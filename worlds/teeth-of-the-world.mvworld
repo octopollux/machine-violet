@@ -6,7 +6,35 @@
   "genres": [
     "fantasy"
   ],
-  "detail": "The mountains are moving. Slowly — a hand's breadth a day, a span a week, the height of a man over a season — but unmistakably. Stones that marked the boundary of a village's grazing have walked themselves into the next valley. The shadow of the great peak no longer falls where the temple was oriented to receive it. The roads through the passes are subtly wrong, and the old men who walked them in their youth are the first to notice.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE SUMMONS — The mountains are sleeping titans, and something has called them. They are answering at the only speed they remember. The summons is loud only to them; no human ear can catch it, but the dogs are restless and the birds have changed their routes. Whatever called them will be where they are going, and the going may take a generation.\n2. THE MIGRATION — These are not titans but stone organisms, continent-scale, with a season. This has happened before, very long ago, and the records of it are scripture in the older orders. The mountains are doing what mountains do once every age. The species is just larger than the species that has been watching it.\n3. THE LEAVING — The mountains are leaving, and where they walked becomes uninhabitable. The land they vacate is wrong in ways that take a year to manifest — the soil refuses, the water turns, the children born there are quiet. A glacier-slow apocalypse. The mountains know. They are sorry, in the way mountains are sorry, which is silent.\n\nDM approach:\n- Tone: geologic, patient, awed. Scenes are long, and the world is older than the campaign.\n- NPCs by variant: a hermit who has stopped sleeping because he can hear the summons in his teeth (1); a court astrologer whose ancient texts have suddenly become operational manuals (2); a child born in a valley the mountain left, who does not cry (3).\n- Seed early: a survey marker the player remembers, in a new place; the way the prevailing wind has shifted; a temple's sunrise alignment off by a finger's width.\n- Pacing structure: each session is a season or a generation, depending on scale chosen. The world is slow and the player's life is fast.\n- Resist the urge to make this an action setting. The drama is the realization, the choice to stay or go, the inheritance of the news.\n\nPacing: Each in-game beat is a season or a generation. Settlements measure their lives against landmarks that no longer exist — the stone the bride was kissed on, the rock where the priest stood. Players can track the clock by what has stopped being where it was.",
+  "detail": "The mountains are moving. Slowly — a hand's breadth a day, a span a week, the height of a man over a season — but unmistakably. Stones that marked the boundary of a village's grazing have walked themselves into the next valley. The shadow of the great peak no longer falls where the temple was oriented to receive it. The roads through the passes are subtly wrong, and the old men who walked them in their youth are the first to notice.\n\nDM approach:\n- Tone: geologic, patient, awed. Scenes are long, and the world is older than the campaign.\n- NPCs by variant: a hermit who has stopped sleeping because he can hear the summons in his teeth (1); a court astrologer whose ancient texts have suddenly become operational manuals (2); a child born in a valley the mountain left, who does not cry (3).\n- Seed early: a survey marker the player remembers, in a new place; the way the prevailing wind has shifted; a temple's sunrise alignment off by a finger's width.\n- Pacing structure: each session is a season or a generation, depending on scale chosen. The world is slow and the player's life is fast.\n- Resist the urge to make this an action setting. The drama is the realization, the choice to stay or go, the inheritance of the news.\n\nPacing: Each in-game beat is a season or a generation. Settlements measure their lives against landmarks that no longer exist — the stone the bride was kissed on, the rock where the priest stood. Players can track the clock by what has stopped being where it was.",
+  "forks": [
+    {
+      "id": "crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose to fit the player's tone. Do NOT reveal early — this is what the campaign slowly turns on.",
+      "options": [
+        {
+          "id": "the-summons",
+          "name": "The Summons",
+          "description": "The mountains are sleeping titans answering a call only they can hear; the going may take a generation.",
+          "detail": "THE SUMMONS — The mountains are sleeping titans, and something has called them. They are answering at the only speed they remember. The summons is loud only to them; no human ear can catch it, but the dogs are restless and the birds have changed their routes. Whatever called them will be where they are going, and the going may take a generation."
+        },
+        {
+          "id": "the-migration",
+          "name": "The Migration",
+          "description": "These are continent-scale stone organisms doing what they do once an age; the older orders' scripture is the record.",
+          "detail": "THE MIGRATION — These are not titans but stone organisms, continent-scale, with a season. This has happened before, very long ago, and the records of it are scripture in the older orders. The mountains are doing what mountains do once every age. The species is just larger than the species that has been watching it."
+        },
+        {
+          "id": "the-leaving",
+          "name": "The Leaving",
+          "description": "The mountains are leaving and the land they vacate turns uninhabitable; a glacier-slow apocalypse they are silently sorry for.",
+          "detail": "THE LEAVING — The mountains are leaving, and where they walked becomes uninhabitable. The land they vacate is wrong in ways that take a year to manifest — the soil refuses, the water turns, the children born there are quiet. A glacier-slow apocalypse. The mountains know. They are sorry, in the way mountains are sorry, which is silent."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Your scale",

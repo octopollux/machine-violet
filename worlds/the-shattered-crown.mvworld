@@ -6,7 +6,35 @@
   "genres": [
     "fantasy"
   ],
-  "detail": "Roll or choose the throne's secret (DM only — do NOT reveal to the player):\n1. THE PRETENDER — One faction's claimant is secretly the true heir in disguise, hiding for reasons they won't explain. The player may end up serving them without knowing.\n2. THE EMPTY THRONE — The heir faked their death. They're watching from the margins, testing who deserves to rule. They will approach the player mid-campaign with a terrible bargain.\n3. THE SUCCESSION CURSE — Every claimant who sits the throne dies within a week. The throne itself is the antagonist — a bound entity that feeds on sovereignty.\n\nFaction texture: All three factions have a sympathetic leader and an inner circle with its own agenda. The player's starting faction colors their first impression of the conflict, but all three are equally complex.\n\nPacing: Start the player entangled with their chosen faction before they understand the full picture. Reveal the second faction as nuanced allies-or-enemies by mid-campaign. The third faction's true nature is the late-game twist. Use ticking clocks — a coronation deadline, a foreign army massing at the border, a plague in the capital.",
+  "detail": "Faction texture: All three factions have a sympathetic leader and an inner circle with its own agenda. The player's starting faction colors their first impression of the conflict, but all three are equally complex.\n\nPacing: Start the player entangled with their chosen faction before they understand the full picture. Reveal the second faction as nuanced allies-or-enemies by mid-campaign. The third faction's true nature is the late-game twist. Use ticking clocks — a coronation deadline, a foreign army massing at the border, a plague in the capital.",
+  "forks": [
+    {
+      "id": "thrones-secret",
+      "label": "The throne's secret",
+      "chooser": "agent",
+      "prompt": "Roll or choose to fit the player's tone. Do NOT reveal to the player early.",
+      "options": [
+        {
+          "id": "the-pretender",
+          "name": "The Pretender",
+          "description": "One faction's claimant is secretly the true heir in disguise; the player may serve them unknowing.",
+          "detail": "THE PRETENDER — One faction's claimant is secretly the true heir in disguise, hiding for reasons they won't explain. The player may end up serving them without knowing."
+        },
+        {
+          "id": "the-empty-throne",
+          "name": "The Empty Throne",
+          "description": "The heir faked their death and watches from the margins, testing who deserves to rule.",
+          "detail": "THE EMPTY THRONE — The heir faked their death. They're watching from the margins, testing who deserves to rule. They will approach the player mid-campaign with a terrible bargain."
+        },
+        {
+          "id": "the-succession-curse",
+          "name": "The Succession Curse",
+          "description": "Every claimant who sits the throne dies within a week; the throne itself is the antagonist.",
+          "detail": "THE SUCCESSION CURSE — Every claimant who sits the throne dies within a week. The throne itself is the antagonist — a bound entity that feeds on sovereignty."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Your starting faction",

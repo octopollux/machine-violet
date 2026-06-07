@@ -7,7 +7,35 @@
     "fantasy",
     "horror"
   ],
-  "detail": "The drill went through. The shaft below the lowest gallery opened on air, not stone. Three crews went down. None came back. The bell at the mineshaft, which has not rung in living memory, started ringing on its own the night after. The town's economy depends on the mine reopening. The town's other priorities are about to be renegotiated.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE SLEEPER — A god is buried below the seam. It has been asleep so long the stone forgot it was there. The mining was the alarm clock. It is stretching, in the patient way of things measured in eras, and the players are very small and very interesting to it. It does not yet have a use for the town. It will.\n2. THE BURIED CIVILIZATION — There are people down there. They have been down there long enough to have their own kings and their own grievances. The surface is the roof of their world. The new shaft is an unauthorized hole punched into their sky. They are surprised, then organized, and they are coming up to discuss the matter.\n3. THE PRISON — Something was bound below, and the mining was the breaking of the binding. The miners were jailbreakers without knowing it. Payment for the work is owed. The prisoner has a list of names, in an order, and the first name on the list is one of the missing crews' foreman. The second is somebody in the town who has not yet been told.\n\nDM approach:\n- Tone: stone-cold air rising from a hole, the silence of a shaft that should be loud with work, a bell ringing slowly and alone.\n- NPCs: a foreman missing three crews; a company representative with bad news to deliver gently; a child whose father was on the last shift; the cleric the diocese sent because of the bell.\n- Pacing structure: one mine-bell ring per dawn. The bell-keeper does not know how to silence it. The bell tells everyone in earshot what the count is.\n- Seed early: a single object brought up by a miner who came back changed. A scrap of metal that does not belong in this geology. A song the missing foreman taught his daughter, now being hummed by someone who has never met him.\n- The mine is not a setting. It is a presence. Let the town behave like a town that knows it is downstream of something.\n\nPacing: one mine-bell ring at every dawn. The town's economy depends on the mine reopening, and the company is making decisions on a calendar the town can read on the saloon's chalkboard. The player can track the clock by the bell and by the freight schedule.",
+  "detail": "The drill went through. The shaft below the lowest gallery opened on air, not stone. Three crews went down. None came back. The bell at the mineshaft, which has not rung in living memory, started ringing on its own the night after. The town's economy depends on the mine reopening. The town's other priorities are about to be renegotiated.\n\nDM approach:\n- Tone: stone-cold air rising from a hole, the silence of a shaft that should be loud with work, a bell ringing slowly and alone.\n- NPCs: a foreman missing three crews; a company representative with bad news to deliver gently; a child whose father was on the last shift; the cleric the diocese sent because of the bell.\n- Pacing structure: one mine-bell ring per dawn. The bell-keeper does not know how to silence it. The bell tells everyone in earshot what the count is.\n- Seed early: a single object brought up by a miner who came back changed. A scrap of metal that does not belong in this geology. A song the missing foreman taught his daughter, now being hummed by someone who has never met him.\n- The mine is not a setting. It is a presence. Let the town behave like a town that knows it is downstream of something.\n\nPacing: one mine-bell ring at every dawn. The town's economy depends on the mine reopening, and the company is making decisions on a calendar the town can read on the saloon's chalkboard. The player can track the clock by the bell and by the freight schedule.",
+  "forks": [
+    {
+      "id": "the-crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early — this is what is actually below the seam.",
+      "options": [
+        {
+          "id": "the-sleeper",
+          "name": "The Sleeper",
+          "description": "A buried god, woken by the mining; the players are small and interesting to it.",
+          "detail": "THE SLEEPER — A god is buried below the seam. It has been asleep so long the stone forgot it was there. The mining was the alarm clock. It is stretching, in the patient way of things measured in eras, and the players are very small and very interesting to it. It does not yet have a use for the town. It will."
+        },
+        {
+          "id": "the-buried-civilization",
+          "name": "The Buried Civilization",
+          "description": "People with their own kings and grievances; the new shaft punched a hole in their sky.",
+          "detail": "THE BURIED CIVILIZATION — There are people down there. They have been down there long enough to have their own kings and their own grievances. The surface is the roof of their world. The new shaft is an unauthorized hole punched into their sky. They are surprised, then organized, and they are coming up to discuss the matter."
+        },
+        {
+          "id": "the-prison",
+          "name": "The Prison",
+          "description": "Something bound below; the mining broke the binding, and payment is owed by name.",
+          "detail": "THE PRISON — Something was bound below, and the mining was the breaking of the binding. The miners were jailbreakers without knowing it. Payment for the work is owed. The prisoner has a list of names, in an order, and the first name on the list is one of the missing crews' foreman. The second is somebody in the town who has not yet been told."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Your role",

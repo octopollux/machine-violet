@@ -7,7 +7,35 @@
     "fantasy",
     "horror"
   ],
-  "detail": "The famous labyrinth is well-mapped. Theseus walked it, the bones of the tribute children were cleared out long ago, and the tourist torches now light the corridors for paying pilgrims. The player has found a staircase that wasn't in the published maps. The stair goes down. Below the labyrinth there is another labyrinth, older, and the player is on the third turn before they realize that the turn behind them has closed.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE MINOTAUR'S PARENT — Older, divine, the reason the minotaur was made in the first place. The minotaur was a stopgap, a small terrible cousin built to occupy the labyrinth so the parent would not have to. The parent has been waiting in patient silence beneath the lower stones for an audience worthy of attention. The player is being considered.\n2. THE ABSENCE — There is a hole in reality, and the original labyrinth was a patch over it. The patch is failing. The walls of the second labyrinth are stitches, the dead ends are knots, the player walking through them is widening the tear by being there. Each chamber the player enters never quite closes behind them in the way the previous one did.\n3. THE PRISONERS — The first labyrinth's tribute children did not all die. Some of them survived, found water, learned the dark, and propagated. Generations of them are alive below. They have built civilization down there. They have their own minotaurs — older models, smaller now — and their own myths about the surface, and they have just discovered that the surface is real and the player has been spotted.\n\nDM approach:\n- Tone: cool air rising from below, the smell of stone and old water, the long acoustic of a chamber the player cannot see the ends of.\n- The current minotaur (if still alive): grieving, articulate, intelligent. Not the antagonist. May guide the player. May warn them.\n- A subterranean: a priest, a guide, a child of the prisoners — depending on which truth obtains. Has reasons of their own.\n- Seed early: an artifact in the upper labyrinth that did not come from the period the upper labyrinth was built; a map fragment in a script that pre-dates anything the player should be able to read.\n- Pacing: each descent closes the previous turning behind the player. The player can go down. The player cannot go back the same way.\n\nThe clock is the staircases. The player counts the descents and counts the layers. Each layer's architecture tells the player what era they are in; each layer is also a season of the campaign. When the player runs out of staircase, they meet the thing at the bottom, and the clock is the architecture of the next layer revealing itself a chamber at a time.",
+  "detail": "The famous labyrinth is well-mapped. Theseus walked it, the bones of the tribute children were cleared out long ago, and the tourist torches now light the corridors for paying pilgrims. The player has found a staircase that wasn't in the published maps. The stair goes down. Below the labyrinth there is another labyrinth, older, and the player is on the third turn before they realize that the turn behind them has closed.\n\nDM approach:\n- Tone: cool air rising from below, the smell of stone and old water, the long acoustic of a chamber the player cannot see the ends of.\n- The current minotaur (if still alive): grieving, articulate, intelligent. Not the antagonist. May guide the player. May warn them.\n- A subterranean: a priest, a guide, a child of the prisoners — depending on which truth obtains. Has reasons of their own.\n- Seed early: an artifact in the upper labyrinth that did not come from the period the upper labyrinth was built; a map fragment in a script that pre-dates anything the player should be able to read.\n- Pacing: each descent closes the previous turning behind the player. The player can go down. The player cannot go back the same way.\n\nThe clock is the staircases. The player counts the descents and counts the layers. Each layer's architecture tells the player what era they are in; each layer is also a season of the campaign. When the player runs out of staircase, they meet the thing at the bottom, and the clock is the architecture of the next layer revealing itself a chamber at a time.",
+  "forks": [
+    {
+      "id": "crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early — this is what the second labyrinth slowly turns on.",
+      "options": [
+        {
+          "id": "the-minotaurs-parent",
+          "name": "The Minotaur's Parent",
+          "description": "An older, divine thing the minotaur was built to occupy the labyrinth in place of; it is considering the player.",
+          "detail": "THE MINOTAUR'S PARENT — Older, divine, the reason the minotaur was made in the first place. The minotaur was a stopgap, a small terrible cousin built to occupy the labyrinth so the parent would not have to. The parent has been waiting in patient silence beneath the lower stones for an audience worthy of attention. The player is being considered."
+        },
+        {
+          "id": "the-absence",
+          "name": "The Absence",
+          "description": "A hole in reality the original labyrinth patched; the patch is failing and the player widens the tear by walking it.",
+          "detail": "THE ABSENCE — There is a hole in reality, and the original labyrinth was a patch over it. The patch is failing. The walls of the second labyrinth are stitches, the dead ends are knots, the player walking through them is widening the tear by being there. Each chamber the player enters never quite closes behind them in the way the previous one did."
+        },
+        {
+          "id": "the-prisoners",
+          "name": "The Prisoners",
+          "description": "The tribute children survived, propagated, and built a civilization below — which has just spotted the surface.",
+          "detail": "THE PRISONERS — The first labyrinth's tribute children did not all die. Some of them survived, found water, learned the dark, and propagated. Generations of them are alive below. They have built civilization down there. They have their own minotaurs — older models, smaller now — and their own myths about the surface, and they have just discovered that the surface is real and the player has been spotted."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Why you went down",

@@ -205,3 +205,37 @@ describe("bundled seed forks are well-formed", () => {
     }
   }
 });
+
+// --- Honesty test: Pacing includes never live in the DM channel ---
+//
+// A `<!--include:Pacing.*-->` is SETUP-AGENT scope guidance (which pacing
+// options to present, which `campaign_scope` slug to finalize). It must never
+// sit in the fork-invariant base `detail` or a fork option's `detail` — both
+// flow to the DM via `assembleCampaignDetail`. Its only valid home is
+// `setup_detail` (the setup-agent-only channel), which is never assembled into
+// `campaign_detail`. Other includes (e.g. `NPC.Atmospheric`) may stay in
+// `detail`; only Pacing is setup-scope.
+
+describe("bundled seeds keep Pacing includes out of the DM channel", () => {
+  const dir = bundledWorldsDir();
+  const files = readdirSync(dir).filter((f) => f.endsWith(".mvworld"));
+  const PACING = /<!--\s*include:Pacing\b/i;
+
+  for (const file of files) {
+    const world = JSON.parse(readFileSync(join(dir, file), "utf-8")) as WorldFile;
+    it(`${file}: no Pacing include in detail or any fork option detail`, () => {
+      expect(
+        PACING.test(world.detail ?? ""),
+        `base detail in ${file} carries a Pacing include — move it to setup_detail`,
+      ).toBe(false);
+      for (const fork of world.forks ?? []) {
+        for (const opt of fork.options) {
+          expect(
+            PACING.test(opt.detail ?? ""),
+            `option "${opt.id}" of fork "${fork.id}" in ${file} carries a Pacing include — move it to setup_detail`,
+          ).toBe(false);
+        }
+      }
+    });
+  }
+});

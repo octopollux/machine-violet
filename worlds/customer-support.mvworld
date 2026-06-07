@@ -8,7 +8,36 @@
     "fantasy",
     "modern"
   ],
-  "detail": "The player wears a headset. The headset is the player's life now. Customers call in with wishes that went sideways and want them adjusted, refunded, or escalated. The player has scripts. The scripts have edge cases the scripts do not cover. The player is the edge case the scripts do not cover.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE CO-OP — The company is a djinn cooperative. Old, ethical, unionized. They write the contracts in plain language. They lose money every quarter to competitors who do not. The shop steward is a thousand-year-old djinni named GREEN who organizes the lunch break and is quietly desperate. The player will be asked to choose sides in a dying labor dispute.\n2. THE MONKEY'S-PAW SHOP — A predatory operation that profits on the literal-genie interpretation of every wish. The pleasant voice on the line is the kill mechanism. The player has been hired as bait and being trained without being told — friendly, scripted, the customer dies on the supervisor's call. The supervisor is generous about bonuses and unreadable about everything else.\n3. THE STARTUP — A platform that doesn't understand its own product. Wishes are sublet from a reality the company hasn't paid for. The founders are twenty-eight and on stage at conferences. The wishes work until they don't and the bill is coming due, in dimensions, not dollars.\n\nDM approach:\n- Tone: open-plan office comedy with bureaucratic dread underneath. The ticket queue is the antagonist. Customers are sympathetic, weird, dangerous, or all three.\n- NPCs derive from the variant: GREEN the shop steward (1), the kind dangerous supervisor (2), the founders on Zoom and the customer whose wish has begun to invoice (3).\n- Pacing: tickets queue weekly. Quarterly the metrics worsen and the bonus pool shrinks. The player learns to game both.\n- Seed early: one ticket the player handled perfectly and the customer never called back, in a way that doesn't feel right.\n\nPacing: Tickets queue weekly. Quarterly metrics are the visible clock — the leaderboard in the breakroom, the bonus calculator on the intranet that never quite resolves. The player can track time by which performance review cycle they are in.\n\n<!--include:Pacing.EndlessCampaigns-->",
+  "setup_detail": "<!--include:Pacing.EndlessCampaigns-->",
+  "detail": "The player wears a headset. The headset is the player's life now. Customers call in with wishes that went sideways and want them adjusted, refunded, or escalated. The player has scripts. The scripts have edge cases the scripts do not cover. The player is the edge case the scripts do not cover.\n\nDM approach:\n- Tone: open-plan office comedy with bureaucratic dread underneath. The ticket queue is the antagonist. Customers are sympathetic, weird, dangerous, or all three.\n- NPCs derive from the variant: GREEN the shop steward (1), the kind dangerous supervisor (2), the founders on Zoom and the customer whose wish has begun to invoice (3).\n- Pacing: tickets queue weekly. Quarterly the metrics worsen and the bonus pool shrinks. The player learns to game both.\n- Seed early: one ticket the player handled perfectly and the customer never called back, in a way that doesn't feel right.\n\nPacing: Tickets queue weekly. Quarterly metrics are the visible clock — the leaderboard in the breakroom, the bonus calculator on the intranet that never quite resolves. The player can track time by which performance review cycle they are in.",
+  "forks": [
+    {
+      "id": "the-crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose to fit the player's tone. Do NOT reveal early.",
+      "options": [
+        {
+          "id": "the-co-op",
+          "name": "The Co-op",
+          "description": "A dying ethical djinn cooperative; the player gets pulled into a labor dispute.",
+          "detail": "THE CO-OP — The company is a djinn cooperative. Old, ethical, unionized. They write the contracts in plain language. They lose money every quarter to competitors who do not. The shop steward is a thousand-year-old djinni named GREEN who organizes the lunch break and is quietly desperate. The player will be asked to choose sides in a dying labor dispute."
+        },
+        {
+          "id": "the-monkeys-paw-shop",
+          "name": "The Monkey's-Paw Shop",
+          "description": "A predatory literal-genie operation; the friendly player is the unwitting kill mechanism.",
+          "detail": "THE MONKEY'S-PAW SHOP — A predatory operation that profits on the literal-genie interpretation of every wish. The pleasant voice on the line is the kill mechanism. The player has been hired as bait and being trained without being told — friendly, scripted, the customer dies on the supervisor's call. The supervisor is generous about bonuses and unreadable about everything else."
+        },
+        {
+          "id": "the-startup",
+          "name": "The Startup",
+          "description": "A platform subletting wishes from a reality it hasn't paid for; the bill is coming due.",
+          "detail": "THE STARTUP — A platform that doesn't understand its own product. Wishes are sublet from a reality the company hasn't paid for. The founders are twenty-eight and on stage at conferences. The wishes work until they don't and the bill is coming due, in dimensions, not dollars."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Tenure",

@@ -8,7 +8,36 @@
     "comedy",
     "meta"
   ],
-  "detail": "The shop sells universes. Bottled cosmologies on shelves, kit-cosmoses in flat boxes, single-serving realities by the register. A handwritten sign in the window: EVERYTHING MUST GO. The lights dim a notch every week. Something has gone wrong with the business, and the player is the one standing in the aisles when the music stops.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE RETIREMENT — The proprietor walked out one morning leaving the keys on the counter and a note that said \"good luck.\" The player has sixty days on the lease. The stocktake is incomplete and getting worse — items wander off the shelves. The proprietor is a small wizened person somewhere drinking tea, refusing all calls. Two long-tenured floor staff (a woman who remembers when the warehouse had only one aisle; a kid who's worked here three months and has lasted) are looking to the player to tell them what comes next.\n2. THE TAKEOVER — A larger universe-chain bought the franchise and is rebranding aggressively. Their corporate rep — beige suit, perfect teeth, name tag says BRENDON — arrives Monday morning with a clipboard and a forklift. They are repricing physical constants. The speed of light is being marked down to move stock. The new gravity is on backorder. Old customers come in and find their favorite reality has been replaced with a knockoff that almost works.\n3. THE LIQUIDATION — Corporate has done the math and the shop loses money. No villain. No miracle. The closure is final and the player can't save it. What the player CAN do is choose what gets marked down last — which laws of physics go in the bargain bin first, which beloved cosmos gets the dignity of a final week at full price. The regional manager is sympathetic, distant, and on a schedule.\n\nDM approach:\n- Tone: deadpan retail-comedy with grief leaking around the edges. Think the last day at a beloved bookstore, except the bookstore is the cosmos.\n- NPCs derive from the variant: absent proprietor and two loyal staff (1), Brendon and his clipboard (2), the regional manager and the corporate spreadsheet (3).\n- Layout: aisles you can name, a stockroom you don't open without reason, a back office with paperwork older than the player. Reveal one new aisle per session.\n- Seed early: the dimming lights, the FINAL DAY sign, one customer who comes in every day for the same thing and is starting to notice it costs more.\n\nPacing: Each session, one more physical law goes onto the clearance rack. Track it visibly — a chalked list behind the counter, the lights one notch dimmer, the bell above the door slightly less loud than it was last week.\n\n<!--include:Pacing.TimedCampaigns-->",
+  "setup_detail": "<!--include:Pacing.TimedCampaigns-->",
+  "detail": "The shop sells universes. Bottled cosmologies on shelves, kit-cosmoses in flat boxes, single-serving realities by the register. A handwritten sign in the window: EVERYTHING MUST GO. The lights dim a notch every week. Something has gone wrong with the business, and the player is the one standing in the aisles when the music stops.\n\nDM approach:\n- Tone: deadpan retail-comedy with grief leaking around the edges. Think the last day at a beloved bookstore, except the bookstore is the cosmos.\n- NPCs derive from the variant: absent proprietor and two loyal staff (1), Brendon and his clipboard (2), the regional manager and the corporate spreadsheet (3).\n- Layout: aisles you can name, a stockroom you don't open without reason, a back office with paperwork older than the player. Reveal one new aisle per session.\n- Seed early: the dimming lights, the FINAL DAY sign, one customer who comes in every day for the same thing and is starting to notice it costs more.\n\nPacing: Each session, one more physical law goes onto the clearance rack. Track it visibly — a chalked list behind the counter, the lights one notch dimmer, the bell above the door slightly less loud than it was last week.",
+  "forks": [
+    {
+      "id": "crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early.",
+      "options": [
+        {
+          "id": "the-retirement",
+          "name": "The Retirement",
+          "description": "The proprietor walked out leaving the keys and a note; sixty days on the lease, an incomplete stocktake, and two loyal staff looking to the player.",
+          "detail": "THE RETIREMENT — The proprietor walked out one morning leaving the keys on the counter and a note that said \"good luck.\" The player has sixty days on the lease. The stocktake is incomplete and getting worse — items wander off the shelves. The proprietor is a small wizened person somewhere drinking tea, refusing all calls. Two long-tenured floor staff (a woman who remembers when the warehouse had only one aisle; a kid who's worked here three months and has lasted) are looking to the player to tell them what comes next."
+        },
+        {
+          "id": "the-takeover",
+          "name": "The Takeover",
+          "description": "A universe-chain bought the franchise; corporate rep Brendon arrives Monday to reprice physical constants and rebrand aggressively.",
+          "detail": "THE TAKEOVER — A larger universe-chain bought the franchise and is rebranding aggressively. Their corporate rep — beige suit, perfect teeth, name tag says BRENDON — arrives Monday morning with a clipboard and a forklift. They are repricing physical constants. The speed of light is being marked down to move stock. The new gravity is on backorder. Old customers come in and find their favorite reality has been replaced with a knockoff that almost works."
+        },
+        {
+          "id": "the-liquidation",
+          "name": "The Liquidation",
+          "description": "No villain, no miracle — the closure is final; the player only chooses what gets marked down last, overseen by a sympathetic, scheduled regional manager.",
+          "detail": "THE LIQUIDATION — Corporate has done the math and the shop loses money. No villain. No miracle. The closure is final and the player can't save it. What the player CAN do is choose what gets marked down last — which laws of physics go in the bargain bin first, which beloved cosmos gets the dignity of a final week at full price. The regional manager is sympathetic, distant, and on a schedule."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Your role",

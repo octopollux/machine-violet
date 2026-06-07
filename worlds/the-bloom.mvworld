@@ -7,7 +7,36 @@
     "post-apocalyptic",
     "horror"
   ],
-  "detail": "The world ended some years ago and what came up afterward was flowers. They grow where nothing should — on asphalt, on salt, on the sides of dead skyscrapers, in the eye sockets of unburied dead. They are not all the same species and they have not been catalogued and the air where they grow tastes sweet. The Bloom is in its third or fourth season and the survivors have learned to read it the way old farmers read weather.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. TERRAFORMING GIFT — Something that observed the planet, mistakenly or sentimentally, concluded that humans loved flowers. It seeded the Bloom as a kindness. It is far away. It is not paying close attention. The Bloom is exactly what it appears to be and what it appears to be is well-meant and inadequate.\n2. SLOW COLONIZATION — The Bloom is the first stage of an alien project that has not yet decided what to do with the original inhabitants. The flowers are testing the atmosphere, the soil, the response of the surviving biosphere. The decision about humans will be made by something that has not yet arrived.\n3. THE DREAMER BELOW — The Bloom is the visible surface of an entity that lives underground and is asleep. The pollen carries the dream. People who breathe enough of it begin to share specific images, then to share decisions, then to share a single will. The dreamer is gentle. The dreamer is not human.\n\nDM approach:\n- Tone: beautiful and wrong. Sweetness as menace. Color as warning.\n- NPCs to seed: a botanist with theories; a convert who has stopped being entirely individual; a child who hears the Bloom hum.\n- Pacing structure: the Bloom has seasons. The player learns to read them or doesn't. Each season has its own dangers — pollen storms, mass dormancy, the brief week the flowers all turn the same direction.\n- Seed early: a flower that wasn't there yesterday; a smell that gives the player a memory that isn't theirs; one person in the player's circle who has been spending too much time at the edge of the Bloom.\n- Make the colors specific. The species the player learns by name should be a small handful, each with a behavior.\n\nPacing: The Bloom has seasons. The player can track them by which flowers are open, which are seeding, which are turning their heads. The clock is botanical and it is generous and it is firm.\n\n<!--include:Pacing.EndlessCampaigns-->",
+  "setup_detail": "<!--include:Pacing.EndlessCampaigns-->",
+  "detail": "The world ended some years ago and what came up afterward was flowers. They grow where nothing should — on asphalt, on salt, on the sides of dead skyscrapers, in the eye sockets of unburied dead. They are not all the same species and they have not been catalogued and the air where they grow tastes sweet. The Bloom is in its third or fourth season and the survivors have learned to read it the way old farmers read weather.\n\nDM approach:\n- Tone: beautiful and wrong. Sweetness as menace. Color as warning.\n- NPCs to seed: a botanist with theories; a convert who has stopped being entirely individual; a child who hears the Bloom hum.\n- Pacing structure: the Bloom has seasons. The player learns to read them or doesn't. Each season has its own dangers — pollen storms, mass dormancy, the brief week the flowers all turn the same direction.\n- Seed early: a flower that wasn't there yesterday; a smell that gives the player a memory that isn't theirs; one person in the player's circle who has been spending too much time at the edge of the Bloom.\n- Make the colors specific. The species the player learns by name should be a small handful, each with a behavior.\n\nPacing: The Bloom has seasons. The player can track them by which flowers are open, which are seeding, which are turning their heads. The clock is botanical and it is generous and it is firm.",
+  "forks": [
+    {
+      "id": "crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose to fit the player's tone. Do NOT reveal early — this is what the Bloom slowly turns out to be.",
+      "options": [
+        {
+          "id": "terraforming-gift",
+          "name": "Terraforming Gift",
+          "description": "A distant, inattentive intelligence seeded the Bloom as a well-meant, inadequate kindness; it is exactly what it appears to be.",
+          "detail": "TERRAFORMING GIFT — Something that observed the planet, mistakenly or sentimentally, concluded that humans loved flowers. It seeded the Bloom as a kindness. It is far away. It is not paying close attention. The Bloom is exactly what it appears to be and what it appears to be is well-meant and inadequate."
+        },
+        {
+          "id": "slow-colonization",
+          "name": "Slow Colonization",
+          "description": "First stage of an alien project still deciding what to do with humanity; the flowers are testing the biosphere.",
+          "detail": "SLOW COLONIZATION — The Bloom is the first stage of an alien project that has not yet decided what to do with the original inhabitants. The flowers are testing the atmosphere, the soil, the response of the surviving biosphere. The decision about humans will be made by something that has not yet arrived."
+        },
+        {
+          "id": "the-dreamer-below",
+          "name": "The Dreamer Below",
+          "description": "The Bloom is the surface of a sleeping underground entity; its pollen carries a dream that merges those who breathe it.",
+          "detail": "THE DREAMER BELOW — The Bloom is the visible surface of an entity that lives underground and is asleep. The pollen carries the dream. People who breathe enough of it begin to share specific images, then to share decisions, then to share a single will. The dreamer is gentle. The dreamer is not human."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Your relationship to the Bloom",

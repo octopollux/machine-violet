@@ -8,7 +8,36 @@
     "modern",
     "mystery"
   ],
-  "detail": "The player came to Blackwater because someone said you could lose yourself here. They were right. The harbor takes anyone, the harbormaster doesn't write down names, and the regulars at the tavern only ask what you call yourself this week. Then a ship lands that the player recognizes, and the question is whether the bay still protects you when you've been recognized first.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE GEOGRAPHY FORGETS — The bay is easy to enter and hard to find on a map twice. Charts go fuzzy at the headland. Pursuers arrive sharp-eyed and within a week they're squinting at the wrong horizon. The town does nothing — it simply exists in a slightly different place each morning. The player can leave whenever they want. They almost certainly cannot come back.\n2. THE MAGICAL SINK — Whatever was hunting you arrived. They're at the inn. They forgot why a week ago and now they're a regular too. The bay absorbs pursuit and the pursuers stay; over time this means everyone in town is being hunted by someone else who is also in town and also doesn't remember. When somebody remembers, the bay handles it. The harbormaster has a quiet room for the remembering.\n3. THE FAVOR — The bay shelters you and the harbormaster keeps a ledger. He'll never name what's owed; he doesn't have to. One day someone will arrive who can't be turned away, and the harbormaster will look at you, and the ledger will balance. You will know it when you see his face.\n\nDM approach:\n- Tone: salt, fog, the long pull of a rope through a ring. Nobody speaks above the wind.\n- The harbormaster: ancient, courteous, never raises his voice. Knows everyone's real name and has chosen not to.\n- Other refugees: each NPC came running from something. Sketch their tells without naming the cause.\n- Seed early: the ledger is visible behind the harbormaster's desk; the player notices their own name has been written and crossed out and re-written.\n- Pacing: one new arrival per session; one regular vanishes per session and nobody comments.\n\nTrack time by the tide chart at the harbormaster's office and by who's still drinking at the tavern's corner table. When a familiar regular doesn't show, that's a beat. When the new arrival starts answering to a name they didn't give, that's another.\n\n<!--include:Pacing.EndlessCampaigns-->",
+  "setup_detail": "<!--include:Pacing.EndlessCampaigns-->",
+  "detail": "The player came to Blackwater because someone said you could lose yourself here. They were right. The harbor takes anyone, the harbormaster doesn't write down names, and the regulars at the tavern only ask what you call yourself this week. Then a ship lands that the player recognizes, and the question is whether the bay still protects you when you've been recognized first.\n\nDM approach:\n- Tone: salt, fog, the long pull of a rope through a ring. Nobody speaks above the wind.\n- The harbormaster: ancient, courteous, never raises his voice. Knows everyone's real name and has chosen not to.\n- Other refugees: each NPC came running from something. Sketch their tells without naming the cause.\n- Seed early: the ledger is visible behind the harbormaster's desk; the player notices their own name has been written and crossed out and re-written.\n- Pacing: one new arrival per session; one regular vanishes per session and nobody comments.\n\nTrack time by the tide chart at the harbormaster's office and by who's still drinking at the tavern's corner table. When a familiar regular doesn't show, that's a beat. When the new arrival starts answering to a name they didn't give, that's another.",
+  "forks": [
+    {
+      "id": "the-crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose to fit the player's tone. Do NOT reveal early — this is what the bay slowly turns on.",
+      "options": [
+        {
+          "id": "the-geography-forgets",
+          "name": "The Geography Forgets",
+          "description": "The bay relocates slightly each morning; pursuers lose the trail, and so can the player — leaving is one-way.",
+          "detail": "THE GEOGRAPHY FORGETS — The bay is easy to enter and hard to find on a map twice. Charts go fuzzy at the headland. Pursuers arrive sharp-eyed and within a week they're squinting at the wrong horizon. The town does nothing — it simply exists in a slightly different place each morning. The player can leave whenever they want. They almost certainly cannot come back."
+        },
+        {
+          "id": "the-magical-sink",
+          "name": "The Magical Sink",
+          "description": "The bay absorbs pursuit and the pursuers stay, forgetting why; everyone is hunted by someone who also forgot.",
+          "detail": "THE MAGICAL SINK — Whatever was hunting you arrived. They're at the inn. They forgot why a week ago and now they're a regular too. The bay absorbs pursuit and the pursuers stay; over time this means everyone in town is being hunted by someone else who is also in town and also doesn't remember. When somebody remembers, the bay handles it. The harbormaster has a quiet room for the remembering."
+        },
+        {
+          "id": "the-favor",
+          "name": "The Favor",
+          "description": "The harbormaster's shelter is a debt in his ledger; one day he'll call it in and the player will know.",
+          "detail": "THE FAVOR — The bay shelters you and the harbormaster keeps a ledger. He'll never name what's owed; he doesn't have to. One day someone will arrive who can't be turned away, and the harbormaster will look at you, and the ledger will balance. You will know it when you see his face."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Why you came",

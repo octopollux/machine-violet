@@ -6,7 +6,36 @@
   "genres": [
     "fantasy"
   ],
-  "detail": "The wheat fields have whitened. The wells are brackish at first and salt by morning. The line of salt advances across the heartland at the pace of a slow rider, and the imperial dispatches that reach the provinces describe this as policy. The emperor is, the dispatches say, making the desert. The emperor has reasons. The player is not yet among those who have been told what they are.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE PRICE — The salt is a ritual payment. Each year of the dynasty's continuation costs a measured advance of desert across the heartland. The emperor knows. The court priests know. The line will not stop while the throne holds. The bargain was struck before any of them were born, and renewing it is the work of a single sentence the emperor speaks once per spring.\n2. THE SEAL — Something was buried in the heartland long ago, and the salt is the seal pressed down over it. If the salt stops advancing, the seal fails. The emperor is feeding the dynasty into the ground to keep the lid on. The provinces are being asked, without being asked, to die for a thing they were never told existed.\n3. THE EMPEROR IS THE DESERT — He is slowly translating himself outward. What he was, is now drift and crust and dry wind. The court is staffed by people pretending the man on the throne is still a man. The throne hall is the last damp room in the capital. Everywhere the salt advances is more of him, learning the new shape of his rule.\n\nDM approach:\n- Tone: dry mouth, white horizons, courtly understatement.\n- NPCs: the imperial herald with new orders the herald does not understand; a provincial governor whose harvest is white; a salt-priest who will not look the player in the eye; the emperor only at the end, only briefly.\n- Pacing structure: the salt-line advances a set distance per session. The capital is a week behind the line, and the player can be ahead of it, level with it, or behind it.\n- Seed early: a single dead well. A folded dispatch sealed in red wax. The shape the salt leaves on a stone, which is not the shape of natural deposit.\n- Let the empire's silence about its own death be the loudest thing in the room.\n\nPacing: the salt-line advances a set distance per session — call it a day's ride. The capital is roughly a week behind the line at the start. The player can chart the advance by the wells they pass, by the abandoned barns, by the shrines whose offerings have begun crystallizing on the altar.\n\n<!--include:Pacing.TimedCampaigns-->",
+  "setup_detail": "<!--include:Pacing.TimedCampaigns-->",
+  "detail": "The wheat fields have whitened. The wells are brackish at first and salt by morning. The line of salt advances across the heartland at the pace of a slow rider, and the imperial dispatches that reach the provinces describe this as policy. The emperor is, the dispatches say, making the desert. The emperor has reasons. The player is not yet among those who have been told what they are.\n\nDM approach:\n- Tone: dry mouth, white horizons, courtly understatement.\n- NPCs: the imperial herald with new orders the herald does not understand; a provincial governor whose harvest is white; a salt-priest who will not look the player in the eye; the emperor only at the end, only briefly.\n- Pacing structure: the salt-line advances a set distance per session. The capital is a week behind the line, and the player can be ahead of it, level with it, or behind it.\n- Seed early: a single dead well. A folded dispatch sealed in red wax. The shape the salt leaves on a stone, which is not the shape of natural deposit.\n- Let the empire's silence about its own death be the loudest thing in the room.\n\nPacing: the salt-line advances a set distance per session — call it a day's ride. The capital is roughly a week behind the line at the start. The player can chart the advance by the wells they pass, by the abandoned barns, by the shrines whose offerings have begun crystallizing on the altar.",
+  "forks": [
+    {
+      "id": "crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose to fit the player's tone. Do NOT reveal early — this is the campaign's hidden truth.",
+      "options": [
+        {
+          "id": "the-price",
+          "name": "The Price",
+          "description": "The salt is a ritual payment; each year of the dynasty costs a measured advance of desert, and the emperor knowingly renews the bargain.",
+          "detail": "THE PRICE — The salt is a ritual payment. Each year of the dynasty's continuation costs a measured advance of desert across the heartland. The emperor knows. The court priests know. The line will not stop while the throne holds. The bargain was struck before any of them were born, and renewing it is the work of a single sentence the emperor speaks once per spring."
+        },
+        {
+          "id": "the-seal",
+          "name": "The Seal",
+          "description": "The salt is a seal pressed over something buried long ago; stopping the advance breaks the seal, so the emperor feeds the dynasty into the ground to keep the lid on.",
+          "detail": "THE SEAL — Something was buried in the heartland long ago, and the salt is the seal pressed down over it. If the salt stops advancing, the seal fails. The emperor is feeding the dynasty into the ground to keep the lid on. The provinces are being asked, without being asked, to die for a thing they were never told existed."
+        },
+        {
+          "id": "the-emperor-is-the-desert",
+          "name": "The Emperor Is the Desert",
+          "description": "The emperor is slowly translating himself outward into drift and dry wind; the court pretends the throne still holds a man, and every advance of salt is more of him.",
+          "detail": "THE EMPEROR IS THE DESERT — He is slowly translating himself outward. What he was, is now drift and crust and dry wind. The court is staffed by people pretending the man on the throne is still a man. The throne hall is the last damp room in the capital. Everywhere the salt advances is more of him, learning the new shape of his rule."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Station",

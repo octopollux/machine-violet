@@ -6,7 +6,35 @@
   "genres": [
     "sci-fi"
   ],
-  "detail": "The player checks the comm at the appointed minute. There is no reply. They check at the next window, and the one after. Seventy-two hours pass with the radio open and the static unbroken. The mission profile says what to do when a single check-in is missed. It does not say what to do when the world stops talking.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. NO EARTH TO RETURN TO — Something happened down there and the silence is permanent. Whatever the crew has on board is what they have for the rest of their lives. The DM should let the players reach this conclusion themselves, slowly, over signs: a satellite that should still be ticking has gone dark; a relay that should have automatically retransmitted has not; the night side of Earth on their cameras is darker than it should be.\n2. THE SHIP HAS BEEN MOVED — Mission Control is fine. They are calling. The ship is not where it thought it was. The navigator runs the star fixes and the numbers come out wrong by a margin too small for instruments to be lying about and too large for instruments to be right. Nobody else has noticed yet. The navigator decides, alone, whether to say.\n3. THE RECEIVER IS BROKEN — Earth is shouting. The crew cannot hear. Each missed window, the message has grown more frantic. Diagnostics on the receiver come back nominal. The crew is being told they are in danger by a voice they cannot pick up. Whatever the threat is, it will reach them before they fix the radio.\n\nDM approach:\n- Tone: long minutes, the hum of life support, a habit of looking at the comm panel every time you pass it.\n- NPCs: the rest of the crew (or the AI), and the absence of everyone else. The silence is the antagonist for a long time.\n- Seed early: the small rituals of check-in. The names of the controllers the crew thinks of as friends. A photograph on the console.\n- Pacing structure: each missed window is a beat. The first is concern. The second is procedure. The third is when the crew starts to split.\n- Let the silence work. Do not fill it with events. Let the players decide what an extra hour of nothing means.\n\nPacing: missed windows accumulate. The schedule is on the bulkhead, printed and laminated. After the third missed window, the question is no longer what happened to Mission Control; it is what the crew is going to do about each other.",
+  "detail": "The player checks the comm at the appointed minute. There is no reply. They check at the next window, and the one after. Seventy-two hours pass with the radio open and the static unbroken. The mission profile says what to do when a single check-in is missed. It does not say what to do when the world stops talking.\n\nDM approach:\n- Tone: long minutes, the hum of life support, a habit of looking at the comm panel every time you pass it.\n- NPCs: the rest of the crew (or the AI), and the absence of everyone else. The silence is the antagonist for a long time.\n- Seed early: the small rituals of check-in. The names of the controllers the crew thinks of as friends. A photograph on the console.\n- Pacing structure: each missed window is a beat. The first is concern. The second is procedure. The third is when the crew starts to split.\n- Let the silence work. Do not fill it with events. Let the players decide what an extra hour of nothing means.\n\nPacing: missed windows accumulate. The schedule is on the bulkhead, printed and laminated. After the third missed window, the question is no longer what happened to Mission Control; it is what the crew is going to do about each other.",
+  "forks": [
+    {
+      "id": "the-silence",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early — this is the campaign's hidden truth, and the players should reach it themselves.",
+      "options": [
+        {
+          "id": "no-earth-to-return-to",
+          "name": "No Earth To Return To",
+          "description": "Something happened down there; the silence is permanent and the crew is on their own forever.",
+          "detail": "NO EARTH TO RETURN TO — Something happened down there and the silence is permanent. Whatever the crew has on board is what they have for the rest of their lives. The DM should let the players reach this conclusion themselves, slowly, over signs: a satellite that should still be ticking has gone dark; a relay that should have automatically retransmitted has not; the night side of Earth on their cameras is darker than it should be."
+        },
+        {
+          "id": "the-ship-has-been-moved",
+          "name": "The Ship Has Been Moved",
+          "description": "Mission Control is fine and still calling; the ship is not where it thinks it is.",
+          "detail": "THE SHIP HAS BEEN MOVED — Mission Control is fine. They are calling. The ship is not where it thought it was. The navigator runs the star fixes and the numbers come out wrong by a margin too small for instruments to be lying about and too large for instruments to be right. Nobody else has noticed yet. The navigator decides, alone, whether to say."
+        },
+        {
+          "id": "the-receiver-is-broken",
+          "name": "The Receiver Is Broken",
+          "description": "Earth is shouting a warning the crew physically cannot hear; the threat arrives before the fix.",
+          "detail": "THE RECEIVER IS BROKEN — Earth is shouting. The crew cannot hear. Each missed window, the message has grown more frantic. Diagnostics on the receiver come back nominal. The crew is being told they are in danger by a voice they cannot pick up. Whatever the threat is, it will reach them before they fix the radio."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "The mission",
