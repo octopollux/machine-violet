@@ -228,6 +228,13 @@ play-state).
   `{ fork: "city", option: "dreaming-souk" }`.
 - **Don't seed empty stubs.** A blank `maps.json` grid (no regions/terrain) or a
   thin, variant-dependent calendar adds nothing — skip it rather than carry a
-  hollow shell. And non-ASCII names slugify poorly (`Mizân` → `miz-n`); key the
-  entity with a clean ASCII slug and accept that `[[Mizân]]` wikilinks won't
-  resolve to it.
+  hollow shell.
+- **Slugs come from `slugify(title)`, not your JSON key.** The importer paths
+  every entity through `campaignPaths`/`slugify(entity.title)` — the record key
+  you write is organizational only. So author the key as `slugify(title)` to
+  avoid confusion, and know that `[[Wikilinks]]` resolve fine as long as the link
+  text matches the title (both sides slugify identically). Non-ASCII titles just
+  produce surprising-but-consistent slugs (`Mizân` → `miz-n`, since `slugify`
+  maps non-`a-z0-9` runs to `-`): the file *and* `[[Mizân]]` both land on
+  `miz-n`, so links still work — use an ASCII title only if you want a tidy
+  filename.
