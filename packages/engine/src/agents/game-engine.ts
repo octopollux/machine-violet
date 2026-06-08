@@ -5,6 +5,7 @@ import { DM_TURN_LENGTH_PCT_DEFAULT } from "@machine-violet/shared/types/config.
 import { agentLoopStreaming } from "./agent-loop.js";
 import type { AgentLoopConfig, TuiCommand, UsageStats } from "./agent-loop.js";
 import type { LLMProvider, NormalizedMessage, ContentPart, TierProvider } from "../providers/types.js";
+import { GENERATE_IMAGE_TOOL_NAME } from "../providers/types.js";
 import { ConversationManager } from "../context/conversation.js";
 import type { DroppedExchange } from "../context/conversation.js";
 import { narrativeLinesToMarkdown } from "../context/display-log.js";
@@ -86,6 +87,12 @@ export class GameEngine {
   private sceneManager: SceneManager;
   private callbacks: EngineCallbacks;
   private engineState: EngineState = "idle";
+  /** Count of in-flight `generate_image` tool calls. Image renders take minutes
+   *  and run concurrently with faster sibling tools (scene_transition,
+   *  style_scene); this keeps the "generating_image" activity state up for the
+   *  whole render instead of letting a sibling's completion flip it to thinking.
+   *  Reset to 0 at each turn start in case a render was abandoned mid-flight. */
+  private imageGenInFlight = 0;
   private sessionUsage: UsageStats = {
     inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0,
   };
@@ -519,6 +526,7 @@ export class GameEngine {
     };
     this.callbacks.onTurnStart(dmTurn);
 
+    this.imageGenInFlight = 0;
     this.setState("dm_thinking");
     const turnStartTime = Date.now();
     this.dmProvidedChoicesThisTurn = false;
@@ -1494,6 +1502,7 @@ export class GameEngine {
     const active = getActivePlayer(this.gameState);
     const characterName = active.characterName;
 
+    this.imageGenInFlight = 0;
     this.setState("dm_thinking");
 
     // Load character sheet (best-effort)
@@ -1608,11 +1617,17 @@ export class GameEngine {
       asyncToolHandler: (name, input) => this.handleAsyncToolInternal(name, input),
       onTextDelta: (delta) => this.callbacks.onNarrativeDelta(delta),
       onToolStart: (name) => {
-        this.setState("tool_running");
+        if (name === GENERATE_IMAGE_TOOL_NAME) this.imageGenInFlight++;
+        // An in-flight image render owns the indicator (it's the slow, notable
+        // one); otherwise it's a generic tool.
+        this.setState(this.imageGenInFlight > 0 ? "generating_image" : "tool_running");
         this.callbacks.onToolStart(name);
       },
       onToolEnd: (name, result) => {
-        this.setState("dm_thinking");
+        if (name === GENERATE_IMAGE_TOOL_NAME && this.imageGenInFlight > 0) this.imageGenInFlight--;
+        // Stay on "generating_image" while any render is still going — a faster
+        // sibling tool finishing first must not drop the image indicator.
+        this.setState(this.imageGenInFlight > 0 ? "generating_image" : "dm_thinking");
         this.callbacks.onToolEnd(name, result);
       },
       onTuiCommand: (cmd) => {
