@@ -93,6 +93,23 @@ const mockResponsesCreate: ReturnType<typeof vi.fn> = openaiMod.__mockResponses.
 const { createAnthropicProvider } = await import("./anthropic.js");
 const { createOpenAIProvider } = await import("./openai.js");
 
+/**
+ * Shape the Anthropic `messages.create` mock to mirror the real SDK: the
+ * provider consumes the call via `.withResponse()` (to read rate-limit
+ * headers), so the mock returns an object exposing that method rather than a
+ * bare resolved Message. Headers are empty here — header capture is exercised
+ * in anthropic.usage.test.ts.
+ */
+function mockAnthropicResponse(message: unknown): void {
+  mockAnthropicCreate.mockReturnValue({
+    withResponse: () => Promise.resolve({
+      data: message,
+      response: { headers: new Headers() },
+      request_id: "req_test",
+    }),
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Per-provider wiring
 // ---------------------------------------------------------------------------
@@ -124,13 +141,13 @@ anthropicEntry.captureTurn1 = async () => {
       { type: "text", text: "4" },
     ],
   } as unknown as Anthropic.Message;
-  mockAnthropicCreate.mockResolvedValue(fakeMsg);
+  mockAnthropicResponse(fakeMsg);
   const provider = createAnthropicProvider("test-key");
   const result = await provider.chat(baseParams({ messages: [{ role: "user", content: "2+2?" }] }));
   return { assistantContent: result.assistantContent, thinkingText: result.thinkingText };
 };
 anthropicEntry.encodeTurn2 = async (turn1Content) => {
-  mockAnthropicCreate.mockResolvedValue({
+  mockAnthropicResponse({
     id: "msg_2", model: "claude-opus-4-7", role: "assistant", type: "message",
     stop_reason: "end_turn", usage: { input_tokens: 10, output_tokens: 5 },
     content: [{ type: "text", text: "6" }],
