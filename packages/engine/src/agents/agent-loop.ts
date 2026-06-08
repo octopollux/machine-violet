@@ -173,15 +173,23 @@ async function runAgentLoopInternal(
         "and style. The caption (if any) should be composed into the image itself " +
         "as a printed plate, not emitted as separate text. Use sparingly — at most " +
         "one image per turn. " +
-        "Default to `effort: \"standard\"` for ordinary scene snapshots. Reach for " +
-        "`effort: \"quality\"` or `\"showcase\"` only for once-per-arc set-pieces; " +
-        "they take longer and cost more. Use `aspect: \"landscape\"` for scenes, " +
+        "Default to `effort: \"quality\"` for scene snapshots and player-requested " +
+        "illustrations — a high-quality render that still comes back at reasonable speed. " +
+        "Drop to `\"standard\"` (medium) for quick or minor inserts where speed matters more. " +
+        "Reserve `\"showcase\"` for rare set-piece hero shots; it takes a bit longer. " +
+        "Use `aspect: \"landscape\"` for scenes, " +
         "`\"portrait\"` for character close-ups, `\"square\"` for objects/symbols. " +
         "Set `intent` to `\"scene_snapshot\"` for scenes (the usual case), " +
         "`\"character_portrait\"` for character close-ups, or `\"player_request\"` " +
         "when the player explicitly asked for an illustration of something. The " +
         "intent steers on-disk naming and the engine-log breadcrumb — it does not " +
-        "affect the rendered image.",
+        "affect the rendered image. " +
+        "When a specific player character is clearly the subject of the image, list " +
+        "their name in `reference_characters` so the render matches their established " +
+        "portrait (face, build, outfit). Only name characters who actually appear in " +
+        "THIS image, and only when their likeness matters — it adds noticeable render " +
+        "time and pulls the picture toward that person, so leave it off for wide " +
+        "scenes, crowds, or anyone whose exact look doesn't matter.",
       inputSchema: {
         type: "object",
         properties: {
@@ -192,7 +200,7 @@ async function runAgentLoopInternal(
           effort: {
             type: "string",
             enum: ["draft", "standard", "quality", "showcase"],
-            description: "Render effort. Default 'standard'. 'showcase' for once-per-arc moments only.",
+            description: "Render effort. Default 'quality' (high quality, reasonable speed) for scenes; 'standard' (medium) for quick inserts; 'showcase' for rare set-piece hero shots (slower).",
           },
           aspect: {
             type: "string",
@@ -203,6 +211,11 @@ async function runAgentLoopInternal(
             type: "string",
             enum: ["scene_snapshot", "player_request", "character_portrait"],
             description: "Steers on-disk naming and the engine-log breadcrumb. 'scene_snapshot' is the right default for in-narrative renders. Omit to default to scene_snapshot.",
+          },
+          reference_characters: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional. Names of player characters whose established portrait should visually guide this render (image-to-image), so the depicted character matches their look. Only include characters who actually appear in this image and whose likeness matters; omit otherwise. Names without a saved portrait are ignored.",
           },
         },
         required: ["prompt", "effort", "aspect"],

@@ -25,6 +25,18 @@ export const ACTIVITY_MAP: Record<string, IndicatorWithTiers> = {
       { atSec: 75, label: "The DM is still working..." },
     ],
   },
+  // Set while one or more image renders are in flight. Image gen is the
+  // slowest tool by far (minutes), so it gets its own indicator instead of the
+  // generic "working" one, with tiers so a multi-minute render reads as
+  // progress. The engine holds this state across faster sibling tools.
+  generating_image: {
+    label: "The DM is creating an image...",
+    glyph: "🎨",
+    tiers: [
+      { atSec: 45, label: "Still rendering the image..." },
+      { atSec: 120, label: "The image is taking a little while..." },
+    ],
+  },
   // Engine emits this for the duration of any in-flight tool call.
   // Most tools finish in milliseconds, but subagent-backed tools (style_scene
   // → theme-styler, scribe, etc.) routinely run 20-60s. Without an entry
@@ -78,6 +90,9 @@ const TOOL_GLYPH_MAP: Record<string, ToolGlyph> = {
   // Entity / worldbuilding
   scribe:             { glyph: "✎", color: "green" },
   dm_notes:           { glyph: "✎", color: "green" },
+  // Image generation (single-width symbol so it aligns in the glyph row;
+  // the long-form "creating an image" label lives in ACTIVITY_MAP)
+  generate_image:     { glyph: "❖", color: "magenta" },
   // TUI / presentation
   update_modeline:    { glyph: "◆", color: "magenta" },
   style_scene:        { glyph: "◆", color: "magenta" },

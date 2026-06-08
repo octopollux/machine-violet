@@ -5,6 +5,7 @@ import { DM_TURN_LENGTH_PCT_DEFAULT } from "@machine-violet/shared/types/config.
 import { agentLoopStreaming } from "./agent-loop.js";
 import type { AgentLoopConfig, TuiCommand, UsageStats } from "./agent-loop.js";
 import type { LLMProvider, NormalizedMessage, ContentPart, TierProvider } from "../providers/types.js";
+import { GENERATE_IMAGE_TOOL_NAME } from "../providers/types.js";
 import { ConversationManager } from "../context/conversation.js";
 import type { DroppedExchange } from "../context/conversation.js";
 import { narrativeLinesToMarkdown } from "../context/display-log.js";
@@ -45,7 +46,7 @@ import type { ChoiceGeneratorSession } from "./subagents/choice-generator.js";
 import { campaignPaths, parseFrontMatter, serializeEntity, formatChangelogEntry } from "../tools/filesystem/index.js";
 import { handleImageGenerated } from "./image-handler.js";
 import { normalizeImageEffort, normalizeImageAspect } from "../providers/image-coerce.js";
-import { loadDmPortraitMessage } from "./dm-portraits.js";
+import { loadDmPortraitMessage, loadCharacterReferences } from "./dm-portraits.js";
 import { runScribe } from "./subagents/scribe.js";
 import { promoteCharacter } from "./subagents/character-promotion.js";
 import { searchCampaign } from "./subagents/search-campaign.js";
@@ -86,6 +87,12 @@ export class GameEngine {
   private sceneManager: SceneManager;
   private callbacks: EngineCallbacks;
   private engineState: EngineState = "idle";
+  /** Count of in-flight `generate_image` tool calls. Image renders take minutes
+   *  and run concurrently with faster sibling tools (scene_transition,
+   *  style_scene); this keeps the "generating_image" activity state up for the
+   *  whole render instead of letting a sibling's completion flip it to thinking.
+   *  Reset to 0 at each turn start in case a render was abandoned mid-flight. */
+  private imageGenInFlight = 0;
   private sessionUsage: UsageStats = {
     inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0,
   };
@@ -519,6 +526,7 @@ export class GameEngine {
     };
     this.callbacks.onTurnStart(dmTurn);
 
+    this.imageGenInFlight = 0;
     this.setState("dm_thinking");
     const turnStartTime = Date.now();
     this.dmProvidedChoicesThisTurn = false;
@@ -1241,7 +1249,10 @@ export class GameEngine {
     if (!promptText) {
       return { content: "generate_image requires a non-empty prompt.", is_error: true };
     }
-    const effort = normalizeImageEffort(input.effort);
+    // Fallback matches the documented DM default (the tool schema marks
+    // `effort` required, but coerce defensively so an omitted/invalid value
+    // still lands on the intended "quality" tier rather than the lib default).
+    const effort = normalizeImageEffort(input.effort, "quality");
     const aspect = normalizeImageAspect(input.aspect);
     // Default to scene_snapshot: that's the DM's overwhelmingly common case
     // (in-narrative scene rendering) and matches the on-disk naming the
@@ -1254,12 +1265,30 @@ export class GameEngine {
       rawIntent === "scene_snapshot" || rawIntent === "character_portrait" || rawIntent === "player_request"
         ? rawIntent
         : "scene_snapshot";
+    // Optional image-to-image references: the DM names characters whose
+    // established portrait this render should match (face/build/outfit). Resolve
+    // the names to portrait files now — a missing or typo'd name degrades to a
+    // text-only render rather than erroring, and an empty list omits the field
+    // so we do a plain text-to-image. Off by default: a portrait reference
+    // biases the whole render toward that character, wrong for a scene they're
+    // not in, so the DM must opt in per call.
+    const referenceNames = Array.isArray(input.reference_characters)
+      ? input.reference_characters.filter((n): n is string => typeof n === "string")
+      : [];
+    const referenceImages = referenceNames.length > 0
+      ? await loadCharacterReferences(
+          referenceNames,
+          this.sceneManager.getFileIO(),
+          this.gameState.campaignRoot,
+        )
+      : [];
     try {
       const result = await this.provider.generateImage({
         prompt: promptText,
         effort,
         aspect,
         intent,
+        ...(referenceImages.length > 0 ? { referenceImages } : {}),
       });
       const scene = this.sceneManager.getScene();
       const persisted = await handleImageGenerated(
@@ -1473,6 +1502,7 @@ export class GameEngine {
     const active = getActivePlayer(this.gameState);
     const characterName = active.characterName;
 
+    this.imageGenInFlight = 0;
     this.setState("dm_thinking");
 
     // Load character sheet (best-effort)
@@ -1587,11 +1617,17 @@ export class GameEngine {
       asyncToolHandler: (name, input) => this.handleAsyncToolInternal(name, input),
       onTextDelta: (delta) => this.callbacks.onNarrativeDelta(delta),
       onToolStart: (name) => {
-        this.setState("tool_running");
+        if (name === GENERATE_IMAGE_TOOL_NAME) this.imageGenInFlight++;
+        // An in-flight image render owns the indicator (it's the slow, notable
+        // one); otherwise it's a generic tool.
+        this.setState(this.imageGenInFlight > 0 ? "generating_image" : "tool_running");
         this.callbacks.onToolStart(name);
       },
       onToolEnd: (name, result) => {
-        this.setState("dm_thinking");
+        if (name === GENERATE_IMAGE_TOOL_NAME && this.imageGenInFlight > 0) this.imageGenInFlight--;
+        // Stay on "generating_image" while any render is still going — a faster
+        // sibling tool finishing first must not drop the image indicator.
+        this.setState(this.imageGenInFlight > 0 ? "generating_image" : "dm_thinking");
         this.callbacks.onToolEnd(name, result);
       },
       onTuiCommand: (cmd) => {

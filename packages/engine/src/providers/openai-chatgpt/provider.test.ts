@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
+import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   TurnCollector, CodexTurnFailedError, messageToResponsesItems,
   buildImagePromptText, extractGeneratedImage, createOpenAIChatGptProvider,
+  shouldRetryImageRender, ImageGenNoDataError,
+  summarizeItem, readNewestPngAsBase64,
 } from "./provider.js";
 import type {
   AgentMessageDeltaNotification, ItemCompletedNotification,
@@ -365,11 +370,49 @@ describe("buildImagePromptText", () => {
     expect(text).toContain("1024x1024");
   });
 
-  it("adds a max-fidelity nudge for quality/showcase effort but not draft/standard", () => {
-    expect(buildImagePromptText("x", "square", "quality")).toContain("maximum detail");
-    expect(buildImagePromptText("x", "square", "showcase")).toContain("maximum detail");
-    expect(buildImagePromptText("x", "square", "standard")).not.toContain("maximum detail");
-    expect(buildImagePromptText("x", "square", "draft")).not.toContain("maximum detail");
+  it("emits graduated quality/speed steering per effort level", () => {
+    expect(buildImagePromptText("x", "square", "draft")).toContain("low fidelity");
+    expect(buildImagePromptText("x", "square", "standard")).toContain("medium quality");
+    expect(buildImagePromptText("x", "square", "quality")).toContain("high quality");
+    expect(buildImagePromptText("x", "square", "showcase")).toContain("highest standard quality");
+  });
+
+  it("steers quality and showcase away from the slowest maximum-fidelity pass", () => {
+    // The whole point of the render-time cap: even the top routine tier must not
+    // invoke gpt-image's slowest mode (the multi-minute render we want to avoid).
+    expect(buildImagePromptText("x", "square", "quality")).toMatch(/do NOT engage the slowest/i);
+    expect(buildImagePromptText("x", "square", "showcase")).toMatch(/avoid the slowest/i);
+  });
+
+  it("appends a reference directive naming the characters only when labels are given", () => {
+    const none = buildImagePromptText("a scene", "landscape", "quality");
+    expect(none).not.toMatch(/reference image/i);
+
+    const one = buildImagePromptText("a scene", "portrait", "standard", ["Xera"]);
+    expect(one).toMatch(/reference image is the established appearance of Xera/i);
+    expect(one).toMatch(/match that character's face, build, and outfit/i);
+
+    const two = buildImagePromptText("a scene", "landscape", "quality", ["Xera", "Vera"]);
+    expect(two).toMatch(/reference images are the established appearance of Xera and Vera/i);
+    expect(two).toMatch(/match their face, build, and outfit/i);
+  });
+});
+
+describe("shouldRetryImageRender", () => {
+  const MAX = 3;
+  it("retries a transient no-data failure while attempts remain", () => {
+    expect(shouldRetryImageRender(new ImageGenNoDataError("no bytes"), 1, MAX)).toBe(true);
+    expect(shouldRetryImageRender(new ImageGenNoDataError("no bytes"), 2, MAX)).toBe(true);
+  });
+
+  it("does not retry the no-data failure on the final attempt", () => {
+    expect(shouldRetryImageRender(new ImageGenNoDataError("no bytes"), MAX, MAX)).toBe(false);
+  });
+
+  it("never retries a non-transient failure (failed turn, timeout, auth)", () => {
+    expect(shouldRetryImageRender(new CodexTurnFailedError("refused", "t1"), 1, MAX)).toBe(false);
+    expect(shouldRetryImageRender(new Error("image render turn timed out after 600s"), 1, MAX)).toBe(false);
+    expect(shouldRetryImageRender("not even an error", 1, MAX)).toBe(false);
   });
 });
 
@@ -403,6 +446,95 @@ describe("extractGeneratedImage", () => {
   it("returns null for non-imageGeneration items", () => {
     expect(extractGeneratedImage({ id: "msg_1", type: "agentMessage", text: "hi" } as ItemBase)).toBeNull();
     expect(extractGeneratedImage({ id: "c_1", type: "commandExecution" } as ItemBase)).toBeNull();
+  });
+});
+
+describe("summarizeItem", () => {
+  it("records result byte-length (not bytes) for imageGeneration items", () => {
+    // A byteless render must surface resultLen: 0 rather than vanish, and we
+    // must never copy the multi-MB base64 into the log.
+    expect(summarizeItem({ id: "ig_1", type: "imageGeneration", status: "generating", result: "" } as ItemBase))
+      .toEqual({ type: "imageGeneration", status: "generating", resultLen: 0 });
+    expect(summarizeItem({ id: "ig_2", type: "imageGeneration", result: "AAAA" } as ItemBase))
+      .toEqual({ type: "imageGeneration", resultLen: 4 });
+  });
+
+  it("captures a short text preview so a model refusal surfaces", () => {
+    const long = "I can't create that image because ".repeat(20);
+    const s = summarizeItem({ id: "m1", type: "agentMessage", text: long } as ItemBase);
+    expect(s.type).toBe("agentMessage");
+    expect(s.textPreview).toHaveLength(200);
+    expect(s.textPreview!.startsWith("I can't create that image")).toBe(true);
+    expect(s).not.toHaveProperty("resultLen");
+  });
+
+  it("records tool + success for tool-call items", () => {
+    expect(summarizeItem({ id: "t1", type: "toolCall", tool: "image_gen", success: false } as ItemBase))
+      .toEqual({ type: "toolCall", tool: "image_gen", success: false });
+  });
+});
+
+describe("readNewestPngAsBase64 (disk image harvest)", () => {
+  async function withTempDir(fn: (dir: string) => Promise<void>): Promise<void> {
+    const dir = await mkdtemp(join(tmpdir(), "mv-imggen-"));
+    try {
+      await fn(dir);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+
+  it("reads a PNG written to a session dir and returns it base64-encoded", async () => {
+    await withTempDir(async (root) => {
+      const sessionDir = join(root, "generated_images", "019ea7c8-sess");
+      await mkdir(sessionDir, { recursive: true });
+      const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]); // PNG magic
+      await writeFile(join(sessionDir, "ig_abc.png"), bytes);
+
+      const got = await readNewestPngAsBase64(sessionDir);
+      expect(got).toEqual({ base64: bytes.toString("base64") });
+    });
+  });
+
+  it("returns null when the session dir does not exist (no image written)", async () => {
+    await withTempDir(async (root) => {
+      expect(await readNewestPngAsBase64(join(root, "nope"))).toBeNull();
+    });
+  });
+
+  it("returns null for an empty dir or a dir with no PNGs", async () => {
+    await withTempDir(async (root) => {
+      const empty = join(root, "empty");
+      await mkdir(empty, { recursive: true });
+      expect(await readNewestPngAsBase64(empty)).toBeNull();
+
+      await writeFile(join(empty, "notes.txt"), "not an image");
+      expect(await readNewestPngAsBase64(empty)).toBeNull();
+    });
+  });
+
+  it("returns null for a zero-byte PNG (treated as no image)", async () => {
+    await withTempDir(async (root) => {
+      const d = join(root, "s");
+      await mkdir(d, { recursive: true });
+      await writeFile(join(d, "ig_empty.png"), Buffer.alloc(0));
+      expect(await readNewestPngAsBase64(d)).toBeNull();
+    });
+  });
+
+  it("picks the newest PNG when several exist", async () => {
+    await withTempDir(async (root) => {
+      const d = join(root, "s");
+      await mkdir(d, { recursive: true });
+      await writeFile(join(d, "ig_old.png"), Buffer.from([1, 1, 1]));
+      // Force a later mtime on the second file.
+      await new Promise((r) => setTimeout(r, 12));
+      const newer = Buffer.from([2, 2, 2, 2]);
+      await writeFile(join(d, "ig_new.png"), newer);
+
+      const got = await readNewestPngAsBase64(d);
+      expect(got).toEqual({ base64: newer.toString("base64") });
+    });
   });
 });
 

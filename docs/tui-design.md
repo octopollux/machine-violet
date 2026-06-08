@@ -98,10 +98,13 @@ The activity line shows what the engine is doing, mapped automatically from in-f
 | `scene_transition` cascade | `Scene transition...` | `⟳` |
 | Waiting for DM API response | `The DM is thinking...` | `◆` |
 | Tool call in flight (`tool_running`) | `The DM is working...` | `◆` |
+| Image render in flight (`generating_image`) | `The DM is creating an image...` | `🎨` |
 | Setup→game handoff in flight | `Preparing your campaign...` | `◆` |
 | Player's turn (idle) | *(hidden)* | *(hidden)* |
 
 The `tool_running` row matters because subagent-backed tools (e.g. `style_scene` → theme-styler) routinely take 20-60s. ActivityLine also renders any accumulated tool glyphs even when the engine state itself has no mapped label, so a transient or unmapped state can never silently wipe the row.
+
+`generating_image` is its own state (not just `tool_running`) because image rendering is the slowest tool by far — minutes — and deserves a clear "creating an image" message with tier escalation. Crucially, image gen runs *concurrently* with faster sibling tools (a scene-snapshot fires alongside `scene_transition` + `style_scene`), so the engine counts in-flight renders and holds `generating_image` until the **last** one finishes — a quick sibling completing first must not drop the indicator back to `dm_thinking`. Its accumulating tool glyph is `❖` (magenta).
 
 The modeline glyph column is used when the activity line has been dropped due to viewport size (see [Responsive Design](#responsive-design)). The glyph appears at the start of the modeline.
 

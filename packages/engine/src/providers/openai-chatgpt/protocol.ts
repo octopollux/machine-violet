@@ -275,8 +275,11 @@ export interface ItemBase {
   // `imageGeneration` variant (codex's built-in image_gen skill). Spike-
   // confirmed on codex 0.133.0: `result` carries the raw base64 image bytes
   // inline (no data: prefix), `revisedPrompt` is the backend-rewritten prompt,
-  // and `savedPath` is where codex also wrote the PNG under ~/.codex/
-  // generated_images/. We harvest `result` directly and ignore the file.
+  // and `savedPath` is where codex also wrote the PNG under
+  // <codexHome>/generated_images/<sessionId>/. We harvest `result` inline when
+  // it survives the stdio pipe, but that line is multi-MB and can be dropped or
+  // corrupted in transit — so the canonical fallback is to read the PNG off
+  // disk from that per-session dir. See provider.ts readNewestPngAsBase64.
   result?: string;
   revisedPrompt?: string | null;
   savedPath?: string;
