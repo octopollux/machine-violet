@@ -68,6 +68,22 @@ export interface SetupConversation {
   readonly hasPendingChoice: boolean;
 }
 
+/**
+ * Outcome of dispatching one setup tool call through the shared dispatcher
+ * (`runToolDispatch`). `content`/`isError` form the tool_result body for every
+ * non-suspending tool. `pendingChoices` is set ONLY by present_choices, which
+ * suspends the turn: when present, the caller must capture the choices and
+ * record NO tool_result — that result is synthesized later from the player's
+ * selection in resolveChoice/send. Both dispatch paths (the codex
+ * `dispatchTool` closure and the legacy per-tool loop) interpret this same
+ * shape, so each tool body has one source of truth.
+ */
+interface ToolDispatchOutcome {
+  content: string;
+  isError: boolean;
+  pendingChoices?: { prompt: string; choices: string[]; descriptions?: string[] };
+}
+
 // --- Tool definitions ---
 
 const FINALIZE_TOOL: NormalizedTool = {
@@ -922,7 +938,7 @@ export function createSetupConversation(
      * the same side effects: `handleFinalize` fires when finalize_setup
      * lands, `pendingChoices` is captured when present_choices lands, etc.
      */
-    async function runToolDispatch(call: { id: string; name: string; input: Record<string, unknown> }): Promise<{ content: string; isError: boolean }> {
+    async function runToolDispatch(call: { id: string; name: string; input: Record<string, unknown> }): Promise<ToolDispatchOutcome> {
       if (call.name === "generate_image") {
         return dispatchGenerateImage(call.id, call.input);
       }
@@ -937,13 +953,16 @@ export function createSetupConversation(
         const descriptions = rawDescs.length > 0
           ? rawDescs.map((d: unknown) => typeof d === "string" ? d : String(d))
           : undefined;
-        internalPendingChoices = { prompt: input.prompt ?? "Choose:", choices, descriptions };
         pendingToolUseId = call.id;
-        // Tell the model to halt — we'll resume the conversation with the
-        // player's selection via resolveChoice on the next chat() call.
+        // present_choices suspends the turn — signal that via pendingChoices so
+        // both dispatch paths handle it uniformly (capture the choices, skip the
+        // tool_result; it's synthesized later from the player's selection). The
+        // content is still returned so codex's in-band server request gets a
+        // synchronous reply telling the model to halt.
         return {
           content: "Choices have been presented to the player. End your turn now; you will be re-invoked once they select.",
           isError: false,
+          pendingChoices: { prompt: input.prompt ?? "Choose:", choices, descriptions },
         };
       }
       if (call.name === "load_world") {
@@ -989,9 +1008,13 @@ export function createSetupConversation(
           internalDispatchUsed = true;
           const dispatched = await runToolDispatch({ id: call.id, name: call.name, input: call.input });
           // Record tool_result for non-suspending tools. present_choices
-          // produces no recorded result here — its tool_result is synthesized
-          // later from the player's selection in resolveChoice/send.
-          if (call.name !== "present_choices") {
+          // suspends instead (pendingChoices set) — its tool_result is
+          // synthesized later from the player's selection in resolveChoice/send,
+          // so stash the choices for the post-stream codex block and record
+          // nothing here.
+          if (dispatched.pendingChoices) {
+            internalPendingChoices = dispatched.pendingChoices;
+          } else {
             internalToolResults.push({
               type: "tool_result",
               tool_use_id: call.id,
@@ -999,7 +1022,9 @@ export function createSetupConversation(
               ...(dispatched.isError ? { is_error: true } : {}),
             });
           }
-          return dispatched;
+          // dispatchTool's contract is { content, isError? }; strip the suspend
+          // signal before replying to codex's in-band request.
+          return { content: dispatched.content, isError: dispatched.isError };
         },
       };
 
@@ -1082,82 +1107,22 @@ export function createSetupConversation(
       const toolResults: ContentPart[] = [];
       let pendingChoices: { prompt: string; choices: string[]; descriptions?: string[] } | undefined;
 
+      // Dispatch every tool call through the SAME shared dispatcher the codex
+      // path uses (runToolDispatch), so each tool body lives in exactly one
+      // place. This is what prevents the paths from drifting — previously the
+      // load_world / finalize_setup / generate_image bodies were written out a
+      // second time here, and a missed branch silently dropped a tool call (the
+      // generate_image bug this dedupe closes). present_choices is the one
+      // suspending tool: runToolDispatch returns a `pendingChoices` signal and
+      // sets pendingToolUseId, and we record NO tool_result for it (it's
+      // synthesized from the player's selection in resolveChoice/send). Every
+      // other tool returns a uniform { content, isError } body.
       for (const tc of result.toolCalls) {
-        if (tc.name === "present_choices") {
-          // Don't resolve immediately — pause and return to the app for player input
-          const input = tc.input as { prompt?: string; choices?: unknown; descriptions?: unknown };
-          const rawChoices = Array.isArray(input.choices) ? input.choices : [];
-          const choices = rawChoices.map((c: unknown) => typeof c === "string" ? c : String(c));
-          const rawDescs = Array.isArray(input.descriptions) ? input.descriptions : [];
-          const descriptions = rawDescs.length > 0
-            ? rawDescs.map((d: unknown) => typeof d === "string" ? d : String(d))
-            : undefined;
-          pendingChoices = { prompt: input.prompt ?? "Choose:", choices, descriptions };
-          pendingToolUseId = tc.id;
-        } else if (tc.name === "load_world") {
-          const slug = (tc.input as { slug?: string }).slug ?? "";
-          const world = loadWorldBySlug(slug, userWorldsDir);
-          const content = world ? renderWorldForAgent(world) : `No world found with slug "${slug}".`;
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: tc.id,
-            content,
-          });
-        } else if (tc.name === "roll_dice") {
-          const dispatched = renderRollDice(tc.input);
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: tc.id,
-            content: dispatched.content,
-            ...(dispatched.isError ? { is_error: true } : {}),
-          });
-        } else if (tc.name === "finalize_setup") {
-          // The provider returns `_parse_error` when tool-call JSON is
-          // truncated or otherwise unparseable (e.g. a model hits its
-          // output cap mid-emission). Surface that as an error tool_result
-          // so the agent sees it and can retry — `handleFinalize` would
-          // otherwise default-fill every missing field and ship a
-          // placeholder campaign. (Mirrors agent-loop-bridge.ts:312.)
-          if (tc.input._parse_error) {
-            toolResults.push({
-              type: "tool_result",
-              tool_use_id: tc.id,
-              content: String(tc.input._parse_error),
-              is_error: true,
-            });
-            continue;
-          }
-          handleFinalize(tc.input);
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: tc.id,
-            content: "Setup finalized. Say a brief farewell (don't narrate on behalf of the DM!) and finish with a separator: `---`",
-          });
-        } else if (tc.name === "set_portrait") {
-          // Promote a draft to the canonical character-portrait path. The
-          // world-builder picks it up at finalize and copies into the new
-          // campaign. Failures surface as error tool_results so the agent
-          // can retry or move on.
-          const dispatched = await dispatchSetPortrait(tc.input);
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: tc.id,
-            content: dispatched.content,
-            ...(dispatched.isError ? { is_error: true } : {}),
-          });
-        } else if (tc.name === "generate_image") {
-          // Function-tool dispatch for the portrait loop. Without this
-          // branch the call is silently dropped: toolResults stays empty,
-          // line 1043's `if (toolResults.length === 0) break;` fires, the
-          // turn ends, and the model never gets a tool_result back —
-          // user-facing symptom is "the agent talks about the portrait
-          // and then yields back to the player without one ever
-          // appearing." The openai-chatgpt path doesn't hit this because
-          // it dispatches via the dispatchTool closure on chatParams,
-          // which routes through runToolDispatch (which DOES handle
-          // generate_image). This branch is the missing legacy-path
-          // counterpart.
-          const dispatched = await dispatchGenerateImage(tc.id, tc.input);
+        const dispatched = await runToolDispatch({ id: tc.id, name: tc.name, input: tc.input });
+        if (dispatched.pendingChoices) {
+          // Pause and return to the app for player input — don't push a result.
+          pendingChoices = dispatched.pendingChoices;
+        } else {
           toolResults.push({
             type: "tool_result",
             tool_use_id: tc.id,
