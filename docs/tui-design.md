@@ -584,6 +584,7 @@ The character pane is a right-side overlay (Tab toggle) that shows the active ch
 
 **Behavior:**
 - Toggled with Tab (or via key hints indicator in the Player Pane top-right)
+- Tab stays available while a choice overlay is on screen — the quick view opens over the narrative and the overlay keeps arrow/Enter for selection, so the two don't conflict (the Tab toggle is handled ahead of the choices input guard)
 - 35-column fixed-width panel, right-aligned over the narrative area
 - Lazy-fetches the character sheet on first open via `GET /session/character/:name` (returns `{ name, content }`)
 - Caches content across toggles; cache invalidates when the active player changes
