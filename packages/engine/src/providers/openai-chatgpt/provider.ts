@@ -501,7 +501,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
           imageItems,
           items: itemLog,
         });
-        throw new ImageGenNoDataError("codex image_gen turn completed without emitting an imageGeneration item");
+        throw new ImageGenNoDataError("codex image_gen turn completed but produced no image bytes (none inline, none on disk)");
       }
 
       logEvent("image_gen:response", {
@@ -1167,7 +1167,11 @@ export async function readNewestPngAsBase64(dir: string): Promise<{ base64: stri
 export interface ItemSummary {
   type: string;
   status?: string;
-  /** For imageGeneration items: byte-length of `result` (0 ⇒ backend emitted no image). */
+  /**
+   * For imageGeneration items: character length of the base64 `result` string
+   * (~4/3 of the decoded byte size) — a proxy for image size, not a decoded
+   * byte count. 0 ⇒ the item carried no bytes (backend emitted no image).
+   */
   resultLen?: number;
   /** For text-bearing items (agentMessage, reasoning): a short preview to catch refusals. */
   textPreview?: string;
@@ -1715,13 +1719,14 @@ export class CodexTurnFailedError extends Error {
 
 /**
  * Thrown by a single image-render attempt when the turn finished cleanly
- * (`turn/completed`, status "completed") but emitted no imageGeneration item —
- * codex's `image_gen` hosted tool intermittently completes a turn without
- * producing bytes (deep-alpha flakiness; observed even on a quiet account). A
- * distinct class so {@link OpenAIChatGptProvider.generateImage} can retry ONLY
- * this transient case (a fresh render almost always succeeds), while still
- * surfacing auth errors, a failed/interrupted turn, and the render-timeout
- * backstop immediately — none of those self-heal on a cheap retry.
+ * (`turn/completed`, status "completed") but yielded no image bytes by *either*
+ * harvest path — nothing inline and nothing on disk. (The common case is the
+ * inline base64 dropping on the pipe; the disk fallback normally rescues that,
+ * so reaching this means the render genuinely produced nothing.) A distinct
+ * class so {@link OpenAIChatGptProvider.generateImage} can retry ONLY this
+ * transient case (a fresh render almost always succeeds), while still surfacing
+ * auth errors, a failed/interrupted turn, and the render-timeout backstop
+ * immediately — none of those self-heal on a cheap retry.
  */
 export class ImageGenNoDataError extends Error {
   constructor(message: string) {

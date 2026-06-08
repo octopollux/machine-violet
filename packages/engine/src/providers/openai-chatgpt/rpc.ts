@@ -146,9 +146,14 @@ export class CodexRpcClient extends EventEmitter {
       // is exactly the kind of silent drop that makes an image render
       // "complete" with no bytes and no error — so surface it loudly with
       // enough of the line to tell truncated-JSON from genuine binary noise.
-      if (line.length >= RPC_PARSE_FAIL_LOG_MIN_BYTES) {
+      // Measure actual UTF-8 bytes read off the pipe, not `line.length` (UTF-16
+      // code units) — the threshold and the logged `bytes` are both about wire
+      // size. (Identical for the all-ASCII base64 image lines we care about, but
+      // honest for non-ASCII tracing noise.)
+      const byteLen = Buffer.byteLength(line, "utf8");
+      if (byteLen >= RPC_PARSE_FAIL_LOG_MIN_BYTES) {
         log.parseFailure({
-          bytes: line.length,
+          bytes: byteLen,
           head: line.slice(0, 200),
           tail: line.slice(-200),
           sessionId: this.sessionId,
@@ -160,10 +165,14 @@ export class CodexRpcClient extends EventEmitter {
     // A large line that *did* parse: note it (with method) so we can confirm
     // big base64 payloads survive the transport intact. If we see a 256 KB+
     // `item/completed` parse cleanly yet the render still yields no bytes, the
-    // loss is the backend's, not the pipe's.
-    if (line.length >= RPC_LARGE_LINE_LOG_MIN_BYTES) {
+    // loss is the backend's, not the pipe's. Byte count, not code-unit count
+    // (see parse-failure branch). Runs per parsed line, but Buffer.byteLength is
+    // a fast O(n) scan over short messages — negligible next to the JSON.parse
+    // that just ran on the same string.
+    const lineBytes = Buffer.byteLength(line, "utf8");
+    if (lineBytes >= RPC_LARGE_LINE_LOG_MIN_BYTES) {
       log.largeLine({
-        bytes: line.length,
+        bytes: lineBytes,
         method: msg.method,
         hasResult: msg.result !== undefined,
         sessionId: this.sessionId,
