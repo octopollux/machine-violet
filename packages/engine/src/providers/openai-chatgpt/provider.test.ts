@@ -187,6 +187,35 @@ describe("TurnCollector: encrypted reasoning capture", () => {
       summary: [],
     });
   });
+
+  it("reasoningCaptureStats counts summary deltas, raw items, and captured blobs", () => {
+    // The #597 detector reads these counts. A raw reasoning item that arrives
+    // with null content (ZDR off) still counts toward rawReasoningItems — only
+    // its blob is absent — so a quiet non-ZDR org never trips the drop signal.
+    const c = new TurnCollector();
+    c.onReasoningDelta(agentMessageDelta("Thinking"));
+    c.onReasoningDelta(agentMessageDelta(" harder."));
+    c.onRawResponseItem(rawReasoning({ id: "rs_1", encrypted_content: "blob", summary: [] }));
+    c.onRawResponseItem(rawReasoning({ id: "rs_2", encrypted_content: null, summary: [] }));
+
+    expect(c.reasoningCaptureStats()).toEqual({
+      summaryDeltas: 2,
+      rawReasoningItems: 2,
+      encryptedCaptured: 1,
+    });
+  });
+
+  it("flags a likely transport drop: model reasoned but no raw reasoning item arrived", () => {
+    // Reasoning-summary deltas streamed (so the model reasoned) yet
+    // rawResponseItem/completed never landed — the exact condition runTurn logs
+    // as codex:rpc:reasoning_item_missing.
+    const c = new TurnCollector();
+    c.onReasoningDelta(agentMessageDelta("Weighed it."));
+    const stats = c.reasoningCaptureStats();
+
+    expect(stats.summaryDeltas).toBeGreaterThan(0);
+    expect(stats.rawReasoningItems).toBe(0);
+  });
 });
 
 describe("messageToResponsesItems: reasoning replay (issue #533)", () => {

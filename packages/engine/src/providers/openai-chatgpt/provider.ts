@@ -141,6 +141,15 @@ export class OpenAIChatGptProvider implements LLMProvider {
    */
   private defaultModelPromise: Promise<string> | null = null;
 
+  /**
+   * Set once we've logged the #597 reasoning-replay gap (model reasoned but no
+   * `rawResponseItem/completed` reasoning item arrived) for this session. Keeps
+   * it a single informational breadcrumb instead of firing on every reasoning
+   * turn — which it would, since non-ZDR ChatGPT accounts never emit those raw
+   * items (confirmed via live test). See {@link runTurn}.
+   */
+  private reasoningGapLogged = false;
+
   constructor(opts: OpenAIChatGptProviderOptions) {
     this.sessionId = opts.sessionId;
     this.cwd = opts.cwd ?? process.cwd();
@@ -1028,6 +1037,28 @@ export class OpenAIChatGptProvider implements LLMProvider {
         throw new CodexTurnFailedError(errorMessage ?? "(no error message from codex)", turnId);
       }
 
+      // #597 reasoning-replay visibility. If the model demonstrably reasoned
+      // (summary deltas streamed) but NOT ONE raw reasoning item arrived on
+      // `rawResponseItem/completed`, the encrypted_content blob we replay for
+      // cross-turn chain-of-thought (#533) got no data this turn. Two causes,
+      // indistinguishable from here: a transport drop (no disk fallback, unlike
+      // images), OR — confirmed by a live test on this non-ZDR ChatGPT account —
+      // codex simply does not emit raw reasoning items at all there, making #533
+      // replay a no-op for that account. A genuine *intermittent* drop instead
+      // shows up reliably as a `parse_failure` with `methodGuess`. So this is an
+      // informational breadcrumb, logged ONCE per session (else it fires on
+      // every reasoning turn for every non-ZDR account).
+      const rstats = collected.reasoningCaptureStats();
+      if (!this.reasoningGapLogged && rstats.summaryDeltas > 0 && rstats.rawReasoningItems === 0) {
+        this.reasoningGapLogged = true;
+        log.reasoningRawItemMissing({
+          threadId,
+          turnId,
+          summaryDeltas: rstats.summaryDeltas,
+          sessionId: this.sessionId,
+        });
+      }
+
       return collected.toChatResult(completed);
     } finally {
       unsubAgentDelta();
@@ -1550,6 +1581,16 @@ export class TurnCollector {
    * See the mirror logic in `openai.ts` (`encryptedReasoningById`).
    */
   private encryptedReasoningById = new Map<string, { id: string; encryptedContent: string; summary: string[] }>();
+  /**
+   * Count of reasoning items that ARRIVED on `rawResponseItem/completed` this
+   * turn — incremented regardless of whether they carried an `encrypted_content`
+   * blob. This is the denominator the #597 drop-detector needs: a ZDR-off org
+   * still *receives* the raw item (with null content), so "blob not captured" is
+   * benign there, but "no raw reasoning item arrived at all while the model
+   * demonstrably reasoned" points at a dropped notification. See
+   * {@link reasoningCaptureStats}.
+   */
+  private rawReasoningItemsSeen = 0;
 
   constructor(private readonly onDelta?: (text: string) => void) {}
 
@@ -1570,6 +1611,11 @@ export class TurnCollector {
   onRawResponseItem(params: RawResponseItemCompletedNotification): void {
     const item = params.item;
     if (item.type !== "reasoning") return;
+    // Count every reasoning raw item that arrives (even a ZDR-off one with null
+    // content), BEFORE the encrypted_content gate below — the #597 detector
+    // distinguishes "item arrived, no blob" (benign) from "no item at all"
+    // (likely a pipe drop).
+    this.rawReasoningItemsSeen++;
     // `encrypted_content` is nullable on the wire — present only when codex
     // is configured to forward it (typically when ZDR is on for the org).
     // Without the blob there's nothing to round-trip, so skip the item;
@@ -1584,6 +1630,24 @@ export class TurnCollector {
       encryptedContent: item.encrypted_content,
       summary,
     });
+  }
+
+  /**
+   * Diagnostic snapshot for the #597 transport-drop detector. `summaryDeltas`
+   * proves the model reasoned this turn (it streamed reasoning-summary text on
+   * the intact `item/reasoning/*` channel); `rawReasoningItems` is how many
+   * reasoning items arrived on the *separate* `rawResponseItem/completed`
+   * channel. `summaryDeltas > 0 && rawReasoningItems === 0` means that second
+   * channel's item went missing — likely a dropped/corrupted line on the stdio
+   * pipe, silently degrading cross-turn chain-of-thought (#533) with no disk
+   * fallback to rescue it. `encryptedCaptured` is how many carried a usable blob.
+   */
+  reasoningCaptureStats(): { summaryDeltas: number; rawReasoningItems: number; encryptedCaptured: number } {
+    return {
+      summaryDeltas: this.reasoning.length,
+      rawReasoningItems: this.rawReasoningItemsSeen,
+      encryptedCaptured: this.encryptedReasoningById.size,
+    };
   }
 
   onItemCompleted(params: ItemCompletedNotification): void {

@@ -91,7 +91,9 @@ All emitted via `logEvent` to `.debug/engine.jsonl`. Token counts and per-call c
 | `codex:subprocess:spawn` | `{ binaryPath, version?, sessionId? }` | Codex child process starts |
 | `codex:subprocess:initialized` | `{ userAgent?, codexHome?, platformOs?, platformArch?, sessionId? }` | `initialize` handshake completed — records codex version + platform diagnostics |
 | `codex:subprocess:exit` | `{ code, signal, sessionId? }` | Codex child process dies |
+| `codex:subprocess:stderr` | `{ line, sessionId? }` | One WARN/ERROR line (or non-tracing diagnostic) codex wrote to its own stderr, captured to our log instead of `inherit`-ed to the terminal. ANSI-stripped, length-capped; INFO/DEBUG/TRACE filtered out (they flood at `RUST_LOG=info`+). Near-silent at the default `RUST_LOG`. |
 | `codex:rpc:error` | `{ method, code, message, sessionId? }` | A JSON-RPC request returned an error result |
+| `codex:rpc:reasoning_item_missing` | `{ threadId, turnId, summaryDeltas, sessionId? }` | **Once per session.** Model reasoned but no `rawResponseItem/completed` reasoning item arrived, so #533 replay got no blob — a transport drop, or (confirmed live) a non-ZDR ChatGPT account where codex emits no raw reasoning items at all. Informational. (#597) |
 | `codex:auth:login_started` | `{ type, loginId }` | OAuth or device-code flow initiated |
 | `codex:auth:login_completed` | `{ loginId, success, planType?, error? }` | Login finished (success or failure) |
 | `codex:auth:token_refresh` | `{ reason, previousAccountId? }` | Codex requested a fresh ChatGPT token |
@@ -101,13 +103,15 @@ All emitted via `logEvent` to `.debug/engine.jsonl`. Token counts and per-call c
 | `codex:turn:start` | `{ threadId, turnId?, effort? }` | A turn was dispatched |
 | `codex:turn:complete` | `{ threadId, turnId, durationMs, status }` | A turn finished |
 
-(Encrypted-reasoning capture has no dedicated event — it flows through the normal turn capture and shows up in the persisted assistant content. Matches the openai-apikey path which is also silent about reasoning blobs.)
+(Encrypted-reasoning capture has no dedicated *success* event — it flows through the normal turn capture and shows up in the persisted assistant content, matching the openai-apikey path. The one diagnostic is `codex:rpc:reasoning_item_missing`, logged when the blob's carrier notification appears to have been dropped on the pipe — see Reasoning preservation and Transport reliability below, and issue #597.)
 
 ## Reasoning preservation across turns
 
 Reasoning-effort-enabled turns produce an opaque `encrypted_content` blob per reasoning item that the Responses API will accept back as input on subsequent turns — that's what lets the model continue its chain-of-thought instead of re-deriving setup each round. The blob is **not** exposed on codex's sanitized `item/completed` stream (the `ReasoningThreadItem` view defines only `summary` and `content` text). It surfaces on a separate notification: **`rawResponseItem/completed`**.
 
 Capture: the provider subscribes to `rawResponseItem/completed` per turn and stores items where `item.type === "reasoning"` and `encrypted_content` is non-null. Each captured item becomes a `reasoning` ContentPart on `assistantContent`. ZDR-off codex configurations don't forward the blob, in which case the item is dropped (persisting an empty shell would replay back as an invalid input item).
+
+Unlike the inline image path (which falls back to reading the PNG off disk), this blob has **no fallback** — its sole carrier is the one `rawResponseItem/completed` line. The provider logs `codex:rpc:reasoning_item_missing` (once per session) when the model reasoned (summary deltas streamed) yet no raw reasoning item arrived. **A live test on a non-ZDR ChatGPT Plus account found this firing on every reasoning turn: codex emits no `rawResponseItem/completed` reasoning items there at all** — so encrypted-reasoning replay is effectively a **no-op for ChatGPT-account users** (the model re-derives its reasoning each turn — graceful, but #533 buys nothing on this path). A genuine *intermittent* transport drop instead surfaces as a `parse_failure` with a `methodGuess`. Whether raw/encrypted reasoning can be enabled for ChatGPT-account turns is a separate question worth its own investigation.
 
 Replay: `messageToResponsesItems` emits any `reasoning` ContentPart as a Responses-API `reasoning` item at the **head** of the assistant turn (before message and function_call items, as the API requires).
 
@@ -120,6 +124,24 @@ The same encrypted-blob round-trip is what the `openai-apikey` / `openrouter` pa
 - **`DynamicToolCallResponse`** requires both `success: boolean` AND `contentItems: [{ type: "inputText" | "inputImage", ... }]`. Both fields required, strict validation.
 - **`dynamicTools`** is wire-supported via `thread/start` even though it's missing from the v0.130.0 generated schema. Could churn — pin codex versions and re-validate on bumps.
 - **`modelContextWindow`** returned by `thread/tokenUsage/updated` reflects per-plan caps. GPT-5.5 reports 258,400 tokens on Plus, NOT the published 1.05M. Callers that care about an accurate window must read from this notification at runtime, not from `known-models.json`.
+
+## Transport reliability
+
+The JSON-RPC wire is newline-delimited JSON on the subprocess's **stdout**; multi-MB lines (chiefly inline base64 images) intermittently arrive corrupt and fail `JSON.parse`. Two mechanisms were ruled out empirically while investigating #597:
+
+- **codex's tracing does not splice into stdout.** codex routes its `tracing` subscriber to **stderr** — verified by capturing the two streams separately and forcing `RUST_LOG=trace`: ~13 KB of ANSI records landed on stderr while stdout stayed 100% clean JSON. stderr is a separate fd; it cannot corrupt the stdout protocol pipe. (We now pipe + drain stderr to the engine log as `codex:subprocess:stderr` rather than `inherit`-ing it — both to surface codex's own diagnostics and to confirm what is/isn't on each stream. Only WARN/ERROR + non-tracing lines are logged: a live run at `RUST_LOG=info` emitted **121k** INFO span records in one turn, so the lower levels are filtered to keep the engine log usable. The drain itself must keep up regardless — that same 121k-line turn completed cleanly, confirming no pipe-buffer deadlock.)
+- **Our read side is not lossy.** Node `readline` over the child stdout pipe delivers 3 MB lines interleaved with small notifications intact (60/60 whole, 0 parse failures in a stress probe).
+
+By elimination the corruption originates inside **codex's own stdout writes** (a module printing directly to stdout, or one protocol write spliced into another). It predominantly hits the multi-MB image lines, which already recover via the disk fallback (`generated_images/<sessionId>/`) — confirmed in a live run where a 1.8 MB inline-image `item/completed` line parsed cleanly (logged as `large_line`) with no `parse_failure` and no disk recovery needed. Smaller non-image payloads are far less exposed; any large unparseable stdout line is logged as `codex:rpc:parse_failure` with a salvaged `methodGuess` so the dropped message type is attributable. (The encrypted-reasoning blob has no fallback, but a live test showed it never arrives on a non-ZDR ChatGPT account in the first place — see Reasoning preservation above.)
+
+## Subprocess hygiene — disabled codex features
+
+We spawn `codex app-server` with **`--disable plugins --disable shell_snapshot`** (`CODEX_LEAN_FLAGS` in `rpc.ts`; these are per-process `-c features.X=false` equivalents, **not** writes to `~/.codex/config.toml`). MV uses neither subsystem — it supplies its own tools via `dynamicTools` on `thread/start` and runs `sandbox: "read-only"` — and leaving them on is pure waste that surfaced as stderr noise once we started capturing it (#597):
+
+- **`plugins`** makes codex re-read and re-validate every plugin manifest under `~/.codex` on **every turn** (a single malformed user plugin produced ~370 WARN lines in one live session) and fires a startup remote plugin-sync that 401s. Disabling it removes the work and the noise.
+- **`shell_snapshot`** attempts a shell-environment snapshot per `thread/start` that isn't even supported on PowerShell (one WARN per thread).
+
+Verified live: with both disabled, a full 9-turn session emitted **zero** plugin/shell/sync WARNs (vs ~370), every turn completed, and **`image_gen` still works** — it's a built-in skill, independent of the user-plugin system (a 1.58 MB portrait rendered and persisted as a valid PNG). Do **not** disable `image_generation`, `shell_tool` blindly, or other `stable` features without re-validating a render — only `plugins`/`shell_snapshot` were confirmed safe for MV's usage.
 
 ## Distribution
 
