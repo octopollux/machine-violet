@@ -183,7 +183,13 @@ async function runAgentLoopInternal(
         "`\"character_portrait\"` for character close-ups, or `\"player_request\"` " +
         "when the player explicitly asked for an illustration of something. The " +
         "intent steers on-disk naming and the engine-log breadcrumb — it does not " +
-        "affect the rendered image.",
+        "affect the rendered image. " +
+        "When a specific player character is clearly the subject of the image, list " +
+        "their name in `reference_characters` so the render matches their established " +
+        "portrait (face, build, outfit). Only name characters who actually appear in " +
+        "THIS image, and only when their likeness matters — it adds noticeable render " +
+        "time and pulls the picture toward that person, so leave it off for wide " +
+        "scenes, crowds, or anyone whose exact look doesn't matter.",
       inputSchema: {
         type: "object",
         properties: {
@@ -205,6 +211,11 @@ async function runAgentLoopInternal(
             type: "string",
             enum: ["scene_snapshot", "player_request", "character_portrait"],
             description: "Steers on-disk naming and the engine-log breadcrumb. 'scene_snapshot' is the right default for in-narrative renders. Omit to default to scene_snapshot.",
+          },
+          reference_characters: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional. Names of player characters whose established portrait should visually guide this render (image-to-image), so the depicted character matches their look. Only include characters who actually appear in this image and whose likeness matters; omit otherwise. Names without a saved portrait are ignored.",
           },
         },
         required: ["prompt", "effort", "aspect"],

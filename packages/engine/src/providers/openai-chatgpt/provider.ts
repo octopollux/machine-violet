@@ -411,8 +411,12 @@ export class OpenAIChatGptProvider implements LLMProvider {
           ...referenceItems,
           { type: "text", text: buildImagePromptText(prompt, aspect, effort, labels) },
         ],
-        // Minimal reasoning — the model only needs to call one tool. Summaries
-        // off; we don't surface thinking from image turns.
+        // Lowest reasoning the model needs to call one tool. Summaries off; we
+        // don't surface thinking from image turns. NOTE: "low" is the FLOOR
+        // here — the backend rejects image_gen at reasoning.effort "minimal"
+        // ("The following tools cannot be used with reasoning.effort 'minimal':
+        // image_gen, web_search", HTTP 400), which would break ALL renders, not
+        // just reference ones. Do not lower this past "low".
         effort: "low",
         summary: "none",
       } satisfies TurnStartParams);
