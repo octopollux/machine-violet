@@ -155,6 +155,17 @@ describe("rateLimitsToUsageStatus", () => {
     expect(status!.segments.map((s) => s.id)).toEqual(["tokens"]);
   });
 
+  it("skips a segment whose remaining is NaN rather than fabricating an 'ok' segment", () => {
+    // A non-numeric `*-remaining` header (Number(...) → NaN) must not slip
+    // through as usedPercent: NaN, which rateLimitSegmentStatus would wrongly
+    // resolve to "ok".
+    const status = rateLimitsToUsageStatus(
+      { requestsRemaining: NaN, requestsLimit: 100, tokensRemaining: 250000, tokensLimit: 1000000 },
+      0,
+    );
+    expect(status!.segments.map((s) => s.id)).toEqual(["tokens"]);
+  });
+
   it("returns null when neither limit is usable", () => {
     expect(rateLimitsToUsageStatus(
       { requestsRemaining: 0, requestsLimit: 0, tokensRemaining: 0, tokensLimit: 0 },
@@ -195,6 +206,21 @@ describe("createAnthropicProvider: getUsageStatus", () => {
     // A subsequent header-less response (e.g. some error/retry paths) must not
     // blank the gauge — the previous snapshot stands.
     mockResponseHeaders(new Headers());
+    await provider.chat(baseParams());
+
+    const usage = provider.getUsageStatus?.();
+    expect(usage!.segments.map((s) => s.usedPercent)).toEqual([40, 75]);
+  });
+
+  it("keeps the last snapshot when a later response has partial (unusable) headers", async () => {
+    const provider = createAnthropicProvider("test-key");
+
+    mockResponseHeaders(ratelimitHeaders({ reqRemaining: 30, reqLimit: 50, tokRemaining: 250000, tokLimit: 1000000 }));
+    await provider.chat(baseParams());
+
+    // Only a `*-remaining` header, no limit — parses non-null but yields no
+    // renderable segment. It must not overwrite the prior good snapshot.
+    mockResponseHeaders(ratelimitHeaders({ reqRemaining: 5 }));
     await provider.chat(baseParams());
 
     const usage = provider.getUsageStatus?.();

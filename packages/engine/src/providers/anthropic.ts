@@ -517,10 +517,28 @@ export function parseAnthropicRateLimits(
 }
 
 /**
- * Store the parsed snapshot when a response carries the headers. A response
- * without them (parse returns null) leaves the prior snapshot intact — the
- * missing-header fallback — so a stray header-less response doesn't blank the
- * UI between turns.
+ * A `remaining`/`limit` pair is renderable only with a finite positive limit
+ * and a finite remaining. Guards against a malformed/partial header set (e.g.
+ * a `*-remaining` with no `*-limit`, or a non-numeric value that `Number()`
+ * turned into NaN) producing a misleading 0% / NaN segment.
+ */
+function isRenderableLimit(remaining: number, limit: number): boolean {
+  return Number.isFinite(limit) && limit > 0 && Number.isFinite(remaining);
+}
+
+/** True when a snapshot has at least one renderable segment. */
+function hasRenderableLimits(l: AnthropicRateLimits): boolean {
+  return isRenderableLimit(l.requestsRemaining, l.requestsLimit)
+    || isRenderableLimit(l.tokensRemaining, l.tokensLimit);
+}
+
+/**
+ * Store the parsed snapshot when a response carries *usable* rate-limit headers.
+ * A response without them (parse returns null) — or one whose parse yields no
+ * renderable limit (a partial/garbage header set) — leaves the prior snapshot
+ * intact. This is the missing-header fallback: a stray header-less or malformed
+ * response must not blank the UI (or overwrite a good snapshot with junk)
+ * between turns.
  */
 function captureRateLimits(
   headers: { get(name: string): string | null } | null | undefined,
@@ -528,7 +546,7 @@ function captureRateLimits(
 ): void {
   if (!headers) return;
   const parsed = parseAnthropicRateLimits(headers);
-  if (parsed) {
+  if (parsed && hasRenderableLimits(parsed)) {
     state.limits = parsed;
     state.capturedAt = Date.now();
   }
@@ -536,10 +554,10 @@ function captureRateLimits(
 
 /**
  * Build the generic {@link UsageStatus} from a rate-limit snapshot: up to two
- * `percentage` segments (requests, tokens). A segment whose limit is ≤ 0 or
- * non-finite (header absent/garbage) is skipped rather than rendered as a
- * misleading 0% / NaN; if neither is usable the result is null so the UI shows
- * no usage line. Exported for tests.
+ * `percentage` segments (requests, tokens). A segment without a finite positive
+ * limit and finite remaining (header absent/partial/garbage) is skipped rather
+ * than rendered as a misleading 0% / NaN; if neither is usable the result is
+ * null so the UI shows no usage line. Exported for tests.
  */
 export function rateLimitsToUsageStatus(
   limits: AnthropicRateLimits,
@@ -547,9 +565,9 @@ export function rateLimitsToUsageStatus(
 ): UsageStatus | null {
   const segments: UsageSegment[] = [];
   const addSegment = (id: string, label: string, remaining: number, limit: number): void => {
-    if (!Number.isFinite(limit) || limit <= 0) return;
+    if (!isRenderableLimit(remaining, limit)) return;
     const used = Math.max(0, limit - remaining);
-    const usedPercent = Math.min(100, (used / limit) * 100);
+    const usedPercent = Math.max(0, Math.min(100, (used / limit) * 100));
     segments.push({
       id,
       label,
