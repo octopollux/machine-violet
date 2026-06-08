@@ -247,14 +247,14 @@ export class CodexRpcClient extends EventEmitter {
 
   /**
    * Forward one line of codex's stderr to the engine log. Strips ANSI color
-   * codes (codex's tracing subscriber emits SGR-colored records) and caps the
-   * length so a panic backtrace can't bloat a single log entry. Volume tracks
-   * codex's `RUST_LOG` — sparse at the default level. Never consumed as
-   * protocol; this is diagnostics only.
+   * codes (codex's tracing subscriber emits SGR-colored records), filters to the
+   * diagnostic levels (see {@link codexStderrLineWorthLogging}), and caps the
+   * length so a panic backtrace can't bloat a single log entry. Never consumed
+   * as protocol; this is diagnostics only.
    */
   private handleStderrLine(line: string): void {
     const clean = line.replace(ANSI_SGR_RE, "").trimEnd();
-    if (!clean) return;
+    if (!clean || !codexStderrLineWorthLogging(clean)) return;
     log.stderr({
       line: clean.length > STDERR_LINE_MAX_CHARS ? clean.slice(0, STDERR_LINE_MAX_CHARS) + "…[truncated]" : clean,
       sessionId: this.sessionId,
@@ -361,6 +361,24 @@ export class CodexRpcClient extends EventEmitter {
 function salvageMethod(line: string): string | undefined {
   const m = /"method"\s*:\s*"([^"\\]{1,80})"/.exec(line.slice(0, 1024));
   return m ? m[1] : undefined;
+}
+
+/**
+ * Decide whether an (already ANSI-stripped) codex stderr line is worth logging.
+ * codex's tracing format is `<ts> <LEVEL> <target>: <msg>`. At `RUST_LOG=info`
+ * the per-request INFO span records alone run to 100k+ lines per turn (measured
+ * live, #597) — each a synchronous append that would flood the engine log and
+ * slow the game. We keep **WARN/ERROR** (the diagnostic signal, including the
+ * "ERROR records from dynamic_tools" the issue is about) and drop TRACE/DEBUG/
+ * INFO. A line that does NOT match the tracing format (a panic, a stack frame,
+ * a raw print) is **kept** — anomalous codex output is exactly what we don't
+ * want to silently drop. At the default `RUST_LOG` codex's stderr is near-silent
+ * regardless, so this only matters when someone raises the level for debugging.
+ */
+export function codexStderrLineWorthLogging(clean: string): boolean {
+  const m = /^\S+\s+(TRACE|DEBUG|INFO|WARN|ERROR)\b/.exec(clean);
+  if (!m) return true; // not a recognizable tracing record — keep it
+  return m[1] === "WARN" || m[1] === "ERROR";
 }
 
 export class CodexRpcError extends Error {

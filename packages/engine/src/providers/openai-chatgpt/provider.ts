@@ -141,6 +141,15 @@ export class OpenAIChatGptProvider implements LLMProvider {
    */
   private defaultModelPromise: Promise<string> | null = null;
 
+  /**
+   * Set once we've logged the #597 reasoning-replay gap (model reasoned but no
+   * `rawResponseItem/completed` reasoning item arrived) for this session. Keeps
+   * it a single informational breadcrumb instead of firing on every reasoning
+   * turn — which it would, since non-ZDR ChatGPT accounts never emit those raw
+   * items (confirmed via live test). See {@link runTurn}.
+   */
+  private reasoningGapLogged = false;
+
   constructor(opts: OpenAIChatGptProviderOptions) {
     this.sessionId = opts.sessionId;
     this.cwd = opts.cwd ?? process.cwd();
@@ -997,15 +1006,20 @@ export class OpenAIChatGptProvider implements LLMProvider {
         throw new CodexTurnFailedError(errorMessage ?? "(no error message from codex)", turnId);
       }
 
-      // #597 transport-drop detector. If the model demonstrably reasoned this
-      // turn (reasoning-summary deltas streamed) but NOT ONE raw reasoning item
-      // arrived, the `rawResponseItem/completed` carrying the encrypted blob was
-      // probably dropped/corrupted on the stdio pipe — and unlike the image path
-      // there's no disk fallback, so cross-turn chain-of-thought (#533) degrades
-      // silently. Surface it. A non-ZDR org still receives the raw item (with
-      // null content), so this fires only on a genuine miss, not a missing blob.
+      // #597 reasoning-replay visibility. If the model demonstrably reasoned
+      // (summary deltas streamed) but NOT ONE raw reasoning item arrived on
+      // `rawResponseItem/completed`, the encrypted_content blob we replay for
+      // cross-turn chain-of-thought (#533) got no data this turn. Two causes,
+      // indistinguishable from here: a transport drop (no disk fallback, unlike
+      // images), OR — confirmed by a live test on this non-ZDR ChatGPT account —
+      // codex simply does not emit raw reasoning items at all there, making #533
+      // replay a no-op for that account. A genuine *intermittent* drop instead
+      // shows up reliably as a `parse_failure` with `methodGuess`. So this is an
+      // informational breadcrumb, logged ONCE per session (else it fires on
+      // every reasoning turn for every non-ZDR account).
       const rstats = collected.reasoningCaptureStats();
-      if (rstats.summaryDeltas > 0 && rstats.rawReasoningItems === 0) {
+      if (!this.reasoningGapLogged && rstats.summaryDeltas > 0 && rstats.rawReasoningItems === 0) {
+        this.reasoningGapLogged = true;
         log.reasoningRawItemMissing({
           threadId,
           turnId,

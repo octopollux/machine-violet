@@ -36,14 +36,16 @@ export const log = {
   exit: (data: { code: number | null; signal: NodeJS.Signals | null; sessionId?: string }) =>
     logEvent("codex:subprocess:exit", data),
   /**
-   * One line codex wrote to its OWN stderr — its `tracing` subscriber output
-   * (INFO/WARN/ERROR records) plus any direct diagnostics. We pipe + drain
+   * One line codex wrote to its OWN stderr — a WARN/ERROR `tracing` record or
+   * any non-tracing diagnostic (panic, stack frame, raw print). We pipe + drain
    * stderr (rather than `inherit`-ing it to the terminal) so these land in the
    * engine log alongside the protocol events: codex's stderr is the only place
    * its internal failures surface, and a render/tool turn that misbehaves often
    * explains itself here. ANSI color codes are stripped and long lines are
-   * truncated before logging. Volume scales with codex's `RUST_LOG` (sparse at
-   * the default level; floods at `trace`).
+   * truncated before logging; INFO/DEBUG/TRACE records are filtered out (at
+   * `RUST_LOG=info`+ they run to 100k+ lines/turn — see
+   * `codexStderrLineWorthLogging`). At the default `RUST_LOG` codex's stderr is
+   * near-silent, so this is rare in normal operation.
    */
   stderr: (data: { line: string; sessionId?: string }) =>
     logEvent("codex:subprocess:stderr", data),
@@ -65,14 +67,16 @@ export const log = {
   parseFailure: (data: { bytes: number; head: string; tail: string; methodGuess?: string; sessionId?: string }) =>
     logEvent("codex:rpc:parse_failure", data),
   /**
-   * The model demonstrably reasoned this turn (reasoning-summary deltas streamed
-   * on the intact `item/reasoning/*` channel) yet NOT ONE `rawResponseItem/
-   * completed` reasoning item arrived on its separate channel — so the encrypted
-   * reasoning blob we replay for cross-turn chain-of-thought continuity (#533)
-   * was probably dropped/corrupted on the stdio pipe. Unlike the image path
-   * there's no disk fallback, so this would otherwise degrade silently. A
-   * non-ZDR org still RECEIVES the raw item (with null content), so this fires
-   * only on a genuine miss — see {@link OpenAIChatGptProvider} runTurn. (#597)
+   * Informational, logged ONCE per session: the model reasoned (summary deltas
+   * streamed on `item/reasoning/*`) yet NOT ONE `rawResponseItem/completed`
+   * reasoning item arrived on its separate channel, so the encrypted_content
+   * blob we replay for cross-turn chain-of-thought (#533) got no data. Two
+   * indistinguishable causes: a transport drop (no disk fallback, unlike
+   * images), OR — confirmed by live test — a non-ZDR ChatGPT account, where
+   * codex emits no raw reasoning items at all and #533 replay is simply a no-op.
+   * A genuine intermittent drop instead surfaces as `parse_failure` with a
+   * `methodGuess`; this event just makes the "replay got nothing" state visible.
+   * See {@link OpenAIChatGptProvider} runTurn. (#597)
    */
   reasoningRawItemMissing: (data: { threadId: string; turnId: string; summaryDeltas: number; sessionId?: string }) =>
     logEvent("codex:rpc:reasoning_item_missing", data),
