@@ -1022,23 +1022,33 @@ function systemPromptToString(systemPrompt: string | SystemBlock[]): string {
 }
 
 /**
- * Developer instructions for the scoped image-render turn. Keeps the model
- * on rails: call image_gen once, no shell, no file ops, no prose. Without
- * this the model treats the request like a coding task — in the spike it
- * read SKILL.md and tried `Copy-Item`/`Get-ChildItem` to "save" the file
- * (all blocked by read-only sandbox, but a waste of tokens and latency).
+ * Developer instructions for the scoped image-render turn. Keeps the model on
+ * rails: its one job is to call image_gen once — no shell, no file ops, no
+ * prose, and (for the reference path) no *analyzing* the attached images.
+ *
+ * Two failure modes this defends against:
+ *  - Without the no-shell rails the model treats the request like a coding task
+ *    — in the spike it read SKILL.md and tried `Copy-Item`/`Get-ChildItem` to
+ *    "save" the file (blocked by read-only sandbox, but wasted tokens/latency).
+ *  - When a reference image is attached, telling the model to "match the
+ *    character's face to the reference" makes it think *it* must study and
+ *    describe the picture — so it spends a long reasoning pass on vision
+ *    analysis and then replies with text instead of calling image_gen at all
+ *    (observed: ~200s wasted, the turn rescued only by the caller's retry). The
+ *    matching is image_gen's job, and the per-character match directive already
+ *    rides in the prompt text via buildImagePromptText — so here we tell the
+ *    model the opposite: the references are consumed automatically, don't look
+ *    at them, just call the tool.
  */
 const IMAGE_RENDERER_INSTRUCTIONS =
   "You are a silent image-rendering backend. The user message is an image " +
-  "description, optionally preceded by one or more reference images. Call the " +
-  "built-in image_gen tool exactly once to render the description. When reference " +
-  "images are attached, they are visual references for the characters named in " +
-  "the description — match each named character's face, build, and outfit to their " +
-  "reference, but follow the description for everything else (pose, setting, " +
-  "framing, other subjects); do NOT reproduce a reference's background or crop. " +
-  "Do NOT run shell commands. Do NOT save, copy, move, or list files — the caller " +
-  "harvests the rendered bytes directly. Do NOT write any explanatory prose, " +
-  "captions, or follow-up. Render the image and stop.";
+  "description, optionally preceded by one or more reference images. Your only " +
+  "job is to call the built-in image_gen tool exactly once with that description. " +
+  "Any reference images are consumed by image_gen automatically — you do NOT need " +
+  "to view, analyze, describe, or reason about them; the description already names " +
+  "which character each one depicts. Do NOT run shell commands. Do NOT save, copy, " +
+  "move, or list files — the caller harvests the rendered bytes directly. Do NOT " +
+  "write any explanatory prose, captions, or follow-up. Render the image and stop.";
 
 const ASPECT_GUIDANCE: Record<ImageAspect, string> = {
   portrait: "Use a tall vertical portrait orientation (roughly 1024x1536).",
