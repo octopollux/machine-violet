@@ -308,6 +308,64 @@ describe("GameEngine", () => {
     expect(log.toolEnds).toContain("style_scene");
   });
 
+  it("holds 'generating_image' across a faster sibling tool finishing mid-render", async () => {
+    // generate_image runs for minutes alongside fast tools batched in the same
+    // turn. The activity indicator must stay on "generating_image" for the whole
+    // render — a sibling's completion must NOT flip it back to dm_thinking.
+    const engineRef: { current?: { getState(): string } } = {};
+    let stateWhileRendering: string | undefined;
+    const imageBatch: ChatResult = {
+      text: "",
+      toolCalls: [
+        { id: "t1", name: "generate_image", input: { prompt: "a sword", effort: "standard", aspect: "square" } },
+        { id: "t2", name: "roll_dice", input: { expression: "1d20" } },
+      ],
+      usage: mockUsage(),
+      stopReason: "tool_use",
+      assistantContent: [
+        { type: "tool_use", id: "t1", name: "generate_image", input: { prompt: "a sword", effort: "standard", aspect: "square" } },
+        { type: "tool_use", id: "t2", name: "roll_dice", input: { expression: "1d20" } },
+      ],
+    };
+    const responses = [imageBatch, textMessage("Here it is.")];
+    let idx = 0;
+    const provider = {
+      providerId: "mock",
+      chat: vi.fn(async () => responses[idx++]),
+      stream: vi.fn(async () => responses[idx++]),
+      healthCheck: vi.fn(async () => ({ ok: true })),
+      getCapabilities: () => ({ imageGeneration: true, thinking: false, tools: true, streaming: true, caching: false }),
+      generateImage: vi.fn(async () => {
+        // Yield so the concurrently-dispatched roll_dice finishes first, then
+        // snapshot the engine state mid-render.
+        await new Promise((r) => setTimeout(r, 5));
+        stateWhileRendering = engineRef.current!.getState();
+        return { base64: "AAA=", mimeType: "image/png", effortUsed: "standard", aspectUsed: "square" };
+      }),
+    } as unknown as LLMProvider;
+    const { callbacks, log } = mockCallbacks();
+
+    const engine = makeEngine({
+      provider,
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: { ...mockFileIO(), writeBinaryFile: vi.fn(async () => {}) },
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+    engineRef.current = engine;
+
+    await engine.processInput("Aldric", "Show me the sword.");
+
+    // The render emitted the dedicated state...
+    expect(log.states).toContain("generating_image");
+    // ...and roll_dice ending did not clobber it back to dm_thinking.
+    expect(stateWhileRendering).toBe("generating_image");
+    // Turn still ends cleanly.
+    expect(engine.getState()).toBe("waiting_input");
+  });
+
   it("tracks session usage", async () => {
     const provider = mockProvider([textMessage("Hello.")]);
     const { callbacks, log } = mockCallbacks();
