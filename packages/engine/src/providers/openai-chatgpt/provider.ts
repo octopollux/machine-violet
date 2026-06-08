@@ -200,6 +200,24 @@ export class OpenAIChatGptProvider implements LLMProvider {
   // -----------------------------------------------------------------------
 
   /**
+   * Give-up cap for a render turn that never reports `turn/completed`. A real
+   * gpt-image render (especially `quality`/`showcase`, image-to-image with a
+   * reference, or under account contention) routinely runs a few minutes, and
+   * codex itself imposes no turn cap by design (it's built to run unattended
+   * for a long time) — so this is NOT a render-time budget and must sit well
+   * above any legitimate single-image render. At 10 minutes it serves two
+   * ends: it's far past any real render, AND past it a waiting player has
+   * effectively given up, so it doubles as a sane give-up point. We keep a
+   * finite cap rather than waiting forever because the render is a nested turn
+   * that pauses the DM turn awaiting our tool reply: with no cap a genuine
+   * hang freezes the game with no recovery, whereas hitting this throws an
+   * error the dispatcher turns into an isError tool_result the DM degrades
+   * from. (The earlier value was 180s, which wrongly killed ordinary slow
+   * renders — see the "image render timed out" reports.)
+   */
+  private static readonly IMAGE_RENDER_TIMEOUT_MS = 10 * 60_000;
+
+  /**
    * Render one image via codex's built-in `image_gen` skill (gpt-image-2,
    * billed to the ChatGPT plan — no API key). Unlike the openai-apikey
    * provider (a single `images.generate` REST call), there is no direct
@@ -299,7 +317,12 @@ export class OpenAIChatGptProvider implements LLMProvider {
       const completed = await Promise.race([
         completion,
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("image render turn timed out after 180s")), 180_000).unref(),
+          setTimeout(
+            () => reject(new Error(
+              `image render turn timed out after ${Math.round(OpenAIChatGptProvider.IMAGE_RENDER_TIMEOUT_MS / 1000)}s`,
+            )),
+            OpenAIChatGptProvider.IMAGE_RENDER_TIMEOUT_MS,
+          ).unref(),
         ),
       ]);
 
