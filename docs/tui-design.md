@@ -148,25 +148,30 @@ The DM can use a small set of inline tags in narration for dramatic effect. Thes
 
 Available tags:
 - `<b>`, `<i>`, `<u>` — bold, italic, underline
+- `<code>` — inline monospace (rendered dim), for diegetic system text / identifiers
 - `<sub>`, `<sup>` — subscript, superscript (rendered via Unicode substitution in `render-nodes.tsx`; chars without a Unicode equivalent pass through unchanged)
-- `<center>`, `<right>` — text justification (default is left)
+- `<center>`, `<right>` — text justification (default is left); the content **wraps** to terminal width
+- `<br>` — a hard line break, a contentless `linebreak` leaf; inside an alignment block it splits a multi-line sign into independently-padded rows
 - `<color=#hex>` — hex color (e.g., `<color=#cc0000>The King has died.</color>`)
 
-The DM prompt includes one line: *"You can use `<b>`, `<i>`, `<u>`, `<sub>`, `<sup>`, `<center>`, `<right>`, and `<color=#hex>` tags in your narration for dramatic effect. Use sparingly."*
+The DM contract (`packages/engine/src/prompts/dm-directives.md`, `<formatting>` block) teaches this set. The tag vocabulary is defined once by the `FormattingTag` union in `packages/shared/src/types/tui.ts`.
 
-Unrecognized tags are stripped. Malformed tags render as plain text. This is cosmetic — no tag changes game state.
+Anything tag-shaped but outside the vocabulary is **stripped to its content** — it never renders as literal markup (the no-leak guarantee). Dialect synonyms (`<strong>`→`<b>`, `<em>`→`<i>`, `<h1-6>`→bold, attribute variants, a little inline Markdown) are mapped onto the canonical set first, by `narrative/normalize.ts`. A bare `<` that isn't a tag (`3 < 5`, `<3`) stays literal. None of this changes game state.
 
 ### Formatting Pipeline
 
 All DM text processing flows through `processNarrativeLines(lines, width, quoteColor?) → ProcessedLine[]`:
 
-1. **Heal** cross-line tags on raw strings (all formatting tags persist across source lines; only real paragraph boundaries — blank DM lines from `\n\n` — reset the tag stack; visual spacers from single `\n` don't reset)
-2. **Parse** healed text into `FormattingNode[]` AST via `parseFormatting`
-3. **Wrap** each AST at terminal width via `wrapNodes` (tags never break across lines)
-4. **Pad** alignment lines (`<center>`, `<right>`) with blank lines for breathing room
-5. **Quote highlight** with paragraph-scoped reset (blank DM lines reset quote state)
+1. **Normalize** each DM line's dialect into the canonical vocabulary (`narrative/normalize.ts`) before anything else
+2. **Heal** cross-line tags on raw strings (all formatting tags persist across source lines; only real paragraph boundaries — blank DM lines from `\n\n` — reset the tag stack; visual spacers from single `\n` don't reset; `<br>` is a leaf and does **not** reset the stack)
+3. **Parse** healed text into `FormattingNode[]` AST via `parseFormatting`
+4. **Layout** each line into width-safe physical rows by DISPLAY width via `narrative/layout.ts` (`layoutRuns`): wraps by terminal columns using the real `string-width`, hard-breaks an overlong token, splits a run on `<br>`, and wraps + pads aligned blocks. Tags never break across rows. (The legacy `wrapNodes` measures code units and is retained only for the modals.)
+5. **Pad** alignment groups (`<center>`, `<right>`) with blank lines for breathing room (consecutive aligned rows of one sign are not split)
+6. **Quote highlight** with paragraph-scoped reset (blank DM lines reset quote state)
 
 Non-DM lines (player, dev, system) pass through without entering the formatting pipeline.
+
+The contract is pinned by an invariant harness (`narrative/harness/`) that runs the real pipeline over synthetic fixtures, a seeded generator of legal documents, and the committed/live campaign corpus, asserting no-leak, width-safety (real display width), content preservation, well-formedness, alignment, and cache-transparent determinism at every width. See [e2e-harness.md](e2e-harness.md).
 
 ### Quote Highlighting
 

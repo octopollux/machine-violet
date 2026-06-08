@@ -34,6 +34,7 @@ function nodeToHtml(node: FormattingNode): string {
 }
 
 function tagToHtml(tag: FormattingTag): string {
+  if (tag.type === "linebreak") return "<br>";
   const inner = tag.content.map(nodeToHtml).join("");
   switch (tag.type) {
     case "bold":
@@ -42,6 +43,8 @@ function tagToHtml(tag: FormattingTag): string {
       return `<i>${inner}</i>`;
     case "underline":
       return `<u>${inner}</u>`;
+    case "code":
+      return `<code>${inner}</code>`;
     case "subscript":
       return `<sub>${inner}</sub>`;
     case "superscript":
@@ -124,7 +127,7 @@ function lineToHtml(
       if (line.alignment) {
         const align = line.alignment === "center" ? "center" : "right";
         const inner =
-          line.nodes.length === 1 && typeof line.nodes[0] !== "string"
+          line.nodes.length === 1 && typeof line.nodes[0] !== "string" && "content" in line.nodes[0]
             ? line.nodes[0].content
             : line.nodes;
         return `<div class="dm" style="text-align:${align}">${nodesToHtml(inner)}</div>`;

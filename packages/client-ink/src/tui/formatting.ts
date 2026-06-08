@@ -1,15 +1,22 @@
 import type { FormattingNode, FormattingTag, NarrativeLine, ProcessedLine } from "@machine-violet/shared/types/tui.js";
+import { stringWidth } from "./frames/string-width.js";
+import { normalizeDialect } from "./narrative/normalize.js";
+import { layoutRuns } from "./narrative/layout.js";
 
 /**
  * Parse DM text with inline formatting tags into a tree of FormattingNodes.
  *
- * Supported tags: <b>, <i>, <u>, <sub>, <sup>, <center>, <right>, <color=#hex>,
- * <wikilink slug=foo>...</wikilink> (render-only — emitted by the colorizer, not LLMs)
- * Unrecognized tags are stripped. Malformed tags render as plain text.
- * Orphan close tags (e.g. `</i>` with no matching open in scope) are stripped
- * silently — they're nearly always a leak from healing across paragraph
- * boundaries, never something the user intended to display literally.
- * Tags can be nested: <b><i>bold italic</i></b>
+ * Supported tags: <b>, <i>, <u>, <sub>, <sup>, <center>, <right>, <code>,
+ * <color=#hex>, <br> (a contentless line-break leaf), and the render-only
+ * <wikilink slug=foo>...</wikilink> (emitted by the colorizer, not LLMs).
+ * Tags can nest: <b><i>bold italic</i></b>.
+ *
+ * Anything tag-SHAPED but outside this vocabulary — unknown tags (<strong>,
+ * <table>), attribute-laden variants (<b class="x">), or an orphan close left
+ * by healing across a paragraph boundary (#454) — is STRIPPED to its content;
+ * it never renders as literal markup (the INV-NO-LEAK guarantee). A bare '<'
+ * that isn't tag-shaped (math `3 < 5`, an emoticon `<3`) stays literal.
+ * Dialect synonyms and markdown are mapped upstream in `narrative/normalize.ts`.
  */
 export function parseFormatting(input: string): FormattingNode[] {
   const result: FormattingNode[] = [];
@@ -33,18 +40,25 @@ export function parseFormatting(input: string): FormattingNode[] {
     // Try to parse an opening tag
     const parsed = parseOpenTag(input, tagStart);
     if (!parsed) {
-      // Orphan close tag (e.g. `</i>` with no matching open in this scope):
-      // strip it silently. Healing leaves these behind when an open tag is
-      // reset by a paragraph boundary before its close arrives — without this,
-      // the close would render as literal `</tagname>` text (issue #454).
-      const orphanClose = input.slice(tagStart).match(KNOWN_CLOSE_TAG_RE);
-      if (orphanClose) {
-        i = tagStart + orphanClose[0].length;
+      // Tag-shaped but outside our vocabulary (unknown tag like <strong>, an
+      // attribute-laden <b class="x">, or an orphan </i> left by healing across
+      // a paragraph boundary, #454): strip the delimiter and keep any inner
+      // content. Unknown markup never renders literally (INV-NO-LEAK).
+      const generic = input.slice(tagStart).match(GENERIC_TAG_RE);
+      if (generic) {
+        i = tagStart + generic[0].length;
         continue;
       }
-      // Not a recognized tag at all — treat the < as plain text
+      // A bare '<' that isn't tag-shaped (math `3 < 5`, emoticon `<3`) is literal.
       pushText(result, "<");
       i = tagStart + 1;
+      continue;
+    }
+
+    // Void tags (<br>) are contentless leaves — emit and move on (no close tag).
+    if (parsed.void) {
+      result.push({ type: "linebreak" });
+      i = parsed.end;
       continue;
     }
 
@@ -84,6 +98,8 @@ export function toPlainText(nodes: FormattingNode[]): string {
   return nodes
     .map((node) => {
       if (typeof node === "string") return node;
+      // A linebreak is structural (handled at layout) and carries no text.
+      if (node.type === "linebreak") return "";
       return toPlainText(node.content);
     })
     .join("");
@@ -100,10 +116,21 @@ export function stripLeadingBullet(input: string): string {
 }
 
 /**
- * Compute the visible length of a FormattingNode array (strip all tags).
+ * Visible LENGTH of a FormattingNode array in code units (strip all tags).
+ * Legacy measure retained for the modal `wrapNodes` callers. For terminal
+ * layout prefer {@link nodeDisplayWidth} — code units overflow on wide glyphs.
  */
 export function nodeVisibleLength(nodes: FormattingNode[]): number {
   return toPlainText(nodes).length;
+}
+
+/**
+ * Visible DISPLAY WIDTH of a FormattingNode array in terminal columns, via the
+ * real `string-width` oracle (CJK/wide = 2, combining/zero-width = 0, emoji by
+ * rendered width). This is the measure the narrative layout engine wraps by.
+ */
+export function nodeDisplayWidth(nodes: FormattingNode[]): number {
+  return stringWidth(toPlainText(nodes));
 }
 
 /**
@@ -168,8 +195,12 @@ export function wrapNodes(nodes: FormattingNode[], width: number): FormattingNod
  * Flatten a FormattingNode[] into word tokens, splitting text at spaces.
  * Each word token carries structurally well-formed node fragments.
  * Returns true if the last text ended with a space (trailing word break).
+ *
+ * Exported for the narrative layout engine (`narrative/layout.ts`), which reuses
+ * this proven tokenizer (spacing + wikilink atomicity) but re-measures each word
+ * by display width and adds overlong-token breaking.
  */
-function flattenToWords(
+export function flattenToWords(
   nodes: FormattingNode[],
   words: { nodes: FormattingNode[]; visible: number }[],
 ): boolean {
@@ -217,6 +248,12 @@ function flattenToWords(
         words.push({ nodes: [node], visible });
       }
       wordBreak = false;
+    } else if (node.type === "linebreak") {
+      // wrapNodes is the legacy single-line wrapper (modal callers); hard breaks
+      // don't occur on that path. If one ever appears, treat it as a word
+      // boundary so adjacent text doesn't fuse. The narrative path handles
+      // linebreaks structurally in the layout engine, not here.
+      wordBreak = true;
     } else {
       // Tag node — recurse into children, wrapping fragments in the same tag type
       const childWords: { nodes: FormattingNode[]; visible: number }[] = [];
@@ -288,8 +325,15 @@ export function processNarrativeLines(
   // (e.g. on session resume, the disk's "---" markers are streamed as DM
   // chunks AND the client injects a separator before the first DM chunk
   // after a player line).
+  // Pre-pass: rewrite each DM line's dialect (semantic HTML, attribute variants,
+  // inline markdown) into the canonical vocabulary before healing/parsing, so the
+  // heal and parse stages only ever see the closed tag set.
+  const normLines: NarrativeLine[] = lines.map((l) =>
+    l.kind === "dm" && l.text !== "" ? { ...l, text: normalizeDialect(l.text) } : l,
+  );
+
   const expandedLines: NarrativeLine[] = [];
-  for (const srcLine of lines) {
+  for (const srcLine of normLines) {
     if (srcLine.kind === "dm" && srcLine.text.trim() !== "") {
       if (isHorizontalRule(srcLine.text)) {
         pushSeparator(expandedLines);
@@ -372,19 +416,31 @@ export function processNarrativeLines(
     parsed.push({ kind: "dm", nodes, isSourceBoundary: true });
   }
 
-  // Phase 2: Wrap each line
+  // Phase 2: Lay out each line into physical rows by DISPLAY width. Aligned
+  // blocks wrap their inner content and split on <br> into independent rows, each
+  // emitted as its own single-tag aligned line; every row fits `width` (INV-WIDTH).
   const wrapped: { kind: NarrativeLine["kind"]; nodes: FormattingNode[]; isSourceBoundary: boolean; intent?: Extract<NarrativeLine, { kind: "image" }>["intent"] }[] = [];
   for (const line of parsed) {
-    if (line.kind === "dm" || line.kind === "player") {
-      const wLines = wrapNodes(line.nodes, width);
-      for (let j = 0; j < wLines.length; j++) {
-        if (line.kind === "player") {
-          // Player nodes are always plain strings — re-join after wrapping
-          // so the renderer can still read nodes[0] as the full line text.
-          wrapped.push({ kind: "player", nodes: [toPlainText(wLines[j])], isSourceBoundary: j === 0 });
-        } else {
-          wrapped.push({ kind: "dm", nodes: wLines[j], isSourceBoundary: j === 0 });
-        }
+    const first = line.nodes[0];
+    if (line.kind === "dm" && line.nodes.length === 1 && typeof first !== "string"
+        && (first.type === "center" || first.type === "right")) {
+      // Aligned block: wrap + split-on-<br> the inner content; re-wrap each row
+      // in the alignment tag so it stays a single-node aligned line.
+      const rows = layoutRuns(first.content, width);
+      for (let j = 0; j < rows.length; j++) {
+        wrapped.push({ kind: "dm", nodes: [{ ...first, content: rows[j] }], isSourceBoundary: j === 0 });
+      }
+    } else if (line.kind === "dm") {
+      const rows = layoutRuns(line.nodes, width);
+      for (let j = 0; j < rows.length; j++) {
+        wrapped.push({ kind: "dm", nodes: rows[j], isSourceBoundary: j === 0 });
+      }
+    } else if (line.kind === "player") {
+      // Player nodes are always plain strings — re-join after wrapping so the
+      // renderer can still read nodes[0] as the full line text.
+      const rows = layoutRuns(line.nodes, width);
+      for (let j = 0; j < rows.length; j++) {
+        wrapped.push({ kind: "player", nodes: [toPlainText(rows[j])], isSourceBoundary: j === 0 });
       }
     } else {
       wrapped.push(line);
@@ -398,15 +454,19 @@ export function processNarrativeLines(
     const isAlign = line.kind === "dm" && isAlignmentNode(line.nodes);
 
     if (isAlign) {
-      // Blank line before if previous is non-empty
+      // Blank line before the aligned GROUP if the previous line is non-empty
+      // and not itself aligned (consecutive aligned rows — e.g. a multi-line
+      // <br> sign — must not get blanks between them).
       const prev = padded[padded.length - 1];
-      if (prev !== undefined && !isEmptyNodes(prev.nodes)) {
+      const prevAlign = prev !== undefined && prev.kind === "dm" && isAlignmentNode(prev.nodes);
+      if (prev !== undefined && !isEmptyNodes(prev.nodes) && !prevAlign) {
         padded.push({ kind: "dm", nodes: [], isSourceBoundary: false });
       }
       padded.push(line);
-      // Blank line after if next is non-empty
+      // Blank line after if the next line is non-empty and not aligned.
       const next = wrapped[i + 1];
-      if (next !== undefined && !isEmptyNodes(next.nodes)) {
+      const nextAlign = next !== undefined && next.kind === "dm" && isAlignmentNode(next.nodes);
+      if (next !== undefined && !isEmptyNodes(next.nodes) && !nextAlign) {
         padded.push({ kind: "dm", nodes: [], isSourceBoundary: false });
       }
     } else {
@@ -442,7 +502,7 @@ export function processNarrativeLines(
         alignment = line.nodes[0].type;
       }
 
-      result.push({ kind: "dm", nodes, alignment });
+      result.push({ kind: "dm", nodes, alignment, ...(alignment ? { padWidth: width } : {}) });
     } else {
       result.push({
         kind: line.kind,
@@ -556,6 +616,8 @@ export function highlightQuotesWithState(
       result.push(...expanded);
       // Update state: count quotes in this text
       for (const ch of node) if (ch === '"') inQuote = !inQuote;
+    } else if (node.type === "linebreak") {
+      result.push(node); // contentless leaf — no quote state to thread
     } else {
       const newContent = highlightQuotesWithState(node.content, color, inQuote);
       result.push({ ...node, content: newContent } as FormattingTag);
@@ -588,7 +650,7 @@ function scanTagChanges(line: string): TagChange[] {
     if (tagStart === -1) break;
 
     // Try close tag first: </tagname>
-    const closeMatch = line.slice(tagStart).match(/^<\/(b|i|u|sub|sup|center|right|color|wikilink)>/);
+    const closeMatch = line.slice(tagStart).match(/^<\/(b|i|u|sub|sup|center|right|color|wikilink|code)>/);
     if (closeMatch) {
       changes.push({ kind: "close", name: closeMatch[1], raw: closeMatch[0] });
       i = tagStart + closeMatch[0].length;
@@ -598,6 +660,13 @@ function scanTagChanges(line: string): TagChange[] {
     // Try open tag via parseOpenTag (reuses existing logic)
     const parsed = parseOpenTag(line, tagStart);
     if (parsed) {
+      // Void tags (<br>) are self-contained — they never open a span, so they
+      // must not push onto the heal stack (else healing would emit a bogus
+      // </br> closer).
+      if (parsed.void) {
+        i = parsed.end;
+        continue;
+      }
       changes.push({ kind: "open", name: parsed.tagName, raw: line.slice(tagStart, parsed.end) });
       i = parsed.end;
       continue;
@@ -663,10 +732,17 @@ interface ParsedTag {
   type: string;
   color?: string;
   target?: string;
+  void?: boolean; // self-contained leaf (e.g. <br>) — no closing tag
   end: number; // index after the closing >
 }
 
-const KNOWN_CLOSE_TAG_RE = /^<\/(?:b|i|u|sub|sup|center|right|color|wikilink)>/;
+// A tag-shaped run to strip: `<name>`, `</name>`, `<name/>`, or an attributed
+// `<name key="v" …>` (an attribute section is required to contain `=`). Matches
+// unknown opens (<strong>, <h2>, <b class="x">, <span style="…">) and any close
+// (</foo>). Deliberately does NOT match prose that merely contains angle
+// brackets — `3 < 5` (space after `<`), `<3` (digit), or `i<j and j>k`
+// (bareword "attributes" with no `=`) all stay literal.
+const GENERIC_TAG_RE = /^<\/?[a-zA-Z][a-zA-Z0-9]*\s*(?:\/?>|[^<>]*=[^<>]*>)/;
 
 const SIMPLE_TAGS: Record<string, string> = {
   b: "bold",
@@ -676,14 +752,15 @@ const SIMPLE_TAGS: Record<string, string> = {
   sup: "superscript",
   center: "center",
   right: "right",
+  code: "code",
 };
 
 function parseOpenTag(input: string, start: number): ParsedTag | null {
   // Match <tagname> or <color=#hex>
   const remaining = input.slice(start);
 
-  // Simple tags: <b>, <i>, <u>, <sub>, <sup>, <center>, <right>
-  const simpleMatch = remaining.match(/^<(b|i|u|sub|sup|center|right)>/);
+  // Simple paired tags: <b>, <i>, <u>, <sub>, <sup>, <center>, <right>, <code>
+  const simpleMatch = remaining.match(/^<(b|i|u|sub|sup|center|right|code)>/);
   if (simpleMatch) {
     const tagName = simpleMatch[1];
     return {
@@ -691,6 +768,12 @@ function parseOpenTag(input: string, start: number): ParsedTag | null {
       type: SIMPLE_TAGS[tagName],
       end: start + simpleMatch[0].length,
     };
+  }
+
+  // Void tag: <br> / <br/> / <br /> → a hard line-break leaf.
+  const brMatch = remaining.match(/^<br\s*\/?>/);
+  if (brMatch) {
+    return { tagName: "br", type: "linebreak", void: true, end: start + brMatch[0].length };
   }
 
   // Color tag: <color=#hex>
@@ -735,6 +818,16 @@ function findClosingTag(input: string, startAfter: number, tagName: string): num
     while (searchPos < nextClose) {
       const nextOpen = input.indexOf(openTag, searchPos);
       if (nextOpen === -1 || nextOpen >= nextClose) break;
+      // The match is a real nested open of THIS tag only if the char after the
+      // name is a tag terminator. Without this, counting `<b>` would treat the
+      // unrelated `<br>` as a nested open (the "<b" prefix matches) and never
+      // balance — leaking the `<b>` as literal text.
+      const after = input[nextOpen + openTag.length];
+      const isRealOpen = after === ">" || after === " " || after === "/" || after === "=";
+      if (!isRealOpen) {
+        searchPos = nextOpen + openTag.length;
+        continue;
+      }
       // Verify it's a complete open tag (ends with >)
       const afterOpen = input.indexOf(">", nextOpen);
       if (afterOpen !== -1 && afterOpen < nextClose) {
@@ -766,6 +859,8 @@ function buildNode(
       return { type: "italic", content: children };
     case "underline":
       return { type: "underline", content: children };
+    case "code":
+      return { type: "code", content: children };
     case "subscript":
       return { type: "subscript", content: children };
     case "superscript":

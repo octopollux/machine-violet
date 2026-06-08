@@ -11,6 +11,7 @@ function firstColor(content: FormattingNode[]): string | undefined {
   for (const node of content) {
     if (typeof node === "string") continue;
     if (node.type === "color") return node.color;
+    if (node.type === "linebreak") continue;
     const nested = firstColor(node.content);
     if (nested) return nested;
   }
@@ -34,6 +35,12 @@ function renderTag(tag: FormattingTag): React.ReactNode {
   if (tag.type === "superscript") {
     return <Text>{renderNodes(transformText(tag.content, SUPERSCRIPT_MAP))}</Text>;
   }
+  // Hard line break. On the narrative path layout has already split rows, so a
+  // linebreak should not reach here; if one does (e.g. a modal feeding raw
+  // inline nodes), render it as a newline rather than dropping content.
+  if (tag.type === "linebreak") {
+    return "\n";
+  }
 
   const children = renderNodes(tag.content);
 
@@ -44,6 +51,10 @@ function renderTag(tag: FormattingTag): React.ReactNode {
       return <Text italic>{children}</Text>;
     case "underline":
       return <Text underline>{children}</Text>;
+    case "code":
+      // Inline monospace: terminals are already monospace, so distinguish code
+      // spans by dimming — the least-surprising, theme-agnostic affordance.
+      return <Text dimColor>{children}</Text>;
     case "color":
       return <Text color={tag.color}>{children}</Text>;
     case "wikilink": {
@@ -109,6 +120,7 @@ function transformText(
     // Pre-substituting would double-transform chars present in both maps
     // (e.g. digits), breaking H<sub>1<sup>2</sup></sub> → "₁²".
     if (node.type === "subscript" || node.type === "superscript") return node;
+    if (node.type === "linebreak") return node; // contentless leaf
     return { ...node, content: transformText(node.content, map) } as FormattingTag;
   });
 }

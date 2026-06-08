@@ -424,7 +424,7 @@ const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
       if (width && line.alignment) {
         const justify = line.alignment === "center" ? "center" : "flex-end";
         // Unwrap the outer alignment tag to get inner content
-        const inner = line.nodes.length === 1 && typeof line.nodes[0] !== "string"
+        const inner = line.nodes.length === 1 && typeof line.nodes[0] !== "string" && "content" in line.nodes[0]
           ? line.nodes[0].content
           : line.nodes;
         return (

@@ -84,6 +84,7 @@ function walk(nodes: FormattingNode[], visit: (tag: FormattingTag) => void): voi
   for (const node of nodes) {
     if (typeof node === "string") continue;
     visit(node);
+    if (node.type === "linebreak") continue; // contentless leaf
     walk(node.content, visit);
   }
 }
@@ -95,6 +96,7 @@ function mapNodes(
 ): FormattingNode[] {
   return nodes.map((node) => {
     if (typeof node === "string") return node;
+    if (node.type === "linebreak") return transform(node); // contentless leaf
     const mappedContent = mapNodes(node.content, transform);
     const rebuilt = mappedContent === node.content ? node : ({ ...node, content: mappedContent } as FormattingTag);
     return transform(rebuilt);

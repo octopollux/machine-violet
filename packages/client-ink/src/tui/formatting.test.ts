@@ -77,10 +77,11 @@ describe("parseFormatting", () => {
     expect(result).toEqual(["before <b>unclosed"]);
   });
 
-  it("treats unrecognized tags as plain text", () => {
+  it("strips unrecognized tags to their content (INV-NO-LEAK)", () => {
+    // An unknown tag-shaped run never renders as literal markup; the delimiters
+    // are stripped and the content is kept.
     const result = parseFormatting("<blink>flashing</blink>");
-    // <blink> isn't recognized, so < is treated as text
-    expect(toPlainText(result)).toBe("<blink>flashing</blink>");
+    expect(toPlainText(result)).toBe("flashing");
   });
 
   it("strips orphan close tags silently (issue #454)", () => {
@@ -91,11 +92,51 @@ describe("parseFormatting", () => {
     expect(parseFormatting("a</color>b")).toEqual(["ab"]);
   });
 
-  it("does not strip unrecognized close tags", () => {
-    // Only known tag names are stripped; arbitrary </blink> stays literal
-    // so e.g. code samples and quoted HTML still render.
+  it("strips unrecognized close tags too (INV-NO-LEAK)", () => {
+    // Any tag-shaped close — known or not — is stripped rather than leaked.
     const result = parseFormatting("text</blink>more");
-    expect(toPlainText(result)).toBe("text</blink>more");
+    expect(toPlainText(result)).toBe("textmore");
+  });
+
+  it("keeps a bare '<' that isn't tag-shaped literal", () => {
+    // Strip-to-content only fires on tag-shaped runs (a letter right after '<').
+    expect(toPlainText(parseFormatting("if x < y then"))).toBe("if x < y then");
+    expect(toPlainText(parseFormatting("a <3 emoticon"))).toBe("a <3 emoticon");
+    expect(toPlainText(parseFormatting("i<j and j>k"))).toBe("i<j and j>k");
+  });
+
+  it("parses <br> as a contentless linebreak leaf", () => {
+    const result = parseFormatting("line one<br>line two");
+    expect(result).toHaveLength(3);
+    expect(result[0]).toBe("line one");
+    expect((result[1] as FormattingTag).type).toBe("linebreak");
+    expect(result[2]).toBe("line two");
+    // A linebreak contributes no plain text (it's structural).
+    expect(toPlainText(result)).toBe("line oneline two");
+  });
+
+  it("tolerates <br/> and <br /> void forms", () => {
+    expect((parseFormatting("a<br/>b")[1] as FormattingTag).type).toBe("linebreak");
+    expect((parseFormatting("a<br />b")[1] as FormattingTag).type).toBe("linebreak");
+  });
+
+  it("parses <code> as inline code", () => {
+    const result = parseFormatting("run <code>npm test</code> now");
+    expect((result[1] as FormattingTag).type).toBe("code");
+    expect((result[1] as FormattingTag).content).toEqual(["npm test"]);
+  });
+
+  it("nests <br> inside an alignment + color span (the diegetic-sign case)", () => {
+    const result = parseFormatting(
+      "<center><color=#20b2aa>A</color><br><color=#20b2aa>B</color></center>",
+    );
+    const center = result[0] as FormattingTag;
+    expect(center.type).toBe("center");
+    // content: color(A), linebreak, color(B)
+    expect(center.type === "center" && center.content).toHaveLength(3);
+    if (center.type === "center") {
+      expect((center.content[1] as FormattingTag).type).toBe("linebreak");
+    }
   });
 
   it("handles empty content between tags", () => {
@@ -1448,13 +1489,9 @@ describe("wikilink tag", () => {
     );
   });
 
-  it("rejects malformed wikilink (no slug attribute)", () => {
-    // Unparseable open tag — `<wikilink>` without slug=. The `<wikilink>`
-    // open emits as literal text (no matching close for an unparseable open).
-    // The trailing `</wikilink>` is a known close tag with no matching open
-    // in scope, so it's stripped as an orphan (issue #454 behavior).
-    const result = parseFormatting("<wikilink>Foo</wikilink>");
-    expect(stripFormatting("<wikilink>Foo</wikilink>")).toBe("<wikilink>Foo");
-    expect(result.length).toBeGreaterThan(0);
+  it("strips a malformed wikilink (no slug attribute) to its content", () => {
+    // `<wikilink>` without slug= is not a valid open tag; both it and its close
+    // are tag-shaped and stripped to content rather than leaked (INV-NO-LEAK).
+    expect(stripFormatting("<wikilink>Foo</wikilink>")).toBe("Foo");
   });
 });
