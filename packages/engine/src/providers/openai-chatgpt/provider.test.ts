@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, rm, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -8,7 +8,6 @@ import {
   shouldRetryImageRender, ImageGenNoDataError,
   summarizeItem, readNewestPngAsBase64, removeGeneratedImageDir,
 } from "./provider.js";
-import { readdir } from "node:fs/promises";
 import type {
   AgentMessageDeltaNotification, ItemCompletedNotification,
   TurnCompletedNotification, RawResponseItemCompletedNotification,

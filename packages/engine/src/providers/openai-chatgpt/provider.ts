@@ -593,7 +593,10 @@ export class OpenAIChatGptProvider implements LLMProvider {
   /**
    * Best-effort removal of this render's per-session dir once the bytes are
    * harvested. See {@link removeGeneratedImageDir} for why it's safe and why we
-   * bother. No-op when we never learned a sessionId or codexHome.
+   * bother. No-op without a sessionId; the dir base mirrors the read path's
+   * `codexHome ?? ~/.codex` fallback (`generatedImageDir`), so we always remove
+   * exactly the dir we'd have harvested from — including when codexHome was
+   * never learned and the read fell back to `~/.codex`.
    */
   private async cleanupGeneratedImageDir(sessionId: string | undefined): Promise<void> {
     if (!sessionId) return;
