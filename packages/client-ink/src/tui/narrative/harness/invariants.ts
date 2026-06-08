@@ -116,8 +116,9 @@ export function checkInvariants(
       }
     }
 
-    // ALIGN
-    if (line.alignment) {
+    // ALIGN (skipped with wrapping disabled — `padWidth` is 0 there, which is
+    // not a meaningful column target, matching the WIDTH guard above).
+    if (width > 0 && line.alignment) {
       if (line.padWidth === undefined) {
         v.push({ inv: "ALIGN", detail: "aligned row missing padWidth" });
       } else if (stringWidth(plain) > line.padWidth) {

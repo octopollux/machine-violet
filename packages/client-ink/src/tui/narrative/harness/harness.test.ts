@@ -72,6 +72,16 @@ describe("formatting harness — synthetic fixtures", () => {
   }
 });
 
+// With wrapping disabled (width <= 0) the WIDTH and ALIGN checks are both
+// skipped — `padWidth` is 0 there, which is not a meaningful column target, so
+// asserting against it would spuriously flag any aligned content.
+describe("formatting harness — wrapping disabled", () => {
+  it("reports no WIDTH/ALIGN violations for an aligned block at width 0", () => {
+    const aligned = dmLines("<center><b>A long centered banner that would overflow any real width</b></center>");
+    expect(checkInvariants(aligned, 0)).toEqual([]);
+  });
+});
+
 // --- 2. Seeded generator: thousands of legal documents. ---
 describe("formatting harness — generative grammar", () => {
   const seeds = SOAK ? 6000 : 200;
