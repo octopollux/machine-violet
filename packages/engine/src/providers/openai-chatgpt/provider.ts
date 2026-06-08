@@ -828,7 +828,8 @@ const ASPECT_GUIDANCE: Record<ImageAspect, string> = {
  * want the player waiting on it for ordinary play. `showcase` allows a little
  * more time for a rare hero shot but still stops short of the exhaustive pass.
  *
- * Exported for unit tests.
+ * Internal — covered indirectly by the exported {@link buildImagePromptText}
+ * unit tests, which assert each level's steering shows up in the prompt.
  */
 const EFFORT_GUIDANCE: Record<ImageEffort, string> = {
   draft:
