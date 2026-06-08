@@ -36,7 +36,7 @@ import type {
   ImageEffort, ImageAspect,
 } from "../types.js";
 import type { UsageStatus } from "@machine-violet/shared";
-import { readFile, readdir, stat } from "node:fs/promises";
+import { readFile, readdir, stat, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { CodexRpcClient } from "./rpc.js";
@@ -535,6 +535,15 @@ export class OpenAIChatGptProvider implements LLMProvider {
       if (timeoutHandle) clearTimeout(timeoutHandle);
       unsubItem();
       unsubCompleted();
+      // Drop codex's per-session render dir. By now we've harvested the bytes
+      // (inline or off disk) into `captured` and persist our own copy into the
+      // campaign, so codex's <codexHome>/generated_images/<sessionId>/ copy is
+      // pure redundancy — 2–3 MB per render that would otherwise accumulate
+      // forever (a slow disk leak in a long, image-heavy campaign). The dir is
+      // unique to this ephemeral thread, so removing it can't touch any other
+      // render. Best-effort and awaited so it's deterministic in tests; a failed
+      // cleanup never fails the render (removeGeneratedImageDir swallows errors).
+      await this.cleanupGeneratedImageDir(sessionId);
     }
   }
 
@@ -556,8 +565,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
     sessionId: string | undefined,
   ): Promise<{ base64: string } | null> {
     if (!sessionId) return null;
-    const base = this.codexHome ?? join(homedir(), ".codex");
-    const dir = join(base, "generated_images", sessionId);
+    const dir = this.generatedImageDir(sessionId);
     // codex writes the PNG before the turn completes, so it's normally on disk
     // the instant we look. Retry a few times anyway as cheap insurance against
     // a filesystem-flush lag on the rare failure path (we only get here when the
@@ -570,6 +578,29 @@ export class OpenAIChatGptProvider implements LLMProvider {
       }
     }
     return null;
+  }
+
+  /**
+   * `<codexHome>/generated_images/<sessionId>/` — the per-session dir codex's
+   * image_gen skill writes rendered PNGs into. Keyed by sessionId (not thread
+   * id) and unique per ephemeral render thread.
+   */
+  private generatedImageDir(sessionId: string): string {
+    const base = this.codexHome ?? join(homedir(), ".codex");
+    return join(base, "generated_images", sessionId);
+  }
+
+  /**
+   * Best-effort removal of this render's per-session dir once the bytes are
+   * harvested. See {@link removeGeneratedImageDir} for why it's safe and why we
+   * bother. No-op without a sessionId; the dir base mirrors the read path's
+   * `codexHome ?? ~/.codex` fallback (`generatedImageDir`), so we always remove
+   * exactly the dir we'd have harvested from — including when codexHome was
+   * never learned and the read fell back to `~/.codex`.
+   */
+  private async cleanupGeneratedImageDir(sessionId: string | undefined): Promise<void> {
+    if (!sessionId) return;
+    await removeGeneratedImageDir(this.generatedImageDir(sessionId));
   }
 
   /** Lazily resolve + cache the account's default model id for image turns. */
@@ -1183,6 +1214,23 @@ export async function readNewestPngAsBase64(dir: string): Promise<{ base64: stri
   } catch {
     // Dir missing (no image was written) or unreadable — not recoverable here.
     return null;
+  }
+}
+
+/**
+ * Best-effort, never-throws removal of a codex per-session render dir
+ * (`<codexHome>/generated_images/<sessionId>/`). We harvest the rendered bytes
+ * (inline or off disk via {@link readNewestPngAsBase64}) and persist our own
+ * copy into the campaign, so codex's copy is pure redundancy — ~2–3 MB per
+ * render that otherwise accumulates forever. The dir is unique to one ephemeral
+ * render thread, so removing it can't affect any other render. A failed cleanup
+ * must never fail the render, so all errors are swallowed. Exported for tests.
+ */
+export async function removeGeneratedImageDir(dir: string): Promise<void> {
+  try {
+    await rm(dir, { recursive: true, force: true });
+  } catch {
+    // A leftover redundant PNG is harmless; failing the render over cleanup is not.
   }
 }
 

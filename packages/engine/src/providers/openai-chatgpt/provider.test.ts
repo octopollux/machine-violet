@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, rm, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   TurnCollector, CodexTurnFailedError, messageToResponsesItems,
   buildImagePromptText, extractGeneratedImage, createOpenAIChatGptProvider,
   shouldRetryImageRender, ImageGenNoDataError,
-  summarizeItem, readNewestPngAsBase64,
+  summarizeItem, readNewestPngAsBase64, removeGeneratedImageDir,
 } from "./provider.js";
 import type {
   AgentMessageDeltaNotification, ItemCompletedNotification,
@@ -534,6 +534,37 @@ describe("readNewestPngAsBase64 (disk image harvest)", () => {
 
       const got = await readNewestPngAsBase64(d);
       expect(got).toEqual({ base64: newer.toString("base64") });
+    });
+  });
+});
+
+describe("removeGeneratedImageDir (post-harvest cleanup)", () => {
+  async function withTempDir(fn: (dir: string) => Promise<void>): Promise<void> {
+    const dir = await mkdtemp(join(tmpdir(), "mv-imggen-rm-"));
+    try {
+      await fn(dir);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+
+  it("removes the per-session dir and the redundant PNG it holds", async () => {
+    await withTempDir(async (root) => {
+      const sessionDir = join(root, "generated_images", "019ea7c8-sess");
+      await mkdir(sessionDir, { recursive: true });
+      await writeFile(join(sessionDir, "ig_abc.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+
+      await removeGeneratedImageDir(sessionDir);
+
+      // Dir is gone; the sibling generated_images parent is untouched.
+      await expect(readdir(sessionDir)).rejects.toThrow();
+      expect(await readdir(join(root, "generated_images"))).toEqual([]);
+    });
+  });
+
+  it("is a no-op (never throws) when the dir does not exist", async () => {
+    await withTempDir(async (root) => {
+      await expect(removeGeneratedImageDir(join(root, "nope"))).resolves.toBeUndefined();
     });
   });
 });
