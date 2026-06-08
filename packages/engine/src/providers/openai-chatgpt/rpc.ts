@@ -186,9 +186,9 @@ export class CodexRpcClient extends EventEmitter {
       // corrupted, the silent drop that makes an image render "complete" with no
       // bytes and no error. Short lines we ignore to avoid spam; a large one we
       // surface loudly with enough of the line to tell a truncated-JSON drop
-      // from genuine noise, plus the salvaged `method` so a non-image drop (e.g.
-      // a dropped rawResponseItem/completed reasoning blob) is attributable
-      // rather than opaque. Measure actual UTF-8 bytes off the pipe, not
+      // from genuine noise, plus the salvaged `method` so a non-image drop is
+      // attributable by its method name rather than opaque. Measure actual UTF-8
+      // bytes off the pipe, not
       // `line.length` (UTF-16 code units) — threshold and logged `bytes` are
       // both wire size (identical for all-ASCII base64, honest for non-ASCII).
       const byteLen = Buffer.byteLength(line, "utf8");

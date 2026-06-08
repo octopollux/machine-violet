@@ -16,7 +16,7 @@
  *   codex:rpc:error               — JSON-RPC method returned an error
  *   codex:rpc:parse_failure       — a large stdout line failed to JSON.parse (truncated/corrupt payload)
  *   codex:rpc:large_line          — an unusually large line DID parse (confirms big payloads survive transport)
- *   codex:rpc:reasoning_item_missing — model reasoned this turn but no rawResponseItem/completed arrived (likely a dropped encrypted-reasoning blob; #597)
+ *   codex:rpc:reasoning_item_missing — model reasoned but no rawResponseItem/completed arrived; the expected steady state on a ChatGPT account (no reasoning replay there — #607), kept as a tripwire (#597)
  *   codex:auth:login_started      — OAuth/device-code flow initiated
  *   codex:auth:login_completed    — login finished (success or otherwise)
  *   codex:auth:token_refresh      — Codex requested fresh ChatGPT tokens
@@ -69,13 +69,13 @@ export const log = {
   /**
    * Informational, logged ONCE per session: the model reasoned (summary deltas
    * streamed on `item/reasoning/*`) yet NOT ONE `rawResponseItem/completed`
-   * reasoning item arrived on its separate channel, so the encrypted_content
-   * blob we replay for cross-turn chain-of-thought (#533) got no data. Two
-   * indistinguishable causes: a transport drop (no disk fallback, unlike
-   * images), OR — confirmed by live test — a non-ZDR ChatGPT account, where
-   * codex emits no raw reasoning items at all and #533 replay is simply a no-op.
-   * A genuine intermittent drop instead surfaces as `parse_failure` with a
-   * `methodGuess`; this event just makes the "replay got nothing" state visible.
+   * reasoning item arrived on its separate channel. On a ChatGPT account this is
+   * the expected steady state — codex emits no raw reasoning items there at all,
+   * so there is nothing to preserve cross-turn and the #533 codex replay was
+   * removed as a no-op (#607). Kept as a tripwire: if such items ever start
+   * arriving (a ZDR/enterprise login, an upstream change) this stops firing —
+   * the signal to revisit replay. A genuine intermittent transport drop is a
+   * different signature: a `parse_failure` with a `methodGuess`.
    * See {@link OpenAIChatGptProvider} runTurn. (#597)
    */
   reasoningRawItemMissing: (data: { threadId: string; turnId: string; summaryDeltas: number; sessionId?: string }) =>

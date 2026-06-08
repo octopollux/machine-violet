@@ -142,11 +142,12 @@ export class OpenAIChatGptProvider implements LLMProvider {
   private defaultModelPromise: Promise<string> | null = null;
 
   /**
-   * Set once we've logged the #597 reasoning-replay gap (model reasoned but no
+   * Set once we've logged the #597 reasoning tripwire (model reasoned but no
    * `rawResponseItem/completed` reasoning item arrived) for this session. Keeps
    * it a single informational breadcrumb instead of firing on every reasoning
-   * turn — which it would, since non-ZDR ChatGPT accounts never emit those raw
-   * items (confirmed via live test). See {@link runTurn}.
+   * turn — which it would, since ChatGPT accounts never emit those raw items
+   * (confirmed via live test; #533 codex replay was removed as a no-op, #607).
+   * See {@link runTurn}.
    */
   private reasoningGapLogged = false;
 
@@ -920,11 +921,12 @@ export class OpenAIChatGptProvider implements LLMProvider {
       "item/reasoning/summaryTextDelta",
       (p) => { if (forThisThread(p)) collected.onReasoningDelta(p); },
     );
-    // Encrypted reasoning blob lives on the `rawResponseItem/completed`
-    // stream — the sanitized `item/completed` view strips it. Capturing it
-    // here lets us round-trip the blob via thread/inject_items on the next
-    // turn so the model keeps its reasoning across turn boundaries instead
-    // of re-deriving setup each round. See issue #533.
+    // We subscribe to `rawResponseItem/completed` for the #597 tripwire only —
+    // NOT to capture reasoning for replay. codex emits no usable encrypted
+    // reasoning blob on the ChatGPT-account path, so #533 codex replay was a
+    // no-op and was removed (#607). The handler just counts reasoning items so
+    // we can tell "model reasoned but none arrived" (the steady state here)
+    // from a future account type that does emit them.
     const unsubRawItem = client.onNotification<RawResponseItemCompletedNotification>(
       "rawResponseItem/completed",
       (p) => { if (forThisThread(p)) collected.onRawResponseItem(p); },
@@ -1037,17 +1039,18 @@ export class OpenAIChatGptProvider implements LLMProvider {
         throw new CodexTurnFailedError(errorMessage ?? "(no error message from codex)", turnId);
       }
 
-      // #597 reasoning-replay visibility. If the model demonstrably reasoned
-      // (summary deltas streamed) but NOT ONE raw reasoning item arrived on
-      // `rawResponseItem/completed`, the encrypted_content blob we replay for
-      // cross-turn chain-of-thought (#533) got no data this turn. Two causes,
-      // indistinguishable from here: a transport drop (no disk fallback, unlike
-      // images), OR — confirmed by a live test on this non-ZDR ChatGPT account —
-      // codex simply does not emit raw reasoning items at all there, making #533
-      // replay a no-op for that account. A genuine *intermittent* drop instead
-      // shows up reliably as a `parse_failure` with `methodGuess`. So this is an
-      // informational breadcrumb, logged ONCE per session (else it fires on
-      // every reasoning turn for every non-ZDR account).
+      // #597 tripwire. If the model demonstrably reasoned (summary deltas
+      // streamed) but NOT ONE raw reasoning item arrived on
+      // `rawResponseItem/completed`, there was no encrypted blob with which to
+      // preserve cross-turn chain-of-thought this turn. On a ChatGPT account
+      // this is the norm, not an error: a live test confirmed codex emits no
+      // raw reasoning items there at all, so the #533 codex replay was a no-op
+      // and has been removed (#607). We keep this breadcrumb as a tripwire — if
+      // raw reasoning items ever DO start arriving (a ZDR/enterprise login, an
+      // upstream codex change) it stops firing, and that's the signal to
+      // reconsider replay. A genuine *intermittent* transport drop instead
+      // shows up reliably as a `parse_failure` with `methodGuess`. Logged ONCE
+      // per session (else it fires on every reasoning turn for every account).
       const rstats = collected.reasoningCaptureStats();
       if (!this.reasoningGapLogged && rstats.summaryDeltas > 0 && rstats.rawReasoningItems === 0) {
         this.reasoningGapLogged = true;
@@ -1469,26 +1472,14 @@ export function messageToResponsesItems(msg: NormalizedMessage): unknown[] {
   if (msg.role === "assistant") {
     const items: unknown[] = [];
 
-    // Reasoning items must precede the message/function_call items they
-    // reason about, per the Responses API contract. Emit them all up front
-    // in capture order. Mirrors `toResponsesInput` in openai.ts. Anthropic
-    // `thinking` blocks live in our normalized type for the Anthropic
-    // provider's round-trip; codex doesn't accept them on input, so we
-    // skip them silently if we encounter them on this provider (they would
-    // never be present in practice — only this provider emits/consumes
-    // reasoning items, and only the anthropic provider emits/consumes
-    // thinking blocks).
-    for (const part of msg.content) {
-      if (part.type === "reasoning") {
-        items.push({
-          type: "reasoning",
-          id: part.id,
-          encrypted_content: part.encryptedContent,
-          summary: part.summary.map((text) => ({ type: "summary_text", text })),
-        });
-      }
-    }
-
+    // We emit no reasoning items on this provider. codex surfaces no usable
+    // encrypted reasoning blob on the ChatGPT-account path, so we never capture
+    // one to replay — the #533 codex replay was a no-op and was removed (#607).
+    // A `reasoning` part therefore can't originate here; the only way one
+    // reaches this function is a mid-campaign connection switch from the
+    // openai-apikey Responses path, and codex would reject that foreign blob on
+    // input — so we drop it (handled in the loop below, alongside the Anthropic
+    // `thinking`/`redacted_thinking` blocks).
     let pendingText = "";
     for (const part of msg.content) {
       if (part.type === "text") {
@@ -1505,8 +1496,9 @@ export function messageToResponsesItems(msg: NormalizedMessage): unknown[] {
           arguments: JSON.stringify(part.input),
         });
       }
-      // reasoning already emitted above; thinking/redacted_thinking are
-      // Anthropic-shape and dropped (see comment above).
+      // reasoning (a foreign openai-apikey blob) and thinking/redacted_thinking
+      // (Anthropic-shape) are all dropped — codex rejects them on input. See
+      // the header comment on this branch.
     }
     if (pendingText) {
       items.push({ type: "message", role: "assistant", content: [asstPart(pendingText)] });
@@ -1574,20 +1566,12 @@ export class TurnCollector {
   private assistantContent: ContentPart[] = [];
   private latestUsage: TokenUsageUpdatedNotification["tokenUsage"] | null = null;
   /**
-   * Encrypted reasoning items captured from `rawResponseItem/completed`,
-   * keyed by item id. Last-write-wins on duplicate ids — codex shouldn't
-   * emit the same id twice, but if a retry or reconnect did, replaying both
-   * on the next turn would have the Responses API reject duplicate ids.
-   * See the mirror logic in `openai.ts` (`encryptedReasoningById`).
-   */
-  private encryptedReasoningById = new Map<string, { id: string; encryptedContent: string; summary: string[] }>();
-  /**
    * Count of reasoning items that ARRIVED on `rawResponseItem/completed` this
-   * turn — incremented regardless of whether they carried an `encrypted_content`
-   * blob. This is the denominator the #597 drop-detector needs: a ZDR-off org
-   * still *receives* the raw item (with null content), so "blob not captured" is
-   * benign there, but "no raw reasoning item arrived at all while the model
-   * demonstrably reasoned" points at a dropped notification. See
+   * turn. We no longer capture or replay the encrypted blob — codex emits no
+   * usable reasoning blob on the ChatGPT-account path, so #533 codex replay was
+   * a no-op and was removed (see #607). This counter survives purely to feed the
+   * #597 tripwire: "the model demonstrably reasoned (summary deltas streamed)
+   * yet no raw reasoning item arrived at all" is what we watch for. See
    * {@link reasoningCaptureStats}.
    */
   private rawReasoningItemsSeen = 0;
@@ -1609,44 +1593,33 @@ export class TurnCollector {
   }
 
   onRawResponseItem(params: RawResponseItemCompletedNotification): void {
-    const item = params.item;
-    if (item.type !== "reasoning") return;
-    // Count every reasoning raw item that arrives (even a ZDR-off one with null
-    // content), BEFORE the encrypted_content gate below — the #597 detector
-    // distinguishes "item arrived, no blob" (benign) from "no item at all"
-    // (likely a pipe drop).
-    this.rawReasoningItemsSeen++;
-    // `encrypted_content` is nullable on the wire — present only when codex
-    // is configured to forward it (typically when ZDR is on for the org).
-    // Without the blob there's nothing to round-trip, so skip the item;
-    // persisting an empty shell would replay back as an invalid input item.
-    if (!item.encrypted_content || !item.id) return;
-    const summary: string[] = [];
-    for (const part of item.summary ?? []) {
-      if (part.type === "summary_text" && part.text) summary.push(part.text);
-    }
-    this.encryptedReasoningById.set(item.id, {
-      id: item.id,
-      encryptedContent: item.encrypted_content,
-      summary,
-    });
+    // Detector-only. We do NOT capture or replay the encrypted reasoning blob:
+    // codex surfaces no usable blob on the ChatGPT-account path (it emits no
+    // raw reasoning items there at all), so #533 codex replay was a no-op and
+    // was removed (#607). We still count reasoning items that arrive so the
+    // #597 tripwire can flag "model reasoned but no raw item arrived" — and so
+    // that a future account type which DOES emit them (a ZDR/enterprise login,
+    // or an upstream codex change) produces a visible signal worth revisiting
+    // replay for. See {@link reasoningCaptureStats}.
+    if (params.item.type === "reasoning") this.rawReasoningItemsSeen++;
   }
 
   /**
-   * Diagnostic snapshot for the #597 transport-drop detector. `summaryDeltas`
-   * proves the model reasoned this turn (it streamed reasoning-summary text on
-   * the intact `item/reasoning/*` channel); `rawReasoningItems` is how many
-   * reasoning items arrived on the *separate* `rawResponseItem/completed`
-   * channel. `summaryDeltas > 0 && rawReasoningItems === 0` means that second
-   * channel's item went missing — likely a dropped/corrupted line on the stdio
-   * pipe, silently degrading cross-turn chain-of-thought (#533) with no disk
-   * fallback to rescue it. `encryptedCaptured` is how many carried a usable blob.
+   * Diagnostic snapshot for the #597 tripwire. `summaryDeltas` proves the model
+   * reasoned this turn (it streamed reasoning-summary text on the intact
+   * `item/reasoning/*` channel); `rawReasoningItems` is how many reasoning items
+   * arrived on the *separate* `rawResponseItem/completed` channel. On a ChatGPT
+   * account `rawReasoningItems` is normally 0 (codex emits none there — #607);
+   * `summaryDeltas > 0 && rawReasoningItems === 0` is therefore the expected
+   * steady state, logged once per session. It would only be a *surprise* if that
+   * second channel ever started carrying items — the signal that reasoning
+   * preservation became possible and replay (removed with #533's codex path)
+   * is worth reconsidering.
    */
-  reasoningCaptureStats(): { summaryDeltas: number; rawReasoningItems: number; encryptedCaptured: number } {
+  reasoningCaptureStats(): { summaryDeltas: number; rawReasoningItems: number } {
     return {
       summaryDeltas: this.reasoning.length,
       rawReasoningItems: this.rawReasoningItemsSeen,
-      encryptedCaptured: this.encryptedReasoningById.size,
     };
   }
 
@@ -1720,22 +1693,10 @@ export class TurnCollector {
       this.assistantContent.push({ type: "text", text: this.text });
     }
 
-    // Append encrypted reasoning items to assistantContent so they round-trip
-    // through conversation persistence and get replayed on the next turn via
-    // `messageToResponsesItems`. The order within assistantContent is purely
-    // cosmetic — `messageToResponsesItems` re-sorts reasoning items ahead of
-    // text/tool_use when replaying, which is the order the Responses API
-    // requires. Map preserves insertion order, matching the order codex
-    // emitted the items on `rawResponseItem/completed`.
-    for (const r of this.encryptedReasoningById.values()) {
-      this.assistantContent.push({
-        type: "reasoning",
-        id: r.id,
-        encryptedContent: r.encryptedContent,
-        summary: r.summary,
-      });
-    }
-
+    // No reasoning items are appended: we capture no encrypted blob on this
+    // provider (codex emits none on the ChatGPT-account path — #607), so there
+    // is nothing to round-trip. The reasoning *summary* text is still surfaced
+    // via `thinkingText` below for the debug dump.
     return {
       text: this.text,
       // Always empty — see onToolCall. Tool calls were dispatched in-band
