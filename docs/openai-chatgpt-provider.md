@@ -134,6 +134,15 @@ The JSON-RPC wire is newline-delimited JSON on the subprocess's **stdout**; mult
 
 By elimination the corruption originates inside **codex's own stdout writes** (a module printing directly to stdout, or one protocol write spliced into another). It predominantly hits the multi-MB image lines, which already recover via the disk fallback (`generated_images/<sessionId>/`) — confirmed in a live run where a 1.8 MB inline-image `item/completed` line parsed cleanly (logged as `large_line`) with no `parse_failure` and no disk recovery needed. Smaller non-image payloads are far less exposed; any large unparseable stdout line is logged as `codex:rpc:parse_failure` with a salvaged `methodGuess` so the dropped message type is attributable. (The encrypted-reasoning blob has no fallback, but a live test showed it never arrives on a non-ZDR ChatGPT account in the first place — see Reasoning preservation above.)
 
+## Subprocess hygiene — disabled codex features
+
+We spawn `codex app-server` with **`--disable plugins --disable shell_snapshot`** (`CODEX_LEAN_FLAGS` in `rpc.ts`; these are per-process `-c features.X=false` equivalents, **not** writes to `~/.codex/config.toml`). MV uses neither subsystem — it supplies its own tools via `dynamicTools` on `thread/start` and runs `sandbox: "read-only"` — and leaving them on is pure waste that surfaced as stderr noise once we started capturing it (#597):
+
+- **`plugins`** makes codex re-read and re-validate every plugin manifest under `~/.codex` on **every turn** (a single malformed user plugin produced ~370 WARN lines in one live session) and fires a startup remote plugin-sync that 401s. Disabling it removes the work and the noise.
+- **`shell_snapshot`** attempts a shell-environment snapshot per `thread/start` that isn't even supported on PowerShell (one WARN per thread).
+
+Verified live: with both disabled, a full 9-turn session emitted **zero** plugin/shell/sync WARNs (vs ~370), every turn completed, and **`image_gen` still works** — it's a built-in skill, independent of the user-plugin system (a 1.58 MB portrait rendered and persisted as a valid PNG). Do **not** disable `image_generation`, `shell_tool` blindly, or other `stable` features without re-validating a render — only `plugins`/`shell_snapshot` were confirmed safe for MV's usage.
+
 ## Distribution
 
 `@openai/codex` is a workspace dependency in `packages/engine/package.json`, so it's pulled in by `npm install` and bundled into `node_modules/` at build time. The Node SEA build vendors `node_modules/`, so shipped binaries get codex transparently — no auto-download UX needed for the common case. Developers running from source get it via `npm install`.

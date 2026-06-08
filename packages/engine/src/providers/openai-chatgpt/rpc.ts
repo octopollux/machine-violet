@@ -62,6 +62,22 @@ const ANSI_SGR_RE = /\[[0-9;]*m/g;
 const STDERR_LINE_MAX_CHARS = 4000;
 
 /**
+ * Per-spawn feature disables for codex's app-server. MV uses NONE of codex's
+ * plugin system (we pass our own `dynamicTools` on `thread/start`) or its shell
+ * tooling (we run `sandbox: "read-only"`), so leaving these on is pure waste:
+ *  - `plugins` re-reads + re-validates every plugin manifest under `~/.codex`
+ *    on every turn (240+ WARN lines in one live session against a single
+ *    malformed user plugin) and fires a startup remote-sync that 401s.
+ *  - `shell_snapshot` attempts a shell-environment snapshot per `thread/start`
+ *    that isn't even supported on PowerShell.
+ * Disabling both is transient — `--disable X` is the `-c features.X=false`
+ * equivalent, NOT a write to `~/.codex/config.toml` — and was A/B-verified to
+ * eliminate the noise and the work behind it with no protocol impact. See
+ * docs/openai-chatgpt-provider.md (Transport reliability) and #597.
+ */
+const CODEX_LEAN_FLAGS = ["--disable", "plugins", "--disable", "shell_snapshot"];
+
+/**
  * A line that *parses* and is at least this large is noted (with its method) so
  * we can confirm big payloads — chiefly inline base64 images — survive the
  * stdio pipe intact. Ordinary protocol messages are well under 256 KB.
@@ -109,7 +125,7 @@ export class CodexRpcClient extends EventEmitter {
     const bin = resolveCodexBinary();
     log.spawn({ binaryPath: bin.path, sessionId: this.sessionId });
 
-    this.proc = spawn(bin.path, [...bin.prefixArgs, "app-server", ...this.extraArgs], {
+    this.proc = spawn(bin.path, [...bin.prefixArgs, "app-server", ...CODEX_LEAN_FLAGS, ...this.extraArgs], {
       // Pipe stderr (not `inherit`) so codex's own diagnostics land in the
       // engine log instead of vanishing to the terminal — see handleStderrLine.
       stdio: ["pipe", "pipe", "pipe"],
