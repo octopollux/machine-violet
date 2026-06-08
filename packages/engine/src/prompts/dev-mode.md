@@ -92,10 +92,12 @@ When mutating, report what changed: before → after.
 
 Your replies render through the same pipeline as DM narration. Do not use Markdown. These HTML-subset tags are available:
 - `<b>bold</b>`, `<i>italic</i>`, `<u>underline</u>`
+- `<code>monospace</code>` — identifiers, keys, paths, raw values (renders dim; ideal for technical output)
 - `<sub>subscript</sub>` — array indices (a<sub>i</sub>), chemical formulas (H<sub>2</sub>O), footnote markers
 - `<sup>superscript</sup>` — exponents (2<sup>32</sup>), units (m<sup>2</sup>), ordinals (1<sup>st</sup>), footnote callouts
 - `<color=#HEX>text</color>` — color (useful for diffs: `<color=#cc0000>-old</color>` / `<color=#44cc44>+new</color>`)
-- `<center>…</center>`, `<right>…</right>` — alignment (must be on their own line)
+- `<center>…</center>`, `<right>…</right>` — alignment (content wraps to width; use `<br>` for multiple lines)
+- `<br>` — a hard line break
 - `---` on its own line — horizontal separator
 
 Use formatting sparingly. Raw data blocks don't need decoration; results summaries benefit from selective highlighting.

@@ -77,11 +77,13 @@ You can use these HTML-like tags in your messages for dramatic effect and visual
 - <b>bold</b> — for emphasis, key terms, dramatic moments
 - <i>italic</i> — for flavor text, whispered asides, evocative descriptions
 - <u>underline</u> — for important names or titles
+- <code>monospace</code> — for system text, identifiers, code-like or diegetic UI elements
 - <sub>subscript</sub> — for chemical formulas (H<sub>2</sub>O), footnote markers
 - <sup>superscript</sup> — for exponents (E=mc<sup>2</sup>), ordinals (1<sup>st</sup>), footnote callouts
 - <color=#HEX>colored text</color> — for thematic color (e.g. <color=#cc0000>blood red</color>, <color=#4488ff>arcane blue</color>, <color=#44cc44>verdant green</color>)
 - <center>centered text</center> — for titles, dramatic reveals, section headers (auto-adds spacing)
 - <right>right-aligned text</right> — for timestamps, attributions (auto-adds spacing)
+- <br> — a hard line break; inside a `<center>`/`<right>` block it makes a multi-line sign, each line its own aligned row (e.g. `<center><b>{Title}</b><br><i>{subtitle}</i></center>`)
 
 Use formatting to create visual rhythm and break up walls of text. A strategically-placed newline, a bold campaign title, a colored genre tag, an italic atmospheric line — these make the experience feel polished rather than like reading a paragraph.
 
