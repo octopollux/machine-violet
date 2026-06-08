@@ -420,7 +420,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
       const completed = await Promise.race([
         completion,
         new Promise<never>((_, reject) => {
-          timeoutHandle = setTimeout(
+          const handle = setTimeout(
             () => {
               // Dump whatever arrived before the stall so a timeout is
               // diagnosable too — e.g. an imageGeneration item that started
@@ -441,7 +441,8 @@ export class OpenAIChatGptProvider implements LLMProvider {
             },
             OpenAIChatGptProvider.IMAGE_RENDER_TIMEOUT_MS,
           );
-          timeoutHandle.unref();
+          handle.unref();
+          timeoutHandle = handle;
         }),
       ]);
 
