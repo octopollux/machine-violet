@@ -38,15 +38,17 @@ export type ContentPart =
    */
   | { type: "redacted_thinking"; data: string }
   /**
-   * Encrypted reasoning blob produced by an OpenAI reasoning model (Responses
-   * API, with `include: ["reasoning.encrypted_content"]`, OR by `codex
-   * app-server` via the `rawResponseItem/completed` notification). Persisted
-   * with the assistant turn and replayed on subsequent turns so the model
-   * keeps its chain-of-thought across calls without us setting `store: true`.
-   * The `encryptedContent` payload is opaque; `summary` mirrors the
-   * human-readable reasoning summary we already surface via `thinkingText`
-   * (kept here only so a turn round-trips identically through persistence).
-   * Anthropic ignores this variant when serializing back to its API.
+   * Encrypted reasoning blob produced by an OpenAI reasoning model on the
+   * Responses API (with `include: ["reasoning.encrypted_content"]`) — i.e. the
+   * `openai-apikey` / `openrouter` providers. Persisted with the assistant turn
+   * and replayed on subsequent turns so the model keeps its chain-of-thought
+   * across calls without us setting `store: true`. The `encryptedContent`
+   * payload is opaque; `summary` mirrors the human-readable reasoning summary we
+   * already surface via `thinkingText` (kept here only so a turn round-trips
+   * identically through persistence). Anthropic ignores this variant when
+   * serializing back to its API; the `openai-chatgpt` (codex) provider neither
+   * produces nor replays it — codex surfaces no usable blob on the
+   * ChatGPT-account path, so its #533 replay was removed as a no-op (#607).
    */
   | { type: "reasoning"; id: string; encryptedContent: string; summary: string[] }
   /**

@@ -307,14 +307,15 @@ export interface TokenUsageBreakdown {
 // rawResponseItem/completed (notification)
 //
 // Codex exposes the raw Responses-API items it received from OpenAI on this
-// secondary stream. We use it specifically to capture the opaque
-// `encrypted_content` blob on reasoning items — the sanitized `item/completed`
-// stream strips that field. Replaying the blob via thread/inject_items on
-// the next turn is what lets the model continue its chain-of-thought across
-// turn boundaries instead of re-deriving setup beat-to-beat. See issue #533.
+// secondary stream. The opaque `encrypted_content` blob on reasoning items lives
+// here (the sanitized `item/completed` stream strips that field). #533 wired the
+// codex provider to capture and replay it for cross-turn chain-of-thought, but
+// that was a no-op on the ChatGPT-account path — codex emits no reasoning items
+// here at all — so the replay was removed (#607). We still subscribe, now only
+// to COUNT reasoning items for the #597 tripwire. See issues #533 / #607.
 //
 // Source: codex-rs/app-server-protocol/schema/json/v2/RawResponseItemCompletedNotification.json
-// (codex 0.130.0+). Modeled minimally — we only read the reasoning variant.
+// (codex 0.130.0+). Modeled minimally — we only read the reasoning variant's type.
 // ---------------------------------------------------------------------------
 
 export interface RawResponseItemCompletedNotification {
