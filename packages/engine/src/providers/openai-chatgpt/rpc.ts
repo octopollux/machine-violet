@@ -57,7 +57,7 @@ const RPC_PARSE_FAIL_LOG_MIN_BYTES = 4 * 1024;
 
 /** Strip SGR (color) escape sequences from a codex stderr line before logging. */
 // eslint-disable-next-line no-control-regex
-const ANSI_SGR_RE = /\[[0-9;]*m/g;
+const ANSI_SGR_RE = /\x1b\[[0-9;]*m/g;
 /** Cap each logged stderr line so a panic backtrace can't bloat one log entry. */
 const STDERR_LINE_MAX_CHARS = 4000;
 
@@ -271,10 +271,12 @@ export class CodexRpcClient extends EventEmitter {
   private handleStderrLine(line: string): void {
     const clean = line.replace(ANSI_SGR_RE, "").trimEnd();
     if (!clean || !codexStderrLineWorthLogging(clean)) return;
-    log.stderr({
-      line: clean.length > STDERR_LINE_MAX_CHARS ? clean.slice(0, STDERR_LINE_MAX_CHARS) + "…[truncated]" : clean,
-      sessionId: this.sessionId,
-    });
+    // Cap the FULL logged line — suffix included — at STDERR_LINE_MAX_CHARS.
+    const suffix = "…[truncated]";
+    const capped = clean.length > STDERR_LINE_MAX_CHARS
+      ? clean.slice(0, STDERR_LINE_MAX_CHARS - suffix.length) + suffix
+      : clean;
+    log.stderr({ line: capped, sessionId: this.sessionId });
   }
 
   private async handleServerRequest(id: number, method: string, params: unknown): Promise<void> {
