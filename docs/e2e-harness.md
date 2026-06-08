@@ -24,6 +24,30 @@ the real model. (The setup *agent conversation* itself now has deterministic
 offline coverage via the Tier-2 setup corpus.) It is **not** the everyday gate;
 that's Tier 2.
 
+### Formatting invariant harness (Tier 1, property-based)
+
+The DM narrative formatting/render pipeline has its own deterministic, LLM-free
+harness at
+[`packages/client-ink/src/tui/narrative/harness/`](../packages/client-ink/src/tui/narrative/harness/).
+It runs the **real** pipeline (`processNarrativeLines`) and asserts the formatting
+contract — no markup leaks, every physical row fits the terminal's *display* width,
+content is preserved, the AST is well-formed, aligned rows pad correctly, and
+output is deterministic + cache-transparent — over three input sources at every
+width: hand-authored fixtures (one per construct + every known-hard combo), a
+**seeded generator** of legal documents (`generator.ts`, reproducible by seed),
+and the **committed campaign corpus** under `harness/corpus/`. A curated subset is
+re-checked through the real Ink renderer (`harness.render.test.tsx`) to confirm
+Ink's layout agrees with the width oracle.
+
+```bash
+npx vitest run packages/client-ink/src/tui/narrative/      # default: fast gate
+MV_FORMAT_SOAK=1 npx vitest run .../harness/harness.test.ts # 6000 seeds × all widths
+MV_LIVE_CORPUS=<campaigns-dir> npx vitest run .../harness/   # replay real on-disk campaigns
+```
+
+Touching the formatting pipeline or its vocabulary → see
+[maintenance.md](maintenance.md) and keep this harness green.
+
 ## Two ways to use the live harness: scripted probes vs. interactive play
 
 Built on the same launcher + sidecar:

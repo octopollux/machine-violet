@@ -34,6 +34,7 @@ function nodeToHtml(node: FormattingNode): string {
 }
 
 function tagToHtml(tag: FormattingTag): string {
+  if (tag.type === "linebreak") return "<br>";
   const inner = tag.content.map(nodeToHtml).join("");
   switch (tag.type) {
     case "bold":
@@ -42,6 +43,8 @@ function tagToHtml(tag: FormattingTag): string {
       return `<i>${inner}</i>`;
     case "underline":
       return `<u>${inner}</u>`;
+    case "code":
+      return `<code>${inner}</code>`;
     case "subscript":
       return `<sub>${inner}</sub>`;
     case "superscript":
@@ -54,7 +57,8 @@ function tagToHtml(tag: FormattingTag): string {
       return inner;
     case "center":
     case "right":
-      // Alignment handled at line level; if nested, just render inline
+    case "quote":
+      // Block tags handled at line level; if nested, just render inline
       return inner;
   }
 }
@@ -119,12 +123,27 @@ function lineToHtml(
       return `<div class="player" style="color:${esc(opts.playerColor)}">${esc(text)}</div>`;
     }
 
+    case "list": {
+      // Each ProcessedLine is one physical row. The first row carries the marker
+      // and a hanging indent (negative text-indent); continuation rows just pad.
+      const indent = line.listIndent ?? 0;
+      if (line.listMarker !== undefined) {
+        return `<div class="list-item" style="padding-left:${indent}ch;text-indent:-${indent}ch">${esc(line.listMarker)} ${nodesToHtml(line.nodes)}</div>`;
+      }
+      return `<div class="list-item" style="padding-left:${indent}ch">${nodesToHtml(line.nodes)}</div>`;
+    }
+
     case "dm": {
       if (isEmpty) return `<div class="dm">&nbsp;</div>`;
+      // Blockquote row: a bordered, indented passage.
+      const sole = line.nodes.length === 1 && typeof line.nodes[0] !== "string" ? line.nodes[0] : undefined;
+      if (sole && sole.type === "quote") {
+        return `<blockquote class="dm-quote">${nodesToHtml(sole.content)}</blockquote>`;
+      }
       if (line.alignment) {
         const align = line.alignment === "center" ? "center" : "right";
         const inner =
-          line.nodes.length === 1 && typeof line.nodes[0] !== "string"
+          line.nodes.length === 1 && typeof line.nodes[0] !== "string" && "content" in line.nodes[0]
             ? line.nodes[0].content
             : line.nodes;
         return `<div class="dm" style="text-align:${align}">${nodesToHtml(inner)}</div>`;
@@ -238,6 +257,17 @@ div {
 b { font-weight: bold; }
 i { font-style: italic; }
 u { text-decoration: underline; }
+.dm-quote {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  border-left: 2px solid #666;
+  margin: 0;
+  padding-left: 1ch;
+  opacity: 0.9;
+  font-style: italic;
+  min-height: 1.4em;
+}
+.list-item { white-space: pre-wrap; word-wrap: break-word; }
 /* Image shadowbox: clicking a narrative image fills the viewport on black. */
 #shadowbox {
   display: none;

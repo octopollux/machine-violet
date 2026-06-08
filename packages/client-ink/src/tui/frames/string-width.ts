@@ -3,15 +3,23 @@
  * Kept in their own module so the composer doesn't pull in the ink/React-laden
  * renderer when imported from browser tools (e.g. the theme editor).
  */
+import realStringWidth from "string-width";
 
 /**
- * Approximate string width (handles most common cases).
- * Does not handle full Unicode width detection — just counts characters.
+ * Display width of a string in terminal columns — the SAME oracle Ink uses for
+ * layout (the `string-width` package). Handles full Unicode: CJK/wide glyphs
+ * count 2, zero-width/combining marks count 0, emoji (incl. ZWJ sequences and
+ * variation selectors) count their rendered width, and ANSI escapes are
+ * stripped. This is load-bearing for width-safety: wrapping that measured
+ * `String.length` (code units) overflowed on wide chars and truncated content.
+ *
+ * `truncateToWidth` (below) still slices by code-unit index, so it can over-cut
+ * a line containing wide glyphs — acceptable for the frame/modal sizing callers
+ * (which deal in box-drawing + mostly-ASCII chrome). The narrative layout engine
+ * does width-aware breaking itself rather than relying on truncation.
  */
 export function stringWidth(str: string): number {
-  // Strip ANSI escape codes
-  // eslint-disable-next-line no-control-regex
-  return str.replace(/\x1b\[[0-9;]*m/g, "").length;
+  return realStringWidth(str);
 }
 
 /**
