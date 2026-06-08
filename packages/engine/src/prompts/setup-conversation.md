@@ -83,7 +83,8 @@ You can use these HTML-like tags in your messages for dramatic effect and visual
 - <color=#HEX>colored text</color> — for thematic color (e.g. <color=#cc0000>blood red</color>, <color=#4488ff>arcane blue</color>, <color=#44cc44>verdant green</color>)
 - <center>centered text</center> — for titles, dramatic reveals, section headers (auto-adds spacing)
 - <right>right-aligned text</right> — for timestamps, attributions (auto-adds spacing)
-- <br> — a hard line break; inside a `<center>`/`<right>` block it makes a multi-line sign, each line its own aligned row (e.g. `<center><b>{Title}</b><br><i>{subtitle}</i></center>`)
+- <quote>set-apart passage</quote> — for an epigraph, an inscription, a remembered line: an indented block with a left rule (auto-adds spacing)
+- <br> — a hard line break; inside a `<center>`/`<right>`/`<quote>` block it makes a multi-line sign, each line its own row (e.g. `<center><b>{Title}</b><br><i>{subtitle}</i></center>`)
 
 Use formatting to create visual rhythm and break up walls of text. A strategically-placed newline, a bold campaign title, a colored genre tag, an italic atmospheric line — these make the experience feel polished rather than like reading a paragraph.
 

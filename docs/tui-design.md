@@ -151,22 +151,25 @@ Available tags:
 - `<code>` — inline monospace (rendered dim), for diegetic system text / identifiers
 - `<sub>`, `<sup>` — subscript, superscript (rendered via Unicode substitution in `render-nodes.tsx`; chars without a Unicode equivalent pass through unchanged)
 - `<center>`, `<right>` — text justification (default is left); the content **wraps** to terminal width
-- `<br>` — a hard line break, a contentless `linebreak` leaf; inside an alignment block it splits a multi-line sign into independently-padded rows
+- `<quote>` — a block-level set-apart passage (letter, inscription, readout): split onto its own line and rendered as an indented block with a left rule (`▏`), content wrapped to width minus the rule. Multi-line via `<br>`. Deliberately **not** Markdown `>` (which collides with the player display-log marker).
+- `<br>` — a hard line break, a contentless `linebreak` leaf; inside an alignment or quote block it splits a multi-line sign into independent rows
 - `<color=#hex>` — hex color (e.g., `<color=#cc0000>The King has died.</color>`)
 
 The DM contract (`packages/engine/src/prompts/dm-directives.md`, `<formatting>` block) teaches this set. The tag vocabulary is defined once by the `FormattingTag` union in `packages/shared/src/types/tui.ts`.
 
-Anything tag-shaped but outside the vocabulary is **stripped to its content** — it never renders as literal markup (the no-leak guarantee). Dialect synonyms (`<strong>`→`<b>`, `<em>`→`<i>`, `<h1-6>`→bold, attribute variants, a little inline Markdown) are mapped onto the canonical set first, by `narrative/normalize.ts`. A bare `<` that isn't a tag (`3 < 5`, `<3`) stays literal. None of this changes game state.
+**Markdown lists** are a tolerated block construct (not a tag): a line beginning `- `/`* ` or `N.`/`N)` becomes a `kind: "list"` row with a resolved marker (`•` or the literal number) and a hanging indent, content wrapped to width minus the indent. Consecutive items render tight (the `appendDelta` spacer between them is collapsed); nesting is intentionally flattened. Markers/indent are renderer-side decoration carried on `ProcessedLine.listMarker`/`listIndent`.
+
+Anything tag-shaped but outside the vocabulary is **stripped to its content** — it never renders as literal markup (the no-leak guarantee). Dialect synonyms (`<strong>`→`<b>`, `<em>`→`<i>`, `<h1-6>`→bold, `<blockquote>`→`<quote>`, attribute variants, a little inline Markdown) are mapped onto the canonical set first, by `narrative/normalize.ts`. A bare `<` that isn't a tag (`3 < 5`, `<3`) stays literal. None of this changes game state.
 
 ### Formatting Pipeline
 
 All DM text processing flows through `processNarrativeLines(lines, width, quoteColor?) → ProcessedLine[]`:
 
-1. **Normalize** each DM line's dialect into the canonical vocabulary (`narrative/normalize.ts`) before anything else
-2. **Heal** cross-line tags on raw strings (all formatting tags persist across source lines; only real paragraph boundaries — blank DM lines from `\n\n` — reset the tag stack; visual spacers from single `\n` don't reset; `<br>` is a leaf and does **not** reset the stack)
+1. **Normalize** each DM line's dialect into the canonical vocabulary (`narrative/normalize.ts`) before anything else, then **tighten lists** (drop the `appendDelta` spacer between adjacent list items)
+2. **Heal** cross-line tags on raw strings (all formatting tags persist across source lines; only real paragraph boundaries — blank DM lines from `\n\n` — reset the tag stack; visual spacers from single `\n` don't reset; `<br>` is a leaf and does **not** reset the stack). List items are detected here, healed self-contained (marker lifted to metadata), and reset the heal stack.
 3. **Parse** healed text into `FormattingNode[]` AST via `parseFormatting`
-4. **Layout** each line into width-safe physical rows by DISPLAY width via `narrative/layout.ts` (`layoutRuns`): wraps by terminal columns using the real `string-width`, hard-breaks an overlong token, splits a run on `<br>`, and wraps + pads aligned blocks. Tags never break across rows. (The legacy `wrapNodes` measures code units and is retained only for the modals.)
-5. **Pad** alignment groups (`<center>`, `<right>`) with blank lines for breathing room (consecutive aligned rows of one sign are not split)
+4. **Layout** each line into width-safe physical rows by DISPLAY width via `narrative/layout.ts` (`layoutRuns`): wraps by terminal columns using the real `string-width`, hard-breaks an overlong token, splits a run on `<br>`, and wraps aligned/quote blocks (each to width minus its rule/indent) and list items (to width minus the hanging indent). Tags never break across rows. (The legacy `wrapNodes` measures code units and is retained only for the modals.)
+5. **Frame** block groups (`<center>`, `<right>`, `<quote>`) with blank lines for breathing room (consecutive rows of one block are not split)
 6. **Quote highlight** with paragraph-scoped reset (blank DM lines reset quote state)
 
 Non-DM lines (player, dev, system) pass through without entering the formatting pipeline.

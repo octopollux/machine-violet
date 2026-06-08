@@ -5,6 +5,7 @@ import type { ScrollViewRef } from "ink-scroll-view";
 import { InlineImage } from "../image/InlineImage.js";
 import type { NarrativeLine, ProcessedLine } from "@machine-violet/shared/types/tui.js";
 import { processNarrativeLines } from "../formatting.js";
+import { QUOTE_RULE } from "../narrative/layout.js";
 import { renderNodes } from "../render-nodes.js";
 import { useScrollHandle } from "../hooks/useScrollHandle.js";
 import type { ScrollHandle } from "../hooks/useScrollHandle.js";
@@ -419,7 +420,34 @@ const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
       return <Text wrap="truncate" color="#FFBF00">{text}</Text>;
     }
 
+    case "list": {
+      // Layout already wrapped the content to width − indent, so marker + content
+      // (first row) and indent + content (continuation rows) each fit `width`.
+      const indent = line.listIndent ?? 0;
+      if (line.listMarker !== undefined) {
+        return (
+          <Text wrap="truncate">
+            <Text>{line.listMarker} </Text>
+            {renderNodes(line.nodes)}
+          </Text>
+        );
+      }
+      return <Text wrap="truncate">{" ".repeat(indent)}{renderNodes(line.nodes)}</Text>;
+    }
+
     case "dm": {
+      // Blockquote row: a left rule + the wrapped inner content. Layout reserved
+      // the rule's columns, so rule + content fits `width`.
+      const sole = line.nodes.length === 1 && typeof line.nodes[0] !== "string" ? line.nodes[0] : undefined;
+      if (sole && sole.type === "quote") {
+        return (
+          <Text wrap="truncate">
+            <Text dimColor>{QUOTE_RULE} </Text>
+            {renderNodes(sole.content)}
+          </Text>
+        );
+      }
+
       // Alignment lines get Box layout
       if (width && line.alignment) {
         const justify = line.alignment === "center" ? "center" : "flex-end";

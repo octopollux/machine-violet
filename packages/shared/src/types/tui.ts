@@ -64,7 +64,13 @@ export type FormattingTag =
   | { type: "linebreak" }
   // Inline monospace (from `<code>` / `` `backtick` ``). Behaves like the other
   // styling tags for wrapping/quoting; its content is not re-parsed for tags.
-  | { type: "code"; content: FormattingNode[] };
+  | { type: "code"; content: FormattingNode[] }
+  // A set-apart quoted passage (from `<quote>` — a letter, inscription, console
+  // readout). Block-level like `center`/`right`: on the narrative path it is
+  // split onto its own line and the layout engine wraps its content to a reduced
+  // width, so each row renders with a left rule. Deliberately NOT markdown `> `,
+  // which collides with the player display-log marker. Multi-line via `<br>`.
+  | { type: "quote"; content: FormattingNode[] };
 
 export type FormattingNode = string | FormattingTag;
 

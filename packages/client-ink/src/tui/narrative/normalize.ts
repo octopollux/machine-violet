@@ -7,7 +7,7 @@
  * FIRST — before cross-line healing and before `parseFormatting` — and rewrites
  * those dialects into the canonical vocabulary as a string transform, so the heal
  * and parse stages only ever see `<b>/<i>/<u>/<sub>/<sup>/<center>/<right>/<code>/`
- * `<color=#hex>/<br>`.
+ * `<quote>/<color=#hex>/<br>`.
  *
  * It is a *tolerance net*, not the contract: anything it doesn't recognize is still
  * caught by `parseFormatting`'s strip-to-content fallback (INV-NO-LEAK), so this can
@@ -43,9 +43,10 @@ function rewriteTag(raw: string, close: boolean, name: string): string {
     case "h1": case "h2": case "h3": case "h4": case "h5": case "h6":
       return close ? "</b>" : "<b>";
     case "b": case "i": case "u": case "sub": case "sup":
-    case "center": case "right": case "code":
+    case "center": case "right": case "code": case "quote":
       // Canonical bare form — drops attributes and normalizes case.
       return close ? `</${name.toLowerCase()}>` : `<${name.toLowerCase()}>`;
+    case "blockquote": return close ? "</quote>" : "<quote>"; // HTML synonym
     case "br": return "<br>";
     case "s": case "strike": case "del": return ""; // no strikethrough primitive
     default: return raw; // unknown tag — leave it for parseFormatting to strip

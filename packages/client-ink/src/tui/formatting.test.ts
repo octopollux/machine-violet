@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { parseFormatting, toPlainText, stripFormatting, stripLeadingBullet, highlightQuotesWithState, markdownToTags, nodeVisibleLength, wrapNodes, processNarrativeLines, isHorizontalRule, splitTrailingHorizontalRule } from "./formatting.js";
-import type { FormattingTag, FormattingNode, NarrativeLine } from "@machine-violet/shared/types/tui.js";
+import { parseFormatting, toPlainText, stripFormatting, stripLeadingBullet, highlightQuotesWithState, markdownToTags, matchListItem, nodeVisibleLength, wrapNodes, processNarrativeLines, isHorizontalRule, splitTrailingHorizontalRule } from "./formatting.js";
+import type { FormattingTag, FormattingNode, NarrativeLine, ProcessedLine } from "@machine-violet/shared/types/tui.js";
 
 describe("parseFormatting", () => {
   it("returns plain text as-is", () => {
@@ -1493,5 +1493,99 @@ describe("wikilink tag", () => {
     // `<wikilink>` without slug= is not a valid open tag; both it and its close
     // are tag-shaped and stripped to content rather than leaked (INV-NO-LEAK).
     expect(stripFormatting("<wikilink>Foo</wikilink>")).toBe("Foo");
+  });
+});
+
+describe("matchListItem", () => {
+  it("recognizes unordered markers and lifts the bullet glyph", () => {
+    expect(matchListItem("- a coil of rope")).toEqual({ marker: "•", indent: 2, ordered: false, content: "a coil of rope" });
+    expect(matchListItem("* a coil")).toMatchObject({ marker: "•", ordered: false, content: "a coil" });
+  });
+
+  it("recognizes ordered markers and preserves the number (normalizing N) → N.)", () => {
+    expect(matchListItem("1. Bread primary.")).toEqual({ marker: "1.", indent: 3, ordered: true, content: "Bread primary." });
+    expect(matchListItem("12) wait")).toMatchObject({ marker: "12.", indent: 4, ordered: true, content: "wait" });
+  });
+
+  it("rejects horizontal rules, marker-without-space, and plain prose", () => {
+    expect(matchListItem("---")).toBeNull();
+    expect(matchListItem("* * *")).toBeNull();
+    expect(matchListItem("-nospace")).toBeNull();
+    expect(matchListItem("just prose")).toBeNull();
+    expect(matchListItem("-")).toBeNull(); // marker with no content
+  });
+});
+
+describe("processNarrativeLines — blockquote", () => {
+  const isQuoteRow = (l: ProcessedLine): boolean =>
+    l.kind === "dm" && l.nodes.length === 1 && typeof l.nodes[0] !== "string"
+    && (l.nodes[0] as FormattingTag).type === "quote";
+  const quoteText = (l: ProcessedLine): string => toPlainText(l.nodes);
+
+  it("emits a single quote node per row, wraps wide content within width − rule, and never leaks", () => {
+    const out = processNarrativeLines(
+      [{ kind: "dm", text: "<quote>The inscription read the last honest broker rests here beneath cold stone tonight forever</quote>" }],
+      40,
+      "#ffffff",
+    );
+    const rows = out.filter(isQuoteRow);
+    expect(rows.length).toBeGreaterThan(1); // it wrapped
+    for (const r of rows) expect(quoteText(r).length).toBeLessThanOrEqual(38); // 40 − rule prefix
+    expect(out.map((l) => toPlainText(l.nodes)).join(" ")).not.toContain("<quote>");
+  });
+
+  it("splits a <br> blockquote into independent ruled rows", () => {
+    const out = processNarrativeLines(
+      [{ kind: "dm", text: "<quote>ALERT<br>breach<br>evacuate</quote>" }],
+      40,
+      "#ffffff",
+    );
+    expect(out.filter(isQuoteRow).map(quoteText)).toEqual(["ALERT", "breach", "evacuate"]);
+  });
+});
+
+describe("processNarrativeLines — lists", () => {
+  it("renders an ordered list tight, with markers + hanging-indent continuation rows", () => {
+    const input: NarrativeLine[] = [
+      { kind: "dm", text: "1. alpha" },
+      { kind: "spacer", text: "" },
+      { kind: "dm", text: "2. a very long second item that will certainly wrap across to a continuation row at forty cols" },
+    ];
+    const out = processNarrativeLines(input, 40, "#ffffff");
+    const lists = out.filter((l) => l.kind === "list");
+    // Both items keep their (normalized) markers on the first row.
+    expect(lists.find((l) => l.listMarker === "1.")).toBeTruthy();
+    expect(lists.find((l) => l.listMarker === "2.")).toBeTruthy();
+    // Tight: the inter-item spacer was collapsed away.
+    expect(out.some((l) => l.kind === "spacer")).toBe(false);
+    // The long item wrapped: continuation rows carry the indent but no marker.
+    const cont = lists.filter((l) => l.listMarker === undefined);
+    expect(cont.length).toBeGreaterThan(0);
+    for (const c of cont) expect(c.listIndent).toBe(3);
+    // Every list row fits width − indent.
+    for (const l of lists) expect(toPlainText(l.nodes).length).toBeLessThanOrEqual(37);
+  });
+
+  it("uses bullet glyphs for unordered markers", () => {
+    const out = processNarrativeLines(
+      [{ kind: "dm", text: "- rope" }, { kind: "spacer", text: "" }, { kind: "dm", text: "* lantern" }],
+      40,
+      "#ffffff",
+    );
+    expect(out.filter((l) => l.kind === "list" && l.listMarker !== undefined).map((l) => l.listMarker)).toEqual(["•", "•"]);
+  });
+
+  it("keeps the lead-in blank but tightens the list (intro line then items)", () => {
+    const input: NarrativeLine[] = [
+      { kind: "dm", text: "Pack list:" },
+      { kind: "spacer", text: "" },
+      { kind: "dm", text: "- rope" },
+      { kind: "spacer", text: "" },
+      { kind: "dm", text: "- lantern" },
+    ];
+    const out = processNarrativeLines(input, 40, "#ffffff");
+    // The intro keeps its spacer (prev is not a list item); the inter-item one is gone.
+    expect(out.filter((l) => l.kind === "spacer").length).toBe(1);
+    expect(out.filter((l) => l.kind === "list").length).toBe(2);
   });
 });

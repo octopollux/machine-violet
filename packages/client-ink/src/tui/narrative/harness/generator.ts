@@ -2,9 +2,10 @@
  * Deterministic, seeded generator of LEGAL DM-formatting documents.
  *
  * Each seed produces one well-formed document over the canonical vocabulary —
- * nested b/i/u/code/color spans, sub/sup, quotes, hard `<br>` breaks, centered
- * and right-aligned blocks, and a sprinkling of wide glyphs (CJK/emoji/accents)
- * and overlong unbreakable tokens to stress the width-correct layout. The harness
+ * nested b/i/u/code/color spans, sub/sup, dialogue quotes, hard `<br>` breaks,
+ * centered and right-aligned blocks, `<quote>` blockquotes, Markdown lists
+ * (ordered + unordered), and a sprinkling of wide glyphs (CJK/emoji/accents) and
+ * overlong unbreakable tokens to stress the width-correct layout. The harness
  * runs the pipeline over thousands of these at every width and asserts the
  * invariants; a failure prints its seed so it can be replayed exactly.
  *
@@ -75,13 +76,35 @@ export function generateDoc(seed: number): string {
   const rng = mulberry32(seed >>> 0);
   const r = rng();
 
-  if (r < 0.25) {
+  if (r < 0.18) {
     // Aligned block, possibly multi-line via <br> (the diegetic-sign shape).
     const align = rng() < 0.5 ? "center" : "right";
     const rows = 1 + Math.floor(rng() * 3);
     const lines: string[] = [];
     for (let i = 0; i < rows; i++) lines.push(genInline(rng, 2));
     return `<${align}>${lines.join("<br>")}</${align}>`;
+  }
+
+  if (r < 0.30) {
+    // Blockquote, possibly multi-line via <br> (letter / inscription / readout).
+    const rows = 1 + Math.floor(rng() * 3);
+    const lines: string[] = [];
+    for (let i = 0; i < rows; i++) lines.push(genInline(rng, 2));
+    return `<quote>${lines.join("<br>")}</quote>`;
+  }
+
+  if (r < 0.42) {
+    // A flat list (ordered or unordered), 2–5 items, each with inline formatting.
+    // An optional lead-in line precedes it (the common "Plan:\n1. …" shape).
+    const ordered = rng() < 0.5;
+    const count = 2 + Math.floor(rng() * 4);
+    const items: string[] = [];
+    if (rng() < 0.5) items.push(genInline(rng, 1));
+    for (let i = 0; i < count; i++) {
+      const marker = ordered ? `${i + 1}.` : pick(rng, ["-", "*"]);
+      items.push(`${marker} ${genInline(rng, 2)}`);
+    }
+    return items.join("\n");
   }
 
   // 1–3 prose paragraphs (\n\n separated), some with an in-paragraph <br>.

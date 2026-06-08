@@ -13,6 +13,7 @@ import { render } from "ink-testing-library";
 import { Box, Text } from "ink";
 import { renderNodes } from "../../render-nodes.js";
 import { processNarrativeLines } from "../../formatting.js";
+import { QUOTE_RULE } from "../layout.js";
 import { appendDelta } from "../../narrative-helpers.js";
 import type { FormattingNode, NarrativeLine, ProcessedLine } from "@machine-violet/shared/types/tui.js";
 
@@ -24,6 +25,10 @@ const CASES: Record<string, string> = {
   subsup: "H<sub>2</sub>O and E=mc<sup>2</sup> and the 1<sup>st</sup>.",
   code: "Type <code>npm test</code> then <code>git push</code>.",
   nested: "<b><color=#20b2aa>bold <i>and italic</i></color></b> tail text here for wrapping.",
+  quote: "<quote>The inscription read: <i>Here lies the last honest broker.</i> Beneath it, someone had scratched <color=#cc0000>LIAR</color> deep into the stone.</quote>",
+  quoteBr: "<quote><color=#cc0000>SYSTEM ALERT</color><br>Reactor breach in sector seven<br>Evacuate the platform immediately</quote>",
+  ulist: "Pack list:\n- A coil of rope\n- <b>Three</b> oil torches\n- A spare lantern that will absolutely not fit inside a narrow forty-column terminal pane at all",
+  olist: "Plan:\n1. Bread primary.\n2. Crackers forbidden, by order of the tribunal that convenes at dawn beneath the great oven.\n3. Muffins await.",
 };
 
 // eslint-disable-next-line no-control-regex
@@ -38,13 +43,28 @@ function unwrapAligned(line: ProcessedLine): FormattingNode[] {
 
 /** Render one processed line the way NarrativeLineComponent does, return frame. */
 function renderLine(line: ProcessedLine, width: number): string {
-  const el = line.alignment ? (
-    <Box width={width} justifyContent={line.alignment === "center" ? "center" : "flex-end"}>
-      <Text wrap="truncate">{renderNodes(unwrapAligned(line))}</Text>
-    </Box>
-  ) : (
-    <Box width={width}><Text wrap="truncate">{renderNodes(line.nodes)}</Text></Box>
-  );
+  let el: React.ReactElement;
+  if (line.kind === "list") {
+    const indent = line.listIndent ?? 0;
+    el = line.listMarker !== undefined ? (
+      <Box width={width}><Text wrap="truncate"><Text>{line.listMarker} </Text>{renderNodes(line.nodes)}</Text></Box>
+    ) : (
+      <Box width={width}><Text wrap="truncate">{" ".repeat(indent)}{renderNodes(line.nodes)}</Text></Box>
+    );
+  } else {
+    const sole = line.nodes.length === 1 && typeof line.nodes[0] !== "string" ? line.nodes[0] : undefined;
+    if (sole && sole.type === "quote") {
+      el = <Box width={width}><Text wrap="truncate"><Text dimColor>{QUOTE_RULE} </Text>{renderNodes(sole.content)}</Text></Box>;
+    } else if (line.alignment) {
+      el = (
+        <Box width={width} justifyContent={line.alignment === "center" ? "center" : "flex-end"}>
+          <Text wrap="truncate">{renderNodes(unwrapAligned(line))}</Text>
+        </Box>
+      );
+    } else {
+      el = <Box width={width}><Text wrap="truncate">{renderNodes(line.nodes)}</Text></Box>;
+    }
+  }
   return render(el).lastFrame() ?? "";
 }
 
@@ -55,10 +75,10 @@ describe("formatting harness — render-level ground truth", () => {
         const lines: NarrativeLine[] = appendDelta([], raw, "dm");
         const out = processNarrativeLines(lines, width, "#ffffff");
         for (const line of out) {
-          if (line.kind !== "dm") continue;
+          if (line.kind !== "dm" && line.kind !== "list") continue;
           const atWidth = renderLine(line, width).replace(ANSI, "");
           // No tag-shaped markup leaks into the rendered frame.
-          expect(atWidth).not.toMatch(/<\/?(?:b|i|u|sub|sup|center|right|color|code|br)\b/i);
+          expect(atWidth).not.toMatch(/<\/?(?:b|i|u|sub|sup|center|right|color|code|br|quote)\b/i);
           // Nothing truncated: rendering at the target width yields the same
           // visible content as rendering unconstrained (substitution-agnostic,
           // so sub/sup glyph mapping doesn't trip the comparison).

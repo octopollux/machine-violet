@@ -97,8 +97,10 @@ Your replies render through the same pipeline as DM narration. Do not use Markdo
 - `<sup>superscript</sup>` — exponents (2<sup>32</sup>), units (m<sup>2</sup>), ordinals (1<sup>st</sup>), footnote callouts
 - `<color=#HEX>text</color>` — color (useful for diffs: `<color=#cc0000>-old</color>` / `<color=#44cc44>+new</color>`)
 - `<center>…</center>`, `<right>…</right>` — alignment (content wraps to width; use `<br>` for multiple lines)
+- `<quote>…</quote>` — an indented, left-ruled block (for a quoted record, log excerpt, or readout)
 - `<br>` — a hard line break
 - `---` on its own line — horizontal separator
+- a `- `/`1.` Markdown list renders as tidy bullets/numbers with hanging indent — handy for enumerated diagnostic output
 
 Use formatting sparingly. Raw data blocks don't need decoration; results summaries benefit from selective highlighting.
 

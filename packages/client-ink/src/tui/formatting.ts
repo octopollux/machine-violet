@@ -1,14 +1,14 @@
-import type { FormattingNode, FormattingTag, NarrativeLine, ProcessedLine } from "@machine-violet/shared/types/tui.js";
+import type { FormattingNode, FormattingTag, ImageIntent, NarrativeLine, ProcessedLine } from "@machine-violet/shared/types/tui.js";
 import { stringWidth } from "./frames/string-width.js";
 import { normalizeDialect } from "./narrative/normalize.js";
-import { layoutRuns } from "./narrative/layout.js";
+import { layoutRuns, QUOTE_PREFIX_COLS } from "./narrative/layout.js";
 
 /**
  * Parse DM text with inline formatting tags into a tree of FormattingNodes.
  *
  * Supported tags: <b>, <i>, <u>, <sub>, <sup>, <center>, <right>, <code>,
- * <color=#hex>, <br> (a contentless line-break leaf), and the render-only
- * <wikilink slug=foo>...</wikilink> (emitted by the colorizer, not LLMs).
+ * <quote>, <color=#hex>, <br> (a contentless line-break leaf), and the
+ * render-only <wikilink slug=foo>...</wikilink> (emitted by the colorizer, not LLMs).
  * Tags can nest: <b><i>bold italic</i></b>.
  *
  * Anything tag-SHAPED but outside this vocabulary — unknown tags (<strong>,
@@ -307,6 +307,85 @@ export function splitTrailingHorizontalRule(text: string): string | null {
 }
 
 /**
+ * Recognize a Markdown list item: a line whose first non-space content is an
+ * unordered marker (`-`/`*`) or an ordered marker (`N.`/`N)`) followed by at
+ * least one space and non-empty content. Horizontal rules (`---`, `* * *`) are
+ * rejected explicitly so they stay separators, not bullets. Returns the resolved
+ * display marker, the hanging-indent width (marker + one space, in display
+ * columns), whether it's ordered, and the remaining content text.
+ *
+ * Nesting is deliberately flattened — leading indent is ignored (no sub-lists),
+ * matching what real DM narration emits (notebooks, itineraries, sign readouts).
+ */
+export function matchListItem(
+  text: string,
+): { marker: string; indent: number; ordered: boolean; content: string } | null {
+  if (isHorizontalRule(text)) return null;
+  const m = text.match(/^\s*([-*]|\d{1,9}[.)])\s+(\S.*)$/);
+  if (!m) return null;
+  const raw = m[1];
+  const ordered = /\d/.test(raw);
+  // Unordered → a single bullet glyph; ordered → the literal number normalized to
+  // `N.` form (we preserve the DM's number rather than renumbering).
+  const marker = ordered ? `${raw.replace(/[.)]$/, "")}.` : "•";
+  const indent = stringWidth(marker) + 1; // marker + one space
+  return { marker, indent, ordered, content: m[2] };
+}
+
+/**
+ * Close any tags left open within a single self-contained line (a list item's
+ * content), so an unclosed `<b>` closes at the item end instead of leaking. No
+ * prefix — nothing is open before a standalone unit. Reuses {@link scanTagChanges}.
+ */
+function healStandalone(text: string): string {
+  const stack: string[] = [];
+  for (const c of scanTagChanges(text)) {
+    if (c.kind === "open") {
+      stack.push(c.name);
+    } else {
+      for (let j = stack.length - 1; j >= 0; j--) {
+        if (stack[j] === c.name) { stack.splice(j, 1); break; }
+      }
+    }
+  }
+  const suffix = stack.reverse().map((n) => `</${n}>`).join("");
+  return text + suffix;
+}
+
+/**
+ * Drop the visual `spacer` that `appendDelta` inserts between two consecutive
+ * list items, so a list renders tight (bulleted) rather than double-spaced. Only
+ * a spacer flanked by two list items is removed; the spacers framing the list as
+ * a whole are left in place. A list run never contains a blank DM line, so it
+ * never straddles the incremental cache's frozen-prefix split — this stays
+ * transparent to INV-DETERMINISM.
+ */
+function collapseListSpacers(lines: NarrativeLine[]): NarrativeLine[] {
+  const isItem = (l: NarrativeLine | undefined): boolean =>
+    l !== undefined && l.kind === "dm" && matchListItem(l.text) !== null;
+  const out: NarrativeLine[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (l.kind === "spacer" && isItem(out[out.length - 1]) && isItem(lines[i + 1])) {
+      continue;
+    }
+    out.push(l);
+  }
+  return out;
+}
+
+/** One line threaded through the processing pipeline. Carries the parsed AST plus
+ *  the block decoration (image intent, list marker/indent) accumulated per phase. */
+interface PipelineLine {
+  kind: ProcessedLine["kind"];
+  nodes: FormattingNode[];
+  isSourceBoundary: boolean;
+  intent?: ImageIntent;
+  listMarker?: string;
+  listIndent?: number;
+}
+
+/**
  * Unified processing pipeline for NarrativeLines.
  * Heal → parse → wrap → pad alignment → quote highlight.
  * Returns ProcessedLine[] ready for direct rendering.
@@ -332,8 +411,12 @@ export function processNarrativeLines(
     l.kind === "dm" && l.text !== "" ? { ...l, text: normalizeDialect(l.text) } : l,
   );
 
+  // Tighten lists: drop the appendDelta spacer between adjacent list items so a
+  // list renders bulleted/contiguous rather than double-spaced.
+  const tightLines = collapseListSpacers(normLines);
+
   const expandedLines: NarrativeLine[] = [];
-  for (const srcLine of normLines) {
+  for (const srcLine of tightLines) {
     if (srcLine.kind === "dm" && srcLine.text.trim() !== "") {
       if (isHorizontalRule(srcLine.text)) {
         pushSeparator(expandedLines);
@@ -358,7 +441,7 @@ export function processNarrativeLines(
   // Phase 1: Heal cross-line tags on raw strings, then parse into AST.
   // Healing must happen before parsing because parseFormatting treats
   // unclosed tags as plain text.
-  const parsed: { kind: NarrativeLine["kind"]; nodes: FormattingNode[]; isSourceBoundary: boolean; intent?: Extract<NarrativeLine, { kind: "image" }>["intent"] }[] = [];
+  const parsed: PipelineLine[] = [];
 
   // Track open tags across DM source lines for cross-line healing
   const openStack: { raw: string; name: string }[] = [];
@@ -371,6 +454,24 @@ export function processNarrativeLines(
         isSourceBoundary: true,
         // Carry image framing intent through the pipeline (only image lines have it).
         ...(srcLine.kind === "image" ? { intent: srcLine.intent } : {}),
+      });
+      continue;
+    }
+
+    // List item? Lift the marker to metadata and treat the item as a
+    // self-contained, paragraph-like unit: the content is healed on its own (so
+    // an unclosed tag closes at the item end), and the cross-line heal stack is
+    // reset so prior formatting doesn't bleed into the marker or the item.
+    const item = srcLine.text.trim() === "" ? null : matchListItem(srcLine.text);
+    if (item) {
+      openStack.length = 0;
+      const nodes = parseFormatting(healStandalone(item.content));
+      parsed.push({
+        kind: "list",
+        nodes,
+        isSourceBoundary: true,
+        listMarker: item.marker,
+        listIndent: item.indent,
       });
       continue;
     }
@@ -419,7 +520,7 @@ export function processNarrativeLines(
   // Phase 2: Lay out each line into physical rows by DISPLAY width. Aligned
   // blocks wrap their inner content and split on <br> into independent rows, each
   // emitted as its own single-tag aligned line; every row fits `width` (INV-WIDTH).
-  const wrapped: { kind: NarrativeLine["kind"]; nodes: FormattingNode[]; isSourceBoundary: boolean; intent?: Extract<NarrativeLine, { kind: "image" }>["intent"] }[] = [];
+  const wrapped: PipelineLine[] = [];
   for (const line of parsed) {
     const first = line.nodes[0];
     if (line.kind === "dm" && line.nodes.length === 1 && typeof first !== "string"
@@ -427,6 +528,16 @@ export function processNarrativeLines(
       // Aligned block: wrap + split-on-<br> the inner content; re-wrap each row
       // in the alignment tag so it stays a single-node aligned line.
       const rows = layoutRuns(first.content, width);
+      for (let j = 0; j < rows.length; j++) {
+        wrapped.push({ kind: "dm", nodes: [{ ...first, content: rows[j] }], isSourceBoundary: j === 0 });
+      }
+    } else if (line.kind === "dm" && line.nodes.length === 1 && typeof first !== "string"
+        && first.type === "quote") {
+      // Blockquote: reserve columns for the renderer's left rule, then wrap +
+      // split-on-<br>; each row stays a single quote tag so the rule prefix plus
+      // the wrapped content fits `width` (INV-WIDTH, proven at render level).
+      const inner = width > 0 ? Math.max(1, width - QUOTE_PREFIX_COLS) : width;
+      const rows = layoutRuns(first.content, inner);
       for (let j = 0; j < rows.length; j++) {
         wrapped.push({ kind: "dm", nodes: [{ ...first, content: rows[j] }], isSourceBoundary: j === 0 });
       }
@@ -442,31 +553,48 @@ export function processNarrativeLines(
       for (let j = 0; j < rows.length; j++) {
         wrapped.push({ kind: "player", nodes: [toPlainText(rows[j])], isSourceBoundary: j === 0 });
       }
+    } else if (line.kind === "list") {
+      // List item: wrap the content to the column budget left after the marker /
+      // hanging indent, so marker + content fits `width`. The marker rides only
+      // on the first physical row; continuation rows carry the indent alone.
+      const indent = line.listIndent ?? 0;
+      const inner = width > 0 ? Math.max(1, width - indent) : width;
+      const rows = layoutRuns(line.nodes, inner);
+      for (let j = 0; j < rows.length; j++) {
+        wrapped.push({
+          kind: "list",
+          nodes: rows[j],
+          isSourceBoundary: j === 0,
+          listIndent: indent,
+          ...(j === 0 ? { listMarker: line.listMarker } : {}),
+        });
+      }
     } else {
       wrapped.push(line);
     }
   }
 
-  // Phase 3: Pad alignment lines
-  const padded: { kind: NarrativeLine["kind"]; nodes: FormattingNode[]; isSourceBoundary: boolean; intent?: Extract<NarrativeLine, { kind: "image" }>["intent"] }[] = [];
+  // Phase 3: Frame block rows (alignment + blockquote) with a blank line before
+  // and after the GROUP, but keep the rows within a group tight.
+  const padded: PipelineLine[] = [];
   for (let i = 0; i < wrapped.length; i++) {
     const line = wrapped[i];
-    const isAlign = line.kind === "dm" && isAlignmentNode(line.nodes);
+    const isBlock = line.kind === "dm" && isBlockTagNode(line.nodes);
 
-    if (isAlign) {
-      // Blank line before the aligned GROUP if the previous line is non-empty
-      // and not itself aligned (consecutive aligned rows — e.g. a multi-line
-      // <br> sign — must not get blanks between them).
+    if (isBlock) {
+      // Blank line before the GROUP if the previous line is non-empty and not
+      // itself a block row (consecutive block rows — e.g. a multi-line <br> sign
+      // or a wrapped blockquote — must not get blanks between them).
       const prev = padded[padded.length - 1];
-      const prevAlign = prev !== undefined && prev.kind === "dm" && isAlignmentNode(prev.nodes);
-      if (prev !== undefined && !isEmptyNodes(prev.nodes) && !prevAlign) {
+      const prevBlock = prev !== undefined && prev.kind === "dm" && isBlockTagNode(prev.nodes);
+      if (prev !== undefined && !isEmptyNodes(prev.nodes) && !prevBlock) {
         padded.push({ kind: "dm", nodes: [], isSourceBoundary: false });
       }
       padded.push(line);
-      // Blank line after if the next line is non-empty and not aligned.
+      // Blank line after if the next line is non-empty and not a block row.
       const next = wrapped[i + 1];
-      const nextAlign = next !== undefined && next.kind === "dm" && isAlignmentNode(next.nodes);
-      if (next !== undefined && !isEmptyNodes(next.nodes) && !nextAlign) {
+      const nextBlock = next !== undefined && next.kind === "dm" && isBlockTagNode(next.nodes);
+      if (next !== undefined && !isEmptyNodes(next.nodes) && !nextBlock) {
         padded.push({ kind: "dm", nodes: [], isSourceBoundary: false });
       }
     } else {
@@ -508,6 +636,8 @@ export function processNarrativeLines(
         kind: line.kind,
         nodes: line.nodes,
         ...(line.intent ? { intent: line.intent } : {}),
+        ...(line.listMarker !== undefined ? { listMarker: line.listMarker } : {}),
+        ...(line.listIndent !== undefined ? { listIndent: line.listIndent } : {}),
       });
     }
   }
@@ -516,12 +646,12 @@ export function processNarrativeLines(
 }
 
 /**
- * Split a raw text line so that <center>...</center> and <right>...</right>
- * blocks each end up on their own line. Text before/after is preserved as
- * separate lines. If the line has no inline alignment blocks, returns [text].
+ * Split a raw text line so that <center>...</center>, <right>...</right>, and
+ * <quote>...</quote> blocks each end up on their own line. Text before/after is
+ * preserved as separate lines. If the line has no inline block tags, returns [text].
  */
 function splitAlignmentBlocks(text: string): string[] {
-  const pattern = /(<(?:center|right)>[\s\S]*?<\/(?:center|right)>)/;
+  const pattern = /(<(?:center|right|quote)>[\s\S]*?<\/(?:center|right|quote)>)/;
   const parts = text.split(pattern);
   const result: string[] = [];
   for (const part of parts) {
@@ -549,9 +679,11 @@ function pushSeparator(lines: NarrativeLine[], source?: NarrativeLine): void {
   lines.push(source && source.kind === "separator" ? source : { kind: "separator", text: "" });
 }
 
-function isAlignmentNode(nodes: FormattingNode[]): boolean {
+/** A row that is a single block tag (alignment or blockquote). These are framed
+ *  with a blank line before/after the group but stay tight against each other. */
+function isBlockTagNode(nodes: FormattingNode[]): boolean {
   return nodes.length === 1 && typeof nodes[0] !== "string"
-    && (nodes[0].type === "center" || nodes[0].type === "right");
+    && (nodes[0].type === "center" || nodes[0].type === "right" || nodes[0].type === "quote");
 }
 
 function isEmptyNodes(nodes: FormattingNode[]): boolean {
@@ -650,7 +782,7 @@ function scanTagChanges(line: string): TagChange[] {
     if (tagStart === -1) break;
 
     // Try close tag first: </tagname>
-    const closeMatch = line.slice(tagStart).match(/^<\/(b|i|u|sub|sup|center|right|color|wikilink|code)>/);
+    const closeMatch = line.slice(tagStart).match(/^<\/(b|i|u|sub|sup|center|right|color|wikilink|code|quote)>/);
     if (closeMatch) {
       changes.push({ kind: "close", name: closeMatch[1], raw: closeMatch[0] });
       i = tagStart + closeMatch[0].length;
@@ -753,14 +885,15 @@ const SIMPLE_TAGS: Record<string, string> = {
   center: "center",
   right: "right",
   code: "code",
+  quote: "quote",
 };
 
 function parseOpenTag(input: string, start: number): ParsedTag | null {
   // Match <tagname> or <color=#hex>
   const remaining = input.slice(start);
 
-  // Simple paired tags: <b>, <i>, <u>, <sub>, <sup>, <center>, <right>, <code>
-  const simpleMatch = remaining.match(/^<(b|i|u|sub|sup|center|right|code)>/);
+  // Simple paired tags: <b>, <i>, <u>, <sub>, <sup>, <center>, <right>, <code>, <quote>
+  const simpleMatch = remaining.match(/^<(b|i|u|sub|sup|center|right|code|quote)>/);
   if (simpleMatch) {
     const tagName = simpleMatch[1];
     return {
@@ -869,6 +1002,8 @@ function buildNode(
       return { type: "center", content: children };
     case "right":
       return { type: "right", content: children };
+    case "quote":
+      return { type: "quote", content: children };
     case "color":
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- color is set when tag === "color"
       return { type: "color", color: color!, content: children };

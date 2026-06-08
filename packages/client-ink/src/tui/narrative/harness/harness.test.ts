@@ -48,6 +48,13 @@ const FIXTURES: Record<string, string> = {
   quotesMultiline: '"Beware\nthe dark\nthat waits" the wizard said quietly.',
   brInProse: "Line one of the readout<br>line two of the readout<br>line three closes it",
   everything: "<center><b>THE <color=#e13d73>VAULT</color></b><br><i>你好</i> H<sub>2</sub>O <code>id_42</code></center>",
+  quote: "<quote>The inscription read <i>Here lies the last honest broker</i> and beneath it someone had scratched <color=#cc0000>LIAR</color> into the stone.</quote>",
+  quoteBr: "<quote><color=#cc0000>SYSTEM ALERT</color><br>Reactor breach in sector seven<br>Evacuate the platform immediately</quote>",
+  quoteWide: "<quote>她写下 你好世界 然后微笑 and the 🗡️ caught the café 🔥 light just so</quote>",
+  listUnordered: "Pack list:\n- A coil of rope\n- <b>Three</b> oil torches\n- A spare lantern that absolutely will not fit a narrow pane",
+  listOrdered: "1. Bread primary.\n2. Crackers forbidden.\n3. Muffins await tribunal.\n4. Bell is a menace.",
+  listParen: "Steps:\n1) open the valve\n2) <i>wait</i> for the hiss\n3) close it again",
+  listInline: "- <color=#20b2aa>Heura</color> handles relays\n- H<sub>2</sub>O reserves low\n- <code>id_42</code> flagged",
   emptyish: "",
   whitespace: "   ",
 };

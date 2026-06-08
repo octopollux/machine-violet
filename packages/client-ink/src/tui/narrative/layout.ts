@@ -18,6 +18,17 @@ import { stringWidth } from "../frames/string-width.js";
 import { toPlainText, nodeDisplayWidth, flattenToWords } from "../formatting.js";
 
 /**
+ * Left rule glyph the Ink renderer prefixes to every `<quote>` row. U+258F LEFT
+ * ONE EIGHTH BLOCK — a thin, full-height vertical bar that reads as a blockquote
+ * border without stealing a full column of ink. The pipeline reserves
+ * {@link QUOTE_PREFIX_COLS} columns (rule + one space) when wrapping quote
+ * content, so the prefixed row still fits the target width (INV-WIDTH).
+ */
+export const QUOTE_RULE = "▏";
+/** Columns reserved for the quote rule + its trailing space. */
+export const QUOTE_PREFIX_COLS = 2;
+
+/**
  * Lay out an inline run into physical rows that each fit `width` display columns.
  * Splits on `<br>` leaves first, then word-wraps each segment. With `width <= 0`
  * returns the nodes unwrapped (a single row) — callers use 0 to disable wrapping.

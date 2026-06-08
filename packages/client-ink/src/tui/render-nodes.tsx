@@ -73,8 +73,9 @@ function renderTag(tag: FormattingTag): React.ReactNode {
     }
     case "center":
     case "right":
-      // Alignment is handled at the NarrativeLine level when this is a
-      // top-level tag. Nested inside other formatting, render children inline.
+    case "quote":
+      // Block tags (alignment, blockquote) are handled at the NarrativeLine
+      // level when top-level. Nested inside other formatting, render inline.
       return <Text>{children}</Text>;
   }
 }

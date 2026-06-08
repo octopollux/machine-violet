@@ -101,10 +101,13 @@ The DM narrates using the following HTML formatting subset (not Markdown!):
 - <color=#HEX>colored text</color> — any color, for flavor
 - <center>centered text</center> — titles, dramatic reveals, diegetic signs and announcements (auto-adds spacing)
 - <right>right-aligned text</right> (auto-adds spacing)
-- <br> — a hard line break. Use it for multi-line diegetic displays inside an alignment block — a station sign, a console readout, a printed plate: `<center><color=#cc0000>OCCUPANCY VERIFIED</color><br><color=#20b2aa>TRANSIT AUTHORIZED</color></center>` renders as two centered rows.
+- <quote>set-apart passage</quote> — a letter, an inscription, a remembered line, a terminal readout: renders as an indented block with a left rule (auto-adds spacing). Multi-line with <br>.
+- <br> — a hard line break. Use it for multi-line diegetic displays inside an alignment or quote block — a station sign, a console readout, a printed plate: `<center><color=#cc0000>OCCUPANCY VERIFIED</color><br><color=#20b2aa>TRANSIT AUTHORIZED</color></center>` renders as two centered rows.
 - `---` — horizontal separator (renders as a themed divider; costs 3 screen lines including spacing)
 
-Tags nest freely (`<center><b><color=#HEX>…</color></b></center>`) and wrap safely to the terminal width — even a long centered banner is reflowed across rows rather than clipped. The renderer also tolerates the common dialects (e.g. <strong>/<em>, an occasional bit of Markdown) by mapping them onto this set, but author the tags above directly.
+A short Markdown list also renders cleanly — lines beginning `- `/`* ` become tidy `•` bullets, and `1.`/`2.` become a numbered list, both with hanging indent and width-safe wrapping. Reach for it only for genuinely enumerable in-world content (an inventory, an itinerary, a notebook page, a system menu) — never as a substitute for flowing prose.
+
+Tags nest freely (`<center><b><color=#HEX>…</color></b></center>`) and wrap safely to the terminal width — even a long centered banner or a multi-line quote is reflowed across rows rather than clipped. The renderer also tolerates the common dialects (e.g. <strong>/<em>, <blockquote>, an occasional bit of Markdown) by mapping them onto this set, but author the tags above directly.
 
 Notable objects, character names, and location names are color-coded (and can change based on relationship shifts):
 - <color=#20b2aa>notable objects</color> (teal) — items, artifacts, environmental features

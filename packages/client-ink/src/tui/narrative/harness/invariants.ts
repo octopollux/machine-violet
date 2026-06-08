@@ -68,11 +68,13 @@ function checkWellformed(nodes: FormattingNode[], out: Violation[]): void {
   }
 }
 
-/** Plain text of all DM/player output rows, joined — what the reader sees. */
+/** Plain text of all DM/player/list output rows, joined — what the reader sees.
+ *  List rows prepend their resolved marker (the reader sees the `1.`/`•`), so an
+ *  ordered list's ordinal digits are counted as content, not dropped. */
 function outputText(lines: ProcessedLine[]): string {
   return lines
     .filter((l) => l.kind === "dm" || l.kind === "player" || l.kind === "list")
-    .map((l) => toPlainText(l.nodes))
+    .map((l) => (l.kind === "list" && l.listMarker !== undefined ? `${l.listMarker} ` : "") + toPlainText(l.nodes))
     .join(" ");
 }
 
