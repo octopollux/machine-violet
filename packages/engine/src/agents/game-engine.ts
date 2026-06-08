@@ -45,7 +45,7 @@ import type { ChoiceGeneratorSession } from "./subagents/choice-generator.js";
 import { campaignPaths, parseFrontMatter, serializeEntity, formatChangelogEntry } from "../tools/filesystem/index.js";
 import { handleImageGenerated } from "./image-handler.js";
 import { normalizeImageEffort, normalizeImageAspect } from "../providers/image-coerce.js";
-import { loadDmPortraitMessage } from "./dm-portraits.js";
+import { loadDmPortraitMessage, loadCharacterReferences } from "./dm-portraits.js";
 import { runScribe } from "./subagents/scribe.js";
 import { promoteCharacter } from "./subagents/character-promotion.js";
 import { searchCampaign } from "./subagents/search-campaign.js";
@@ -1257,12 +1257,30 @@ export class GameEngine {
       rawIntent === "scene_snapshot" || rawIntent === "character_portrait" || rawIntent === "player_request"
         ? rawIntent
         : "scene_snapshot";
+    // Optional image-to-image references: the DM names characters whose
+    // established portrait this render should match (face/build/outfit). Resolve
+    // the names to portrait files now — a missing or typo'd name degrades to a
+    // text-only render rather than erroring, and an empty list omits the field
+    // so we do a plain text-to-image. Off by default: a portrait reference
+    // biases the whole render toward that character, wrong for a scene they're
+    // not in, so the DM must opt in per call.
+    const referenceNames = Array.isArray(input.reference_characters)
+      ? input.reference_characters.filter((n): n is string => typeof n === "string")
+      : [];
+    const referenceImages = referenceNames.length > 0
+      ? await loadCharacterReferences(
+          referenceNames,
+          this.sceneManager.getFileIO(),
+          this.gameState.campaignRoot,
+        )
+      : [];
     try {
       const result = await this.provider.generateImage({
         prompt: promptText,
         effort,
         aspect,
         intent,
+        ...(referenceImages.length > 0 ? { referenceImages } : {}),
       });
       const scene = this.sceneManager.getScene();
       const persisted = await handleImageGenerated(

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { loadDmPortraitMessage } from "./dm-portraits.js";
+import { loadDmPortraitMessage, loadCharacterReferences } from "./dm-portraits.js";
 import type { FileIO } from "./scene-manager.js";
 import { norm } from "../utils/paths.js";
 import { campaignPaths } from "../tools/filesystem/index.js";
@@ -130,5 +130,93 @@ describe("loadDmPortraitMessage", () => {
     // text intro + Good's portrait only — Bad is silently dropped
     expect(content).toHaveLength(2);
     expect(content[1]).toMatchObject({ label: "Good" });
+  });
+});
+
+describe("loadCharacterReferences", () => {
+  it("resolves named characters to provider referenceImages (base64 + label)", async () => {
+    const paths = campaignPaths("/camp");
+    const io = makeFileIO({
+      [paths.characterPortrait("Janey Bruce")]: new Uint8Array([1, 2, 3]),
+      [paths.characterPortrait("Oros")]: new Uint8Array([4, 5, 6]),
+    });
+
+    const refs = await loadCharacterReferences(["Janey Bruce", "Oros"], io, "/camp");
+
+    expect(refs).toEqual([
+      { base64: Buffer.from([1, 2, 3]).toString("base64"), mimeType: "image/png", label: "Janey Bruce" },
+      { base64: Buffer.from([4, 5, 6]).toString("base64"), mimeType: "image/png", label: "Oros" },
+    ]);
+  });
+
+  it("skips names with no portrait on disk (partial match still conditions on the rest)", async () => {
+    const paths = campaignPaths("/camp");
+    const io = makeFileIO({ [paths.characterPortrait("Janey Bruce")]: new Uint8Array([1]) });
+
+    const refs = await loadCharacterReferences(["Janey Bruce", "Nobody"], io, "/camp");
+
+    expect(refs).toHaveLength(1);
+    expect(refs[0].label).toBe("Janey Bruce");
+  });
+
+  it("returns [] when no named character has a portrait (caller renders text-only)", async () => {
+    const refs = await loadCharacterReferences(["Ghost", "Phantom"], makeFileIO({}), "/camp");
+    expect(refs).toEqual([]);
+  });
+
+  it("deduplicates by resolved portrait path (same character named twice)", async () => {
+    const paths = campaignPaths("/camp");
+    const io = makeFileIO({ [paths.characterPortrait("Janey Bruce")]: new Uint8Array([7]) });
+
+    // "Janey Bruce" and "the janey bruce" slugify to the same portrait file.
+    const refs = await loadCharacterReferences(["Janey Bruce", "Janey Bruce", "the Janey Bruce"], io, "/camp");
+
+    expect(refs).toHaveLength(1);
+  });
+
+  it("ignores blank / whitespace-only names", async () => {
+    const paths = campaignPaths("/camp");
+    const io = makeFileIO({ [paths.characterPortrait("Oros")]: new Uint8Array([2]) });
+
+    const refs = await loadCharacterReferences(["", "   ", "Oros"], io, "/camp");
+
+    expect(refs).toHaveLength(1);
+    expect(refs[0].label).toBe("Oros");
+  });
+
+  it("returns [] when fileIO has no readBinaryFile (legacy mock — no throw)", async () => {
+    const io: FileIO = {
+      readFile: async () => "",
+      writeFile: async () => {},
+      appendFile: async () => {},
+      mkdir: async () => {},
+      exists: async () => true,
+      listDir: async () => [],
+      // readBinaryFile intentionally absent
+    };
+    expect(await loadCharacterReferences(["X"], io, "/camp")).toEqual([]);
+  });
+
+  it("survives a single corrupted/unreadable portrait — returns the rest", async () => {
+    const paths = campaignPaths("/camp");
+    const goodPath = paths.characterPortrait("Good");
+    const badPath = paths.characterPortrait("Bad");
+    const io: FileIO = {
+      readFile: async () => "",
+      writeFile: async () => {},
+      appendFile: async () => {},
+      mkdir: async () => {},
+      exists: async (p) => norm(p) === norm(goodPath) || norm(p) === norm(badPath),
+      listDir: async () => [],
+      readBinaryFile: vi.fn(async (p: string) => {
+        if (norm(p) === norm(badPath)) throw new Error("EACCES");
+        return new Uint8Array([9]);
+      }),
+    };
+
+    const refs = await loadCharacterReferences(["Good", "Bad"], io, "/camp");
+
+    expect(refs).toHaveLength(1);
+    expect(refs[0].label).toBe("Good");
   });
 });
