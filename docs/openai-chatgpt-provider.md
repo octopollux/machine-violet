@@ -91,7 +91,9 @@ All emitted via `logEvent` to `.debug/engine.jsonl`. Token counts and per-call c
 | `codex:subprocess:spawn` | `{ binaryPath, version?, sessionId? }` | Codex child process starts |
 | `codex:subprocess:initialized` | `{ userAgent?, codexHome?, platformOs?, platformArch?, sessionId? }` | `initialize` handshake completed — records codex version + platform diagnostics |
 | `codex:subprocess:exit` | `{ code, signal, sessionId? }` | Codex child process dies |
+| `codex:subprocess:stderr` | `{ line, sessionId? }` | One line codex wrote to its own stderr (its `tracing` INFO/WARN/ERROR + direct diagnostics), captured to our log instead of `inherit`-ed to the terminal. ANSI-stripped, length-capped. Volume scales with codex's `RUST_LOG`. |
 | `codex:rpc:error` | `{ method, code, message, sessionId? }` | A JSON-RPC request returned an error result |
+| `codex:rpc:reasoning_item_missing` | `{ threadId, turnId, summaryDeltas, sessionId? }` | The model reasoned this turn (summary deltas streamed) but no `rawResponseItem/completed` reasoning item arrived — a likely dropped encrypted-reasoning blob on the stdio pipe (#597). |
 | `codex:auth:login_started` | `{ type, loginId }` | OAuth or device-code flow initiated |
 | `codex:auth:login_completed` | `{ loginId, success, planType?, error? }` | Login finished (success or failure) |
 | `codex:auth:token_refresh` | `{ reason, previousAccountId? }` | Codex requested a fresh ChatGPT token |
@@ -101,13 +103,15 @@ All emitted via `logEvent` to `.debug/engine.jsonl`. Token counts and per-call c
 | `codex:turn:start` | `{ threadId, turnId?, effort? }` | A turn was dispatched |
 | `codex:turn:complete` | `{ threadId, turnId, durationMs, status }` | A turn finished |
 
-(Encrypted-reasoning capture has no dedicated event — it flows through the normal turn capture and shows up in the persisted assistant content. Matches the openai-apikey path which is also silent about reasoning blobs.)
+(Encrypted-reasoning capture has no dedicated *success* event — it flows through the normal turn capture and shows up in the persisted assistant content, matching the openai-apikey path. The one diagnostic is `codex:rpc:reasoning_item_missing`, logged when the blob's carrier notification appears to have been dropped on the pipe — see Reasoning preservation and Transport reliability below, and issue #597.)
 
 ## Reasoning preservation across turns
 
 Reasoning-effort-enabled turns produce an opaque `encrypted_content` blob per reasoning item that the Responses API will accept back as input on subsequent turns — that's what lets the model continue its chain-of-thought instead of re-deriving setup each round. The blob is **not** exposed on codex's sanitized `item/completed` stream (the `ReasoningThreadItem` view defines only `summary` and `content` text). It surfaces on a separate notification: **`rawResponseItem/completed`**.
 
 Capture: the provider subscribes to `rawResponseItem/completed` per turn and stores items where `item.type === "reasoning"` and `encrypted_content` is non-null. Each captured item becomes a `reasoning` ContentPart on `assistantContent`. ZDR-off codex configurations don't forward the blob, in which case the item is dropped (persisting an empty shell would replay back as an invalid input item).
+
+Unlike the inline image path (which falls back to reading the PNG off disk), this blob has **no fallback** — its sole carrier is the one `rawResponseItem/completed` line. If that line is dropped/corrupted on the stdio pipe, replay silently degrades and the model re-derives its reasoning next turn. The provider can't recover the blob, but it *detects* the case: when summary deltas streamed (the model reasoned) yet no raw reasoning item arrived at all, it logs `codex:rpc:reasoning_item_missing` (#597). A ZDR-off org still *receives* the raw item (with null content), so the detector fires only on a genuine miss, not on a benign missing blob.
 
 Replay: `messageToResponsesItems` emits any `reasoning` ContentPart as a Responses-API `reasoning` item at the **head** of the assistant turn (before message and function_call items, as the API requires).
 
@@ -120,6 +124,15 @@ The same encrypted-blob round-trip is what the `openai-apikey` / `openrouter` pa
 - **`DynamicToolCallResponse`** requires both `success: boolean` AND `contentItems: [{ type: "inputText" | "inputImage", ... }]`. Both fields required, strict validation.
 - **`dynamicTools`** is wire-supported via `thread/start` even though it's missing from the v0.130.0 generated schema. Could churn — pin codex versions and re-validate on bumps.
 - **`modelContextWindow`** returned by `thread/tokenUsage/updated` reflects per-plan caps. GPT-5.5 reports 258,400 tokens on Plus, NOT the published 1.05M. Callers that care about an accurate window must read from this notification at runtime, not from `known-models.json`.
+
+## Transport reliability
+
+The JSON-RPC wire is newline-delimited JSON on the subprocess's **stdout**; multi-MB lines (chiefly inline base64 images) intermittently arrive corrupt and fail `JSON.parse`. Two mechanisms were ruled out empirically while investigating #597:
+
+- **codex's tracing does not splice into stdout.** codex routes its `tracing` subscriber to **stderr** — verified by capturing the two streams separately and forcing `RUST_LOG=trace`: ~13 KB of ANSI records landed on stderr while stdout stayed 100% clean JSON. stderr is a separate fd; it cannot corrupt the stdout protocol pipe. (We now pipe + drain stderr to the engine log as `codex:subprocess:stderr` rather than `inherit`-ing it — both to surface codex's own diagnostics and to confirm what is/isn't on each stream.)
+- **Our read side is not lossy.** Node `readline` over the child stdout pipe delivers 3 MB lines interleaved with small notifications intact (60/60 whole, 0 parse failures in a stress probe).
+
+By elimination the corruption originates inside **codex's own stdout writes** (a module printing directly to stdout, or one protocol write spliced into another). It predominantly hits the multi-MB image lines, which already recover via the disk fallback (`generated_images/<sessionId>/`). Smaller non-image payloads are far less exposed; the one with no fallback (the encrypted-reasoning blob) is covered by the `codex:rpc:reasoning_item_missing` detector above, and any large unparseable stdout line is logged as `codex:rpc:parse_failure` with a salvaged `methodGuess` so the dropped message type is attributable.
 
 ## Distribution
 

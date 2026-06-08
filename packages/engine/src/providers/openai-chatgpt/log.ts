@@ -12,9 +12,11 @@
  *   codex:subprocess:spawn        — child started, binary resolved
  *   codex:subprocess:initialized  — `initialize` handshake completed (records codex version + userAgent)
  *   codex:subprocess:exit         — child died (expected or otherwise)
+ *   codex:subprocess:stderr       — a line codex wrote to ITS stderr (its tracing/diagnostics), captured to our log
  *   codex:rpc:error               — JSON-RPC method returned an error
  *   codex:rpc:parse_failure       — a large stdout line failed to JSON.parse (truncated/corrupt payload)
  *   codex:rpc:large_line          — an unusually large line DID parse (confirms big payloads survive transport)
+ *   codex:rpc:reasoning_item_missing — model reasoned this turn but no rawResponseItem/completed arrived (likely a dropped encrypted-reasoning blob; #597)
  *   codex:auth:login_started      — OAuth/device-code flow initiated
  *   codex:auth:login_completed    — login finished (success or otherwise)
  *   codex:auth:token_refresh      — Codex requested fresh ChatGPT tokens
@@ -33,18 +35,47 @@ export const log = {
     logEvent("codex:subprocess:initialized", data),
   exit: (data: { code: number | null; signal: NodeJS.Signals | null; sessionId?: string }) =>
     logEvent("codex:subprocess:exit", data),
+  /**
+   * One line codex wrote to its OWN stderr — its `tracing` subscriber output
+   * (INFO/WARN/ERROR records) plus any direct diagnostics. We pipe + drain
+   * stderr (rather than `inherit`-ing it to the terminal) so these land in the
+   * engine log alongside the protocol events: codex's stderr is the only place
+   * its internal failures surface, and a render/tool turn that misbehaves often
+   * explains itself here. ANSI color codes are stripped and long lines are
+   * truncated before logging. Volume scales with codex's `RUST_LOG` (sparse at
+   * the default level; floods at `trace`).
+   */
+  stderr: (data: { line: string; sessionId?: string }) =>
+    logEvent("codex:subprocess:stderr", data),
   rpcError: (data: { method: string; code: number; message: string; sessionId?: string }) =>
     logEvent("codex:rpc:error", data),
   /**
-   * A large stdout line that `JSON.parse` rejected. Short non-JSON lines are
-   * codex's ANSI tracing noise and are ignored; a *large* unparseable line is
-   * the smoking gun for a silently-dropped payload — e.g. a multi-MB inline
-   * base64 image that arrived truncated/corrupted over the pipe, which makes an
-   * image render "complete" with no bytes and no error. head/tail let us tell a
-   * truncated-JSON drop (starts `{`, ends mid-token) from genuine binary noise.
+   * A large stdout line that `JSON.parse` rejected — the smoking gun for a
+   * silently-dropped payload (e.g. a multi-MB inline base64 image that arrived
+   * truncated/corrupted over the pipe, making an image render "complete" with no
+   * bytes and no error). NOTE: this is NOT codex's tracing — that goes to its
+   * stderr (now captured as `codex:subprocess:stderr`), a separate fd that can't
+   * touch the stdout protocol pipe. A non-JSON line on *stdout* is foreign bytes
+   * (a codex module printing directly to stdout, or one protocol write spliced
+   * into another). `head`/`tail` tell a truncated-JSON drop (starts `{`, ends
+   * mid-token) from genuine noise; `methodGuess` is the `"method"` field
+   * salvaged from the fragment when the head survived, so a non-image drop
+   * (e.g. `rawResponseItem/completed`) is attributable instead of opaque.
    */
-  parseFailure: (data: { bytes: number; head: string; tail: string; sessionId?: string }) =>
+  parseFailure: (data: { bytes: number; head: string; tail: string; methodGuess?: string; sessionId?: string }) =>
     logEvent("codex:rpc:parse_failure", data),
+  /**
+   * The model demonstrably reasoned this turn (reasoning-summary deltas streamed
+   * on the intact `item/reasoning/*` channel) yet NOT ONE `rawResponseItem/
+   * completed` reasoning item arrived on its separate channel — so the encrypted
+   * reasoning blob we replay for cross-turn chain-of-thought continuity (#533)
+   * was probably dropped/corrupted on the stdio pipe. Unlike the image path
+   * there's no disk fallback, so this would otherwise degrade silently. A
+   * non-ZDR org still RECEIVES the raw item (with null content), so this fires
+   * only on a genuine miss — see {@link OpenAIChatGptProvider} runTurn. (#597)
+   */
+  reasoningRawItemMissing: (data: { threadId: string; turnId: string; summaryDeltas: number; sessionId?: string }) =>
+    logEvent("codex:rpc:reasoning_item_missing", data),
   /**
    * An unusually large line that DID parse. Confirms the transport carries big
    * payloads intact, so a byteless image turn is the backend's doing, not ours.

@@ -140,8 +140,10 @@ For harness probes + post-mortem debugging:
 | `image_gen:no_data` | provider | Turn completed but produced **no** bytes inline *and* none on disk. Dumps the full item inventory (types, statuses, imageGeneration `resultLen`, any text preview) so the real reason — refusal, empty result, wrong tool, empty turn — is visible. |
 | `image_gen:timeout` | provider (codex) | Render turn exceeded the backstop timeout; dumps whatever items arrived before the stall. |
 | `image_gen:error` | provider | API call threw. |
-| `codex:rpc:parse_failure` | provider (rpc) | A **large** (≥4 KB) stdout line failed `JSON.parse` — the smoking gun for a dropped/truncated payload (e.g. inline image base64). Carries byte length + head/tail of the line. Short non-JSON lines (codex tracing noise) are still ignored. |
+| `codex:rpc:parse_failure` | provider (rpc) | A **large** (≥4 KB) stdout line failed `JSON.parse` — the smoking gun for a dropped/truncated payload (e.g. inline image base64). Carries byte length, head/tail, and a salvaged `methodGuess` so a non-image drop is attributable. NOT codex tracing (that's on stderr — see `codex:subprocess:stderr`); short non-JSON stdout lines are still ignored. |
 | `codex:rpc:large_line` | provider (rpc) | A ≥256 KB line that *did* parse — confirms big payloads survive the pipe intact, so a byteless render is the backend's doing, not ours. |
+| `codex:subprocess:stderr` | provider (rpc) | A line codex wrote to its own stderr (tracing/diagnostics), captured to the engine log instead of the terminal. The place a misbehaving render/tool turn explains itself. ANSI-stripped, length-capped; volume scales with `RUST_LOG`. |
+| `codex:rpc:reasoning_item_missing` | provider | Model reasoned this turn but no `rawResponseItem/completed` reasoning item arrived — a likely dropped encrypted-reasoning blob (no disk fallback, unlike images). See [openai-chatgpt-provider.md](openai-chatgpt-provider.md#transport-reliability) / #597. |
 | `image_gen:persisted` | image-handler | Bytes written to disk; carries relPath + size. |
 | `image_gen:dispatch_failed` | setup-conversation, game-engine | Caller couldn't dispatch (no capability, empty prompt, etc.). |
 | `image_gen:legacy_hosted_item_ignored` | provider | Tripwire — see Tool dispatch above. |
