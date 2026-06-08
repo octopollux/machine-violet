@@ -118,12 +118,20 @@ export interface NormalizedMessage {
  * The four levels are deliberately named for *use case*, not backend
  * parameters, so we don't tie the schema to OpenAI's specific quality
  * tiers as those evolve:
- *   - `draft`    — fastest. Iteration loops (setup-agent portraits
- *                  during chargen). Acceptable thumbnail quality.
- *   - `standard` — balanced. Typical DM scene snapshots.
- *   - `quality`  — nice. Pinned scenes the player will likely revisit,
- *                  player-requested illustrations.
- *   - `showcase` — max effort. End-of-arc moments, hero shots.
+ *   - `draft`    — fastest, low fidelity. Throwaway thumbnails.
+ *   - `standard` — medium quality. Character portraits (setup-agent
+ *                  chargen + in-game close-ups); quick/minor scene inserts.
+ *   - `quality`  — high quality at a still-reasonable render time. The
+ *                  default for DM scene snapshots and player-requested
+ *                  illustrations.
+ *   - `showcase` — highest polish for a rare hero shot; slower, so reserved
+ *                  for set-piece moments.
+ *
+ * On the OpenAI API-key path these map to `quality: low|medium|high|high`.
+ * On the ChatGPT/codex path (no explicit quality param) they become
+ * natural-language steering in the prompt; both paths deliberately steer
+ * `quality` short of gpt-image's slowest maximum-fidelity pass so ordinary
+ * play never blocks on a multi-minute render.
  *
  * The model picks per-call from the `generate_image` tool's `effort` arg
  * (each subagent's system prompt directs the model on when to pick what).

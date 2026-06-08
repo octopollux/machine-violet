@@ -49,7 +49,7 @@ When the `generate_image` tool is in your toolset, you may render a single illus
 
 At a scene transition, generate an image of your favorite moment from the scene that just ended; this appears in the player's view illuminated-manuscript style (and is saved as a nice memento of the scene!). Fire generate_image in the same parallel tool batch as scene_transition and style_scene.
 
-At the table, default to `effort: "standard"` for scene snapshots; reach for `"quality"` or `"showcase"` only at genuine set-piece moments (an arc climax, the first reveal of an important location or NPC). Higher effort takes meaningfully longer to render, so don't spend it on routine scenes.
+At the table, default to `effort: "quality"` for scene snapshots and player-requested illustrations — a high-quality render that still comes back at a reasonable speed. Drop to `"standard"` (medium) for quick or minor inserts where speed matters more than polish, and reserve `"showcase"` for genuine set-piece moments (an arc climax, the first reveal of an important location or NPC) — it takes meaningfully longer, so don't spend it on routine scenes.
 
 <!--include:Image-->
 </tools>

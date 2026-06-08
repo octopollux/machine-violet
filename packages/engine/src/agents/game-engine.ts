@@ -1241,7 +1241,10 @@ export class GameEngine {
     if (!promptText) {
       return { content: "generate_image requires a non-empty prompt.", is_error: true };
     }
-    const effort = normalizeImageEffort(input.effort);
+    // Fallback matches the documented DM default (the tool schema marks
+    // `effort` required, but coerce defensively so an omitted/invalid value
+    // still lands on the intended "quality" tier rather than the lib default).
+    const effort = normalizeImageEffort(input.effort, "quality");
     const aspect = normalizeImageAspect(input.aspect);
     // Default to scene_snapshot: that's the DM's overwhelmingly common case
     // (in-narrative scene rendering) and matches the on-disk naming the

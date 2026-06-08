@@ -173,9 +173,11 @@ async function runAgentLoopInternal(
         "and style. The caption (if any) should be composed into the image itself " +
         "as a printed plate, not emitted as separate text. Use sparingly — at most " +
         "one image per turn. " +
-        "Default to `effort: \"standard\"` for ordinary scene snapshots. Reach for " +
-        "`effort: \"quality\"` or `\"showcase\"` only for once-per-arc set-pieces; " +
-        "they take longer and cost more. Use `aspect: \"landscape\"` for scenes, " +
+        "Default to `effort: \"quality\"` for scene snapshots and player-requested " +
+        "illustrations — a high-quality render that still comes back at reasonable speed. " +
+        "Drop to `\"standard\"` (medium) for quick or minor inserts where speed matters more. " +
+        "Reserve `\"showcase\"` for rare set-piece hero shots; it takes a bit longer. " +
+        "Use `aspect: \"landscape\"` for scenes, " +
         "`\"portrait\"` for character close-ups, `\"square\"` for objects/symbols. " +
         "Set `intent` to `\"scene_snapshot\"` for scenes (the usual case), " +
         "`\"character_portrait\"` for character close-ups, or `\"player_request\"` " +
@@ -192,7 +194,7 @@ async function runAgentLoopInternal(
           effort: {
             type: "string",
             enum: ["draft", "standard", "quality", "showcase"],
-            description: "Render effort. Default 'standard'. 'showcase' for once-per-arc moments only.",
+            description: "Render effort. Default 'quality' (high quality, reasonable speed) for scenes; 'standard' (medium) for quick inserts; 'showcase' for rare set-piece hero shots (slower).",
           },
           aspect: {
             type: "string",

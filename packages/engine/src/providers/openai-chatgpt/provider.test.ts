@@ -365,11 +365,18 @@ describe("buildImagePromptText", () => {
     expect(text).toContain("1024x1024");
   });
 
-  it("adds a max-fidelity nudge for quality/showcase effort but not draft/standard", () => {
-    expect(buildImagePromptText("x", "square", "quality")).toContain("maximum detail");
-    expect(buildImagePromptText("x", "square", "showcase")).toContain("maximum detail");
-    expect(buildImagePromptText("x", "square", "standard")).not.toContain("maximum detail");
-    expect(buildImagePromptText("x", "square", "draft")).not.toContain("maximum detail");
+  it("emits graduated quality/speed steering per effort level", () => {
+    expect(buildImagePromptText("x", "square", "draft")).toContain("low fidelity");
+    expect(buildImagePromptText("x", "square", "standard")).toContain("medium quality");
+    expect(buildImagePromptText("x", "square", "quality")).toContain("high quality");
+    expect(buildImagePromptText("x", "square", "showcase")).toContain("highest standard quality");
+  });
+
+  it("steers quality and showcase away from the slowest maximum-fidelity pass", () => {
+    // The whole point of the render-time cap: even the top routine tier must not
+    // invoke gpt-image's slowest mode (the multi-minute render we want to avoid).
+    expect(buildImagePromptText("x", "square", "quality")).toMatch(/do NOT engage the slowest/i);
+    expect(buildImagePromptText("x", "square", "showcase")).toMatch(/avoid the slowest/i);
   });
 });
 
