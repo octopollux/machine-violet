@@ -36,6 +36,9 @@ import type {
   ImageEffort, ImageAspect,
 } from "../types.js";
 import type { UsageStatus } from "@machine-violet/shared";
+import { readFile, readdir, stat } from "node:fs/promises";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import { CodexRpcClient } from "./rpc.js";
 import { getAccount, isChatGptAccount, pushChatGptAuthTokens } from "./auth.js";
 import { toUsageStatus, shouldWarn } from "./usage.js";
@@ -45,7 +48,7 @@ import { getCodexClientInfo } from "./client-info.js";
 import type { ChatGptTokenStore, PersistedChatGptTokens } from "./token-store.js";
 import type {
   InitializeResult, ThreadStartParams, ThreadStartResult,
-  TurnStartParams, TurnCompletedNotification,
+  TurnStartParams, UserInputItem, TurnCompletedNotification,
   AgentMessageDeltaNotification, ItemStartedNotification,
   ItemCompletedNotification, ItemBase, TokenUsageUpdatedNotification,
   RateLimitsUpdatedNotification, RateLimits,
@@ -106,6 +109,14 @@ export class OpenAIChatGptProvider implements LLMProvider {
   private readonly sessionId?: string;
   private readonly cwd: string;
   private readonly tokenStore?: ChatGptTokenStore;
+  /**
+   * codex's home dir, learned from the `initialize` handshake. The image_gen
+   * skill writes every rendered PNG to `<codexHome>/generated_images/<thread
+   * sessionId>/` — our reliable, disk-based harvest path when the multi-MB
+   * inline-base64 `item/completed` notification is dropped/corrupted on the
+   * stdio pipe. Null until the handshake completes. See {@link readRenderedImageFromDisk}.
+   */
+  private codexHome: string | null = null;
   /**
    * Active per-thread tool dispatchers. Populated by `runTurn` at
    * subscribe time, cleared in its `finally`. The single
@@ -200,6 +211,44 @@ export class OpenAIChatGptProvider implements LLMProvider {
   // -----------------------------------------------------------------------
 
   /**
+   * Give-up cap for a render turn that never reports `turn/completed`. A real
+   * gpt-image render (especially `quality`/`showcase`, image-to-image with a
+   * reference, or under account contention) routinely runs a few minutes, and
+   * codex itself imposes no turn cap by design (it's built to run unattended
+   * for a long time) — so this is NOT a render-time budget and must sit well
+   * above any legitimate single-image render. At 10 minutes it serves two
+   * ends: it's far past any real render, AND past it a waiting player has
+   * effectively given up, so it doubles as a sane give-up point. We keep a
+   * finite cap rather than waiting forever because the render is a nested turn
+   * that pauses the DM turn awaiting our tool reply: with no cap a genuine
+   * hang freezes the game with no recovery, whereas hitting this throws an
+   * error the dispatcher turns into an isError tool_result the DM degrades
+   * from. (The earlier value was 180s, which wrongly killed ordinary slow
+   * renders — see the "image render timed out" reports.)
+   */
+  private static readonly IMAGE_RENDER_TIMEOUT_MS = 10 * 60_000;
+
+  /**
+   * Total render attempts before `generateImage` gives up. Retries fire ONLY
+   * on {@link ImageGenNoDataError} (a clean turn that emitted no bytes), which
+   * a fresh render usually fixes — codex's `image_gen` tool is flaky enough
+   * that a single attempt fails a non-trivial fraction of the time even on a
+   * quiet account. 3 keeps a good success rate without unbounded latency/cost;
+   * a true backend outage still fails (each attempt is independent, so we don't
+   * hammer indefinitely). A render-timeout, failed turn, or auth error is NOT
+   * retried — see {@link ImageGenNoDataError}.
+   */
+  private static readonly IMAGE_RENDER_MAX_ATTEMPTS = 3;
+
+  /**
+   * Bounded retry for the disk image harvest. codex writes the PNG before the
+   * turn completes, so it's normally present the instant we look; these guard
+   * only against a filesystem-flush lag on the rare inline-failure path.
+   */
+  private static readonly DISK_HARVEST_MAX_ATTEMPTS = 3;
+  private static readonly DISK_HARVEST_RETRY_MS = 150;
+
+  /**
    * Render one image via codex's built-in `image_gen` skill (gpt-image-2,
    * billed to the ChatGPT plan — no API key). Unlike the openai-apikey
    * provider (a single `images.generate` REST call), there is no direct
@@ -224,12 +273,14 @@ export class OpenAIChatGptProvider implements LLMProvider {
     const effort: ImageEffort = req.effort ?? "standard";
     const aspect: ImageAspect = req.aspect ?? "square";
     const intent = req.intent ?? "player_request";
+    const references = req.referenceImages ?? [];
 
     logEvent("image_gen:request", {
       provider: this.providerId,
       effort,
       aspect,
       intent,
+      ...(references.length > 0 ? { referenceCount: references.length } : {}),
       promptPreview: req.prompt.slice(0, 120),
     });
 
@@ -245,18 +296,62 @@ export class OpenAIChatGptProvider implements LLMProvider {
 
     const model = await this.resolveDefaultModel(client);
 
+    // Bounded retry on the transient "turn completed but emitted no bytes"
+    // failure (ImageGenNoDataError) — a fresh render usually fixes it. Every
+    // other failure (auth, a failed/interrupted turn, the render-timeout
+    // backstop) throws straight out: those don't self-heal on a cheap retry.
+    const maxAttempts = OpenAIChatGptProvider.IMAGE_RENDER_MAX_ATTEMPTS;
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await this.renderImageOnce(client, model, { effort, aspect, prompt: req.prompt, references });
+      } catch (e) {
+        if (shouldRetryImageRender(e, attempt, maxAttempts)) {
+          logEvent("image_gen:retry", { provider: this.providerId, effort, aspect, attempt, maxAttempts });
+          continue;
+        }
+        const message = e instanceof Error ? e.message : String(e);
+        logEvent("image_gen:error", { provider: this.providerId, effort, aspect, message: message.slice(0, 400) });
+        throw e;
+      }
+    }
+  }
+
+  /**
+   * One image-render attempt: spin up a throwaway codex thread, kick off the
+   * render turn (with any reference images), and harvest the inline bytes.
+   * Throws {@link ImageGenNoDataError} when the turn completes cleanly but
+   * produces no image — the caller ({@link generateImage}) retries that case.
+   */
+  private async renderImageOnce(
+    client: CodexRpcClient,
+    model: string,
+    p: {
+      effort: ImageEffort;
+      aspect: ImageAspect;
+      prompt: string;
+      references: NonNullable<GenerateImageRequest["referenceImages"]>;
+    },
+  ): Promise<GenerateImageResult> {
+    const { effort, aspect, prompt, references } = p;
+
     const thread = await client.call<ThreadStartResult>("thread/start", {
       model,
       cwd: this.cwd,
       sandbox: "read-only",
       approvalPolicy: "never",
       developerInstructions: IMAGE_RENDERER_INSTRUCTIONS,
-      // Throwaway thread — we only harvest the inline bytes. Marking it
-      // ephemeral keeps codex from persisting session/thread artifacts,
-      // which would otherwise pile up fast in the portrait draft loop.
+      // Throwaway thread — we harvest the rendered bytes (inline, or off disk
+      // from generated_images/<sessionId>/) and discard the thread. Marking it
+      // ephemeral keeps codex from persisting session/thread rollout artifacts,
+      // which would otherwise pile up fast in the portrait draft loop. (It still
+      // writes the generated_images PNG — confirmed — so the disk harvest works.)
       ephemeral: true,
     });
     const threadId = thread.thread.id;
+    // codex writes the rendered PNG to <codexHome>/generated_images/<sessionId>/
+    // — keyed by the thread's *sessionId*, not its id. This is our reliable
+    // disk harvest when the inline-base64 notification is dropped on the pipe.
+    const sessionId = thread.thread.sessionId;
 
     // Harvest the first imageGeneration item that carries bytes. Codex emits
     // it on `item/completed` (status "generating" but `result` already full —
@@ -265,31 +360,51 @@ export class OpenAIChatGptProvider implements LLMProvider {
     // Boxed so the declared union type survives — TS control-flow can't see
     // the closure assignment and would otherwise narrow a bare `let` to never.
     const harvested: { value: { base64: string; revisedPrompt?: string } | null } = { value: null };
+    // Inventory of every item the thread emits, so a byteless failure can show
+    // exactly what codex produced instead — a refusal `agentMessage`, an
+    // `imageGeneration` item with an empty `result`, a different tool call, or
+    // nothing at all. This is the difference between "no data" (opaque) and an
+    // actual response reason.
+    const itemLog: ItemSummary[] = [];
     const unsubItem = client.onNotification<ItemCompletedNotification>(
       "item/completed",
-      (p) => {
-        if (p.threadId !== threadId) return;
+      (p2) => {
+        if (p2.threadId !== threadId) return;
+        itemLog.push(summarizeItem(p2.item));
         if (harvested.value) return;
-        const img = extractGeneratedImage(p.item);
+        const img = extractGeneratedImage(p2.item);
         if (img) harvested.value = img;
       },
     );
 
-    let completionResolve: ((p: TurnCompletedNotification) => void) | null = null;
+    let completionResolve: ((p2: TurnCompletedNotification) => void) | null = null;
     const completion = new Promise<TurnCompletedNotification>((resolve) => { completionResolve = resolve; });
     const unsubCompleted = client.onNotification<TurnCompletedNotification>(
       "turn/completed",
-      (p) => {
-        if (p.threadId !== threadId) return;
-        completionResolve?.(p);
+      (p2) => {
+        if (p2.threadId !== threadId) return;
+        completionResolve?.(p2);
         completionResolve = null;
       },
     );
 
     try {
+      // Reference images (PC portraits, opt-in per call) ride as `image`
+      // input items ahead of the text, so the model sees them as visual
+      // references for the named characters. Codex's image_gen then conditions
+      // the render on them (image-to-image). data: URLs keep us from writing
+      // temp files for the throwaway turn.
+      const referenceItems: UserInputItem[] = references.map((r) => ({
+        type: "image",
+        url: `data:${r.mimeType};base64,${r.base64}`,
+      }));
+      const labels = references.map((r) => r.label).filter((l): l is string => !!l);
       await client.call("turn/start", {
         threadId,
-        input: [{ type: "text", text: buildImagePromptText(req.prompt, aspect, effort) }],
+        input: [
+          ...referenceItems,
+          { type: "text", text: buildImagePromptText(prompt, aspect, effort, labels) },
+        ],
         // Minimal reasoning — the model only needs to call one tool. Summaries
         // off; we don't surface thinking from image turns.
         effort: "low",
@@ -299,7 +414,27 @@ export class OpenAIChatGptProvider implements LLMProvider {
       const completed = await Promise.race([
         completion,
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("image render turn timed out after 180s")), 180_000).unref(),
+          setTimeout(
+            () => {
+              // Dump whatever arrived before the stall so a timeout is
+              // diagnosable too — e.g. an imageGeneration item that started
+              // (status "generating") but whose bytes never landed points at a
+              // backend/transport hang, not a model that never called the tool.
+              logEvent("image_gen:timeout", {
+                provider: this.providerId,
+                effort,
+                aspect,
+                timeoutMs: OpenAIChatGptProvider.IMAGE_RENDER_TIMEOUT_MS,
+                itemCount: itemLog.length,
+                itemTypes: itemLog.map((i) => i.type),
+                items: itemLog,
+              });
+              reject(new Error(
+                `image render turn timed out after ${Math.round(OpenAIChatGptProvider.IMAGE_RENDER_TIMEOUT_MS / 1000)}s`,
+              ));
+            },
+            OpenAIChatGptProvider.IMAGE_RENDER_TIMEOUT_MS,
+          ).unref(),
         ),
       ]);
 
@@ -315,10 +450,58 @@ export class OpenAIChatGptProvider implements LLMProvider {
         );
       }
 
-      const captured = harvested.value;
+      let captured = harvested.value;
+
+      // Disk fallback: codex always writes the rendered PNG to
+      // <codexHome>/generated_images/<sessionId>/ as it generates, *regardless*
+      // of whether the inline-base64 bytes survive the stdio pipe. When the
+      // inline harvest came up empty (a multi-MB base64 `item/completed` line
+      // that was dropped/corrupted on the wire — confirmed: a complete 2 MB PNG
+      // lands on disk while our harvest sees nothing), read it straight off
+      // disk. The dir is keyed by this ephemeral thread's unique sessionId, so
+      // there's no race with concurrent renders. This is the actual fix; the
+      // inline path stays as the zero-I/O fast path when it does work.
       if (!captured) {
-        logEvent("image_gen:no_data", { provider: this.providerId, effort, aspect });
-        throw new Error("codex image_gen turn completed without emitting an imageGeneration item");
+        const fromDisk = await this.readRenderedImageFromDisk(sessionId);
+        if (fromDisk) {
+          logEvent("image_gen:disk_recovery", {
+            provider: this.providerId,
+            effort,
+            aspect,
+            base64Length: fromDisk.base64.length,
+            // The inline notification failed but the file was on disk — this
+            // count tells us how often the pipe drops the bytes in practice.
+            inlineItemCount: itemLog.length,
+            inlineItemTypes: itemLog.map((i) => i.type),
+          });
+          captured = fromDisk;
+        }
+      }
+
+      if (!captured) {
+        // The turn completed cleanly, no inline bytes, and nothing on disk
+        // either. Dump the full inventory of what codex *did* emit — this is the
+        // diagnostic that turns an opaque "no data" into an actual reason: a
+        // refusal message, an imageGeneration item with an empty result, a
+        // different tool call, or an empty turn. Pair with
+        // codex:rpc:parse_failure / codex:rpc:large_line to tell a transport
+        // drop from a backend no-op.
+        const imageItems = itemLog.filter((i) => i.type === "imageGeneration");
+        logEvent("image_gen:no_data", {
+          provider: this.providerId,
+          effort,
+          aspect,
+          turnStatus: completed.turn.status,
+          ...(completed.turn.error?.message ? { turnError: completed.turn.error.message } : {}),
+          turnDurationMs: completed.turn.durationMs,
+          itemCount: itemLog.length,
+          itemTypes: itemLog.map((i) => i.type),
+          // Did an imageGeneration item arrive at all, and with what result size?
+          // resultLen 0 ⇒ backend produced no bytes; absent ⇒ no item emitted.
+          imageItems,
+          items: itemLog,
+        });
+        throw new ImageGenNoDataError("codex image_gen turn completed but produced no image bytes (none inline, none on disk)");
       }
 
       logEvent("image_gen:response", {
@@ -336,14 +519,44 @@ export class OpenAIChatGptProvider implements LLMProvider {
         effortUsed: effort,
         aspectUsed: aspect,
       };
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      logEvent("image_gen:error", { provider: this.providerId, effort, aspect, message: message.slice(0, 400) });
-      throw e;
     } finally {
       unsubItem();
       unsubCompleted();
     }
+  }
+
+  /**
+   * Reliable disk harvest for a rendered image. codex's image_gen skill writes
+   * every PNG to `<codexHome>/generated_images/<sessionId>/ig_*.png` as part of
+   * the tool call, *before* the turn completes — so by the time we see
+   * `turn/completed` the file is fully flushed. Reading it here rescues the
+   * render when the inline-base64 `item/completed` notification is dropped or
+   * corrupted on the multi-MB stdio line (the observed failure: a complete 2 MB
+   * PNG on disk while our harvest saw nothing).
+   *
+   * The dir is keyed by this ephemeral thread's unique `sessionId`, so the
+   * newest PNG in it is unambiguously ours — no race with concurrent renders.
+   * Returns null (never throws) if the dir/file isn't there, so the caller
+   * falls through to the existing no-data diagnostics.
+   */
+  private async readRenderedImageFromDisk(
+    sessionId: string | undefined,
+  ): Promise<{ base64: string } | null> {
+    if (!sessionId) return null;
+    const base = this.codexHome ?? join(homedir(), ".codex");
+    const dir = join(base, "generated_images", sessionId);
+    // codex writes the PNG before the turn completes, so it's normally on disk
+    // the instant we look. Retry a few times anyway as cheap insurance against
+    // a filesystem-flush lag on the rare failure path (we only get here when the
+    // inline harvest already came up empty — a little latency is fine).
+    for (let attempt = 0; attempt < OpenAIChatGptProvider.DISK_HARVEST_MAX_ATTEMPTS; attempt++) {
+      const got = await readNewestPngAsBase64(dir);
+      if (got) return got;
+      if (attempt < OpenAIChatGptProvider.DISK_HARVEST_MAX_ATTEMPTS - 1) {
+        await new Promise((r) => setTimeout(r, OpenAIChatGptProvider.DISK_HARVEST_RETRY_MS).unref());
+      }
+    }
+    return null;
   }
 
   /** Lazily resolve + cache the account's default model id for image turns. */
@@ -384,6 +597,9 @@ export class OpenAIChatGptProvider implements LLMProvider {
         platformOs: init.platformOs,
         sessionId: this.sessionId,
       });
+      // Retain codexHome for the disk-based image harvest (generated_images
+      // live under it). Learned only from this handshake.
+      if (init.codexHome) this.codexHome = init.codexHome;
       client.notify("initialized", {});
 
       // Subscribe to rate-limit updates for the lifetime of the subprocess.
@@ -800,11 +1016,16 @@ function systemPromptToString(systemPrompt: string | SystemBlock[]): string {
  * (all blocked by read-only sandbox, but a waste of tokens and latency).
  */
 const IMAGE_RENDERER_INSTRUCTIONS =
-  "You are a silent image-rendering backend. The user message is a single " +
-  "image description. Call the built-in image_gen tool exactly once to render " +
-  "it. Do NOT run shell commands. Do NOT save, copy, move, or list files — the " +
-  "caller harvests the rendered bytes directly. Do NOT write any explanatory " +
-  "prose, captions, or follow-up. Render the image and stop.";
+  "You are a silent image-rendering backend. The user message is an image " +
+  "description, optionally preceded by one or more reference images. Call the " +
+  "built-in image_gen tool exactly once to render the description. When reference " +
+  "images are attached, they are visual references for the characters named in " +
+  "the description — match each named character's face, build, and outfit to their " +
+  "reference, but follow the description for everything else (pose, setting, " +
+  "framing, other subjects); do NOT reproduce a reference's background or crop. " +
+  "Do NOT run shell commands. Do NOT save, copy, move, or list files — the caller " +
+  "harvests the rendered bytes directly. Do NOT write any explanatory prose, " +
+  "captions, or follow-up. Render the image and stop.";
 
 const ASPECT_GUIDANCE: Record<ImageAspect, string> = {
   portrait: "Use a tall vertical portrait orientation (roughly 1024x1536).",
@@ -852,10 +1073,43 @@ const EFFORT_GUIDANCE: Record<ImageEffort, string> = {
  * orientation via {@link ASPECT_GUIDANCE}, fidelity/speed via
  * {@link EFFORT_GUIDANCE}.
  *
+ * When `referenceLabels` is non-empty, a directive naming the referenced
+ * characters is appended so the model knows the attached images are
+ * appearance references for those names (the images themselves ride as
+ * separate `image` input items on the turn — see {@link generateImage}).
+ *
  * Exported for unit tests.
  */
-export function buildImagePromptText(prompt: string, aspect: ImageAspect, effort: ImageEffort): string {
-  return `${ASPECT_GUIDANCE[aspect]} ${EFFORT_GUIDANCE[effort]} ${prompt}`;
+/**
+ * Retry policy for {@link OpenAIChatGptProvider.generateImage}: retry iff the
+ * failure is a transient {@link ImageGenNoDataError} (clean turn, no bytes)
+ * AND we have attempts left. Every other failure — auth, a failed/interrupted
+ * turn, the render-timeout backstop — is terminal. Pure + exported so the
+ * policy is unit-tested without driving a live codex turn.
+ */
+export function shouldRetryImageRender(error: unknown, attempt: number, maxAttempts: number): boolean {
+  return error instanceof ImageGenNoDataError && attempt < maxAttempts;
+}
+
+export function buildImagePromptText(
+  prompt: string,
+  aspect: ImageAspect,
+  effort: ImageEffort,
+  referenceLabels: string[] = [],
+): string {
+  const refDirective = referenceLabels.length > 0
+    ? ` The attached reference image${referenceLabels.length > 1 ? "s are" : " is"} the established ` +
+      `appearance of ${formatList(referenceLabels)} — match ${referenceLabels.length > 1 ? "their" : "that character's"} ` +
+      `face, build, and outfit to the reference, but follow this description for pose, setting, and framing.`
+    : "";
+  return `${ASPECT_GUIDANCE[aspect]} ${EFFORT_GUIDANCE[effort]} ${prompt}${refDirective}`;
+}
+
+/** Oxford-comma join: ["a"] → "a"; ["a","b"] → "a and b"; ["a","b","c"] → "a, b, and c". */
+function formatList(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
 }
 
 /**
@@ -875,6 +1129,76 @@ export function extractGeneratedImage(item: ItemBase): { base64: string; revised
     base64: item.result,
     ...(item.revisedPrompt ? { revisedPrompt: item.revisedPrompt } : {}),
   };
+}
+
+/**
+ * Read the newest `*.png` in a directory and return it base64-encoded, or null
+ * if the dir is absent/empty/unreadable (never throws). This is the core of the
+ * disk-based image harvest: codex writes rendered PNGs to a per-session dir, and
+ * the newest one is the render we just kicked off. Exported for unit tests.
+ */
+export async function readNewestPngAsBase64(dir: string): Promise<{ base64: string } | null> {
+  try {
+    const entries = await readdir(dir);
+    const pngs = entries.filter((e) => e.toLowerCase().endsWith(".png"));
+    if (pngs.length === 0) return null;
+    // Newest by mtime — a single render writes one file, but be defensive.
+    let newest: { path: string; mtimeMs: number } | null = null;
+    for (const name of pngs) {
+      const full = join(dir, name);
+      try {
+        const st = await stat(full);
+        if (!newest || st.mtimeMs > newest.mtimeMs) newest = { path: full, mtimeMs: st.mtimeMs };
+      } catch {
+        // Vanished between readdir and stat — ignore.
+      }
+    }
+    if (!newest) return null;
+    const bytes = await readFile(newest.path);
+    if (bytes.length === 0) return null;
+    return { base64: bytes.toString("base64") };
+  } catch {
+    // Dir missing (no image was written) or unreadable — not recoverable here.
+    return null;
+  }
+}
+
+/** Compact, log-safe summary of a thread item — never carries raw image bytes. */
+export interface ItemSummary {
+  type: string;
+  status?: string;
+  /**
+   * For imageGeneration items: character length of the base64 `result` string
+   * (~4/3 of the decoded byte size) — a proxy for image size, not a decoded
+   * byte count. 0 ⇒ the item carried no bytes (backend emitted no image).
+   */
+  resultLen?: number;
+  /** For text-bearing items (agentMessage, reasoning): a short preview to catch refusals. */
+  textPreview?: string;
+  /** For tool calls: which tool, and whether it reported success. */
+  tool?: string;
+  success?: boolean;
+}
+
+/**
+ * Reduce a thread {@link ItemBase} to a small, log-safe shape. Critically it
+ * records `result.length` for imageGeneration items (so a byteless render shows
+ * `resultLen: 0` rather than just vanishing) and a text preview for messages
+ * (so a model refusal surfaces as the actual response reason) — without ever
+ * copying multi-MB base64 into the log. Exported for unit tests.
+ */
+export function summarizeItem(item: ItemBase): ItemSummary {
+  const s: ItemSummary = { type: item.type };
+  if (typeof item.status === "string") s.status = item.status;
+  if (item.type === "imageGeneration") {
+    s.resultLen = typeof item.result === "string" ? item.result.length : 0;
+  }
+  if (typeof item.text === "string" && item.text.length > 0) {
+    s.textPreview = item.text.slice(0, 200);
+  }
+  if (typeof item.tool === "string") s.tool = item.tool;
+  if (typeof item.success === "boolean") s.success = item.success;
+  return s;
 }
 
 function toolToDynamicSpec(tool: NormalizedTool): DynamicToolSpec {
@@ -1390,6 +1714,24 @@ export class CodexTurnFailedError extends Error {
     super(`Codex turn ${turnId} failed: ${codexMessage}`);
     this.name = "CodexTurnFailedError";
     this.kind = classifyCodexFailure(codexMessage);
+  }
+}
+
+/**
+ * Thrown by a single image-render attempt when the turn finished cleanly
+ * (`turn/completed`, status "completed") but yielded no image bytes by *either*
+ * harvest path — nothing inline and nothing on disk. (The common case is the
+ * inline base64 dropping on the pipe; the disk fallback normally rescues that,
+ * so reaching this means the render genuinely produced nothing.) A distinct
+ * class so {@link OpenAIChatGptProvider.generateImage} can retry ONLY this
+ * transient case (a fresh render almost always succeeds), while still surfacing
+ * auth errors, a failed/interrupted turn, and the render-timeout backstop
+ * immediately — none of those self-heal on a cheap retry.
+ */
+export class ImageGenNoDataError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ImageGenNoDataError";
   }
 }
 

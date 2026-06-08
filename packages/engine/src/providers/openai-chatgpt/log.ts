@@ -13,6 +13,8 @@
  *   codex:subprocess:initialized  — `initialize` handshake completed (records codex version + userAgent)
  *   codex:subprocess:exit         — child died (expected or otherwise)
  *   codex:rpc:error               — JSON-RPC method returned an error
+ *   codex:rpc:parse_failure       — a large stdout line failed to JSON.parse (truncated/corrupt payload)
+ *   codex:rpc:large_line          — an unusually large line DID parse (confirms big payloads survive transport)
  *   codex:auth:login_started      — OAuth/device-code flow initiated
  *   codex:auth:login_completed    — login finished (success or otherwise)
  *   codex:auth:token_refresh      — Codex requested fresh ChatGPT tokens
@@ -33,6 +35,22 @@ export const log = {
     logEvent("codex:subprocess:exit", data),
   rpcError: (data: { method: string; code: number; message: string; sessionId?: string }) =>
     logEvent("codex:rpc:error", data),
+  /**
+   * A large stdout line that `JSON.parse` rejected. Short non-JSON lines are
+   * codex's ANSI tracing noise and are ignored; a *large* unparseable line is
+   * the smoking gun for a silently-dropped payload — e.g. a multi-MB inline
+   * base64 image that arrived truncated/corrupted over the pipe, which makes an
+   * image render "complete" with no bytes and no error. head/tail let us tell a
+   * truncated-JSON drop (starts `{`, ends mid-token) from genuine binary noise.
+   */
+  parseFailure: (data: { bytes: number; head: string; tail: string; sessionId?: string }) =>
+    logEvent("codex:rpc:parse_failure", data),
+  /**
+   * An unusually large line that DID parse. Confirms the transport carries big
+   * payloads intact, so a byteless image turn is the backend's doing, not ours.
+   */
+  largeLine: (data: { bytes: number; method?: string; hasResult?: boolean; sessionId?: string }) =>
+    logEvent("codex:rpc:large_line", data),
   loginStarted: (data: { type: "chatgpt" | "chatgptDeviceCode"; loginId: string }) =>
     logEvent("codex:auth:login_started", data),
   loginCompleted: (data: { loginId: string; success: boolean; planType?: string; error?: string }) =>
