@@ -45,6 +45,21 @@ interface JsonRpcMessage {
   error?: { code: number; message: string; data?: unknown };
 }
 
+/**
+ * A line that fails `JSON.parse` and is at least this many bytes is treated as
+ * a dropped/corrupt payload and logged, not silently ignored. Below it we
+ * assume codex's short ANSI tracing lines and stay quiet to avoid log spam.
+ * 4 KB is well above any tracing line yet far below an inline image payload.
+ */
+const RPC_PARSE_FAIL_LOG_MIN_BYTES = 4 * 1024;
+
+/**
+ * A line that *parses* and is at least this large is noted (with its method) so
+ * we can confirm big payloads — chiefly inline base64 images — survive the
+ * stdio pipe intact. Ordinary protocol messages are well under 256 KB.
+ */
+const RPC_LARGE_LINE_LOG_MIN_BYTES = 256 * 1024;
+
 // ---------------------------------------------------------------------------
 // Client
 // ---------------------------------------------------------------------------
@@ -122,11 +137,37 @@ export class CodexRpcClient extends EventEmitter {
     try {
       msg = JSON.parse(line);
     } catch {
-      // Non-JSON line on stdout — Codex sometimes writes non-JSON tracing
-      // lines (e.g. ANSI-colored ERROR records from its dynamic_tools
-      // module) interleaved with the protocol stream. Ignore those lines
-      // rather than crash; stderr is also inherited so tracing is captured.
+      // Non-JSON line on stdout. Short ones are codex's ANSI tracing noise
+      // (e.g. colored ERROR records from its dynamic_tools module) interleaved
+      // with the protocol stream — ignore them; stderr is inherited so tracing
+      // is still captured. But a *large* unparseable line is a smoking gun: a
+      // multi-MB payload (typically an inline base64 image) that arrived
+      // truncated or corrupted over the pipe and can no longer be parsed. That
+      // is exactly the kind of silent drop that makes an image render
+      // "complete" with no bytes and no error — so surface it loudly with
+      // enough of the line to tell truncated-JSON from genuine binary noise.
+      if (line.length >= RPC_PARSE_FAIL_LOG_MIN_BYTES) {
+        log.parseFailure({
+          bytes: line.length,
+          head: line.slice(0, 200),
+          tail: line.slice(-200),
+          sessionId: this.sessionId,
+        });
+      }
       return;
+    }
+
+    // A large line that *did* parse: note it (with method) so we can confirm
+    // big base64 payloads survive the transport intact. If we see a 256 KB+
+    // `item/completed` parse cleanly yet the render still yields no bytes, the
+    // loss is the backend's, not the pipe's.
+    if (line.length >= RPC_LARGE_LINE_LOG_MIN_BYTES) {
+      log.largeLine({
+        bytes: line.length,
+        method: msg.method,
+        hasResult: msg.result !== undefined,
+        sessionId: this.sessionId,
+      });
     }
 
     // Response to one of our calls
