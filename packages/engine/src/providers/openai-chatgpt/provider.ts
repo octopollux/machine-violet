@@ -388,6 +388,12 @@ export class OpenAIChatGptProvider implements LLMProvider {
       },
     );
 
+    // The render-timeout backstop. Held out here so the `finally` can clear it
+    // the instant the race settles — otherwise the timer survives a *successful*
+    // render and fires ~10min later, logging a bogus image_gen:timeout and
+    // rejecting an already-settled promise. In long-lived gameplay every
+    // successful render would leak one, making the timeout signal untrustworthy.
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
     try {
       // Reference images (PC portraits, opt-in per call) ride as `image`
       // input items ahead of the text, so the model sees them as visual
@@ -413,8 +419,8 @@ export class OpenAIChatGptProvider implements LLMProvider {
 
       const completed = await Promise.race([
         completion,
-        new Promise<never>((_, reject) =>
-          setTimeout(
+        new Promise<never>((_, reject) => {
+          timeoutHandle = setTimeout(
             () => {
               // Dump whatever arrived before the stall so a timeout is
               // diagnosable too — e.g. an imageGeneration item that started
@@ -434,8 +440,9 @@ export class OpenAIChatGptProvider implements LLMProvider {
               ));
             },
             OpenAIChatGptProvider.IMAGE_RENDER_TIMEOUT_MS,
-          ).unref(),
-        ),
+          );
+          timeoutHandle.unref();
+        }),
       ]);
 
       // Any terminal status other than "completed" (failed, interrupted, or
@@ -520,6 +527,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
         aspectUsed: aspect,
       };
     } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
       unsubItem();
       unsubCompleted();
     }
