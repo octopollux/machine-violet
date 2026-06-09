@@ -11,7 +11,7 @@
   "mood": "Tense, salt-and-candlelight",
   "difficulty": "Balanced",
   "calendar_display_format": "fantasy",
-  "detail": "A worked example of a *rich* seed — it ships inline NPCs, locations, factions, lore, an item, a small map, and a starting calendar, all of which the engine materializes into the campaign directory at creation. Treat it as a template you can copy when converting a played campaign into a seed.\n\nThe situation: two coastal houses, Holt and Vane, have feuded since the night of the Drowning Pact two generations ago. A marriage between Saoirse Holt and Edric Vane is supposed to end it. The wedding is tonight, at the Tideward Hall on the saltmarsh, and the bride is gone. The causeway floods within hours. Everyone has a reason to want the wedding stopped and a reason to want it to proceed, and nobody is telling the whole truth.\n\nDM approach:\n- Tone: candlelit, brackish, intimate. A locked-room mystery where the room is a flooding hall full of people who hate each other and have dressed up to pretend otherwise.\n- Pacing: few-sessions. The tide is the clock — describe it rising. Escalate from \"the bride is late\" to \"the bride is missing\" to \"the causeway is underwater.\"\n- The seeded NPCs all lie, but each lies about a different thing. Let the players catch them in it.\n- The starting location placeholder will be the Tideward Hall — begin the opening scene there.",
+  "detail": "The situation: two coastal houses, Holt and Vane, have feuded since the night of the Drowning Pact two generations ago. A marriage between Saoirse Holt and Edric Vane is supposed to end it. The wedding is tonight, at the Tideward Hall on the saltmarsh, and the bride is gone. The causeway floods within hours. Everyone has a reason to want the wedding stopped and a reason to want it to proceed, and nobody is telling the whole truth.\n\nDM approach:\n- Tone: candlelit, brackish, intimate. A locked-room mystery where the room is a flooding hall full of people who hate each other and have dressed up to pretend otherwise.\n- Pacing: few-sessions. The tide is the clock — describe it rising. Escalate from \"the bride is late\" to \"the bride is missing\" to \"the causeway is underwater.\"\n- The seeded NPCs all lie, but each lies about a different thing. Let the players catch them in it.\n- Begin the opening scene at the Tideward Hall.",
   "forks": [
     {
       "id": "crucial-question",
@@ -91,7 +91,7 @@
           "location": "[[The Tideward Hall]]",
           "disposition": "hostile"
         },
-        "body": "Edric's father and the man who reopened the feud a generation ago. He agreed to this marriage in public and has told three people in private that it will never happen.\n\n## What he's hiding (DM only)\nThe obvious suspect — which is exactly why the DM should decide carefully whether he's guilty (crucial-question option 2) or a loud decoy for someone quieter. He genuinely opposes the union. Whether he acted on it is the table's mystery to uncover."
+        "body": "Edric's father and the man who reopened the feud a generation ago. He agreed to this marriage in public and has told three people in private that it will never happen.\n\n## What he's hiding (DM only)\nThe obvious suspect — which is exactly why he may be a loud decoy for someone quieter. He genuinely opposes the union; whether he acted on it is the table's mystery to uncover."
       }
     },
     "locations": {
@@ -102,7 +102,7 @@
           "theme": "gothic",
           "additional_names": "The Hall"
         },
-        "body": "A long stone wedding hall raised on pilings over the saltmarsh, reached only by the [[The Saltmarsh Causeway]]. Candlelit, garlanded, and slowly filling with the smell of the rising tide through the floorboards. Two long tables — Holt on one side, Vane on the other, the aisle between them like a border.\n\nThe opening scene begins here. (If this campaign's starting-location placeholder still exists, it should be renamed to point at this hall.)"
+        "body": "A long stone wedding hall raised on pilings over the saltmarsh, reached only by the [[The Saltmarsh Causeway]]. Candlelit, garlanded, and slowly filling with the smell of the rising tide through the floorboards. Two long tables — Holt on one side, Vane on the other, the aisle between them like a border.\n\nThe opening scene begins here."
       },
       "the-saltmarsh-causeway": {
         "title": "The Saltmarsh Causeway",
@@ -144,7 +144,7 @@
           "type": "Item",
           "location": "[[The Tideward Hall]]"
         },
-        "body": "The Holt wedding ring — pale, rough, cut from a single block of hardened marsh-salt rather than metal. Worn by every Holt bride of the Pact. It is meant to be slipped onto the bride's finger at the vow.\n\n## DM only\nWhat the ring *is*, and what putting it on a bride actually does, is the heart of crucial-question option 1. Saoirse learned it. That's why she's gone."
+        "body": "The Holt wedding ring — pale, rough, cut from a single block of hardened marsh-salt rather than metal. Worn by every Holt bride of the Pact. It is meant to be slipped onto the bride's finger at the vow.\n\n## DM only\nWhat the ring *is*, and what putting it on a bride actually does, is the secret Saoirse learned. That's why she's gone."
       }
     }
   },
