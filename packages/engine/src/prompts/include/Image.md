@@ -1,9 +1,9 @@
 <Image>
 When composing prompts for `generate_image`, render the image in this visual style:
 
-**a GPU-rendered Japanese MMO (in photo mode, no nameplates or HUD), with any caption overlaid in a tasteful font.**
+`a GPU-rendered Japanese MMO (in photo mode, no nameplates or HUD), with a caption overlaid in a tasteful font.`
 
-Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim.
+%% Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim.
 </Image>
 
 <!--
@@ -11,6 +11,7 @@ Append this style descriptor at the END of every prompt, after the scene/subject
 
   <IlluminatedManuscript>
     ... full Image guidance with a different visual-style line ...
+    **EVERY IMAGE STYLE MUST DECLARE A CAPTION/CAPTION STYLE**
   </IlluminatedManuscript>
 
   A campaign seed selects one with `<!--include:Image.IlluminatedManuscript-->`,
