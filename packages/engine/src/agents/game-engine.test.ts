@@ -1015,7 +1015,9 @@ describe("GameEngine Scribe Integration", () => {
       })
       .mockImplementationOnce(async () => {
         order.push("scribe2:start");
-        return { summary: "", created: [], updated: [], entityDeltas: [], removedSlugs: [], usage: zero };
+        // A location-only write must NOT nudge the character pane (gating).
+        return { summary: "", created: ["loc"], updated: [], removedSlugs: [], usage: zero,
+          entityDeltas: [{ slug: "loc", name: "Loc", aliases: [], type: "location", path: "locations/loc/index.md" }] };
       });
 
     const tick = () => new Promise<void>((r) => setTimeout(r, 0));
@@ -1035,9 +1037,12 @@ describe("GameEngine Scribe Integration", () => {
     await engine.awaitPendingScribe();
     expect(order).toEqual(["scribe1:start", "scribe1:end", "scribe2:start"]);
 
-    // Effects landed: tree delta applied, and the sheet-cache nudge fired.
+    // Effects landed: both tree deltas applied; the sheet-cache nudge fired
+    // exactly once — for the character write (scribe1), NOT the location-only
+    // write (scribe2).
     expect(engine.getSceneManager().getEntityTree()["a"]).toBeDefined();
-    expect(log.tuiCommands.filter((c) => c.type === "character_sheet_changed").length).toBeGreaterThan(0);
+    expect(engine.getSceneManager().getEntityTree()["loc"]).toBeDefined();
+    expect(log.tuiCommands.filter((c) => c.type === "character_sheet_changed").length).toBe(1);
   });
 });
 

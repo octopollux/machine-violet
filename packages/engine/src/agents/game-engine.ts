@@ -1063,16 +1063,18 @@ export class GameEngine {
    * Execute a scene transition.
    */
   async transitionScene(title: string, timeAdvance?: number): Promise<void> {
-    // Barrier: a scene transition rebuilds the next scene's opening from
-    // persisted entity files + changelogs, so every detached scribe write must
-    // be flushed first. This is the consistency point the user named: scribes
-    // are non-blocking within a scene, but must complete before the scene
-    // advances. (Same-batch [scribe, scene_transition] is covered too — the
-    // scribe was just chained, and we await it here.)
-    await this.awaitPendingScribe();
     this.injectionRegistry.get<BehaviorInjection>("behavior")?.reset();
     this.injectionRegistry.get<HardStatsInjection>("hard-stats")?.reset();
+    // Arm the re-entrancy guard BEFORE the barrier: transitionScene is
+    // reachable from `waiting_input` (the server `/scene` command), so flushing
+    // while still input-accepting would let a concurrent processInput slip in
+    // and touch entity state mid-transition. setState to a non-input state
+    // first (as processInput does), THEN flush — a scene transition rebuilds
+    // the next scene's opening from persisted entity files + changelogs, so
+    // every detached scribe write must land first (non-blocking within a scene,
+    // flushed before it advances).
     this.setState("scene_transition");
+    await this.awaitPendingScribe();
 
     // The conversation is cleared on transition (sceneManager.stepPruneContext),
     // so the BP4 message cache is rebuilt anyway — the free moment to refresh the
@@ -1120,11 +1122,13 @@ export class GameEngine {
    * End the session.
    */
   async endSession(title: string, timeAdvance?: number): Promise<void> {
-    // Barrier: don't snapshot/close the session over a half-written scribe.
-    await this.awaitPendingScribe();
     this.injectionRegistry.get<BehaviorInjection>("behavior")?.reset();
     this.injectionRegistry.get<HardStatsInjection>("hard-stats")?.reset();
+    // Arm the guard before the barrier (endSession is reachable from
+    // `waiting_input` too): set the non-input state, THEN flush the detached
+    // scribe so we don't snapshot/close the session over a half-written write.
     this.setState("session_ending");
+    await this.awaitPendingScribe();
 
     try {
       const result = await this.sceneManager.sessionEnd(
@@ -1273,8 +1277,13 @@ export class GameEngine {
       // sheet is stale until it refetches. Nudge any open character pane to
       // re-pull. Bare signal (no payload): the bridge's default branch forwards
       // `tui:character_sheet_changed`, the client bumps a sheet epoch and
-      // re-fetches the active sheet on demand. Only when something was written.
-      if (result.created.length > 0 || result.updated.length > 0) {
+      // re-fetches the active sheet on demand. Gate on an actual character/player
+      // write — the pane only shows character sheets, so a location/item/faction
+      // edit shouldn't invalidate its cache.
+      const touchedSheet = result.entityDeltas.some(
+        (d) => d.type === "character" || d.type === "player",
+      );
+      if (touchedSheet) {
         this.callbacks.onTuiCommand?.({ type: "character_sheet_changed" });
       }
     } catch (e) {
@@ -1289,6 +1298,11 @@ export class GameEngine {
     const characterName = cmd.character as string;
     const context = cmd.context as string;
     if (!characterName) return;
+
+    // Barrier: promote reads + rewrites the character sheet and upserts the
+    // entity tree. A detached scribe may be rewriting the same files, so flush
+    // it first or the read tears / the writes clobber (last-writer-wins).
+    await this.awaitPendingScribe();
 
     const paths = campaignPaths(this.gameState.campaignRoot);
     const filePath = norm(paths.character(characterName));
