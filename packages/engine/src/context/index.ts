@@ -12,6 +12,6 @@ export type { CampaignLog, CampaignLogEntry } from "./campaign-log.js";
 export { initEngineLog, logEvent, closeEngineLog, resetEngineLog } from "./engine-log.js";
 export {
   initTraceLog, resetTraceLog, getTraceLogPath, setTraceSink,
-  withSpan, setSpanAttrs, currentSpan,
+  withSpan, setSpanAttrs, currentSpan, captureContext, runInContext,
 } from "./trace.js";
-export type { SpanKind, SpanContext, SpanRecord } from "./trace.js";
+export type { SpanKind, SpanContext, SpanRecord, TraceContext } from "./trace.js";

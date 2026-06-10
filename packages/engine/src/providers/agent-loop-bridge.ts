@@ -48,7 +48,7 @@ const DEFERRED_TUI_TYPES = new Set([
 import { normalizeTurn, type CapturedToolResult } from "./normalize-turn.js";
 import { dumpContext, dumpThinking } from "../config/context-dump.js";
 import { logEvent } from "../context/engine-log.js";
-import { withSpan, setSpanAttrs } from "../context/trace.js";
+import { withSpan, setSpanAttrs, captureContext, runInContext, type TraceContext } from "../context/trace.js";
 import { ContentRefusalError } from "@machine-violet/shared/types/errors.js";
 import { getEffortConfig } from "../config/models.js";
 import type { EffortLevel } from "../config/models.js";
@@ -289,6 +289,13 @@ export async function runProviderLoop(
   let roundsRun = 0;
   for (let round = 0; round < maxToolRounds; round++) {
     roundsRun++;
+    // Span context for this round's in-band tool dispatch, re-anchored below.
+    // codex keeps a persistent JSON-RPC connection whose dispatchTool callback,
+    // on every later turn, still runs inside the ALS context captured when the
+    // connection first opened (turn 1's first api_call). We pin it to the
+    // current round's api_call span (set inside that span just before the
+    // provider call) so tool + subagent spans land on the right turn.
+    let inbandCtx: TraceContext | undefined;
     // Tool dispatcher for providers that own tool dispatch internally
     // (currently openai-chatgpt). Wraps the same per-call logic the
     // bridge runs after this chat() returns for non-internal-dispatch
@@ -297,7 +304,7 @@ export async function runProviderLoop(
     // path the provider takes. Other providers (Anthropic, openai-apikey)
     // ignore this field and surface tool calls back through
     // ChatResult.toolCalls.
-    const dispatchTool: DispatchToolFn = async (call) => {
+    const dispatchTool: DispatchToolFn = async (call) => runInContext(inbandCtx, async () => {
       const dispatched = await dispatchToolCall(
         { id: call.id, name: call.name, input: call.input },
         config,
@@ -318,7 +325,7 @@ export async function runProviderLoop(
         is_error: dispatched.isError,
       });
       return { content: dispatched.content, isError: dispatched.isError };
-    };
+    });
 
     // ChatParams is a discriminated union: tools + dispatchTool are
     // either both present (this call uses tools) or both absent (text-only).
@@ -372,6 +379,10 @@ export async function runProviderLoop(
     const result: ChatResult = await withSpan(
       { kind: "api_call", name: config.name },
       async () => {
+    // Pin this round's in-band tool dispatch (codex) to this api_call span, so
+    // codex-dispatched tools nest under the round that triggered them rather
+    // than the stale context its persistent connection carries.
+    inbandCtx = captureContext();
     let res: ChatResult;
     // Number of tries it took to succeed (1 = first try). Assigned only on the
     // success path so there are no dead stores on retrying iterations.

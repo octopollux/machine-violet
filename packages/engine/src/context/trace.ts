@@ -113,6 +113,28 @@ export function currentSpan(): SpanContext | undefined {
   return als.getStore();
 }
 
+/** Opaque captured span context, re-entered later via {@link runInContext}. */
+export type TraceContext = ActiveSpan;
+
+/** Capture the currently-open span so async work can be re-anchored to it later. */
+export function captureContext(): TraceContext | undefined {
+  return als.getStore();
+}
+
+/**
+ * Run `fn` within a previously {@link captureContext}-d span, so spans opened
+ * inside it nest under that span regardless of the ALS context active at call
+ * time. Needed to re-anchor a provider's in-band tool dispatch: codex keeps a
+ * persistent JSON-RPC connection whose `dispatchTool` callback, on every later
+ * turn, still carries the ALS context captured when the connection first opened
+ * (turn 1's first api_call). Without re-anchoring, every codex-dispatched tool —
+ * and its whole subagent subtree — leaks onto turn 1. With it, each dispatch is
+ * pinned to the round that actually triggered it.
+ */
+export function runInContext<T>(ctx: TraceContext | undefined, fn: () => T): T {
+  return ctx ? als.run(ctx, fn) : fn();
+}
+
 /** Merge attributes into the currently-open span. No-op outside a span. */
 export function setSpanAttrs(attrs: Record<string, unknown>): void {
   const store = als.getStore();

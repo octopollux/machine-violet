@@ -6,8 +6,8 @@
  * Spans are captured in-memory via `setTraceSink` (no disk I/O), and the id
  * counter is reset per-test so parent/child assertions are deterministic.
  */
-import { withSpan, setSpanAttrs, currentSpan, resetTraceLog, setTraceSink } from "./trace.js";
-import type { SpanRecord } from "./trace.js";
+import { withSpan, setSpanAttrs, currentSpan, resetTraceLog, setTraceSink, captureContext, runInContext } from "./trace.js";
+import type { SpanRecord, TraceContext } from "./trace.js";
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
@@ -117,6 +117,41 @@ describe("trace", () => {
 
     await withSpan({ kind: "turn", name: "t2", campaignId: "x" }, async () => { /* */ });
     expect(spans[0].id).toBe(1);
+  });
+
+  it("runInContext re-anchors a span to a captured context, defeating a stale ambient one", async () => {
+    // Regression for the codex in-band dispatch leak: codex's persistent
+    // connection invokes dispatchTool inside the ALS context captured when it
+    // first opened (an early turn), so without re-anchoring every later tool
+    // leaks onto that turn. captureContext()/runInContext() pin the dispatch to
+    // the round that actually triggered it.
+    let captured: TraceContext | undefined;
+    await withSpan({ kind: "turn", name: "turn 2", campaignId: "demo" }, async () => {
+      await withSpan({ kind: "agent", name: "dm" }, async () => {
+        await withSpan({ kind: "api_call", name: "dm" }, async () => {
+          captured = captureContext(); // turn 2's api_call context
+        });
+      });
+    });
+
+    // Simulate the provider firing dispatchTool from a STALE outer context
+    // (an earlier turn) — re-anchored to turn 2's captured api_call.
+    await withSpan({ kind: "turn", name: "turn 1 (stale)", campaignId: "demo" }, async () => {
+      await runInContext(captured, async () => {
+        await withSpan({ kind: "tool", name: "search_campaign" }, async () => { /* */ });
+      });
+    });
+
+    const turn2 = spans.find((s) => s.kind === "turn" && s.name === "turn 2")!;
+    const apiCall = spans.find((s) => s.kind === "api_call")!;
+    const staleTurn = spans.find((s) => s.name === "turn 1 (stale)")!;
+    const tool = spans.find((s) => s.kind === "tool" && s.name === "search_campaign")!;
+
+    // The tool lands on turn 2's api_call (the captured context), NOT the stale
+    // turn it was lexically dispatched within.
+    expect(tool.parentId).toBe(apiCall.id);
+    expect(tool.turnId).toBe(turn2.id);
+    expect(tool.turnId).not.toBe(staleTurn.id);
   });
 
   it("root:true detaches from an enclosing span (own trace)", async () => {
