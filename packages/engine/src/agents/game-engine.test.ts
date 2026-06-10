@@ -944,6 +944,8 @@ describe("GameEngine Scribe Integration", () => {
     });
 
     await engine.processInput("Aldric", "I look at the orc.");
+    // The scribe runs detached now — settle it before asserting its effects.
+    await engine.awaitPendingScribe();
 
     // Should NOT forward scribe command to TUI
     expect(log.tuiCommands.filter((c) => c.type === "scribe")).toHaveLength(0);
@@ -975,12 +977,72 @@ describe("GameEngine Scribe Integration", () => {
     });
 
     await engine.processInput("Aldric", "I look around.");
+    // The scribe runs detached now — settle it before asserting its effects.
+    await engine.awaitPendingScribe();
 
     // The mock runScribe returns entityDeltas with grimjaw
     // Mid-scene upserts update the in-memory tree but not the DM snapshot
     const sm = engine.getSceneManager();
     expect(sm.getEntityTree()["grimjaw"]).toBeDefined();
     expect(sm.getEntityTree()["grimjaw"].name).toBe("Grimjaw");
+  });
+
+  it("runs scribes detached + serialized, flushed by awaitPendingScribe, and nudges the sheet cache", async () => {
+    const { callbacks, log } = mockCallbacks();
+    const engine = makeEngine({
+      provider: mockProvider([]),
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: mockFileIO(),
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    const zero = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 };
+    const order: string[] = [];
+    // Gate the first scribe so we can observe it running in the background while
+    // the turn (here: applyDeferredTuiCommands) has already returned.
+    let release1!: () => void;
+    const gate1 = new Promise<void>((r) => { release1 = r; });
+    vi.mocked(runScribe)
+      .mockImplementationOnce(async () => {
+        order.push("scribe1:start");
+        await gate1;
+        order.push("scribe1:end");
+        return { summary: "", created: ["a"], updated: [], removedSlugs: [], usage: zero,
+          entityDeltas: [{ slug: "a", name: "A", aliases: [], type: "character", path: "characters/a.md" }] };
+      })
+      .mockImplementationOnce(async () => {
+        order.push("scribe2:start");
+        // A location-only write must NOT nudge the character pane (gating).
+        return { summary: "", created: ["loc"], updated: [], removedSlugs: [], usage: zero,
+          entityDeltas: [{ slug: "loc", name: "Loc", aliases: [], type: "location", path: "locations/loc/index.md" }] };
+      });
+
+    const tick = () => new Promise<void>((r) => setTimeout(r, 0));
+
+    // Two deferred scribe batches back-to-back. Neither call blocks on the
+    // gated subagent — if the scribe were still awaited inline, the first
+    // `await` here would deadlock (gate1 is held).
+    await engine.applyDeferredTuiCommands([{ type: "scribe", updates: [{ visibility: "private", content: "first" }] }]);
+    await engine.applyDeferredTuiCommands([{ type: "scribe", updates: [{ visibility: "private", content: "second" }] }]);
+
+    // Detached + serialized: scribe1 is running (gated), scribe2 has NOT started.
+    await tick();
+    expect(order).toEqual(["scribe1:start"]);
+
+    // The barrier resolves only once the whole chain drains, in order.
+    release1();
+    await engine.awaitPendingScribe();
+    expect(order).toEqual(["scribe1:start", "scribe1:end", "scribe2:start"]);
+
+    // Effects landed: both tree deltas applied; the sheet-cache nudge fired
+    // exactly once — for the character write (scribe1), NOT the location-only
+    // write (scribe2).
+    expect(engine.getSceneManager().getEntityTree()["a"]).toBeDefined();
+    expect(engine.getSceneManager().getEntityTree()["loc"]).toBeDefined();
+    expect(log.tuiCommands.filter((c) => c.type === "character_sheet_changed").length).toBe(1);
   });
 });
 

@@ -65,6 +65,10 @@ export interface GameContextValue {
   // Provider remaining-usage snapshot (null when not on a usage-tracking provider).
   usageStatus: UsageStatus | null;
 
+  /** Monotonic sheet-invalidation counter. Bumped when a detached scribe
+   *  rewrites a PC sheet; the character pane refetches when it changes. */
+  sheetEpoch: number;
+
   // Terminal capabilities
   /** Whether the Kitty keyboard protocol is active (affects raw mode guardian). */
   hasKittyProtocol?: boolean;

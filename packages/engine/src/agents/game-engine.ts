@@ -177,6 +177,22 @@ export class GameEngine {
    */
   private portraitCommitChain: Promise<unknown> = Promise.resolve();
 
+  /**
+   * In-flight detached scribe(s). The scribe persists narrative events into
+   * entity files; the DM never consumes its result, yet it is the single
+   * largest chunk of player-facing turn latency (~half of an entity-heavy
+   * turn). So it runs fire-and-forget off the turn's critical path.
+   *
+   * Chained, not parallelized: consecutive scribes must serialize, because
+   * scribe N's entity-tree deltas have to land before scribe N+1 reads the
+   * tree for dedup. `awaitPendingScribe()` is the barrier at every point that
+   * reads or snapshots durable entity state — the next turn's context build,
+   * scene transition, session end, rollback — and the seam tests/teardown use
+   * to settle background work deterministically. The chain swallows errors so
+   * one failed scribe never poisons a later one or a barrier await.
+   */
+  private pendingScribe: Promise<void> = Promise.resolve();
+
   constructor(params: {
     provider: LLMProvider;
     gameState: GameState;
@@ -419,7 +435,17 @@ export class GameEngine {
       } else if (cmd.type === "rollback") {
         await this.rollbackAndExit(cmd.target as string);
       } else if (cmd.type === "scribe") {
-        await this.handleScribe(cmd);
+        // Detached: the DM doesn't need the scribe's result to keep narrating,
+        // and the scribe is ~half of player-facing turn latency. Chain (not
+        // parallelize) so scribes serialize — dedup needs scribe N's tree
+        // deltas applied before scribe N+1 reads. The `.catch` keeps a failed
+        // scribe from poisoning the chain or a later barrier await
+        // (handleScribe already swallows its own errors — belt & braces). The
+        // barrier in transitionScene/endSession/rollback (and at the next
+        // turn's start) flushes this before any durable entity read.
+        this.pendingScribe = this.pendingScribe
+          .catch(() => undefined)
+          .then(() => this.handleScribe(cmd));
       } else if (cmd.type === "promote_character") {
         await this.handlePromoteCharacter(cmd);
       } else if (cmd.type === "dm_notes") {
@@ -569,6 +595,16 @@ export class GameEngine {
 
     this.imageGenInFlight = 0;
     this.setState("dm_thinking");
+
+    // Barrier: the previous turn's scribe runs detached (see `pendingScribe`).
+    // Flush it before reading entity state for this turn — the DM context
+    // (entity registry + character sheets) and the next scribe's dedup both
+    // need the prior writes landed, and a concurrent read could otherwise tear
+    // a half-written sheet. Placed AFTER `setState("dm_thinking")` so the
+    // re-entrancy guard above is already armed before we yield on the await;
+    // usually a no-op, since the player's think-time dwarfs the scribe.
+    await this.awaitPendingScribe();
+
     const turnStartTime = Date.now();
     this.dmProvidedChoicesThisTurn = false;
     this.imagesEmittedThisTurn = [];
@@ -1029,7 +1065,16 @@ export class GameEngine {
   async transitionScene(title: string, timeAdvance?: number): Promise<void> {
     this.injectionRegistry.get<BehaviorInjection>("behavior")?.reset();
     this.injectionRegistry.get<HardStatsInjection>("hard-stats")?.reset();
+    // Arm the re-entrancy guard BEFORE the barrier: transitionScene is
+    // reachable from `waiting_input` (the server `/scene` command), so flushing
+    // while still input-accepting would let a concurrent processInput slip in
+    // and touch entity state mid-transition. setState to a non-input state
+    // first (as processInput does), THEN flush — a scene transition rebuilds
+    // the next scene's opening from persisted entity files + changelogs, so
+    // every detached scribe write must land first (non-blocking within a scene,
+    // flushed before it advances).
     this.setState("scene_transition");
+    await this.awaitPendingScribe();
 
     // The conversation is cleared on transition (sceneManager.stepPruneContext),
     // so the BP4 message cache is rebuilt anyway — the free moment to refresh the
@@ -1079,7 +1124,11 @@ export class GameEngine {
   async endSession(title: string, timeAdvance?: number): Promise<void> {
     this.injectionRegistry.get<BehaviorInjection>("behavior")?.reset();
     this.injectionRegistry.get<HardStatsInjection>("hard-stats")?.reset();
+    // Arm the guard before the barrier (endSession is reachable from
+    // `waiting_input` too): set the non-input state, THEN flush the detached
+    // scribe so we don't snapshot/close the session over a half-written write.
     this.setState("session_ending");
+    await this.awaitPendingScribe();
 
     try {
       const result = await this.sceneManager.sessionEnd(
@@ -1157,6 +1206,10 @@ export class GameEngine {
       this.callbacks.onError(new Error("Rollback unavailable: git is disabled for this campaign."));
       return;
     }
+    // Barrier: a git rollback rewrites entity files; let any detached scribe
+    // finish first so its writes are part of the snapshot being reverted (not
+    // racing the checkout).
+    await this.awaitPendingScribe();
     this.callbacks.onDevLog?.(`[dev] rollback: rolling back to "${target}"`);
     const result = await performRollback(this.repo, target, this.gameState.campaignRoot, this.fileIO);
     this.callbacks.onTuiCommand?.({ type: "show_rollback_summary", summary: result.summary });
@@ -1166,6 +1219,20 @@ export class GameEngine {
   // --- Validation ---
 
   // --- Worldbuilding Entity I/O ---
+
+  /**
+   * Barrier: await the in-flight detached scribe chain before reading or
+   * snapshotting durable entity state. Never throws (the chain is
+   * `.catch`-guarded and handleScribe swallows its own errors). Usually
+   * resolves instantly — by the time the player acts or the DM ends a scene
+   * the background scribe has long finished; it only actually blocks when a
+   * scribe overruns that gap, which is exactly when waiting is correct.
+   * Public so graceful teardown and deterministic tests can settle it (mirrors
+   * `awaitPendingPortraitRenders`).
+   */
+  async awaitPendingScribe(): Promise<void> {
+    await this.pendingScribe;
+  }
 
   /** Spawn the scribe subagent to process batched entity updates */
   private async handleScribe(cmd: TuiCommand): Promise<void> {
@@ -1204,6 +1271,21 @@ export class GameEngine {
       accUsage(this.sessionUsage, result.usage);
       this.callbacks.onUsageUpdate(result.usage, "small");
       this.callbacks.onDevLog?.(`[dev] scribe: ${result.summary}`);
+
+      // Now that the scribe runs detached, a PC sheet it rewrote (HP, inventory,
+      // conditions) may land seconds after the turn ended — the client's cached
+      // sheet is stale until it refetches. Nudge any open character pane to
+      // re-pull. Bare signal (no payload): the bridge's default branch forwards
+      // `tui:character_sheet_changed`, the client bumps a sheet epoch and
+      // re-fetches the active sheet on demand. Gate on an actual character/player
+      // write — the pane only shows character sheets, so a location/item/faction
+      // edit shouldn't invalidate its cache.
+      const touchedSheet = result.entityDeltas.some(
+        (d) => d.type === "character" || d.type === "player",
+      );
+      if (touchedSheet) {
+        this.callbacks.onTuiCommand?.({ type: "character_sheet_changed" });
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       logEvent("subagent:error", { name: "scribe", message: msg, durationMs: Date.now() - subStart });
@@ -1216,6 +1298,11 @@ export class GameEngine {
     const characterName = cmd.character as string;
     const context = cmd.context as string;
     if (!characterName) return;
+
+    // Barrier: promote reads + rewrites the character sheet and upserts the
+    // entity tree. A detached scribe may be rewriting the same files, so flush
+    // it first or the read tears / the writes clobber (last-writer-wins).
+    await this.awaitPendingScribe();
 
     const paths = campaignPaths(this.gameState.campaignRoot);
     const filePath = norm(paths.character(characterName));

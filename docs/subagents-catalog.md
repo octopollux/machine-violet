@@ -241,6 +241,8 @@ Autonomous entity file manager. Receives batched natural-language updates tagged
 
 **Returns**: Terse summary of entities created/updated. Usage stats accumulated to session total.
 
+**Execution — detached, off the turn's critical path.** The DM never consumes the scribe's result, yet the scribe is ~half of an entity-heavy turn's wall-clock (its file I/O is sub-millisecond — the cost is the small-model round-trip). So `applyDeferredTuiCommands` does **not** await it: the turn ends, prose and choices land, and the player can act while the scribe persists entities in the background (`GameEngine.pendingScribe`). Consecutive scribes are **chained, not parallelized**, so scribe N's entity-tree deltas land before scribe N+1 reads the tree for dedup. `awaitPendingScribe()` is the barrier at every point that reads or snapshots durable entity state — the **next turn's context build**, a **`promote_character`** subagent (it rewrites the same sheets), **scene transition**, **session end**, and **rollback**. Each barrier sets its non-input engine state *before* awaiting (e.g. `setState("dm_thinking")` / `"scene_transition")`), so the re-entrancy guard is armed before the await yields and a concurrent `processInput` can't slip in to tear a half-written sheet. On completion the scribe emits a bare `character_sheet_changed` TUI command — gated on an actual character/player write (not locations/items) — so an open character pane drops its cached sheet and refetches the late write. See `handleScribe` / `awaitPendingScribe` in `game-engine.ts`.
+
 ---
 
 ### 6c. Campaign Search Subagent
