@@ -56,6 +56,33 @@ mkdirSync(DIST, { recursive: true });
 // --- Step 1: esbuild bundle ---
 console.log("  Bundling with esbuild...");
 
+// `sixel/upng.js` opens with `module.exports = UPNG = {};` — an assignment to
+// an *undeclared* `UPNG`, i.e. an implicit global. Node loads that file as a
+// sloppy-mode CommonJS module in dev, where implicit globals are legal, so it
+// works. But esbuild emits this whole bundle as a single ESM module
+// (`format: "esm"`), and ESM is always strict mode — strictness propagates into
+// esbuild's CJS module wrappers, so the implicit-global assignment throws
+// `ReferenceError: UPNG is not defined` the moment the packaged binary touches
+// sixel (i.e. on first image render). Declare `UPNG` so the assignment binds a
+// module-scoped local instead. Fails loudly if upstream sixel changes the line,
+// so we re-check the shim rather than silently ship a broken binary.
+const fixSixelUpngGlobal = {
+  name: "fix-sixel-upng-global",
+  setup(b) {
+    b.onLoad({ filter: /[\\/]sixel[\\/]upng\.js$/ }, (args) => {
+      const original = readFileSync(args.path, "utf-8");
+      const needle = "module.exports = UPNG = {};";
+      if (!original.includes(needle)) {
+        throw new Error(
+          `fix-sixel-upng-global: expected "${needle}" in ${args.path}. ` +
+            `sixel upstream changed — re-verify whether this shim is still needed.`,
+        );
+      }
+      return { contents: original.replace(needle, `var UPNG;\n${needle}`), loader: "js" };
+    });
+  },
+};
+
 await build({
   entryPoints: [join(ROOT, "scripts/launcher.ts")],
   bundle: true,
@@ -65,6 +92,7 @@ await build({
   format: "esm",
   jsx: "automatic",
   external: ["node:*"],
+  plugins: [fixSixelUpngGlobal],
   define: {
     "process.env.MV_VERSION": JSON.stringify(version),
     "process.env.MV_RELEASE_DATE": JSON.stringify(releaseDate),

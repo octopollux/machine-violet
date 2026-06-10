@@ -415,13 +415,16 @@ export function PlayingPhase() {
       return;
     }
 
-    if (activeChoices) return;
-
-    // Tab: toggle character pane
+    // Tab: toggle the quick-view character pane. Handled before the choices
+    // guard below so the quick view stays reachable while a choice overlay is
+    // on screen — the overlay keeps arrow/Enter for selection, so the two
+    // don't conflict (see #541).
     if (key.tab) {
       setCharacterPaneOpen((prev) => !prev);
       return;
     }
+
+    if (activeChoices) return;
 
     // In OOC/Dev mode: ESC exits
     if (mode === "ooc" || mode === "dev") {

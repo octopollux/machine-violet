@@ -39,6 +39,13 @@ This project maintains a closed loop between code and documentation. When you ch
 2. If it's a new modal type, add to [tui-design.md](tui-design.md)
 3. Add to the tui section of [docs/module-map.md](module-map.md)
 
+### Changing the DM formatting pipeline / vocabulary
+
+1. Add/alter the tag in the `FormattingTag` union in `packages/shared/src/types/tui.ts` (the single source of truth) and handle it in both renderers — `render-nodes.tsx` (Ink) and `commands/transcript.ts` (HTML) — plus the node-walkers in `formatting.ts`
+2. Map any dialect/synonym for it in `packages/client-ink/src/tui/narrative/normalize.ts`
+3. Teach it in the `<formatting>` block of `packages/engine/src/prompts/dm-directives.md` and update the tag list + pipeline stages in [tui-design.md](tui-design.md)
+4. Extend the invariant harness (`packages/client-ink/src/tui/narrative/harness/`): add a fixture and, if it's a new construct, a generator production. Run `npx vitest run packages/client-ink/src/tui/narrative/` and the soak (`MV_FORMAT_SOAK=1`, and `MV_LIVE_CORPUS=<dir>` against real campaigns) — zero violations is the gate
+
 ### Changing the scene transition cascade
 
 1. Update step list in [state-atlas.md](state-atlas.md) (section 6)

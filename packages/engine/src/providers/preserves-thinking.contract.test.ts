@@ -15,9 +15,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
-import type { ChatParams, ContentPart, NormalizedMessage } from "./types.js";
-import { TurnCollector, messageToResponsesItems } from "./openai-chatgpt/provider.js";
-import type { RawResponseItemCompletedNotification } from "./openai-chatgpt/protocol.js";
+import type { ChatParams, ContentPart } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Provider registry — one entry per `conn.provider` enum value
@@ -51,7 +49,12 @@ const PROVIDERS: ProviderContract[] = [
   { name: "openai-apikey" },    // wired below
   { name: "openrouter", unsupportedReason: "shares the Responses-API path with openai-apikey; covered by that entry" },
   { name: "custom", unsupportedReason: "Chat Completions API has no opaque reasoning blob; see openai.ts comment" },
-  { name: "openai-chatgpt" },   // wired below
+  {
+    name: "openai-chatgpt",
+    unsupportedReason:
+      "codex emits no encrypted reasoning items on the ChatGPT-account path " +
+      "(live-verified, #597), so #533's codex replay was a no-op and was removed (#607)",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -93,6 +96,23 @@ const mockResponsesCreate: ReturnType<typeof vi.fn> = openaiMod.__mockResponses.
 const { createAnthropicProvider } = await import("./anthropic.js");
 const { createOpenAIProvider } = await import("./openai.js");
 
+/**
+ * Shape the Anthropic `messages.create` mock to mirror the real SDK: the
+ * provider consumes the call via `.withResponse()` (to read rate-limit
+ * headers), so the mock returns an object exposing that method rather than a
+ * bare resolved Message. Headers are empty here — header capture is exercised
+ * in anthropic.usage.test.ts.
+ */
+function mockAnthropicResponse(message: unknown): void {
+  mockAnthropicCreate.mockReturnValue({
+    withResponse: () => Promise.resolve({
+      data: message,
+      response: { headers: new Headers() },
+      request_id: "req_test",
+    }),
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Per-provider wiring
 // ---------------------------------------------------------------------------
@@ -124,13 +144,13 @@ anthropicEntry.captureTurn1 = async () => {
       { type: "text", text: "4" },
     ],
   } as unknown as Anthropic.Message;
-  mockAnthropicCreate.mockResolvedValue(fakeMsg);
+  mockAnthropicResponse(fakeMsg);
   const provider = createAnthropicProvider("test-key");
   const result = await provider.chat(baseParams({ messages: [{ role: "user", content: "2+2?" }] }));
   return { assistantContent: result.assistantContent, thinkingText: result.thinkingText };
 };
 anthropicEntry.encodeTurn2 = async (turn1Content) => {
-  mockAnthropicCreate.mockResolvedValue({
+  mockAnthropicResponse({
     id: "msg_2", model: "claude-opus-4-7", role: "assistant", type: "message",
     stop_reason: "end_turn", usage: { input_tokens: 10, output_tokens: 5 },
     content: [{ type: "text", text: "6" }],
@@ -215,40 +235,12 @@ openaiEntry.assertReplayed = (encoded) => {
 
 // --- openai-chatgpt ---
 //
-// The codex provider talks to a subprocess and full-provider mocking would
-// require shimming the rpc + auth + binary modules. We test the same contract
-// at the natural unit-level pair instead: TurnCollector consumes the
-// notifications, messageToResponsesItems is what `splitHistoryAndUserInput`
-// calls to encode injected history. Together they prove the same round-trip.
-
-const codexEntry = PROVIDERS.find((p) => p.name === "openai-chatgpt")!;
-codexEntry.captureTurn1 = async () => {
-  const c = new TurnCollector();
-  const note: RawResponseItemCompletedNotification = {
-    threadId: "t1", turnId: "turn_1",
-    item: {
-      type: "reasoning", id: "rs_codex",
-      encrypted_content: "enc-codex-1",
-      summary: [{ type: "summary_text", text: "Pondered." }],
-    },
-  };
-  c.onRawResponseItem(note);
-  c.onItemCompleted({ threadId: "t1", turnId: "turn_1", completedAtMs: 0,
-    item: { id: "msg_1", type: "agentMessage", text: "4" } });
-  const result = c.toChatResult({ threadId: "t1",
-    turn: { id: "turn_1", status: "completed", durationMs: 1, completedAt: 1 } });
-  return { assistantContent: result.assistantContent, thinkingText: result.thinkingText };
-};
-codexEntry.encodeTurn2 = async (turn1Content) => {
-  const msg: NormalizedMessage = { role: "assistant", content: turn1Content };
-  return messageToResponsesItems(msg);
-};
-codexEntry.assertReplayed = (encoded) => {
-  const items = encoded as { type: string; id?: string; encrypted_content?: string }[];
-  const reasoningItems = items.filter((i) => i.type === "reasoning");
-  expect(reasoningItems).toHaveLength(1);
-  expect(reasoningItems[0]).toMatchObject({ id: "rs_codex", encrypted_content: "enc-codex-1" });
-};
+// Not wired: codex preserves no reasoning across turns on the ChatGPT-account
+// path — it emits no encrypted reasoning items at all (live-verified, #597), so
+// #533's codex replay was a no-op and was removed (#607). Registered above with
+// `unsupportedReason`; the "unsupported providers are explicitly documented"
+// test below is its coverage. If a ZDR/enterprise ChatGPT login ever surfaces
+// real encrypted reasoning items, re-add the capture+replay and wire this entry.
 
 // ---------------------------------------------------------------------------
 // Contract test

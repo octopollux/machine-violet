@@ -148,25 +148,33 @@ The DM can use a small set of inline tags in narration for dramatic effect. Thes
 
 Available tags:
 - `<b>`, `<i>`, `<u>` — bold, italic, underline
+- `<code>` — inline monospace (rendered dim), for diegetic system text / identifiers
 - `<sub>`, `<sup>` — subscript, superscript (rendered via Unicode substitution in `render-nodes.tsx`; chars without a Unicode equivalent pass through unchanged)
-- `<center>`, `<right>` — text justification (default is left)
+- `<center>`, `<right>` — text justification (default is left); the content **wraps** to terminal width
+- `<quote>` — a block-level set-apart passage (letter, inscription, readout): split onto its own line and rendered as an indented block with a left rule (`▏`), content wrapped to width minus the rule. Multi-line via `<br>`. Deliberately **not** Markdown `>` (which collides with the player display-log marker).
+- `<br>` — a hard line break, a contentless `linebreak` leaf; inside an alignment or quote block it splits a multi-line sign into independent rows
 - `<color=#hex>` — hex color (e.g., `<color=#cc0000>The King has died.</color>`)
 
-The DM prompt includes one line: *"You can use `<b>`, `<i>`, `<u>`, `<sub>`, `<sup>`, `<center>`, `<right>`, and `<color=#hex>` tags in your narration for dramatic effect. Use sparingly."*
+The DM contract (`packages/engine/src/prompts/dm-directives.md`, `<formatting>` block) teaches this set. The tag vocabulary is defined once by the `FormattingTag` union in `packages/shared/src/types/tui.ts`.
 
-Unrecognized tags are stripped. Malformed tags render as plain text. This is cosmetic — no tag changes game state.
+**Markdown lists** are a tolerated block construct (not a tag): a line beginning `- `/`* ` or `N.`/`N)` becomes a `kind: "list"` row with a resolved marker (`•` or the literal number) and a hanging indent, content wrapped to width minus the indent. Consecutive items render tight (the `appendDelta` spacer between them is collapsed); nesting is intentionally flattened. Markers/indent are renderer-side decoration carried on `ProcessedLine.listMarker`/`listIndent`.
+
+Anything tag-shaped but outside the vocabulary is **stripped to its content** — it never renders as literal markup (the no-leak guarantee). Dialect synonyms (`<strong>`→`<b>`, `<em>`→`<i>`, `<h1-6>`→bold, `<blockquote>`→`<quote>`, attribute variants, a little inline Markdown) are mapped onto the canonical set first, by `narrative/normalize.ts`. A bare `<` that isn't a tag (`3 < 5`, `<3`) stays literal. None of this changes game state.
 
 ### Formatting Pipeline
 
 All DM text processing flows through `processNarrativeLines(lines, width, quoteColor?) → ProcessedLine[]`:
 
-1. **Heal** cross-line tags on raw strings (all formatting tags persist across source lines; only real paragraph boundaries — blank DM lines from `\n\n` — reset the tag stack; visual spacers from single `\n` don't reset)
-2. **Parse** healed text into `FormattingNode[]` AST via `parseFormatting`
-3. **Wrap** each AST at terminal width via `wrapNodes` (tags never break across lines)
-4. **Pad** alignment lines (`<center>`, `<right>`) with blank lines for breathing room
-5. **Quote highlight** with paragraph-scoped reset (blank DM lines reset quote state)
+1. **Normalize** each DM line's dialect into the canonical vocabulary (`narrative/normalize.ts`) before anything else, then **tighten lists** (drop the `appendDelta` spacer between adjacent list items)
+2. **Heal** cross-line tags on raw strings (all formatting tags persist across source lines; only real paragraph boundaries — blank DM lines from `\n\n` — reset the tag stack; visual spacers from single `\n` don't reset; `<br>` is a leaf and does **not** reset the stack). List items are detected here, healed self-contained (marker lifted to metadata), and reset the heal stack.
+3. **Parse** healed text into `FormattingNode[]` AST via `parseFormatting`
+4. **Layout** each line into width-safe physical rows by DISPLAY width via `narrative/layout.ts` (`layoutRuns`): wraps by terminal columns using the real `string-width`, hard-breaks an overlong token, splits a run on `<br>`, and wraps aligned/quote blocks (each to width minus its rule/indent) and list items (to width minus the hanging indent). Tags never break across rows. (The legacy `wrapNodes` measures code units and is retained only for the modals.)
+5. **Frame** block groups (`<center>`, `<right>`, `<quote>`) with blank lines for breathing room (consecutive rows of one block are not split)
+6. **Quote highlight** with paragraph-scoped reset (blank DM lines reset quote state)
 
 Non-DM lines (player, dev, system) pass through without entering the formatting pipeline.
+
+The contract is pinned by an invariant harness (`narrative/harness/`) that runs the real pipeline over synthetic fixtures, a seeded generator of legal documents, and the committed/live campaign corpus, asserting no-leak, width-safety (real display width), content preservation, well-formedness, alignment, and cache-transparent determinism at every width. See [e2e-harness.md](e2e-harness.md).
 
 ### Quote Highlighting
 
@@ -584,6 +592,7 @@ The character pane is a right-side overlay (Tab toggle) that shows the active ch
 
 **Behavior:**
 - Toggled with Tab (or via key hints indicator in the Player Pane top-right)
+- Tab stays available while a choice overlay is on screen — the quick view opens over the narrative and the overlay keeps arrow/Enter for selection, so the two don't conflict (the Tab toggle is handled ahead of the choices input guard)
 - 35-column fixed-width panel, right-aligned over the narrative area
 - Lazy-fetches the character sheet on first open via `GET /session/character/:name` (returns `{ name, content }`)
 - Caches content across toggles; cache invalidates when the active player changes
@@ -771,7 +780,7 @@ Toggle items display `ON` (green) or `OFF` (dim) as a suffix. The version string
 
 A full-screen out-of-game wizard (root title: "AI Connections") for managing LLM provider connections and model tier assignments, reached from Settings → API Keys. It uses `FullScreenFrame` for all sub-screens. The root menu has four items selectable with arrow keys + Enter; Escape from any sub-screen returns to the parent.
 
-**Connections list** — shows all configured connections. Each row displays a health indicator (`✔` valid / `⚠` rate-limited / `✘` invalid / `?` unchecked, color-coded), the connection label, provider, and model count. When a live usage snapshot is available (active Codex session), per-connection usage segments appear indented below the row — each segment shows label, value (percentage, balance, or token count), and a relative reset timer. Usage is fetched for all connections on mount and refreshed every 30 seconds. Hotkeys: `R` = recheck health, `D` = delete.
+**Connections list** — shows all configured connections. Each row displays a health indicator (`✔` valid / `⚠` rate-limited / `✘` invalid / `?` unchecked, color-coded), the connection label, provider, and model count. When a live usage snapshot is available (an active session backing that connection — Codex's plan rate-limit windows, or an Anthropic key's request/token rate-limit quota parsed from `anthropic-ratelimit-*` response headers), per-connection usage segments appear indented below the row — each segment shows label, value (percentage, balance, or token count), and a relative reset timer when the segment carries a reset time (Codex windows do; the Anthropic header-derived segments don't). Usage is fetched for all connections on mount and refreshed every 30 seconds. Hotkeys: `R` = recheck health, `D` = delete.
 
 **Model Assignments** — shows the three model tiers (Large: DM narration, Medium: OOC / AI players, Small: mechanical tasks). Each tier displays the currently assigned model and connection label. Enter on a tier enters the model picker, which lists all models from all connections; Enter there assigns the selected model + connection to that tier.
 
