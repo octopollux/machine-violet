@@ -32,6 +32,10 @@ function useSpans(
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Clear any prior campaign's failure so the UI reflects the current fetch
+    // lifecycle (otherwise a stale "Failed to load spans" can flash while the
+    // newly-selected campaign is still loading).
+    setError(null);
     if (!campaignSlug) {
       setSpans(null);
       return;
@@ -199,7 +203,7 @@ export function TimelineView({
         {segments.length > 0 && <span style={{ color: "var(--text-muted)" }}>{segments.length} turns</span>}
         <button onClick={() => setZoomIndex((i) => Math.max(0, i - 1))} disabled={zoomIndex === 0}>−</button>
         <span style={{ color: "var(--text-muted)", minWidth: 56, textAlign: "center" }}>
-          {pxPerMs >= 0.1 ? `${(pxPerMs * 1000).toFixed(0)}px/s` : `${(pxPerMs * 1000).toFixed(0)}px/s`}
+          {`${(pxPerMs * 1000).toFixed(0)}px/s`}
         </span>
         <button
           onClick={() => setZoomIndex((i) => Math.min(ZOOM_LEVELS.length - 1, i + 1))}

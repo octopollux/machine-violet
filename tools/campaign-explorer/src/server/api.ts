@@ -164,7 +164,9 @@ export function createApiRouter(
   // Spans: the per-turn flame-chart data from trace.jsonl, filtered to one
   // campaign. A single turn produces dozens of spans, so the cap is far higher
   // than api-calls. A last-N tail can split the oldest turn across the boundary;
-  // the client drops any turnId group that's missing its kind:"turn" root.
+  // the client (buildSegments) drops any turnId group missing its root span
+  // (the one with parentId === null), which also keeps detached `background`
+  // roots rather than only `turn` roots.
   router.get("/engine-log/spans", async (req, res) => {
     const campaign = typeof req.query.campaign === "string" ? req.query.campaign : undefined;
     const limit = Math.max(1, Math.min(20000, Number(req.query.limit) || 5000));
