@@ -207,6 +207,31 @@ function mockFileIO(): FileIO {
   };
 }
 
+/** Real solid-color PNG bytes — valid input for sharp / loadCharacterReferences. */
+async function pngBytes(size: number, rgb: { r: number; g: number; b: number }): Promise<Uint8Array> {
+  return new Uint8Array(await sharp({ create: { width: size, height: size, channels: 3, background: rgb } }).png().toBuffer());
+}
+
+/** FileIO backed by an in-memory binary `store` (plus the text mockFileIO behavior). */
+function binaryFileIO(store: Map<string, Uint8Array>): FileIO {
+  return {
+    ...mockFileIO(),
+    exists: vi.fn(async (p: string) => store.has(norm(p)) || norm(p) in files || dirs.has(norm(p))),
+    readBinaryFile: vi.fn(async (p: string) => {
+      const k = norm(p);
+      if (!store.has(k)) throw new Error(`ENOENT: ${p}`);
+      return store.get(k)!;
+    }),
+    writeBinaryFile: vi.fn(async (p: string, b: Uint8Array) => { store.set(norm(p), b); }),
+    listDir: vi.fn(async (p: string) => {
+      const prefix = norm(p) + "/";
+      const names = new Set<string>();
+      for (const k of store.keys()) if (k.startsWith(prefix)) names.add(k.slice(prefix.length).split("/")[0]);
+      return [...names];
+    }),
+  };
+}
+
 interface CallbackLog {
   states: EngineState[];
   narrativeDeltas: string[];
@@ -372,26 +397,22 @@ describe("GameEngine", () => {
     const paths = campaignPaths("/tmp/test-campaign");
     const portraitPath = norm(paths.characterPortrait("Aldric"));
     const archivePath = norm(paths.characterPortraitArchive("Aldric", 1));
-    // Backing store with Aldric's existing portrait (a real PNG so the
-    // reference/downscale paths work).
     const store = new Map<string, Uint8Array>();
-    const makePng = async (size: number, rgb: { r: number; g: number; b: number }) =>
-      new Uint8Array(await sharp({ create: { width: size, height: size, channels: 3, background: rgb } }).png().toBuffer());
-    store.set(portraitPath, await makePng(64, { r: 1, g: 2, b: 3 }));
-    const renderedPng = await makePng(800, { r: 200, g: 40, b: 40 });
+    store.set(portraitPath, await pngBytes(64, { r: 1, g: 2, b: 3 }));
+    const renderedPng = await pngBytes(800, { r: 200, g: 40, b: 40 });
 
     const capturedMessages: NormalizedMessage[][] = [];
+    // A change with a newline + quote, to exercise marker sanitization.
+    const change = 'left boot torn off,\nbare foot "muddy"';
     const responses: ChatResult[] = [
-      // Turn 1: the DM calls update_portrait, then narrates.
       {
         text: "",
-        toolCalls: [{ id: "t1", name: "update_portrait", input: { character: "Aldric", change: "left boot torn off" } }],
+        toolCalls: [{ id: "t1", name: "update_portrait", input: { character: "Aldric", change } }],
         usage: mockUsage(),
         stopReason: "tool_use",
-        assistantContent: [{ type: "tool_use", id: "t1", name: "update_portrait", input: { character: "Aldric", change: "left boot torn off" } }],
+        assistantContent: [{ type: "tool_use", id: "t1", name: "update_portrait", input: { character: "Aldric", change } }],
       },
       textMessage("Aldric's boot is wrenched off in the dark."),
-      // Turn 2: plain narration.
       textMessage("He limps onward."),
     ];
     let idx = 0;
@@ -411,27 +432,10 @@ describe("GameEngine", () => {
       generateImage,
     } as unknown as LLMProvider;
 
-    const fileIO: FileIO = {
-      ...mockFileIO(),
-      exists: vi.fn(async (p: string) => store.has(norm(p)) || norm(p) in files || dirs.has(norm(p))),
-      readBinaryFile: vi.fn(async (p: string) => {
-        const k = norm(p);
-        if (!store.has(k)) throw new Error(`ENOENT: ${p}`);
-        return store.get(k)!;
-      }),
-      writeBinaryFile: vi.fn(async (p: string, b: Uint8Array) => { store.set(norm(p), b); }),
-      listDir: vi.fn(async (p: string) => {
-        const prefix = norm(p) + "/";
-        const names = new Set<string>();
-        for (const k of store.keys()) if (k.startsWith(prefix)) names.add(k.slice(prefix.length).split("/")[0]);
-        return [...names];
-      }),
-    };
-
     const { callbacks } = mockCallbacks();
     const engine = makeEngine({
       provider, gameState: mockState(), scene: mockScene(), sessionState: mockSessionState(),
-      fileIO, callbacks, model: "claude-haiku-4-5-20251001",
+      fileIO: binaryFileIO(store), callbacks, model: "claude-haiku-4-5-20251001",
     });
 
     // Turn 1: DM fires update_portrait; the render runs in the background.
@@ -451,7 +455,106 @@ describe("GameEngine", () => {
     expect(Array.isArray(lastUser.content)).toBe(true);
     const parts = lastUser.content as { type: string; mimeType?: string; label?: string; text?: string }[];
     expect(parts.find((p) => p.type === "image_input")).toMatchObject({ type: "image_input", mimeType: "image/webp", label: "Aldric" });
-    expect(parts.find((p) => p.type === "text" && /portrait_updated/.test(p.text ?? ""))).toBeDefined();
+    // The marker is present and sanitized — single line, no raw quote that could
+    // break the pseudo-XML frame.
+    const marker = parts.find((p) => p.type === "text" && /portrait_updated/.test(p.text ?? ""))!;
+    expect(marker).toBeDefined();
+    expect(marker.text).not.toContain("\n"); // newline collapsed
+    expect(marker.text).toContain("left boot torn off");
+    expect(marker.text).toContain("bare foot muddy"); // inner quotes stripped, not the tag's own
+  });
+
+  it("update_portrait serializes concurrent revisions so archived history isn't clobbered", async () => {
+    const paths = campaignPaths("/tmp/test-campaign");
+    const portraitPath = norm(paths.characterPortrait("Aldric"));
+    const store = new Map<string, Uint8Array>();
+    store.set(portraitPath, await pngBytes(64, { r: 0, g: 0, b: 0 }));
+    // Two renders, distinct bytes; a small delay so both are in flight at once.
+    const outs = [await pngBytes(80, { r: 200, g: 0, b: 0 }), await pngBytes(80, { r: 0, g: 0, b: 200 })];
+    let call = 0;
+    const generateImage = vi.fn(async () => {
+      const i = call++;
+      await new Promise((r) => setTimeout(r, 3));
+      return { base64: Buffer.from(outs[i]).toString("base64"), mimeType: "image/png" as const, effortUsed: "standard" as const, aspectUsed: "portrait" as const };
+    });
+    // Two update_portrait tool calls in ONE turn → dispatched concurrently.
+    const responses: ChatResult[] = [
+      {
+        text: "",
+        toolCalls: [
+          { id: "t1", name: "update_portrait", input: { character: "Aldric", change: "boot lost" } },
+          { id: "t2", name: "update_portrait", input: { character: "Aldric", change: "scarf added" } },
+        ],
+        usage: mockUsage(),
+        stopReason: "tool_use",
+        assistantContent: [
+          { type: "tool_use", id: "t1", name: "update_portrait", input: { character: "Aldric", change: "boot lost" } },
+          { type: "tool_use", id: "t2", name: "update_portrait", input: { character: "Aldric", change: "scarf added" } },
+        ],
+      },
+      textMessage("Both changes settle."),
+    ];
+    let idx = 0;
+    const provider = {
+      providerId: "mock",
+      chat: vi.fn(async () => responses[idx++]),
+      stream: vi.fn(async () => responses[idx++]),
+      healthCheck: vi.fn(async () => ({ ok: true })),
+      getCapabilities: () => ({ imageGeneration: true, thinking: false, tools: true, streaming: true, caching: false }),
+      generateImage,
+    } as unknown as LLMProvider;
+
+    const { callbacks } = mockCallbacks();
+    const engine = makeEngine({
+      provider, gameState: mockState(), scene: mockScene(), sessionState: mockSessionState(),
+      fileIO: binaryFileIO(store), callbacks, model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "Two things happen at once.");
+    await engine.awaitPendingPortraitRenders();
+
+    // Both revisions archived to DISTINCT versions — neither overwrote the other.
+    const v1 = store.get(norm(paths.characterPortraitArchive("Aldric", 1)));
+    const v2 = store.get(norm(paths.characterPortraitArchive("Aldric", 2)));
+    expect(v1).toBeDefined();
+    expect(v2).toBeDefined();
+    expect([...v1!]).not.toEqual([...v2!]);
+  });
+
+  it("update_portrait errors before rendering when persistence is unavailable", async () => {
+    const generateImage = vi.fn(async () => ({ base64: "AAA=", mimeType: "image/png" as const, effortUsed: "standard" as const, aspectUsed: "portrait" as const }));
+    const responses: ChatResult[] = [
+      {
+        text: "",
+        toolCalls: [{ id: "t1", name: "update_portrait", input: { character: "Aldric", change: "new hat" } }],
+        usage: mockUsage(),
+        stopReason: "tool_use",
+        assistantContent: [{ type: "tool_use", id: "t1", name: "update_portrait", input: { character: "Aldric", change: "new hat" } }],
+      },
+      textMessage("Nothing persists."),
+    ];
+    let idx = 0;
+    const provider = {
+      providerId: "mock",
+      chat: vi.fn(async () => responses[idx++]),
+      stream: vi.fn(async () => responses[idx++]),
+      healthCheck: vi.fn(async () => ({ ok: true })),
+      getCapabilities: () => ({ imageGeneration: true, thinking: false, tools: true, streaming: true, caching: false }),
+      generateImage,
+    } as unknown as LLMProvider;
+
+    const { callbacks } = mockCallbacks();
+    const engine = makeEngine({
+      provider, gameState: mockState(), scene: mockScene(), sessionState: mockSessionState(),
+      fileIO: mockFileIO(), // no writeBinaryFile
+      callbacks, model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "Change something.");
+    await engine.awaitPendingPortraitRenders();
+
+    // Guarded before spending a paid render we couldn't persist.
+    expect(generateImage).not.toHaveBeenCalled();
   });
 
   it("update_portrait with no existing portrait errors and renders nothing", async () => {

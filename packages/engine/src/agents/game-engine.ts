@@ -68,6 +68,9 @@ import type { ActionDeclaration, StateDelta } from "@machine-violet/shared/types
 import type { EngineState, TurnInfo, EngineCallbacks } from "@machine-violet/shared/types/engine.js";
 export type { EngineState, TurnInfo, EngineCallbacks } from "@machine-violet/shared/types/engine.js";
 
+/** Cap on an `update_portrait` change description — keeps the prompt, ack, and context marker bounded. */
+const MAX_PORTRAIT_CHANGE_CHARS = 280;
+
 /**
  * The game engine — orchestrates the DM agent, tools, TUI, and scene management.
  * This is the master state machine that drives gameplay.
@@ -161,6 +164,16 @@ export class GameEngine {
    * land on disk + the pointer swaps via the promise's own `.then`.
    */
   private inFlightPortraitRenders = new Set<Promise<void>>();
+
+  /**
+   * Serializes the archive+swap critical section across portrait revisions.
+   * Renders run in parallel (each takes minutes), but two completing close
+   * together for the same character would otherwise compute the same next
+   * archive version (`listDir` + max + 1) and clobber history. Commits chain
+   * through here so they run one-at-a-time; the chain swallows errors so one
+   * failure never poisons later commits.
+   */
+  private portraitCommitChain: Promise<unknown> = Promise.resolve();
 
   constructor(params: {
     provider: LLMProvider;
@@ -1387,12 +1400,19 @@ export class GameEngine {
       return { content: "Image generation is not available on the configured provider.", is_error: true };
     }
     const name = typeof input.character === "string" ? input.character.trim() : "";
-    const change = typeof input.change === "string" ? input.change.trim() : "";
+    // Cap the change description — it rides into the render prompt, the
+    // persisted ack, and the next-turn context marker, so an over-long string
+    // bloats all three.
+    const change = (typeof input.change === "string" ? input.change.trim() : "").slice(0, MAX_PORTRAIT_CHANGE_CHARS);
     if (!name || !change) {
       return { content: "update_portrait requires both `character` and `change`.", is_error: true };
     }
 
     const fileIO = this.sceneManager.getFileIO();
+    if (!fileIO.writeBinaryFile) {
+      // Bail before spending a (paid, minutes-long) render we couldn't persist.
+      return { content: "Portrait revision isn't available here (no file persistence).", is_error: true };
+    }
     const root = this.gameState.campaignRoot;
 
     // Condition the revision on the current portrait so identity carries
@@ -1419,14 +1439,23 @@ export class GameEngine {
           referenceImages,
         });
         const bytes = Buffer.from(result.base64, "base64");
-        const { archivedVersion } = await commitPortraitRevision(fileIO, root, name, bytes);
         const small = await downscalePortraitForContext(bytes);
-        this.pendingPortraitInjections.push({
-          name,
-          change,
-          image: { type: "image_input", base64: small.base64, mimeType: small.mimeType, lowDetail: true, label: name },
+        // Serialize archive+swap+stash through the commit chain: renders run in
+        // parallel, but this fast critical section must be one-at-a-time so two
+        // revisions completing close together don't compute the same archive
+        // version and clobber history. The chain swallows errors so one failure
+        // can't poison later commits; `commit` re-throws into the catch below.
+        const commit = this.portraitCommitChain.then(async () => {
+          const { archivedVersion } = await commitPortraitRevision(fileIO, root, name, bytes);
+          this.pendingPortraitInjections.push({
+            name,
+            change,
+            image: { type: "image_input", base64: small.base64, mimeType: small.mimeType, lowDetail: true, label: name },
+          });
+          logEvent("portrait_update:completed", { agent: "dm", character: name, archivedVersion });
         });
-        logEvent("portrait_update:completed", { agent: "dm", character: name, archivedVersion });
+        this.portraitCommitChain = commit.catch(() => undefined);
+        await commit;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         logEvent("portrait_update:failed", { agent: "dm", character: name, message: msg.slice(0, 400) });
@@ -1465,11 +1494,16 @@ export class GameEngine {
    */
   private consumePendingPortraitInjections(): ContentPart[] {
     if (this.pendingPortraitInjections.length === 0) return [];
+    // Strip structural chars + collapse whitespace so a name/change can't break
+    // the marker or smuggle markup into the DM context. The values are
+    // model-authored (not untrusted user input), but keep the frame well-formed
+    // regardless — a stray quote or newline shouldn't malform the tag.
+    const safe = (s: string) => s.replace(/[<>"&]/g, " ").replace(/\s+/g, " ").trim();
     const parts: ContentPart[] = [];
     for (const inj of this.pendingPortraitInjections) {
       parts.push({
         type: "text",
-        text: `<portrait_updated character="${inj.name}">Now reflects: ${inj.change}</portrait_updated>`,
+        text: `<portrait_updated character="${safe(inj.name)}">Now reflects: ${safe(inj.change)}</portrait_updated>`,
       });
       parts.push(inj.image);
     }
