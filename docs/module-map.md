@@ -89,7 +89,8 @@ Token tracking, conversation window, prompt caching, state persistence.
 | `token-counter.ts` | `estimateTokens()` — tiktoken-based estimation |
 | `usage-helpers.ts` | `accumulateUsage()` — merge Anthropic Usage objects |
 | `display-log.ts` | Narrative line ↔ markdown conversion |
-| `engine-log.ts` | Structured append-only JSONL event log at `../.debug/engine.jsonl` (relative to campaigns dir): server/session/turn lifecycle, API calls, errors. Non-blocking fire-and-forget |
+| `engine-log.ts` | Structured append-only JSONL event log at `../.debug/engine.jsonl` (relative to campaigns dir): server/session/turn lifecycle, API calls, errors. Synchronous `appendFileSync` for live-tail visibility |
+| `trace.ts` | Span trace at `../.debug/trace.jsonl` — a causal tree of `turn → agent → api_call/tool` spans (AsyncLocalStorage `withSpan`), correlated by `parentId`/`turnId`. Backs the campaign-explorer Timeline flame chart |
 
 ## Engine: providers/ — LLM Provider Adapters
 

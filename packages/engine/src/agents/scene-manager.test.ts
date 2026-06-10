@@ -701,12 +701,31 @@ describe("SceneManager", () => {
       return [];
     });
 
-    // Mock provider: summarizer + compendium (resolves before changelog due to fewer awaits) + changelog
-    const provider = transitionProvider([
+    // The compendium and changelog subagents run concurrently (scene-manager
+    // fires them in a Promise.all) and race to pull from the mock's response
+    // queue. A positional queue is therefore timing-fragile: any shift in
+    // await scheduling (e.g. span instrumentation adding a microtask hop) can
+    // swap which subagent receives which response. Route by request content
+    // instead — the changelog updater's prompt is the only one that lists
+    // "Known entity files:". The summarizer is awaited before the race, so the
+    // remaining (non-changelog) calls stay positional: summary then compendium.
+    const nonChangelog: ChatResult[] = [
       textResponse("- Scene summary\n---MINI---\nScene summary."),
       EMPTY_COMPENDIUM_RESPONSE,
-      textResponse("tavern/index.md: Party entered and caused a brawl"),
-    ]);
+    ];
+    let nonChangelogIdx = 0;
+    const route = async (params: { messages?: unknown }): Promise<ChatResult> => {
+      if (JSON.stringify(params.messages ?? []).includes("Known entity files:")) {
+        return textResponse("tavern/index.md: Party entered and caused a brawl");
+      }
+      return nonChangelog[nonChangelogIdx++] ?? EMPTY_COMPENDIUM_RESPONSE;
+    };
+    const provider = {
+      providerId: "mock",
+      chat: vi.fn(route),
+      stream: vi.fn(route),
+      healthCheck: vi.fn(async () => ({ ok: true })),
+    } as unknown as LLMProvider;
 
     const mgr = new SceneManager(
       mockState(),

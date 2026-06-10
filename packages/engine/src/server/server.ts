@@ -20,6 +20,7 @@ import { recordingActive } from "../providers/tape-mode.js";
 import { wsHandler } from "./ws.js";
 import { SessionManager } from "./session-manager.js";
 import { initEngineLog, logEvent, closeEngineLog } from "../context/engine-log.js";
+import { initTraceLog } from "../context/trace.js";
 import { isCompiled } from "../utils/paths.js";
 
 export interface ServerConfig {
@@ -69,6 +70,7 @@ export async function createServer(
   // --- Engine event log ---
   if (process.env.NODE_ENV !== "test" && cfg.campaignsDir) {
     initEngineLog(cfg.campaignsDir);
+    initTraceLog(cfg.campaignsDir);
     logEvent("server:start", {
       version: process.env.npm_package_version ?? "dev",
       port: cfg.port,
