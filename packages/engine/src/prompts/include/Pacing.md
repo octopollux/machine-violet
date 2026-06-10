@@ -38,5 +38,5 @@ Skip `present_choices` for the scope question. Pick the slug for `finalize_setup
 - Medium window (a week, a quest cycle) → `few-sessions`
 - Long window (a season, a generation, a major countdown) → `grand-campaign`
 
-Mention the timer prominently in the `handoff_note` so the DM establishes it in the opening scene — the player needs to know the structural commitment from the start.
+Mention the timer prominently in the `handoff_note`.
 </TimedCampaigns>
