@@ -698,6 +698,7 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
       mode: clientState.mode,
       stateSnapshot,
       usageStatus: clientState.usageStatus,
+      sheetEpoch: clientState.sheetEpoch,
       hasKittyProtocol,
       stdinFilterChain,
       graphicsCaps,

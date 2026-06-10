@@ -47,6 +47,7 @@ export function PlayingPhase() {
     activeModal, setActiveModal,
     mode, stateSnapshot,
     usageStatus,
+    sheetEpoch,
     hasKittyProtocol,
     devModeEnabled,
     showVerbose,
@@ -72,6 +73,7 @@ export function PlayingPhase() {
   const [characterPaneOpen, setCharacterPaneOpen] = useState(false);
   const [characterSheetCache, setCharacterSheetCache] = useState<string | null>(null);
   const characterSheetCacheCharRef = useRef<string>("");
+  const characterSheetCacheEpochRef = useRef<number>(0);
   // attemptId the user last dismissed the API-error modal at. The modal hides
   // while this matches the current overlay's attemptId; each fresh onRetry
   // bumps attemptId, so the next failure brings the modal back. Reset to null
@@ -146,9 +148,12 @@ export function PlayingPhase() {
     reportViewport({ columns: cols, rows, narrativeRows: narRows });
   }, [cols, rows, narRows, reportViewport]);
 
-  // Clear character sheet cache when active character changes
-  if (activeChar !== characterSheetCacheCharRef.current) {
+  // Clear character sheet cache when the active character changes, or when a
+  // detached scribe rewrote a sheet (sheetEpoch bumped) — the latter repaints
+  // an open pane with the scribe's late write instead of waiting for re-open.
+  if (activeChar !== characterSheetCacheCharRef.current || sheetEpoch !== characterSheetCacheEpochRef.current) {
     characterSheetCacheCharRef.current = activeChar;
+    characterSheetCacheEpochRef.current = sheetEpoch;
     setCharacterSheetCache(null);
   }
   const handleCharacterSheetLoaded = useCallback((content: string | null) => {
