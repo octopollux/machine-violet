@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { LLMProvider, ChatResult, TierProvider } from "../providers/types.js";
+import sharp from "sharp";
+import type { LLMProvider, ChatResult, TierProvider, NormalizedMessage } from "../providers/types.js";
+import { campaignPaths } from "../tools/filesystem/index.js";
 import { GameEngine } from "./game-engine.js";
 import { pruneEmptyDirs } from "../tools/git/index.js";
 import type { EngineCallbacks, EngineState, TurnInfo } from "./game-engine.js";
@@ -364,6 +366,128 @@ describe("GameEngine", () => {
     expect(stateWhileRendering).toBe("generating_image");
     // Turn still ends cleanly.
     expect(engine.getState()).toBe("waiting_input");
+  });
+
+  it("update_portrait revises the portrait and hands the new image to the DM next turn (no extra turn)", async () => {
+    const paths = campaignPaths("/tmp/test-campaign");
+    const portraitPath = norm(paths.characterPortrait("Aldric"));
+    const archivePath = norm(paths.characterPortraitArchive("Aldric", 1));
+    // Backing store with Aldric's existing portrait (a real PNG so the
+    // reference/downscale paths work).
+    const store = new Map<string, Uint8Array>();
+    const makePng = async (size: number, rgb: { r: number; g: number; b: number }) =>
+      new Uint8Array(await sharp({ create: { width: size, height: size, channels: 3, background: rgb } }).png().toBuffer());
+    store.set(portraitPath, await makePng(64, { r: 1, g: 2, b: 3 }));
+    const renderedPng = await makePng(800, { r: 200, g: 40, b: 40 });
+
+    const capturedMessages: NormalizedMessage[][] = [];
+    const responses: ChatResult[] = [
+      // Turn 1: the DM calls update_portrait, then narrates.
+      {
+        text: "",
+        toolCalls: [{ id: "t1", name: "update_portrait", input: { character: "Aldric", change: "left boot torn off" } }],
+        usage: mockUsage(),
+        stopReason: "tool_use",
+        assistantContent: [{ type: "tool_use", id: "t1", name: "update_portrait", input: { character: "Aldric", change: "left boot torn off" } }],
+      },
+      textMessage("Aldric's boot is wrenched off in the dark."),
+      // Turn 2: plain narration.
+      textMessage("He limps onward."),
+    ];
+    let idx = 0;
+    const capture = async (p: { messages: NormalizedMessage[] }) => { capturedMessages.push(p.messages); return responses[idx++]; };
+    const generateImage = vi.fn(async () => ({
+      base64: Buffer.from(renderedPng).toString("base64"),
+      mimeType: "image/png",
+      effortUsed: "standard" as const,
+      aspectUsed: "portrait" as const,
+    }));
+    const provider = {
+      providerId: "mock",
+      chat: vi.fn(capture),
+      stream: vi.fn(capture),
+      healthCheck: vi.fn(async () => ({ ok: true })),
+      getCapabilities: () => ({ imageGeneration: true, thinking: false, tools: true, streaming: true, caching: false }),
+      generateImage,
+    } as unknown as LLMProvider;
+
+    const fileIO: FileIO = {
+      ...mockFileIO(),
+      exists: vi.fn(async (p: string) => store.has(norm(p)) || norm(p) in files || dirs.has(norm(p))),
+      readBinaryFile: vi.fn(async (p: string) => {
+        const k = norm(p);
+        if (!store.has(k)) throw new Error(`ENOENT: ${p}`);
+        return store.get(k)!;
+      }),
+      writeBinaryFile: vi.fn(async (p: string, b: Uint8Array) => { store.set(norm(p), b); }),
+      listDir: vi.fn(async (p: string) => {
+        const prefix = norm(p) + "/";
+        const names = new Set<string>();
+        for (const k of store.keys()) if (k.startsWith(prefix)) names.add(k.slice(prefix.length).split("/")[0]);
+        return [...names];
+      }),
+    };
+
+    const { callbacks } = mockCallbacks();
+    const engine = makeEngine({
+      provider, gameState: mockState(), scene: mockScene(), sessionState: mockSessionState(),
+      fileIO, callbacks, model: "claude-haiku-4-5-20251001",
+    });
+
+    // Turn 1: DM fires update_portrait; the render runs in the background.
+    await engine.processInput("Aldric", "I step into the dark.");
+    await engine.awaitPendingPortraitRenders();
+
+    // Versioning: the new portrait is the current pointer; the prior one is archived.
+    expect([...store.get(portraitPath)!]).toEqual([...renderedPng]);
+    expect(store.has(archivePath)).toBe(true);
+    expect(generateImage).toHaveBeenCalledTimes(1);
+
+    // Turn 2: the revised portrait rides into THIS turn's user message as an
+    // image_input part — the DM sees its actual work, for free.
+    await engine.processInput("Aldric", "I keep moving.");
+    const turn2 = capturedMessages[capturedMessages.length - 1];
+    const lastUser = [...turn2].reverse().find((m) => m.role === "user")!;
+    expect(Array.isArray(lastUser.content)).toBe(true);
+    const parts = lastUser.content as { type: string; mimeType?: string; label?: string; text?: string }[];
+    expect(parts.find((p) => p.type === "image_input")).toMatchObject({ type: "image_input", mimeType: "image/webp", label: "Aldric" });
+    expect(parts.find((p) => p.type === "text" && /portrait_updated/.test(p.text ?? ""))).toBeDefined();
+  });
+
+  it("update_portrait with no existing portrait errors and renders nothing", async () => {
+    const generateImage = vi.fn(async () => ({ base64: "AAA=", mimeType: "image/png", effortUsed: "standard" as const, aspectUsed: "portrait" as const }));
+    const provider = {
+      providerId: "mock",
+      chat: vi.fn(async () => responses[idx++]),
+      stream: vi.fn(async () => responses[idx++]),
+      healthCheck: vi.fn(async () => ({ ok: true })),
+      getCapabilities: () => ({ imageGeneration: true, thinking: false, tools: true, streaming: true, caching: false }),
+      generateImage,
+    } as unknown as LLMProvider;
+    const responses: ChatResult[] = [
+      {
+        text: "",
+        toolCalls: [{ id: "t1", name: "update_portrait", input: { character: "Nemo", change: "new hat" } }],
+        usage: mockUsage(),
+        stopReason: "tool_use",
+        assistantContent: [{ type: "tool_use", id: "t1", name: "update_portrait", input: { character: "Nemo", change: "new hat" } }],
+      },
+      textMessage("Nothing visibly changes."),
+    ];
+    let idx = 0;
+
+    const { callbacks } = mockCallbacks();
+    const engine = makeEngine({
+      provider, gameState: mockState(), scene: mockScene(), sessionState: mockSessionState(),
+      fileIO: { ...mockFileIO(), readBinaryFile: vi.fn(async () => { throw new Error("ENOENT"); }), writeBinaryFile: vi.fn(async () => {}) },
+      callbacks, model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "Look at Nemo.");
+    await engine.awaitPendingPortraitRenders();
+
+    // No portrait on disk for "Nemo" → the tool errored before rendering.
+    expect(generateImage).not.toHaveBeenCalled();
   });
 
   it("tracks session usage", async () => {
