@@ -36,6 +36,23 @@ export function resetContextDump(): void {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type DumpableParams = Record<string, any>;
 
+/**
+ * JSON.stringify replacer that collapses inline image data to a size
+ * placeholder. A single full-res portrait is ~1.8 MB of base64 that
+ * otherwise dominates and effectively unreadably bloats the dump (the
+ * `base64` key shows up on `image_input` parts and `referenceImages`
+ * alike). The dump is for human inspection — the bytes carry no debugging
+ * signal, so we elide any long base64 string to `<base64 elided, ~N KB>`.
+ * Short incidental base64-ish values pass through untouched.
+ */
+function elideBase64(key: string, value: unknown): unknown {
+  if (key === "base64" && typeof value === "string" && value.length > 256) {
+    const kb = Math.round((value.length * 3) / 4 / 1024);
+    return `<base64 elided, ~${kb} KB>`;
+  }
+  return value;
+}
+
 // --- Public API ---
 
 /**
@@ -75,7 +92,7 @@ export function dumpContext(agentName: string, params: DumpableParams): void {
     }
   }
 
-  const json = JSON.stringify(envelope, null, 2);
+  const json = JSON.stringify(envelope, elideBase64, 2);
   const filePath = join(dumpDir, `${agentName}.json`);
 
   void writeFile(filePath, json, "utf-8").catch(noop);
