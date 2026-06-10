@@ -6,11 +6,15 @@ import { useSSE } from "./hooks/useSSE";
 import { CampaignSelector } from "./components/CampaignSelector";
 import { FileTree } from "./components/FileTree";
 import { ContentPane } from "./components/ContentPane";
+import { TimelineView } from "./components/TimelineView";
 import type { SSEEvent, FileChangeEvent } from "../shared/protocol";
 import { MACHINE_SLUG } from "../shared/protocol";
 
 const STORAGE_KEY_CAMPAIGN = "ce:selectedCampaign";
 const STORAGE_KEY_FILE = "ce:selectedFile";
+const STORAGE_KEY_VIEW = "ce:view";
+
+type View = "files" | "timeline";
 
 function loadStored(key: string): string | null {
   try { return sessionStorage.getItem(key); } catch { return null; }
@@ -33,7 +37,16 @@ export function App() {
     loadStored(STORAGE_KEY_FILE),
   );
   const [refreshKey, setRefreshKey] = useState(0);
+  const [view, setView] = useState<View>(
+    (loadStored(STORAGE_KEY_VIEW) as View | null) ?? "files",
+  );
+  const [timelineRefreshKey, setTimelineRefreshKey] = useState(0);
   const lastFileChangeRef = useRef<FileChangeEvent | null>(null);
+
+  const selectView = useCallback((next: View) => {
+    setView(next);
+    saveStored(STORAGE_KEY_VIEW, next);
+  }, []);
 
   // Validate restored selection once campaigns load — clear if the campaign no longer exists
   const restoredRef = useRef(false);
@@ -72,6 +85,13 @@ export function App() {
         }
         lastFileChangeRef.current = event;
 
+        // The span trace lives in the machine .debug/ — refresh the Timeline
+        // view when it changes (a slow poll in TimelineView backstops the dev
+        // layout where this dir isn't SSE-watched).
+        if (event.campaignSlug === MACHINE_SLUG && event.relativePath.endsWith("trace.jsonl")) {
+          setTimelineRefreshKey((k) => k + 1);
+        }
+
         // If the changed file is currently selected, refresh content
         const isSelectedMachineFile =
           selectedScope === "machine" &&
@@ -102,8 +122,9 @@ export function App() {
       saveStored(STORAGE_KEY_FILE, relativePath);
       markRead(relativePath);
       setRefreshKey((k) => k + 1);
+      selectView("files");
     },
-    [markRead],
+    [markRead, selectView],
   );
 
   const handleSelectMachineFile = useCallback(
@@ -113,8 +134,9 @@ export function App() {
       saveStored(STORAGE_KEY_FILE, relativePath);
       machineMarkRead(relativePath);
       setRefreshKey((k) => k + 1);
+      selectView("files");
     },
-    [machineMarkRead],
+    [machineMarkRead, selectView],
   );
 
   const handleCampaignChange = useCallback((slug: string | null) => {
@@ -166,6 +188,14 @@ export function App() {
       </div>
       <div className="app-body">
         <div className="sidebar">
+          {/* Views */}
+          <button
+            type="button"
+            className={`nav-item${view === "timeline" ? " nav-item-active" : ""}`}
+            onClick={() => selectView("timeline")}
+          >
+            ⏱ Timeline
+          </button>
           {/* Machine-scope files — always visible */}
           {!machineLoading && machineGroups.length > 0 && (
             <div className="machine-section">
@@ -196,13 +226,17 @@ export function App() {
             <div className="loading">Select a campaign</div>
           )}
         </div>
-        <ContentPane
-          campaignSlug={effectiveSlug}
-          selectedFile={selectedFile}
-          fileCategory={selectedCategory}
-          refreshKey={refreshKey}
-          onNavigate={handleNavigate}
-        />
+        {view === "timeline" ? (
+          <TimelineView campaignSlug={selectedCampaign} refreshKey={timelineRefreshKey} />
+        ) : (
+          <ContentPane
+            campaignSlug={effectiveSlug}
+            selectedFile={selectedFile}
+            fileCategory={selectedCategory}
+            refreshKey={refreshKey}
+            onNavigate={handleNavigate}
+          />
+        )}
       </div>
     </>
   );

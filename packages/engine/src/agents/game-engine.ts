@@ -37,6 +37,8 @@ import type { DMSessionState } from "./dm-prompt.js";
 import type { ModelTier } from "../config/models.js";
 import { accUsage } from "../context/usage-helpers.js";
 import { logEvent } from "../context/engine-log.js";
+import { withSpan, setSpanAttrs } from "../context/trace.js";
+import { basename } from "node:path";
 import { getMaxOutput } from "../config/model-registry.js";
 import type { ToolRegistry } from "./tool-registry.js";
 import { isAITurn, getActivePlayer, getCombatActivePlayer } from "./player-manager.js";
@@ -520,6 +522,14 @@ export class GameEngine {
   }
 
   /**
+   * Campaign slug used to tag trace spans — the campaign directory basename,
+   * matching how campaign-explorer keys campaigns (`?campaign=<slug>`).
+   */
+  private get campaignId(): string {
+    return basename(norm(this.gameState.campaignRoot));
+  }
+
+  /**
    * Process player input: send to DM, stream response, handle tools.
    * This is the main game loop entry point.
    */
@@ -674,6 +684,19 @@ export class GameEngine {
       },
     };
 
+    // Root turn span: the wall-clock envelope the flame chart segments on.
+    // The DM agent loop (agentLoopStreaming) and any deferred subagents
+    // (scribe/promote/scene_transition, run in applyDeferredTuiCommands) nest
+    // under it via ALS. Errors are caught (not re-thrown) here, so the span is
+    // tagged `failed` rather than `isError`.
+    await withSpan(
+      {
+        kind: "turn",
+        name: `turn ${this.turnCounter}`,
+        campaignId: this.campaignId,
+        attrs: { turnNumber: this.turnCounter, participant: characterName },
+      },
+      async () => {
     try {
       // Run the agent loop with streaming
       const result = await agentLoopStreaming(
@@ -836,6 +859,7 @@ export class GameEngine {
       this.lastFailedInput = null;
 
     } catch (e) {
+      setSpanAttrs({ failed: true });
       if (e instanceof ContentRefusalError) {
         // Content classifier refusal — don't persist exchange or set retry
         // (same input would just re-trigger). Clear partial DM output and
@@ -868,6 +892,8 @@ export class GameEngine {
         this.callbacks.onError(error);
       }
     }
+      },
+    );
 
     this.setState("waiting_input");
 
@@ -909,6 +935,13 @@ export class GameEngine {
 
     if (!shouldGenerateChoices(frequency, this.dmProvidedChoicesThisTurn)) return;
 
+    // Detached background span (root). This is fire-and-forget from the turn
+    // (void-called after the turn span closes), so it must NOT extend the turn
+    // bar — `root: true` starts a fresh trace so the choice-generator subagent
+    // shows as its own short bar in the timeline.
+    await withSpan(
+      { kind: "background", name: "suggested_choices", campaignId: this.campaignId, root: true },
+      async () => {
     try {
       const session = await this.getOrCreateChoiceSession();
       const generated = await session.generate({
@@ -932,6 +965,8 @@ export class GameEngine {
         `[dev] choice-generator failed: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
+      },
+    );
   }
 
   /**

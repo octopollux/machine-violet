@@ -51,3 +51,26 @@ export interface TreeEntry {
   size: number;
   mtime: string;
 }
+
+/**
+ * One completed span from the engine's `trace.jsonl`. Mirrors the engine's
+ * `SpanRecord` (packages/engine/src/context/trace.ts). The flame chart rebuilds
+ * the per-turn tree from `parentId` and groups turns by `turnId`.
+ */
+export interface SpanRecord {
+  id: number;
+  parentId: number | null;
+  turnId: number;
+  campaignId: string;
+  kind: "turn" | "agent" | "api_call" | "tool" | "image_gen" | "background";
+  name: string;
+  /** epoch ms at open */
+  t0: number;
+  /** epoch ms at settle */
+  t1: number;
+  durMs: number;
+  /** present (true) only when the span's work threw */
+  isError?: boolean;
+  /** model, tokens, stopReason, attempts, effort/aspect, failed, … */
+  attrs?: Record<string, unknown>;
+}

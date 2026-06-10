@@ -3,6 +3,8 @@ import sharp from "sharp";
 import type { LLMProvider, ChatResult, TierProvider, NormalizedMessage } from "../providers/types.js";
 import { campaignPaths } from "../tools/filesystem/index.js";
 import { GameEngine } from "./game-engine.js";
+import { setTraceSink, resetTraceLog } from "../context/trace.js";
+import type { SpanRecord } from "../context/trace.js";
 import { pruneEmptyDirs } from "../tools/git/index.js";
 import type { EngineCallbacks, EngineState, TurnInfo } from "./game-engine.js";
 import type { GameState } from "./game-state.js";
@@ -660,6 +662,57 @@ describe("GameEngine", () => {
 
     expect(log.narrativeComplete.length).toBe(1);
     expect(log.narrativeComplete[0]).toBe("You rolled a 15!");
+  });
+
+  it("emits a nested span tree (turn → agent → api_call + tool) for an instrumented turn", async () => {
+    // End-to-end check that the real processInput → runProviderLoop →
+    // dispatchToolCall path emits correctly-correlated spans (not just the
+    // trace.ts primitive in isolation). A tool round + a text round → ≥2
+    // api_call spans and one tool span, all under one agent under one turn.
+    const spans: SpanRecord[] = [];
+    resetTraceLog();
+    setTraceSink((r) => spans.push(r));
+    try {
+      const provider = mockProvider([
+        ...toolAndTextMessages("roll_dice", { expression: "1d20" }, "You rolled a 15!"),
+      ]);
+      const { callbacks } = mockCallbacks();
+      const engine = makeEngine({
+        provider,
+        gameState: mockState(),
+        scene: mockScene(),
+        sessionState: mockSessionState(),
+        fileIO: mockFileIO(),
+        callbacks,
+        model: "claude-haiku-4-5-20251001",
+      });
+      await engine.processInput("Aldric", "I attack the goblin.");
+    } finally {
+      setTraceSink(null);
+    }
+
+    const turn = spans.find((s) => s.kind === "turn");
+    expect(turn).toBeDefined();
+    const agent = spans.find((s) => s.kind === "agent" && s.parentId === turn!.id);
+    const tool = spans.find((s) => s.kind === "tool" && s.name === "roll_dice");
+    const apiCalls = spans.filter((s) => s.kind === "api_call");
+
+    expect(agent).toBeDefined();
+    expect(tool).toBeDefined();
+    expect(apiCalls.length).toBeGreaterThanOrEqual(2);
+
+    // Tree shape: turn(root) → agent → { api_call×, tool }
+    expect(turn!.parentId).toBeNull();
+    expect(tool!.parentId).toBe(agent!.id);
+    for (const a of apiCalls) expect(a.parentId).toBe(agent!.id);
+    // Everything shares the turn's turnId and the campaign slug.
+    for (const s of [agent!, tool!, ...apiCalls]) {
+      expect(s.turnId).toBe(turn!.id);
+      expect(s.campaignId).toBe("test-campaign");
+    }
+    // Turn header attributes for the timeline.
+    expect(typeof turn!.attrs?.turnNumber).toBe("number");
+    expect(turn!.attrs?.participant).toBe("Aldric");
   });
 
   it("handles errors gracefully", async () => {

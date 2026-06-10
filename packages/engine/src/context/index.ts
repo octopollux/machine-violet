@@ -10,3 +10,8 @@ export type { StateSlice, PersistedSceneState, PersistedUIState, LoadedState } f
 export { renderCampaignLog, parseLegacyLog, formatFullEntry, formatMiniEntry } from "./campaign-log.js";
 export type { CampaignLog, CampaignLogEntry } from "./campaign-log.js";
 export { initEngineLog, logEvent, closeEngineLog, resetEngineLog } from "./engine-log.js";
+export {
+  initTraceLog, resetTraceLog, getTraceLogPath, setTraceSink,
+  withSpan, setSpanAttrs, currentSpan, captureContext, runInContext,
+} from "./trace.js";
+export type { SpanKind, SpanContext, SpanRecord, TraceContext } from "./trace.js";
