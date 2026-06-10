@@ -2,7 +2,7 @@ import type { ToolRegistry, ToolResult } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
 import { runProviderLoop } from "../providers/agent-loop-bridge.js";
 import type { LLMProvider, NormalizedMessage, NormalizedTool, SystemBlock } from "../providers/types.js";
-import { GENERATE_IMAGE_TOOL_NAME } from "../providers/types.js";
+import { GENERATE_IMAGE_TOOL_NAME, UPDATE_PORTRAIT_TOOL_NAME } from "../providers/types.js";
 
 // --- TUI tools ---
 
@@ -219,6 +219,38 @@ async function runAgentLoopInternal(
           },
         },
         required: ["prompt", "effort", "aspect"],
+      },
+    });
+    tools.push({
+      name: UPDATE_PORTRAIT_TOOL_NAME,
+      description:
+        "Silently revise a player character's saved portrait when the fiction has " +
+        "durably changed how they look — a lost or gained piece of gear, a new scar " +
+        "or lasting wound, a different outfit, a permanent physical change. The new " +
+        "portrait is rendered from their CURRENT one, so their identity (face, build) " +
+        "carries forward and only the described change is applied. " +
+        "This is NOT shown to the player as an image and is NOT a scene render — it " +
+        "quietly updates the reference the engine uses for future scene images and " +
+        "your own visual sense of the character. Do not announce 'here is the new " +
+        "portrait'; simply narrate the change in the fiction as you normally would. " +
+        "Use sparingly and only for changes that PERSIST — never for a transient state " +
+        "the next scene undoes. You do not wait for it: the updated portrait returns to " +
+        "you in context on a later turn.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          character: {
+            type: "string",
+            description: "Name of the player character whose portrait to revise. Must be a PC who already has a portrait.",
+          },
+          change: {
+            type: "string",
+            description:
+              "The character's appearance AFTER the change, described concretely — the new state, not the action that caused it. " +
+              "e.g. 'left boot torn off, bare foot mud-streaked to the shin; jacket singed at the right cuff'.",
+          },
+        },
+        required: ["character", "change"],
       },
     });
   }

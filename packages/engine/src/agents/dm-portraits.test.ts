@@ -4,10 +4,38 @@ import {
   loadDmPortraitMessage,
   loadCharacterReferences,
   downscalePortraitForContext,
+  commitPortraitRevision,
 } from "./dm-portraits.js";
 import type { FileIO } from "./scene-manager.js";
 import { norm } from "../utils/paths.js";
 import { campaignPaths } from "../tools/filesystem/index.js";
+
+/** In-memory FileIO with working binary read/write/listDir, for revision tests. */
+function makeRWFileIO(initial: Record<string, Uint8Array> = {}) {
+  const store = new Map<string, Uint8Array>();
+  for (const [k, v] of Object.entries(initial)) store.set(norm(k), v);
+  const dirs = new Set<string>();
+  const io: FileIO = {
+    readFile: async () => { throw new Error("unused"); },
+    writeFile: async () => {},
+    appendFile: async () => {},
+    mkdir: async (p) => { dirs.add(norm(p)); },
+    exists: async (p) => store.has(norm(p)) || dirs.has(norm(p)),
+    listDir: async (p) => {
+      const prefix = norm(p) + "/";
+      const names = new Set<string>();
+      for (const k of store.keys()) if (k.startsWith(prefix)) names.add(k.slice(prefix.length).split("/")[0]);
+      return [...names];
+    },
+    readBinaryFile: async (p) => {
+      const k = norm(p);
+      if (!store.has(k)) throw new Error(`ENOENT: ${p}`);
+      return store.get(k)!;
+    },
+    writeBinaryFile: async (p, bytes) => { store.set(norm(p), bytes); },
+  };
+  return { io, store };
+}
 
 /** Produce a real solid-color PNG of the given square size — valid input for sharp. */
 async function makePng(size: number, rgb: { r: number; g: number; b: number }): Promise<Uint8Array> {
@@ -175,6 +203,57 @@ describe("downscalePortraitForContext", () => {
     // Robustness: a slightly larger upload beats dropping the PC's likeness.
     expect(mimeType).toBe("image/png");
     expect(base64).toBe(Buffer.from(garbage).toString("base64"));
+  });
+});
+
+describe("commitPortraitRevision", () => {
+  const paths = campaignPaths("/camp");
+
+  it("archives the existing portrait and swaps in the new bytes", async () => {
+    const cur = paths.characterPortrait("Janey Bruce");
+    const { io, store } = makeRWFileIO({ [cur]: new Uint8Array([1, 1, 1]) });
+
+    const { archivedVersion } = await commitPortraitRevision(io, "/camp", "Janey Bruce", new Uint8Array([2, 2, 2]));
+
+    expect(archivedVersion).toBe(1);
+    expect([...store.get(norm(cur))!]).toEqual([2, 2, 2]); // current = new
+    expect([...store.get(norm(paths.characterPortraitArchive("Janey Bruce", 1)))!]).toEqual([1, 1, 1]); // prior archived
+  });
+
+  it("increments the archive version across repeated revisions", async () => {
+    const cur = paths.characterPortrait("Janey Bruce");
+    const { io, store } = makeRWFileIO({ [cur]: new Uint8Array([1]) });
+
+    await commitPortraitRevision(io, "/camp", "Janey Bruce", new Uint8Array([2]));
+    const second = await commitPortraitRevision(io, "/camp", "Janey Bruce", new Uint8Array([3]));
+
+    expect(second.archivedVersion).toBe(2);
+    expect([...store.get(norm(cur))!]).toEqual([3]);
+    expect([...store.get(norm(paths.characterPortraitArchive("Janey Bruce", 1)))!]).toEqual([1]);
+    expect([...store.get(norm(paths.characterPortraitArchive("Janey Bruce", 2)))!]).toEqual([2]);
+  });
+
+  it("archives nothing on a first-ever write (no prior portrait)", async () => {
+    const cur = paths.characterPortrait("Oros");
+    const { io, store } = makeRWFileIO({});
+
+    const { archivedVersion } = await commitPortraitRevision(io, "/camp", "Oros", new Uint8Array([9]));
+
+    expect(archivedVersion).toBeNull();
+    expect([...store.get(norm(cur))!]).toEqual([9]);
+  });
+
+  it("no-ops (null) when fileIO lacks writeBinaryFile", async () => {
+    const io: FileIO = {
+      readFile: async () => "",
+      writeFile: async () => {},
+      appendFile: async () => {},
+      mkdir: async () => {},
+      exists: async () => true,
+      listDir: async () => [],
+      // no binary capability
+    };
+    expect(await commitPortraitRevision(io, "/camp", "X", new Uint8Array([1]))).toEqual({ archivedVersion: null });
   });
 });
 

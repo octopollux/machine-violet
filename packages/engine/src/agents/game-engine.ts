@@ -5,7 +5,7 @@ import { DM_TURN_LENGTH_PCT_DEFAULT } from "@machine-violet/shared/types/config.
 import { agentLoopStreaming } from "./agent-loop.js";
 import type { AgentLoopConfig, TuiCommand, UsageStats } from "./agent-loop.js";
 import type { LLMProvider, NormalizedMessage, ContentPart, TierProvider } from "../providers/types.js";
-import { GENERATE_IMAGE_TOOL_NAME } from "../providers/types.js";
+import { GENERATE_IMAGE_TOOL_NAME, UPDATE_PORTRAIT_TOOL_NAME } from "../providers/types.js";
 import { ConversationManager } from "../context/conversation.js";
 import type { DroppedExchange } from "../context/conversation.js";
 import { narrativeLinesToMarkdown } from "../context/display-log.js";
@@ -46,7 +46,7 @@ import type { ChoiceGeneratorSession } from "./subagents/choice-generator.js";
 import { campaignPaths, parseFrontMatter, serializeEntity, formatChangelogEntry } from "../tools/filesystem/index.js";
 import { handleImageGenerated } from "./image-handler.js";
 import { normalizeImageEffort, normalizeImageAspect } from "../providers/image-coerce.js";
-import { loadDmPortraitMessage, loadCharacterReferences } from "./dm-portraits.js";
+import { loadDmPortraitMessage, loadCharacterReferences, commitPortraitRevision, downscalePortraitForContext, buildPortraitRevisionPrompt } from "./dm-portraits.js";
 import { runScribe } from "./subagents/scribe.js";
 import { promoteCharacter } from "./subagents/character-promotion.js";
 import { searchCampaign } from "./subagents/search-campaign.js";
@@ -67,6 +67,9 @@ import type { ActionDeclaration, StateDelta } from "@machine-violet/shared/types
 
 import type { EngineState, TurnInfo, EngineCallbacks } from "@machine-violet/shared/types/engine.js";
 export type { EngineState, TurnInfo, EngineCallbacks } from "@machine-violet/shared/types/engine.js";
+
+/** Cap on an `update_portrait` change description — keeps the prompt, ack, and context marker bounded. */
+const MAX_PORTRAIT_CHANGE_CHARS = 280;
 
 /**
  * The game engine — orchestrates the DM agent, tools, TUI, and scene management.
@@ -143,6 +146,34 @@ export class GameEngine {
    * (e.g. after the setup agent writes a new portrait mid-campaign).
    */
   private cachedPortraitMessage: NormalizedMessage | null | undefined = undefined;
+
+  /**
+   * Revised PC portraits waiting to be handed back to the DM. When the DM
+   * fires `update_portrait`, the render runs in the background; on completion
+   * it pushes the downscaled new portrait here. The NEXT real player turn
+   * folds these into its user message (the OOC-summary pattern) so the DM
+   * sees the actual updated image — and it persists in that exchange — without
+   * spending a dedicated turn or API call. Dropped on scene transition (the
+   * prefix refresh carries the current portrait into the new scene).
+   */
+  private pendingPortraitInjections: { name: string; change: string; image: ContentPart }[] = [];
+
+  /**
+   * In-flight `update_portrait` renders. Tracked (not detached) so a failure
+   * is logged rather than swallowed and so teardown can await them; the bytes
+   * land on disk + the pointer swaps via the promise's own `.then`.
+   */
+  private inFlightPortraitRenders = new Set<Promise<void>>();
+
+  /**
+   * Serializes the archive+swap critical section across portrait revisions.
+   * Renders run in parallel (each takes minutes), but two completing close
+   * together for the same character would otherwise compute the same next
+   * archive version (`listDir` + max + 1) and clobber history. Commits chain
+   * through here so they run one-at-a-time; the chain swallows errors so one
+   * failure never poisons later commits.
+   */
+  private portraitCommitChain: Promise<unknown> = Promise.resolve();
 
   constructor(params: {
     provider: LLMProvider;
@@ -611,14 +642,24 @@ export class GameEngine {
     // message instead of this one, so next turn's cache lookup hits through
     // the stable tail and only pays for one turn's delta — not the entire
     // conversation tail.
+    // Revised portraits that finished rendering since the last turn ride into
+    // THIS turn's user message as image_input parts — the DM sees the actual
+    // updated likeness for free (no dedicated turn), and they persist in the
+    // stored exchange so they replay through the rest of the scene. See the
+    // `pendingPortraitInjections` field and `dispatchUpdatePortrait`.
+    const portraitParts = this.consumePendingPortraitInjections();
     const apiUserMessage: NormalizedMessage = {
       role: "user",
-      content: `${preamble}${taggedInput}`,
+      content: portraitParts.length > 0
+        ? [...portraitParts, { type: "text", text: `${preamble}${taggedInput}` }]
+        : `${preamble}${taggedInput}`,
       ephemeral: preamble.length > 0,
     };
     const storedUserMessage: NormalizedMessage = {
       role: "user",
-      content: taggedInput,
+      content: portraitParts.length > 0
+        ? [...portraitParts, { type: "text", text: taggedInput }]
+        : taggedInput,
     };
     messages.push(apiUserMessage);
 
@@ -954,6 +995,15 @@ export class GameEngine {
     this.injectionRegistry.get<BehaviorInjection>("behavior")?.reset();
     this.injectionRegistry.get<HardStatsInjection>("hard-stats")?.reset();
     this.setState("scene_transition");
+
+    // The conversation is cleared on transition (sceneManager.stepPruneContext),
+    // so the BP4 message cache is rebuilt anyway — the free moment to refresh the
+    // portrait prefix. Invalidate the cached prefix message so the new scene
+    // reloads each PC's *current* portrait (picking up any mid-scene revision),
+    // and drop any pending portrait injection: the prefix now carries it, so
+    // there's nothing left to hand back as a "previous turn."
+    this.cachedPortraitMessage = undefined;
+    this.pendingPortraitInjections = [];
 
     try {
       const result = await this.sceneManager.sceneTransition(
@@ -1334,6 +1384,134 @@ export class GameEngine {
   }
 
   /**
+   * Silent portrait revision (`update_portrait`). Re-renders a PC's portrait
+   * conditioned on their current one to reflect a durable appearance change,
+   * archives the prior version, and hands the new portrait back to the DM in
+   * context on a later turn. Unlike `generate_image` it does NOT display to the
+   * player and does NOT block the turn: it returns an immediate ack (which
+   * persists the DM's intent in conversation) and runs the render in the
+   * background. The new bytes land on disk + swap the current pointer via the
+   * tracked promise's own continuation.
+   */
+  private async dispatchUpdatePortrait(
+    input: Record<string, unknown>,
+  ): Promise<import("./tool-registry.js").ToolResult> {
+    if (!this.provider.generateImage) {
+      return { content: "Image generation is not available on the configured provider.", is_error: true };
+    }
+    const name = typeof input.character === "string" ? input.character.trim() : "";
+    // Cap the change description — it rides into the render prompt, the
+    // persisted ack, and the next-turn context marker, so an over-long string
+    // bloats all three.
+    const change = (typeof input.change === "string" ? input.change.trim() : "").slice(0, MAX_PORTRAIT_CHANGE_CHARS);
+    if (!name || !change) {
+      return { content: "update_portrait requires both `character` and `change`.", is_error: true };
+    }
+
+    const fileIO = this.sceneManager.getFileIO();
+    if (!fileIO.writeBinaryFile) {
+      // Bail before spending a (paid, minutes-long) render we couldn't persist.
+      return { content: "Portrait revision isn't available here (no file persistence).", is_error: true };
+    }
+    const root = this.gameState.campaignRoot;
+
+    // Condition the revision on the current portrait so identity carries
+    // forward — change one thing, keep the rest. No existing portrait → nothing
+    // to revise (e.g. an NPC, or a campaign where image-gen was off at setup).
+    const referenceImages = await loadCharacterReferences([name], fileIO, root);
+    if (referenceImages.length === 0) {
+      return {
+        content: `No saved portrait for "${name}" to revise — update_portrait only works on a character who already has one.`,
+        is_error: true,
+      };
+    }
+
+    logEvent("portrait_update:requested", { agent: "dm", character: name, change: change.slice(0, 200) });
+
+    const generateImage = this.provider.generateImage.bind(this.provider);
+    const render = (async () => {
+      try {
+        const result = await generateImage({
+          prompt: buildPortraitRevisionPrompt(name, change),
+          effort: "standard",
+          aspect: "portrait",
+          intent: "character_portrait",
+          referenceImages,
+        });
+        const bytes = Buffer.from(result.base64, "base64");
+        const small = await downscalePortraitForContext(bytes);
+        // Serialize archive+swap+stash through the commit chain: renders run in
+        // parallel, but this fast critical section must be one-at-a-time so two
+        // revisions completing close together don't compute the same archive
+        // version and clobber history. The chain swallows errors so one failure
+        // can't poison later commits; `commit` re-throws into the catch below.
+        const commit = this.portraitCommitChain.then(async () => {
+          const { archivedVersion } = await commitPortraitRevision(fileIO, root, name, bytes);
+          this.pendingPortraitInjections.push({
+            name,
+            change,
+            image: { type: "image_input", base64: small.base64, mimeType: small.mimeType, lowDetail: true, label: name },
+          });
+          logEvent("portrait_update:completed", { agent: "dm", character: name, archivedVersion });
+        });
+        this.portraitCommitChain = commit.catch(() => undefined);
+        await commit;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        logEvent("portrait_update:failed", { agent: "dm", character: name, message: msg.slice(0, 400) });
+        this.callbacks.onDevLog?.(`[portrait] update for ${name} failed: ${msg}`);
+      }
+    })();
+    this.trackPortraitRender(render);
+
+    return {
+      content:
+        `Portrait revision for ${name} started in the background (silent — the player sees no image). ` +
+        `It will reflect: ${change}. The updated portrait returns to you in context on a later turn; ` +
+        `narrate the change in the fiction now, and do not announce a new image.`,
+    };
+  }
+
+  /** Track a background portrait render so failures aren't swallowed and teardown can await it. */
+  private trackPortraitRender(p: Promise<void>): void {
+    this.inFlightPortraitRenders.add(p);
+    void p.finally(() => this.inFlightPortraitRenders.delete(p));
+  }
+
+  /**
+   * Await any in-flight background `update_portrait` renders. Each settles on
+   * its own (disk write + pointer swap happen in the promise), so callers don't
+   * normally need this — it exists for graceful teardown and deterministic tests.
+   */
+  async awaitPendingPortraitRenders(): Promise<void> {
+    await Promise.all([...this.inFlightPortraitRenders]);
+  }
+
+  /**
+   * Drain revised portraits into image_input + label parts for the next user
+   * message. Returns [] when nothing is pending (the common case keeps the
+   * user message a plain string).
+   */
+  private consumePendingPortraitInjections(): ContentPart[] {
+    if (this.pendingPortraitInjections.length === 0) return [];
+    // Strip structural chars + collapse whitespace so a name/change can't break
+    // the marker or smuggle markup into the DM context. The values are
+    // model-authored (not untrusted user input), but keep the frame well-formed
+    // regardless — a stray quote or newline shouldn't malform the tag.
+    const safe = (s: string) => s.replace(/[<>"&]/g, " ").replace(/\s+/g, " ").trim();
+    const parts: ContentPart[] = [];
+    for (const inj of this.pendingPortraitInjections) {
+      parts.push({
+        type: "text",
+        text: `<portrait_updated character="${safe(inj.name)}">Now reflects: ${safe(inj.change)}</portrait_updated>`,
+      });
+      parts.push(inj.image);
+    }
+    this.pendingPortraitInjections = [];
+    return parts;
+  }
+
+  /**
    * Handle style_scene as an async tool — runs the theme-styler subagent
    * during tool execution so the theme update broadcasts immediately
    * (via _tui on the ToolResult) instead of after the DM turn.
@@ -1693,6 +1871,10 @@ export class GameEngine {
 
     if (name === "generate_image") {
       return this.dispatchGenerateImage(input);
+    }
+
+    if (name === UPDATE_PORTRAIT_TOOL_NAME) {
+      return this.dispatchUpdatePortrait(input);
     }
 
     /**
