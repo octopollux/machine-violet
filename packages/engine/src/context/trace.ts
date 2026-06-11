@@ -230,6 +230,10 @@ export function recordElapsedSpan(span: {
   name: string;
   t0: number;
   t1: number;
+  /** Explicit campaign id — needed when this span has no enclosing turn span to
+   *  inherit from (e.g. a barrier that fires before the turn span opens), so the
+   *  explorer's per-campaign filter still keeps it. */
+  campaignId?: string;
   attrs?: Record<string, unknown>;
 }): void {
   const parent = als.getStore();
@@ -238,7 +242,7 @@ export function recordElapsedSpan(span: {
     id,
     parentId: parent ? parent.spanId : null,
     turnId: parent ? parent.turnId : id,
-    campaignId: parent?.campaignId ?? "",
+    campaignId: span.campaignId ?? parent?.campaignId ?? "",
     kind: span.kind,
     name: span.name,
     t0: span.t0,

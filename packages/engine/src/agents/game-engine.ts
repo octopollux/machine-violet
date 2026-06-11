@@ -614,7 +614,7 @@ export class GameEngine {
     // for that write-back lane. Placed AFTER `setState("dm_thinking")` so the
     // re-entrancy guard above is already armed before we yield on the await;
     // usually a no-op, since the player's think-time dwarfs the work.
-    await this.deferred.settle("next-turn");
+    await this.deferred.settle("next-turn", this.campaignId);
 
     const turnStartTime = Date.now();
     this.dmProvidedChoicesThisTurn = false;
@@ -862,8 +862,9 @@ export class GameEngine {
       // think-time hides max(), not sum()). It is write-back — its threads/intents
       // feed the DM's *next-turn* `activeState` (buildActiveState) — kept fresh by
       // the barrier-for-freshness at the next turn's context build:
-      // `settleDeferredWork("next-turn")` runs before `getSystemPrompt` reads
-      // activeState, so the refresh either finished during think-time (free) or
+      // `this.deferred.settle("next-turn")` (in processInput) runs before
+      // `getSystemPrompt` reads activeState, so the refresh either finished
+      // during think-time (free) or
       // the player out-raced it and we block just long enough to avoid serving
       // stale threads. Enqueued AFTER the dropped-exchange handler on purpose:
       // that handler's precis-updater also writes openThreads/npcIntents (and
@@ -1100,7 +1101,7 @@ export class GameEngine {
     // every detached write (scribe + scene-tracker) must land first (non-blocking
     // within a scene, flushed before it advances).
     this.setState("scene_transition");
-    await this.deferred.settle("scene-transition");
+    await this.deferred.settle("scene-transition", this.campaignId);
 
     // The conversation is cleared on transition (sceneManager.stepPruneContext),
     // so the BP4 message cache is rebuilt anyway — the free moment to refresh the
@@ -1154,7 +1155,7 @@ export class GameEngine {
     // `waiting_input` too): set the non-input state, THEN flush detached work so
     // we don't snapshot/close the session over a half-written write.
     this.setState("session_ending");
-    await this.deferred.settle("session-end");
+    await this.deferred.settle("session-end", this.campaignId);
 
     try {
       const result = await this.sceneManager.sessionEnd(
@@ -1235,7 +1236,7 @@ export class GameEngine {
     // Barrier: a git rollback rewrites entity files; let any detached work
     // finish first so its writes are part of the snapshot being reverted (not
     // racing the checkout).
-    await this.deferred.settle("rollback");
+    await this.deferred.settle("rollback", this.campaignId);
     this.callbacks.onDevLog?.(`[dev] rollback: rolling back to "${target}"`);
     const result = await performRollback(this.repo, target, this.gameState.campaignRoot, this.fileIO);
     this.callbacks.onTuiCommand?.({ type: "show_rollback_summary", summary: result.summary });
@@ -1257,7 +1258,7 @@ export class GameEngine {
    * tests can settle it (mirrors `awaitPendingPortraitRenders`).
    */
   async settleDeferredWork(): Promise<void> {
-    await this.deferred.settle("teardown");
+    await this.deferred.settle("teardown", this.campaignId);
   }
 
   /** Spawn the scribe subagent to process batched entity updates */
@@ -1331,7 +1332,7 @@ export class GameEngine {
     // Barrier: promote reads + rewrites the character sheet and upserts the
     // entity tree. A detached scribe may be rewriting the same files, so flush
     // first or the read tears / the writes clobber (last-writer-wins).
-    await this.deferred.settle("promote-character");
+    await this.deferred.settle("promote-character", this.campaignId);
 
     const paths = campaignPaths(this.gameState.campaignRoot);
     const filePath = norm(paths.character(characterName));

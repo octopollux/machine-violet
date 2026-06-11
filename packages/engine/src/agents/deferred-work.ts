@@ -51,13 +51,15 @@ export class DeferredWork {
 
   /**
    * Enqueue `work` on `lane`, serialized after the lane's prior work. Returns
-   * immediately; the work runs detached. The `.catch` seam keeps a failed task
-   * from poisoning the chain or a later `settle` await — `work` is responsible
-   * for reporting its own failure.
+   * immediately; the work runs detached. The trailing `.catch` keeps a *failed*
+   * task from poisoning the chain or a later `settle` await — the stored tail
+   * always resolves, whether or not `work` (or the prior tail) rejected, so the
+   * next task on the lane still runs in order and `settle` never sees a rejected
+   * promise. `work` owns reporting its own failure.
    */
   enqueue(lane: string, work: () => Promise<void>): void {
     const prev = this.lanes.get(lane) ?? Promise.resolve();
-    this.lanes.set(lane, prev.catch(() => undefined).then(work));
+    this.lanes.set(lane, prev.then(work).catch(() => undefined));
   }
 
   /**
@@ -65,17 +67,30 @@ export class DeferredWork {
    * by the time the player acts or a scene ends, background work has long
    * finished; it only blocks when work overran the hiding gap, which is exactly
    * when waiting is correct. A blocking settle is attributed to a `barrier_wait`
-   * span named `label` (e.g. the barrier site), nested under the open turn span
-   * when there is one.
+   * span named `label` (the barrier site), nested under the open turn span when
+   * there is one — pass `campaignId` for barriers that fire *outside* a turn span
+   * (e.g. the next-turn barrier, before the span opens) so the span still carries
+   * a campaign and the explorer's per-campaign filter keeps it.
+   *
+   * Drains until stable rather than awaiting a single snapshot: awaiting a lane's
+   * tail can let a task enqueued *during* the settle append a fresh tail, so we
+   * re-snapshot and keep awaiting until a pass finds nothing new. That makes the
+   * barrier honest — "all work, including work that arrived while we waited" —
+   * not just "the work in flight when settle was called."
    */
-  async settle(label: string): Promise<void> {
-    const pending = [...this.lanes.values()];
-    if (pending.length === 0) return;
+  async settle(label: string, campaignId?: string): Promise<void> {
+    if (this.lanes.size === 0) return;
     const t0 = this.now();
-    await Promise.all(pending);
+    const awaited = new Set<Promise<void>>();
+    for (;;) {
+      const fresh = [...this.lanes.values()].filter((p) => !awaited.has(p));
+      if (fresh.length === 0) break;
+      fresh.forEach((p) => awaited.add(p));
+      await Promise.all(fresh);
+    }
     const t1 = this.now();
     if (t1 - t0 > BARRIER_WAIT_EPSILON_MS) {
-      recordElapsedSpan({ kind: "barrier_wait", name: label, t0, t1 });
+      recordElapsedSpan({ kind: "barrier_wait", name: label, t0, t1, campaignId });
     }
   }
 }

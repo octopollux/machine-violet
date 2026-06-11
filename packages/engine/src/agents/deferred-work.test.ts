@@ -68,6 +68,33 @@ describe("DeferredWork", () => {
     expect(order).toEqual(["after-failure"]);
   });
 
+  it("a lone failing task does not make settle throw (no follow-up enqueue to absorb it)", async () => {
+    const dw = new DeferredWork();
+    // The failing task is the lane's only work — nothing chains after it to
+    // `.catch` the rejection. The trailing catch in enqueue must keep the stored
+    // tail resolved so settle's Promise.all never rejects.
+    dw.enqueue("scribe", async () => { throw new Error("boom"); });
+    await expect(dw.settle("test")).resolves.toBeUndefined();
+  });
+
+  it("settle awaits work enqueued onto a lane while it is already awaiting", async () => {
+    const dw = new DeferredWork();
+    const order: string[] = [];
+    const g = gate();
+
+    dw.enqueue("lane", async () => { await g.promise; order.push("first"); });
+    // Start the barrier, then append more work to the same lane *before* the
+    // first task resolves — the new tail wasn't in settle's initial snapshot.
+    const settling = dw.settle("test");
+    dw.enqueue("lane", async () => { order.push("second"); });
+    g.release();
+    await settling;
+
+    // The barrier drained to stable, so it waited for both — not just the task
+    // in flight when it was called.
+    expect(order).toEqual(["first", "second"]);
+  });
+
   it("settle on an empty registry is an instant no-op", async () => {
     const spans: SpanRecord[] = [];
     setTraceSink((rec) => spans.push(rec));
@@ -85,12 +112,16 @@ describe("DeferredWork", () => {
     const dw = new DeferredWork({ now: () => ticks.shift() ?? 1050 });
     dw.enqueue("scribe", async () => { /* resolved work */ });
 
-    await dw.settle("next-turn");
+    // Pass an explicit campaignId — the next-turn barrier fires outside a turn
+    // span, so without it the span would carry "" and the explorer's per-campaign
+    // filter would drop it.
+    await dw.settle("next-turn", "my-campaign");
 
     expect(spans).toHaveLength(1);
     expect(spans[0]).toMatchObject({
       kind: "barrier_wait",
       name: "next-turn",
+      campaignId: "my-campaign",
       t0: 1000,
       t1: 1050,
       durMs: 50,
