@@ -60,6 +60,7 @@ import type { GitIO } from "../tools/git/index.js";
 import { writeDebugDump } from "../tools/filesystem/debug-dump.js";
 import { styleTheme } from "./subagents/theme-styler.js";
 import { SCENE_TRACKER_CADENCE } from "./subagents/scene-tracker.js";
+import { DeferredWork } from "./deferred-work.js";
 import { ResolveSession } from "./resolve-session.js";
 import { EntityStore } from "../entities/store.js";
 import { buildEntityToolHandler, ENTITY_TOOL_NAME_SET } from "../entities/tools.js";
@@ -178,30 +179,32 @@ export class GameEngine {
   private portraitCommitChain: Promise<unknown> = Promise.resolve();
 
   /**
-   * In-flight detached scribe(s). The scribe persists narrative events into
-   * entity files; the DM never consumes its result, yet it is the single
-   * largest chunk of player-facing turn latency (~half of an entity-heavy
-   * turn). So it runs fire-and-forget off the turn's critical path.
+   * Detached background work that has to be consistent at barriers, but doesn't
+   * gate the player turn that produced it. Two lanes today:
    *
-   * Chained, not parallelized: consecutive scribes must serialize, because
-   * scribe N's entity-tree deltas have to land before scribe N+1 reads the
-   * tree for dedup. `awaitPendingScribe()` is the barrier at every point that
-   * reads or snapshots durable entity state — the next turn's context build,
-   * scene transition, session end, rollback — and the seam tests/teardown use
-   * to settle background work deterministically. The chain swallows errors so
-   * one failed scribe never poisons a later one or a barrier await.
+   * - **scribe** — write-only: persists narrative into entity files the DM never
+   *   reads back, yet was the single largest chunk of player-facing turn latency
+   *   (~half of an entity-heavy turn). All its barriers are cold (consistency,
+   *   never freshness-for-the-DM).
+   * - **scene-tracker** — write-back: refreshes open threads / NPC intents that
+   *   feed the DM's *next-turn* `activeState` (`buildActiveState`). Its next-turn
+   *   barrier is hot — a barrier-for-freshness: detach execution to turn-end but
+   *   pin consumption to the next context build, so human think-time hides it for
+   *   free with zero staleness, and worst case degrades to inline. Never a
+   *   regression.
    *
-   * TODO(perf/maintainability): generalize this single-task chain into a
-   * deferred-work registry — lanes (serial/parallel) × barrier points, each lane
-   * declaring its "deferral horizon" (which barriers it must settle at). Scribe
-   * is write-only → all barriers are cold; scene-tracker is write-back →
-   * next-ctx barrier is hot; choices gen → no engine barrier. One `settle(point)`
-   * per barrier covers every lane, so adding work or a consistency point can't
-   * silently miss a barrier (cf. the `promote_character` barrier we only caught
-   * in review). Attribute a *blocked* settle() as a `barrier_wait` span so the
-   * flame chart measures the real overrun rate instead of us guessing it.
+   * `settleDeferredWork()` is the barrier; it flushes *every* lane at each point
+   * that reads or snapshots the durable state this work touches — the next turn's
+   * context build (before `getSystemPrompt` reads activeState), scene transition,
+   * session end, rollback, `promote_character` — and is what tests/teardown use to
+   * settle background work deterministically. Lanes serialize internally
+   * (consecutive scribes apply in order for dedup) and run parallel to each other
+   * (think-time hides max(), not sum()). See {@link DeferredWork} for why one
+   * `settle` per barrier covers every lane — it's what kills the "forgot a barrier
+   * for the new task" bug class (cf. the `promote_character` barrier we only caught
+   * in the scribe-detach review).
    */
-  private pendingScribe: Promise<void> = Promise.resolve();
+  private readonly deferred = new DeferredWork();
 
   constructor(params: {
     provider: LLMProvider;
@@ -446,16 +449,12 @@ export class GameEngine {
         await this.rollbackAndExit(cmd.target as string);
       } else if (cmd.type === "scribe") {
         // Detached: the DM doesn't need the scribe's result to keep narrating,
-        // and the scribe is ~half of player-facing turn latency. Chain (not
-        // parallelize) so scribes serialize — dedup needs scribe N's tree
-        // deltas applied before scribe N+1 reads. The `.catch` keeps a failed
-        // scribe from poisoning the chain or a later barrier await
-        // (handleScribe already swallows its own errors — belt & braces). The
-        // barrier in transitionScene/endSession/rollback (and at the next
-        // turn's start) flushes this before any durable entity read.
-        this.pendingScribe = this.pendingScribe
-          .catch(() => undefined)
-          .then(() => this.handleScribe(cmd));
+        // and the scribe is ~half of player-facing turn latency. The "scribe"
+        // lane serializes consecutive scribes (dedup needs scribe N's tree
+        // deltas applied before scribe N+1 reads) and swallows their errors;
+        // `settleDeferredWork()` (next turn start, scene transition, session
+        // end, rollback, promote) flushes it before any durable entity read.
+        this.deferred.enqueue("scribe", () => this.handleScribe(cmd));
       } else if (cmd.type === "promote_character") {
         await this.handlePromoteCharacter(cmd);
       } else if (cmd.type === "dm_notes") {
@@ -606,14 +605,16 @@ export class GameEngine {
     this.imageGenInFlight = 0;
     this.setState("dm_thinking");
 
-    // Barrier: the previous turn's scribe runs detached (see `pendingScribe`).
-    // Flush it before reading entity state for this turn — the DM context
-    // (entity registry + character sheets) and the next scribe's dedup both
-    // need the prior writes landed, and a concurrent read could otherwise tear
-    // a half-written sheet. Placed AFTER `setState("dm_thinking")` so the
+    // Barrier: the previous turn's detached work runs off the critical path
+    // (see `deferred`). Flush every lane before building this turn's context.
+    // The scribe lane: the DM's entity registry + character sheets need its
+    // writes landed (a concurrent read could tear a half-written sheet). The
+    // scene-tracker lane: `getSystemPrompt` below reads its refreshed
+    // threads/intents into activeState, so this doubles as the freshness barrier
+    // for that write-back lane. Placed AFTER `setState("dm_thinking")` so the
     // re-entrancy guard above is already armed before we yield on the await;
-    // usually a no-op, since the player's think-time dwarfs the scribe.
-    await this.awaitPendingScribe();
+    // usually a no-op, since the player's think-time dwarfs the work.
+    await this.deferred.settle("next-turn");
 
     const turnStartTime = Date.now();
     this.dmProvidedChoicesThisTurn = false;
@@ -848,33 +849,42 @@ export class GameEngine {
       // label.
       await this.repo?.trackExchange(opts?.skipTranscript ? undefined : text);
 
-      // Run scene tracker periodically to maintain open threads / NPC intents
-      // TODO(perf): detach this as a deferred-work lane like the scribe. It's
-      // write-back — its threads/intents feed the DM's next-turn `activeState`
-      // (buildActiveState) — so use a barrier-for-freshness at the next-turn
-      // context build: free in the common case (human think-time hides it),
-      // only blocks if the player out-races it, never a regression. Runs in
-      // parallel with the scribe lane, so think-time hides max(), not sum().
-      if (!opts?.skipTranscript) {
-        const currentScene = this.sceneManager.getScene();
-        const playerExchanges = currentScene.transcript.filter((t) => t.startsWith("**[")).length;
-        if (playerExchanges > 0 && playerExchanges % SCENE_TRACKER_CADENCE === 0) {
-          try {
-            const trackerUsage = await this.sceneManager.runSceneTracker(this.provider);
-            accUsage(this.sessionUsage, trackerUsage);
-            this.persistCurrentScene();
-          } catch (e) {
-            this.callbacks.onDevLog?.(`[dev] scene-tracker failed: ${e instanceof Error ? e.message : e}`);
-          }
-        }
-      }
-
       // Handle dropped exchange — update precis, then re-persist scene
       // so the precis written to disk includes the just-dropped content.
       if (dropped) {
         this.callbacks.onExchangeDropped();
         await this.handleDroppedExchange(dropped);
         this.persistCurrentScene();
+      }
+
+      // Run scene tracker periodically to maintain open threads / NPC intents.
+      // Detached onto its own "scene-tracker" lane (parallel to the scribe, so
+      // think-time hides max(), not sum()). It is write-back — its threads/intents
+      // feed the DM's *next-turn* `activeState` (buildActiveState) — kept fresh by
+      // the barrier-for-freshness at the next turn's context build:
+      // `settleDeferredWork("next-turn")` runs before `getSystemPrompt` reads
+      // activeState, so the refresh either finished during think-time (free) or
+      // the player out-raced it and we block just long enough to avoid serving
+      // stale threads. Enqueued AFTER the dropped-exchange handler on purpose:
+      // that handler's precis-updater also writes openThreads/npcIntents (and
+      // persists the scene) inline, so detaching the tracker last makes it the
+      // sole *final* writer of those fields — no concurrent scene mutation or
+      // persist to race — instead of overlapping it. The cadence gate stays
+      // inline so we only spawn the subagent on its cadence, not every turn.
+      if (!opts?.skipTranscript) {
+        const currentScene = this.sceneManager.getScene();
+        const playerExchanges = currentScene.transcript.filter((t) => t.startsWith("**[")).length;
+        if (playerExchanges > 0 && playerExchanges % SCENE_TRACKER_CADENCE === 0) {
+          this.deferred.enqueue("scene-tracker", async () => {
+            try {
+              const trackerUsage = await this.sceneManager.runSceneTracker(this.provider);
+              accUsage(this.sessionUsage, trackerUsage);
+              this.persistCurrentScene();
+            } catch (e) {
+              this.callbacks.onDevLog?.(`[dev] scene-tracker failed: ${e instanceof Error ? e.message : e}`);
+            }
+          });
+        }
       }
 
       // Process deferred TUI commands — engine-side work (scene transitions,
@@ -1087,10 +1097,10 @@ export class GameEngine {
     // and touch entity state mid-transition. setState to a non-input state
     // first (as processInput does), THEN flush — a scene transition rebuilds
     // the next scene's opening from persisted entity files + changelogs, so
-    // every detached scribe write must land first (non-blocking within a scene,
-    // flushed before it advances).
+    // every detached write (scribe + scene-tracker) must land first (non-blocking
+    // within a scene, flushed before it advances).
     this.setState("scene_transition");
-    await this.awaitPendingScribe();
+    await this.deferred.settle("scene-transition");
 
     // The conversation is cleared on transition (sceneManager.stepPruneContext),
     // so the BP4 message cache is rebuilt anyway — the free moment to refresh the
@@ -1141,10 +1151,10 @@ export class GameEngine {
     this.injectionRegistry.get<BehaviorInjection>("behavior")?.reset();
     this.injectionRegistry.get<HardStatsInjection>("hard-stats")?.reset();
     // Arm the guard before the barrier (endSession is reachable from
-    // `waiting_input` too): set the non-input state, THEN flush the detached
-    // scribe so we don't snapshot/close the session over a half-written write.
+    // `waiting_input` too): set the non-input state, THEN flush detached work so
+    // we don't snapshot/close the session over a half-written write.
     this.setState("session_ending");
-    await this.awaitPendingScribe();
+    await this.deferred.settle("session-end");
 
     try {
       const result = await this.sceneManager.sessionEnd(
@@ -1222,10 +1232,10 @@ export class GameEngine {
       this.callbacks.onError(new Error("Rollback unavailable: git is disabled for this campaign."));
       return;
     }
-    // Barrier: a git rollback rewrites entity files; let any detached scribe
+    // Barrier: a git rollback rewrites entity files; let any detached work
     // finish first so its writes are part of the snapshot being reverted (not
     // racing the checkout).
-    await this.awaitPendingScribe();
+    await this.deferred.settle("rollback");
     this.callbacks.onDevLog?.(`[dev] rollback: rolling back to "${target}"`);
     const result = await performRollback(this.repo, target, this.gameState.campaignRoot, this.fileIO);
     this.callbacks.onTuiCommand?.({ type: "show_rollback_summary", summary: result.summary });
@@ -1237,17 +1247,17 @@ export class GameEngine {
   // --- Worldbuilding Entity I/O ---
 
   /**
-   * Barrier: await the in-flight detached scribe chain before reading or
-   * snapshotting durable entity state. Never throws (the chain is
-   * `.catch`-guarded and handleScribe swallows its own errors). Usually
-   * resolves instantly — by the time the player acts or the DM ends a scene
-   * the background scribe has long finished; it only actually blocks when a
-   * scribe overruns that gap, which is exactly when waiting is correct.
-   * Public so graceful teardown and deterministic tests can settle it (mirrors
-   * `awaitPendingPortraitRenders`).
+   * Barrier: flush all detached background lanes (scribe, scene-tracker) before
+   * reading or snapshotting the durable state they touch. Never throws (lanes
+   * `.catch`-guard their seams and the tasks swallow their own errors). Usually
+   * resolves instantly — by the time the player acts or the DM ends a scene the
+   * background work has long finished; it only actually blocks when work
+   * overruns that gap, which is exactly when waiting is correct (and is recorded
+   * as a `barrier_wait` span). Public so graceful teardown and deterministic
+   * tests can settle it (mirrors `awaitPendingPortraitRenders`).
    */
-  async awaitPendingScribe(): Promise<void> {
-    await this.pendingScribe;
+  async settleDeferredWork(): Promise<void> {
+    await this.deferred.settle("teardown");
   }
 
   /** Spawn the scribe subagent to process batched entity updates */
@@ -1320,8 +1330,8 @@ export class GameEngine {
 
     // Barrier: promote reads + rewrites the character sheet and upserts the
     // entity tree. A detached scribe may be rewriting the same files, so flush
-    // it first or the read tears / the writes clobber (last-writer-wins).
-    await this.awaitPendingScribe();
+    // first or the read tears / the writes clobber (last-writer-wins).
+    await this.deferred.settle("promote-character");
 
     const paths = campaignPaths(this.gameState.campaignRoot);
     const filePath = norm(paths.character(characterName));

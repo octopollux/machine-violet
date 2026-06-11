@@ -29,7 +29,14 @@ import { appendFileSync, existsSync, mkdirSync, openSync, closeSync } from "node
 import { join, dirname } from "node:path";
 import { AsyncLocalStorage } from "node:async_hooks";
 
-export type SpanKind = "turn" | "agent" | "api_call" | "tool" | "image_gen" | "background";
+export type SpanKind =
+  | "turn"
+  | "agent"
+  | "api_call"
+  | "tool"
+  | "image_gen"
+  | "background"
+  | "barrier_wait";
 
 /** The ALS store: the currently-open span, inherited by everything `fn` awaits. */
 export interface SpanContext {
@@ -203,4 +210,40 @@ export async function withSpan<T>(
       ...(Object.keys(active.attrs).length > 0 ? { attrs: active.attrs } : {}),
     });
   }
+}
+
+/**
+ * Record a span whose interval the caller has *already* measured (it supplies
+ * `t0`/`t1`), as a child of the currently-open span. Unlike {@link withSpan},
+ * which brackets a function it runs, this is for after-the-fact instrumentation
+ * — where you only know whether the span is worth recording *after* the work it
+ * describes has completed. The motivating case is a consistency barrier
+ * (`DeferredWork.settle`): an instant settle is a no-op we don't want to log on
+ * every turn, but a settle that actually *blocked* on overrunning background
+ * work is exactly what we want the flame chart to surface, and by then the wait
+ * is already over. Nests under the open span when there is one (so a barrier
+ * inside a turn shows at the start of that turn's bar); otherwise it stands as
+ * its own root, which the explorer still renders.
+ */
+export function recordElapsedSpan(span: {
+  kind: SpanKind;
+  name: string;
+  t0: number;
+  t1: number;
+  attrs?: Record<string, unknown>;
+}): void {
+  const parent = als.getStore();
+  const id = ++spanCounter;
+  writeSpan({
+    id,
+    parentId: parent ? parent.spanId : null,
+    turnId: parent ? parent.turnId : id,
+    campaignId: parent?.campaignId ?? "",
+    kind: span.kind,
+    name: span.name,
+    t0: span.t0,
+    t1: span.t1,
+    durMs: span.t1 - span.t0,
+    ...(span.attrs && Object.keys(span.attrs).length > 0 ? { attrs: span.attrs } : {}),
+  });
 }

@@ -22,6 +22,7 @@ The game loop, state management, and AI session handling.
 |---|---|
 | `game-state.ts` | `GameState` interface — the single mutable state object |
 | `game-engine.ts` | Main orchestrator: callbacks, turn management, scene transitions |
+| `deferred-work.ts` | `DeferredWork` registry — detached background lanes (scribe, scene-tracker) flushed at consistency barriers via `settle()`; blocked settles emit `barrier_wait` spans |
 | `agent-loop.ts` | Single-turn conversation loop: streaming, tool handling, usage |
 | `tool-registry.ts` | All tool definitions + `TOOL_STATE_MAP` + dispatch |
 | `scene-manager.ts` | `SceneState`, transitions, pending operations, precis updates |
