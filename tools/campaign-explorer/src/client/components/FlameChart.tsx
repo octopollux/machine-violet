@@ -11,6 +11,7 @@ export const KIND_COLORS: Record<string, string> = {
   tool: "#66bb6a",       // green — a tool call
   image_gen: "#ff7043",  // orange — image generation
   background: "#78909c", // gray — detached background work (suggested choices)
+  barrier_wait: "#ffca28", // amber — a consistency barrier that actually blocked on overrunning background work
 };
 
 const ERROR_COLOR = "#da3633";

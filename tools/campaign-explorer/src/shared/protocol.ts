@@ -62,7 +62,7 @@ export interface SpanRecord {
   parentId: number | null;
   turnId: number;
   campaignId: string;
-  kind: "turn" | "agent" | "api_call" | "tool" | "image_gen" | "background";
+  kind: "turn" | "agent" | "api_call" | "tool" | "image_gen" | "background" | "barrier_wait";
   name: string;
   /** epoch ms at open */
   t0: number;
