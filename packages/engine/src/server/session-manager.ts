@@ -26,8 +26,9 @@ import { getActivePlayer } from "../agents/player-manager.js";
 import { loadEnv } from "../config/first-launch.js";
 import { loadConnectionStore, buildEffectiveConnections } from "../config/connections.js";
 import { buildTierProvidersWithCache } from "../config/tier-resolver.js";
-import { wrapForRecording } from "../providers/tape-mode.js";
-import type { LLMProvider } from "../providers/types.js";
+import { wrapForRecording, buildReplayTierProviders } from "../providers/tape-mode.js";
+import type { LLMProvider, TierProvider } from "../providers/types.js";
+import type { ModelTier } from "@machine-violet/shared/types/engine.js";
 import { configDir, norm } from "../utils/paths.js";
 import { processingPaths } from "../config/processing-paths.js";
 import { readBundledRuleCard } from "../config/systems.js";
@@ -573,23 +574,31 @@ export class SessionManager {
     // Medium/Small=Anthropic) routes each call to the right vendor without
     // ever sending an Anthropic model ID through an OpenAI client.
     const appConfigDir = configDir();
-    const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
-    const { createAnthropicProvider } = await import("../providers/anthropic.js");
-    const tierResolution = buildTierProvidersWithCache(connStore, () => createAnthropicProvider(), appConfigDir);
-    // Tapes every LLM call when MV_TAPE_MODE=record; identity pass-through otherwise.
-    const tierProviders = wrapForRecording(tierResolution.tiers);
+    this.providersByConnectionId.clear();
+    let tierProviders: Record<ModelTier, TierProvider>;
+    const replayTiers = buildReplayTierProviders();
+    if (replayTiers) {
+      // Full-stack replay (E2E): every tier served from the tape at
+      // MV_TAPE_PATH — no connection, no network, no key. byConnectionId
+      // stays empty; a taped session has no management-route providers.
+      tierProviders = replayTiers;
+    } else {
+      const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
+      const { createAnthropicProvider } = await import("../providers/anthropic.js");
+      const tierResolution = buildTierProvidersWithCache(connStore, () => createAnthropicProvider(), appConfigDir);
+      // Tapes every LLM call when MV_TAPE_MODE=record; identity pass-through otherwise.
+      tierProviders = wrapForRecording(tierResolution.tiers);
+      // Build the connectionId → provider lookup for management routes.
+      for (const [connId, provider] of tierResolution.byConnectionId) {
+        this.providersByConnectionId.set(connId, provider);
+      }
+    }
 
     // Track unique providers for end-of-session disposal. Stateful providers
     // (openai-chatgpt) own subprocesses that linger across sessions otherwise.
     this.sessionProviders.add(tierProviders.large.provider);
     this.sessionProviders.add(tierProviders.medium.provider);
     this.sessionProviders.add(tierProviders.small.provider);
-
-    // Build the connectionId → provider lookup for management routes.
-    this.providersByConnectionId.clear();
-    for (const [connId, provider] of tierResolution.byConnectionId) {
-      this.providersByConnectionId.set(connId, provider);
-    }
 
     // The DM uses the large tier; keep `provider` as a local alias for the
     // many downstream sites in this method that still reference it directly.

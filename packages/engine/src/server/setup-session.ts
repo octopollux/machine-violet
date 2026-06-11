@@ -25,7 +25,7 @@ import { processingPaths } from "../config/processing-paths.js";
 import { readBundledRuleCard } from "../config/systems.js";
 import { loadConnectionStore, buildEffectiveConnections } from "../config/connections.js";
 import { buildTierProvidersWithCache } from "../config/tier-resolver.js";
-import { wrapForRecording } from "../providers/tape-mode.js";
+import { wrapForRecording, buildReplayTierProviders } from "../providers/tape-mode.js";
 import { createAnthropicProvider } from "../providers/index.js";
 import type { LLMProvider, TierProvider } from "../providers/types.js";
 import type { ModelTier } from "../config/models.js";
@@ -76,18 +76,25 @@ export class SetupSession {
     // incremental cost over medium is small and the quality of the handoff
     // note + world framing benefits meaningfully.
     const appConfigDir = configDir();
-    const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
-    // configDir must be forwarded so openai-chatgpt connections get a
-    // token store backed by connections.json — without it the codex
-    // subprocess never sees the persisted ChatGPT tokens and the very
-    // first setup turn throws "no active ChatGPT login" before any
-    // model call. Game sessions (session-manager) already pass this;
-    // setup was missing it, breaking any campaign whose large tier
-    // resolves to an openai-chatgpt connection.
-    const resolution = buildTierProvidersWithCache(connStore, () => createAnthropicProvider(), appConfigDir);
-    // Tapes every LLM call when MV_TAPE_MODE=record; identity pass-through otherwise.
-    this.tierProviders = wrapForRecording(resolution.tiers);
-    this.providersByConnectionId = resolution.byConnectionId;
+    const replayTiers = buildReplayTierProviders();
+    if (replayTiers) {
+      // Full-stack replay (E2E): tiers served from the tape, no connection/key.
+      this.tierProviders = replayTiers;
+      this.providersByConnectionId = new Map();
+    } else {
+      const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
+      // configDir must be forwarded so openai-chatgpt connections get a
+      // token store backed by connections.json — without it the codex
+      // subprocess never sees the persisted ChatGPT tokens and the very
+      // first setup turn throws "no active ChatGPT login" before any
+      // model call. Game sessions (session-manager) already pass this;
+      // setup was missing it, breaking any campaign whose large tier
+      // resolves to an openai-chatgpt connection.
+      const resolution = buildTierProvidersWithCache(connStore, () => createAnthropicProvider(), appConfigDir);
+      // Tapes every LLM call when MV_TAPE_MODE=record; identity pass-through otherwise.
+      this.tierProviders = wrapForRecording(resolution.tiers);
+      this.providersByConnectionId = resolution.byConnectionId;
+    }
     this.provider = this.tierProviders.large.provider;
     this.model = this.tierProviders.large.model;
   }
