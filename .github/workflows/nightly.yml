@@ -144,8 +144,49 @@ jobs:
           name: machine-violet-${{ matrix.asset_suffix }}
           path: machine-violet-nightly-*
 
-  release:
+  # Gate: replay the golden corpus against the PACKAGED per-OS artifact before
+  # publishing the nightly — a broken package fails here and blocks it.
+  # Deterministic + offline (MV_E2E + replay, no API key). See docs/e2e-harness.md.
+  verify-package:
     needs: [prepare, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            asset_suffix: windows-x64
+          - os: macos-latest
+            asset_suffix: darwin-arm64
+          - os: ubuntu-latest
+            asset_suffix: linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 25
+          cache: npm
+      - run: npm ci
+      - name: Build shared package
+        run: npm run build -w packages/shared
+      - name: Download packaged artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: machine-violet-${{ matrix.asset_suffix }}
+          path: pkg-artifact
+      - name: Replay goldens against the packaged binary
+        shell: bash
+        run: bash scripts/ci/replay-packaged-binary.sh pkg-artifact
+      - name: Velopack install/uninstall smoke (Windows)
+        if: matrix.os == 'windows-latest'
+        # Report-only until a test-build.yml dispatch validates the install CLI;
+        # flip to blocking afterward. See docs/e2e-harness.md.
+        continue-on-error: true
+        shell: pwsh
+        run: scripts/ci/velopack-install-smoke.ps1 -ArtifactDir pkg-artifact -RepoRoot .
+
+  release:
+    needs: [prepare, build, verify-package]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
