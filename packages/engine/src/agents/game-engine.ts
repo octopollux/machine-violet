@@ -1260,16 +1260,9 @@ export class GameEngine {
     try {
       const sceneNumber = this.sceneManager.getScene().sceneNumber;
       const small = this.tierProviders.small;
-      // TODO(perf): prefetch the batch's referenced entities here and inject
-      // them as canonical instead of letting the scribe pull them via
-      // read_entity — that read burst is ~a third of its wall-clock. The cheap
-      // subagents already push their inputs (promote_character pre-reads the
-      // sheet, scene-tracker gets the transcript); the scribe is the lone
-      // puller. Resolve the batch against the entity tree, read those files,
-      // pass them in with a "treat as canonical, don't re-read" prompt hint.
-      // Keep read_entity as the fallback for anything unpredicted; be generous
-      // including near-match dedup candidates (reads are cheap; under-fetching
-      // there is the one thing that hurts dedup quality).
+      // (runScribe prefetches the batch's referenced entities and hands them to
+      // the subagent as canonical, so it skips the read_entity round-trips —
+      // see buildPrefetchedEntityBlock in scribe.ts.)
       const result = await runScribe(small.provider, {
         updates: updates.map(u => ({
           visibility: u.visibility as "private" | "player-facing",
