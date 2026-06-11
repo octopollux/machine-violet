@@ -211,6 +211,13 @@ describe("setup golden corpus", () => {
     describe(scenario.name, () => {
       it.skipIf(process.env.RECORD_GOLDENS !== "1")("records the golden (live API)", async () => {
         loadEnv();
+        // Fail fast with an actionable message: without a key the OpenAI SDK
+        // throws an opaque auth error deep inside the first call. This `it` is
+        // the explicit live-recording gate, so the key is a hard precondition.
+        expect(
+          process.env.OPENAI_API_KEY,
+          "RECORD_GOLDENS=1 records the setup corpus via gpt-5.5 (openai-apikey) — set OPENAI_API_KEY first",
+        ).toBeTruthy();
         const writer = new TapeWriter(scenario.name);
         const { narrative, finalized } = await runSetupScenario(
           scenario,
