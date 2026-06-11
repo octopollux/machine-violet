@@ -3,11 +3,18 @@
  * DM voice-guide generator (personality-prior authoring tool).
  *
  * Asks the DM — primed with the real Core DM Identity, a chosen DM personality
- * block, and the live formatting rules — to write a short guide, IN ITS OWN
- * VOICE and in the SECOND PERSON, describing how it speaks and what it says,
- * with examples. The output is shaped to drop straight into a personality
- * block's `detail` field as a deeper, example-rich voice prior: showing the
- * model its own voice beats describing it.
+ * block, and the live formatting rules — to write a short guide describing how
+ * it speaks and what it says, with examples. The output is shaped to drop
+ * straight into a personality block's `detail` field as a deeper, example-rich
+ * voice prior: showing the model its own voice beats describing it.
+ *
+ * TWO PASSES, deliberately. Asking for second person up front ("You speak
+ * like…") makes the model narrate ABOUT the voice and flattens it. So:
+ *   1. Voice pass  — write the guide IN ITS OWN VOICE, first person, natural.
+ *   2. Person flip — a tight rewrite that ONLY swaps the framing from first to
+ *      second person, preserving every word of idiom and every quoted
+ *      in-character line. Second person is what fits a `detail` block, but the
+ *      voice has to be on the page (pass 1) before we touch the pronouns.
  *
  * We deliberately drive GPT-5.5 rather than Claude. Its personality vector is
  * softer, so it adopts an authored voice more readily and with less of the
@@ -97,28 +104,96 @@ function personalityBlock(p: Personality): string {
   return [p.prompt_fragment?.trim(), p.detail?.trim()].filter(Boolean).join("\n\n");
 }
 
-/**
- * Assemble the system/user split that mirrors how the real DM is primed:
- * identity + personality + formatting are the cached system prefix; the writing
- * request is the turn, with the persona repeated as a closing "Reminder:" to
- * reinforce the voice right before generation.
- */
-function buildPrompt(
-  identity: string,
-  formatting: string,
-  persona: string,
-): { instructions: string; task: string } {
-  const instructions = [identity, persona, formatting].join("\n\n");
-  const task = [
-    "You are writing a guide to pass along your personality to another agent who will inherit your voice. " +
-      "Write 2-3 paragraphs in the second person — address that agent directly as \"you\" (\"You speak like…\", \"You never…\") — " +
-      "describing how you speak and what you say, with examples. " +
+/** The system prefix that primes the DM exactly as the real engine does. */
+function buildInstructions(identity: string, formatting: string, persona: string): string {
+  return [identity, persona, formatting].join("\n\n");
+}
+
+/** Pass 1 task: write the guide in the DM's own voice, first person, natural. */
+function buildVoiceTask(persona: string): string {
+  return [
+    "You are writing a guide to pass along your personality to another agent. " +
+      "Write 2-3 paragraphs *in your own voice* describing how you speak and what you say, with examples. " +
       "It is more important that it be idiomatic and full of personality than it be technically sound.",
     "",
     "Reminder:",
     persona,
   ].join("\n");
-  return { instructions, task };
+}
+
+/** Pass 2 input: flip ONLY the grammatical person, preserving everything else. */
+function buildFlipInput(firstPersonGuide: string): string {
+  return [
+    "Below is a voice guide you just wrote in the first person. Rewrite it so it speaks to your successor — " +
+      'the next agent who will inherit your voice — in the SECOND PERSON ("You speak like…", "You never…").',
+    "",
+    "Change ONLY the grammatical person of your own narration (I/me/my/myself → you/your/yourself). " +
+      "Do not rephrase, soften, summarize, reorder, or turn anything into a list of instructions. " +
+      "Keep every example, every metaphor, every word of idiom and rhythm exactly as written. " +
+      "Anything inside quotation marks is a line you might SAY to a player in character — leave those quoted " +
+      "lines untouched, first person and all.",
+    "",
+    "Output only the rewritten guide, nothing else.",
+    "",
+    "---",
+    firstPersonGuide,
+  ].join("\n");
+}
+
+interface ModelCall {
+  text: string;
+  status: string;
+  reasoningTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  summary: string;
+}
+
+/**
+ * One Responses API call at high reasoning effort. The primary attempt asks for
+ * a reasoning summary; some orgs gate summaries behind verification, so if
+ * that's the only complaint we retry without it — the reasoning_tokens count
+ * still proves reasoning ran.
+ */
+async function callModel(client: OpenAI, instructions: string, input: string): Promise<ModelCall> {
+  const create = (withSummary: boolean) =>
+    client.responses.create({
+      model: MODEL,
+      instructions,
+      input,
+      reasoning: withSummary
+        ? { effort: REASONING_EFFORT, summary: "auto" }
+        : { effort: REASONING_EFFORT },
+      max_output_tokens: MAX_OUTPUT_TOKENS,
+      store: false,
+    });
+
+  let response;
+  try {
+    response = await create(true);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/summary|verif/i.test(msg)) response = await create(false);
+    else throw e;
+  }
+
+  const summaries: string[] = [];
+  for (const item of response.output) {
+    if (item.type === "reasoning") {
+      for (const s of item.summary ?? []) {
+        if (s.type === "summary_text" && s.text) summaries.push(s.text);
+      }
+    }
+  }
+
+  return {
+    text: response.output_text.trim(),
+    status: response.status ?? "unknown",
+    reasoningTokens: response.usage?.output_tokens_details?.reasoning_tokens ?? 0,
+    inputTokens: response.usage?.input_tokens ?? 0,
+    outputTokens: response.usage?.output_tokens ?? 0,
+    summary: summaries.join("\n\n"),
+  };
 }
 
 interface GuideResult {
@@ -128,14 +203,18 @@ interface GuideResult {
   reasoningTokens: number;
   inputTokens: number;
   outputTokens: number;
-  guide: string;
+  /** Pass 1 output — the voice-true source, kept for review. */
+  guideFirstPerson: string;
+  /** Pass 2 output — second person, the version that folds into `detail`. */
+  guideSecondPerson: string;
+  /** Reasoning summary from the voice pass. */
   summary: string;
   error?: string;
 }
 
 /**
- * One personality → one guide. Catches its own errors and returns them in the
- * result so a batch run never aborts on a single bad seed.
+ * One personality → two passes → one guide. Catches its own errors and returns
+ * them in the result so a batch run never aborts on a single bad seed.
  */
 async function generateGuide(
   client: OpenAI,
@@ -150,59 +229,28 @@ async function generateGuide(
     reasoningTokens: 0,
     inputTokens: 0,
     outputTokens: 0,
-    guide: "",
+    guideFirstPerson: "",
+    guideSecondPerson: "",
     summary: "",
   };
   try {
     const personality = loadPersonality(slug);
     const persona = personalityBlock(personality);
-    const { instructions, task } = buildPrompt(identity, formatting, persona);
+    const instructions = buildInstructions(identity, formatting, persona);
 
-    // Primary attempt asks for a reasoning summary. Some orgs gate summaries
-    // behind verification; if that's the only complaint, retry without it — the
-    // reasoning_tokens count still proves reasoning ran.
-    const callModel = (withSummary: boolean) =>
-      client.responses.create({
-        model: MODEL,
-        instructions,
-        input: task,
-        reasoning: withSummary
-          ? { effort: REASONING_EFFORT, summary: "auto" }
-          : { effort: REASONING_EFFORT },
-        max_output_tokens: MAX_OUTPUT_TOKENS,
-        store: false,
-      });
-
-    let response;
-    try {
-      response = await callModel(true);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (/summary|verif/i.test(msg)) {
-        response = await callModel(false);
-      } else {
-        throw e;
-      }
-    }
-
-    const summaries: string[] = [];
-    for (const item of response.output) {
-      if (item.type === "reasoning") {
-        for (const s of item.summary ?? []) {
-          if (s.type === "summary_text" && s.text) summaries.push(s.text);
-        }
-      }
-    }
+    const voice = await callModel(client, instructions, buildVoiceTask(persona));
+    const flip = await callModel(client, instructions, buildFlipInput(voice.text));
 
     return {
       slug,
       name: personality.name,
-      status: response.status ?? "unknown",
-      reasoningTokens: response.usage?.output_tokens_details?.reasoning_tokens ?? 0,
-      inputTokens: response.usage?.input_tokens ?? 0,
-      outputTokens: response.usage?.output_tokens ?? 0,
-      guide: response.output_text.trim(),
-      summary: summaries.join("\n\n"),
+      status: flip.status,
+      reasoningTokens: voice.reasoningTokens + flip.reasoningTokens,
+      inputTokens: voice.inputTokens + flip.inputTokens,
+      outputTokens: voice.outputTokens + flip.outputTokens,
+      guideFirstPerson: voice.text,
+      guideSecondPerson: flip.text,
+      summary: voice.summary,
     };
   } catch (e) {
     return { ...base, error: e instanceof Error ? e.message : String(e) };
@@ -243,12 +291,23 @@ function toCsv(rows: GuideResult[]): string {
     "input_tokens",
     "output_tokens",
     "guide",
+    "guide_first_person",
     "error",
   ];
   const lines = [header.map(csvCell).join(",")];
   for (const r of rows) {
     lines.push(
-      [r.slug, r.name, r.status, r.reasoningTokens, r.inputTokens, r.outputTokens, r.guide, r.error ?? ""]
+      [
+        r.slug,
+        r.name,
+        r.status,
+        r.reasoningTokens,
+        r.inputTokens,
+        r.outputTokens,
+        r.guideSecondPerson,
+        r.guideFirstPerson,
+        r.error ?? "",
+      ]
         .map(csvCell)
         .join(","),
     );
@@ -294,18 +353,20 @@ async function runSingle(slug: string): Promise<void> {
     return;
   }
 
-  console.error("--- reasoning ---");
+  console.error("--- reasoning (both passes) ---");
   console.error(
     `reasoning_tokens: ${r.reasoningTokens}${r.reasoningTokens > 0 ? "  ✓ reasoning fired" : "  ✗ NO reasoning"}`,
   );
-  console.error(r.summary ? `\nreasoning summary:\n${r.summary}` : "(no reasoning summary text returned)");
+  console.error(r.summary ? `\nvoice-pass summary:\n${r.summary}` : "(no reasoning summary text returned)");
   if (r.status === "incomplete") {
     console.error("\n⚠ response incomplete — the visible text may be truncated; raise MAX_OUTPUT_TOKENS.");
   }
 
-  console.log("\n================ VOICE GUIDE ================\n");
-  console.log(r.guide);
-  console.log("\n============================================");
+  console.log("\n=========== PASS 1 · IN-VOICE (first person) ===========\n");
+  console.log(r.guideFirstPerson);
+  console.log("\n=========== PASS 2 · PERSON-FLIPPED (second person) ===========\n");
+  console.log(r.guideSecondPerson);
+  console.log("\n===============================================================");
   console.error(`\nusage: in=${r.inputTokens} out=${r.outputTokens} (reasoning=${r.reasoningTokens}) status=${r.status}`);
 }
 
@@ -328,7 +389,9 @@ async function runBatch(): Promise<void> {
   const rows = await mapWithConcurrency(slugs, concurrency, async (slug) => {
     const r = await generateGuide(client, identity, formatting, slug);
     done += 1;
-    const tag = r.error ? `ERROR ${r.error.slice(0, 60)}` : `${r.status} reasoning=${r.reasoningTokens} chars=${r.guide.length}`;
+    const tag = r.error
+      ? `ERROR ${r.error.slice(0, 60)}`
+      : `${r.status} reasoning=${r.reasoningTokens} chars=${r.guideSecondPerson.length}`;
     console.error(`[${String(done).padStart(2)}/${slugs.length}] ${slug.padEnd(20)} ${tag}`);
     return r;
   });
