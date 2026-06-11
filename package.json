@@ -19,6 +19,7 @@
     "golden:verify": "vitest run golden",
     "smoketest": "node --import tsx/esm packages/test-harness/bin/smoketest.ts",
     "e2e:boot": "node --import tsx/esm packages/test-harness/bin/boot-and-quit.ts",
+    "e2e:replay": "node --import tsx/esm packages/test-harness/bin/replay-golden.ts",
     "play": "node --import tsx/esm packages/test-harness/bin/mvplay.ts",
     "dist": "node scripts/build-dist.js",
     "explorer": "node tools/campaign-explorer/scripts/dev.js",

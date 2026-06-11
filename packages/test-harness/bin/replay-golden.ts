@@ -14,10 +14,15 @@
  *
  * Exits 0 if every golden replays identically, 1 on any mismatch/error.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 
 import { replayGolden, normalizeNarrative, type ReplayOptions } from "../src/replay-runner.js";
 import type { FullStackGolden } from "../src/golden.js";
+
+/** Default corpus: every *.golden.json under packages/test-harness/goldens/. */
+const GOLDENS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "goldens");
 
 function parseArgs(argv: string[]): { paths: string[]; binary?: string } {
   const paths: string[] = [];
@@ -30,9 +35,13 @@ function parseArgs(argv: string[]): { paths: string[]; binary?: string } {
 }
 
 async function main(): Promise<void> {
-  const { paths, binary } = parseArgs(process.argv.slice(2));
+  const { paths: argPaths, binary } = parseArgs(process.argv.slice(2));
+  // No explicit paths → replay the whole goldens corpus (the CI gate form).
+  const paths = argPaths.length > 0
+    ? argPaths
+    : readdirSync(GOLDENS_DIR).filter((f) => f.endsWith(".golden.json")).map((f) => join(GOLDENS_DIR, f));
   if (paths.length === 0) {
-    process.stderr.write("usage: replay-golden <golden.json...> [--binary <path>]\n");
+    process.stderr.write("no goldens found (usage: replay-golden [golden.json...] [--binary <path>])\n");
     process.exit(2);
   }
 
