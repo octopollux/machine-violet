@@ -132,10 +132,12 @@ The gauge represents remaining capacity as a unary countdown of 25 ticks (4% per
 | State | Glyph | Color | Ticks in cell |
 |---|---|---|---|
 | Full | `◆` | Light blue (`#529EAB`) | 5 |
-| Ruby | `⬢` | Red (`#781313`) | 4 |
-| Garnet | `■` | Brown (`#A87712`) | 3 |
+| Topaz | `■` | Yellow-gold (`#A88912`) | 4 |
+| Ruby | `⬢` | Red (`#781313`) | 3 |
 | Tarnished | `*` | Grey | 1–2 (collapsed) |
 | Empty | (space) | — | 0 |
+
+The middle two states are ordered by perceived brightness rather than gemstone value: the warm topaz reads as "more remaining" to the eye than the dark ruby, so it sits higher in the drain.
 
 Because ticks 1 and 2 within a cell both render as `*`, the bottom 8% of each cell's drain is visually compressed into one state; the gauge still updates on every 4% step. The `primary` segment must be a `percentage` segment carrying a `usedPercent` — currently only the openai-chatgpt provider supplies one (its 5-hour rate-limit window); see [openai-chatgpt-provider.md](openai-chatgpt-provider.md) for the server-side `subscribeUsage` implementation.
 
