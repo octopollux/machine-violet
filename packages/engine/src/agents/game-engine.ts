@@ -190,6 +190,16 @@ export class GameEngine {
    * scene transition, session end, rollback — and the seam tests/teardown use
    * to settle background work deterministically. The chain swallows errors so
    * one failed scribe never poisons a later one or a barrier await.
+   *
+   * TODO(perf/maintainability): generalize this single-task chain into a
+   * deferred-work registry — lanes (serial/parallel) × barrier points, each lane
+   * declaring its "deferral horizon" (which barriers it must settle at). Scribe
+   * is write-only → all barriers are cold; scene-tracker is write-back →
+   * next-ctx barrier is hot; choices gen → no engine barrier. One `settle(point)`
+   * per barrier covers every lane, so adding work or a consistency point can't
+   * silently miss a barrier (cf. the `promote_character` barrier we only caught
+   * in review). Attribute a *blocked* settle() as a `barrier_wait` span so the
+   * flame chart measures the real overrun rate instead of us guessing it.
    */
   private pendingScribe: Promise<void> = Promise.resolve();
 
@@ -839,6 +849,12 @@ export class GameEngine {
       await this.repo?.trackExchange(opts?.skipTranscript ? undefined : text);
 
       // Run scene tracker periodically to maintain open threads / NPC intents
+      // TODO(perf): detach this as a deferred-work lane like the scribe. It's
+      // write-back — its threads/intents feed the DM's next-turn `activeState`
+      // (buildActiveState) — so use a barrier-for-freshness at the next-turn
+      // context build: free in the common case (human think-time hides it),
+      // only blocks if the player out-races it, never a regression. Runs in
+      // parallel with the scribe lane, so think-time hides max(), not sum().
       if (!opts?.skipTranscript) {
         const currentScene = this.sceneManager.getScene();
         const playerExchanges = currentScene.transcript.filter((t) => t.startsWith("**[")).length;
@@ -1244,6 +1260,9 @@ export class GameEngine {
     try {
       const sceneNumber = this.sceneManager.getScene().sceneNumber;
       const small = this.tierProviders.small;
+      // (runScribe prefetches the batch's referenced entities and hands them to
+      // the subagent as canonical, so it skips the read_entity round-trips —
+      // see buildPrefetchedEntityBlock in scribe.ts.)
       const result = await runScribe(small.provider, {
         updates: updates.map(u => ({
           visibility: u.visibility as "private" | "player-facing",

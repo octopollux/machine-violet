@@ -233,11 +233,13 @@ Maintains the player-facing campaign compendium (`campaign/compendium.json`). Re
 
 Autonomous entity file manager. Receives batched natural-language updates tagged `private` or `player-facing`. Has its own tools (`list_entities`, `read_entity`, `write_entity`) to manage the campaign filesystem. Handles entity creation, updates, front matter merging, changelog entries, and deduplication. Replaces the old `create_entity` / `update_entity` DM tools.
 
-**Context**: The DM's update batch (natural language). ~200-500 tokens.
+**Context**: The DM's update batch (natural language), the entity registry, and a **prefetched canonical block** (see below). ~200-500 tokens for the batch, plus the prefetched entity contents.
 
 **Tools**: `list_entities(type)`, `read_entity(type, slug)`, `write_entity(mode, type, name, front_matter?, body?, changelog_entry?)`.
 
-**Max tool rounds**: 8 (needs to list → read → write multiple entities).
+**Input prefetch — push, don't pull.** The scribe's reads are predictable: the entities a batch touches are exactly the registry names/aliases that appear in the update text. So `runScribe` resolves and reads them up front (`buildPrefetchedEntityBlock`) and hands them to the subagent as a *"CANONICAL — do not `read_entity` these"* block — collapsing the decide-and-read reasoning burst (~a third of the scribe's wall-clock) so it goes straight to `write_entity`. Matching is case-insensitive and word-boundary on name/alias (so an aliased mention still surfaces the canonical entity for dedup), capped at 16; overflow / unmatched / newly-created entities fall back to the `read_entity` tool, so it's a pure latency optimization, never a correctness dependency. This mirrors the other subagents, which already push their inputs (`promote_character` pre-reads the sheet; scene-tracker gets the transcript).
+
+**Max tool rounds**: 8 (list → read → write), though with prefetch a typical update turn is write-only.
 
 **Returns**: Terse summary of entities created/updated. Usage stats accumulated to session total.
 
