@@ -20,6 +20,7 @@
     "smoketest": "node --import tsx/esm packages/test-harness/bin/smoketest.ts",
     "e2e:boot": "node --import tsx/esm packages/test-harness/bin/boot-and-quit.ts",
     "play": "node --import tsx/esm packages/test-harness/bin/mvplay.ts",
+    "voice-guide": "node --import tsx/esm packages/test-harness/bin/dm-voice-guide.ts",
     "dist": "node scripts/build-dist.js",
     "explorer": "node tools/campaign-explorer/scripts/dev.js",
     "theme-editor": "node tools/theme-editor/scripts/dev.js",
