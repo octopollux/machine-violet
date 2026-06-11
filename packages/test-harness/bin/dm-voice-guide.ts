@@ -53,6 +53,9 @@ const REASONING_EFFORT = "high" as const;
 // visible text is never starved by the thinking pass.
 const MAX_OUTPUT_TOKENS = 16_000;
 const DEFAULT_CONCURRENCY = 6;
+// UTF-8 byte-order mark. Excel needs it to read a .csv as UTF-8 rather than
+// guessing the Windows-1252 codepage (which mangles em-dashes / é).
+const CSV_BOM = String.fromCharCode(0xfeff);
 
 // repo root = three levels up from packages/test-harness/bin
 const here = dirname(fileURLToPath(import.meta.url));
@@ -84,6 +87,21 @@ function resolveForGpt(block: string): string {
     .replace(/^%%[^\n]*\n?/gm, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+/**
+ * Fold the model's typographic punctuation to the seeds' house style: straight
+ * quotes/apostrophes (the .mvdm files use no curly quotes at all) and ASCII
+ * ellipses. Em-dashes are kept — the existing seeds use them (84×) — and real
+ * accented letters (é) are left alone; the CSV carries a UTF-8 BOM so those
+ * still render correctly in Excel.
+ */
+function normalizeTypography(s: string): string {
+  return s
+    .replace(/[‘’]/g, "'") // ‘ ’ → '
+    .replace(/[“”]/g, '"') // “ ” → "
+    .replace(/…/g, "...") // … → ...
+    .replace(/–/g, "-"); // – (en-dash) → -   (em-dash U+2014 kept)
 }
 
 interface Personality {
@@ -187,7 +205,7 @@ async function callModel(client: OpenAI, instructions: string, input: string): P
   }
 
   return {
-    text: response.output_text.trim(),
+    text: normalizeTypography(response.output_text.trim()),
     status: response.status ?? "unknown",
     reasoningTokens: response.usage?.output_tokens_details?.reasoning_tokens ?? 0,
     inputTokens: response.usage?.input_tokens ?? 0,
@@ -312,9 +330,11 @@ function toCsv(rows: GuideResult[]): string {
         .join(","),
     );
   }
-  // CRLF record separator for spreadsheet friendliness; embedded \n in a quoted
+  // Lead with a UTF-8 BOM so Excel reads the file as UTF-8 instead of guessing
+  // the Windows-1252 codepage (which turns em-dashes / é into mojibake). CRLF
+  // record separator for spreadsheet friendliness; embedded \n in a quoted
   // guide field is preserved and renders as a multi-line cell.
-  return lines.join("\r\n") + "\r\n";
+  return CSV_BOM + lines.join("\r\n") + "\r\n";
 }
 
 function requireKey(): string {
