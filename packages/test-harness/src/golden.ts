@@ -29,7 +29,12 @@ export interface FullStackGolden {
   scenario: string;
   /** Serialized Tape (opaque here — the engine owns the shape). */
   tape: unknown;
-  /** DM/non-player narrative lines produced this session; the replay assertion target. */
+  /**
+   * DM narration lines (kind === "dm") produced this session — the replay
+   * assertion target. Reproduced verbatim from the tape on replay. Excludes
+   * `dev` breadcrumbs (environment-specific paths, dev-only) and `player`
+   * echoes (replay re-issues the inputs itself).
+   */
   expectedNarrative: string[];
   /** Ordered player input ops that drove the session; replayed by the harness. */
   inputs: RecordedInput[];

@@ -727,12 +727,17 @@ export async function saveTape(outPath: string): Promise<void> {
     );
   }
 
-  // Capture the narrative produced this session as the replay assertion target.
+  // Capture the DM narration as the replay assertion target. Only `dm` lines:
+  // they're the player-facing narrative and are reproduced verbatim from the
+  // tape on replay. Deliberately excludes `dev` breadcrumbs (scribe/theme
+  // logs carry environment-specific absolute paths and are dev-only) and
+  // `player` echoes (the replay re-issues inputs, but say-retries can double
+  // the echoed text). `spacer`/`separator` are structural noise.
   let expectedNarrative: string[] = [];
   try {
     const snap = await getState(s);
     expectedNarrative = snap.narrativeLines
-      .filter((l) => l.kind !== "player")
+      .filter((l) => l.kind === "dm")
       .map((l) => l.text);
   } catch { /* tape alone is still useful */ }
 
