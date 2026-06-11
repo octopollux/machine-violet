@@ -573,12 +573,13 @@ function mentions(haystack: string, needle: string): boolean {
  * Prefetch the current on-disk content of entities the update batch references,
  * so the Scribe is handed them as canonical instead of spending a tool
  * round-trip pulling each via `read_entity` — that read burst is ~a third of
- * the Scribe's wall-clock. Matches registry names/aliases against the batch
- * text (generous on near-matches to preserve dedup), reads the matched files,
- * and returns a formatted block (empty string when nothing resolves). Capped to
- * bound context; overflow and any unmatched/created entity falls back to the
- * `read_entity` tool, so this is a pure latency optimization with graceful
- * degradation — never a correctness dependency.
+ * the Scribe's wall-clock. Matches a registry entry when its name or any alias
+ * appears in the batch text (case-insensitive, word-boundary), so an aliased
+ * mention still surfaces the canonical entity for dedup; reads the matched
+ * files and returns a formatted block (empty string when nothing resolves).
+ * Capped to bound context; overflow and any unmatched/created entity falls back
+ * to the `read_entity` tool, so this is a pure latency optimization with
+ * graceful degradation — never a correctness dependency.
  */
 export async function buildPrefetchedEntityBlock(
   updates: ScribeUpdate[],
@@ -595,27 +596,37 @@ export async function buildPrefetchedEntityBlock(
   const store = new EntityStore(campaignRoot, fileIO);
   const mPaths = homeDir ? machinePaths(homeDir) : undefined;
 
-  const blocks: string[] = [];
+  // Match phase (sync, cheap): registry entries whose name/alias appears in the
+  // batch text, resolved to a file path. Capped to bound context.
+  const matched: { entry: EntityTree[string]; path: string }[] = [];
   for (const [slug, entry] of Object.entries(entityTree)) {
-    if (blocks.length >= maxEntities) break;
+    if (matched.length >= maxEntities) break;
     const names = [entry.name, ...(entry.aliases ?? [])]
       .filter((n) => n && n.trim().length >= 3)
       .map((n) => n.toLowerCase());
     if (!names.some((n) => mentions(haystack, n))) continue;
-
-    let path: string;
     try {
-      path = norm(resolveEntityFilePath(store, mPaths, entry.type, slug));
+      matched.push({ entry, path: norm(resolveEntityFilePath(store, mPaths, entry.type, slug)) });
     } catch {
-      continue; // e.g. player entity with no homeDir — let the tool fetch it
-    }
-    try {
-      const content = await fileIO.readFile(path);
-      blocks.push(`### ${entry.name} (${entry.type})\n${content.trim()}`);
-    } catch {
-      // Stale tree entry / unreadable — scribe falls back to read_entity.
+      // e.g. player entity with no homeDir — let the read_entity tool fetch it.
     }
   }
+  if (matched.length === 0) return "";
+
+  // Read phase (parallel — independent files, ≤ maxEntities): a stale/unreadable
+  // entry drops to null and is skipped (scribe falls back to read_entity).
+  const blocks = (
+    await Promise.all(
+      matched.map(async ({ entry, path }) => {
+        try {
+          const content = await fileIO.readFile(path);
+          return `### ${entry.name} (${entry.type})\n${content.trim()}`;
+        } catch {
+          return null;
+        }
+      }),
+    )
+  ).filter((b): b is string => b !== null);
 
   if (blocks.length === 0) return "";
   return (
