@@ -36,7 +36,10 @@ describe("GET /tape", () => {
   }, 20000);
 
   afterAll(async () => {
-    await app.close();
+    // Guard: if beforeAll's construction threw/timed out, `app` is undefined —
+    // an unconditional close() would throw a secondary error that buries the
+    // real setup failure (the very failure mode this test guards against).
+    await app?.close();
   });
 
   beforeEach(() => {
