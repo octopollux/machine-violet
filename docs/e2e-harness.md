@@ -118,9 +118,10 @@ can be validated without cutting a release.
 installs `Setup.exe` → replays against the *installed* binary → uninstalls,
 catching install-layout/manifest bugs the portable replay can't. It is **not
 locally validatable** (needs a signed `Setup.exe` + a real machine install), so
-it is **report-only (`continue-on-error`) in release/nightly** and **blocking in
-test-build.yml**. Dispatch `test-build.yml` to validate the install CLI on a
-clean runner, then flip the release/nightly steps to blocking.
+it was validated end-to-end on a clean runner via a `test-build.yml` dispatch
+(install → replay installed binary → uninstall, all green) and is now
+**blocking in release/nightly and test-build.yml** — a broken Windows installer
+blocks publish like any other packaging failure.
 
 **Known gap (by design):** replay returns taped image bytes, so it exercises
 `sharp` rendering but **not** codex generation — replay bypasses codex entirely.
@@ -483,6 +484,6 @@ Conventions:
   (or future agents) will thank you.
 - **Changing the packaged-artifact gate** (the replay knobs, the runner, the CI
   job, or the Velopack smoke): update "Packaged-artifact replay gate" above and
-  keep the workflow comments in sync. If you validate the Velopack install smoke
-  via `test-build.yml`, flip the release/nightly steps from `continue-on-error`
-  to blocking and note it here.
+  keep the workflow comments in sync. The Velopack install smoke is now blocking
+  in release/nightly (validated via a `test-build.yml` dispatch); if it ever
+  proves flaky, re-add `continue-on-error` and note it here.
