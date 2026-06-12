@@ -61,7 +61,7 @@ The workflow:
 
 RC releases are marked `--prerelease` on GitHub, skip Discord, and skip the Homebrew formula bump. Stable releases do all three.
 
-**Publish is gated on packaging.** A `verify-package` matrix job sits between `build` and `release` (in both [release.yml](../.github/workflows/release.yml) and [nightly.yml](../.github/workflows/nightly.yml)): it replays recorded golden tapes against the built per-OS artifact — deterministic, offline, no API key — and a broken package (SEA injection, asset vendoring, boot, config-dir) fails the replay and blocks the release. The optional Velopack install/uninstall smoke (Windows) is report-only until validated via `test-build.yml`. Full mechanics in [e2e-harness.md](e2e-harness.md#packaged-artifact-replay-gate-release--nightly-ci).
+**Publish is gated on packaging.** A `verify-package` matrix job sits between `build` and `release` (in both [release.yml](../.github/workflows/release.yml) and [nightly.yml](../.github/workflows/nightly.yml)): it replays recorded golden tapes against the built per-OS artifact — deterministic, offline, no API key — and a broken package (SEA injection, asset vendoring, boot, config-dir) fails the replay and blocks the release. The Velopack install/uninstall smoke (Windows) — install → replay the installed binary → uninstall — is also **blocking** (validated end-to-end via `test-build.yml`), so a broken installer blocks publish too. Full mechanics in [e2e-harness.md](e2e-harness.md#packaged-artifact-replay-gate-release--nightly-ci).
 
 ## Release-list hygiene
 

@@ -210,9 +210,8 @@ jobs:
         run: bash scripts/ci/replay-packaged-binary.sh pkg-artifact
       - name: Velopack install/uninstall smoke (Windows)
         if: matrix.os == 'windows-latest'
-        # Report-only until a test-build.yml dispatch validates the install CLI
-        # on a clean runner; flip to blocking afterward. See docs/e2e-harness.md.
-        continue-on-error: true
+        # Blocking: validated end-to-end on a clean runner via test-build.yml
+        # (install -> replay installed binary -> uninstall). See docs/e2e-harness.md.
         shell: pwsh
         run: scripts/ci/velopack-install-smoke.ps1 -ArtifactDir pkg-artifact -RepoRoot .
 
