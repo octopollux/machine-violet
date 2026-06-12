@@ -16,7 +16,7 @@ jobs:
       timestamp: ${{ steps.ts.outputs.timestamp }}
       nightly_version: ${{ steps.ts.outputs.nightly_version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Compute nightly version
         id: ts
         run: |
@@ -42,9 +42,9 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 25
           cache: npm
@@ -95,7 +95,7 @@ jobs:
 
       - name: Azure login (OIDC)
         if: matrix.os == 'windows-latest'
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -132,14 +132,14 @@ jobs:
 
       - name: Upload artifact (Windows)
         if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: machine-violet-${{ matrix.asset_suffix }}
           path: velopack-out/*
 
       - name: Upload artifact (macOS/Linux)
         if: matrix.os != 'windows-latest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: machine-violet-${{ matrix.asset_suffix }}
           path: machine-violet-nightly-*
@@ -161,8 +161,8 @@ jobs:
             asset_suffix: linux-x64
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 25
           cache: npm
@@ -170,7 +170,7 @@ jobs:
       - name: Build shared package
         run: npm run build -w packages/shared
       - name: Download packaged artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: machine-violet-${{ matrix.asset_suffix }}
           path: pkg-artifact
@@ -188,11 +188,11 @@ jobs:
     needs: [prepare, build, verify-package]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
