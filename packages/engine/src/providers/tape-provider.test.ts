@@ -2,9 +2,11 @@ import { describe, it, expect, vi } from "vitest";
 import type {
   ChatParams,
   ChatResult,
+  DispatchToolFn,
   GenerateImageResult,
   LLMProvider,
   NormalizedMessage,
+  NormalizedToolCall,
   NormalizedUsage,
   ProviderCapabilities,
 } from "./types.js";
@@ -115,5 +117,53 @@ describe("createReplayProvider", () => {
   it("reports no image-gen capability for an unrecorded model", () => {
     const replay = createReplayProvider(new TapeReader({ version: 1, scenario: "empty", capabilities: {}, entries: [] }));
     expect(replay.getCapabilities("unknown-model")).toEqual({ imageGeneration: false });
+  });
+
+  // Internal-dispatch (codex / openai-chatgpt) providers dispatch tool calls
+  // IN-BAND via params.dispatchTool and leave ChatResult.toolCalls empty — the
+  // calls survive only as tool_use blocks in assistantContent. Replay must
+  // re-issue those, or present_choices / finalize_setup never fire.
+  function withToolUse(text: string, ...tools: NormalizedToolCall[]): ChatResult {
+    return {
+      text,
+      toolCalls: [], // codex shape: in-band dispatch, empty here
+      usage: usage(),
+      stopReason: "end",
+      assistantContent: [{ type: "text", text }, ...tools.map((t) => ({ type: "tool_use" as const, ...t }))],
+    };
+  }
+  function toolParams(dispatchTool: DispatchToolFn): ChatParams {
+    return {
+      model: "model-x", systemPrompt: "sys",
+      messages: [{ role: "user", content: "x" }], maxTokens: 100, conversationId: "default",
+      tools: [{ name: "present_choices", description: "d", inputSchema: { type: "object", properties: {} } }],
+      dispatchTool,
+    };
+  }
+
+  it("re-issues codex-shape tool calls (empty toolCalls + tool_use in assistantContent) via dispatchTool", async () => {
+    const writer = new TapeWriter("unit");
+    writer.recordChat("default", params([{ role: "user", content: "x" }], "default"),
+      withToolUse("hi", { id: "c1", name: "present_choices", input: { choices: ["A", "B"] } }));
+    const replay = createReplayProvider(new TapeReader(deserializeTape(serializeTape(writer.build()))));
+
+    const calls: string[] = [];
+    const dispatchTool: DispatchToolFn = vi.fn(async (c) => { calls.push(c.name); return { content: "ok" }; });
+    await replay.stream(toolParams(dispatchTool), () => {});
+    expect(calls).toEqual(["present_choices"]);
+  });
+
+  it("does NOT dispatch when the recording surfaces toolCalls (Anthropic shape) — the outer loop owns those", async () => {
+    const writer = new TapeWriter("unit");
+    const anthropicShape: ChatResult = {
+      text: "hi", toolCalls: [{ id: "c1", name: "present_choices", input: {} }], usage: usage(),
+      stopReason: "tool_use", assistantContent: [{ type: "tool_use", id: "c1", name: "present_choices", input: {} }],
+    };
+    writer.recordChat("default", params([{ role: "user", content: "x" }], "default"), anthropicShape);
+    const replay = createReplayProvider(new TapeReader(deserializeTape(serializeTape(writer.build()))));
+
+    const dispatchTool: DispatchToolFn = vi.fn(async () => ({ content: "ok" }));
+    await replay.stream(toolParams(dispatchTool), () => {});
+    expect(dispatchTool).not.toHaveBeenCalled();
   });
 });

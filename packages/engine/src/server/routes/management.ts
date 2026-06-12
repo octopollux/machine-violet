@@ -15,6 +15,7 @@ import {
   maskKey, upsertChatGptConnection,
 } from "../../config/connections.js";
 import type { ConnectionStore, TierAssignment, ProviderType } from "../../config/connections.js";
+import { e2eActive, e2eConnectionStore, E2E_HEALTH } from "../../config/e2e.js";
 import { createProviderFromConnection } from "../../providers/index.js";
 import { loadModelRegistry, getModelsForProvider, modelFamilyFor } from "../../config/model-registry.js";
 import {
@@ -46,6 +47,10 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   // -----------------------------------------------------------------------
 
   function getConnections(): ConnectionStore {
+    // E2E: one synthetic always-valid connection so the menu unlocks without
+    // real credentials. Real LLM calls still route through the replay tier
+    // seam (MV_TAPE_MODE=replay), which ignores connections.
+    if (e2eActive()) return e2eConnectionStore();
     const stored = loadConnectionStore(server.configDir);
     return buildEffectiveConnections(stored, server.configDir);
   }
@@ -157,6 +162,12 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     const conn = store.connections.find((c) => c.id === (request.params as { id: string }).id);
     if (!conn) {
       return reply.status(404).send({ error: "Connection not found." });
+    }
+
+    // E2E: the synthetic connection is always valid — short-circuit before
+    // building a real provider (which would make a live network call).
+    if (e2eActive()) {
+      return { id: conn.id, ...E2E_HEALTH };
     }
 
     // configDir is required for openai-chatgpt: without it the provider

@@ -44,6 +44,30 @@ time — the deterministic replay target. `expectedSetup` (setup goldens only) i
 the `SetupResult` the agent finalized; replay re-derives it and the handoff
 scaffolds a campaign from it.
 
+**Full-stack goldens** (driven through the running server / a packaged binary by
+[`replay-runner.ts`](../packages/test-harness/src/replay-runner.ts), not the
+in-process corpus) add an `inputs` array so the replay is **self-driving** —
+re-issuing the same player ops re-drives menu → setup → handoff → DM turns:
+
+```jsonc
+{ "scenario": "fullstack-quickstart", "tape": { /* Tape */ },
+  "expectedNarrative": ["...", "..."],   // DM (kind "dm") lines only — the assertion target
+  "inputs": [                            // ordered key/say/pick ops captured at record time
+    { "kind": "key", "name": "return" },
+    { "kind": "pick", "index": 0, "label": "..." },
+    { "kind": "say", "text": "..." }
+  ] }
+```
+
+The `inputs` field lives on the **envelope**, not the `Tape` — so it's additive
+and needs no `TAPE_VERSION` bump. The `FullStackGolden` type is owned by
+test-harness ([`golden.ts`](../packages/test-harness/src/golden.ts)); the engine
+runtime only ever reads the bare `Tape`. Here `expectedNarrative` is **`dm` lines
+only** (the verbatim DM narration), excluding `dev` breadcrumbs (environment-
+specific paths, dev-only) and `player` echoes. The replay assertion is
+whitespace-normalized — it compares content, not line segmentation, since
+segmentation around mid-stream tool-call flushes is a streaming artifact.
+
 ## Bucketing + matching
 
 Every chat call is filed into a **bucket** and matched **ordinally** within it:
@@ -94,8 +118,22 @@ The replay must reproduce the recorded run bit-for-bit where it matters:
 
 - **`tool_use` IDs are replayed verbatim** so the bridge re-pairs
   `tool_use`↔`tool_result` and `normalizeTurn` stays stable.
+- **Internal-dispatch (codex) tool calls are re-issued on replay.** codex
+  dispatches tool calls in-band via `params.dispatchTool` and leaves
+  `ChatResult.toolCalls` empty — the calls survive only as `tool_use` blocks in
+  `assistantContent`. `createReplayProvider` walks `assistantContent` and
+  re-issues each through `dispatchTool`, or `present_choices` / `finalize_setup`
+  never fire on replay. Anthropic-shape tapes surface `toolCalls` (dispatched by
+  the outer loop) and are detected + left untouched, so they never double-dispatch.
 - **Thinking `signature` / `redacted_thinking` / reasoning blobs** are opaque and
   replayed verbatim.
+- **Replay tiers adopt a recorded model id.** The replay provider keys
+  `getCapabilities` by model against the tape's per-model `capabilities`
+  snapshot, so `buildReplayTierProviders` drives the tiers with a model the tape
+  actually recorded (preferring an image-capable one) rather than a synthetic
+  id. Otherwise capabilities fall back to `{ imageGeneration: false }` and replay
+  would silently suppress the image-consent / portrait flow — which matters once
+  image-bearing goldens land.
 - **Image base64** is out-of-line-able (see above).
 - **Usage counts** are recorded but excluded from matching; **timestamps /
   `durationMs`** are ignored.
@@ -106,9 +144,16 @@ The replay must reproduce the recorded run bit-for-bit where it matters:
 message rather than silently mis-replaying. Bump `TAPE_VERSION` only with a
 matching re-record of the corpus.
 
-## Record against the API-key provider, not codex
+## Recording against codex vs. the API-key provider
 
-Record against `anthropic` / `openai-apikey`, **not** the `openai-chatgpt`/codex
-path: codex runs the whole tool loop inside one `chat()` call, opaque to the
-bridge and unstable to serialize. The codex path is covered by Tier-3 live smoke
-only.
+**In-process Tier-2 corpus** (`corpus.golden.test.ts`): record against
+`anthropic` / `openai-apikey`. That corpus drives the engine directly and mocks
+subagents to keep each turn a single deterministic bucket; the API-key shape
+(tool calls surfaced via `ChatResult.toolCalls`) is what it expects.
+
+**Full-stack goldens** (`mvplay record` → the replay runner): codex
+(`openai-chatgpt`) **is** supported — these are recorded on whatever connection
+is configured, and the in-band tool calls replay via the `assistantContent`
+re-dispatch described under "Determinism normalization". The earlier blanket
+"never record codex" no longer holds for full-stack tapes; it survives only as
+in-process-corpus guidance.

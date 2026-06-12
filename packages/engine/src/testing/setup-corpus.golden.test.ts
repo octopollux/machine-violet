@@ -16,7 +16,13 @@
  *  - REPLAY (always, offline; skipped until the golden exists): a pure
  *    tape-backed provider reproduces the SAME per-turn narrative AND the same
  *    finalized SetupResult with ZERO live calls, and the handoff scaffolds a
- *    campaign whose config matches. Runs in the normal `npm test`.
+ *    campaign whose config matches. Runs in the normal `npm test`. Two prose
+ *    fields are excepted from the SetupResult deep-equal — `personality.detail`
+ *    (from the seed `.mvdm`) and a seeded world's `campaignDetail` (assembled
+ *    from the `.mvworld` detail block) — because finalize assembles both from
+ *    bundled seed files at runtime, not from the tape; pinning their prose
+ *    would force a live re-record on every seed edit (issue #620). We pin their
+ *    presence instead — see the replay assertion.
  *
  * Why this is the in-process setup→game replay backbone (vs. replaying an
  * mvplay full-stack capture): the setup agent had no offline coverage at all,
@@ -247,8 +253,33 @@ describe("setup golden corpus", () => {
 
         // 1. The conversation reproduces verbatim, offline.
         expect(narrative).toEqual(golden.expectedNarrative);
-        // 2. finalize_setup derives the same campaign blueprint.
-        expect(finalized).toEqual(golden.expectedSetup);
+        // 2. finalize_setup derives the same campaign blueprint — but two prose
+        //    fields are excluded from the verbatim deep-equal because finalize
+        //    assembles them from bundled seed files at runtime, NOT from the
+        //    tape:
+        //      • personality.detail — loaded from personalities/*.mvdm
+        //        (handleFinalize → getPersonality);
+        //      • campaignDetail — for a seeded world, assembled from the
+        //        .mvworld detail block (handleFinalize → assembleCampaignDetail).
+        //    Pinning either by value forces a live re-record of the setup
+        //    goldens whenever a seed's prose is edited (issue #620 — exactly
+        //    what #619's voice-prior rewrite triggered). The golden should pin
+        //    the agent's *selections* — worldSlug, personality.name, premise,
+        //    handoffNote, all deterministic from the tape and still compared
+        //    verbatim below — not the bundled prose the seed files already own.
+        //    So strip both fields from the deep-equal and pin their PRESENCE
+        //    instead: a regression that drops the prose still fails, while a
+        //    seed content edit stays free. (Custom campaigns/personalities
+        //    legitimately carry neither, so presence — truthy↔truthy — is the
+        //    right invariant, not non-emptiness.)
+        const stripSeedProse = (s: SetupResult): SetupResult => {
+          const { detail: _detail, ...personality } = s.personality; // eslint-disable-line @typescript-eslint/no-unused-vars
+          const { campaignDetail: _campaignDetail, ...rest } = s; // eslint-disable-line @typescript-eslint/no-unused-vars
+          return { ...rest, personality };
+        };
+        expect(stripSeedProse(finalized as SetupResult)).toEqual(stripSeedProse(golden.expectedSetup));
+        expect(Boolean(finalized?.personality.detail)).toBe(Boolean(golden.expectedSetup.personality.detail));
+        expect(Boolean(finalized?.campaignDetail)).toBe(Boolean(golden.expectedSetup.campaignDetail));
 
         // 3. The handoff scaffolds a campaign matching that blueprint. Runs the
         //    real buildCampaignWorld against in-memory FileIO (config.json's

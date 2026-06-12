@@ -91,6 +91,18 @@ jobs:
             --channel test \
             --outputDir velopack-out
 
+      # Validate the packaged-artifact gate end-to-end (the same script
+      # release.yml / nightly.yml run). Blocking here so a dispatch surfaces
+      # any breakage; in release/nightly the Velopack-install leg is
+      # report-only until this confirms it. See docs/e2e-harness.md.
+      - name: Replay goldens against the packaged binary
+        shell: bash
+        run: bash scripts/ci/replay-packaged-binary.sh velopack-out
+
+      - name: Velopack install/uninstall smoke
+        shell: pwsh
+        run: scripts/ci/velopack-install-smoke.ps1 -ArtifactDir velopack-out -RepoRoot .
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -122,6 +134,11 @@ jobs:
       - name: Package
         run: tar -czf machine-violet-test-darwin-arm64.tar.gz -C dist .
 
+      - name: Replay goldens against the packaged binary
+        run: |
+          mkdir -p pkg && cp machine-violet-test-darwin-arm64.tar.gz pkg/
+          bash scripts/ci/replay-packaged-binary.sh pkg
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -152,6 +169,11 @@ jobs:
 
       - name: Package
         run: tar -czf machine-violet-test-linux-x64.tar.gz -C dist .
+
+      - name: Replay goldens against the packaged binary
+        run: |
+          mkdir -p pkg && cp machine-violet-test-linux-x64.tar.gz pkg/
+          bash scripts/ci/replay-packaged-binary.sh pkg
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
