@@ -116,6 +116,23 @@ describe("tape-mode replay wiring", () => {
     expect((await t!.small.provider.chat(params("scribe"))).text).toBe("taped-scribe");
   });
 
+  it("drives tiers with a recorded model id so capabilities resolve (not the unrecorded fallback)", () => {
+    const w = new TapeWriter("replay-caps");
+    w.recordCapabilities("gpt-5.5", { imageGeneration: true });
+    w.recordChat("dm", params("dm"), result("taped-dm"));
+    const file = join(mkdtempSync(join(tmpdir(), "mv-replay-")), "tape.json");
+    writeFileSync(file, serializeTape(w.build()));
+    process.env.MV_TAPE_MODE = "replay";
+    process.env.MV_TAPE_PATH = file;
+
+    const t = buildReplayTierProviders();
+    // The tier model is the recorded one, so getCapabilities finds the snapshot
+    // (image-gen stays enabled on replay) instead of the {imageGeneration:false}
+    // fallback a synthetic, unrecorded model id would hit.
+    expect(t!.large.model).toBe("gpt-5.5");
+    expect(t!.large.provider.getCapabilities(t!.large.model).imageGeneration).toBe(true);
+  });
+
   it("throws a clear error when MV_TAPE_PATH is unset", () => {
     process.env.MV_TAPE_MODE = "replay";
     expect(() => buildReplayTierProviders()).toThrow(/MV_TAPE_PATH/);

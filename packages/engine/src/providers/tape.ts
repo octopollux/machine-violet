@@ -187,6 +187,25 @@ export class TapeReader {
     return this.tape.capabilities[model];
   }
 
+  /**
+   * A recorded model id suitable for the replay tiers' `model` field, so
+   * {@link capabilities} resolves to a recorded snapshot instead of the
+   * unrecorded-model fallback (which reports `imageGeneration: false` and would
+   * silently suppress the image-consent / portrait flow on replay). Prefers a
+   * model whose recorded capabilities include image generation — the capability
+   * that gates that flow lives on the large tier — then any recorded model,
+   * then the first recorded chat request's model for capability-less tapes.
+   * Undefined only for an empty tape.
+   */
+  defaultModel(): string | undefined {
+    const models = Object.keys(this.tape.capabilities);
+    return (
+      models.find((m) => this.tape.capabilities[m]?.imageGeneration) ??
+      models[0] ??
+      this.tape.entries.find((e): e is TapeChatEntry => e.kind === "chat")?.request.model
+    );
+  }
+
   chatAt(bucket: string, ordinal: number): TapeChatEntry | undefined {
     return this.chatsByBucket.get(bucket)?.[ordinal];
   }

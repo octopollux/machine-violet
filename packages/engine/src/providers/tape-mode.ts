@@ -78,7 +78,7 @@ export function getRecordedTape(): Tape | null {
 // Gated, env-only, never set in production. See docs/e2e-harness.md.
 // ---------------------------------------------------------------------------
 
-/** Synthetic model id for replayed tiers; the replay provider ignores it. */
+/** Fallback model id for replayed tiers when the tape recorded none. */
 const REPLAY_MODEL = "replay-tape";
 
 export function replayActive(): boolean {
@@ -103,8 +103,16 @@ function getReader(): TapeReader {
  */
 export function buildReplayTierProviders(): Record<ModelTier, TierProvider> | null {
   if (!replayActive()) return null;
-  const provider = createReplayProvider(getReader());
-  const tp = (): TierProvider => ({ provider, model: REPLAY_MODEL });
+  const reader = getReader();
+  const provider = createReplayProvider(reader);
+  // Drive the tiers with a model id the tape actually recorded, so the replay
+  // provider's getCapabilities resolves to the recorded snapshot (image-gen,
+  // etc.) instead of the unrecorded-model fallback that reports no image
+  // capability — otherwise replaying an image-bearing golden would silently
+  // skip the consent/portrait flow. Falls back to the synthetic id only for a
+  // capability-less / empty tape.
+  const model = reader.defaultModel() ?? REPLAY_MODEL;
+  const tp = (): TierProvider => ({ provider, model });
   return { large: tp(), medium: tp(), small: tp() };
 }
 

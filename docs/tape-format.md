@@ -127,6 +127,13 @@ The replay must reproduce the recorded run bit-for-bit where it matters:
   the outer loop) and are detected + left untouched, so they never double-dispatch.
 - **Thinking `signature` / `redacted_thinking` / reasoning blobs** are opaque and
   replayed verbatim.
+- **Replay tiers adopt a recorded model id.** The replay provider keys
+  `getCapabilities` by model against the tape's per-model `capabilities`
+  snapshot, so `buildReplayTierProviders` drives the tiers with a model the tape
+  actually recorded (preferring an image-capable one) rather than a synthetic
+  id. Otherwise capabilities fall back to `{ imageGeneration: false }` and replay
+  would silently suppress the image-consent / portrait flow — which matters once
+  image-bearing goldens land.
 - **Image base64** is out-of-line-able (see above).
 - **Usage counts** are recorded but excluded from matching; **timestamps /
   `durationMs`** are ignored.

@@ -195,7 +195,16 @@ async function submitWithRetry(h: Harness, submit: () => Promise<void>, basePlay
   await h.sendKey("ctrl+u"); // clear any partial buffer, then resend
   await delay(80);
   await submit();
-  await inputAccepted(h, basePlayer, 4_000);
+  if (await inputAccepted(h, basePlayer, 4_000)) return;
+  // Both attempts went unacknowledged. Fail loudly HERE rather than let the
+  // caller hit a generic settle timeout several lines later — the input path
+  // either stopped echoing a player line (UI flow changed) or keystrokes are
+  // being dropped. Surface the engine log tail so the cause is visible.
+  throw new Error(
+    `Replay input was not acknowledged after one retry ` +
+      `(player-line count never rose above ${basePlayer}). The replay UI flow ` +
+      `likely changed or keystrokes were dropped.\n--- engine log tail ---\n${h.childLogTail()}`,
+  );
 }
 
 /** True once the engine echoes the input as a new player line (or starts thinking). */
