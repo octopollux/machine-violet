@@ -91,10 +91,11 @@ jobs:
             --channel test \
             --outputDir velopack-out
 
-      # Validate the packaged-artifact gate end-to-end (the same script
-      # release.yml / nightly.yml run). Blocking here so a dispatch surfaces
-      # any breakage; in release/nightly the Velopack-install leg is
-      # report-only until this confirms it. See docs/e2e-harness.md.
+      # Validate the packaged-artifact gate end-to-end (the same scripts
+      # release.yml / nightly.yml run). Both legs are blocking here and in
+      # release/nightly — a dispatch here exercises the Windows signing + pack
+      # path that the OIDC trust boundary keeps off feature branches. See
+      # docs/e2e-harness.md.
       - name: Replay goldens against the packaged binary
         shell: bash
         run: bash scripts/ci/replay-packaged-binary.sh velopack-out

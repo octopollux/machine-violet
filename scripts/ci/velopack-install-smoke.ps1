@@ -9,9 +9,9 @@
   bugs that the portable-zip replay can't.
 
   NOT validated locally (a real install modifies the machine and the signed
-  Setup.exe only exists in CI). Wired report-only (continue-on-error) until a
-  test-build.yml dispatch confirms the install/uninstall CLI on a clean runner;
-  flip the step to blocking afterward. See docs/e2e-harness.md.
+  Setup.exe only exists in CI), so it was validated on a clean runner via a
+  test-build.yml dispatch (install -> replay installed binary -> uninstall, all
+  green). Now blocking in release/nightly + test-build. See docs/e2e-harness.md.
 #>
 param(
   [Parameter(Mandatory)][string]$ArtifactDir,
