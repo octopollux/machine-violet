@@ -945,7 +945,7 @@ describe("GameEngine Scribe Integration", () => {
 
     await engine.processInput("Aldric", "I look at the orc.");
     // The scribe runs detached now — settle it before asserting its effects.
-    await engine.awaitPendingScribe();
+    await engine.settleDeferredWork();
 
     // Should NOT forward scribe command to TUI
     expect(log.tuiCommands.filter((c) => c.type === "scribe")).toHaveLength(0);
@@ -978,7 +978,7 @@ describe("GameEngine Scribe Integration", () => {
 
     await engine.processInput("Aldric", "I look around.");
     // The scribe runs detached now — settle it before asserting its effects.
-    await engine.awaitPendingScribe();
+    await engine.settleDeferredWork();
 
     // The mock runScribe returns entityDeltas with grimjaw
     // Mid-scene upserts update the in-memory tree but not the DM snapshot
@@ -987,7 +987,7 @@ describe("GameEngine Scribe Integration", () => {
     expect(sm.getEntityTree()["grimjaw"].name).toBe("Grimjaw");
   });
 
-  it("runs scribes detached + serialized, flushed by awaitPendingScribe, and nudges the sheet cache", async () => {
+  it("runs scribes detached + serialized, flushed by settleDeferredWork, and nudges the sheet cache", async () => {
     const { callbacks, log } = mockCallbacks();
     const engine = makeEngine({
       provider: mockProvider([]),
@@ -1034,7 +1034,7 @@ describe("GameEngine Scribe Integration", () => {
 
     // The barrier resolves only once the whole chain drains, in order.
     release1();
-    await engine.awaitPendingScribe();
+    await engine.settleDeferredWork();
     expect(order).toEqual(["scribe1:start", "scribe1:end", "scribe2:start"]);
 
     // Effects landed: both tree deltas applied; the sheet-cache nudge fired
@@ -1043,6 +1043,52 @@ describe("GameEngine Scribe Integration", () => {
     expect(engine.getSceneManager().getEntityTree()["a"]).toBeDefined();
     expect(engine.getSceneManager().getEntityTree()["loc"]).toBeDefined();
     expect(log.tuiCommands.filter((c) => c.type === "character_sheet_changed").length).toBe(1);
+  });
+
+  it("runs the scene-tracker detached on its own lane; the write-back is flushed by settleDeferredWork", async () => {
+    // Seed three prior player exchanges so the cadence (every 4) fires this turn.
+    const scene = mockScene();
+    scene.transcript = ["**[Aldric]** a", "**[Aldric]** b", "**[Aldric]** c"];
+
+    const { callbacks } = mockCallbacks();
+    const engine = makeEngine({
+      provider: mockProvider([textMessage("You wait in the dark.")]),
+      gameState: mockState(),
+      scene,
+      sessionState: mockSessionState(),
+      fileIO: mockFileIO(),
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    const sm = engine.getSceneManager();
+    const zero = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 };
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    let started = false;
+    // Gate the tracker and have it write back open threads, exactly as the real
+    // one mutates the scene — so we can watch when the write-back becomes visible.
+    vi.spyOn(sm, "runSceneTracker").mockImplementation(async () => {
+      started = true;
+      await gate;
+      sm.getScene().openThreads = "the door is ajar";
+      return zero;
+    });
+
+    await engine.processInput("Aldric", "I wait.");
+
+    // Detached: the turn returned even though the tracker is gated — an inline
+    // await would deadlock. It is running in the background but its write-back
+    // has not landed, so the scene still shows the stale (empty) threads.
+    await new Promise<void>((r) => setTimeout(r, 0));
+    expect(started).toBe(true);
+    expect(sm.getScene().openThreads).toBe("");
+
+    // The barrier flushes the lane; the refreshed threads are now visible. This
+    // is the freshness guarantee the next turn's getSystemPrompt relies on.
+    release();
+    await engine.settleDeferredWork();
+    expect(sm.getScene().openThreads).toBe("the door is ajar");
   });
 });
 
