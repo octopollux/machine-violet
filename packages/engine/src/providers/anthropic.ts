@@ -292,6 +292,7 @@ function toAnthropicMessage(msg: NormalizedMessage): Anthropic.MessageParam {
   // See https://platform.claude.com/docs/en/docs/build-with-claude/extended-thinking
   const content: (
     | Anthropic.TextBlockParam
+    | Anthropic.ImageBlockParam
     | Anthropic.ToolUseBlockParam
     | Anthropic.ToolResultBlockParam
     | Anthropic.ThinkingBlockParam
@@ -300,6 +301,16 @@ function toAnthropicMessage(msg: NormalizedMessage): Anthropic.MessageParam {
   for (const part of msg.content) {
     if (part.type === "text") {
       content.push({ type: "text", text: part.text });
+    } else if (part.type === "image_input") {
+      // Party portraits (and any other input image) — embed as a base64
+      // image block so the model sees the PC's likeness, not just its text
+      // description. Anthropic has no per-image detail tier like OpenAI's
+      // `lowDetail`, so the flag is ignored here; it auto-downsamples and
+      // bills by pixel area, which is why dm-portraits ships a ≤512px WebP.
+      content.push({
+        type: "image",
+        source: { type: "base64", media_type: part.mimeType, data: part.base64 },
+      });
     } else if (part.type === "tool_use") {
       content.push({
         type: "tool_use",

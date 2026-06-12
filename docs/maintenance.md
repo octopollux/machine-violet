@@ -106,6 +106,8 @@ The smoketest is the **Tier-3 live smoke** (not the regression gate — that's T
 2. Update the "State-driven waiting" table in [e2e-harness.md](e2e-harness.md)
 3. If you added a new engine-log event category, append a row to the "Engine-log breadcrumbs" table in the same doc
 
+> **Engine log vs. span trace.** Flat lifecycle/latency breadcrumbs go to `engine.jsonl` via `logEvent`. *Timing spans* (the per-turn causal tree behind the campaign-explorer Timeline) are a separate stream — `trace.jsonl` via `withSpan` (`packages/engine/src/context/trace.ts`). Add a span only at a genuine nesting boundary (a new agent/tool/loop kind); don't duplicate an `engine.jsonl` breadcrumb as a span. See [state-atlas.md](state-atlas.md) §9.
+
 ### Changing what the e2e skills do
 
 The skills are the single source of truth for how agents/users invoke each tier: `.claude/skills/replay-goldens/` (the regression gate), `.claude/skills/record-tape/` (recording), `.claude/skills/smoketest/` (live Tier-3), `.claude/skills/play/` (live-pilot + record substrate). If you change an invocation convention or the tier roles, edit the matching skill — its `description` field is what triggers it, so keep the trigger phrases accurate (e.g. "did I break it" must point at `replay-goldens`, not `smoketest`).

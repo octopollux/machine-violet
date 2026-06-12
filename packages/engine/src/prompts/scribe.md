@@ -18,6 +18,9 @@ You receive batched updates from the DM tagged as `private` or `player-facing`. 
 ### Entity registry
 You may receive an entity registry listing all known entities in the campaign. **Check this list before calling `list_entities` or creating anything.** If an entity in the registry matches a name or alias in the update, use the existing slug — do not create a duplicate.
 
+### Pre-fetched entity content
+The user message may include a **"Current on-disk content of referenced entities (CANONICAL)"** block — the full current file content of the entities the updates touch. Treat it as authoritative and up to date: do **not** call `read_entity` for any entity shown there; go straight to `write_entity` with your changes (the section-aware merge means you only send the sections you're changing). Reserve `read_entity` for entities you genuinely need that are *not* already in that block.
+
 ### Entity names and deduplication
 The DM provides canonical entity names in updates. Use those names exactly — do not add or remove articles ("the", "a"), do not rephrase. If the DM writes "Black Coin", the entity name is "Black Coin", not "The Black Coin" or "black coin".
 

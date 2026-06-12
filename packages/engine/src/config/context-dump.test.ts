@@ -71,6 +71,53 @@ describe("dumpContext", () => {
     expect(parsed.messages).toEqual([{ role: "user", content: "Hello" }]);
   });
 
+  it("elides inline base64 image data to a size placeholder", async () => {
+    const { writeFile } = await import("node:fs/promises");
+    (writeFile as ReturnType<typeof vi.fn>).mockClear();
+    setContextDumpDir("/tmp/test-dump");
+
+    // A portrait-shaped message: ~1.5 KB of base64 that would otherwise
+    // dominate the dump. (Real portraits are ~1.8 MB.)
+    const bigBase64 = "A".repeat(2000);
+    dumpContext("dm", {
+      model: "claude-opus-4-6",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Party portraits:" },
+            { type: "image_input", base64: bigBase64, mimeType: "image/webp", label: "Xera" },
+          ],
+        },
+      ],
+    });
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    const written = (writeFile as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
+    // The raw base64 must not survive into the dump...
+    expect(written).not.toContain(bigBase64);
+    // ...replaced by a human-readable size placeholder.
+    const parsed = JSON.parse(written);
+    expect(parsed.messages[0].content[1].base64).toMatch(/^<base64 elided, ~\d+ KB>$/);
+    // Sibling fields on the same part are untouched.
+    expect(parsed.messages[0].content[1].mimeType).toBe("image/webp");
+    expect(parsed.messages[0].content[0].text).toBe("Party portraits:");
+  });
+
+  it("leaves short base64-ish values untouched", async () => {
+    const { writeFile } = await import("node:fs/promises");
+    (writeFile as ReturnType<typeof vi.fn>).mockClear();
+    setContextDumpDir("/tmp/test-dump");
+
+    dumpContext("dm", { model: "test", messages: [], base64: "QUJD" });
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    const written = (writeFile as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
+    expect(JSON.parse(written).base64).toBe("QUJD");
+  });
+
   it("preserves all fields including unknown ones", async () => {
     const { writeFile } = await import("node:fs/promises");
     (writeFile as ReturnType<typeof vi.fn>).mockClear();

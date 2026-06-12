@@ -211,6 +211,16 @@ export interface NormalizedTool {
  */
 export const GENERATE_IMAGE_TOOL_NAME = "generate_image";
 
+/**
+ * Tool name for the DM's silent portrait-revision tool. Unlike
+ * {@link GENERATE_IMAGE_TOOL_NAME} it does NOT display to the player: it
+ * re-renders a PC's saved portrait (conditioned on the current one) to reflect
+ * a durable appearance change, archives the prior version, and returns the new
+ * portrait back into the DM's context on a later turn. Registered only when
+ * image generation is enabled.
+ */
+export const UPDATE_PORTRAIT_TOOL_NAME = "update_portrait";
+
 /** A tool call extracted from a model response. */
 export interface NormalizedToolCall {
   id: string;

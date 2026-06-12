@@ -22,6 +22,7 @@ The game loop, state management, and AI session handling.
 |---|---|
 | `game-state.ts` | `GameState` interface — the single mutable state object |
 | `game-engine.ts` | Main orchestrator: callbacks, turn management, scene transitions |
+| `deferred-work.ts` | `DeferredWork` registry — detached background lanes (scribe, scene-tracker) flushed at consistency barriers via `settle()`; blocked settles emit `barrier_wait` spans |
 | `agent-loop.ts` | Single-turn conversation loop: streaming, tool handling, usage |
 | `tool-registry.ts` | All tool definitions + `TOOL_STATE_MAP` + dispatch |
 | `scene-manager.ts` | `SceneState`, transitions, pending operations, precis updates |
@@ -89,7 +90,8 @@ Token tracking, conversation window, prompt caching, state persistence.
 | `token-counter.ts` | `estimateTokens()` — tiktoken-based estimation |
 | `usage-helpers.ts` | `accumulateUsage()` — merge Anthropic Usage objects |
 | `display-log.ts` | Narrative line ↔ markdown conversion |
-| `engine-log.ts` | Structured append-only JSONL event log at `../.debug/engine.jsonl` (relative to campaigns dir): server/session/turn lifecycle, API calls, errors. Non-blocking fire-and-forget |
+| `engine-log.ts` | Structured append-only JSONL event log at `../.debug/engine.jsonl` (relative to campaigns dir): server/session/turn lifecycle, API calls, errors. Synchronous `appendFileSync` for live-tail visibility |
+| `trace.ts` | Span trace at `../.debug/trace.jsonl` — a causal tree of `turn → agent → api_call/tool` spans (AsyncLocalStorage `withSpan`), correlated by `parentId`/`turnId`. Backs the campaign-explorer Timeline flame chart |
 
 ## Engine: providers/ — LLM Provider Adapters
 

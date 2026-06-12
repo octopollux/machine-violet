@@ -659,9 +659,21 @@ The engine writes a structured, append-only JSONL event log to `../.debug/engine
 - **Subagent lifecycle:** spawn, complete, usage
 - **Errors:** unhandled exceptions, API failures
 
-The log is non-blocking (fire-and-forget via a WriteStream) and never throws. It is initialized once at server creation via `initEngineLog(campaignsDir)` and closed on shutdown via `closeEngineLog()`.
+The log uses synchronous `appendFileSync` (not a buffered WriteStream) so an external reader — the campaign-explorer, a diagnostics bundle — sees each line the instant it lands; the per-event cost is microseconds and writes never throw. It is initialized once at server creation via `initEngineLog(campaignsDir)` and closed on shutdown via `closeEngineLog()`.
 
 **Code:** `packages/engine/src/context/engine-log.ts`
+
+### Span Trace (`trace.jsonl`)
+
+`engine.jsonl` is a *flat* event stream — good for "what happened and how long did it take", but it can't reconstruct *causality* when the engine fans out (parallel tool calls in one round, nested subagents). The span trace fills that gap: a sibling append-only JSONL at `../.debug/trace.jsonl` where each line is a completed **span** — `{ id, parentId, turnId, campaignId, kind, name, t0, t1, durMs, isError?, attrs? }`.
+
+- **kinds:** `turn` (the player-turn wall-clock envelope) → `agent` (one DM or subagent loop) → `api_call` (one model round) / `tool` (one tool call) / `image_gen` (a render) / `background` (detached work like suggested-choice generation). The DM turn nests as `turn → agent(dm) → { api_call×rounds, tool× }`; a tool that spawns a subagent nests as `tool(search_campaign) → agent(search_campaign) → api_call`.
+- **correlation:** `parentId` rebuilds the tree; `turnId` groups every span of one player turn. Parallel tool calls appear as sibling spans with overlapping `[t0, t1]`.
+- **mechanism:** nesting propagates through the async call stack via `AsyncLocalStorage` (`withSpan`) — no ctx parameter is threaded through call sites. Spans are emitted **on completion** (one line per span), with the same synchronous-append rationale as `engine.jsonl`. Writes are gated on `initTraceLog` (server start, non-test only), so unit tests and golden replay exercise the nesting without touching disk.
+  - *Provider caveat:* a provider that dispatches tools **in-band** over a persistent connection (codex/openai-chatgpt) invokes its `dispatchTool` callback inside the ALS context captured when the connection first opened, not the current turn's. The bridge re-anchors each in-band dispatch to the round's `api_call` span via `captureContext` / `runInContext` (`trace.ts`); without it, every codex-dispatched tool leaks onto turn 1. Loop-style providers (Anthropic) dispatch in the correct context already.
+- **consumer:** the campaign-explorer **Timeline** view renders this as a per-turn flame chart (`GET /engine-log/spans?campaign=<slug>`).
+
+**Code:** `packages/engine/src/context/trace.ts`, instrumented at `agents/game-engine.ts` (turn span) and `providers/agent-loop-bridge.ts` (agent / api_call / tool spans).
 
 ## 10. Evolution Notes
 

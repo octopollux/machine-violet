@@ -9,10 +9,14 @@
  * passes through five visual states as it drains:
  *
  *   ◆  light blue  (full)
+ *   ■  yellow-gold (topaz)
  *   ⬢  red         (ruby)
- *   ■  brown       (garnet)
  *   *  grey        (tarnished)
  *   (space)        (empty)
+ *
+ * The topaz → ruby ordering is by eye, not gemstone value: the brighter,
+ * warmer gold reads as "more left" than the dark red, so it sits higher in
+ * the drain even though a ruby is the costlier stone.
  *
  * Because the user only specified four glyphs plus an empty cell, ticks 1
  * and 2 within a cell share the `*` rendering — visually compressing the
@@ -38,7 +42,7 @@ interface Cell {
 
 const FULL: Cell = { glyph: "◆", color: "#529EAB" };       // light-blue diamond
 const RUBY: Cell = { glyph: "⬢", color: "#781313" };       // red hexagon
-const GARNET: Cell = { glyph: "■", color: "#A87712" };     // brown square
+const TOPAZ: Cell = { glyph: "■", color: "#A88912" };      // yellow-gold square
 const TARNISHED: Cell = { glyph: "*", color: "gray" };     // grey asterisk
 const EMPTY: Cell = { glyph: " " };
 
@@ -48,8 +52,8 @@ const EMPTY: Cell = { glyph: " " };
  */
 function cellFor(buckets: number): Cell {
   if (buckets >= 5) return FULL;
-  if (buckets === 4) return RUBY;
-  if (buckets === 3) return GARNET;
+  if (buckets === 4) return TOPAZ;
+  if (buckets === 3) return RUBY;
   if (buckets >= 1) return TARNISHED;
   return EMPTY;
 }

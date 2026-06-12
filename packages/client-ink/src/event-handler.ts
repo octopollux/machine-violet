@@ -86,6 +86,11 @@ export interface ClientState {
    *  silently bouncing to the menu. Null until the engine emits
    *  show_rollback_summary; cleared on the full reset in returnToMenu. */
   rollbackSummary: string | null;
+  /** Monotonic counter bumped whenever the engine signals a scribe rewrote an
+   *  entity sheet (`tui:character_sheet_changed`). The character pane clears
+   *  its cached sheet and refetches when this changes, so a detached scribe's
+   *  late write repaints an open pane instead of waiting for the next open. */
+  sheetEpoch: number;
 }
 
 export function initialClientState(): ClientState {
@@ -109,6 +114,7 @@ export function initialClientState(): ClientState {
     resourceValues: {},
     usageStatus: null,
     rollbackSummary: null,
+    sheetEpoch: 0,
   };
 }
 
@@ -483,6 +489,10 @@ function handleActivityUpdate(event: ActivityUpdateEvent, update: StateUpdater):
       // Stash the summary; app.tsx raises the modal when session:ended lands.
       const summary = data.summary as string | undefined;
       if (summary) next = { ...next, rollbackSummary: summary };
+    } else if (tuiType === "character_sheet_changed") {
+      // A (now-detached) scribe rewrote a PC sheet after the turn ended. Bump
+      // the epoch so an open character pane drops its cache and refetches.
+      next = { ...next, sheetEpoch: next.sheetEpoch + 1 };
     }
 
     return next;

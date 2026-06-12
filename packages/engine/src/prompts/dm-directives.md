@@ -51,6 +51,8 @@ When the `generate_image` tool is in your toolset, you can use it to render a si
 
 At a scene transition, always generate an image of your favorite moment from the scene that just ended. Fire `generate_image` in the same parallel tool batch as `scene_transition` and `style_scene`.
 
+When `update_portrait` is in your toolset, use it to keep a player character's saved portrait honest as the story changes their look — a boot lost in the dark, a scar earned, a coat traded, a lasting wound. This is a silent, behind-the-scenes update: it does NOT show the player an image and it is NOT a scene render. It quietly revises the reference the engine uses for future scene images (and your own visual sense of the character) by re-rendering their portrait from the current one, so their face and build stay consistent and only the change applies. Just narrate the moment in the fiction as you always would — never announce "here's the updated portrait." Reach for it only when the change PERSISTS; skip it for things the next scene undoes (a moment of being soaked, a borrowed cloak handed back). You don't wait on it — the new portrait returns to you in context a little later. Reserve it for the player characters whose likeness the game actually tracks.
+
 <!--include:Image-->
 
 Image effort levels:

@@ -1,8 +1,50 @@
 import { describe, it, expect, vi } from "vitest";
-import { loadDmPortraitMessage, loadCharacterReferences } from "./dm-portraits.js";
+import sharp from "sharp";
+import {
+  loadDmPortraitMessage,
+  loadCharacterReferences,
+  downscalePortraitForContext,
+  commitPortraitRevision,
+} from "./dm-portraits.js";
 import type { FileIO } from "./scene-manager.js";
 import { norm } from "../utils/paths.js";
 import { campaignPaths } from "../tools/filesystem/index.js";
+
+/** In-memory FileIO with working binary read/write/listDir, for revision tests. */
+function makeRWFileIO(initial: Record<string, Uint8Array> = {}) {
+  const store = new Map<string, Uint8Array>();
+  for (const [k, v] of Object.entries(initial)) store.set(norm(k), v);
+  const dirs = new Set<string>();
+  const io: FileIO = {
+    readFile: async () => { throw new Error("unused"); },
+    writeFile: async () => {},
+    appendFile: async () => {},
+    mkdir: async (p) => { dirs.add(norm(p)); },
+    exists: async (p) => store.has(norm(p)) || dirs.has(norm(p)),
+    listDir: async (p) => {
+      const prefix = norm(p) + "/";
+      const names = new Set<string>();
+      for (const k of store.keys()) if (k.startsWith(prefix)) names.add(k.slice(prefix.length).split("/")[0]);
+      return [...names];
+    },
+    readBinaryFile: async (p) => {
+      const k = norm(p);
+      if (!store.has(k)) throw new Error(`ENOENT: ${p}`);
+      return store.get(k)!;
+    },
+    writeBinaryFile: async (p, bytes) => { store.set(norm(p), bytes); },
+  };
+  return { io, store };
+}
+
+/** Produce a real solid-color PNG of the given square size — valid input for sharp. */
+async function makePng(size: number, rgb: { r: number; g: number; b: number }): Promise<Uint8Array> {
+  return new Uint8Array(
+    await sharp({ create: { width: size, height: size, channels: 3, background: rgb } })
+      .png()
+      .toBuffer(),
+  );
+}
 
 function makeFileIO(present: Record<string, Uint8Array>) {
   const normalized = new Map<string, Uint8Array>();
@@ -34,13 +76,13 @@ describe("loadDmPortraitMessage", () => {
     expect(msg).toBeNull();
   });
 
-  it("returns a synthetic non-ephemeral user message with image_input blocks for present portraits", async () => {
+  it("returns a synthetic non-ephemeral user message with downscaled WebP image_input blocks for present portraits", async () => {
     const paths = campaignPaths("/camp");
     const janeyPath = paths.characterPortrait("Janey Bruce");
     const orosPath = paths.characterPortrait("Oros");
     const io = makeFileIO({
-      [janeyPath]: new Uint8Array([1, 2, 3]),
-      [orosPath]: new Uint8Array([4, 5, 6]),
+      [janeyPath]: await makePng(800, { r: 200, g: 40, b: 40 }),
+      [orosPath]: await makePng(800, { r: 40, g: 40, b: 200 }),
     });
 
     const msg = await loadDmPortraitMessage(
@@ -58,19 +100,20 @@ describe("loadDmPortraitMessage", () => {
     expect(content[0]).toMatchObject({ type: "text" });
     expect(content[1]).toMatchObject({
       type: "image_input",
-      mimeType: "image/png",
+      mimeType: "image/webp", // re-encoded small copy, not the full-res PNG
       lowDetail: true,
       label: "Janey Bruce",
     });
     expect(content[2]).toMatchObject({
       type: "image_input",
-      mimeType: "image/png",
+      mimeType: "image/webp",
       lowDetail: true,
       label: "Oros",
     });
-    // Bytes round-trip correctly through base64.
-    expect((content[1] as { base64: string }).base64).toBe(Buffer.from([1, 2, 3]).toString("base64"));
-    expect((content[2] as { base64: string }).base64).toBe(Buffer.from([4, 5, 6]).toString("base64"));
+    // The through-routed bytes are a genuine ≤512px WebP, not the 800px source.
+    const janeyMeta = await sharp(Buffer.from((content[1] as { base64: string }).base64, "base64")).metadata();
+    expect(janeyMeta.format).toBe("webp");
+    expect(Math.max(janeyMeta.width ?? 0, janeyMeta.height ?? 0)).toBeLessThanOrEqual(512);
   });
 
   it("skips PCs whose portrait file is missing (mid-campaign opt-in works without all PCs covered)", async () => {
@@ -130,6 +173,87 @@ describe("loadDmPortraitMessage", () => {
     // text intro + Good's portrait only — Bad is silently dropped
     expect(content).toHaveLength(2);
     expect(content[1]).toMatchObject({ label: "Good" });
+  });
+});
+
+describe("downscalePortraitForContext", () => {
+  it("downscales a large portrait to a ≤512px WebP", async () => {
+    const png = await makePng(800, { r: 200, g: 40, b: 40 });
+    const { base64, mimeType } = await downscalePortraitForContext(png);
+    expect(mimeType).toBe("image/webp");
+    const meta = await sharp(Buffer.from(base64, "base64")).metadata();
+    expect(meta.format).toBe("webp");
+    expect(Math.max(meta.width ?? 0, meta.height ?? 0)).toBeLessThanOrEqual(512);
+    // The point of the exercise: the through-routed copy is dramatically
+    // smaller than the full-res source.
+    expect(base64.length).toBeLessThan(Buffer.from(png).toString("base64").length);
+  });
+
+  it("does not upscale a portrait already smaller than the cap", async () => {
+    const png = await makePng(128, { r: 10, g: 10, b: 200 });
+    const { base64, mimeType } = await downscalePortraitForContext(png);
+    expect(mimeType).toBe("image/webp");
+    const meta = await sharp(Buffer.from(base64, "base64")).metadata();
+    expect(meta.width).toBe(128); // withoutEnlargement — no blurry upscale
+  });
+
+  it("falls back to the original bytes as PNG when sharp can't decode the input", async () => {
+    const garbage = new Uint8Array([1, 2, 3, 4]);
+    const { base64, mimeType } = await downscalePortraitForContext(garbage);
+    // Robustness: a slightly larger upload beats dropping the PC's likeness.
+    expect(mimeType).toBe("image/png");
+    expect(base64).toBe(Buffer.from(garbage).toString("base64"));
+  });
+});
+
+describe("commitPortraitRevision", () => {
+  const paths = campaignPaths("/camp");
+
+  it("archives the existing portrait and swaps in the new bytes", async () => {
+    const cur = paths.characterPortrait("Janey Bruce");
+    const { io, store } = makeRWFileIO({ [cur]: new Uint8Array([1, 1, 1]) });
+
+    const { archivedVersion } = await commitPortraitRevision(io, "/camp", "Janey Bruce", new Uint8Array([2, 2, 2]));
+
+    expect(archivedVersion).toBe(1);
+    expect([...store.get(norm(cur))!]).toEqual([2, 2, 2]); // current = new
+    expect([...store.get(norm(paths.characterPortraitArchive("Janey Bruce", 1)))!]).toEqual([1, 1, 1]); // prior archived
+  });
+
+  it("increments the archive version across repeated revisions", async () => {
+    const cur = paths.characterPortrait("Janey Bruce");
+    const { io, store } = makeRWFileIO({ [cur]: new Uint8Array([1]) });
+
+    await commitPortraitRevision(io, "/camp", "Janey Bruce", new Uint8Array([2]));
+    const second = await commitPortraitRevision(io, "/camp", "Janey Bruce", new Uint8Array([3]));
+
+    expect(second.archivedVersion).toBe(2);
+    expect([...store.get(norm(cur))!]).toEqual([3]);
+    expect([...store.get(norm(paths.characterPortraitArchive("Janey Bruce", 1)))!]).toEqual([1]);
+    expect([...store.get(norm(paths.characterPortraitArchive("Janey Bruce", 2)))!]).toEqual([2]);
+  });
+
+  it("archives nothing on a first-ever write (no prior portrait)", async () => {
+    const cur = paths.characterPortrait("Oros");
+    const { io, store } = makeRWFileIO({});
+
+    const { archivedVersion } = await commitPortraitRevision(io, "/camp", "Oros", new Uint8Array([9]));
+
+    expect(archivedVersion).toBeNull();
+    expect([...store.get(norm(cur))!]).toEqual([9]);
+  });
+
+  it("no-ops (null) when fileIO lacks writeBinaryFile", async () => {
+    const io: FileIO = {
+      readFile: async () => "",
+      writeFile: async () => {},
+      appendFile: async () => {},
+      mkdir: async () => {},
+      exists: async () => true,
+      listDir: async () => [],
+      // no binary capability
+    };
+    expect(await commitPortraitRevision(io, "/camp", "X", new Uint8Array([1]))).toEqual({ archivedVersion: null });
   });
 });
 

@@ -52,13 +52,15 @@ import { campaignPaths } from "../tools/filesystem/index.js";
 import { norm } from "../utils/paths.js";
 import { TapeReader, TapeWriter, deserializeTape, serializeTape, type Tape } from "../providers/tape.js";
 import { createReplayProvider, createTapingProvider } from "../providers/tape-provider.js";
-import { createAnthropicProvider } from "../providers/index.js";
+import { createOpenAIProvider } from "../providers/index.js";
 import { loadEnv } from "../config/first-launch.js";
 
-// Setup runs on the large tier in production; record on Sonnet so the recorded
-// conversation finalizes coherently. The replay is model-agnostic (it returns
-// recorded results regardless of model), so verification stays free.
-const SCENARIO_MODEL = "claude-sonnet-4-6";
+// Setup runs on the large tier in production. We record against the OpenAI key
+// (gpt-5.5) — the auth the dev/CI environment here actually has (connections.json
+// configures OpenAI/Codex; there's no Anthropic connection). The replay is
+// model-agnostic — the tape provider returns recorded results by sequence,
+// regardless of model — so verification stays free and offline either way.
+const SCENARIO_MODEL = "gpt-5.5";
 
 interface SetupGolden {
   scenario: string;
@@ -209,10 +211,20 @@ describe("setup golden corpus", () => {
     describe(scenario.name, () => {
       it.skipIf(process.env.RECORD_GOLDENS !== "1")("records the golden (live API)", async () => {
         loadEnv();
+        // Fail fast with an actionable message: without a key the OpenAI SDK
+        // throws an opaque auth error deep inside the first call. This `it` is
+        // the explicit live-recording gate, so the key is a hard precondition.
+        expect(
+          process.env.OPENAI_API_KEY,
+          "RECORD_GOLDENS=1 records the setup corpus via gpt-5.5 (openai-apikey) — set OPENAI_API_KEY first",
+        ).toBeTruthy();
         const writer = new TapeWriter(scenario.name);
         const { narrative, finalized } = await runSetupScenario(
           scenario,
-          createTapingProvider(createAnthropicProvider(), writer),
+          createTapingProvider(
+            createOpenAIProvider({ apiKey: process.env.OPENAI_API_KEY ?? "", providerId: "openai-apikey" }),
+            writer,
+          ),
         );
 
         expect(finalized, "scenario must reach finalize_setup — extend its inputs").toBeDefined();

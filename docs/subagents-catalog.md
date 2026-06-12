@@ -161,7 +161,9 @@ With `max_conversation_tokens` disabled (default), the precis updater never fire
 
 **Returns**: `SceneTrackerResult` with `openThreads` (comma-separated wikilinks) and optional `npcIntents` (semicolon-separated).
 
-**Consumed by**: `buildScenePacing()` → `ScenePacingInjection` (unopinionated scene-length and thread-count readout for the DM).
+**Consumed by**: the DM's **next-turn context** — `buildActiveState()` (the `NPC intents:` / `Open:` lines in volatile `activeState`) and `buildScenePacing()` → `ScenePacingInjection` (unopinionated scene-length and thread-count readout). Both are assembled while building the next turn's system prompt.
+
+**Execution — detached (write-back), kept fresh by a barrier.** Unlike the write-only scribe, the scene tracker is **write-back**: the threads/intents it refreshes are read back by the DM on the *next* turn (above). So rather than blocking the turn that triggers it, it runs on its own **scene-tracker lane** of `GameEngine`'s deferred-work registry — parallel to the scribe lane, so player think-time hides `max()` of the two, not their sum — and is flushed by the same next-turn barrier (`this.deferred.settle("next-turn")` in `processInput`), which runs *before* `getSystemPrompt` reads the scene state. That's a **barrier-for-freshness**: detach the execution to turn-end, but pin consumption to the next context build, so think-time makes it free in the common case with zero staleness; the worst case (an AI player out-racing it) degrades to inline — never a regression, never stale. A barrier that actually blocks on overrunning work is recorded as a `barrier_wait` span (visible in the campaign-explorer flame chart). The cadence gate stays on the critical path (only spawn the subagent on its cadence); see the `enqueue("scene-tracker", …)` site in `game-engine.ts`.
 
 ---
 
@@ -233,13 +235,17 @@ Maintains the player-facing campaign compendium (`campaign/compendium.json`). Re
 
 Autonomous entity file manager. Receives batched natural-language updates tagged `private` or `player-facing`. Has its own tools (`list_entities`, `read_entity`, `write_entity`) to manage the campaign filesystem. Handles entity creation, updates, front matter merging, changelog entries, and deduplication. Replaces the old `create_entity` / `update_entity` DM tools.
 
-**Context**: The DM's update batch (natural language). ~200-500 tokens.
+**Context**: The DM's update batch (natural language), the entity registry, and a **prefetched canonical block** (see below). ~200-500 tokens for the batch, plus the prefetched entity contents.
 
 **Tools**: `list_entities(type)`, `read_entity(type, slug)`, `write_entity(mode, type, name, front_matter?, body?, changelog_entry?)`.
 
-**Max tool rounds**: 8 (needs to list → read → write multiple entities).
+**Input prefetch — push, don't pull.** The scribe's reads are predictable: the entities a batch touches are exactly the registry names/aliases that appear in the update text. So `runScribe` resolves and reads them up front (`buildPrefetchedEntityBlock`) and hands them to the subagent as a *"CANONICAL — do not `read_entity` these"* block — collapsing the decide-and-read reasoning burst (~a third of the scribe's wall-clock) so it goes straight to `write_entity`. Matching is case-insensitive and word-boundary on name/alias (so an aliased mention still surfaces the canonical entity for dedup), capped at 16; overflow / unmatched / newly-created entities fall back to the `read_entity` tool, so it's a pure latency optimization, never a correctness dependency. This mirrors the other subagents, which already push their inputs (`promote_character` pre-reads the sheet; scene-tracker gets the transcript).
+
+**Max tool rounds**: 8 (list → read → write), though with prefetch a typical update turn is write-only.
 
 **Returns**: Terse summary of entities created/updated. Usage stats accumulated to session total.
+
+**Execution — detached, off the turn's critical path.** The DM never consumes the scribe's result, yet the scribe is ~half of an entity-heavy turn's wall-clock (its file I/O is sub-millisecond — the cost is the small-model round-trip). So `applyDeferredTuiCommands` does **not** await it: the turn ends, prose and choices land, and the player can act while the scribe persists entities in the background. It runs on the **scribe lane** of `GameEngine`'s deferred-work registry (`DeferredWork`, `deferred-work.ts`); consecutive scribes are **serialized within the lane, not parallelized**, so scribe N's entity-tree deltas land before scribe N+1 reads the tree for dedup. The registry's `settle()` barrier — exposed on the engine as `settleDeferredWork()` — flushes **every** lane at each point that reads or snapshots durable entity state: the **next turn's context build**, a **`promote_character`** subagent (it rewrites the same sheets), **scene transition**, **session end**, and **rollback**. (One `settle` per barrier covers every lane, so a newly added lane or barrier can't silently miss a flush.) Each barrier sets its non-input engine state *before* awaiting (e.g. `setState("dm_thinking")` / `setState("scene_transition")`), so the re-entrancy guard is armed before the await yields and a concurrent `processInput` can't slip in to tear a half-written sheet. On completion the scribe emits a bare `character_sheet_changed` TUI command — gated on an actual character/player write (not locations/items) — so an open character pane drops its cached sheet and refetches the late write. See `handleScribe` / `settleDeferredWork` in `game-engine.ts`.
 
 ---
 

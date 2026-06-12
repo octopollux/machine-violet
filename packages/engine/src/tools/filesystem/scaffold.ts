@@ -92,8 +92,22 @@ export function campaignPaths(root: string) {
      * Confirmed character portrait, sitting next to the character's `.md`
      * file. Setup-agent writes to this path after the player accepts a
      * draft from the show-and-confirm loop.
+     *
+     * This is a **stable pointer**: it always holds the *current* look. When
+     * the DM revises a portrait mid-campaign (`commitPortraitRevision`), the
+     * prior version is archived under `portrait-history/` and this path is
+     * overwritten — so every reader stays on one path and always gets newest.
      */
     characterPortrait: (name: string) => join(root, "characters", `${slugify(name)}-portrait.png`),
+    /**
+     * Archive of superseded portrait versions. `commitPortraitRevision` copies
+     * the outgoing current portrait here (numbered, highest = most recent)
+     * before overwriting `characterPortrait` — old portraits are never
+     * destroyed, but only the current pointer is ever read back into context.
+     */
+    portraitHistoryDir: join(root, "characters", "portrait-history"),
+    characterPortraitArchive: (name: string, version: number) =>
+      join(root, "characters", "portrait-history", `${slugify(name)}-${String(version).padStart(3, "0")}.png`),
   };
 }
 
