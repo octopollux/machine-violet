@@ -23,6 +23,7 @@ import { sceneDir, campaignPaths, machinePaths, parseFrontMatter, extractSection
 import { formatChangelogEntry, appendChangelog } from "../tools/filesystem/index.js";
 import type { EntityTree, EntityTreeEntry } from "@machine-violet/shared/types/entities.js";
 import { slugify } from "./world-builder.js";
+import { findSystem } from "../config/systems.js";
 import type { UsageStats } from "./agent-loop.js";
 import { accUsage } from "../context/usage-helpers.js";
 import { norm } from "../utils/paths.js";
@@ -199,6 +200,9 @@ export class SceneManager {
     this.sessionState.hardStats = buildHardStats({
       turnHolder: opts?.turnHolder,
       resourceValues: this.state.resourceValues,
+      activeSystem: this.state.config.system
+        ? (findSystem(this.state.config.system)?.name ?? this.state.config.system)
+        : undefined,
     });
     this.sessionState.scenePrecis = buildScenePrecis(this.scene);
     this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);

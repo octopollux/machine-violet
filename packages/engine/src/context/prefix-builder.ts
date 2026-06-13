@@ -1,6 +1,7 @@
 import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
 import { CAMPAIGN_SCOPE_LABELS } from "@machine-violet/shared/types/config.js";
 import type { SystemBlock } from "../providers/types.js";
+import { findSystem } from "../config/systems.js";
 
 /**
  * Build the cached prefix (system prompt) for the DM agent.
@@ -96,7 +97,8 @@ export function buildCachedPrefix(
 
   // Game system
   if (config.system) {
-    blocks.push({ text: `\n\n## Game System\nYou are running: ${config.system}` });
+    const systemName = findSystem(config.system)?.name ?? config.system;
+    blocks.push({ text: `\n\n## Game System\nYou are running: ${systemName}` });
   }
 
   // Campaign setting (genre, mood, difficulty, premise)

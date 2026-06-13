@@ -137,6 +137,24 @@ describe("buildHardStats", () => {
     });
     expect(result).toBe("Turn: Aldric\nResources:\n  Aldric: HP=24/30");
   });
+
+  it("renders the active system as the first line", () => {
+    const result = buildHardStats({
+      activeSystem: "FATE Accelerated",
+      turnHolder: "Aldric",
+      resourceValues: { Aldric: { HP: "24/30" } },
+    });
+    expect(result).toBe("System: FATE Accelerated\nTurn: Aldric\nResources:\n  Aldric: HP=24/30");
+  });
+
+  it("emits the system line even with no turn holder or resources", () => {
+    expect(buildHardStats({ activeSystem: "FATE Accelerated" })).toBe("System: FATE Accelerated");
+  });
+
+  it("omits the system line entirely when there is no active system", () => {
+    expect(buildHardStats({ turnHolder: "Aldric" })).toBe("Turn: Aldric");
+    expect(buildHardStats({ activeSystem: undefined })).toBe("");
+  });
 });
 
 describe("buildDMPrefix cascading entity override", () => {

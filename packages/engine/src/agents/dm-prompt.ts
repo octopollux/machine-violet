@@ -158,8 +158,14 @@ export function buildHardStats(params: {
   turnHolder?: string;
   combatRound?: number;
   resourceValues?: Record<string, Record<string, string>>;
+  /** Display name of the active game system. Omitted entirely when absent. */
+  activeSystem?: string;
 }): string {
   const lines: string[] = [];
+
+  if (params.activeSystem) {
+    lines.push(`System: ${params.activeSystem}`);
+  }
 
   if (params.turnHolder) {
     lines.push(`Turn: ${params.turnHolder}${params.combatRound ? ` (Round ${params.combatRound})` : ""}`);
