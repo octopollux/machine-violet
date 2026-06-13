@@ -57,7 +57,7 @@
     "@vitest/coverage-v8": "^4.0.18",
     "concurrently": "^10.0.3",
     "cross-env": "^10.1.0",
-    "esbuild": "^0.28.0",
+    "esbuild": "^0.28.1",
     "eslint": "^10.0.0",
     "ink-testing-library": "^4.0.0",
     "knip": "^6.15.0",
