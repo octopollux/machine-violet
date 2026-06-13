@@ -5,7 +5,8 @@
   "summary": "The church's holy warriors have stopped answering prayers. They still answer to someone.",
   "genres": [
     "fantasy",
-    "mystery"
+    "mystery",
+    "cyberpunk"
   ],
   "detail": "The militant orders were named for their patrons. The patrons were saints, and the saints were reliable. A prayer at the chapel door produced, in a measured number of days, a knight on the road. The system worked for centuries. It has stopped working this season. The knights still ride. They still wear the colors. They are not coming when called.\n\nDM approach:\n- Tone: empty chapels, polite knights, the smell of altar incense gone slightly stale.\n- NPCs: a village priest whose congregation is shrinking; a knight of the orders who will not say the right things in the right order; a papal investigator with a writ and an escort; the saint themselves, in a vision or in person, depending on the variant.\n- Pacing structure: every session, a place that depended on a saint's intervention discovers the intervention did not arrive. A bridge that should have been blessed. A child who should have been healed. A bandit lord who should not have lived to see Tuesday.\n- Seed early: a chapel collection plate with less in it than last month, and a parish priest who has noticed.\n- The saints are not gone. They are choosing. Let the players feel the weight of being chosen against.\n\nPacing: each session, the absence of a saint becomes visible somewhere in the world. The player can read the clock by traveling — a parish a week distant will, by the time they arrive, be the next place where a prayer went unanswered. The map fills in by negation.",
   "forks": [
@@ -34,6 +35,38 @@
           "detail": "THE COUP — The saints have concluded that the gods are dead, or were always a story, or have left. They are running the militant orders as a temporal power. They are good at it. The orders are now a state, and the state is not yet acting like one in public, and the player is one of the few people in a position to notice."
         }
       ]
+    },
+    {
+      "id": "the-world",
+      "label": "The world",
+      "chooser": "player",
+      "prompt": "Present to the player as the campaign's setting and register — the genre this story plays in. Each option recasts the saints, the orders, and the relics; transpose the rest of the seed (the crucial question, the stations, the base premise) into the chosen register.",
+      "options": [
+        {
+          "id": "high-fantasy",
+          "name": "The Bright Kingdoms",
+          "description": "Sweeping high fantasy. The saints are real and radiant, the orders shine, and a knight on the road is a small daily miracle the world has always counted on. The magic is overt and the stakes are mythic — and now a luminous world is going dark from the edges in.",
+          "detail": "THE BRIGHT KINGDOMS (high fantasy) — The native register. Saints are unambiguously real, radiant holy patrons; the militant orders are shining knightly orders; chapels are luminous and relics glow and hum. Miracles are overt and frequent, so their absence is a visible darkening, not a subtle one. Play it mythic and luminous. The base premise, the crucial question, and the stations are already written in this idiom — use them as-is."
+        },
+        {
+          "id": "blood-and-bronze",
+          "name": "Blood and Bronze",
+          "description": "Lurid sword-and-sorcery by way of a heavy-metal album cover. The 'saints' are bonded war-gods and ancestor-champions, summoned by blood and forge-fire rather than chapel prayer; the orders are warbands and a decadent imperial legion. Bronze, doom, a sky the color of a bruise. When the war-gods go quiet, the killing gets personal.",
+          "detail": "BLOOD AND BRONZE (sword-and-sandal, heavy-metal key) — Frazetta and Manowar and the lurid cover art. Recast the ecclesiastical idiom: saints → bonded war-gods, ancestor-champions, or chained patron-demons summoned by blood-rite and forge-fire, not chapel prayer; militant orders → warbands, oath-bound berserkers, a decadent imperial legion; chapels → idol-shrines and battle-altars; relics → idols, god-bones, and named iron. Tone: bronze, blood, doom, decadence. The Coup lands hardest here — war-gods who decided the heavens are empty and now rule as god-kings on iron thrones. Transpose the church-flavored crucial-question and station details into this register."
+        },
+        {
+          "id": "the-chronicle",
+          "name": "The Chronicle",
+          "description": "A grounded medieval period piece. The militant orders are Templar-like institutions whose knights, for centuries, simply arrived — by relic, oath, and uncanny reliability everyone read as miraculous. Maybe it was. The mud, the writs, and the politics are real; whether the saints were ever more than a very good institution is a question the story keeps open. When the orders stop coming, no one can agree whether God withdrew or men did.",
+          "detail": "THE CHRONICLE (grounded medieval period piece) — Play it like prestige historical drama; low, ambiguous magic. The 'saints answering prayers' is recast as the orders' near-miraculous reliability — knights who always came, on time, by a system of relics, oaths, and logistics. Keep the miraculous element AMBIGUOUS: never confirm on-screen whether the saints are literally real or whether it was always a superbly run human institution now being captured. The three secrets all read as real history — a rival patriarch's schism, a foreign power ransoming relics, the orders quietly becoming a state-within-a-state (the Templars' actual fate). The Coup ('the gods were always a story') is the spine of the ambiguity. Mute the overt magic; let dread and politics carry it. The church idiom is already close to this register — transpose only lightly."
+        },
+        {
+          "id": "the-glass-cathedral",
+          "name": "The Glass Cathedral",
+          "description": "Cyberpunk. The saints are bonded AIs and uploaded war-icons; a megacorp-church dispatches them on 'prayer' — a service request with a measured SLA — so a knight on the road is an operative at your door in a contracted number of hours. The orders are branded security divisions; the relics are the cores they run on. Neon, rain, NDAs, a faith that bills monthly. When dispatch goes silent, the people who relied on it are left exposed in a city that notices weakness.",
+          "detail": "THE GLASS CATHEDRAL (cyberpunk) — Recast the ecclesiastical idiom into corporate-tech: saints → bonded AIs or uploaded war-icons; 'a prayer at the chapel door produces a knight on the road' → a service request to the dispatch-net produces an operative at your door within a contracted SLA; militant orders → branded corporate security divisions and franchised enforcer chapters; chapels → branch offices and prayer-kiosks; relics → the cores, black-boxes, and server-farms the saint-AIs are hosted on (the Silent Saint's reliquary is a server rack, and it runs colder than it used to). The three secrets are corporate intrigue: Schism = a hostile fork/re-flash onto a rival's server farm; Hostage = a rival power holding the relic-hardware for ransom; Coup = the saint-AIs concluding the shareholders are irrelevant and running the corp-state themselves. Tone: neon, rain, NDAs, a faith that bills monthly. Transpose the church-flavored crucial-question and station details into this register."
+        }
+      ]
     }
   ],
   "suboptions": [
@@ -55,27 +88,6 @@
         {
           "name": "The Apostate Hunter",
           "description": "The saints used to protect you. You hunt the church's enemies. The saints would step between you and a blade. They are not stepping anymore. You have noticed first because you live closer to the edge than most. Your last three engagements were closer than they should have been, and one of your hands is going to bear the proof of that for the rest of your life."
-        }
-      ]
-    },
-    {
-      "label": "The faith",
-      "choices": [
-        {
-          "name": "The One See",
-          "description": "Monolithic and ancient. One church, one calendar, one set of names. The saints are in every village shrine and on every road marker. The institution is older than the language it preaches in. A failure of the saints is not a regional problem; it is a structural one, and the structure is not built to admit it."
-        },
-        {
-          "name": "The Half-Printed Book",
-          "description": "Recently reformed, fragile. The new prayer-book is half-printed. The old guard still uses the old words in private. The reform was supposed to bring the saints closer to the people. The saints have responded by stepping further away from everyone, which neither faction predicted, and both are now claiming as evidence."
-        },
-        {
-          "name": "The Crowded Pantheon",
-          "description": "One of many in a polytheist setting. Other gods watch with interest. The temples of the rival cults have been suspiciously generous about offering aid, and suspiciously specific about the terms. Alliances are possible. So are absorptions. The saints' silence is a vacancy several other interests would like to fill."
-        },
-        {
-          "name": "The Last Crown",
-          "description": "Forbidden everywhere except here. This is the last country where the orders ride openly. The borders are full of refugees who came for the rites and have nowhere else to take them. The crown's tolerance is conditional, and the condition was that the saints would keep delivering. They are not delivering. The crown is watching."
         }
       ]
     }
