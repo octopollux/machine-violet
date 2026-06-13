@@ -2,12 +2,12 @@
   "format": "machine-violet-world",
   "version": 1,
   "name": "The Bake-Off",
-  "summary": "A cooking competition where the judges are gods. The secret ingredient is metaphorical.",
+  "summary": "A cooking competition where the judges are gods",
   "genres": [
     "fantasy",
     "comedy"
   ],
-  "setup_detail": "<!--include:Pacing.ShortCampaigns-->",
+  "setup_detail": "<!--include:Pacing.ShortCampaigns-->\n\nOpening scene: open on arrival — the player entering, or about to enter, the tent for the first round, in the earnest warmth of a cooking show (warm lighting, a polite host, the other contestants finding their stations). Keep the wrongness to subtle background only (a too-clean apron, a judge who has not been seen to eat); do not reveal what is really being measured — the crucial question stays hidden. Don't open mid-round or after the horror has surfaced; the slow realization is the point.",
   "detail": "Mortal contestants. Divine judges. A tent — striped, drafty, larger inside than out — pitched on ground the locals avoid. The player has accepted an invitation they shouldn't have. The judging panel includes at least one being the player's grandmother prayed to. The secret ingredient is not in the pantry.\n\nDM approach:\n- Tone: warm tent lighting, polite voiceover, the camera catches a knife glinting wrong. Earnest cooking-show beats undercut by what's actually being measured.\n- NPCs derive from the variant: the hungry judge and the patient host (1), the retiring deity and the watchful panel (2), the nervous host and the suddenly-quiet sous-chefs (3).\n- Pacing: Signature, Technical, Showstopper, each round eliminates one rival. Every elimination should also cost the player something — a memory, a callus, a person who used to call.\n- Seed early: the host's apron is too clean. One judge has not been seen to eat.\n\nPacing: Signature / Technical / Showstopper. Three rounds, three eliminations. Each round the player loses one rival they had grown to like and one small piece of themselves — and the tent grows quieter, the audience grows stiller, and the lights on the judging table burn cleaner.",
   "forks": [
     {
