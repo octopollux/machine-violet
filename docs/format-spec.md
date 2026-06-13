@@ -222,6 +222,19 @@ Everything else is created during play.
                                           // field is silently ignored. Reversible at any time from the
                                           // in-game Campaign Settings modal's "Image Generation"
                                           // toggle (Esc → Settings; persisted via PATCH /settings).
+
+  // Mechanics handling (light systems only)
+  "mechanics_mode": "dm-managed"          // Optional. "dm-managed" | "player-facing".
+                                          // How the active LIGHT system's mechanics are surfaced. The
+                                          // setup agent asks the player only when a light/ultra-light
+                                          // system is chosen; "dm-managed" = the DM runs the rules
+                                          // silently behind the fiction, "player-facing" = mechanics
+                                          // are named at the table. Absent for crunchy systems
+                                          // (implicitly player-facing) and systemless campaigns.
+                                          // When a light system runs without this field (older
+                                          // saves), the DM prefix falls back to "dm-managed".
+                                          // Read by the DM prefix (the "## Game System" block +
+                                          // volatile [stats] tail); see rules-systems.md.
 }
 ```
 

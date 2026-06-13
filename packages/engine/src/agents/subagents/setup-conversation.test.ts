@@ -351,6 +351,33 @@ describe("createSetupConversation", () => {
     expect(result.finalized!.campaignScope).toBe("few-sessions");
   });
 
+  it("finalize_setup passes through a valid mechanics_mode", async () => {
+    const input = { ...FINALIZE_INPUT, system: "fate-accelerated", mechanics_mode: "player-facing" };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Onward!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized!.mechanicsMode).toBe("player-facing");
+  });
+
+  it("finalize_setup leaves mechanicsMode undefined when omitted or invalid", async () => {
+    // Omitted (the agent didn't ask — crunchy/pure-narrative) and a garbage
+    // value both resolve to undefined; the DM prefix applies the light-system
+    // default downstream.
+    for (const extra of [{}, { mechanics_mode: "loud" }]) {
+      const provider = mockProvider([
+        finalizeResponse({ ...FINALIZE_INPUT, ...extra }),
+        textResponse("Onward!"),
+      ]);
+      const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+      const result = await conv.start(noop);
+      expect(result.finalized!.mechanicsMode).toBeUndefined();
+    }
+  });
+
   it("finalize_setup defaults campaign_scope to few-sessions when given an unknown value", async () => {
     const input = { ...FINALIZE_INPUT, campaign_scope: "epic-saga" };
     const provider = mockProvider([

@@ -158,8 +158,17 @@ export function buildHardStats(params: {
   turnHolder?: string;
   combatRound?: number;
   resourceValues?: Record<string, Record<string, string>>;
+  /** Display name of the active game system. Omitted entirely when absent. */
+  activeSystem?: string;
+  /** When the system is run DM-managed (silently), tag the system line so the
+   * reminder to keep mechanics behind the fiction rides the same cadence. */
+  mechanicsSilent?: boolean;
 }): string {
   const lines: string[] = [];
+
+  if (params.activeSystem) {
+    lines.push(`System: ${params.activeSystem}${params.mechanicsSilent ? " · running silently" : ""}`);
+  }
 
   if (params.turnHolder) {
     lines.push(`Turn: ${params.turnHolder}${params.combatRound ? ` (Round ${params.combatRound})` : ""}`);

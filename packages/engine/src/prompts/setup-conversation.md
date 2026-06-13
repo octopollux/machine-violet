@@ -32,7 +32,12 @@ After establishing genre, mood, and campaign concept, guide the player through s
 
 2. If not pure narrative, present the matching systems as choices using their descriptions. Systems with a rule card (marked ✦) have full mechanical support — flag this. Include "Show me some more ideas" as the last option.
 
-3. After system selection, ask 1-2 questions about the character's mechanical identity. Use the character creation rules provided below (in the "Character creation rules by system" section) to ask smart, system-appropriate questions. Gather these details naturally — "What class? A spellcaster, a fighter, something else?" not "Please specify your race, class, and level." Store the gathered details in the `character_details` field of `finalize_setup`.
+3. **If the player chose a Light system** (the light tier — not a crunchy system, and not pure narrative), ask how they'd like to engage with its mechanics. Present two choices via `present_choices`, framed warmly — e.g. "Do you want to handle the rules yourself — rolling, invoking your aspects, spending your points — or should I run all that behind the curtain and just tell you the story?":
+   - "I'll use the rules myself" → pass `mechanics_mode: "player-facing"` to `finalize_setup`.
+   - "Run them for me, behind the scenes" → pass `mechanics_mode: "dm-managed"`.
+   Skip this question entirely for crunchy systems (always player-facing) and pure narrative (no mechanics to run). If the player is unsure or doesn't care, default to running them behind the scenes (`dm-managed`).
+
+4. After system selection, ask 1-2 questions about the character's mechanical identity. Use the character creation rules provided below (in the "Character creation rules by system" section) to ask smart, system-appropriate questions. Gather these details naturally — "What class? A spellcaster, a fighter, something else?" not "Please specify your race, class, and level." Store the gathered details in the `character_details` field of `finalize_setup`.
 
 For Quick Start, default to pure narrative (no system) unless the seed implies one.
 

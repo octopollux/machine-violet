@@ -1,7 +1,7 @@
 import type { SubagentResult } from "../subagent.js";
 import type { SetupResult } from "../setup-agent.js";
 import { generateThemeColor } from "../setup-agent.js";
-import { CAMPAIGN_SCOPES, type CampaignScope } from "@machine-violet/shared/types/config.js";
+import { CAMPAIGN_SCOPES, type CampaignScope, type MechanicsMode } from "@machine-violet/shared/types/config.js";
 import { loadAllPersonalities, getPersonality } from "../../config/personality-loader.js";
 import { loadAllWorlds, worldSummaries, loadWorldBySlug } from "../../config/world-loader.js";
 import { normalizeForks, assembleCampaignDetail } from "../../config/world-forks.js";
@@ -124,6 +124,12 @@ const FINALIZE_TOOL: NormalizedTool = {
         type: "string",
         enum: ["on", "off"],
         description: "Player's answer to the image-generation consent question. 'on' if they said yes, 'off' if they said no. Only include this field if you actually asked the consent question (which only happens when the active provider/model supports image generation — see the Image generation section of your prompt). Omit when not asked.",
+        nullable: true,
+      },
+      mechanics_mode: {
+        type: "string",
+        enum: ["dm-managed", "player-facing"],
+        description: "Player's answer to the mechanics-handling question. 'dm-managed' if they want you to run the rules silently behind the scenes; 'player-facing' if they want to engage the mechanics directly. ONLY include this field if you actually asked the question, which only happens when the chosen system is light or ultra-light (see the System selection section of your prompt). Omit for crunchy systems and pure-narrative campaigns.",
         nullable: true,
       },
       handoff_note: { type: "string", description: "Handoff postcard for the DM's first turn. Free-form prose — the DM sees this once as priming for the opening scene. Include: what the player said about their character IN THEIR OWN WORDS (quote or paraphrase closely, don't sanitize), any freeform remarks they made about the world / tone / things they want or don't want, and anything you (the setup agent) want to pass along to the DM — hooks you promised, tone cues the structured fields don't capture, unresolved ambiguities. Write it as a direct note to the DM, not as narration. A paragraph or two is usually right. Always include this field." },
@@ -873,6 +879,12 @@ export function createSetupConversation(
       contentPreferences: (input.content_preferences as string) || undefined,
       imageGeneration: input.image_generation === "on" || input.image_generation === "off"
         ? (input.image_generation as "on" | "off")
+        : undefined,
+      // Only honored for light/ultra-light systems (the only case the agent is
+      // told to ask). Recorded verbatim when the agent reports it; the DM prefix
+      // applies MECHANICS_MODE_DEFAULT when a light system runs without a choice.
+      mechanicsMode: input.mechanics_mode === "dm-managed" || input.mechanics_mode === "player-facing"
+        ? (input.mechanics_mode as MechanicsMode)
         : undefined,
       handoffNote: (typeof input.handoff_note === "string" && input.handoff_note.trim())
         ? input.handoff_note.trim() : undefined,
