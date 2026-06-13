@@ -87,6 +87,10 @@
         {
           "name": "The Relief",
           "description": "You came in on the last supply run. The previous keeper went out on the same boat without speaking to you, except to hand you the keys and say not to open the bottom drawer. There was no briefing. You are still learning which lights on the console are normal."
+        },
+        {
+          "name": "The Black Beacon",
+          "description": "Sole keeper. You tend a light that does not officially exist. The service that posted you is on no roster you could point to; the orders that put you here would, if anyone followed them back, lead nowhere. There is no rescue protocol — not because someone forgot to write one, but because there was never anyone authorized to come. Whatever is out there, you will meet it alone, by design."
         }
       ]
     }
