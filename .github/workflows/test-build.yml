@@ -4,7 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       windows:
-        description: "Build Windows (installer + signing)"
+        description: "Build Windows (installer)"
+        type: boolean
+        default: true
+      sign:
+        description: "Sign the Windows installer (Azure OIDC — protected branches only; set false on feature/Dependabot branches)"
         type: boolean
         default: true
       macos:
@@ -63,6 +67,7 @@ jobs:
           fi
 
       - name: Azure login (OIDC)
+        if: inputs.sign
         uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -75,10 +80,17 @@ jobs:
           dotnet tool install -g vpk
           echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
 
-      - name: Package and sign (Velopack)
+      - name: Package (Velopack)
         shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
+          # Signing is gated on the `sign` input: Azure Trusted Signing only
+          # authenticates from protected refs, so feature/Dependabot branches
+          # pack unsigned (sign=false) to still exercise the gate below.
+          SIGN_ARGS=()
+          if [ "${{ inputs.sign }}" = "true" ]; then
+            SIGN_ARGS+=(--azureTrustedSignFile assets/trusted-signing.json)
+          fi
           vpk pack \
             --packId MachineViolet \
             --packVersion "${VERSION}-test" \
@@ -87,14 +99,15 @@ jobs:
             --mainExe MachineViolet.exe \
             --icon assets/machine-violet.ico \
             --shortcuts StartMenuRoot \
-            --azureTrustedSignFile assets/trusted-signing.json \
+            "${SIGN_ARGS[@]}" \
             --channel test \
             --outputDir velopack-out
 
       # Validate the packaged-artifact gate end-to-end (the same scripts
       # release.yml / nightly.yml run). Both legs are blocking here and in
-      # release/nightly — a dispatch here exercises the Windows signing + pack
-      # path that the OIDC trust boundary keeps off feature branches. See
+      # release/nightly. With sign=false the package is unsigned, which lets
+      # this gate (pack + replay + install smoke) run on feature/Dependabot
+      # branches where the OIDC trust boundary blocks signing. See
       # docs/e2e-harness.md.
       - name: Replay goldens against the packaged binary
         shell: bash

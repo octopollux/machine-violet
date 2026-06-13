@@ -112,13 +112,18 @@ artifact, runs [`scripts/ci/replay-packaged-binary.sh`](../scripts/ci/replay-pac
 `release` job's `needs:` so a red replay blocks publish. **Not** in PR `ci.yml` —
 this gate is for the release/nightly pipelines only.
 [`test-build.yml`](../.github/workflows/test-build.yml) runs the same gate so it
-can be validated without cutting a release.
+can be validated without cutting a release. Dispatch with `sign=false` to run the
+pack → replay → install-smoke gate on a feature/Dependabot branch (the package is
+unsigned), since Azure Trusted Signing only authenticates from protected refs;
+omit it (default `sign=true`) from `release`/`main` to also exercise signing.
 
 **Velopack install smoke** ([`scripts/ci/velopack-install-smoke.ps1`](../scripts/ci/velopack-install-smoke.ps1)):
 installs `Setup.exe` → replays against the *installed* binary → uninstalls,
-catching install-layout/manifest bugs the portable replay can't. It is **not
-locally validatable** (needs a signed `Setup.exe` + a real machine install), so
-it was validated end-to-end on a clean runner via a `test-build.yml` dispatch
+catching install-layout/manifest bugs the portable replay can't. It is
+**impractical to run locally** (it performs a real machine install → uninstall
+and is Windows-only — signing is optional via the `sign` input, so a signed
+`Setup.exe` is no longer the blocker), so it was validated end-to-end on a clean
+runner via a `test-build.yml` dispatch
 (install → replay installed binary → uninstall, all green) and is now
 **blocking in release/nightly and test-build.yml** — a broken Windows installer
 blocks publish like any other packaging failure.
