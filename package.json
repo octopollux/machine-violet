@@ -25,7 +25,7 @@
     "dist": "node scripts/build-dist.js",
     "explorer": "node tools/campaign-explorer/scripts/dev.js",
     "theme-editor": "node tools/theme-editor/scripts/dev.js",
-    "prepare": "lefthook install --force"
+    "prepare": "node scripts/install-hooks.mjs"
   },
   "keywords": [
     "rpg",

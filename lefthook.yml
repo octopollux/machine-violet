@@ -8,7 +8,8 @@
 #                suite, which INCLUDES the Tier-2 golden replays). ~80s, paid
 #                once before sharing.
 #
-# Activated by `npm install` (root `prepare` runs `lefthook install`). Both
+# Activated by `npm install` (root `prepare` runs `scripts/install-hooks.mjs`,
+# which force-installs into the shared `.git/hooks` dir under worktrees). Both
 # hooks are scoped to *.ts/*.tsx staged files, so docs-only commits skip them.
 
 pre-commit:
