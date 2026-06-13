@@ -189,6 +189,22 @@ export class SceneManager {
     return this.tierProviders?.[tier] ?? { provider: fallbackProvider, model: getModel(tier) };
   }
 
+  /**
+   * Build the volatile `[stats]` string for the current state. Shared by
+   * getSystemPrompt and contextRefresh so the system/silent line and resources
+   * stay consistent — contextRefresh runs after scene transitions, and must not
+   * drop the active-system reminder from the hard-stats cadence.
+   */
+  private buildCurrentHardStats(turnHolder?: string): string {
+    const system = this.state.config.system;
+    return buildHardStats({
+      turnHolder,
+      resourceValues: this.state.resourceValues,
+      activeSystem: system ? (findSystem(system)?.name ?? system) : undefined,
+      mechanicsSilent: effectiveMechanicsMode(this.state.config) === "dm-managed",
+    });
+  }
+
   /** Get the current system prompt (cached prefix) and volatile context. */
   getSystemPrompt(opts?: { turnHolder?: string }): CachedPrefixResult {
     this.state.objectives.current_scene = this.scene.sceneNumber;
@@ -197,14 +213,7 @@ export class SceneManager {
       pendingAlarms: [],
       activeObjectives: this.getActiveObjectives(),
     });
-    this.sessionState.hardStats = buildHardStats({
-      turnHolder: opts?.turnHolder,
-      resourceValues: this.state.resourceValues,
-      activeSystem: this.state.config.system
-        ? (findSystem(this.state.config.system)?.name ?? this.state.config.system)
-        : undefined,
-      mechanicsSilent: effectiveMechanicsMode(this.state.config) === "dm-managed",
-    });
+    this.sessionState.hardStats = this.buildCurrentHardStats(opts?.turnHolder);
     this.sessionState.scenePrecis = buildScenePrecis(this.scene);
     this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);
     this.sessionState.entityIndex = this.entityRegistrySnapshot();
@@ -605,9 +614,7 @@ export class SceneManager {
       pendingAlarms,
       activeObjectives: this.getActiveObjectives(),
     });
-    this.sessionState.hardStats = buildHardStats({
-      resourceValues: this.state.resourceValues,
-    });
+    this.sessionState.hardStats = this.buildCurrentHardStats();
 
     // Sync precis and player read
     this.sessionState.scenePrecis = buildScenePrecis(this.scene);

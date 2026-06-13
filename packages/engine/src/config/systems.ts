@@ -89,18 +89,21 @@ export function isLightSystem(slug: string | undefined): boolean {
 }
 
 /**
- * Resolve the effective mechanics mode for a campaign: an explicit choice if
- * recorded, otherwise the default for a light system, otherwise undefined
- * (crunchy systems are implicitly player-facing; systemless campaigns have no
- * mechanics to run). Single source of truth shared by the DM prefix and the
- * volatile [stats] tail so both surfaces agree.
+ * Resolve the effective mechanics mode for a campaign. Mechanics mode is only
+ * meaningful for light/ultra-light systems: for those, an explicit choice if
+ * recorded, otherwise the default (`dm-managed`). For crunchy systems (which
+ * are implicitly player-facing) and systemless campaigns it is always
+ * undefined — a stray `mechanics_mode` left on a hand-edited crunchy config is
+ * ignored rather than rendering a nonsensical "run D&D silently". Single source
+ * of truth shared by the DM prefix and the volatile [stats] tail so both
+ * surfaces agree.
  */
 export function effectiveMechanicsMode(config: {
   system?: string;
   mechanics_mode?: MechanicsMode;
 }): MechanicsMode | undefined {
-  if (config.mechanics_mode) return config.mechanics_mode;
-  return isLightSystem(config.system) ? MECHANICS_MODE_DEFAULT : undefined;
+  if (!isLightSystem(config.system)) return undefined;
+  return config.mechanics_mode ?? MECHANICS_MODE_DEFAULT;
 }
 
 /**

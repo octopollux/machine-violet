@@ -226,7 +226,7 @@ When a campaign runs a **light or ultra-light** system, the player chooses how v
 
 **Set at setup.** When the player picks a light system, the setup agent asks the mechanics question (after system selection, before character details) and records the answer in `finalize_setup.mechanics_mode`. Crunchy systems (D&D 5e, Ironsworn) are implicitly player-facing and skip the question; systemless campaigns have no mechanics to run. The user can change the stored value later by editing `config.json`.
 
-**Read at play.** The DM prefix resolves the effective mode (`effectiveMechanicsMode` in `config/systems.ts`: an explicit choice, else the light-system default `dm-managed`, else nothing) and surfaces it two ways:
+**Read at play.** The DM prefix resolves the effective mode (`effectiveMechanicsMode` in `config/systems.ts`: for a light system, an explicit choice or the default `dm-managed`; for crunchy or systemless campaigns, always nothing — a stray `mechanics_mode` on a non-light config is ignored) and surfaces it two ways:
 
 1. The campaign-stable `## Game System` block names the active mode (`Mechanics: …`), and the `<About_Mechanics>` directive enumerates how to run each.
 2. The volatile `[stats]` tail echoes the system name every other turn — tagged `· running silently` in `dm-managed` mode — so the system stays salient where the DM's attention is sharpest (it otherwise tends to fade from the hour-cached prefix). This is the fix for light systems "disappearing" from play unless the player re-invokes them by name.

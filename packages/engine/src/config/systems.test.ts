@@ -135,9 +135,9 @@ describe("isLightSystem", () => {
 });
 
 describe("effectiveMechanicsMode", () => {
-  it("returns an explicit mode verbatim regardless of system", () => {
+  it("honors an explicit mode for a light system", () => {
     expect(effectiveMechanicsMode({ system: "fate-accelerated", mechanics_mode: "player-facing" })).toBe("player-facing");
-    expect(effectiveMechanicsMode({ system: "dnd-5e", mechanics_mode: "dm-managed" })).toBe("dm-managed");
+    expect(effectiveMechanicsMode({ system: "24xx", mechanics_mode: "dm-managed" })).toBe("dm-managed");
   });
 
   it("defaults a light system with no explicit choice to dm-managed", () => {
@@ -145,10 +145,14 @@ describe("effectiveMechanicsMode", () => {
     expect(effectiveMechanicsMode({ system: "24xx" })).toBe("dm-managed");
   });
 
-  it("returns undefined for crunchy systems and systemless campaigns with no explicit choice", () => {
+  it("is undefined for crunchy/systemless campaigns — even with a stray explicit mode", () => {
+    // Mechanics mode is light-system-only; a hand-edited value on a crunchy
+    // config is ignored rather than rendering a nonsensical "run D&D silently".
     expect(effectiveMechanicsMode({ system: "dnd-5e" })).toBeUndefined();
     expect(effectiveMechanicsMode({ system: "ironsworn" })).toBeUndefined();
+    expect(effectiveMechanicsMode({ system: "dnd-5e", mechanics_mode: "dm-managed" })).toBeUndefined();
     expect(effectiveMechanicsMode({})).toBeUndefined();
+    expect(effectiveMechanicsMode({ mechanics_mode: "player-facing" })).toBeUndefined();
   });
 });
 
