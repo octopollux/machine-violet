@@ -132,6 +132,18 @@ const SETUP_SCENARIOS: SetupScenario[] = [
       "My character is Vesper Quill, a sly, charming half-elf rogue who's light on her feet. Standard array is fine and you can pick sensible skills.",
     ],
   },
+  {
+    // Light system → exercises the mechanics-mode question. The player states a
+    // light system (FATE Accelerated) AND the dm-managed preference up front, so
+    // finalize_setup records `mechanics_mode: "dm-managed"` — locking the new
+    // light-system branch end to end (system slug + mechanics_mode through
+    // finalize → SetupResult → scaffolded config).
+    name: "setup-fate-light-silent",
+    inputs: [
+      "I'm Sam, an adult. Full setup, please. I want a pulpy planar-adventure on FATE Accelerated — the light system. And I'd like you to run the rules for me, behind the scenes; I won't be tracking dice, aspects, or fate points myself.",
+      "My character is Roan Calloway, a quick-witted sky-courier who smuggles refugees off worlds marked for erasure; his recurring trouble is a blood-debt to the very tyrant whose work he's undoing. Flashy daring is his strongest approach. Mood heroic pulp, a tight one-shot — surprise me with the rest.",
+    ],
+  },
 ];
 
 // ---------------------------------------------------------------------------
