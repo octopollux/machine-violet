@@ -34,6 +34,7 @@ import { useGameContext } from "../tui/game-context.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
 import { buildTranscriptHtml, loadImageBytes } from "../commands/transcript.js";
 import { openPath, revealInExplorer } from "../commands/open-path.js";
+import { routePlayingPhaseKey } from "./playing-input.js";
 
 export function PlayingPhase() {
   const {
@@ -383,12 +384,38 @@ export function PlayingPhase() {
 
   // --- Input handling ---
   useInput((_input, key) => {
-    // Triple-ESC reset
+    // Triple-Esc panic-reset bookkeeping is stateful (a timestamp ring), so it
+    // stays here; the routing *decision* below is pure (see playing-input.ts).
+    let tripleEscReady = false;
     if (key.escape) {
       const now = Date.now();
       escTimestamps.current.push(now);
       escTimestamps.current = escTimestamps.current.filter((t) => now - t <= 1500);
-      if (escTimestamps.current.length >= 3) {
+      tripleEscReady = escTimestamps.current.length >= 3;
+    }
+
+    // Esc/menu both open the pause menu and refresh the token summary.
+    const openMenu = () => {
+      setMenuOpen(true);
+      apiClient.getCost().then(({ formatted }) => setTokenSummary(formatted)).catch(() => { /* no-op */ });
+    };
+
+    const action = routePlayingPhaseKey(
+      { escape: !!key.escape, tab: !!key.tab, pageUp: !!key.pageUp, pageDown: !!key.pageDown },
+      {
+        tripleEscReady,
+        apiErrorModalActive,
+        hasRetryOverlay: !!retryOverlay,
+        activeModal: !!activeModal,
+        menuOpen,
+        activeChoices: !!activeChoices,
+        characterPaneOpen,
+        mode,
+      },
+    );
+
+    switch (action) {
+      case "tripleEscReset":
         escTimestamps.current = [];
         setActiveChoices(null);
         setActiveModal(null);
@@ -398,63 +425,36 @@ export function PlayingPhase() {
           apiClient.command("exit_mode").catch(() => { /* no-op */ });
         }
         return;
-      }
-    }
-
-    // Esc on the API-error modal dismisses it (latched on attemptId so the
-    // next retry brings it back). Handled before the catch-all blocker below
-    // so the user isn't trapped while the engine retries in the background.
-    if (key.escape && apiErrorModalActive && retryOverlay) {
-      setDismissedAttemptId(retryOverlay.attemptId);
-      return;
-    }
-
-    if (apiErrorModalActive || activeModal || menuOpen) return;
-
-    // ESC while choices are visible opens the menu without clearing them.
-    // The overlay's own input is disabled while the menu is open (isActive
-    // prop), so arrow keys/Enter don't drive both UIs at once.
-    if (key.escape && activeChoices) {
-      setMenuOpen(true);
-      apiClient.getCost().then(({ formatted }) => setTokenSummary(formatted)).catch(() => { /* no-op */ });
-      return;
-    }
-
-    // Tab: toggle the quick-view character pane. Handled before the choices
-    // guard below so the quick view stays reachable while a choice overlay is
-    // on screen — the overlay keeps arrow/Enter for selection, so the two
-    // don't conflict (see #541).
-    if (key.tab) {
-      setCharacterPaneOpen((prev) => !prev);
-      return;
-    }
-
-    if (activeChoices) return;
-
-    // In OOC/Dev mode: ESC exits
-    if (mode === "ooc" || mode === "dev") {
-      if (key.escape) {
+      case "dismissApiError":
+        // Latched on attemptId so the next retry brings the modal back.
+        if (retryOverlay) setDismissedAttemptId(retryOverlay.attemptId);
+        return;
+      // The choice overlay's own input is disabled while the menu is open
+      // (isActive prop), so arrow keys/Enter don't drive both UIs at once.
+      case "openMenuOverChoices":
+      case "openMenu":
+        openMenu();
+        return;
+      case "toggleCharacterPane":
+        setCharacterPaneOpen((prev) => !prev);
+        return;
+      case "exitMode":
         apiClient.command("exit_mode").catch(() => { /* no-op */ });
         return;
-      }
-    }
-
-    // ESC: dismiss character pane first, then open menu
-    if (key.escape) {
-      if (characterPaneOpen) {
+      case "dismissCharacterPane":
         setCharacterPaneOpen(false);
         return;
+      case "scroll": {
+        // Target the character pane when open, else the narrative.
+        const step = scrollAmount(rows);
+        const target = characterPaneOpen ? modalScrollRef.current : narrativeRef.current;
+        target?.scrollBy(key.pageUp ? -step : step);
+        return;
       }
-      setMenuOpen(true);
-      apiClient.getCost().then(({ formatted }) => setTokenSummary(formatted)).catch(() => { /* no-op */ });
-      return;
-    }
-
-    // Scroll keys — target character pane when open, else narrative
-    if (key.pageUp || key.pageDown) {
-      const step = scrollAmount(rows);
-      const target = characterPaneOpen ? modalScrollRef.current : narrativeRef.current;
-      target?.scrollBy(key.pageUp ? -step : step);
+      case "blocked":
+      case "choicesBlocked":
+      case "none":
+        return;
     }
   });
 
