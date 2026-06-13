@@ -18,7 +18,7 @@
     "ink": "^7.0.0",
     "ink-scroll-view": "^0.3.6",
     "react": "^19.2.0",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.1",
     "sixel": "^0.16.0",
     "string-width": "^8.2.1"
   },
