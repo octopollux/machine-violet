@@ -33,6 +33,12 @@
           "name": "The Building Is Alive",
           "description": "The exhibits aren't moving — the rooms are. The museum is breathing, and the night staff are its first witnesses.",
           "detail": "THE BUILDING IS ALIVE — The exhibits are not moving. The rooms are. The Egyptian wing is where the medieval armor was. The mastodon is in a hallway that did not exist on Tuesday. The museum is breathing, slowly, and the player is inside the lung. The building wants to be seen. The night staff are its first witnesses."
+        },
+        {
+          "id": "the-curators-grief",
+          "name": "The Curator's Grief",
+          "description": "The curator lost someone; the museum is their cathedral now and the collection their congregation. They are in the building tonight, preparing a service.",
+          "detail": "THE CURATOR'S GRIEF — The curator buried someone they loved, and somewhere in the after-hours building they built a private altar to them. The ritual worked, or it worked in the worst way: the museum is a cathedral now and the collection is the congregation. The curator is here tonight with the player — not angry, not hunting, simply preparing a service, and gently certain the player has arrived to attend it. The horror is sympathy: stopping them means refusing a grieving person the only comfort they have left."
         }
       ]
     }
@@ -56,6 +62,10 @@
         {
           "name": "The Founders' Gallery",
           "description": "You recognize the people in the photographs. The diorama of the founding has somebody new in it this week, standing at the back of the founders' group, looking at the front of the case. The donor wall in the lobby has your last name on it, in a gift-tier you cannot afford, and you do not remember anyone in your family being asked."
+        },
+        {
+          "name": "The Trophy Hall",
+          "description": "Mounted animals posed as in life: the elk mid-stride, the wolf at the edge of a painted treeline, the mountain lion gathered to spring. By daylight they are glass-eyed and still. After hours they remember they were alive — and the manner in which they stopped being so, and the hunter each was bound for. The curator knows every one by catalog number and by the rifle that brought it down, and the night staff who mounted them know exactly which seams will not hold."
         }
       ]
     },
