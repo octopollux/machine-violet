@@ -6,53 +6,67 @@
   "genres": [
     "modern",
     "sci-fi",
-    "fantasy"
+    "fantasy",
+    "mystery"
   ],
-  "setup_detail": "<!--include:Pacing.EndlessCampaigns-->",
-  "detail": "The core mystery: The ground floor didn't vanish — the building was pulled INTO something. A pocket of collapsed geometry (a Fold, a phase-slip, a doctrinal paradox, depending on the setting). The person responsible is inside the building. They meant to run a small test. They were wrong about the scale.\n\nThe Fold is UNSTABLE. It will collapse in approximately 12 hours. Collapse either returns the building to real space (best case) or compresses — geometry folds inward, catastrophic structural failure.\n\nKey NPCs (adapt names and roles to setting):\n- THE ARCHITECT — The person who caused this. Mid-50s, brilliant, evasive. Always touches their left temple when lying. Barricaded near the device.\n- THE ENFORCER — Security/military/temple guard. Bulky, keeps reaching for a weapon that isn't there. Wants order. Fears there's no order left to restore.\n- THE ORGANIZER — Sharp, mid-30s, compulsive list-maker. Wants actionable information. The player's best ally — if given tasks.\n- THE LOUDMOUTH — Young, charismatic, wrong about everything. Already rallying a group toward a dangerous plan. Will force a crisis if no one steps up.\n\nTicking clocks:\n- FOLD COLLAPSE: 12 hours. Non-negotiable.\n- The Architect attempts full lockdown of their floor within 1 hour of first contact.\n- The Loudmouth's group attempts something reckless within 2 hours if no leader emerges.\n\nMotifs: Light with no source. Lists as coping. Elevation as distance from the problem. An elevator that works when it shouldn't.\n\nPacing: Start in a break room / common area / nave alcove. Let the player absorb the wrongness before anyone asks them to lead. The first act is social — keeping people from falling apart. The second act is exploration — what's on each floor? The third act is confrontation — the Architect, the device, the choice.",
+  "setup_detail": "<!--include:Pacing.EndlessCampaigns-->\n\nOpening scene: begin somewhere ordinary inside the building — a break room, a stalled elevator, a window desk — in the first hours after the ground went away, with the wrongness just sinking in. Don't open mid-exploration or in front of the central mystery; let the player feel the impossible calm (the lights still on, the sky where the street should be) before anyone has to decide what to do. Keep the crucial question hidden.",
+  "detail": "The building has come loose from the world. A downtown high-rise — offices, elevators, a sky lobby, a parking garage below grade — except the ground floor opens onto nothing now, and every window shows open sky: no street, no city, no ground, only a long blue fall into cloud and a blue-black nothing beneath. The power still runs. The elevators still chime. No one knows why, or how long it lasts, or what is below. This is not a twelve-hour emergency to survive and escape — it is the new shape of the world, and the people inside have a long time to find out what it is.\n\nThis is a Big Mystery Box. One enormous central enigma — why the building is in the sky, what waits below, what this place has become — revealed only in pieces, never all at once. Treat every floor as a nested box inside the big one: something strange is happening on each, and most of them are sealed, dark, or rumored until the players force their way in. Pay out partial answers that each open two new questions. Withhold the center until it has been earned across many sessions. The engine of this campaign is the question, not its answer — keep the question alive.\n\nGate everything. Reaching a floor costs something concrete: a chained stairwell door, a dead elevator bank that must be repowered or rewired from the machine room, a keycard system, a decades-old building-automation terminal (the kind that still boots to an ancient operating system) that has to be coaxed back to life, a wary or hostile group that holds the only way through. The building's own systems — power, elevators, cameras, doors, water, air — are the puzzle and the keys at once. Turning one on usually turns something else off.\n\nGrow the world as you go, and write it down. Treat every numbered floor as its own location entity: create it the moment the players reach or learn of it, and record what is there, who holds it, what is wrong with it, and how it connects up and down. Track the non-floor infrastructure as location entities too. Keep the map cumulative and honest — never contradict a floor once it is established, and let each discovery set up the next. This is a world primed to grow; your job is to grow it coherently and remember all of it.\n\nThe building's non-floor anatomy (the connective tissue and the locks — a normal high-rise has at least this much; name more as you need it): the lobby and atrium, where the ground floor used to be and now the sky begins; the security and visitor desk; the below-grade parking levels, now hanging out into open air; the loading dock and freight entrance; the mailroom; the passenger elevator banks and the sky-lobby transfer floor; the freight elevator; the elevator machine room at the top, with the governors and controllers and the gear; the two fire stairwells running the full height; the roof, the mechanical penthouse, and the window-washing davits; the HVAC air-handling plant and the cooling towers; the boiler and chiller plant; the main electrical switchgear and transformer vault; the emergency generator room and its finite fuel; the server room and telecom closets, with the old building-automation terminals; the fire command center; the security operations center and its wall of cameras looking onto floors no one has reached; the water tanks and pump room; the janitorial and maintenance shops; and the sub-basement and utility tunnels, which now end at open sky.\n\nGenre-bend the content to the chosen world. The anatomy above is the corporate-tower default; for the orbital ring or the cathedral spire, keep the bones and change the skin (the chosen world's detail says how), and bend the per-floor mysteries to that genre too — engineering and AI and biotech aboard the ring, relics and rites and heresies in the spire.\n\nMotifs: light with no source; elevation as status and as distance from the problem; an elevator that works when it shouldn't; systems that answer to no one's hand. Keep the wrongness in what is discovered, not in the ordinary fabric of the building — the hallway is just a hallway until it isn't.\n\nPacing: there is no collapse countdown. The pressure is the slow kind — finite fuel and water and food, a structure that ages, the open sky always one failed door away — and the pull is forward and inward, floor by floor, toward the center of the box. Start small (one common area, the wrongness sinking in) and let the world open as fast or as slowly as the players push.",
   "forks": [
     {
-      "id": "architect-motive",
-      "label": "The architect's motive",
+      "id": "crucial-question",
+      "label": "The crucial question",
       "chooser": "agent",
-      "prompt": "Roll or choose to fit the player's tone. Do NOT reveal early.",
+      "prompt": "The answer at the center of the mystery box. Roll or choose to fit the players' tone. Do NOT reveal early — pay it out in pieces across the whole campaign; the question is the engine.",
       "options": [
         {
-          "id": "validation",
-          "name": "Validation",
-          "description": "Desperate for vindication; protects the device because shutting it down means admitting a mistake.",
-          "detail": "VALIDATION — They need the world to acknowledge their work. They'll protect the device because shutting it down means admitting it was a mistake. They're wrong, and increasingly unhinged, but not evil — just desperate."
+          "id": "something-pulled-it-in",
+          "name": "Something Pulled It In",
+          "description": "An intelligence took the building — collecting, studying, or harvesting; the deeper floors trend toward contact with it.",
+          "detail": "SOMETHING PULLED IT IN — The building did not fall; it was taken, by something that does this on purpose. It is collecting, studying, or harvesting — and the building may not be the only thing it has. The deeper the players go, the more the floors trend toward evidence of the taker, and finally toward contact. It is not necessarily hostile. It is certainly not done."
         },
         {
-          "id": "escape",
-          "name": "Escape",
-          "description": "Made the Fold deliberately as a lifeboat to hide from something on the outside.",
-          "detail": "ESCAPE — They created the Fold deliberately to hide from something on the outside. Returning the building means exposing everyone to whatever they're running from. The Fold is a lifeboat, not a trap."
+          "id": "it-was-always-here",
+          "name": "It Was Always Going to Happen Here",
+          "description": "The building sits on or around something latent that finally woke; the cause is downward, in the sub-basement and below.",
+          "detail": "IT WAS ALWAYS GOING TO HAPPEN HERE — The site was always wrong. The building was raised on or around something — buried, waiting, older than the city — and it has finally woken. The cause is downward: the sub-basement, the foundation, the utility tunnels that now end at sky. Records of the building's construction, and of whatever was here before it, are a thread worth pulling. The high floors are symptoms; the bottom is the disease."
         },
         {
-          "id": "accident",
-          "name": "Accident",
-          "description": "Doesn't understand what happened; as scared as everyone, hiding it behind authority and jargon.",
-          "detail": "ACCIDENT — They genuinely don't understand what happened. They're as scared as everyone else but hiding it behind authority and jargon. The device is running on its own now and they have no idea how to stop it."
+          "id": "one-of-many",
+          "name": "It's One of Many",
+          "description": "The building is one node in a vast structure of taken places hanging in the sky; others are out there, reachable, signaling.",
+          "detail": "IT'S ONE OF MANY — The building is one node in something enormous. Out in the open sky, at the edge of sight from the right window, are other shapes — other buildings, other taken places, hung in the same nothing. Some still have lights. Some are signaling. The campaign can reach them — across the sky, or through whatever connects them below — and the scope keeps widening: a whole drowned archipelago of stolen places, and the question of who hung them there, and why."
+        },
+        {
+          "id": "the-building-is-unstuck",
+          "name": "The Building Is Unstuck",
+          "description": "Floors no longer agree on when or where they are; some are the past, some the future, some elsewhere — which is why each floor is its own strange world.",
+          "detail": "THE BUILDING IS UNSTUCK — The building has come loose from when and where, not just from the ground. The floors no longer agree: one is the day it opened, one is years after everyone left, one is somewhere that was never here at all. This is why every floor is its own strange country — and why the same elevator doors can open onto two different worlds on two different trips. The center of the box is whatever broke time and place in this one building, and whether it can be set right or only ridden."
         }
       ]
-    }
-  ],
-  "suboptions": [
+    },
     {
-      "label": "The building",
-      "choices": [
+      "id": "your-world",
+      "label": "Your world",
+      "chooser": "player",
+      "prompt": "Present to the player as the kind of place the building is — use each option's name and description. Each option's detail tells you how to bend the building's anatomy, systems, and per-floor mysteries to that genre: keep the bones, change the skin.",
+      "options": [
         {
+          "id": "meridian-tower",
           "name": "Meridian Tower",
-          "description": "A corporate tower. A glass-and-steel office building, mid-week, mid-afternoon. Forty survivors across 26 floors, mostly cubicle workers, a security guard, and a physicist on-site. The horror is mundane people in an impossible situation."
+          "description": "A glass-and-steel corporate high-rise — offices, server floors, a sky lobby, a parking garage below. The most ordinary and the most relatable: regular people in an impossible place, half-finished workdays frozen the moment the ground went away.",
+          "detail": "MERIDIAN TOWER (corporate, modern) — The default; the base anatomy applies as written. The locks are corporate building-tech: keycards, the NT-era building-automation system, elevator controllers, the camera grid in the security operations center. The per-floor mysteries wear business-as-usual — the trading floor, the unmarked floor that isn't in the directory, the executive suite that locked itself down, the company that may have known this was coming. The horror is the mundane made impossible."
         },
         {
-          "name": "The Halo Ring",
-          "description": "An orbital habitat ring. A rotating station module that just detached from the superstructure. The \"sky\" is naked vacuum behind failing radiation shielding. Forty crew, a malfunctioning AI, and a cutting-edge research lab. The horror is engineering and time pressure."
+          "id": "orbital-habitat-ring",
+          "name": "Orbital Habitat Ring",
+          "description": "A rotating orbital habitat. The \"open sky\" is naked vacuum behind the viewports; spin-gravity, decks instead of floors, the void wheeling past below. The horror is engineering, and the things a closed system does when it starts to fail.",
+          "detail": "ORBITAL HABITAT RING (orbital, hard SF) — Transpose the bones to a station. Floors become decks around the ring; the elevator machine room becomes the hub and transit spindle; the stairwells become spoke-ladders toward the axis; the parking garage becomes the docking bays; the building-automation terminals become legacy flight-control systems and a degrading station AI; the generator and its fuel become the reactor and life-support margins; the camera wall becomes internal sensor feeds; \"the sky below\" is the void the ring is falling through. Bend the per-floor mysteries to AI, biotech, and engineering."
         },
         {
+          "id": "the-threshold-spire",
           "name": "The Threshold Spire",
-          "description": "A cathedral spire. A mile-high temple to a god of boundaries, mid-festival, mid-prayer. The nave floor dissolved into luminous void. Forty pilgrims, a heretic scholar, and a central liturgy of the faith. The horror is faith tested by the literal."
+          "description": "A mile-high cathedral to a god of thresholds — naves, cells, reliquaries, bell-stages, a pilgrim stair winding up through stone. The open sky below is doctrine made literal: the abyss of scripture, opened under everyone's feet. The horror is faith tested by the impossibly real.",
+          "detail": "THE THRESHOLD SPIRE (cathedral, fantasy) — Transpose the bones to stone and faith. Floors become naves, cells, and reliquary stages; the elevator machine room becomes the great bell-winch and counterweight loft; the stairwells become the pilgrim stair; the server room and its terminals become the reliquary and the orrery-mechanisms only the keepers can read; the switchgear becomes the lamp-vaults; the camera wall becomes a watch of icons whose painted eyes are not blind; \"the sky below\" is the abyss the faith always warned of, now literal. Bend the per-floor mysteries to relics, rites, heresies, and the divine."
         }
       ]
     }
