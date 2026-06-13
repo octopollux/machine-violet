@@ -77,14 +77,20 @@ export interface PortraitablePlayer {
  * rides along as an image-to-image reference (the renderer consumes it directly,
  * so we don't tell the model to "analyze" it — see IMAGE_RENDERER_INSTRUCTIONS),
  * so the prompt only has to describe the desired *result*: same character, one
- * thing changed. Mirrors the setup-agent's neutral portrait styling so the
- * revised reference stays consistent across any campaign's art direction.
+ * thing changed. The canonical portrait is the multi-angle landscape reference
+ * sheet the setup agent produced, so the revision must reproduce that same
+ * three-view turnaround layout exactly — otherwise the first revision would
+ * collapse the sheet to a single pose and lose the angles the in-game art
+ * conditions on. Mirrors the setup-agent's neutral styling so the revised
+ * reference stays consistent across any campaign's art direction.
  */
 export function buildPortraitRevisionPrompt(name: string, change: string): string {
   return (
-    `A revised reference portrait of ${name}, matching the reference image's character ` +
-    `(face, build, hair, overall identity) and framing exactly, with one change applied: ${change}. ` +
-    `Keep everything else about their appearance the same. Simple digital art, plain black background.`
+    `A revised character reference sheet of ${name}, matching the reference image's character ` +
+    `(face, build, hair, overall identity) and its layout exactly — the same three side-by-side views ` +
+    `(front, front-left three-quarter, rear-right three-quarter) on one plain black background — ` +
+    `with one change applied: ${change}. Keep everything else about their appearance the same. ` +
+    `Simple digital art, plain black background.`
   );
 }
 

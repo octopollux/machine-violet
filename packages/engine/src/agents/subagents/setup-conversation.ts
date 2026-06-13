@@ -282,35 +282,41 @@ function renderRollDice(input: Record<string, unknown>): { content: string; isEr
 const GENERATE_IMAGE_TOOL: NormalizedTool = {
   name: "generate_image",
   description:
-    "Generate a full-length character portrait for the player's character. " +
-    "Use ONLY for character portraits during chargen — never for scenes or other illustrations during setup. " +
-    "The image is shown to the player automatically. After showing each draft, ask the player whether " +
-    "the portrait looks right or what to adjust, then call this again with an updated prompt if needed. " +
-    "When the player confirms a portrait, call `set_portrait` with that draft's filename to keep it. " +
-    "ALWAYS render setup portraits in the style: **simple digital art, plain black background**. " +
-    "Do not match the campaign's visual style during chargen — the black-background style is " +
-    "the canonical character-card look, and it stays consistent across worlds. Describe the " +
-    "character (build, clothing, pose, mood, expression) in the prompt, then end with " +
-    "\"Simple digital art, plain black background.\" Save campaign-styled imagery for in-game scenes. " +
-    "ALWAYS pass `effort: \"standard\"` and `aspect: \"portrait\"` for these chargen portraits — `standard` is a " +
-    "medium-quality render that comes back reasonably fast for iteration. A portrait never needs more than `standard`; " +
-    "do not reach for `quality`/`showcase` here (they're slower and meant for in-campaign scenes).",
+    "Generate the player character's reference sheet: a SINGLE landscape image showing the SAME full-body character " +
+    "from three angles side by side against one shared background — a front view, a three-quarter view from the " +
+    "front-left, and a three-quarter view from the rear-right. " +
+    "Use ONLY for the character reference sheet during chargen — never for scenes or other illustrations during setup. " +
+    "This sheet becomes the canonical reference the DM later conditions in-game art on, so the multiple angles are what " +
+    "keep generated scenes from defaulting to a stiff, camera-facing pose. " +
+    "The image is shown to the player automatically. After showing each draft, ask the player whether it looks right or " +
+    "what to adjust, then call this again with an updated prompt if needed. " +
+    "When the player confirms, call `set_portrait` with that draft's filename to keep it. " +
+    "ALWAYS render setup reference sheets in the style: **simple digital art, plain black background, even neutral " +
+    "lighting, the same character identical across all three views**. Do not match the campaign's visual style during " +
+    "chargen — the neutral black-background sheet is the canonical character-card look, and it stays consistent across " +
+    "worlds. Describe the character once (build, clothing, footwear, mood, expression), then call for the three " +
+    "side-by-side views and end with \"Character reference sheet — three views (front, front-left three-quarter, " +
+    "rear-right three-quarter), simple digital art, plain black background.\" Save campaign-styled imagery for in-game " +
+    "scenes. " +
+    "ALWAYS pass `effort: \"standard\"` and `aspect: \"landscape\"` for these chargen reference sheets — `standard` is a " +
+    "medium-quality render that comes back reasonably fast for iteration, and `landscape` gives the three views room to " +
+    "sit side by side. Do not reach for `quality`/`showcase` here (they're slower and meant for in-campaign scenes).",
   inputSchema: {
     type: "object" as const,
     properties: {
       prompt: {
         type: "string",
-        description: "Vivid description of the character's full-body appearance — clothing, build, pose, mood, background hint, art style. The model composes the image from this; be specific.",
+        description: "Vivid description of the character's full-body appearance — clothing, build, footwear, mood, expression — described once, since the character is identical in every view. End by calling for the three side-by-side angles (front, front-left three-quarter, rear-right three-quarter) on a plain black background. The model composes the image from this; be specific.",
       },
       effort: {
         type: "string",
         enum: ["draft", "standard", "quality", "showcase"],
-        description: "Render effort. Use 'standard' (medium quality) for chargen portraits — it's the ceiling for a portrait. 'quality' / 'showcase' are slower and reserved for in-campaign scenes.",
+        description: "Render effort. Use 'standard' (medium quality) for the chargen reference sheet — it's the ceiling a character sheet needs. 'quality' / 'showcase' are slower and reserved for in-campaign scenes.",
       },
       aspect: {
         type: "string",
         enum: ["portrait", "landscape", "square"],
-        description: "Aspect ratio. Use 'portrait' for character portraits during chargen.",
+        description: "Aspect ratio. Use 'landscape' for the chargen reference sheet — it gives the three side-by-side views room to breathe.",
       },
     },
     required: ["prompt", "effort", "aspect"],
@@ -415,15 +421,15 @@ function buildSystemPrompt(
   if (imageGenSupported) {
     const portraitSection = portraitLoopActive ? [
       "",
-      "### Character portraits (only when the player said Yes above)",
+      "### Character reference sheet (only when the player said Yes above)",
       "",
-      "Once the player has chosen a character name and given you a description, generate a full-length portrait of them. Use the `generate_image` tool — its `prompt` argument should be a vivid, specific description of the character's full body (build, clothing, pose, mood, background hint), composed in a visual style that matches the campaign's world (illuminated-manuscript serif plate, cinematic matte, painterly fresco, woodcut, anime-comic, etc. — pick what fits). Pass `effort: \"standard\"` (medium quality — plenty for a portrait, and fast enough to iterate) and `aspect: \"portrait\"`.",
+      "Once the player has chosen a character name and given you a description, generate a character reference sheet for them. Use the `generate_image` tool — its `prompt` should describe the character's full body once (build, clothing, footwear, mood, expression) and then call for a single side-by-side sheet showing that SAME character from three angles: a front view, a three-quarter view from the front-left, and a three-quarter view from the rear-right, all on one plain black background in simple digital art with even, neutral lighting. Keep it campaign-agnostic — NOT the campaign's art style — because this sheet becomes the canonical reference the DM conditions in-game art on, and the extra angles are what stop generated scenes from defaulting to a stiff, camera-facing pose. Pass `effort: \"standard\"` (medium quality — plenty here, and fast enough to iterate) and `aspect: \"landscape\"` (the three views need the width).",
       "",
       "After each draft is rendered, ask the player something light like \"Look right, or do you want me to try again with anything different?\" — don't editorialize about the image yourself. If they want adjustments, call `generate_image` again with a revised prompt. There's no iteration cap; let them iterate until they're happy.",
       "",
       "When the player confirms (or moves on without enthusiasm), call `set_portrait` with the character's name and the latest draft's filename. The filename comes back as the tool result of `generate_image` — record it and pass it through verbatim. Do this BEFORE calling `finalize_setup`.",
       "",
-      "If the player said No to images at the consent step above, skip this entire section. Don't generate a portrait, don't call set_portrait, just continue with character creation and finalize.",
+      "If the player said No to images at the consent step above, skip this entire section. Don't generate a reference sheet, don't call set_portrait, just continue with character creation and finalize.",
     ].join("\n") : "";
 
     blocks.push({
@@ -689,7 +695,11 @@ export function createSetupConversation(
       return { content: "generate_image requires a non-empty prompt.", isError: true };
     }
     const effort = normalizeImageEffort(input.effort, "standard");
-    const aspect = normalizeImageAspect(input.aspect, "portrait");
+    // Chargen renders a multi-angle reference sheet, so the fallback is
+    // `landscape` — the three side-by-side views need the width. The model
+    // passes aspect explicitly per the tool schema; this only catches an
+    // omitted/garbage value.
+    const aspect = normalizeImageAspect(input.aspect, "landscape");
     try {
       const result = await provider.generateImage({
         prompt: promptText,

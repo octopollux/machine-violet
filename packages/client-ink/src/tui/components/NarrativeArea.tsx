@@ -25,17 +25,20 @@ import { UsageGauge } from "./UsageGauge.js";
  * shrunk to fit, not cropped — landscapes lose width to side pillars, portraits
  * cap their height).
  *
- * The budget is keyed off image intent (see {@link imageHeightCapFraction}):
- * character portraits are tall and would otherwise dominate, so they get a
- * smaller slice of the pane; scene snapshots / player-requested illustrations
- * are the focus of the moment and get nearly the whole pane.
+ * Every displayed image now gets nearly the whole pane. This used to be keyed
+ * off intent — `character_portrait` got a smaller 0.6 slice because the setup
+ * portrait was a tall front-facing close-up that would otherwise dominate. The
+ * setup portrait is now a *landscape* multi-angle reference sheet (the only
+ * `character_portrait` image the player ever sees; the DM's silent
+ * `update_portrait` render isn't displayed), so it's wide-not-tall and is the
+ * focus of the chargen moment — same as a scene. The intent param is retained
+ * so a future tall-portrait intent could reintroduce a tighter cap.
  */
-const IMAGE_HEIGHT_CAP_PORTRAIT = 0.6;
 const IMAGE_HEIGHT_CAP_SCENE = 0.9;
 
 /** Fraction of the narrative pane an image may occupy, by its display intent. */
-function imageHeightCapFraction(intent: ProcessedLine["intent"]): number {
-  return intent === "character_portrait" ? IMAGE_HEIGHT_CAP_PORTRAIT : IMAGE_HEIGHT_CAP_SCENE;
+function imageHeightCapFraction(_intent: ProcessedLine["intent"]): number {
+  return IMAGE_HEIGHT_CAP_SCENE;
 }
 
 
@@ -345,12 +348,11 @@ const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
   // the absolute path the engine wrote.
   //
   // We pass BOUNDS, not a footprint: the full content width, and a height cap —
-  // a fraction of the narrative viewport keyed off the image's intent (portraits
-  // 0.6, scenes 0.9) so an image leaves room for surrounding narration without a
-  // tall portrait swallowing the pane. InlineImage reads the image's true aspect
-  // and reserves exactly the scaled footprint inside these bounds — no
-  // letterboxing here, no `isPortrait` guesswork (landscapes fill width,
-  // portraits fill height up to the cap).
+  // a fraction of the narrative viewport (0.9; see imageHeightCapFraction) so an
+  // image leaves room for surrounding narration without swallowing the pane.
+  // InlineImage reads the image's true aspect and reserves exactly the scaled
+  // footprint inside these bounds — no letterboxing here, no `isPortrait`
+  // guesswork (landscapes fill width, portraits fill height up to the cap).
   if (line.kind === "image") {
     const path = typeof line.nodes[0] === "string" ? line.nodes[0] : "";
     if (!path) return <Text dimColor>[image: missing path]</Text>;
