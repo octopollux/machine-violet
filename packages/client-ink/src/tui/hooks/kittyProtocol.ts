@@ -15,7 +15,6 @@
  */
 
 import type { StdinFilter } from "./stdinFilterChain.js";
-import { logInputEvent } from "./inputDebugLog.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -340,28 +339,8 @@ export function createKittyFilter(onKey: (key: KittyKey) => void): StdinFilter {
       pending = nextPending;
       const { keys, remainder } = extractKittyKeys(head);
       if (keys.length > 0) {
-        logInputEvent("kitty-extract", {
-          keyCount: keys.length,
-          keys: keys.map((k) => ({
-            key: k.key,
-            code: k.code,
-            shift: k.shift,
-            ctrl: k.ctrl,
-            alt: k.alt,
-          })),
-          remainderLen: remainder?.length ?? 0,
-        });
         process.nextTick(() => {
-          for (const key of keys) {
-            logInputEvent("kitty-dispatch", {
-              key: key.key,
-              code: key.code,
-              shift: key.shift,
-              ctrl: key.ctrl,
-              alt: key.alt,
-            });
-            onKey(key);
-          }
+          for (const key of keys) onKey(key);
         });
       }
       return remainder;
