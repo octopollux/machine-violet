@@ -115,6 +115,7 @@ Conversational flow — the agent asks about each topic one or two at a time:
 7. Character (name + one-sentence concept)
 8. Player name
 9. Game system
+10. Mechanics handling — **only when a light/ultra-light system was chosen**: the agent asks whether the player wants to use the mechanics themselves (`player-facing`) or have the DM run them silently behind the scenes (`dm-managed`, the default). Recorded as `config.json` `mechanics_mode`. Skipped for crunchy systems (implicitly player-facing) and pure-narrative campaigns. See [rules-systems.md](rules-systems.md#mechanics-mode-player-facing-vs-dm-managed).
 
 Both paths include a mandatory pre-finalize review where the agent reads back the full configuration and gets explicit confirmation.
 

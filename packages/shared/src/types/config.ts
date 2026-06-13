@@ -38,6 +38,35 @@ export const CAMPAIGN_SCOPE_LABELS: Record<CampaignScope, string> = {
   "open-ended": "Open-Ended",
 };
 
+/**
+ * How a light system's mechanics are surfaced to the player. Only meaningful
+ * for light/ultra-light systems — the setup agent asks when one is chosen.
+ * Crunchy systems (sheet-driven d20-likes) are implicitly player-facing and
+ * systemless freeform campaigns leave this absent.
+ *
+ *  - "dm-managed": the DM runs the rules silently, behind the fiction. It
+ *    still makes the rolls and tracks aspects/approaches/resources — the
+ *    mechanics shape pacing, stakes, and consequences — but never surfaces
+ *    dice or jargon unless the player invokes a mechanic first. The default
+ *    for a light system.
+ *  - "player-facing": mechanics are named at the table — the DM invites the
+ *    player to invoke their aspects/approaches, spend resources, and call for
+ *    rolls, surfacing dice and outcomes.
+ *
+ * Set at setup and read by the DM prefix; the user can change it later by
+ * editing config.json.
+ */
+export type MechanicsMode = "dm-managed" | "player-facing";
+
+/** Human labels for UI and prompt rendering. */
+export const MECHANICS_MODE_LABELS: Record<MechanicsMode, string> = {
+  "dm-managed": "DM-managed (run silently)",
+  "player-facing": "Player-facing",
+};
+
+/** Default when a light system is chosen but no explicit mode is recorded. */
+export const MECHANICS_MODE_DEFAULT: MechanicsMode = "dm-managed";
+
 export interface PlayerConfig {
   name: string;
   character: string;
@@ -142,6 +171,14 @@ export interface CampaignConfig {
    * is gated by capability AND preference, not preference alone.
    */
   image_generation?: "on" | "off" | "unset";
+  /**
+   * How the active light system's mechanics are surfaced (see MechanicsMode).
+   * Only set for light/ultra-light systems; absent for crunchy systems
+   * (implicitly player-facing) and systemless campaigns. Defaults to
+   * MECHANICS_MODE_DEFAULT when a light system is run without an explicit
+   * choice (e.g. older saves).
+   */
+  mechanics_mode?: MechanicsMode;
 }
 
 export const DM_TURN_LENGTH_PCT_DEFAULT = 80;

@@ -155,6 +155,16 @@ describe("buildHardStats", () => {
     expect(buildHardStats({ turnHolder: "Aldric" })).toBe("Turn: Aldric");
     expect(buildHardStats({ activeSystem: undefined })).toBe("");
   });
+
+  it("tags the system line when mechanics run silently", () => {
+    expect(buildHardStats({ activeSystem: "FATE Accelerated", mechanicsSilent: true }))
+      .toBe("System: FATE Accelerated · running silently");
+  });
+
+  it("does not tag the system line when mechanics are player-facing", () => {
+    expect(buildHardStats({ activeSystem: "FATE Accelerated", mechanicsSilent: false }))
+      .toBe("System: FATE Accelerated");
+  });
 });
 
 describe("buildDMPrefix cascading entity override", () => {

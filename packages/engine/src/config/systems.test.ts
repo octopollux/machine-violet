@@ -1,4 +1,4 @@
-import { KNOWN_SYSTEMS, findSystem, listAvailableSystems, readChargenSection } from "./systems.js";
+import { KNOWN_SYSTEMS, findSystem, listAvailableSystems, readChargenSection, isLightSystem, effectiveMechanicsMode } from "./systems.js";
 import type { FileIO } from "../agents/scene-manager.js";
 
 const norm = (p: string) => p.replace(/\\/g, "/");
@@ -113,6 +113,42 @@ describe("listAvailableSystems", () => {
     expect(custom).toBeDefined();
     expect(custom!.complexity).toBe("medium");
     expect(custom!.description).toBeTruthy();
+  });
+});
+
+describe("isLightSystem", () => {
+  it("is true for light and ultra-light systems", () => {
+    expect(isLightSystem("fate-accelerated")).toBe(true); // light
+    expect(isLightSystem("24xx")).toBe(true); // ultra-light
+    expect(isLightSystem("cairn")).toBe(true); // light, no rule card
+  });
+
+  it("is false for medium and high systems", () => {
+    expect(isLightSystem("ironsworn")).toBe(false); // medium
+    expect(isLightSystem("dnd-5e")).toBe(false); // high
+  });
+
+  it("is false for unknown or absent systems", () => {
+    expect(isLightSystem("my-homebrew")).toBe(false);
+    expect(isLightSystem(undefined)).toBe(false);
+  });
+});
+
+describe("effectiveMechanicsMode", () => {
+  it("returns an explicit mode verbatim regardless of system", () => {
+    expect(effectiveMechanicsMode({ system: "fate-accelerated", mechanics_mode: "player-facing" })).toBe("player-facing");
+    expect(effectiveMechanicsMode({ system: "dnd-5e", mechanics_mode: "dm-managed" })).toBe("dm-managed");
+  });
+
+  it("defaults a light system with no explicit choice to dm-managed", () => {
+    expect(effectiveMechanicsMode({ system: "fate-accelerated" })).toBe("dm-managed");
+    expect(effectiveMechanicsMode({ system: "24xx" })).toBe("dm-managed");
+  });
+
+  it("returns undefined for crunchy systems and systemless campaigns with no explicit choice", () => {
+    expect(effectiveMechanicsMode({ system: "dnd-5e" })).toBeUndefined();
+    expect(effectiveMechanicsMode({ system: "ironsworn" })).toBeUndefined();
+    expect(effectiveMechanicsMode({})).toBeUndefined();
   });
 });
 

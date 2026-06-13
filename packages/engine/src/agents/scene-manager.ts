@@ -23,7 +23,7 @@ import { sceneDir, campaignPaths, machinePaths, parseFrontMatter, extractSection
 import { formatChangelogEntry, appendChangelog } from "../tools/filesystem/index.js";
 import type { EntityTree, EntityTreeEntry } from "@machine-violet/shared/types/entities.js";
 import { slugify } from "./world-builder.js";
-import { findSystem } from "../config/systems.js";
+import { findSystem, effectiveMechanicsMode } from "../config/systems.js";
 import type { UsageStats } from "./agent-loop.js";
 import { accUsage } from "../context/usage-helpers.js";
 import { norm } from "../utils/paths.js";
@@ -203,6 +203,7 @@ export class SceneManager {
       activeSystem: this.state.config.system
         ? (findSystem(this.state.config.system)?.name ?? this.state.config.system)
         : undefined,
+      mechanicsSilent: effectiveMechanicsMode(this.state.config) === "dm-managed",
     });
     this.sessionState.scenePrecis = buildScenePrecis(this.scene);
     this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);
