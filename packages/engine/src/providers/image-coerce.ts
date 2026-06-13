@@ -7,9 +7,10 @@
  *     pass `effort: "fast"` or `aspect: "PORTRAIT"` and the SDK will
  *     happily pass it through. We catch that here so the provider's
  *     mapping table doesn't get an unmapped key.
- *   - Defaults differ per call site (setup-agent → standard/landscape for
- *     the multi-angle reference sheet, DM → quality/square) so each
- *     dispatcher passes its own fallback rather than baking it in here.
+ *   - The DM dispatcher passes its own fallback (quality/square) rather than
+ *     baking it in here. (The setup/chargen dispatcher doesn't coerce at all —
+ *     it pins the single canonical config, a standard-effort landscape
+ *     reference sheet, since the model has no effort/aspect choice there.)
  */
 import type { ImageEffort, ImageAspect } from "./types.js";
 

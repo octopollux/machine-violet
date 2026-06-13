@@ -31,7 +31,6 @@ import { campaignPaths } from "../../tools/filesystem/index.js";
 import { norm } from "../../utils/paths.js";
 import { slugify } from "../../utils/slug.js";
 import { logEvent } from "../../context/engine-log.js";
-import { normalizeImageEffort, normalizeImageAspect } from "../../providers/image-coerce.js";
 
 // --- Types ---
 
@@ -298,9 +297,9 @@ const GENERATE_IMAGE_TOOL: NormalizedTool = {
     "side-by-side views and end with \"Character reference sheet — three views (front, front-left three-quarter, " +
     "rear-right three-quarter), simple digital art, plain black background.\" Save campaign-styled imagery for in-game " +
     "scenes. " +
-    "ALWAYS pass `effort: \"standard\"` and `aspect: \"landscape\"` for these chargen reference sheets — `standard` is a " +
-    "medium-quality render that comes back reasonably fast for iteration, and `landscape` gives the three views room to " +
-    "sit side by side. Do not reach for `quality`/`showcase` here (they're slower and meant for in-campaign scenes).",
+    "You don't choose render effort or aspect here — the engine always renders the chargen sheet at a fixed " +
+    "standard quality (fast enough to iterate, the ceiling a character sheet needs) and landscape framing (the three " +
+    "views need the width). Just write the prompt.",
   inputSchema: {
     type: "object" as const,
     properties: {
@@ -308,18 +307,8 @@ const GENERATE_IMAGE_TOOL: NormalizedTool = {
         type: "string",
         description: "Vivid description of the character's full-body appearance — clothing, build, footwear, mood, expression — described once, since the character is identical in every view. End by calling for the three side-by-side angles (front, front-left three-quarter, rear-right three-quarter) on a plain black background. The model composes the image from this; be specific.",
       },
-      effort: {
-        type: "string",
-        enum: ["draft", "standard", "quality", "showcase"],
-        description: "Render effort. Use 'standard' (medium quality) for the chargen reference sheet — it's the ceiling a character sheet needs. 'quality' / 'showcase' are slower and reserved for in-campaign scenes.",
-      },
-      aspect: {
-        type: "string",
-        enum: ["portrait", "landscape", "square"],
-        description: "Aspect ratio. Use 'landscape' for the chargen reference sheet — it gives the three side-by-side views room to breathe.",
-      },
     },
-    required: ["prompt", "effort", "aspect"],
+    required: ["prompt"],
   },
 };
 
@@ -423,7 +412,7 @@ function buildSystemPrompt(
       "",
       "### Character reference sheet (only when the player said Yes above)",
       "",
-      "Once the player has chosen a character name and given you a description, generate a character reference sheet for them. Use the `generate_image` tool — its `prompt` should describe the character's full body once (build, clothing, footwear, mood, expression) and then call for a single side-by-side sheet showing that SAME character from three angles: a front view, a three-quarter view from the front-left, and a three-quarter view from the rear-right, all on one plain black background in simple digital art with even, neutral lighting. Keep it campaign-agnostic — NOT the campaign's art style — because this sheet becomes the canonical reference the DM conditions in-game art on, and the extra angles are what stop generated scenes from defaulting to a stiff, camera-facing pose. Pass `effort: \"standard\"` (medium quality — plenty here, and fast enough to iterate) and `aspect: \"landscape\"` (the three views need the width).",
+      "Once the player has chosen a character name and given you a description, generate a character reference sheet for them. Use the `generate_image` tool — its `prompt` should describe the character's full body once (build, clothing, footwear, mood, expression) and then call for a single side-by-side sheet showing that SAME character from three angles: a front view, a three-quarter view from the front-left, and a three-quarter view from the rear-right, all on one plain black background in simple digital art with even, neutral lighting. Keep it campaign-agnostic — NOT the campaign's art style — because this sheet becomes the canonical reference the DM conditions in-game art on, and the extra angles are what stop generated scenes from defaulting to a stiff, camera-facing pose. (The engine renders it at a fixed standard quality and landscape framing automatically — you just write the prompt.)",
       "",
       "After each draft is rendered, ask the player something light like \"Look right, or do you want me to try again with anything different?\" — don't editorialize about the image yourself. If they want adjustments, call `generate_image` again with a revised prompt. There's no iteration cap; let them iterate until they're happy.",
       "",
@@ -694,17 +683,18 @@ export function createSetupConversation(
     if (!promptText) {
       return { content: "generate_image requires a non-empty prompt.", isError: true };
     }
-    const effort = normalizeImageEffort(input.effort, "standard");
-    // Chargen renders a multi-angle reference sheet, so the fallback is
-    // `landscape` — the three side-by-side views need the width. The model
-    // passes aspect explicitly per the tool schema; this only catches an
-    // omitted/garbage value.
-    const aspect = normalizeImageAspect(input.aspect, "landscape");
     try {
+      // Chargen has exactly one canonical render config — a standard-effort,
+      // landscape multi-angle reference sheet — so we pin both here rather than
+      // read them from the model. Tool args aren't enforced server-side (see
+      // image-coerce), and a stray `aspect: "portrait"` would collapse the
+      // sheet back to a single front pose (defeating the whole point) while a
+      // stray `showcase` would block chargen on a slow maximum-fidelity render.
+      // That's why the tool no longer exposes either knob.
       const result = await provider.generateImage({
         prompt: promptText,
-        effort,
-        aspect,
+        effort: "standard",
+        aspect: "landscape",
         intent: "character_portrait",
       });
       // Persist via image-handler — shared with the DM-side dispatch in
@@ -722,7 +712,7 @@ export function createSetupConversation(
       turnImageDisplays.push({ filename: absPath, intent: "character_portrait" });
       const basename = persisted.relPath.split("/").pop() ?? "portrait-draft.png";
       return {
-        content: `Portrait rendered and shown to the player at ${basename} (effort: ${result.effortUsed}, aspect: ${result.aspectUsed}). Now check in with the player about it — and remember the filename if they want to keep this draft via set_portrait.`,
+        content: `Reference sheet rendered and shown to the player at ${basename} (effort: ${result.effortUsed}, aspect: ${result.aspectUsed}). Now check in with the player about it — and remember the filename if they want to keep this draft via set_portrait.`,
         isError: false,
       };
     } catch (e) {
