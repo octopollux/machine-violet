@@ -290,15 +290,55 @@ export function extractKittyKeys(data: string): { keys: KittyKey[]; remainder: s
 }
 
 /**
+ * Maximum length of an incomplete CSI-u fragment we'll buffer across reads.
+ * A real CSI-u keystroke is short (keycode + a few modifier/sub fields), so
+ * anything longer isn't a fragmented keypress and shouldn't be held back.
+ */
+const MAX_PARTIAL_LEN = 32;
+
+/**
+ * Matches a trailing, unterminated CSI-u prefix at end-of-string: a bare
+ * ESC, `ESC[`, or `ESC[<params>` where params are CSI-u bytes (digits, `:`,
+ * `;`) with no final byte yet. A complete sequence ends in `u`, which is
+ * outside the class, so completed sequences never match.
+ */
+// eslint-disable-next-line no-control-regex -- intentional: parsing ANSI escape sequences
+const TRAILING_PARTIAL_RE = /\x1b(?:\[[0-9:;]*)?$/;
+
+/**
+ * Split a chunk into the part safe to process now (`head`) and a trailing
+ * incomplete CSI-u fragment to carry into the next read (`pending`).
+ *
+ * ConPTY on Windows routinely fragments escape sequences across reads — a
+ * CSI-u keystroke like Enter (`\x1b[13u`) can arrive as `\x1b[13` then `u`.
+ * Extracting per-chunk would pass the unterminated half straight through,
+ * where Ink reassembles it into a sequence it can't recognize as a key —
+ * the intermittent missed-Enter bug (#436). Buffering the fragment lets the
+ * next read complete it. Fragments longer than MAX_PARTIAL_LEN aren't real
+ * keystrokes, so they pass through untouched.
+ */
+export function splitTrailingPartial(data: string): { head: string; pending: string } {
+  const m = TRAILING_PARTIAL_RE.exec(data);
+  if (!m || m[0].length > MAX_PARTIAL_LEN) return { head: data, pending: "" };
+  return { head: data.slice(0, data.length - m[0].length), pending: m[0] };
+}
+
+/**
  * Create a StdinFilter that intercepts CSI-u sequences. Parsed keys
  * are dispatched via `onKey`, deferred with process.nextTick so the
  * chain's read() returns before any React re-rendering.
+ *
+ * Holds an incomplete trailing CSI-u fragment across reads (see
+ * splitTrailingPartial) so a keystroke fragmented by ConPTY isn't lost.
  */
 export function createKittyFilter(onKey: (key: KittyKey) => void): StdinFilter {
+  let pending = "";
   return {
     name: "kitty",
     process(data: string): string | null {
-      const { keys, remainder } = extractKittyKeys(data);
+      const { head, pending: nextPending } = splitTrailingPartial(pending + data);
+      pending = nextPending;
+      const { keys, remainder } = extractKittyKeys(head);
       if (keys.length > 0) {
         logInputEvent("kitty-extract", {
           keyCount: keys.length,

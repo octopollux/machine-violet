@@ -3,12 +3,15 @@ import {
   parseKittyKey,
   kittyKeyToLegacy,
   extractKittyKeys,
+  splitTrailingPartial,
   detectKittySupport,
   enableKittyProtocol,
   disableKittyProtocol,
   createKittyFilter,
   type KittyKey,
 } from "./kittyProtocol.js";
+
+const flushNextTick = () => new Promise((r) => process.nextTick(r));
 
 // ---------------------------------------------------------------------------
 // parseKittyKey
@@ -218,6 +221,58 @@ describe("extractKittyKeys", () => {
 });
 
 // ---------------------------------------------------------------------------
+// splitTrailingPartial
+// ---------------------------------------------------------------------------
+
+describe("splitTrailingPartial", () => {
+  it("holds a bare trailing ESC", () => {
+    expect(splitTrailingPartial("abc\x1b")).toEqual({ head: "abc", pending: "\x1b" });
+  });
+
+  it("holds a trailing ESC[", () => {
+    expect(splitTrailingPartial("\x1b[")).toEqual({ head: "", pending: "\x1b[" });
+  });
+
+  it("holds a trailing ESC[<params> with no final byte", () => {
+    expect(splitTrailingPartial("\x1b[13")).toEqual({ head: "", pending: "\x1b[13" });
+    expect(splitTrailingPartial("x\x1b[57350")).toEqual({ head: "x", pending: "\x1b[57350" });
+    expect(splitTrailingPartial("\x1b[13;5")).toEqual({ head: "", pending: "\x1b[13;5" });
+    expect(splitTrailingPartial("\x1b[97:65;2")).toEqual({ head: "", pending: "\x1b[97:65;2" });
+  });
+
+  it("does NOT hold a complete CSI-u sequence", () => {
+    expect(splitTrailingPartial("\x1b[13u")).toEqual({ head: "\x1b[13u", pending: "" });
+  });
+
+  it("does NOT hold a sequence terminated by a non-'u' final byte", () => {
+    // Legacy arrow / function-key forms end in a letter or ~ — already complete.
+    expect(splitTrailingPartial("\x1b[A")).toEqual({ head: "\x1b[A", pending: "" });
+    expect(splitTrailingPartial("\x1b[3~")).toEqual({ head: "\x1b[3~", pending: "" });
+  });
+
+  it("does NOT hold a DA-style response (contains '?')", () => {
+    expect(splitTrailingPartial("\x1b[?1u")).toEqual({ head: "\x1b[?1u", pending: "" });
+  });
+
+  it("holds only the trailing fragment when a complete sequence precedes it", () => {
+    expect(splitTrailingPartial("\x1b[97u\x1b[13")).toEqual({
+      head: "\x1b[97u",
+      pending: "\x1b[13",
+    });
+  });
+
+  it("returns plain text untouched", () => {
+    expect(splitTrailingPartial("hello")).toEqual({ head: "hello", pending: "" });
+    expect(splitTrailingPartial("")).toEqual({ head: "", pending: "" });
+  });
+
+  it("does NOT hold an over-long fragment (not a real keystroke)", () => {
+    const long = "\x1b[" + "1".repeat(40);
+    expect(splitTrailingPartial(long)).toEqual({ head: long, pending: "" });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // detectKittySupport
 // ---------------------------------------------------------------------------
 
@@ -362,5 +417,78 @@ describe("createKittyFilter", () => {
   it("has name 'kitty'", () => {
     const filter = createKittyFilter(() => {});
     expect(filter.name).toBe("kitty");
+  });
+
+  // -------------------------------------------------------------------------
+  // Fragmentation across reads — regression guard for the missed-Enter bug
+  // (#436). ConPTY can split a CSI-u keystroke across stdin reads; the filter
+  // must buffer the incomplete tail instead of leaking it downstream.
+  // -------------------------------------------------------------------------
+
+  it("recovers a CSI-u Enter fragmented across two reads (#436)", async () => {
+    const keys: KittyKey[] = [];
+    const filter = createKittyFilter((k) => keys.push(k));
+
+    // First read carries only the unterminated prefix — held, nothing leaks.
+    expect(filter.process("\x1b[13")).toBeNull();
+    await flushNextTick();
+    expect(keys).toHaveLength(0);
+
+    // Second read completes it — Enter is dispatched, nothing leaks downstream.
+    expect(filter.process("u")).toBeNull();
+    await flushNextTick();
+    expect(keys).toHaveLength(1);
+    expect(keys[0].key).toBe("enter");
+    expect(kittyKeyToLegacy(keys[0])).toBe("\r"); // the byte Ink needs
+  });
+
+  it("recovers a fragment split right after ESC", async () => {
+    const keys: KittyKey[] = [];
+    const filter = createKittyFilter((k) => keys.push(k));
+    expect(filter.process("\x1b")).toBeNull();
+    expect(filter.process("[13u")).toBeNull();
+    await flushNextTick();
+    expect(keys.map((k) => k.key)).toEqual(["enter"]);
+  });
+
+  it("recovers a fragment split three ways", async () => {
+    const keys: KittyKey[] = [];
+    const filter = createKittyFilter((k) => keys.push(k));
+    filter.process("\x1b[1");
+    filter.process("3");
+    filter.process("u");
+    await flushNextTick();
+    expect(keys.map((k) => k.key)).toEqual(["enter"]);
+  });
+
+  it("passes leading text through while buffering a trailing fragment", async () => {
+    const keys: KittyKey[] = [];
+    const filter = createKittyFilter((k) => keys.push(k));
+    expect(filter.process("hi\x1b[13")).toBe("hi");
+    expect(filter.process("u")).toBeNull();
+    await flushNextTick();
+    expect(keys.map((k) => k.key)).toEqual(["enter"]);
+  });
+
+  it("dispatches a complete key and holds a trailing fragment in one chunk", async () => {
+    const keys: KittyKey[] = [];
+    const filter = createKittyFilter((k) => keys.push(k));
+    // 'a' (97) is complete; the trailing Enter prefix is incomplete.
+    filter.process("\x1b[97u\x1b[13");
+    await flushNextTick();
+    expect(keys.map((k) => k.key)).toEqual(["a"]);
+    filter.process("u");
+    await flushNextTick();
+    expect(keys.map((k) => k.key)).toEqual(["a", "enter"]);
+  });
+
+  it("reassembles a fragmented bracketed-paste start without dispatching keys", async () => {
+    const keys: KittyKey[] = [];
+    const filter = createKittyFilter((k) => keys.push(k));
+    expect(filter.process("\x1b[200")).toBeNull(); // held
+    // Completing it yields no CSI-u key; the whole marker flows downstream.
+    expect(filter.process("~hi\x1b[201~")).toBe("\x1b[200~hi\x1b[201~");
+    await flushNextTick();
+    expect(keys).toHaveLength(0);
   });
 });
