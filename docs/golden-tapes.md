@@ -140,7 +140,9 @@ which:
   of the engine graph is ~20-30s, too heavy per commit).
 - **pre-push**: full `npm run check`, which includes the golden replays.
 
-Activated by `npm install` (the root `prepare` runs `lefthook install`).
+Activated by `npm install` (the root `prepare` runs `scripts/install-hooks.mjs`,
+which installs the lefthook hooks — force-installing into the shared `.git/hooks`
+dir when `core.hooksPath` points there, so all worktrees share one set of hooks).
 
 ## Deferred / open edges
 

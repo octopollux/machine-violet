@@ -25,7 +25,7 @@
     "dist": "node scripts/build-dist.js",
     "explorer": "node tools/campaign-explorer/scripts/dev.js",
     "theme-editor": "node tools/theme-editor/scripts/dev.js",
-    "prepare": "lefthook install"
+    "prepare": "node scripts/install-hooks.mjs"
   },
   "keywords": [
     "rpg",
@@ -52,7 +52,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^22.0.0",
+    "@types/node": "^25.9.3",
     "@types/react": "^19.2.0",
     "@vitest/coverage-v8": "^4.0.18",
     "concurrently": "^10.0.3",
@@ -61,7 +61,7 @@
     "eslint": "^10.0.0",
     "ink-testing-library": "^4.0.0",
     "knip": "^6.15.0",
-    "lefthook": "^1.13.6",
+    "lefthook": "^2.1.9",
     "rcedit": "^5.0.2",
     "react-devtools-core": "^7.0.1",
     "tsx": "^4.7.0",
@@ -75,7 +75,7 @@
     "tools/theme-editor"
   ],
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=25.0.0"
   },
   "overrides": {
     "ink-scroll-view": {
