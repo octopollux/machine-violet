@@ -180,6 +180,99 @@ describe("MainMenuPhase", () => {
     expect(lastFrame()).not.toContain("Requires a valid API key");
   });
 
+  it("collapses the campaign list and advances to the next menu item when scrolling past the end", async () => {
+    // Mirror of the up-arrow collapse at the top: down-arrow on the last
+    // campaign should close the sub-list and land on the main-menu item
+    // *below* Continue Campaign (here, Settings), not clamp in place.
+    const props = defaultProps({
+      campaigns: [
+        { name: "Alpha Campaign", path: "/a" },
+        { name: "Beta Campaign", path: "/b" },
+      ],
+    });
+    const { stdin, lastFrame } = render(<MainMenuPhase {...props} />);
+    const frame = () => lastFrame() ?? "";
+    const selected = () => frame().split("\n").find((l) => l.includes("◆")) ?? "";
+    // ink only parses an arrow when the chunk is the real CSI escape
+    // sequence (its fnKeyRe requires a leading \x1b); a bare "[B" matches
+    // nothing.
+    const DOWN = "\u001B[B";
+
+    // ink-testing-library's stdin listener attaches in an effect, and ink
+    // re-registers the useInput closure on every commit. A fixed sleep
+    // races both, so each step re-sends its key (guarded on the current
+    // frame so it can't overshoot — the frame and the live closure are
+    // both products of the last commit) until the move is observable.
+    await vi.waitFor(() => {
+      if (selected().includes("New Campaign")) stdin.write(DOWN);
+      expect(selected()).toContain("Continue Campaign");
+    });
+    await vi.waitFor(() => {
+      if (!frame().includes("Alpha Campaign")) stdin.write("\r"); // expand
+      expect(frame()).toContain("Alpha Campaign");
+    });
+    await vi.waitFor(() => {
+      if (selected().includes("Alpha Campaign")) stdin.write(DOWN); // to last
+      expect(selected()).toContain("Beta Campaign");
+    });
+    await vi.waitFor(() => {
+      if (frame().includes("Alpha Campaign")) stdin.write(DOWN); // past the end
+      // Sub-list collapsed (campaign names gone) and selection advanced
+      // to the main-menu item below Continue Campaign.
+      expect(frame()).not.toContain("Alpha Campaign");
+      expect(selected()).toContain("Settings");
+    });
+  });
+
+  it("clamps campaign selection when several Down events arrive before a re-render (#631)", async () => {
+    // A held ↓ can dispatch multiple events against the same useInput
+    // closure before React commits. The selection must stay clamped at
+    // the last campaign — never run off the end into an undefined entry.
+    const onResumeCampaign = vi.fn();
+    const props = defaultProps({
+      campaigns: [
+        { name: "Alpha Campaign", path: "/a" },
+        { name: "Beta Campaign", path: "/b" },
+        { name: "Gamma Campaign", path: "/c" },
+      ],
+      onResumeCampaign,
+    });
+    const { stdin, lastFrame } = render(<MainMenuPhase {...props} />);
+    const frame = () => lastFrame() ?? "";
+    const selected = () => frame().split("\n").find((l) => l.includes("◆")) ?? "";
+    const DOWN = "\u001B[B";
+
+    // Navigate to Continue Campaign and expand (guarded; see sibling test).
+    await vi.waitFor(() => {
+      if (selected().includes("New Campaign")) stdin.write(DOWN);
+      expect(selected()).toContain("Continue Campaign");
+    });
+    await vi.waitFor(() => {
+      if (!frame().includes("Alpha Campaign")) stdin.write("\r"); // expand
+      expect(frame()).toContain("Alpha Campaign");
+    });
+
+    // Burst: more Down events than there are rows, delivered synchronously
+    // so they all hit the same (index 0) closure before any commit.
+    stdin.write(DOWN);
+    stdin.write(DOWN);
+    stdin.write(DOWN);
+    stdin.write(DOWN);
+
+    // Selection pins to the last campaign — not an out-of-range index that
+    // would leave no row marked and resume an undefined campaign.
+    await vi.waitFor(() => {
+      expect(frame()).toContain("Gamma Campaign"); // still expanded
+      expect(selected()).toContain("Gamma Campaign"); // last row selected
+    });
+    stdin.write("\r"); // resume the selected campaign
+    await vi.waitFor(() => {
+      expect(onResumeCampaign).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Gamma Campaign" }),
+      );
+    });
+  });
+
   it("renders the disabled hint only once even with multiple disabled items", () => {
     const props = defaultProps({
       apiKeyValid: false,

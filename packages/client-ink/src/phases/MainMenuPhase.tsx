@@ -106,7 +106,24 @@ export function MainMenuPhase({
         return;
       }
       if (key.downArrow) {
-        setCampaignSelectIndex((i) => Math.min(campaigns.length - 1, i + 1));
+        if (campaignSelectIndex === campaigns.length - 1) {
+          // Scrolling past the end collapses the list and advances to the
+          // main-menu item below "Continue Campaign" — the mirror of the
+          // up-arrow collapse at the top. Together they make the sub-list
+          // feel woven into the parent menu rather than a trap you can
+          // only back out of the way you came in.
+          setExpandedCampaigns(false);
+          setCampaignColumn(COL_NAME);
+          const continueIndex = mainMenuItems.indexOf("Continue Campaign");
+          setMainMenuIndex(Math.min(mainMenuItems.length - 1, continueIndex + 1));
+        } else {
+          // Clamp inside the updater, not via the closure's stale
+          // campaignSelectIndex: a held ↓ can fire several events against
+          // the same render before React commits, and an unclamped i + 1
+          // would then run repeatedly and overshoot campaigns.length - 1
+          // (making campaigns[campaignSelectIndex] undefined on Enter).
+          setCampaignSelectIndex((i) => Math.min(campaigns.length - 1, i + 1));
+        }
         return;
       }
       if (key.rightArrow) {

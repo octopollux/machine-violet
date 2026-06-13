@@ -73,7 +73,7 @@ When "Continue Campaign" is selected and campaigns exist, the menu expands an in
 | Delete (red) | — | Open the Delete Campaign confirmation modal |
 
 - **Left/Right** arrows cycle columns within the selected row (clamped at the ends).
-- **Up/Down** arrows move between campaign rows. Up from the first row collapses the sub-list back to the main menu.
+- **Up/Down** arrows move between campaign rows. Up from the first row collapses the sub-list and reselects "Continue Campaign"; Down from the last row collapses it and advances to the menu item below "Continue Campaign" — so the sub-list reads as woven into the main menu rather than a one-way trap.
 - **ESC** collapses the sub-list.
 
 The archive action calls `archiveCampaign()` from [campaign-archive.ts](../packages/engine/src/config/campaign-archive.ts) — zip → verify round-trip → move → verify → delete source. The delete action opens the confirmation modal (below), populated with summary data from `getCampaignDeleteInfo()` before any files are removed. Source: [packages/client-ink/src/phases/MainMenuPhase.tsx](../packages/client-ink/src/phases/MainMenuPhase.tsx).
