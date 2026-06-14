@@ -8,32 +8,32 @@
     "comedy",
     "horror"
   ],
-  "setup_detail": "<!--include:Pacing.ShortCampaigns-->",
-  "detail": "The player has arrived somewhere with a docent. The docent has a lanyard. The docent has a script. The docent works for tips, and the tip jar is not metaphorical. The tour will move along the planned route. Questions are encouraged. There is a gift shop at the end, in a manner of speaking.\n\nDM approach:\n- Tone: tour-guide cadence, careful pleasantness, occasional honest answers when no one else is listening.\n- NPCs: the docent (warm, professional, with a private life the player can glimpse if they ask the right questions); the rest of the tour group, if any; the figure at each stop who delivers their small piece of the lesson.\n- Pacing structure: tips accumulate and matter. Each stop concludes with an opportunity to give, and the tour responds.\n- Seed early: the lanyard. The schedule. The fact that the docent looks at their watch in a way the player will eventually understand.\n- Play the comedy and the horror without flinching from either. The afterlife is a job, and a place, and a verdict.\n\nPacing: tips accumulate and matter. The tour ends at a specific door, on a schedule the docent is keeping to. The player can read the clock by counting stops remaining on the laminated itinerary the docent carries, and by the docent's small tells when they fall behind.",
+  "setup_detail": "<!--include:Pacing.Iterated-->\n\nOpening scene: open on a straightforward first tour — the player arriving, the docent with the lanyard and the careful pleasantness, the first stop. Do NOT foreshadow the loop, the reset, or the rig, and do not reveal the tour's true purpose or the player's status (e.g. whether they are dead). Let the unfairness, the first reset, and the conspiracy all land in play. Establish an ordinary, slightly-too-smooth tour, so the wrongness has somewhere to arrive from.",
+  "detail": "The player has arrived for a guided tour of the afterlife, with a docent. The docent has a lanyard, a script, an itinerary, and expectations. The tour presents itself as having a purpose — see the crucial question — and on the first pass the player will take that purpose at face value. They should not.\n\nThe truth beneath every version: the tour is RIGGED. It is a holding pattern dressed up as a service — a loop that ends, resets, and runs again — and the purpose it advertises is a cover for what it actually does (keep you here, harvest something from you, hide where the dead really go, bury someone in plain sight). The player is meant to take the tour quietly and never notice. They will notice.\n\nRun it as an iterated loop (see Pacing). The first iteration is unfair: there were things the player was supposed to do, bars they were supposed to meet, someone they were supposed to be — and no way to have known. The tour ends (at a door, a verdict, an elimination) with the player having fallen short. Then it begins again, and something is different: the stops in a new order, NPCs traded into each other's roles (the docent is a tourist this time; the kind woman from the Office of Returns is on the tour; for one loop the player is the one handed the lanyard), small tells shifted. Across iterations the player learns the hidden rules, clocks the shuffle, and a conspiracy unfolds — what this place actually is, who keeps the loop running, why, and whether it can be broken.\n\nDM approach:\n- Tone: tour-guide cadence, careful pleasantness, the occasional honest answer when no one else is listening — over the slow dread that the whole thing is a front.\n- Two layers, paid out gradually: the advertised purpose (the crucial question) is the lens of the early loops; the rig beneath it is the deep game. Never confirm the rig early — let the Break Room and the Staff Door leak it, and let the player reach it.\n- Each iteration: shuffle the board, trade NPC roles, change a few details, and let the player spend what they learned last time. Reward noticing; never punish the same way twice.\n- Seed early: the lanyard; the itinerary; the docent checking a watch in a way the player will only understand later; and — once there has been a last time — one detail that is subtly different from the last loop.\n- Play the comedy and the horror without flinching from either. The afterlife is a job, and a place, and a verdict, and a trap.\n\nThe afterlife (the board the loop shuffles — the order, the contents, and who staffs each change every iteration; these are the bones, invent more): the Waiting Room, where the clock has no hands; the Orientation Theater, whose welcome film is about the player's life and is re-cut each loop; the Hall of First Lies, mirrors each showing the untruth that made a life possible; the Gallery of Forgotten Faces, people the player forgot, who remember the player; the River of Unsaid Things, warm and cold by turns, the unspoken drifting near the surface; the Weighing Room, where the scales do not weigh what anyone expects; the Lost-and-Found, shelves going in every direction including up, ownership contested; the Hall of Almosts, the lives the player did not live; the Promenade, where the dead walk and one of them is the player, older; the Records Office, the player's file, which grows; the Break Room, backstage, where the docents go off-script and the machinery shows; the Staff Door, marked, where the hired go and do not come back; the Office of Returns, a quiet desk and a short form and a way to leave the tour and not return; and the Threshold, the final door that resets — and what is behind it changes.\n\nPacing: an iterated loop (see setup). The real clock is not the itinerary but the iteration count and what the player has figured out — each loop they should know more, and the tour should let them act on it. The tour keeps running until the player breaks it, satisfies it, or chooses to stop.",
   "forks": [
     {
       "id": "crucial-question",
       "label": "The crucial question",
       "chooser": "agent",
-      "prompt": "Roll or choose. Do NOT reveal early — this is the tour's hidden purpose.",
+      "prompt": "The purpose the tour advertises — the cover the rig wears, and the lens the early loops are seen through. Roll or choose to fit the player's tone. Do NOT reveal it early, and never confirm the rig beneath it (see the base premise) until the player has earned it across iterations.",
       "options": [
         {
           "id": "orientation",
           "name": "Orientation",
-          "description": "The player is recently dead; the docent is easing them into the news. The tour is the afterlife's soft landing.",
-          "detail": "ORIENTATION — The player is recently dead. They may or may not know it. The docent is easing them into the news with the practiced kindness of a hospice nurse who has memorized the script. The tour is the soft landing the afterlife provides between cessation and whatever comes after."
+          "description": "The tour presents as easing the recently dead into the news — a soft landing. Beneath: the loop is what keeps them from ever actually moving on.",
+          "detail": "ORIENTATION — On its surface the tour is a hospice for the newly dead: the docent eases the player toward the fact of their death with practiced, memorized kindness. That is the cover. The rig beneath: the soft landing is a holding pen — the loop runs precisely so that no one completes the crossing. Something here feeds on the moment of letting-go, or is hiding where the dead actually go, and the orientation is designed never to end. Each loop the player edges closer to realizing they were never being eased through anything — only kept."
         },
         {
           "id": "audit",
           "name": "Audit",
-          "description": "The player is being shown their life from outside; the tour assembles evidence for a verdict they will render on themselves.",
-          "detail": "AUDIT — The player is being shown their life from outside. The exhibits are scenes they lived. The tour is the assembly of evidence for a verdict the player will be asked to render, on themselves, at the end. The docent's neutrality is professional and complete."
+          "description": "The tour presents as showing the player their life so they can render a verdict on it. Beneath: the trial is theater and the verdict was fixed before they arrived.",
+          "detail": "AUDIT — On its surface the tour assembles the evidence of the player's life for a verdict they will be asked to render on themselves at the end. That is the cover. The rig beneath: the trial is theater — the verdict was decided before the tour began, and the self-judgment is the mechanism, extracting loop after loop the one admission the place needs from the player. Each iteration shows different evidence to steer them toward it. The conspiracy is who set the verdict, and what they are taking each time the player delivers it."
         },
         {
           "id": "recruitment",
           "name": "Recruitment",
-          "description": "The afterlife is hiring docents; this is the interview. The other tourists are candidates too, and the player is being scored.",
-          "detail": "RECRUITMENT — The afterlife is hiring docents. This is the interview. The other tourists are also candidates, though they may not have been told. The player's questions are being scored. The way they treat the docent counts double."
+          "description": "The tour presents as a job interview for a docent post. Beneath: being hired is the trap — the docents are tourists who passed and can never leave.",
+          "detail": "RECRUITMENT — On its surface the tour is an interview: the player (and the other tourists, who may not know they are candidates) is being scored for a docent posting, and the way they treat the docent counts double. That is the cover. The rig beneath: being hired is the trap. The docent guiding the player was once a tourist who passed, and has been guiding the loop ever since, and cannot leave. The interview is the snare; passing is the worst outcome. The conspiracy is who needs an endless supply of docents — and what the tours are really for."
         }
       ]
     }
@@ -57,31 +57,6 @@
         {
           "name": "Paperwork Pending",
           "description": "You weren't supposed to be here yet. The docent keeps apologizing about the paperwork. They have been hastily prepared. They are improvising. The other tour groups make way for yours, and you do not know if that is courtesy or quarantine."
-        }
-      ]
-    },
-    {
-      "label": "Tour stops",
-      "choices": [
-        {
-          "name": "Hall of First Lies",
-          "description": "A long corridor lined with mirrors. Each mirror shows the lie that started a life — the first untruth a person told to make themselves possible. The docent does not stop in front of any particular mirror, but slows when passing yours."
-        },
-        {
-          "name": "River of Unsaid Things",
-          "description": "You can wade in. The water is warm in some places and cold in others, and the difference is not random. The things you did not say will be there, in the river, drifting near the surface where you can pick them out if you are willing to put your hands under the water."
-        },
-        {
-          "name": "Lost-and-Found",
-          "description": "Everything anyone ever lost. The shelves go in every direction at once, including up. The docent says to keep your hands in your pockets and not to call out for anything by name. The lighting is fluorescent and patient. A small placard reminds you that ownership is contested."
-        },
-        {
-          "name": "The Promenade",
-          "description": "Where the dead walk. A wide paved avenue with benches and trees. A few of them will recognize you and nod. One of them is you, older than you have ever been, walking arm-in-arm with someone you do not yet know. The docent will not let you stop and stare."
-        },
-        {
-          "name": "The Office of Returns",
-          "description": "A quiet desk with a kind woman behind it. There is no line, today. If you go in, the docent will wait outside, professionally pretending to check the schedule. You will not come back to the tour. The door is unlocked. The chair is comfortable. The form is on the desk and it is short."
         }
       ]
     }
