@@ -40,3 +40,14 @@ Skip `present_choices` for the scope question. Pick the slug for `finalize_setup
 
 Mention the timer prominently in the `handoff_note`.
 </TimedCampaigns>
+
+<Iterated>
+This world runs as an iterated loop — a time loop, a repeating trial, a recurring scenario. The scenario resets, but the player carries what they have learned across iterations. The engine is try → fall short → reset → try again, knowing more. Something changes each loop (the configuration shifts; roles, details, or stops rearrange; new information surfaces), and a larger goal, mystery, or truth unfolds across the runs — the campaign is the player cracking it, satisfying it, or breaking the loop.
+
+Skip `present_choices` for the scope question — the loop dictates the rhythm, not a session count. Pick the slug for `finalize_setup` by how deep the loop runs:
+
+- A short loop, cracked in a handful of iterations → `few-sessions`
+- A deep iterated mystery unfolding across many runs → `grand-campaign`
+
+In the `handoff_note`, tell the DM prominently that this is an iterated/loop campaign: each run is one iteration, the player retains knowledge across resets, the DM varies the configuration each loop, and the larger mystery pays out gradually. If the seed hides something the player is meant to discover (a rule, a purpose, who they're supposed to be), let the first iteration play unfair — the player cannot know what they were supposed to do until they have been through it once.
+</Iterated>
