@@ -13,6 +13,7 @@ Ink (React for CLI) + Anthropic Claude SDK + TypeScript.
 | Look up a subagent's contract | [subagents-catalog.md](subagents-catalog.md) |
 | Understand state shape and persistence | [state-atlas.md](state-atlas.md) |
 | Construct or validate a campaign on disk | [format-spec.md](format-spec.md) |
+| Author or review a bundled campaign seed (`.mvworld`) | [seed-authoring.md](seed-authoring.md) |
 | Understand context window management | [context-management.md](context-management.md) |
 | Understand entity files and wikilinks | [entity-filesystem.md](entity-filesystem.md) |
 | Understand DM text formatting | [tui-design.md](tui-design.md) |

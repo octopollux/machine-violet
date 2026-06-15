@@ -119,6 +119,13 @@ The openai-chatgpt provider emits its own operational events (subprocess lifecyc
 1. Add a helper to `log.ts`
 2. Document the event name and payload in [openai-chatgpt-provider.md](openai-chatgpt-provider.md)
 
+### Adding a seed-authoring design bar or changing the review loop
+
+When a catalog pass surfaces a new "what makes a seed good/bad" bar, or you change
+the review-loop process, record it in [seed-authoring.md](seed-authoring.md) (the
+editorial practice doc). The `.mvworld` **schema** — forks, channels,
+materialization — is separate and lives in [format-spec.md §10](format-spec.md#10-world-files-mvworld); don't duplicate it. Durable design principles should also go to memory so they survive future sessions.
+
 ### Changes that DON'T need doc updates
 
 - Bug fixes that don't change interfaces or behavior
@@ -146,6 +153,7 @@ The openai-chatgpt provider emits its own operational events (subprocess lifecyc
 | E2E strategy / live harness | [e2e-harness.md](e2e-harness.md) | Three-tier strategy; Tier-3 live harness — probes, mvplay, engine-state gotchas, engine-log breadcrumbs |
 | Golden tapes (Tier-2) | [golden-tapes.md](golden-tapes.md) | Record/replay operating model, corpus, record paths, when to re-record |
 | Tape format | [tape-format.md](tape-format.md) | On-disk tape schema, bucketing, ordinal matching, determinism normalization |
+| Seed authoring | [seed-authoring.md](seed-authoring.md) | Editorial playbook for bundled `.mvworld` seeds: design bars, review checklist, review-pass loop |
 
 ## Principles
 

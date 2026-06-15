@@ -153,3 +153,4 @@ The live prompt is split across [packages/engine/src/prompts/dm-identity.md](../
 | [Development Plan](development-plan.md) | 10-phase implementation roadmap, dependency graph, testing strategy |
 | [State Atlas](state-atlas.md) | Runtime state schema, tool×state matrix, invariants, lifecycle |
 | [Campaign Format Spec](format-spec.md) | On-disk format for campaigns: directory layout, file schemas, entity format |
+| [Seed Authoring](seed-authoring.md) | Editorial playbook for bundled `.mvworld` seeds: design bars, review checklist, the catalog-review loop |
