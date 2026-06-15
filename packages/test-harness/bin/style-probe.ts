@@ -76,6 +76,8 @@ interface Args {
   effort: ImageEffort;
   aspect: ImageAspect;
   connectionId?: string;
+  /** Scene/subject text; defaults to the baked-in Cenotaph establishing shot. */
+  scene: string;
   /** Character-portrait reference path, or null when --no-reference. */
   referencePath: string | null;
   referenceLabel: string;
@@ -94,9 +96,12 @@ function parseArgs(argv: string[]): Args {
   let connectionId: string | undefined;
   let referencePath: string | null = DEFAULT_REFERENCE_PATH;
   let referenceLabel = DEFAULT_REFERENCE_LABEL;
+  let scene = SCENE;
   for (const arg of argv) {
     if (arg.startsWith("--style=")) style = arg.slice("--style=".length);
     else if (arg.startsWith("--label=")) label = arg.slice("--label=".length);
+    else if (arg.startsWith("--scene=")) scene = arg.slice("--scene=".length);
+    else if (arg.startsWith("--scene-file=")) scene = readFileSync(arg.slice("--scene-file=".length), "utf8").trim();
     else if (arg.startsWith("--connection=")) connectionId = arg.slice("--connection=".length);
     else if (arg === "--no-reference") referencePath = null;
     else if (arg.startsWith("--reference=")) referencePath = arg.slice("--reference=".length);
@@ -114,7 +119,7 @@ function parseArgs(argv: string[]): Args {
   if (!style) die('Required: --style="<full style line ending in a caption directive>"');
   if (!label) label = "sample";
   if (referencePath && !existsSync(referencePath)) die(`Reference image not found: ${referencePath} (use --no-reference to skip)`);
-  return { style, label, effort, aspect, connectionId, referencePath, referenceLabel };
+  return { style, label, effort, aspect, connectionId, scene, referencePath, referenceLabel };
 }
 
 // ---------------------------------------------------------------------------
@@ -123,7 +128,7 @@ function parseArgs(argv: string[]): Args {
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
-  const prompt = `${SCENE}\n\n${args.style}`;
+  const prompt = `${args.scene}\n\n${args.style}`;
 
   const configDir = findConfigDir(REPO_ROOT);
   const store = loadConnectionStore(configDir);
