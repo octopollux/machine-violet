@@ -8,7 +8,7 @@
     "horror",
     "mystery"
   ],
-  "detail": "Six chairs in a circle, coffee in the back, a facilitator with a clipboard nobody has ever seen them write on. Everyone in the room survived something nobody else would believe. The rule is you share when you're ready. Tonight someone shares for the first time and the player's skin reacts before their mind does, because the words are right and the cadence is right and something underneath is wrong.\n\nDM approach:\n- Tone: fluorescent buzz, bad coffee, the specific intimacy of strangers who have agreed not to know each other outside this room.\n- The facilitator: kind, professional, terrified that one of these stories is true. They do not know which.\n- The members: name each one by their share, not their job. The lawyer-who-lost-a-week. The mother-with-the-thing-in-the-walls.\n- Seed early: one member's share that contradicts itself by a tiny verifiable detail. The player notices; the others do not.\n- Pacing: one member's share per session. In six sessions someone will be missing, and the chair will still be in the circle.\n\nThe clock is the chair count. Six chairs at week one, six chairs at week two, six chairs at week six with five people in them. Track time by who has shared, who hasn't, and which member always sits where. When the new arrival picks the empty chair, that's a beat.",
+  "detail": "A tense conversation-heavy bottle story told across a series of scheduled meetings. Six chairs in a circle, coffee in the back, a facilitator with a clipboard nobody has ever seen them write on. Everyone in the room survived something nobody else would believe. Small details in the room shift from session to session. The rule is you share when you're ready. Tonight someone shares for the first time and the player's skin reacts before their mind does, because the words are right and the cadence is right and something underneath is wrong.\n\nDM approach:\n- Tone: fluorescent buzz, bad coffee, the specific intimacy of strangers who have agreed not to know each other outside this room.\n- The facilitator: kind, professional, terrified that some of these stories could be true.\n- The members: name each one by their share, not their job. Storytelling tools: The chair count, the people and how they are the same or different between sessions, their moods, the things in the room that are different from session to session. The player is free to leave the room, but once that story beat ends, the next scene is the next session, in the room.",
   "forks": [
     {
       "id": "crucial-question",
@@ -23,16 +23,22 @@
           "detail": "THE HUNTER — One of the regulars is using the group as bait. Real survivors of certain things continue to attract what survived them; collect six survivors in one room and you have collected six lures. The hunter is not malicious about it. They have a list of names they intend to save. They will use the group's bodies to do it if they have to."
         },
         {
-          "id": "the-skinwalker",
-          "name": "The Skinwalker",
-          "description": "A thing wearing a survivor's skin is studying the room to learn the language of trauma so it can wear yours next; the real survivor it replaced can still be found.",
-          "detail": "THE SKINWALKER — A thing is wearing a survivor's skin and learning the language of trauma in order to wear yours next. It studies the room. It cries on cue, three weeks in. It is patient and it improves session by session. The genuine survivor it replaced is somewhere the player can find, if the player asks the right person."
-        },
-        {
           "id": "the-writer",
           "name": "The Writer",
           "description": "A novelist who came for research is now being researched; their notebook fills with details they no longer dictate, and they are the most frightened — and most committed — person in the room.",
           "detail": "THE WRITER — A novelist is in over their head. They came for research and got it; now what they came researching has noticed them and the group is research for something else entirely. The writer's notebook is filling with details the writer is no longer dictating. The writer is the most frightened person in the room and is the one most committed to coming back."
+        },
+        {
+          "id": "the-simulation",
+          "name": "The Simulation",
+          "description": "The PC is unconscious, in a simulation. Every other person in the room is a constructed personality working the PC from a different angle — because the PC really did experience something ineffable, and someone wants to know what.",
+          "detail": "THE SIMULATION — The PC is not in a church basement; the PC is unconscious, and the room is a construct. Every other survivor, the facilitator, the coffee, the buzzing tube — all built, and the people are simulated personalities each running a different play on the PC: one earns trust, one models brave vulnerability so sharing feels safe, one demonstrates equal peril so the PC feels less alone, one pushes. The goal is the PC's own memory — they genuinely experienced something ineffable, and someone (an agency, a lab, a buyer) has built a world to extract it. Run it straight and mundane; the horror is the seams, never effects. A member can't quite field a question off their script. A detail in the room resets between sessions. The time between meetings won't add up. The coffee is always exactly the same temperature. 'Someone's lying about theirs' resolves to: all of them, because none of them are real — and the realest thing in the room is whatever the PC is being farmed for. The dread is the slow proof of unreality, and the violation of being mined for a thing you cannot even name."
+        },
+        {
+          "id": "only-the-facilitator-is-real",
+          "name": "Only the Facilitator Is Real",
+          "description": "There is one real chair, and it is the PC's. A supernatural experience broke their mind; the facilitator is their intensive therapist, and every other 'survivor' is a fractured piece of the PC's own personality, externalized and trying to reassimilate.",
+          "detail": "ONLY THE FACILITATOR IS REAL — There is one real chair, and it is the PC's. The encounter already happened and it broke the PC's mind; the facilitator is not a volunteer with a clipboard but a specialized, intensive therapist doing reintegration work, and the other members are not people. Each is a split-off facet of the PC — the part that remembers what happened, the part that refuses to, the guilty one, the angry one, the one still bargaining — wearing a stranger's face and telling the PC's own story back as if it were theirs. Keep it quiet and clinical and never tacky: a calm room, a patient professional, and the slow, vertiginous recognition that the group is the inside of one head. 'Someone's lying about theirs' becomes a facet lying to the PC about what really happened — a defense the mind built and now has to dismantle. The arc is reassimilation: the climax is the PC taking the broken parts back, or refusing to, and what the facilitator can and cannot do to help. The ineffable thing the PC survived stays offstage and unspeakable — its only evidence is the shape of the damage."
         }
       ]
     }

@@ -215,6 +215,15 @@ play-state).
   opening scene begins (ideally one of your seeded locations); the Scribe renames
   the placeholder once the locale is named. No schema field for this — prompt
   around it in `detail`.
+- **Opening-scene hint** (optional). At finalize the *setup agent* composes a
+  one-sentence `opening_scene` directive that tells the DM where/how to open turn
+  1 — deliberately biased toward a character-grounded beat rather than dropping
+  the player onto the main objective. You don't author `opening_scene` in the
+  seed (it's per-campaign, the agent's job), but you can **nudge** it: drop a
+  "begins in…" / opening-image line into `setup_detail` (the setup-agent-only
+  channel) and the agent will honor it. Use this when a seed has a signature
+  opening (e.g. The Long Patience always opening in a bar/train/alleyway, never
+  at Langley). Keep it to a sentence of intent, not a scripted scene.
 - **Scope is small and manual.** This is meant for a few dozen conversions, done
   with care, not a batch pipeline. Spend the effort on the `detail` projection —
   that's the part only judgement can do.

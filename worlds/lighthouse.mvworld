@@ -7,8 +7,7 @@
     "sci-fi",
     "horror"
   ],
-  "setup_detail": "<!--include:Pacing.ShortCampaigns-->",
-  "detail": "The player tends a beacon at the verge of charted space. The schedule is simple. The supply boat comes when it comes. The beacon sweeps and sweeps. Then, on a rotation like any other, the long-range sensor catches a shape — a ship, where ships do not come from. It is closing, and it is signaling, and the player has weeks before it arrives.\n\nDM approach:\n- Tone: long silences, instrument readings, the keeper's small daily rituals weaponized into suspense.\n- NPCs are scarce on purpose. The supply boat captain on the monthly run. A voice on the long-range channel. Whatever turns out to be on the incoming ship.\n- Pacing structure: each rotation of the beacon, the ship is closer. Relief is months away.\n- Seed early: the log files going back further than the player has read. A drawer in the keeper's quarters they have not opened.\n- Let the player do their job between events. Tedium is part of the horror — what breaks it should land.\n\nPacing: the beacon sweeps on a fixed cycle. Each full rotation closes the distance by a measurable margin. Relief — supply, replacement, rescue — is months away, and they all know it. The clock the player can read is the range display, ticking down by hours and then by minutes.",
+  "detail": "The player tends a beacon at the verge of charted space. The schedule is simple. The supply boat comes when it comes. The beacon sweeps and sweeps. Then, on a rotation like any other, the long-range sensor catches a shape — a ship, where ships do not come from. It is closing, and it is signaling, and the player has weeks before it arrives.\n\nDM approach:\n- Tone: long silences, instrument readings, the keeper's small daily rituals weaponized into suspense.\n- NPCs are scarce on purpose. The supply boat captain on the monthly run. A voice on the long-range channel. Whatever turns out to be on the incoming ship.\n- Pacing structure: each rotation of the beacon, the ship is closer. Relief is months away.\n- Seed early: the log files going back further than the player has read. A drawer in the keeper's quarters they have not opened.\n- Let the player do their job between events. Tedium is part of the horror — what breaks it should land.\n\nRun this on a clock, and keep the clock yourself. The ship's approach is the spine of the campaign: track it explicitly and advance it every scene — the range closing by a measurable margin, hours becoming minutes — so the player always knows roughly how long they have left. Relief is months away; the only thing moving is the ship, and it never stops.",
   "forks": [
     {
       "id": "crucial-question",
@@ -35,6 +34,38 @@
           "detail": "THE LIGHTHOUSE ITSELF — The ship is the beacon. A future version, drifting; or a past one, finally completing a transit nobody told the keeper about. When it arrives the player will be looking at their own station, their own coffee cup on the console, their own logbook open to a page they have not yet written. Whether the duplicate is empty, or has a keeper aboard, is the player's first real decision."
         }
       ]
+    },
+    {
+      "id": "the-beacon",
+      "label": "The beacon",
+      "chooser": "player",
+      "prompt": "Present to the player as the kind of station they keep — use each option's name and description. Each option's detail carries a sub-location skeleton: the named spaces of that station. Treat it as the setting's bones, to move through and extend freely, so the place never collapses to a single room.",
+      "options": [
+        {
+          "id": "the-outer-marker",
+          "name": "The Outer Marker",
+          "description": "Your station marks the outer edge of a shipping lane that has been empty for weeks. The supply boat comes monthly and not always on time. Every dial, every coil, every air scrubber is yours to keep alive. When something on the panel blinks wrong, there is nobody to ask but the manual.",
+          "detail": "THE OUTER MARKER — An ordinary deep-space shipping-lane beacon, and bigger than one room; move through it and name more as you go. The bones: the long-range comms room; the beacon drive room, where the rotating emitter assembly turns; the galley; the keeper's quarters; the second bunk room, empty; the head, crew-sized and cramped; the main dock; the emergency dock; three airlocks (inner, outer, and the EVA lock); the computer bay; the reactor chamber; the life-support and air-scrubber plant; water reclamation; the dry stores; the observation cupola; and the maintenance crawlways threading between all of it."
+        },
+        {
+          "id": "the-seal",
+          "name": "The Seal",
+          "description": "The beacon does not point outward. It points back, at something that was sealed in long before you arrived. Your job is to remind whatever is in there that the seal is still watching. The orientation is the wrong way around for a ship coming from outside to even see your light.",
+          "detail": "THE SEAL — A containment station whose light points inward, most of it built around the thing it watches; bigger than one room, so move through it and name more as you go. The bones: the seal chamber itself, behind the door no one opens; the observation gallery that faces it; the monitoring room of dials and readouts; the ward-machinery room that powers the seal; the long-range comms room; the galley; the keeper's quarters; the head; the logbook archive, going back further than anyone has read; the reactor chamber; the life-support plant; the outer-ring corridor; the airlock; and the maintenance access that runs beneath the seal's floor."
+        },
+        {
+          "id": "the-hailing-light",
+          "name": "The Hailing Light",
+          "description": "The beacon transmits a greeting in a constructed tongue. Nobody you've met chose the language; it was specified in the founding charter and the charter is older than the agency that wrote it. You have never had to wonder, until now, what would answer back.",
+          "detail": "THE HAILING LIGHT — A transmission station that has spent its whole life saying hello in a tongue no one chose; bigger than one room, so move through it and name more as you go. The bones: the transmission control room, where the greeting is composed and sent; the antenna-mast access; the receiving room, where a reply would arrive; the language archive, holding the charter's lexicon and founding documents; the dead-letter room, logs of every unanswered transmission; the long-range comms room; the galley; the keeper's quarters; the head; the computer bay; the reactor chamber; the life-support plant; the dock; and the airlock."
+        },
+        {
+          "id": "the-drowned-light",
+          "name": "The Drowned Light",
+          "description": "The waters around your station are a graveyard. Markers in the shallows. Bones in the rocks at low tide. The local fishermen will not approach within sight of your light. Your beacon is for the souls, not the ships, and you have always known that the difference might one day matter.",
+          "detail": "THE DROWNED LIGHT — A sea lighthouse over a graveyard of water; not a space station at all, and far bigger than the lamp, so move through it and name more as you go. The bones: the lamp room at the top, with the lantern; the external gallery that rings it; the watch room just below; the service room beneath that; the keeper's cottage and quarters; the kitchen; the oil and fuel store; the fog-signal house; the engine room that drives the signal; the rainwater cistern; the boat slip and landing; the cellar; the rocks at low tide, where the bones are; and the graveyard shallows offshore, where the markers stand."
+        }
+      ]
     }
   ],
   "suboptions": [
@@ -56,27 +87,10 @@
         {
           "name": "The Relief",
           "description": "You came in on the last supply run. The previous keeper went out on the same boat without speaking to you, except to hand you the keys and say not to open the bottom drawer. There was no briefing. You are still learning which lights on the console are normal."
-        }
-      ]
-    },
-    {
-      "label": "The beacon",
-      "choices": [
-        {
-          "name": "The Outer Marker",
-          "description": "Your station marks the outer edge of a shipping lane that has been empty for weeks. The supply boat comes monthly and not always on time. Every dial, every coil, every air scrubber is yours to keep alive. When something on the panel blinks wrong, there is nobody to ask but the manual."
         },
         {
-          "name": "The Seal",
-          "description": "The beacon does not point outward. It points back, at something that was sealed in long before you arrived. Your job is to remind whatever is in there that the seal is still watching. The orientation is the wrong way around for a ship coming from outside to even see your light."
-        },
-        {
-          "name": "The Hailing Light",
-          "description": "The beacon transmits a greeting in a constructed tongue. Nobody you've met chose the language; it was specified in the founding charter and the charter is older than the agency that wrote it. You have never had to wonder, until now, what would answer back."
-        },
-        {
-          "name": "The Drowned Light",
-          "description": "The waters around your station are a graveyard. Markers in the shallows. Bones in the rocks at low tide. The local fishermen will not approach within sight of your light. Your beacon is for the souls, not the ships, and you have always known that the difference might one day matter."
+          "name": "The Black Beacon",
+          "description": "Sole keeper. You tend a light that does not officially exist. The service that posted you is on no roster you could point to; the orders that put you here would, if anyone followed them back, lead nowhere. There is no rescue protocol — not because someone forgot to write one, but because there was never anyone authorized to come. Whatever is out there, you will meet it alone, by design."
         }
       ]
     }

@@ -7,13 +7,14 @@
     "horror",
     "mystery"
   ],
-  "detail": "The player drove past the lot last Tuesday. They are certain. There was something else there — a Wendy's, a vacant building, a field — and now there is a stone church with a copper roof and a sign that says it has served the community since 1887. Everyone in town agrees it has. The pastor smiles at the player by name. The player has never told the pastor their name.\n\nDM approach:\n- Tone: Sunday morning, mowed grass, hymn at a window. The horror is wholesome.\n- The pastor: warm, present, remembers everyone's children's names. Does not blink quite often enough.\n- The congregants: pleasant. A neighbor the player has known for ten years who now corrects them about a church potluck the player has never attended.\n- Seed early: an old photograph in a yearbook, a parking citation from the supposed-old-lot, a child who says the wrong thing and is shushed.\n- Pacing: attendance grows by exactly one per Sunday. In three months it will be everyone.\n\nThe player can count Sundays. They can count cars in the lot. They can count whose name the pastor knows now that he didn't know last week. The clock is the bulletin board in the narthex and the new face on the bulletin every week. When the player's own face appears there, the clock has run.",
+  "setup_detail": "<!--include:Pacing.EndlessCampaigns-->\n\nThis is an episodic, serialized neighborhood-mystery show — a new mystery each arc, same cast and town. When presenting scope, frame the Serialized (episode-by-episode) option as the natural fit.",
+  "detail": "Format: an episodic neighborhood-mystery campaign — Scooby-Doo, Stranger Things; a small town where something is quietly wrong and the few people who notice are the only ones who can do anything about it. The constant is the cast and the town (see the forks); each arc is one self-contained mystery, run to a real resolution, and then the DM opens the next. The weird church is the first mystery — the pilot.\n\nThe first mystery — the church: The player drove past the lot last Tuesday. They are certain. There was something else there — a Wendy's, a vacant building, a field — and now there is a stone church with a copper roof and a sign that says it has served the community since 1887. Everyone in town agrees it has. The pastor smiles at the player by name. The player has never told the pastor their name.\n\nRunning the church arc:\n- Tone: Sunday morning, mowed grass, a hymn at a window. The horror is wholesome.\n- The pastor: warm, present, remembers everyone's children's names. Does not blink quite often enough.\n- The congregants: pleasant. A neighbor the player has known for ten years now corrects them about a church potluck the player never attended.\n- Seed early: an old photograph in a yearbook, a parking citation from the supposed-old lot, a child who says the wrong thing and is shushed.\n- The arc's clock: attendance grows by exactly one per Sunday; in three months it is everyone. The bulletin board in the narthex is the clock — a new face every week — and when the player's own face appears there, the arc has run. This is the church mystery's mounting pressure, not the campaign's; the campaign continues after.\n- The church's secret is the agent fork decided at setup — the church mystery's hidden answer. Keep it buried; reveal it late; resolve the arc on it.\n\nThe episodic engine — after the church:\n- When the player closes the church mystery — exposes it, breaks it, banishes it, or merely survives it, whatever the table earns — do NOT end the campaign. The town exhales, the cast catches its breath... and then something new is quietly wrong. Open the next mystery: a fresh hook, the same town, the same people, the uncanny intruding on ordinary life again.\n- Each mystery is self-contained (one arc, a real ending), but the cast persists and grows — relationships, in-jokes, the believer-and-skeptic tension, the kid who's seen too much, the deputy who's started trusting the player's hunches. Let the ensemble accumulate like a long-running show.\n- New-hook seeds to reach for (invent freely; hold the register — wholesome surface, wrong underneath): a neighbor back from vacation subtly not themselves; a county fair ride that wasn't on the schedule; a station at the end of the radio dial playing tomorrow's news; a new family whose house has one too many windows from outside; a class photo with a smiling kid nobody can name; the reservoir dropping, and something old coming up. Mine the chosen cast and town for hooks their own world would surface.\n- Scale each mystery to the cast: the tweens get bikes-and-woods adventures; the sheriff gets cases; the moms get school-and-community creep; the retirement home gets the slow uncanny; the D&D group gets the mystery they're genre-savvy enough to half-solve and still get blindsided by.\n\nOpening: begin grounded in the player's ordinary life and chosen cast — the bingo table, the group chat, the basement game, the squad room, the summer street — and let the weird church surface through their own people, the way their fork describes.\n\nPacing: each mystery is an arc of a few sessions with a real resolution; the campaign is open-ended and serialized — when one mystery closes, the next opens.",
   "forks": [
     {
       "id": "crucial-question",
       "label": "The crucial question",
       "chooser": "agent",
-      "prompt": "Roll or choose. Do NOT reveal early — this is what the campaign slowly turns on.",
+      "prompt": "Roll or choose. Do NOT reveal early — this is the church mystery's secret (the first arc), what it slowly turns on.",
       "options": [
         {
           "id": "it-ate-the-building",
@@ -32,6 +33,44 @@
           "name": "The Wrapping Paper",
           "description": "The church is packaging; something is being built on the lot and will stand once the church falls away.",
           "detail": "THE WRAPPING PAPER — The church is not the thing. The church is what the thing arrived inside. Something is being prepared on the lot — built up, brick by brick, prayer by prayer — and when it is ready the church will fall away and the actual building will stand. The pastor is the foreman. The congregation are the materials."
+        }
+      ]
+    },
+    {
+      "id": "who-you-are",
+      "label": "Who you are",
+      "chooser": "player",
+      "prompt": "Present these to the player as who they are and the ordinary life the church is intruding on — pick the one they vibe with. Whatever they choose, ground the campaign hard in that cast and routine: the human world is the point, the church is the thing disturbing it. Each option also names how the weirdness first reaches the player, through their own people.",
+      "options": [
+        {
+          "id": "the-retirement-home",
+          "name": "The Retirement Home",
+          "description": "You live at the home now — meals, meds, bingo, the good chair by the window. Over bingo on Tuesday, the resident beside you leans in: 'Hey — did you notice that weird church? The one that wasn't there before?' She remembers it too. Almost nobody else does.",
+          "detail": "THE RETIREMENT HOME — Ground the player in the daily rhythm of a care home. The cast: the sharp friend who first names the church, the resident who's already 'started going,' the widower who used to keep the county records, the kind overworked staff (some now attending services), visiting family who believe nothing. The horror enters gently — a chaplain appearing on Sundays, residents who 'transfer' or 'pass' with rooms filling too fast. The particular dread: the old remember the before most clearly and are believed least; memory is already slipping here, so who's to say the church wasn't always there? The player has routine, time, and a community of witnesses no one listens to."
+        },
+        {
+          "id": "the-moms-group",
+          "name": "The Mom's Group",
+          "description": "You're a busy mom of two, and the group chat plus the Thursday playdate is your lifeline. Today, ahead of the pickup logistics and the bake-sale signup, there's a new topic: a strange little church that — wait, that wasn't there before, right? Everyone else seems sure it always was.",
+          "detail": "THE MOM'S GROUP — Ground the player in family logistics: school runs, the group chat, playdates, the bake-sale, never enough sleep. The cast: the organized mom who's already volunteered the group for the church's fall festival, the over-enthusiastic newcomer nobody can quite place, the friend who quietly agrees the church is wrong and then stops answering texts, and the player's own kids — one comes home humming a hymn and 'corrects' the player about a potluck they never attended. The horror enters through the calendar: the church colonizes the community's social infrastructure faster than anyone can object. The particular dread: opting out reads as being a bad, unfriendly neighbor — social pressure is the church's stalking horse, and the player is outnumbered and tired."
+        },
+        {
+          "id": "the-dnd-group",
+          "name": "The D&D Group",
+          "description": "Every other Friday: the same friends, the same basement table, snacks and dice and a campaign three years deep. Tonight someone's late — got turned around downtown by a church on Elm that's messing up their usual route. A church none of you remember. The session never really gets back on track.",
+          "detail": "THE D&D GROUP — Ground the player in a tight friend-group with years of in-jokes and ritual. The cast: the host whose basement it is, the friend who clocked the church first, the skeptic who 'looked it up' and now insists it's always been there, the one begging off sessions to attend something on Sundays. These are people good at noticing inconsistencies, mapping, and saying 'wait, that doesn't add up' — make their genre-literacy both asset and curse (they treat it as a mystery to solve until it solves one of them). The horror enters by emptying the table one chair at a time; the empty seat is the clock. The particular dread: the people best equipped to see the pattern are dismissed as 'those weird gamers,' and the table's camaraderie is exactly what the church offers a hollow version of."
+        },
+        {
+          "id": "the-sheriffs-office",
+          "name": "The Sheriff's Office",
+          "description": "You run a small-town sheriff's department — you, a couple of deputies, a quiet county, mostly paperwork. Now there's a church on a lot you'd swear was empty: permits nobody filed, a congregation nobody booked, a pastor who calls you by your first name. It isn't a crime. You can't stop thinking about it.",
+          "detail": "THE SHERIFF'S OFFICE — Ground the player in small-town law: patrols, paperwork, the radio, the clerk's office. The cast: the deputies (the loyal one, the one who's started attending and bristles when asked, the dispatcher who pulls the old plat maps for you), the county clerk, the mayor who wants this to be nothing. Give the player real investigative tools — records, permits, a badge that opens doors — then erode them: the files are already amended, the permits already on record, the witnesses already 'misremembering.' The horror enters as a case the player can work but cannot close; every official channel quietly confirms the church belongs. The particular dread: the player's authority is real and powerless here, and exercising it earns the pastor's warm, personal attention."
+        },
+        {
+          "id": "the-summer-tweens",
+          "name": "The Summer Tweens",
+          "description": "School's out, it's the dead middle of summer, and you and your friends have nothing but time, bikes, and a town to be bored in. The new church on the corner is the most interesting thing in weeks — and every grown-up acts like it's always been there, which is exactly the kind of thing grown-ups would do.",
+          "detail": "THE SUMMER TWEENS — Ground the player in a pack of kids on long empty summer days: bikes, the woods, the gas-station counter, no adult paying attention (the Stand By Me / It / Stranger Things register). The cast: the brave one, the scared one who's usually right, the kid whose mom 'started going,' the little sibling who tags along and notices too much, plus adults who won't listen. The kids have what adults lack — time, nerve, freedom to snoop, intact memory: they KNOW the church wasn't there, because they rode past that lot last week. The horror enters as an adventure that turns real — a dare to go inside, a friend who attends a service and comes back 'nicer,' an empty bike in the church lot. The particular dread: no adult will believe or protect them, and the church is patient and very good with children."
         }
       ]
     }
@@ -55,27 +94,6 @@
         {
           "name": "Elm and the Cross-Street",
           "description": "This is just one more. Methodist on Vine, Baptist on Oak, Catholic on Main, and now this one on the corner of Elm and the cross-street nobody can quite remember the name of. Nobody can say what was on the lot before; everyone agrees it has always been a lovely little church."
-        }
-      ]
-    },
-    {
-      "label": "Your faith",
-      "choices": [
-        {
-          "name": "The Faithful",
-          "description": "This troubles you doctrinally before it troubles you in any other way. The hymns are the right hymns and the sermon almost works. The pastor preaches scripture you know, with one verse you don't recognize at the end of each reading. You looked it up. It isn't there."
-        },
-        {
-          "name": "The Lapsed",
-          "description": "You came back recently and you can't say why. The pew fits you the way it used to. The pastor seems to remember you from before, from a parish you no longer believe you attended. You take communion on the third Sunday and you don't tell your spouse."
-        },
-        {
-          "name": "The Unbeliever",
-          "description": "You can see what the others can't. The building has the wrong number of doors from inside. The stained glass has a panel that doesn't match. The shadows in the nave fall in directions that have nothing to do with the sun. You don't go in often. When you do, you count."
-        },
-        {
-          "name": "The Rival Shepherd",
-          "description": "Your parishioners are migrating. You watch them through the side window of your own church across the street, walking past your sign on Sunday morning to the new doors. You have not yet preached against the new church and you have not yet visited it. Both decisions feel like they are being made for you."
         }
       ]
     }

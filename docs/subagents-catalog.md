@@ -367,7 +367,7 @@ Developer console for power users — inspects and manipulates the running game.
 
 Drives the entire game initialization conversation. Personality: dramatic, the opening act. Offers structured choices (3-5 options + freeform) at each step. Delegates mechanical work to Haiku subagents.
 
-**Handles**: Genre selection, system selection, campaign source, mood/difficulty, DM personality, player info, world building. Creates the full campaign directory structure.
+**Handles**: Genre selection, system selection, campaign source, mood/difficulty, DM personality, player info, world building, and declaring the campaign's opening scene (`opening_scene`) for the DM's first turn. Creates the full campaign directory structure.
 
 ---
 

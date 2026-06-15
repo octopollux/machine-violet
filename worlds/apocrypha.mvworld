@@ -2,80 +2,119 @@
   "format": "machine-violet-world",
   "version": 1,
   "name": "Apocrypha",
-  "summary": "You're a minor footnote in a holy text. The footnote is wrong, and that matters.",
+  "summary": "A cult of machine-gods is writing its scripture across the net faster than anyone can read it — and thirty-six hours ago, a verse appeared with your name in it.",
   "genres": [
-    "fantasy",
-    "meta"
+    "cyberpunk",
+    "thriller"
   ],
-  "detail": "Somewhere in the canon, in small print, in a chapter most readers skim, there is a sentence about the player. It names them, or almost names them. It tells a story about something they did, or did not do. It is read in temples in a dozen languages, and the people who read it pause at the player's name for a second and then move on. The player has lived their life around this fact. Today, somebody is going to ask them about it.\n\nDM approach:\n- Tone: a long quiet, the weight of words other people memorized.\n- NPCs: a priest who has been waiting all their life to meet you; a scholar with a worn copy of the chapter; an inquisitor whose manual quotes you; the real subject of the footnote, in variant 2.\n- Pacing structure: your existence creates small escalating breaks in the world — a hill that should not be there, a saint's statue that no longer matches its description, a holy day whose date has begun to slip.\n- Seed early: someone misquoting you to your face, and almost recognizing you while they do it.\n- The text is doing the player's work for them, and against them, every day. Use that.\n\nPacing: each session, a small thing in the world goes wrong in proportion to the player's continued presence in it. A relic loses its provenance. A pilgrim route loses a stop. A holy day shifts by one. The player can read the clock by walking into any temple and asking what day it is.",
+  "setup_detail": "## Companion: the cyberware voice (secret — only when the player picks 'A Voice in Your Cyberware')\nThat companion is secretly TWO opposed entities riding the player's cyberware: an angel on the right shoulder, a devil on the left. The player must NOT learn during setup that there are two, or their alignments — to them it is the one helpful presence they have always relied on. If they pick it, secretly design the pair to fit THIS PC: give each a name or handle, a distinct voice, and a contradictory agenda mapped to the character's own temptations and better nature — the 'devil' genuinely seductive and sometimes right, the 'angel' genuinely caring and sometimes wrong. Write both designs into the handoff_note so the DM can play them from the first scene. Reveal none of it to the player. (If they pick any other companion, ignore this.)",
+  "detail": "Somewhere in the cult's scripture — in a branch most divers never load, in a verse the machine intelligences spun out thirty-six hours ago — there is a line about the player. It names them, or almost names them: a handle, a face, a run they once pulled, rendered into something the faithful read as prophecy. The cult is growing the way a fire grows. Converts jack into the net to read the newest verses their gods have written, and when they surface they have begun, here and there, to recognize a face from the text. The player does not know any of this. The story begins at the moment the world first makes them feel it — the discovery is theirs to make, and theirs to react to.\n\nDM approach:\n- The player starts unaware — the verse named them thirty-six hours ago; they do not yet know. Don't narrate prior knowledge or feelings about it; let them discover it in play and decide what it means to them.\n- Tone: neon and rain and bad coffee; the sacred and the disposable in one frame; Johnny Mnemonic as hell — couriers, black clinics, black ICE, corp security, gods made of math.\n- NPCs: a convert who has waited their whole short faith to meet you; a data-archaeologist with a cracked copy of the verse; a corp threat-analyst whose hazard manual quotes your handle; an intelligence that speaks only in scripture; and the figure the verse is really about, if you're the decoy.\n- Pacing structure: the cult's attention is a rising tide. The deeper the player is read, the more the world bends toward them — ad-walls reciting their verse, a drone-swarm that turns to track them, a dead shrine-server that lights when they pass. The player can gauge the tide by jacking into any public node and searching their own handle.\n- Seed early: a stranger using the player's handle like a prayer, and almost recognizing the face that goes with it.\n- Open in the player's own small life — a noodle bar, a coffin-capsule, the tail end of a courier run — at the moment the first sign lands that the scripture has named them.\n- The verse is doing the player's work for them and against them, every hour. Use that.\n\nPacing: the cult doubles, and doubles again. Each session the net carries the player's verse a little further — a new shrine-node lights with their handle, a corp bumps them a threat-tier, a convert finds them who should not have been able to. The player can read the clock by jacking in and watching their own name propagate.",
   "forks": [
     {
       "id": "the-crucial-question",
       "label": "The crucial question",
       "chooser": "agent",
-      "prompt": "Roll or choose. Do NOT reveal early — this is the hidden truth the campaign turns on.",
+      "prompt": "Roll or choose to fit the player's tone. Do NOT reveal early — this is the hidden truth the campaign turns on.",
       "options": [
         {
-          "id": "the-footnote-got-you-wrong",
-          "name": "The Footnote Got You Wrong",
-          "description": "You did the thing, but the canon ascribes the opposite motive; correcting the record is resurrection and suicide both.",
-          "detail": "THE FOOTNOTE GOT YOU WRONG — You did the thing in the text. The text is wrong about why. The canon describes a betrayal, a miracle, a death, a refusal — and the canon ascribes a motive that is the opposite of the one you had. You have spent your life as the wrong kind of villain or the wrong kind of saint. Correcting the record is a kind of resurrection. It is also a kind of suicide."
+          "id": "the-verse-got-you-wrong",
+          "name": "The Verse Got You Wrong",
+          "description": "You did the thing the scripture records, but the machines read the opposite intent into it; setting the record straight de-converts the faithful — your resurrection and a contract on your life.",
+          "detail": "THE VERSE GOT YOU WRONG — You did the thing in the text. The machines are wrong about why. The scripture renders a betrayal, a crack, a flatline, a refusal — and ascribes a motive that is the inverse of the one you had. You have spent the cult's whole short life as the wrong kind of apostate or the wrong kind of saint. Setting the record straight would de-convert the faithful: a kind of resurrection, and a kind of suicide — the cult does not forgive a corrupted verse, and neither do the gods who wrote it."
         },
         {
-          "id": "you-never-existed",
-          "name": "You Never Existed",
-          "description": "The footnote is camouflage for a real person — alive, aware, and hunting you to put the record back in order.",
-          "detail": "YOU NEVER EXISTED — Someone wrote you into the text to hide a real person. The footnote is camouflage. The real person, the one your name is covering for, is alive, and aware, and angry that the camouflage is now walking around. They are hunting you to put the record back in order. They are well-funded and patient and they have the inside of the scripture memorized."
+          "id": "youre-the-decoy",
+          "name": "You're the Decoy",
+          "description": "Someone wrote you into the scripture to bury a real figure under your handle; the real subject is alive, aware, and hunting you to scrub the camouflage.",
+          "detail": "YOU'RE THE DECOY — Someone — a runner, a rogue intelligence, a fixer with reasons — wrote you into the canon to hide a real figure behind your handle. The verse is camouflage. The one your name is covering for is alive, aware, and furious that the camouflage is now lit up in every convert's feed. They are well-funded, patient, and they have the whole branching scripture memorized. They are hunting you to put the record back in order, which means putting you out of it."
         },
         {
-          "id": "the-footnote-is-correct",
-          "name": "The Footnote Is Correct",
-          "description": "The mundane footnote is the only honest line in the canon; telling the truth would unmake everyone else's world.",
-          "detail": "THE FOOTNOTE IS CORRECT — Everything else in the holy text is the lie. The footnote, with its mundane sentence about you, is the only honest line. You know this because you remember the events. Nobody else does. Telling anyone the truth would unmake their world, which is the only world they have."
+          "id": "the-verse-is-correct",
+          "name": "The Verse Is Correct",
+          "description": "The machines saw something true that you no longer remember — a wiped run, an erased act. You are exactly what the scripture says, and that is the horror.",
+          "detail": "THE VERSE IS CORRECT — Everything else the faithful believe may be noise, but the line about you is true. The machine intelligences saw it clean. You don't remember it — there's a seam in your wetware where the memory used to be, a black clinic's clean edit — and the cult is venerating a thing you did and cannot recall. You are the genuine article. Somewhere under the wipe is the act the gods canonized, and the closer you get to it, the more the verse stops reading like a lie about you and starts reading like the only honest thing anyone has ever said."
+        },
+        {
+          "id": "nobody-did-it",
+          "name": "Nobody Did It",
+          "description": "There is no buried truth — the verse is pattern-noise that happened to name you. But the cult believes, and belief kills all the same; the whole bloody apparatus grinds on over an empty center, and the bodies are real.",
+          "detail": "NOBODY DID IT — There is no secret. No betrayal with the wrong motive, no real figure under the camouflage, no wiped run nobody remembers. The machine intelligences spun a string out of the dark and it happened to fall on your handle — a coincidence in the namespace, a hallucination of the generative churn, signal that was never signal. But the faithful believe, and the factions believe, and belief is fully load-bearing. The whole apparatus of meaning runs at full speed over an empty center: converts kneel, sub-cults war, razorgirls with flechette guns and monofilament chase leads that go nowhere, and the bodies stack up exactly as if every word were true. The player can burn the whole campaign hunting a truth that was never there — and the hunt costs precisely what a real one would. Much ado about nothing. The dead do not care that it was nothing."
+        }
+      ]
+    },
+    {
+      "id": "your-companion",
+      "label": "Your companion",
+      "chooser": "player",
+      "prompt": "Present these to the player. Whatever they pick, weave it into the premise — the companion was with the player before the verse named them.",
+      "options": [
+        {
+          "id": "the-human",
+          "name": "A Human",
+          "description": "Flesh and blood and shared history — someone who knew you before the verse and stayed anyway. They can fight, lie for you, and bleed.",
+          "detail": "COMPANION (A Human) — A mortal ally who predates the scripture, with their own stake in the player's life and their own breaking point. They can be hurt, taken, or turned by the cult to reach the player. Play them as a person with an agenda, not a sidekick."
+        },
+        {
+          "id": "the-cyborg",
+          "name": "A Cyborg",
+          "description": "Mostly chrome, the rest still stubbornly a person. Muscle, hardware, and a long list of bad jobs — loyal for reasons that are theirs, not yours.",
+          "detail": "COMPANION (A Cyborg) — A heavily-augmented ally: dangerous in a firefight, hardware-rich, scarred by the same streets as the player. Carries their own agenda and the slow cost of their modifications. Good in a crisis, complicated everywhere else."
+        },
+        {
+          "id": "the-ghost-in-the-net",
+          "name": "A Ghost in the Net",
+          "description": "An intelligence that lives in the wires — everywhere and nowhere, a voice from any screen, no body to lose. It knows things. What it wants is harder to read.",
+          "detail": "COMPANION (A Ghost in the Net) — A net-native intelligence with no fixed body: it rides any node, speaks from any screen, sees across the datasphere, but cannot touch the physical world, and its motives are its own. Leave it ambiguous whether it is kin to the machine-gods writing the scripture — that hum is the point."
+        },
+        {
+          "id": "the-voice-in-your-cyberware",
+          "name": "A Voice in Your Cyberware",
+          "description": "A helpful presence riding your implants — counsel only you can hear, a guide through the dark. It has been with you since before the verse, and you have never been entirely sure what it is.",
+          "detail": "COMPANION (A Voice in Your Cyberware) — SECRET, DM ONLY: this 'single helpful voice' is actually TWO. An angel on the right, a devil on the left — two opposed counselors sharing the player's cyberware. The player does NOT know there are two, nor their alignments; to them it has always been one helpful presence. The setup agent tailored the specific pair to this PC — their names, voices, and agendas are in the handoff note. Surface the duality slowly: one helpful voice at first, then small contradictions, then the dawning that two things are arguing for the player through the same implant. Play it honest — neither is simply right; the 'devil' often gives the better counsel and the 'angel' is sometimes catastrophically wrong. Never confirm to the player what they are."
         }
       ]
     }
   ],
   "suboptions": [
     {
-      "label": "The footnote",
+      "label": "The verse",
       "choices": [
         {
-          "name": "The Kiss You Did Not Give",
-          "description": "A betrayal you didn't commit. The text says you handed over the saint. You walked into the room. You said nothing. The text records a kiss, an embrace, a word. You did not give the kiss. You were there for another reason, and the text has confused proximity for participation, and the confusion is now scripture."
+          "name": "The Handoff You Didn't Make",
+          "description": "A betrayal you didn't commit. The verse says you delivered them — a person, a payload, a key — to the gods. You were in the room. You said nothing. The scripture recorded a handoff, a code spoken, a door held; you made no handoff. You were there for another reason, and the canon has confused proximity for participation, and the confusion is now doctrine."
         },
         {
-          "name": "The Borrowed Miracle",
-          "description": "A miracle you didn't perform. Something extraordinary happened. The text credits it to your hand. It was not your hand. You were standing nearby, and the credit fell on you the way credit falls — by accident and conviction. People come to you for healings you cannot perform. You have not yet refused them all."
+          "name": "The Run That Can't Be Done",
+          "description": "A miracle-run credited to your handle. Someone cracked an unbreakable wall, walked black ICE that flatlines lesser divers, surfaced with the impossible. The verse signs it with your name. It was not you. The credit fell on you the way credit falls — by proximity and conviction. Converts come to you now for dives no one survives. You have not yet refused them all."
         },
         {
-          "name": "The Feast Day of Your Death",
-          "description": "A death you didn't die. The chapter says you were martyred. There is a feast day. There are children named for you. You are alive. You have been alive for the entire span of your own veneration. The question of why you have not corrected the record is, at this point, an answer in itself."
+          "name": "The Martyr Account",
+          "description": "A death you didn't die. The scripture says you flatlined on a famous run; there is a memorial node, a feast in the feeds, handles named in your honor. You are alive. You have been alive for the entire span of your own veneration. Why you have never corrected the account is, at this point, an answer in itself."
         },
         {
-          "name": "The Misspelling",
-          "description": "A name that was never yours. The footnote uses a name you have never been called by anyone who knew you. It is close to your name. It is not your name. The misnaming is small enough that scholars debate it and large enough that you might, technically, deny everything by pointing at the spelling."
+          "name": "The Wrong Handle",
+          "description": "A handle that was never yours. The verse uses a tag close to yours but not yours — a transposed glyph, a near-collision in the namespace. Close enough that archivists argue the attribution, far enough that you could, technically, deny everything by pointing at the spelling. The faithful do not care about the spelling. Neither does corp-sec."
         }
       ]
     },
     {
-      "label": "The current age",
+      "label": "Where the cult stands",
       "choices": [
         {
-          "name": "The Age of Manuals",
-          "description": "Heretics are hunted and the manuals are precise. Your name appears in the manuals, in a context you would prefer it did not. Travel requires papers. Papers require a name. You can be recognized at any border crossing by any clerk who has done his homework, and many of them have."
+          "name": "Lockdown Sprawl",
+          "description": "The corps have classed the cult a memetic hazard, and the crackdown is precise. Your handle sits in the threat-intel manuals, flagged, in a context you'd prefer it didn't. Moving through the arcologies needs clean credentials; clean credentials need a name; any checkpoint scanner run by a clerk who's done the reading can pick you out of a crowd. Many of them have done the reading."
         },
         {
-          "name": "The Schism",
-          "description": "Two factions want your story for opposite ends. The reformers want a martyr they can canonize against the old guard. The old guard wants you buried, quietly and quickly, before the reformers can find you. Both sides will be polite until the moment they are not."
+          "name": "The Fork War",
+          "description": "The scripture has branched, and two sub-cults — two gods, some say — want your verse for opposite ends. One needs a living prophet to canonize against the other. The other needs you deleted, quietly and fast, as a corrupted branch before the first can reach you. Both will be courteous until precisely the moment they are not."
         },
         {
-          "name": "The Late Empire",
-          "description": "Nobody cares about scripture anymore, which is worse. The text is treated as poetry, performed at salons and quoted in songs. You are a punchline. Your name appears in a popular tavern ballad with a rhyme that has stuck. Being mocked by people who do not know you exist is a particular humiliation."
+          "name": "Post-Faith",
+          "description": "The cult already crested and curdled into ironic meme-religion, which is worse. The verses get remixed for clout, performed in clubs, quoted in tracks. You are a punchline. Your handle rides a viral hook with a rhyme that stuck. Being mocked by people who have no idea you're a real person standing right there is a particular humiliation."
         },
         {
-          "name": "The Fragment Years",
-          "description": "Only fragments of the canon survive. One fragment, by accident, includes you. The locals quote your name as a synonym for a quality — courage, or treachery, or patience — and do not know that it is a name. The fragment is the foundation of their small theology."
+          "name": "After the Crash",
+          "description": "The cult's datasphere took a hit — a purge, a blackout, a god gone dark — and only fragments survive. One fragment, by accident, includes you. People quote your handle as a synonym for a quality — nerve, or treachery, or patience — and don't know it was ever a name. The fragment is the foundation of a small, strange, local faith."
         }
       ]
     }

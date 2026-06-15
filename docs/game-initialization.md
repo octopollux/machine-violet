@@ -148,7 +148,13 @@ The setup agent's work is done. The app starts the main DM agent loop (Opus) wit
 - Cached prefix built (rules, campaign summary, location, character sheets, clocks)
 - Empty conversation history
 
-The DM's first message is the opening narration. The game begins.
+The DM's first message is the opening narration. `startNewGame` (in [session-manager.ts](../packages/engine/src/server/session-manager.ts)) kicks it off with a synthetic, transcript-skipped **priming message** — the only turn the DM doesn't react to real player input. Its layout:
+
+1. A bracketed stage direction: `[Session begins. Set the scene. Campaign premise: … The player character is …. <opening scene>.]` — the cue the DM is trained to react to. When the setup agent declared an opening scene at finalize (`config.opening_scene`), its one sentence is dropped into the bracket **verbatim** — no wrapping instruction. It counters the DM's default pull toward dropping the player straight onto the main objective: most campaigns should open on a character-grounded beat, then let plot arrive. The setup agent owns this because it has the whole picture (premise + PC + player intent + any seed hint), and the DM's "you are a DM" vector doesn't steer toward "put the player in a warm bed first." The setup agent's sentence *is* the directive — the DM gets no extra static prompting on the matter.
+2. The **handoff note** (if present): `config.setup_handoff` verbatim — the player's own words and setup-agent notes that don't survive into structured config.
+3. A **Pre-existing entities** block — the chain-of-custody listing so the DM writes to existing entity files instead of creating duplicates.
+
+`opening_scene` and `setup_handoff` are both one-shot reads injected only on this turn; they persist in `config.json` purely so a mid-first-turn crash can replay the same priming on resume. Neither is re-injected once the opening narration succeeds. The game begins.
 
 ### Player file (machine-scope)
 
@@ -217,6 +223,8 @@ Because the personality is read live each turn (not snapshotted like `pcSheets`)
 // config.json (partial)
 {
   "campaign_scope": "few-sessions",
+  "opening_scene": "Open with the PC asleep in a hayloft, woken by a stranger saddling a horse below.",
+  "setup_handoff": "Player leans noir-burnout, loves ensemble scenes. I promised a talking cat.",
   "dm_personality": {
     "name": "The Chronicler",
     "prompt_fragment": "You are The Chronicler. Your narration is deliberate..."

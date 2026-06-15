@@ -306,6 +306,9 @@ describe("setup golden corpus", () => {
         expect(config.system).toBe(golden.expectedSetup.system ?? undefined);
         expect(config.dm_personality.name).toBe(golden.expectedSetup.personality.name);
         expect(config.players[0]?.character).toBe(golden.expectedSetup.characterName);
+        // The setup agent's opening-scene directive survives into config so the
+        // session manager can inject it into the DM's first-turn priming.
+        expect(config.opening_scene).toBe(golden.expectedSetup.openingScene ?? undefined);
 
         const charRaw = await fileIO.readFile(norm(campaignPaths(root).character(golden.expectedSetup.characterName)));
         expect(charRaw, "character sheet should be scaffolded").not.toBe("");

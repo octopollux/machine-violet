@@ -2,82 +2,67 @@
   "format": "machine-violet-world",
   "version": 1,
   "name": "Closing Time",
-  "summary": "The universe is a shop. It's going out of business. Everything must go.",
+  "summary": "An antique shop at the end of the world",
   "genres": [
+    "fantasy",
     "sci-fi",
-    "comedy",
-    "meta"
+    "drama"
   ],
-  "setup_detail": "<!--include:Pacing.TimedCampaigns-->",
-  "detail": "The shop sells universes. Bottled cosmologies on shelves, kit-cosmoses in flat boxes, single-serving realities by the register. A handwritten sign in the window: EVERYTHING MUST GO. The lights dim a notch every week. Something has gone wrong with the business, and the player is the one standing in the aisles when the music stops.\n\nDM approach:\n- Tone: deadpan retail-comedy with grief leaking around the edges. Think the last day at a beloved bookstore, except the bookstore is the cosmos.\n- NPCs derive from the variant: absent proprietor and two loyal staff (1), Brendon and his clipboard (2), the regional manager and the corporate spreadsheet (3).\n- Layout: aisles you can name, a stockroom you don't open without reason, a back office with paperwork older than the player. Reveal one new aisle per session.\n- Seed early: the dimming lights, the FINAL DAY sign, one customer who comes in every day for the same thing and is starting to notice it costs more.\n\nPacing: Each session, one more physical law goes onto the clearance rack. Track it visibly — a chalked list behind the counter, the lights one notch dimmer, the bell above the door slightly less loud than it was last week.",
+  "setup_detail": "<!--include:Pacing.EndlessCampaigns-->\n\nClosing Time is an episodic anthology — each session is a different dying world reached through the doorway, with the shop as the warm constant between. When presenting scope, frame the Serialized (episode-by-episode) option as the natural fit.",
+  "detail": "Tone: the warm, melancholy flip side of a coffee shop. This is a SLOW, episodic campaign about endings — but the shop itself is the safe, lamplit constant, and the feeling is tenderness, not terror. Out there, every day, a different world is ending, each for a different reason; Closing Time is where the last irreplaceable thing gets carried to safety. Grief and comfort in the same frame. Funny, too — it is a SHOP: there is still a till, a bell, a kettle, dust, and a price nobody knows how to set on the last of something.\n\nThe shop: a stable dimensional antique shop, unaging, packed end to end with the salvaged irreplaceable articles of dead worlds — a jar holding a sky that no longer exists, the last laugh of an extinct people, a coin from a currency no one remembers, a blade that only cuts what its dead owner hated. Some articles have very strange properties. Nothing here can be made again. The lantern over the door is always lit; the shop does not close.\n\nNot the scenario: this is not a refugee shelter. Worlds end, but terrified crowds do not come pouring through the door to pack the shop — that is simply not the story we are telling here. Don't invent an in-fiction reason it can't happen; just don't run it. The doorway carries the keeper out to a world's last hours and back; it is not an evacuation route, and the shop stays the quiet, lamplit constant.\n\nShop infrastructure (reach for these if the player wanders — it is a working, lived-in place, not a façade; terse by intent):\n- Back room: a narrow bed, always made, sized to whoever lies in it.\n- Kitchen: a cast-iron stove that lights itself; the kettle is always warm.\n- Pantry that restocks to the keeper's last craving, never quite enough.\n- Washroom: a copper tub, hot water from a tap labeled in a dead tongue.\n- A hearth that burns without fuel; the flames hold a face a beat too long.\n- A reading chair under a lamp that brightens when the keeper is sad.\n- A coat rack wearing one coat that belongs to nobody here.\n- The counter: worn smooth, a brass till that disputes every price.\n- Till drawer: coins from currencies that no longer spend.\n- A ledger in a hand that isn't the keeper's, never out of ink.\n- A price gun that prints values no one set.\n- A repair bench with tools for materials that don't exist.\n- Shelves that reorder overnight by a logic the keeper half-knows.\n- The door-bell, whose note means: a world is ending.\n- A staircase down, further than the building is tall.\n- A hall of doors, each warm or cold to the touch.\n- A storeroom larger inside than the shop; aisles run past the lights.\n- A cellar of crated cosmoses, packing straw still faintly smoking.\n- A dumbwaiter that delivers things no one ordered.\n- A back office, locked; the key is already somewhere on the keeper.\n- An attic nobody admits to — footsteps up there when it's empty.\n- A corridor that measures a different length each time.\n- A door that only opens the day after you stop needing it.\n- A window onto a sky that exists nowhere else anymore.\n- A window showing the last world the keeper failed to save.\n- A skylight of stars being filed away, one by one, each night.\n- A peephole showing whoever needs the shop next.\n- A round pane onto deep water, something patient on the far side.\n- A mirror reflecting the shop on a day long after this one.\n- A back garden that shouldn't fit, flowering from springs long dead.\n- A cat that is not always a cat, paying its rent in warnings.\n\nDM approach:\n- Run it as an ANTHOLOGY. Each episode opens with the lantern-lit doorway appearing onto a different dying world — a different genre, a different ending, a different reason. The player goes out, meets someone, finds the one thing worth saving, and decides whether and how to save it, and at what cost to whom. Then the door closes and the shop holds the new artifact and the new grief.\n- Where does the lantern-lit doorway appear? Answer it fresh each episode — let it flow with the story rather than fixing one rule. Sometimes it opens where a world's grief is loudest (a deathbed, a last stand, a final evacuation); sometimes it is a side door in an overlooked corner while the apocalypse roars elsewhere; sometimes the door chooses and the keeper can only answer; sometimes a dying soul's last wish calls it without their knowing. Pick what serves the scene.\n- Out there: build each dying world fast and make it land in a single episode — one person, one loss, one irreplaceable thing. The apocalypse is backdrop; the relationship is the scene. The player cannot carry everything, and the shop has rules about the living — so let them choose what gets saved and what gets left.\n- Who do you meet out there? The people of the dying world are the heart of each episode — one-off, vivid, the heartbreak, gone when the door closes. Reach for recurring figures too as the campaign grows; some to keep in your pocket: a fellow traveler who keeps turning up at the ends of worlds on an errand you can't quite read; an impossible regular who keeps coming back though their world ended long ago; the last-of-something the keeper carried out and couldn't bear to shelve; or the shop itself as the keeper's only steady company — a bell that answers, a till that argues. Keep the one-off strangers sharp and any recurring figure warm.\n- Back here: the shop accumulates. Saved artifacts recur — sold, consulted, regretted, returned. Treat strange-property items honestly: they do what they do, and the cost is usually emotional, not mechanical.\n- The deep question — who made this place, and why (the crucial question) — should stay buried and bleed in slowly: a ledger in a hand that isn't the player's, a price tag in the player's own writing, a regular who knew the maker. Reveal it late.\n- Resist grand plot. The stakes are intimate: one thing, one person, one ending, well felt. The best episode is a small mercy; the worst thing is what you had to leave on the shelf out there.\n\nPacing: each session is one ending — one trip through the doorway and back, or one quiet shift minding the counter. Time between is elastic; the shop waits. The rhythm is arrival, browse, loss, departure — and now and then a day where no door opens and you just dust the irreplaceable things.\n\nOpening: begin in the shop on an ordinary, timeless afternoon — then let the lantern brighten and the bell ring as the first doorway opens onto the player's first dying world.",
   "forks": [
     {
-      "id": "crucial-question",
-      "label": "The crucial question",
+      "id": "the-maker",
+      "label": "Who made this place",
       "chooser": "agent",
-      "prompt": "Roll or choose. Do NOT reveal early.",
+      "prompt": "Roll or choose. This is the buried heart of the campaign — do NOT reveal early. Let it bleed in over many episodes; the surface (a warm shop at the end of worlds) reads the same whichever is true.",
       "options": [
         {
-          "id": "the-retirement",
-          "name": "The Retirement",
-          "description": "The proprietor walked out leaving the keys and a note; sixty days on the lease, an incomplete stocktake, and two loyal staff looking to the player.",
-          "detail": "THE RETIREMENT — The proprietor walked out one morning leaving the keys on the counter and a note that said \"good luck.\" The player has sixty days on the lease. The stocktake is incomplete and getting worse — items wander off the shelves. The proprietor is a small wizened person somewhere drinking tea, refusing all calls. Two long-tenured floor staff (a woman who remembers when the warehouse had only one aisle; a kid who's worked here three months and has lasted) are looking to the player to tell them what comes next."
+          "id": "no-one-made-it",
+          "name": "No One Made It",
+          "description": "There is no maker. The shop is scar tissue — where enough worlds end, the multiverse grows this callus, and someone always ends up keeping it. Play the comfort and the horror of cosmic indifference: nothing chose to save these things; saving is just what the wound does.",
+          "detail": "NO ONE MADE IT — Closing Time was not built; it accreted. Where enough endings pile up, the multiverse scars over, and the scar is shaped like a shop, because someone always needs somewhere to put the last thing. There is no plan, no benefactor, no one to thank or to blame — only the callus and whoever holds the keys this turn. The keeper's deepest discovery is the absence at the center: they kept waiting for a reason, and there isn't one. The artifacts are saved by no intention but their own keeping. Let that land as both unbearable and, strangely, freeing — if no one ordained the mercy, then the mercy is entirely the keeper's."
         },
         {
-          "id": "the-takeover",
-          "name": "The Takeover",
-          "description": "A universe-chain bought the franchise; corporate rep Brendon arrives Monday to reprice physical constants and rebrand aggressively.",
-          "detail": "THE TAKEOVER — A larger universe-chain bought the franchise and is rebranding aggressively. Their corporate rep — beige suit, perfect teeth, name tag says BRENDON — arrives Monday morning with a clipboard and a forklift. They are repricing physical constants. The speed of light is being marked down to move stock. The new gravity is on backorder. Old customers come in and find their favorite reality has been replaced with a knockoff that almost works."
+          "id": "the-grieving-maker",
+          "name": "The Grieving Maker",
+          "description": "Someone built it to save ONE thing they couldn't bear to lose — and it metastasized into saving everything, because they could never again choose. The maker may still be out there, may be the shop, may be waiting to be found. Play love that didn't know where to end.",
+          "detail": "THE GRIEVING MAKER — At the first ending, someone — a god, a god's widow, the last of the first world — could not bear to lose one irreplaceable thing, and built a place to keep it. And then they could not choose to stop. If you save one, how do you not save the next, and the next? The shop is compulsive grief given walls and a till. The maker is somewhere in the campaign — gone on ahead, hidden among the regulars, dissolved into the inventory, or waiting at the end of a doorway the keeper hasn't been sent through yet — and finding them means finding out what the first lost thing was, and whether it is still on a shelf. Play it as love that didn't know where to end."
         },
         {
-          "id": "the-liquidation",
-          "name": "The Liquidation",
-          "description": "No villain, no miracle — the closure is final; the player only chooses what gets marked down last, overseen by a sympathetic, scheduled regional manager.",
-          "detail": "THE LIQUIDATION — Corporate has done the math and the shop loses money. No villain. No miracle. The closure is final and the player can't save it. What the player CAN do is choose what gets marked down last — which laws of physics go in the bargain bin first, which beloved cosmos gets the dignity of a final week at full price. The regional manager is sympathetic, distant, and on a schedule."
+          "id": "keepers-all-the-way-back",
+          "name": "Keepers All the Way Back",
+          "description": "No original maker — only a chain of grief-struck successors, each handed the keys with a 'good luck,' back past where memory reaches. The campaign circles one unsettling question: is the player the next link, or the same link, looping? Pairs well with the Lifer origin.",
+          "detail": "KEEPERS ALL THE WAY BACK — Ask who made it and the answer is: the keeper before, who was given it by the keeper before, and so on past every record, with no first link ever found. Closing Time is inherited grief with no origin — a relay of strangers each told 'good luck' and left to it. The dread the campaign slowly raises is whether the chain is many people or one person looping: the handwriting in the old ledgers drifts toward the player's own; a portrait in the back office is almost their face; a regular calls them by a name they haven't used yet. Never resolve it cleanly. The keeper is either the newest of a long line of the lonely, or they have done this forever and forgotten — and both are a kind of life sentence served as a kindness."
+        },
+        {
+          "id": "the-collector",
+          "name": "The Collector",
+          "description": "It's a predator wearing mercy. The shop genuinely saves the irreplaceable — but it saves them FOR something: a buyer, an appetite, a museum of extinctions that prizes the last-of-its-kind. The keeper is the unwitting picker. The warmth is real and so is the trap. Play the betrayal slow.",
+          "detail": "THE COLLECTOR — Something made Closing Time to harvest endings. It is not a lie that the shop saves the irreplaceable; that is exactly what makes it work. But the saved things are saved FOR a buyer the keeper has never met — an appetite that prizes the only-one-left, a private museum of extinctions, a collector who needs worlds to die to complete a set. The keeper is the picker, sent out by a kindness to bring home the last of everything. The campaign's turn is the keeper realizing the mercy has a mouth: where do the artifacts go when they leave the shelf? who signs for them? what does the lantern actually steer the door toward — grief, or harvest? The cruelty is that the warmth was never fake. Saving these things was real. It was also shopping for a god that eats endings."
         }
       ]
     }
   ],
   "suboptions": [
     {
-      "label": "Your role",
+      "label": "Who you are",
       "choices": [
         {
-          "name": "The Keyholder",
-          "description": "You know the aisles. You've worked here long enough that customers ask for you by name. The proprietor never told you what you were really selling and you never asked. Now closing is your problem because nobody else has the keys."
+          "name": "The Inheritor",
+          "description": "You woke one morning with the keys warm in your hand and a note on the counter that said only 'good luck.' The keeper before you is gone and the regulars are wary. You don't remember agreeing to any of this, and the back office is full of paperwork in a hand that isn't yours."
         },
         {
-          "name": "The Last Customer",
-          "description": "You came in for one specific thing. You don't remember exactly what — you had a list, somewhere. The doors locked behind you and the staff are looking at you expectantly. Something about the way they're looking suggests you might be the inventory."
+          "name": "The Stranded",
+          "description": "You came in as a customer, browsing, the afternoon your own world ended outside the window. The door wouldn't open onto anything anymore. You stayed because there was nowhere left, and the shop needed someone — and now you are the last of your world, living among the last of everyone's."
         },
         {
-          "name": "The Auditor",
-          "description": "You were sent to close out the numbers. You are not supposed to feel anything about the inventory. You have a quota of regret you're allowed to express in writing and you're already over it. Your tablet keeps recalculating the loss column."
+          "name": "The Chosen",
+          "description": "The doorway came for you, specifically, in your own dying world — and instead of selling you something, it offered you the counter. You said yes. You have never been sure why it picked you, and the shop has never explained."
         },
         {
-          "name": "The Heir",
-          "description": "Your parent ran this place your whole life and never explained it. They left you the shop, the lease, and a debt. The staff knew you when you were small. The aisles smell like home and you've been avoiding them for twenty years."
-        }
-      ]
-    },
-    {
-      "label": "The branch",
-      "choices": [
-        {
-          "name": "The Annex",
-          "description": "A small wing off something larger, full of bottled mini-cosmoses meant as souvenirs. The fluorescents flicker on a schedule the manager pretends not to know. Pegboard hooks, half of them empty, hold keychains shaped like dead stars. Everything smells like cardboard and the faint chemical sweetness of new plastic."
-        },
-        {
-          "name": "The Cathedral Warehouse",
-          "description": "Cathedral aisles you could lose a customer in. The forklifts run themselves; you wave at them out of habit. Pallets sit stacked higher than the lights can reach, some of them older than the stars they contain. The PA system pages employees who haven't worked here in decades."
-        },
-        {
-          "name": "The Boutique",
-          "description": "A single proprietor's life work, behind a hand-painted sign. Old wood and the smell of beeswax polish. One window onto a street that isn't quite the one outside the back door. The bell above the door has a specific note and the proprietor used to flinch at it lovingly."
-        },
-        {
-          "name": "The Clearance Tent",
-          "description": "Flapping canvas in a parking lot that wasn't here yesterday. The inventory keeps shifting between visits — what you sold this morning is back on the table tonight, dustier. A FINAL DAY sign has been zip-tied to the entrance for what the older staff swear is several centuries. Nobody has refilled the float."
+          "name": "The Lifer",
+          "description": "You have always been here. You cannot remember a before, and you have stopped trying. The regulars-across-worlds know you; the inventory knows your hands. Whether the shop is your home or your sentence is a question you used to ask."
         }
       ]
     }

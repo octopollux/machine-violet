@@ -2,14 +2,14 @@
   "format": "machine-violet-world",
   "version": 1,
   "name": "Route 0",
-  "summary": "A highway that doesn't appear on GPS. The exits lead to towns that shouldn't exist.",
+  "summary": "A highway that doesn't appear on GPS. Roadside Americana gone wrong.",
   "genres": [
     "modern",
     "horror",
     "mystery"
   ],
   "setup_detail": "<!--include:Pacing.ShortCampaigns-->",
-  "detail": "The highway runs flat and straight and the median is mowed and the rest stops have working bathrooms. There are exits. The exit signs are green and reflective and they name towns the player has never heard of. The GPS shows the player driving through a field. The radio agrees with the road, not the satellite.\n\nDM approach:\n- Tone: Twilight Zone evenness — the road is well-maintained and the diners take cash and the bathrooms have soap. Wrongness arrives in small persistent details that accumulate.\n- NPCs to seed: a gas-station attendant who isn't surprised by the player; one fellow traveler at a rest stop who's been on the road longer; the voice on the radio that knows the next exit's name.\n- Pacing structure: each exit costs something to take — gas, food, a memory, a name. The player can stop, can stay, cannot turn around. The shoulder is a fiction.\n- Seed early: the odometer is wrong; the gas gauge does not move; the sun does not set in the expected place.\n- Resist explaining. The road is not a puzzle to solve from the driver's seat. The road is something the player drives.\n\nPacing: Each exit costs something specific to take. The player can stop driving. The player can stay at an exit. The player cannot turn around. The clock the player can read is the mile-marker count — and the suspicion that the markers don't go up the way they should.",
+  "detail": "The highway runs flat and straight and the median is mowed and the rest stops have working bathrooms. There are exits. The exit signs are green and reflective and they name towns the player has never heard of. The GPS shows the player driving through a field. The radio agrees with the road, not the satellite.\n\nThe feel is a descent. The pressure builds mile for mile, the way it builds on a deep dive — the wrongness does not spike, it accumulates, heavier and stranger the further in you go, until the air in the car is thick with it and turning back is no longer a thing the road allows. Every mile is deeper. Play the slow crush, not the jump-scare. The exits are pocket towns: whole places folded off the map, each one an offer.\n\nDM approach:\n- Tone: Twilight Zone evenness — the road is well-maintained and the diners take cash and the bathrooms have soap. Wrongness arrives in small persistent details that accumulate.\n- Register the seed leans toward (a strong option, not the only one): old Deep South folk-supernatural — Voodoo, hoodoo, roadside conjure, bargains made at crossroads and paid in kin, the wrong-dead sent back not quite right, the old religion running under the new asphalt. Reach for it freely, especially on a delivery run; the road is wide enough for other Americas too (see the crucial question).\n- NPCs to seed: a gas-station attendant who isn't surprised by the player; the diner waitress who has been at her exit longer than makes sense and knows exactly what the road is; a haunted trucker on the CB going the other way, warning the player off a specific exit no matter what they hear — he stopped there himself, and he forgets the mic is hot, so you catch him trailing off after he thinks the line is dead; the locals at a roadblock who lost family to a pocket town's bargain and are trying to stop the player, their spokesperson rubbing the pale groove where a wedding ring used to be, speaking calmly through fear; the voice on the radio that knows the next exit's name.\n- Pacing structure: each exit costs something to take — gas, food, a memory, a name. The player can stop, can stay, cannot turn around. The shoulder is a fiction.\n- Seed early: the odometer is wrong; the gas gauge does not move; the sun does not set in the expected place.\n- Example pocket towns (templates — invent more): Maren Crossing, a diner and gas station where no one casts a shadow; the fuel pump shows an odometer reading instead of a price, and the receipt's timestamp is from a day that hasn't happened. Sutter's Mill, which will not manifest openly — it holds back behind the limestone bluffs with warm lights and patient hospitality, waiting for the player to choose to stop. The kind exits are the dangerous ones.\n- Resist explaining. The road is not a puzzle to solve from the driver's seat. The road is something the player drives.\n\nPacing: Each exit costs something specific to take. The player can stop driving. The player can stay at an exit. The player cannot turn around. The clock the player can read is the mile-marker count — and the suspicion that the markers don't go up the way they should.",
   "forks": [
     {
       "id": "crucial-question",
@@ -36,30 +36,43 @@
           "detail": "THE GRAVEYARD OF AMERICAS — Every failed national experiment is still here, exits in chronological order. The Shaker colony at mile 47. The free-love commune at mile 112. The walled-off pandemic town from 1918, still walled. The corporate company town that paid its workers in scrip. Each one is alive in the present tense and each one will offer the player a place to stay."
         }
       ]
-    }
-  ],
-  "suboptions": [
+    },
     {
-      "label": "Why you took the exit",
-      "choices": [
+      "id": "why-youre-on-route-0",
+      "label": "Why you're on Route 0",
+      "chooser": "player",
+      "prompt": "Present to the player as how they came to be on this road. The first four are ways the road drew them in; The Delivery is a purposeful run that carries its own DM detail (a directed, mile-for-mile descent toward a destination).",
+      "options": [
         {
+          "id": "the-missed-turn",
           "name": "The Missed Turn",
           "description": "You missed the turn for your actual destination an hour ago and you've been pretending not to. The first Route 0 sign was a relief — any exit would do. You took it because going further on the highway felt worse than getting off. That instinct was right. The implications were not."
         },
         {
+          "id": "the-tail-light-ahead",
           "name": "The Tail-Light Ahead",
           "description": "A car ahead of you took the exit and something in their tail-light pattern, or their license plate, or the way they signaled, made you follow. You are not a person who follows strangers. You followed this one. They are somewhere ahead of you now, or they were never there at all."
         },
         {
+          "id": "the-static",
           "name": "The Static",
           "description": "A voice on the radio said your name. You were scanning through static between stations and the static said your name. Then your mother's maiden name. Then the name of the street you grew up on. The next exit was the only thing the radio mentioned by number, and you took it before you'd decided to."
         },
         {
+          "id": "the-recurring-dream",
           "name": "The Recurring Dream",
           "description": "You recognized the exit sign. You recognized the curve of the off-ramp. You recognized the diner at the bottom of the ramp before you saw it. You have been having this dream since you were a child, and you have never told anyone about it, and you are about to be a regular here."
+        },
+        {
+          "id": "the-delivery",
+          "name": "The Delivery",
+          "description": "You weren't drawn onto Route 0 — you were hired to drive it. You have something to carry to a town a long way down this road. The money was wrong-good and the questions felt rude, so you didn't ask many. Now the road won't let you turn around, the cargo is heavier every mile, and you are starting to wonder what you're really delivering, and to whom, and what they'll do with it when it arrives.",
+          "detail": "THE DELIVERY — The PC is on a delivery run: hired to carry something down Route 0 to a specific town far along it. This is the seed's mile-for-mile engine — a directed descent rather than aimless wandering. The road pulls toward the destination; the dread and the supernatural load build the deeper in they go, like the pressure on a dive. Keep the cargo's nature loose — a crate, a coffin, a passenger, a vehicle, a sealed thing that hums — let the player define it or let it stay unknown; what matters is that it wants to arrive, the road wants it to arrive, and the receiving town has been waiting. The pocket towns along the way are the encounters: offers to stop, warnings not to, locals who know what the delivery costs. Tie the destination to the crucial question — the collector who commissioned it; a loop that returns the cargo to its sender; one more failed America that needs what is in the back. The campaign converges on arrival, and on whether the PC should complete the delivery at all."
         }
       ]
-    },
+    }
+  ],
+  "suboptions": [
     {
       "label": "Your vehicle",
       "choices": [

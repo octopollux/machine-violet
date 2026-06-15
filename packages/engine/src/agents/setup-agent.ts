@@ -56,6 +56,14 @@ export interface SetupResult {
    */
   handoffNote?: string;
   /**
+   * One-sentence opening-scene directive the setup agent composes at finalize,
+   * telling the DM where/how to open turn 1 (a character-grounded entry beat,
+   * not the main objective). Persisted to CampaignConfig.opening_scene and
+   * injected once into the DM's first-turn priming. Optional for back-compat
+   * (replayed pre-feature tapes won't carry it).
+   */
+  openingScene?: string;
+  /**
    * Slug of the `.mvworld` seed this campaign was built from, when the player
    * chose a bundled/imported world (vs. a fully custom premise). Set only when
    * the setup agent passed an explicit `world_slug` to `finalize_setup` — never
@@ -104,6 +112,7 @@ export function buildCampaignConfig(result: SetupResult): CampaignConfig {
       ? result.forkSelections
       : undefined,
     setup_handoff: result.handoffNote ?? undefined,
+    opening_scene: result.openingScene ?? undefined,
     dm_personality: result.personality,
     players: [player],
     combat: defaultCombatConfig(),

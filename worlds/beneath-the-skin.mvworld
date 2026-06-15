@@ -9,7 +9,7 @@
     "mystery"
   ],
   "setup_detail": "<!--include:Pacing.ShortCampaigns-->",
-  "detail": "The \"different\" is subtle and specific: affected people become slightly better versions of themselves. The angry drunk is calm. The neglectful parent is attentive. The bully is kind. This is the horror — something is fixing people, and it's working.\n\nThe tell: Affected people all share one tiny behavioral tic that's easy to miss — they pause exactly one beat too long before laughing, or they all hum the same four notes when idle, or they never blink when making eye contact.\n\nPacing: Open with normalcy disrupted in small ways. The player should spend 2-3 scenes thinking this might be a good thing before the first crack appears. Someone the player cares about gets \"fixed,\" and the player has to decide if they want them back the way they were.",
+  "detail": "The \"different\" is subtle and specific: affected people become slightly better versions of themselves. The angry drunk is calm. The neglectful parent is attentive. The bully is kind. This is the horror — something is fixing people, and it's working.\n\nThe tell: Affected people all share one tiny behavioral tic that's easy to miss — they pause exactly one beat too long before laughing, or they all hum the same four notes when idle, or they never blink when making eye contact.\n\nPacing: Open with normalcy disrupted in small ways. The player should spend 2-3 scenes thinking this might be a good thing before the first crack appears. Someone the player cares about gets \"fixed,\" and the player has to decide if they want them back the way they were.\n\nSetting: the player chooses where this happens (the 'Where it happens' fork). Wherever they land, ground every scene relentlessly in that real place — its food, weather, speech, work, faith, architecture, and social grain. The horror lands hardest against a concrete, accurate backdrop: render the locale so truthfully that the wrongness of the 'better' people shows against it. Each setting also carries its own local idea of what 'better' means, and its own particular loss — play to that.",
   "forks": [
     {
       "id": "the-source",
@@ -36,23 +36,42 @@
           "detail": "THE REHEARSAL — The town is being replaced, person by person, by something practicing being human. The copies are better because they're trying harder. The originals aren't dead — they're somewhere else, watching their lives improve without them."
         }
       ]
-    }
-  ],
-  "suboptions": [
+    },
     {
-      "label": "The town",
-      "choices": [
+      "id": "where-it-happens",
+      "label": "Where it happens",
+      "chooser": "player",
+      "prompt": "Present these to the player as the campaign's setting. Whatever they pick, saturate every scene with that locale's specific, accurate texture — its food, speech, weather, work, faith, and social grain — and read the 'better versions' horror through that place's own idea of what 'better' means.",
+      "options": [
         {
-          "name": "Millbrook",
-          "description": "Everyone knows everyone. Diner, church, high school football. The \"different\" stands out because you've known these people your whole life."
+          "id": "rhode-island-fishing-town",
+          "name": "A Rhode Island Fishing Town",
+          "description": "A weathered working port on the southern Rhode Island coast — draggers and lobster boats, stone walls and salt marsh, a town that empties when the summer people leave. Everyone's stock goes back generations, and the sea has taken its share.",
+          "detail": "RHODE ISLAND FISHING TOWN — A small, real working port on the South County coast (Point Judith / Galilee register), not a tourist front: commercial draggers and lobstermen, quahogging and stuffies, clam shacks, coffee milk and Del's and 'Gansett, the bubbler, the dropped Rs of swamp-Yankee and Portuguese-Catholic fishing families. Weathered cedar shingle, lobster buoys, fog and nor'easters, the off-season hush after Labor Day. This is dangerous, weather-beaten, superstitious work; the people are stoic, close-mouthed, and wary — the sea takes someone every few years and everyone knows it. Here 'better' looks like the drunk skippers gone sober, the family feuds healed, the reckless shortcuts stopped — and what's lost is the salt and the grit and the hard-won wariness that keeps fishermen alive. A whole coast of contented, untroubled people on water that kills for a living reads deeply, quietly wrong."
         },
         {
-          "name": "Saltwell Cove",
-          "description": "Fishing community, salt air, tight-knit families. Isolation makes the changes harder to report and easier to deny. The sea is always watching."
+          "id": "scottish-village",
+          "name": "A Village in Scotland",
+          "description": "A small village in a remote Highland glen or island coast — stone cottages and slate roofs, the kirk and the one pub, single-track roads and sheep on the hill, peat smoke and horizontal rain. Outsiders stay 'incomers' for thirty years, and the old folk remember things the kirk doesn't preach.",
+          "detail": "SCOTTISH VILLAGE — A remote village, Highland glen or west-coast/Hebridean (Wicker-Man / Summerisle register, played straight): stone cottages, slate and peat smoke, the kirk (stern Presbyterian; Free-Church Sabbath-keeping), the local pub, single-track roads with passing places, sheep and heather moor and midges, the loch, a standing stone or cairn, Gaelic place-names. Close, clannish, thrawn, dryly funny, suspicious of incomers. Under the Presbyterian surface runs deep folk memory — second sight, the good folk / the sìth, 'we don't speak of that.' Here 'better' looks like the village sober and reconciled and full at the kirk on Sunday — and what's lost is the thrawn stubbornness, the black humour, and the old wary folk-knowledge. The strongest local note: the eldest residents have half a memory that this has happened before, and an old word for it they won't say aloud."
         },
         {
-          "name": "Cedar Heights",
-          "description": "Gated community, HOA rules, manicured lawns. The \"different\" looks like people finally following the rules they always resented. Conformity was already the norm — now it's perfect."
+          "id": "san-francisco-tech",
+          "name": "Tech-World San Francisco",
+          "description": "The beating heart of San Francisco's tech culture — SoMa offices and Mission lofts, startups and wellness and optimization, kombucha on tap and microdosing on weekends, everyone hustling to become their best self. Karl the Fog over the Victorians; extreme money a block from the Tenderloin.",
+          "detail": "SAN FRANCISCO (TECH) — The optimization capital itself: SoMa open-plan startups, the gentrifying Mission, shuttle buses down the 101, Sand Hill VCs, hoodies and 'disruption' and LinkedIn-speak, kombucha on tap, Soylent, nootropics, meditation apps, biohacking, Burning Man, quantified-self wellness, Philz and Dolores Park and Karl the Fog over the painted Victorians — and tech wealth a block from the Tenderloin. This setting is the ironic jackpot: a culture that ALREADY worships self-optimization and 'becoming your best self,' so the horror is camouflage — being optimized looks exactly like the dream everyone's already chasing, the shared tic reads as the hot new wellness protocol, and nobody questions it because questioning it is being un-optimized. What's lost is friction, dissent, weirdness, the messy human. (The Therapist source fits like a glove here — a charismatic founder/guru/wellness-startup with methods 'from elsewhere.') Lean into how no alarm ever sounds when the apocalypse is indistinguishable from hitting your goals."
+        },
+        {
+          "id": "disneyland-cast-member",
+          "name": "Disneyland (You Work There)",
+          "description": "You're a cast member at Disneyland — onstage in the park where the rule is relentless magic. Guests, not customers; never break character, never let them see you frown. The smile is the job, eight hours a day, in the heat, for low pay, with a name tag.",
+          "detail": "DISNEYLAND, AS A CAST MEMBER — The player works at Disneyland (Anaheim). Use the real vocabulary and culture: 'cast members' not employees, 'guests' not customers, onstage vs. backstage, the Disney Look grooming standards, name tags, the Four Keys (Safety, Courtesy, Show, Efficiency), 'have a magical day,' point with two fingers never one, never break character, 'good show / bad show,' the scripted spiels, the looping music, the audio-animatronics, Main Street's manufactured nostalgia — and underneath it, the emotional-labor grind: mandated cheerfulness as a literal job requirement, sweltering character costumes, low pay, exhaustion, the real self you only get back backstage when you clock out. This is the other ironic jackpot: here performing relentless happiness IS the job, so the horror — cast members becoming permanently, genuinely the smiling content performer, the mask fused to the face — reads at first as just excellent show. The tell looks like flawless cast discipline. What's lost is the backstage self, the tired real person behind the smile; the dread note is a human edging toward the smooth, looping, untiring register of an animatronic."
+        },
+        {
+          "id": "texas-hill-country",
+          "name": "The Texas Hill Country",
+          "description": "A German-Lutheran town in the Texas Hill Country — limestone and live oak, Fredericksburg/New Braunfels stock, biergartens and dance halls and Sunday services, peach stands and Wurstfest and a near-vanished German dialect the oldest folk still speak. Orderly, devout, hardworking, and proud of it.",
+          "detail": "TEXAS HILL COUNTRY (GERMAN-LUTHERAN) — Gillespie / Comal-County register: Fredericksburg and New Braunfels, German-Texan heritage (the dying Texas-German dialect the eldest still speak), Sunday Houses, the Vereinskirche and the Lutheran (plus some Methodist/Catholic) churches, biergartens and Gruene-style dance halls with polka and two-step, Wurstfest, smoked German-Texan sausage and BBQ, peach orchards and the Highway 290 wineries, limestone and live oak and cedar, Enchanted Rock's pink granite, swimming holes on the Guadalupe and Pedernales, flash floods and brutal summer heat, Gemütlichkeit over a bedrock of order, thrift, faith, and propriety. Here 'better' looks like everyone more industrious, more devout, more orderly, the rough edges sanded smooth and the church pews full — and the unsettling part is precisely that a community already built on order and decorum is being optimized into PERFECT order, the warm Gemütlichkeit curdling into something performed. What's lost is the stubborn German-Texan ornery streak and the genuine, unforced warmth. (The Rehearsal source resonates here — copies 'trying harder' to be proper.)"
         }
       ]
     }

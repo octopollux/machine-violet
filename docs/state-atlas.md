@@ -77,6 +77,7 @@ GameState
 │   ├── name, system, genre, mood, difficulty, premise
 │   ├── campaign_scope?: CampaignScope       const ("one-shot" | "few-sessions" | "grand-campaign" | "open-ended")
 │   ├── setup_handoff?: string               const (postcard from setup agent, injected once into the first-turn priming; persists for resume-from-disk after a mid-first-turn crash)
+│   ├── opening_scene?: string               const (one-sentence opening-scene directive from setup agent — where/how the DM opens turn 1; injected once into first-turn priming alongside setup_handoff; persists for resume only)
 │   ├── dm_personality: DMPersonality       mut   → config.json            DM/OOC (swap_dm_personality) — read live each DM turn
 │   ├── players: PlayerConfig[]              mut   → config.json            DM/OOC (swap_pc) — PC roster handoff
 │   ├── combat: CombatConfig

@@ -1197,8 +1197,14 @@ export class SessionManager {
     // stream live to the client as activity:update events during this call.
     //
     // Priming message layout:
-    //   1. Bracketed stage direction: "[Session begins. Set the scene. <premise>. <PC>.]"
-    //      This is the cue the DM is trained to react to.
+    //   1. Bracketed stage direction: "[Session begins. Set the scene. <premise>.
+    //      <PC>. <opening scene>.]" — the cue the DM is trained to react to. When
+    //      the setup agent declared an opening scene, its sentence is dropped into
+    //      the bracket verbatim: where/how to open turn 1, a character-grounded
+    //      beat so the DM doesn't default to dropping the player onto the main
+    //      objective. No instruction wraps it — the setup agent's sentence IS the
+    //      directive, and the DM needs no extra static prompting on the matter.
+    //      One-shot read; persists in config.json for resume only.
     //   2. If the setup agent wrote a handoff note, a blank line + the note verbatim.
     //      The note carries the player's own words and any setup-agent notes that
     //      don't survive into structured config. It's a one-shot read; after the
@@ -1213,6 +1219,13 @@ export class SessionManager {
     if (config.premise) openingParts.push(`Campaign premise: ${config.premise}`);
     const pc = config.players[0];
     if (pc) openingParts.push(`The player character is ${pc.character}.`);
+    // The setup agent's opening-scene sentence is already phrased as a direct
+    // instruction ("Open with …" / "Begin mid-flight …"); drop it into the
+    // stage direction verbatim. No surrounding framing — the sentence is the
+    // whole of the directive.
+    if (config.opening_scene && config.opening_scene.trim()) {
+      openingParts.push(config.opening_scene.trim());
+    }
     let priming = openingParts.join(" ") + "]";
     if (config.setup_handoff && config.setup_handoff.trim()) {
       priming += "\n\nSetup agent's handoff note:\n" + config.setup_handoff.trim();

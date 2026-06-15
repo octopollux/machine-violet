@@ -143,6 +143,8 @@ Everything else is created during play.
   },
   "campaign_scope": "few-sessions",       // Optional. "one-shot" | "few-sessions" | "grand-campaign" | "open-ended". Shapes DM pacing.
   "setup_handoff": "Player wants to...",  // Optional. Postcard from the setup agent for the DM's first-turn priming. Injected once.
+  "opening_scene": "Open with the PC...",  // Optional. One-sentence opening-scene directive the setup agent composes at finalize — where/how the DM opens turn 1
+                                          // (a character-grounded beat, not the main objective). Injected once into first-turn priming alongside setup_handoff.
 
   // DM personality
   "dm_personality": {
@@ -929,6 +931,8 @@ The setup agent receives world summaries (name, summary, genres, slug) in its sy
 
 The setup agent only ever sees this **thin slice** — the forks (labels/options/ids) and the suggested `system`/`mood`/`difficulty`/`campaign_scope`. It does **not** receive the DM-only premise prose: `campaign_detail` is assembled in code at finalize from the seed's base + the selected branches (§10.6). A world's rich inline content (`entities`, `maps`, `rules`, `calendar`) is likewise never loaded into the agent's context; it is materialized in code at build time (§10.5).
 
+At finalize the setup agent also composes a one-sentence **opening-scene directive** (`finalize_setup.opening_scene` → `config.opening_scene`) telling the DM where/how to open turn 1. This is deliberately the setup agent's job, not the DM's: the DM's "you are a DM" framing biases it toward dropping the player straight onto the main objective, whereas a good campaign usually opens on a character-grounded beat. A seed can nudge the chosen opening by putting a "begins in…" hint in `setup_detail` (the setup-agent-only channel, §10.7); the agent honors it if present, or **suppress the declaration entirely** with `<!--include:OpeningScene.DMHandled-->` in `setup_detail` (the agent then passes an empty `opening_scene` and the DM opens from the campaign's own brief — used by seeds like `cold-open` whose `detail` already scripts turn 1). The directive is injected once into the DM's first-turn priming ([game-initialization.md](game-initialization.md#step-4-handoff-to-the-dm)) and never reaches the cached DM prefix.
+
 ### 10.5 Importing rich worlds (materialization)
 
 When a campaign is built from a world that carries inline content, `buildCampaignWorld` → `materializeWorldContent` ([`packages/engine/src/agents/world-builder.ts`](../packages/engine/src/agents/world-builder.ts)) re-loads the world by slug (`SetupResult.worldSlug`, set only when the setup agent passed an explicit `world_slug` to `finalize_setup`) and writes its content directly to disk:
@@ -980,7 +984,7 @@ Seed content reaches three different audiences, and a field belongs to exactly o
 | **Setup agent** | `forks` (labels/options), config hints, and **`setup_detail`** | `load_world` → `renderWorldForAgent` (includes expanded here) | setup agent only |
 | **Player** | player-fork option `name`/`description`, `suboptions` | the setup agent presents them via `present_choices` | player |
 
-`setup_detail` is the **setup-agent-only** channel. The setup agent acts on it (e.g. presents a scope/pacing variant) but it is **never assembled into `campaign_detail`** — the exclusion is by omission (`assembleCampaignDetail` only reads `detail` + selected option `detail`), so it is structurally impossible for it to reach the DM. This is the home for content that is neither DM-facing nor directly player-facing: scope/rhythm presentation (e.g. `<!--include:Pacing.EndlessCampaigns-->`), chargen hints, alternate hooks the agent should weigh. **Setup-only includes (notably the `Pacing.*` scope blocks) belong here, not in `detail`** — in `detail` they would expand into the DM's context and make it re-ask the scope question on turn 1.
+`setup_detail` is the **setup-agent-only** channel. The setup agent acts on it (e.g. presents a scope/pacing variant) but it is **never assembled into `campaign_detail`** — the exclusion is by omission (`assembleCampaignDetail` only reads `detail` + selected option `detail`), so it is structurally impossible for it to reach the DM. This is the home for content that is neither DM-facing nor directly player-facing: scope/rhythm presentation (e.g. `<!--include:Pacing.EndlessCampaigns-->`), the opening-scene opt-out (`<!--include:OpeningScene.DMHandled-->` — the agent declares no opening and the DM opens instead), chargen hints, alternate hooks the agent should weigh. **Setup-only includes (notably the `Pacing.*` scope blocks) belong here, not in `detail`** — in `detail` they would expand into the DM's context and make it re-ask the scope question on turn 1.
 
 ---
 

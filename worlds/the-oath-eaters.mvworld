@@ -6,31 +6,64 @@
   "genres": [
     "fantasy"
   ],
-  "detail": "An oath, in this world, is a thing. Sworn properly it has weight, color, a faint smell when struck. Marriages bind. Fealties hold. A debt is a visible filament between two people that other people can step around. Lately the filaments have been thinning. Marriages have been forgetting themselves. Knights have wandered out of liege-halls with empty expressions. The merchants are worst hit; the guilds are dissolving like sugar in rain.\n\nDM approach:\n- Tone: brittle, ceremonial, full of small protocol failures. Doors that should open by rite do not. Names that should be remembered are not.\n- NPCs by variant: a temple-keeper who knows what was released and won't say (1); a lay scholar who has begun cataloging the symptoms by oath-type, ignored by her superiors (2); a recent convert to the new god who is calm and articulate and frightening in their certainty (3).\n- Seed early: a small unbreakable oath visibly fraying; a courier who arrives but cannot recall what they came to deliver; a wedding ring slipping off in a marketplace.\n- Pacing structure: the DM picks 3-5 oaths in the world the player cares about — a marriage, a fealty, a debt, a treaty, a personal vow — and unravels them on a clock the player can hear ticking.\n- The horror is that the eater is not personal. It is appetite. It does not know who it is hurting.\n\nPacing: The DM tracks 3-5 active world oaths and unravels them as ticking clocks. The player can hear which is next by watching what the world stops respecting. When the queen's fealty starts to slip, the guard begins drifting in the throne room. When a marriage starts to go, the spouse begins forgetting names.",
+  "setup_detail": "Opening scene: begin somewhere quiet and ordinary, at least one scene before the plot arrives. Open on a settled, unremarkable beat of the player's life inside their oath and their court — a morning, a small rite performed correctly, a promise kept without thinking — with the world's bindings still holding and oaths still carrying their weight, their color, their faint struck-smell. Do NOT open on the fraying. Let the first tremor — the player's own chosen oath beginning to slacken, or a small unbreakable oath visibly thinning nearby — arrive a scene or more later, so the wrongness has an ordinary world to spoil. Do not reveal or foreshadow what is eating the oaths.",
+  "detail": "An oath, in this world, is a thing. Sworn properly it has weight, color, a faint smell when struck. Marriages bind. Fealties hold. A debt is a visible filament between two people that other people can step around. Lately the filaments have been thinning. Marriages have been forgetting themselves. Knights have wandered out of liege-halls with empty expressions. The merchants are worst hit; the guilds are dissolving like sugar in rain.\n\nDM approach:\n- Tone: brittle, ceremonial, full of small protocol failures. Doors that should open by rite do not. Names that should be remembered are not.\n- NPCs by variant: a temple-keeper who knows what was released and won't say (1); a lay scholar who has begun cataloging the symptoms by oath-type, ignored by her superiors (2); a recent convert to the new god who is calm and articulate and frightening in their certainty (3).\n- Seed early: a small unbreakable oath visibly fraying; a courier who arrives but cannot recall what they came to deliver; a wedding ring slipping off in a marketplace.\n- Pacing structure: the DM picks 3-5 oaths in the world the player cares about — a marriage, a fealty, a debt, a treaty, a personal vow — and unravels them on a clock the player can hear ticking.\n- Locations: the chosen eater (crucial question) and the chosen court each carry a skeleton of named places, flavored to them — bones to open, inhabit, and grow as the player moves. Reuse or merge places across the two sets where they plainly overlap (an archive is an archive, a temple a temple); invent more freely.\n- The horror is that the eater is not personal. It is appetite. It does not know who it is hurting.\n\nPacing: The DM tracks 3-5 active world oaths and unravels them as ticking clocks. The player can hear which is next by watching what the world stops respecting. When the queen's fealty starts to slip, the guard begins drifting in the throne room. When a marriage starts to go, the spouse begins forgetting names.",
   "forks": [
     {
       "id": "the-eater",
       "label": "The crucial question",
       "chooser": "agent",
-      "prompt": "Roll or choose. Do NOT reveal early — this is the campaign's hidden truth about what is devouring the oaths.",
+      "prompt": "Roll or choose. Do NOT reveal early — this is the campaign's hidden truth about what is devouring the oaths. Each option's detail carries 10 locations flavored to that eater: a skeleton of named places to open and grow, reusing/merging with the chosen court's own where they overlap.",
       "options": [
         {
           "id": "the-ancient-one",
           "name": "The Ancient One",
           "description": "A single bound being, released by mistake, methodically un-doing every promise ever made.",
-          "detail": "THE ANCIENT ONE — A single being, bound for an age beneath a temple or stone or sea, released by a mistake or a betrayal or a miscalculated rite, is methodically un-doing every promise ever made. It is hungry and patient and has a queue. The oldest oaths go last because they are the richest. There are clerics who know what it is and who released it. Those clerics are also hiding."
+          "detail": "THE ANCIENT ONE — A single being, bound for an age beneath a temple or stone or sea, released by a mistake or a betrayal or a miscalculated rite, is methodically un-doing every promise ever made. It is hungry and patient and has a queue. The oldest oaths go last because they are the richest. There are clerics who know what it is and who released it. Those clerics are also hiding.\n\nLocations (10, flavored to this eater — bones to open and grow; reuse/merge with the chosen court's places where they overlap):\n- The Underseal — the chamber where it was bound for an age, now broken open and empty; the source of everything.\n- The Reliquary of First Oaths — where the oldest, richest oaths are kept; the eater's last course, so the safest ground left, and the thing to defend.\n- The Cartulary — the realm's great archive of recorded oaths, where the eater's queue can be read: what it has taken, and what is next.\n- The Cleric's Bolthole — a deconsecrated cell where the ones who released it are hiding, sick with what they did.\n- The Hall of Broken Seals — a once-sacred hall where the dissolution is visibly advancing, seals going dark in order, oldest last.\n- The Elder Binding-Site — one of the old places a previous age bound such things; the method of re-binding is written in its stones.\n- The Mourning-House — where people whose oaths were eaten gather, hollowed, unable to name what they have lost.\n- The Processional — the route the eater follows along the thickest oath-filaments; you can map where it will be next.\n- The Last Rite-Keeper's Deathbed — the only one alive who remembers the full binding-rite, and is dying with it.\n- The Deeper Vault — where a second such thing may still lie bound: the stakes, and the price of getting the rite wrong."
         },
         {
           "id": "the-swarm",
           "name": "The Swarm",
           "description": "Many specialized parasites, each eating a different oath-type, with different tells.",
-          "detail": "THE SWARM — Not one eater but many. Small parasites, each specialized — one for marriage-vows, one for liege-bonds, one for blood-debts. They have different tells. A marriage going first leaves a sweet smell. A fealty leaves a copper taste. The oldest priests have noticed the symptoms differ by oath-type and are trying to convince the court that this is more than coincidence."
+          "detail": "THE SWARM — Not one eater but many. Small parasites, each specialized — one for marriage-vows, one for liege-bonds, one for blood-debts. They have different tells. A marriage going first leaves a sweet smell. A fealty leaves a copper taste. The oldest priests have noticed the symptoms differ by oath-type and are trying to convince the court that this is more than coincidence.\n\nLocations (10, flavored to this eater — bones to open and grow; reuse/merge with the chosen court's places where they overlap):\n- The Scholar's Study — the lay scholar's cluttered room, walls papered with the symptom-catalog by oath-type; the war room.\n- The Wedding-Hall — a marriage-registry where the marriage-parasite works; the air goes sweet as the vows go.\n- The Liege-Hall — where the fealty-parasite feeds; a copper taste, oaths of service slackening.\n- The Counting-House — debt-court and ledgers, where the blood-debt parasite thins the filaments of what is owed.\n- The Sealed District — the first quarter the authorities tried to quarantine; holding, or already failed.\n- The Convocation Floor — where the oldest priests argue the symptoms before a skeptical court.\n- The Nest — a place oaths are densest (a guildhall, a courthouse) where the parasites concentrate and breed.\n- The Warding-House — an apothecary of wards and repellents, each tuned to a different oath-type.\n- The Rot-Quarter — the pauper's district where untended broken oaths lie rotting, the parasites' feeding-ground.\n- The Specimen-Room — where a scholar has caught and pinned live specimens to study their tells."
         },
         {
           "id": "the-new-god",
           "name": "The New God",
           "description": "A young god of broken trust, gathering worshippers — every broken oath is a sermon.",
-          "detail": "THE NEW GOD — A god of broken trust has been born of the present age, and is gathering worshippers by the only method that works for it: demonstration. Every broken oath is a sermon. The cult is small and the god is small but the god is growing exactly as fast as the breaking is, and the breaking is fast."
+          "detail": "THE NEW GOD — A god of broken trust has been born of the present age, and is gathering worshippers by the only method that works for it: demonstration. Every broken oath is a sermon. The cult is small and the god is small but the god is growing exactly as fast as the breaking is, and the breaking is fast.\n\nLocations (10, flavored to this eater — bones to open and grow; reuse/merge with the chosen court's places where they overlap):\n- The New Shrine — the cult's small, growing gathering-place, swept and bright and certain.\n- The Sermon-Site — where a famous public oath-break became the god's first 'miracle'; pilgrims come now.\n- The Emptying Temple — an old faith's house, losing congregants to the new god by the week.\n- The Convert's House — the home of someone calm, articulate, and frightening in their new certainty.\n- The Market-Pulpit — the square where the cult preaches by demonstration, breaking oaths in public as worship.\n- The Refuge of the Betrayed — where the cheated and abandoned gather; the new god's natural flock.\n- The Theology-Library — where a scholar (or the player) researches what could unmake a god still young.\n- The Rival Sanctuary — an established faith's stronghold; a possible ally against the newcomer.\n- The Birth-Site — the great betrayal where the god was born of broken trust.\n- The First Temple — the building the cult is making over into the god's seat as it grows."
+        }
+      ]
+    },
+    {
+      "id": "the-court",
+      "label": "The court",
+      "chooser": "player",
+      "prompt": "Present to the player as the realm they hold a place in — they choose on its character. Each option's detail carries that court's location skeleton (5 named places, aligned to the setting), as bones for you to furnish and grow alongside the chosen eater's locations.",
+      "options": [
+        {
+          "id": "the-spine-of-peace",
+          "name": "The Spine of Peace",
+          "description": "A high feudal court where the king's daughter is married to your enemy. The realm is held together by an oath that everyone in the room understands and few discuss aloud. The princess's marriage is the spine of the peace. That oath is going first. The court is beginning to look at each other differently. The chancellor has not slept in three days and the household guards are quietly being doubled.",
+          "detail": "THE SPINE OF PEACE (5 locations — bones to furnish): The Throne Room, where the fealty is fraying and the household guard drifts at the edges; the Marriage-Apartments of the princess and the enemy-prince, where the spine-oath is going first; the Chancellor's Cabinet, the sleepless man holding the realm together with paper and will; the Doubled Barracks, where the guard is quietly being reinforced and whose loyalty still holds is the open question; the Hostage Wing, the enemy-prince's quarters, where the peace lives or dies as a marriage does."
+        },
+        {
+          "id": "the-sediment-city",
+          "name": "The Sediment City",
+          "description": "A merchant city of guild-contracts. The city runs on signed contracts and apprentice-oaths, layered like sediment. The guilds are dissolving. The streets are renegotiating who owns what daily, and at the corner of two old guild-districts there have been shoving matches that did not happen a week ago. The clerks are quitting in shifts.",
+          "detail": "THE SEDIMENT CITY (5 locations — bones to furnish): The Guildhall Archive, the contracts layered like sediment, dissolving from the top down; the Exchange, the market floor where ownership is renegotiated, loudly, every single day; Notary Row, the clerks' offices emptying in shifts as the work stops meaning anything; the Contested Corner, the seam of two old guild-districts where the shoving matches have started; the Warehouse Quays, goods whose contracts are unraveling and whose ownership is suddenly up for grabs."
+        },
+        {
+          "id": "the-blood-confederation",
+          "name": "The Blood Confederation",
+          "description": "A nomad confederation held together by blood-oaths. The confederation is a generation old and the binding was always thin. The camps are scattering. Old hatreds are returning — the ones the oath was sworn to bury — and the elders who sealed the original cuts are trying to call council and finding that fewer riders come each time.",
+          "detail": "THE BLOOD CONFEDERATION (5 locations — bones to furnish): The Council-Ground, where the elders call the riders and fewer come each time; the Scattering Camps, the tents pulling apart along old lines as the binding thins; the Elders' Tent, keepers of the original cuts, trying to re-seal a generation-old peace; the Feud-Stones, the site of an old killing the blood-oath had buried, now returning; the Contested Wells, the grazing and water the confederation shared, argued over again."
+        },
+        {
+          "id": "the-order-of-the-bound-hand",
+          "name": "The Order of the Bound Hand",
+          "description": "A monastic order whose vows are physical bonds. The monks are wandering out of their cells. The vow-marks on their hands are fading. The abbot does not remember why he became abbot. The library is unattended for the first time in a hundred years and the gates are open to anyone who walks up. The kitchens are running, just, because someone is still cooking and nobody knows who.",
+          "detail": "THE ORDER OF THE BOUND HAND (5 locations — bones to furnish): The Cloister Cells, emptying as monks wander out with the vow-marks fading from their hands; the Vow-Hall, where the bonds are made on the hand and the marks no longer take; the Abbot's Chambers, where a man sits forgetting why he ever became abbot; the Open Library, unattended for the first time in a century, its gates wide to anyone; the Kitchens, still running — just — because someone is still cooking and nobody knows who."
         }
       ]
     }
@@ -54,27 +87,6 @@
         {
           "name": "The Unremembered Debt",
           "description": "The creditor doesn't remember anymore. You owe them — a sum, a service, a life — and they have stopped sending the polite reminders. They greet you now without recognition. Nobody else knows about it. You are alone with the knowledge of the debt, and the moral problem of what you are now obligated to do."
-        }
-      ]
-    },
-    {
-      "label": "The court",
-      "choices": [
-        {
-          "name": "The Spine of Peace",
-          "description": "A high feudal court where the king's daughter is married to your enemy. The realm is held together by an oath that everyone in the room understands and few discuss aloud. The princess's marriage is the spine of the peace. That oath is going first. The court is beginning to look at each other differently. The chancellor has not slept in three days and the household guards are quietly being doubled."
-        },
-        {
-          "name": "The Sediment City",
-          "description": "A merchant city of guild-contracts. The city runs on signed contracts and apprentice-oaths, layered like sediment. The guilds are dissolving. The streets are renegotiating who owns what daily, and at the corner of two old guild-districts there have been shoving matches that did not happen a week ago. The clerks are quitting in shifts."
-        },
-        {
-          "name": "The Blood Confederation",
-          "description": "A nomad confederation held together by blood-oaths. The confederation is a generation old and the binding was always thin. The camps are scattering. Old hatreds are returning — the ones the oath was sworn to bury — and the elders who sealed the original cuts are trying to call council and finding that fewer riders come each time."
-        },
-        {
-          "name": "The Order of the Bound Hand",
-          "description": "A monastic order whose vows are physical bonds. The monks are wandering out of their cells. The vow-marks on their hands are fading. The abbot does not remember why he became abbot. The library is unattended for the first time in a hundred years and the gates are open to anyone who walks up. The kitchens are running, just, because someone is still cooking and nobody knows who."
         }
       ]
     }

@@ -133,11 +133,13 @@ const FINALIZE_TOOL: NormalizedTool = {
         nullable: true,
       },
       handoff_note: { type: "string", description: "Handoff postcard for the DM's first turn. Free-form prose — the DM sees this once as priming for the opening scene. Include: what the player said about their character IN THEIR OWN WORDS (quote or paraphrase closely, don't sanitize), any freeform remarks they made about the world / tone / things they want or don't want, and anything you (the setup agent) want to pass along to the DM — hooks you promised, tone cues the structured fields don't capture, unresolved ambiguities. Write it as a direct note to the DM, not as narration. A paragraph or two is usually right. Always include this field." },
+      opening_scene: { type: "string", description: "ONE sentence telling the DM where and how to OPEN the very first turn — the concrete situation the player character is in when the curtain rises. Bias hard toward a character-grounded entry beat (waking somewhere, a quiet moment, mid-journey, a conversation, an ordinary task) rather than dropping the player straight onto the campaign's main objective or a crisis — a story should start with the PC, then let plot ensue. Ground it in this specific PC and premise; if the seed's setup-only guidance suggests an opening, honor it. Written as a direct instruction to the DM, not as narration (e.g. \"Open with the PC asleep in a warm bed, woken by frantic hammering at the door\" or \"Begin mid-flight on the back of their pet dragon, the city shrinking below\"). Always include this field." },
     },
     required: [
       "genre", "campaign_name", "campaign_premise", "mood",
       "difficulty", "dm_personality", "player_name",
       "character_name", "character_description", "handoff_note",
+      "opening_scene",
     ],
   },
 };
@@ -888,6 +890,8 @@ export function createSetupConversation(
         : undefined,
       handoffNote: (typeof input.handoff_note === "string" && input.handoff_note.trim())
         ? input.handoff_note.trim() : undefined,
+      openingScene: (typeof input.opening_scene === "string" && input.opening_scene.trim())
+        ? input.opening_scene.trim() : undefined,
       worldSlug: worldSlug || undefined,
       forkSelections,
     };
