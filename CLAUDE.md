@@ -12,7 +12,7 @@ npm run dev             # launch two-tier (needs ANTHROPIC_API_KEY in .env)
 
 All documentation lives in `docs/`. Start at `docs/index.md` for navigation, `docs/overview.md` for the spec index.
 
-**Authoring or reviewing campaign seeds** (`worlds/*.mvworld`) — the design bars (place + call-to-action, location skeletons, mystery-box, clean-room/no-imitation, …), the review checklist, and the repeatable catalog-review loop — live in `docs/seed-authoring.md`. (The `.mvworld` *schema* is `docs/format-spec.md §10`; turning a *played campaign* into a seed is the `build-mvworld` skill.)
+**Authoring or reviewing campaign seeds** (`worlds/*.mvworld`) — the design bars (place + call-to-action, location skeletons, mystery-box, originality/no-imitation, …), the review checklist, and the repeatable catalog-review loop — live in `docs/seed-authoring.md`. (The `.mvworld` *schema* is `docs/format-spec.md §10`; turning a *played campaign* into a seed is the `build-mvworld` skill.)
 
 **Code and docs stay in sync.** Changes to game behavior, APIs, or on-disk formats require corresponding doc updates in the same commit. See `docs/maintenance.md` for what to update when. API schemas (`packages/shared/src/protocol/rest.ts`, `events.ts`) stay in sync with routes and `docs/websocket-api.md`.
 

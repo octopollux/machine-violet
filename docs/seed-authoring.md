@@ -99,15 +99,21 @@ discovers their situation in play, and that discovery + agency belong to the
 player. Don't write "you have always feared the lighthouse" — write what the
 lighthouse *is*.
 
-### Clean-room — no artist or IP imitation
-MV is by design **not** an art-replacement engine. Never bake "in the style of
-[a real artist]" into shipped content, and file the serial numbers off premises
-that collide with a specific living (or recently-dead) creator's published work —
-this is a Golden Rule, not merely a legal one. A named work is fine as private
-user↔Claude shorthand, but **clean-room it into descriptive genre/mood before it
-reaches the repo** (e.g. "1970s occult noir, rain-soaked city" — not the film).
-When a built seed turns out to be an unmistakable homage, rename it to scrub the
-title from the repo, then disable it pending a real clean-room rebuild.
+### Originality — no artist or IP imitation
+MV's seeds are **original work**, and we extend other creators the courtesy we'd
+want for ourselves: we don't take their material — not because we might get caught,
+but because it isn't ours to take and MV is its own art. So never bake "in the
+style of [a real artist]" into shipped content, and don't ship a premise that is
+really a specific living (or recently-dead) creator's published work, however it's
+dressed up. This is a Golden Rule — be decent, make our own thing — **not** a legal
+hedge; the aim is never to borrow-without-getting-caught, it's to build something
+genuinely ours. A named work is fine as private user↔Claude shorthand to get on the
+same page; the job is then to **make something genuinely your own** — your own
+world, described by its genre and mood — before it reaches the repo (e.g. "1970s
+occult noir in a rain-soaked city", arrived at on its own terms — not a retread of
+any one film). If a built seed turns out to be an unmistakable homage, rename it so
+MV isn't shipping someone else's title and disable it until it can be rebuilt as
+something original.
 
 ### Player-identity forks are optional
 Players can always state their own character concept at chargen, so a seed does
@@ -196,10 +202,10 @@ Three points, increasing DM control of turn 1:
 ### NPC includes (DM-facing, place at the END of `detail`)
 [`packages/engine/src/prompts/include/NPC.md`](../packages/engine/src/prompts/include/NPC.md): `NPC` (default), `Atmospheric`, `Introverted`, `AsParty` — referenced as e.g. `<!--include:NPC.Introverted-->`. Use to tune how much the world's cast crowds the player.
 
-### Disable / delete / clean-room rename
+### Disable / delete / rename-an-homage
 - **Disable** (drop from enumeration, keep the file & concept): `git mv foo.mvworld foo.mvworld.disabled`. Use for rebuild candidates and set-asides. Fork-test counts change — expect that.
 - **Delete** (truly redundant; fold the best bits into a neighbor first): `git rm`.
-- **Clean-room rename-then-disable** (scrub an IP title from the repo even while parked): edit the `name` field, then `git mv` to a new `<clean-slug>.mvworld.disabled`.
+- **Rename-then-disable** (when a parked seed is too close to someone else's work — so MV isn't shipping their title even while it sits disabled): edit the `name` field, then `git mv` to a new `<original-slug>.mvworld.disabled`; rebuild it as original work later.
 
 ### Validate an edit
 ```bash
