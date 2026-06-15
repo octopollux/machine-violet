@@ -30,6 +30,14 @@ When composing prompts for `generate_image`, render the image in this visual sty
 %% Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Engraving is the hard case: dense burin line is the medium's DEFAULT, so merely asking for "less detail" fails — gpt-image-2 will hatch every surface (the textbook tic). The load-bearing fix is STRUCTURAL: it is a *vignette* that fades into blank paper, at least half the sheet stays bare, and the sky is unprinted paper, not stippled tone. Those clauses are what give the model a reason to stop. Don't trim them or let the image fill the rectangle edge-to-edge.
 </IntaglioVignette>
 
+<Risograph>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Printed as a two-color risograph zine print on coarse off-white recycled paper: only two spot inks — one warm fluorescent pink-orange and one cool deep blue — overprinting to a third tone where they overlap, and no other colors. Strict process discipline: separate the whole image into just those two flat ink layers, and render every tone and shadow as a FINE, precise, regular halftone dot screen — a tight, even dot grid at a consistent screen angle, fine enough to read as smooth tone from a distance but clearly dotted up close. Build forms from flat spot-color shapes filled with these fine halftone screens, never smooth digital gradients. Offset the two ink layers by a few millimeters for a crisp visible misregistration, with grainy uneven ink coverage, speckle, roller streaks, and the soft imperfect saturation of soy ink. Close with a caption in a bold, chunky display typeface printed in one of the two inks, integrated like zine cover type.`
+
+%% Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Risograph is a maximalist medium (gig posters ARE busy), so the goal is not an empty frame — it is to convert density into legitimate print texture. The load-bearing clause is the FINE, precise, regular halftone dot screen: it gives gpt-image-2 exacting work and unifies every surface into one coherent screen instead of the reflexive bored-model tic. Do NOT "fix" this style by adding negative-space directives ("leave empty", "resist filling") — negating a tic doesn't work; the demanding fine screen is what does. Keep the two-ink limit, the fine screen, and the misregistration.
+</Risograph>
+
 <!--
   Named variants go here as additional top-level sections, e.g.
 
