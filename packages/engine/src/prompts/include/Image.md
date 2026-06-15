@@ -95,4 +95,18 @@ When composing prompts for `generate_image`, render the image in this visual sty
   ALL variants must be human-eyeballed against gpt-image-2 before landing —
   the model is temperamental and defaults look terrible. Don't add a variant
   without a sample image to back it up.
+
+  TRIED AND REJECTED (don't re-attempt without a new angle):
+  - Old Master oil painting (Baroque/tenebrist). Too IN-DISTRIBUTION: the model
+    has seen so many that it coasts on its default render and the tic stays put.
+    Tenebrism gave dark masses but the lit landscape was still crammed; heavy
+    impasto + a hand-carved frame helped (density -> paint texture) but never
+    cleared the bar. The lesson: anti-tic levers work best on SPECIFIC,
+    out-of-distribution processes the model can't autopilot (riso fine halftone,
+    masked airbrush, intaglio vignette, gilded vellum, fresco) — not on prestige-
+    realism styles it renders by reflex.
+  - Annotated technical cutaway (leader-line callouts, title block). Gorgeous and
+    the caption mechanic was perfect, but it's a DIAGRAM, not a campaign art
+    direction anyone would actually want. (Its niche is covered by DarkAirbrush /
+    SilverAgeAirbrush.)
 -->
