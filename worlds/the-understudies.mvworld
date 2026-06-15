@@ -9,6 +9,7 @@
     "horror",
     "meta"
   ],
+  "setup_detail": "<!--include:Pacing.ShortCampaigns-->\n\nOpening scene: open in the immediate aftermath — the main characters are already dead, and the player is thrust into their role at once, no training montage, no warm-up. Establish the wrongness of being expected to fill shoes that don't fit (the dead heroes' gear and unfinished business lying around; at least one NPC who loved one of them and is visibly unimpressed by the replacement) and the fact that the threat which killed them is still out there. Play the chaos and improvisation of being underqualified and suddenly on the spot. Do NOT reveal the twist (the agent's fork) — let it surface in play.",
   "detail": "Tone: This is a comedy, but the threat is real. The main characters are genuinely dead. The danger that killed them is genuinely dangerous. The comedy comes from underqualified people rising (or failing to rise) to the occasion — not from the stakes being fake. The funniest version of this campaign is the one where the B-team wins by being resourceful, stubborn, and too dumb to know they should be scared.\n\nThe dead main characters:\n- They should feel like real people who mattered. Don't mock them. The comedy isn't that they were silly — it's that they were competent, and now the incompetent people have to fill their shoes.\n- Their gear, their plans, their unfinished business are all still here. The player inherits fragments: a half-decoded star chart, a script with notes in the margins, a journal that stops mid-sentence. Figuring out what the main characters were doing is part of the campaign.\n- At least one NPC loved one of the main characters and is deeply unimpressed by the replacement.\n\nThe player's arc: Start incompetent. Not useless — they have skills, just the wrong ones for this job. A cargo handler who knows every corridor of the ship. An extra who understands the rhythm of the show better than any writer. A village apothecary who knows poisons, not monsters. Let them MacGyver their way through with lateral thinking. By the end, they should have earned the role — not by becoming the main characters, but by proving the B-team was always the real story.\n\nPacing: Start in the aftermath — the main characters are already dead when the campaign opens. The player is thrust into the role immediately, no training montage. The first act is chaos and improvisation. The second act is finding their footing and uncovering what the main characters knew. The third act is the confrontation the main characters were preparing for, fought on the B-team's terms.",
   "forks": [
     {
@@ -36,23 +37,30 @@
           "detail": "There is ANOTHER backup cast, and they showed up at the same time you did. They're slightly more qualified, slightly better-looking, and they think they're the protagonists now. You disagree. The original threat is still out there, but first you have to prove you're the real replacement heroes. This is petty and urgent and neither side will back down."
         }
       ]
-    }
-  ],
-  "suboptions": [
+    },
     {
+      "id": "the-story",
       "label": "The story you've inherited",
-      "choices": [
+      "chooser": "player",
+      "prompt": "The player picks the story they've inherited — it sets the genre and the stage. Each option's detail is its location skeleton: the dead heroes' world, with their gear and quarters and unfinished business strewn through it and the threat still out there. Bones for you to furnish and grow.",
+      "options": [
         {
+          "id": "b-shift",
           "name": "The B-Shift",
-          "description": "Space opera. The bridge crew of a flagship is dead. All of them — captain, first officer, science lead, the one who was definitely going to betray everyone in episode 7. You're the B-shift. The ensigns, the cargo handlers, the person who fixes the coffee machine. The galaxy-ending threat is still out there and it does not care about your qualifications."
+          "description": "Space opera. The bridge crew of a flagship is dead. All of them — captain, first officer, science lead, the one who was definitely going to betray everyone in episode 7. You're the B-shift. The ensigns, the cargo handlers, the person who fixes the coffee machine. The galaxy-ending threat is still out there and it does not care about your qualifications.",
+          "detail": "THE B-SHIFT (location skeleton — the flagship; grow more as the player moves): the bridge, the dead command crew's stations and the captain's chair nobody will sit in; the cargo decks the B-shift actually knows cold; engineering and the reactor; the dead officers' quarters, where the gear and the half-decoded star chart and the journal-that-stops-mid-sentence are; the science lab and whatever the science lead was chasing; the mess hall where the crew grieves and argues; the medbay and the bodies; the hangar and shuttle bay (escape, or the way out to the threat); the comms and sensor array still pinging the thing out there; the maintenance crawlways — the B-shift's secret edge, they know every corridor; the three airlocks; and the threat's foothold, where it got in or is getting in."
         },
         {
+          "id": "laugh-track",
           "name": "The Laugh Track",
-          "description": "Sitcom — a literal three-camera television show. The laugh track is real. The set walls wobble if you lean on them. The main cast — the wacky neighbor, the will-they-won't-they couple, the sarcastic best friend — are dead. The network needs a new cast by Monday or the show gets cancelled. You're the extras who just got promoted. The audience can see you. You can hear them."
+          "description": "Sitcom — a literal three-camera television show. The laugh track is real. The set walls wobble if you lean on them. The main cast — the wacky neighbor, the will-they-won't-they couple, the sarcastic best friend — are dead. The network needs a new cast by Monday or the show gets cancelled. You're the extras who just got promoted. The audience can see you. You can hear them.",
+          "detail": "THE LAUGH TRACK (location skeleton — the soundstage; grow more as the player moves): the standing set (the apartment, the bar, wherever the show happens — walls that wobble if you lean); backstage and the wings, the unreal space behind the set; the writers' room, with the script and the margin notes and what was planned for the season; the control booth, where the laugh track lives and a director's god-voice might; the green room and the dead cast's dressing rooms, their things and their unfinished arcs; the audience seating (they can see you; you can hear them); the prop and wardrobe department, where everything you might need waits, theatrically; craft services, where the extras gossip; the soundstage door marked EXIT (does 'outside' even exist?); the network office, the suits who need a new cast by Monday; and the parking lot, the liminal almost-real edge of the world."
         },
         {
+          "id": "villages-refund",
           "name": "The Village's Refund",
-          "description": "Gothic horror. The monster hunters are dead. The Van Helsing, the psychic, the one with the family curse and the silver bullets — all gone, taken by the thing in the manor on the hill. The village hired them. The village paid in advance. The village would like a refund or a replacement. You are the replacement. You are not qualified."
+          "description": "Gothic horror. The monster hunters are dead. The Van Helsing, the psychic, the one with the family curse and the silver bullets — all gone, taken by the thing in the manor on the hill. The village hired them. The village paid in advance. The village would like a refund or a replacement. You are the replacement. You are not qualified.",
+          "detail": "THE VILLAGE'S REFUND (location skeleton — the village and the manor; grow more as the player moves): the village square and the inn, where the village hired the now-dead hunters and where they would very much like their refund; the church, its sanctuary and consecrated ground and wary priest; the dead hunters' lodgings, with the silver bullets, the cursed one's journal, the psychic's notes; the road up to the manor on the hill; the manor foyer and great hall; the manor library, where the hunters were researching the thing's weakness; the crypt and cellar, where it lairs; the woods between village and manor; the graveyard with its fresh graves (the hunters', soon); the apothecary or wise-woman, the village's own folk-defenses; and the locked wing of the manor, the heart of it."
         }
       ]
     }
