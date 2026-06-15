@@ -107,13 +107,20 @@ style of [a real artist]" into shipped content, and don't ship a premise that is
 really a specific living (or recently-dead) creator's published work, however it's
 dressed up. This is a Golden Rule — be decent, make our own thing — **not** a legal
 hedge; the aim is never to borrow-without-getting-caught, it's to build something
-genuinely ours. A named work is fine as private user↔Claude shorthand to get on the
-same page; the job is then to **make something genuinely your own** — your own
-world, described by its genre and mood — before it reaches the repo (e.g. "1970s
-occult noir in a rain-soaked city", arrived at on its own terms — not a retread of
-any one film). If a built seed turns out to be an unmistakable homage, rename it so
-MV isn't shipping someone else's title and disable it until it can be rebuilt as
-something original.
+genuinely ours. Citing a touchstone to each other is normal, welcome shorthand — a compressed
+bundle of stylistic influences (mood, palette, tempo) to converge on a vibe, never
+a request to reproduce anyone. The discipline lives at the **output boundary**: by
+the time the influence becomes a file on disk it has been metabolized into
+something genuinely your own, so no creator is actually ripped off. (This is the
+*legitimate* sense of "clean-rooming" — reference in, original work out — as
+opposed to the evasion reading, "disguise a rip-off well enough to get away with
+it," which is exactly what we're not doing.) So a named work is fine as private
+user↔Claude shorthand to get on the same page; the job is then to **make something
+genuinely your own** — your own world, described by its genre and mood — before it
+reaches the repo (e.g. "1970s occult noir in a rain-soaked city", arrived at on its
+own terms — not a retread of any one film). If a built seed turns out to be an
+unmistakable homage, rename it so MV isn't shipping someone else's title and
+disable it until it can be rebuilt as something original.
 
 ### Player-identity forks are optional
 Players can always state their own character concept at chargen, so a seed does
