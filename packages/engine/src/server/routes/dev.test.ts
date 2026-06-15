@@ -12,6 +12,13 @@ import { devRoutes } from "./dev.js";
 
 const mockGetTape = vi.mocked(getRecordedTape);
 
+// These tests are logically instant (in-process Fastify `inject`, no network),
+// but Fastify boot can blow the 5s default under heavy parallel-suite CPU
+// contention (multiple agents/tsc share this machine — see CLAUDE.md). Give
+// generous headroom so a starved event loop never reds the nightly; a genuine
+// hang still trips this ceiling.
+vi.setConfig({ testTimeout: 30_000 });
+
 async function buildApp() {
   const app = Fastify();
   await app.register(devRoutes);
