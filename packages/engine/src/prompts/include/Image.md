@@ -462,6 +462,22 @@ When composing prompts for `generate_image`, render the image in this visual sty
 %% Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. An atmospheric sumi-e INK-WASH on fibrous washi / rag paper — a spare, calm, meditative MONOCHROME register. The strongest economy lever in this traditional-media pair: LARGE AREAS OF BARE PAPER left empty as mist / sky / space (intrinsic sumi-e anti-cram) plus the ink bleeding into the paper's fibrous tooth as the texture-target (the cotton-rag / washi lever, user idea). The tic is well-MITIGATED — bare paper dominates and the distance dissolves into emptiness. Monochrome with at most one restrained accent (e.g. a red seal). The portrait-prior keeps the figure a touch rendered (accepted, see [[Charcoal]]). Caption = clean type. Validated on the Xera dusk scene. Keep the bare-paper economy, the fibrous-paper ink bleed, and the brush economy.
 </InkWash>
 
+<WesternRPG>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as an in-game screenshot from a high-end modern Western open-world RPG, in photo mode (no HUD, no nameplates) — a realistic, gritty, atmospheric game-engine render. Physically-based realistic materials, naturalistic global-illumination lighting and weather, detailed but grounded environments, a believable lived-in world, cinematic depth of field and subtle film grain. Grounded, immersive, high-fidelity but not anime — the realistic counterpart to a Japanese MMO render. Close with a caption overlaid in a tasteful font.`
+
+%% Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. An expansion of the GAME-RENDER family anchored by the default [[Image]] style (a GPU-rendered Japanese MMO in photo mode) — this is the REALISTIC / grounded Western open-world RPG counterpart (think a modern photoreal open-world game in photo mode), distinct from the anime MMO. Game renders are an in-distribution prior, so it renders clean with no real tic problem. Caption overlaid in a tasteful font (the [[Image]] family caption). Reach for it on grittier, grounded, non-anime campaigns. Validated on the Xera dusk scene; an instant keeper (user). Keep the photo-mode / no-HUD framing, the realistic PBR + naturalistic lighting, and the overlaid caption.
+</WesternRPG>
+
+<RetroPSX>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as an in-game screenshot from a late-1990s and early-2000s PlayStation-era 3D game — a gritty low-fidelity retro real-time render. Low-polygon models with jittery wobbling vertices, low-resolution warping affine-mapped textures, visible texture seams and aliasing, chunky pixelation, ordered dithering in the gradients, thick atmospheric draw-distance fog swallowing the background, and a low-res CRT-ish look. Nostalgic, janky, atmospheric early-3D. Close with a caption overlaid in a tasteful pixel or period font.`
+
+%% Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. An expansion of the GAME-RENDER family ([[Image]]) — the gritty, janky PS1 / PS2-era retro 3D register. The STRUCTURAL retro format (low-poly jitter, low-res warping affine textures, ordered dithering, thick draw-distance FOG swallowing the background) is what separates it cleanly AND is anti-tic: the fog + low fidelity dissolve the background so the model can't cram (same family as the [[PracticalMiniature]] haze-fills-the-negatives lever, here as draw-distance fog). Distinct from the clean faceted [[LowPoly]] — this is gritty, textured, nostalgic jank. Charming, atmospheric, retro / horror-friendly (it even gave itself a JRPG dialogue caption). Validated on the Xera dusk scene; a keeper (user). Keep the low-fi jitter + warping textures + dithering + draw-distance fog, and the pixel/period caption.
+</RetroPSX>
+
 <!--
   Named variants go here as additional top-level sections, e.g.
 
