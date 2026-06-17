@@ -390,6 +390,22 @@ When composing prompts for `generate_image`, render the image in this visual sty
 %% Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Tic-controlled digital-illustration workhorse, family of [[CleanDigital]]. The lever: deliberate, even-weight VECTOR-LIKE BRUSH economy — confident purposeful strokes, no noodling, large clean shapes carrying the forms, detail spent only where it counts. (My own read rated this the weakest of the four, but the USER's eye judged it tic-free and clean — the human eye is the comparator, see [[show-renders-before-banking]] — so it's banked; the brush-economy framing reads as deliberate rather than reflexive even when detail is present.) Caption = tasteful clean type.
 </VectorBrush>
 
+<LowPoly>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a stylised LOW-POLY 3D illustration — forms built from a small number of flat-shaded polygon facets, faceted geometry with crisp polygon edges and flat or gently-graded facets, a coordinated limited colour-swatch palette, soft clean lighting. Strict economy: keep the polygon count low and the shapes big and simple, the focal subject a touch more detailed, the background simplified into large faceted forms. Clean, geometric, stylish, modern. Close with a small tasteful caption in clean type.`
+
+%% Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. A DISTINCT-DIGITAL style (a modern digital register beyond the painted-illustration / clean-digital families). Low-poly faceted 3D — the FORMAT enforces economy for free: a small polygon count + flat-shaded facets means the model CANNOT cram fine detail, so a structural format escapes BOTH the painted-default convergence AND the tic. This confirms the round's lesson: a structural FORMAT (polygon facets, pixel grid, isometric projection, neon-on-black) beats a soft "stylised" adjective — the one soft ask in the round, "stylised 3D", drifted straight to a realistic CG render and was not banked. Coordinated limited swatch palette + big faceted shapes. Crystalline, geometric, clean, stylish. Caption = tasteful clean type. Validated on the Xera dusk scene; an instant keeper (user).
+</LowPoly>
+
+<NeonSynthwave>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a bold retro-future NEON digital illustration — a synthwave and cyberpunk look. A dark scene cut through with glowing neon light: a strict limited palette of a few saturated neon hues (hot magenta, cyan, electric purple) glowing against deep near-black, big simple silhouette shapes, clean glowing edges and gradients, light bloom and haze. Strict economy: design as a few big value shapes with a strong silhouette read, detail spent only on the focal subject, the rest in deep calm dark. Moody, electric, stylish. Close with a small tasteful caption in a clean modern or retro-digital font.`
+
+%% Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. A DISTINCT-DIGITAL style — bold retro-future synthwave / cyberpunk NEON. LOAD-BEARING: a few saturated neon hues glowing against DEEP NEAR-BLACK plus big simple silhouette shapes — the deep-black + big-shape economy both kills the tic (most of the frame is calm dark, nothing to cram) AND composites beautifully into the dark TUI with no bright rectangle (the [[TrinitronCRT]] / [[Scratchboard]] "black gives rest for free" lever, here as a neon mood). A distinct, moody, electric register. Caption = tasteful clean or retro-digital type. Validated on the Xera dusk scene; an instant keeper (user).
+</NeonSynthwave>
+
 <!--
   Named variants go here as additional top-level sections, e.g.
 
