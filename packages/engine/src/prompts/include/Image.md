@@ -406,6 +406,14 @@ When composing prompts for `generate_image`, render the image in this visual sty
 %% Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. A DISTINCT-DIGITAL style — bold retro-future synthwave / cyberpunk NEON. LOAD-BEARING: a few saturated neon hues glowing against DEEP NEAR-BLACK plus big simple silhouette shapes — the deep-black + big-shape economy both kills the tic (most of the frame is calm dark, nothing to cram) AND composites beautifully into the dark TUI with no bright rectangle (the [[TrinitronCRT]] / [[Scratchboard]] "black gives rest for free" lever, here as a neon mood). A distinct, moody, electric register. Caption = tasteful clean or retro-digital type. Validated on the Xera dusk scene; an instant keeper (user).
 </NeonSynthwave>
 
+<Isometric>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a clean ISOMETRIC illustration — a tidy isometric (axonometric) diorama view, the scene built as a neat 3D-looking miniature floating on a deep solid BLACK background. Crisp clean shapes with flat or softly-graded colour from a coordinated limited swatch palette, neat geometric forms, soft even lighting and tidy small shadows, a clear focal subject. The diorama sits as a small island of colour on the surrounding deep-black field, which fills the rest of the frame. Strict economy: big simple shapes, minimal clutter. Charming, clean, modern isometric on black. Close with a small tasteful caption in clean type.`
+
+%% Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. A DISTINCT-DIGITAL style — a tidy isometric (axonometric) DIORAMA: the whole scene rendered as a neat 3D-looking miniature on an isometric base. The isometric PROJECTION is the structural format that escapes the painted-default and the tic (same lesson as [[LowPoly]]). BLACK GROUND is load-bearing and was the user's fix: the first cut floated the diorama on WHITE, which reads as a bright rectangle in the dark TUI — forcing a deep solid black background composites it cleanly into the terminal (the same dark-ground-for-TUI choice as [[Tapestry]] / [[Ukiyoe]] / [[NeonSynthwave]]). Coordinated limited swatch palette + big simple shapes keep it clean. Especially good for LOCATIONS / scenes / maps (a place as a little diorama). Caption = tasteful clean type. Validated on the Xera dusk scene. Keep the isometric-diorama framing, the deep-black ground, and the swatch + big-shape economy.
+</Isometric>
+
 <!--
   Named variants go here as additional top-level sections, e.g.
 
