@@ -14,6 +14,8 @@ All documentation lives in `docs/`. Start at `docs/index.md` for navigation, `do
 
 **Code and docs stay in sync.** Changes to game behavior, APIs, or on-disk formats require corresponding doc updates in the same commit. See `docs/maintenance.md` for what to update when. API schemas (`packages/shared/src/protocol/rest.ts`, `events.ts`) stay in sync with routes and `docs/websocket-api.md`.
 
+**Authoring image-gen visual styles.** The `Image.md` style catalog (the per-seed art-direction variants behind `generate_image`) has its own end-to-end workflow — the anti-tic levers, the render-and-eyeball loop, and the banking checklist — in `docs/visual-style-authoring.md`. Read it before adding or editing a style variant.
+
 ## Conventions
 
 ### TypeScript
