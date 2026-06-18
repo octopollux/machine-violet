@@ -582,6 +582,14 @@ When composing prompts for `generate_image`, render the image in this visual sty
 %% Append at the END — style last. The catalog's prestige CINEMATIC FILM-STILL register (35mm anamorphic, horizontal lens flares, shallow DoF, film grain, teal/warm grade, letterbox + film-title caption) — the "this is a movie moment" look the catalog lacked. Differentiates from the photoreal game renders not by the base render (which converges) but by the cinematic FRAMING + FINISH (letterbox, anamorphic flares, title treatment). Genre-neutral (scrubbed "science-fiction" → "film" so it serves any setting). Sibling: the B&W [[NoirCinema]]. NOTE: user wants a higher-FLARE take too ("sometimes you just need some lens flares") — a flarier render is under review; may update this style line or add a sibling. Validated on the Xera corridor; a keeper (user). Keep the anamorphic + letterbox + title caption.
 </CinematicFilm>
 
+<CinematicFlare>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a still frame from a prestige cinematic film, shot on 35mm anamorphic film — NOT a game render and NOT a digital illustration. Cinematic photography with PROMINENT ANAMORPHIC LENS FLARES as the signature: bold horizontal blue-streak flares lancing right across the frame from every bright light source, stacked lens halos, veiling glare and bokeh-disc artefacts, and a hazy atmosphere that scatters the light into the lens. A wide anamorphic frame, a shallow depth of field with creamy bokeh and oval out-of-focus highlights. Real photochemical 35mm character — fine organic film grain, soft highlight roll-off, deep but detailed shadows, and a restrained cinematic colour grade (teal shadows, warm skin tones, muted saturation). Dramatic, motivated practical lighting. The composed, flare-drenched look of a single frame lifted from a beautifully shot anamorphic film. Close with a small caption in an elegant film-title font set within a subtle letterbox bar.`
+
+%% Append at the END — style last. The FLARE-FORWARD sibling of [[CinematicFilm]] — same prestige 35mm anamorphic film-still register, but with PROMINENT anamorphic lens flares as the signature (bold horizontal blue streaks lancing across the frame, stacked halos, veiling glare) — the blockbuster-anamorphic look. Kept as a SEPARATE variant (user: "we actually keep cinema35 — the reroll is for an added one"): [[CinematicFilm]] = the subtler prestige-drama flare, CinematicFlare = the heavy blockbuster flare; pick by mood. Genre-neutral ("science-fiction" → "film"). Letterbox + film-title caption. Validated on the Xera corridor; a keeper (user). Keep the prominent anamorphic flares (the signature) + the letterbox title.
+</CinematicFlare>
+
 <NoirCinema>
 When composing prompts for `generate_image`, render the image in this visual style:
 
