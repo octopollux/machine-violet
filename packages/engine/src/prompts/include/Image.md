@@ -710,6 +710,54 @@ When composing prompts for `generate_image`, render the image in this visual sty
 %% Append at the END — style last. MOTION-PICTURE family — Italian GIALLO colour-horror: bold saturated unnatural COLOURED GEL LIGHTING (blood reds vs electric blues), hard theatrical shadows, high contrast, stylised glamorous dread. CAPTION FIX BAKED IN (user): the model defaults to ITALIAN captions for giallo (the first cut titled itself "L'OSSESSIONE DELLO SPAZIO PROFONDO"); the style line now explicitly demands an ENGLISH caption — KEEP that directive or it reverts to Italian. SCENE AFFINITY: wants a dark scene it can flood with red / blue gels (validated on a shadow chamber). A distinct lurid-colour-horror lane vs the photographic horror ([[SurvivalHorror]] / [[LandCamera]]) and the B&W [[NoirCinema]]. Caption = English, stylish period font. Validated (v2); a keeper (user). Keep the red / blue gel lighting + the explicit English-caption directive.
 </Giallo>
 
+<CandlelitNatural>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from a film shot ENTIRELY BY NATURAL CANDLELIGHT on specially-made ultra-fast large-aperture lenses — NOT artificially lit. The technique's signature: a soft, warm, low-light interior glow with light falling off naturally into gentle shadow; an extremely SHALLOW depth of field with a delicate focus plane and creamy soft backgrounds (the cost of the wide-open fast lens); a painterly old-master composition like a period oil portrait; warm candle-amber colour, fine grain, and a still, quiet, contemplative atmosphere. Natural, painterly, intimate, luminous. Close with a small caption in an elegant period font.`
+
+%% Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED (the user's framing: specify the technique / tech, NEVER name the auteur — both better, genre-agnostic results AND [[feedback_no_artist_imitation]]-compliant). NATURAL-CANDLELIGHT technique: warm low-light glow, ultra-fast-lens SHALLOW focus, painterly old-master tableau, fine grain. SCENE AFFINITY: warm low-lit interiors. AAA-TIER (user: the motion-picture looks are likely to land in MOST campaign seeds). Caption = elegant period font. Validated on a candlelit interior; an instant bank (user, "bank every single one"). Keep the natural-candlelight glow + shallow focus + painterly composition.
+</CandlelitNatural>
+
+<Symmetrical>
+When composing prompts for `generate_image` in this style, compose the SUBJECT centered and front-on in a balanced, symmetrical setting. Then render in this visual style:
+
+`Rendered as a frame from a film with a rigorously SYMMETRICAL, planimetric visual technique — NOT a naturalistic shot. The technique's signature: a perfectly centered subject and a precisely symmetrical, mirror-balanced frame; a flat, front-on PLANIMETRIC camera placed exactly perpendicular to the back wall (no diagonal perspective); a deliberate, curated, harmonious PASTEL colour palette; meticulous orderly set design with everything squared-up and centered; even, flat, controlled lighting; and a deadpan, dollhouse-precise, storybook formality. Tidy, symmetric, pastel, deliberate. Close with a small centered caption in a clean typographic font.`
+
+%% Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED (no auteur name, by design — describe the HOW not the WHO, [[feedback_no_artist_imitation]]). The rigorously SYMMETRICAL / PLANIMETRIC technique: dead-centered subject, mirror-balanced frame, flat front-on camera (perpendicular to the wall, no diagonal), a curated PASTEL palette, even flat lighting, deadpan formality. The technique alone nails the look without naming anyone. Very distinct from everything else in the catalog. SCENE-COUPLED: composes best when the brief centres the subject in a symmetrical setting (steering in the DM-facing intro). Caption = centered clean type. Validated; an instant bank (user). Keep the symmetry + planimetric flatness + pastel palette.
+</Symmetrical>
+
+<EightiesSciFi>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from a 1980s science-fiction action film, using that era's practical cinematography techniques — NOT a modern render. The signature: ANAMORPHIC widescreen with horizontal lens flares; thick atmospheric HAZE and smoke filling the air; hard, dramatic BACKLIGHT and rim-light carving the figure out of the dark; glowing coloured NEON and practical light sources; a moody blue-and-amber or neon-noir palette; visible 35mm Kodak film grain; and motion-control, miniature-and-practical-effects solidity. Smoky, backlit, neon, atmospheric, analog. Close with a small caption in a bold period sci-fi font.`
+
+%% Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — 1980s SCI-FI ACTION practical cinematography: ANAMORPHIC flares, atmospheric HAZE / smoke, hard BACKLIGHT / rim, glowing NEON practicals, 35mm grain, motion-control / practical solidity. Analog, smoky, backlit (the hard backlight + haze is also an anti-cram lever — it dissolves the background). AAA-tier. Caption = bold period sci-fi font. Validated on a smoky neon corridor; an instant bank (user). Keep the anamorphic + haze + hard backlight + neon.
+</EightiesSciFi>
+
+<DayForNight>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame using the classic DAY-FOR-NIGHT film technique — a scene shot in real daylight but exposed and graded to read as night. The signature: a deep, cool BLUE moonlit cast over everything; underexposed, slightly crushed midtones; but with the tell-tale artifacts of a daylight shoot — crisp hard-edged shadows pointing the wrong way for moonlight, bright specular glints, and far more fine detail than a real night shot would hold; and a bright "moon" that is really the sun. Cool, eerie, artificial night. Close with a small caption in a tasteful font.`
+
+%% Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — the DAY-FOR-NIGHT technique: a deep cool BLUE moonlit grade carrying the give-away DAYLIGHT artifacts (too-crisp shadows, too much detail, a "moon" that's really the sun). A distinct artificial-nocturnal register. SCENE AFFINITY: outdoor "night" scenes. Caption overlaid. Validated on a moonlit clearing; an instant bank (user). Keep the blue grade + the daylight-crispness tell.
+</DayForNight>
+
+<DiffusionGlamour>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame shot through a heavy DIFFUSION / soft-focus filter — the dreamy old-Hollywood-and-1970s glamour technique. The signature: a soft, glowing, slightly hazy image where the highlights BLOOM and halate into a romantic gauzy glow; gentle low contrast with lifted milky blacks; a flattering, wrinkle-softening softness on the subject; a warm pastel pearlescent palette; and a nostalgic, dreamy, luminous quality, as if the lens were breathed upon. Soft, glowing, romantic, hazy. Close with a small caption in an elegant font.`
+
+%% Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — the heavy DIFFUSION / soft-focus glamour technique: blooming halated highlights, gauzy romantic glow, lifted milky blacks, warm pastel pearlescence, breathed-on-lens dreaminess. The soft / romantic register (the bloom also softens fine detail, a gentle anti-cram). AAA-tier. Caption = elegant font. Validated on a golden-hour clearing; an instant bank (user). Keep the diffusion bloom + soft low contrast.
+</DiffusionGlamour>
+
+<LargeFormat70>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame shot on large-format 65/70MM film — the high-resolution epic-cinema format. The signature: extraordinary CLARITY and resolution with immense fine detail held from the extreme foreground to the far horizon; DEEP focus front-to-back; rich, smooth, almost grainless tonality; a vast widescreen sense of scale and grandeur; natural, restrained colour; and the immersive, monumental quality of a roadshow epic. Crisp, deep, vast, monumental. Close with a small caption in an elegant period film-title font.`
+
+%% Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — large-format 65/70MM tech: extraordinary CLARITY, DEEP focus front-to-back, near-grainless tonality, vast monumental scale. A superb ESTABLISHING-VISTA register — the deep-focus clarity is its own anti-tic (all crisp but organised by the grand vista, the resolution analogue of [[MattePainting]]'s aerial dissolve). AAA-tier; pairs with [[MattePainting]] for grand establishing shots. Caption = elegant period film-title font. Validated on an epic vista; an instant bank (user). Keep the deep-focus clarity + epic scale.
+</LargeFormat70>
+
 <!--
   Named variants go here as additional top-level sections, e.g.
 
