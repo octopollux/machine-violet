@@ -617,7 +617,7 @@ When composing prompts for `generate_image`, render the image in this visual sty
 <Velvia>
 When composing prompts for `generate_image`, render the image in this visual style:
 
-`Rendered as a photograph shot on Fujichrome Velvia — the iconic ultra-saturated colour slide (transparency) film. Velvia's unmistakable signature: INTENSE, vivid colour saturation, especially deep glowing GREENS and rich punchy reds; high contrast with deep shadows and bright highlights; a cool-leaning colour balance; extremely fine grain and razor-sharp clarity; and the luminous, almost hyper-real "chrome" glow of a backlit slide. A landscape-photographer's dream stock — bold, saturated, crisp, vivid. Close with a small caption in a clean photographic font.`
+`Rendered as a photograph shot on Fujichrome Velvia — the iconic ultra-saturated colour slide (transparency) film. Velvia's unmistakable signature: INTENSE, vivid colour saturation, especially deep glowing GREENS and rich punchy reds; high contrast with deep shadows and bright highlights; a cool-leaning colour balance; extremely fine grain and razor-sharp clarity; and the luminous, almost hyper-real "chrome" glow of a backlit slide. A landscape-photographer's dream stock — bold, saturated, crisp, vivid. Close with a small caption in a clean photographic font — a scene or place title only; do NOT print the film stock or process name in the caption.`
 
 %% Append at the END — style last. First of an ICONIC FILM-STOCK family (user vein) — Fujichrome VELVIA, the ultra-saturated colour slide film (the "intense greens" stock the user named). Signature: INTENSE saturation (glowing greens + punchy reds), high contrast, fine grain, the hyper-real backlit-chrome glow. A pure photographic-MEDIUM register (the stock IS the look) — applies to any scene, but revealed best on colour-rich / outdoor scenes (proof film stocks on a colour-rich scene; the dark corridor hides the colour signature). Film-stock product names are technical MEDIA descriptors, fine to bake in (cf. [[feedback_no_artist_imitation]] = artists / named works only, not photographic stocks). Caption = clean photographic font. Validated on a golden-hour alien clearing; "Holy shit, yes, no notes" (user). Keep the intense saturation + chrome glow.
 </Velvia>
@@ -625,7 +625,7 @@ When composing prompts for `generate_image`, render the image in this visual sty
 <Kodachrome>
 When composing prompts for `generate_image`, render the image in this visual style:
 
-`Rendered as a photograph shot on Kodachrome — the legendary archival colour slide film with the timeless "National Geographic" look. Kodachrome's signature: rich, deep, slightly warm colour with famously luminous REDS and warm earth tones, natural but saturated greens and blues, beautiful skin tones, high microcontrast and crisp sharpness, extremely fine grain, and a subtle warm golden cast. A nostalgic, richly-toned, timeless mid-century photographic look. Close with a small caption in a clean photographic font.`
+`Rendered as a photograph shot on Kodachrome — the legendary archival colour slide film with the timeless "National Geographic" look. Kodachrome's signature: rich, deep, slightly warm colour with famously luminous REDS and warm earth tones, natural but saturated greens and blues, beautiful skin tones, high microcontrast and crisp sharpness, extremely fine grain, and a subtle warm golden cast. A nostalgic, richly-toned, timeless mid-century photographic look. Close with a small caption in a clean photographic font — a scene or place title only; do NOT print the film stock or process name in the caption.`
 
 %% Append at the END — style last. ICONIC FILM-STOCK family (sibling of [[Velvia]]) — KODACHROME, the warm archival slide (the "National Geographic" look): luminous warm reds + earth tones, high microcontrast, fine grain, a warm golden cast — the WARM-archival counterpart to Velvia's cool-saturated punch. PHOTOREALISM LEVER (user finding, remember this): asking for a named FILM STOCK is an extremely effective way to invoke SERIOUS PHOTOREALISM (the stock IS the look). Reveal on a colour-rich scene. Caption = clean photographic font. Validated on the clearing; "super impressive, big keep" (user). Keep the warm golden archival cast.
 </Kodachrome>
@@ -633,7 +633,7 @@ When composing prompts for `generate_image`, render the image in this visual sty
 <Portra>
 When composing prompts for `generate_image`, render the image in this visual style:
 
-`Rendered as a photograph shot on Kodak Portra 400 — the beloved soft colour negative portrait film. Portra's signature: gentle, natural, true-to-life SKIN TONES, low contrast with soft creamy highlights and open shadows, a slightly warm pastel colour palette, muted-but-pleasing saturation, fine grain, and a gentle, flattering, naturalistic look. Soft, warm, timeless, editorial. Close with a small caption in a clean photographic font.`
+`Rendered as a photograph shot on Kodak Portra 400 — the beloved soft colour negative portrait film. Portra's signature: gentle, natural, true-to-life SKIN TONES, low contrast with soft creamy highlights and open shadows, a slightly warm pastel colour palette, muted-but-pleasing saturation, fine grain, and a gentle, flattering, naturalistic look. Soft, warm, timeless, editorial. Close with a small caption in a clean photographic font — a scene or place title only; do NOT print the film stock or process name in the caption.`
 
 %% Append at the END — style last. FILM-STOCK family ([[Velvia]] / [[Kodachrome]]) — PORTRA 400, the SOFT colour-negative portrait film: gentle natural skin tones, LOW contrast, creamy highlights, warm pastel palette, muted-pleasing saturation. The soft / flattering register vs the punchy slides. Photorealism lever (see [[Kodachrome]]). Caption = clean photographic font. Validated on the clearing; a keeper (user, kept the whole set). Keep the soft low-contrast pastel skin-tone look.
 </Portra>
@@ -641,7 +641,7 @@ When composing prompts for `generate_image`, render the image in this visual sty
 <TriX>
 When composing prompts for `generate_image`, render the image in this visual style:
 
-`Rendered as a black-and-white photograph shot on Kodak Tri-X 400 — the classic photojournalism and street film. Tri-X's signature: gritty, distinctive visible GRAIN, a rich tonal range with deep blacks and bright highlights, punchy contrast, a raw documentary feel, and hand-developed character. The timeless look of 35mm reportage black-and-white. Close with a small caption in a plain documentary font.`
+`Rendered as a black-and-white photograph shot on Kodak Tri-X 400 — the classic photojournalism and street film. Tri-X's signature: gritty, distinctive visible GRAIN, a rich tonal range with deep blacks and bright highlights, punchy contrast, a raw documentary feel, and hand-developed character. The timeless look of 35mm reportage black-and-white. Close with a small caption in a plain documentary font — a scene or place title only; do NOT print the film stock or process name in the caption.`
 
 %% Append at the END — style last. FILM-STOCK family — KODAK TRI-X 400, the classic B&W reportage / street film: gritty visible GRAIN, rich tonal range, punchy contrast, documentary feel. Distinct B&W lane from [[NoirCinema]] (dramatic chiaroscuro) and [[LandCamera]] (harsh flash) — Tri-X = naturalistic documentary B&W (the B&W cousin of [[DocumentaryPhoto]]). Photorealism lever (see [[Kodachrome]]). Caption = plain documentary font. Validated on the clearing; a keeper (user). Keep the gritty grain + documentary tonality.
 </TriX>
@@ -649,7 +649,7 @@ When composing prompts for `generate_image`, render the image in this visual sty
 <Ektachrome>
 When composing prompts for `generate_image`, render the image in this visual style:
 
-`Rendered as a photograph shot on Kodak Ektachrome E100 — the clean, accurate colour slide film. Ektachrome's signature: crisp, clean, neutral-to-COOL colour rendition, accurate natural saturation (not over-saturated), clean bright BLUES, fine grain, sharp clarity, and a slightly cool, modern, true-to-life slide look — the cooler, more restrained counterpart to Velvia. Close with a small caption in a clean photographic font.`
+`Rendered as a photograph shot on Kodak Ektachrome E100 — the clean, accurate colour slide film. Ektachrome's signature: crisp, clean, neutral-to-COOL colour rendition, accurate natural saturation (not over-saturated), clean bright BLUES, fine grain, sharp clarity, and a slightly cool, modern, true-to-life slide look — the cooler, more restrained counterpart to Velvia. Close with a small caption in a clean photographic font — a scene or place title only; do NOT print the film stock or process name in the caption.`
 
 %% Append at the END — style last. FILM-STOCK family — KODAK EKTACHROME E100, the clean / accurate COOL slide: neutral-to-cool rendition, accurate (not over-saturated) colour, clean bright blues, sharp. The restrained / cool counterpart to [[Velvia]]'s saturation. NOTE: the LEAST-differentiated of the slides (accurate colour sits near a neutral render, and Velvia owns "saturated slide") — but the user kept the whole set ("every single one is fantastic"). Photorealism lever (see [[Kodachrome]]). Caption = clean photographic font. Validated on the clearing; a keeper (user). Keep the cool, clean, accurate slide rendition.
 </Ektachrome>
@@ -657,7 +657,7 @@ When composing prompts for `generate_image`, render the image in this visual sty
 <CineStill>
 When composing prompts for `generate_image`, render the image in this visual style:
 
-`Rendered as a photograph shot on CineStill 800T — the tungsten-balanced cinema colour film famous for its night look. CineStill's signature: a cool tungsten colour balance with cyan-leaning shadows and teal midtones, warm amber highlights, and — the unmistakable trademark — a soft red-orange HALATION GLOW blooming around every bright light source, where the bright halos bleed a warm red ring. Cinematic, moody, nocturnal, with fine grain. Close with a small caption in a clean photographic font.`
+`Rendered as a photograph shot on CineStill 800T — the tungsten-balanced cinema colour film famous for its night look. CineStill's signature: a cool tungsten colour balance with cyan-leaning shadows and teal midtones, warm amber highlights, and — the unmistakable trademark — a soft red-orange HALATION GLOW blooming around every bright light source, where the bright halos bleed a warm red ring. Cinematic, moody, nocturnal, with fine grain. Close with a small caption in a clean photographic font — a scene or place title only; do NOT print the film stock or process name in the caption.`
 
 %% Append at the END — style last. FILM-STOCK family — CINESTILL 800T, the tungsten-balanced NIGHT cinema film: cyan shadows + teal midtones + amber highlights + the trademark soft red-orange HALATION GLOW around bright lights. PROOF-SCENE matters: rendered on the NIGHT CORRIDOR (not the daylight clearing) so the halation-around-lights signature shows — a night / artificial-light scene is its native habitat. USER NOTE: it reads "a little weak — doesn't quite look like FILM, basically a really high-quality UNSTYLED render" — kept anyway (a clean cinematic night look). Photorealism lever (see [[Kodachrome]]). Caption = clean photographic font. Validated on the corridor; a keeper (user). Keep the tungsten balance + red halation.
 </CineStill>
@@ -665,7 +665,7 @@ When composing prompts for `generate_image`, render the image in this visual sty
 <Technicolor>
 When composing prompts for `generate_image`, render the image in this visual style:
 
-`Rendered as a frame from a classic three-strip TECHNICOLOR motion picture — the glorious, glossy Golden-Age-of-Hollywood colour process. Technicolor's signature: intensely vivid, glowing, saturated colour with bold pure primaries (rich reds, deep blues, vivid greens), a glossy luminous quality, creamy glamour lighting, high production-value sheen, and a slightly heightened, hyper-real Technicolor glow. Lush, vivid, spectacular, timeless. Close with a small caption in an elegant period film-title font.`
+`Rendered as a frame from a classic three-strip TECHNICOLOR motion picture — the glorious, glossy Golden-Age-of-Hollywood colour process. Technicolor's signature: intensely vivid, glowing, saturated colour with bold pure primaries (rich reds, deep blues, vivid greens), a glossy luminous quality, creamy glamour lighting, high production-value sheen, and a slightly heightened, hyper-real Technicolor glow. Lush, vivid, spectacular, timeless. Close with a small caption in an elegant period film-title font — a scene or place title only; do NOT print the film process or format name in the caption.`
 
 %% Append at the END — style last. ICONIC MOTION-PICTURE family (a sibling vein to the [[Velvia]] film-stock family — eras / processes / genres, NOT director signatures, cf. [[feedback_no_artist_imitation]]). THREE-STRIP TECHNICOLOR — the glossy Golden-Age glow: vivid saturated pure primaries, glamour lighting, hyper-real sheen. Like the film stocks, naming a real motion-picture PROCESS strongly invokes that look. Reveal on a colour-rich scene. Caption = elegant period film-title font. Validated on the clearing; an instant take (user). Keep the vivid saturated Technicolor glow.
 </Technicolor>
@@ -753,7 +753,7 @@ When composing prompts for `generate_image`, render the image in this visual sty
 <LargeFormat70>
 When composing prompts for `generate_image`, render the image in this visual style:
 
-`Rendered as a frame shot on large-format 65/70MM film — the high-resolution epic-cinema format. The signature: extraordinary CLARITY and resolution with immense fine detail held from the extreme foreground to the far horizon; DEEP focus front-to-back; rich, smooth, almost grainless tonality; a vast widescreen sense of scale and grandeur; natural, restrained colour; and the immersive, monumental quality of a roadshow epic. Crisp, deep, vast, monumental. Close with a small caption in an elegant period film-title font.`
+`Rendered as a frame shot on large-format 65/70MM film — the high-resolution epic-cinema format. The signature: extraordinary CLARITY and resolution with immense fine detail held from the extreme foreground to the far horizon; DEEP focus front-to-back; rich, smooth, almost grainless tonality; a vast widescreen sense of scale and grandeur; natural, restrained colour; and the immersive, monumental quality of a roadshow epic. Crisp, deep, vast, monumental. Close with a small caption in an elegant period film-title font — a scene or place title only; do NOT print the film process or format name in the caption.`
 
 %% Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — large-format 65/70MM tech: extraordinary CLARITY, DEEP focus front-to-back, near-grainless tonality, vast monumental scale. A superb ESTABLISHING-VISTA register — the deep-focus clarity is its own anti-tic (all crisp but organised by the grand vista, the resolution analogue of [[MattePainting]]'s aerial dissolve). AAA-tier; pairs with [[MattePainting]] for grand establishing shots. Caption = elegant period film-title font. Validated on an epic vista; an instant bank (user). Keep the deep-focus clarity + epic scale.
 </LargeFormat70>
@@ -761,7 +761,7 @@ When composing prompts for `generate_image`, render the image in this visual sty
 <CrossProcess>
 When composing prompts for `generate_image`, render the image in this visual style:
 
-`Rendered as a frame from film that has been CROSS-PROCESSED — developed in the wrong chemistry (slide film in C-41, or negative in E-6) — NOT a clean render. The technique's signature: wildly shifted, unnatural colour with a strong cyan-green cast in the shadows and yellow-green or acid highlights; heavily boosted contrast with crushed blacks and blown highlights; oversaturated, skewed skin tones; and a grungy, lurid, unpredictable analog look. Punchy, toxic, off-kilter, stylish. Close with a small caption in a tasteful font.`
+`Rendered as a frame from film that has been CROSS-PROCESSED — developed in the wrong chemistry (slide film in C-41, or negative in E-6) — NOT a clean render. The technique's signature: wildly shifted, unnatural colour with a strong cyan-green cast in the shadows and yellow-green or acid highlights; heavily boosted contrast with crushed blacks and blown highlights; oversaturated, skewed skin tones; and a grungy, lurid, unpredictable analog look. Punchy, toxic, off-kilter, stylish. Close with a small caption in a tasteful font — a scene or place title only; do NOT print the film process name in the caption.`
 
 %% Append at the END — style last. MOTION-PICTURE / film family, TECHNIQUE-SPECIFIED — CROSS-PROCESS (wrong-chemistry development): wildly shifted unnatural colour (cyan-green shadows, acid-yellow highlights), boosted contrast, skewed skin, grungy lurid analog look. A great "something's wrong here" register. Reveal on a colour scene. Caption overlaid. Validated on the clearing; an instant bank (user, "face-meltingly gorgeous"). Keep the toxic shifted colour + boosted contrast.
 </CrossProcess>
@@ -769,7 +769,7 @@ When composing prompts for `generate_image`, render the image in this visual sty
 <Infrared>
 When composing prompts for `generate_image`, render the image in this visual style:
 
-`Rendered as a photograph on colour INFRARED (Aerochrome) film — the surreal false-colour infrared technique. The signature: green foliage and plant life rendered in vivid surreal REDS, PINKS and magentas (infrared-reflective chlorophyll); skies and water going deep cyan-blue; an eerie, dreamlike, otherworldly false-colour palette; high contrast; a soft halation glow; and fine grain. Surreal, psychedelic, dreamlike, alien. Close with a small caption in a tasteful font.`
+`Rendered as a photograph on colour INFRARED (Aerochrome) film — the surreal false-colour infrared technique. The signature: green foliage and plant life rendered in vivid surreal REDS, PINKS and magentas (infrared-reflective chlorophyll); skies and water going deep cyan-blue; an eerie, dreamlike, otherworldly false-colour palette; high contrast; a soft halation glow; and fine grain. Surreal, psychedelic, dreamlike, alien. Close with a small caption in a tasteful font — a scene or place title only; do NOT print the film stock or process name in the caption.`
 
 %% Append at the END — style last. Film family, TECHNIQUE-SPECIFIED — colour INFRARED (Aerochrome): foliage → surreal REDS / PINKS / magentas, cyan skies, dreamlike false-colour, halation glow. Spectacularly ALIEN — ideal for off-world flora (the user's pick of the batch). SCENE AFFINITY: vegetation-rich / outdoor scenes (foliage is what goes red). Caption overlaid. Validated on the clearing; an instant bank (user). Keep the false-colour red-foliage signature.
 </Infrared>
@@ -777,7 +777,7 @@ When composing prompts for `generate_image`, render the image in this visual sty
 <Super8>
 When composing prompts for `generate_image`, render the image in this visual style:
 
-`Rendered as a frame from a SUPER-8 / 8MM home movie — the nostalgic amateur small-gauge film technique. The signature: heavy visible film GRAIN, warm faded slightly-yellowed colour, soft low resolution, a vignette darkening the corners, GATE-WEAVE jitter and frame wobble, dust and scratches, occasional LIGHT LEAKS flaring orange-red across the frame, and a warm, nostalgic, decayed-memory quality. Grainy, warm, faded, intimate, amateur. Close with a small caption in a casual handwritten or period font.`
+`Rendered as a frame from a SUPER-8 / 8MM home movie — the nostalgic amateur small-gauge film technique. The signature: heavy visible film GRAIN, warm faded slightly-yellowed colour, soft low resolution, a vignette darkening the corners, GATE-WEAVE jitter and frame wobble, dust and scratches, occasional LIGHT LEAKS flaring orange-red across the frame, and a warm, nostalgic, decayed-memory quality. Grainy, warm, faded, intimate, amateur. Close with a small caption in a casual handwritten or period font — a scene or place title only; do NOT print the film format or process name in the caption.`
 
 %% Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — SUPER-8 / 8MM home movie: heavy grain, warm faded colour, corner vignette, gate-weave, dust / scratches, orange LIGHT LEAKS, decayed-memory nostalgia. The intimate amateur-film register. Caption = casual / handwritten. Validated on the clearing; an instant bank (user). Keep the grain + light leaks + faded warmth.
 </Super8>
@@ -797,6 +797,62 @@ When composing prompts for `generate_image`, render the image in this visual sty
 
 %% Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — single-source low-key CHIAROSCURO (boldly underexposed, top-lit; the Gordon-Willis technique, no name): deep dominant BLACK swallowing the frame, one hard amber pool on the subject, very high contrast, operatic dread. The deep black is also the black-gives-rest lever (composites into the dark TUI) AND an anti-cram. A premium dramatic register. SCENE AFFINITY: dark / interior dramatic moments. Caption = elegant font. Validated on the corridor; an instant bank (user). Keep the deep-black single-source amber lighting.
 </Chiaroscuro>
+
+<Autochrome>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a photograph on an AUTOCHROME plate — the earliest practical colour photography (circa 1907), an additive potato-starch-grain process. The signature: soft, dreamy, slightly muted and desaturated colour with a gentle warm cast; a delicate POINTILLIST grain texture from the dyed starch grains, like a fine colour stipple; a soft, painterly, low-contrast, almost impressionist quality; gentle vignetting; and the fragile, luminous, antique atmosphere of a turn-of-the-century colour plate. Dreamy, painterly, muted, antique. Close with a small caption in an elegant period font — a scene or place title only; do NOT print the photographic process or plate name in the caption.`
+
+%% Append at the END — style last. EARLY-COLOR family (user vein: mine early colour for the JAZZ-ERA + COLD-WAR campaigns). AUTOCHROME (circa 1907, additive potato-starch): dreamy, soft, muted, low-contrast, POINTILLIST grain, antique — the most VELVETY of the set, the JAZZ-ERA hero. CAPTION RULE baked in (title only, no process name — vintage prints stamped the stock on them, so it leaks). Validated on the clearing; an instant keeper (user, "every single one is a keeper"). Keep the pointillist grain + dreamy muted palette.
+</Autochrome>
+
+<HandTinted>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a HAND-TINTED / hand-coloured early photograph or film frame — a monochrome image with delicate colour applied by hand on top. The signature: an underlying soft black-and-white or sepia photographic base showing through; translucent, delicately brushed-on pastel COLOUR washes that don't quite stay in the lines, applied only to select areas (cheeks, lips, foliage, sky); slightly imprecise, artisanal registration; a gentle, antique, handmade quality; and the quiet charm of early hand-colouring. Delicate, handmade, pastel-on-monochrome, antique. Close with a small caption in an elegant period font — a scene or place title only; do NOT print the process or technique name in the caption.`
+
+%% Append at the END — style last. EARLY-COLOR family — HAND-TINTED: soft B&W / sepia base + delicate hand-brushed pastel colour washes that don't stay in the lines, artisanal antique charm. Jazz-era. Caption = title only (no process name). Validated on the clearing; a keeper (user). Keep the monochrome base + hand-applied pastel washes.
+</HandTinted>
+
+<DyeTransfer>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a print made by the DYE-TRANSFER (imbibition Technicolor) process — the lush, archival, ultra-rich colour-print technique. The signature: deep, saturated, velvety colour with gorgeous dense blacks and luminous highlights; rich, smooth, glowing dye-saturated reds, greens and blues; an extremely fine, almost grainless texture; superb tonal separation; and a sumptuous, glamorous, glowing classic-Hollywood-print quality. Lush, velvety, saturated, glamorous. Close with a small caption in an elegant period font — a scene or place title only; do NOT print the print process or technique name in the caption.`
+
+%% Append at the END — style last. EARLY-COLOR family — DYE-TRANSFER (imbibition Technicolor print): lush, velvety, ultra-rich saturated colour, dense blacks, near-grainless, glamorous — the glamorous end of jazz-era early colour. Caption = title only (no process name). Validated on the clearing; a keeper (user). Keep the rich velvety dye saturation.
+</DyeTransfer>
+
+<Agfacolor>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame shot on early AGFACOLOR film — the mid-century European colour stock. The signature: a distinctive warm-but-muted European palette leaning into soft earthy ambers, dusty reds, olive greens and gentle teals; lower saturation and softer contrast than American Technicolor; a slightly faded, nostalgic, continental quality; fine grain; and the understated, naturalistic colour of a 1930s-40s European film. Warm-muted, earthy, understated, period-European. Close with a small caption in an elegant period font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+%% Append at the END — style last. EARLY-COLOR family — AGFACOLOR (mid-century EUROPEAN stock): warm-but-muted earthy palette (ambers, dusty reds, olive), low saturation, understated, faded-continental. For period-European / COLD-WAR-adjacent moods. SCENE AFFINITY: reads cold-war strongest on a grim institutional scene; on the sunny clearing (where validated) it reads warm-muted — a cold-war re-roll was attempted but the codex SESSION died mid-render (auth). Caption = title only (this one leaked "AGFACOLOR FILM", the trigger for the family-wide caption rule). A keeper (user). Keep the warm-muted European palette.
+</Agfacolor>
+
+<Sovcolor>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame shot on SOVCOLOR / Eastern-bloc colour film stock — the mid-century Soviet colour process. The signature: a cool, muted, slightly sickly palette with desaturated greens, anaemic blues, and a faint cyan-green or jaundiced cast; low contrast and a flat, grey, institutional quality; subdued, washed-out, melancholy colour; visible grain; and the austere, overcast, period Eastern-European atmosphere. Cool, muted, austere, institutional, melancholy. Close with a small caption in a plain period font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+%% Append at the END — style last. EARLY-COLOR family — SOVCOLOR / Eastern-bloc stock: cool, muted, slightly sickly palette (desaturated greens, anaemic blues, jaundiced cast), flat grey institutional quality, austere melancholy — the COLD-WAR-INTRIGUE stock. SCENE AFFINITY: pops on grim institutional / urban scenes; on the sunny clearing (where validated) the cold-war tell reads gently. Caption = title only (no process name). A keeper (user). Keep the cool sickly institutional palette.
+</Sovcolor>
+
+<Anscochrome>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a photograph on 1950s ANSCOCHROME colour slide film — an amateur mid-century colour-transparency stock. The signature: warm but slightly off-balance vintage colour with a tendency to shift toward magenta-pink and amber; gently faded, slightly low-contrast tones; a nostalgic mid-century snapshot quality; fine grain; soft highlights; and the cosy, faded, family-album atmosphere of a 1950s colour slide. Faded, warm, nostalgic, mid-century. Close with a small caption in a casual period font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+%% Append at the END — style last. EARLY-COLOR family — ANSCOCHROME (1950s amateur slide): warm, slightly off-balance, magenta-shifting, gently faded mid-century family-album colour. The nostalgic transitional member; sits near [[Agfacolor]] in the muted-vintage zone (I'd flagged it as the least-differentiated, but the user kept the whole set). Caption = title only (no process name). A keeper (user). Keep the faded warm nostalgic cast.
+</Anscochrome>
+
+<TwoStripTechnicolor>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from an early TWO-STRIP TECHNICOLOR motion picture — the limited two-colour process from before full three-strip colour. The signature: a restricted palette built ONLY from red-orange and cyan-green, with NO true blues or pure full-spectrum colour; pale, slightly chalky pastel flesh tones; a muted teal-and-salmon overall cast; soft vintage early-cinema texture; gentle grain; and a quaint, antique, two-tone period charm. Limited-palette, antique, two-tone-by-chemistry. Close with a small caption in an ornate early-cinema font — a scene or place TITLE only; do NOT name the film process, stock, or colour technique in the caption.`
+
+%% Append at the END — style last. EARLY-COLOR / MOTION-PICTURE family — early TWO-STRIP TECHNICOLOR: a limited RED-ORANGE + CYAN-GREEN palette (NO true blue), chalky pastel flesh, teal-and-salmon cast, antique two-tone charm. Distinct from full three-strip [[Technicolor]] (the limited palette is the tell). CAPTION FIX (user, the seed of the family-wide no-process-name caption rule): the first cut printed the PROCESS NAME ("in TECHNICOLOR TWO-STRIP"); the v2 demands a scene/place TITLE only — validated clean ("THE VERDANT CLEARING"). Reveal on a colour scene. A keeper (user). Keep the two-colour palette + the no-process caption directive.
+</TwoStripTechnicolor>
 
 <!--
   Named variants go here as additional top-level sections, e.g.
