@@ -462,6 +462,398 @@ When composing prompts for `generate_image`, render the image in this visual sty
 %% Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. An atmospheric sumi-e INK-WASH on fibrous washi / rag paper — a spare, calm, meditative MONOCHROME register. The strongest economy lever in this traditional-media pair: LARGE AREAS OF BARE PAPER left empty as mist / sky / space (intrinsic sumi-e anti-cram) plus the ink bleeding into the paper's fibrous tooth as the texture-target (the cotton-rag / washi lever, user idea). The tic is well-MITIGATED — bare paper dominates and the distance dissolves into emptiness. Monochrome with at most one restrained accent (e.g. a red seal). The portrait-prior keeps the figure a touch rendered (accepted, see [[Charcoal]]). Caption = clean type. Validated on the Xera dusk scene. Keep the bare-paper economy, the fibrous-paper ink bleed, and the brush economy.
 </InkWash>
 
+<WesternRPG>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as an in-game screenshot from a high-end modern Western open-world RPG, in photo mode (no HUD, no nameplates) — a realistic, gritty, atmospheric game-engine render. Physically-based realistic materials, naturalistic global-illumination lighting and weather, detailed but grounded environments, a believable lived-in world, cinematic depth of field and subtle film grain. Grounded, immersive, high-fidelity but not anime — the realistic counterpart to a Japanese MMO render. Close with a caption overlaid in a tasteful font.`
+
+%% Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. An expansion of the GAME-RENDER family anchored by the default [[Image]] style (a GPU-rendered Japanese MMO in photo mode) — this is the REALISTIC / grounded Western open-world RPG counterpart (think a modern photoreal open-world game in photo mode), distinct from the anime MMO. Game renders are an in-distribution prior, so it renders clean with no real tic problem. Caption overlaid in a tasteful font (the [[Image]] family caption). Reach for it on grittier, grounded, non-anime campaigns. Validated on the Xera dusk scene; an instant keeper (user). Keep the photo-mode / no-HUD framing, the realistic PBR + naturalistic lighting, and the overlaid caption.
+</WesternRPG>
+
+<RetroPSX>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as an in-game screenshot from a late-1990s and early-2000s PlayStation-era 3D game — a gritty low-fidelity retro real-time render. Low-polygon models with jittery wobbling vertices, low-resolution warping affine-mapped textures, visible texture seams and aliasing, chunky pixelation, ordered dithering in the gradients, thick atmospheric draw-distance fog swallowing the background, and a low-res CRT-ish look. Nostalgic, janky, atmospheric early-3D. Close with a caption overlaid in a tasteful pixel or period font.`
+
+%% Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. An expansion of the GAME-RENDER family ([[Image]]) — the gritty, janky PS1 / PS2-era retro 3D register. The STRUCTURAL retro format (low-poly jitter, low-res warping affine textures, ordered dithering, thick draw-distance FOG swallowing the background) is what separates it cleanly AND is anti-tic: the fog + low fidelity dissolve the background so the model can't cram (same family as the [[PracticalMiniature]] haze-fills-the-negatives lever, here as draw-distance fog). Distinct from the clean faceted [[LowPoly]] — this is gritty, textured, nostalgic jank. Charming, atmospheric, retro / horror-friendly (it even gave itself a JRPG dialogue caption). Validated on the Xera dusk scene; a keeper (user). Keep the low-fi jitter + warping textures + dithering + draw-distance fog, and the pixel/period caption.
+</RetroPSX>
+
+<HeroShooter>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as an in-game shot from a bright, stylised modern multiplayer hero-shooter, in photo mode (no HUD) — a clean, appealing, chunky stylised 3D game render. Bold readable shapes, slightly exaggerated heroic proportions, smooth stylised physically-based materials with a clean colourful palette, punchy saturated lighting. Strict process discipline to keep it clean: a SHALLOW DEPTH OF FIELD with the focal character crisp and the background falling into soft bokeh blur, and strong VOLUMETRIC LIGHTING — god-rays, atmospheric haze and light shafts filling the air — so the background reads as soft light and atmosphere rather than crammed detail; rim light and bloom on the hero. Bright, energetic, broadly appealing stylised game art. Close with a caption overlaid in a tasteful font.`
+
+%% Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Game-render family ([[Image]] / [[WesternRPG]] / [[RetroPSX]]) — the bright, clean, STYLISED multiplayer hero-shooter register. The high-fidelity 3D game renders CONVERGE (polished 3D Xera-on-a-vista) and carry the tic; the fix here (user) is DoF + VOLUMETRIC LIGHTING — a shallow depth of field plus god-rays / haze / light-shafts ORGANISE the background into soft light and atmosphere instead of crammed detail (the [[PracticalMiniature]] DoF-and-haze lever, applied to game renders) — it tamed the tic while keeping the hero-shooter punch. Bright, energetic, broadly appealing. Caption overlaid. Validated on the Xera dusk scene; a keeper (user). Keep the DoF + volumetric lighting (the anti-tic), the bright stylised PBR, and the overlaid caption.
+</HeroShooter>
+
+<JRPGCinematic>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a cinematic cutscene still from a high-budget modern Japanese RPG, in photo mode (no HUD) — a polished, dramatic, anime-flavoured real-time cinematic render. Beautiful stylised anime-inflected characters, lush fantastical environments, dramatic cinematic lighting. Strict process discipline to keep it clean: a SHALLOW cinematic DEPTH OF FIELD with the focal character crisp and everything else softening into bokeh, strong VOLUMETRIC LIGHTING (god-rays, atmospheric haze, light shafts) filling the air, and a LONG ATMOSPHERIC DRAW DISTANCE — push all the environmental clutter and detail far back into the distance where aerial perspective and haze dissolve it into soft simple shapes, keeping the near-field clean and uncluttered. A rich saturated palette, bloom, flare, emotional staging. Epic, cinematic, anime-JRPG. Close with a caption overlaid in a tasteful font.`
+
+%% Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Game-render family ([[Image]]) — the epic, anime-flavoured JRPG CINEMATIC / cutscene register, the most dramatic of the high-fidelity game renders. Same tic-fix as [[HeroShooter]]: DoF + VOLUMETRIC LIGHTING plus a long ATMOSPHERIC draw distance that DISSOLVES the far clutter into soft simple shapes (aerial perspective), keeping the near-field clean (the [[PracticalMiniature]] DoF-and-haze lever). KEY LESSON (user, learned the hard way): a literal "long CLUTTER draw distance" — lots of detail RENDERED far out — is a MAXIMAL manifestation of the tic, NOT richness; the clean version DISSOLVES distant clutter into atmosphere, it does not pack it in. Epic, dramatic, cinematic. Caption overlaid. Validated on the Xera dusk scene; a keeper (user). Keep the DoF + volumetric + atmospheric-DISSOLVE (the anti-tic), and the overlaid caption.
+</JRPGCinematic>
+
+<MobaStylized>
+When composing prompts for `generate_image` in this style, make the SUBJECT a single character filling the frame in a dynamic, heroic action pose — this is character splash art, so put the hero front and centre in motion (not a wide landscape with a small figure), with the setting reduced to a dramatic background behind them. Then render in this visual style:
+
+`Rendered as bright, stylised MOBA hero splash art — clean, polished, exaggerated key-art of a competitive battle-arena game champion. The character fills the frame in a bold dynamic heroic pose with slightly exaggerated stylised proportions, rendered in clean bright stylised colour with bold readable shapes, punchy saturated lighting, glowing colourful VFX, and a clean dynamic background. Bright, energetic, appealing, polished stylised key-art. Close with the hero's name in a bold stylised title treatment.`
+
+%% Append the style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. MOBA / battle-arena champion SPLASH ART — bright, clean, STYLISED hero key-art. This is a SCENE-COUPLED, CHARACTER-FORWARD register (like [[NurseryWatercolor]]): splash art needs the hero filling the frame in a dynamic pose, so the steering lives in the DM-FACING intro above (the `%%` note is stripped before the DM sees it, and the style line is read by the image model, not the DM) — a normal vista brief would render a small figure in a landscape, not a splash. The bright / clean / graphic finish separates it from the moodier painterly + realistic MOBA cousins (which converged and were not banked). MOBA splash WANTS energy / VFX / drama — lean in (density-as-feature, the tic is welcome here). Sibling: [[MobaAnime]] (the anime version, the most distinct of the takes). Caption = the hero's name in a bold stylised title treatment. Validated on a heroic-action Xera scene; a keeper (user). Keep the character-forward intro, the bright stylised render + VFX, and the bold title lockup.
+</MobaStylized>
+
+<MobaAnime>
+When composing prompts for `generate_image` in this style, make the SUBJECT a single character filling the frame in a dynamic, heroic action pose — this is character splash art, so put the hero front and centre in motion (not a wide landscape with a small figure), with the setting reduced to a dramatic background behind them. Then render in this visual style:
+
+`Rendered as anime-style hero splash art — the clean, polished character key-art of a high-budget anime gacha or battle-arena game. The character fills the frame in a dynamic heroic anime pose, with clean anime lineart and cel-and-painted colour, expressive features, flowing hair and gear caught in motion, glowing magical and tech effects, dramatic bloom and rim light, and a bright atmospheric background. Polished, expressive, dynamic anime key-art. Close with the hero's name in a bold stylised title treatment.`
+
+%% Append the style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. MOBA / gacha hero SPLASH ART in the ANIME register — clean anime lineart + cel-and-painted colour, dynamic heroic pose, VFX, bold title lockup. The most DISTINCT of the MOBA takes (the anime prior separates cleanly, as it does for [[AnimeIllustration]]). Same SCENE-COUPLED, CHARACTER-FORWARD requirement as its sibling [[MobaStylized]]: the hero must fill the frame in a dynamic pose, so the steering lives in the DM-FACING intro above (a vista brief won't read as splash). Caption = the hero's name in a bold stylised title treatment. Validated on a heroic-action Xera scene; a keeper (user). Keep the character-forward intro, the anime render + VFX, and the bold title lockup.
+</MobaAnime>
+
+<BakedAAA>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as an authentic in-game screenshot from a flagship 2004-era AAA game engine — real-time rasterized 3D of the mid-2000s, NOT a pre-rendered cinematic and NOT a modern render. Period fidelity is the whole point: moderate polygon counts with honestly faceted geometry on curved surfaces, DXT-compressed textures with their characteristic mild blocking, and crisp clean polygon edges from heavy 8x multisample anti-aliasing (no jaggies anywhere). Lighting is BAKED — precomputed lightmaps and radiosity give soft, warm, completely static global illumination, with gentle baked ambient occlusion pooling in the corners and soft contact shadows under objects; no real-time dynamic shadows. Early-HDR touches of the era: a restrained warm bloom off the brightest surfaces, slightly crushed near-black shadows, and a mild filmic colour grade. The intrinsic asset economy of the period is the discipline: honest game-asset budgeting, clean simple shapes, a limited set of repeated materials, no needless clutter — a technically confident game built within a 2004 hardware budget. Atmospheric, clean, nostalgic. Close with a caption overlaid in a tasteful font.`
+
+%% Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Game-render family ([[Image]] / [[WesternRPG]] / [[RetroPSX]] / [[HeroShooter]] / [[JRPGCinematic]] / [[DX9Interior]]) — the mid-2000s BAKED-LIGHTING AAA register (precomputed lightmaps + radiosity, heavy 8x MSAA, DXT textures), more advanced than the [[RetroPSX]] jank but distinctly PERIOD, not modern. KEY LEVER (user): this is one of the rare DENSITY-AS-FEATURE registers (like [[MobaStylized]] / [[Blockbook]]) — 2004 games leaned on REPEATED tiling textures and RECURRING modular set-dressing, so the model's cram-detail tic reads as PERIOD-AUTHENTIC rather than as noise; the tic is welcome / disguised here, no suppression needed. The render CONVERGES toward a polished MODERN game shot (it collapsed into [[WesternRPG]] on the first pass) unless the period DEGRADATION tells carry real weight — the [[RetroPSX]] lesson: keep the baked-lightmap signature, DXT blocking, faceted geometry and early-HDR bloom doing the work; a bare "NOT modern" negation is weak on its own. SCENE NOTE: validated on the Xera dusk VISTA, but the register's NATIVE habitat is an INDOOR lightmapped corridor / interior (the era literally couldn't render this kind of open alien vista) — an indoor Xera scene is the truest FUTURE showcase. Caption overlaid in a tasteful font (the [[Image]] family caption). Validated on the Xera dusk scene; an instant keeper (user). Keep the baked-lighting signature, the period DXT / faceting / bloom degradation, the repeated-texture density-as-feature, and the overlaid caption.
+</BakedAAA>
+
+<DX9Interior>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as an authentic in-game screenshot from a 2004-era DirectX 9 AAA game engine — real-time rasterized 3D of the mid-2000s, NOT a pre-rendered cinematic and NOT a modern render. Period rendering tech is the whole point and is what keeps it honest: DirectX 9 / Shader Model 2.0 per-pixel lighting, with HARD-EDGED DYNAMIC SHADOWS cast by stencil shadow volumes — sharp, crisp shadow shapes thrown from the strong light sources in the scene, with no soft penumbra. Bump and normal-mapped surfaces catch tight specular highlights; textures seen at a grazing angle stay sharp into the distance thanks to ANISOTROPIC FILTERING; DXT-compressed textures show their characteristic mild blocking; crisp clean polygon edges from multisample anti-aliasing. Moderate polygon counts with honestly faceted geometry, a restrained early-HDR bloom off the brightest lights, slightly crushed near-black shadows, and a mild filmic colour grade. The era's asset economy is the discipline: honest game-asset budgeting, a limited set of repeated tiling textures, clean simple shapes. Atmospheric, nostalgic, technically confident for its year. Close with a caption overlaid in a tasteful font.`
+
+%% Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Game-render family ([[Image]] / [[WesternRPG]] / [[BakedAAA]]) — the 2004-era DX9 / SM2.0 HARD-DYNAMIC-SHADOW take, sibling to [[BakedAAA]] (which uses the era's OTHER lighting approach — precomputed baked lightmaps / static GI). Its identity is the era's HARD DYNAMIC SHADOWS (stencil shadow volumes — sharp shadows, no soft penumbra), DX9 / SM2.0 per-pixel lighting, normal/bump mapping with tight speculars, anisotropic filtering, DXT blocking, faceted geometry, and early-HDR bloom. SCENE-NEUTRAL BY DESIGN (user, important): the style line is kept to RENDERING TECHNIQUE only — it deliberately does NOT name an interior / corridor / dark scene, because content + mood words in a style line make it SCENE-COUPLED and would force e.g. an outdoor campaign beat to render as a dark interior (same lesson as [[Blockbook]]'s hell-lock fix — keep the style line about the MEDIUM, let the DM's scene supply the content). We proof it on INDOOR scenes OURSELVES (where the hard-shadow look reads strongest, and where the gallery example lives), but that steering stays OUT of the shipped prompt. HONEST: like [[BakedAAA]] it renders at near-MODERN fidelity (~2018), NOT strictly 2004 — the in-game-render prior gravitates modern; for the unmistakably-period 2004 look see the hard-degraded sibling [[RetroDX9]]. The user's eye keeps it as the clean, grounded, atmospheric narrative-game render — the leverage for illuminating a narrative game. Caption overlaid in a tasteful font. Validated on the Xera station-corridor scene; a keeper (user). Keep the hard stencil-shadow + anisotropic + DX9 technique callouts (scene-neutral), and the overlaid caption.
+</DX9Interior>
+
+<RetroDX9>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a real in-game screenshot from a 2004 PC game running on DirectX 9 hardware of the time — low fidelity by today's standards, NOT a modern render and NOT cinematic. Make the period limitations VISIBLE and obvious: visibly LOW-POLYGON models with hard faceted silhouettes (chunky hands, blocky shoulders, angular environment geometry), LOW-RESOLUTION textures that look soft and slightly blurry up close with obvious blocky DXT compression artefacts, and a limited material palette of a few repeated tiling textures. Lighting is simple and HARD: per-pixel lighting from a few strong light sources with HARD-EDGED stencil-volume shadows that have NO soft penumbra and NO ambient occlusion — unlit areas fall to a flat, evenly-dark ambient fill with no bounced light or global illumination. Tight plasticky specular highlights on the normal-mapped surfaces, an over-eager early-HDR BLOOM blowing out around the brightest lights, mild colour banding in the gradients, and a slightly low-resolution, faintly soft image. The look of a game that was technically impressive FOR 2004 — clearly dated, clean, simple, a little stiff. Close with a caption overlaid in a period game font.`
+
+%% Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Game-render family ([[Image]] / [[BakedAAA]] / [[DX9Interior]] / [[RetroPSX]]) — the UNMISTAKABLY-PERIOD, hard-degraded 2004 DX9 take, and the intended BOTTOM RUNG of a game-render ERA LADDER (2004 → 2007 → 2011 → 2016 → 2019). Where [[BakedAAA]] / [[DX9Interior]] CONVERGE to near-modern fidelity (the in-game-render prior gravitates ~2018), this one is forced genuinely down to 2004 by STRUCTURAL DEGRADATION doing real work — the [[RetroPSX]] lesson: visibly LOW-POLY faceted geometry, LOW-RES + chunky DXT-blocked textures, HARD penumbra-less stencil shadows with NO ambient occlusion / NO GI (unlit areas fall to a flat even dark — the period no-SSAO look), over-eager early-HDR BLOOM, mild colour banding, a faintly soft low-res image — plus DROPPING the modern-pulling words ("AAA / atmospheric / cinematic"). The soft tech callouts alone do NOT shift the era (they got steamrolled, like "NOT modern"); the visible LOW-FIDELITY degradation is what lands 2004. Pairs with [[RetroPSX]] as the low-fi retro-GAME register (RetroPSX = PS1/PS2 jank, RetroDX9 = 2004 PC). It even gave itself a period in-game DIALOGUE SUBTITLE caption (mid-2000s survival-horror / adventure UI). SCENE-NEUTRAL by design (rendering technique only, same rule as [[DX9Interior]]); proofed on the indoor corridor OURSELVES, not commanded in the prompt. Caption = an overlaid period game font / dialogue subtitle. Validated on the Xera station-corridor scene; "PERFECT, we keep that" (user). Keep the visible low-poly / low-res / DXT / hard-shadow degradation (the era-lander) and the period caption.
+</RetroDX9>
+
+<MidGenConsole>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as an authentic in-game screenshot from a 2007-era Xbox-360 / PlayStation-3 generation game engine (DirectX 9c / Shader Model 3) — a clearly last-generation real-time render, NOT modern and NOT pre-rendered. Make the period limitations VISIBLE: chunky last-gen geometry (smoother than the early 2000s but still obviously low-detail, with simple silhouettes), CRUNCHY normal-mapped textures at limited resolution, and a waxy PRE-PBR look where everything carries the same plasticky over-glossy specular sheen. Lighting is heavy-handed and dated: aggressive early-HDR BLOOM blowing out every bright source, crude tone-mapping, FIRST-GENERATION screen-space ambient occlusion drawing obvious muddy dark halos around objects, and LOW-RESOLUTION shadow maps with visibly jagged, aliased, flickery edges. A thick period colour grade — heavily crushed blacks and a strong brown-and-orange or teal cast over everything. Hard edge aliasing with no temporal anti-aliasing (jaggies and shimmer), and a limited draw distance. The unmistakable look of a flagship 2007 console game — impressive for its day, plasticky, bloom-drunk, and clearly dated. Close with a caption overlaid in a period game font.`
+
+%% Append this style descriptor at the END of every prompt — `gpt-image-2` adheres better when style guidance comes last. Game-render ERA LADDER ([[RetroDX9]] 2004 → MidGenConsole 2007 → [[DeferredDX11]] 2011 → [[RayTracedAAA]] 2019): the mid-2000s Xbox-360 / PS3 generation rung. Forced into its era by AGGRESSIVE structural degradation (chunky last-gen geometry, crunchy textures, waxy PRE-PBR speculars, bloom-drunk early HDR, crude first-gen SSAO halos, jagged low-res shadow maps, brown/teal grade, no-TAA aliasing) — the [[RetroDX9]] lesson; moderate callouts just converge to modern (the rejected non-degraded 2007 twin proved it). Reads as the over-the-shoulder 360-era console game. Scene-neutral. Caption = period game font. Validated on the Xera corridor scene; a keeper (user). Keep the aggressive period degradation (the era-lander).
+</MidGenConsole>
+
+<DeferredDX11>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as an authentic in-game screenshot from a 2011-era DirectX 11 AAA game engine — an early-DX11 real-time render, NOT a modern engine and NOT pre-rendered. Period rendering tech, pushed so it reads as 2011 and not newer: a DEFERRED-SHADING look with many dynamic lights, slightly overdone screen-space ambient occlusion drawing dark contact-shadow halos in every crevice, TESSELLATED surfaces, and cascaded shadow maps that are soft but still a little low-resolution. Anti-aliasing is early post-process FXAA — so edges are smooth but slightly SMEARY and blurred, with a faint loss of fine texture detail (no crisp modern temporal anti-aliasing). Materials are improved but still PRE-physically-based: a slightly plasticky, ad-hoc specular-and-gloss look. A glossy Hollywood colour grade — teal-and-orange, lifted blacks, lens dirt and mild bloom on the highlights. Higher detail than the previous console generation but still clearly dated geometry and texture resolution. The look of a flagship game of 2011 — slick for its day, a touch soft and plasticky. Close with a caption overlaid in a tasteful font.`
+
+%% Append at the END — style last. Game-render ERA LADDER, the 2011 DX11 rung (deferred shading, overdone SSAO, tessellation, FXAA smear, pre-PBR speculars, teal-orange grade). HONEST: 2011 and [[RayTracedAAA]] (2019) CONVERGE to essentially the same modern look (the whole upper ladder collapses to modern — also covered by [[DX9Interior]] / [[WesternRPG]]); banked as a distinct era LABEL by user call, not because it looks meaningfully different from 2019. Reach for it when you want the named-era vibe. Scene-neutral. Caption overlaid. Validated on the Xera corridor; a keeper (user, "just manages to be a keep").
+</DeferredDX11>
+
+<RayTracedAAA>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as an authentic in-game screenshot from a 2019-era cutting-edge AAA game engine — a near-photoreal modern real-time render in photo mode (no HUD). State-of-the-art rendering: full physically-based materials, real-time HYBRID RAY TRACING for reflections, soft contact-hardening shadows and global illumination, a high-resolution temporally anti-aliased image, volumetric fog and god-rays, photogrammetry-grade surface detail, screen-space reflections, subtle film grain and a refined filmic colour grade. Extremely high geometry and texture detail, a long draw distance, and cinematic depth of field. The look of a flagship 2019 game at maximum settings — crisp, atmospheric, photoreal. Close with a caption overlaid in a tasteful font.`
+
+%% Append at the END — style last. Game-render ERA LADDER, the 2019 / current-gen TOP rung (full PBR, hybrid RAY TRACING, TAA, volumetrics, photogrammetry detail). This is the model's DEFAULT in-game look — crisp, photoreal, modern — so it converges with [[DeferredDX11]] and with [[DX9Interior]] / [[WesternRPG]]. The cleanest "modern flagship game" anchor of the ladder. Scene-neutral. Caption overlaid. Validated on the Xera corridor; a keeper (user, "very nice").
+</RayTracedAAA>
+
+<FirstPerson>
+When composing prompts for `generate_image` in this style, compose the SUBJECT as a FIRST-PERSON view — describe the scene as seen directly through the character's own eyes, with their gloved hands / forearms and whatever they are holding (a lamp, a tool, a weapon) in the lower foreground, and any interface as a small diegetic readout. Then render in this visual style:
+
+`Rendered as an authentic first-person in-game screenshot from a modern immersive-sim / survival-horror video game — a real-time first-person render seen directly through the player-character's eyes, NOT a third-person or cinematic shot. The character's own gloved hands and forearms are visible in the lower foreground holding their equipment, exactly as in a first-person game. A restrained DIEGETIC interface only — a faint glowing holographic readout on a wrist or handheld device, no floating arcade HUD. Physically-based materials, atmospheric volumetric lighting, subtle film grain and a filmic colour grade. Grounded, immersive first-person realism. Close with a small caption in a tasteful diegetic font.`
+
+%% Append at the END — style last. A SCENE-COUPLED, FIRST-PERSON in-game framing (immersive-sim / survival-horror, Alien-Isolation feel) — like the splash-art variants, the steering lives in the DM-FACING intro above (the `%%` note is stripped before the DM sees it, and the style line is read by the image model, not the DM). The subject MUST be composed first-person (own gloved hands + held equipment in the lower foreground, diegetic-only HUD) or a normal third-person brief renders a normal third-person shot. The distinct value is the FRAMING (you ARE the character), which escapes the photoreal-convergence the era renders suffer. Style line scrubbed scene-neutral (technique only, cf. [[DX9Interior]]); proofed on the Xera corridor. Caption = small diegetic font. Validated; a keeper (user). Keep the first-person intro + hands-in-frame + diegetic HUD.
+</FirstPerson>
+
+<FixedCamHorror>
+When composing prompts for `generate_image` in this style, compose the SUBJECT for a fixed dramatic camera — describe a single static, high or canted cinematic camera angle looking at the character as a small, vulnerable figure dwarfed by the environment, framed for tension. Then render in this visual style:
+
+`Rendered as an in-game screenshot from a classic fixed-camera survival-horror video game — a single dramatic STATIC camera angle (a high, canted, cinematic vantage the player does not control), composing the scene for maximum tension and vulnerability, with the character a small figure within a richly detailed, almost pre-rendered-looking environment, dwarfed by the framing. Cinematic, ominous staging; high contrast with crushed blacks; modern game fidelity with a deliberately old-school fixed-cam horror composition. Close with a caption overlaid in a tasteful font.`
+
+%% Append at the END — style last. A SCENE-COUPLED fixed-camera survival-horror FRAMING — the steering lives in the DM-FACING intro above (a high / canted static dramatic angle with the character a small, vulnerable figure dwarfed by the environment); a normal brief won't compose the dramatic angle. Distinct value = the fixed-cam COMPOSITION (RE / Dead-Space dread), which escapes the eye-level photoreal-convergence. OVERLAP: shares the dread register with the photographic [[SurvivalHorror]] — this is the in-engine fixed-cam cousin. Caption overlaid. Validated on the Xera corridor; "WOW" (user). Keep the fixed-dramatic-angle intro + small-figure composition.
+</FixedCamHorror>
+
+<CinematicFilm>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a still frame from a prestige cinematic film, shot on 35mm anamorphic film — NOT a game render and NOT a digital illustration. Cinematic photography: a wide anamorphic frame with gentle horizontal lens flares, a shallow depth of field with creamy bokeh and oval out-of-focus highlights, and natural filmic sharpness on the subject. Real photochemical 35mm character — fine organic film grain, soft highlight roll-off, deep but detailed shadows, and a restrained cinematic colour grade (teal shadows, warm skin tones, muted saturation). Dramatic, motivated practical lighting with an atmospheric haze catching the light. The composed, intentional look of a single frame lifted from a beautifully shot film. Close with a small caption in an elegant film-title font set within a subtle letterbox bar.`
+
+%% Append at the END — style last. The catalog's prestige CINEMATIC FILM-STILL register (35mm anamorphic, horizontal lens flares, shallow DoF, film grain, teal/warm grade, letterbox + film-title caption) — the "this is a movie moment" look the catalog lacked. Differentiates from the photoreal game renders not by the base render (which converges) but by the cinematic FRAMING + FINISH (letterbox, anamorphic flares, title treatment). Genre-neutral (scrubbed "science-fiction" → "film" so it serves any setting). Sibling: the B&W [[NoirCinema]]. NOTE: user wants a higher-FLARE take too ("sometimes you just need some lens flares") — a flarier render is under review; may update this style line or add a sibling. Validated on the Xera corridor; a keeper (user). Keep the anamorphic + letterbox + title caption.
+</CinematicFilm>
+
+<CinematicFlare>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a still frame from a prestige cinematic film, shot on 35mm anamorphic film — NOT a game render and NOT a digital illustration. Cinematic photography with PROMINENT ANAMORPHIC LENS FLARES as the signature: bold horizontal blue-streak flares lancing right across the frame from every bright light source, stacked lens halos, veiling glare and bokeh-disc artefacts, and a hazy atmosphere that scatters the light into the lens. A wide anamorphic frame, a shallow depth of field with creamy bokeh and oval out-of-focus highlights. Real photochemical 35mm character — fine organic film grain, soft highlight roll-off, deep but detailed shadows, and a restrained cinematic colour grade (teal shadows, warm skin tones, muted saturation). Dramatic, motivated practical lighting. The composed, flare-drenched look of a single frame lifted from a beautifully shot anamorphic film. Close with a small caption in an elegant film-title font set within a subtle letterbox bar.`
+
+%% Append at the END — style last. The FLARE-FORWARD sibling of [[CinematicFilm]] — same prestige 35mm anamorphic film-still register, but with PROMINENT anamorphic lens flares as the signature (bold horizontal blue streaks lancing across the frame, stacked halos, veiling glare) — the blockbuster-anamorphic look. Kept as a SEPARATE variant (user: "we actually keep cinema35 — the reroll is for an added one"): [[CinematicFilm]] = the subtler prestige-drama flare, CinematicFlare = the heavy blockbuster flare; pick by mood. Genre-neutral ("science-fiction" → "film"). Letterbox + film-title caption. Validated on the Xera corridor; a keeper (user). Keep the prominent anamorphic flares (the signature) + the letterbox title.
+</CinematicFlare>
+
+<NoirCinema>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a black-and-white still frame from a classic film-noir motion picture, shot on high-contrast 35mm — NOT a game render and NOT a modern photo. Dramatic chiaroscuro cinematography: a single hard key light carving the subject out of deep, inky black, bold geometric shadow shapes thrown across the scene, slatted light and drifting haze or smoke catching the beam, a glistening highlight on wet surfaces. Rich monochrome with crushed blacks and luminous highlights, fine photochemical film grain, soft highlight roll-off, and a low, dramatic camera angle. Moody, tense, expressionist, timeless. Close with a small caption in an elegant period film-title font within a subtle letterbox bar.`
+
+%% Append at the END — style last. B&W FILM-NOIR cinema still — dramatic chiaroscuro, a single hard key carving the subject from inky black, smoke/haze, film grain, low dramatic angle, letterbox + film-title caption. A true MOVIE frame: distinct from the ink-illustration [[InkNoir]] and the harsh-flash snapshot [[LandCamera]]; the B&W sibling of [[CinematicFilm]]. The black-gives-rest lever (deep blacks) also composites into the dark TUI. High narrative value for tense / dramatic beats. Validated on the Xera corridor (user found the grinning Xera hilariously incongruent but kept it — the portrait-prior expression, cf. [[Charcoal]]); a keeper. Keep the chiaroscuro + monochrome + letterbox title.
+</NoirCinema>
+
+<DocumentaryPhoto>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a grounded documentary photograph — a candid, photojournalistic still as if shot by an embedded reportage photographer on a full-frame DSLR with available light, NOT a game render, NOT a cinematic movie still, and NOT a posed studio shot. Naturalistic and unglamorous: a real available-light exposure with motivated practical sources, honest skin and materials, a slightly imperfect handheld composition, a moderate natural depth of field, true-to-life muted colour, and fine high-ISO sensor grain in the shadows. The authentic, in-the-moment, you-are-there feeling of reportage — observed, not staged. Close with a small caption in a plain documentary font, like a photo-essay caption.`
+
+%% Append at the END — style last. Grounded DOCUMENTARY / reportage photograph — candid available-light photojournalism, handheld imperfection, muted true-to-life colour, high-ISO grain, photo-essay caption. The grounded "you-are-there, observed-not-staged" register; distinct from the cold degraded SURVEILLANCE cluster ([[NightVisionCam]] etc.) and from the polished [[CinematicFilm]]. I rated it weakly-differentiated; the USER rated it a TOP-5-OVERALL keeper (eyeballs win, cf. [[show-renders-before-banking]]) — the candid reportage mood reads stronger than I credited. Scene-neutral. A photo-essay caption may include an in-world (future) date — fine, NOT the surveillance no-date rule. Validated on the Xera corridor; a BIG keeper (user). Keep the available-light candid realism + photo-essay caption.
+</DocumentaryPhoto>
+
+<PainterlyGame>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as an in-game screenshot from a stylised, painterly video game with a hand-painted art direction — NOT photoreal and NOT a digital concept-painting. Shot on a WIDE 20MM LENS — a wide field of view with natural wide-angle perspective that gives the scene room to breathe, big simple foreground shapes, and the composition spread out rather than crammed. Visible painterly brushwork baked directly into the textures and surfaces, slightly exaggerated and characterful proportions and architecture, hand-crafted stylised materials rather than physically-based realism, bold readable shapes, a warm hand-mixed colour palette, and soft painterly lighting. The look of a game world built out of paintings — stylised, textured, artful, immediately recognisable as a painterly game rather than a photoreal one. Close with a caption overlaid in a tasteful font.`
+
+%% Append at the END — style last. A painterly STYLISED game render (hand-painted world, Dishonored-ish) — visible painterly brushwork in the textures, characterful proportions, warm hand-mixed palette. KEY LEVER (user): a WIDE 20MM LENS is baked in as the anti-tic control — the wide field of view + big simple foreground shapes SPREAD the composition out so the model can't cram (a FOCAL-LENGTH expression of the economy-of-result lever, cf. [[ValueBlocked]] / [[CleanDigital]]; reusable on any cram-prone style). The no-20mm first cut carried a mild tic and converged toward [[DigitalPainting]] concept-art; the 20mm version breathes and reads more as a painterly GAME. Scene-neutral. Caption overlaid. Validated on the Xera corridor; a keeper (user, "it worked"). Keep the 20mm wide lens (the tic-control) + the painterly brushwork.
+</PainterlyGame>
+
+<Velvia>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a photograph shot on Fujichrome Velvia — the iconic ultra-saturated colour slide (transparency) film. Velvia's unmistakable signature: INTENSE, vivid colour saturation, especially deep glowing GREENS and rich punchy reds; high contrast with deep shadows and bright highlights; a cool-leaning colour balance; extremely fine grain and razor-sharp clarity; and the luminous, almost hyper-real "chrome" glow of a backlit slide. A landscape-photographer's dream stock — bold, saturated, crisp, vivid. Close with a small caption in a clean photographic font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+%% Append at the END — style last. First of an ICONIC FILM-STOCK family (user vein) — Fujichrome VELVIA, the ultra-saturated colour slide film (the "intense greens" stock the user named). Signature: INTENSE saturation (glowing greens + punchy reds), high contrast, fine grain, the hyper-real backlit-chrome glow. A pure photographic-MEDIUM register (the stock IS the look) — applies to any scene, but revealed best on colour-rich / outdoor scenes (proof film stocks on a colour-rich scene; the dark corridor hides the colour signature). Film-stock product names are technical MEDIA descriptors, fine to bake in (cf. [[feedback_no_artist_imitation]] = artists / named works only, not photographic stocks). Caption = clean photographic font. Validated on a golden-hour alien clearing; "Holy shit, yes, no notes" (user). Keep the intense saturation + chrome glow.
+</Velvia>
+
+<Kodachrome>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a photograph shot on Kodachrome — the legendary archival colour slide film with the timeless "National Geographic" look. Kodachrome's signature: rich, deep, slightly warm colour with famously luminous REDS and warm earth tones, natural but saturated greens and blues, beautiful skin tones, high microcontrast and crisp sharpness, extremely fine grain, and a subtle warm golden cast. A nostalgic, richly-toned, timeless mid-century photographic look. Close with a small caption in a clean photographic font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+%% Append at the END — style last. ICONIC FILM-STOCK family (sibling of [[Velvia]]) — KODACHROME, the warm archival slide (the "National Geographic" look): luminous warm reds + earth tones, high microcontrast, fine grain, a warm golden cast — the WARM-archival counterpart to Velvia's cool-saturated punch. PHOTOREALISM LEVER (user finding, remember this): asking for a named FILM STOCK is an extremely effective way to invoke SERIOUS PHOTOREALISM (the stock IS the look). Reveal on a colour-rich scene. Caption = clean photographic font. Validated on the clearing; "super impressive, big keep" (user). Keep the warm golden archival cast.
+</Kodachrome>
+
+<Portra>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a photograph shot on Kodak Portra 400 — the beloved soft colour negative portrait film. Portra's signature: gentle, natural, true-to-life SKIN TONES, low contrast with soft creamy highlights and open shadows, a slightly warm pastel colour palette, muted-but-pleasing saturation, fine grain, and a gentle, flattering, naturalistic look. Soft, warm, timeless, editorial. Close with a small caption in a clean photographic font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+%% Append at the END — style last. FILM-STOCK family ([[Velvia]] / [[Kodachrome]]) — PORTRA 400, the SOFT colour-negative portrait film: gentle natural skin tones, LOW contrast, creamy highlights, warm pastel palette, muted-pleasing saturation. The soft / flattering register vs the punchy slides. Photorealism lever (see [[Kodachrome]]). Caption = clean photographic font. Validated on the clearing; a keeper (user, kept the whole set). Keep the soft low-contrast pastel skin-tone look.
+</Portra>
+
+<TriX>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a black-and-white photograph shot on Kodak Tri-X 400 — the classic photojournalism and street film. Tri-X's signature: gritty, distinctive visible GRAIN, a rich tonal range with deep blacks and bright highlights, punchy contrast, a raw documentary feel, and hand-developed character. The timeless look of 35mm reportage black-and-white. Close with a small caption in a plain documentary font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+%% Append at the END — style last. FILM-STOCK family — KODAK TRI-X 400, the classic B&W reportage / street film: gritty visible GRAIN, rich tonal range, punchy contrast, documentary feel. Distinct B&W lane from [[NoirCinema]] (dramatic chiaroscuro) and [[LandCamera]] (harsh flash) — Tri-X = naturalistic documentary B&W (the B&W cousin of [[DocumentaryPhoto]]). Photorealism lever (see [[Kodachrome]]). Caption = plain documentary font. Validated on the clearing; a keeper (user). Keep the gritty grain + documentary tonality.
+</TriX>
+
+<Ektachrome>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a photograph shot on Kodak Ektachrome E100 — the clean, accurate colour slide film. Ektachrome's signature: crisp, clean, neutral-to-COOL colour rendition, accurate natural saturation (not over-saturated), clean bright BLUES, fine grain, sharp clarity, and a slightly cool, modern, true-to-life slide look — the cooler, more restrained counterpart to Velvia. Close with a small caption in a clean photographic font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+%% Append at the END — style last. FILM-STOCK family — KODAK EKTACHROME E100, the clean / accurate COOL slide: neutral-to-cool rendition, accurate (not over-saturated) colour, clean bright blues, sharp. The restrained / cool counterpart to [[Velvia]]'s saturation. NOTE: the LEAST-differentiated of the slides (accurate colour sits near a neutral render, and Velvia owns "saturated slide") — but the user kept the whole set ("every single one is fantastic"). Photorealism lever (see [[Kodachrome]]). Caption = clean photographic font. Validated on the clearing; a keeper (user). Keep the cool, clean, accurate slide rendition.
+</Ektachrome>
+
+<CineStill>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a photograph shot on CineStill 800T — the tungsten-balanced cinema colour film famous for its night look. CineStill's signature: a cool tungsten colour balance with cyan-leaning shadows and teal midtones, warm amber highlights, and — the unmistakable trademark — a soft red-orange HALATION GLOW blooming around every bright light source, where the bright halos bleed a warm red ring. Cinematic, moody, nocturnal, with fine grain. Close with a small caption in a clean photographic font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+%% Append at the END — style last. FILM-STOCK family — CINESTILL 800T, the tungsten-balanced NIGHT cinema film: cyan shadows + teal midtones + amber highlights + the trademark soft red-orange HALATION GLOW around bright lights. PROOF-SCENE matters: rendered on the NIGHT CORRIDOR (not the daylight clearing) so the halation-around-lights signature shows — a night / artificial-light scene is its native habitat. USER NOTE: it reads "a little weak — doesn't quite look like FILM, basically a really high-quality UNSTYLED render" — kept anyway (a clean cinematic night look). Photorealism lever (see [[Kodachrome]]). Caption = clean photographic font. Validated on the corridor; a keeper (user). Keep the tungsten balance + red halation.
+</CineStill>
+
+<Technicolor>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from a classic three-strip TECHNICOLOR motion picture — the glorious, glossy Golden-Age-of-Hollywood colour process. Technicolor's signature: intensely vivid, glowing, saturated colour with bold pure primaries (rich reds, deep blues, vivid greens), a glossy luminous quality, creamy glamour lighting, high production-value sheen, and a slightly heightened, hyper-real Technicolor glow. Lush, vivid, spectacular, timeless. Close with a small caption in an elegant period film-title font — a scene or place title only; do NOT print the film process or format name in the caption.`
+
+%% Append at the END — style last. ICONIC MOTION-PICTURE family (a sibling vein to the [[Velvia]] film-stock family — eras / processes / genres, NOT director signatures, cf. [[feedback_no_artist_imitation]]). THREE-STRIP TECHNICOLOR — the glossy Golden-Age glow: vivid saturated pure primaries, glamour lighting, hyper-real sheen. Like the film stocks, naming a real motion-picture PROCESS strongly invokes that look. Reveal on a colour-rich scene. Caption = elegant period film-title font. Validated on the clearing; an instant take (user). Keep the vivid saturated Technicolor glow.
+</Technicolor>
+
+<TealOrange>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from a glossy modern blockbuster film with the signature TEAL-AND-ORANGE Hollywood colour grade. Its signature: cool TEAL and cyan pushed into the shadows and backgrounds, warm ORANGE skin tones and highlights, a polished high-contrast digital-cinema sheen, shallow depth of field, anamorphic framing, lens flares, and a slick, expensive, contemporary popcorn-movie look. Glossy, punchy, cinematic. Close with a small caption in a tasteful font.`
+
+%% Append at the END — style last. MOTION-PICTURE family — the modern blockbuster TEAL-AND-ORANGE grade: cool teal shadows, warm orange skin / highlights, glossy high-contrast digital-cinema sheen, anamorphic + flares. NOTE: the closest of the motion-picture set to the existing modern polished cinematic look ([[CinematicFilm]] / the modern game renders), but the teal / orange split is a distinct, recognisable GRADE. Caption overlaid. Validated on the corridor; an instant take (user). Keep the teal-shadow / orange-skin grade.
+</TealOrange>
+
+<SpaghettiWestern>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from a classic SPAGHETTI WESTERN motion picture — the sun-scorched Italian-western look. Its signature: a hot, dusty, sun-bleached palette of ochre, amber, tan and sweat; harsh overhead desert sun and squint-inducing glare; an extreme TELEPHOTO compression flattening the distance; deep weathered close-up texture on skin and grit; heat-shimmer; a lurid saturated golden warmth; and a tense, operatic, dust-and-leather mood. Gritty, parched, iconic. Close with a small caption in a rugged period font.`
+
+%% Append at the END — style last. MOTION-PICTURE family — the SPAGHETTI-WESTERN look: sun-bleached ochre / amber / tan palette, harsh sun glare, extreme TELEPHOTO compression, weathered close-up grit, heat-shimmer, operatic dust-and-leather mood. SCENE AFFINITY: shines on OUTDOOR / arid / sunlit scenes (validated on a noon desert) — the sun-baked light is part of the genre signature, so it fits sunny exteriors best (less so a dark interior). Caption = rugged period font. Validated on a desert; an instant take + user favourite. Keep the sun-baked palette + telephoto grit.
+</SpaghettiWestern>
+
+<SilentFilm>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from an early 1920s SILENT MOTION PICTURE — vintage black-and-white film. Its signature: high-contrast orthochromatic black-and-white with bright skin and dark skies, a soft IRIS vignette darkening the corners, visible film damage (dust, scratches, flicker, frame jitter and emulsion mottling), a slightly fast under-cranked motion feel, and a nostalgic, ghostly, archival quality. Close with a caption styled as a silent-film INTERTITLE card in an ornate period font.`
+
+%% Append at the END — style last. MOTION-PICTURE family — early-1920s SILENT FILM: high-contrast ortho B&W, a soft IRIS vignette, film damage (dust / scratches / flicker / jitter), an under-cranked feel, archival ghostliness, and an ornate INTERTITLE-CARD caption. A distinct vintage B&W lane (vs [[NoirCinema]] dramatic chiaroscuro, [[TriX]] reportage grain, [[LandCamera]] flash). The intertitle card is the signature caption. Validated on the clearing; an instant take (user). Keep the iris vignette + film damage + intertitle card.
+</SilentFilm>
+
+<BleachBypass>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from a gritty modern war or thriller film processed with BLEACH BYPASS (silver retention) — NOT a clean render. Bleach-bypass signature: heavily DESATURATED, near-monochrome colour with just traces of muted hue, very high contrast, crushed inky blacks and harsh blown highlights, a gritty metallic silvery sheen, and heavy grain. Strict process discipline to keep it clean and uncluttered: a SHALLOW DEPTH OF FIELD with the figure sharp and the cluttered background falling into soft blur and deep crushed BLACK, plus atmospheric HAZE and drifting smoke swallowing the background detail — so the dense surroundings dissolve into simple dark shapes and atmosphere rather than crammed texture. Grim, hard, cold, cinematic, built from big simple value masses. Close with a small caption in a tasteful font.`
+
+%% Append at the END — style last. MOTION-PICTURE family — BLEACH BYPASS (silver retention): heavily desaturated near-monochrome, very high contrast, crushed blacks, blown highlights, gritty metallic sheen, heavy grain — the visceral war / thriller look. DE-TIC BAKED IN (user): the first cut crammed the busy corridor; the fix = the cinematic DE-TIC toolkit — shallow DoF + atmospheric HAZE / smoke + deep-black-rest + big simple VALUE MASSES dissolve the dense background into atmosphere instead of crammed texture (the [[HeroShooter]] DoF+volumetric and [[PaperbackCover]] value-mass levers, applied to a film grade). KEEP those clauses — they're load-bearing anti-tic, not flavour. Caption overlaid. Validated on the corridor (v2); a keeper (user). Keep the desaturated high-contrast silver-retention look + the DoF / haze / black / value-mass de-tic.
+</BleachBypass>
+
+<Giallo>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from a classic Italian GIALLO horror-thriller film — the lurid, stylised colour-horror look. Its signature: bold, saturated, unnatural COLOURED GEL LIGHTING (deep blood reds against cold electric blues), hard theatrical shadows, high contrast, a glossy expressionistic palette, and an atmosphere of stylised, glamorous dread. Lurid, vivid, suspenseful, beautiful and sinister. Close with a small caption in ENGLISH (NOT Italian — use English words despite the Italian-horror style), set in a stylish period font.`
+
+%% Append at the END — style last. MOTION-PICTURE family — Italian GIALLO colour-horror: bold saturated unnatural COLOURED GEL LIGHTING (blood reds vs electric blues), hard theatrical shadows, high contrast, stylised glamorous dread. CAPTION FIX BAKED IN (user): the model defaults to ITALIAN captions for giallo (the first cut titled itself "L'OSSESSIONE DELLO SPAZIO PROFONDO"); the style line now explicitly demands an ENGLISH caption — KEEP that directive or it reverts to Italian. SCENE AFFINITY: wants a dark scene it can flood with red / blue gels (validated on a shadow chamber). A distinct lurid-colour-horror lane vs the photographic horror ([[SurvivalHorror]] / [[LandCamera]]) and the B&W [[NoirCinema]]. Caption = English, stylish period font. Validated (v2); a keeper (user). Keep the red / blue gel lighting + the explicit English-caption directive.
+</Giallo>
+
+<CandlelitNatural>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from a film shot ENTIRELY BY NATURAL CANDLELIGHT on specially-made ultra-fast large-aperture lenses — NOT artificially lit. The technique's signature: a soft, warm, low-light interior glow with light falling off naturally into gentle shadow; an extremely SHALLOW depth of field with a delicate focus plane and creamy soft backgrounds (the cost of the wide-open fast lens); a painterly old-master composition like a period oil portrait; warm candle-amber colour, fine grain, and a still, quiet, contemplative atmosphere. Natural, painterly, intimate, luminous. Close with a small caption in an elegant period font.`
+
+%% Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED (the user's framing: specify the technique / tech, NEVER name the auteur — both better, genre-agnostic results AND [[feedback_no_artist_imitation]]-compliant). NATURAL-CANDLELIGHT technique: warm low-light glow, ultra-fast-lens SHALLOW focus, painterly old-master tableau, fine grain. SCENE AFFINITY: warm low-lit interiors. AAA-TIER (user: the motion-picture looks are likely to land in MOST campaign seeds). Caption = elegant period font. Validated on a candlelit interior; an instant bank (user, "bank every single one"). Keep the natural-candlelight glow + shallow focus + painterly composition.
+</CandlelitNatural>
+
+<Symmetrical>
+When composing prompts for `generate_image` in this style, compose the SUBJECT centered and front-on in a balanced, symmetrical setting. Then render in this visual style:
+
+`Rendered as a frame from a film with a rigorously SYMMETRICAL, planimetric visual technique — NOT a naturalistic shot. The technique's signature: a perfectly centered subject and a precisely symmetrical, mirror-balanced frame; a flat, front-on PLANIMETRIC camera placed exactly perpendicular to the back wall (no diagonal perspective); a deliberate, curated, harmonious PASTEL colour palette; meticulous orderly set design with everything squared-up and centered; even, flat, controlled lighting; and a deadpan, dollhouse-precise, storybook formality. Tidy, symmetric, pastel, deliberate. Close with a small centered caption in a clean typographic font.`
+
+%% Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED (no auteur name, by design — describe the HOW not the WHO, [[feedback_no_artist_imitation]]). The rigorously SYMMETRICAL / PLANIMETRIC technique: dead-centered subject, mirror-balanced frame, flat front-on camera (perpendicular to the wall, no diagonal), a curated PASTEL palette, even flat lighting, deadpan formality. The technique alone nails the look without naming anyone. Very distinct from everything else in the catalog. SCENE-COUPLED: composes best when the brief centres the subject in a symmetrical setting (steering in the DM-facing intro). Caption = centered clean type. Validated; an instant bank (user). Keep the symmetry + planimetric flatness + pastel palette.
+</Symmetrical>
+
+<EightiesSciFi>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from a 1980s science-fiction action film, using that era's practical cinematography techniques — NOT a modern render. The signature: ANAMORPHIC widescreen with horizontal lens flares; thick atmospheric HAZE and smoke filling the air; hard, dramatic BACKLIGHT and rim-light carving the figure out of the dark; glowing coloured NEON and practical light sources; a moody blue-and-amber or neon-noir palette; visible 35mm Kodak film grain; and motion-control, miniature-and-practical-effects solidity. Smoky, backlit, neon, atmospheric, analog. Close with a small caption in a bold period sci-fi font.`
+
+%% Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — 1980s SCI-FI ACTION practical cinematography: ANAMORPHIC flares, atmospheric HAZE / smoke, hard BACKLIGHT / rim, glowing NEON practicals, 35mm grain, motion-control / practical solidity. Analog, smoky, backlit (the hard backlight + haze is also an anti-cram lever — it dissolves the background). AAA-tier. Caption = bold period sci-fi font. Validated on a smoky neon corridor; an instant bank (user). Keep the anamorphic + haze + hard backlight + neon.
+</EightiesSciFi>
+
+<DayForNight>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame using the classic DAY-FOR-NIGHT film technique — a scene shot in real daylight but exposed and graded to read as night. The signature: a deep, cool BLUE moonlit cast over everything; underexposed, slightly crushed midtones; but with the tell-tale artifacts of a daylight shoot — crisp hard-edged shadows pointing the wrong way for moonlight, bright specular glints, and far more fine detail than a real night shot would hold; and a bright "moon" that is really the sun. Cool, eerie, artificial night. Close with a small caption in a tasteful font.`
+
+%% Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — the DAY-FOR-NIGHT technique: a deep cool BLUE moonlit grade carrying the give-away DAYLIGHT artifacts (too-crisp shadows, too much detail, a "moon" that's really the sun). A distinct artificial-nocturnal register. SCENE AFFINITY: outdoor "night" scenes. Caption overlaid. Validated on a moonlit clearing; an instant bank (user). Keep the blue grade + the daylight-crispness tell.
+</DayForNight>
+
+<DiffusionGlamour>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame shot through a heavy DIFFUSION / soft-focus filter — the dreamy old-Hollywood-and-1970s glamour technique. The signature: a soft, glowing, slightly hazy image where the highlights BLOOM and halate into a romantic gauzy glow; gentle low contrast with lifted milky blacks; a flattering, wrinkle-softening softness on the subject; a warm pastel pearlescent palette; and a nostalgic, dreamy, luminous quality, as if the lens were breathed upon. Soft, glowing, romantic, hazy. Close with a small caption in an elegant font.`
+
+%% Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — the heavy DIFFUSION / soft-focus glamour technique: blooming halated highlights, gauzy romantic glow, lifted milky blacks, warm pastel pearlescence, breathed-on-lens dreaminess. The soft / romantic register (the bloom also softens fine detail, a gentle anti-cram). AAA-tier. Caption = elegant font. Validated on a golden-hour clearing; an instant bank (user). Keep the diffusion bloom + soft low contrast.
+</DiffusionGlamour>
+
+<LargeFormat70>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame shot on large-format 65/70MM film — the high-resolution epic-cinema format. The signature: extraordinary CLARITY and resolution with immense fine detail held from the extreme foreground to the far horizon; DEEP focus front-to-back; rich, smooth, almost grainless tonality; a vast widescreen sense of scale and grandeur; natural, restrained colour; and the immersive, monumental quality of a roadshow epic. Crisp, deep, vast, monumental. Close with a small caption in an elegant period film-title font — a scene or place title only; do NOT print the film process or format name in the caption.`
+
+%% Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — large-format 65/70MM tech: extraordinary CLARITY, DEEP focus front-to-back, near-grainless tonality, vast monumental scale. A superb ESTABLISHING-VISTA register — the deep-focus clarity is its own anti-tic (all crisp but organised by the grand vista, the resolution analogue of [[MattePainting]]'s aerial dissolve). AAA-tier; pairs with [[MattePainting]] for grand establishing shots. Caption = elegant period film-title font. Validated on an epic vista; an instant bank (user). Keep the deep-focus clarity + epic scale.
+</LargeFormat70>
+
+<CrossProcess>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from film that has been CROSS-PROCESSED — developed in the wrong chemistry (slide film in C-41, or negative in E-6) — NOT a clean render. The technique's signature: wildly shifted, unnatural colour with a strong cyan-green cast in the shadows and yellow-green or acid highlights; heavily boosted contrast with crushed blacks and blown highlights; oversaturated, skewed skin tones; and a grungy, lurid, unpredictable analog look. Punchy, toxic, off-kilter, stylish. Close with a small caption in a tasteful font — a scene or place title only; do NOT print the film process name in the caption.`
+
+%% Append at the END — style last. MOTION-PICTURE / film family, TECHNIQUE-SPECIFIED — CROSS-PROCESS (wrong-chemistry development): wildly shifted unnatural colour (cyan-green shadows, acid-yellow highlights), boosted contrast, skewed skin, grungy lurid analog look. A great "something's wrong here" register. Reveal on a colour scene. Caption overlaid. Validated on the clearing; an instant bank (user, "face-meltingly gorgeous"). Keep the toxic shifted colour + boosted contrast.
+</CrossProcess>
+
+<Infrared>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a photograph on colour INFRARED (Aerochrome) film — the surreal false-colour infrared technique. The signature: green foliage and plant life rendered in vivid surreal REDS, PINKS and magentas (infrared-reflective chlorophyll); skies and water going deep cyan-blue; an eerie, dreamlike, otherworldly false-colour palette; high contrast; a soft halation glow; and fine grain. Surreal, psychedelic, dreamlike, alien. Close with a small caption in a tasteful font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+%% Append at the END — style last. Film family, TECHNIQUE-SPECIFIED — colour INFRARED (Aerochrome): foliage → surreal REDS / PINKS / magentas, cyan skies, dreamlike false-colour, halation glow. Spectacularly ALIEN — ideal for off-world flora (the user's pick of the batch). SCENE AFFINITY: vegetation-rich / outdoor scenes (foliage is what goes red). Caption overlaid. Validated on the clearing; an instant bank (user). Keep the false-colour red-foliage signature.
+</Infrared>
+
+<Super8>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from a SUPER-8 / 8MM home movie — the nostalgic amateur small-gauge film technique. The signature: heavy visible film GRAIN, warm faded slightly-yellowed colour, soft low resolution, a vignette darkening the corners, GATE-WEAVE jitter and frame wobble, dust and scratches, occasional LIGHT LEAKS flaring orange-red across the frame, and a warm, nostalgic, decayed-memory quality. Grainy, warm, faded, intimate, amateur. Close with a small caption in a casual handwritten or period font — a scene or place title only; do NOT print the film format or process name in the caption.`
+
+%% Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — SUPER-8 / 8MM home movie: heavy grain, warm faded colour, corner vignette, gate-weave, dust / scratches, orange LIGHT LEAKS, decayed-memory nostalgia. The intimate amateur-film register. Caption = casual / handwritten. Validated on the clearing; an instant bank (user). Keep the grain + light leaks + faded warmth.
+</Super8>
+
+<VHS>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from an old VHS videotape — the degraded analog-video technique. The signature: low-resolution soft video, visible horizontal SCANLINES and interlacing, CHROMA BLEED and colour smearing, tracking noise and tape distortion bands, slightly washed and noisy colour, a faint timestamp / camcorder OSD, and a grungy late-80s/90s home-video or found-footage feel. Lo-fi, analog, degraded, eerie. Close with a small caption styled as a blocky video-camera on-screen display.`
+
+%% Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — degraded VHS analog video: scanlines, interlacing, chroma bleed, tracking distortion, washed noisy colour, a camcorder OSD. Lo-fi found-footage register. CAPTION NOTE: the model gives itself a camcorder DATE STAMP (e.g. "OCT 26 1997") — a real year can break far-future / fantasy immersion (cf. the surveillance-cam TIME-ONLY rule, [[NightVisionCam]]); flagged to the user, who KEPT the period stamp (VHS is inherently a period / anachronistic FLAIR choice). If a seed needs it era-neutral, make the OSD time-only or an in-world date. Caption = blocky video OSD. Validated on the corridor; an instant bank (user). Keep the analog-video degradation + OSD.
+</VHS>
+
+<Chiaroscuro>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame lit with extreme low-key CHIAROSCURO from a single source — the boldly UNDEREXPOSED, top-lit cinematography technique. The signature: deep, dominant BLACK shadow swallowing most of the frame; a single hard pool of warm amber light from above falling on the subject, the eyes and lower face often dropping into shadow; very high contrast; rich warm low-key colour; and an intense, operatic, dread-laden mood. Dark, sculpted, amber, dramatic. Close with a small caption in an elegant font.`
+
+%% Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — single-source low-key CHIAROSCURO (boldly underexposed, top-lit; the Gordon-Willis technique, no name): deep dominant BLACK swallowing the frame, one hard amber pool on the subject, very high contrast, operatic dread. The deep black is also the black-gives-rest lever (composites into the dark TUI) AND an anti-cram. A premium dramatic register. SCENE AFFINITY: dark / interior dramatic moments. Caption = elegant font. Validated on the corridor; an instant bank (user). Keep the deep-black single-source amber lighting.
+</Chiaroscuro>
+
+<Autochrome>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a photograph on an AUTOCHROME plate — the earliest practical colour photography (circa 1907), an additive potato-starch-grain process. The signature: soft, dreamy, slightly muted and desaturated colour with a gentle warm cast; a delicate POINTILLIST grain texture from the dyed starch grains, like a fine colour stipple; a soft, painterly, low-contrast, almost impressionist quality; gentle vignetting; and the fragile, luminous, antique atmosphere of a turn-of-the-century colour plate. Dreamy, painterly, muted, antique. Close with a small caption in an elegant period font — a scene or place title only; do NOT print the photographic process or plate name in the caption.`
+
+%% Append at the END — style last. EARLY-COLOR family (user vein: mine early colour for the JAZZ-ERA + COLD-WAR campaigns). AUTOCHROME (circa 1907, additive potato-starch): dreamy, soft, muted, low-contrast, POINTILLIST grain, antique — the most VELVETY of the set, the JAZZ-ERA hero. CAPTION RULE baked in (title only, no process name — vintage prints stamped the stock on them, so it leaks). Validated on the clearing; an instant keeper (user, "every single one is a keeper"). Keep the pointillist grain + dreamy muted palette.
+</Autochrome>
+
+<HandTinted>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a HAND-TINTED / hand-coloured early photograph or film frame — a monochrome image with delicate colour applied by hand on top. The signature: an underlying soft black-and-white or sepia photographic base showing through; translucent, delicately brushed-on pastel COLOUR washes that don't quite stay in the lines, applied only to select areas (cheeks, lips, foliage, sky); slightly imprecise, artisanal registration; a gentle, antique, handmade quality; and the quiet charm of early hand-colouring. Delicate, handmade, pastel-on-monochrome, antique. Close with a small caption in an elegant period font — a scene or place title only; do NOT print the process or technique name in the caption.`
+
+%% Append at the END — style last. EARLY-COLOR family — HAND-TINTED: soft B&W / sepia base + delicate hand-brushed pastel colour washes that don't stay in the lines, artisanal antique charm. Jazz-era. Caption = title only (no process name). Validated on the clearing; a keeper (user). Keep the monochrome base + hand-applied pastel washes.
+</HandTinted>
+
+<DyeTransfer>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a print made by the DYE-TRANSFER (imbibition Technicolor) process — the lush, archival, ultra-rich colour-print technique. The signature: deep, saturated, velvety colour with gorgeous dense blacks and luminous highlights; rich, smooth, glowing dye-saturated reds, greens and blues; an extremely fine, almost grainless texture; superb tonal separation; and a sumptuous, glamorous, glowing classic-Hollywood-print quality. Lush, velvety, saturated, glamorous. Close with a small caption in an elegant period font — a scene or place title only; do NOT print the print process or technique name in the caption.`
+
+%% Append at the END — style last. EARLY-COLOR family — DYE-TRANSFER (imbibition Technicolor print): lush, velvety, ultra-rich saturated colour, dense blacks, near-grainless, glamorous — the glamorous end of jazz-era early colour. Caption = title only (no process name). Validated on the clearing; a keeper (user). Keep the rich velvety dye saturation.
+</DyeTransfer>
+
+<Agfacolor>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame shot on early AGFACOLOR film — the mid-century European colour stock. The signature: a distinctive warm-but-muted European palette leaning into soft earthy ambers, dusty reds, olive greens and gentle teals; lower saturation and softer contrast than American Technicolor; a slightly faded, nostalgic, continental quality; fine grain; and the understated, naturalistic colour of a 1930s-40s European film. Warm-muted, earthy, understated, period-European. Close with a small caption in an elegant period font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+%% Append at the END — style last. EARLY-COLOR family — AGFACOLOR (mid-century EUROPEAN stock): warm-but-muted earthy palette (ambers, dusty reds, olive), low saturation, understated, faded-continental. For period-European / COLD-WAR-adjacent moods. SCENE AFFINITY: reads cold-war strongest on a grim institutional scene; on the sunny clearing (where validated) it reads warm-muted — a cold-war re-roll was attempted but the codex SESSION died mid-render (auth). Caption = title only (this one leaked "AGFACOLOR FILM", the trigger for the family-wide caption rule). A keeper (user). Keep the warm-muted European palette.
+</Agfacolor>
+
+<Sovcolor>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame shot on SOVCOLOR / Eastern-bloc colour film stock — the mid-century Soviet colour process. The signature: a cool, muted, slightly sickly palette with desaturated greens, anaemic blues, and a faint cyan-green or jaundiced cast; low contrast and a flat, grey, institutional quality; subdued, washed-out, melancholy colour; visible grain; and the austere, overcast, period Eastern-European atmosphere. Cool, muted, austere, institutional, melancholy. Close with a small caption in a plain period font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+%% Append at the END — style last. EARLY-COLOR family — SOVCOLOR / Eastern-bloc stock: cool, muted, slightly sickly palette (desaturated greens, anaemic blues, jaundiced cast), flat grey institutional quality, austere melancholy — the COLD-WAR-INTRIGUE stock. SCENE AFFINITY: pops on grim institutional / urban scenes; on the sunny clearing (where validated) the cold-war tell reads gently. Caption = title only (no process name). A keeper (user). Keep the cool sickly institutional palette.
+</Sovcolor>
+
+<Anscochrome>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a photograph on 1950s ANSCOCHROME colour slide film — an amateur mid-century colour-transparency stock. The signature: warm but slightly off-balance vintage colour with a tendency to shift toward magenta-pink and amber; gently faded, slightly low-contrast tones; a nostalgic mid-century snapshot quality; fine grain; soft highlights; and the cosy, faded, family-album atmosphere of a 1950s colour slide. Faded, warm, nostalgic, mid-century. Close with a small caption in a casual period font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+%% Append at the END — style last. EARLY-COLOR family — ANSCOCHROME (1950s amateur slide): warm, slightly off-balance, magenta-shifting, gently faded mid-century family-album colour. The nostalgic transitional member; sits near [[Agfacolor]] in the muted-vintage zone (I'd flagged it as the least-differentiated, but the user kept the whole set). Caption = title only (no process name). A keeper (user). Keep the faded warm nostalgic cast.
+</Anscochrome>
+
+<TwoStripTechnicolor>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from an early TWO-STRIP TECHNICOLOR motion picture — the limited two-colour process from before full three-strip colour. The signature: a restricted palette built ONLY from red-orange and cyan-green, with NO true blues or pure full-spectrum colour; pale, slightly chalky pastel flesh tones; a muted teal-and-salmon overall cast; soft vintage early-cinema texture; gentle grain; and a quaint, antique, two-tone period charm. Limited-palette, antique, two-tone-by-chemistry. Close with a small caption in an ornate early-cinema font — a scene or place TITLE only; do NOT name the film process, stock, or colour technique in the caption.`
+
+%% Append at the END — style last. EARLY-COLOR / MOTION-PICTURE family — early TWO-STRIP TECHNICOLOR: a limited RED-ORANGE + CYAN-GREEN palette (NO true blue), chalky pastel flesh, teal-and-salmon cast, antique two-tone charm. Distinct from full three-strip [[Technicolor]] (the limited palette is the tell). CAPTION FIX (user, the seed of the family-wide no-process-name caption rule): the first cut printed the PROCESS NAME ("in TECHNICOLOR TWO-STRIP"); the v2 demands a scene/place TITLE only — validated clean ("THE VERDANT CLEARING"). Reveal on a colour scene. A keeper (user). Keep the two-colour palette + the no-process caption directive.
+</TwoStripTechnicolor>
+
 <!--
   Named variants go here as additional top-level sections, e.g.
 
