@@ -758,6 +758,46 @@ When composing prompts for `generate_image`, render the image in this visual sty
 %% Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — large-format 65/70MM tech: extraordinary CLARITY, DEEP focus front-to-back, near-grainless tonality, vast monumental scale. A superb ESTABLISHING-VISTA register — the deep-focus clarity is its own anti-tic (all crisp but organised by the grand vista, the resolution analogue of [[MattePainting]]'s aerial dissolve). AAA-tier; pairs with [[MattePainting]] for grand establishing shots. Caption = elegant period film-title font. Validated on an epic vista; an instant bank (user). Keep the deep-focus clarity + epic scale.
 </LargeFormat70>
 
+<CrossProcess>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from film that has been CROSS-PROCESSED — developed in the wrong chemistry (slide film in C-41, or negative in E-6) — NOT a clean render. The technique's signature: wildly shifted, unnatural colour with a strong cyan-green cast in the shadows and yellow-green or acid highlights; heavily boosted contrast with crushed blacks and blown highlights; oversaturated, skewed skin tones; and a grungy, lurid, unpredictable analog look. Punchy, toxic, off-kilter, stylish. Close with a small caption in a tasteful font.`
+
+%% Append at the END — style last. MOTION-PICTURE / film family, TECHNIQUE-SPECIFIED — CROSS-PROCESS (wrong-chemistry development): wildly shifted unnatural colour (cyan-green shadows, acid-yellow highlights), boosted contrast, skewed skin, grungy lurid analog look. A great "something's wrong here" register. Reveal on a colour scene. Caption overlaid. Validated on the clearing; an instant bank (user, "face-meltingly gorgeous"). Keep the toxic shifted colour + boosted contrast.
+</CrossProcess>
+
+<Infrared>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a photograph on colour INFRARED (Aerochrome) film — the surreal false-colour infrared technique. The signature: green foliage and plant life rendered in vivid surreal REDS, PINKS and magentas (infrared-reflective chlorophyll); skies and water going deep cyan-blue; an eerie, dreamlike, otherworldly false-colour palette; high contrast; a soft halation glow; and fine grain. Surreal, psychedelic, dreamlike, alien. Close with a small caption in a tasteful font.`
+
+%% Append at the END — style last. Film family, TECHNIQUE-SPECIFIED — colour INFRARED (Aerochrome): foliage → surreal REDS / PINKS / magentas, cyan skies, dreamlike false-colour, halation glow. Spectacularly ALIEN — ideal for off-world flora (the user's pick of the batch). SCENE AFFINITY: vegetation-rich / outdoor scenes (foliage is what goes red). Caption overlaid. Validated on the clearing; an instant bank (user). Keep the false-colour red-foliage signature.
+</Infrared>
+
+<Super8>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from a SUPER-8 / 8MM home movie — the nostalgic amateur small-gauge film technique. The signature: heavy visible film GRAIN, warm faded slightly-yellowed colour, soft low resolution, a vignette darkening the corners, GATE-WEAVE jitter and frame wobble, dust and scratches, occasional LIGHT LEAKS flaring orange-red across the frame, and a warm, nostalgic, decayed-memory quality. Grainy, warm, faded, intimate, amateur. Close with a small caption in a casual handwritten or period font.`
+
+%% Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — SUPER-8 / 8MM home movie: heavy grain, warm faded colour, corner vignette, gate-weave, dust / scratches, orange LIGHT LEAKS, decayed-memory nostalgia. The intimate amateur-film register. Caption = casual / handwritten. Validated on the clearing; an instant bank (user). Keep the grain + light leaks + faded warmth.
+</Super8>
+
+<VHS>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from an old VHS videotape — the degraded analog-video technique. The signature: low-resolution soft video, visible horizontal SCANLINES and interlacing, CHROMA BLEED and colour smearing, tracking noise and tape distortion bands, slightly washed and noisy colour, a faint timestamp / camcorder OSD, and a grungy late-80s/90s home-video or found-footage feel. Lo-fi, analog, degraded, eerie. Close with a small caption styled as a blocky video-camera on-screen display.`
+
+%% Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — degraded VHS analog video: scanlines, interlacing, chroma bleed, tracking distortion, washed noisy colour, a camcorder OSD. Lo-fi found-footage register. CAPTION NOTE: the model gives itself a camcorder DATE STAMP (e.g. "OCT 26 1997") — a real year can break far-future / fantasy immersion (cf. the surveillance-cam TIME-ONLY rule, [[NightVisionCam]]); flagged to the user, who KEPT the period stamp (VHS is inherently a period / anachronistic FLAIR choice). If a seed needs it era-neutral, make the OSD time-only or an in-world date. Caption = blocky video OSD. Validated on the corridor; an instant bank (user). Keep the analog-video degradation + OSD.
+</VHS>
+
+<Chiaroscuro>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame lit with extreme low-key CHIAROSCURO from a single source — the boldly UNDEREXPOSED, top-lit cinematography technique. The signature: deep, dominant BLACK shadow swallowing most of the frame; a single hard pool of warm amber light from above falling on the subject, the eyes and lower face often dropping into shadow; very high contrast; rich warm low-key colour; and an intense, operatic, dread-laden mood. Dark, sculpted, amber, dramatic. Close with a small caption in an elegant font.`
+
+%% Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — single-source low-key CHIAROSCURO (boldly underexposed, top-lit; the Gordon-Willis technique, no name): deep dominant BLACK swallowing the frame, one hard amber pool on the subject, very high contrast, operatic dread. The deep black is also the black-gives-rest lever (composites into the dark TUI) AND an anti-cram. A premium dramatic register. SCENE AFFINITY: dark / interior dramatic moments. Caption = elegant font. Validated on the corridor; an instant bank (user). Keep the deep-black single-source amber lighting.
+</Chiaroscuro>
+
 <!--
   Named variants go here as additional top-level sections, e.g.
 
